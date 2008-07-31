@@ -14,6 +14,15 @@ AC_PROG_LIBTOOL
 
 PKG_CHECK_MODULES(MM, dbus-glib-1 >= 0.75 glib-2.0 >= 2.14 gmodule-2.0 gobject-2.0 hal)
 
+AC_ARG_WITH(docs, AC_HELP_STRING([--with-docs], [Build ModemManager documentation]))
+AM_CONDITIONAL(WITH_DOCS, test "x$with_docs" = "xyes")
+case $with_docs in
+       yes) ;;
+       *)
+               with_docs=no
+               ;;
+esac
+
 AC_CONFIG_FILES([
 Makefile
 src/Makefile

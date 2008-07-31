@@ -1,3 +1,25 @@
+if WITH_DOCS
+
+all:
+
+XSLTPROC = xsltproc --xinclude --nonet
+
+XMLS = $(wildcard introspection/mm-*.xml)
+# Figure out if we need ASYNC_INTROSPECT and add it later
+
+GENERATED_FILES = \
+	docs/spec.html
+
+docs/spec.html: $(XMLS) introspection/all.xml doc-generator.xsl
+	@install -d docs
+	$(XSLTPROC) doc-generator.xsl introspection/all.xml > $@
+
+all: $(GENERATED_FILES)
+
+clean:
+	rm -f $(GENERATED_FILES)
+endif
+
 SUBDIRS = src plugins introspection test
 
 pkgconfigdir = $(libdir)/pkgconfig
@@ -26,5 +48,6 @@ DISTCLEANFILES = \
 
 EXTRA_DIST = \
 	ModemManager.pc.in \
+	doc-generator.xsl \
 	$(dbusservice_DATA) \
 	$(dbusactivation_in_files)

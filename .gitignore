@@ -22,4 +22,5 @@ libtool
 org.freedesktop.ModemManager.service
 ModemManager.pc
 src/modem-manager
+docs/spec.html
 
