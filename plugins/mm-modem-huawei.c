@@ -18,6 +18,7 @@ G_DEFINE_TYPE_EXTENDED (MMModemHuawei, mm_modem_huawei, MM_TYPE_GENERIC_GSM,
 
 typedef struct {
     MMSerial *monitor_device;
+    guint watch_id;
 } MMModemHuaweiPrivate;
 
 enum {
@@ -136,19 +137,27 @@ enable (MMModem *modem,
 {
     MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (modem);
 
+    parent_class_iface->enable (modem, enable, callback, user_data);
+
     if (enable) {
         GIOChannel *channel;
 
-        mm_serial_open (priv->monitor_device);
-        channel = mm_serial_get_io_channel (priv->monitor_device);
-        g_io_add_watch (channel, G_IO_IN | G_IO_ERR | G_IO_HUP,
-                        monitor_device_got_data, modem);
+        if (priv->watch_id == 0) {
+            mm_serial_open (priv->monitor_device);
 
-        g_io_channel_unref (channel);
-    } else
-        mm_serial_close (priv->monitor_device);
+            channel = mm_serial_get_io_channel (priv->monitor_device);
+            priv->watch_id = g_io_add_watch (channel, G_IO_IN | G_IO_ERR | G_IO_HUP,
+                                             monitor_device_got_data, modem);
 
-    parent_class_iface->enable (modem, enable, callback, user_data);
+            g_io_channel_unref (channel);
+        }
+    } else {
+        if (priv->watch_id) {
+            g_source_remove (priv->watch_id);
+            priv->watch_id = 0;
+            mm_serial_close (priv->monitor_device);
+        }
+    }
 }
 
 static gboolean
@@ -525,6 +534,12 @@ static void
 finalize (GObject *object)
 {
     MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (object);
+
+    if (priv->watch_id) {
+        g_source_remove (priv->watch_id);
+        priv->watch_id = 0;
+        mm_serial_close (priv->monitor_device);
+    }
 
     if (priv->monitor_device)
         g_object_unref (priv->monitor_device);
