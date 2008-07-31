@@ -746,7 +746,7 @@ mm_serial_wait_for_reply (MMSerial *self,
     info->callback = callback;
     info->user_data = user_data;
     info->reply_index = -1;
-    info->timeout = timeout * 1000;
+    info->timeout = timeout;
     info->start = time (NULL);
 
     return mm_serial_set_pending (self, timeout, wait_for_reply_got_data, info, wait_for_reply_done);

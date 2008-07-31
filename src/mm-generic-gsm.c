@@ -110,7 +110,7 @@ flash_done (MMSerial *serial, gpointer user_data)
     char *responses[] = { "OK", "ERROR", "ERR", NULL };
     guint id = 0;
 
-    if (mm_serial_send_command_string (serial, "AT E0"))
+    if (mm_serial_send_command_string (serial, "ATZ E0"))
         id = mm_serial_wait_for_reply (serial, 10, responses, responses, init_done, user_data);
 
     if (!id) {
@@ -262,10 +262,11 @@ register_auto_done (MMSerial *serial,
 
     switch (reply_index) {
     case 0:
-        g_message ("Registered on Home network");
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                   "%s", "Automatic registration failed: not registered and not searching.");
         break;
     case 1:
-        g_message ("Registered on Roaming network");
+        g_message ("Registered on Home network");
         break;
     case 2:
         mm_callback_info_set_data (info, "modem", g_object_ref (serial), g_object_unref);
@@ -273,8 +274,11 @@ register_auto_done (MMSerial *serial,
         return;
         break;
     case 3:
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                   "%s", "Automatic registration failed: not registered and not searching.");
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", 
+                                   "Automatic registration failed: registration denied");
+        break;
+    case 4:
+        g_message ("Registered on Roaming network");
         break;
     case -1:
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Automatic registration timed out");
@@ -290,7 +294,7 @@ register_auto_done (MMSerial *serial,
 static void
 register_auto (MMModem *modem, MMCallbackInfo *info)
 {
-    char *responses[] = { "+CREG: 0,1", "+CREG: 0,5", "+CREG: 0,2", "+CREG: 0,0", NULL };
+    char *responses[] = { "+CREG: 0,0", "+CREG: 0,1", "+CREG: 0,2", "+CREG: 0,3", "+CREG: 0,5", NULL };
     char *terminators[] = { "OK", "ERROR", "ERR", NULL };
     guint id = 0;
 
