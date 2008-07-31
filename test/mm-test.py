@@ -41,7 +41,19 @@ def get_modem(manager):
         print "No modems found."
         sys.exit(1)
     dev_proxy = bus.get_object(MM_DBUS_SERVICE, modems[0])
-    return dbus.Interface(dev_proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM)
+    modem = dbus.Interface(dev_proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM)
+
+    need_pin = False
+    try:
+        modem.Enable(True)
+    except dbus.exceptions.DBusException, e:
+        need_pin = True
+
+    if need_pin:
+        modem.SetPin("1234")
+
+    return modem
+
 
 def scan(modem):
     results = modem.Scan()
@@ -59,6 +71,7 @@ def scan(modem):
         print "%s: %s" % (r['operator-long'], status)
 
 def get_quality(modem):
+    modem.Enable(True)
     print "Signal Quality: %d%%" % modem.GetSignalQuality()
 
 def get_network_mode(modem):
@@ -108,34 +121,28 @@ def get_band(modem):
     print "Band: %s" % band
 
 def connect(modem):
-    need_pin = False
-
-    try:
-        modem.Enable(True)
-    except dbus.exceptions.DBusException, e:
-        need_pin = True
-
-    if need_pin:
-        modem.SetPin("1234")
 
     modem.Register("")
     modem.Connect('"*99#', '')
 
-
 if '--list' in sys.argv:
     enumerate_devices(manager_iface)
-elif '--scan' in sys.argv:
-    scan(get_modem(manager_iface))
+    sys.exit()
+
+modem = get_modem(manager_iface)
+
+if '--scan' in sys.argv:
+    scan(modem)
 elif '--quality' in sys.argv:
-    get_quality(get_modem(manager_iface))
+    get_quality(modem)
 elif '--mode' in sys.argv:
-    get_network_mode(get_modem(manager_iface))
+    get_network_mode(modem)
 elif '--band' in sys.argv:
-    get_band(get_modem(manager_iface))
-elif '--disable' in sys.argv:
-    get_modem(manager_iface).Enable(False)
+    get_band(modem)
 elif '--disconnect' in sys.argv:
     modem = get_modem(manager_iface)
     modem.Disconnect()
 elif '--connect' in sys.argv:
-    connect(get_modem(manager_iface))
+    connect(modem)
+
+modem.Enable(False)
