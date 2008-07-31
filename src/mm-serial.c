@@ -295,7 +295,6 @@ mm_serial_set_pending (MMSerial *self,
                                             G_PRIORITY_DEFAULT,
                                             G_IO_IN | G_IO_ERR | G_IO_HUP,
                                             callback, user_data, notify);
-
     mm_serial_add_timeout (self, timeout);
 
     return priv->pending_id;
@@ -355,6 +354,10 @@ mm_serial_open (MMSerial *self)
 
     priv = MM_SERIAL_GET_PRIVATE (self);
 
+    if (priv->fd)
+        /* Already open */
+        return TRUE;
+
     g_debug ("(%s) opening serial device...", priv->device);
     priv->fd = open (priv->device, O_RDWR | O_EXCL | O_NONBLOCK | O_NOCTTY);
 
@@ -371,6 +374,7 @@ mm_serial_open (MMSerial *self)
 
     if (!config_fd (self)) {
         close (priv->fd);
+        priv->fd = 0;
         return FALSE;
     }
 
