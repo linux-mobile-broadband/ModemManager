@@ -1,4 +1,4 @@
-SUBDIRS = src plugins introspection
+SUBDIRS = src plugins introspection test
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = ModemManager.pc

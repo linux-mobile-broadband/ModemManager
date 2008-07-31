@@ -11,6 +11,7 @@ install-sh
 ltmain.sh
 missing
 stamp-h1
+*~
 *.o
 *.lo
 *.la
