@@ -21,12 +21,13 @@ for all cards.
 
 Plugins.
 Plugins are loaded on startup, and must implement the MMPlugin interface. It
-consists of a couple of methods to which tell the daemon whether the plugin
+consists of a couple of methods which tell the daemon whether the plugin
 supports a HAL UDI and to create custom MMModem implementations. It most likely
-makes sense to derive custom modem implementations to one of the generic classes
-and just add (or override) operations which are not standard. There's a fully
-working plugin in the plugins/ directory for Huawei cards that can be used as
-an example for writing new plugins. Writing new plugins is highly encouraged!
+makes sense to derive custom modem implementations from one of the generic
+classes and just add (or override) operations which are not standard. There's a
+fully working plugin in the plugins/ directory for Huawei cards that can be
+used as an example for writing new plugins. Writing new plugins is highly
+encouraged!
 
 API.
 The API is open for changes, so if you're writing a plugin and need to add or
