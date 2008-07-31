@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<node name="/">
+  <interface name="org.freedesktop.ModemManager.Modem">
+    <method name="Enable">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_enable"/>
+      <arg name="enable" type="b" direction="in"/>
+    </method>
+
+    <method name="SetPin">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_set_pin"/>
+      <arg name="secret" type="s" direction="in"/>
+    </method>
+
+    <method name="Register">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_register"/>
+      <arg name="network_id" type="s" direction="in"/>
+    </method>
+
+    <method name="Connect">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_connect"/>
+      <arg name="number" type="s" direction="in"/>
+      <arg name="apn" type="s" direction="in"/>
+    </method>
+
+    <method name="Disconnect">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_disconnect"/>
+    </method>
+
+    <method name="Scan">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_scan"/>
+      <arg name="results" type="aa{ss}" direction="out"/>
+    </method>
+
+    <method name="GetSignalQuality">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_get_signal_quality"/>
+      <arg name="quality" type="u" direction="out"/>
+    </method>
+
+    <method name="SetBand">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_set_band"/>
+      <arg name="band" type="u" direction="in"/>
+    </method>
+
+    <method name="GetBand">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_get_band"/>
+      <arg name="band" type="u" direction="out"/>
+    </method>
+
+    <method name="SetNetworkMode">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_set_network_mode"/>
+      <arg name="mode" type="u" direction="in"/>
+    </method>
+
+    <method name="GetNetworkMode">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_get_network_mode"/>
+      <arg name="mode" type="u" direction="out"/>
+    </method>
+
+
+    <property name="DataDevice" type="s" access="read"/>
+    <property name="Driver" type="s" access="read"/>
+    <property name="Type" type="u" access="read"/>
+
+    <signal name="SignalQuality">
+      <arg name="quality" type="u"/>
+    </signal>
+
+    <signal name="NetworkMode">
+      <arg name="mode" type="u"/>
+    </signal>
+
+  </interface>
+</node>

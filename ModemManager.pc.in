@@ -1,0 +1,12 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+libgnome_serverdir=@libexecdir@
+
+Name: ModemManager
+Description: DBus service to interact with modems.
+Requires: dbus-glib-1 glib-2.0
+Version: @VERSION@
+Cflags: -I${includedir}/ModemManager
+Libs: -L${libdir} -lmm

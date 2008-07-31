@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<node name="/">
+  <interface name="org.freedesktop.ModemManager">
+    <method name="EnumerateDevices">
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_manager_enumerate_devices"/>
+      <arg name="devices" type="ao" direction="out"/>
+    </method>
+
+    <signal name="DeviceAdded">
+      <arg name="device" type="o"/>
+    </signal>
+
+    <signal name="DeviceRemoved">
+      <arg name="device" type="o"/>
+    </signal>
+
+  </interface>
+</node>
