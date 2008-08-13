@@ -178,7 +178,7 @@
       </tp:docstring>
       <arg name="mode" type="u" tp:type="MM_MODEM_NETWORK_MODE">
 	<tp:docstring>
-	  The new quality in percent, 0..100.
+	  The new network mode.
 	</tp:docstring>
       </arg>
     </signal>
