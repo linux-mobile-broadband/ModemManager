@@ -116,6 +116,29 @@
       </arg>
     </method>
 
+    <method name="GetRegistrationInfo">
+      <tp:docstring>
+	Get the registration status and the current operator (if registered).
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_reg_info"/>
+      <arg name="status" type="u" direction="out" tp:type="MM_GSM_MODEM_REG_STATUS">
+	<tp:docstring>
+	  The current network mode.
+	</tp:docstring>
+      </arg>
+      <arg name="operator_code" type="s" direction="out">
+	<tp:docstring>
+	  The current operator code.
+	</tp:docstring>
+      </arg>
+      <arg name="operator_name" type="s" direction="out">
+	<tp:docstring>
+	  The current operator name.
+	</tp:docstring>
+      </arg>
+    </method>
+
     <signal name="SignalQuality">
       <tp:docstring>
 	The signal quality changed.
@@ -235,6 +258,39 @@
       <tp:enumvalue suffix="U17IX" value="11">
 	<tp:docstring>
 	  U17IX (WCDMA 3GPP UMTS MHz).
+	</tp:docstring>
+      </tp:enumvalue>
+    </tp:enum>
+
+    <tp:enum name="MM_GSM_MODEM_REG_STATUS" type="u">
+      <tp:enumvalue suffix="IDLE" value="0">
+	<tp:docstring>
+	  Not registered, not searching for new operator to register.
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="HOME" value="1">
+	<tp:docstring>
+	  Registered on home network.
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="SEARCHING" value="2">
+	<tp:docstring>
+	  Not registered, searching for new operator to register with.
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="DENIED" value="3">
+	<tp:docstring>
+	  Registration denied.
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="UNKNOWN" value="4">
+	<tp:docstring>
+	  Unknown registration status.
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="ROAMING" value="5">
+	<tp:docstring>
+	  Registered on a roaming network.
 	</tp:docstring>
       </tp:enumvalue>
     </tp:enum>

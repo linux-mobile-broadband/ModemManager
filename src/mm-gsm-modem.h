@@ -39,12 +39,28 @@ typedef enum {
     MM_GSM_MODEM_BAND_LAST = MM_GSM_MODEM_BAND_U17IX
 } MMGsmModemBand;
 
+typedef enum {
+    MM_GSM_MODEM_REG_STATUS_IDLE = 0,
+    MM_GSM_MODEM_REG_STATUS_HOME = 1,
+    MM_GSM_MODEM_REG_STATUS_SEARCHING = 2,
+    MM_GSM_MODEM_REG_STATUS_DENIED = 3,
+    MM_GSM_MODEM_REG_STATUS_UNKNOWN = 4,
+    MM_GSM_MODEM_REG_STATUS_ROAMING = 5
+} NMGsmModemRegStatus;
+
 typedef struct _MMGsmModem MMGsmModem;
 
 typedef void (*MMGsmModemScanFn) (MMGsmModem *modem,
                                   GPtrArray *results,
                                   GError *error,
                                   gpointer user_data);
+
+typedef void (*MMGsmModemRegInfoFn) (MMGsmModem *modem,
+                                     NMGsmModemRegStatus status,
+                                     const char *oper_code,
+                                     const char *oper_name,
+                                     GError *error,
+                                     gpointer user_data);
 
 struct _MMGsmModem {
     GTypeInterface g_iface;
@@ -60,6 +76,10 @@ struct _MMGsmModem {
                          const char *network_id,
                          MMModemFn callback,
                          gpointer user_data);
+
+    void (*get_registration_info) (MMGsmModem *self,
+                                   MMGsmModemRegInfoFn callback,
+                                   gpointer user_data);
 
     void (*scan) (MMGsmModem *self,
                   MMGsmModemScanFn callback,
@@ -111,6 +131,10 @@ void mm_gsm_modem_register (MMGsmModem *self,
                             const char *network_id,
                             MMModemFn callback,
                             gpointer user_data);
+
+void mm_gsm_modem_get_reg_info (MMGsmModem *self,
+                                MMGsmModemRegInfoFn callback,
+                                gpointer user_data);
 
 void mm_gsm_modem_scan (MMGsmModem *self,
                         MMGsmModemScanFn callback,

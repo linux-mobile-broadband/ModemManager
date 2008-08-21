@@ -8,6 +8,7 @@
 
 static void impl_gsm_modem_set_pin (MMGsmModem *modem, const char *pin, DBusGMethodInvocation *context);
 static void impl_gsm_modem_register (MMGsmModem *modem, const char *network_id, DBusGMethodInvocation *context);
+static void impl_gsm_modem_get_reg_info (MMGsmModem *modem, DBusGMethodInvocation *context);
 static void impl_gsm_modem_scan (MMGsmModem *modem, DBusGMethodInvocation *context);
 static void impl_gsm_modem_set_apn (MMGsmModem *modem, const char *apn, DBusGMethodInvocation *context);
 static void impl_gsm_modem_get_signal_quality (MMGsmModem *modem, DBusGMethodInvocation *context);
@@ -129,6 +130,65 @@ impl_gsm_modem_register (MMGsmModem *modem,
         id = network_id;
 
     mm_gsm_modem_register (modem, id, async_call_done, context);
+}
+
+static void
+reg_not_supported (MMModem *modem, GError *error, gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMGsmModemRegInfoFn callback = (MMGsmModemRegInfoFn) mm_callback_info_get_data (info, "reg-info-callback");
+
+    callback (MM_GSM_MODEM (modem), 0, NULL, NULL, error, mm_callback_info_get_data (info, "reg-info-data"));
+}
+
+void
+mm_gsm_modem_get_reg_info (MMGsmModem *self,
+                           MMGsmModemRegInfoFn callback,
+                           gpointer user_data)
+{
+    g_return_if_fail (MM_IS_GSM_MODEM (self));
+    g_return_if_fail (callback != NULL);
+
+    if (MM_GSM_MODEM_GET_INTERFACE (self)->get_registration_info)
+        MM_GSM_MODEM_GET_INTERFACE (self)->get_registration_info (self, callback, user_data);
+    else {
+        MMCallbackInfo *info;
+
+        info = mm_callback_info_new (MM_MODEM (self), reg_not_supported, user_data);
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                   "%s", "Operation not supported");
+
+        info->user_data = info;
+        mm_callback_info_set_data (info, "reg-info-callback", callback, NULL);
+        mm_callback_info_set_data (info, "reg-info-data", user_data, NULL);
+
+        mm_callback_info_schedule (info);
+    }
+}
+
+static void
+get_reg_info_done (MMGsmModem *modem,
+                   NMGsmModemRegStatus status,
+                   const char *oper_code,
+                   const char *oper_name,
+                   GError *error,
+                   gpointer user_data)
+{
+    DBusGMethodInvocation *context = (DBusGMethodInvocation *) user_data;
+
+    if (error)
+        dbus_g_method_return_error (context, error);
+    else {
+        dbus_g_method_return (context, status, 
+                              oper_code ? oper_code : "",
+                              oper_name ? oper_name : "");
+    }
+}
+
+static void
+impl_gsm_modem_get_reg_info (MMGsmModem *modem, DBusGMethodInvocation *context)
+{
+    mm_gsm_modem_get_reg_info (modem, get_reg_info_done, context);
 }
 
 void
