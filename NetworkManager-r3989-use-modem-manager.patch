@@ -1,0 +1,4835 @@
+diff --git a/configure.in b/configure.in
+index 95737a0..11507c0 100644
+--- a/configure.in
++++ b/configure.in
+@@ -422,6 +422,7 @@ src/dhcp-manager/Makefile
+ src/supplicant-manager/Makefile
+ src/ppp-manager/Makefile
+ src/dnsmasq-manager/Makefile
++src/modem-manager/Makefile
+ src/backends/Makefile
+ libnm-util/libnm-util.pc
+ libnm-util/Makefile
+diff --git a/introspection/nm-device-cdma.xml b/introspection/nm-device-cdma.xml
+index 2b43f8f..33e80cb 100644
+--- a/introspection/nm-device-cdma.xml
++++ b/introspection/nm-device-cdma.xml
+@@ -3,12 +3,28 @@
+ <node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
+   <interface name="org.freedesktop.NetworkManager.Device.Cdma">
+ 
+-    <signal name="PropertiesChanged">
+-        <arg name="properties" type="a{sv}" tp:type="String_Variant_Map">
+-            <tp:docstring>
+-                A dictionary mapping property names to variant boxed values
+-            </tp:docstring>
+-        </arg>
++    <method name="GetSignalQuality">
++      <tp:docstring>
++        Get the current signal quality.
++      </tp:docstring>
++      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
++      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_cdma_device_get_signal_quality"/>
++      <arg name="quality" type="u" direction="out">
++        <tp:docstring>
++          Signal quality (percent).
++        </tp:docstring>
++      </arg>
++    </method>
++
++    <signal name="SignalQuality">
++      <tp:docstring>
++        The signal quality changed.
++      </tp:docstring>
++      <arg name="quality" type="u">
++        <tp:docstring>
++          The signal quality (percent).
++        </tp:docstring>
++      </arg>
+     </signal>
+ 
+   </interface>
+diff --git a/introspection/nm-device-gsm.xml b/introspection/nm-device-gsm.xml
+index 650d656..753669d 100644
+--- a/introspection/nm-device-gsm.xml
++++ b/introspection/nm-device-gsm.xml
+@@ -3,12 +3,39 @@
+ <node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
+   <interface name="org.freedesktop.NetworkManager.Device.Gsm">
+ 
+-    <signal name="PropertiesChanged">
+-        <arg name="properties" type="a{sv}" tp:type="String_Variant_Map">
+-            <tp:docstring>
+-                A dictionary mapping property names to variant boxed values
+-            </tp:docstring>
+-        </arg>
++    <method name="GetSignalQuality">
++      <tp:docstring>
++        Get the current signal quality.
++      </tp:docstring>
++      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
++      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_device_get_signal_quality"/>
++      <arg name="quality" type="u" direction="out">
++        <tp:docstring>
++          Signal quality (percent).
++        </tp:docstring>
++      </arg>
++    </method>
++
++    <signal name="SignalQuality">
++      <tp:docstring>
++        The signal quality changed.
++      </tp:docstring>
++      <arg name="quality" type="u">
++        <tp:docstring>
++          The signal quality (percent).
++        </tp:docstring>
++      </arg>
++    </signal>
++
++    <signal name="NetworkMode">
++      <tp:docstring>
++        The network mode changed.
++      </tp:docstring>
++      <arg name="mode" type="u">
++        <tp:docstring>
++          The new network mode.
++        </tp:docstring>
++      </arg>
+     </signal>
+ 
+   </interface>
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 3c4ce75..3f24eb5 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -5,7 +5,8 @@ SUBDIRS= \
+ 	supplicant-manager \
+ 	ppp-manager \
+ 	backends \
+-	dnsmasq-manager
++	dnsmasq-manager \
++	modem-manager
+ 
+ INCLUDES = -I${top_srcdir}                   \
+            -I${top_srcdir}/include           \
+@@ -15,6 +16,7 @@ INCLUDES = -I${top_srcdir}                   \
+            -I${top_srcdir}/src/dhcp-manager  \
+            -I${top_srcdir}/src/supplicant-manager  \
+            -I${top_srcdir}/src/dnsmasq-manager  \
++           -I${top_srcdir}/src/modem-manager  \
+            -I${top_srcdir}/libnm-util \
+            -I${top_srcdir}/callouts
+ 
+@@ -59,14 +61,6 @@ NetworkManager_SOURCES =				\
+ 		nm-activation-request.h		\
+ 		nm-properties-changed-signal.c	\
+ 		nm-properties-changed-signal.h	\
+-		nm-serial-device.c		\
+-		nm-serial-device.h		\
+-		nm-gsm-device.c		\
+-		nm-gsm-device.h		\
+-		nm-cdma-device.c		\
+-		nm-cdma-device.h		\
+-		nm-hso-gsm-device.c \
+-		nm-hso-gsm-device.h \
+ 		wpa.c				\
+ 		wpa.h				\
+ 		nm-netlink.c			\
+@@ -89,15 +83,6 @@ nm-device-ethernet-glue.h: $(top_srcdir)/introspection/nm-device-ethernet.xml
+ nm-device-wifi-glue.h: $(top_srcdir)/introspection/nm-device-wifi.xml
+ 	dbus-binding-tool --prefix=nm_device_wifi --mode=glib-server --output=$@ $<
+ 
+-nm-serial-device-glue.h: $(top_srcdir)/introspection/nm-device-serial.xml
+-	dbus-binding-tool --prefix=nm_serial_device --mode=glib-server --output=$@ $<
+-
+-nm-cdma-device-glue.h: $(top_srcdir)/introspection/nm-device-cdma.xml
+-	dbus-binding-tool --prefix=nm_cdma_device --mode=glib-server --output=$@ $<
+-
+-nm-gsm-device-glue.h: $(top_srcdir)/introspection/nm-device-gsm.xml
+-	dbus-binding-tool --prefix=nm_gsm_device --mode=glib-server --output=$@ $<
+-
+ nm-ip4-config-glue.h: $(top_srcdir)/introspection/nm-ip4-config.xml
+ 	dbus-binding-tool --prefix=nm_ip4_config --mode=glib-server --output=$@ $<
+ 
+@@ -113,9 +98,6 @@ BUILT_SOURCES = 					\
+ 	nm-device-interface-glue.h			\
+ 	nm-device-ethernet-glue.h			\
+ 	nm-device-wifi-glue.h		\
+-	nm-serial-device-glue.h \
+-	nm-cdma-device-glue.h \
+-	nm-gsm-device-glue.h \
+ 	nm-ip4-config-glue.h				\
+ 	nm-active-connection-glue.h \
+ 	nm-dhcp4-config-glue.h
+@@ -150,6 +132,7 @@ NetworkManager_LDADD = 							\
+ 			./supplicant-manager/libsupplicant-manager.la		\
+ 			./dnsmasq-manager/libdnsmasq-manager.la		\
+ 			./ppp-manager/libppp-manager.la		\
++			./modem-manager/libmodem-manager.la		\
+ 			./backends/libnmbackend.la			\
+ 			$(top_builddir)/libnm-util/libnm-util.la
+ 
+diff --git a/src/NetworkManagerPolicy.c b/src/NetworkManagerPolicy.c
+index c8fa251..432af94 100644
+--- a/src/NetworkManagerPolicy.c
++++ b/src/NetworkManagerPolicy.c
+@@ -31,9 +31,6 @@
+ #include "nm-device.h"
+ #include "nm-device-wifi.h"
+ #include "nm-device-ethernet.h"
+-#include "nm-hso-gsm-device.h"
+-#include "nm-gsm-device.h"
+-#include "nm-cdma-device.h"
+ #include "nm-dbus-manager.h"
+ #include "nm-setting-ip4-config.h"
+ #include "nm-setting-connection.h"
+@@ -90,10 +87,10 @@ update_default_route (NMPolicy *policy, NMDevice *new)
+ static guint32
+ get_device_priority (NMDevice *dev)
+ {
+-	if (NM_IS_CDMA_DEVICE (dev))
++	if (nm_device_get_device_type (dev) == NM_DEVICE_TYPE_CDMA)
+ 		return 2;
+ 
+-	if (NM_IS_GSM_DEVICE (dev))
++	if (nm_device_get_device_type (dev) == NM_DEVICE_TYPE_GSM)
+ 		return 3;
+ 
+ 	if (NM_IS_DEVICE_WIFI (dev))
+@@ -153,10 +150,6 @@ update_routing_and_dns (NMPolicy *policy, gboolean force_update)
+ 			}
+ 		}
+ 
+-		/* 'hso' devices never get a gateway from the remote end */
+-		if (!can_default && !NM_IS_HSO_GSM_DEVICE (dev))
+-			continue;
+-
+ 		prio = get_device_priority (dev);
+ 		if (prio > best_prio) {
+ 			best = dev;
+diff --git a/src/modem-manager/Makefile.am b/src/modem-manager/Makefile.am
+new file mode 100644
+index 0000000..cc84137
+--- /dev/null
++++ b/src/modem-manager/Makefile.am
+@@ -0,0 +1,41 @@
++INCLUDES = \
++	-I${top_srcdir}/src \
++	-I${top_srcdir}/include \
++	-I${top_srcdir}/libnm-util \
++	-I${top_builddir}/marshallers
++
++noinst_LTLIBRARIES = libmodem-manager.la
++
++libmodem_manager_la_SOURCES = \
++	nm-cdma-modem-device.c \
++	nm-cdma-modem-device.h \
++	nm-gsm-modem-device.c \
++	nm-gsm-modem-device.h \
++	nm-modem-device.c \
++	nm-modem-device.h \
++	nm-modem-manager.h \
++	nm-modem-manager.c \
++	nm-modem-types.h
++
++libmodem_manager_la_CPPFLAGS = \
++	$(DBUS_CFLAGS)
++
++libmodem_manager_la_LIBADD = \
++	$(DBUS_LIBS) \
++	$(top_builddir)/marshallers/libmarshallers.la
++
++nm-cdma-device-glue.h: $(top_srcdir)/introspection/nm-device-cdma.xml
++	dbus-binding-tool --prefix=nm_cdma_device --mode=glib-server --output=$@ $<
++
++nm-gsm-device-glue.h: $(top_srcdir)/introspection/nm-device-gsm.xml
++	dbus-binding-tool --prefix=nm_gsm_device --mode=glib-server --output=$@ $<
++
++nm-serial-device-glue.h: $(top_srcdir)/introspection/nm-device-serial.xml
++	dbus-binding-tool --prefix=nm_serial_device --mode=glib-server --output=$@ $<
++
++BUILT_SOURCES = \
++	nm-cdma-device-glue.h \
++	nm-gsm-device-glue.h \
++	nm-serial-device-glue.h
++
++CLEANFILES = $(BUILT_SOURCES)
+diff --git a/src/modem-manager/nm-cdma-modem-device.c b/src/modem-manager/nm-cdma-modem-device.c
+new file mode 100644
+index 0000000..b674342
+--- /dev/null
++++ b/src/modem-manager/nm-cdma-modem-device.c
+@@ -0,0 +1,315 @@
++/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
++
++#include <string.h>
++
++#include "nm-cdma-modem-device.h"
++#include "nm-modem-types.h"
++#include "nm-device-interface.h"
++#include "nm-device-private.h"
++#include "nm-dbus-manager.h"
++#include "nm-setting-connection.h"
++#include "nm-setting-cdma.h"
++#include "nm-utils.h"
++
++static void impl_cdma_device_get_signal_quality (NMCdmaModemDevice *modem, DBusGMethodInvocation *context);
++
++#include "nm-cdma-device-glue.h"
++
++G_DEFINE_TYPE (NMCdmaModemDevice, nm_cdma_modem_device, NM_TYPE_MODEM_DEVICE)
++
++#define NM_CDMA_MODEM_DEVICE_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_CDMA_MODEM_DEVICE, NMCdmaModemDevicePrivate))
++
++enum {
++	MODEM_STATE_BEGIN,
++	MODEM_STATE_ENABLE,
++	MODEM_STATE_CONNECT
++};
++
++typedef struct {
++	NMDBusManager *dbus_mgr;
++	char *path;
++	DBusGProxy *proxy;
++	int modem_state;
++} NMCdmaModemDevicePrivate;
++
++enum {
++	SIGNAL_QUALITY,
++
++	LAST_SIGNAL
++};
++
++static guint signals[LAST_SIGNAL] = { 0 };
++
++NMDevice *
++nm_cdma_modem_device_new (const char *path,
++					 const char *data_device,
++					 const char *driver)
++{
++	g_return_val_if_fail (path != NULL, NULL);
++	g_return_val_if_fail (data_device != NULL, NULL);
++	g_return_val_if_fail (driver != NULL, NULL);
++
++	return (NMDevice *) g_object_new (NM_TYPE_CDMA_MODEM_DEVICE,
++							    NM_DEVICE_INTERFACE_UDI, path,
++							    NM_DEVICE_INTERFACE_IFACE, data_device,
++							    NM_DEVICE_INTERFACE_DRIVER, driver,
++							    NM_DEVICE_INTERFACE_MANAGED, TRUE,
++							    NM_MODEM_DEVICE_PATH, path,
++							    NULL);
++}
++
++static NMSetting *
++get_setting (NMCdmaModemDevice *device, GType setting_type)
++{
++	NMActRequest *req;
++	NMSetting *setting = NULL;
++
++	req = nm_device_get_act_request (NM_DEVICE (device));
++	if (req) {
++		NMConnection *connection;
++
++		connection = nm_act_request_get_connection (req);
++		if (connection)
++			setting = nm_connection_get_setting (connection, setting_type);
++	}
++
++	return setting;
++}
++
++static void
++state_machine (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data)
++{
++	NMCdmaModemDevice *modem = NM_CDMA_MODEM_DEVICE (user_data);
++	NMCdmaModemDevicePrivate *priv = NM_CDMA_MODEM_DEVICE_GET_PRIVATE (modem);
++	NMSettingCdma *setting;
++	GError *error = NULL;
++
++	setting = NM_SETTING_CDMA (get_setting (modem, NM_TYPE_SETTING_CDMA));
++
++	if (call_id)
++		dbus_g_proxy_end_call (proxy, call_id, &error, G_TYPE_INVALID);
++
++	if (error) {
++		nm_warning ("CDMA device connection failed: %s", error->message);
++		nm_device_state_changed (NM_DEVICE (modem), NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_NONE);
++		return;
++	}
++
++	switch (priv->modem_state) {
++	case MODEM_STATE_BEGIN:
++		priv->modem_state = MODEM_STATE_ENABLE;
++		dbus_g_proxy_begin_call (nm_modem_device_get_proxy (NM_MODEM_DEVICE (modem)),
++							"Enable", state_machine,
++							modem, NULL,
++							G_TYPE_BOOLEAN, TRUE,
++							G_TYPE_INVALID);
++		break;
++	case MODEM_STATE_ENABLE:
++		priv->modem_state = MODEM_STATE_CONNECT;
++		dbus_g_proxy_begin_call (nm_modem_device_get_proxy (NM_MODEM_DEVICE (modem)),
++							"Connect", state_machine,
++							modem, NULL,
++							G_TYPE_STRING, setting->number,
++							G_TYPE_INVALID);
++		break;
++	case MODEM_STATE_CONNECT:
++		nm_device_activate_schedule_stage2_device_config (NM_DEVICE (modem));
++		break;
++	default:
++		nm_warning ("Invalid modem state %d", priv->modem_state);
++		nm_device_state_changed (NM_DEVICE (modem), NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_NONE);
++		break;
++	}
++}
++
++static NMActStageReturn
++real_act_stage1_prepare (NMDevice *device, NMDeviceStateReason *reason)
++{
++	NMCdmaModemDevicePrivate *priv = NM_CDMA_MODEM_DEVICE_GET_PRIVATE (device);
++
++	priv->modem_state = MODEM_STATE_BEGIN;
++	state_machine (priv->proxy, NULL, device);
++
++	return NM_ACT_STAGE_RETURN_POSTPONE;
++}
++
++static NMConnection *
++real_get_best_auto_connection (NMDevice *dev,
++                               GSList *connections,
++                               char **specific_object)
++{
++	GSList *iter;
++
++	for (iter = connections; iter; iter = g_slist_next (iter)) {
++		NMConnection *connection = NM_CONNECTION (iter->data);
++		NMSettingConnection *s_con;
++
++		s_con = (NMSettingConnection *) nm_connection_get_setting (connection, NM_TYPE_SETTING_CONNECTION);
++		g_assert (s_con);
++
++		if (!s_con->autoconnect)
++			continue;
++
++		if (strcmp (s_con->type, NM_SETTING_CDMA_SETTING_NAME))
++			continue;
++
++		return connection;
++	}
++	return NULL;
++}
++
++static void
++real_connection_secrets_updated (NMDevice *dev,
++                                 NMConnection *connection,
++                                 GSList *updated_settings,
++                                 RequestSecretsCaller caller)
++{
++	NMActRequest *req;
++	gboolean found = FALSE;
++	GSList *iter;
++
++	if (caller == SECRETS_CALLER_PPP) {
++		NMPPPManager *ppp_manager;
++		NMSettingCdma *s_cdma = NULL;
++
++		ppp_manager = nm_modem_device_get_ppp_manager (NM_MODEM_DEVICE (dev));
++		g_return_if_fail (ppp_manager != NULL);
++
++		s_cdma = (NMSettingCdma *) nm_connection_get_setting (connection, NM_TYPE_SETTING_CDMA);
++		if (!s_cdma) {
++			/* Shouldn't ever happen */
++			nm_ppp_manager_update_secrets (ppp_manager,
++			                               nm_device_get_iface (dev),
++			                               NULL,
++			                               NULL,
++			                               "missing CDMA setting; no secrets could be found.");
++		} else {
++			nm_ppp_manager_update_secrets (ppp_manager,
++			                               nm_device_get_iface (dev),
++			                               s_cdma->username ? s_cdma->username : "",
++			                               s_cdma->password ? s_cdma->password : "",
++			                               NULL);
++		}
++		return;
++	}
++
++	g_return_if_fail (caller == SECRETS_CALLER_GSM);
++	g_return_if_fail (nm_device_get_state (dev) == NM_DEVICE_STATE_NEED_AUTH);
++
++	for (iter = updated_settings; iter; iter = g_slist_next (iter)) {
++		const char *setting_name = (const char *) iter->data;
++
++		if (!strcmp (setting_name, NM_SETTING_CDMA_SETTING_NAME))
++			found = TRUE;
++		else
++			nm_warning ("Ignoring updated secrets for setting '%s'.", setting_name);
++	}
++
++	if (!found)
++		return;
++
++	req = nm_device_get_act_request (dev);
++	g_assert (req);
++
++	g_return_if_fail (nm_act_request_get_connection (req) == connection);
++
++	nm_device_activate_schedule_stage1_device_prepare (dev);
++}
++
++static void
++signal_quality_proxy (DBusGProxy *proxy, guint32 quality, gpointer user_data)
++{
++	g_signal_emit (NM_CDMA_MODEM_DEVICE (user_data), signals[SIGNAL_QUALITY], 0, quality);
++}
++
++static void
++impl_cdma_device_get_signal_quality (NMCdmaModemDevice *modem, DBusGMethodInvocation *context)
++{
++	/* FIXME */
++}
++
++/*****************************************************************************/
++
++static void
++nm_cdma_modem_device_init (NMCdmaModemDevice *self)
++{
++	NMCdmaModemDevicePrivate *priv = NM_CDMA_MODEM_DEVICE_GET_PRIVATE (self);
++
++	priv->dbus_mgr = nm_dbus_manager_get ();
++
++	nm_device_set_device_type (NM_DEVICE (self), NM_DEVICE_TYPE_GSM);
++}
++
++static GObject*
++constructor (GType type,
++		   guint n_construct_params,
++		   GObjectConstructParam *construct_params)
++{
++	GObject *object;
++	NMCdmaModemDevicePrivate *priv;
++
++	object = G_OBJECT_CLASS (nm_cdma_modem_device_parent_class)->constructor (type,
++															    n_construct_params,
++															    construct_params);
++	if (!object)
++		return NULL;
++
++	priv = NM_CDMA_MODEM_DEVICE_GET_PRIVATE (object);
++
++	priv->proxy = dbus_g_proxy_new_for_name (nm_dbus_manager_get_connection (priv->dbus_mgr),
++									 MM_DBUS_SERVICE,
++									 nm_device_get_udi (NM_DEVICE (object)),
++									 MM_DBUS_INTERFACE_CDMA_MODEM);
++
++	dbus_g_proxy_add_signal (priv->proxy, "SignalQuality", G_TYPE_UINT, G_TYPE_INVALID);
++	dbus_g_proxy_connect_signal (priv->proxy, "SignalQuality",
++						    G_CALLBACK (signal_quality_proxy),
++						    object,
++						    NULL);
++
++	return object;
++}
++
++static void
++finalize (GObject *object)
++{
++	NMCdmaModemDevicePrivate *priv = NM_CDMA_MODEM_DEVICE_GET_PRIVATE (object);
++
++	if (priv->proxy)
++		g_object_unref (priv->proxy);
++
++	g_object_unref (priv->dbus_mgr);
++
++	G_OBJECT_CLASS (nm_cdma_modem_device_parent_class)->finalize (object);
++}
++
++static void
++nm_cdma_modem_device_class_init (NMCdmaModemDeviceClass *klass)
++{
++	GObjectClass *object_class = G_OBJECT_CLASS (klass);
++	NMDeviceClass *device_class = NM_DEVICE_CLASS (klass);
++
++	g_type_class_add_private (object_class, sizeof (NMCdmaModemDevicePrivate));
++
++	/* Virtual methods */
++	object_class->constructor = constructor;
++	object_class->finalize = finalize;
++
++	device_class->get_best_auto_connection = real_get_best_auto_connection;
++	device_class->connection_secrets_updated = real_connection_secrets_updated;
++	device_class->act_stage1_prepare = real_act_stage1_prepare;
++
++	/* Signals */
++	signals[SIGNAL_QUALITY] =
++		g_signal_new ("signal-quality",
++				    G_OBJECT_CLASS_TYPE (object_class),
++				    G_SIGNAL_RUN_FIRST,
++				    G_STRUCT_OFFSET (NMCdmaModemDeviceClass, signal_quality),
++				    NULL, NULL,
++				    g_cclosure_marshal_VOID__UINT,
++				    G_TYPE_NONE, 1,
++				    G_TYPE_UINT);
++
++	dbus_g_object_type_install_info (G_TYPE_FROM_CLASS (klass),
++							   &dbus_glib_nm_cdma_device_object_info);
++}
+diff --git a/src/modem-manager/nm-cdma-modem-device.h b/src/modem-manager/nm-cdma-modem-device.h
+new file mode 100644
+index 0000000..888d429
+--- /dev/null
++++ b/src/modem-manager/nm-cdma-modem-device.h
+@@ -0,0 +1,36 @@
++/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
++
++#ifndef NM_CDMA_MODEM_DEVICE_H
++#define NM_CDMA_MODEM_DEVICE_H
++
++#include <nm-modem-device.h>
++
++G_BEGIN_DECLS
++
++#define NM_TYPE_CDMA_MODEM_DEVICE            (nm_cdma_modem_device_get_type ())
++#define NM_CDMA_MODEM_DEVICE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), NM_TYPE_CDMA_MODEM_DEVICE, NMCdmaModemDevice))
++#define NM_CDMA_MODEM_DEVICE_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  NM_TYPE_CDMA_MODEM_DEVICE, NMCdmaModemDeviceClass))
++#define NM_IS_CDMA_MODEM_DEVICE(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), NM_TYPE_CDMA_MODEM_DEVICE))
++#define NM_IS_CDMA_MODEM_DEVICE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  NM_TYPE_CDMA_MODEM_DEVICE))
++#define NM_CDMA_MODEM_DEVICE_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  NM_TYPE_CDMA_MODEM_DEVICE, NMCdmaModemDeviceClass))
++
++typedef struct {
++	NMModemDevice parent;
++} NMCdmaModemDevice;
++
++typedef struct {
++	NMModemDeviceClass parent;
++
++	/* Signals */
++	void (*signal_quality) (NMModemDevice *device, guint32 quality);
++} NMCdmaModemDeviceClass;
++
++GType nm_cdma_modem_device_get_type (void);
++
++NMDevice *nm_cdma_modem_device_new (const char *path,
++							 const char *data_device,
++							 const char *driver);
++
++G_END_DECLS
++
++#endif /* NM_CDMA_MODEM_DEVICE_H */
+diff --git a/src/modem-manager/nm-gsm-modem-device.c b/src/modem-manager/nm-gsm-modem-device.c
+new file mode 100644
+index 0000000..eb2c4d6
+--- /dev/null
++++ b/src/modem-manager/nm-gsm-modem-device.c
+@@ -0,0 +1,411 @@
++/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
++
++#include <string.h>
++#include "nm-gsm-modem-device.h"
++#include "nm-device-private.h"
++#include "nm-device-interface.h"
++#include "nm-dbus-manager.h"
++#include "nm-setting-connection.h"
++#include "nm-setting-gsm.h"
++#include "nm-setting-cdma.h"
++#include "nm-marshal.h"
++#include "nm-properties-changed-signal.h"
++#include "nm-modem-types.h"
++#include "nm-utils.h"
++
++static void impl_gsm_device_get_signal_quality (NMGsmModemDevice *modem, DBusGMethodInvocation *context);
++
++#include "nm-gsm-device-glue.h"
++
++G_DEFINE_TYPE (NMGsmModemDevice, nm_gsm_modem_device, NM_TYPE_MODEM_DEVICE)
++
++#define NM_GSM_MODEM_DEVICE_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_GSM_MODEM_DEVICE, NMGsmModemDevicePrivate))
++
++enum {
++	MODEM_STATE_BEGIN,
++	MODEM_STATE_ENABLE,
++	MODEM_STATE_SET_PIN,
++	MODEM_STATE_SET_APN,
++	MODEM_STATE_SET_BAND,
++	MODEM_STATE_SET_NETWORK_MODE,
++	MODEM_STATE_REGISTER,
++	MODEM_STATE_CONNECT
++};
++
++typedef struct {
++	NMDBusManager *dbus_mgr;
++	char *path;
++	DBusGProxy *proxy;
++	NMPPPManager *ppp_manager;
++	NMIP4Config  *pending_ip4_config;
++
++	int modem_state;
++} NMGsmModemDevicePrivate;
++
++enum {
++	SIGNAL_QUALITY,
++
++	LAST_SIGNAL
++};
++
++static guint signals[LAST_SIGNAL] = { 0 };
++
++NMDevice *
++nm_gsm_modem_device_new (const char *path,
++					const char *data_device,
++					const char *driver)
++{
++	g_return_val_if_fail (path != NULL, NULL);
++	g_return_val_if_fail (data_device != NULL, NULL);
++	g_return_val_if_fail (driver != NULL, NULL);
++
++	return (NMDevice *) g_object_new (NM_TYPE_GSM_MODEM_DEVICE,
++							    NM_DEVICE_INTERFACE_UDI, path,
++							    NM_DEVICE_INTERFACE_IFACE, data_device,
++							    NM_DEVICE_INTERFACE_DRIVER, driver,
++							    NM_DEVICE_INTERFACE_MANAGED, TRUE,
++							    NM_MODEM_DEVICE_PATH, path,
++							    NULL);
++}
++
++static NMSetting *
++get_setting (NMGsmModemDevice *device, GType setting_type)
++{
++	NMActRequest *req;
++	NMSetting *setting = NULL;
++
++	req = nm_device_get_act_request (NM_DEVICE (device));
++	if (req) {
++		NMConnection *connection;
++
++		connection = nm_act_request_get_connection (req);
++		if (connection)
++			setting = nm_connection_get_setting (connection, setting_type);
++	}
++
++	return setting;
++}
++
++static void
++state_machine (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data)
++{
++	NMGsmModemDevice *modem = NM_GSM_MODEM_DEVICE (user_data);
++	NMGsmModemDevicePrivate *priv = NM_GSM_MODEM_DEVICE_GET_PRIVATE (modem);
++	NMSettingGsm *setting;
++	const char *secret = NULL;
++	const char *secret_name = NULL;
++	gboolean retry_secret = FALSE;
++	GError *error = NULL;
++
++	setting = NM_SETTING_GSM (get_setting (modem, NM_TYPE_SETTING_GSM));
++
++	if (call_id)
++		dbus_g_proxy_end_call (proxy, call_id, &error, G_TYPE_INVALID);
++
++	if (error) {
++		if (dbus_g_error_has_name (error, MM_MODEM_ERROR_PIN_NEEDED)) {
++			secret = setting->pin;
++			secret_name = NM_SETTING_GSM_PIN;
++			priv->modem_state = MODEM_STATE_SET_PIN;
++		} else if (dbus_g_error_has_name (error, MM_MODEM_ERROR_PUK_NEEDED)) {
++			secret = setting->puk;
++			secret_name = NM_SETTING_GSM_PUK;
++			priv->modem_state = MODEM_STATE_SET_PIN;
++		} else if (dbus_g_error_has_name (error, MM_MODEM_ERROR_INVALID_SECRET)) {
++			g_free (setting->pin);
++			setting->pin = NULL;
++			secret_name = NM_SETTING_GSM_PIN;
++			retry_secret = TRUE;
++			priv->modem_state = MODEM_STATE_SET_PIN;
++		} else {
++			nm_warning ("GSM device connection failed: %s", error->message);
++			nm_device_state_changed (NM_DEVICE (modem), NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_NONE);
++			return;
++		}
++	}
++
++ again:
++
++	switch (priv->modem_state) {
++	case MODEM_STATE_BEGIN:
++		priv->modem_state = MODEM_STATE_ENABLE;
++		dbus_g_proxy_begin_call (nm_modem_device_get_proxy (NM_MODEM_DEVICE (modem)),
++							"Enable", state_machine,
++							modem, NULL,
++							G_TYPE_BOOLEAN, TRUE,
++							G_TYPE_INVALID);
++		break;
++
++	case MODEM_STATE_SET_PIN:
++		if (secret) {
++			priv->modem_state = MODEM_STATE_ENABLE;
++			dbus_g_proxy_begin_call (priv->proxy, "SetPin", state_machine,
++								modem, NULL,
++								G_TYPE_STRING, secret,
++								G_TYPE_INVALID);
++		} else {
++			nm_device_state_changed (NM_DEVICE (modem), NM_DEVICE_STATE_NEED_AUTH, NM_DEVICE_STATE_REASON_NONE);
++			nm_act_request_request_connection_secrets (nm_device_get_act_request (NM_DEVICE (modem)),
++											   NM_SETTING_GSM_SETTING_NAME,
++											   retry_secret,
++											   SECRETS_CALLER_GSM,
++											   secret_name,
++											   NULL);
++
++		}
++		break;
++
++	case MODEM_STATE_ENABLE:
++		priv->modem_state = MODEM_STATE_SET_APN;
++		if (setting->apn)
++			dbus_g_proxy_begin_call (priv->proxy, "SetAPN", state_machine,
++								modem, NULL,
++								G_TYPE_STRING, setting->apn,
++								G_TYPE_INVALID);
++		else
++			goto again;
++
++		break;
++	case MODEM_STATE_SET_APN:
++		priv->modem_state = MODEM_STATE_SET_BAND;
++		if (setting->band)
++			dbus_g_proxy_begin_call (priv->proxy, "SetBand", state_machine,
++								modem, NULL,
++								G_TYPE_UINT, (guint32) setting->band,
++								G_TYPE_INVALID);
++		else
++			goto again;
++
++		break;
++
++	case MODEM_STATE_SET_BAND:
++		priv->modem_state = MODEM_STATE_SET_NETWORK_MODE;
++		if (setting->network_type)
++			dbus_g_proxy_begin_call (priv->proxy, "SetNetworkMode", state_machine,
++								modem, NULL,
++								G_TYPE_UINT, (guint32) setting->network_type,
++								G_TYPE_INVALID);
++		else
++			goto again;
++
++		break;
++
++	case MODEM_STATE_SET_NETWORK_MODE:
++		priv->modem_state = MODEM_STATE_REGISTER;
++		dbus_g_proxy_begin_call (priv->proxy, "Register", state_machine,
++							modem, NULL,
++							G_TYPE_STRING, setting->network_id ? setting->network_id : "",
++							G_TYPE_INVALID);
++		break;
++
++	case MODEM_STATE_REGISTER:
++		priv->modem_state = MODEM_STATE_CONNECT;
++		dbus_g_proxy_begin_call (nm_modem_device_get_proxy (NM_MODEM_DEVICE (modem)),
++							"Connect", state_machine,
++							modem, NULL,
++							G_TYPE_STRING, setting->number,
++							G_TYPE_INVALID);
++		break;
++
++	case MODEM_STATE_CONNECT:
++		nm_device_activate_schedule_stage2_device_config (NM_DEVICE (modem));
++		break;
++
++	default:
++		nm_warning ("Invalid modem state %d", priv->modem_state);
++		nm_device_state_changed (NM_DEVICE (modem), NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_NONE);
++		break;
++	}
++}
++
++static NMActStageReturn
++real_act_stage1_prepare (NMDevice *device, NMDeviceStateReason *reason)
++{
++	NMGsmModemDevicePrivate *priv = NM_GSM_MODEM_DEVICE_GET_PRIVATE (device);
++
++	priv->modem_state = MODEM_STATE_BEGIN;
++	state_machine (priv->proxy, NULL, device);
++
++	return NM_ACT_STAGE_RETURN_POSTPONE;
++}
++
++static NMConnection *
++real_get_best_auto_connection (NMDevice *dev,
++                               GSList *connections,
++                               char **specific_object)
++{
++	GSList *iter;
++
++	for (iter = connections; iter; iter = g_slist_next (iter)) {
++		NMConnection *connection = NM_CONNECTION (iter->data);
++		NMSettingConnection *s_con;
++
++		s_con = (NMSettingConnection *) nm_connection_get_setting (connection, NM_TYPE_SETTING_CONNECTION);
++		g_assert (s_con);
++
++		if (!s_con->autoconnect)
++			continue;
++
++		if (strcmp (s_con->type, NM_SETTING_GSM_SETTING_NAME))
++			continue;
++
++		return connection;
++	}
++	return NULL;
++}
++
++static void
++real_connection_secrets_updated (NMDevice *dev,
++                                 NMConnection *connection,
++                                 GSList *updated_settings,
++                                 RequestSecretsCaller caller)
++{
++	NMActRequest *req;
++	gboolean found = FALSE;
++	GSList *iter;
++
++	if (caller == SECRETS_CALLER_PPP) {
++		NMPPPManager *ppp_manager;
++		NMSettingGsm *s_gsm = NULL;
++
++		ppp_manager = nm_modem_device_get_ppp_manager (NM_MODEM_DEVICE (dev));
++		g_return_if_fail (ppp_manager != NULL);
++
++		s_gsm = (NMSettingGsm *) nm_connection_get_setting (connection, NM_TYPE_SETTING_GSM);
++		if (!s_gsm) {
++			/* Shouldn't ever happen */
++			nm_ppp_manager_update_secrets (ppp_manager,
++			                               nm_device_get_iface (dev),
++			                               NULL,
++			                               NULL,
++			                               "missing GSM setting; no secrets could be found.");
++		} else {
++			nm_ppp_manager_update_secrets (ppp_manager,
++			                               nm_device_get_iface (dev),
++			                               s_gsm->username ? s_gsm->username : "",
++			                               s_gsm->password ? s_gsm->password : "",
++			                               NULL);
++		}
++		return;
++	}
++
++	g_return_if_fail (caller == SECRETS_CALLER_GSM);
++	g_return_if_fail (nm_device_get_state (dev) == NM_DEVICE_STATE_NEED_AUTH);
++
++	for (iter = updated_settings; iter; iter = g_slist_next (iter)) {
++		const char *setting_name = (const char *) iter->data;
++
++		if (!strcmp (setting_name, NM_SETTING_GSM_SETTING_NAME))
++			found = TRUE;
++		else
++			nm_warning ("Ignoring updated secrets for setting '%s'.", setting_name);
++	}
++
++	if (!found)
++		return;
++
++	req = nm_device_get_act_request (dev);
++	g_assert (req);
++
++	g_return_if_fail (nm_act_request_get_connection (req) == connection);
++
++	nm_device_activate_schedule_stage1_device_prepare (dev);
++}
++
++static void
++signal_quality_proxy (DBusGProxy *proxy, guint32 quality, gpointer user_data)
++{
++	g_signal_emit (NM_GSM_MODEM_DEVICE (user_data), signals[SIGNAL_QUALITY], 0, quality);
++}
++
++static void
++impl_gsm_device_get_signal_quality (NMGsmModemDevice *modem, DBusGMethodInvocation *context)
++{
++	/* FIXME */
++}
++
++/*****************************************************************************/
++
++static void
++nm_gsm_modem_device_init (NMGsmModemDevice *self)
++{
++	NMGsmModemDevicePrivate *priv = NM_GSM_MODEM_DEVICE_GET_PRIVATE (self);
++
++	priv->dbus_mgr = nm_dbus_manager_get ();
++
++	nm_device_set_device_type (NM_DEVICE (self), NM_DEVICE_TYPE_GSM);
++}
++
++static GObject*
++constructor (GType type,
++		   guint n_construct_params,
++		   GObjectConstructParam *construct_params)
++{
++	GObject *object;
++	NMGsmModemDevicePrivate *priv;
++
++	object = G_OBJECT_CLASS (nm_gsm_modem_device_parent_class)->constructor (type,
++															   n_construct_params,
++															   construct_params);
++	if (!object)
++		return NULL;
++
++	priv = NM_GSM_MODEM_DEVICE_GET_PRIVATE (object);
++
++	priv->proxy = dbus_g_proxy_new_for_name (nm_dbus_manager_get_connection (priv->dbus_mgr),
++									 MM_DBUS_SERVICE,
++									 nm_device_get_udi (NM_DEVICE (object)),
++									 MM_DBUS_INTERFACE_GSM_MODEM);
++
++	dbus_g_proxy_add_signal (priv->proxy, "SignalQuality", G_TYPE_UINT, G_TYPE_INVALID);
++	dbus_g_proxy_connect_signal (priv->proxy, "SignalQuality",
++						    G_CALLBACK (signal_quality_proxy),
++						    object,
++						    NULL);
++
++	return object;
++}
++
++static void
++finalize (GObject *object)
++{
++	NMGsmModemDevicePrivate *priv = NM_GSM_MODEM_DEVICE_GET_PRIVATE (object);
++
++	if (priv->proxy)
++		g_object_unref (priv->proxy);
++
++	g_object_unref (priv->dbus_mgr);
++
++	G_OBJECT_CLASS (nm_gsm_modem_device_parent_class)->finalize (object);
++}
++
++static void
++nm_gsm_modem_device_class_init (NMGsmModemDeviceClass *klass)
++{
++	GObjectClass *object_class = G_OBJECT_CLASS (klass);
++	NMDeviceClass *device_class = NM_DEVICE_CLASS (klass);
++
++	g_type_class_add_private (object_class, sizeof (NMGsmModemDevicePrivate));
++
++	/* Virtual methods */
++	object_class->constructor = constructor;
++	object_class->finalize = finalize;
++
++	device_class->get_best_auto_connection = real_get_best_auto_connection;
++	device_class->connection_secrets_updated = real_connection_secrets_updated;
++	device_class->act_stage1_prepare = real_act_stage1_prepare;
++
++	/* Signals */
++	signals[SIGNAL_QUALITY] =
++		g_signal_new ("signal-quality",
++				    G_OBJECT_CLASS_TYPE (object_class),
++				    G_SIGNAL_RUN_FIRST,
++				    G_STRUCT_OFFSET (NMGsmModemDeviceClass, signal_quality),
++				    NULL, NULL,
++				    g_cclosure_marshal_VOID__UINT,
++				    G_TYPE_NONE, 1,
++				    G_TYPE_UINT);
++
++	dbus_g_object_type_install_info (G_TYPE_FROM_CLASS (klass),
++							   &dbus_glib_nm_gsm_device_object_info);
++}
+diff --git a/src/modem-manager/nm-gsm-modem-device.h b/src/modem-manager/nm-gsm-modem-device.h
+new file mode 100644
+index 0000000..535c0f3
+--- /dev/null
++++ b/src/modem-manager/nm-gsm-modem-device.h
+@@ -0,0 +1,36 @@
++/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
++
++#ifndef NM_GSM_MODEM_DEVICE_H
++#define NM_GSM_MODEM_DEVICE_H
++
++#include <nm-modem-device.h>
++
++G_BEGIN_DECLS
++
++#define NM_TYPE_GSM_MODEM_DEVICE            (nm_gsm_modem_device_get_type ())
++#define NM_GSM_MODEM_DEVICE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), NM_TYPE_GSM_MODEM_DEVICE, NMGsmModemDevice))
++#define NM_GSM_MODEM_DEVICE_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  NM_TYPE_GSM_MODEM_DEVICE, NMGsmModemDeviceClass))
++#define NM_IS_GSM_MODEM_DEVICE(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), NM_TYPE_GSM_MODEM_DEVICE))
++#define NM_IS_GSM_MODEM_DEVICE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  NM_TYPE_GSM_MODEM_DEVICE))
++#define NM_GSM_MODEM_DEVICE_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  NM_TYPE_GSM_MODEM_DEVICE, NMGsmModemDeviceClass))
++
++typedef struct {
++	NMModemDevice parent;
++} NMGsmModemDevice;
++
++typedef struct {
++	NMModemDeviceClass parent;
++
++	/* Signals */
++	void (*signal_quality) (NMModemDevice *device, guint32 quality);
++} NMGsmModemDeviceClass;
++
++GType nm_gsm_modem_device_get_type (void);
++
++NMDevice *nm_gsm_modem_device_new (const char *path,
++							const char *data_device,
++							const char *driver);
++
++G_END_DECLS
++
++#endif /* NM_GSM_MODEM_DEVICE_H */
+diff --git a/src/modem-manager/nm-modem-device.c b/src/modem-manager/nm-modem-device.c
+new file mode 100644
+index 0000000..e9227fd
+--- /dev/null
++++ b/src/modem-manager/nm-modem-device.c
+@@ -0,0 +1,411 @@
++/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
++
++#include <string.h>
++#include "nm-modem-device.h"
++#include "nm-device-private.h"
++#include "nm-device-interface.h"
++#include "nm-dbus-manager.h"
++#include "nm-setting-connection.h"
++#include "nm-setting-gsm.h"
++#include "nm-setting-cdma.h"
++#include "nm-marshal.h"
++#include "nm-properties-changed-signal.h"
++#include "nm-modem-types.h"
++#include "nm-utils.h"
++#include "nm-serial-device-glue.h"
++
++G_DEFINE_TYPE (NMModemDevice, nm_modem_device, NM_TYPE_DEVICE)
++
++#define NM_MODEM_DEVICE_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_MODEM_DEVICE, NMModemDevicePrivate))
++
++enum {
++	PROP_0,
++	PROP_PATH,
++
++	LAST_PROP
++};
++
++typedef struct {
++	NMDBusManager *dbus_mgr;
++	char *path;
++	DBusGProxy *proxy;
++	NMPPPManager *ppp_manager;
++	NMIP4Config  *pending_ip4_config;
++
++	guint state_to_disconnected_id;
++
++	/* PPP stats */
++	guint32 in_bytes;
++	guint32 out_bytes;
++} NMModemDevicePrivate;
++
++enum {
++	PPP_STATS,
++	PROPERTIES_CHANGED,
++
++	LAST_SIGNAL
++};
++
++static guint signals[LAST_SIGNAL] = { 0 };
++
++NMPPPManager *
++nm_modem_device_get_ppp_manager (NMModemDevice *device)
++{
++	g_return_val_if_fail (NM_IS_MODEM_DEVICE (device), NULL);
++
++	return NM_MODEM_DEVICE_GET_PRIVATE (device)->ppp_manager;
++}
++
++DBusGProxy *
++nm_modem_device_get_proxy (NMModemDevice *device)
++{
++	g_return_val_if_fail (NM_IS_MODEM_DEVICE (device), NULL);
++
++	return NM_MODEM_DEVICE_GET_PRIVATE (device)->proxy;
++}
++
++static void
++ppp_state_changed (NMPPPManager *ppp_manager, NMPPPStatus status, gpointer user_data)
++{
++	NMDevice *device = NM_DEVICE (user_data);
++
++	switch (status) {
++	case NM_PPP_STATUS_NETWORK:
++		nm_device_state_changed (device, NM_DEVICE_STATE_IP_CONFIG, NM_DEVICE_STATE_REASON_NONE);
++		break;
++	case NM_PPP_STATUS_DISCONNECT:
++		nm_device_state_changed (device, NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_PPP_DISCONNECT);
++		break;
++	case NM_PPP_STATUS_DEAD:
++		nm_device_state_changed (device, NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_PPP_FAILED);
++		break;
++	case NM_PPP_STATUS_AUTHENTICATE:
++		nm_device_state_changed (device, NM_DEVICE_STATE_NEED_AUTH, NM_DEVICE_STATE_REASON_NONE);
++		break;
++	default:
++		break;
++	}
++}
++
++static void
++ppp_ip4_config (NMPPPManager *ppp_manager,
++			 const char *iface,
++			 NMIP4Config *config,
++			 gpointer user_data)
++{
++	NMDevice *device = NM_DEVICE (user_data);
++
++	nm_device_set_ip_iface (device, iface);
++	NM_MODEM_DEVICE_GET_PRIVATE (device)->pending_ip4_config = g_object_ref (config);
++	nm_device_activate_schedule_stage4_ip_config_get (device);
++}
++
++static void
++ppp_stats (NMPPPManager *ppp_manager,
++		 guint32 in_bytes,
++		 guint32 out_bytes,
++		 gpointer user_data)
++{
++	NMModemDevice *device = NM_MODEM_DEVICE (user_data);
++	NMModemDevicePrivate *priv = NM_MODEM_DEVICE_GET_PRIVATE (device);
++
++	if (priv->in_bytes != in_bytes || priv->out_bytes != out_bytes) {
++		priv->in_bytes = in_bytes;
++		priv->out_bytes = out_bytes;
++
++		g_signal_emit (device, signals[PPP_STATS], 0, in_bytes, out_bytes);
++	}
++}
++
++static NMConnection *
++real_get_best_auto_connection (NMDevice *dev,
++                               GSList *connections,
++                               char **specific_object)
++{
++	GSList *iter;
++
++	for (iter = connections; iter; iter = g_slist_next (iter)) {
++		NMConnection *connection = NM_CONNECTION (iter->data);
++		NMSettingConnection *s_con;
++
++		s_con = (NMSettingConnection *) nm_connection_get_setting (connection, NM_TYPE_SETTING_CONNECTION);
++		g_assert (s_con);
++
++		if (!s_con->autoconnect)
++			continue;
++
++		if (strcmp (s_con->type, NM_SETTING_GSM_SETTING_NAME))
++			continue;
++
++		return connection;
++	}
++	return NULL;
++}
++
++static NMActStageReturn
++real_act_stage2_config (NMDevice *device, NMDeviceStateReason *reason)
++{
++	NMModemDevicePrivate *priv = NM_MODEM_DEVICE_GET_PRIVATE (device);
++	NMActRequest *req;
++	GError *err = NULL;
++	NMActStageReturn ret;
++
++	req = nm_device_get_act_request (device);
++	g_assert (req);
++
++	priv->ppp_manager = nm_ppp_manager_new (nm_device_get_iface (device));
++
++	if (nm_ppp_manager_start (priv->ppp_manager, req, &err)) {
++		g_signal_connect (priv->ppp_manager, "state-changed",
++					   G_CALLBACK (ppp_state_changed),
++					   device);
++		g_signal_connect (priv->ppp_manager, "ip4-config",
++					   G_CALLBACK (ppp_ip4_config),
++					   device);
++		g_signal_connect (priv->ppp_manager, "stats",
++					   G_CALLBACK (ppp_stats),
++					   device);
++
++		ret = NM_ACT_STAGE_RETURN_POSTPONE;
++	} else {
++		nm_warning ("%s", err->message);
++		g_error_free (err);
++
++		g_object_unref (priv->ppp_manager);
++		priv->ppp_manager = NULL;
++
++		*reason = NM_DEVICE_STATE_REASON_PPP_START_FAILED;
++		ret = NM_ACT_STAGE_RETURN_FAILURE;
++	}
++
++	return ret;
++}
++
++static NMActStageReturn
++real_act_stage4_get_ip4_config (NMDevice *device,
++                                NMIP4Config **config,
++                                NMDeviceStateReason *reason)
++{
++	NMModemDevicePrivate *priv = NM_MODEM_DEVICE_GET_PRIVATE (device);
++
++	*config = priv->pending_ip4_config;
++	priv->pending_ip4_config = NULL;
++
++	return NM_ACT_STAGE_RETURN_SUCCESS;
++}
++
++static void
++real_deactivate_quickly (NMDevice *device)
++{
++	NMModemDevicePrivate *priv = NM_MODEM_DEVICE_GET_PRIVATE (device);
++
++	nm_device_set_ip_iface (device, NULL);
++
++	if (priv->pending_ip4_config) {
++		g_object_unref (priv->pending_ip4_config);
++		priv->pending_ip4_config = NULL;
++	}
++
++	priv->in_bytes = priv->out_bytes = 0;
++
++	if (priv->ppp_manager) {
++		g_object_unref (priv->ppp_manager);
++		priv->ppp_manager = NULL;
++	}
++
++	dbus_g_proxy_call_no_reply (priv->proxy, "Enable", G_TYPE_BOOLEAN, FALSE, G_TYPE_INVALID);
++}
++
++static guint32
++real_get_generic_capabilities (NMDevice *dev)
++{
++	return NM_DEVICE_CAP_NM_SUPPORTED;
++}
++
++static gboolean
++unavailable_to_disconnected (gpointer user_data)
++{
++	nm_device_state_changed (NM_DEVICE (user_data),
++	                         NM_DEVICE_STATE_DISCONNECTED,
++	                         NM_DEVICE_STATE_REASON_NONE);
++	return FALSE;
++}
++
++static void
++device_state_changed (NMDeviceInterface *device,
++                      NMDeviceState new_state,
++                      NMDeviceState old_state,
++                      NMDeviceStateReason reason,
++                      gpointer user_data)
++{
++	NMModemDevicePrivate *priv = NM_MODEM_DEVICE_GET_PRIVATE (user_data);
++
++	/* Remove any previous delayed transition to disconnected */
++	if (priv->state_to_disconnected_id) {
++		g_source_remove (priv->state_to_disconnected_id);
++		priv->state_to_disconnected_id = 0;
++	}
++
++	/* If transitioning to UNAVAILBLE and we have a carrier, transition to
++	 * DISCONNECTED because the device is ready to use.  Otherwise the carrier-on
++	 * handler will handle the transition to DISCONNECTED when the carrier is detected.
++	 */
++	if (new_state == NM_DEVICE_STATE_UNAVAILABLE)
++		priv->state_to_disconnected_id = g_idle_add (unavailable_to_disconnected, user_data);
++
++	/* Make sure we don't leave the serial device open */
++	switch (new_state) {
++	case NM_DEVICE_STATE_NEED_AUTH:
++	case NM_DEVICE_STATE_UNMANAGED:
++	case NM_DEVICE_STATE_UNAVAILABLE:
++	case NM_DEVICE_STATE_FAILED:
++	case NM_DEVICE_STATE_DISCONNECTED:
++		dbus_g_proxy_call_no_reply (priv->proxy, "Disconnect", G_TYPE_INVALID);
++		break;
++	default:
++		break;
++	}
++}
++
++/*****************************************************************************/
++
++static void
++nm_modem_device_init (NMModemDevice *self)
++{
++	NMModemDevicePrivate *priv = NM_MODEM_DEVICE_GET_PRIVATE (self);
++
++	priv->dbus_mgr = nm_dbus_manager_get ();
++}
++
++static GObject*
++constructor (GType type,
++		   guint n_construct_params,
++		   GObjectConstructParam *construct_params)
++{
++	GObject *object;
++	NMModemDevicePrivate *priv;
++
++	object = G_OBJECT_CLASS (nm_modem_device_parent_class)->constructor (type,
++														    n_construct_params,
++														    construct_params);
++	if (!object)
++		return NULL;
++
++	priv = NM_MODEM_DEVICE_GET_PRIVATE (object);
++
++	if (!priv->path) {
++		g_warning ("DBus path not provided");
++		goto err;
++	}
++
++	priv->proxy = dbus_g_proxy_new_for_name (nm_dbus_manager_get_connection (priv->dbus_mgr),
++									 MM_DBUS_SERVICE, priv->path, MM_DBUS_INTERFACE_MODEM);
++
++	g_signal_connect (object, "state-changed", G_CALLBACK (device_state_changed), object);
++
++	return object;
++
++ err:
++	g_object_unref (object);
++	return NULL;
++}
++
++static void
++get_property (GObject *object, guint prop_id,
++		    GValue *value, GParamSpec *pspec)
++{
++	NMModemDevicePrivate *priv = NM_MODEM_DEVICE_GET_PRIVATE (object);
++
++	switch (prop_id) {
++	case PROP_PATH:
++		g_value_set_string (value, priv->path);
++		break;
++	default:
++		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
++		break;
++	}
++
++}
++
++static void
++set_property (GObject *object, guint prop_id,
++		    const GValue *value, GParamSpec *pspec)
++{
++	NMModemDevicePrivate *priv = NM_MODEM_DEVICE_GET_PRIVATE (object);
++
++	switch (prop_id) {
++	case PROP_PATH:
++		/* Construct only */
++		priv->path = g_value_dup_string (value);
++		break;
++	default:
++		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
++		break;
++	}
++}
++
++static void
++finalize (GObject *object)
++{
++	NMModemDevicePrivate *priv = NM_MODEM_DEVICE_GET_PRIVATE (object);
++
++	if (priv->state_to_disconnected_id) {
++		g_source_remove (priv->state_to_disconnected_id);
++		priv->state_to_disconnected_id = 0;
++	}
++
++	if (priv->proxy)
++		g_object_unref (priv->proxy);
++
++	g_object_unref (priv->dbus_mgr);
++
++	G_OBJECT_CLASS (nm_modem_device_parent_class)->finalize (object);
++}
++
++static void
++nm_modem_device_class_init (NMModemDeviceClass *klass)
++{
++	GObjectClass *object_class = G_OBJECT_CLASS (klass);
++	NMDeviceClass *device_class = NM_DEVICE_CLASS (klass);
++
++	g_type_class_add_private (object_class, sizeof (NMModemDevicePrivate));
++
++	/* Virtual methods */
++	object_class->constructor = constructor;
++	object_class->set_property = set_property;
++	object_class->get_property = get_property;
++	object_class->finalize = finalize;
++
++	device_class->get_best_auto_connection = real_get_best_auto_connection;
++	device_class->get_generic_capabilities = real_get_generic_capabilities;
++	device_class->act_stage2_config = real_act_stage2_config;
++	device_class->act_stage4_get_ip4_config = real_act_stage4_get_ip4_config;
++	device_class->deactivate_quickly = real_deactivate_quickly;
++
++	/* Properties */
++	g_object_class_install_property
++		(object_class, PROP_PATH,
++		 g_param_spec_string (NM_MODEM_DEVICE_PATH,
++						  "DBus path",
++						  "DBus path",
++						  NULL,
++						  G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
++
++	/* Signals */
++	signals[PPP_STATS] =
++		g_signal_new ("ppp-stats",
++				    G_OBJECT_CLASS_TYPE (object_class),
++				    G_SIGNAL_RUN_FIRST,
++				    G_STRUCT_OFFSET (NMModemDeviceClass, ppp_stats),
++				    NULL, NULL,
++				    nm_marshal_VOID__UINT_UINT,
++				    G_TYPE_NONE, 2,
++				    G_TYPE_UINT, G_TYPE_UINT);
++
++	signals[PROPERTIES_CHANGED] = 
++		nm_properties_changed_signal_new (object_class,
++								    G_STRUCT_OFFSET (NMModemDeviceClass, properties_changed));
++
++	dbus_g_object_type_install_info (G_TYPE_FROM_CLASS (klass),
++							   &dbus_glib_nm_serial_device_object_info);
++}
+diff --git a/src/modem-manager/nm-modem-device.h b/src/modem-manager/nm-modem-device.h
+new file mode 100644
+index 0000000..cc15c3a
+--- /dev/null
++++ b/src/modem-manager/nm-modem-device.h
+@@ -0,0 +1,42 @@
++/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
++
++#ifndef NM_MODEM_DEVICE_H
++#define NM_MODEM_DEVICE_H
++
++#include <dbus/dbus-glib.h>
++#include <nm-device.h>
++#include "ppp-manager/nm-ppp-manager.h"
++
++G_BEGIN_DECLS
++
++#define NM_TYPE_MODEM_DEVICE			(nm_modem_device_get_type ())
++#define NM_MODEM_DEVICE(obj)			(G_TYPE_CHECK_INSTANCE_CAST ((obj), NM_TYPE_MODEM_DEVICE, NMModemDevice))
++#define NM_MODEM_DEVICE_CLASS(klass)	(G_TYPE_CHECK_CLASS_CAST ((klass),  NM_TYPE_MODEM_DEVICE, NMModemDeviceClass))
++#define NM_IS_MODEM_DEVICE(obj)		(G_TYPE_CHECK_INSTANCE_TYPE ((obj), NM_TYPE_MODEM_DEVICE))
++#define NM_IS_MODEM_DEVICE_CLASS(klass)	(G_TYPE_CHECK_CLASS_TYPE ((klass),  NM_TYPE_MODEM_DEVICE))
++#define NM_MODEM_DEVICE_GET_CLASS(obj)	(G_TYPE_INSTANCE_GET_CLASS ((obj),  NM_TYPE_MODEM_DEVICE, NMModemDeviceClass))
++
++#define NM_MODEM_DEVICE_PATH "path"
++
++typedef struct {
++	NMDevice parent;
++} NMModemDevice;
++
++typedef struct {
++	NMDeviceClass parent;
++
++	/* Signals */
++	void (*ppp_stats) (NMModemDevice *device, guint32 in_bytes, guint32 out_bytes);
++	void (*properties_changed) (NMModemDevice *device, GHashTable *properties);
++} NMModemDeviceClass;
++
++GType nm_modem_device_get_type (void);
++
++/* Protected */
++
++NMPPPManager *nm_modem_device_get_ppp_manager (NMModemDevice *device);
++DBusGProxy   *nm_modem_device_get_proxy       (NMModemDevice *device);
++
++G_END_DECLS
++
++#endif /* NM_MODEM_DEVICE_H */
+diff --git a/src/modem-manager/nm-modem-manager.c b/src/modem-manager/nm-modem-manager.c
+new file mode 100644
+index 0000000..bf81e9e
+--- /dev/null
++++ b/src/modem-manager/nm-modem-manager.c
+@@ -0,0 +1,404 @@
++/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
++
++#include <string.h>
++#include "nm-modem-manager.h"
++#include "nm-modem-device.h"
++#include "nm-gsm-modem-device.h"
++#include "nm-cdma-modem-device.h"
++#include "nm-dbus-manager.h"
++#include "nm-utils.h"
++#include "nm-modem-types.h"
++
++#define MODEM_POKE_INTERVAL 120000
++
++G_DEFINE_TYPE (NMModemManager, nm_modem_manager, G_TYPE_OBJECT)
++
++#define NM_MODEM_MANAGER_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_MODEM_MANAGER, NMModemManagerPrivate))
++
++typedef struct {
++	NMDBusManager *dbus_mgr;
++	DBusGProxy *proxy;
++	GHashTable *modems;
++	gboolean disposed;
++	guint poke_id;
++} NMModemManagerPrivate;
++
++enum {
++	DEVICE_ADDED,
++	DEVICE_REMOVED,
++
++	LAST_SIGNAL
++};
++
++static guint signals[LAST_SIGNAL] = { 0 };
++
++
++NMModemManager *
++nm_modem_manager_get (void)
++{
++	static NMModemManager *singleton = NULL;
++
++	if (!singleton)
++		singleton = NM_MODEM_MANAGER (g_object_new (NM_TYPE_MODEM_MANAGER, NULL));
++	else
++		g_object_ref (singleton);
++
++	g_assert (singleton);
++	return singleton;
++}
++
++static gboolean
++get_modem_properties (DBusGConnection *connection,
++				  const char *path,
++				  char **data_device,
++				  char **driver,
++				  guint32 *type)
++{
++	DBusGProxy *proxy;
++	GValue value = { 0 };
++	GError *err = NULL;
++
++	proxy = dbus_g_proxy_new_for_name (connection,
++								MM_DBUS_SERVICE,
++								path,
++								"org.freedesktop.DBus.Properties");
++
++	if (dbus_g_proxy_call_with_timeout (proxy, "Get", 15000, &err,
++								 G_TYPE_STRING, MM_DBUS_INTERFACE_MODEM,
++								 G_TYPE_STRING, "Type",
++								 G_TYPE_INVALID,
++								 G_TYPE_VALUE, &value,
++								 G_TYPE_INVALID)) {
++		*type = g_value_get_uint (&value);
++		g_value_unset (&value);
++	} else {
++		g_warning ("Could not get modem data device: %s", err->message);
++		goto out;
++	}
++
++	if (dbus_g_proxy_call_with_timeout (proxy, "Get", 15000, &err,
++								 G_TYPE_STRING, MM_DBUS_INTERFACE_MODEM,
++								 G_TYPE_STRING, "DataDevice",
++								 G_TYPE_INVALID,
++								 G_TYPE_VALUE, &value,
++								 G_TYPE_INVALID)) {
++		*data_device = g_value_dup_string (&value);
++		g_value_unset (&value);
++	} else {
++		g_warning ("Could not get modem data device: %s", err->message);
++		goto out;
++	}
++
++	if (dbus_g_proxy_call_with_timeout (proxy, "Get", 15000, &err,
++								 G_TYPE_STRING, MM_DBUS_INTERFACE_MODEM,
++								 G_TYPE_STRING, "Driver",
++								 G_TYPE_INVALID,
++								 G_TYPE_VALUE, &value,
++								 G_TYPE_INVALID)) {
++		*driver = g_value_dup_string (&value);
++		g_value_unset (&value);
++	} else {
++		g_warning ("Could not get modem driver: %s", err->message);
++		goto out;
++	}
++
++ out:
++	if (err)
++		g_error_free (err);
++
++	g_object_unref (proxy);
++
++	return *data_device && *driver;
++}
++
++static void
++create_modem (NMModemManager *manager, const char *path)
++{
++	NMModemManagerPrivate *priv = NM_MODEM_MANAGER_GET_PRIVATE (manager);
++	NMDevice *device;
++	char *data_device = NULL;
++	char *driver = NULL;
++	uint modem_type = MM_MODEM_TYPE_UNKNOWN;
++
++	if (g_hash_table_lookup (priv->modems, path)) {
++		nm_warning ("Modem with path %s already exists, ignoring", path);
++		return;
++	}
++
++	if (!get_modem_properties (nm_dbus_manager_get_connection (priv->dbus_mgr), path,
++						  &data_device, &driver, &modem_type))
++		return;
++
++	if (modem_type == MM_MODEM_TYPE_UNKNOWN) {
++		nm_warning ("Modem with path %s has unknown type, ignoring", path);
++		return;
++	}
++
++	if (!driver || !strlen (driver)) {
++		nm_warning ("Modem with path %s has unknown driver, ignoring", path);
++		return;
++	}
++
++	if (!data_device || !strlen (data_device)) {
++		nm_warning ("Modem with path %s has unknown data device, ignoring", path);
++		return;
++	}
++
++	if (modem_type == MM_MODEM_TYPE_GSM)
++		device = nm_gsm_modem_device_new (path,
++								    data_device,
++								    driver);
++	else if (modem_type == MM_MODEM_TYPE_CDMA)
++		device = nm_cdma_modem_device_new (path,
++									data_device,
++									driver);
++	else
++		g_error ("Invalid modem type");
++
++	g_free (data_device);
++	g_free (driver);
++
++	if (device) {
++		g_hash_table_insert (priv->modems, g_strdup (path), g_object_ref (device));
++		g_signal_emit (manager, signals[DEVICE_ADDED], 0, device);
++	}
++}
++
++static void
++modem_added (DBusGProxy *proxy, const char *path, gpointer user_data)
++{
++	g_print ("Modem added %s\n", path);
++	create_modem (NM_MODEM_MANAGER (user_data), path);
++}
++
++static void
++modem_removed (DBusGProxy *proxy, const char *path, gpointer user_data)
++{
++	NMModemManagerPrivate *priv = NM_MODEM_MANAGER_GET_PRIVATE (user_data);
++	NMModemDevice *modem;
++
++	g_print ("Modem removed %s\n", path);
++
++	modem = (NMModemDevice *) g_hash_table_lookup (priv->modems, path);
++	if (modem) {
++		g_signal_emit (user_data, signals[DEVICE_REMOVED], 0, modem);
++		g_hash_table_remove (priv->modems, path);
++	}
++}
++
++static void
++get_modems_cb (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer data)
++{
++	NMModemManager *manager = NM_MODEM_MANAGER (data);
++	GPtrArray *modems;
++	GError *error = NULL;
++
++	if (!dbus_g_proxy_end_call (proxy, call_id, &error,
++						   dbus_g_type_get_collection ("GPtrArray", DBUS_TYPE_G_OBJECT_PATH), &modems,
++						   G_TYPE_INVALID)) {
++		nm_warning ("Could not get modem list: %s", error->message);
++		g_error_free (error);
++	} else {
++		int i;
++
++		for (i = 0; i < modems->len; i++) {
++			char *path = (char *) g_ptr_array_index (modems, i);
++
++			g_print ("Got modem: %s\n", path);
++			create_modem (manager, path);
++			g_free (path);
++		}
++
++		g_ptr_array_free (modems, TRUE);
++	}
++}
++
++static gboolean
++get_modems (gpointer data)
++{
++	NMModemManagerPrivate *priv = NM_MODEM_MANAGER_GET_PRIVATE (data);
++
++	priv->proxy = dbus_g_proxy_new_for_name (nm_dbus_manager_get_connection (priv->dbus_mgr),
++									 MM_DBUS_SERVICE, MM_DBUS_PATH, MM_DBUS_INTERFACE);
++
++	dbus_g_proxy_add_signal (priv->proxy, "DeviceAdded", G_TYPE_STRING, G_TYPE_INVALID);
++	dbus_g_proxy_connect_signal (priv->proxy, "DeviceAdded",
++						    G_CALLBACK (modem_added),
++						    data,
++						    NULL);
++
++	dbus_g_proxy_add_signal (priv->proxy, "DeviceRemoved", G_TYPE_STRING, G_TYPE_INVALID);
++	dbus_g_proxy_connect_signal (priv->proxy, "DeviceRemoved",
++						    G_CALLBACK (modem_removed),
++						    data,
++						    NULL);
++
++	dbus_g_proxy_begin_call (priv->proxy, "EnumerateDevices", get_modems_cb, data, NULL, G_TYPE_INVALID);
++
++	return FALSE;
++}
++
++static gboolean
++nm_modem_manager_startup (NMModemManager *self)
++{
++	gboolean running;
++
++	running = nm_dbus_manager_name_has_owner (NM_MODEM_MANAGER_GET_PRIVATE (self)->dbus_mgr, MM_DBUS_SERVICE);
++	if (running) {
++		g_idle_add (get_modems, self);
++	}
++
++	return running;
++}
++
++static gboolean
++poke_modem_cb (gpointer user_data)
++{
++	NMModemManager *self = NM_MODEM_MANAGER (user_data);
++	NMModemManagerPrivate *priv = NM_MODEM_MANAGER_GET_PRIVATE (self);
++	DBusGConnection *g_connection;
++	DBusGProxy *proxy;
++
++	g_connection = nm_dbus_manager_get_connection (priv->dbus_mgr);
++	proxy = dbus_g_proxy_new_for_name (g_connection,
++	                                   MM_DBUS_SERVICE,
++	                                   MM_DBUS_PATH,
++	                                   MM_DBUS_INTERFACE);
++	if (!proxy) {
++		nm_warning ("Error: could not init wpa_modem proxy");
++		goto out;
++	}
++
++	nm_info ("Trying to start the modem-manager...");
++	dbus_g_proxy_call_no_reply (proxy, "EnumerateDevices", G_TYPE_INVALID);
++	g_object_unref (proxy);
++
++out:
++	/* Reschedule the poke */	
++	priv->poke_id = g_timeout_add (MODEM_POKE_INTERVAL, poke_modem_cb, self);
++
++	return FALSE;
++}
++
++static void
++nm_modem_manager_name_owner_changed (NMDBusManager *dbus_mgr,
++							  const char *name,
++							  const char *old_owner,
++							  const char *new_owner,
++							  gpointer user_data)
++{
++	NMModemManager * self = (NMModemManager *) user_data;
++	NMModemManagerPrivate *priv = NM_MODEM_MANAGER_GET_PRIVATE (self);
++	gboolean old_owner_good = (old_owner && strlen (old_owner));
++	gboolean new_owner_good = (new_owner && strlen (new_owner));
++
++	/* Can't handle the signal if its not from the modem service */
++	if (strcmp (MM_DBUS_SERVICE, name) != 0)
++		return;
++
++	if (!old_owner_good && new_owner_good) {
++		gboolean running;
++
++		running = nm_modem_manager_startup (self);
++
++		if (running && priv->poke_id) {
++			g_source_remove (priv->poke_id);
++			priv->poke_id = 0;
++		}
++	} else if (old_owner_good && !new_owner_good) {
++		if (priv->proxy) {
++			g_object_unref (priv->proxy);
++			priv->proxy = NULL;
++		}
++
++		/* Poke the modem so that it gets activated by dbus system bus
++		 * activation.
++		 */
++		if (!priv->poke_id)
++			priv->poke_id = g_idle_add (poke_modem_cb, (gpointer) self);
++	}
++}
++
++static void
++nm_modem_manager_init (NMModemManager *self)
++{
++	NMModemManagerPrivate *priv = NM_MODEM_MANAGER_GET_PRIVATE (self);
++	gboolean running;
++
++	priv->modems = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
++	priv->dbus_mgr = nm_dbus_manager_get ();
++
++	running = nm_modem_manager_startup (self);
++
++	g_signal_connect (priv->dbus_mgr,
++	                  "name-owner-changed",
++	                  G_CALLBACK (nm_modem_manager_name_owner_changed),
++	                  self);
++
++	if (!running) {
++		/* Try to activate the modem-manager */
++		priv->poke_id = g_idle_add (poke_modem_cb, (gpointer) self);
++	}
++}
++
++static void
++dispose (GObject *object)
++{
++	NMModemManagerPrivate *priv = NM_MODEM_MANAGER_GET_PRIVATE (object);
++
++	if (priv->disposed)
++		return;
++
++	priv->disposed = TRUE;
++
++	if (priv->poke_id) {
++		g_source_remove (priv->poke_id);
++		priv->poke_id = 0;
++	}
++
++	g_hash_table_destroy (priv->modems);
++
++	if (priv->proxy) {
++		g_object_unref (priv->proxy);
++		priv->proxy = NULL;
++	}
++
++	if (priv->dbus_mgr) {
++		g_object_unref (priv->dbus_mgr);
++		priv->dbus_mgr = NULL;
++	}
++
++	/* Chain up to the parent class */
++	G_OBJECT_CLASS (nm_modem_manager_parent_class)->dispose (object);
++}
++
++static void
++nm_modem_manager_class_init (NMModemManagerClass *klass)
++{
++	GObjectClass *object_class = G_OBJECT_CLASS (klass);
++
++	g_type_class_add_private (object_class, sizeof (NMModemManagerPrivate));
++
++	object_class->dispose = dispose;
++
++	/* signals */
++	signals[DEVICE_ADDED] =
++		g_signal_new ("device-added",
++				    G_OBJECT_CLASS_TYPE (object_class),
++				    G_SIGNAL_RUN_FIRST,
++				    G_STRUCT_OFFSET (NMModemManagerClass, device_added),
++				    NULL, NULL,
++				    g_cclosure_marshal_VOID__OBJECT,
++				    G_TYPE_NONE, 1,
++				    G_TYPE_OBJECT);
++
++	signals[DEVICE_REMOVED] =
++		g_signal_new ("device-removed",
++				    G_OBJECT_CLASS_TYPE (object_class),
++				    G_SIGNAL_RUN_FIRST,
++				    G_STRUCT_OFFSET (NMModemManagerClass, device_removed),
++				    NULL, NULL,
++				    g_cclosure_marshal_VOID__OBJECT,
++				    G_TYPE_NONE, 1,
++				    G_TYPE_OBJECT);
++}
+diff --git a/src/modem-manager/nm-modem-manager.h b/src/modem-manager/nm-modem-manager.h
+new file mode 100644
+index 0000000..ec62f84
+--- /dev/null
++++ b/src/modem-manager/nm-modem-manager.h
+@@ -0,0 +1,35 @@
++/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
++
++#ifndef NM_MODEM_MANAGER_H
++#define NM_MODEM_MANAGER_H
++
++#include <glib-object.h>
++#include "nm-device.h"
++
++#define NM_TYPE_MODEM_MANAGER				(nm_modem_manager_get_type ())
++#define NM_MODEM_MANAGER(obj)				(G_TYPE_CHECK_INSTANCE_CAST ((obj), NM_TYPE_MODEM_MANAGER, NMModemManager))
++#define NM_MODEM_MANAGER_CLASS(klass)		(G_TYPE_CHECK_CLASS_CAST ((klass),  NM_TYPE_MODEM_MANAGER, NMModemManagerClass))
++#define NM_IS_MODEM_MANAGER(obj)			(G_TYPE_CHECK_INSTANCE_TYPE ((obj), NM_TYPE_MODEM_MANAGER))
++#define NM_IS_MODEM_MANAGER_CLASS(klass)	(G_TYPE_CHECK_CLASS_TYPE ((klass),  NM_TYPE_MODEM_MANAGER))
++#define NM_MODEM_MANAGER_GET_CLASS(obj)	(G_TYPE_INSTANCE_GET_CLASS ((obj),  NM_TYPE_MODEM_MANAGER, NMModemManagerClass))
++
++typedef struct {
++	GObject parent;
++} NMModemManager;
++
++typedef struct {
++	GObjectClass parent;
++
++	/* Signals */
++	void (*device_added) (NMModemManager *manager,
++					  NMDevice *device);
++
++	void (*device_removed) (NMModemManager *manager,
++					    NMDevice *device);
++} NMModemManagerClass;
++
++GType nm_modem_manager_get_type (void);
++
++NMModemManager *nm_modem_manager_get (void);
++
++#endif /* NM_MODEM_MANAGER_H */
+diff --git a/src/modem-manager/nm-modem-types.h b/src/modem-manager/nm-modem-types.h
+new file mode 100644
+index 0000000..ddbea05
+--- /dev/null
++++ b/src/modem-manager/nm-modem-types.h
+@@ -0,0 +1,22 @@
++/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
++
++#ifndef NM_MODEM_TYPES_H
++#define NM_MODEM_TYPES_H
++
++#define MM_DBUS_SERVICE              "org.freedesktop.ModemManager"
++#define MM_DBUS_PATH                 "/org/freedesktop/ModemManager"
++#define MM_DBUS_INTERFACE            "org.freedesktop.ModemManager"
++#define MM_DBUS_INTERFACE_MODEM      "org.freedesktop.ModemManager.Modem"
++#define MM_DBUS_INTERFACE_GSM_MODEM  "org.freedesktop.ModemManager.Modem.Gsm"
++#define MM_DBUS_INTERFACE_CDMA_MODEM "org.freedesktop.ModemManager.Modem.Cdma"
++
++#define MM_MODEM_TYPE_UNKNOWN  0
++#define MM_MODEM_TYPE_GSM      1
++#define MM_MODEM_TYPE_CDMA     2
++
++#define MM_MODEM_ERROR_GENERAL        MM_DBUS_INTERFACE_MODEM ".GeneralError"
++#define MM_MODEM_ERROR_PIN_NEEDED     MM_DBUS_INTERFACE_MODEM ".PINNeeded"
++#define MM_MODEM_ERROR_PUK_NEEDED     MM_DBUS_INTERFACE_MODEM ".PUKNeeded"
++#define MM_MODEM_ERROR_INVALID_SECRET MM_DBUS_INTERFACE_MODEM ".InvalidSecret"
++
++#endif /* NM_MODEM_TYPES_H */
+diff --git a/src/nm-cdma-device.c b/src/nm-cdma-device.c
+deleted file mode 100644
+index 31023e1..0000000
+--- a/src/nm-cdma-device.c
++++ /dev/null
+@@ -1,525 +0,0 @@
+-/* -*- Mode: C; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*- */
+-
+-#include <stdio.h>
+-#include <string.h>
+-#include "nm-cdma-device.h"
+-#include "nm-device-interface.h"
+-#include "nm-device-private.h"
+-#include "nm-setting-cdma.h"
+-#include "nm-utils.h"
+-#include "nm-properties-changed-signal.h"
+-#include "nm-cdma-device-glue.h"
+-#include "nm-setting-connection.h"
+-
+-G_DEFINE_TYPE (NMCdmaDevice, nm_cdma_device, NM_TYPE_SERIAL_DEVICE)
+-
+-#define NM_CDMA_DEVICE_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_CDMA_DEVICE, NMCdmaDevicePrivate))
+-
+-typedef struct {
+-	char *monitor_iface;
+-	NMSerialDevice *monitor_device;
+-
+-	guint state_to_disconnected_id;
+-} NMCdmaDevicePrivate;
+-
+-enum {
+-	PROP_0,
+-	PROP_MONITOR_IFACE,
+-
+-	LAST_PROP
+-};
+-
+-enum {
+-	PROPERTIES_CHANGED,
+-
+-	LAST_SIGNAL
+-};
+-
+-static guint signals[LAST_SIGNAL] = { 0 };
+-
+-
+-NMCdmaDevice *
+-nm_cdma_device_new (const char *udi,
+-                    const char *data_iface,
+-                    const char *monitor_iface,
+-                    const char *driver,
+-                    gboolean managed)
+-{
+-	g_return_val_if_fail (udi != NULL, NULL);
+-	g_return_val_if_fail (data_iface != NULL, NULL);
+-	g_return_val_if_fail (driver != NULL, NULL);
+-
+-	return (NMCdmaDevice *) g_object_new (NM_TYPE_CDMA_DEVICE,
+-	                                      NM_DEVICE_INTERFACE_UDI, udi,
+-	                                      NM_DEVICE_INTERFACE_IFACE, data_iface,
+-	                                      NM_DEVICE_INTERFACE_DRIVER, driver,
+-	                                      NM_CDMA_DEVICE_MONITOR_IFACE, monitor_iface,
+-										  NM_DEVICE_INTERFACE_MANAGED, managed,
+-	                                      NULL);
+-}
+-
+-static NMSetting *
+-cdma_device_get_setting (NMCdmaDevice *device, GType setting_type)
+-{
+-	NMActRequest *req;
+-	NMSetting *setting = NULL;
+-
+-	req = nm_device_get_act_request (NM_DEVICE (device));
+-	if (req) {
+-		NMConnection *connection;
+-
+-		connection = nm_act_request_get_connection (req);
+-		if (connection)
+-			setting = nm_connection_get_setting (connection, setting_type);
+-	}
+-
+-	return setting;
+-}
+-
+-static void
+-dial_done (NMSerialDevice *device,
+-           int reply_index,
+-           gpointer user_data)
+-{
+-	NMDeviceStateReason reason = NM_DEVICE_STATE_REASON_UNKNOWN;
+-	gboolean success = FALSE;
+-
+-	switch (reply_index) {
+-	case 0:
+-		nm_info ("Connected, Woo!");
+-		success = TRUE;
+-		break;
+-	case 1:
+-		nm_info ("Busy");
+-		reason = NM_DEVICE_STATE_REASON_MODEM_BUSY;
+-		break;
+-	case 2:
+-		nm_warning ("No dial tone");
+-		reason = NM_DEVICE_STATE_REASON_MODEM_NO_DIAL_TONE;
+-		break;
+-	case 3:
+-		nm_warning ("No carrier");
+-		reason = NM_DEVICE_STATE_REASON_MODEM_NO_CARRIER;
+-		break;
+-	case -1:
+-		nm_warning ("Dialing timed out");
+-		reason = NM_DEVICE_STATE_REASON_MODEM_DIAL_TIMEOUT;
+-		break;
+-	default:
+-		nm_warning ("Dialing failed");
+-		break;
+-	}
+-
+-	if (success)
+-		nm_device_activate_schedule_stage2_device_config (NM_DEVICE (device));
+-	else
+-		nm_device_state_changed (NM_DEVICE (device), NM_DEVICE_STATE_FAILED, reason);
+-}
+-
+-static void
+-do_dial (NMSerialDevice *device)
+-{
+-	NMSettingCdma *setting;
+-	char *command;
+-	guint id = 0;
+-	char *responses[] = { "CONNECT", "BUSY", "NO DIAL TONE", "NO CARRIER", NULL };
+-
+-	setting = NM_SETTING_CDMA (cdma_device_get_setting (NM_CDMA_DEVICE (device), NM_TYPE_SETTING_CDMA));
+-
+-	command = g_strconcat ("ATDT", setting->number, NULL);
+-	if (nm_serial_device_send_command_string (device, command))
+-		id = nm_serial_device_wait_for_reply (device, 60, responses, responses, dial_done, NULL);
+-	g_free (command);
+-
+-	if (id == 0)
+-		nm_device_state_changed (NM_DEVICE (device),
+-		                         NM_DEVICE_STATE_FAILED,
+-		                         NM_DEVICE_STATE_REASON_UNKNOWN);
+-}
+-
+-static void
+-init_done (NMSerialDevice *device,
+-		 int reply_index,
+-		 gpointer user_data)
+-{
+-	switch (reply_index) {
+-	case 0:
+-		do_dial (device);
+-		break;
+-	case -1:
+-		nm_warning ("Modem initialization timed out");
+-		nm_device_state_changed (NM_DEVICE (device),
+-		                         NM_DEVICE_STATE_FAILED,
+-		                         NM_DEVICE_STATE_REASON_MODEM_INIT_FAILED);
+-		break;
+-	default:
+-		nm_warning ("Modem initialization failed");
+-		nm_device_state_changed (NM_DEVICE (device),
+-		                         NM_DEVICE_STATE_FAILED,
+-		                         NM_DEVICE_STATE_REASON_MODEM_INIT_FAILED);
+-		return;
+-	}
+-}
+-
+-static void
+-init_modem (NMSerialDevice *device, gpointer user_data)
+-{
+-	guint id = 0;
+-	char *responses[] = { "OK", "ERROR", "ERR", NULL };
+-
+-	if (nm_serial_device_send_command_string (device, "ATZ E0"))
+-		id = nm_serial_device_wait_for_reply (device, 10, responses, responses, init_done, NULL);
+-
+-	if (id == 0)
+-		nm_device_state_changed (NM_DEVICE (device), NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_UNKNOWN);
+-}
+-
+-static NMActStageReturn
+-real_act_stage1_prepare (NMDevice *device, NMDeviceStateReason *reason)
+-{
+-	NMSerialDevice *serial_device = NM_SERIAL_DEVICE (device);
+-	NMSettingSerial *setting;
+-	guint id;
+-
+-	setting = NM_SETTING_SERIAL (cdma_device_get_setting (NM_CDMA_DEVICE (device), NM_TYPE_SETTING_SERIAL));
+-
+-	if (!nm_serial_device_open (serial_device, setting)) {
+-		*reason = NM_DEVICE_STATE_REASON_CONFIG_FAILED;
+-		return NM_ACT_STAGE_RETURN_FAILURE;
+-	}
+-
+-	id = nm_serial_device_flash (serial_device, 100, init_modem, NULL);
+-	if (!id)
+-		*reason = NM_DEVICE_STATE_REASON_UNKNOWN;
+-
+-	return id ? NM_ACT_STAGE_RETURN_POSTPONE : NM_ACT_STAGE_RETURN_FAILURE;
+-}
+-
+-static NMConnection *
+-real_get_best_auto_connection (NMDevice *dev,
+-                               GSList *connections,
+-                               char **specific_object)
+-{
+-	GSList *iter;
+-
+-	for (iter = connections; iter; iter = g_slist_next (iter)) {
+-		NMConnection *connection = NM_CONNECTION (iter->data);
+-		NMSettingConnection *s_con;
+-
+-		s_con = (NMSettingConnection *) nm_connection_get_setting (connection, NM_TYPE_SETTING_CONNECTION);
+-		g_assert (s_con);
+-
+-		if (!s_con->autoconnect)
+-			continue;
+-
+-		if (strcmp (s_con->type, NM_SETTING_CDMA_SETTING_NAME))
+-			continue;
+-
+-		return connection;
+-	}
+-	return NULL;
+-}
+-
+-static guint32
+-real_get_generic_capabilities (NMDevice *dev)
+-{
+-	return NM_DEVICE_CAP_NM_SUPPORTED;
+-}
+-
+-static void
+-real_connection_secrets_updated (NMDevice *dev,
+-                                 NMConnection *connection,
+-                                 GSList *updated_settings,
+-                                 RequestSecretsCaller caller)
+-{
+-	NMActRequest *req;
+-	gboolean found = FALSE;
+-	GSList *iter;
+-
+-	if (caller == SECRETS_CALLER_PPP) {
+-		NMPPPManager *ppp_manager;
+-		NMSettingCdma *s_cdma = NULL;
+-
+-		ppp_manager = nm_serial_device_get_ppp_manager (NM_SERIAL_DEVICE (dev));
+-		g_return_if_fail (ppp_manager != NULL);
+-
+-		s_cdma = (NMSettingCdma *) nm_connection_get_setting (connection, NM_TYPE_SETTING_CDMA);
+-		if (!s_cdma) {
+-			/* Shouldn't ever happen */
+-			nm_ppp_manager_update_secrets (ppp_manager,
+-			                               nm_device_get_iface (dev),
+-			                               NULL,
+-			                               NULL,
+-			                               "missing CDMA setting; no secrets could be found.");
+-		} else {
+-			nm_ppp_manager_update_secrets (ppp_manager,
+-			                               nm_device_get_iface (dev),
+-			                               s_cdma->username ? s_cdma->username : "",
+-			                               s_cdma->password ? s_cdma->password : "",
+-			                               NULL);
+-		}
+-		return;
+-	}
+-
+-	g_return_if_fail (caller == SECRETS_CALLER_CDMA);
+-	g_return_if_fail (nm_device_get_state (dev) == NM_DEVICE_STATE_NEED_AUTH);
+-
+-	for (iter = updated_settings; iter; iter = g_slist_next (iter)) {
+-		const char *setting_name = (const char *) iter->data;
+-
+-		if (!strcmp (setting_name, NM_SETTING_CDMA_SETTING_NAME))
+-			found = TRUE;
+-		else
+-			nm_warning ("Ignoring updated secrets for setting '%s'.", setting_name);
+-	}
+-
+-	if (!found)
+-		return;
+-
+-	req = nm_device_get_act_request (dev);
+-	g_assert (req);
+-
+-	g_return_if_fail (nm_act_request_get_connection (req) == connection);
+-
+-	nm_device_activate_schedule_stage1_device_prepare (dev);
+-}
+-
+-/*****************************************************************************/
+-/* Monitor device handling */
+-
+-static gboolean
+-monitor_device_got_data (GIOChannel *source,
+-					GIOCondition condition,
+-					gpointer data)
+-{
+-	gsize bytes_read;
+-	char buf[4096];
+-	GIOStatus status;
+-
+-	if (condition & G_IO_IN) {
+-		do {
+-			status = g_io_channel_read_chars (source, buf, 4096, &bytes_read, NULL);
+-
+-			if (bytes_read) {
+-				buf[bytes_read] = '\0';
+-				/* Do nothing with the data for now */
+-				nm_debug ("Monitor got unhandled data: '%s'", buf);
+-			}
+-		} while (bytes_read == 4096 || status == G_IO_STATUS_AGAIN);
+-	}
+-
+-	if (condition & G_IO_HUP || condition & G_IO_ERR) {
+-		return FALSE;
+-	}
+-
+-	return TRUE;
+-}
+-
+-static gboolean
+-setup_monitor_device (NMCdmaDevice *device)
+-{
+-	NMCdmaDevicePrivate *priv = NM_CDMA_DEVICE_GET_PRIVATE (device);
+-	GIOChannel *channel;
+-	NMSettingSerial *setting;
+-
+-	if (!priv->monitor_iface) {
+-		nm_debug ("No monitoring udi provided");
+-		return FALSE;
+-	}
+-
+-	priv->monitor_device = g_object_new (NM_TYPE_SERIAL_DEVICE,
+-	                                     NM_DEVICE_INTERFACE_UDI, nm_device_get_udi (NM_DEVICE (device)),
+-	                                     NM_DEVICE_INTERFACE_IFACE, priv->monitor_iface,
+-	                                     NULL);
+-
+-	if (!priv->monitor_device) {
+-		nm_warning ("Creation of the monitoring device failed");
+-		return FALSE;
+-	}
+-
+-	setting = NM_SETTING_SERIAL (nm_setting_serial_new ());
+-	if (!nm_serial_device_open (priv->monitor_device, setting)) {
+-		nm_warning ("Monitoring device open failed");
+-		g_object_unref (setting);
+-		g_object_unref (priv->monitor_device);
+-		return FALSE;
+-	}
+-
+-	g_object_unref (setting);
+-
+-	channel = nm_serial_device_get_io_channel (priv->monitor_device);
+-	g_io_add_watch (channel, G_IO_IN | G_IO_ERR | G_IO_HUP,
+-				 monitor_device_got_data, device);
+-
+-	g_io_channel_unref (channel);
+-
+-	return TRUE;
+-}
+-
+-/*****************************************************************************/
+-
+-static void
+-nm_cdma_device_init (NMCdmaDevice *self)
+-{
+-	nm_device_set_device_type (NM_DEVICE (self), NM_DEVICE_TYPE_CDMA);
+-}
+-
+-static gboolean
+-unavailable_to_disconnected (gpointer user_data)
+-{
+-	nm_device_state_changed (NM_DEVICE (user_data),
+-	                         NM_DEVICE_STATE_DISCONNECTED,
+-	                         NM_DEVICE_STATE_REASON_NONE);
+-	return FALSE;
+-}
+-
+-static void
+-device_state_changed (NMDeviceInterface *device,
+-                      NMDeviceState new_state,
+-                      NMDeviceState old_state,
+-                      NMDeviceStateReason reason,
+-                      gpointer user_data)
+-{
+-	NMCdmaDevice *self = NM_CDMA_DEVICE (user_data);
+-	NMCdmaDevicePrivate *priv = NM_CDMA_DEVICE_GET_PRIVATE (self);
+-
+-	/* Remove any previous delayed transition to disconnected */
+-	if (priv->state_to_disconnected_id) {
+-		g_source_remove (priv->state_to_disconnected_id);
+-		priv->state_to_disconnected_id = 0;
+-	}
+-
+-	/* If transitioning to UNAVAILBLE and we have a carrier, transition to
+-	 * DISCONNECTED because the device is ready to use.  Otherwise the carrier-on
+-	 * handler will handle the transition to DISCONNECTED when the carrier is detected.
+-	 */
+-	if (new_state == NM_DEVICE_STATE_UNAVAILABLE)
+-		priv->state_to_disconnected_id = g_idle_add (unavailable_to_disconnected, self);
+-
+-	/* Make sure we don't leave the serial device open */
+-	switch (new_state) {
+-	case NM_DEVICE_STATE_UNMANAGED:
+-	case NM_DEVICE_STATE_UNAVAILABLE:
+-	case NM_DEVICE_STATE_FAILED:
+-	case NM_DEVICE_STATE_DISCONNECTED:
+-		nm_serial_device_close (NM_SERIAL_DEVICE (self));
+-		break;
+-	default:
+-		break;
+-	}
+-}
+-
+-static GObject*
+-constructor (GType type,
+-             guint n_construct_params,
+-             GObjectConstructParam *construct_params)
+-{
+-	GObject *object;
+-
+-	object = G_OBJECT_CLASS (nm_cdma_device_parent_class)->constructor (type,
+-														  n_construct_params,
+-														  construct_params);
+-	if (!object)
+-		return NULL;
+-
+-	/* FIXME: Make the monitor device not required for now */
+-	setup_monitor_device (NM_CDMA_DEVICE (object));
+-#if 0
+-	if (!setup_monitor_device (NM_CDMA_DEVICE (object))) {
+-		g_object_unref (object);
+-		object = NULL;
+-	}
+-#endif
+-
+-	g_signal_connect (NM_DEVICE (object), "state-changed",
+-	                  G_CALLBACK (device_state_changed), NM_CDMA_DEVICE (object));
+-
+-	return object;
+-}
+-
+-static void
+-set_property (GObject *object, guint prop_id,
+-		    const GValue *value, GParamSpec *pspec)
+-{
+-	NMCdmaDevicePrivate *priv = NM_CDMA_DEVICE_GET_PRIVATE (object);
+-
+-	switch (prop_id) {
+-	case PROP_MONITOR_IFACE:
+-		/* Construct only */
+-		priv->monitor_iface = g_value_dup_string (value);
+-		break;
+-	default:
+-		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+-		break;
+-	}
+-}
+-
+-static void
+-get_property (GObject *object, guint prop_id,
+-		    GValue *value, GParamSpec *pspec)
+-{
+-	NMCdmaDevicePrivate *priv = NM_CDMA_DEVICE_GET_PRIVATE (object);
+-
+-	switch (prop_id) {
+-	case PROP_MONITOR_IFACE:
+-		g_value_set_string (value, priv->monitor_iface);
+-		break;
+-	default:
+-		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+-		break;
+-	}
+-}
+-
+-static void
+-finalize (GObject *object)
+-{
+-	NMCdmaDevicePrivate *priv = NM_CDMA_DEVICE_GET_PRIVATE (object);
+-
+-	if (priv->monitor_device)
+-		g_object_unref (priv->monitor_device);
+-
+-	g_free (priv->monitor_iface);
+-
+-	if (priv->state_to_disconnected_id) {
+-		g_source_remove (priv->state_to_disconnected_id);
+-		priv->state_to_disconnected_id = 0;
+-	}
+-
+-	G_OBJECT_CLASS (nm_cdma_device_parent_class)->finalize (object);
+-}
+-
+-static void
+-nm_cdma_device_class_init (NMCdmaDeviceClass *klass)
+-{
+-	GObjectClass *object_class = G_OBJECT_CLASS (klass);
+-	NMDeviceClass *device_class = NM_DEVICE_CLASS (klass);
+-
+-	g_type_class_add_private (object_class, sizeof (NMCdmaDevicePrivate));
+-
+-	object_class->constructor = constructor;
+-	object_class->get_property = get_property;
+-	object_class->set_property = set_property;
+-	object_class->finalize = finalize;
+-
+-	device_class->get_best_auto_connection = real_get_best_auto_connection;
+-	device_class->get_generic_capabilities = real_get_generic_capabilities;
+-	device_class->act_stage1_prepare = real_act_stage1_prepare;
+-	device_class->connection_secrets_updated = real_connection_secrets_updated;
+-
+-	/* Properties */
+-	g_object_class_install_property
+-		(object_class, PROP_MONITOR_IFACE,
+-		 g_param_spec_string (NM_CDMA_DEVICE_MONITOR_IFACE,
+-						  "Monitoring interface",
+-						  "Monitoring interface",
+-						  NULL,
+-						  G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | NM_PROPERTY_PARAM_NO_EXPORT));
+-
+-	/* Signals */
+-	signals[PROPERTIES_CHANGED] = 
+-		nm_properties_changed_signal_new (object_class,
+-								    G_STRUCT_OFFSET (NMCdmaDeviceClass, properties_changed));
+-
+-	dbus_g_object_type_install_info (G_TYPE_FROM_CLASS (klass),
+-									 &dbus_glib_nm_cdma_device_object_info);
+-}
+diff --git a/src/nm-cdma-device.h b/src/nm-cdma-device.h
+deleted file mode 100644
+index eef2aba..0000000
+--- a/src/nm-cdma-device.h
++++ /dev/null
+@@ -1,40 +0,0 @@
+-/* -*- Mode: C; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*- */
+-
+-#ifndef NM_CDMA_DEVICE_H
+-#define NM_CDMA_DEVICE_H
+-
+-#include <nm-serial-device.h>
+-
+-G_BEGIN_DECLS
+-
+-#define NM_TYPE_CDMA_DEVICE			(nm_cdma_device_get_type ())
+-#define NM_CDMA_DEVICE(obj)			(G_TYPE_CHECK_INSTANCE_CAST ((obj), NM_TYPE_CDMA_DEVICE, NMCdmaDevice))
+-#define NM_CDMA_DEVICE_CLASS(klass)		(G_TYPE_CHECK_CLASS_CAST ((klass),  NM_TYPE_CDMA_DEVICE, NMCdmaDeviceClass))
+-#define NM_IS_CDMA_DEVICE(obj)			(G_TYPE_CHECK_INSTANCE_TYPE ((obj), NM_TYPE_CDMA_DEVICE))
+-#define NM_IS_CDMA_DEVICE_CLASS(klass)	(G_TYPE_CHECK_CLASS_TYPE ((klass),  NM_TYPE_CDMA_DEVICE))
+-#define NM_CDMA_DEVICE_GET_CLASS(obj)	(G_TYPE_INSTANCE_GET_CLASS ((obj),  NM_TYPE_CDMA_DEVICE, NMCdmaDeviceClass))
+-
+-#define NM_CDMA_DEVICE_MONITOR_IFACE "monitor-iface"
+-
+-typedef struct {
+-	NMSerialDevice parent;
+-} NMCdmaDevice;
+-
+-typedef struct {
+-	NMSerialDeviceClass parent;
+-
+-	/* Signals */
+-	void (*properties_changed) (NMCdmaDevice *device, GHashTable *properties);
+-} NMCdmaDeviceClass;
+-
+-GType nm_cdma_device_get_type (void);
+-
+-NMCdmaDevice *nm_cdma_device_new (const char *udi,
+-                                  const char *data_iface,
+-                                  const char *monitor_iface,
+-                                  const char *driver,
+-                                  gboolean managed);
+-
+-G_END_DECLS
+-
+-#endif /* NM_CDMA_DEVICE_H */
+diff --git a/src/nm-hal-manager.c b/src/nm-hal-manager.c
+index 7286a06..cbc2496 100644
+--- a/src/nm-hal-manager.c
++++ b/src/nm-hal-manager.c
+@@ -13,9 +13,6 @@
+ #include "nm-utils.h"
+ #include "nm-device-wifi.h"
+ #include "nm-device-ethernet.h"
+-#include "nm-gsm-device.h"
+-#include "nm-hso-gsm-device.h"
+-#include "nm-cdma-device.h"
+ 
+ /* Killswitch poll frequency in seconds */
+ #define RFKILL_POLL_FREQUENCY 6
+@@ -200,145 +197,6 @@ wireless_device_creator (NMHalManager *self, const char *udi, gboolean managed)
+ 	return device;
+ }
+ 
+-/* Modem device creator */
+-
+-static gboolean
+-is_modem_device (NMHalManager *self, const char *udi)
+-{
+-	NMHalManagerPrivate *priv = NM_HAL_MANAGER_GET_PRIVATE (self);
+-	gboolean is_modem = FALSE;
+-
+-	if (libhal_device_property_exists (priv->hal_ctx, udi, "info.category", NULL)) {
+-		char *category;
+-
+-		category = libhal_device_get_property_string (priv->hal_ctx, udi, "info.category", NULL);
+-		if (category) {
+-			is_modem = strcmp (category, "serial") == 0;
+-			libhal_free_string (category);
+-		}
+-	}
+-
+-	return is_modem;
+-}
+-
+-static char *
+-get_hso_netdev (LibHalContext *ctx, const char *udi)
+-{
+-	char *serial_parent, *netdev = NULL;
+-	char **netdevs;
+-	int num, i;
+-
+-	/* Get the serial interface's originating device UDI, used to find the
+-	 * originating device's netdev.
+-	 */
+-	serial_parent = libhal_device_get_property_string (ctx, udi, "serial.originating_device", NULL);
+-	if (!serial_parent)
+-		serial_parent = libhal_device_get_property_string (ctx, udi, "info.parent", NULL);
+-	if (!serial_parent)
+-		return NULL;
+-
+-	/* Look for the originating device's netdev */
+-	netdevs = libhal_find_device_by_capability (ctx, "net", &num, NULL);
+-	for (i = 0; netdevs && !netdev && (i < num); i++) {
+-		char *netdev_parent, *tmp;
+-
+-		netdev_parent = libhal_device_get_property_string (ctx, netdevs[i], "net.originating_device", NULL);
+-		if (!netdev_parent)
+-			netdev_parent = libhal_device_get_property_string (ctx, netdevs[i], "net.physical_device", NULL);
+-		if (!netdev_parent)
+-			continue;
+-
+-		if (!strcmp (netdev_parent, serial_parent)) {
+-			/* We found it */
+-			tmp = libhal_device_get_property_string (ctx, netdevs[i], "net.interface", NULL);
+-			if (tmp) {
+-				netdev = g_strdup (tmp);
+-				libhal_free_string (tmp);
+-			}
+-		}
+-
+-		libhal_free_string (netdev_parent);
+-	}
+-	libhal_free_string_array (netdevs);
+-	libhal_free_string (serial_parent);
+-
+-	return netdev;
+-}
+-
+-static GObject *
+-modem_device_creator (NMHalManager *self, const char *udi, gboolean managed)
+-{
+-	NMHalManagerPrivate *priv = NM_HAL_MANAGER_GET_PRIVATE (self);
+-	char *serial_device;
+-	char *parent_udi;
+-	char *driver_name = NULL;
+-	GObject *device = NULL;
+-	char **capabilities, **iter;
+-	gboolean type_gsm = FALSE;
+-	gboolean type_cdma = FALSE;
+-	char *netdev = NULL;
+-
+-	serial_device = libhal_device_get_property_string (priv->hal_ctx, udi, "serial.device", NULL);
+-
+-	/* Get the driver */
+-	parent_udi = libhal_device_get_property_string (priv->hal_ctx, udi, "info.parent", NULL);
+-	if (parent_udi) {
+-		driver_name = libhal_device_get_property_string (priv->hal_ctx, parent_udi, "info.linux.driver", NULL);
+-		libhal_free_string (parent_udi);
+-	}
+-
+-	if (!serial_device || !driver_name)
+-		goto out;
+-
+-	capabilities = libhal_device_get_property_strlist (priv->hal_ctx, udi, "modem.command_sets", NULL);
+-	/* 'capabilites' may be NULL */
+-	for (iter = capabilities; iter && *iter; iter++) {
+-		if (!strcmp (*iter, "GSM-07.07")) {
+-			type_gsm = TRUE;
+-			break;
+-		}
+-		if (!strcmp (*iter, "IS-707-A")) {
+-			type_cdma = TRUE;
+-			break;
+-		}
+-	}
+-	g_strfreev (capabilities);
+-
+-	/* Compatiblity with the pre-specification bits */
+-	if (!type_gsm && !type_cdma) {
+-		capabilities = libhal_device_get_property_strlist (priv->hal_ctx, udi, "info.capabilities", NULL);
+-		for (iter = capabilities; *iter; iter++) {
+-			if (!strcmp (*iter, "gsm")) {
+-				type_gsm = TRUE;
+-				break;
+-			}
+-			if (!strcmp (*iter, "cdma")) {
+-				type_cdma = TRUE;
+-				break;
+-			}
+-		}
+-		g_strfreev (capabilities);
+-	}
+-
+-	/* Special handling of 'hso' cards (until punted out to a modem manager) */
+-	if (type_gsm && !strcmp (driver_name, "hso"))
+-		netdev = get_hso_netdev (priv->hal_ctx, udi);
+-
+-	if (type_gsm) {
+-		if (netdev)
+-			device = (GObject *) nm_hso_gsm_device_new (udi, serial_device + strlen ("/dev/"), NULL, netdev, driver_name, managed);
+-		else
+-			device = (GObject *) nm_gsm_device_new (udi, serial_device + strlen ("/dev/"), NULL, driver_name, managed);
+-	} else if (type_cdma)
+-		device = (GObject *) nm_cdma_device_new (udi, serial_device + strlen ("/dev/"), NULL, driver_name, managed);
+-
+-out:
+-	libhal_free_string (serial_device);
+-	libhal_free_string (driver_name);
+-
+-	return device;
+-}
+-
+ static void
+ register_built_in_creators (NMHalManager *self)
+ {
+@@ -360,14 +218,6 @@ register_built_in_creators (NMHalManager *self)
+ 	creator->is_device_fn = is_wireless_device;
+ 	creator->creator_fn = wireless_device_creator;
+ 	priv->device_creators = g_slist_append (priv->device_creators, creator);
+-
+-	/* Modem */
+-	creator = g_slice_new0 (DeviceCreator);
+-	creator->device_type_name = g_strdup ("Modem");
+-	creator->capability_str = g_strdup ("modem");
+-	creator->is_device_fn = is_modem_device;
+-	creator->creator_fn = modem_device_creator;
+-	priv->device_creators = g_slist_append (priv->device_creators, creator);
+ }
+ 
+ static void
+diff --git a/src/nm-hso-gsm-device.c b/src/nm-hso-gsm-device.c
+deleted file mode 100644
+index 009d803..0000000
+--- a/src/nm-hso-gsm-device.c
++++ /dev/null
+@@ -1,569 +0,0 @@
+-/* -*- Mode: C; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*- */
+-
+-#include <stdio.h>
+-#include <string.h>
+-#include <errno.h>
+-#include <stdlib.h>
+-#include <arpa/inet.h>
+-#include <dbus/dbus-glib.h>
+-
+-#include "nm-device.h"
+-#include "nm-hso-gsm-device.h"
+-#include "nm-gsm-device.h"
+-#include "nm-device-interface.h"
+-#include "nm-device-private.h"
+-#include "nm-setting-gsm.h"
+-#include "nm-utils.h"
+-#include "nm-properties-changed-signal.h"
+-#include "nm-setting-connection.h"
+-#include "NetworkManagerSystem.h"
+-
+-G_DEFINE_TYPE (NMHsoGsmDevice, nm_hso_gsm_device, NM_TYPE_GSM_DEVICE)
+-
+-#define NM_HSO_GSM_DEVICE_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_HSO_GSM_DEVICE, NMHsoGsmDevicePrivate))
+-
+-extern const DBusGObjectInfo dbus_glib_nm_gsm_device_object_info;
+-
+-#define GSM_CID "gsm-cid"
+-#define HSO_SECRETS_TRIES "gsm-secrets-tries"
+-
+-typedef struct {
+-	char *netdev_iface;
+-	NMIP4Config *pending_ip4_config;
+-} NMHsoGsmDevicePrivate;
+-
+-enum {
+-	PROP_0,
+-	PROP_NETDEV_IFACE,
+-
+-	LAST_PROP
+-};
+-
+-NMHsoGsmDevice *
+-nm_hso_gsm_device_new (const char *udi,
+-                       const char *data_iface,
+-                       const char *monitor_iface,
+-                       const char *netdev_iface,
+-                       const char *driver,
+-                       gboolean managed)
+-{
+-	g_return_val_if_fail (udi != NULL, NULL);
+-	g_return_val_if_fail (data_iface != NULL, NULL);
+-	g_return_val_if_fail (driver != NULL, NULL);
+-	g_return_val_if_fail (netdev_iface != NULL, NULL);
+-
+-	return (NMHsoGsmDevice *) g_object_new (NM_TYPE_HSO_GSM_DEVICE,
+-								  NM_DEVICE_INTERFACE_UDI, udi,
+-								  NM_DEVICE_INTERFACE_IFACE, data_iface,
+-								  NM_DEVICE_INTERFACE_DRIVER, driver,
+-								  NM_GSM_DEVICE_MONITOR_IFACE, monitor_iface,
+-								  NM_HSO_GSM_DEVICE_NETDEV_IFACE, netdev_iface,
+-								  NM_DEVICE_INTERFACE_MANAGED, managed,
+-								  NULL);
+-}
+-
+-static void
+-modem_wait_for_reply (NMGsmDevice *self,
+-				  const char *command,
+-				  guint timeout,
+-				  char **responses,
+-				  char **terminators,
+-				  NMSerialWaitForReplyFn callback,
+-				  gpointer user_data)
+-{
+-	NMSerialDevice *serial = NM_SERIAL_DEVICE (self);
+-	guint id = 0;
+-
+-	if (nm_serial_device_send_command_string (serial, command))
+-		id = nm_serial_device_wait_for_reply (serial, timeout, responses, terminators, callback, user_data);
+-
+-	if (id == 0)
+-		nm_device_state_changed (NM_DEVICE (self), NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_UNKNOWN);
+-}
+-
+-static void
+-modem_get_reply (NMGsmDevice *self,
+-			  const char *command,
+-			  guint timeout,
+-			  const char *terminators,
+-			  NMSerialGetReplyFn callback)
+-{
+-	NMSerialDevice *serial = NM_SERIAL_DEVICE (self);
+-	guint id = 0;
+-
+-	if (nm_serial_device_send_command_string (serial, command))
+-		id = nm_serial_device_get_reply (serial, timeout, terminators, callback, NULL);
+-
+-	if (id == 0)
+-		nm_device_state_changed (NM_DEVICE (self), NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_UNKNOWN);
+-}
+-
+-static NMSetting *
+-gsm_device_get_setting (NMGsmDevice *device, GType setting_type)
+-{
+-	NMActRequest *req;
+-	NMSetting *setting = NULL;
+-
+-	req = nm_device_get_act_request (NM_DEVICE (device));
+-	if (req) {
+-		NMConnection *connection;
+-
+-		connection = nm_act_request_get_connection (req);
+-		if (connection)
+-			setting = nm_connection_get_setting (connection, setting_type);
+-	}
+-
+-	return setting;
+-}
+-
+-static void
+-hso_call_done (NMSerialDevice *device,
+-               int reply_index,
+-               gpointer user_data)
+-{
+-	gboolean success = FALSE;
+-
+-	switch (reply_index) {
+-	case 0:
+-		nm_info ("Connected, Woo!");
+-		success = TRUE;
+-		break;
+-	default:
+-		nm_warning ("Connect request failed");
+-		break;
+-	}
+-
+-	if (success)
+-		nm_device_activate_schedule_stage3_ip_config_start (NM_DEVICE (device));
+-	else
+-		nm_device_state_changed (NM_DEVICE (device), NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_MODEM_DIAL_FAILED);
+-}
+-
+-static void
+-hso_clear_done (NMSerialDevice *device,
+-               int reply_index,
+-               gpointer user_data)
+-{
+-	char *responses[] = { "_OWANCALL: ", "ERROR", NULL };
+-	guint cid = GPOINTER_TO_UINT (user_data);
+-	char *command;
+-
+-	/* Try to connect */
+-	command = g_strdup_printf ("AT_OWANCALL=%d,1,1", cid);
+-	modem_wait_for_reply (NM_GSM_DEVICE (device), command, 10, responses, responses, hso_call_done, NULL);
+-	g_free (command);
+-}
+-
+-static void
+-hso_auth_done (NMSerialDevice *device,
+-               int reply_index,
+-               gpointer user_data)
+-{
+-	gboolean success = FALSE;
+-	char *responses[] = { "_OWANCALL: ", "ERROR", "NO CARRIER", NULL };
+-	guint cid = GPOINTER_TO_UINT (user_data);
+-	char *command;
+-
+-	switch (reply_index) {
+-	case 0:
+-		nm_info ("Authentication successful!");
+-		success = TRUE;
+-		break;
+-	default:
+-		nm_warning ("Authentication failed");
+-		break;
+-	}
+-
+-	if (!success) {
+-		nm_device_state_changed (NM_DEVICE (device), NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_MODEM_DIAL_FAILED);
+-		return;
+-	}
+-
+-	/* Kill any existing connection */
+-	command = g_strdup_printf ("AT_OWANCALL=%d,0,1", cid);
+-	modem_wait_for_reply (NM_GSM_DEVICE (device), command, 5, responses, responses, hso_clear_done, GUINT_TO_POINTER (cid));
+-	g_free (command);
+-}
+-
+-static void
+-do_hso_auth (NMHsoGsmDevice *device)
+-{
+-	NMSettingGsm *s_gsm;
+-	NMActRequest *req;
+-	char *responses[] = { "OK", "ERROR", NULL };
+-	char *command;
+-	guint cid;
+-
+-	req = nm_device_get_act_request (NM_DEVICE (device));
+-	g_assert (req);
+-
+-	cid = GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (req), GSM_CID));
+-
+-	s_gsm = NM_SETTING_GSM (gsm_device_get_setting (NM_GSM_DEVICE (device), NM_TYPE_SETTING_GSM));
+-
+-	command = g_strdup_printf ("AT$QCPDPP=%d,1,\"%s\",\"%s\"",
+-	                           cid,
+-	                           s_gsm->password ? s_gsm->password : "",
+-	                           s_gsm->username ? s_gsm->username : "");
+-	modem_wait_for_reply (NM_GSM_DEVICE (device), command, 5, responses, responses, hso_auth_done, GUINT_TO_POINTER (cid));
+-	g_free (command);
+-}
+-
+-static NMActStageReturn
+-real_act_stage2_config (NMDevice *device, NMDeviceStateReason *reason)
+-{
+-	NMActRequest *req;
+-	NMConnection *connection;
+-	const char *setting_name;
+-	GPtrArray *hints = NULL;
+-	const char *hint1 = NULL, *hint2 = NULL;
+-	guint32 tries;
+-
+-	req = nm_device_get_act_request (device);
+-	g_assert (req);
+-	connection = nm_act_request_get_connection (req);
+-	g_assert (connection);
+-
+-	setting_name = nm_connection_need_secrets (connection, &hints);
+-	if (!setting_name) {
+-		do_hso_auth (NM_HSO_GSM_DEVICE (device));
+-		return NM_ACT_STAGE_RETURN_POSTPONE;
+-	}
+-
+-	if (hints) {
+-		if (hints->len > 0)
+-			hint1 = g_ptr_array_index (hints, 0);
+-		if (hints->len > 1)
+-			hint2 = g_ptr_array_index (hints, 1);
+-	}
+-
+-	nm_device_state_changed (device, NM_DEVICE_STATE_NEED_AUTH, NM_DEVICE_STATE_REASON_NONE);
+-
+-	tries = GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (connection), HSO_SECRETS_TRIES));
+-	nm_act_request_request_connection_secrets (req,
+-	                                           setting_name,
+-	                                           tries ? TRUE : FALSE,
+-	                                           SECRETS_CALLER_HSO_GSM,
+-	                                           hint1,
+-	                                           hint2);
+-	g_object_set_data (G_OBJECT (connection), HSO_SECRETS_TRIES, GUINT_TO_POINTER (++tries));
+-
+-	if (hints)
+-		g_ptr_array_free (hints, TRUE);
+-
+-	return NM_ACT_STAGE_RETURN_POSTPONE;
+-}
+-
+-static void
+-real_do_dial (NMGsmDevice *device, guint cid)
+-{
+-	NMActRequest *req;
+-
+-	req = nm_device_get_act_request (NM_DEVICE (device));
+-	g_assert (req);
+-	g_object_set_data (G_OBJECT (req), GSM_CID, GUINT_TO_POINTER (cid));
+-
+-	nm_device_activate_schedule_stage2_device_config (NM_DEVICE (device));
+-}
+-
+-#define OWANDATA_TAG "_OWANDATA: "
+-
+-static void
+-hso_ip4_config_done (NMSerialDevice *device,
+-                     const char *response,
+-                     gpointer user_data)
+-{
+-	NMHsoGsmDevicePrivate *priv = NM_HSO_GSM_DEVICE_GET_PRIVATE (device);
+-	NMActRequest *req;
+-	char **items, **iter;
+-	guint cid, i;
+-	NMSettingIP4Address addr = { 0, 32, 0 };
+-	guint32 dns1 = 0, dns2 = 0;
+-
+-	if (!response || strncmp (response, OWANDATA_TAG, strlen (OWANDATA_TAG))) {
+-		nm_device_activate_schedule_stage4_ip_config_timeout (NM_DEVICE (device));
+-		return;
+-	}
+-
+-	req = nm_device_get_act_request (NM_DEVICE (device));
+-	g_assert (req);
+-	cid = GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (req), GSM_CID));
+-
+-	items = g_strsplit (response + strlen (OWANDATA_TAG), ", ", 0);
+-	for (iter = items, i = 0; *iter; iter++, i++) {
+-		if (i == 0) { /* CID */
+-			long int tmp;
+-
+-			errno = 0;
+-			tmp = strtol (*iter, NULL, 10);
+-			if (errno != 0 || tmp < 0 || (guint) tmp != cid) {
+-				nm_warning ("%s: unknown CID in OWANDATA response (got %d, expected %d)",
+-				            nm_device_get_iface (NM_DEVICE (device)),
+-				            (guint) tmp, cid);
+-				goto out;
+-			}
+-		} else if (i == 1) { /* IP address */
+-			if (inet_pton (AF_INET, *iter, &(addr.address)) <= 0)
+-				addr.address = 0;
+-		} else if (i == 3) { /* DNS 1 */
+-			if (inet_pton (AF_INET, *iter, &dns1) <= 0)
+-				dns1 = 0;
+-		} else if (i == 4) { /* DNS 2 */
+-			if (inet_pton (AF_INET, *iter, &dns2) <= 0)
+-				dns2 = 0;
+-		}
+-	}
+-
+-out:
+-	g_strfreev (items);
+-
+-	if (addr.address) {
+-		priv->pending_ip4_config = nm_ip4_config_new ();
+-
+-		nm_ip4_config_add_address (priv->pending_ip4_config, &addr);
+-
+-		if (dns1)
+-			nm_ip4_config_add_nameserver (priv->pending_ip4_config, dns1);
+-		if (dns2)
+-			nm_ip4_config_add_nameserver (priv->pending_ip4_config, dns2);
+-
+-		nm_device_activate_schedule_stage4_ip_config_get (NM_DEVICE (device));
+-	} else {
+-		nm_device_state_changed (NM_DEVICE (device),
+-		                         NM_DEVICE_STATE_FAILED,
+-		                         NM_DEVICE_STATE_REASON_IP_CONFIG_UNAVAILABLE);
+-	}
+-}
+-
+-static NMActStageReturn
+-real_act_stage3_ip_config_start (NMDevice *device, NMDeviceStateReason *reason)
+-{
+-	const char terminators[] = { '\r', '\n', '\0' };
+-	NMActRequest *req;
+-	char *command;
+-	gint cid;
+-
+-	req = nm_device_get_act_request (device);
+-	g_assert (req);
+-
+-	cid = GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (req), GSM_CID));
+-	command = g_strdup_printf ("AT_OWANDATA=%d", cid);
+-	modem_get_reply (NM_GSM_DEVICE (device), command, 5, terminators, hso_ip4_config_done);
+-	g_free (command);
+-
+-	return NM_ACT_STAGE_RETURN_POSTPONE;
+-}
+-
+-static NMActStageReturn
+-real_act_stage4_get_ip4_config (NMDevice *device,
+-                                NMIP4Config **config,
+-                                NMDeviceStateReason *reason)
+-{
+-	NMHsoGsmDevice *self = NM_HSO_GSM_DEVICE (device);
+-	NMHsoGsmDevicePrivate *priv = NM_HSO_GSM_DEVICE_GET_PRIVATE (self);
+-	gboolean no_firmware = FALSE;
+-
+-	g_return_val_if_fail (config != NULL, NM_ACT_STAGE_RETURN_FAILURE);
+-	g_return_val_if_fail (*config == NULL, NM_ACT_STAGE_RETURN_FAILURE);
+-
+-	nm_device_set_ip_iface (device, priv->netdev_iface);
+-	if (!nm_device_hw_bring_up (device, TRUE, &no_firmware)) {
+-		if (no_firmware)
+-			*reason = NM_DEVICE_STATE_REASON_FIRMWARE_MISSING;
+-		else
+-			*reason = NM_DEVICE_STATE_REASON_CONFIG_FAILED;
+-		return NM_ACT_STAGE_RETURN_FAILURE;
+-	}
+-
+-	*config = priv->pending_ip4_config;
+-	priv->pending_ip4_config = NULL;
+-	return NM_ACT_STAGE_RETURN_SUCCESS;
+-}
+-
+-static void
+-real_connection_secrets_updated (NMDevice *device,
+-                                 NMConnection *connection,
+-                                 GSList *updated_settings,
+-                                 RequestSecretsCaller caller)
+-{
+-	g_return_if_fail (caller == SECRETS_CALLER_HSO_GSM);
+-	g_return_if_fail (nm_device_get_state (device) == NM_DEVICE_STATE_NEED_AUTH);
+-
+-	nm_device_activate_schedule_stage2_device_config (device);
+-}
+-
+-static void
+-real_deactivate_quickly (NMDevice *device)
+-{
+-	NMHsoGsmDevicePrivate *priv = NM_HSO_GSM_DEVICE_GET_PRIVATE (device);
+-	NMActRequest *req;
+-	guint cid;
+-	char *command;
+-
+-	if (priv->pending_ip4_config) {
+-		g_object_unref (priv->pending_ip4_config);
+-		priv->pending_ip4_config = NULL;
+-	}
+-
+-	/* Don't leave the modem connected */
+-	req = nm_device_get_act_request (device);
+-	if (req) {
+-		cid = GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (req), GSM_CID));
+-		if (cid) {
+-			command = g_strdup_printf ("AT_OWANCALL=%d,0,1", cid);
+-			nm_serial_device_send_command_string (NM_SERIAL_DEVICE (device), command);
+-			g_free (command);
+-
+-			/* FIXME: doesn't seem to take the command otherwise, perhaps since
+-			 * the serial port gets closed right away
+-			 */
+-			g_usleep (G_USEC_PER_SEC / 3);
+-		}
+-	}
+-
+-
+-	if (NM_DEVICE_CLASS (nm_hso_gsm_device_parent_class)->deactivate_quickly)
+-		NM_DEVICE_CLASS (nm_hso_gsm_device_parent_class)->deactivate_quickly (device);
+-}
+-
+-static void
+-real_deactivate (NMDevice *device)
+-{
+-	NMHsoGsmDevicePrivate *priv = NM_HSO_GSM_DEVICE_GET_PRIVATE (device);
+-
+-	if (priv->netdev_iface) {
+-		nm_system_device_flush_ip4_routes_with_iface (priv->netdev_iface);
+-		nm_system_device_flush_ip4_addresses_with_iface (priv->netdev_iface);
+-		nm_system_device_set_up_down_with_iface (priv->netdev_iface, FALSE, NULL);
+-	}
+-	nm_device_set_ip_iface (device, NULL);
+-
+-	if (NM_DEVICE_CLASS (nm_hso_gsm_device_parent_class)->deactivate)
+-		NM_DEVICE_CLASS (nm_hso_gsm_device_parent_class)->deactivate (device);
+-}
+-
+-static gboolean
+-real_hw_is_up (NMDevice *device)
+-{
+-	NMHsoGsmDevicePrivate *priv = NM_HSO_GSM_DEVICE_GET_PRIVATE (device);
+-	NMDeviceState state;
+-
+-	state = nm_device_interface_get_state (NM_DEVICE_INTERFACE (device));
+-
+-	if (   priv->pending_ip4_config
+-	    || (state == NM_DEVICE_STATE_IP_CONFIG)
+-	    || (state == NM_DEVICE_STATE_ACTIVATED))
+-		return nm_system_device_is_up_with_iface (priv->netdev_iface);
+-
+-	return TRUE;
+-}
+-
+-static gboolean
+-real_hw_bring_up (NMDevice *device, gboolean *no_firmware)
+-{
+-	NMHsoGsmDevicePrivate *priv = NM_HSO_GSM_DEVICE_GET_PRIVATE (device);
+-	NMDeviceState state;
+-
+-	state = nm_device_interface_get_state (NM_DEVICE_INTERFACE (device));
+-
+-	if (   priv->pending_ip4_config
+-	    || (state == NM_DEVICE_STATE_IP_CONFIG)
+-	    || (state == NM_DEVICE_STATE_ACTIVATED))
+-		return nm_system_device_set_up_down_with_iface (priv->netdev_iface, TRUE, no_firmware);
+-
+-	return TRUE;
+-}
+-
+-static void
+-nm_hso_gsm_device_init (NMHsoGsmDevice *self)
+-{
+-}
+-
+-static GObject*
+-constructor (GType type,
+-             guint n_params,
+-             GObjectConstructParam *params)
+-{
+-	return G_OBJECT_CLASS (nm_hso_gsm_device_parent_class)->constructor (type, n_params, params);
+-}
+-
+-static void
+-set_property (GObject *object, guint prop_id,
+-		    const GValue *value, GParamSpec *pspec)
+-{
+-	NMHsoGsmDevicePrivate *priv = NM_HSO_GSM_DEVICE_GET_PRIVATE (object);
+-
+-	switch (prop_id) {
+-	case PROP_NETDEV_IFACE:
+-		/* Construct only */
+-		priv->netdev_iface = g_value_dup_string (value);
+-		break;
+-	default:
+-		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+-		break;
+-	}
+-}
+-
+-static void
+-get_property (GObject *object, guint prop_id,
+-		    GValue *value, GParamSpec *pspec)
+-{
+-	NMHsoGsmDevicePrivate *priv = NM_HSO_GSM_DEVICE_GET_PRIVATE (object);
+-
+-	switch (prop_id) {
+-	case PROP_NETDEV_IFACE:
+-		g_value_set_string (value, priv->netdev_iface);
+-		break;
+-	default:
+-		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+-		break;
+-	}
+-}
+-
+-static void
+-finalize (GObject *object)
+-{
+-	NMHsoGsmDevicePrivate *priv = NM_HSO_GSM_DEVICE_GET_PRIVATE (object);
+-
+-	g_free (priv->netdev_iface);
+-
+-	G_OBJECT_CLASS (nm_hso_gsm_device_parent_class)->finalize (object);
+-}
+-
+-static void
+-nm_hso_gsm_device_class_init (NMHsoGsmDeviceClass *klass)
+-{
+-	GObjectClass *object_class = G_OBJECT_CLASS (klass);
+-	NMDeviceClass *device_class = NM_DEVICE_CLASS (klass);
+-	NMGsmDeviceClass *gsm_class = NM_GSM_DEVICE_CLASS (klass);
+-
+-	g_type_class_add_private (object_class, sizeof (NMHsoGsmDevicePrivate));
+-
+-	object_class->constructor = constructor;
+-	object_class->get_property = get_property;
+-	object_class->set_property = set_property;
+-	object_class->finalize = finalize;
+-
+-	device_class->act_stage2_config = real_act_stage2_config;
+-	device_class->act_stage3_ip_config_start = real_act_stage3_ip_config_start;
+-	device_class->act_stage4_get_ip4_config = real_act_stage4_get_ip4_config;
+-	device_class->connection_secrets_updated = real_connection_secrets_updated;
+-	device_class->deactivate_quickly = real_deactivate_quickly;
+-	device_class->deactivate = real_deactivate;
+-	device_class->hw_is_up = real_hw_is_up;
+-	device_class->hw_bring_up = real_hw_bring_up;
+-
+-	gsm_class->do_dial = real_do_dial;
+-
+-	/* Properties */
+-	g_object_class_install_property
+-		(object_class, PROP_NETDEV_IFACE,
+-		 g_param_spec_string (NM_HSO_GSM_DEVICE_NETDEV_IFACE,
+-						  "Network interface",
+-						  "Network interface",
+-						  NULL,
+-						  G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | NM_PROPERTY_PARAM_NO_EXPORT));
+-
+-	dbus_g_object_type_install_info (G_TYPE_FROM_CLASS (klass),
+-									 &dbus_glib_nm_gsm_device_object_info);
+-}
+diff --git a/src/nm-hso-gsm-device.h b/src/nm-hso-gsm-device.h
+deleted file mode 100644
+index a7498c8..0000000
+--- a/src/nm-hso-gsm-device.h
++++ /dev/null
+@@ -1,38 +0,0 @@
+-/* -*- Mode: C; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*- */
+-
+-#ifndef NM_HSO_GSM_DEVICE_H
+-#define NM_HSO_GSM_DEVICE_H
+-
+-#include <nm-gsm-device.h>
+-
+-G_BEGIN_DECLS
+-
+-#define NM_TYPE_HSO_GSM_DEVICE				(nm_hso_gsm_device_get_type ())
+-#define NM_HSO_GSM_DEVICE(obj)				(G_TYPE_CHECK_INSTANCE_CAST ((obj), NM_TYPE_HSO_GSM_DEVICE, NMHsoGsmDevice))
+-#define NM_HSO_GSM_DEVICE_CLASS(klass)		(G_TYPE_CHECK_CLASS_CAST ((klass),  NM_TYPE_HSO_GSM_DEVICE, NMHsoGsmDeviceClass))
+-#define NM_IS_HSO_GSM_DEVICE(obj)			(G_TYPE_CHECK_INSTANCE_TYPE ((obj), NM_TYPE_HSO_GSM_DEVICE))
+-#define NM_IS_HSO_GSM_DEVICE_CLASS(klass)	(G_TYPE_CHECK_CLASS_TYPE ((klass),  NM_TYPE_HSO_GSM_DEVICE))
+-#define NM_HSO_GSM_DEVICE_GET_CLASS(obj)	(G_TYPE_INSTANCE_GET_CLASS ((obj),  NM_TYPE_HSO_GSM_DEVICE, NMHsoGsmDeviceClass))
+-
+-#define NM_HSO_GSM_DEVICE_NETDEV_IFACE "netdev-iface"
+-
+-typedef struct {
+-	NMGsmDevice parent;
+-} NMHsoGsmDevice;
+-
+-typedef struct {
+-	NMGsmDeviceClass parent;
+-} NMHsoGsmDeviceClass;
+-
+-GType nm_hso_gsm_device_get_type (void);
+-
+-NMHsoGsmDevice *nm_hso_gsm_device_new (const char *udi,
+-                                       const char *data_iface,
+-                                       const char *monitor_iface,
+-                                       const char *netdev_iface,
+-                                       const char *driver,
+-                                       gboolean managed);
+-
+-G_END_DECLS
+-
+-#endif /* NM_HSO_GSM_DEVICE_H */
+diff --git a/src/nm-manager.c b/src/nm-manager.c
+index 4ba0c7a..1f5b37f 100644
+--- a/src/nm-manager.c
++++ b/src/nm-manager.c
+@@ -7,6 +7,7 @@
+ #include "nm-utils.h"
+ #include "nm-dbus-manager.h"
+ #include "nm-vpn-manager.h"
++#include "nm-modem-manager.h"
+ #include "nm-device-interface.h"
+ #include "nm-device-private.h"
+ #include "nm-device-wifi.h"
+@@ -70,6 +71,9 @@ static void hal_manager_rfkill_changed_cb (NMHalManager *hal_mgr,
+ static void hal_manager_hal_reappeared_cb (NMHalManager *hal_mgr,
+                                            gpointer user_data);
+ 
++static void add_device (NMManager *self, NMDevice *device, const char *type_name);
++static void remove_one_device (NMManager *manager, NMDevice *device);
++
+ #define SSD_POKE_INTERVAL 120000
+ 
+ typedef struct {
+@@ -107,6 +111,10 @@ typedef struct {
+ 	NMVPNManager *vpn_manager;
+ 	guint vpn_manager_id;
+ 
++	NMModemManager *modem_manager;
++	guint modem_added_id;
++	guint modem_removed_id;
++
+ 	DBusGProxy *aipd_proxy;
+ 
+ 	gboolean disposed;
+@@ -212,6 +220,33 @@ vpn_manager_connection_deactivated_cb (NMVPNManager *manager,
+ }
+ 
+ static void
++modem_added (NMModemManager *modem_manager,
++		   NMDevice *modem,
++		   gpointer user_data)
++{
++	NMDeviceType type;
++	const char *type_name;
++
++	type = nm_device_get_device_type (NM_DEVICE (modem));
++	if (type == NM_DEVICE_TYPE_GSM)
++		type_name = "GSM modem";
++	else if (type == NM_DEVICE_TYPE_CDMA)
++		type_name = "CDMA modem";
++	else
++		type_name = "Unknown modem";
++
++	add_device (NM_MANAGER (user_data), modem, type_name);
++}
++
++static void
++modem_removed (NMModemManager *modem_manager,
++			NMDevice *modem,
++			gpointer user_data)
++{
++	remove_one_device (NM_MANAGER (user_data), modem);
++}
++
++static void
+ aipd_handle_event (DBusGProxy *proxy,
+                    const char *event,
+                    const char *iface,
+@@ -274,6 +309,12 @@ nm_manager_init (NMManager *manager)
+ 	                                                g_free,
+ 	                                                g_object_unref);
+ 
++	priv->modem_manager = nm_modem_manager_get ();
++	priv->modem_added_id = g_signal_connect (priv->modem_manager, "device-added",
++									 G_CALLBACK (modem_added), manager);
++	priv->modem_removed_id = g_signal_connect (priv->modem_manager, "device-removed",
++									   G_CALLBACK (modem_removed), manager);
++
+ 	priv->vpn_manager = nm_vpn_manager_get ();
+ 	id = g_signal_connect (G_OBJECT (priv->vpn_manager), "connection-deactivated",
+ 	                       G_CALLBACK (vpn_manager_connection_deactivated_cb), manager);
+@@ -452,6 +493,16 @@ dispose (GObject *object)
+ 	}
+ 	g_object_unref (priv->vpn_manager);
+ 
++	if (priv->modem_added_id) {
++		g_source_remove (priv->modem_added_id);
++		priv->modem_added_id = 0;
++	}
++	if (priv->modem_removed_id) {
++		g_source_remove (priv->modem_removed_id);
++		priv->modem_removed_id = 0;
++	}
++	g_object_unref (priv->modem_manager);
++
+ 	g_object_unref (priv->dbus_mgr);
+ 	g_object_unref (priv->hal_mgr);
+ 
+@@ -1528,58 +1579,66 @@ next:
+ }
+ 
+ static void
+-hal_manager_udi_added_cb (NMHalManager *hal_mgr,
+-                          const char *udi,
+-                          const char *type_name,
+-                          NMDeviceCreatorFn creator_fn,
+-                          gpointer user_data)
++add_device (NMManager *self, NMDevice *device, const char *type_name)
+ {
+-	NMManager *self = NM_MANAGER (user_data);
+ 	NMManagerPrivate *priv = NM_MANAGER_GET_PRIVATE (self);
+-	GObject *device;
+ 	const char *iface;
+ 
+-	if (priv->sleeping)
+-		return;
+-
+-	/* Make sure the device is not already in the device list */
+-	if (nm_manager_get_device_by_udi (self, udi))
+-		return;
+-
+-	device = creator_fn (hal_mgr, udi, nm_manager_udi_is_managed (self, udi));
+-	if (!device)
+-		return;
+-
+ 	priv->devices = g_slist_append (priv->devices, device);
+ 
+ 	g_signal_connect (device, "state-changed",
+-					  G_CALLBACK (manager_device_state_changed),
+-					  self);
++				   G_CALLBACK (manager_device_state_changed),
++				   self);
+ 
+ 	/* Attach to the access-point-added signal so that the manager can fill
+ 	 * non-SSID-broadcasting APs with an SSID.
+ 	 */
+ 	if (NM_IS_DEVICE_WIFI (device)) {
+ 		g_signal_connect (device, "hidden-ap-found",
+-						  G_CALLBACK (manager_hidden_ap_found),
+-						  self);
++					   G_CALLBACK (manager_hidden_ap_found),
++					   self);
+ 
+ 		/* Set initial rfkill state */
+ 		nm_device_wifi_set_enabled (NM_DEVICE_WIFI (device), priv->wireless_enabled);
+ 	}
+ 
+-	iface = nm_device_get_iface (NM_DEVICE (device));
++	iface = nm_device_get_iface (device);
+ 	nm_info ("Found new %s device '%s'.", type_name, iface);
+ 
+ 	dbus_g_connection_register_g_object (nm_dbus_manager_get_connection (priv->dbus_mgr),
+ 								  nm_device_get_udi (NM_DEVICE (device)),
+-								  device);
+-	nm_info ("(%s): exported as %s", iface, udi);
++								  G_OBJECT (device));
++	nm_info ("(%s): exported as %s", iface, nm_device_get_udi (device));
+ 
+ 	g_signal_emit (self, signals[DEVICE_ADDED], 0, device);
+ }
+ 
+ static void
++hal_manager_udi_added_cb (NMHalManager *hal_mgr,
++                          const char *udi,
++                          const char *type_name,
++                          NMDeviceCreatorFn creator_fn,
++                          gpointer user_data)
++{
++	NMManager *self = NM_MANAGER (user_data);
++	NMManagerPrivate *priv = NM_MANAGER_GET_PRIVATE (self);
++	GObject *device;
++
++	if (priv->sleeping)
++		return;
++
++	/* Make sure the device is not already in the device list */
++	if (nm_manager_get_device_by_udi (self, udi))
++		return;
++
++	device = creator_fn (hal_mgr, udi, nm_manager_udi_is_managed (self, udi));
++	if (!device)
++		return;
++
++	add_device (self, NM_DEVICE (device), type_name);
++}
++
++static void
+ hal_manager_udi_removed_cb (NMHalManager *manager,
+                             const char *udi,
+                             gpointer user_data)
+diff --git a/src/nm-serial-device.c b/src/nm-serial-device.c
+deleted file mode 100644
+index db8dc7b..0000000
+--- a/src/nm-serial-device.c
++++ /dev/null
+@@ -1,1151 +0,0 @@
+-/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
+-
+-#define _GNU_SOURCE  /* for strcasestr() */
+-
+-#include <termio.h>
+-#include <unistd.h>
+-#include <sys/types.h>
+-#include <sys/stat.h>
+-#include <fcntl.h>
+-#include <errno.h>
+-#include <sys/ioctl.h>
+-#include <string.h>
+-#include <glib.h>
+-
+-#include "nm-serial-device.h"
+-#include "nm-device-interface.h"
+-#include "nm-device-private.h"
+-#include "ppp-manager/nm-ppp-manager.h"
+-#include "nm-setting-ppp.h"
+-#include "nm-marshal.h"
+-#include "nm-utils.h"
+-#include "nm-serial-device-glue.h"
+-
+-/* #define NM_DEBUG_SERIAL 1 */
+-
+-#define SERIAL_BUF_SIZE 2048
+-
+-G_DEFINE_TYPE (NMSerialDevice, nm_serial_device, NM_TYPE_DEVICE)
+-
+-#define NM_SERIAL_DEVICE_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_SERIAL_DEVICE, NMSerialDevicePrivate))
+-
+-typedef struct {
+-	int fd;
+-	GIOChannel *channel;
+-	NMPPPManager *ppp_manager;
+-	NMIP4Config  *pending_ip4_config;
+-	struct termios old_t;
+-
+-	guint pending_id;
+-	guint timeout_id;
+-
+-	/* PPP stats */
+-	guint32 in_bytes;
+-	guint32 out_bytes;
+-} NMSerialDevicePrivate;
+-
+-enum {
+-	PPP_STATS,
+-
+-	LAST_SIGNAL
+-};
+-
+-static guint signals[LAST_SIGNAL] = { 0 };
+-
+-static int
+-parse_baudrate (guint i)
+-{
+-	int speed;
+-
+-	switch (i) {
+-	case 0:
+-		speed = B0;
+-		break;
+-	case 50:
+-		speed = B50;
+-		break;
+-	case 75:
+-		speed = B75;
+-		break;
+-	case 110:
+-		speed = B110;
+-		break;
+-	case 150:
+-		speed = B150;
+-		break;
+-	case 300:
+-		speed = B300;
+-		break;
+-	case 600:
+-		speed = B600;
+-		break;
+-	case 1200:
+-		speed = B1200;
+-		break;
+-	case 2400:
+-		speed = B2400;
+-		break;
+-	case 4800:
+-		speed = B4800;
+-		break;
+-	case 9600:
+-		speed = B9600;
+-		break;
+-	case 19200:
+-		speed = B19200;
+-		break;
+-	case 38400:
+-		speed = B38400;
+-		break;
+-	case 57600:
+-		speed = B57600;
+-		break;
+-	case 115200:
+-		speed = B115200;
+-		break;
+-	case 460800:
+-		speed = B460800;
+-		break;
+-	default:
+-		g_warning ("Invalid baudrate '%d'", i);
+-		speed = B9600;
+-	}
+-
+-	return speed;
+-}
+-
+-static int
+-parse_bits (guint i)
+-{
+-	int bits;
+-
+-	switch (i) {
+-	case 5:
+-		bits = CS5;
+-		break;
+-	case 6:
+-		bits = CS6;
+-		break;
+-	case 7:
+-		bits = CS7;
+-		break;
+-	case 8:
+-		bits = CS8;
+-		break;
+-	default:
+-		g_warning ("Invalid bits (%d). Valid values are 5, 6, 7, 8.", i);
+-		bits = CS8;
+-	}
+-
+-	return bits;
+-}
+-
+-static int
+-parse_parity (char c)
+-{
+-	int parity;
+-
+-	switch (c) {
+-	case 'n':
+-	case 'N':
+-		parity = 0;
+-		break;
+-	case 'e':
+-	case 'E':
+-		parity = PARENB;
+-		break;
+-	case 'o':
+-	case 'O':
+-		parity = PARENB | PARODD;
+-		break;
+-	default:
+-		g_warning ("Invalid parity (%c). Valid values are n, e, o", c);
+-		parity = 0;
+-	}
+-
+-	return parity;
+-}
+-
+-static int
+-parse_stopbits (guint i)
+-{
+-	int stopbits;
+-
+-	switch (i) {
+-	case 1:
+-		stopbits = 0;
+-		break;
+-	case 2:
+-		stopbits = CSTOPB;
+-		break;
+-	default:
+-		g_warning ("Invalid stop bits (%d). Valid values are 1 and 2)", i);
+-		stopbits = 0;
+-	}
+-
+-	return stopbits;
+-}
+-
+-#ifdef NM_DEBUG_SERIAL
+-static inline void
+-serial_debug (const char *prefix, const char *data, int len)
+-{
+-	GString *str;
+-	int i;
+-
+-	str = g_string_sized_new (len);
+-	for (i = 0; i < len; i++) {
+-		if (data[i] == '\0')
+-			g_string_append_c (str, ' ');
+-		else if (data[i] == '\r')
+-			g_string_append_c (str, '\n');
+-		else
+-			g_string_append_c (str, data[i]);
+-	}
+-
+-	nm_debug ("%s '%s'", prefix, str->str);
+-	g_string_free (str, TRUE);
+-}
+-#else
+-static inline void
+-serial_debug (const char *prefix, const char *data, int len)
+-{
+-}
+-#endif /* NM_DEBUG_SERIAL */
+-
+-static NMSetting *
+-serial_device_get_setting (NMSerialDevice *device, GType setting_type)
+-{
+-	NMActRequest *req;
+-	NMSetting *setting = NULL;
+-
+-	req = nm_device_get_act_request (NM_DEVICE (device));
+-	if (req) {
+-		NMConnection *connection;
+-
+-		connection = nm_act_request_get_connection (req);
+-		if (connection)
+-			setting = nm_connection_get_setting (connection, setting_type);
+-	}
+-
+-	return setting;
+-}
+-
+-/* Timeout handling */
+-
+-static void
+-nm_serial_device_timeout_removed (gpointer data)
+-{
+-	NMSerialDevicePrivate *priv = NM_SERIAL_DEVICE_GET_PRIVATE (data);
+-
+-	priv->timeout_id = 0;
+-}
+-
+-static gboolean
+-nm_serial_device_timed_out (gpointer data)
+-{
+-	NMSerialDevicePrivate *priv = NM_SERIAL_DEVICE_GET_PRIVATE (data);
+-
+-	/* Cancel data reading */
+-	if (priv->pending_id)
+-		g_source_remove (priv->pending_id);
+-	else
+-		nm_warning ("Timeout reached, but there's nothing to time out");
+-
+-	return FALSE;
+-}
+-
+-static void
+-nm_serial_device_add_timeout (NMSerialDevice *self, guint timeout)
+-{
+-	NMSerialDevicePrivate *priv = NM_SERIAL_DEVICE_GET_PRIVATE (self);
+-
+-	if (priv->pending_id == 0)
+-		nm_warning ("Adding a time out while not waiting for any data");
+-
+-	if (priv->timeout_id) {
+-		nm_warning ("Trying to add a new time out while the old one still exists");
+-		g_source_remove (priv->timeout_id);
+-	}
+-
+-	priv->timeout_id = g_timeout_add_full (G_PRIORITY_DEFAULT,
+-								    timeout * 1000,
+-								    nm_serial_device_timed_out,
+-								    self,
+-								    nm_serial_device_timeout_removed);
+-	if (G_UNLIKELY (priv->timeout_id == 0))
+-		nm_warning ("Registering serial device time out failed.");
+-}
+-
+-static void
+-nm_serial_device_remove_timeout (NMSerialDevice *self)
+-{
+-	NMSerialDevicePrivate *priv = NM_SERIAL_DEVICE_GET_PRIVATE (self);
+-
+-	if (priv->timeout_id)
+-		g_source_remove (priv->timeout_id);
+-}
+-
+-/* Pending data reading */
+-
+-static guint
+-nm_serial_device_set_pending (NMSerialDevice *device,
+-						guint timeout,
+-						GIOFunc callback,
+-						gpointer user_data,
+-						GDestroyNotify notify)
+-{
+-	NMSerialDevicePrivate *priv = NM_SERIAL_DEVICE_GET_PRIVATE (device);
+-
+-	if (G_UNLIKELY (priv->pending_id)) {
+-		/* FIXME: Probably should queue up pending calls instead? */
+-		/* Multiple pending calls on the same GIOChannel doesn't work, so let's cancel the previous one. */
+-		nm_warning ("Adding new pending call while previous one isn't finished.");
+-		nm_warning ("Cancelling the previous pending call.");
+-		g_source_remove (priv->pending_id);
+-	}
+-
+-	priv->pending_id = g_io_add_watch_full (priv->channel,
+-									G_PRIORITY_DEFAULT,
+-									G_IO_IN | G_IO_ERR | G_IO_HUP,
+-									callback, user_data, notify);
+-
+-	nm_serial_device_add_timeout (device, timeout);
+-
+-	return priv->pending_id;
+-}
+-
+-static void
+-nm_serial_device_pending_done (NMSerialDevice *self)
+-{
+-	NM_SERIAL_DEVICE_GET_PRIVATE (self)->pending_id = 0;
+-	nm_serial_device_remove_timeout (self);
+-}
+-
+-/****/
+-
+-static gboolean
+-config_fd (NMSerialDevice *device, NMSettingSerial *setting)
+-{
+-	NMSerialDevicePrivate *priv = NM_SERIAL_DEVICE_GET_PRIVATE (device);
+-	struct termio stbuf;
+-	int speed;
+-	int bits;
+-	int parity;
+-	int stopbits;
+-
+-	speed = parse_baudrate (setting->baud);
+-	bits = parse_bits (setting->bits);
+-	parity = parse_parity (setting->parity);
+-	stopbits = parse_stopbits (setting->stopbits);
+-
+-	ioctl (priv->fd, TCGETA, &stbuf);
+-
+-	stbuf.c_iflag &= ~(IGNCR | ICRNL | IUCLC | INPCK | IXON | IXANY | IGNPAR );
+-	stbuf.c_oflag &= ~(OPOST | OLCUC | OCRNL | ONLCR | ONLRET);
+-	stbuf.c_lflag &= ~(ICANON | XCASE | ECHO | ECHOE | ECHONL);
+-	stbuf.c_lflag &= ~(ECHO | ECHOE);
+-	stbuf.c_cc[VMIN] = 1;
+-	stbuf.c_cc[VTIME] = 0;
+-	stbuf.c_cc[VEOF] = 1;
+-
+-	stbuf.c_cflag &= ~(CBAUD | CSIZE | CSTOPB | CLOCAL | PARENB);
+-	stbuf.c_cflag |= (speed | bits | CREAD | 0 | parity | stopbits);
+-
+-	if (ioctl (priv->fd, TCSETA, &stbuf) < 0) {
+-		nm_warning ("(%s) cannot control device (errno %d)",
+-		            nm_device_get_iface (NM_DEVICE (device)), errno);
+-		return FALSE;
+-	}
+-
+-	return TRUE;
+-}
+-
+-gboolean
+-nm_serial_device_open (NMSerialDevice *device,
+-				   NMSettingSerial *setting)
+-{
+-	NMSerialDevicePrivate *priv;
+-	const char *iface;
+-	char *path;
+-
+-	g_return_val_if_fail (NM_IS_SERIAL_DEVICE (device), FALSE);
+-	g_return_val_if_fail (NM_IS_SETTING_SERIAL (setting), FALSE);
+-
+-	priv = NM_SERIAL_DEVICE_GET_PRIVATE (device);
+-	iface = nm_device_get_iface (NM_DEVICE (device));
+-
+-	nm_debug ("(%s) opening device...", iface);
+-
+-	path = g_build_filename ("/dev", iface, NULL);
+-	priv->fd = open (path, O_RDWR | O_EXCL | O_NONBLOCK | O_NOCTTY);
+-	g_free (path);
+-
+-	if (priv->fd < 0) {
+-		nm_warning ("(%s) cannot open device (errno %d)", iface, errno);
+-		return FALSE;
+-	}
+-
+-	if (ioctl (priv->fd, TCGETA, &priv->old_t) < 0) {
+-		nm_warning ("(%s) cannot control device (errno %d)", iface, errno);
+-		close (priv->fd);
+-		return FALSE;
+-	}
+-
+-	if (!config_fd (device, setting)) {
+-		close (priv->fd);
+-		return FALSE;
+-	}
+-
+-	priv->channel = g_io_channel_unix_new (priv->fd);
+-
+-	return TRUE;
+-}
+-
+-void
+-nm_serial_device_close (NMSerialDevice *device)
+-{
+-	NMSerialDevicePrivate *priv;
+-
+-	g_return_if_fail (NM_IS_SERIAL_DEVICE (device));
+-
+-	priv = NM_SERIAL_DEVICE_GET_PRIVATE (device);
+-
+-	if (priv->pending_id)
+-		g_source_remove (priv->pending_id);
+-
+-	if (priv->fd) {
+-		nm_debug ("Closing device '%s'", nm_device_get_iface (NM_DEVICE (device)));
+-
+-		if (priv->channel) {
+-			g_io_channel_unref (priv->channel);
+-			priv->channel = NULL;
+-		}
+-
+-		ioctl (priv->fd, TCSETA, &priv->old_t);
+-		close (priv->fd);
+-		priv->fd = 0;
+-	}
+-}
+-
+-gboolean
+-nm_serial_device_send_command (NMSerialDevice *device, GByteArray *command)
+-{
+-	int fd;
+-	NMSettingSerial *setting;
+-	int i;
+-	ssize_t status;
+-
+-	g_return_val_if_fail (NM_IS_SERIAL_DEVICE (device), FALSE);
+-	g_return_val_if_fail (command != NULL, FALSE);
+-
+-	fd = NM_SERIAL_DEVICE_GET_PRIVATE (device)->fd;
+-	setting = NM_SETTING_SERIAL (serial_device_get_setting (device, NM_TYPE_SETTING_SERIAL));
+-
+-	serial_debug ("Sending:", (char *) command->data, command->len);
+-
+-	for (i = 0; i < command->len; i++) {
+-	again:
+-		status = write (fd, command->data + i, 1);
+-
+-		if (status < 0) {
+-			if (errno == EAGAIN)
+-				goto again;
+-
+-			g_warning ("Error in writing (errno %d)", errno);
+-			return FALSE;
+-		}
+-
+-		if (setting->send_delay)
+-			usleep (setting->send_delay);
+-	}
+-
+-	return TRUE;
+-}
+-
+-gboolean
+-nm_serial_device_send_command_string (NMSerialDevice *device, const char *str)
+-{
+-	GByteArray *command;
+-	gboolean ret;
+-
+-	g_return_val_if_fail (NM_IS_SERIAL_DEVICE (device), FALSE);
+-	g_return_val_if_fail (str != NULL, FALSE);
+-
+-	command = g_byte_array_new ();
+-	g_byte_array_append (command, (guint8 *) str, strlen (str));
+-	g_byte_array_append (command, (guint8 *) "\r", 1);
+-
+-	ret = nm_serial_device_send_command (device, command);
+-	g_byte_array_free (command, TRUE);
+-
+-	return ret;
+-}
+-
+-typedef struct {
+-	NMSerialDevice *device;
+-	char *terminators;
+-	GString *result;
+-	NMSerialGetReplyFn callback;
+-	gpointer user_data;
+-} GetReplyInfo;
+-
+-static void
+-get_reply_done (gpointer data)
+-{
+-	GetReplyInfo *info = (GetReplyInfo *) data;
+-
+-	nm_serial_device_pending_done (info->device);
+-
+-	/* Call the callback */
+-	info->callback (info->device, info->result->str, info->user_data);
+-
+-	/* Free info */
+-	g_free (info->terminators);
+-	g_string_free (info->result, TRUE);
+-
+-	g_slice_free (GetReplyInfo, info);
+-}
+-
+-static gboolean
+-get_reply_got_data (GIOChannel *source,
+-				GIOCondition condition,
+-				gpointer data)
+-{
+-	GetReplyInfo *info = (GetReplyInfo *) data;
+-	gsize bytes_read;
+-	char buf[SERIAL_BUF_SIZE + 1];
+-	GIOStatus status;
+-	gboolean done = FALSE;
+-	int i;
+-
+-	if (condition & G_IO_HUP || condition & G_IO_ERR) {
+-		g_string_truncate (info->result, 0);
+-		return FALSE;
+-	}
+-
+-	do {
+-		GError *err = NULL;
+-
+-		status = g_io_channel_read_chars (source, buf, SERIAL_BUF_SIZE, &bytes_read, &err);
+-		if (status == G_IO_STATUS_ERROR) {
+-			g_warning ("%s", err->message);
+-			g_error_free (err);
+-			err = NULL;
+-		}
+-
+-		if (bytes_read > 0) {
+-			char *p;
+-
+-			serial_debug ("Got:", buf, bytes_read);
+-
+-			p = &buf[0];
+-			for (i = 0; i < bytes_read && !done; i++, p++) {
+-				int j;
+-				gboolean is_terminator = FALSE;
+-
+-				for (j = 0; j < strlen (info->terminators); j++) {
+-					if (*p == info->terminators[j]) {
+-						is_terminator = TRUE;
+-						break;
+-					}
+-				}
+-
+-				if (is_terminator) {
+-					/* Ignore terminators in the beginning of the output */
+-					if (info->result->len > 0)
+-						done = TRUE;
+-				} else
+-					g_string_append_c (info->result, *p);
+-			}
+-		}
+-
+-		/* Limit the size of the buffer */
+-		if (info->result->len > SERIAL_BUF_SIZE) {
+-			g_warning ("%s (%s): response buffer filled before repsonse received",
+-			           __func__, nm_device_get_iface (NM_DEVICE (info->device)));
+-			g_string_truncate (info->result, 0);
+-			done = TRUE;
+-		}
+-	} while (!done || bytes_read == SERIAL_BUF_SIZE || status == G_IO_STATUS_AGAIN);
+-
+-	return !done;
+-}
+-
+-guint
+-nm_serial_device_get_reply (NMSerialDevice *device,
+-					   guint timeout,
+-					   const char *terminators,
+-					   NMSerialGetReplyFn callback,
+-					   gpointer user_data)
+-{
+-	GetReplyInfo *info;
+-
+-	g_return_val_if_fail (NM_IS_SERIAL_DEVICE (device), 0);
+-	g_return_val_if_fail (terminators != NULL, 0);
+-	g_return_val_if_fail (callback != NULL, 0);
+-
+-	info = g_slice_new0 (GetReplyInfo);
+-	info->device = device;
+-	info->terminators = g_strdup (terminators);
+-	info->result = g_string_new (NULL);
+-	info->callback = callback;
+-	info->user_data = user_data;
+-
+-	return nm_serial_device_set_pending (device, timeout, get_reply_got_data, info, get_reply_done);
+-}
+-
+-typedef struct {
+-	NMSerialDevice *device;
+-	char **str_needles;
+-	char **terminators;
+-	GString *result;
+-	NMSerialWaitForReplyFn callback;
+-	gpointer user_data;
+-	int reply_index;
+-	guint timeout;
+-	time_t start;
+-} WaitForReplyInfo;
+-
+-static void
+-wait_for_reply_done (gpointer data)
+-{
+-	WaitForReplyInfo *info = (WaitForReplyInfo *) data;
+-
+-	nm_serial_device_pending_done (info->device);
+-
+-	/* Call the callback */
+-	info->callback (info->device, info->reply_index, info->user_data);
+-
+-	/* Free info */
+-	if (info->result)
+-		g_string_free (info->result, TRUE);
+-
+-	g_strfreev (info->str_needles);
+-	g_strfreev (info->terminators);
+-	g_slice_free (WaitForReplyInfo, info);
+-}
+-
+-static gboolean
+-find_terminator (const char *line, char **terminators)
+-{
+-	int i;
+-
+-	for (i = 0; terminators[i]; i++) {
+-		if (!strncasecmp (line, terminators[i], strlen (terminators[i])))
+-			return TRUE;
+-	}
+-	return FALSE;
+-}
+-
+-static gboolean
+-find_response (const char *line, char **responses, gint *idx)
+-{
+-	int i;
+-
+-	/* Don't look for a result again if we got one previously */
+-	for (i = 0; responses[i]; i++) {
+-		if (strcasestr (line, responses[i])) {
+-			*idx = i;
+-			return TRUE;
+-		}
+-	}
+-	return FALSE;
+-}
+-
+-#define RESPONSE_LINE_MAX 128
+-
+-static gboolean
+-wait_for_reply_got_data (GIOChannel *source,
+-					GIOCondition condition,
+-					gpointer data)
+-{
+-	WaitForReplyInfo *info = (WaitForReplyInfo *) data;
+-	gchar buf[SERIAL_BUF_SIZE + 1];
+-	gsize bytes_read;
+-	GIOStatus status;
+-	gboolean got_response = FALSE;
+-	gboolean done = FALSE;
+-
+-	if (condition & G_IO_HUP || condition & G_IO_ERR)
+-		return FALSE;
+-
+-	do {
+-		GError *err = NULL;
+-
+-		status = g_io_channel_read_chars (source, buf, SERIAL_BUF_SIZE, &bytes_read, &err);
+-		if (status == G_IO_STATUS_ERROR) {
+-			g_warning ("%s", err->message);
+-			g_error_free (err);
+-			err = NULL;
+-		}
+-
+-		if (bytes_read > 0) {
+-			buf[bytes_read] = 0;
+-			g_string_append (info->result, buf);
+-
+-			serial_debug ("Got:", info->result->str, info->result->len);
+-		}
+-
+-		/* Look for needles and terminators */
+-		if ((bytes_read > 0) && info->result->str) {
+-			char *p = info->result->str;
+-
+-			/* Break the response up into lines and process each one */
+-			while (   (p < info->result->str + strlen (info->result->str))
+-			       && !(done && got_response)) {
+-				char line[RESPONSE_LINE_MAX] = { '\0', };
+-				char *tmp;
+-				int i;
+-				gboolean got_something = FALSE;
+-
+-				for (i = 0; *p && (i < RESPONSE_LINE_MAX - 1); p++) {
+-					/* Ignore front CR/LF */
+-					if ((*p == '\n') || (*p == '\r')) {
+-						if (got_something)
+-							break;
+-					} else {
+-						line[i++] = *p;
+-						got_something = TRUE;
+-					}
+-				}
+-				line[i] = '\0';
+-
+-				tmp = g_strstrip (line);
+-				if (tmp && strlen (tmp)) {
+-					done = find_terminator (tmp, info->terminators);
+-					if (info->reply_index == -1)
+-						got_response = find_response (tmp, info->str_needles, &(info->reply_index));
+-				}
+-			}
+-
+-			if (done && got_response)
+-				break;
+-		}
+-
+-		/* Limit the size of the buffer */
+-		if (info->result->len > SERIAL_BUF_SIZE) {
+-			g_warning ("%s (%s): response buffer filled before repsonse received",
+-			           __func__, nm_device_get_iface (NM_DEVICE (info->device)));
+-			done = TRUE;
+-			break;
+-		}
+-
+-		/* Make sure we don't go over the timeout, in addition to the timeout
+-		 * handler that's been scheduled.  If for some reason this loop doesn't
+-		 * terminate (terminator not found, whatever) then this should make
+-		 * sure that NM doesn't spin the CPU forever.
+-		 */
+-		if (time (NULL) - info->start > info->timeout + 1) {
+-			done = TRUE;
+-			break;
+-		} else
+-			g_usleep (50);
+-	} while (!done || bytes_read == SERIAL_BUF_SIZE || status == G_IO_STATUS_AGAIN);
+-
+-	return !done;
+-}
+-
+-guint
+-nm_serial_device_wait_for_reply (NMSerialDevice *device,
+-						   guint timeout,
+-						   char **responses,
+-						   char **terminators,
+-						   NMSerialWaitForReplyFn callback,
+-						   gpointer user_data)
+-{
+-	WaitForReplyInfo *info;
+-
+-	g_return_val_if_fail (NM_IS_SERIAL_DEVICE (device), 0);
+-	g_return_val_if_fail (responses != NULL, 0);
+-	g_return_val_if_fail (callback != NULL, 0);
+-
+-	info = g_slice_new0 (WaitForReplyInfo);
+-	info->device = device;
+-	info->str_needles = g_strdupv (responses);
+-	info->terminators = g_strdupv (terminators);
+-	info->result = g_string_new (NULL);
+-	info->callback = callback;
+-	info->user_data = user_data;
+-	info->reply_index = -1;
+-	info->timeout = timeout;
+-	info->start = time (NULL);
+-
+-	return nm_serial_device_set_pending (device, timeout, wait_for_reply_got_data, info, wait_for_reply_done);
+-}
+-
+-#if 0
+-typedef struct {
+-	NMSerialDevice *device;
+-	gboolean timed_out;
+-	NMSerialWaitQuietFn callback;
+-	gpointer user_data;
+-} WaitQuietInfo;
+-
+-static void
+-wait_quiet_done (gpointer data)
+-{
+-	WaitQuietInfo *info = (WaitQuietInfo *) data;
+-
+-	nm_serial_device_pending_done (info->device);
+-
+-	/* Call the callback */
+-	info->callback (info->device, info->timed_out, info->user_data);
+-
+-	/* Free info */
+-	g_slice_free (WaitQuietInfo, info);
+-}
+-
+-static gboolean
+-wait_quiet_quiettime (gpointer data)
+-{
+-	WaitQuietInfo *info = (WaitQuietInfo *) data;
+-
+-	info->timed_out = FALSE;
+-	g_source_remove (NM_SERIAL_DEVICE_GET_PRIVATE (info->device)->pending);
+-
+-	return FALSE;
+-}
+-
+-static gboolean
+-wait_quiet_got_data (GIOChannel *source,
+-				 GIOCondition condition,
+-				 gpointer data)
+-{
+-	WaitQuietInfo *info = (WaitQuietInfo *) data;
+-	gsize bytes_read;
+-	char buf[4096];
+-	GIOStatus status;
+-
+-	if (condition & G_IO_HUP || condition & G_IO_ERR)
+-		return FALSE;
+-
+-	if (condition & G_IO_IN) {
+-		do {
+-			status = g_io_channel_read_chars (source, buf, 4096, &bytes_read, NULL);
+-
+-			if (bytes_read) {
+-				/* Reset the quiet time timeout */
+-				g_source_remove (info->quiet_id);
+-				info->quiet_id = g_timeout_add (info->quiet_time, wait_quiet_quiettime, info);
+-			}
+-		} while (bytes_read == 4096 || status == G_IO_STATUS_AGAIN);
+-	}
+-
+-	return TRUE;
+-}
+-
+-void
+-nm_serial_device_wait_quiet (NMSerialDevice *device,
+-					    guint timeout, 
+-					    guint quiet_time,
+-					    NMSerialWaitQuietFn callback,
+-					    gpointer user_data)
+-{
+-	WaitQuietInfo *info;
+-
+-	g_return_if_fail (NM_IS_SERIAL_DEVICE (device));
+-	g_return_if_fail (callback != NULL);
+-
+-	info = g_slice_new0 (WaitQuietInfo);
+-	info->device = device;
+-	info->timed_out = TRUE;
+-	info->callback = callback;
+-	info->user_data = user_data;
+-	info->quiet_id = g_timeout_add (quiet_time,
+-							  wait_quiet_timeout,
+-							  info);
+-
+-	return nm_serial_device_set_pending (device, timeout, wait_quiet_got_data, info, wait_quiet_done);
+-}
+-
+-#endif
+-
+-typedef struct {
+-	NMSerialDevice *device;
+-	speed_t current_speed;
+-	NMSerialFlashFn callback;
+-	gpointer user_data;
+-} FlashInfo;
+-
+-static speed_t
+-get_speed (NMSerialDevice *device)
+-{
+-	struct termios options;
+-
+-	tcgetattr (NM_SERIAL_DEVICE_GET_PRIVATE (device)->fd, &options);
+-
+-	return cfgetospeed (&options);
+-}
+-
+-static void
+-set_speed (NMSerialDevice *device, speed_t speed)
+-{
+-	struct termios options;
+-	int fd;
+-
+-	fd = NM_SERIAL_DEVICE_GET_PRIVATE (device)->fd;
+-	tcgetattr (fd, &options);
+-
+-	cfsetispeed (&options, speed);
+-	cfsetospeed (&options, speed);
+-
+-	options.c_cflag |= (CLOCAL | CREAD);
+-	tcsetattr (fd, TCSANOW, &options);
+-}
+-
+-static void
+-flash_done (gpointer data)
+-{
+-	FlashInfo *info = (FlashInfo *) data;
+-
+-	NM_SERIAL_DEVICE_GET_PRIVATE (info->device)->pending_id = 0;
+-
+-	info->callback (info->device, info->user_data);
+-
+-	g_slice_free (FlashInfo, info);
+-}
+-
+-static gboolean
+-flash_do (gpointer data)
+-{
+-	FlashInfo *info = (FlashInfo *) data;
+-
+-	set_speed (info->device, info->current_speed);
+-
+-	return FALSE;
+-}
+-
+-guint
+-nm_serial_device_flash (NMSerialDevice *device,
+-				    guint32 flash_time,
+-				    NMSerialFlashFn callback,
+-				    gpointer user_data)
+-{
+-	FlashInfo *info;
+-	guint id;
+-
+-	g_return_val_if_fail (NM_IS_SERIAL_DEVICE (device), 0);
+-	g_return_val_if_fail (callback != NULL, 0);
+-
+-	info = g_slice_new0 (FlashInfo);
+-	info->device = device;
+-	info->current_speed = get_speed (device);
+-	info->callback = callback;
+-	info->user_data = user_data;
+-
+-	set_speed (device, B0);
+-
+-	id = g_timeout_add_full (G_PRIORITY_DEFAULT,
+-						flash_time,
+-						flash_do,
+-						info,
+-						flash_done);
+-
+-	NM_SERIAL_DEVICE_GET_PRIVATE (device)->pending_id = id;
+-
+-	return id;
+-}
+-
+-GIOChannel *
+-nm_serial_device_get_io_channel (NMSerialDevice *device)
+-{
+-	NMSerialDevicePrivate *priv;
+-
+-	g_return_val_if_fail (NM_IS_SERIAL_DEVICE (device), 0);
+-
+-	priv = NM_SERIAL_DEVICE_GET_PRIVATE (device);
+-	if (priv->channel)
+-		return g_io_channel_ref (priv->channel);
+-
+-	return NULL;
+-}
+-
+-NMPPPManager *
+-nm_serial_device_get_ppp_manager (NMSerialDevice *device)
+-{
+-	g_return_val_if_fail (NM_IS_SERIAL_DEVICE (device), NULL);
+-
+-	return NM_SERIAL_DEVICE_GET_PRIVATE (device)->ppp_manager;
+-}
+-
+-static void
+-ppp_state_changed (NMPPPManager *ppp_manager, NMPPPStatus status, gpointer user_data)
+-{
+-	NMDevice *device = NM_DEVICE (user_data);
+-
+-	switch (status) {
+-	case NM_PPP_STATUS_NETWORK:
+-		nm_device_state_changed (device, NM_DEVICE_STATE_IP_CONFIG, NM_DEVICE_STATE_REASON_NONE);
+-		break;
+-	case NM_PPP_STATUS_DISCONNECT:
+-		nm_device_state_changed (device, NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_PPP_DISCONNECT);
+-		break;
+-	case NM_PPP_STATUS_DEAD:
+-		nm_device_state_changed (device, NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_PPP_FAILED);
+-		break;
+-	case NM_PPP_STATUS_AUTHENTICATE:
+-		nm_device_state_changed (device, NM_DEVICE_STATE_NEED_AUTH, NM_DEVICE_STATE_REASON_NONE);
+-		break;
+-	default:
+-		break;
+-	}
+-}
+-
+-static void
+-ppp_ip4_config (NMPPPManager *ppp_manager,
+-			 const char *iface,
+-			 NMIP4Config *config,
+-			 gpointer user_data)
+-{
+-	NMDevice *device = NM_DEVICE (user_data);
+-
+-	nm_device_set_ip_iface (device, iface);
+-	NM_SERIAL_DEVICE_GET_PRIVATE (device)->pending_ip4_config = g_object_ref (config);
+-	nm_device_activate_schedule_stage4_ip_config_get (device);
+-}
+-
+-static void
+-ppp_stats (NMPPPManager *ppp_manager,
+-		 guint32 in_bytes,
+-		 guint32 out_bytes,
+-		 gpointer user_data)
+-{
+-	NMSerialDevice *device = NM_SERIAL_DEVICE (user_data);
+-	NMSerialDevicePrivate *priv = NM_SERIAL_DEVICE_GET_PRIVATE (device);
+-
+-	if (priv->in_bytes != in_bytes || priv->out_bytes != out_bytes) {
+-		priv->in_bytes = in_bytes;
+-		priv->out_bytes = out_bytes;
+-
+-		g_signal_emit (device, signals[PPP_STATS], 0, in_bytes, out_bytes);
+-	}
+-}
+-
+-static NMActStageReturn
+-real_act_stage2_config (NMDevice *device, NMDeviceStateReason *reason)
+-{
+-	NMSerialDevicePrivate *priv = NM_SERIAL_DEVICE_GET_PRIVATE (device);
+-	NMActRequest *req;
+-	GError *err = NULL;
+-	NMActStageReturn ret;
+-
+-	req = nm_device_get_act_request (device);
+-	g_assert (req);
+-
+-	priv->ppp_manager = nm_ppp_manager_new (nm_device_get_iface (device));
+-	if (nm_ppp_manager_start (priv->ppp_manager, req, &err)) {
+-		g_signal_connect (priv->ppp_manager, "state-changed",
+-					   G_CALLBACK (ppp_state_changed),
+-					   device);
+-		g_signal_connect (priv->ppp_manager, "ip4-config",
+-					   G_CALLBACK (ppp_ip4_config),
+-					   device);
+-		g_signal_connect (priv->ppp_manager, "stats",
+-					   G_CALLBACK (ppp_stats),
+-					   device);
+-
+-		ret = NM_ACT_STAGE_RETURN_POSTPONE;
+-	} else {
+-		nm_warning ("%s", err->message);
+-		g_error_free (err);
+-
+-		g_object_unref (priv->ppp_manager);
+-		priv->ppp_manager = NULL;
+-
+-		*reason = NM_DEVICE_STATE_REASON_PPP_START_FAILED;
+-		ret = NM_ACT_STAGE_RETURN_FAILURE;
+-	}
+-
+-	return ret;
+-}
+-
+-static NMActStageReturn
+-real_act_stage4_get_ip4_config (NMDevice *device,
+-                                NMIP4Config **config,
+-                                NMDeviceStateReason *reason)
+-{
+-	NMSerialDevicePrivate *priv = NM_SERIAL_DEVICE_GET_PRIVATE (device);
+-
+-	*config = priv->pending_ip4_config;
+-	priv->pending_ip4_config = NULL;
+-
+-	return NM_ACT_STAGE_RETURN_SUCCESS;
+-}
+-
+-static void
+-real_deactivate_quickly (NMDevice *device)
+-{
+-	NMSerialDevice *self = NM_SERIAL_DEVICE (device);
+-	NMSerialDevicePrivate *priv = NM_SERIAL_DEVICE_GET_PRIVATE (device);
+-
+-	nm_device_set_ip_iface (device, NULL);
+-
+-	if (priv->pending_ip4_config) {
+-		g_object_unref (priv->pending_ip4_config);
+-		priv->pending_ip4_config = NULL;
+-	}
+-
+-	priv->in_bytes = priv->out_bytes = 0;
+-
+-	if (priv->ppp_manager) {
+-		g_object_unref (priv->ppp_manager);
+-		priv->ppp_manager = NULL;
+-	}
+-
+-	nm_serial_device_close (self);
+-}
+-
+-static guint32
+-real_get_generic_capabilities (NMDevice *dev)
+-{
+-	return NM_DEVICE_CAP_NM_SUPPORTED;
+-}
+-
+-/*****************************************************************************/
+-
+-static void
+-nm_serial_device_init (NMSerialDevice *self)
+-{
+-}
+-
+-static void
+-finalize (GObject *object)
+-{
+-	NMSerialDevice *self = NM_SERIAL_DEVICE (object);
+-
+-	nm_serial_device_close (self);
+-
+-	G_OBJECT_CLASS (nm_serial_device_parent_class)->finalize (object);
+-}
+-
+-static void
+-nm_serial_device_class_init (NMSerialDeviceClass *klass)
+-{
+-	GObjectClass *object_class = G_OBJECT_CLASS (klass);
+-	NMDeviceClass *parent_class = NM_DEVICE_CLASS (klass);
+-
+-	g_type_class_add_private (object_class, sizeof (NMSerialDevicePrivate));
+-
+-	/* Virtual methods */
+-	object_class->finalize = finalize;
+-
+-	parent_class->get_generic_capabilities = real_get_generic_capabilities;
+-	parent_class->act_stage2_config = real_act_stage2_config;
+-	parent_class->act_stage4_get_ip4_config = real_act_stage4_get_ip4_config;
+-	parent_class->deactivate_quickly = real_deactivate_quickly;
+-
+-	/* Signals */
+-	signals[PPP_STATS] =
+-		g_signal_new ("ppp-stats",
+-				    G_OBJECT_CLASS_TYPE (object_class),
+-				    G_SIGNAL_RUN_FIRST,
+-				    G_STRUCT_OFFSET (NMSerialDeviceClass, ppp_stats),
+-				    NULL, NULL,
+-				    nm_marshal_VOID__UINT_UINT,
+-				    G_TYPE_NONE, 2,
+-				    G_TYPE_UINT, G_TYPE_UINT);
+-
+-	dbus_g_object_type_install_info (G_TYPE_FROM_CLASS (klass),
+-							   &dbus_glib_nm_serial_device_object_info);
+-}
+diff --git a/src/nm-serial-device.h b/src/nm-serial-device.h
+deleted file mode 100644
+index 41ee520..0000000
+--- a/src/nm-serial-device.h
++++ /dev/null
+@@ -1,89 +0,0 @@
+-/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
+-
+-#ifndef NM_SERIAL_DEVICE_H
+-#define NM_SERIAL_DEVICE_H
+-
+-#include <nm-device.h>
+-#include <nm-setting-serial.h>
+-#include "ppp-manager/nm-ppp-manager.h"
+-
+-G_BEGIN_DECLS
+-
+-#define NM_TYPE_SERIAL_DEVICE			(nm_serial_device_get_type ())
+-#define NM_SERIAL_DEVICE(obj)			(G_TYPE_CHECK_INSTANCE_CAST ((obj), NM_TYPE_SERIAL_DEVICE, NMSerialDevice))
+-#define NM_SERIAL_DEVICE_CLASS(klass)	(G_TYPE_CHECK_CLASS_CAST ((klass),  NM_TYPE_SERIAL_DEVICE, NMSerialDeviceClass))
+-#define NM_IS_SERIAL_DEVICE(obj)		(G_TYPE_CHECK_INSTANCE_TYPE ((obj), NM_TYPE_SERIAL_DEVICE))
+-#define NM_IS_SERIAL_DEVICE_CLASS(klass)	(G_TYPE_CHECK_CLASS_TYPE ((klass),  NM_TYPE_SERIAL_DEVICE))
+-#define NM_SERIAL_DEVICE_GET_CLASS(obj)	(G_TYPE_INSTANCE_GET_CLASS ((obj),  NM_TYPE_SERIAL_DEVICE, NMSerialDeviceClass))
+-
+-typedef struct {
+-	NMDevice parent;
+-} NMSerialDevice;
+-
+-typedef struct {
+-	NMDeviceClass parent;
+-
+-	/* Signals */
+-	void (*ppp_stats) (NMSerialDevice *device, guint32 in_bytes, guint32 out_bytes);
+-} NMSerialDeviceClass;
+-
+-GType nm_serial_device_get_type (void);
+-
+-typedef void (*NMSerialGetReplyFn)     (NMSerialDevice *device,
+-								const char *reply,
+-								gpointer user_data);
+-
+-typedef void (*NMSerialWaitForReplyFn) (NMSerialDevice *device,
+-								int reply_index,
+-								gpointer user_data);
+-
+-typedef void (*NMSerialWaitQuietFn)    (NMSerialDevice *device,
+-								gboolean timed_out,
+-								gpointer user_data);
+-
+-typedef void (*NMSerialFlashFn)        (NMSerialDevice *device,
+-								gpointer user_data);
+-
+-
+-
+-gboolean nm_serial_device_open                (NMSerialDevice *device, 
+-									  NMSettingSerial *setting);
+-
+-void     nm_serial_device_close               (NMSerialDevice *device);
+-gboolean nm_serial_device_send_command        (NMSerialDevice *device,
+-									  GByteArray *command);
+-
+-gboolean nm_serial_device_send_command_string (NMSerialDevice *device,
+-									  const char *str);
+-
+-guint    nm_serial_device_get_reply           (NMSerialDevice *device,
+-									  guint timeout,
+-									  const char *terminators,
+-									  NMSerialGetReplyFn callback,
+-									  gpointer user_data);
+-
+-guint    nm_serial_device_wait_for_reply      (NMSerialDevice *device,
+-									  guint timeout,
+-									  char **responses,
+-									  char **terminators,
+-									  NMSerialWaitForReplyFn callback,
+-									  gpointer user_data);
+-
+-void     nm_serial_device_wait_quiet          (NMSerialDevice *device,
+-									  guint timeout, 
+-									  guint quiet_time,
+-									  NMSerialWaitQuietFn callback,
+-									  gpointer user_data);
+-
+-guint    nm_serial_device_flash               (NMSerialDevice *device,
+-									  guint32 flash_time,
+-									  NMSerialFlashFn callback,
+-									  gpointer user_data);
+-
+-GIOChannel *nm_serial_device_get_io_channel   (NMSerialDevice *device);
+-
+-NMPPPManager *nm_serial_device_get_ppp_manager (NMSerialDevice *device);
+-
+-G_END_DECLS
+-
+-#endif /* NM_SERIAL_DEVICE_H */
