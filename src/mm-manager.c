@@ -222,28 +222,29 @@ create_initial_modems_from_plugins (MMManager *manager)
 
     for (iter = priv->plugins; iter; iter = iter->next) {
         MMPlugin *plugin = MM_PLUGIN (iter->data);
-        GSList *udis;
-        GSList *udi_iter;
+        char **udis;
+        int i;
 
         udis = mm_plugin_list_supported_udis (plugin, priv->hal_ctx);
-        for (udi_iter = udis; udi_iter; udi_iter = udi_iter->next) {
-            char *udi = (char *) udi_iter->data;
-            MMModem *modem;
+        if (udis) {
+            for (i = 0; udis[i]; i++) {
+                char *udi = udis[i];
+                MMModem *modem;
 
-            if (modem_exists (manager, udi)) {
-                g_warning ("Modem for UDI %s already exists, ignoring", udi);
-                continue;
+                if (modem_exists (manager, udi)) {
+                    g_warning ("Modem for UDI %s already exists, ignoring", udi);
+                    continue;
+                }
+
+                modem = mm_plugin_create_modem (plugin, priv->hal_ctx, udi);
+                if (modem)
+                    add_modem (manager, udi, modem);
+                else
+                    g_warning ("Plugin failed to create modem for UDI %s", udi);
             }
 
-            modem = mm_plugin_create_modem (plugin, priv->hal_ctx, udi);
-            if (modem)
-                add_modem (manager, udi, modem);
-            else
-                g_warning ("Plugin failed to create modem for UDI %s", udi);
+            g_strfreev (udis);
         }
-
-        g_slist_foreach (udis, (GFunc) g_free, NULL);
-        g_slist_free (udis);
     }
 }
 

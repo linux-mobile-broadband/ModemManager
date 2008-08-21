@@ -1,13 +1,14 @@
 /* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
+#include <string.h>
+#include <stdio.h>
+
 #include "mm-generic-cdma.h"
+#include "mm-cdma-modem.h"
 #include "mm-modem-error.h"
 #include "mm-callback-info.h"
 
-static void modem_init (MMModem *modem_class);
-
-G_DEFINE_TYPE_EXTENDED (MMGenericCdma, mm_generic_cdma, MM_TYPE_SERIAL,
-                        0, G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init))
+static gpointer mm_generic_cdma_parent_class = NULL;
 
 #define MM_GENERIC_CDMA_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_GENERIC_CDMA, MMGenericCdmaPrivate))
 
@@ -131,7 +132,6 @@ dial_done (MMSerial *serial,
 static void
 connect (MMModem *modem,
          const char *number,
-         const char *apn,
          MMModemFn callback,
          gpointer user_data)
 {
@@ -166,15 +166,69 @@ disconnect (MMModem *modem,
     mm_callback_info_schedule (info);
 }
 
+static void
+get_signal_quality_done (MMSerial *serial, const char *reply, gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    guint32 result = 0;
+
+    if (!strncmp (reply, "+CSQ: ", 6)) {
+        /* Got valid reply */
+        int quality;
+        int ber;
+
+        reply += 6;
+
+        if (sscanf (reply, "%d,%d", &quality, &ber)) {
+            /* 99 means unknown */
+            if (quality != 99)
+                /* Normalize the quality */
+                result = quality * 100 / 31;
+        } else
+            info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                       "%s", "Could not parse signal quality results");
+    } else
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                   "%s", "Could not parse signal quality results");
+
+    info->uint_result = result;
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_signal_quality (MMCdmaModem *modem,
+                    MMModemUIntFn callback,
+                    gpointer user_data)
+{
+    MMCallbackInfo *info;
+    char *terminators = "\r\n";
+    guint id = 0;
+
+    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+
+    if (mm_serial_send_command_string (MM_SERIAL (modem), "AT+CSQ"))
+        id = mm_serial_get_reply (MM_SERIAL (modem), 10, terminators, get_signal_quality_done, info);
+
+    if (!id) {
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Getting signal quality failed.");
+        mm_callback_info_schedule (info);
+    }
+}
+
 /*****************************************************************************/
 
 static void
 modem_init (MMModem *modem_class)
 {
-    /* interface implementation */
     modem_class->enable = enable;
     modem_class->connect = connect;
     modem_class->disconnect = disconnect;
+}
+
+static void
+cdma_modem_init (MMCdmaModem *cdma_modem_class)
+{
+    cdma_modem_class->get_signal_quality = get_signal_quality;
 }
 
 static void
@@ -235,6 +289,7 @@ mm_generic_cdma_class_init (MMGenericCdmaClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
+    mm_generic_cdma_parent_class = g_type_class_peek_parent (klass);
     g_type_class_add_private (object_class, sizeof (MMGenericCdmaPrivate));
 
     /* Virtual methods */
@@ -254,6 +309,39 @@ mm_generic_cdma_class_init (MMGenericCdmaClass *klass)
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_TYPE,
                                       MM_MODEM_TYPE);
+}
 
-    mm_modem_install_dbus_info (G_TYPE_FROM_CLASS (klass));
+GType
+mm_generic_cdma_get_type (void)
+{
+    static GType generic_cdma_type = 0;
+
+    if (G_UNLIKELY (generic_cdma_type == 0)) {
+        static const GTypeInfo generic_cdma_type_info = {
+            sizeof (MMGenericCdmaClass),
+            (GBaseInitFunc) NULL,
+            (GBaseFinalizeFunc) NULL,
+            (GClassInitFunc) mm_generic_cdma_class_init,
+            (GClassFinalizeFunc) NULL,
+            NULL,   /* class_data */
+            sizeof (MMGenericCdma),
+            0,      /* n_preallocs */
+            (GInstanceInitFunc) mm_generic_cdma_init,
+        };
+
+        static const GInterfaceInfo modem_iface_info = { 
+            (GInterfaceInitFunc) modem_init
+        };
+        
+        static const GInterfaceInfo cdma_modem_iface_info = {
+            (GInterfaceInitFunc) cdma_modem_init
+        };
+
+        generic_cdma_type = g_type_register_static (MM_TYPE_SERIAL, "MMGenericCdma", &generic_cdma_type_info, 0);
+
+        g_type_add_interface_static (generic_cdma_type, MM_TYPE_MODEM, &modem_iface_info);
+        g_type_add_interface_static (generic_cdma_type, MM_TYPE_CDMA_MODEM, &cdma_modem_iface_info);
+    }
+
+    return generic_cdma_type;
 }

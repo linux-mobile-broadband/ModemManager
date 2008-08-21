@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
+
+  <interface name="org.freedesktop.ModemManager.Modem.Gsm">
+    <method name="SetPin">
+      <tp:docstring>
+	Set the PIN (or PUK) to unlock the SIM card.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_set_pin"/>
+      <arg name="pin" type="s" direction="in">
+	The PIN code.
+      </arg>
+    </method>
+
+    <method name="Register">
+      <tp:docstring>
+	Register the device to network.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_register"/>
+      <arg name="network_id" type="s" direction="in">
+	<tp:docstring>
+	  The network ID to register. An empty string can be used to register to the home network.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <method name="Scan">
+      <tp:docstring>
+	Scan for available networks.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_scan"/>
+      <arg name="results" type="aa{ss}" direction="out">
+	<tp:docstring>
+	  Found networks. It's an array of dictionaries (strings for keys and values), the list of known keys is the following: status, operator-long, operator-short, operator-num.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <method name="SetAPN">
+      <tp:docstring>
+	Set the APN.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_set_apn"/>
+      <arg name="apn" type="s" direction="in">
+	The APN.
+      </arg>
+    </method>
+
+    <method name="GetSignalQuality">
+      <tp:docstring>
+	Get the current signal quality.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_signal_quality"/>
+      <arg name="quality" type="u" direction="out">
+	<tp:docstring>
+	  Signal quality (percent).
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <method name="SetBand">
+      <tp:docstring>
+	Set the GSM band.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_set_band"/>
+      <arg name="band" type="u" direction="in" tp:type="MM_GSM_MODEM_BAND">
+	<tp:docstring>
+	  The band.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <method name="GetBand">
+      <tp:docstring>
+	Get the current band.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_band"/>
+      <arg name="band" type="u" direction="out" tp:type="MM_GSM_MODEM_BAND">
+	<tp:docstring>
+	  The current band.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <method name="SetNetworkMode">
+      <tp:docstring>
+	Set the GSM network mode.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_set_network_mode"/>
+      <arg name="mode" type="u" direction="in" tp:type="MM_GSM_MODEM_NETWORK_MODE">
+	<tp:docstring>
+	  The GSM network mode.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <method name="GetNetworkMode">
+      <tp:docstring>
+	Get the network mode.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_network_mode"/>
+      <arg name="mode" type="u" direction="out" tp:type="MM_GSM_MODEM_NETWORK_MODE">
+	<tp:docstring>
+	  The current network mode.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <signal name="SignalQuality">
+      <tp:docstring>
+	The signal quality changed.
+      </tp:docstring>
+      <arg name="quality" type="u">
+	<tp:docstring>
+	  The new quality in percent, 0..100.
+	</tp:docstring>
+      </arg>
+    </signal>
+
+    <signal name="NetworkMode">
+      <tp:docstring>
+	The network mode changed.
+      </tp:docstring>
+      <arg name="mode" type="u" tp:type="MM_GSM_MODEM_NETWORK_MODE">
+	<tp:docstring>
+	  The new network mode.
+	</tp:docstring>
+      </arg>
+    </signal>
+
+    <tp:enum name="MM_GSM_MODEM_NETWORK_MODE" type="u">
+      <tp:enumvalue suffix="ANY" value="0">
+	<tp:docstring>
+	  Any network mode can be used.
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="GPRS" value="1">
+	<tp:docstring>
+	  GPRS
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="EDGE" value="2">
+	<tp:docstring>
+	  EDGE
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="3G" value="3">
+	<tp:docstring>
+	  3G
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="HSDPA" value="4">
+	<tp:docstring>
+	  HSDPA
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="PREFER_2G" value="5">
+	<tp:docstring>
+	  Prefer 2G (GPRS or EDGE).
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="PREFER_3G" value="6">
+	<tp:docstring>
+	  Prefer 3G (3G or HSDPA).
+	</tp:docstring>
+      </tp:enumvalue>
+    </tp:enum>
+
+    <tp:enum name="MM_GSM_MODEM_BAND" type="u">
+      <tp:enumvalue suffix="ANY" value="0">
+	<tp:docstring>
+	  Any band can be used.
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="EGSM" value="1">
+	<tp:docstring>
+	  EGSM (900 MHz).
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="DCS" value="2">
+	<tp:docstring>
+	  DCS (1800 MHz).
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="PCS" value="3">
+	<tp:docstring>
+	  PCS (1900 MHz).
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="G850" value="4">
+	<tp:docstring>
+	  G850 (850 MHz).
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="U2100" value="5">
+	<tp:docstring>
+	  U2100 (WCDMA 2100 MHz).
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="U1700" value="6">
+	<tp:docstring>
+	  U1700 (WCDMA 3GPP UMTS1800 MHz).
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="17IV" value="7">
+	<tp:docstring>
+	  17IV (WCDMA 3GPP AWS 1700/2100 MHz).
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="U800" value="8">
+	<tp:docstring>
+	  U800 (WCDMA 3GPP UMTS800 MHz).
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="U850" value="9">
+	<tp:docstring>
+	  U850 (WCDMA 3GPP UMTS850 MHz).
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="U900" value="10">
+	<tp:docstring>
+	  U900 (WCDMA 3GPP UMTS900 MHz).
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="U17IX" value="11">
+	<tp:docstring>
+	  U17IX (WCDMA 3GPP UMTS MHz).
+	</tp:docstring>
+      </tp:enumvalue>
+    </tp:enum>
+
+  </interface>
+</node>

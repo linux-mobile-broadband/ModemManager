@@ -26,4 +26,6 @@ GType mm_generic_gsm_get_type (void);
 MMModem *mm_generic_gsm_new (const char *serial_device,
                              const char *driver);
 
+guint32 mm_generic_gsm_get_cid (MMGenericGsm *modem);
+
 #endif /* MM_GENERIC_GSM_H */

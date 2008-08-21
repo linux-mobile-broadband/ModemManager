@@ -4,22 +4,21 @@
 #include <stdio.h>
 #include <string.h>
 #include "mm-generic-gsm.h"
+#include "mm-gsm-modem.h"
 #include "mm-modem-error.h"
 #include "mm-callback-info.h"
 
-static void modem_init (MMModem *modem_class);
-
-G_DEFINE_TYPE_EXTENDED (MMGenericGsm, mm_generic_gsm, MM_TYPE_SERIAL,
-                        0, G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init))
+static gpointer mm_generic_gsm_parent_class = NULL;
 
 #define MM_GENERIC_GSM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_GENERIC_GSM, MMGenericGsmPrivate))
 
 typedef struct {
     char *driver;
+    guint32 cid;
     guint32 pending_id;
 } MMGenericGsmPrivate;
 
-static void register_auto (MMModem *modem, MMCallbackInfo *info);
+static void register_auto (MMGsmModem *modem, MMCallbackInfo *info);
 
 MMModem *
 mm_generic_gsm_new (const char *serial_device, const char *driver)
@@ -31,6 +30,14 @@ mm_generic_gsm_new (const char *serial_device, const char *driver)
                                    MM_SERIAL_DEVICE, serial_device,
                                    MM_MODEM_DRIVER, driver,
                                    NULL));
+}
+
+guint32
+mm_generic_gsm_get_cid (MMGenericGsm *modem)
+{
+    g_return_val_if_fail (MM_IS_GENERIC_GSM (modem), 0);
+
+    return MM_GENERIC_GSM_GET_PRIVATE (modem)->cid;
 }
 
 /*****************************************************************************/
@@ -175,7 +182,7 @@ set_pin_done (MMSerial *serial,
 }
 
 static void
-set_pin (MMModem *modem,
+set_pin (MMGsmModem *modem,
          const char *pin,
          MMModemFn callback,
          gpointer user_data)
@@ -185,7 +192,7 @@ set_pin (MMModem *modem,
     char *responses[] = { "OK", "ERROR", "ERR", NULL };
     guint id = 0;
 
-    info = mm_callback_info_new (modem, callback, user_data);
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
     command = g_strdup_printf ("AT+CPIN=\"%s\"", pin);
     if (mm_serial_send_command_string (MM_SERIAL (modem), command))
@@ -222,7 +229,7 @@ register_manual_done (MMSerial *serial,
 }
 
 static void
-register_manual (MMModem *modem, const char *network_id, MMCallbackInfo *info)
+register_manual (MMGsmModem *modem, const char *network_id, MMCallbackInfo *info)
 {
     char *command;
     char *responses[] = { "OK", "ERROR", "ERR", NULL };
@@ -246,7 +253,7 @@ automatic_registration_again (gpointer data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) data;
 
-	register_auto (MM_MODEM (mm_callback_info_get_data (info, "modem")), info);
+	register_auto (MM_GSM_MODEM (mm_callback_info_get_data (info, "modem")), info);
 
     mm_callback_info_set_data (info, "modem", NULL, NULL);
 	
@@ -292,7 +299,7 @@ register_auto_done (MMSerial *serial,
 }
 
 static void
-register_auto (MMModem *modem, MMCallbackInfo *info)
+register_auto (MMGsmModem *modem, MMCallbackInfo *info)
 {
     char *responses[] = { "+CREG: 0,0", "+CREG: 0,1", "+CREG: 0,2", "+CREG: 0,3", "+CREG: 0,5", NULL };
     char *terminators[] = { "OK", "ERROR", "ERR", NULL };
@@ -309,14 +316,14 @@ register_auto (MMModem *modem, MMCallbackInfo *info)
 }
 
 static void
-do_register (MMModem *modem,
+do_register (MMGsmModem *modem,
              const char *network_id,
              MMModemFn callback,
              gpointer user_data)
 {
     MMCallbackInfo *info;
 
-    info = mm_callback_info_new (modem, callback, user_data);
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
     if (network_id)
         register_manual (modem, network_id, info);
@@ -325,9 +332,9 @@ do_register (MMModem *modem,
 }
 
 static void
-dial_done (MMSerial *serial,
-           int reply_index,
-           gpointer user_data)
+connect_done (MMSerial *serial,
+              int reply_index,
+              gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
@@ -355,15 +362,21 @@ dial_done (MMSerial *serial,
     mm_callback_info_schedule (info);
 }
 
-
 static void
-dial (MMModem *modem, guint cid, const char *number, MMCallbackInfo *info)
+connect (MMModem *modem,
+         const char *number,
+         MMModemFn callback,
+         gpointer user_data)
 {
+    MMCallbackInfo *info;
     char *command;
     char *responses[] = { "CONNECT", "BUSY", "NO DIAL TONE", "NO CARRIER", NULL };
     guint id = 0;
+    guint32 cid = mm_generic_gsm_get_cid (MM_GENERIC_GSM (modem));
 
-    if (cid) {
+    info = mm_callback_info_new (modem, callback, user_data);
+
+    if (cid > 0) {
         GString *str;
 
         str = g_string_new ("ATD");
@@ -378,7 +391,7 @@ dial (MMModem *modem, guint cid, const char *number, MMCallbackInfo *info)
         command = g_strconcat ("ATDT", number, NULL);
 
     if (mm_serial_send_command_string (MM_SERIAL (modem), command))
-        id = mm_serial_wait_for_reply (MM_SERIAL (modem), 60, responses, responses, dial_done, info);
+        id = mm_serial_wait_for_reply (MM_SERIAL (modem), 60, responses, responses, connect_done, info);
 
     g_free (command);
 
@@ -386,65 +399,6 @@ dial (MMModem *modem, guint cid, const char *number, MMCallbackInfo *info)
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Dialing failed.");
         mm_callback_info_schedule (info);
     }
-}
-
-static void
-set_apn_done (MMSerial *serial,
-              int reply_index,
-              gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    const char *number = (char *) mm_callback_info_get_data (info, "number");
-
-    switch (reply_index) {
-    case 0:
-        dial (MM_MODEM (serial), 1, number, info);
-        break;
-    default:
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Setting APN failed");
-        break;
-    }
-
-    if (info->error)
-        mm_callback_info_schedule (info);
-}
-
-static void
-set_apn (MMModem *modem, const char *apn, MMCallbackInfo *info)
-{
-    char *command;
-    char *responses[] = { "OK", "ERROR", NULL };
-    guint cid = 1;
-    guint id = 0;
-
-    command = g_strdup_printf ("AT+CGDCONT=%d, \"IP\", \"%s\"", cid, apn);
-    if (mm_serial_send_command_string (MM_SERIAL (modem), command))
-        id = mm_serial_wait_for_reply (MM_SERIAL (modem), 3, responses, responses, set_apn_done, info);
-
-    g_free (command);
-
-    if (!id) {
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Setting APN failed.");
-        mm_callback_info_schedule (info);
-    }
-}
-
-static void
-connect (MMModem *modem,
-         const char *number,
-         const char *apn,
-         MMModemFn callback,
-         gpointer user_data)
-{
-    MMCallbackInfo *info;
-
-    info = mm_callback_info_new (modem, callback, user_data);
-
-    if (apn) {
-        mm_callback_info_set_data (info, "number", g_strdup (number), g_free);
-        set_apn (modem, apn, info);
-    } else
-        dial (modem, 0, number, info);
 }
 
 static void
@@ -465,15 +419,15 @@ scan_callback_wrapper (MMModem *modem,
                        gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemScanFn scan_fn;
+    MMGsmModemScanFn scan_fn;
     GPtrArray *results;
     gpointer data;
 
-    scan_fn = (MMModemScanFn) mm_callback_info_get_data (info, "scan-callback");
+    scan_fn = (MMGsmModemScanFn) mm_callback_info_get_data (info, "scan-callback");
     results = (GPtrArray *) mm_callback_info_get_data (info, "scan-results");
     data = mm_callback_info_get_data (info, "scan-data");
 
-    scan_fn (modem, results, error, data);
+    scan_fn (MM_GSM_MODEM (modem), results, error, data);
 }
 
 static void
@@ -536,15 +490,15 @@ scan_done (MMSerial *serial, const char *reply, gpointer user_data)
 }
 
 static void
-scan (MMModem *modem,
-      MMModemScanFn callback,
+scan (MMGsmModem *modem,
+      MMGsmModemScanFn callback,
       gpointer user_data)
 {
     MMCallbackInfo *info;
     char *terminators = "\r\n";
     guint id = 0;
 
-    info = mm_callback_info_new (modem, scan_callback_wrapper, NULL);
+    info = mm_callback_info_new (MM_MODEM (modem), scan_callback_wrapper, NULL);
     info->user_data = info;
     mm_callback_info_set_data (info, "scan-callback", callback, NULL);
     mm_callback_info_set_data (info, "scan-data", user_data, NULL);
@@ -554,6 +508,53 @@ scan (MMModem *modem,
 
     if (!id) {
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Scanning failed.");
+        mm_callback_info_schedule (info);
+    }
+}
+
+static void
+set_apn_done (MMSerial *serial,
+              int reply_index,
+              gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    switch (reply_index) {
+    case 0:
+        /* success */
+        MM_GENERIC_GSM_GET_PRIVATE (serial)->cid = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "CID"));
+        break;
+    default:
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Setting APN failed");
+        break;
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+set_apn (MMGsmModem *modem,
+         const char *apn,
+         MMModemFn callback,
+         gpointer user_data)
+{
+    MMCallbackInfo *info;
+    char *command;
+    char *responses[] = { "OK", "ERROR", NULL };
+    guint cid = 1;
+    guint id = 0;
+
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+    mm_callback_info_set_data (info, "CID", GUINT_TO_POINTER (cid), NULL);
+
+    command = g_strdup_printf ("AT+CGDCONT=%d, \"IP\", \"%s\"", cid, apn);
+    if (mm_serial_send_command_string (MM_SERIAL (modem), command))
+        id = mm_serial_wait_for_reply (MM_SERIAL (modem), 3, responses, responses, set_apn_done, info);
+
+    g_free (command);
+
+    if (!id) {
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Setting APN failed.");
         mm_callback_info_schedule (info);
     }
 }
@@ -588,7 +589,7 @@ get_signal_quality_done (MMSerial *serial, const char *reply, gpointer user_data
 }
 
 static void
-get_signal_quality (MMModem *modem,
+get_signal_quality (MMGsmModem *modem,
                     MMModemUIntFn callback,
                     gpointer user_data)
 {
@@ -596,7 +597,7 @@ get_signal_quality (MMModem *modem,
     char *terminators = "\r\n";
     guint id = 0;
 
-    info = mm_callback_info_uint_new (modem, callback, user_data);
+    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
 
     if (mm_serial_send_command_string (MM_SERIAL (modem), "AT+CSQ"))
         id = mm_serial_get_reply (MM_SERIAL (modem), 10, terminators, get_signal_quality_done, info);
@@ -612,14 +613,19 @@ get_signal_quality (MMModem *modem,
 static void
 modem_init (MMModem *modem_class)
 {
-    /* interface implementation */
     modem_class->enable = enable;
-    modem_class->set_pin = set_pin;
-    modem_class->do_register = do_register;
     modem_class->connect = connect;
     modem_class->disconnect = disconnect;
-    modem_class->scan = scan;
-    modem_class->get_signal_quality = get_signal_quality;
+}
+
+static void
+gsm_modem_init (MMGsmModem *gsm_modem_class)
+{
+    gsm_modem_class->set_pin = set_pin;
+    gsm_modem_class->do_register = do_register;
+    gsm_modem_class->set_apn = set_apn;
+    gsm_modem_class->scan = scan;
+    gsm_modem_class->get_signal_quality = get_signal_quality;
 }
 
 static void
@@ -685,6 +691,7 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
+    mm_generic_gsm_parent_class = g_type_class_peek_parent (klass);
     g_type_class_add_private (object_class, sizeof (MMGenericGsmPrivate));
 
     /* Virtual methods */
@@ -704,6 +711,39 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_TYPE,
                                       MM_MODEM_TYPE);
+}
 
-    mm_modem_install_dbus_info (G_TYPE_FROM_CLASS (klass));
+GType
+mm_generic_gsm_get_type (void)
+{
+    static GType generic_gsm_type = 0;
+
+    if (G_UNLIKELY (generic_gsm_type == 0)) {
+        static const GTypeInfo generic_gsm_type_info = {
+            sizeof (MMGenericGsmClass),
+            (GBaseInitFunc) NULL,
+            (GBaseFinalizeFunc) NULL,
+            (GClassInitFunc) mm_generic_gsm_class_init,
+            (GClassFinalizeFunc) NULL,
+            NULL,   /* class_data */
+            sizeof (MMGenericGsm),
+            0,      /* n_preallocs */
+            (GInstanceInitFunc) mm_generic_gsm_init,
+        };
+
+        static const GInterfaceInfo modem_iface_info = { 
+            (GInterfaceInitFunc) modem_init
+        };
+        
+        static const GInterfaceInfo gsm_modem_iface_info = {
+            (GInterfaceInitFunc) gsm_modem_init
+        };
+
+        generic_gsm_type = g_type_register_static (MM_TYPE_SERIAL, "MMGenericGsm", &generic_gsm_type_info, 0);
+
+        g_type_add_interface_static (generic_gsm_type, MM_TYPE_MODEM, &modem_iface_info);
+        g_type_add_interface_static (generic_gsm_type, MM_TYPE_GSM_MODEM, &gsm_modem_iface_info);
+    }
+
+    return generic_gsm_type;
 }
