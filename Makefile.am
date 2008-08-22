@@ -22,9 +22,6 @@ endif
 
 SUBDIRS = src plugins introspection test
 
-pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = ModemManager.pc
-
 dbusservicedir = $(DBUS_SYS_DIR)
 dbusservice_DATA = org.freedesktop.ModemManager.conf
 
@@ -42,12 +39,10 @@ edit = @sed \
 	-e 's|@libexecdir[@]|$(libexecdir)|g'
 
 DISTCLEANFILES = \
-	ModemManager.pc \
 	$(dbusactivation_DATA)
 
 
 EXTRA_DIST = \
-	ModemManager.pc.in \
 	doc-generator.xsl \
 	$(dbusservice_DATA) \
 	$(dbusactivation_in_files)

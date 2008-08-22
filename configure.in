@@ -38,6 +38,5 @@ src/Makefile
 plugins/Makefile
 test/Makefile
 introspection/Makefile
-ModemManager.pc
 ])
 AC_OUTPUT
