@@ -14,6 +14,9 @@ static gpointer mm_generic_gsm_parent_class = NULL;
 
 typedef struct {
     char *driver;
+    char *oper_code;
+    char *oper_name;
+    MMGsmModemRegStatus reg_status;
     guint32 cid;
     guint32 pending_id;
 } MMGenericGsmPrivate;
@@ -38,6 +41,33 @@ mm_generic_gsm_get_cid (MMGenericGsm *modem)
     g_return_val_if_fail (MM_IS_GENERIC_GSM (modem), 0);
 
     return MM_GENERIC_GSM_GET_PRIVATE (modem)->cid;
+}
+
+void
+mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
+                               MMGsmModemRegStatus status)
+{
+    g_return_if_fail (MM_IS_GENERIC_GSM (modem));
+
+    MM_GENERIC_GSM_GET_PRIVATE (modem)->reg_status = status;
+}
+
+void
+mm_generic_gsm_set_operator (MMGenericGsm *modem,
+                             const char *code,
+                             const char *name)
+{
+    MMGenericGsmPrivate *priv;
+
+    g_return_if_fail (MM_IS_GENERIC_GSM (modem));
+
+    priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+
+    g_free (priv->oper_code);
+    g_free (priv->oper_name);
+
+    priv->oper_code = g_strdup (code);
+    priv->oper_name = g_strdup (name);
 }
 
 /*****************************************************************************/
@@ -206,44 +236,85 @@ set_pin (MMGsmModem *modem,
     }
 }
 
+static char *
+parse_operator (const char *reply)
+{
+    char *operator = NULL;
+
+    if (reply && !strncmp (reply, "+COPS: ", 7)) {
+        /* Got valid reply */
+		GRegex *r;
+		GMatchInfo *match_info;
+
+		reply += 7;
+		r = g_regex_new ("(\\d),(\\d),\"(.+)\"", G_REGEX_UNGREEDY, 0, NULL);
+		if (!r)
+            return NULL;
+
+		g_regex_match (r, reply, 0, &match_info);
+		if (g_match_info_matches (match_info))
+            operator = g_match_info_fetch (match_info, 3);
+
+		g_match_info_free (match_info);
+		g_regex_unref (r);
+    }
+
+    return operator;
+}
+
 static void
-register_manual_done (MMSerial *serial,
-                      int reply_index,
-                      gpointer user_data)
+get_reg_name_done (MMSerial *serial, const char *reply, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    char *oper;
 
-    switch (reply_index) {
-    case 0:
-        /* success */
-        break;
-    case -1:
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Manual registration timed out");
-        break;
-    default:
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Manual registration failed");
-        break;
-    }
+    oper = parse_operator (reply);
+    if (!oper)
+        g_warning ("Could not parse operator");
+
+    mm_generic_gsm_set_operator (MM_GENERIC_GSM (serial),
+                                 (char *) mm_callback_info_get_data (info, "reg-info-oper-code"),
+                                 oper);
+    g_free (oper);
 
     mm_callback_info_schedule (info);
 }
 
 static void
-register_manual (MMGsmModem *modem, const char *network_id, MMCallbackInfo *info)
+get_reg_code_done (MMSerial *serial, const char *reply, gpointer user_data)
 {
-    char *command;
-    char *responses[] = { "OK", "ERROR", "ERR", NULL };
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    char *oper;
     guint id = 0;
 
-    command = g_strdup_printf ("AT+COPS=1,2,\"%s\"", network_id);
-    if (mm_serial_send_command_string (MM_SERIAL (modem), command))
-        id = mm_serial_wait_for_reply (MM_SERIAL (modem), 30, responses, responses,
-                                       register_manual_done, info);
+    oper = parse_operator (reply);
+    if (oper) {
+        char *terminators = "\r\n";
 
-    g_free (command);
+        mm_callback_info_set_data (info, "reg-info-oper-code", oper, g_free);
+
+        if (mm_serial_send_command_string (serial, "AT+COPS=3,0;+COPS?"))
+            id = mm_serial_get_reply (MM_SERIAL (serial), 5, terminators, get_reg_name_done, info);
+    }
 
     if (!id) {
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Manual registration failed.");
+        g_warning ("Could not read operator");
+        mm_callback_info_schedule (info);
+    }
+}
+
+static void
+read_operator (MMGenericGsm *modem,
+               MMCallbackInfo *info)
+{
+    char *terminators = "\r\n";
+    guint id = 0;
+
+    if (mm_serial_send_command_string (MM_SERIAL (modem), "AT+COPS=3,2;+COPS?"))
+        id = mm_serial_get_reply (MM_SERIAL (modem), 5, terminators, get_reg_code_done, info);
+
+    if (!id) {
+        g_warning ("Reading operator code failed.");
         mm_callback_info_schedule (info);
     }
 }
@@ -272,14 +343,18 @@ get_reg_status_done (MMSerial *serial,
         info->uint_result = (guint32) MM_GSM_MODEM_REG_STATUS_ROAMING;
         break;
     case -1:
+        info->uint_result = (guint32) MM_GSM_MODEM_REG_STATUS_UNKNOWN;
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s",
                                    "Reading registration status timed out");
         break;
     default:
+        info->uint_result = (guint32) MM_GSM_MODEM_REG_STATUS_UNKNOWN;
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s",
                                    "Reading registration status failed");
         break;
     }
+
+    mm_generic_gsm_set_reg_status (MM_GENERIC_GSM (serial), info->uint_result);
 
     mm_callback_info_schedule (info);
 }
@@ -300,6 +375,64 @@ get_registration_status (MMGsmModem *modem, MMModemUIntFn callback, gpointer use
 
     if (!id) {
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Reading registration status failed.");
+        mm_callback_info_schedule (info);
+    }
+}
+
+static void
+register_manual_get_status_done (MMModem *modem,
+                                 guint32 result,
+                                 GError *error,
+                                 gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (result == MM_GSM_MODEM_REG_STATUS_HOME || result == MM_GSM_MODEM_REG_STATUS_ROAMING)
+        read_operator (MM_GENERIC_GSM (modem), info);
+    else
+        mm_callback_info_schedule (info);
+}
+
+static void
+register_manual_done (MMSerial *serial,
+                      int reply_index,
+                      gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    switch (reply_index) {
+    case 0:
+        /* success */
+        get_registration_status (MM_GSM_MODEM (serial), register_manual_get_status_done, info);
+        break;
+    case -1:
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Manual registration timed out");
+        break;
+    default:
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Manual registration failed");
+        break;
+    }
+
+    if (info->error)
+        mm_callback_info_schedule (info);
+}
+
+static void
+register_manual (MMGsmModem *modem, const char *network_id, MMCallbackInfo *info)
+{
+    char *command;
+    char *responses[] = { "OK", "ERROR", "ERR", NULL };
+    guint id = 0;
+
+    command = g_strdup_printf ("AT+COPS=1,2,\"%s\"", network_id);
+    if (mm_serial_send_command_string (MM_SERIAL (modem), command))
+        id = mm_serial_wait_for_reply (MM_SERIAL (modem), 30, responses, responses,
+                                       register_manual_done, info);
+
+    g_free (command);
+
+    if (!id) {
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Manual registration failed.");
         mm_callback_info_schedule (info);
     }
 }
@@ -355,7 +488,11 @@ register_auto_done (MMModem *modem,
     }
 
  out:
-    mm_callback_info_schedule (info);
+
+    if (info->error)
+        mm_callback_info_schedule (info);
+    else
+        read_operator (MM_GENERIC_GSM (modem), info);
 }
 
 static void
@@ -381,114 +518,20 @@ do_register (MMGsmModem *modem,
 }
 
 
-static char *
-parse_operator (const char *reply)
-{
-    char *operator = NULL;
-
-    if (reply && !strncmp (reply, "+COPS: ", 7)) {
-        /* Got valid reply */
-		GRegex *r;
-		GMatchInfo *match_info;
-
-		reply += 7;
-		r = g_regex_new ("(\\d),(\\d),\"(.+)\"", G_REGEX_UNGREEDY, 0, NULL);
-		if (!r)
-            return NULL;
-
-		g_regex_match (r, reply, 0, &match_info);
-		if (g_match_info_matches (match_info))
-            operator = g_match_info_fetch (match_info, 3);
-
-		g_match_info_free (match_info);
-		g_regex_unref (r);
-    }
-
-    return operator;
-}
-
 static void
-reg_info_callback_wrapper (MMModem *modem,
-                           GError *error,
-                           gpointer user_data)
+get_registration_info_done (MMModem *modem, GError *error, gpointer user_data)
 {
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMGsmModemRegInfoFn reg_info_fn;
 
     reg_info_fn = (MMGsmModemRegInfoFn) mm_callback_info_get_data (info, "reg-info-callback");
     reg_info_fn (MM_GSM_MODEM (modem),
-                 GPOINTER_TO_UINT (mm_callback_info_get_data (info, "reg-info-status")),
-                 (char *) mm_callback_info_get_data (info, "reg-info-oper-code"),
-                 (char *) mm_callback_info_get_data (info, "reg-info-oper-name"),
-                 error,
+                 priv->reg_status,
+                 priv->oper_code,
+                 priv->oper_name,
+                 NULL,
                  mm_callback_info_get_data (info, "reg-info-data"));
-}
-
-static void
-get_reg_name_done (MMSerial *serial, const char *reply, gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    char *oper;
-
-    oper = parse_operator (reply);
-    if (oper)
-        mm_callback_info_set_data (info, "reg-info-oper-name", oper, g_free);
-    else
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Could not parse operator");
-
-    mm_callback_info_schedule (info);
-}
-
-static void
-get_reg_code_done (MMSerial *serial, const char *reply, gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    char *oper;
-
-    oper = parse_operator (reply);
-    if (oper) {
-        char *terminators = "\r\n";
-        guint id = 0;
-
-        mm_callback_info_set_data (info, "reg-info-oper-code", oper, g_free);
-
-        if (mm_serial_send_command_string (serial, "AT+COPS=3,0;+COPS?"))
-            id = mm_serial_get_reply (MM_SERIAL (serial), 5, terminators, get_reg_name_done, info);
-
-        if (!id)
-            info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Reading operator name failed.");
-    } else
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Could not parse operator");
-
-    if (info->error)
-        mm_callback_info_schedule (info);
-}
-
-static void
-get_reg_info_status_done (MMModem *modem,
-                          guint32 result,
-                          GError *error,
-                          gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    char *terminators = "\r\n";
-    guint id = 0;
-
-    if (!error) {
-        mm_callback_info_set_data (info, "reg-info-status", GUINT_TO_POINTER (result), NULL);
-        if (mm_serial_send_command_string (MM_SERIAL (modem), "AT+COPS=3,2;+COPS?"))
-            id = mm_serial_get_reply (MM_SERIAL (modem), 5, terminators, get_reg_code_done, info);
-    }
-
-    if (!id) {
-        if (error)
-            info->error = g_error_copy (error);
-        else
-            info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s",
-                                       "Reading operator code failed.");
-
-        mm_callback_info_schedule (info);
-    }
 }
 
 static void
@@ -498,12 +541,12 @@ get_registration_info (MMGsmModem *self,
 {
     MMCallbackInfo *info;
 
-    info = mm_callback_info_new (MM_MODEM (self), reg_info_callback_wrapper, NULL);
+    info = mm_callback_info_new (MM_MODEM (self), get_registration_info_done, NULL);
     info->user_data = info;
     mm_callback_info_set_data (info, "reg-info-callback", callback, NULL);
     mm_callback_info_set_data (info, "reg-info-data", user_data, NULL);
 
-    get_registration_status (self, get_reg_info_status_done, info);
+    mm_callback_info_schedule (info);
 }
 
 static void
@@ -858,6 +901,8 @@ finalize (GObject *object)
     }
 
     g_free (priv->driver);
+    g_free (priv->oper_code);
+    g_free (priv->oper_name);
 
     G_OBJECT_CLASS (mm_generic_gsm_parent_class)->finalize (object);
 }

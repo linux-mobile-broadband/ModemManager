@@ -168,7 +168,7 @@ mm_gsm_modem_get_reg_info (MMGsmModem *self,
 
 static void
 get_reg_info_done (MMGsmModem *modem,
-                   NMGsmModemRegStatus status,
+                   MMGsmModemRegStatus status,
                    const char *oper_code,
                    const char *oper_name,
                    GError *error,

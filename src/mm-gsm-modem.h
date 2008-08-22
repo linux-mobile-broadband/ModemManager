@@ -46,7 +46,7 @@ typedef enum {
     MM_GSM_MODEM_REG_STATUS_DENIED = 3,
     MM_GSM_MODEM_REG_STATUS_UNKNOWN = 4,
     MM_GSM_MODEM_REG_STATUS_ROAMING = 5
-} NMGsmModemRegStatus;
+} MMGsmModemRegStatus;
 
 typedef struct _MMGsmModem MMGsmModem;
 
@@ -56,7 +56,7 @@ typedef void (*MMGsmModemScanFn) (MMGsmModem *modem,
                                   gpointer user_data);
 
 typedef void (*MMGsmModemRegInfoFn) (MMGsmModem *modem,
-                                     NMGsmModemRegStatus status,
+                                     MMGsmModemRegStatus status,
                                      const char *oper_code,
                                      const char *oper_name,
                                      GError *error,
