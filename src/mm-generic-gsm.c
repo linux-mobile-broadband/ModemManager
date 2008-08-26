@@ -73,7 +73,7 @@ mm_generic_gsm_set_operator (MMGenericGsm *modem,
 /*****************************************************************************/
 
 static void
-check_pin_done (MMSerial *serial,
+need_auth_done (MMSerial *serial,
                 int reply_index,
                 gpointer user_data)
 {
@@ -101,18 +101,21 @@ check_pin_done (MMSerial *serial,
 }
 
 static void
-check_pin (MMSerial *serial, gpointer user_data)
+need_auth (MMGsmModem *modem,
+           MMModemFn callback,
+           gpointer user_data)
 {
+    MMCallbackInfo *info;
     char *responses[] = { "READY", "SIM PIN", "SIM PUK", "ERROR", "ERR", NULL };
     char *terminators[] = { "OK", "ERROR", "ERR", NULL };
     guint id = 0;
 
-    if (mm_serial_send_command_string (serial, "AT+CPIN?"))
-        id = mm_serial_wait_for_reply (serial, 3, responses, terminators, check_pin_done, user_data);
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+
+    if (mm_serial_send_command_string (MM_SERIAL (modem), "AT+CPIN?"))
+        id = mm_serial_wait_for_reply (MM_SERIAL (modem), 3, responses, terminators, need_auth_done, info);
 
     if (!id) {
-        MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "PIN checking failed.");
         mm_callback_info_schedule (info);
     }
@@ -128,7 +131,7 @@ init_done (MMSerial *serial,
     switch (reply_index) {
     case 0:
         /* success */
-        check_pin (serial, user_data);
+        mm_gsm_modem_need_authentication (MM_GSM_MODEM (serial), info->callback, info->user_data);
         break;
     case -1:
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Modem initialization timed out.");
@@ -839,6 +842,7 @@ modem_init (MMModem *modem_class)
 static void
 gsm_modem_init (MMGsmModem *gsm_modem_class)
 {
+    gsm_modem_class->need_authentication = need_auth;
     gsm_modem_class->set_pin = set_pin;
     gsm_modem_class->do_register = do_register;
     gsm_modem_class->get_registration_info = get_registration_info;

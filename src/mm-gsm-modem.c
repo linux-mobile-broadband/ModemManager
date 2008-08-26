@@ -77,6 +77,20 @@ uint_call_done (MMModem *modem, guint32 result, GError *error, gpointer user_dat
 }
 
 void
+mm_gsm_modem_need_authentication (MMGsmModem *self,
+                                  MMModemFn callback,
+                                  gpointer user_data)
+{
+    g_return_if_fail (MM_IS_GSM_MODEM (self));
+    g_return_if_fail (callback != NULL);
+
+    if (MM_GSM_MODEM_GET_INTERFACE (self)->need_authentication)
+        MM_GSM_MODEM_GET_INTERFACE (self)->need_authentication (self, callback, user_data);
+    else
+        async_op_not_supported (MM_MODEM (self), callback, user_data);
+}
+
+void
 mm_gsm_modem_set_pin (MMGsmModem *self,
                       const char *pin,
                       MMModemFn callback,

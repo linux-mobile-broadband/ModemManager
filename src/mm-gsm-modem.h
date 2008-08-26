@@ -66,6 +66,10 @@ struct _MMGsmModem {
     GTypeInterface g_iface;
 
     /* Methods */
+    void (*need_authentication) (MMGsmModem *self,
+                                 MMModemFn callback,
+                                 gpointer user_data);
+
     void (*set_pin) (MMGsmModem *self,
                      const char *pin,
                      MMModemFn callback,
@@ -121,6 +125,10 @@ struct _MMGsmModem {
 };
 
 GType mm_gsm_modem_get_type (void);
+
+void mm_gsm_modem_need_authentication (MMGsmModem *self,
+                                       MMModemFn callback,
+                                       gpointer user_data);
 
 void mm_gsm_modem_set_pin (MMGsmModem *self,
                            const char *pin,
