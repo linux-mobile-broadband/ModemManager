@@ -1,8 +1,8 @@
 diff --git a/configure.in b/configure.in
-index 95737a0..11507c0 100644
+index b7aa437..b154922 100644
 --- a/configure.in
 +++ b/configure.in
-@@ -422,6 +422,7 @@ src/dhcp-manager/Makefile
+@@ -440,6 +440,7 @@ src/dhcp-manager/Makefile
  src/supplicant-manager/Makefile
  src/ppp-manager/Makefile
  src/dnsmasq-manager/Makefile
@@ -1079,7 +1079,7 @@ index 0000000..535c0f3
 +#endif /* NM_GSM_MODEM_DEVICE_H */
 diff --git a/src/modem-manager/nm-modem-device.c b/src/modem-manager/nm-modem-device.c
 new file mode 100644
-index 0000000..e9227fd
+index 0000000..1292854
 --- /dev/null
 +++ b/src/modem-manager/nm-modem-device.c
 @@ -0,0 +1,411 @@
@@ -1483,7 +1483,7 @@ index 0000000..e9227fd
 +				    G_SIGNAL_RUN_FIRST,
 +				    G_STRUCT_OFFSET (NMModemDeviceClass, ppp_stats),
 +				    NULL, NULL,
-+				    nm_marshal_VOID__UINT_UINT,
++				    _nm_marshal_VOID__UINT_UINT,
 +				    G_TYPE_NONE, 2,
 +				    G_TYPE_UINT, G_TYPE_UINT);
 +
@@ -2599,7 +2599,7 @@ index eef2aba..0000000
 -
 -#endif /* NM_CDMA_DEVICE_H */
 diff --git a/src/nm-hal-manager.c b/src/nm-hal-manager.c
-index 7286a06..cbc2496 100644
+index 32cb705..8cf41e1 100644
 --- a/src/nm-hal-manager.c
 +++ b/src/nm-hal-manager.c
 @@ -13,9 +13,6 @@
@@ -3393,7 +3393,7 @@ index a7498c8..0000000
 -
 -#endif /* NM_HSO_GSM_DEVICE_H */
 diff --git a/src/nm-manager.c b/src/nm-manager.c
-index 4ba0c7a..1f5b37f 100644
+index 62fbb0c..ae7c077 100644
 --- a/src/nm-manager.c
 +++ b/src/nm-manager.c
 @@ -7,6 +7,7 @@
@@ -3583,7 +3583,7 @@ index 4ba0c7a..1f5b37f 100644
                              gpointer user_data)
 diff --git a/src/nm-serial-device.c b/src/nm-serial-device.c
 deleted file mode 100644
-index db8dc7b..0000000
+index 4fa4cb4..0000000
 --- a/src/nm-serial-device.c
 +++ /dev/null
 @@ -1,1151 +0,0 @@
@@ -4731,7 +4731,7 @@ index db8dc7b..0000000
 -				    G_SIGNAL_RUN_FIRST,
 -				    G_STRUCT_OFFSET (NMSerialDeviceClass, ppp_stats),
 -				    NULL, NULL,
--				    nm_marshal_VOID__UINT_UINT,
+-				    _nm_marshal_VOID__UINT_UINT,
 -				    G_TYPE_NONE, 2,
 -				    G_TYPE_UINT, G_TYPE_UINT);
 -
