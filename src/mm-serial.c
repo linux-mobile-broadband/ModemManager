@@ -45,7 +45,6 @@ typedef struct {
     guint64 send_delay;
 
     guint pending_id;
-    guint timeout_id;
 } MMSerialPrivate;
 
 const char *
@@ -217,15 +216,7 @@ serial_debug (const char *prefix, const char *data, int len)
 }
 #endif /* MM_DEBUG_SERIAL */
 
-/* Timeout handling */
-
-static void
-mm_serial_timeout_removed (gpointer data)
-{
-    MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (data);
-
-    priv->timeout_id = 0;
-}
+/* Pending data reading */
 
 static gboolean
 mm_serial_timed_out (gpointer data)
@@ -235,44 +226,9 @@ mm_serial_timed_out (gpointer data)
     /* Cancel data reading */
     if (priv->pending_id)
         g_source_remove (priv->pending_id);
-    else
-        g_warning ("Timeout reached, but there's nothing to time out");
 
     return FALSE;
 }
-
-static void
-mm_serial_add_timeout (MMSerial *self, guint timeout)
-{
-    MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
-
-    if (priv->pending_id == 0)
-        g_warning ("Adding a time out while not waiting for any data");
-
-    if (priv->timeout_id) {
-        g_warning ("Trying to add a new time out while the old one still exists");
-        g_source_remove (priv->timeout_id);
-    }
-
-    priv->timeout_id = g_timeout_add_full (G_PRIORITY_DEFAULT,
-                                           timeout * 1000,
-                                           mm_serial_timed_out,
-                                           self,
-                                           mm_serial_timeout_removed);
-    if (G_UNLIKELY (priv->timeout_id == 0))
-        g_warning ("Registering serial device time out failed.");
-}
-
-static void
-mm_serial_remove_timeout (MMSerial *self)
-{
-    MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
-
-    if (priv->timeout_id)
-        g_source_remove (priv->timeout_id);
-}
-
-/* Pending data reading */
 
 static guint
 mm_serial_set_pending (MMSerial *self,
@@ -282,6 +238,7 @@ mm_serial_set_pending (MMSerial *self,
                        GDestroyNotify notify)
 {
     MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
+    GSource *source;
 
     if (G_UNLIKELY (priv->pending_id)) {
         /* FIXME: Probably should queue up pending calls instead? */
@@ -295,7 +252,11 @@ mm_serial_set_pending (MMSerial *self,
                                             G_PRIORITY_DEFAULT,
                                             G_IO_IN | G_IO_ERR | G_IO_HUP,
                                             callback, user_data, notify);
-    mm_serial_add_timeout (self, timeout);
+
+    source = g_timeout_source_new (timeout * 100);
+    g_source_set_closure (source, g_cclosure_new_object (G_CALLBACK (mm_serial_timed_out), G_OBJECT (self)));
+    g_source_attach (source, NULL);
+    g_source_unref (source);
 
     return priv->pending_id;
 }
@@ -304,7 +265,6 @@ static void
 mm_serial_pending_done (MMSerial *self)
 {
     MM_SERIAL_GET_PRIVATE (self)->pending_id = 0;
-    mm_serial_remove_timeout (self);
 }
 
 /****/
