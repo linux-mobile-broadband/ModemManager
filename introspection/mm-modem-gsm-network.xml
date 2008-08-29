@@ -28,7 +28,7 @@
       </arg>
     </method>
 
-    <method name="SetAPN">
+    <method name="SetApn">
       <tp:docstring>
 	Set the APN.
       </tp:docstring>
