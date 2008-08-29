@@ -3,7 +3,7 @@
 #ifndef MM_GENERIC_GSM_H
 #define MM_GENERIC_GSM_H
 
-#include "mm-gsm-modem.h"
+#include "mm-modem-gsm-network.h"
 #include "mm-serial.h"
 
 #define MM_TYPE_GENERIC_GSM			(mm_generic_gsm_get_type ())
@@ -28,7 +28,7 @@ MMModem *mm_generic_gsm_new (const char *serial_device,
 
 guint32 mm_generic_gsm_get_cid (MMGenericGsm *modem);
 void mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
-                                    MMGsmModemRegStatus status);
+                                    MMModemGsmNetworkRegStatus status);
 
 void mm_generic_gsm_set_operator (MMGenericGsm *modem,
                                   const char *code,

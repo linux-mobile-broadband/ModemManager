@@ -4,7 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 #include "mm-generic-gsm.h"
-#include "mm-gsm-modem.h"
+#include "mm-modem-gsm-card.h"
+#include "mm-modem-gsm-network.h"
 #include "mm-modem-error.h"
 #include "mm-callback-info.h"
 
@@ -16,12 +17,12 @@ typedef struct {
     char *driver;
     char *oper_code;
     char *oper_name;
-    MMGsmModemRegStatus reg_status;
+    MMModemGsmNetworkRegStatus reg_status;
     guint32 cid;
     guint32 pending_id;
 } MMGenericGsmPrivate;
 
-static void register_auto (MMGsmModem *modem, MMCallbackInfo *info);
+static void register_auto (MMModemGsmNetwork *modem, MMCallbackInfo *info);
 
 MMModem *
 mm_generic_gsm_new (const char *serial_device, const char *driver)
@@ -45,7 +46,7 @@ mm_generic_gsm_get_cid (MMGenericGsm *modem)
 
 void
 mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
-                               MMGsmModemRegStatus status)
+                               MMModemGsmNetworkRegStatus status)
 {
     g_return_if_fail (MM_IS_GENERIC_GSM (modem));
 
@@ -73,7 +74,7 @@ mm_generic_gsm_set_operator (MMGenericGsm *modem,
 /*****************************************************************************/
 
 static void
-need_auth_done (MMSerial *serial,
+check_pin_done (MMSerial *serial,
                 int reply_index,
                 gpointer user_data)
 {
@@ -101,21 +102,18 @@ need_auth_done (MMSerial *serial,
 }
 
 static void
-need_auth (MMGsmModem *modem,
-           MMModemFn callback,
-           gpointer user_data)
+check_pin (MMSerial *serial, gpointer user_data)
 {
-    MMCallbackInfo *info;
     char *responses[] = { "READY", "SIM PIN", "SIM PUK", "ERROR", "ERR", NULL };
     char *terminators[] = { "OK", "ERROR", "ERR", NULL };
     guint id = 0;
 
-    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
-
-    if (mm_serial_send_command_string (MM_SERIAL (modem), "AT+CPIN?"))
-        id = mm_serial_wait_for_reply (MM_SERIAL (modem), 3, responses, terminators, need_auth_done, info);
+    if (mm_serial_send_command_string (serial, "AT+CPIN?"))
+        id = mm_serial_wait_for_reply (serial, 3, responses, terminators, check_pin_done, user_data);
 
     if (!id) {
+        MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "PIN checking failed.");
         mm_callback_info_schedule (info);
     }
@@ -131,7 +129,7 @@ init_done (MMSerial *serial,
     switch (reply_index) {
     case 0:
         /* success */
-        mm_gsm_modem_need_authentication (MM_GSM_MODEM (serial), info->callback, info->user_data);
+        check_pin (serial, user_data);
         break;
     case -1:
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Modem initialization timed out.");
@@ -215,10 +213,10 @@ set_pin_done (MMSerial *serial,
 }
 
 static void
-set_pin (MMGsmModem *modem,
-         const char *pin,
-         MMModemFn callback,
-         gpointer user_data)
+send_pin (MMModemGsmCard *modem,
+          const char *pin,
+          MMModemFn callback,
+          gpointer user_data)
 {
     MMCallbackInfo *info;
     char *command;
@@ -331,27 +329,27 @@ get_reg_status_done (MMSerial *serial,
 
     switch (reply_index) {
     case 0:
-        info->uint_result = (guint32) MM_GSM_MODEM_REG_STATUS_IDLE;
+        info->uint_result = (guint32) MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE;
         break;
     case 1:
-        info->uint_result = (guint32) MM_GSM_MODEM_REG_STATUS_HOME;
+        info->uint_result = (guint32) MM_MODEM_GSM_NETWORK_REG_STATUS_HOME;
         break;
     case 2:
-        info->uint_result = (guint32) MM_GSM_MODEM_REG_STATUS_SEARCHING;
+        info->uint_result = (guint32) MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING;
         break;
     case 3:
-        info->uint_result = (guint32) MM_GSM_MODEM_REG_STATUS_DENIED;
+        info->uint_result = (guint32) MM_MODEM_GSM_NETWORK_REG_STATUS_DENIED;
         break;
     case 4:
-        info->uint_result = (guint32) MM_GSM_MODEM_REG_STATUS_ROAMING;
+        info->uint_result = (guint32) MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING;
         break;
     case -1:
-        info->uint_result = (guint32) MM_GSM_MODEM_REG_STATUS_UNKNOWN;
+        info->uint_result = (guint32) MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN;
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s",
                                    "Reading registration status timed out");
         break;
     default:
-        info->uint_result = (guint32) MM_GSM_MODEM_REG_STATUS_UNKNOWN;
+        info->uint_result = (guint32) MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN;
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s",
                                    "Reading registration status failed");
         break;
@@ -363,7 +361,7 @@ get_reg_status_done (MMSerial *serial,
 }
 
 static void
-get_registration_status (MMGsmModem *modem, MMModemUIntFn callback, gpointer user_data)
+get_registration_status (MMModemGsmNetwork *modem, MMModemUIntFn callback, gpointer user_data)
 {
     MMCallbackInfo *info;
     char *responses[] = { "+CREG: 0,0", "+CREG: 0,1", "+CREG: 0,2", "+CREG: 0,3", "+CREG: 0,5", NULL };
@@ -390,7 +388,7 @@ register_manual_get_status_done (MMModem *modem,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    if (result == MM_GSM_MODEM_REG_STATUS_HOME || result == MM_GSM_MODEM_REG_STATUS_ROAMING)
+    if (result == MM_MODEM_GSM_NETWORK_REG_STATUS_HOME || result == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING)
         read_operator (MM_GENERIC_GSM (modem), info);
     else
         mm_callback_info_schedule (info);
@@ -406,7 +404,7 @@ register_manual_done (MMSerial *serial,
     switch (reply_index) {
     case 0:
         /* success */
-        get_registration_status (MM_GSM_MODEM (serial), register_manual_get_status_done, info);
+        get_registration_status (MM_MODEM_GSM_NETWORK (serial), register_manual_get_status_done, info);
         break;
     case -1:
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Manual registration timed out");
@@ -421,7 +419,7 @@ register_manual_done (MMSerial *serial,
 }
 
 static void
-register_manual (MMGsmModem *modem, const char *network_id, MMCallbackInfo *info)
+register_manual (MMModemGsmNetwork *modem, const char *network_id, MMCallbackInfo *info)
 {
     char *command;
     char *responses[] = { "OK", "ERROR", "ERR", NULL };
@@ -445,7 +443,7 @@ automatic_registration_again (gpointer data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) data;
 
-	register_auto (MM_GSM_MODEM (info->modem), info);	
+	register_auto (MM_MODEM_GSM_NETWORK (info->modem), info);	
 
     return FALSE;
 }
@@ -464,22 +462,22 @@ register_auto_done (MMModem *modem,
     }
 
     switch (result) {
-    case MM_GSM_MODEM_REG_STATUS_IDLE:
+    case MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE:
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
                                    "%s", "Automatic registration failed: not registered and not searching.");
         break;
-    case MM_GSM_MODEM_REG_STATUS_HOME:
+    case MM_MODEM_GSM_NETWORK_REG_STATUS_HOME:
         g_message ("Registered on Home network");
         break;
-    case MM_GSM_MODEM_REG_STATUS_SEARCHING:
+    case MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING:
         MM_GENERIC_GSM_GET_PRIVATE (modem)->pending_id = g_timeout_add (1000, automatic_registration_again, info);
         return;
         break;
-    case MM_GSM_MODEM_REG_STATUS_DENIED:
+    case MM_MODEM_GSM_NETWORK_REG_STATUS_DENIED:
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", 
                                    "Automatic registration failed: registration denied");
         break;
-    case MM_GSM_MODEM_REG_STATUS_ROAMING:
+    case MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING:
         g_message ("Registered on Roaming network");
         break;
     case -1:
@@ -499,13 +497,13 @@ register_auto_done (MMModem *modem,
 }
 
 static void
-register_auto (MMGsmModem *modem, MMCallbackInfo *info)
+register_auto (MMModemGsmNetwork *modem, MMCallbackInfo *info)
 {
     get_registration_status (modem, register_auto_done, info);
 }
 
 static void
-do_register (MMGsmModem *modem,
+do_register (MMModemGsmNetwork *modem,
              const char *network_id,
              MMModemFn callback,
              gpointer user_data)
@@ -526,10 +524,10 @@ get_registration_info_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMGsmModemRegInfoFn reg_info_fn;
+    MMModemGsmNetworkRegInfoFn reg_info_fn;
 
-    reg_info_fn = (MMGsmModemRegInfoFn) mm_callback_info_get_data (info, "reg-info-callback");
-    reg_info_fn (MM_GSM_MODEM (modem),
+    reg_info_fn = (MMModemGsmNetworkRegInfoFn) mm_callback_info_get_data (info, "reg-info-callback");
+    reg_info_fn (MM_MODEM_GSM_NETWORK (modem),
                  priv->reg_status,
                  priv->oper_code,
                  priv->oper_name,
@@ -538,8 +536,8 @@ get_registration_info_done (MMModem *modem, GError *error, gpointer user_data)
 }
 
 static void
-get_registration_info (MMGsmModem *self,
-                       MMGsmModemRegInfoFn callback,
+get_registration_info (MMModemGsmNetwork *self,
+                       MMModemGsmNetworkRegInfoFn callback,
                        gpointer user_data)
 {
     MMCallbackInfo *info;
@@ -640,15 +638,15 @@ scan_callback_wrapper (MMModem *modem,
                        gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMGsmModemScanFn scan_fn;
+    MMModemGsmNetworkScanFn scan_fn;
     GPtrArray *results;
     gpointer data;
 
-    scan_fn = (MMGsmModemScanFn) mm_callback_info_get_data (info, "scan-callback");
+    scan_fn = (MMModemGsmNetworkScanFn) mm_callback_info_get_data (info, "scan-callback");
     results = (GPtrArray *) mm_callback_info_get_data (info, "scan-results");
     data = mm_callback_info_get_data (info, "scan-data");
 
-    scan_fn (MM_GSM_MODEM (modem), results, error, data);
+    scan_fn (MM_MODEM_GSM_NETWORK (modem), results, error, data);
 }
 
 static void
@@ -711,8 +709,8 @@ scan_done (MMSerial *serial, const char *reply, gpointer user_data)
 }
 
 static void
-scan (MMGsmModem *modem,
-      MMGsmModemScanFn callback,
+scan (MMModemGsmNetwork *modem,
+      MMModemGsmNetworkScanFn callback,
       gpointer user_data)
 {
     MMCallbackInfo *info;
@@ -754,7 +752,7 @@ set_apn_done (MMSerial *serial,
 }
 
 static void
-set_apn (MMGsmModem *modem,
+set_apn (MMModemGsmNetwork *modem,
          const char *apn,
          MMModemFn callback,
          gpointer user_data)
@@ -810,7 +808,7 @@ get_signal_quality_done (MMSerial *serial, const char *reply, gpointer user_data
 }
 
 static void
-get_signal_quality (MMGsmModem *modem,
+get_signal_quality (MMModemGsmNetwork *modem,
                     MMModemUIntFn callback,
                     gpointer user_data)
 {
@@ -840,15 +838,19 @@ modem_init (MMModem *modem_class)
 }
 
 static void
-gsm_modem_init (MMGsmModem *gsm_modem_class)
+modem_gsm_card_init (MMModemGsmCard *class)
 {
-    gsm_modem_class->need_authentication = need_auth;
-    gsm_modem_class->set_pin = set_pin;
-    gsm_modem_class->do_register = do_register;
-    gsm_modem_class->get_registration_info = get_registration_info;
-    gsm_modem_class->set_apn = set_apn;
-    gsm_modem_class->scan = scan;
-    gsm_modem_class->get_signal_quality = get_signal_quality;
+    class->send_pin = send_pin;
+}
+
+static void
+modem_gsm_network_init (MMModemGsmNetwork *class)
+{
+    class->do_register = do_register;
+    class->get_registration_info = get_registration_info;
+    class->set_apn = set_apn;
+    class->scan = scan;
+    class->get_signal_quality = get_signal_quality;
 }
 
 static void
@@ -960,14 +962,19 @@ mm_generic_gsm_get_type (void)
             (GInterfaceInitFunc) modem_init
         };
         
-        static const GInterfaceInfo gsm_modem_iface_info = {
-            (GInterfaceInitFunc) gsm_modem_init
+        static const GInterfaceInfo modem_gsm_card_info = {
+            (GInterfaceInitFunc) modem_gsm_card_init
+        };
+
+        static const GInterfaceInfo modem_gsm_network_info = {
+            (GInterfaceInitFunc) modem_gsm_network_init
         };
 
         generic_gsm_type = g_type_register_static (MM_TYPE_SERIAL, "MMGenericGsm", &generic_gsm_type_info, 0);
 
         g_type_add_interface_static (generic_gsm_type, MM_TYPE_MODEM, &modem_iface_info);
-        g_type_add_interface_static (generic_gsm_type, MM_TYPE_GSM_MODEM, &gsm_modem_iface_info);
+        g_type_add_interface_static (generic_gsm_type, MM_TYPE_MODEM_GSM_CARD, &modem_gsm_card_info);
+        g_type_add_interface_static (generic_gsm_type, MM_TYPE_MODEM_GSM_NETWORK, &modem_gsm_network_info);
     }
 
     return generic_gsm_type;

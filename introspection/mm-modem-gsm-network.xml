@@ -1,19 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
 <node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
-
-  <interface name="org.freedesktop.ModemManager.Modem.Gsm">
-    <method name="SetPin">
-      <tp:docstring>
-	Set the PIN (or PUK) to unlock the SIM card.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_set_pin"/>
-      <arg name="pin" type="s" direction="in">
-	The PIN code.
-      </arg>
-    </method>
-
+  <interface name="org.freedesktop.ModemManager.Modem.Gsm.Network">
     <method name="Register">
       <tp:docstring>
 	Register the device to network.
@@ -47,7 +35,9 @@
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_set_apn"/>
       <arg name="apn" type="s" direction="in">
-	The APN.
+	<tp:docstring>
+	  The APN.
+	</tp:docstring>
       </arg>
     </method>
 
@@ -70,7 +60,7 @@
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_set_band"/>
-      <arg name="band" type="u" direction="in" tp:type="MM_GSM_MODEM_BAND">
+      <arg name="band" type="u" direction="in" tp:type="MM_MODEM_GSM_NETWORK_BAND">
 	<tp:docstring>
 	  The band.
 	</tp:docstring>
@@ -83,7 +73,7 @@
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_band"/>
-      <arg name="band" type="u" direction="out" tp:type="MM_GSM_MODEM_BAND">
+      <arg name="band" type="u" direction="out" tp:type="MM_MODEM_GSM_NETWORK_BAND">
 	<tp:docstring>
 	  The current band.
 	</tp:docstring>
@@ -96,7 +86,7 @@
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_set_network_mode"/>
-      <arg name="mode" type="u" direction="in" tp:type="MM_GSM_MODEM_NETWORK_MODE">
+      <arg name="mode" type="u" direction="in" tp:type="MM_MODEM_GSM_NETWORK_MODE">
 	<tp:docstring>
 	  The GSM network mode.
 	</tp:docstring>
@@ -109,7 +99,7 @@
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_network_mode"/>
-      <arg name="mode" type="u" direction="out" tp:type="MM_GSM_MODEM_NETWORK_MODE">
+      <arg name="mode" type="u" direction="out" tp:type="MM_MODEM_GSM_NETWORK_MODE">
 	<tp:docstring>
 	  The current network mode.
 	</tp:docstring>
@@ -122,9 +112,9 @@
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_reg_info"/>
-      <arg name="status" type="u" direction="out" tp:type="MM_GSM_MODEM_REG_STATUS">
+      <arg name="status" type="u" direction="out" tp:type="MM_MODEM_GSM_NETWORK_REG_STATUS">
 	<tp:docstring>
-	  The current network mode.
+	  The network status.
 	</tp:docstring>
       </arg>
       <arg name="operator_code" type="s" direction="out">
@@ -150,18 +140,39 @@
       </arg>
     </signal>
 
+    <signal name="RegistrationInfo">
+      <tp:docstring>
+	The registration status changed.
+      </tp:docstring>
+      <arg name="status" type="u" tp:type="MM_MODEM_GSM_NETWORK_REG_STATUS">
+	<tp:docstring>
+	  The network status.
+	</tp:docstring>
+      </arg>
+      <arg name="operator_code" type="s">
+	<tp:docstring>
+	  The current operator code.
+	</tp:docstring>
+      </arg>
+      <arg name="operator_name" type="s">
+	<tp:docstring>
+	  The current operator name.
+	</tp:docstring>
+      </arg>
+    </signal>
+
     <signal name="NetworkMode">
       <tp:docstring>
 	The network mode changed.
       </tp:docstring>
-      <arg name="mode" type="u" tp:type="MM_GSM_MODEM_NETWORK_MODE">
+      <arg name="mode" type="u" tp:type="MM_MODEM_GSM_NETWORK_MODE">
 	<tp:docstring>
 	  The new network mode.
 	</tp:docstring>
       </arg>
     </signal>
 
-    <tp:enum name="MM_GSM_MODEM_NETWORK_MODE" type="u">
+    <tp:enum name="MM_MODEM_GSM_NETWORK_MODE" type="u">
       <tp:enumvalue suffix="ANY" value="0">
 	<tp:docstring>
 	  Any network mode can be used.
@@ -199,7 +210,7 @@
       </tp:enumvalue>
     </tp:enum>
 
-    <tp:enum name="MM_GSM_MODEM_BAND" type="u">
+    <tp:enum name="MM_MODEM_GSM_NETWORK_BAND" type="u">
       <tp:enumvalue suffix="ANY" value="0">
 	<tp:docstring>
 	  Any band can be used.
@@ -215,54 +226,54 @@
 	  DCS (1800 MHz).
 	</tp:docstring>
       </tp:enumvalue>
-      <tp:enumvalue suffix="PCS" value="3">
+      <tp:enumvalue suffix="PCS" value="4">
 	<tp:docstring>
 	  PCS (1900 MHz).
 	</tp:docstring>
       </tp:enumvalue>
-      <tp:enumvalue suffix="G850" value="4">
+      <tp:enumvalue suffix="G850" value="8">
 	<tp:docstring>
 	  G850 (850 MHz).
 	</tp:docstring>
       </tp:enumvalue>
-      <tp:enumvalue suffix="U2100" value="5">
+      <tp:enumvalue suffix="U2100" value="16">
 	<tp:docstring>
 	  U2100 (WCDMA 2100 MHz).
 	</tp:docstring>
       </tp:enumvalue>
-      <tp:enumvalue suffix="U1700" value="6">
+      <tp:enumvalue suffix="U1700" value="32">
 	<tp:docstring>
 	  U1700 (WCDMA 3GPP UMTS1800 MHz).
 	</tp:docstring>
       </tp:enumvalue>
-      <tp:enumvalue suffix="17IV" value="7">
+      <tp:enumvalue suffix="17IV" value="64">
 	<tp:docstring>
 	  17IV (WCDMA 3GPP AWS 1700/2100 MHz).
 	</tp:docstring>
       </tp:enumvalue>
-      <tp:enumvalue suffix="U800" value="8">
+      <tp:enumvalue suffix="U800" value="128">
 	<tp:docstring>
 	  U800 (WCDMA 3GPP UMTS800 MHz).
 	</tp:docstring>
       </tp:enumvalue>
-      <tp:enumvalue suffix="U850" value="9">
+      <tp:enumvalue suffix="U850" value="256">
 	<tp:docstring>
 	  U850 (WCDMA 3GPP UMTS850 MHz).
 	</tp:docstring>
       </tp:enumvalue>
-      <tp:enumvalue suffix="U900" value="10">
+      <tp:enumvalue suffix="U900" value="512">
 	<tp:docstring>
 	  U900 (WCDMA 3GPP UMTS900 MHz).
 	</tp:docstring>
       </tp:enumvalue>
-      <tp:enumvalue suffix="U17IX" value="11">
+      <tp:enumvalue suffix="U17IX" value="1024">
 	<tp:docstring>
 	  U17IX (WCDMA 3GPP UMTS MHz).
 	</tp:docstring>
       </tp:enumvalue>
     </tp:enum>
 
-    <tp:enum name="MM_GSM_MODEM_REG_STATUS" type="u">
+    <tp:enum name="MM_MODEM_GSM_NETWORK_REG_STATUS" type="u">
       <tp:enumvalue suffix="IDLE" value="0">
 	<tp:docstring>
 	  Not registered, not searching for new operator to register.

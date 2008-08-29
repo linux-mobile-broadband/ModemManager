@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "mm-modem-huawei.h"
-#include "mm-gsm-modem.h"
+#include "mm-modem-gsm-network.h"
 #include "mm-modem-error.h"
 #include "mm-callback-info.h"
 
@@ -44,7 +44,7 @@ mm_modem_huawei_new (const char *data_device,
 /*****************************************************************************/
 
 static void
-parse_monitor_line (MMGsmModem *gsm_modem, char *buf)
+parse_monitor_line (MMModemGsmNetwork *modem, char *buf)
 {
     char **lines;
     char **iter;
@@ -71,25 +71,25 @@ parse_monitor_line (MMGsmModem *gsm_modem, char *buf)
                 quality = quality * 100 / 31;
 
             g_debug ("Signal quality: %d", quality);
-            mm_gsm_modem_signal_quality (gsm_modem, (guint32) quality);
+            mm_modem_gsm_network_signal_quality (modem, (guint32) quality);
         } else if (!strncmp (line, "MODE:", 5)) {
-            MMGsmModemNetworkMode mode = 0;
+            MMModemGsmNetworkMode mode = 0;
             int a;
             int b;
 
             if (sscanf (line + 5, "%d,%d", &a, &b)) {
                 if (a == 3 && b == 2)
-                    mode = MM_GSM_MODEM_NETWORK_MODE_GPRS;
+                    mode = MM_MODEM_GSM_NETWORK_MODE_GPRS;
                 else if (a == 3 && b == 3)
-                    mode = MM_GSM_MODEM_NETWORK_MODE_EDGE;
+                    mode = MM_MODEM_GSM_NETWORK_MODE_EDGE;
                 else if (a == 5 && b == 4)
-                    mode = MM_GSM_MODEM_NETWORK_MODE_3G;
+                    mode = MM_MODEM_GSM_NETWORK_MODE_3G;
                 else if (a ==5 && b == 5)
-                    mode = MM_GSM_MODEM_NETWORK_MODE_HSDPA;
+                    mode = MM_MODEM_GSM_NETWORK_MODE_HSDPA;
 
                 if (mode) {
                     g_debug ("Mode: %d", mode);
-                    mm_gsm_modem_network_mode (gsm_modem, mode);
+                    mm_modem_gsm_network_mode (modem, mode);
                 }
             }
         }
@@ -113,7 +113,7 @@ monitor_device_got_data (GIOChannel *source,
 
 			if (bytes_read) {
 				buf[bytes_read] = '\0';
-                parse_monitor_line (MM_GSM_MODEM (data), buf);
+                parse_monitor_line (MM_MODEM_GSM_NETWORK (data), buf);
 			}
 		} while (bytes_read == 4096 || status == G_IO_STATUS_AGAIN);
 	}
@@ -220,8 +220,8 @@ set_network_mode_get_done (MMSerial *serial, const char *reply, gpointer user_da
 }
 
 static void
-set_network_mode (MMGsmModem *modem,
-                  MMGsmModemNetworkMode mode,
+set_network_mode (MMModemGsmNetwork *modem,
+                  MMModemGsmNetworkMode mode,
                   MMModemFn callback,
                   gpointer user_data)
 {
@@ -232,26 +232,26 @@ set_network_mode (MMGsmModem *modem,
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
     switch (mode) {
-    case MM_GSM_MODEM_NETWORK_MODE_ANY:
+    case MM_MODEM_GSM_NETWORK_MODE_ANY:
         /* Do nothing */
         mm_callback_info_schedule (info);
         return;
         break;
-    case MM_GSM_MODEM_NETWORK_MODE_GPRS:
-    case MM_GSM_MODEM_NETWORK_MODE_EDGE:
+    case MM_MODEM_GSM_NETWORK_MODE_GPRS:
+    case MM_MODEM_GSM_NETWORK_MODE_EDGE:
         mm_callback_info_set_data (info, "mode-a", GINT_TO_POINTER (13), NULL);
         mm_callback_info_set_data (info, "mode-b", GINT_TO_POINTER (1), NULL);
         break;
-    case MM_GSM_MODEM_NETWORK_MODE_3G:
-    case MM_GSM_MODEM_NETWORK_MODE_HSDPA:
+    case MM_MODEM_GSM_NETWORK_MODE_3G:
+    case MM_MODEM_GSM_NETWORK_MODE_HSDPA:
         mm_callback_info_set_data (info, "mode-a", GINT_TO_POINTER (14), NULL);
         mm_callback_info_set_data (info, "mode-b", GINT_TO_POINTER (2), NULL);
         break;
-    case MM_GSM_MODEM_NETWORK_MODE_PREFER_2G:
+    case MM_MODEM_GSM_NETWORK_MODE_PREFER_2G:
         mm_callback_info_set_data (info, "mode-a", GINT_TO_POINTER (2), NULL);
         mm_callback_info_set_data (info, "mode-b", GINT_TO_POINTER (1), NULL);
         break;
-    case MM_GSM_MODEM_NETWORK_MODE_PREFER_3G:
+    case MM_MODEM_GSM_NETWORK_MODE_PREFER_3G:
         mm_callback_info_set_data (info, "mode-a", GINT_TO_POINTER (2), NULL);
         mm_callback_info_set_data (info, "mode-b", GINT_TO_POINTER (2), NULL);
         break;
@@ -280,13 +280,13 @@ get_network_mode_done (MMSerial *serial, const char *reply, gpointer user_data)
 
     if (parse_syscfg (reply, &a, &b, &band, &u1, &u2)) {
         if (a == 2 && b == 1)
-            info->uint_result = MM_GSM_MODEM_NETWORK_MODE_PREFER_2G;
+            info->uint_result = MM_MODEM_GSM_NETWORK_MODE_PREFER_2G;
         else if (a == 2 && b == 2)
-            info->uint_result = MM_GSM_MODEM_NETWORK_MODE_PREFER_3G;
+            info->uint_result = MM_MODEM_GSM_NETWORK_MODE_PREFER_3G;
         else if (a == 13 && b == 1)
-            info->uint_result = MM_GSM_MODEM_NETWORK_MODE_GPRS;
+            info->uint_result = MM_MODEM_GSM_NETWORK_MODE_GPRS;
         else if (a == 14 && b == 2)
-            info->uint_result = MM_GSM_MODEM_NETWORK_MODE_3G;
+            info->uint_result = MM_MODEM_GSM_NETWORK_MODE_3G;
     }
 
     if (info->uint_result == 0)
@@ -297,7 +297,7 @@ get_network_mode_done (MMSerial *serial, const char *reply, gpointer user_data)
 }
 
 static void
-get_network_mode (MMGsmModem *modem,
+get_network_mode (MMModemGsmNetwork *modem,
                   MMModemUIntFn callback,
                   gpointer user_data)
 {
@@ -364,8 +364,8 @@ set_band_get_done (MMSerial *serial, const char *reply, gpointer user_data)
 }
 
 static void
-set_band (MMGsmModem *modem,
-          MMGsmModemBand band,
+set_band (MMModemGsmNetwork *modem,
+          MMModemGsmNetworkBand band,
           MMModemFn callback,
           gpointer user_data)
 {
@@ -376,15 +376,15 @@ set_band (MMGsmModem *modem,
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
     switch (band) {
-    case MM_GSM_MODEM_BAND_ANY:
+    case MM_MODEM_GSM_NETWORK_BAND_ANY:
         mm_callback_info_set_data (info, "band", GUINT_TO_POINTER (0x3FFFFFFF), NULL);
         break;
-    case MM_GSM_MODEM_BAND_EGSM:
-    case MM_GSM_MODEM_BAND_DCS:
-    case MM_GSM_MODEM_BAND_U2100:
+    case MM_MODEM_GSM_NETWORK_BAND_EGSM:
+    case MM_MODEM_GSM_NETWORK_BAND_DCS:
+    case MM_MODEM_GSM_NETWORK_BAND_U2100:
         mm_callback_info_set_data (info, "band", GUINT_TO_POINTER (0x400380), NULL);
         break;
-    case MM_GSM_MODEM_BAND_PCS:
+    case MM_MODEM_GSM_NETWORK_BAND_PCS:
         mm_callback_info_set_data (info, "band", GUINT_TO_POINTER (0x200000), NULL);
         break;
     default:
@@ -414,11 +414,11 @@ get_band_done (MMSerial *serial, const char *reply, gpointer user_data)
 
     if (parse_syscfg (reply, &a, &b, &band, &u1, &u2)) {
         if (band == 0x3FFFFFFF)
-            info->uint_result = MM_GSM_MODEM_BAND_ANY;
+            info->uint_result = MM_MODEM_GSM_NETWORK_BAND_ANY;
         else if (band == 0x400380)
-            info->uint_result = MM_GSM_MODEM_BAND_DCS;
+            info->uint_result = MM_MODEM_GSM_NETWORK_BAND_DCS;
         else if (band == 0x200000)
-            info->uint_result = MM_GSM_MODEM_BAND_PCS;
+            info->uint_result = MM_MODEM_GSM_NETWORK_BAND_PCS;
     }
 
     if (info->uint_result == 0xdeadbeaf) {
@@ -431,7 +431,7 @@ get_band_done (MMSerial *serial, const char *reply, gpointer user_data)
 }
 
 static void
-get_band (MMGsmModem *modem,
+get_band (MMModemGsmNetwork *modem,
           MMModemUIntFn callback,
           gpointer user_data)
 {
@@ -459,12 +459,12 @@ modem_init (MMModem *modem_class)
 }
 
 static void
-gsm_modem_init (MMGsmModem *gsm_modem_class)
+modem_gsm_network_init (MMModemGsmNetwork *class)
 {
-    gsm_modem_class->set_network_mode = set_network_mode;
-    gsm_modem_class->get_network_mode = get_network_mode;
-    gsm_modem_class->set_band = set_band;
-    gsm_modem_class->get_band = get_band;
+    class->set_network_mode = set_network_mode;
+    class->get_network_mode = get_network_mode;
+    class->set_band = set_band;
+    class->get_band = get_band;
 }
 
 static void
@@ -593,14 +593,14 @@ mm_modem_huawei_get_type (void)
             (GInterfaceInitFunc) modem_init
         };
         
-        static const GInterfaceInfo gsm_modem_iface_info = {
-            (GInterfaceInitFunc) gsm_modem_init
+        static const GInterfaceInfo modem_gsm_network_info = {
+            (GInterfaceInitFunc) modem_gsm_network_init
         };
 
         modem_huawei_type = g_type_register_static (MM_TYPE_GENERIC_GSM, "MMModemHuawei", &modem_huawei_type_info, 0);
 
         g_type_add_interface_static (modem_huawei_type, MM_TYPE_MODEM, &modem_iface_info);
-        g_type_add_interface_static (modem_huawei_type, MM_TYPE_GSM_MODEM, &gsm_modem_iface_info);
+        g_type_add_interface_static (modem_huawei_type, MM_TYPE_MODEM_GSM_NETWORK, &modem_gsm_network_info);
     }
 
     return modem_huawei_type;

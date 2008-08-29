@@ -8,7 +8,7 @@
 	Get the current signal quality.
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_cdma_modem_get_signal_quality"/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_cdma_get_signal_quality"/>
       <arg name="quality" type="u" direction="out">
 	<tp:docstring>
 	  Signal quality (percent).

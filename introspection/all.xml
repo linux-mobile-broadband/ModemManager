@@ -24,7 +24,9 @@
 
   <xi:include href="mm-manager.xml"/>
   <xi:include href="mm-modem.xml"/>
-  <xi:include href="mm-cdma-modem.xml"/>
-  <xi:include href="mm-gsm-modem.xml"/>
-  <xi:include href="mm-gsm-modem-hso.xml"/>
+  <xi:include href="mm-modem-cdma.xml"/>
+  <xi:include href="mm-modem-gsm-card.xml"/>
+  <xi:include href="mm-modem-gsm-contacts.xml"/>
+  <xi:include href="mm-modem-gsm-network.xml"/>
+  <xi:include href="mm-modem-gsm-sms.xml"/>
 </tp:spec>

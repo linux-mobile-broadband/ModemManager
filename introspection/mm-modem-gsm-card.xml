@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
+  <interface name="org.freedesktop.ModemManager.Modem.Gsm.Card">
+    <method name="GetImei">
+      <tp:docstring>
+	Get the IMEI of the SIM card.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_imei"/>
+      <arg name="imei" type="s" direction="out">
+	<tp:docstring>
+	  The IMEI.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <method name="GetImsi">
+      <tp:docstring>
+	Get the IMSI of the SIM card.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_imsi"/>
+      <arg name="imsi" type="s" direction="out">
+	<tp:docstring>
+	  The IMSI.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <method name="GetInfo">
+      <tp:docstring>
+	Get the card information (manufacturer, modem, version).
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_info"/>
+      <arg name="manufacturer" type="s" direction="out">
+	<tp:docstring>
+	  The manufacturer of the card.
+	</tp:docstring>
+      </arg>
+      <arg name="modem" type="s" direction="out">
+	<tp:docstring>
+	  The model of the card.
+	</tp:docstring>
+      </arg>
+      <arg name="version" type="s" direction="out">
+	<tp:docstring>
+	  The version (revision) of the card.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <method name="SendPin">
+      <tp:docstring>
+	Send the PIN (or PUK) to unlock the SIM card.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_send_pin"/>
+      <arg name="pin" type="s" direction="in">
+	<tp:docstring>
+	  The PIN code.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <method name="EnablePin">
+      <tp:docstring>
+	Enable or disable the PIN checking.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_enable_pin"/>
+      <arg name="pin" type="s" direction="in">
+	<tp:docstring>
+	  The PIN code.
+	</tp:docstring>
+      </arg>
+      <arg name="enabled" type="b" direction="in">
+	<tp:docstring>
+	  True to enable PIN checking.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <method name="ChangePin">
+      <tp:docstring>
+	Change the PIN code.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_change_pin"/>
+      <arg name="old_pin" type="s" direction="in">
+	<tp:docstring>
+	  The current PIN code.
+	</tp:docstring>
+      </arg>
+      <arg name="new_pin" type="s" direction="in">
+	<tp:docstring>
+	  The new PIN code.
+	</tp:docstring>
+      </arg>
+    </method>
+
+  </interface>
+</node>

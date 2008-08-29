@@ -36,6 +36,11 @@ typedef void (*MMModemUIntFn) (MMModem *modem,
                                GError *error,
                                gpointer user_data);
 
+typedef void (*MMModemStringFn) (MMModem *modem,
+                                 const char *result,
+                                 GError *error,
+                                 gpointer user_data);
+
 struct _MMModem {
     GTypeInterface g_iface;
 

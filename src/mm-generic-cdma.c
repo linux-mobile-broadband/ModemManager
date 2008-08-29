@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 #include "mm-generic-cdma.h"
-#include "mm-cdma-modem.h"
+#include "mm-modem-cdma.h"
 #include "mm-modem-error.h"
 #include "mm-callback-info.h"
 
@@ -196,7 +196,7 @@ get_signal_quality_done (MMSerial *serial, const char *reply, gpointer user_data
 }
 
 static void
-get_signal_quality (MMCdmaModem *modem,
+get_signal_quality (MMModemCdma *modem,
                     MMModemUIntFn callback,
                     gpointer user_data)
 {
@@ -226,7 +226,7 @@ modem_init (MMModem *modem_class)
 }
 
 static void
-cdma_modem_init (MMCdmaModem *cdma_modem_class)
+modem_cdma_init (MMModemCdma *cdma_modem_class)
 {
     cdma_modem_class->get_signal_quality = get_signal_quality;
 }
@@ -333,14 +333,14 @@ mm_generic_cdma_get_type (void)
             (GInterfaceInitFunc) modem_init
         };
         
-        static const GInterfaceInfo cdma_modem_iface_info = {
-            (GInterfaceInitFunc) cdma_modem_init
+        static const GInterfaceInfo modem_cdma_iface_info = {
+            (GInterfaceInitFunc) modem_cdma_init
         };
 
         generic_cdma_type = g_type_register_static (MM_TYPE_SERIAL, "MMGenericCdma", &generic_cdma_type_info, 0);
 
         g_type_add_interface_static (generic_cdma_type, MM_TYPE_MODEM, &modem_iface_info);
-        g_type_add_interface_static (generic_cdma_type, MM_TYPE_CDMA_MODEM, &cdma_modem_iface_info);
+        g_type_add_interface_static (generic_cdma_type, MM_TYPE_MODEM_CDMA, &modem_cdma_iface_info);
     }
 
     return generic_cdma_type;

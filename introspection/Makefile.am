@@ -1,6 +1,9 @@
 EXTRA_DIST = \
 	mm-manager.xml \
 	mm-modem.xml \
-	mm-gsm-modem.xml \
-	mm-gsm-modem-hso.xml \
-	mm-cdma-modem.xml
+	mm-modem-cdma.xml \
+	mm-modem-gsm-card.xml \
+	mm-modem-gsm-contacts.xml \
+	mm-modem-gsm-network.xml \
+	mm-modem-gsm-sms.xml
+

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
+  <interface name="org.freedesktop.ModemManager.Modem.Gsm.SMS">
+    <method name="Delete">
+      <tp:docstring>
+	Delete an SMS message.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_sms_delete"/>
+      <arg name="index" type="u" direction="in">
+	<tp:docstring>
+	  The index of the SMS.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <method name="Get">
+      <tp:docstring>
+	Retrieve an SMS from the SIM card.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_sms_get"/>
+      <arg name="index" type="u" direction="in">
+	<tp:docstring>
+	  The index of the SMS.
+	</tp:docstring>
+      </arg>
+      <arg name="found_index" type="u" direction="out">
+	<tp:docstring>
+	  The index of the SMS (same as the passed index).
+	</tp:docstring>
+      </arg>
+      <arg name="number" type="s" direction="out">
+	<tp:docstring>
+	  The number the SMS was received from.
+	</tp:docstring>
+      </arg>
+      <arg name="contents" type="s" direction="out">
+	<tp:docstring>
+	  The contents of the SMS.
+	</tp:docstring>
+      </arg>
+      <arg name="time" type="d" direction="out">
+	<tp:docstring>
+	  The timestamp.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <method name="GetFormat">
+      <arg name="result" type="u" direction="out"/>
+    </method>
+
+    <method name="SetFormat">
+      <arg name="format" type="u" direction="in"/>
+    </method>
+
+    <method name="GetSmsc">
+      <arg name="result" type="s" direction="out"/>
+    </method>
+
+    <method name="SetSmsc">
+      <arg name="smsc" type="s" direction="in"/>
+    </method>
+
+    <method name="List">
+      <arg name="result" type="a(ussd)" direction="out"/>
+    </method>
+
+    <method name="Save">
+      <arg name="number" type="s" direction="in"/>
+      <arg name="contents" type="s" direction="in"/>
+      <arg name="index" type="u" direction="out"/>
+    </method>
+
+    <method name="Send">
+      <arg name="result" type="u" direction="out"/>
+    </method>
+
+    <method name="SendFromStorage">
+      <arg name="index" type="u" direction="in"/>
+    </method>
+
+    <method name="SetIndication">
+      <arg name="mode" type="u" direction="in"/>
+      <arg name="mt" type="u" direction="in"/>
+      <arg name="bm" type="u" direction="in"/>
+      <arg name="ds" type="u" direction="in"/>
+      <arg name="bfr" type="u" direction="in"/>
+    </method>
+
+    <signal name="SmsReceived">
+      <arg name="index" type="u"/>
+    </signal>
+
+  </interface>
+</node>

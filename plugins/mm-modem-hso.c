@@ -9,7 +9,6 @@
 #include <dbus/dbus-glib.h>
 #include "mm-modem-hso.h"
 #include "mm-serial.h"
-#include "mm-gsm-modem.h"
 #include "mm-modem-error.h"
 #include "mm-callback-info.h"
 
@@ -358,20 +357,14 @@ impl_hso_authenticate (MMModemHso *self,
 /*****************************************************************************/
 
 static void
+mm_modem_hso_init (MMModemHso *self)
+{
+}
+
+static void
 modem_init (MMModem *modem_class)
 {
     modem_class->connect = do_connect;
-}
-
-static void
-gsm_modem_init (MMGsmModem *gsm_modem_class)
-{
-    gsm_modem_class->need_authentication = need_auth;
-}
-
-static void
-mm_modem_hso_init (MMModemHso *self)
-{
 }
 
 static GObject*
@@ -486,14 +479,9 @@ mm_modem_hso_get_type (void)
             (GInterfaceInitFunc) modem_init
         };
         
-        static const GInterfaceInfo gsm_modem_iface_info = {
-            (GInterfaceInitFunc) gsm_modem_init
-        };
-
         modem_hso_type = g_type_register_static (MM_TYPE_GENERIC_GSM, "MMModemHso", &modem_hso_type_info, 0);
 
         g_type_add_interface_static (modem_hso_type, MM_TYPE_MODEM, &modem_iface_info);
-        g_type_add_interface_static (modem_hso_type, MM_TYPE_GSM_MODEM, &gsm_modem_iface_info);
     }
 
     return modem_hso_type;
