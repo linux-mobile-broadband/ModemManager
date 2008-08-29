@@ -148,7 +148,7 @@ index ad125e5..9ae87e1 100644
  		break;
 diff --git a/src/mm-types.h b/src/mm-types.h
 new file mode 100644
-index 0000000..4c6e514
+index 0000000..a1f9979
 --- /dev/null
 +++ b/src/mm-types.h
 @@ -0,0 +1,18 @@
@@ -158,7 +158,7 @@ index 0000000..4c6e514
 +#define MM_TYPES_H
 +
 +#define MM_DBUS_SERVICE "org.freedesktop.ModemManager"
-+#define MM_DBUS_INTERFACE_MODEM_GSM "org.freedesktop.ModemManager.Modem.Gsm"
++#define MM_DBUS_INTERFACE_MODEM_GSM "org.freedesktop.ModemManager.Modem.Gsm.Network"
 +
 +enum {
 +  MM_GSM_MODEM_REG_STATUS_IDLE = 0,

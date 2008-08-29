@@ -11,94 +11,43 @@ index b7aa437..b154922 100644
  libnm-util/libnm-util.pc
  libnm-util/Makefile
 diff --git a/introspection/nm-device-cdma.xml b/introspection/nm-device-cdma.xml
-index 2b43f8f..33e80cb 100644
+index 2b43f8f..22a612b 100644
 --- a/introspection/nm-device-cdma.xml
 +++ b/introspection/nm-device-cdma.xml
-@@ -3,12 +3,28 @@
+@@ -2,14 +2,5 @@
+ 
  <node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
    <interface name="org.freedesktop.NetworkManager.Device.Cdma">
- 
+-
 -    <signal name="PropertiesChanged">
 -        <arg name="properties" type="a{sv}" tp:type="String_Variant_Map">
 -            <tp:docstring>
 -                A dictionary mapping property names to variant boxed values
 -            </tp:docstring>
 -        </arg>
-+    <method name="GetSignalQuality">
-+      <tp:docstring>
-+        Get the current signal quality.
-+      </tp:docstring>
-+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_cdma_device_get_signal_quality"/>
-+      <arg name="quality" type="u" direction="out">
-+        <tp:docstring>
-+          Signal quality (percent).
-+        </tp:docstring>
-+      </arg>
-+    </method>
-+
-+    <signal name="SignalQuality">
-+      <tp:docstring>
-+        The signal quality changed.
-+      </tp:docstring>
-+      <arg name="quality" type="u">
-+        <tp:docstring>
-+          The signal quality (percent).
-+        </tp:docstring>
-+      </arg>
-     </signal>
- 
+-    </signal>
+-
    </interface>
+ </node>
 diff --git a/introspection/nm-device-gsm.xml b/introspection/nm-device-gsm.xml
-index 650d656..753669d 100644
+index 650d656..0bf7b08 100644
 --- a/introspection/nm-device-gsm.xml
 +++ b/introspection/nm-device-gsm.xml
-@@ -3,12 +3,39 @@
+@@ -2,14 +2,5 @@
+ 
  <node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
    <interface name="org.freedesktop.NetworkManager.Device.Gsm">
- 
+-
 -    <signal name="PropertiesChanged">
 -        <arg name="properties" type="a{sv}" tp:type="String_Variant_Map">
 -            <tp:docstring>
 -                A dictionary mapping property names to variant boxed values
 -            </tp:docstring>
 -        </arg>
-+    <method name="GetSignalQuality">
-+      <tp:docstring>
-+        Get the current signal quality.
-+      </tp:docstring>
-+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_device_get_signal_quality"/>
-+      <arg name="quality" type="u" direction="out">
-+        <tp:docstring>
-+          Signal quality (percent).
-+        </tp:docstring>
-+      </arg>
-+    </method>
-+
-+    <signal name="SignalQuality">
-+      <tp:docstring>
-+        The signal quality changed.
-+      </tp:docstring>
-+      <arg name="quality" type="u">
-+        <tp:docstring>
-+          The signal quality (percent).
-+        </tp:docstring>
-+      </arg>
-+    </signal>
-+
-+    <signal name="NetworkMode">
-+      <tp:docstring>
-+        The network mode changed.
-+      </tp:docstring>
-+      <arg name="mode" type="u">
-+        <tp:docstring>
-+          The new network mode.
-+        </tp:docstring>
-+      </arg>
-     </signal>
- 
+-    </signal>
+-
    </interface>
+ </node>
 diff --git a/src/Makefile.am b/src/Makefile.am
 index 3c4ce75..3f24eb5 100644
 --- a/src/Makefile.am
@@ -210,7 +159,7 @@ index c8fa251..432af94 100644
  			best = dev;
 diff --git a/src/modem-manager/Makefile.am b/src/modem-manager/Makefile.am
 new file mode 100644
-index 0000000..cc84137
+index 0000000..d8730b1
 --- /dev/null
 +++ b/src/modem-manager/Makefile.am
 @@ -0,0 +1,41 @@
@@ -223,10 +172,10 @@ index 0000000..cc84137
 +noinst_LTLIBRARIES = libmodem-manager.la
 +
 +libmodem_manager_la_SOURCES = \
-+	nm-cdma-modem-device.c \
-+	nm-cdma-modem-device.h \
-+	nm-gsm-modem-device.c \
-+	nm-gsm-modem-device.h \
++	nm-cdma-modem.c \
++	nm-cdma-modem.h \
++	nm-gsm-modem.c \
++	nm-gsm-modem.h \
 +	nm-modem-device.c \
 +	nm-modem-device.h \
 +	nm-modem-manager.h \
@@ -255,17 +204,17 @@ index 0000000..cc84137
 +	nm-serial-device-glue.h
 +
 +CLEANFILES = $(BUILT_SOURCES)
-diff --git a/src/modem-manager/nm-cdma-modem-device.c b/src/modem-manager/nm-cdma-modem-device.c
+diff --git a/src/modem-manager/nm-cdma-modem.c b/src/modem-manager/nm-cdma-modem.c
 new file mode 100644
-index 0000000..b674342
+index 0000000..fec4540
 --- /dev/null
-+++ b/src/modem-manager/nm-cdma-modem-device.c
-@@ -0,0 +1,315 @@
++++ b/src/modem-manager/nm-cdma-modem.c
+@@ -0,0 +1,248 @@
 +/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
 +
 +#include <string.h>
 +
-+#include "nm-cdma-modem-device.h"
++#include "nm-cdma-modem.h"
 +#include "nm-modem-types.h"
 +#include "nm-device-interface.h"
 +#include "nm-device-private.h"
@@ -274,13 +223,11 @@ index 0000000..b674342
 +#include "nm-setting-cdma.h"
 +#include "nm-utils.h"
 +
-+static void impl_cdma_device_get_signal_quality (NMCdmaModemDevice *modem, DBusGMethodInvocation *context);
-+
 +#include "nm-cdma-device-glue.h"
 +
-+G_DEFINE_TYPE (NMCdmaModemDevice, nm_cdma_modem_device, NM_TYPE_MODEM_DEVICE)
++G_DEFINE_TYPE (NMCdmaModem, nm_cdma_modem, NM_TYPE_MODEM_DEVICE)
 +
-+#define NM_CDMA_MODEM_DEVICE_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_CDMA_MODEM_DEVICE, NMCdmaModemDevicePrivate))
++#define NM_CDMA_MODEM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_CDMA_MODEM, NMCdmaModemPrivate))
 +
 +enum {
 +	MODEM_STATE_BEGIN,
@@ -289,11 +236,8 @@ index 0000000..b674342
 +};
 +
 +typedef struct {
-+	NMDBusManager *dbus_mgr;
-+	char *path;
-+	DBusGProxy *proxy;
 +	int modem_state;
-+} NMCdmaModemDevicePrivate;
++} NMCdmaModemPrivate;
 +
 +enum {
 +	SIGNAL_QUALITY,
@@ -304,15 +248,15 @@ index 0000000..b674342
 +static guint signals[LAST_SIGNAL] = { 0 };
 +
 +NMDevice *
-+nm_cdma_modem_device_new (const char *path,
-+					 const char *data_device,
-+					 const char *driver)
++nm_cdma_modem_new (const char *path,
++			    const char *data_device,
++			    const char *driver)
 +{
 +	g_return_val_if_fail (path != NULL, NULL);
 +	g_return_val_if_fail (data_device != NULL, NULL);
 +	g_return_val_if_fail (driver != NULL, NULL);
 +
-+	return (NMDevice *) g_object_new (NM_TYPE_CDMA_MODEM_DEVICE,
++	return (NMDevice *) g_object_new (NM_TYPE_CDMA_MODEM,
 +							    NM_DEVICE_INTERFACE_UDI, path,
 +							    NM_DEVICE_INTERFACE_IFACE, data_device,
 +							    NM_DEVICE_INTERFACE_DRIVER, driver,
@@ -322,7 +266,7 @@ index 0000000..b674342
 +}
 +
 +static NMSetting *
-+get_setting (NMCdmaModemDevice *device, GType setting_type)
++get_setting (NMCdmaModem *device, GType setting_type)
 +{
 +	NMActRequest *req;
 +	NMSetting *setting = NULL;
@@ -342,8 +286,8 @@ index 0000000..b674342
 +static void
 +state_machine (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data)
 +{
-+	NMCdmaModemDevice *modem = NM_CDMA_MODEM_DEVICE (user_data);
-+	NMCdmaModemDevicePrivate *priv = NM_CDMA_MODEM_DEVICE_GET_PRIVATE (modem);
++	NMCdmaModem *modem = NM_CDMA_MODEM (user_data);
++	NMCdmaModemPrivate *priv = NM_CDMA_MODEM_GET_PRIVATE (modem);
 +	NMSettingCdma *setting;
 +	GError *error = NULL;
 +
@@ -353,7 +297,7 @@ index 0000000..b674342
 +		dbus_g_proxy_end_call (proxy, call_id, &error, G_TYPE_INVALID);
 +
 +	if (error) {
-+		nm_warning ("CDMA device connection failed: %s", error->message);
++		nm_warning ("CDMA modem connection failed: %s", error->message);
 +		nm_device_state_changed (NM_DEVICE (modem), NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_NONE);
 +		return;
 +	}
@@ -361,7 +305,7 @@ index 0000000..b674342
 +	switch (priv->modem_state) {
 +	case MODEM_STATE_BEGIN:
 +		priv->modem_state = MODEM_STATE_ENABLE;
-+		dbus_g_proxy_begin_call (nm_modem_device_get_proxy (NM_MODEM_DEVICE (modem)),
++		dbus_g_proxy_begin_call (nm_modem_device_get_proxy (NM_MODEM_DEVICE (modem), NULL),
 +							"Enable", state_machine,
 +							modem, NULL,
 +							G_TYPE_BOOLEAN, TRUE,
@@ -369,7 +313,7 @@ index 0000000..b674342
 +		break;
 +	case MODEM_STATE_ENABLE:
 +		priv->modem_state = MODEM_STATE_CONNECT;
-+		dbus_g_proxy_begin_call (nm_modem_device_get_proxy (NM_MODEM_DEVICE (modem)),
++		dbus_g_proxy_begin_call (nm_modem_device_get_proxy (NM_MODEM_DEVICE (modem), NULL),
 +							"Connect", state_machine,
 +							modem, NULL,
 +							G_TYPE_STRING, setting->number,
@@ -388,10 +332,10 @@ index 0000000..b674342
 +static NMActStageReturn
 +real_act_stage1_prepare (NMDevice *device, NMDeviceStateReason *reason)
 +{
-+	NMCdmaModemDevicePrivate *priv = NM_CDMA_MODEM_DEVICE_GET_PRIVATE (device);
++	NMCdmaModemPrivate *priv = NM_CDMA_MODEM_GET_PRIVATE (device);
 +
 +	priv->modem_state = MODEM_STATE_BEGIN;
-+	state_machine (priv->proxy, NULL, device);
++	state_machine (NULL, NULL, device);
 +
 +	return NM_ACT_STAGE_RETURN_POSTPONE;
 +}
@@ -479,85 +423,23 @@ index 0000000..b674342
 +	nm_device_activate_schedule_stage1_device_prepare (dev);
 +}
 +
-+static void
-+signal_quality_proxy (DBusGProxy *proxy, guint32 quality, gpointer user_data)
-+{
-+	g_signal_emit (NM_CDMA_MODEM_DEVICE (user_data), signals[SIGNAL_QUALITY], 0, quality);
-+}
-+
-+static void
-+impl_cdma_device_get_signal_quality (NMCdmaModemDevice *modem, DBusGMethodInvocation *context)
-+{
-+	/* FIXME */
-+}
-+
 +/*****************************************************************************/
 +
 +static void
-+nm_cdma_modem_device_init (NMCdmaModemDevice *self)
++nm_cdma_modem_init (NMCdmaModem *self)
 +{
-+	NMCdmaModemDevicePrivate *priv = NM_CDMA_MODEM_DEVICE_GET_PRIVATE (self);
-+
-+	priv->dbus_mgr = nm_dbus_manager_get ();
-+
 +	nm_device_set_device_type (NM_DEVICE (self), NM_DEVICE_TYPE_GSM);
 +}
 +
-+static GObject*
-+constructor (GType type,
-+		   guint n_construct_params,
-+		   GObjectConstructParam *construct_params)
-+{
-+	GObject *object;
-+	NMCdmaModemDevicePrivate *priv;
-+
-+	object = G_OBJECT_CLASS (nm_cdma_modem_device_parent_class)->constructor (type,
-+															    n_construct_params,
-+															    construct_params);
-+	if (!object)
-+		return NULL;
-+
-+	priv = NM_CDMA_MODEM_DEVICE_GET_PRIVATE (object);
-+
-+	priv->proxy = dbus_g_proxy_new_for_name (nm_dbus_manager_get_connection (priv->dbus_mgr),
-+									 MM_DBUS_SERVICE,
-+									 nm_device_get_udi (NM_DEVICE (object)),
-+									 MM_DBUS_INTERFACE_CDMA_MODEM);
-+
-+	dbus_g_proxy_add_signal (priv->proxy, "SignalQuality", G_TYPE_UINT, G_TYPE_INVALID);
-+	dbus_g_proxy_connect_signal (priv->proxy, "SignalQuality",
-+						    G_CALLBACK (signal_quality_proxy),
-+						    object,
-+						    NULL);
-+
-+	return object;
-+}
-+
 +static void
-+finalize (GObject *object)
-+{
-+	NMCdmaModemDevicePrivate *priv = NM_CDMA_MODEM_DEVICE_GET_PRIVATE (object);
-+
-+	if (priv->proxy)
-+		g_object_unref (priv->proxy);
-+
-+	g_object_unref (priv->dbus_mgr);
-+
-+	G_OBJECT_CLASS (nm_cdma_modem_device_parent_class)->finalize (object);
-+}
-+
-+static void
-+nm_cdma_modem_device_class_init (NMCdmaModemDeviceClass *klass)
++nm_cdma_modem_class_init (NMCdmaModemClass *klass)
 +{
 +	GObjectClass *object_class = G_OBJECT_CLASS (klass);
 +	NMDeviceClass *device_class = NM_DEVICE_CLASS (klass);
 +
-+	g_type_class_add_private (object_class, sizeof (NMCdmaModemDevicePrivate));
++	g_type_class_add_private (object_class, sizeof (NMCdmaModemPrivate));
 +
 +	/* Virtual methods */
-+	object_class->constructor = constructor;
-+	object_class->finalize = finalize;
-+
 +	device_class->get_best_auto_connection = real_get_best_auto_connection;
 +	device_class->connection_secrets_updated = real_connection_secrets_updated;
 +	device_class->act_stage1_prepare = real_act_stage1_prepare;
@@ -567,7 +449,7 @@ index 0000000..b674342
 +		g_signal_new ("signal-quality",
 +				    G_OBJECT_CLASS_TYPE (object_class),
 +				    G_SIGNAL_RUN_FIRST,
-+				    G_STRUCT_OFFSET (NMCdmaModemDeviceClass, signal_quality),
++				    G_STRUCT_OFFSET (NMCdmaModemClass, signal_quality),
 +				    NULL, NULL,
 +				    g_cclosure_marshal_VOID__UINT,
 +				    G_TYPE_NONE, 1,
@@ -576,58 +458,58 @@ index 0000000..b674342
 +	dbus_g_object_type_install_info (G_TYPE_FROM_CLASS (klass),
 +							   &dbus_glib_nm_cdma_device_object_info);
 +}
-diff --git a/src/modem-manager/nm-cdma-modem-device.h b/src/modem-manager/nm-cdma-modem-device.h
+diff --git a/src/modem-manager/nm-cdma-modem.h b/src/modem-manager/nm-cdma-modem.h
 new file mode 100644
-index 0000000..888d429
+index 0000000..5dc3c14
 --- /dev/null
-+++ b/src/modem-manager/nm-cdma-modem-device.h
++++ b/src/modem-manager/nm-cdma-modem.h
 @@ -0,0 +1,36 @@
 +/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
 +
-+#ifndef NM_CDMA_MODEM_DEVICE_H
-+#define NM_CDMA_MODEM_DEVICE_H
++#ifndef NM_CDMA_MODEM_H
++#define NM_CDMA_MODEM_H
 +
 +#include <nm-modem-device.h>
 +
 +G_BEGIN_DECLS
 +
-+#define NM_TYPE_CDMA_MODEM_DEVICE            (nm_cdma_modem_device_get_type ())
-+#define NM_CDMA_MODEM_DEVICE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), NM_TYPE_CDMA_MODEM_DEVICE, NMCdmaModemDevice))
-+#define NM_CDMA_MODEM_DEVICE_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  NM_TYPE_CDMA_MODEM_DEVICE, NMCdmaModemDeviceClass))
-+#define NM_IS_CDMA_MODEM_DEVICE(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), NM_TYPE_CDMA_MODEM_DEVICE))
-+#define NM_IS_CDMA_MODEM_DEVICE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  NM_TYPE_CDMA_MODEM_DEVICE))
-+#define NM_CDMA_MODEM_DEVICE_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  NM_TYPE_CDMA_MODEM_DEVICE, NMCdmaModemDeviceClass))
++#define NM_TYPE_CDMA_MODEM            (nm_cdma_modem_get_type ())
++#define NM_CDMA_MODEM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), NM_TYPE_CDMA_MODEM, NMCdmaModem))
++#define NM_CDMA_MODEM_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  NM_TYPE_CDMA_MODEM, NMCdmaModemClass))
++#define NM_IS_CDMA_MODEM(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), NM_TYPE_CDMA_MODEM))
++#define NM_IS_CDMA_MODEM_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  NM_TYPE_CDMA_MODEM))
++#define NM_CDMA_MODEM_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  NM_TYPE_CDMA_MODEM, NMCdmaModemClass))
 +
 +typedef struct {
 +	NMModemDevice parent;
-+} NMCdmaModemDevice;
++} NMCdmaModem;
 +
 +typedef struct {
 +	NMModemDeviceClass parent;
 +
 +	/* Signals */
-+	void (*signal_quality) (NMModemDevice *device, guint32 quality);
-+} NMCdmaModemDeviceClass;
++	void (*signal_quality) (NMCdmaModem *modem, guint32 quality);
++} NMCdmaModemClass;
 +
-+GType nm_cdma_modem_device_get_type (void);
++GType nm_cdma_modem_get_type (void);
 +
-+NMDevice *nm_cdma_modem_device_new (const char *path,
-+							 const char *data_device,
-+							 const char *driver);
++NMDevice *nm_cdma_modem_new (const char *path,
++					    const char *data_device,
++					    const char *driver);
 +
 +G_END_DECLS
 +
-+#endif /* NM_CDMA_MODEM_DEVICE_H */
-diff --git a/src/modem-manager/nm-gsm-modem-device.c b/src/modem-manager/nm-gsm-modem-device.c
++#endif /* NM_CDMA_MODEM_H */
+diff --git a/src/modem-manager/nm-gsm-modem.c b/src/modem-manager/nm-gsm-modem.c
 new file mode 100644
-index 0000000..eb2c4d6
+index 0000000..1069cd7
 --- /dev/null
-+++ b/src/modem-manager/nm-gsm-modem-device.c
-@@ -0,0 +1,411 @@
++++ b/src/modem-manager/nm-gsm-modem.c
+@@ -0,0 +1,329 @@
 +/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
 +
 +#include <string.h>
-+#include "nm-gsm-modem-device.h"
++#include "nm-gsm-modem.h"
 +#include "nm-device-private.h"
 +#include "nm-device-interface.h"
 +#include "nm-dbus-manager.h"
@@ -639,13 +521,11 @@ index 0000000..eb2c4d6
 +#include "nm-modem-types.h"
 +#include "nm-utils.h"
 +
-+static void impl_gsm_device_get_signal_quality (NMGsmModemDevice *modem, DBusGMethodInvocation *context);
-+
 +#include "nm-gsm-device-glue.h"
 +
-+G_DEFINE_TYPE (NMGsmModemDevice, nm_gsm_modem_device, NM_TYPE_MODEM_DEVICE)
++G_DEFINE_TYPE (NMGsmModem, nm_gsm_modem, NM_TYPE_MODEM_DEVICE)
 +
-+#define NM_GSM_MODEM_DEVICE_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_GSM_MODEM_DEVICE, NMGsmModemDevicePrivate))
++#define NM_GSM_MODEM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_GSM_MODEM, NMGsmModemPrivate))
 +
 +enum {
 +	MODEM_STATE_BEGIN,
@@ -659,33 +539,19 @@ index 0000000..eb2c4d6
 +};
 +
 +typedef struct {
-+	NMDBusManager *dbus_mgr;
-+	char *path;
-+	DBusGProxy *proxy;
-+	NMPPPManager *ppp_manager;
-+	NMIP4Config  *pending_ip4_config;
-+
 +	int modem_state;
-+} NMGsmModemDevicePrivate;
-+
-+enum {
-+	SIGNAL_QUALITY,
-+
-+	LAST_SIGNAL
-+};
-+
-+static guint signals[LAST_SIGNAL] = { 0 };
++} NMGsmModemPrivate;
 +
 +NMDevice *
-+nm_gsm_modem_device_new (const char *path,
-+					const char *data_device,
-+					const char *driver)
++nm_gsm_modem_new (const char *path,
++			   const char *data_device,
++			   const char *driver)
 +{
 +	g_return_val_if_fail (path != NULL, NULL);
 +	g_return_val_if_fail (data_device != NULL, NULL);
 +	g_return_val_if_fail (driver != NULL, NULL);
 +
-+	return (NMDevice *) g_object_new (NM_TYPE_GSM_MODEM_DEVICE,
++	return (NMDevice *) g_object_new (NM_TYPE_GSM_MODEM,
 +							    NM_DEVICE_INTERFACE_UDI, path,
 +							    NM_DEVICE_INTERFACE_IFACE, data_device,
 +							    NM_DEVICE_INTERFACE_DRIVER, driver,
@@ -695,12 +561,12 @@ index 0000000..eb2c4d6
 +}
 +
 +static NMSetting *
-+get_setting (NMGsmModemDevice *device, GType setting_type)
++get_setting (NMGsmModem *modem, GType setting_type)
 +{
 +	NMActRequest *req;
 +	NMSetting *setting = NULL;
 +
-+	req = nm_device_get_act_request (NM_DEVICE (device));
++	req = nm_device_get_act_request (NM_DEVICE (modem));
 +	if (req) {
 +		NMConnection *connection;
 +
@@ -712,11 +578,13 @@ index 0000000..eb2c4d6
 +	return setting;
 +}
 +
++#define get_proxy(dev,iface) (nm_modem_device_get_proxy(NM_MODEM_DEVICE (dev), iface))
++
 +static void
 +state_machine (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data)
 +{
-+	NMGsmModemDevice *modem = NM_GSM_MODEM_DEVICE (user_data);
-+	NMGsmModemDevicePrivate *priv = NM_GSM_MODEM_DEVICE_GET_PRIVATE (modem);
++	NMGsmModem *modem = NM_GSM_MODEM (user_data);
++	NMGsmModemPrivate *priv = NM_GSM_MODEM_GET_PRIVATE (modem);
 +	NMSettingGsm *setting;
 +	const char *secret = NULL;
 +	const char *secret_name = NULL;
@@ -744,7 +612,7 @@ index 0000000..eb2c4d6
 +			retry_secret = TRUE;
 +			priv->modem_state = MODEM_STATE_SET_PIN;
 +		} else {
-+			nm_warning ("GSM device connection failed: %s", error->message);
++			nm_warning ("GSM modem connection failed: %s", error->message);
 +			nm_device_state_changed (NM_DEVICE (modem), NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_NONE);
 +			return;
 +		}
@@ -755,7 +623,7 @@ index 0000000..eb2c4d6
 +	switch (priv->modem_state) {
 +	case MODEM_STATE_BEGIN:
 +		priv->modem_state = MODEM_STATE_ENABLE;
-+		dbus_g_proxy_begin_call (nm_modem_device_get_proxy (NM_MODEM_DEVICE (modem)),
++		dbus_g_proxy_begin_call (get_proxy (modem, MM_DBUS_INTERFACE_MODEM),
 +							"Enable", state_machine,
 +							modem, NULL,
 +							G_TYPE_BOOLEAN, TRUE,
@@ -765,7 +633,8 @@ index 0000000..eb2c4d6
 +	case MODEM_STATE_SET_PIN:
 +		if (secret) {
 +			priv->modem_state = MODEM_STATE_ENABLE;
-+			dbus_g_proxy_begin_call (priv->proxy, "SetPin", state_machine,
++			dbus_g_proxy_begin_call (get_proxy (modem, MM_DBUS_INTERFACE_MODEM_GSM_CARD),
++								"SetPin", state_machine,
 +								modem, NULL,
 +								G_TYPE_STRING, secret,
 +								G_TYPE_INVALID);
@@ -784,7 +653,8 @@ index 0000000..eb2c4d6
 +	case MODEM_STATE_ENABLE:
 +		priv->modem_state = MODEM_STATE_SET_APN;
 +		if (setting->apn)
-+			dbus_g_proxy_begin_call (priv->proxy, "SetAPN", state_machine,
++			dbus_g_proxy_begin_call (get_proxy (modem, MM_DBUS_INTERFACE_MODEM_GSM_NETWORK),
++								"SetAPN", state_machine,
 +								modem, NULL,
 +								G_TYPE_STRING, setting->apn,
 +								G_TYPE_INVALID);
@@ -795,7 +665,8 @@ index 0000000..eb2c4d6
 +	case MODEM_STATE_SET_APN:
 +		priv->modem_state = MODEM_STATE_SET_BAND;
 +		if (setting->band)
-+			dbus_g_proxy_begin_call (priv->proxy, "SetBand", state_machine,
++			dbus_g_proxy_begin_call (get_proxy (modem, MM_DBUS_INTERFACE_MODEM_GSM_NETWORK),
++								"SetBand", state_machine,
 +								modem, NULL,
 +								G_TYPE_UINT, (guint32) setting->band,
 +								G_TYPE_INVALID);
@@ -807,7 +678,8 @@ index 0000000..eb2c4d6
 +	case MODEM_STATE_SET_BAND:
 +		priv->modem_state = MODEM_STATE_SET_NETWORK_MODE;
 +		if (setting->network_type)
-+			dbus_g_proxy_begin_call (priv->proxy, "SetNetworkMode", state_machine,
++			dbus_g_proxy_begin_call (get_proxy (modem, MM_DBUS_INTERFACE_MODEM_GSM_NETWORK),
++								"SetNetworkMode", state_machine,
 +								modem, NULL,
 +								G_TYPE_UINT, (guint32) setting->network_type,
 +								G_TYPE_INVALID);
@@ -818,7 +690,8 @@ index 0000000..eb2c4d6
 +
 +	case MODEM_STATE_SET_NETWORK_MODE:
 +		priv->modem_state = MODEM_STATE_REGISTER;
-+		dbus_g_proxy_begin_call (priv->proxy, "Register", state_machine,
++		dbus_g_proxy_begin_call (get_proxy (modem, MM_DBUS_INTERFACE_MODEM_GSM_NETWORK),
++							"Register", state_machine,
 +							modem, NULL,
 +							G_TYPE_STRING, setting->network_id ? setting->network_id : "",
 +							G_TYPE_INVALID);
@@ -826,7 +699,7 @@ index 0000000..eb2c4d6
 +
 +	case MODEM_STATE_REGISTER:
 +		priv->modem_state = MODEM_STATE_CONNECT;
-+		dbus_g_proxy_begin_call (nm_modem_device_get_proxy (NM_MODEM_DEVICE (modem)),
++		dbus_g_proxy_begin_call (get_proxy (modem, MM_DBUS_INTERFACE_MODEM),
 +							"Connect", state_machine,
 +							modem, NULL,
 +							G_TYPE_STRING, setting->number,
@@ -847,10 +720,10 @@ index 0000000..eb2c4d6
 +static NMActStageReturn
 +real_act_stage1_prepare (NMDevice *device, NMDeviceStateReason *reason)
 +{
-+	NMGsmModemDevicePrivate *priv = NM_GSM_MODEM_DEVICE_GET_PRIVATE (device);
++	NMGsmModemPrivate *priv = NM_GSM_MODEM_GET_PRIVATE (device);
 +
 +	priv->modem_state = MODEM_STATE_BEGIN;
-+	state_machine (priv->proxy, NULL, device);
++	state_machine (NULL, NULL, device);
 +
 +	return NM_ACT_STAGE_RETURN_POSTPONE;
 +}
@@ -938,151 +811,78 @@ index 0000000..eb2c4d6
 +	nm_device_activate_schedule_stage1_device_prepare (dev);
 +}
 +
-+static void
-+signal_quality_proxy (DBusGProxy *proxy, guint32 quality, gpointer user_data)
-+{
-+	g_signal_emit (NM_GSM_MODEM_DEVICE (user_data), signals[SIGNAL_QUALITY], 0, quality);
-+}
-+
-+static void
-+impl_gsm_device_get_signal_quality (NMGsmModemDevice *modem, DBusGMethodInvocation *context)
-+{
-+	/* FIXME */
-+}
-+
 +/*****************************************************************************/
 +
 +static void
-+nm_gsm_modem_device_init (NMGsmModemDevice *self)
++nm_gsm_modem_init (NMGsmModem *self)
 +{
-+	NMGsmModemDevicePrivate *priv = NM_GSM_MODEM_DEVICE_GET_PRIVATE (self);
-+
-+	priv->dbus_mgr = nm_dbus_manager_get ();
-+
 +	nm_device_set_device_type (NM_DEVICE (self), NM_DEVICE_TYPE_GSM);
 +}
 +
-+static GObject*
-+constructor (GType type,
-+		   guint n_construct_params,
-+		   GObjectConstructParam *construct_params)
-+{
-+	GObject *object;
-+	NMGsmModemDevicePrivate *priv;
-+
-+	object = G_OBJECT_CLASS (nm_gsm_modem_device_parent_class)->constructor (type,
-+															   n_construct_params,
-+															   construct_params);
-+	if (!object)
-+		return NULL;
-+
-+	priv = NM_GSM_MODEM_DEVICE_GET_PRIVATE (object);
-+
-+	priv->proxy = dbus_g_proxy_new_for_name (nm_dbus_manager_get_connection (priv->dbus_mgr),
-+									 MM_DBUS_SERVICE,
-+									 nm_device_get_udi (NM_DEVICE (object)),
-+									 MM_DBUS_INTERFACE_GSM_MODEM);
-+
-+	dbus_g_proxy_add_signal (priv->proxy, "SignalQuality", G_TYPE_UINT, G_TYPE_INVALID);
-+	dbus_g_proxy_connect_signal (priv->proxy, "SignalQuality",
-+						    G_CALLBACK (signal_quality_proxy),
-+						    object,
-+						    NULL);
-+
-+	return object;
-+}
-+
 +static void
-+finalize (GObject *object)
-+{
-+	NMGsmModemDevicePrivate *priv = NM_GSM_MODEM_DEVICE_GET_PRIVATE (object);
-+
-+	if (priv->proxy)
-+		g_object_unref (priv->proxy);
-+
-+	g_object_unref (priv->dbus_mgr);
-+
-+	G_OBJECT_CLASS (nm_gsm_modem_device_parent_class)->finalize (object);
-+}
-+
-+static void
-+nm_gsm_modem_device_class_init (NMGsmModemDeviceClass *klass)
++nm_gsm_modem_class_init (NMGsmModemClass *klass)
 +{
 +	GObjectClass *object_class = G_OBJECT_CLASS (klass);
 +	NMDeviceClass *device_class = NM_DEVICE_CLASS (klass);
 +
-+	g_type_class_add_private (object_class, sizeof (NMGsmModemDevicePrivate));
++	g_type_class_add_private (object_class, sizeof (NMGsmModemPrivate));
 +
 +	/* Virtual methods */
-+	object_class->constructor = constructor;
-+	object_class->finalize = finalize;
-+
 +	device_class->get_best_auto_connection = real_get_best_auto_connection;
 +	device_class->connection_secrets_updated = real_connection_secrets_updated;
 +	device_class->act_stage1_prepare = real_act_stage1_prepare;
 +
-+	/* Signals */
-+	signals[SIGNAL_QUALITY] =
-+		g_signal_new ("signal-quality",
-+				    G_OBJECT_CLASS_TYPE (object_class),
-+				    G_SIGNAL_RUN_FIRST,
-+				    G_STRUCT_OFFSET (NMGsmModemDeviceClass, signal_quality),
-+				    NULL, NULL,
-+				    g_cclosure_marshal_VOID__UINT,
-+				    G_TYPE_NONE, 1,
-+				    G_TYPE_UINT);
-+
 +	dbus_g_object_type_install_info (G_TYPE_FROM_CLASS (klass),
 +							   &dbus_glib_nm_gsm_device_object_info);
 +}
-diff --git a/src/modem-manager/nm-gsm-modem-device.h b/src/modem-manager/nm-gsm-modem-device.h
+diff --git a/src/modem-manager/nm-gsm-modem.h b/src/modem-manager/nm-gsm-modem.h
 new file mode 100644
-index 0000000..535c0f3
+index 0000000..8df8265
 --- /dev/null
-+++ b/src/modem-manager/nm-gsm-modem-device.h
++++ b/src/modem-manager/nm-gsm-modem.h
 @@ -0,0 +1,36 @@
 +/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
 +
-+#ifndef NM_GSM_MODEM_DEVICE_H
-+#define NM_GSM_MODEM_DEVICE_H
++#ifndef NM_GSM_MODEM_H
++#define NM_GSM_MODEM_H
 +
 +#include <nm-modem-device.h>
 +
 +G_BEGIN_DECLS
 +
-+#define NM_TYPE_GSM_MODEM_DEVICE            (nm_gsm_modem_device_get_type ())
-+#define NM_GSM_MODEM_DEVICE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), NM_TYPE_GSM_MODEM_DEVICE, NMGsmModemDevice))
-+#define NM_GSM_MODEM_DEVICE_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  NM_TYPE_GSM_MODEM_DEVICE, NMGsmModemDeviceClass))
-+#define NM_IS_GSM_MODEM_DEVICE(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), NM_TYPE_GSM_MODEM_DEVICE))
-+#define NM_IS_GSM_MODEM_DEVICE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  NM_TYPE_GSM_MODEM_DEVICE))
-+#define NM_GSM_MODEM_DEVICE_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  NM_TYPE_GSM_MODEM_DEVICE, NMGsmModemDeviceClass))
++#define NM_TYPE_GSM_MODEM            (nm_gsm_modem_get_type ())
++#define NM_GSM_MODEM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), NM_TYPE_GSM_MODEM, NMGsmModem))
++#define NM_GSM_MODEM_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  NM_TYPE_GSM_MODEM, NMGsmModemClass))
++#define NM_IS_GSM_MODEM(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), NM_TYPE_GSM_MODEM))
++#define NM_IS_GSM_MODEM_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  NM_TYPE_GSM_MODEM))
++#define NM_GSM_MODEM_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  NM_TYPE_GSM_MODEM, NMGsmModemClass))
 +
 +typedef struct {
 +	NMModemDevice parent;
-+} NMGsmModemDevice;
++} NMGsmModem;
 +
 +typedef struct {
 +	NMModemDeviceClass parent;
 +
 +	/* Signals */
-+	void (*signal_quality) (NMModemDevice *device, guint32 quality);
-+} NMGsmModemDeviceClass;
++	void (*signal_quality) (NMGsmModem *modem, guint32 quality);
++} NMGsmModemClass;
 +
-+GType nm_gsm_modem_device_get_type (void);
++GType nm_gsm_modem_get_type (void);
 +
-+NMDevice *nm_gsm_modem_device_new (const char *path,
-+							const char *data_device,
-+							const char *driver);
++NMDevice *nm_gsm_modem_new (const char *path,
++					   const char *data_device,
++					   const char *driver);
 +
 +G_END_DECLS
 +
-+#endif /* NM_GSM_MODEM_DEVICE_H */
++#endif /* NM_GSM_MODEM_H */
 diff --git a/src/modem-manager/nm-modem-device.c b/src/modem-manager/nm-modem-device.c
 new file mode 100644
-index 0000000..1292854
+index 0000000..bc3ab47
 --- /dev/null
 +++ b/src/modem-manager/nm-modem-device.c
-@@ -0,0 +1,411 @@
+@@ -0,0 +1,427 @@
 +/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
 +
 +#include <string.h>
@@ -1142,11 +942,24 @@ index 0000000..1292854
 +}
 +
 +DBusGProxy *
-+nm_modem_device_get_proxy (NMModemDevice *device)
++nm_modem_device_get_proxy (NMModemDevice *device,
++					  const char *interface)
 +{
++
++	NMModemDevicePrivate *priv = NM_MODEM_DEVICE_GET_PRIVATE (device);
++	const char *current_iface;
++
 +	g_return_val_if_fail (NM_IS_MODEM_DEVICE (device), NULL);
 +
-+	return NM_MODEM_DEVICE_GET_PRIVATE (device)->proxy;
++	/* Default to the default interface. */
++	if (interface == NULL)
++		interface = MM_DBUS_INTERFACE_MODEM;
++
++	current_iface = dbus_g_proxy_get_interface (priv->proxy);
++	if (!current_iface || strcmp (current_iface, interface))
++		dbus_g_proxy_set_interface (priv->proxy, interface);
++
++	return priv->proxy;
 +}
 +
 +static void
@@ -1298,7 +1111,8 @@ index 0000000..1292854
 +		priv->ppp_manager = NULL;
 +	}
 +
-+	dbus_g_proxy_call_no_reply (priv->proxy, "Enable", G_TYPE_BOOLEAN, FALSE, G_TYPE_INVALID);
++	dbus_g_proxy_call_no_reply (nm_modem_device_get_proxy (NM_MODEM_DEVICE (device), NULL),
++						   "Enable", G_TYPE_BOOLEAN, FALSE, G_TYPE_INVALID);
 +}
 +
 +static guint32
@@ -1323,7 +1137,8 @@ index 0000000..1292854
 +                      NMDeviceStateReason reason,
 +                      gpointer user_data)
 +{
-+	NMModemDevicePrivate *priv = NM_MODEM_DEVICE_GET_PRIVATE (user_data);
++	NMModemDevice *self = NM_MODEM_DEVICE (user_data);
++	NMModemDevicePrivate *priv = NM_MODEM_DEVICE_GET_PRIVATE (self);
 +
 +	/* Remove any previous delayed transition to disconnected */
 +	if (priv->state_to_disconnected_id) {
@@ -1345,7 +1160,8 @@ index 0000000..1292854
 +	case NM_DEVICE_STATE_UNAVAILABLE:
 +	case NM_DEVICE_STATE_FAILED:
 +	case NM_DEVICE_STATE_DISCONNECTED:
-+		dbus_g_proxy_call_no_reply (priv->proxy, "Disconnect", G_TYPE_INVALID);
++		dbus_g_proxy_call_no_reply (nm_modem_device_get_proxy (self, NULL),
++							   "Disconnect", G_TYPE_INVALID);
 +		break;
 +	default:
 +		break;
@@ -1496,10 +1312,10 @@ index 0000000..1292854
 +}
 diff --git a/src/modem-manager/nm-modem-device.h b/src/modem-manager/nm-modem-device.h
 new file mode 100644
-index 0000000..cc15c3a
+index 0000000..c0977cf
 --- /dev/null
 +++ b/src/modem-manager/nm-modem-device.h
-@@ -0,0 +1,42 @@
+@@ -0,0 +1,43 @@
 +/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
 +
 +#ifndef NM_MODEM_DEVICE_H
@@ -1537,14 +1353,15 @@ index 0000000..cc15c3a
 +/* Protected */
 +
 +NMPPPManager *nm_modem_device_get_ppp_manager (NMModemDevice *device);
-+DBusGProxy   *nm_modem_device_get_proxy       (NMModemDevice *device);
++DBusGProxy   *nm_modem_device_get_proxy       (NMModemDevice *device,
++									  const char *interface);
 +
 +G_END_DECLS
 +
 +#endif /* NM_MODEM_DEVICE_H */
 diff --git a/src/modem-manager/nm-modem-manager.c b/src/modem-manager/nm-modem-manager.c
 new file mode 100644
-index 0000000..bf81e9e
+index 0000000..693e130
 --- /dev/null
 +++ b/src/modem-manager/nm-modem-manager.c
 @@ -0,0 +1,404 @@
@@ -1553,8 +1370,8 @@ index 0000000..bf81e9e
 +#include <string.h>
 +#include "nm-modem-manager.h"
 +#include "nm-modem-device.h"
-+#include "nm-gsm-modem-device.h"
-+#include "nm-cdma-modem-device.h"
++#include "nm-gsm-modem.h"
++#include "nm-cdma-modem.h"
 +#include "nm-dbus-manager.h"
 +#include "nm-utils.h"
 +#include "nm-modem-types.h"
@@ -1695,13 +1512,13 @@ index 0000000..bf81e9e
 +	}
 +
 +	if (modem_type == MM_MODEM_TYPE_GSM)
-+		device = nm_gsm_modem_device_new (path,
-+								    data_device,
-+								    driver);
++		device = nm_gsm_modem_new (path,
++							  data_device,
++							  driver);
 +	else if (modem_type == MM_MODEM_TYPE_CDMA)
-+		device = nm_cdma_modem_device_new (path,
-+									data_device,
-+									driver);
++		device = nm_cdma_modem_new (path,
++							   data_device,
++							   driver);
 +	else
 +		g_error ("Invalid modem type");
 +
@@ -1995,10 +1812,10 @@ index 0000000..ec62f84
 +#endif /* NM_MODEM_MANAGER_H */
 diff --git a/src/modem-manager/nm-modem-types.h b/src/modem-manager/nm-modem-types.h
 new file mode 100644
-index 0000000..ddbea05
+index 0000000..83bbbb0
 --- /dev/null
 +++ b/src/modem-manager/nm-modem-types.h
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,24 @@
 +/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
 +
 +#ifndef NM_MODEM_TYPES_H
@@ -2008,8 +1825,10 @@ index 0000000..ddbea05
 +#define MM_DBUS_PATH                 "/org/freedesktop/ModemManager"
 +#define MM_DBUS_INTERFACE            "org.freedesktop.ModemManager"
 +#define MM_DBUS_INTERFACE_MODEM      "org.freedesktop.ModemManager.Modem"
-+#define MM_DBUS_INTERFACE_GSM_MODEM  "org.freedesktop.ModemManager.Modem.Gsm"
-+#define MM_DBUS_INTERFACE_CDMA_MODEM "org.freedesktop.ModemManager.Modem.Cdma"
++#define MM_DBUS_INTERFACE_MODEM_CDMA "org.freedesktop.ModemManager.Modem.Cdma"
++
++#define MM_DBUS_INTERFACE_MODEM_GSM_CARD    "org.freedesktop.ModemManager.Modem.Gsm.Card"
++#define MM_DBUS_INTERFACE_MODEM_GSM_NETWORK "org.freedesktop.ModemManager.Modem.Gsm.Network"
 +
 +#define MM_MODEM_TYPE_UNKNOWN  0
 +#define MM_MODEM_TYPE_GSM      1
