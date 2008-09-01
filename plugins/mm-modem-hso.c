@@ -287,6 +287,41 @@ mm_hso_modem_get_ip4_config (MMModemHso *self,
 /*****************************************************************************/
 
 static void
+modem_enable_done (MMModem *modem, GError *error, gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModem *parent_modem_iface;
+
+    parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (modem));
+    parent_modem_iface->enable (modem,
+                                GPOINTER_TO_INT (mm_callback_info_get_data (info, "enable")),
+                                (MMModemFn) mm_callback_info_get_data (info, "callback"),
+                                mm_callback_info_get_data (info, "user-data"));
+}
+
+static void
+enable (MMModem *modem,
+        gboolean enable,
+        MMModemFn callback,
+        gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new (modem, modem_enable_done, NULL);
+    info->user_data = info;
+    mm_callback_info_set_data (info, "enable", GINT_TO_POINTER (enable), NULL);
+    mm_callback_info_set_data (info, "callback", callback, NULL);
+    mm_callback_info_set_data (info, "user-data", user_data, NULL);
+
+    if (enable)
+        mm_callback_info_schedule (info);
+    else
+        hso_enable (MM_MODEM_HSO (modem), FALSE, modem_enable_done, info);
+}
+
+/*****************************************************************************/
+
+static void
 impl_hso_auth_done (MMModem *modem,
                     GError *error,
                     gpointer user_data)
@@ -335,6 +370,12 @@ impl_hso_get_ip4_config (MMModemHso *self,
 static void
 mm_modem_hso_init (MMModemHso *self)
 {
+}
+
+static void
+modem_init (MMModem *modem_class)
+{
+    modem_class->enable = enable;
 }
 
 static GObject*
@@ -445,7 +486,12 @@ mm_modem_hso_get_type (void)
             (GInstanceInitFunc) mm_modem_hso_init,
         };
 
+        static const GInterfaceInfo modem_iface_info = { 
+            (GInterfaceInitFunc) modem_init
+        };
+
         modem_hso_type = g_type_register_static (MM_TYPE_GENERIC_GSM, "MMModemHso", &modem_hso_type_info, 0);
+        g_type_add_interface_static (modem_hso_type, MM_TYPE_MODEM, &modem_iface_info);
     }
 
     return modem_hso_type;
