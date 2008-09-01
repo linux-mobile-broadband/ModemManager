@@ -162,7 +162,7 @@ enable (MMModem *modem,
 static gboolean
 parse_syscfg (const char *reply, int *mode_a, int *mode_b, guint32 *band, int *unknown1, int *unknown2)
 {
-    if (strncmp (reply, "^SYSCFG:", 8))
+    if (reply == NULL || strncmp (reply, "^SYSCFG:", 8))
         return FALSE;
 
     if (sscanf (reply + 8, "%d,%d,%x,%d,%d", mode_a, mode_b, band, unknown1, unknown2))

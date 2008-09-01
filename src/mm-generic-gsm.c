@@ -194,7 +194,11 @@ get_string_done (MMSerial *serial, const char *reply, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    mm_callback_info_set_result (info, g_strdup (reply), g_free);
+    if (reply)
+        mm_callback_info_set_result (info, g_strdup (reply), g_free);
+    else
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Reading information failed.");
+
     mm_callback_info_schedule (info);
 }
 
@@ -809,7 +813,7 @@ scan_done (MMSerial *serial, const char *reply, gpointer user_data)
 
     results = g_ptr_array_new ();
 
-    if (!strncmp (reply, "+COPS: ", 7)) {
+    if (reply && !strncmp (reply, "+COPS: ", 7)) {
         /* Got valid reply */
 		GRegex *r;
 		GMatchInfo *match_info;
@@ -927,7 +931,7 @@ get_signal_quality_done (MMSerial *serial, const char *reply, gpointer user_data
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     guint32 result = 0;
 
-    if (!strncmp (reply, "+CSQ: ", 6)) {
+    if (reply && !strncmp (reply, "+CSQ: ", 6)) {
         /* Got valid reply */
         int quality;
         int ber;
