@@ -190,9 +190,150 @@ enable (MMModem *modem,
 }
 
 static void
-set_pin_done (MMSerial *serial,
-              int reply_index,
-              gpointer user_data)
+get_string_done (MMSerial *serial, const char *reply, gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    mm_callback_info_set_result (info, g_strdup (reply), g_free);
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_imei (MMModemGsmCard *modem,
+          MMModemStringFn callback,
+          gpointer user_data)
+{
+    MMCallbackInfo *info;
+    const char *terminators = "\r\n";
+    guint id = 0;
+
+    info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
+
+    if (mm_serial_send_command_string (MM_SERIAL (modem), "AT+CGSN"))
+        id = mm_serial_get_reply (MM_SERIAL (modem), 3, terminators, get_string_done, info);
+
+    if (!id) {
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Reading IMEI failed.");
+        mm_callback_info_schedule (info);
+    }
+}
+
+static void
+get_imsi (MMModemGsmCard *modem,
+          MMModemStringFn callback,
+          gpointer user_data)
+{
+    MMCallbackInfo *info;
+    const char *terminators = "\r\n";
+    guint id = 0;
+
+    info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
+
+    if (mm_serial_send_command_string (MM_SERIAL (modem), "AT+CIMI"))
+        id = mm_serial_get_reply (MM_SERIAL (modem), 3, terminators, get_string_done, info);
+
+    if (!id) {
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Reading IMSI failed.");
+        mm_callback_info_schedule (info);
+    }
+}
+
+
+static void
+card_info_wrapper (MMModem *modem,
+                   GError *error,
+                   gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemGsmCardInfoFn info_cb;
+    gpointer data;
+
+    info_cb = (MMModemGsmCardInfoFn) mm_callback_info_get_data (info, "card-info-callback");
+    data = mm_callback_info_get_data (info, "card-info-data");
+    
+    info_cb (MM_MODEM_GSM_CARD (modem),
+             (char *) mm_callback_info_get_data (info, "card-info-manufacturer"),
+             (char *) mm_callback_info_get_data (info, "card-info-model"),
+             (char *) mm_callback_info_get_data (info, "card-info-version"),
+             error, data);
+}
+
+static void
+get_version_done (MMSerial *serial, const char *reply, gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (reply)
+        mm_callback_info_set_data (info, "card-info-version", g_strdup (reply), g_free);
+    else
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Reading version failed.");
+        
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_model_done (MMSerial *serial, const char *reply, gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    char *terminators = "\r\n";
+    guint id = 0;
+
+    if (reply && mm_serial_send_command_string (serial, "AT+CGMR"))
+        id = mm_serial_get_reply (serial, 5, terminators, get_version_done, info);
+
+    if (id)
+        mm_callback_info_set_data (info, "card-info-model", g_strdup (reply), g_free);
+    else {
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Reading model failed.");
+        mm_callback_info_schedule (info);
+    }
+}
+
+static void
+get_manufacturer_done (MMSerial *serial, const char *reply, gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    char *terminators = "\r\n";
+    guint id = 0;
+
+    if (reply && mm_serial_send_command_string (serial, "AT+CGMM"))
+        id = mm_serial_get_reply (serial, 5, terminators, get_model_done, info);
+
+    if (id)
+        mm_callback_info_set_data (info, "card-info-manufacturer", g_strdup (reply), g_free);
+    else {
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Reading manufacturer failed.");
+        mm_callback_info_schedule (info);
+    }
+}
+
+static void
+get_card_info (MMModemGsmCard *modem,
+               MMModemGsmCardInfoFn callback,
+               gpointer user_data)
+{
+    MMCallbackInfo *info;
+    char *terminators = "\r\n";
+    guint id = 0;
+
+    info = mm_callback_info_new (MM_MODEM (modem), card_info_wrapper, NULL);
+    info->user_data = info;
+    mm_callback_info_set_data (info, "card-info-callback", callback, NULL);
+    mm_callback_info_set_data (info, "card-info-data", user_data, NULL);
+
+    if (mm_serial_send_command_string (MM_SERIAL (modem), "AT+CGMI"))
+        id = mm_serial_get_reply (MM_SERIAL (modem), 5, terminators, get_manufacturer_done, info);
+
+    if (!id) {
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Reading card information failed.");
+        mm_callback_info_schedule (info);
+    }
+}
+
+static void
+send_pin_done (MMSerial *serial,
+               int reply_index,
+               gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
@@ -227,7 +368,7 @@ send_pin (MMModemGsmCard *modem,
 
     command = g_strdup_printf ("AT+CPIN=\"%s\"", pin);
     if (mm_serial_send_command_string (MM_SERIAL (modem), command))
-        id = mm_serial_wait_for_reply (MM_SERIAL (modem), 3, responses, responses, set_pin_done, info);
+        id = mm_serial_wait_for_reply (MM_SERIAL (modem), 3, responses, responses, send_pin_done, info);
 
     g_free (command);
 
@@ -326,36 +467,38 @@ get_reg_status_done (MMSerial *serial,
                      gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemGsmNetworkRegStatus status;
 
     switch (reply_index) {
     case 0:
-        info->uint_result = (guint32) MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE;
+        status = MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE;
         break;
     case 1:
-        info->uint_result = (guint32) MM_MODEM_GSM_NETWORK_REG_STATUS_HOME;
+        status = MM_MODEM_GSM_NETWORK_REG_STATUS_HOME;
         break;
     case 2:
-        info->uint_result = (guint32) MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING;
+        status = MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING;
         break;
     case 3:
-        info->uint_result = (guint32) MM_MODEM_GSM_NETWORK_REG_STATUS_DENIED;
+        status = MM_MODEM_GSM_NETWORK_REG_STATUS_DENIED;
         break;
     case 4:
-        info->uint_result = (guint32) MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING;
+        status = MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING;
         break;
     case -1:
-        info->uint_result = (guint32) MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN;
+        status = MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN;
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s",
                                    "Reading registration status timed out");
         break;
     default:
-        info->uint_result = (guint32) MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN;
+        status = MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN;
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s",
                                    "Reading registration status failed");
         break;
     }
 
-    mm_generic_gsm_set_reg_status (MM_GENERIC_GSM (serial), info->uint_result);
+    mm_generic_gsm_set_reg_status (MM_GENERIC_GSM (serial), status);
+    mm_callback_info_set_result (info, GUINT_TO_POINTER (status), NULL);
 
     mm_callback_info_schedule (info);
 }
@@ -803,7 +946,7 @@ get_signal_quality_done (MMSerial *serial, const char *reply, gpointer user_data
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
                                    "%s", "Could not parse signal quality results");
 
-    info->uint_result = result;
+    mm_callback_info_set_result (info, GUINT_TO_POINTER (result), NULL);
     mm_callback_info_schedule (info);
 }
 
@@ -840,6 +983,9 @@ modem_init (MMModem *modem_class)
 static void
 modem_gsm_card_init (MMModemGsmCard *class)
 {
+    class->get_imei = get_imei;
+    class->get_imsi = get_imsi;
+    class->get_info = get_card_info;
     class->send_pin = send_pin;
 }
 

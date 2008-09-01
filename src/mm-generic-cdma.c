@@ -191,7 +191,7 @@ get_signal_quality_done (MMSerial *serial, const char *reply, gpointer user_data
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
                                    "%s", "Could not parse signal quality results");
 
-    info->uint_result = result;
+    mm_callback_info_set_result (info, GUINT_TO_POINTER (result), NULL);
     mm_callback_info_schedule (info);
 }
 

@@ -6,13 +6,15 @@
 #include "mm-modem.h"
 
 typedef struct {
-	GData *qdata;
-	MMModem *modem;
-	MMModemFn callback;
+    GData *qdata;
+    MMModem *modem;
+
+    MMModemFn async_callback;
     MMModemUIntFn uint_callback;
-    guint32 uint_result;
-	gpointer user_data;
-	GError *error;
+    MMModemStringFn str_callback;
+
+    gpointer user_data;
+    GError *error;
     guint pending_id;
 } MMCallbackInfo;
 
@@ -24,8 +26,16 @@ MMCallbackInfo *mm_callback_info_uint_new (MMModem *modem,
                                            MMModemUIntFn callback,
                                            gpointer user_data);
 
+MMCallbackInfo *mm_callback_info_string_new (MMModem *modem,
+                                             MMModemStringFn callback,
+                                             gpointer user_data);
+
 void            mm_callback_info_schedule (MMCallbackInfo *info);
 void            mm_callback_info_cancel   (MMCallbackInfo *info);
+
+void            mm_callback_info_set_result (MMCallbackInfo *info,
+                                             gpointer data,
+                                             GDestroyNotify destroy);
 
 void            mm_callback_info_set_data (MMCallbackInfo *info,
                                            const char *key,

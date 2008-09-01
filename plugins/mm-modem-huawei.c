@@ -277,21 +277,24 @@ get_network_mode_done (MMSerial *serial, const char *reply, gpointer user_data)
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     int a, b, u1, u2;
     guint32 band;
+    guint32 result = 0;
 
     if (parse_syscfg (reply, &a, &b, &band, &u1, &u2)) {
         if (a == 2 && b == 1)
-            info->uint_result = MM_MODEM_GSM_NETWORK_MODE_PREFER_2G;
+            result = MM_MODEM_GSM_NETWORK_MODE_PREFER_2G;
         else if (a == 2 && b == 2)
-            info->uint_result = MM_MODEM_GSM_NETWORK_MODE_PREFER_3G;
+            result = MM_MODEM_GSM_NETWORK_MODE_PREFER_3G;
         else if (a == 13 && b == 1)
-            info->uint_result = MM_MODEM_GSM_NETWORK_MODE_GPRS;
+            result = MM_MODEM_GSM_NETWORK_MODE_GPRS;
         else if (a == 14 && b == 2)
-            info->uint_result = MM_MODEM_GSM_NETWORK_MODE_3G;
+            result = MM_MODEM_GSM_NETWORK_MODE_3G;
     }
 
-    if (info->uint_result == 0)
+    if (result == 0)
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
                                    "%s", "Could not parse network mode results");
+    else
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (result), NULL);
 
     mm_callback_info_schedule (info);
 }
@@ -409,23 +412,22 @@ get_band_done (MMSerial *serial, const char *reply, gpointer user_data)
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     int a, b, u1, u2;
     guint32 band;
-
-    info->uint_result = 0xdeadbeaf;
+    guint32 result = 0xdeadbeaf;
 
     if (parse_syscfg (reply, &a, &b, &band, &u1, &u2)) {
         if (band == 0x3FFFFFFF)
-            info->uint_result = MM_MODEM_GSM_NETWORK_BAND_ANY;
+            result = MM_MODEM_GSM_NETWORK_BAND_ANY;
         else if (band == 0x400380)
-            info->uint_result = MM_MODEM_GSM_NETWORK_BAND_DCS;
+            result = MM_MODEM_GSM_NETWORK_BAND_DCS;
         else if (band == 0x200000)
-            info->uint_result = MM_MODEM_GSM_NETWORK_BAND_PCS;
+            result = MM_MODEM_GSM_NETWORK_BAND_PCS;
     }
 
-    if (info->uint_result == 0xdeadbeaf) {
-        info->uint_result = 0;
+    if (result == 0xdeadbeaf)
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
                                    "%s", "Could not parse band results");
-    }
+    else
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (result), NULL);
 
     mm_callback_info_schedule (info);
 }
