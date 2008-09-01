@@ -12,13 +12,15 @@
 #include "mm-modem-error.h"
 #include "mm-callback-info.h"
 
-static void impl_hso_get_ip4_config (MMModemHso *self, DBusGMethodInvocation *context);
 static void impl_hso_authenticate (MMModemHso *self,
                                    const char *username,
                                    const char *password,
                                    DBusGMethodInvocation *context);
 
-#include "mm-gsm-modem-hso-glue.h"
+static void impl_hso_get_ip4_config (MMModemHso *self,
+                                     DBusGMethodInvocation *context);
+
+#include "mm-modem-gsm-hso-glue.h"
 
 static gpointer mm_modem_hso_parent_class = NULL;
 
@@ -54,43 +56,10 @@ mm_modem_hso_new (const char *serial_device,
                                    NULL));
 }
 
-/*****************************************************************************/
-
 static void
-need_auth_done (MMModem *modem, GError *error, gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemFn callback;
-
-    if (!MM_MODEM_HSO_GET_PRIVATE (modem)->authenticated)
-        /* Re-use the PIN_NEEDED error as HSO never needs PIN or PUK, right? */
-        error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_PIN_NEEDED, "%s", "Authentication needed.");
-
-    callback = mm_callback_info_get_data (info, "callback");
-    callback (MM_MODEM (modem),
-              error,
-              mm_callback_info_get_data (info, "user-data"));
-}
-
-static void
-need_auth (MMModem *modem,
-           MMModemFn callback,
-           gpointer user_data)
-{
-    MMCallbackInfo *info;
-
-    info = mm_callback_info_new (modem, need_auth_done, NULL);
-    info->user_data = info;
-    mm_callback_info_set_data (info, "callback", callback, NULL);
-    mm_callback_info_set_data (info, "user-data", user_data, NULL);
-
-    mm_callback_info_schedule (info);
-}
-
-static void
-call_done (MMSerial *serial,
-           int reply_index,
-           gpointer user_data)
+hso_enable_done (MMSerial *serial,
+                 int reply_index,
+                 gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
@@ -99,7 +68,7 @@ call_done (MMSerial *serial,
         /* Success */
 		break;
 	default:
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Dial failed.");
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Enable/Disable failed.");
 		break;
 	}
 
@@ -107,32 +76,8 @@ call_done (MMSerial *serial,
 }
 
 static void
-clear_done (MMSerial *serial,
-            int reply_index,
-            gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-	char *command;
-	char *responses[] = { "_OWANCALL: ", "ERROR", NULL };
-    guint id = 0;
-
-    /* FIXME: Ignore errors here? */
-	/* Try to connect */
-	command = g_strdup_printf ("AT_OWANCALL=%d,1,1", mm_generic_gsm_get_cid (MM_GENERIC_GSM (serial)));
-    if (mm_serial_send_command_string (serial, command))
-        id = mm_serial_wait_for_reply (serial, 10, responses, responses, call_done, user_data);
-
-    g_free (command);
-
-    if (!id) {
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Dial failed.");
-        mm_callback_info_schedule (info);
-    }
-}
-
-static void
-do_connect (MMModem *modem,
-            const char *number,
+hso_enable (MMModemHso *self,
+            gboolean enabled,
             MMModemFn callback,
             gpointer user_data)
 {
@@ -141,17 +86,98 @@ do_connect (MMModem *modem,
     char *responses[] = { "_OWANCALL: ", "ERROR", "NO CARRIER", NULL };
     guint id = 0;
 
-    info = mm_callback_info_new (modem, callback, user_data);
+    info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
 
-    /* Kill any existing connection first */
-    command = g_strdup_printf ("AT_OWANCALL=%d,0,1", mm_generic_gsm_get_cid (MM_GENERIC_GSM (modem)));
-    if (mm_serial_send_command_string (MM_SERIAL (modem), command))
-        id = mm_serial_wait_for_reply (MM_SERIAL (modem), 5, responses, responses, clear_done, user_data);
+    command = g_strdup_printf ("AT_OWANCALL=%d,%d,1",
+                               mm_generic_gsm_get_cid (MM_GENERIC_GSM (self)),
+                               enabled ? 1 : 0);
+
+    if (mm_serial_send_command_string (MM_SERIAL (self), command))
+        id = mm_serial_wait_for_reply (MM_SERIAL (self), 5, responses, responses, hso_enable_done, user_data);
 
     g_free (command);
 
     if (!id) {
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Dial failed.");
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Enable/Disable failed.");
+        mm_callback_info_schedule (info);
+    }
+}
+
+static void
+hso_enabled (MMModem *modem,
+             GError *error,
+             gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error)
+        info->error = g_error_copy (error);
+    
+    mm_callback_info_schedule (info);
+}
+
+static void
+hso_disabled (MMModem *modem,
+              GError *error,
+              gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+    } else
+        hso_enable (MM_MODEM_HSO (modem), TRUE, hso_enabled, info);
+}
+
+static void
+auth_done (MMSerial *serial,
+           int reply_index,
+           gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    switch (reply_index) {
+    case 0:
+        /* success, kill any existing connections first */
+        hso_enable (MM_MODEM_HSO (serial), FALSE, hso_disabled, info);
+        break;
+    default:
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Authentication failed");
+        break;
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+void
+mm_hso_modem_authenticate (MMModemHso *self,
+                           const char *username,
+                           const char *password,
+                           MMModemFn callback,
+                           gpointer user_data)
+{
+    MMCallbackInfo *info;
+    char *command;
+	char *responses[] = { "OK", "ERROR", NULL };
+    guint id = 0;
+
+    g_return_if_fail (MM_IS_MODEM_HSO (self));
+    g_return_if_fail (callback != NULL);
+
+    info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
+    command = g_strdup_printf ("AT$QCPDPP=%d,1,\"%s\",\"%s\"",
+	                           mm_generic_gsm_get_cid (MM_GENERIC_GSM (self)),
+	                           password ? password : "",
+	                           username ? username : "");
+
+    if (mm_serial_send_command_string (MM_SERIAL (self), command))
+        id = mm_serial_wait_for_reply (MM_SERIAL (self), 5, responses, responses, auth_done, user_data);
+
+    g_free (command);
+
+    if (!id) {
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Authentication failed.");
         mm_callback_info_schedule (info);
     }
 }
@@ -258,79 +284,7 @@ mm_hso_modem_get_ip4_config (MMModemHso *self,
     }
 }
 
-static void
-impl_hso_ip4_config_done (MMModemHso *modem,
-                          guint32 address,
-                          GArray *dns,
-                          GError *error,
-                          gpointer user_data)
-{
-    DBusGMethodInvocation *context = (DBusGMethodInvocation *) user_data;
-
-    if (error)
-        dbus_g_method_return_error (context, error);
-    else
-        dbus_g_method_return (context, address, dns);
-}
-
-static void
-impl_hso_get_ip4_config (MMModemHso *self,
-                         DBusGMethodInvocation *context)
-{
-    mm_hso_modem_get_ip4_config (self, impl_hso_ip4_config_done, context);
-}
-
-static void
-auth_done (MMSerial *serial,
-           int reply_index,
-           gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-
-    switch (reply_index) {
-    case 0:
-        /* success */
-        MM_MODEM_HSO_GET_PRIVATE (serial)->authenticated = TRUE;
-        break;
-    default:
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Authentication failed");
-        break;
-    }
-
-    mm_callback_info_schedule (info);
-}
-
-void
-mm_hso_modem_authenticate (MMModemHso *self,
-                           const char *username,
-                           const char *password,
-                           MMModemFn callback,
-                           gpointer user_data)
-{
-    MMCallbackInfo *info;
-    char *command;
-	char *responses[] = { "OK", "ERROR", NULL };
-    guint id = 0;
-
-    g_return_if_fail (MM_IS_MODEM_HSO (self));
-    g_return_if_fail (callback != NULL);
-
-    info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
-    command = g_strdup_printf ("AT$QCPDPP=%d,1,\"%s\",\"%s\"",
-	                           mm_generic_gsm_get_cid (MM_GENERIC_GSM (self)),
-	                           password ? password : "",
-	                           username ? username : "");
-
-    if (mm_serial_send_command_string (MM_SERIAL (self), command))
-        id = mm_serial_wait_for_reply (MM_SERIAL (self), 5, responses, responses, auth_done, user_data);
-
-    g_free (command);
-
-    if (!id) {
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Authentication failed.");
-        mm_callback_info_schedule (info);
-    }
-}
+/*****************************************************************************/
 
 static void
 impl_hso_auth_done (MMModem *modem,
@@ -354,17 +308,33 @@ impl_hso_authenticate (MMModemHso *self,
     mm_hso_modem_authenticate (self, username, password, impl_hso_auth_done, context);
 }
 
+static void
+impl_hso_ip4_config_done (MMModemHso *modem,
+                          guint32 address,
+                          GArray *dns,
+                          GError *error,
+                          gpointer user_data)
+{
+    DBusGMethodInvocation *context = (DBusGMethodInvocation *) user_data;
+
+    if (error)
+        dbus_g_method_return_error (context, error);
+    else
+        dbus_g_method_return (context, address, dns);
+}
+
+static void
+impl_hso_get_ip4_config (MMModemHso *self,
+                         DBusGMethodInvocation *context)
+{
+    mm_hso_modem_get_ip4_config (self, impl_hso_ip4_config_done, context);
+}
+
 /*****************************************************************************/
 
 static void
 mm_modem_hso_init (MMModemHso *self)
 {
-}
-
-static void
-modem_init (MMModem *modem_class)
-{
-    modem_class->connect = do_connect;
 }
 
 static GObject*
@@ -475,13 +445,7 @@ mm_modem_hso_get_type (void)
             (GInstanceInitFunc) mm_modem_hso_init,
         };
 
-        static const GInterfaceInfo modem_iface_info = { 
-            (GInterfaceInitFunc) modem_init
-        };
-        
         modem_hso_type = g_type_register_static (MM_TYPE_GENERIC_GSM, "MMModemHso", &modem_hso_type_info, 0);
-
-        g_type_add_interface_static (modem_hso_type, MM_TYPE_MODEM, &modem_iface_info);
     }
 
     return modem_hso_type;

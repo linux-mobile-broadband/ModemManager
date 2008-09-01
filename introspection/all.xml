@@ -29,4 +29,5 @@
   <xi:include href="mm-modem-gsm-contacts.xml"/>
   <xi:include href="mm-modem-gsm-network.xml"/>
   <xi:include href="mm-modem-gsm-sms.xml"/>
+  <xi:include href="mm-modem-gsm-hso.xml"/>
 </tp:spec>
