@@ -1,8 +1,8 @@
 diff --git a/configure.in b/configure.in
-index b7aa437..b154922 100644
+index 9f7db7c..bee43d8 100644
 --- a/configure.in
 +++ b/configure.in
-@@ -440,6 +440,7 @@ src/dhcp-manager/Makefile
+@@ -444,6 +444,7 @@ src/dhcp-manager/Makefile
  src/supplicant-manager/Makefile
  src/ppp-manager/Makefile
  src/dnsmasq-manager/Makefile
@@ -159,10 +159,10 @@ index c8fa251..432af94 100644
  			best = dev;
 diff --git a/src/modem-manager/Makefile.am b/src/modem-manager/Makefile.am
 new file mode 100644
-index 0000000..d8730b1
+index 0000000..519636b
 --- /dev/null
 +++ b/src/modem-manager/Makefile.am
-@@ -0,0 +1,41 @@
+@@ -0,0 +1,43 @@
 +INCLUDES = \
 +	-I${top_srcdir}/src \
 +	-I${top_srcdir}/include \
@@ -176,6 +176,8 @@ index 0000000..d8730b1
 +	nm-cdma-modem.h \
 +	nm-gsm-modem.c \
 +	nm-gsm-modem.h \
++	nm-gsm-modem-hso.c \
++	nm-gsm-modem-hso.h \
 +	nm-modem-device.c \
 +	nm-modem-device.h \
 +	nm-modem-manager.h \
@@ -500,24 +502,406 @@ index 0000000..5dc3c14
 +G_END_DECLS
 +
 +#endif /* NM_CDMA_MODEM_H */
+diff --git a/src/modem-manager/nm-gsm-modem-hso.c b/src/modem-manager/nm-gsm-modem-hso.c
+new file mode 100644
+index 0000000..b1a22f1
+--- /dev/null
++++ b/src/modem-manager/nm-gsm-modem-hso.c
+@@ -0,0 +1,341 @@
++/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
++
++#include "nm-gsm-modem-hso.h"
++#include "nm-device-private.h"
++#include "nm-device-interface.h"
++#include "NetworkManagerSystem.h"
++#include "nm-setting-connection.h"
++#include "nm-setting-gsm.h"
++#include "nm-modem-types.h"
++#include "nm-utils.h"
++
++G_DEFINE_TYPE (NMGsmModemHso, nm_gsm_modem_hso, NM_TYPE_GSM_MODEM)
++
++#define NM_GSM_MODEM_HSO_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NM_TYPE_GSM_MODEM_HSO, NMGsmModemHsoPrivate))
++
++typedef struct {
++	char *netdev_iface;
++	NMIP4Config *pending_ip4_config;
++} NMGsmModemHsoPrivate;
++
++#define HSO_SECRETS_TRIES "gsm-secrets-tries"
++
++static char *
++get_network_device (NMDevice *device)
++{
++	char *result = NULL;
++	GError *error = NULL;
++	GValue value = { 0, };
++
++	if (!dbus_g_proxy_call (nm_modem_device_get_proxy (NM_MODEM_DEVICE (device), "org.freedesktop.DBus.Properties"),
++					    "Get", &error,
++					    G_TYPE_STRING, MM_DBUS_INTERFACE_MODEM_GSM_HSO,
++					    G_TYPE_STRING, "NetworkDevice",
++					    G_TYPE_INVALID,
++					    G_TYPE_VALUE, &value,
++					    G_TYPE_INVALID)) {
++		nm_warning ("Could not get HSO device's network interface: %s", error->message);
++		g_error_free (error);
++	} else {
++		if (G_VALUE_HOLDS_STRING (&value))
++			result = g_value_dup_string (&value);
++		else
++			nm_warning ("Could not get HSO device's network interface: wrong type '%s'",
++					  G_VALUE_TYPE_NAME (&value));
++
++		g_value_unset (&value);
++	}
++
++	return result;
++}
++
++NMDevice *
++nm_gsm_modem_hso_new (const char *path,
++				  const char *data_device,
++				  const char *driver)
++{
++	NMDevice *device;
++
++	g_return_val_if_fail (path != NULL, NULL);
++	g_return_val_if_fail (data_device != NULL, NULL);
++	g_return_val_if_fail (driver != NULL, NULL);
++
++	device = (NMDevice *) g_object_new (NM_TYPE_GSM_MODEM_HSO,
++								 NM_DEVICE_INTERFACE_UDI, path,
++								 NM_DEVICE_INTERFACE_IFACE, data_device,
++								 NM_DEVICE_INTERFACE_DRIVER, driver,
++								 NM_DEVICE_INTERFACE_MANAGED, TRUE,
++								 NULL);
++
++	if (device) {
++		NMGsmModemHsoPrivate *priv;
++
++		priv = NM_GSM_MODEM_HSO_GET_PRIVATE (device);
++		priv->netdev_iface = get_network_device (device);
++		if (!priv->netdev_iface) {
++			g_object_unref (device);
++			device = NULL;
++		}
++	}
++
++	return device;
++}
++
++/*****************************************************************************/
++
++static NMSetting *
++get_setting (NMGsmModemHso *modem, GType setting_type)
++{
++	NMActRequest *req;
++	NMSetting *setting = NULL;
++
++	req = nm_device_get_act_request (NM_DEVICE (modem));
++	if (req) {
++		NMConnection *connection;
++
++		connection = nm_act_request_get_connection (req);
++		if (connection)
++			setting = nm_connection_get_setting (connection, setting_type);
++	}
++
++	return setting;
++}
++
++static void
++hso_auth_done (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data)
++{
++	NMDevice *device = NM_DEVICE (user_data);
++	GError *error = NULL;
++
++	if (dbus_g_proxy_end_call (proxy, call_id, &error, G_TYPE_INVALID))
++		nm_device_activate_schedule_stage3_ip_config_start (device);
++	else {
++		nm_warning ("Authentication failed: %s", error->message);
++		g_error_free (error);
++		nm_device_state_changed (device,
++							NM_DEVICE_STATE_FAILED,
++							NM_DEVICE_STATE_REASON_MODEM_DIAL_FAILED);
++	}
++}
++
++static void
++do_hso_auth (NMGsmModemHso *device)
++{
++	NMSettingGsm *s_gsm;
++
++	s_gsm = NM_SETTING_GSM (get_setting (device, NM_TYPE_SETTING_GSM));
++
++	dbus_g_proxy_begin_call (nm_modem_device_get_proxy (NM_MODEM_DEVICE (device), MM_DBUS_INTERFACE_MODEM_GSM_HSO),
++						"Authenticate", hso_auth_done,
++						device, NULL,
++						G_TYPE_STRING, s_gsm->username ? s_gsm->username : "",
++						G_TYPE_STRING, s_gsm->password ? s_gsm->password : "",
++						G_TYPE_INVALID);
++}
++
++static NMActStageReturn
++real_act_stage2_config (NMDevice *device, NMDeviceStateReason *reason)
++{
++	NMActRequest *req;
++	NMConnection *connection;
++	const char *setting_name;
++	GPtrArray *hints = NULL;
++	const char *hint1 = NULL, *hint2 = NULL;
++	guint32 tries;
++
++	req = nm_device_get_act_request (device);
++	g_assert (req);
++	connection = nm_act_request_get_connection (req);
++	g_assert (connection);
++
++	setting_name = nm_connection_need_secrets (connection, &hints);
++	if (!setting_name) {
++		do_hso_auth (NM_GSM_MODEM_HSO (device));
++		return NM_ACT_STAGE_RETURN_POSTPONE;
++	}
++
++	if (hints) {
++		if (hints->len > 0)
++			hint1 = g_ptr_array_index (hints, 0);
++		if (hints->len > 1)
++			hint2 = g_ptr_array_index (hints, 1);
++	}
++
++	nm_device_state_changed (device, NM_DEVICE_STATE_NEED_AUTH, NM_DEVICE_STATE_REASON_NONE);
++
++	tries = GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (connection), HSO_SECRETS_TRIES));
++	nm_act_request_request_connection_secrets (req,
++	                                           setting_name,
++	                                           tries ? TRUE : FALSE,
++	                                           SECRETS_CALLER_HSO_GSM,
++	                                           hint1,
++	                                           hint2);
++	g_object_set_data (G_OBJECT (connection), HSO_SECRETS_TRIES, GUINT_TO_POINTER (++tries));
++
++	if (hints)
++		g_ptr_array_free (hints, TRUE);
++
++	return NM_ACT_STAGE_RETURN_POSTPONE;
++}
++
++static void
++get_ip4_config_done (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data)
++{
++	NMDevice *device = NM_DEVICE (user_data);
++	guint32 ip4_address;
++	GArray *dns_array;
++	GError *error = NULL;
++
++	if (dbus_g_proxy_end_call (proxy, call_id, &error,
++						  G_TYPE_UINT, &ip4_address,
++						  DBUS_TYPE_G_UINT_ARRAY, &dns_array,
++						  G_TYPE_INVALID)) {
++
++		NMGsmModemHsoPrivate *priv = NM_GSM_MODEM_HSO_GET_PRIVATE (device);
++		NMSettingIP4Address addr = { 0, 32, 0 };
++		int i;
++
++		priv->pending_ip4_config = nm_ip4_config_new ();
++
++		addr.address = ip4_address;
++		nm_ip4_config_add_address (priv->pending_ip4_config, &addr);
++
++		for (i = 0; i < dns_array->len; i++)
++			nm_ip4_config_add_nameserver (priv->pending_ip4_config,
++									g_array_index (dns_array, guint32, i));
++
++		nm_device_activate_schedule_stage4_ip_config_get (device);
++	} else {
++		nm_warning ("Retrieving IP4 configuration failed: %s", error->message);
++		g_error_free (error);
++		nm_device_state_changed (device,
++							NM_DEVICE_STATE_FAILED,
++							NM_DEVICE_STATE_REASON_IP_CONFIG_UNAVAILABLE);
++	}
++}
++
++static NMActStageReturn
++real_act_stage3_ip_config_start (NMDevice *device, NMDeviceStateReason *reason)
++{
++	dbus_g_proxy_begin_call (nm_modem_device_get_proxy (NM_MODEM_DEVICE (device), MM_DBUS_INTERFACE_MODEM_GSM_HSO),
++						"GetIP4Config", get_ip4_config_done,
++						device, NULL,
++						G_TYPE_INVALID);
++
++	return NM_ACT_STAGE_RETURN_POSTPONE;
++}
++
++static NMActStageReturn
++real_act_stage4_get_ip4_config (NMDevice *device,
++                                NMIP4Config **config,
++                                NMDeviceStateReason *reason)
++{
++	NMGsmModemHso *self = NM_GSM_MODEM_HSO (device);
++	NMGsmModemHsoPrivate *priv = NM_GSM_MODEM_HSO_GET_PRIVATE (self);
++	gboolean no_firmware = FALSE;
++
++	nm_device_set_ip_iface (device, priv->netdev_iface);
++	if (!nm_device_hw_bring_up (device, TRUE, &no_firmware)) {
++		if (no_firmware)
++			*reason = NM_DEVICE_STATE_REASON_FIRMWARE_MISSING;
++		else
++			*reason = NM_DEVICE_STATE_REASON_CONFIG_FAILED;
++		return NM_ACT_STAGE_RETURN_FAILURE;
++	}
++
++	*config = priv->pending_ip4_config;
++	priv->pending_ip4_config = NULL;
++
++	return NM_ACT_STAGE_RETURN_SUCCESS;
++}
++
++static void
++real_deactivate (NMDevice *device)
++{
++	NMGsmModemHsoPrivate *priv = NM_GSM_MODEM_HSO_GET_PRIVATE (device);
++
++	if (priv->pending_ip4_config) {
++		g_object_unref (priv->pending_ip4_config);
++		priv->pending_ip4_config = NULL;
++	}
++
++	if (priv->netdev_iface) {
++		nm_system_device_flush_ip4_routes_with_iface (priv->netdev_iface);
++		nm_system_device_flush_ip4_addresses_with_iface (priv->netdev_iface);
++		nm_system_device_set_up_down_with_iface (priv->netdev_iface, FALSE, NULL);
++	}
++	nm_device_set_ip_iface (device, NULL);
++
++	if (NM_DEVICE_CLASS (nm_gsm_modem_hso_parent_class)->deactivate)
++		NM_DEVICE_CLASS (nm_gsm_modem_hso_parent_class)->deactivate (device);
++}
++
++static gboolean
++real_hw_is_up (NMDevice *device)
++{
++	NMGsmModemHsoPrivate *priv = NM_GSM_MODEM_HSO_GET_PRIVATE (device);
++	NMDeviceState state;
++
++	state = nm_device_interface_get_state (NM_DEVICE_INTERFACE (device));
++	if (priv->pending_ip4_config || state == NM_DEVICE_STATE_IP_CONFIG || state == NM_DEVICE_STATE_ACTIVATED)
++		return nm_system_device_is_up_with_iface (priv->netdev_iface);
++
++	return TRUE;
++}
++
++static gboolean
++real_hw_bring_up (NMDevice *device, gboolean *no_firmware)
++{
++	NMGsmModemHsoPrivate *priv = NM_GSM_MODEM_HSO_GET_PRIVATE (device);
++	NMDeviceState state;
++
++	state = nm_device_interface_get_state (NM_DEVICE_INTERFACE (device));
++	if (priv->pending_ip4_config || state == NM_DEVICE_STATE_IP_CONFIG || state == NM_DEVICE_STATE_ACTIVATED)
++		return nm_system_device_set_up_down_with_iface (priv->netdev_iface, TRUE, no_firmware);
++
++	return TRUE;
++}
++
++static void
++real_connect (NMModemDevice *modem, const char *number)
++{
++	nm_device_activate_schedule_stage2_device_config (NM_DEVICE (modem));
++}
++
++/*****************************************************************************/
++
++static void
++nm_gsm_modem_hso_init (NMGsmModemHso *self)
++{
++}
++
++static void
++finalize (GObject *object)
++{
++	NMGsmModemHsoPrivate *priv = NM_GSM_MODEM_HSO_GET_PRIVATE (object);
++
++	g_free (priv->netdev_iface);
++
++	G_OBJECT_CLASS (nm_gsm_modem_hso_parent_class)->finalize (object);
++}
++
++static void
++nm_gsm_modem_hso_class_init (NMGsmModemHsoClass *klass)
++{
++	GObjectClass *object_class = G_OBJECT_CLASS (klass);
++	NMDeviceClass *device_class = NM_DEVICE_CLASS (klass);
++	NMModemDeviceClass *modem_class = NM_MODEM_DEVICE_CLASS (klass);
++
++	g_type_class_add_private (object_class, sizeof (NMGsmModemHsoPrivate));
++
++	object_class->finalize = finalize;
++
++	device_class->act_stage2_config = real_act_stage2_config;
++	device_class->act_stage3_ip_config_start = real_act_stage3_ip_config_start;
++	device_class->act_stage4_get_ip4_config = real_act_stage4_get_ip4_config;
++	device_class->deactivate = real_deactivate;
++	device_class->hw_is_up = real_hw_is_up;
++	device_class->hw_bring_up = real_hw_bring_up;
++
++	modem_class->connect = real_connect;
++}
+diff --git a/src/modem-manager/nm-gsm-modem-hso.h b/src/modem-manager/nm-gsm-modem-hso.h
+new file mode 100644
+index 0000000..9b16b0b
+--- /dev/null
++++ b/src/modem-manager/nm-gsm-modem-hso.h
+@@ -0,0 +1,33 @@
++/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
++
++#ifndef NM_GSM_MODEM_HSO_H
++#define NM_GSM_MODEM_HSO_H
++
++#include <nm-gsm-modem.h>
++
++G_BEGIN_DECLS
++
++#define NM_TYPE_GSM_MODEM_HSO            (nm_gsm_modem_hso_get_type ())
++#define NM_GSM_MODEM_HSO(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), NM_TYPE_GSM_MODEM_HSO, NMGsmModemHso))
++#define NM_GSM_MODEM_HSO_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  NM_TYPE_GSM_MODEM_HSO, NMGsmModemHsoClass))
++#define NM_IS_GSM_MODEM_HSO(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), NM_TYPE_GSM_MODEM_HSO))
++#define NM_IS_GSM_MODEM_HSO_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  NM_TYPE_GSM_MODEM_HSO))
++#define NM_GSM_MODEM_HSO_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  NM_TYPE_GSM_MODEM_HSO, NMGsmModemHsoClass))
++
++typedef struct {
++	NMGsmModem parent;
++} NMGsmModemHso;
++
++typedef struct {
++	NMGsmModemClass parent;
++} NMGsmModemHsoClass;
++
++GType nm_gsm_modem_hso_get_type (void);
++
++NMDevice *nm_gsm_modem_hso_new (const char *path,
++						  const char *data_device,
++						  const char *driver);
++
++G_END_DECLS
++
++#endif /* NM_GSM_MODEM_HSO_H */
 diff --git a/src/modem-manager/nm-gsm-modem.c b/src/modem-manager/nm-gsm-modem.c
 new file mode 100644
-index 0000000..1069cd7
+index 0000000..0b75e6c
 --- /dev/null
 +++ b/src/modem-manager/nm-gsm-modem.c
-@@ -0,0 +1,329 @@
+@@ -0,0 +1,316 @@
 +/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
 +
 +#include <string.h>
 +#include "nm-gsm-modem.h"
 +#include "nm-device-private.h"
 +#include "nm-device-interface.h"
-+#include "nm-dbus-manager.h"
 +#include "nm-setting-connection.h"
 +#include "nm-setting-gsm.h"
-+#include "nm-setting-cdma.h"
-+#include "nm-marshal.h"
-+#include "nm-properties-changed-signal.h"
 +#include "nm-modem-types.h"
 +#include "nm-utils.h"
 +
@@ -535,7 +919,7 @@ index 0000000..1069cd7
 +	MODEM_STATE_SET_BAND,
 +	MODEM_STATE_SET_NETWORK_MODE,
 +	MODEM_STATE_REGISTER,
-+	MODEM_STATE_CONNECT
++	MODEM_STATE_FAILED,
 +};
 +
 +typedef struct {
@@ -612,10 +996,11 @@ index 0000000..1069cd7
 +			retry_secret = TRUE;
 +			priv->modem_state = MODEM_STATE_SET_PIN;
 +		} else {
++			priv->modem_state = MODEM_STATE_FAILED;
 +			nm_warning ("GSM modem connection failed: %s", error->message);
-+			nm_device_state_changed (NM_DEVICE (modem), NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_NONE);
-+			return;
 +		}
++
++		g_error_free (error);
 +	}
 +
 + again:
@@ -654,7 +1039,7 @@ index 0000000..1069cd7
 +		priv->modem_state = MODEM_STATE_SET_APN;
 +		if (setting->apn)
 +			dbus_g_proxy_begin_call (get_proxy (modem, MM_DBUS_INTERFACE_MODEM_GSM_NETWORK),
-+								"SetApn", state_machine,
++								"SetAPN", state_machine,
 +								modem, NULL,
 +								G_TYPE_STRING, setting->apn,
 +								G_TYPE_INVALID);
@@ -698,20 +1083,10 @@ index 0000000..1069cd7
 +		break;
 +
 +	case MODEM_STATE_REGISTER:
-+		priv->modem_state = MODEM_STATE_CONNECT;
-+		dbus_g_proxy_begin_call (get_proxy (modem, MM_DBUS_INTERFACE_MODEM),
-+							"Connect", state_machine,
-+							modem, NULL,
-+							G_TYPE_STRING, setting->number,
-+							G_TYPE_INVALID);
++		nm_modem_device_connect (NM_MODEM_DEVICE (modem), setting->number);
 +		break;
-+
-+	case MODEM_STATE_CONNECT:
-+		nm_device_activate_schedule_stage2_device_config (NM_DEVICE (modem));
-+		break;
-+
++	case MODEM_STATE_FAILED:
 +	default:
-+		nm_warning ("Invalid modem state %d", priv->modem_state);
 +		nm_device_state_changed (NM_DEVICE (modem), NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_NONE);
 +		break;
 +	}
@@ -879,10 +1254,10 @@ index 0000000..8df8265
 +#endif /* NM_GSM_MODEM_H */
 diff --git a/src/modem-manager/nm-modem-device.c b/src/modem-manager/nm-modem-device.c
 new file mode 100644
-index 0000000..bc3ab47
+index 0000000..0a198f7
 --- /dev/null
 +++ b/src/modem-manager/nm-modem-device.c
-@@ -0,0 +1,427 @@
+@@ -0,0 +1,464 @@
 +/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
 +
 +#include <string.h>
@@ -960,6 +1335,15 @@ index 0000000..bc3ab47
 +		dbus_g_proxy_set_interface (priv->proxy, interface);
 +
 +	return priv->proxy;
++}
++
++void
++nm_modem_device_connect (NMModemDevice *device,
++					const char *number)
++{
++	g_return_if_fail (NM_IS_MODEM_DEVICE (device));
++
++	NM_MODEM_DEVICE_GET_CLASS (device)->connect (device, number);
 +}
 +
 +static void
@@ -1119,6 +1503,32 @@ index 0000000..bc3ab47
 +real_get_generic_capabilities (NMDevice *dev)
 +{
 +	return NM_DEVICE_CAP_NM_SUPPORTED;
++}
++
++
++static void
++connect_done (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data)
++{
++	NMDevice *device = NM_DEVICE (user_data);
++	GError *error = NULL;
++
++	if (dbus_g_proxy_end_call (proxy, call_id, &error, G_TYPE_INVALID))
++		nm_device_activate_schedule_stage2_device_config (device);
++	else {
++		nm_warning ("Connect failed: %s", error->message);
++		g_error_free (error);
++		nm_device_state_changed (device, NM_DEVICE_STATE_FAILED, NM_DEVICE_STATE_REASON_MODEM_DIAL_FAILED);
++	}
++}
++
++static void
++real_connect (NMModemDevice *modem, const char *number)
++{
++	dbus_g_proxy_begin_call (nm_modem_device_get_proxy (modem, MM_DBUS_INTERFACE_MODEM),
++						"Connect", connect_done,
++						modem, NULL,
++						G_TYPE_STRING, number ? number : "",
++						G_TYPE_INVALID);
 +}
 +
 +static gboolean
@@ -1283,6 +1693,8 @@ index 0000000..bc3ab47
 +	device_class->act_stage4_get_ip4_config = real_act_stage4_get_ip4_config;
 +	device_class->deactivate_quickly = real_deactivate_quickly;
 +
++	klass->connect = real_connect;
++
 +	/* Properties */
 +	g_object_class_install_property
 +		(object_class, PROP_PATH,
@@ -1312,10 +1724,10 @@ index 0000000..bc3ab47
 +}
 diff --git a/src/modem-manager/nm-modem-device.h b/src/modem-manager/nm-modem-device.h
 new file mode 100644
-index 0000000..c0977cf
+index 0000000..6c0de49
 --- /dev/null
 +++ b/src/modem-manager/nm-modem-device.h
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,49 @@
 +/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
 +
 +#ifndef NM_MODEM_DEVICE_H
@@ -1343,6 +1755,9 @@ index 0000000..c0977cf
 +typedef struct {
 +	NMDeviceClass parent;
 +
++	void (*connect) (NMModemDevice *device,
++				  const char *number);
++
 +	/* Signals */
 +	void (*ppp_stats) (NMModemDevice *device, guint32 in_bytes, guint32 out_bytes);
 +	void (*properties_changed) (NMModemDevice *device, GHashTable *properties);
@@ -1356,12 +1771,15 @@ index 0000000..c0977cf
 +DBusGProxy   *nm_modem_device_get_proxy       (NMModemDevice *device,
 +									  const char *interface);
 +
++void          nm_modem_device_connect         (NMModemDevice *device,
++									  const char *number);
++
 +G_END_DECLS
 +
 +#endif /* NM_MODEM_DEVICE_H */
 diff --git a/src/modem-manager/nm-modem-manager.c b/src/modem-manager/nm-modem-manager.c
 new file mode 100644
-index 0000000..693e130
+index 0000000..6e37ebd
 --- /dev/null
 +++ b/src/modem-manager/nm-modem-manager.c
 @@ -0,0 +1,404 @@
@@ -1371,6 +1789,7 @@ index 0000000..693e130
 +#include "nm-modem-manager.h"
 +#include "nm-modem-device.h"
 +#include "nm-gsm-modem.h"
++#include "nm-gsm-modem-hso.h"
 +#include "nm-cdma-modem.h"
 +#include "nm-dbus-manager.h"
 +#include "nm-utils.h"
@@ -1511,14 +1930,13 @@ index 0000000..693e130
 +		return;
 +	}
 +
-+	if (modem_type == MM_MODEM_TYPE_GSM)
-+		device = nm_gsm_modem_new (path,
-+							  data_device,
-+							  driver);
-+	else if (modem_type == MM_MODEM_TYPE_CDMA)
-+		device = nm_cdma_modem_new (path,
-+							   data_device,
-+							   driver);
++	if (modem_type == MM_MODEM_TYPE_GSM) {
++		if (!strcmp (driver, "hso"))
++			device = nm_gsm_modem_hso_new (path, data_device, driver);
++		else
++			device = nm_gsm_modem_new (path, data_device, driver);
++	} else if (modem_type == MM_MODEM_TYPE_CDMA)
++		device = nm_cdma_modem_new (path, data_device, driver);
 +	else
 +		g_error ("Invalid modem type");
 +
@@ -1812,10 +2230,10 @@ index 0000000..ec62f84
 +#endif /* NM_MODEM_MANAGER_H */
 diff --git a/src/modem-manager/nm-modem-types.h b/src/modem-manager/nm-modem-types.h
 new file mode 100644
-index 0000000..83bbbb0
+index 0000000..bd76796
 --- /dev/null
 +++ b/src/modem-manager/nm-modem-types.h
-@@ -0,0 +1,24 @@
+@@ -0,0 +1,25 @@
 +/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
 +
 +#ifndef NM_MODEM_TYPES_H
@@ -1829,6 +2247,7 @@ index 0000000..83bbbb0
 +
 +#define MM_DBUS_INTERFACE_MODEM_GSM_CARD    "org.freedesktop.ModemManager.Modem.Gsm.Card"
 +#define MM_DBUS_INTERFACE_MODEM_GSM_NETWORK "org.freedesktop.ModemManager.Modem.Gsm.Network"
++#define MM_DBUS_INTERFACE_MODEM_GSM_HSO     "org.freedesktop.ModemManager.Modem.Gsm.Hso"
 +
 +#define MM_MODEM_TYPE_UNKNOWN  0
 +#define MM_MODEM_TYPE_GSM      1

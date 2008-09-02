@@ -13,10 +13,10 @@ index de8ccb4..fe60b87 100644
  
  nm_applet_LDADD = \
 diff --git a/src/applet-device-gsm.c b/src/applet-device-gsm.c
-index ad125e5..9ae87e1 100644
+index 1641661..fd2601d 100644
 --- a/src/applet-device-gsm.c
 +++ b/src/applet-device-gsm.c
-@@ -38,6 +38,8 @@
+@@ -39,6 +39,8 @@
  
  #include "applet.h"
  #include "applet-device-gsm.h"
@@ -25,7 +25,7 @@ index ad125e5..9ae87e1 100644
  #include "utils.h"
  
  typedef struct {
-@@ -275,16 +277,64 @@ out:
+@@ -277,16 +279,64 @@ out:
  }
  
  static void
@@ -95,7 +95,7 @@ index ad125e5..9ae87e1 100644
  }
  
  static GdkPixbuf *
-@@ -293,6 +343,7 @@ gsm_get_icon (NMDevice *device,
+@@ -295,6 +345,7 @@ gsm_get_icon (NMDevice *device,
                char **tip,
                NMApplet *applet)
  {
@@ -103,8 +103,8 @@ index ad125e5..9ae87e1 100644
  	GdkPixbuf *pixbuf = NULL;
  	const char *iface;
  
-@@ -306,8 +357,40 @@ gsm_get_icon (NMDevice *device,
- 		*tip = g_strdup_printf (_("Running PPP on device %s..."), iface);
+@@ -311,8 +362,40 @@ gsm_get_icon (NMDevice *device,
+ 		*tip = g_strdup_printf (_("Waiting for user authentication on device '%s'..."), iface);
  		break;
  	case NM_DEVICE_STATE_ACTIVATED:
 -		*tip = g_strdup (_("GSM connection"));
