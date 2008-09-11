@@ -271,11 +271,19 @@ serial_debug (const char *prefix, const char *buf, int len)
 }
 
 static gboolean
-mm_serial_send_command (MMSerial *self, const char *command)
+mm_serial_send_command (MMSerial *self,
+                        const char *command,
+                        GError **error)
 {
     MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
     const char *s;
     int status;
+
+    if (mm_serial_is_connected (self)) {
+        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_SEND_FAILED,
+                     "%s", "Sending command failed: device is connected");
+        return FALSE;
+    }
 
     g_string_truncate (priv->command, g_str_has_prefix (command, "AT") ? 0 : 2);
     g_string_append (priv->command, command);
@@ -293,7 +301,8 @@ mm_serial_send_command (MMSerial *self, const char *command)
             if (errno == EAGAIN)
                 goto again;
             else {
-                g_warning ("Error writing to serial device: %s", strerror (errno));
+                g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_SEND_FAILED,
+                             "Sending command failed: '%s'", strerror (errno));
                 break;
             }
         }
@@ -366,12 +375,13 @@ mm_serial_queue_process (gpointer data)
     MMSerial *self = MM_SERIAL (data);
     MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
     MMQueueData *info;
+    GError *error = NULL;
 
     info = (MMQueueData *) g_queue_peek_head (priv->queue);
     if (!info)
         return FALSE;
 
-    if (mm_serial_send_command (self, info->command)) {
+    if (mm_serial_send_command (self, info->command, &error)) {
         GSource *source;
 
         source = g_timeout_source_new (info->timeout);
@@ -380,12 +390,6 @@ mm_serial_queue_process (gpointer data)
         priv->timeout_id = g_source_get_id (source);
         g_source_unref (source);
     } else {
-        GError *error;
-
-        error = g_error_new (MM_SERIAL_ERROR,
-                             MM_SERIAL_SEND_FAILED,
-                             "%s", "Sending command failed");
-
         mm_serial_got_response (self, error);
     }
 
@@ -636,6 +640,24 @@ mm_serial_flash (MMSerial *self,
                              flash_done);
 
     return id;
+}
+
+gboolean
+mm_serial_is_connected (MMSerial *self)
+{
+    int fd;
+    int mcs = 0;
+
+    g_return_val_if_fail (MM_IS_SERIAL (self), FALSE);
+
+    fd = MM_SERIAL_GET_PRIVATE (self)->fd;
+    if (fd == 0)
+        return FALSE;
+
+    if (ioctl (fd, TIOCMGET, &mcs) < 0)
+        return FALSE;
+
+    return mcs & TIOCM_CAR ? TRUE : FALSE;
 }
 
 /*****************************************************************************/

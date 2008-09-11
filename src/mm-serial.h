@@ -65,6 +65,7 @@ guint    mm_serial_flash             (MMSerial *self,
                                       MMSerialFlashFn callback,
                                       gpointer user_data);
 
+gboolean mm_serial_is_connected      (MMSerial *self);
 const char *mm_serial_get_device     (MMSerial *self);
 
 #endif /* MM_SERIAL_H */
