@@ -58,6 +58,7 @@ typedef struct {
     guint stopbits;
     guint64 send_delay;
 
+    guint queue_schedule;
     guint watch_id;
     guint timeout_id;
 } MMSerialPrivate;
@@ -324,6 +325,23 @@ typedef struct {
 } MMQueueData;
 
 static void
+mm_serial_schedule_queue_process (MMSerial *self)
+{
+    MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
+    GSource *source;
+
+    if (priv->queue_schedule)
+        /* Already scheduled */
+        return;
+
+    source = g_idle_source_new ();
+    g_source_set_closure (source, g_cclosure_new_object (G_CALLBACK (mm_serial_queue_process), G_OBJECT (self)));
+    g_source_attach (source, NULL);
+    priv->queue_schedule = g_source_get_id (source);
+    g_source_unref (source);
+}
+
+static void
 mm_serial_got_response (MMSerial *self, GError *error)
 {
     MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
@@ -346,7 +364,7 @@ mm_serial_got_response (MMSerial *self, GError *error)
 
     g_string_truncate (priv->response, 0);
     if (!g_queue_is_empty (priv->queue))
-        g_idle_add (mm_serial_queue_process, self);
+        mm_serial_schedule_queue_process (self);
 }
 
 static gboolean
@@ -376,6 +394,8 @@ mm_serial_queue_process (gpointer data)
     MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
     MMQueueData *info;
     GError *error = NULL;
+
+    priv->queue_schedule = 0;
 
     info = (MMQueueData *) g_queue_peek_head (priv->queue);
     if (!info)
@@ -557,7 +577,7 @@ mm_serial_queue_command (MMSerial *self,
     g_queue_push_tail (priv->queue, info);
 
     if (g_queue_get_length (priv->queue) == 1)
-        g_idle_add (mm_serial_queue_process, self);
+        mm_serial_schedule_queue_process (self);
 }
 
 typedef struct {

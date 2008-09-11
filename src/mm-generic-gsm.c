@@ -462,7 +462,6 @@ get_reg_status_done (MMSerial *serial,
 static void
 get_registration_status (MMSerial *serial, MMCallbackInfo *info)
 {
-    g_debug ("Queueing +CREG");
     mm_serial_queue_command (serial, "+CREG?", 3, get_reg_status_done, info);
 }
 
