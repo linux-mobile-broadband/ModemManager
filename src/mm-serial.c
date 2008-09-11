@@ -2,6 +2,8 @@
 
 #define _GNU_SOURCE  /* for strcasestr() */
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <termio.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -12,6 +14,10 @@
 #include <string.h>
 
 #include "mm-serial.h"
+#include "mm-errors.h"
+#include "mm-options.h"
+
+static gboolean mm_serial_queue_process (gpointer data);
 
 G_DEFINE_TYPE (MMSerial, mm_serial, G_TYPE_OBJECT)
 
@@ -27,7 +33,6 @@ enum {
     LAST_PROP
 };
 
-#define MM_DEBUG_SERIAL 1
 #define SERIAL_BUF_SIZE 2048
 
 #define MM_SERIAL_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_SERIAL, MMSerialPrivate))
@@ -35,6 +40,15 @@ enum {
 typedef struct {
     int fd;
     GIOChannel *channel;
+    GQueue *queue;
+    GString *command;
+    GString *response;
+
+    /* Response parser data */
+    MMSerialResponseParserFn response_parser_fn;
+    gpointer response_parser_user_data;
+    GDestroyNotify response_parser_notify;
+
     struct termios old_t;
 
     char *device;
@@ -44,7 +58,8 @@ typedef struct {
     guint stopbits;
     guint64 send_delay;
 
-    guint pending_id;
+    guint watch_id;
+    guint timeout_id;
 } MMSerialPrivate;
 
 const char *
@@ -189,86 +204,6 @@ parse_stopbits (guint i)
     return stopbits;
 }
 
-#ifdef MM_DEBUG_SERIAL
-static inline void
-serial_debug (const char *prefix, const char *data, int len)
-{
-    GString *str;
-    int i;
-
-    str = g_string_sized_new (len);
-    for (i = 0; i < len; i++) {
-        if (data[i] == '\0')
-            g_string_append_c (str, ' ');
-        else if (data[i] == '\r')
-            g_string_append_c (str, '\n');
-        else
-            g_string_append_c (str, data[i]);
-    }
-
-    g_debug ("%s '%s'", prefix, str->str);
-    g_string_free (str, TRUE);
-}
-#else
-static inline void
-serial_debug (const char *prefix, const char *data, int len)
-{
-}
-#endif /* MM_DEBUG_SERIAL */
-
-/* Pending data reading */
-
-static gboolean
-mm_serial_timed_out (gpointer data)
-{
-    MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (data);
-
-    /* Cancel data reading */
-    if (priv->pending_id)
-        g_source_remove (priv->pending_id);
-
-    return FALSE;
-}
-
-static guint
-mm_serial_set_pending (MMSerial *self,
-                       guint timeout,
-                       GIOFunc callback,
-                       gpointer user_data,
-                       GDestroyNotify notify)
-{
-    MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
-    GSource *source;
-
-    if (G_UNLIKELY (priv->pending_id)) {
-        /* FIXME: Probably should queue up pending calls instead? */
-        /* Multiple pending calls on the same GIOChannel doesn't work, so let's cancel the previous one. */
-        g_warning ("Adding new pending call while previous one isn't finished.");
-        g_warning ("Cancelling the previous pending call.");
-        g_source_remove (priv->pending_id);
-    }
-
-    priv->pending_id = g_io_add_watch_full (priv->channel,
-                                            G_PRIORITY_DEFAULT,
-                                            G_IO_IN | G_IO_ERR | G_IO_HUP,
-                                            callback, user_data, notify);
-
-    source = g_timeout_source_new (timeout * 100);
-    g_source_set_closure (source, g_cclosure_new_object (G_CALLBACK (mm_serial_timed_out), G_OBJECT (self)));
-    g_source_attach (source, NULL);
-    g_source_unref (source);
-
-    return priv->pending_id;
-}
-
-static void
-mm_serial_pending_done (MMSerial *self)
-{
-    MM_SERIAL_GET_PRIVATE (self)->pending_id = 0;
-}
-
-/****/
-
 static gboolean
 config_fd (MMSerial *self)
 {
@@ -305,8 +240,229 @@ config_fd (MMSerial *self)
     return TRUE;
 }
 
+static void
+serial_debug (const char *prefix, const char *buf, int len)
+{
+    const char *s;
+
+    if (!mm_options_debug ())
+        return;
+
+    if (len < 0)
+        len = strlen (buf);
+
+    g_print ("%s '", prefix);
+
+    s = buf;
+    while (len--) {
+        if (g_ascii_isprint (*s))
+            g_print ("%c", *s);
+        else if (*s == '\r')
+            g_print ("<CR>");
+        else if (*s == '\n')
+            g_print ("<LF>");
+        else
+            g_print ("\\%d", *s);
+
+        s++;
+    }
+
+    g_print ("'\n");
+}
+
+static gboolean
+mm_serial_send_command (MMSerial *self, const char *command)
+{
+    MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
+    const char *s;
+    int status;
+
+    g_string_truncate (priv->command, g_str_has_prefix (command, "AT") ? 0 : 2);
+    g_string_append (priv->command, command);
+
+    if (command[strlen (command)] != '\r')
+        g_string_append_c (priv->command, '\r');
+
+    serial_debug ("-->", priv->command->str, -1);
+
+    s = priv->command->str;
+    while (*s) {
+    again:
+        status = write (priv->fd, s, 1);
+        if (status < 0) {
+            if (errno == EAGAIN)
+                goto again;
+            else {
+                g_warning ("Error writing to serial device: %s", strerror (errno));
+                break;
+            }
+        }
+
+        if (priv->send_delay)
+            usleep (priv->send_delay);
+
+        s++;
+    }
+
+    return *s == '\0';
+}
+
+typedef struct {
+    char *command;
+    MMSerialResponseFn callback;
+    gpointer user_data;
+    guint32 timeout;
+} MMQueueData;
+
+static void
+mm_serial_got_response (MMSerial *self, GError *error)
+{
+    MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
+    MMQueueData *info;
+
+    if (priv->timeout_id)
+        g_source_remove (priv->timeout_id);
+
+    info = (MMQueueData *) g_queue_pop_head (priv->queue);
+    if (info) {
+        if (info->callback)
+            info->callback (self, priv->response, error, info->user_data);
+
+        g_free (info->command);
+        g_slice_free (MMQueueData, info);
+    }
+
+    if (error)
+        g_error_free (error);
+
+    g_string_truncate (priv->response, 0);
+    if (!g_queue_is_empty (priv->queue))
+        g_idle_add (mm_serial_queue_process, self);
+}
+
+static gboolean
+mm_serial_timed_out (gpointer data)
+{
+    MMSerial *self = MM_SERIAL (data);
+    MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
+    GError *error;
+
+    priv->timeout_id = 0;
+
+    error = g_error_new (MM_SERIAL_ERROR,
+                         MM_SERIAL_RESPONSE_TIMEOUT,
+                         "%s", "Serial command timed out");
+    /* FIXME: This is not completely correct - if the response finally arrives and there's
+       some other command waiting for response right now, the other command will
+       get the output of the timed out command. Maybe flashing would help here? */
+    mm_serial_got_response (self, error);
+
+    return FALSE;
+}
+
+static gboolean
+mm_serial_queue_process (gpointer data)
+{
+    MMSerial *self = MM_SERIAL (data);
+    MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
+    MMQueueData *info;
+
+    info = (MMQueueData *) g_queue_peek_head (priv->queue);
+    if (!info)
+        return FALSE;
+
+    if (mm_serial_send_command (self, info->command)) {
+        GSource *source;
+
+        source = g_timeout_source_new (info->timeout);
+        g_source_set_closure (source, g_cclosure_new_object (G_CALLBACK (mm_serial_timed_out), G_OBJECT (self)));
+        g_source_attach (source, NULL);
+        priv->timeout_id = g_source_get_id (source);
+        g_source_unref (source);
+    } else {
+        GError *error;
+
+        error = g_error_new (MM_SERIAL_ERROR,
+                             MM_SERIAL_SEND_FAILED,
+                             "%s", "Sending command failed");
+
+        mm_serial_got_response (self, error);
+    }
+
+    return FALSE;
+}
+
+void
+mm_serial_set_response_parser (MMSerial *self,
+                               MMSerialResponseParserFn fn,
+                               gpointer user_data,
+                               GDestroyNotify notify)
+{
+    MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
+
+    g_return_if_fail (MM_IS_SERIAL (self));
+
+    if (priv->response_parser_notify)
+        priv->response_parser_notify (priv->response_parser_user_data);
+
+    priv->response_parser_fn = fn;
+    priv->response_parser_user_data = user_data;
+    priv->response_parser_notify = notify;
+}
+
+static gboolean
+parse_response (MMSerial *self,
+                GString *response,
+                GError **error)
+{
+    MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
+
+    g_return_val_if_fail (priv->response_parser_fn != NULL, FALSE);
+
+    return priv->response_parser_fn (priv->response_parser_user_data, response, error);
+}
+
+static gboolean
+data_available (GIOChannel *source,
+                GIOCondition condition,
+                gpointer data)
+{
+    MMSerial *self = MM_SERIAL (data);
+    MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
+    char buf[SERIAL_BUF_SIZE + 1];
+    gsize bytes_read;
+    GIOStatus status;
+
+    if (condition & G_IO_HUP || condition & G_IO_ERR) {
+        g_string_truncate (priv->response, 0);
+        return TRUE;
+    }
+
+    do {
+        GError *err = NULL;
+
+        status = g_io_channel_read_chars (source, buf, SERIAL_BUF_SIZE, &bytes_read, &err);
+        if (status == G_IO_STATUS_ERROR) {
+            g_warning ("%s", err->message);
+            g_error_free (err);
+            err = NULL;
+        }
+
+        if (bytes_read > 0) {
+            serial_debug ("<--", buf, bytes_read);
+            g_string_append_len (priv->response, buf, bytes_read);
+        }
+
+        if (parse_response (self, priv->response, &err))
+            mm_serial_got_response (self, err);
+
+    } while (bytes_read == SERIAL_BUF_SIZE || status == G_IO_STATUS_AGAIN);
+
+    return TRUE;
+}
+
 gboolean
-mm_serial_open (MMSerial *self)
+mm_serial_open (MMSerial *self, GError **error)
 {
     MMSerialPrivate *priv;
 
@@ -322,23 +478,30 @@ mm_serial_open (MMSerial *self)
     priv->fd = open (priv->device, O_RDWR | O_EXCL | O_NONBLOCK | O_NOCTTY);
 
     if (priv->fd < 0) {
-        g_warning ("(%s) cannot open device: %s", priv->device, strerror (errno));
+        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_OPEN_FAILED,
+                     "Could not open serial device %s: %s", priv->device, strerror (errno));
         return FALSE;
     }
 
     if (ioctl (priv->fd, TCGETA, &priv->old_t) < 0) {
-        g_warning ("(%s) cannot control device (errno %d)", priv->device, errno);
+        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_OPEN_FAILED,
+                     "Could not open serial device %s: %s", priv->device, strerror (errno));
         close (priv->fd);
         return FALSE;
     }
 
     if (!config_fd (self)) {
+        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_OPEN_FAILED,
+                     "Could not open serial device %s: %s", priv->device, strerror (errno));
         close (priv->fd);
         priv->fd = 0;
         return FALSE;
     }
 
     priv->channel = g_io_channel_unix_new (priv->fd);
+    priv->watch_id = g_io_add_watch (priv->channel,
+                                     G_IO_IN | G_IO_ERR | G_IO_HUP,
+                                     data_available, self);
 
     return TRUE;
 }
@@ -352,13 +515,12 @@ mm_serial_close (MMSerial *self)
 
     priv = MM_SERIAL_GET_PRIVATE (self);
 
-    if (priv->pending_id)
-        g_source_remove (priv->pending_id);
-
     if (priv->fd) {
         g_message ("Closing device '%s'", priv->device);
 
         if (priv->channel) {
+            g_source_remove (priv->watch_id);
+            g_io_channel_shutdown (priv->channel, TRUE, NULL);
             g_io_channel_unref (priv->channel);
             priv->channel = NULL;
         }
@@ -369,439 +531,30 @@ mm_serial_close (MMSerial *self)
     }
 }
 
-gboolean
-mm_serial_send_command (MMSerial *self, GByteArray *command)
-{
-    MMSerialPrivate *priv;
-    int fd;
-    int i;
-    ssize_t status;
-
-    g_return_val_if_fail (MM_IS_SERIAL (self), FALSE);
-    g_return_val_if_fail (command != NULL, FALSE);
-
-    priv = MM_SERIAL_GET_PRIVATE (self);
-
-    fd = priv->fd;
-
-    serial_debug ("Sending:", (char *) command->data, command->len);
-
-    for (i = 0; i < command->len; i++) {
-    again:
-        status = write (fd, command->data + i, 1);
-
-        if (status < 0) {
-            if (errno == EAGAIN)
-                goto again;
-
-            g_warning ("Error in writing (errno %d)", errno);
-            return FALSE;
-        }
-
-        if (priv->send_delay)
-            usleep (priv->send_delay);
-    }
-
-    return TRUE;
-}
-
-gboolean
-mm_serial_send_command_string (MMSerial *self, const char *str)
-{
-    GByteArray *command;
-    gboolean ret;
-
-    g_return_val_if_fail (MM_IS_SERIAL (self), FALSE);
-    g_return_val_if_fail (str != NULL, FALSE);
-
-    command = g_byte_array_new ();
-    g_byte_array_append (command, (guint8 *) str, strlen (str));
-    g_byte_array_append (command, (guint8 *) "\r", 1);
-
-    ret = mm_serial_send_command (self, command);
-    g_byte_array_free (command, TRUE);
-
-    return ret;
-}
-
-typedef struct {
-    MMSerial *serial;
-    char *terminators;
-    GString *result;
-    MMSerialGetReplyFn callback;
-    gpointer user_data;
-} GetReplyInfo;
-
-static void
-get_reply_done (gpointer data)
-{
-    GetReplyInfo *info = (GetReplyInfo *) data;
-
-    mm_serial_pending_done (info->serial);
-
-    /* Call the callback */
-    info->callback (info->serial, info->result->str, info->user_data);
-
-    /* Free info */
-    g_free (info->terminators);
-    g_string_free (info->result, TRUE);
-
-    g_slice_free (GetReplyInfo, info);
-}
-
-static gboolean
-get_reply_got_data (GIOChannel *source,
-                    GIOCondition condition,
-                    gpointer data)
-{
-    GetReplyInfo *info = (GetReplyInfo *) data;
-    gsize bytes_read;
-    char buf[SERIAL_BUF_SIZE + 1];
-    GIOStatus status;
-    gboolean done = FALSE;
-    int i;
-
-    if (condition & G_IO_HUP || condition & G_IO_ERR) {
-        g_string_truncate (info->result, 0);
-        return FALSE;
-    }
-
-    do {
-        GError *err = NULL;
-
-        status = g_io_channel_read_chars (source, buf, SERIAL_BUF_SIZE, &bytes_read, &err);
-        if (status == G_IO_STATUS_ERROR) {
-            g_warning ("%s", err->message);
-            g_error_free (err);
-            err = NULL;
-        }
-
-        if (bytes_read > 0) {
-            char *p;
-
-            serial_debug ("Got:", buf, bytes_read);
-
-            p = &buf[0];
-            for (i = 0; i < bytes_read && !done; i++, p++) {
-                int j;
-                gboolean is_terminator = FALSE;
-
-                for (j = 0; j < strlen (info->terminators); j++) {
-                    if (*p == info->terminators[j]) {
-                        is_terminator = TRUE;
-                        break;
-                    }
-                }
-
-                if (is_terminator) {
-                    /* Ignore terminators in the beginning of the output */
-                    if (info->result->len > 0)
-                        done = TRUE;
-                } else
-                    g_string_append_c (info->result, *p);
-            }
-        }
-
-        /* Limit the size of the buffer */
-        if (info->result->len > SERIAL_BUF_SIZE) {
-            g_warning ("%s (%s): response buffer filled before repsonse received",
-                       __func__, MM_SERIAL_GET_PRIVATE (info->serial)->device);
-            g_string_truncate (info->result, 0);
-            done = TRUE;
-        }
-    } while (!done || bytes_read == SERIAL_BUF_SIZE || status == G_IO_STATUS_AGAIN);
-
-    return !done;
-}
-
-guint
-mm_serial_get_reply (MMSerial *self,
-                     guint timeout,
-                     const char *terminators,
-                     MMSerialGetReplyFn callback,
-                     gpointer user_data)
-{
-    GetReplyInfo *info;
-
-    g_return_val_if_fail (MM_IS_SERIAL (self), 0);
-    g_return_val_if_fail (terminators != NULL, 0);
-    g_return_val_if_fail (callback != NULL, 0);
-
-    info = g_slice_new0 (GetReplyInfo);
-    info->serial = self;
-    info->terminators = g_strdup (terminators);
-    info->result = g_string_new (NULL);
-    info->callback = callback;
-    info->user_data = user_data;
-
-    return mm_serial_set_pending (self, timeout, get_reply_got_data, info, get_reply_done);
-}
-
-typedef struct {
-    MMSerial *serial;
-    char **str_needles;
-    char **terminators;
-    GString *result;
-    MMSerialWaitForReplyFn callback;
-    gpointer user_data;
-    int reply_index;
-    guint timeout;
-    time_t start;
-} WaitForReplyInfo;
-
-static void
-wait_for_reply_done (gpointer data)
-{
-    WaitForReplyInfo *info = (WaitForReplyInfo *) data;
-
-    mm_serial_pending_done (info->serial);
-
-    /* Call the callback */
-    info->callback (info->serial, info->reply_index, info->user_data);
-
-    /* Free info */
-    if (info->result)
-        g_string_free (info->result, TRUE);
-
-    g_strfreev (info->str_needles);
-    g_strfreev (info->terminators);
-    g_slice_free (WaitForReplyInfo, info);
-}
-
-static gboolean
-find_terminator (const char *line, char **terminators)
-{
-    int i;
-
-    for (i = 0; terminators[i]; i++) {
-        if (!strncasecmp (line, terminators[i], strlen (terminators[i])))
-            return TRUE;
-    }
-    return FALSE;
-}
-
-static gboolean
-find_response (const char *line, char **responses, gint *idx)
-{
-    int i;
-
-    /* Don't look for a result again if we got one previously */
-    for (i = 0; responses[i]; i++) {
-        if (strcasestr (line, responses[i])) {
-            *idx = i;
-            return TRUE;
-        }
-    }
-    return FALSE;
-}
-
-#define RESPONSE_LINE_MAX 128
-
-static gboolean
-wait_for_reply_got_data (GIOChannel *source,
-                         GIOCondition condition,
-                         gpointer data)
-{
-    WaitForReplyInfo *info = (WaitForReplyInfo *) data;
-    gchar buf[SERIAL_BUF_SIZE + 1];
-    gsize bytes_read;
-    GIOStatus status;
-    gboolean got_response = FALSE;
-    gboolean done = FALSE;
-
-    if (condition & G_IO_HUP || condition & G_IO_ERR)
-        return FALSE;
-
-    do {
-        GError *err = NULL;
-
-        status = g_io_channel_read_chars (source, buf, SERIAL_BUF_SIZE, &bytes_read, &err);
-        if (status == G_IO_STATUS_ERROR) {
-            g_warning ("%s", err->message);
-            g_error_free (err);
-            err = NULL;
-        }
-
-        if (bytes_read > 0) {
-            buf[bytes_read] = 0;
-            g_string_append (info->result, buf);
-
-            serial_debug ("Got:", info->result->str, info->result->len);
-        }
-
-        /* Look for needles and terminators */
-        if ((bytes_read > 0) && info->result->str) {
-            char *p = info->result->str;
-
-            /* Break the response up into lines and process each one */
-            while (   (p < info->result->str + strlen (info->result->str))
-                      && !(done && got_response)) {
-                char line[RESPONSE_LINE_MAX] = { '\0', };
-                char *tmp;
-                int i;
-                gboolean got_something = FALSE;
-
-                for (i = 0; *p && (i < RESPONSE_LINE_MAX - 1); p++) {
-                    /* Ignore front CR/LF */
-                    if ((*p == '\n') || (*p == '\r')) {
-                        if (got_something)
-                            break;
-                    } else {
-                        line[i++] = *p;
-                        got_something = TRUE;
-                    }
-                }
-                line[i] = '\0';
-
-                tmp = g_strstrip (line);
-                if (tmp && strlen (tmp)) {
-                    done = find_terminator (tmp, info->terminators);
-                    if (info->reply_index == -1)
-                        got_response = find_response (tmp, info->str_needles, &(info->reply_index));
-                }
-            }
-
-            if (done && got_response)
-                break;
-        }
-
-        /* Limit the size of the buffer */
-        if (info->result->len > SERIAL_BUF_SIZE) {
-            g_warning ("%s (%s): response buffer filled before repsonse received",
-                       __func__, MM_SERIAL_GET_PRIVATE (info->serial)->device);
-            done = TRUE;
-            break;
-        }
-
-        /* Make sure we don't go over the timeout, in addition to the timeout
-         * handler that's been scheduled.  If for some reason this loop doesn't
-         * terminate (terminator not found, whatever) then this should make
-         * sure that we don't spin the CPU forever.
-         */
-        if (time (NULL) - info->start > info->timeout + 1) {
-            done = TRUE;
-            break;
-        } else
-            g_usleep (50);
-    } while (!done || bytes_read == SERIAL_BUF_SIZE || status == G_IO_STATUS_AGAIN);
-
-    return !done;
-}
-
-guint
-mm_serial_wait_for_reply (MMSerial *self,
-                          guint timeout,
-                          char **responses,
-                          char **terminators,
-                          MMSerialWaitForReplyFn callback,
-                          gpointer user_data)
-{
-    WaitForReplyInfo *info;
-
-    g_return_val_if_fail (MM_IS_SERIAL (self), 0);
-    g_return_val_if_fail (responses != NULL, 0);
-    g_return_val_if_fail (callback != NULL, 0);
-
-    info = g_slice_new0 (WaitForReplyInfo);
-    info->serial = self;
-    info->str_needles = g_strdupv (responses);
-    info->terminators = g_strdupv (terminators);
-    info->result = g_string_new (NULL);
-    info->callback = callback;
-    info->user_data = user_data;
-    info->reply_index = -1;
-    info->timeout = timeout;
-    info->start = time (NULL);
-
-    return mm_serial_set_pending (self, timeout, wait_for_reply_got_data, info, wait_for_reply_done);
-}
-
-#if 0
-typedef struct {
-    MMSerial *serial;
-    gboolean timed_out;
-    MMSerialWaitQuietFn callback;
-    gpointer user_data;
-} WaitQuietInfo;
-
-static void
-wait_quiet_done (gpointer data)
-{
-    WaitQuietInfo *info = (WaitQuietInfo *) data;
-
-    mm_serial_pending_done (info->serial);
-
-    /* Call the callback */
-    info->callback (info->serial, info->timed_out, info->user_data);
-
-    /* Free info */
-    g_slice_free (WaitQuietInfo, info);
-}
-
-static gboolean
-wait_quiet_quiettime (gpointer data)
-{
-    WaitQuietInfo *info = (WaitQuietInfo *) data;
-
-    info->timed_out = FALSE;
-    g_source_remove (MM_SERIAL_GET_PRIVATE (info->serial)->pending);
-
-    return FALSE;
-}
-
-static gboolean
-wait_quiet_got_data (GIOChannel *source,
-                     GIOCondition condition,
-                     gpointer data)
-{
-    WaitQuietInfo *info = (WaitQuietInfo *) data;
-    gsize bytes_read;
-    char buf[4096];
-    GIOStatus status;
-
-    if (condition & G_IO_HUP || condition & G_IO_ERR)
-        return FALSE;
-
-    if (condition & G_IO_IN) {
-        do {
-            status = g_io_channel_read_chars (source, buf, 4096, &bytes_read, NULL);
-
-            if (bytes_read) {
-                /* Reset the quiet time timeout */
-                g_source_remove (info->quiet_id);
-                info->quiet_id = g_timeout_add (info->quiet_time, wait_quiet_quiettime, info);
-            }
-        } while (bytes_read == 4096 || status == G_IO_STATUS_AGAIN);
-    }
-
-    return TRUE;
-}
-
 void
-mm_serial_wait_quiet (MMSerial *self,
-                      guint timeout, 
-                      guint quiet_time,
-                      MMSerialWaitQuietFn callback,
-                      gpointer user_data)
+mm_serial_queue_command (MMSerial *self,
+                         const char *command,
+                         guint32 timeout_seconds,
+                         MMSerialResponseFn callback,
+                         gpointer user_data)
 {
-    WaitQuietInfo *info;
+    MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
+    MMQueueData *info;
 
     g_return_if_fail (MM_IS_SERIAL (self));
-    g_return_if_fail (callback != NULL);
+    g_return_if_fail (command != NULL);
 
-    info = g_slice_new0 (WaitQuietInfo);
-    info->serial = self;
-    info->timed_out = TRUE;
+    info = g_slice_new0 (MMQueueData);
+    info->command = g_strdup (command);
+    info->timeout = timeout_seconds * 1000;
     info->callback = callback;
     info->user_data = user_data;
-    info->quiet_id = g_timeout_add (quiet_time,
-                                    wait_quiet_timeout,
-                                    info);
 
-    return mm_serial_set_pending (self, timeout, wait_quiet_got_data, info, wait_quiet_done);
+    g_queue_push_tail (priv->queue, info);
+
+    if (g_queue_get_length (priv->queue) == 1)
+        g_idle_add (mm_serial_queue_process, self);
 }
-
-#endif
 
 typedef struct {
     MMSerial *serial;
@@ -840,8 +593,6 @@ static void
 flash_done (gpointer data)
 {
     FlashInfo *info = (FlashInfo *) data;
-
-    MM_SERIAL_GET_PRIVATE (info->serial)->pending_id = 0;
 
     info->callback (info->serial, info->user_data);
 
@@ -884,23 +635,7 @@ mm_serial_flash (MMSerial *self,
                              info,
                              flash_done);
 
-    MM_SERIAL_GET_PRIVATE (self)->pending_id = id;
-
     return id;
-}
-
-GIOChannel *
-mm_serial_get_io_channel (MMSerial *self)
-{
-    MMSerialPrivate *priv;
-
-    g_return_val_if_fail (MM_IS_SERIAL (self), NULL);
-
-    priv = MM_SERIAL_GET_PRIVATE (self);
-    if (priv->channel)
-        return g_io_channel_ref (priv->channel);
-
-    return NULL;
 }
 
 /*****************************************************************************/
@@ -915,6 +650,10 @@ mm_serial_init (MMSerial *self)
     priv->parity = 'n';
     priv->stopbits = 1;
     priv->send_delay = 0;
+
+    priv->queue = g_queue_new ();
+    priv->command  = g_string_new_len   ("AT", SERIAL_BUF_SIZE);
+    priv->response = g_string_sized_new (SERIAL_BUF_SIZE);
 }
 
 static GObject*
@@ -1012,7 +751,14 @@ finalize (GObject *object)
     MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
 
     mm_serial_close (self);
+
+    g_queue_free (priv->queue);
+    g_string_free (priv->command, TRUE);
+    g_string_free (priv->response, TRUE);
     g_free (priv->device);
+
+    if (priv->response_parser_notify)
+        priv->response_parser_notify (priv->response_parser_user_data);
 
     G_OBJECT_CLASS (mm_serial_parent_class)->finalize (object);
 }

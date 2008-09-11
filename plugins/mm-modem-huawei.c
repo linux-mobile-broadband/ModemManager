@@ -5,8 +5,9 @@
 #include <string.h>
 #include "mm-modem-huawei.h"
 #include "mm-modem-gsm-network.h"
-#include "mm-modem-error.h"
+#include "mm-errors.h"
 #include "mm-callback-info.h"
+#include "mm-serial-parsers.h"
 
 static gpointer mm_modem_huawei_parent_class = NULL;
 
@@ -14,7 +15,6 @@ static gpointer mm_modem_huawei_parent_class = NULL;
 
 typedef struct {
     MMSerial *monitor_device;
-    guint watch_id;
 } MMModemHuaweiPrivate;
 
 enum {
@@ -43,25 +43,37 @@ mm_modem_huawei_new (const char *data_device,
 
 /*****************************************************************************/
 
+typedef struct {
+    MMModemGsmNetwork *modem;
+    GRegex *r;
+} MonitorData;
+
 static void
-parse_monitor_line (MMModemGsmNetwork *modem, char *buf)
+monitor_info_free (gpointer data)
 {
-    char **lines;
-    char **iter;
+    MonitorData *info = (MonitorData *) data;
 
-    lines = g_strsplit (buf, "\r\n", 0);
+    g_regex_unref (info->r);
+    g_slice_free (MonitorData, data);
+}
 
-    for (iter = lines; iter && *iter; iter++) {
-        char *line = *iter;
+static gboolean
+monitor_parse (gpointer data,
+               GString *response,
+               GError **error)
+{
+    MonitorData *info = (MonitorData *) data;
+    GMatchInfo *match_info;
+    gboolean found;
 
-        g_strstrip (line);
-        if (strlen (line) < 1 || line[0] != '^')
-            continue;
+    found = g_regex_match_full (info->r, response->str, response->len, 0, 0, &match_info, NULL);
+    if (found) {
+        char *str;
 
-        line += 1;
+        str = g_match_info_fetch (match_info, 1);
 
-        if (!strncmp (line, "RSSI:", 5)) {
-            int quality = atoi (line + 5);
+        if (g_str_has_prefix (str, "^RSSI:")) {
+            int quality = atoi (str + 6);
 
             if (quality == 99)
                 /* 99 means unknown */
@@ -71,13 +83,13 @@ parse_monitor_line (MMModemGsmNetwork *modem, char *buf)
                 quality = quality * 100 / 31;
 
             g_debug ("Signal quality: %d", quality);
-            mm_modem_gsm_network_signal_quality (modem, (guint32) quality);
-        } else if (!strncmp (line, "MODE:", 5)) {
+            mm_modem_gsm_network_signal_quality (info->modem, (guint32) quality);
+        } else if (g_str_has_prefix (str, "^MODE:")) {
             MMModemGsmNetworkMode mode = 0;
             int a;
             int b;
 
-            if (sscanf (line + 5, "%d,%d", &a, &b)) {
+            if (sscanf (str + 6, "%d,%d", &a, &b)) {
                 if (a == 3 && b == 2)
                     mode = MM_MODEM_GSM_NETWORK_MODE_GPRS;
                 else if (a == 3 && b == 3)
@@ -89,40 +101,17 @@ parse_monitor_line (MMModemGsmNetwork *modem, char *buf)
 
                 if (mode) {
                     g_debug ("Mode: %d", mode);
-                    mm_modem_gsm_network_mode (modem, mode);
+                    mm_modem_gsm_network_mode (info->modem, mode);
                 }
             }
         }
+
+        g_free (str);
+        g_match_info_free (match_info);
+
     }
 
-    g_strfreev (lines);
-}
-
-static gboolean
-monitor_device_got_data (GIOChannel *source,
-                         GIOCondition condition,
-                         gpointer data)
-{
-	gsize bytes_read;
-	char buf[4096];
-	GIOStatus status;
-
-	if (condition & G_IO_IN) {
-		do {
-			status = g_io_channel_read_chars (source, buf, 4096, &bytes_read, NULL);
-
-			if (bytes_read) {
-				buf[bytes_read] = '\0';
-                parse_monitor_line (MM_MODEM_GSM_NETWORK (data), buf);
-			}
-		} while (bytes_read == 4096 || status == G_IO_STATUS_AGAIN);
-	}
-
-	if (condition & G_IO_HUP || condition & G_IO_ERR) {
-		return FALSE;
-	}
-
-	return TRUE;
+    return found;
 }
 
 static void
@@ -138,25 +127,16 @@ enable (MMModem *modem,
     parent_modem_iface->enable (modem, enable, callback, user_data);
 
     if (enable) {
-        GIOChannel *channel;
+        GError *error = NULL;
 
-        if (priv->watch_id == 0) {
-            mm_serial_open (priv->monitor_device);
-
-            channel = mm_serial_get_io_channel (priv->monitor_device);
-            priv->watch_id = g_io_add_watch (channel, G_IO_IN | G_IO_ERR | G_IO_HUP,
-                                             monitor_device_got_data, modem);
-
-            g_io_channel_unref (channel);
+        if (!mm_serial_open (priv->monitor_device, &error)) {
+            g_warning ("Could not open monitoring device %s: %s",
+                       mm_serial_get_device (priv->monitor_device),
+                       error->message);
+            g_error_free (error);
         }
-    } else {
-        if (priv->watch_id) {
-            g_source_remove (priv->watch_id);
-            priv->watch_id = 0;
-            mm_serial_close (priv->monitor_device);
-        }
-    }
-
+    } else
+        mm_serial_close (priv->monitor_device);
 }
 
 static gboolean
@@ -173,49 +153,42 @@ parse_syscfg (const char *reply, int *mode_a, int *mode_b, guint32 *band, int *u
 
 static void
 set_network_mode_done (MMSerial *serial,
-                       int reply_index,
+                       GString *response,
+                       GError *error,
                        gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    switch (reply_index) {
-    case 0:
-        /* Success */
-        break;
-    default:
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Setting network mode failed");
-        break;
-    }
+    if (error)
+        info->error = g_error_copy (error);
 
     mm_callback_info_schedule (info);
 }
 
 static void
-set_network_mode_get_done (MMSerial *serial, const char *reply, gpointer user_data)
+set_network_mode_get_done (MMSerial *serial,
+                           GString *response,
+                           GError *error,
+                           gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    int a, b, u1, u2;
-    guint32 band;
-    guint id = 0;
 
-    if (parse_syscfg (reply, &a, &b, &band, &u1, &u2)) {
-        char *responses[] = { "OK", "ERROR", NULL };
-        char *command;
-
-        a = GPOINTER_TO_INT (mm_callback_info_get_data (info, "mode-a"));
-        b = GPOINTER_TO_INT (mm_callback_info_get_data (info, "mode-b"));
-        command = g_strdup_printf ("AT^SYSCFG=%d,%d,%X,%d,%d", a, b, band, u1, u2);
-
-        if (mm_serial_send_command_string (serial, command))
-            id = mm_serial_wait_for_reply (serial, 3, responses, responses, set_network_mode_done, info);
-
-        g_free (command);
-    }
-
-    if (!id) {
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                   "%s", "Could not set network mode");
+    if (error) {
+        info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
+    } else {
+        int a, b, u1, u2;
+        guint32 band;
+
+        if (parse_syscfg (response->str, &a, &b, &band, &u1, &u2)) {
+            char *command;
+
+            a = GPOINTER_TO_INT (mm_callback_info_get_data (info, "mode-a"));
+            b = GPOINTER_TO_INT (mm_callback_info_get_data (info, "mode-b"));
+            command = g_strdup_printf ("AT^SYSCFG=%d,%d,%X,%d,%d", a, b, band, u1, u2);
+            mm_serial_queue_command (serial, command, 3, set_network_mode_done, info);
+            g_free (command);
+        }
     }
 }
 
@@ -226,8 +199,6 @@ set_network_mode (MMModemGsmNetwork *modem,
                   gpointer user_data)
 {
     MMCallbackInfo *info;
-    char *terminators = "\r\n";
-    guint id = 0;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
@@ -262,39 +233,41 @@ set_network_mode (MMModemGsmNetwork *modem,
         break;
     }
 
-    if (mm_serial_send_command_string (MM_SERIAL (modem), "AT^SYSCFG?"))
-        id = mm_serial_get_reply (MM_SERIAL (modem), 10, terminators, set_network_mode_get_done, info);
-
-    if (!id) {
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Setting network mode failed.");
-        mm_callback_info_schedule (info);
-    }
+    mm_serial_queue_command (MM_SERIAL (modem), "AT^SYSCFG?", 3, set_network_mode_get_done, info);
 }
 
 static void
-get_network_mode_done (MMSerial *serial, const char *reply, gpointer user_data)
+get_network_mode_done (MMSerial *serial,
+                       GString *response,
+                       GError *error,
+                       gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    int a, b, u1, u2;
-    guint32 band;
-    guint32 result = 0;
 
-    if (parse_syscfg (reply, &a, &b, &band, &u1, &u2)) {
-        if (a == 2 && b == 1)
-            result = MM_MODEM_GSM_NETWORK_MODE_PREFER_2G;
-        else if (a == 2 && b == 2)
-            result = MM_MODEM_GSM_NETWORK_MODE_PREFER_3G;
-        else if (a == 13 && b == 1)
-            result = MM_MODEM_GSM_NETWORK_MODE_GPRS;
-        else if (a == 14 && b == 2)
-            result = MM_MODEM_GSM_NETWORK_MODE_3G;
+    if (error)
+        info->error = g_error_copy (error);
+    else {
+        int a, b, u1, u2;
+        guint32 band;
+        guint32 result = 0;
+
+        if (parse_syscfg (response->str, &a, &b, &band, &u1, &u2)) {
+            if (a == 2 && b == 1)
+                result = MM_MODEM_GSM_NETWORK_MODE_PREFER_2G;
+            else if (a == 2 && b == 2)
+                result = MM_MODEM_GSM_NETWORK_MODE_PREFER_3G;
+            else if (a == 13 && b == 1)
+                result = MM_MODEM_GSM_NETWORK_MODE_GPRS;
+            else if (a == 14 && b == 2)
+                result = MM_MODEM_GSM_NETWORK_MODE_3G;
+        }
+
+        if (result == 0)
+            info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                       "%s", "Could not parse network mode results");
+        else
+            mm_callback_info_set_result (info, GUINT_TO_POINTER (result), NULL);
     }
-
-    if (result == 0)
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                   "%s", "Could not parse network mode results");
-    else
-        mm_callback_info_set_result (info, GUINT_TO_POINTER (result), NULL);
 
     mm_callback_info_schedule (info);
 }
@@ -305,64 +278,48 @@ get_network_mode (MMModemGsmNetwork *modem,
                   gpointer user_data)
 {
     MMCallbackInfo *info;
-    char *terminators = "\r\n";
-    guint id = 0;
 
     info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-
-    if (mm_serial_send_command_string (MM_SERIAL (modem), "AT^SYSCFG?"))
-        id = mm_serial_get_reply (MM_SERIAL (modem), 10, terminators, get_network_mode_done, info);
-
-    if (!id) {
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Getting network mode failed.");
-        mm_callback_info_schedule (info);
-    }
+    mm_serial_queue_command (MM_SERIAL (modem), "AT^SYSCFG?", 3, get_network_mode_done, info);
 }
 
 static void
 set_band_done (MMSerial *serial,
-               int reply_index,
+               GString *response,
+               GError *error,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    switch (reply_index) {
-    case 0:
-        /* Success */
-        break;
-    default:
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Setting band failed");
-        break;
-    }
+    if (error)
+        info->error = g_error_copy (error);
 
     mm_callback_info_schedule (info);
 }
 
 static void
-set_band_get_done (MMSerial *serial, const char *reply, gpointer user_data)
+set_band_get_done (MMSerial *serial,
+                   GString *response,
+                   GError *error,
+                   gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    int a, b, u1, u2;
-    guint32 band;
-    guint id = 0;
 
-    if (parse_syscfg (reply, &a, &b, &band, &u1, &u2)) {
-        char *responses[] = { "OK", "ERROR", NULL };
-        char *command;
-
-        band = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "band"));
-        command = g_strdup_printf ("AT^SYSCFG=%d,%d,%X,%d,%d", a, b, band, u1, u2);
-
-        if (mm_serial_send_command_string (serial, command))
-            id = mm_serial_wait_for_reply (serial, 3, responses, responses, set_band_done, info);
-
-        g_free (command);
-    }
-
-    if (!id) {
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                   "%s", "Could not set band");
+    if (error) {
+        info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
+    } else {
+        int a, b, u1, u2;
+        guint32 band;
+
+        if (parse_syscfg (response->str, &a, &b, &band, &u1, &u2)) {
+            char *command;
+
+            band = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "band"));
+            command = g_strdup_printf ("AT^SYSCFG=%d,%d,%X,%d,%d", a, b, band, u1, u2);
+            mm_serial_queue_command (serial, command, 3, set_band_done, info);
+            g_free (command);
+        }
     }
 }
 
@@ -373,8 +330,6 @@ set_band (MMModemGsmNetwork *modem,
           gpointer user_data)
 {
     MMCallbackInfo *info;
-    char *terminators = "\r\n";
-    guint id = 0;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
@@ -397,37 +352,39 @@ set_band (MMModemGsmNetwork *modem,
         break;
     }
 
-    if (mm_serial_send_command_string (MM_SERIAL (modem), "AT^SYSCFG?"))
-        id = mm_serial_get_reply (MM_SERIAL (modem), 10, terminators, set_band_get_done, info);
-
-    if (!id) {
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Setting band failed.");
-        mm_callback_info_schedule (info);
-    }
+    mm_serial_queue_command (MM_SERIAL (modem), "AT^SYSCFG?", 3, set_band_get_done, info);
 }
 
 static void
-get_band_done (MMSerial *serial, const char *reply, gpointer user_data)
+get_band_done (MMSerial *serial,
+               GString *response,
+               GError *error,
+               gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    int a, b, u1, u2;
-    guint32 band;
-    guint32 result = 0xdeadbeaf;
 
-    if (parse_syscfg (reply, &a, &b, &band, &u1, &u2)) {
-        if (band == 0x3FFFFFFF)
-            result = MM_MODEM_GSM_NETWORK_BAND_ANY;
-        else if (band == 0x400380)
-            result = MM_MODEM_GSM_NETWORK_BAND_DCS;
-        else if (band == 0x200000)
-            result = MM_MODEM_GSM_NETWORK_BAND_PCS;
+    if (error)
+        info->error = g_error_copy (error);
+    else {
+        int a, b, u1, u2;
+        guint32 band;
+        guint32 result = 0xdeadbeaf;
+
+        if (parse_syscfg (response->str, &a, &b, &band, &u1, &u2)) {
+            if (band == 0x3FFFFFFF)
+                result = MM_MODEM_GSM_NETWORK_BAND_ANY;
+            else if (band == 0x400380)
+                result = MM_MODEM_GSM_NETWORK_BAND_DCS;
+            else if (band == 0x200000)
+                result = MM_MODEM_GSM_NETWORK_BAND_PCS;
+        }
+
+        if (result == 0xdeadbeaf)
+            info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                       "%s", "Could not parse band results");
+        else
+            mm_callback_info_set_result (info, GUINT_TO_POINTER (result), NULL);
     }
-
-    if (result == 0xdeadbeaf)
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                   "%s", "Could not parse band results");
-    else
-        mm_callback_info_set_result (info, GUINT_TO_POINTER (result), NULL);
 
     mm_callback_info_schedule (info);
 }
@@ -438,18 +395,9 @@ get_band (MMModemGsmNetwork *modem,
           gpointer user_data)
 {
     MMCallbackInfo *info;
-    char *terminators = "\r\n";
-    guint id = 0;
 
     info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-
-    if (mm_serial_send_command_string (MM_SERIAL (modem), "AT^SYSCFG?"))
-        id = mm_serial_get_reply (MM_SERIAL (modem), 10, terminators, get_band_done, info);
-
-    if (!id) {
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Getting band failed.");
-        mm_callback_info_schedule (info);
-    }
+    mm_serial_queue_command (MM_SERIAL (modem), "AT^SYSCFG?", 3, get_band_done, info);
 }
 
 /*****************************************************************************/
@@ -481,6 +429,7 @@ constructor (GType type,
 {
     GObject *object;
     MMModemHuaweiPrivate *priv;
+    MonitorData *info;
 
     object = G_OBJECT_CLASS (mm_modem_huawei_parent_class)->constructor (type,
                                                                          n_construct_params,
@@ -495,6 +444,11 @@ constructor (GType type,
         g_object_unref (object);
         return NULL;
     }
+
+    info = g_slice_new (MonitorData);
+    info->modem = MM_MODEM_GSM_NETWORK (object);
+    info->r = g_regex_new ("\\r\\n(.+)\r\n$", G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    mm_serial_set_response_parser (priv->monitor_device, monitor_parse, info, monitor_info_free);
 
     return object;
 }
@@ -538,14 +492,10 @@ finalize (GObject *object)
 {
     MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (object);
 
-    if (priv->watch_id) {
-        g_source_remove (priv->watch_id);
-        priv->watch_id = 0;
+    if (priv->monitor_device) {
         mm_serial_close (priv->monitor_device);
-    }
-
-    if (priv->monitor_device)
         g_object_unref (priv->monitor_device);
+    }
 
     G_OBJECT_CLASS (mm_modem_huawei_parent_class)->finalize (object);
 }

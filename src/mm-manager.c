@@ -6,7 +6,7 @@
 #include <dbus/dbus-glib.h>
 #include <dbus/dbus-glib-lowlevel.h>
 #include "mm-manager.h"
-#include "mm-modem-error.h"
+#include "mm-errors.h"
 #include "mm-generic-gsm.h"
 #include "mm-generic-cdma.h"
 #include "mm-plugin.h"
@@ -454,5 +454,11 @@ mm_manager_class_init (MMManagerClass *manager_class)
     dbus_g_object_type_install_info (G_TYPE_FROM_CLASS (manager_class),
 									 &dbus_glib_mm_manager_object_info);
 
+    /* FIXME: Sigh, these don't work either */
+#if 0
+    dbus_g_error_domain_register (MM_SERIAL_ERROR, NULL, MM_TYPE_SERIAL_ERROR);
 	dbus_g_error_domain_register (MM_MODEM_ERROR, NULL, MM_TYPE_MODEM_ERROR);
+    dbus_g_error_domain_register (MM_MODEM_CONNECT_ERROR, NULL, MM_TYPE_MODEM_CONNECT_ERROR);
+    dbus_g_error_domain_register (MM_MOBILE_ERROR, NULL, MM_TYPE_MOBILE_ERROR);
+#endif
 }

@@ -3,6 +3,7 @@
 #include <syslog.h>
 #include <dbus/dbus-glib.h>
 #include "mm-manager.h"
+#include "mm-options.h"
 
 static void
 log_handler (const gchar *log_domain,
@@ -123,31 +124,13 @@ dbus_init (GMainLoop *loop)
 int
 main (int argc, char *argv[])
 {
-	GOptionContext *opt_ctx;
-    GError *error = NULL;
     GMainLoop *loop;
     MMManager *manager;
-    gboolean debug = FALSE;
-	GOptionEntry entries[] = {
-		{ "debug", 0, 0, G_OPTION_ARG_NONE, &debug, "Output to console rather than syslog", NULL },
-		{ NULL }
-	};
 
-	opt_ctx = g_option_context_new (NULL);
-	g_option_context_set_summary (opt_ctx, "DBus system service to communicate with modems.");
-	g_option_context_add_main_entries (opt_ctx, entries, NULL);
-
-	if (!g_option_context_parse (opt_ctx, &argc, &argv, &error)) {
-		g_warning ("%s\n", error->message);
-		g_error_free (error);
-		return 1;
-	}
-
-	g_option_context_free (opt_ctx);
-
+    mm_options_parse (argc, argv);
     g_type_init ();
 
-	if (!debug)
+	if (!mm_options_debug ())
 		logging_setup ();
 
     loop = g_main_loop_new (NULL, FALSE);

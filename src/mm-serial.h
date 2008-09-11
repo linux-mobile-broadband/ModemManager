@@ -6,12 +6,12 @@
 #include <glib/gtypes.h>
 #include <glib-object.h>
 
-#define MM_TYPE_SERIAL          (mm_serial_get_type ())
-#define MM_SERIAL(obj)          (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SERIAL, MMSerial))
-#define MM_SERIAL_CLASS(klass)  (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_SERIAL, MMSerialClass))
-#define MM_IS_SERIAL(obj)       (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_SERIAL))
-#define MM_IS_SERIAL_CLASS(klass)   (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_SERIAL))
-#define MM_SERIAL_GET_CLASS(obj)    (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_SERIAL, MMSerialClass))
+#define MM_TYPE_SERIAL            (mm_serial_get_type ())
+#define MM_SERIAL(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SERIAL, MMSerial))
+#define MM_SERIAL_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_SERIAL, MMSerialClass))
+#define MM_IS_SERIAL(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_SERIAL))
+#define MM_IS_SERIAL_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_SERIAL))
+#define MM_SERIAL_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_SERIAL, MMSerialClass))
 
 #define MM_SERIAL_DEVICE     "device"
 #define MM_SERIAL_BAUD       "baud"
@@ -20,66 +20,51 @@
 #define MM_SERIAL_STOPBITS   "stopbits"
 #define MM_SERIAL_SEND_DELAY "send-delay"
 
-typedef struct {
-    GObject parent;
-} MMSerial;
+typedef struct _MMSerial MMSerial;
+typedef struct _MMSerialClass MMSerialClass;
 
-typedef struct {
-    GObjectClass parent;
-} MMSerialClass;
+typedef gboolean (*MMSerialResponseParserFn) (gpointer user_data,
+                                              GString *response,
+                                              GError **error);
 
-GType mm_serial_get_type (void);
-
-typedef void (*MMSerialGetReplyFn)     (MMSerial *serial,
-                                        const char *reply,
-                                        gpointer user_data);
-
-typedef void (*MMSerialWaitForReplyFn) (MMSerial *serial,
-                                        int reply_index,
-                                        gpointer user_data);
-
-typedef void (*MMSerialWaitQuietFn)    (MMSerial *serial,
-                                        gboolean timed_out,
+typedef void (*MMSerialResponseFn)     (MMSerial *serial,
+                                        GString *response,
+                                        GError *error,
                                         gpointer user_data);
 
 typedef void (*MMSerialFlashFn)        (MMSerial *serial,
                                         gpointer user_data);
 
-const char *mm_serial_get_device       (MMSerial *serial);
+struct _MMSerial {
+    GObject parent;
+};
 
-gboolean mm_serial_open                (MMSerial *self);
+struct _MMSerialClass {
+    GObjectClass parent;
+};
 
-void     mm_serial_close               (MMSerial *self);
-gboolean mm_serial_send_command        (MMSerial *self,
-                                        GByteArray *command);
+GType mm_serial_get_type (void);
 
-gboolean mm_serial_send_command_string (MMSerial *self,
-                                        const char *str);
+void     mm_serial_set_response_parser (MMSerial *self,
+                                        MMSerialResponseParserFn fn,
+                                        gpointer user_data,
+                                        GDestroyNotify notify);
 
-guint    mm_serial_get_reply           (MMSerial *self,
-                                        guint timeout,
-                                        const char *terminators,
-                                        MMSerialGetReplyFn callback,
-                                        gpointer user_data);
+gboolean mm_serial_open              (MMSerial *self,
+                                      GError  **error);
 
-guint    mm_serial_wait_for_reply      (MMSerial *self,
-                                        guint timeout,
-                                        char **responses,
-                                        char **terminators,
-                                        MMSerialWaitForReplyFn callback,
-                                        gpointer user_data);
+void     mm_serial_close             (MMSerial *self);
+void     mm_serial_queue_command     (MMSerial *self,
+                                      const char *command,
+                                      guint32 timeout_seconds,
+                                      MMSerialResponseFn callback,
+                                      gpointer user_data);
 
-void     mm_serial_wait_quiet          (MMSerial *self,
-                                        guint timeout, 
-                                        guint quiet_time,
-                                        MMSerialWaitQuietFn callback,
-                                        gpointer user_data);
+guint    mm_serial_flash             (MMSerial *self,
+                                      guint32 flash_time,
+                                      MMSerialFlashFn callback,
+                                      gpointer user_data);
 
-guint    mm_serial_flash               (MMSerial *self,
-                                        guint32 flash_time,
-                                        MMSerialFlashFn callback,
-                                        gpointer user_data);
-
-GIOChannel *mm_serial_get_io_channel   (MMSerial *self);
+const char *mm_serial_get_device     (MMSerial *self);
 
 #endif /* MM_SERIAL_H */

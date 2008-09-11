@@ -15,22 +15,26 @@ modem_manager_SOURCES = \
 	mm-generic-cdma.h \
 	mm-generic-gsm.c \
 	mm-generic-gsm.h \
+	mm-errors.c \
+	mm-errors.h \
 	mm-manager.c \
 	mm-manager.h \
 	mm-modem.c \
 	mm-modem.h \
 	mm-modem-cdma.c \
 	mm-modem-cdma.h \
-	mm-modem-error.c \
-	mm-modem-error.h \
 	mm-modem-gsm-card.c \
 	mm-modem-gsm-card.h \
 	mm-modem-gsm-network.c \
 	mm-modem-gsm-network.h \
+	mm-options.c \
+	mm-options.h \
 	mm-plugin.c \
 	mm-plugin.h \
 	mm-serial.c \
-	mm-serial.h
+	mm-serial.h \
+	mm-serial-parsers.c \
+	mm-serial-parsers.h
 
 mm-manager-glue.h: $(top_srcdir)/introspection/mm-manager.xml
 	dbus-binding-tool --prefix=mm_manager --mode=glib-server --output=$@ $<

@@ -4,7 +4,7 @@
 #include <dbus/dbus-glib.h>
 
 #include "mm-modem-gsm-network.h"
-#include "mm-modem-error.h"
+#include "mm-errors.h"
 #include "mm-callback-info.h"
 
 static void impl_gsm_modem_register (MMModemGsmNetwork *modem,

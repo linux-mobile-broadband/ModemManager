@@ -1,7 +1,7 @@
 /* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
 #include "mm-callback-info.h"
-#include "mm-modem-error.h"
+#include "mm-errors.h"
 
 static void
 callback_info_done (gpointer user_data)
@@ -23,9 +23,10 @@ callback_info_done (gpointer user_data)
     if (info->error)
         g_error_free (info->error);
 
-    g_object_unref (info->modem);
-    g_datalist_clear (&info->qdata);
+    if (info->modem)
+        g_object_unref (info->modem);
 
+    g_datalist_clear (&info->qdata);
     g_slice_free (MMCallbackInfo, info);
 }
 
@@ -41,15 +42,6 @@ void
 mm_callback_info_schedule (MMCallbackInfo *info)
 {
     info->pending_id = g_idle_add_full (G_PRIORITY_DEFAULT_IDLE, callback_info_do, info, callback_info_done);
-}
-
-void
-mm_callback_info_cancel (MMCallbackInfo *info)
-{
-    if (info->pending_id) {
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Call cancelled");
-        mm_callback_info_schedule (info);
-    }
 }
 
 MMCallbackInfo *

@@ -5,7 +5,7 @@
 
 #include "mm-generic-cdma.h"
 #include "mm-modem-cdma.h"
-#include "mm-modem-error.h"
+#include "mm-errors.h"
 #include "mm-callback-info.h"
 
 static gpointer mm_generic_cdma_parent_class = NULL;
@@ -32,21 +32,14 @@ mm_generic_cdma_new (const char *serial_device, const char *driver)
 
 static void
 init_done (MMSerial *serial,
-           int reply_index,
+           GString *response,
+           GError *error,
            gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    switch (reply_index) {
-    case 0:
-        /* success */
-        break;
-    case -1:
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Modem initialization timed out.");
-        break;
-    default:
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Modem initialization failed");
-    }
+    if (error)
+        info->error = g_error_copy (error);
 
     mm_callback_info_schedule (info);
 }
@@ -54,18 +47,7 @@ init_done (MMSerial *serial,
 static void
 flash_done (MMSerial *serial, gpointer user_data)
 {
-    char *responses[] = { "OK", "ERROR", "ERR", NULL };
-    guint id = 0;
-
-    if (mm_serial_send_command_string (serial, "AT E0"))
-        id = mm_serial_wait_for_reply (serial, 10, responses, responses, init_done, user_data);
-
-    if (!id) {
-        MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Turning modem echo off failed.");
-        mm_callback_info_schedule (info);
-    }
+    mm_serial_queue_command (serial, "Z E0 V1 X4 &C1 +CMEE=1", 3, init_done, user_data);
 }
 
 static void
@@ -84,15 +66,8 @@ enable (MMModem *modem,
         return;
     }
 
-    if (mm_serial_open (MM_SERIAL (modem))) {
-        guint id;
-
-        id = mm_serial_flash (MM_SERIAL (modem), 100, flash_done, info);
-        if (!id)
-            info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                       "%s", "Could not communicate with serial device.");
-    } else
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Could not open serial device.");
+    if (mm_serial_open (MM_SERIAL (modem), &info->error))
+        mm_serial_flash (MM_SERIAL (modem), 100, flash_done, info);
 
     if (info->error)
         mm_callback_info_schedule (info);
@@ -100,31 +75,14 @@ enable (MMModem *modem,
 
 static void
 dial_done (MMSerial *serial,
-           int reply_index,
+           GString *response,
+           GError *error,
            gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    switch (reply_index) {
-    case 0:
-        /* success */
-        break;
-    case 1:
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Dial failed: Busy");
-        break;
-    case 2:
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Dial failed: No dial tone");
-        break;
-    case 3:
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Dial failed: No carrier");
-        break;
-    case -1:
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Dialing timed out");
-        break;
-    default:
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Dialing failed");
-        break;
-    }
+    if (error)
+        info->error = g_error_copy (error);
 
     mm_callback_info_schedule (info);
 }
@@ -137,21 +95,17 @@ connect (MMModem *modem,
 {
     MMCallbackInfo *info;
     char *command;
-    char *responses[] = { "CONNECT", "BUSY", "NO DIAL TONE", "NO CARRIER", NULL };
-    guint id = 0;
 
     info = mm_callback_info_new (modem, callback, user_data);
-
-    command = g_strconcat ("ATDT", number, NULL);
-    if (mm_serial_send_command_string (MM_SERIAL (modem), command))
-        id = mm_serial_wait_for_reply (MM_SERIAL (modem), 60, responses, responses, dial_done, info);
-
+    command = g_strconcat ("DT", number, NULL);
+    mm_serial_queue_command (MM_SERIAL (modem), command, 60, dial_done, info);
     g_free (command);
+}
 
-    if (!id) {
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Dialing failed.");
-        mm_callback_info_schedule (info);
-    }
+static void
+disconnect_flash_done (MMSerial *serial, gpointer user_data)
+{
+    mm_callback_info_schedule ((MMCallbackInfo *) user_data);
 }
 
 static void
@@ -162,17 +116,21 @@ disconnect (MMModem *modem,
     MMCallbackInfo *info;
 
     info = mm_callback_info_new (modem, callback, user_data);
-    mm_serial_close (MM_SERIAL (modem));
-    mm_callback_info_schedule (info);
+    mm_serial_flash (MM_SERIAL (modem), 1000, disconnect_flash_done, info);
 }
 
 static void
-get_signal_quality_done (MMSerial *serial, const char *reply, gpointer user_data)
+get_signal_quality_done (MMSerial *serial,
+                         GString *response,
+                         GError *error,
+                         gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    guint32 result = 0;
+    char *reply = response->str;
 
-    if (!strncmp (reply, "+CSQ: ", 6)) {
+    if (error)
+        info->error = g_error_copy (error);
+    else if (!strncmp (reply, "+CSQ: ", 6)) {
         /* Got valid reply */
         int quality;
         int ber;
@@ -183,15 +141,14 @@ get_signal_quality_done (MMSerial *serial, const char *reply, gpointer user_data
             /* 99 means unknown */
             if (quality != 99)
                 /* Normalize the quality */
-                result = quality * 100 / 31;
+                quality = quality * 100 / 31;
+            
+            mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
         } else
             info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
                                        "%s", "Could not parse signal quality results");
-    } else
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                   "%s", "Could not parse signal quality results");
+    }
 
-    mm_callback_info_set_result (info, GUINT_TO_POINTER (result), NULL);
     mm_callback_info_schedule (info);
 }
 
@@ -201,18 +158,9 @@ get_signal_quality (MMModemCdma *modem,
                     gpointer user_data)
 {
     MMCallbackInfo *info;
-    char *terminators = "\r\n";
-    guint id = 0;
 
     info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-
-    if (mm_serial_send_command_string (MM_SERIAL (modem), "AT+CSQ"))
-        id = mm_serial_get_reply (MM_SERIAL (modem), 10, terminators, get_signal_quality_done, info);
-
-    if (!id) {
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Getting signal quality failed.");
-        mm_callback_info_schedule (info);
-    }
+    mm_serial_queue_command (MM_SERIAL (modem), "+CSQ", 3, get_signal_quality_done, info);
 }
 
 /*****************************************************************************/

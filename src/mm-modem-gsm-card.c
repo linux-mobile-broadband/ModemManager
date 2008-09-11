@@ -3,7 +3,7 @@
 #include <dbus/dbus-glib.h>
 
 #include "mm-modem-gsm-card.h"
-#include "mm-modem-error.h"
+#include "mm-errors.h"
 #include "mm-callback-info.h"
 
 static void impl_gsm_modem_get_imei (MMModemGsmCard *modem,
