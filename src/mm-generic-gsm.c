@@ -19,12 +19,15 @@ typedef struct {
     char *oper_code;
     char *oper_name;
     MMModemGsmNetworkRegStatus reg_status;
+    guint32 signal_quality;
     guint32 cid;
-    guint32 pending_id;
 } MMGenericGsmPrivate;
 
 static void get_registration_status (MMSerial *serial, MMCallbackInfo *info);
 static void real_register (MMSerial *serial, const char *network_id, MMCallbackInfo *info);
+static void get_signal_quality (MMModemGsmNetwork *modem,
+                                MMModemUIntFn callback,
+                                gpointer user_data);
 
 MMModem *
 mm_generic_gsm_new (const char *serial_device, const char *driver)
@@ -306,7 +309,7 @@ get_reg_code_done (MMSerial *serial,
             MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (serial);
 
             g_free (priv->oper_code);
-            priv->oper_name = oper;
+            priv->oper_code = oper;
         }
     }
 }
@@ -415,6 +418,7 @@ get_reg_status_done (MMSerial *serial,
                 /* Done */
                 mm_serial_queue_command (serial, "+COPS=3,2;+COPS?", 3, get_reg_code_done, NULL);
                 mm_serial_queue_command (serial, "+COPS=3,0;+COPS?", 3, get_reg_name_done, NULL);
+                get_signal_quality (MM_MODEM_GSM_NETWORK (serial), NULL, NULL);
                 done = TRUE;
                 break;
             case MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE:
@@ -770,7 +774,8 @@ get_signal_quality_done (MMSerial *serial,
             if (quality != 99)
                 /* Normalize the quality */
                 quality = quality * 100 / 31;
-            
+
+            MM_GENERIC_GSM_GET_PRIVATE (serial)->signal_quality = quality;
             mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
         } else
             info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
@@ -786,6 +791,12 @@ get_signal_quality (MMModemGsmNetwork *modem,
                     gpointer user_data)
 {
     MMCallbackInfo *info;
+
+    if (mm_serial_is_connected (MM_SERIAL (modem))) {
+        g_message ("Returning saved signal quality %d", MM_GENERIC_GSM_GET_PRIVATE (modem)->signal_quality);
+        callback (MM_MODEM (modem), MM_GENERIC_GSM_GET_PRIVATE (modem)->signal_quality, NULL, user_data);
+        return;
+    }
 
     info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
     mm_serial_queue_command (MM_SERIAL (modem), "+CSQ", 3, get_signal_quality_done, info);
@@ -871,11 +882,6 @@ static void
 finalize (GObject *object)
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (object);
-
-    if (priv->pending_id) {
-        g_source_remove (priv->pending_id);
-        priv->pending_id = 0;
-    }
 
     g_free (priv->driver);
     g_free (priv->oper_code);
