@@ -162,7 +162,7 @@ mm_serial_parser_v1_parse (gpointer data,
 {
     MMSerialParserV1 *parser = (MMSerialParserV1 *) data;
     GMatchInfo *match_info;
-    const char *msg;
+    GError *local_error;
     int code;
     gboolean found = FALSE;
 
@@ -181,6 +181,7 @@ mm_serial_parser_v1_parse (gpointer data,
 
     /* Now failures */
     code = MM_MOBILE_ERROR_UNKNOWN;
+    local_error = NULL;
 
     found = g_regex_match_full (parser->regex_detailed_error,
                                 response->str, response->len,
@@ -198,19 +199,9 @@ mm_serial_parser_v1_parse (gpointer data,
     } else 
         found = g_regex_match_full (parser->regex_unknown_error, response->str, response->len, 0, 0, NULL, NULL);
 
-    if (found) {
-#if 0
-        /* FIXME: This does not work for some reason. */
-        GEnumValue *enum_value;
-
-        enum_value = g_enum_get_value ((GEnumClass *) g_type_class_peek_static (), code);
-        msg = enum_value->value_nick;
-#endif
-        msg = "FIXME";
-
-        g_debug ("Got error code %d: %s", code, msg);
-        g_set_error (error, MM_MOBILE_ERROR, code, "%s", msg);
-    } else {
+    if (found)
+        local_error = mm_mobile_error_for_code (code);
+    else {
         found = g_regex_match_full (parser->regex_connect_failed,
                                     response->str, response->len,
                                     0, 0, &match_info, NULL);
@@ -219,36 +210,32 @@ mm_serial_parser_v1_parse (gpointer data,
 
             str = g_match_info_fetch (match_info, 1);
             if (str) {
-                if (!strcmp (str, "NO CARRIER")) {
+                if (!strcmp (str, "NO CARRIER"))
                     code = MM_MODEM_CONNECT_ERROR_NO_CARRIER;
-                    msg = "No carrier";
-                } else if (!strcmp (str, "BUSY")) {
+                else if (!strcmp (str, "BUSY"))
                     code = MM_MODEM_CONNECT_ERROR_BUSY;
-                    msg = "Busy";
-                } else if (!strcmp (str, "NO ANSWER")) {
+                else if (!strcmp (str, "NO ANSWER"))
                     code = MM_MODEM_CONNECT_ERROR_NO_ANSWER;
-                    msg = "No answer";
-                } else if (!strcmp (str, "NO DIALTONE")) {
+                else if (!strcmp (str, "NO DIALTONE"))
                     code = MM_MODEM_CONNECT_ERROR_NO_DIALTONE;
-                    msg = "No dialtone";
-                } else {
-                    g_warning ("Got matching connect failure, but can't parse it");
+                else
                     /* uhm... make something up (yes, ok, lie!). */
                     code = MM_MODEM_CONNECT_ERROR_NO_CARRIER;
-                    msg = "No carrier";
-                }
 
                 g_free (str);
             }
             g_match_info_free (match_info);
 
-            g_debug ("Got connect failure code %d: %s", code, msg);
-            g_set_error (error, MM_MODEM_CONNECT_ERROR, code, "%s", msg);
+            local_error = mm_modem_connect_error_for_code (code);
         }
     }
 
-    return found;
+    if (local_error) {
+        g_debug ("Got failure code %d: %s", local_error->code, local_error->message);
+        g_propagate_error (error, local_error);
+    }
 
+    return found;
 }
 
 void

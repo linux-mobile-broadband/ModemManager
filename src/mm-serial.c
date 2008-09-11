@@ -376,9 +376,9 @@ mm_serial_timed_out (gpointer data)
 
     priv->timeout_id = 0;
 
-    error = g_error_new (MM_SERIAL_ERROR,
-                         MM_SERIAL_RESPONSE_TIMEOUT,
-                         "%s", "Serial command timed out");
+    error = g_error_new_literal (MM_SERIAL_ERROR,
+                                 MM_SERIAL_RESPONSE_TIMEOUT,
+                                 "Serial command timed out");
     /* FIXME: This is not completely correct - if the response finally arrives and there's
        some other command waiting for response right now, the other command will
        get the output of the timed out command. Maybe flashing would help here? */
@@ -479,6 +479,8 @@ data_available (GIOChannel *source,
 
         if (parse_response (self, priv->response, &err))
             mm_serial_got_response (self, err);
+
+        /* FIXME: Make sure the string doesn't grow too long */
 
     } while (bytes_read == SERIAL_BUF_SIZE || status == G_IO_STATUS_AGAIN);
 

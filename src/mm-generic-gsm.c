@@ -672,7 +672,8 @@ scan_done (MMSerial *serial,
 		if (err) {
 			g_error ("Invalid regular expression: %s", err->message);
 			g_error_free (err);
-            info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Could not parse scan results.");
+            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                               "Could not parse scan results.");
             goto out;
 		}
 
@@ -777,8 +778,8 @@ get_signal_quality_done (MMSerial *serial,
             MM_GENERIC_GSM_GET_PRIVATE (serial)->signal_quality = quality;
             mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
         } else
-            info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                       "%s", "Could not parse signal quality results");
+            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                               "Could not parse signal quality results");
     }
 
     mm_callback_info_schedule (info);

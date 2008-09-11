@@ -40,8 +40,9 @@ enum {
 #define MM_MODEM_CONNECT_ERROR (mm_modem_connect_error_quark ())
 #define MM_TYPE_MODEM_CONNECT_ERROR (mm_modem_connect_error_get_type ())
 
-GQuark mm_modem_connect_error_quark    (void);
-GType  mm_modem_connect_error_get_type (void);
+GQuark  mm_modem_connect_error_quark    (void);
+GType   mm_modem_connect_error_get_type (void);
+GError *mm_modem_connect_error_for_code (int error_code);
 
 
 enum {
@@ -104,7 +105,8 @@ enum {
 #define MM_MOBILE_ERROR (mm_mobile_error_quark ())
 #define MM_TYPE_MOBILE_ERROR (mm_mobile_error_get_type ())
 
-GQuark mm_mobile_error_quark    (void);
-GType  mm_mobile_error_get_type (void);
+GQuark  mm_mobile_error_quark    (void);
+GType   mm_mobile_error_get_type (void);
+GError *mm_mobile_error_for_code (int error_code);
 
 #endif /* MM_MODEM_ERROR_H */
