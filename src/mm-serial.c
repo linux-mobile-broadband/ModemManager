@@ -477,11 +477,15 @@ data_available (GIOChannel *source,
             g_string_append_len (priv->response, buf, bytes_read);
         }
 
+        /* Make sure the string doesn't grow too long */
+		if (priv->response->len > SERIAL_BUF_SIZE) {
+			g_warning ("%s (%s): response buffer filled before repsonse received",
+			           G_STRFUNC, mm_serial_get_device (self));
+			g_string_erase (priv->response, 0, (SERIAL_BUF_SIZE / 2));
+        }
+
         if (parse_response (self, priv->response, &err))
             mm_serial_got_response (self, err);
-
-        /* FIXME: Make sure the string doesn't grow too long */
-
     } while (bytes_read == SERIAL_BUF_SIZE || status == G_IO_STATUS_AGAIN);
 
     return TRUE;
