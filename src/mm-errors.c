@@ -179,7 +179,7 @@ mm_mobile_error_get_type (void)
             ENUM_ENTRY (MM_MOBILE_ERROR_CORP_PIN,                  "CorporatePinRequired"),
             ENUM_ENTRY (MM_MOBILE_ERROR_CORP_PUK,                  "CorporatePukRequired"),
             ENUM_ENTRY (MM_MOBILE_ERROR_HIDDEN_KEY,                "HiddenKeyRequired"),
-            ENUM_ENTRY (MM_MOBILE_ERROR_EAP_NOT_SUPPORTED,         "EAPMethodNotSupported"),
+            ENUM_ENTRY (MM_MOBILE_ERROR_EAP_NOT_SUPPORTED,         "EapMethodNotSupported"),
             ENUM_ENTRY (MM_MOBILE_ERROR_INCORRECT_PARAMS,          "IncorrectParams"),
             ENUM_ENTRY (MM_MOBILE_ERROR_UNKNOWN,                   "Unknown"),
             ENUM_ENTRY (MM_MOBILE_ERROR_GPRS_ILLEGAL_MS,           "GprsIllegalMs"),
@@ -193,12 +193,11 @@ mm_mobile_error_get_type (void)
             ENUM_ENTRY (MM_MOBILE_ERROR_GPRS_OUT_OF_ORDER,         "GprsOutOfOrder"),
             ENUM_ENTRY (MM_MOBILE_ERROR_GPRS_PDP_AUTH_FAILURE,     "GprsPdpAuthFailure"),
             ENUM_ENTRY (MM_MOBILE_ERROR_GPRS_UNKNOWN,              "GprsUnspecified"),
-            ENUM_ENTRY (MM_MOBILE_ERROR_GPRS_INVALID_CLASS,        "GprsInvalidclass"),
+            ENUM_ENTRY (MM_MOBILE_ERROR_GPRS_INVALID_CLASS,        "GprsInvalidClass"),
 			{ 0, 0, 0 }
 		};
 
 		etype = g_enum_register_static ("MMMobileError", values);
-        g_print ("Is enum? %d %d\n", etype, G_TYPE_IS_ENUM (etype));
 	}
 
 	return etype;
