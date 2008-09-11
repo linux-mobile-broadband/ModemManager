@@ -203,7 +203,7 @@ add_modem (MMManager *manager, const char *udi, MMModem *modem)
     g_hash_table_insert (priv->modems, g_strdup (udi), modem);
     dbus_g_connection_register_g_object (priv->connection, udi, G_OBJECT (modem));
 
-    g_signal_emit (manager, signals[DEVICE_ADDED], 0, modem);
+    g_signal_emit (manager, signals[DEVICE_ADDED], 0, udi);
 }
 
 static MMModem *
@@ -349,7 +349,7 @@ device_removed (LibHalContext *ctx, const char *udi)
     modem = modem_exists (manager, udi);
     if (modem) {
         g_debug ("Removed modem %s", udi);
-        g_signal_emit (manager, signals[DEVICE_REMOVED], 0, modem);
+        g_signal_emit (manager, signals[DEVICE_REMOVED], 0, udi);
         g_hash_table_remove (MM_MANAGER_GET_PRIVATE (manager)->modems, udi);
     }
 }
@@ -437,9 +437,9 @@ mm_manager_class_init (MMManagerClass *manager_class)
                       G_SIGNAL_RUN_FIRST,
                       G_STRUCT_OFFSET (MMManagerClass, device_added),
                       NULL, NULL,
-                      g_cclosure_marshal_VOID__OBJECT,
+                      g_cclosure_marshal_VOID__STRING,
                       G_TYPE_NONE, 1,
-                      G_TYPE_OBJECT);
+                      G_TYPE_STRING);
 
     signals[DEVICE_REMOVED] =
         g_signal_new ("device-removed",
@@ -447,18 +447,16 @@ mm_manager_class_init (MMManagerClass *manager_class)
                       G_SIGNAL_RUN_FIRST,
                       G_STRUCT_OFFSET (MMManagerClass, device_removed),
                       NULL, NULL,
-                      g_cclosure_marshal_VOID__OBJECT,
+                      g_cclosure_marshal_VOID__STRING,
                       G_TYPE_NONE, 1,
-                      G_TYPE_OBJECT);
+                      G_TYPE_STRING);
 
     dbus_g_object_type_install_info (G_TYPE_FROM_CLASS (manager_class),
 									 &dbus_glib_mm_manager_object_info);
 
     /* FIXME: Sigh, these don't work either */
-    dbus_g_error_domain_register (MM_SERIAL_ERROR, NULL, MM_TYPE_SERIAL_ERROR);
-#if 0
-	dbus_g_error_domain_register (MM_MODEM_ERROR, NULL, MM_TYPE_MODEM_ERROR);
-    dbus_g_error_domain_register (MM_MODEM_CONNECT_ERROR, NULL, MM_TYPE_MODEM_CONNECT_ERROR);
-    dbus_g_error_domain_register (MM_MOBILE_ERROR, NULL, MM_TYPE_MOBILE_ERROR);
-#endif
+    dbus_g_error_domain_register (MM_SERIAL_ERROR, "org.freedesktop.ModemManager.Modem", MM_TYPE_SERIAL_ERROR);
+	dbus_g_error_domain_register (MM_MODEM_ERROR, "org.freedesktop.ModemManager.Modem", MM_TYPE_MODEM_ERROR);
+    dbus_g_error_domain_register (MM_MODEM_CONNECT_ERROR, "org.freedesktop.ModemManager.Modem", MM_TYPE_MODEM_CONNECT_ERROR);
+    dbus_g_error_domain_register (MM_MOBILE_ERROR, "org.freedesktop.ModemManager.Modem.Gsm", MM_TYPE_MOBILE_ERROR);
 }

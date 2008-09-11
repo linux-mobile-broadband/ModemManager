@@ -25,8 +25,8 @@ typedef struct {
     GObjectClass parent;
 
     /* Signals */
-    void (*device_added) (MMManager *manager, MMModem *device);
-    void (*device_removed) (MMManager *manager, MMModem *device);
+    void (*device_added) (MMManager *manager, const char *device_udi);
+    void (*device_removed) (MMManager *manager, const char *device_udi);
 } MMManagerClass;
 
 GType mm_manager_get_type (void);
