@@ -1,0 +1,1524 @@
+diff --git a/configure.ac b/configure.ac
+index 9e64b77..77ad2ac 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -221,6 +221,7 @@ src/utils/Makefile
+ src/gconf-helpers/Makefile
+ src/wireless-security/Makefile
+ src/connection-editor/Makefile
++src/modems/Makefile
+ icons/Makefile
+ po/Makefile.in
+ ])
+diff --git a/src/Makefile.am b/src/Makefile.am
+index de8ccb4..2be2217 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -1,4 +1,4 @@
+-SUBDIRS = marshallers utils gconf-helpers wireless-security connection-editor
++SUBDIRS = marshallers utils gconf-helpers wireless-security connection-editor modems
+ 
+ NULL=
+ 
+@@ -49,6 +49,9 @@ nm_applet_SOURCES =			\
+ 	applet-device-gsm.c \
+ 	applet-device-cdma.h \
+ 	applet-device-cdma.c \
++	mm-types.h \
++	nma-gsm-modem.c \
++	nma-gsm-modem.h \
+ 	$(NULL)
+ 
+ nm_applet_LDADD = \
+diff --git a/src/applet-device-gsm.c b/src/applet-device-gsm.c
+index 1641661..f0a31e6 100644
+--- a/src/applet-device-gsm.c
++++ b/src/applet-device-gsm.c
+@@ -24,6 +24,9 @@
+ #include <config.h>
+ #endif
+ 
++#include <sys/types.h>
++#include <unistd.h>
++
+ #include <glib/gi18n.h>
+ #include <gtk/gtkwidget.h>
+ #include <gtk/gtkmenuitem.h>
+@@ -39,6 +42,8 @@
+ 
+ #include "applet.h"
+ #include "applet-device-gsm.h"
++#include "nma-gsm-modem.h"
++#include "mm-types.h"
+ #include "utils.h"
+ 
+ typedef struct {
+@@ -165,6 +170,50 @@ add_default_connection_item (NMDevice *device,
+ }
+ 
+ static void
++child_setup (gpointer user_data G_GNUC_UNUSED)
++{
++	/* We are in the child process at this point */
++	pid_t pid = getpid ();
++	setpgid (pid, pid);
++}
++
++static void
++gsm_properties_cb (GtkMenuItem *mi, gpointer user_data)
++{
++	NMDevice *device = NM_DEVICE (user_data);
++	char *argv[3];
++	GError *error = NULL;
++	gboolean success;
++
++	argv[0] = BINDIR "/nm-modem-properties";
++	argv[1] = (char *) nm_device_get_udi (device);
++	argv[2] = NULL;
++
++	success = g_spawn_async ("/", argv, NULL, 0, &child_setup, NULL, NULL, &error);
++	if (!success) {
++		g_warning ("Error launching modem properties dialog: %s", error->message);
++		g_error_free (error);
++	}
++}
++
++static void
++add_properties_item (NMDevice *device,
++                     GtkWidget *menu)
++{
++	GtkWidget *item;
++
++	if (nm_device_get_state (device) != NM_DEVICE_STATE_DISCONNECTED)
++		return;
++
++	item = gtk_menu_item_new_with_label (_("Properties"));
++	g_signal_connect (item, "activate",
++				   G_CALLBACK (gsm_properties_cb),
++				   device);
++
++	gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
++}
++
++static void
+ gsm_menu_item_deactivate (GtkMenuItem *item, gpointer user_data)
+ {
+ 	GSMMenuItemInfo *info = (GSMMenuItemInfo *) user_data;
+@@ -270,23 +319,66 @@ gsm_add_menu_item (NMDevice *device,
+ 		add_connection_items (device, connections, active, menu, applet);
+ 	else
+ 		add_default_connection_item (device, menu, applet);
++
+ 	add_disconnect_item (device, menu, applet);
++	add_properties_item (device, menu);
+ 
+ out:
+ 	g_slist_free (connections);
+ }
+ 
+ static void
++signal_quality_changed (NMAGsmModem *modem, guint32 quality, gpointer user_data)
++{
++	applet_schedule_update_icon (NM_APPLET (user_data));
++}
++
++static void
+ gsm_device_state_changed (NMDevice *device,
+                           NMDeviceState state,
+                           NMApplet *applet)
+ {
+-	if (state == NM_DEVICE_STATE_ACTIVATED) {
+-		applet_do_notify (applet, NOTIFY_URGENCY_LOW,
+-					      _("Connection Established"),
+-						  _("You are now connected to the GSM network."),
+-						  "nm-device-wwan", NULL, NULL, NULL, NULL);
++	NMAGsmModem *modem;
++	char *oper_code;
++	char *oper_name;
++	char *msg;
++	guint32 reg_status;
++
++	if (state != NM_DEVICE_STATE_ACTIVATED)
++		return;
++
++	modem = (NMAGsmModem *) g_object_get_data (G_OBJECT (device), "gsm-modem");
++	if (!modem) {
++			DBusGConnection *bus;
++
++			bus = dbus_g_bus_get (DBUS_BUS_SYSTEM, NULL);
++			if (!bus)
++				return;
++
++			modem = nma_gsm_modem_new (bus, nm_device_get_udi (device));
++			dbus_g_connection_unref (bus);
++
++			g_object_set_data_full (G_OBJECT (device), "gsm-modem", modem, g_object_unref);
++
++			g_signal_connect (modem, "signal-quality",
++						   G_CALLBACK (signal_quality_changed),
++						   applet);
+ 	}
++
++	oper_code = NULL;
++	oper_name = NULL;
++	reg_status = nma_gsm_modem_get_registration_info (modem, &oper_code, &oper_name);
++	msg = g_strdup_printf (_("You are now connected to the %s GSM network '%s'."),
++					   reg_status == MM_GSM_MODEM_REG_STATUS_ROAMING ? _("roaming") : _("home"),
++					   oper_name);
++
++	applet_do_notify (applet, NOTIFY_URGENCY_LOW,
++				   _("Connection Established"), msg,
++				   "nm-device-wwan", NULL, NULL, NULL, NULL);
++
++	g_free (oper_code);
++	g_free (oper_name);
++	g_free (msg);
+ }
+ 
+ static GdkPixbuf *
+@@ -295,6 +387,7 @@ gsm_get_icon (NMDevice *device,
+               char **tip,
+               NMApplet *applet)
+ {
++	NMAGsmModem *modem;
+ 	GdkPixbuf *pixbuf = NULL;
+ 	const char *iface;
+ 
+@@ -311,8 +404,40 @@ gsm_get_icon (NMDevice *device,
+ 		*tip = g_strdup_printf (_("Waiting for user authentication on device '%s'..."), iface);
+ 		break;
+ 	case NM_DEVICE_STATE_ACTIVATED:
+-		*tip = g_strdup (_("GSM connection"));
+-		pixbuf = applet->wwan_icon;
++		modem = (NMAGsmModem *) g_object_get_data (G_OBJECT (device), "gsm-modem");
++		if (modem) {
++			char *oper_code;
++			char *oper_name;
++			guint32 reg_status;
++			guint32 quality;
++
++			quality = nma_gsm_modem_get_signal_quality (modem);
++			quality = CLAMP (quality, 0, 100);
++
++			if (quality > 80)
++				pixbuf = applet->wireless_100_icon;
++			else if (quality > 55)
++				pixbuf = applet->wireless_75_icon;
++			else if (quality > 30)
++				pixbuf = applet->wireless_50_icon;
++			else if (quality > 5)
++				pixbuf = applet->wireless_25_icon;
++			else
++				pixbuf = applet->wireless_00_icon;
++
++			reg_status = nma_gsm_modem_get_registration_info (modem, &oper_code, &oper_name);
++			*tip = g_strdup_printf (_("%s GSM connection '%s' (%d%%)"),
++							    reg_status == MM_GSM_MODEM_REG_STATUS_ROAMING ? _("Roaming") : _("Home"),
++			                        oper_name, quality);
++
++			g_free (oper_name);
++			g_free (oper_code);
++
++		} else {
++			pixbuf = applet->wireless_00_icon;
++			*tip = g_strdup_printf (_("GSM connection"));
++		}
++
+ 		break;
+ 	default:
+ 		break;
+diff --git a/src/mm-types.h b/src/mm-types.h
+new file mode 100644
+index 0000000..a1f9979
+--- /dev/null
++++ b/src/mm-types.h
+@@ -0,0 +1,18 @@
++/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
++
++#ifndef MM_TYPES_H
++#define MM_TYPES_H
++
++#define MM_DBUS_SERVICE "org.freedesktop.ModemManager"
++#define MM_DBUS_INTERFACE_MODEM_GSM "org.freedesktop.ModemManager.Modem.Gsm.Network"
++
++enum {
++  MM_GSM_MODEM_REG_STATUS_IDLE = 0,
++  MM_GSM_MODEM_REG_STATUS_HOME = 1,
++  MM_GSM_MODEM_REG_STATUS_SEARCHING = 2,
++  MM_GSM_MODEM_REG_STATUS_DENIED = 3,
++  MM_GSM_MODEM_REG_STATUS_UNKNOWN = 4,
++  MM_GSM_MODEM_REG_STATUS_ROAMING = 5
++};
++
++#endif /* MM_TYPES_H */
+diff --git a/src/modems/Makefile.am b/src/modems/Makefile.am
+new file mode 100644
+index 0000000..206ee52
+--- /dev/null
++++ b/src/modems/Makefile.am
+@@ -0,0 +1,25 @@
++bin_PROGRAMS = nm-modem-properties
++
++nm_modem_properties_CPPFLAGS = \
++	$(NMA_CFLAGS)				\
++	-DICONDIR=\""$(datadir)/icons"\"	\
++	-DGLADEDIR=\""$(gladedir)"\"		\
++	-DBINDIR=\""$(bindir)"\"		\
++	-DSYSCONFDIR=\""$(sysconfdir)"\"	\
++	-DLIBDIR=\""$(libdir)"\"	\
++	-DNMALOCALEDIR=\"$(datadir)/locale\"	\
++	$(DBUS_CFLAGS)				\
++	-I${top_srcdir}/src/gconf-helpers
++
++nm_modem_properties_SOURCES = \
++	main.c
++
++nm_modem_properties_LDADD = \
++	$(top_builddir)/src/gconf-helpers/libgconf-helpers.la \
++	$(NMA_LIBS)
++
++gladedir = $(datadir)/nm-applet
++glade_DATA = nm-modem-properties.glade
++
++CLEANFILES = *.bak *.gladep
++EXTRA_DIST = $(glade_DATA)
+diff --git a/src/modems/main.c b/src/modems/main.c
+new file mode 100644
+index 0000000..27e700c
+--- /dev/null
++++ b/src/modems/main.c
+@@ -0,0 +1,592 @@
++/* -*- Mode: C; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*- */
++
++#include <string.h>
++#include <gtk/gtk.h>
++#include <glade/glade.h>
++#include <dbus/dbus-glib.h>
++#include <gconf/gconf-client.h>
++#include <nm-connection.h>
++#include <nm-setting-connection.h>
++#include <nm-setting-gsm.h>
++#include <nm-setting-serial.h>
++#include <nm-setting-ppp.h>
++#include <nm-utils.h>
++#include "gconf-helpers.h"
++
++#define MM_DBUS_SERVICE              "org.freedesktop.ModemManager"
++#define MM_DBUS_PATH                 "/org/freedesktop/ModemManager"
++#define MM_DBUS_INTERFACE            "org.freedesktop.ModemManager"
++#define MM_DBUS_INTERFACE_MODEM      "org.freedesktop.ModemManager.Modem"
++
++#define MM_DBUS_INTERFACE_MODEM_GSM_CARD    "org.freedesktop.ModemManager.Modem.Gsm.Card"
++#define MM_DBUS_INTERFACE_MODEM_GSM_NETWORK "org.freedesktop.ModemManager.Modem.Gsm.Network"
++
++#define MM_MODEM_TYPE_UNKNOWN  0
++#define MM_MODEM_TYPE_GSM      1
++#define MM_MODEM_TYPE_CDMA     2
++
++#define SCAN_COL_NAME    0
++#define SCAN_COL_STATUS  1
++#define SCAN_COL_OPER_ID 2
++
++typedef struct {
++	/* UI */
++	GladeXML *glade_xml;
++	GtkDialog *main_dialog;
++	GtkTable *info_table;
++	GtkTreeView *network_list;
++	GtkListStore *network_store;
++	GtkWidget *scan_button;
++	GtkWidget *create_net_button;
++	GtkLabel *signal_quality_label;
++
++	GtkDialog *create_network_dialog;
++	GtkEntry *create_network_name;
++
++	/* DBus */
++	DBusGConnection *bus;
++	DBusGProxy *proxy;
++	DBusGProxy *gsm_net_proxy;
++
++	GMainLoop *main_loop;
++} AppData;
++
++
++typedef struct {
++	GtkTable *table;
++	char *label;
++	guint row;
++} InfoData;
++
++static InfoData *
++info_data_new (GtkTable *table, const char *label, guint row)
++{
++	InfoData *info;
++
++	info = g_slice_new (InfoData);
++	info->table = table;
++	info->label = g_strdup (label);
++	info->row = row;
++
++	return info;
++}
++
++static void
++info_data_free (gpointer data)
++{
++	InfoData *info = (InfoData *) data;
++
++	g_free (info->label);
++	g_slice_free (InfoData, data);
++}
++
++static void
++add_info_row (GtkTable *table, guint row, const char *label, const char *value)
++{
++	GtkWidget *w;
++
++	w = gtk_label_new (label);
++	gtk_misc_set_alignment (GTK_MISC (w), 0.0, 0.0);
++	gtk_widget_show (w);
++	gtk_table_attach_defaults (table, w, 0, 1, row, row + 1);
++
++	w = gtk_label_new (value);
++	gtk_misc_set_alignment (GTK_MISC (w), 0.0, 0.0);
++	gtk_widget_show (w);
++	gtk_table_attach_defaults (table, w, 1, 2, row, row + 1);
++}
++
++static void
++get_str_done (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data)
++{
++	InfoData *info = (InfoData *) user_data;
++	char *result = NULL;
++	GError *error = NULL;
++
++	if (!dbus_g_proxy_end_call (proxy, call_id, &error, G_TYPE_STRING, &result, G_TYPE_INVALID)) {
++		g_warning ("Couldn't get %s: %s", info->label, error->message);
++		g_error_free (error);
++	} else {
++		add_info_row (info->table, info->row, info->label, result);
++		g_free (result);
++	}
++}
++
++static void
++get_card_info_done (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data)
++{
++	GtkTable *table = GTK_TABLE (user_data);
++	char *manufacturer = NULL;
++	char *model = NULL;
++	char *version = NULL;
++	GError *error = NULL;
++
++	if (!dbus_g_proxy_end_call (proxy, call_id, &error,
++								G_TYPE_STRING, &manufacturer,
++								G_TYPE_STRING, &model,
++								G_TYPE_STRING, &version,
++								G_TYPE_INVALID)) {
++		g_warning ("Couldn't get modem information: %s", error->message);
++		g_error_free (error);
++	} else {
++		add_info_row (table, 0, "Vendor", manufacturer);
++		g_free (manufacturer);
++
++		add_info_row (table, 1, "Model", model);
++		g_free (model);
++
++		add_info_row (table, 2, "Version", version);
++		g_free (version);
++	}
++}
++
++static void
++get_property_done (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data)
++{
++	InfoData *info = (InfoData *) user_data;
++	GValue value = { 0, };
++	GError *error = NULL;
++
++	if (!dbus_g_proxy_end_call (proxy, call_id, &error, G_TYPE_VALUE, &value, G_TYPE_INVALID)) {
++		g_warning ("Couldn't get %s: %s", info->label, error->message);
++		g_error_free (error);
++	} else {
++		add_info_row (info->table, info->row, info->label, g_value_get_string (&value));
++		g_value_unset (&value);
++	}
++}
++
++static gboolean
++get_info (gpointer data)
++{
++	AppData *app_data = (AppData *) data;
++
++	dbus_g_proxy_set_interface (app_data->proxy, MM_DBUS_INTERFACE_MODEM_GSM_CARD);
++	dbus_g_proxy_begin_call (app_data->proxy, "GetImsi", get_str_done,
++							 info_data_new (app_data->info_table, "IMSI", 5), info_data_free,
++							 G_TYPE_INVALID);
++
++	dbus_g_proxy_begin_call (app_data->proxy, "GetImei", get_str_done,
++							 info_data_new (app_data->info_table, "IMEI", 6), info_data_free,
++							 G_TYPE_INVALID);
++
++	dbus_g_proxy_begin_call (app_data->proxy, "GetInfo", get_card_info_done,
++							 app_data->info_table, NULL,
++							 G_TYPE_INVALID);
++
++	dbus_g_proxy_set_interface (app_data->proxy, "org.freedesktop.DBus.Properties");
++
++	dbus_g_proxy_begin_call (app_data->proxy, "Get", get_property_done,
++							 info_data_new (app_data->info_table, "Driver", 3), info_data_free,
++							 G_TYPE_STRING, MM_DBUS_INTERFACE_MODEM,
++							 G_TYPE_STRING, "Driver",
++							 G_TYPE_INVALID);
++
++	dbus_g_proxy_begin_call (app_data->proxy, "Get", get_property_done,
++							 info_data_new (app_data->info_table, "Data device", 4), info_data_free,
++							 G_TYPE_STRING, MM_DBUS_INTERFACE_MODEM,
++							 G_TYPE_STRING, "DataDevice",
++							 G_TYPE_INVALID);
++
++	return FALSE;
++}
++
++static void
++got_signal_quality (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data)
++{
++	AppData *app_data = (AppData *) user_data;
++	guint32 quality = 0;
++	GError *error = NULL;
++
++	if (!dbus_g_proxy_end_call (proxy, call_id, &error, G_TYPE_UINT, &quality, G_TYPE_INVALID)) {
++		g_warning ("Couldn't get signal quality: %s", error->message);
++		g_error_free (error);
++	} else {
++		char *tmp;
++
++		tmp = g_strdup_printf ("%d%%", quality);
++		gtk_label_set_text (app_data->signal_quality_label, tmp);
++		g_free (tmp);
++	}
++}
++
++static void
++signal_quality_changed (DBusGProxy *proxy,
++						guint32 signal_quality,
++						gpointer user_data)
++{
++	AppData *app_data = (AppData *) user_data;
++	char *tmp;
++
++	tmp = g_strdup_printf ("%d%%", signal_quality);
++	gtk_label_set_text (app_data->signal_quality_label, tmp);
++	g_free (tmp);
++}
++
++static gboolean
++monitor_signal_quality (gpointer data)
++{
++	AppData *app_data = (AppData *) data;
++	GtkWidget *w;
++
++	w = gtk_label_new ("Signal Quality");
++	gtk_misc_set_alignment (GTK_MISC (w), 0.0, 0.0);	
++	gtk_widget_show (w);
++	gtk_table_attach_defaults (app_data->info_table, w, 0, 1, 7, 8);
++
++	w = gtk_label_new ("");
++	gtk_misc_set_alignment (GTK_MISC (w), 0.0, 0.0);
++	gtk_widget_show (w);
++	gtk_table_attach_defaults (app_data->info_table, w, 1, 2, 7, 8);
++	app_data->signal_quality_label = GTK_LABEL (w);
++
++	dbus_g_proxy_add_signal (app_data->gsm_net_proxy, "SignalQuality", G_TYPE_UINT, G_TYPE_INVALID);
++	dbus_g_proxy_connect_signal (app_data->gsm_net_proxy, "SignalQuality",
++								 G_CALLBACK (signal_quality_changed),
++								 app_data,
++								 NULL);
++
++	dbus_g_proxy_begin_call (app_data->gsm_net_proxy, "GetSignalQuality", got_signal_quality,
++							 app_data, NULL,
++							 G_TYPE_INVALID);
++
++	return FALSE;
++}
++
++static void
++got_scan_results (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data)
++{
++	AppData *app_data = (AppData *) user_data;
++	GPtrArray *array = NULL;
++	GError *error = NULL;
++	GType type;
++
++	type = dbus_g_type_get_collection ("GPtrArray", DBUS_TYPE_G_STRING_STRING_HASHTABLE);
++
++	if (!dbus_g_proxy_end_call (proxy, call_id, &error, type, &array, G_TYPE_INVALID)) {
++		g_warning ("Couldn't scan: %s", error->message);
++		g_error_free (error);
++	} else {
++		GtkTreeIter iter;
++		int i;
++
++		for (i = 0; i < array->len; i++) {
++			GHashTable *hash = (GHashTable *) g_ptr_array_index (array, i);
++			char *status;
++			const char *status_str;
++
++			status = g_hash_table_lookup (hash, "status");
++			if (!strcmp (status, "1"))
++				status_str = "Available";
++			else if (!strcmp (status, "2"))
++				status_str = "Current";
++			else if (!strcmp (status, "3"))
++				status_str = "Forbidden";
++			else
++				status_str = "Unknown";
++
++			gtk_list_store_append (app_data->network_store, &iter);
++			gtk_list_store_set (app_data->network_store, &iter,
++								SCAN_COL_NAME, g_hash_table_lookup (hash, "operator-long"),
++								SCAN_COL_STATUS, status_str,
++								SCAN_COL_OPER_ID, g_hash_table_lookup (hash, "operator-num"),
++								-1);
++
++			g_hash_table_destroy (hash);
++		}
++
++		g_ptr_array_free (array, TRUE);
++	}
++
++	gtk_widget_set_sensitive (app_data->scan_button, TRUE);
++}
++
++static void
++scan (GtkButton *button, gpointer user_data)
++{
++	AppData *app_data = (AppData *) user_data;
++
++	dbus_g_proxy_begin_call (app_data->gsm_net_proxy, "Scan", got_scan_results,
++							 app_data, NULL,
++							 G_TYPE_INVALID);
++
++	gtk_widget_set_sensitive (app_data->scan_button, FALSE);
++	gtk_list_store_clear (app_data->network_store);
++	/* FIXME: Add "Scanning..." dialog */
++}
++
++static void
++modem_enabled (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data)
++{
++	AppData *app_data = (AppData *) user_data;
++	GError *error = NULL;
++
++	if (!dbus_g_proxy_end_call (proxy, call_id, &error, G_TYPE_INVALID)) {
++		g_warning ("Couldn't enable modem: %s", error->message);
++		g_error_free (error);
++		g_main_loop_quit (app_data->main_loop);
++		return;
++	}
++
++	g_idle_add (get_info, app_data);
++	g_idle_add (monitor_signal_quality, app_data);
++}
++
++static void
++modem_enable (AppData *app_data)
++{
++	dbus_g_proxy_begin_call (app_data->proxy, "Enable", modem_enabled,
++ 							 app_data, NULL,
++ 							 G_TYPE_BOOLEAN, TRUE, G_TYPE_INVALID);
++}
++
++static void
++create_network (const char *name, const char *oper_code)
++{
++	NMConnection *connection;
++	NMSettingGsm *s_gsm;
++	NMSettingSerial *s_serial;
++	NMSettingPPP *s_ppp;
++	NMSettingConnection *s_con;
++	GConfClient *gconf_client;
++
++	connection = nm_connection_new ();
++
++	s_gsm = NM_SETTING_GSM (nm_setting_gsm_new ());
++	s_gsm->number = g_strdup ("*99#"); /* This should be a sensible default as it's seems to be quite standard */
++	s_gsm->network_id = g_strdup (oper_code);
++	nm_connection_add_setting (connection, NM_SETTING (s_gsm));
++
++	/* Serial setting */
++	s_serial = (NMSettingSerial *) nm_setting_serial_new ();
++	s_serial->baud = 115200;
++	s_serial->bits = 8;
++	s_serial->parity = 'n';
++	s_serial->stopbits = 1;
++	nm_connection_add_setting (connection, NM_SETTING (s_serial));
++
++	s_ppp = (NMSettingPPP *) nm_setting_ppp_new ();
++	nm_connection_add_setting (connection, NM_SETTING (s_ppp));
++
++	s_con = NM_SETTING_CONNECTION (nm_setting_connection_new ());
++	s_con->id = g_strdup (name);
++	s_con->type = g_strdup (NM_SETTING (s_gsm)->name);
++	s_con->autoconnect = FALSE;
++	s_con->uuid = nm_utils_uuid_generate ();
++	nm_connection_add_setting (connection, NM_SETTING (s_con));
++
++	gconf_client = gconf_client_get_default ();
++	if (gconf_client) {
++		char *dir = NULL;
++		int i;
++
++		/* Find free GConf directory */
++		for (i = 0; i < G_MAXUINT32; i++) {
++			char buf[255];
++
++			snprintf (&buf[0], 255, GCONF_PATH_CONNECTIONS"/%d", i);
++			if (!gconf_client_dir_exists (gconf_client, buf, NULL)) {
++				dir = g_strdup (buf);
++				break;
++			}
++		}
++
++		nm_gconf_write_connection (connection, gconf_client, dir);
++		gconf_client_notify (gconf_client, dir);
++		gconf_client_suggest_sync (gconf_client, NULL);
++		g_free (dir);
++		g_object_unref (gconf_client);
++	} else
++		g_warning ("Writing conneciton failed");
++
++	g_object_unref (connection);
++}
++
++static void
++create_network_clicked (GtkButton *button, gpointer user_data)
++{
++	AppData *app_data = (AppData *) user_data;
++	GtkTreeSelection *selection;
++	GList *selected_rows;
++	GtkTreeModel *model = NULL;
++	GtkTreeIter iter;
++
++	selection = gtk_tree_view_get_selection (app_data->network_list);
++	selected_rows = gtk_tree_selection_get_selected_rows (selection, &model);
++	if (!selected_rows)
++		return;
++
++	if (gtk_tree_model_get_iter (model, &iter, (GtkTreePath *) selected_rows->data)) {
++		char *oper_name = NULL;
++		char *oper_id = NULL;
++		gint result;
++
++		gtk_tree_model_get (model, &iter, SCAN_COL_NAME, &oper_name, -1);
++		gtk_tree_model_get (model, &iter, SCAN_COL_OPER_ID, &oper_id, -1);
++
++		gtk_entry_set_text (app_data->create_network_name, oper_name);
++		gtk_editable_select_region (GTK_EDITABLE (app_data->create_network_name), 0, -1);
++		gtk_widget_grab_focus (GTK_WIDGET (app_data->create_network_name));
++
++		result = gtk_dialog_run (app_data->create_network_dialog);
++		gtk_widget_hide (GTK_WIDGET (app_data->create_network_dialog));
++
++		if (result == GTK_RESPONSE_OK)
++			create_network (gtk_entry_get_text (app_data->create_network_name), oper_id);
++
++		g_free (oper_name);
++		g_free (oper_id);
++	}
++
++	/* free memory */
++	g_list_foreach (selected_rows, (GFunc) gtk_tree_path_free, NULL);
++	g_list_free (selected_rows);
++}
++
++static void
++network_list_selection_changed (GtkTreeSelection *selection, gpointer user_data)
++{
++	AppData *app_data = (AppData *) user_data;
++	GtkTreeIter iter;
++	GtkTreeModel *model;
++
++	if (gtk_tree_selection_get_selected (selection, &model, &iter))
++		gtk_widget_set_sensitive (app_data->create_net_button, TRUE);
++	else
++		gtk_widget_set_sensitive (app_data->create_net_button, FALSE);
++}
++
++
++static void
++app_data_destroy (AppData *app_data)
++{
++	if (app_data->bus)
++		dbus_g_connection_unref (app_data->bus);
++
++	if (app_data->proxy)
++		g_object_unref (app_data->proxy);
++
++	if (app_data->gsm_net_proxy)
++		g_object_unref (app_data->gsm_net_proxy);
++
++	if (app_data->glade_xml)
++		g_object_unref (app_data->glade_xml);
++
++	if (app_data->main_loop)
++		g_main_loop_unref (app_data->main_loop);
++
++	g_slice_free (AppData, app_data);
++}
++
++static void
++close_cb (GtkDialog *dialog,
++		  gint response_id,
++		  gpointer user_data)
++{
++	AppData *app_data = (AppData *) user_data;
++
++	dbus_g_proxy_set_interface (app_data->proxy, MM_DBUS_INTERFACE_MODEM);
++	dbus_g_proxy_call_no_reply (app_data->proxy, "Enable", G_TYPE_BOOLEAN, FALSE, G_TYPE_INVALID);
++
++	g_main_loop_quit (app_data->main_loop);
++	app_data_destroy (app_data);
++}
++
++
++static GtkListStore *
++prepare_network_list (GtkTreeView *treeview)
++{
++	GtkListStore *store;
++
++	store = gtk_list_store_new (3, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING);
++	gtk_tree_view_set_model (treeview, GTK_TREE_MODEL (store));
++	g_object_unref (store);
++
++	gtk_tree_view_insert_column_with_attributes (treeview,
++	                                             -1, "Name", gtk_cell_renderer_text_new (),
++	                                             "text", SCAN_COL_NAME,
++	                                             NULL);
++
++	gtk_tree_view_insert_column_with_attributes (treeview,
++	                                             -1, "Status", gtk_cell_renderer_text_new (),
++	                                             "text", SCAN_COL_STATUS,
++	                                             NULL);
++
++	return store;
++}
++
++static AppData *
++app_data_create (const char *udi)
++{
++	AppData *app_data;
++	GtkTreeSelection *selection;
++	GError *error = NULL;
++
++	app_data = g_slice_new0 (AppData);
++
++	/* DBus */
++	app_data->bus = dbus_g_bus_get (DBUS_BUS_SYSTEM, &error);
++	if (!app_data->bus) {
++		g_error ("Couldn't connect to DBus: %s", error->message);
++		g_error_free (error);
++		g_slice_free (AppData, app_data);
++
++		return NULL;
++	}
++
++	app_data->proxy = dbus_g_proxy_new_for_name (app_data->bus, MM_DBUS_SERVICE, udi, MM_DBUS_INTERFACE_MODEM);
++	app_data->gsm_net_proxy = dbus_g_proxy_new_from_proxy (app_data->proxy, MM_DBUS_INTERFACE_MODEM_GSM_NETWORK, NULL);
++
++	/* UI */
++	app_data->glade_xml = glade_xml_new (GLADEDIR "/nm-modem-properties.glade", NULL, NULL);
++	if (!app_data->glade_xml) {
++		g_error ("Could not load Glade file");
++		g_slice_free (AppData, app_data);
++
++		return NULL;
++	}
++
++	app_data->main_dialog = GTK_DIALOG (glade_xml_get_widget (app_data->glade_xml, "dialog"));
++	g_signal_connect (app_data->main_dialog, "response", G_CALLBACK (close_cb), app_data);
++
++	app_data->info_table = GTK_TABLE (glade_xml_get_widget (app_data->glade_xml, "info_table"));
++	app_data->network_list = GTK_TREE_VIEW (glade_xml_get_widget (app_data->glade_xml, "network_list"));
++	app_data->network_store = prepare_network_list (app_data->network_list);
++	app_data->scan_button = glade_xml_get_widget (app_data->glade_xml, "scan_button");
++	g_signal_connect (app_data->scan_button, "clicked", G_CALLBACK (scan), app_data);
++
++	app_data->create_net_button = glade_xml_get_widget (app_data->glade_xml, "create_connection_button");
++	gtk_widget_set_sensitive (app_data->create_net_button, FALSE);
++	g_signal_connect (app_data->create_net_button, "clicked", G_CALLBACK (create_network_clicked), app_data);
++	selection = gtk_tree_view_get_selection (app_data->network_list);
++	g_signal_connect (selection, "changed", G_CALLBACK (network_list_selection_changed), app_data);
++
++	app_data->create_network_dialog = GTK_DIALOG (glade_xml_get_widget (app_data->glade_xml, "create_network_dialog"));
++	app_data->create_network_name = GTK_ENTRY (glade_xml_get_widget (app_data->glade_xml, "create_network_name"));
++
++	app_data->main_loop = g_main_loop_new (NULL, FALSE);
++
++	return app_data;
++}
++
++int
++main (int argc, char *argv[])
++{
++	//const char *udi = "/org/freedesktop/Hal/devices/usb_device_12d1_1003_noserial_if0_serial_usb_0";
++	AppData *app_data;
++
++	if (argc != 2) {
++		g_print ("Usage: %s <udi>\n", argv[0]);
++		return 1;
++	}
++
++	gtk_init (&argc, &argv);
++
++	app_data = app_data_create (argv[1]);
++	if (app_data) {
++		modem_enable (app_data);
++		g_main_loop_run (app_data->main_loop);
++	}
++
++	return 0;
++}
+diff --git a/src/modems/nm-modem-properties.glade b/src/modems/nm-modem-properties.glade
+new file mode 100644
+index 0000000..61038b8
+--- /dev/null
++++ b/src/modems/nm-modem-properties.glade
+@@ -0,0 +1,381 @@
++<?xml version="1.0" standalone="no"?> <!--*- mode: xml -*-->
++<!DOCTYPE glade-interface SYSTEM "http://glade.gnome.org/glade-2.0.dtd">
++
++<glade-interface>
++
++<widget class="GtkDialog" id="dialog">
++  <property name="visible">True</property>
++  <property name="title" translatable="yes">GSM modem properties</property>
++  <property name="type">GTK_WINDOW_TOPLEVEL</property>
++  <property name="window_position">GTK_WIN_POS_NONE</property>
++  <property name="modal">False</property>
++  <property name="resizable">True</property>
++  <property name="destroy_with_parent">False</property>
++  <property name="decorated">True</property>
++  <property name="skip_taskbar_hint">False</property>
++  <property name="skip_pager_hint">False</property>
++  <property name="type_hint">GDK_WINDOW_TYPE_HINT_DIALOG</property>
++  <property name="gravity">GDK_GRAVITY_NORTH_WEST</property>
++  <property name="focus_on_map">True</property>
++  <property name="urgency_hint">False</property>
++  <property name="has_separator">True</property>
++
++  <child internal-child="vbox">
++    <widget class="GtkVBox" id="dialog-vbox1">
++      <property name="visible">True</property>
++      <property name="homogeneous">False</property>
++      <property name="spacing">0</property>
++
++      <child internal-child="action_area">
++	<widget class="GtkHButtonBox" id="dialog-action_area1">
++	  <property name="visible">True</property>
++	  <property name="layout_style">GTK_BUTTONBOX_END</property>
++
++	  <child>
++	    <widget class="GtkButton" id="closebutton1">
++	      <property name="visible">True</property>
++	      <property name="can_default">True</property>
++	      <property name="can_focus">True</property>
++	      <property name="label">gtk-close</property>
++	      <property name="use_stock">True</property>
++	      <property name="relief">GTK_RELIEF_NORMAL</property>
++	      <property name="focus_on_click">True</property>
++	      <property name="response_id">-7</property>
++	    </widget>
++	  </child>
++	</widget>
++	<packing>
++	  <property name="padding">0</property>
++	  <property name="expand">False</property>
++	  <property name="fill">True</property>
++	  <property name="pack_type">GTK_PACK_END</property>
++	</packing>
++      </child>
++
++      <child>
++	<widget class="GtkVBox" id="vbox1">
++	  <property name="visible">True</property>
++	  <property name="homogeneous">False</property>
++	  <property name="spacing">6</property>
++
++	  <child>
++	    <widget class="GtkFrame" id="frame1">
++	      <property name="visible">True</property>
++	      <property name="label_xalign">0</property>
++	      <property name="label_yalign">0.5</property>
++	      <property name="shadow_type">GTK_SHADOW_NONE</property>
++
++	      <child>
++		<widget class="GtkAlignment" id="alignment1">
++		  <property name="visible">True</property>
++		  <property name="xalign">0.5</property>
++		  <property name="yalign">0.5</property>
++		  <property name="xscale">1</property>
++		  <property name="yscale">1</property>
++		  <property name="top_padding">0</property>
++		  <property name="bottom_padding">0</property>
++		  <property name="left_padding">12</property>
++		  <property name="right_padding">0</property>
++
++		  <child>
++		    <widget class="GtkTable" id="info_table">
++		      <property name="visible">True</property>
++		      <property name="n_rows">8</property>
++		      <property name="n_columns">2</property>
++		      <property name="homogeneous">False</property>
++		      <property name="row_spacing">0</property>
++		      <property name="column_spacing">6</property>
++		    </widget>
++		  </child>
++		</widget>
++	      </child>
++
++	      <child>
++		<widget class="GtkLabel" id="label1">
++		  <property name="visible">True</property>
++		  <property name="label" translatable="yes">&lt;b&gt;Information&lt;/b&gt;</property>
++		  <property name="use_underline">False</property>
++		  <property name="use_markup">True</property>
++		  <property name="justify">GTK_JUSTIFY_LEFT</property>
++		  <property name="wrap">False</property>
++		  <property name="selectable">False</property>
++		  <property name="xalign">0.5</property>
++		  <property name="yalign">0.5</property>
++		  <property name="xpad">0</property>
++		  <property name="ypad">0</property>
++		  <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++		  <property name="width_chars">-1</property>
++		  <property name="single_line_mode">False</property>
++		  <property name="angle">0</property>
++		</widget>
++		<packing>
++		  <property name="type">label_item</property>
++		</packing>
++	      </child>
++	    </widget>
++	    <packing>
++	      <property name="padding">0</property>
++	      <property name="expand">True</property>
++	      <property name="fill">True</property>
++	    </packing>
++	  </child>
++
++	  <child>
++	    <widget class="GtkFrame" id="frame2">
++	      <property name="visible">True</property>
++	      <property name="label_xalign">0</property>
++	      <property name="label_yalign">0.5</property>
++	      <property name="shadow_type">GTK_SHADOW_NONE</property>
++
++	      <child>
++		<widget class="GtkAlignment" id="alignment2">
++		  <property name="visible">True</property>
++		  <property name="xalign">0.5</property>
++		  <property name="yalign">0.5</property>
++		  <property name="xscale">1</property>
++		  <property name="yscale">1</property>
++		  <property name="top_padding">0</property>
++		  <property name="bottom_padding">0</property>
++		  <property name="left_padding">12</property>
++		  <property name="right_padding">0</property>
++
++		  <child>
++		    <widget class="GtkHBox" id="hbox1">
++		      <property name="visible">True</property>
++		      <property name="homogeneous">False</property>
++		      <property name="spacing">6</property>
++
++		      <child>
++			<widget class="GtkScrolledWindow" id="scrolledwindow1">
++			  <property name="visible">True</property>
++			  <property name="can_focus">True</property>
++			  <property name="hscrollbar_policy">GTK_POLICY_AUTOMATIC</property>
++			  <property name="vscrollbar_policy">GTK_POLICY_AUTOMATIC</property>
++			  <property name="shadow_type">GTK_SHADOW_IN</property>
++			  <property name="window_placement">GTK_CORNER_TOP_LEFT</property>
++
++			  <child>
++			    <widget class="GtkTreeView" id="network_list">
++			      <property name="visible">True</property>
++			      <property name="can_focus">True</property>
++			      <property name="headers_visible">False</property>
++			      <property name="rules_hint">False</property>
++			      <property name="reorderable">False</property>
++			      <property name="enable_search">True</property>
++			      <property name="fixed_height_mode">False</property>
++			      <property name="hover_selection">False</property>
++			      <property name="hover_expand">False</property>
++			    </widget>
++			  </child>
++			</widget>
++			<packing>
++			  <property name="padding">0</property>
++			  <property name="expand">True</property>
++			  <property name="fill">True</property>
++			</packing>
++		      </child>
++
++		      <child>
++			<widget class="GtkVButtonBox" id="vbuttonbox1">
++			  <property name="visible">True</property>
++			  <property name="layout_style">GTK_BUTTONBOX_START</property>
++			  <property name="spacing">0</property>
++
++			  <child>
++			    <widget class="GtkButton" id="scan_button">
++			      <property name="visible">True</property>
++			      <property name="can_default">True</property>
++			      <property name="can_focus">True</property>
++			      <property name="label" translatable="yes">Scan</property>
++			      <property name="use_underline">True</property>
++			      <property name="relief">GTK_RELIEF_NORMAL</property>
++			      <property name="focus_on_click">True</property>
++			    </widget>
++			  </child>
++
++			  <child>
++			    <widget class="GtkButton" id="create_connection_button">
++			      <property name="visible">True</property>
++			      <property name="can_default">True</property>
++			      <property name="can_focus">True</property>
++			      <property name="label" translatable="yes">Create connection</property>
++			      <property name="use_underline">True</property>
++			      <property name="relief">GTK_RELIEF_NORMAL</property>
++			      <property name="focus_on_click">True</property>
++			    </widget>
++			  </child>
++			</widget>
++			<packing>
++			  <property name="padding">0</property>
++			  <property name="expand">False</property>
++			  <property name="fill">False</property>
++			</packing>
++		      </child>
++		    </widget>
++		  </child>
++		</widget>
++	      </child>
++
++	      <child>
++		<widget class="GtkLabel" id="label2">
++		  <property name="visible">True</property>
++		  <property name="label" translatable="yes">&lt;b&gt;Networks&lt;/b&gt;</property>
++		  <property name="use_underline">False</property>
++		  <property name="use_markup">True</property>
++		  <property name="justify">GTK_JUSTIFY_LEFT</property>
++		  <property name="wrap">False</property>
++		  <property name="selectable">False</property>
++		  <property name="xalign">0.5</property>
++		  <property name="yalign">0.5</property>
++		  <property name="xpad">0</property>
++		  <property name="ypad">0</property>
++		  <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++		  <property name="width_chars">-1</property>
++		  <property name="single_line_mode">False</property>
++		  <property name="angle">0</property>
++		</widget>
++		<packing>
++		  <property name="type">label_item</property>
++		</packing>
++	      </child>
++	    </widget>
++	    <packing>
++	      <property name="padding">0</property>
++	      <property name="expand">True</property>
++	      <property name="fill">True</property>
++	    </packing>
++	  </child>
++	</widget>
++	<packing>
++	  <property name="padding">0</property>
++	  <property name="expand">True</property>
++	  <property name="fill">True</property>
++	</packing>
++      </child>
++    </widget>
++  </child>
++</widget>
++
++<widget class="GtkDialog" id="create_network_dialog">
++  <property name="title" translatable="yes">Create new connection</property>
++  <property name="type">GTK_WINDOW_TOPLEVEL</property>
++  <property name="window_position">GTK_WIN_POS_NONE</property>
++  <property name="modal">False</property>
++  <property name="resizable">False</property>
++  <property name="destroy_with_parent">False</property>
++  <property name="decorated">True</property>
++  <property name="skip_taskbar_hint">False</property>
++  <property name="skip_pager_hint">False</property>
++  <property name="type_hint">GDK_WINDOW_TYPE_HINT_DIALOG</property>
++  <property name="gravity">GDK_GRAVITY_NORTH_WEST</property>
++  <property name="focus_on_map">True</property>
++  <property name="urgency_hint">False</property>
++  <property name="has_separator">True</property>
++
++  <child internal-child="vbox">
++    <widget class="GtkVBox" id="dialog-vbox2">
++      <property name="visible">True</property>
++      <property name="homogeneous">False</property>
++      <property name="spacing">0</property>
++
++      <child internal-child="action_area">
++	<widget class="GtkHButtonBox" id="dialog-action_area2">
++	  <property name="visible">True</property>
++	  <property name="layout_style">GTK_BUTTONBOX_END</property>
++
++	  <child>
++	    <widget class="GtkButton" id="cancelbutton1">
++	      <property name="visible">True</property>
++	      <property name="can_default">True</property>
++	      <property name="can_focus">True</property>
++	      <property name="label">gtk-cancel</property>
++	      <property name="use_stock">True</property>
++	      <property name="relief">GTK_RELIEF_NORMAL</property>
++	      <property name="focus_on_click">True</property>
++	      <property name="response_id">-6</property>
++	    </widget>
++	  </child>
++
++	  <child>
++	    <widget class="GtkButton" id="okbutton1">
++	      <property name="visible">True</property>
++	      <property name="can_default">True</property>
++	      <property name="can_focus">True</property>
++	      <property name="label">gtk-ok</property>
++	      <property name="use_stock">True</property>
++	      <property name="relief">GTK_RELIEF_NORMAL</property>
++	      <property name="focus_on_click">True</property>
++	      <property name="response_id">-5</property>
++	    </widget>
++	  </child>
++	</widget>
++	<packing>
++	  <property name="padding">0</property>
++	  <property name="expand">False</property>
++	  <property name="fill">True</property>
++	  <property name="pack_type">GTK_PACK_END</property>
++	</packing>
++      </child>
++
++      <child>
++	<widget class="GtkVBox" id="vbox2">
++	  <property name="border_width">6</property>
++	  <property name="visible">True</property>
++	  <property name="homogeneous">False</property>
++	  <property name="spacing">6</property>
++
++	  <child>
++	    <widget class="GtkLabel" id="label3">
++	      <property name="visible">True</property>
++	      <property name="label" translatable="yes">Please choose a name for the connection</property>
++	      <property name="use_underline">False</property>
++	      <property name="use_markup">False</property>
++	      <property name="justify">GTK_JUSTIFY_LEFT</property>
++	      <property name="wrap">False</property>
++	      <property name="selectable">False</property>
++	      <property name="xalign">0.5</property>
++	      <property name="yalign">0.5</property>
++	      <property name="xpad">0</property>
++	      <property name="ypad">0</property>
++	      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++	      <property name="width_chars">-1</property>
++	      <property name="single_line_mode">False</property>
++	      <property name="angle">0</property>
++	    </widget>
++	    <packing>
++	      <property name="padding">0</property>
++	      <property name="expand">False</property>
++	      <property name="fill">False</property>
++	    </packing>
++	  </child>
++
++	  <child>
++	    <widget class="GtkEntry" id="create_network_name">
++	      <property name="visible">True</property>
++	      <property name="can_focus">True</property>
++	      <property name="editable">True</property>
++	      <property name="visibility">True</property>
++	      <property name="max_length">0</property>
++	      <property name="text" translatable="yes"></property>
++	      <property name="has_frame">True</property>
++	      <property name="invisible_char">●</property>
++	      <property name="activates_default">True</property>
++	    </widget>
++	    <packing>
++	      <property name="padding">0</property>
++	      <property name="expand">False</property>
++	      <property name="fill">False</property>
++	    </packing>
++	  </child>
++	</widget>
++	<packing>
++	  <property name="padding">0</property>
++	  <property name="expand">True</property>
++	  <property name="fill">True</property>
++	</packing>
++      </child>
++    </widget>
++  </child>
++</widget>
++
++</glade-interface>
+diff --git a/src/nma-gsm-modem.c b/src/nma-gsm-modem.c
+new file mode 100644
+index 0000000..0dba9cd
+--- /dev/null
++++ b/src/nma-gsm-modem.c
+@@ -0,0 +1,198 @@
++/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
++
++#include "nma-gsm-modem.h"
++#include "mm-types.h"
++
++G_DEFINE_TYPE (NMAGsmModem, nma_gsm_modem, G_TYPE_OBJECT)
++
++#define NMA_GSM_MODEM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NMA_TYPE_GSM_MODEM, NMAGsmModemPrivate))
++
++typedef struct {
++	DBusGProxy *proxy;
++	int signal_quality;
++
++	gboolean disposed;
++} NMAGsmModemPrivate;
++
++enum {
++	SIGNAL_QUALITY,
++	NETWORK_MODE,
++
++	LAST_SIGNAL
++};
++
++static guint signals[LAST_SIGNAL] = { 0 };
++
++static void
++signal_quality_proxy (DBusGProxy *proxy,
++				  guint32 signal_quality,
++				  gpointer user_data)
++{
++	NMAGsmModem *modem = NMA_GSM_MODEM (user_data);
++
++	NMA_GSM_MODEM_GET_PRIVATE (modem)->signal_quality = signal_quality;
++
++	g_signal_emit (modem, signals[SIGNAL_QUALITY], 0, signal_quality);
++}
++
++static void
++network_mode_proxy (DBusGProxy *proxy,
++				guint32 network_mode,
++				gpointer user_data)
++{
++	NMAGsmModem *modem = NMA_GSM_MODEM (user_data);
++
++	g_signal_emit (modem, signals[NETWORK_MODE], 0, network_mode);
++}
++
++NMAGsmModem *
++nma_gsm_modem_new (DBusGConnection *bus, const char *object_path)
++{
++	NMAGsmModem *modem;
++	NMAGsmModemPrivate *priv;
++
++	g_return_val_if_fail (bus != NULL, NULL);
++	g_return_val_if_fail (object_path != NULL, NULL);
++
++	modem = (NMAGsmModem *) g_object_new (NMA_TYPE_GSM_MODEM, NULL);
++	if (!modem)
++		return NULL;
++
++	priv = NMA_GSM_MODEM_GET_PRIVATE (modem);
++	priv->proxy = dbus_g_proxy_new_for_name (bus, MM_DBUS_SERVICE, object_path, MM_DBUS_INTERFACE_MODEM_GSM);
++
++	dbus_g_proxy_add_signal (priv->proxy, "SignalQuality", G_TYPE_UINT, G_TYPE_INVALID);
++	dbus_g_proxy_connect_signal (priv->proxy, "SignalQuality",
++						    G_CALLBACK (signal_quality_proxy),
++						    modem,
++						    NULL);
++
++	dbus_g_proxy_add_signal (priv->proxy, "NetworkMode", G_TYPE_UINT, G_TYPE_INVALID);
++	dbus_g_proxy_connect_signal (priv->proxy, "NetworkMode",
++						    G_CALLBACK (network_mode_proxy),
++						    modem,
++						    NULL);
++
++	return modem;
++}
++
++guint32
++nma_gsm_modem_get_signal_quality (NMAGsmModem *modem)
++{
++	NMAGsmModemPrivate *priv = NMA_GSM_MODEM_GET_PRIVATE (modem);
++	GError *err = NULL;
++
++	g_return_val_if_fail (NMA_IS_GSM_MODEM (modem), 0);
++
++	if (priv->signal_quality == -1) {
++		if (!dbus_g_proxy_call (priv->proxy, "GetSignalQuality", &err,
++						    G_TYPE_INVALID,
++						    G_TYPE_UINT, &priv->signal_quality,
++						    G_TYPE_INVALID)) {
++			g_warning ("Error in getting signal quality: %s", err->message);
++			g_error_free (err);
++		}
++	}
++
++	return priv->signal_quality;
++}
++
++guint32
++nma_gsm_modem_get_registration_info (NMAGsmModem *modem,
++							  char **operator_code,
++							  char **operator_name)
++{
++	NMAGsmModemPrivate *priv = NMA_GSM_MODEM_GET_PRIVATE (modem);
++	GError *err = NULL;
++	guint32 status = MM_GSM_MODEM_REG_STATUS_UNKNOWN;
++
++	g_return_val_if_fail (NMA_IS_GSM_MODEM (modem), 0);
++
++	if (!dbus_g_proxy_call (priv->proxy, "GetRegistrationInfo", &err,
++					    G_TYPE_INVALID,
++					    G_TYPE_UINT, &status,
++					    G_TYPE_STRING, operator_code,
++					    G_TYPE_STRING, operator_name,
++					    G_TYPE_INVALID)) {
++		g_warning ("Error in getting network mode: %s", err->message);
++		g_error_free (err);
++	}
++
++	return status;
++}
++
++guint32
++nma_gsm_modem_get_network_mode (NMAGsmModem *modem)
++{
++	NMAGsmModemPrivate *priv = NMA_GSM_MODEM_GET_PRIVATE (modem);
++	GError *err = NULL;
++	guint32 network_mode = 0;
++
++	g_return_val_if_fail (NMA_IS_GSM_MODEM (modem), 0);
++
++	if (!dbus_g_proxy_call (priv->proxy, "GetNetworkMode", &err,
++					    G_TYPE_INVALID,
++					    G_TYPE_UINT, &network_mode,
++					    G_TYPE_INVALID)) {
++		g_warning ("Error in getting network mode: %s", err->message);
++		g_error_free (err);
++	}
++
++	return network_mode;
++}
++
++static void
++nma_gsm_modem_init (NMAGsmModem *modem)
++{
++	NMAGsmModemPrivate *priv = NMA_GSM_MODEM_GET_PRIVATE (modem);
++
++	priv->signal_quality = -1;
++}
++
++static void
++dispose (GObject *object)
++{
++	NMAGsmModemPrivate *priv = NMA_GSM_MODEM_GET_PRIVATE (object);
++
++	if (priv->disposed)
++		return;
++
++	priv->disposed = TRUE;
++
++	if (priv->proxy)
++		g_object_unref (priv->proxy);
++
++	G_OBJECT_CLASS (nma_gsm_modem_parent_class)->dispose (object);
++}
++
++static void
++nma_gsm_modem_class_init (NMAGsmModemClass *modem_class)
++{
++	GObjectClass *object_class = G_OBJECT_CLASS (modem_class);
++
++	g_type_class_add_private (modem_class, sizeof (NMAGsmModemPrivate));
++
++	/* virtual methods */
++	object_class->dispose = dispose;
++
++	/* Signals */
++	signals[SIGNAL_QUALITY] = 
++		g_signal_new ("signal-quality",
++				    G_OBJECT_CLASS_TYPE (object_class),
++				    G_SIGNAL_RUN_FIRST,
++				    G_STRUCT_OFFSET (NMAGsmModemClass, signal_quality),
++				    NULL, NULL,
++				    g_cclosure_marshal_VOID__UINT,
++				    G_TYPE_NONE, 1,
++				    G_TYPE_UINT);
++
++	signals[NETWORK_MODE] = 
++		g_signal_new ("network-mode",
++				    G_OBJECT_CLASS_TYPE (object_class),
++				    G_SIGNAL_RUN_FIRST,
++				    G_STRUCT_OFFSET (NMAGsmModemClass, network_mode),
++				    NULL, NULL,
++				    g_cclosure_marshal_VOID__UINT,
++				    G_TYPE_NONE, 1,
++				    G_TYPE_UINT);
++}
+diff --git a/src/nma-gsm-modem.h b/src/nma-gsm-modem.h
+new file mode 100644
+index 0000000..90e7ae0
+--- /dev/null
++++ b/src/nma-gsm-modem.h
+@@ -0,0 +1,45 @@
++/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
++
++#ifndef NMA_GSM_MODEM_H
++#define NMA_GSM_MODEM_H
++
++#include <glib/gtypes.h>
++#include <glib-object.h>
++#include <dbus/dbus-glib.h>
++
++G_BEGIN_DECLS
++
++#define NMA_TYPE_GSM_MODEM            (nma_gsm_modem_get_type ())
++#define NMA_GSM_MODEM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), NMA_TYPE_GSM_MODEM, NMAGsmModem))
++#define NMA_GSM_MODEM_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), NMA_TYPE_GSM_MODEM, NMAGsmModemClass))
++#define NMA_IS_GSM_MODEM(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), NMA_TYPE_GSM_MODEM))
++#define NMA_IS_GSM_MODEM_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((obj), NMA_TYPE_GSM_MODEM))
++#define NMA_GSM_MODEM_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), NMA_TYPE_GSM_MODEM, NMAGsmModemClass))
++
++typedef struct {
++	GObject parent;
++} NMAGsmModem;
++
++typedef struct {
++	GObjectClass parent;
++
++	/* Signals */
++	void (*signal_quality) (NMAGsmModem *modem, guint32 signal_quality);
++	void (*network_mode) (NMAGsmModem *modem, guint32 network_mode);
++} NMAGsmModemClass;
++
++GType        nma_gsm_modem_get_type (void);
++
++NMAGsmModem *nma_gsm_modem_new (DBusGConnection *bus,
++						  const char *object_path);
++
++guint32 nma_gsm_modem_get_signal_quality (NMAGsmModem *modem);
++guint32 nma_gsm_modem_get_registration_info (NMAGsmModem *modem,
++									char **operator_code,
++									char **operator_name);
++
++guint32 nma_gsm_modem_get_network_mode (NMAGsmModem *modem);
++
++G_END_DECLS
++
++#endif /* NMA_GSM_MODEM_H */

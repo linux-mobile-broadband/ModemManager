@@ -1,8 +1,8 @@
 diff --git a/configure.in b/configure.in
-index 9f7db7c..bee43d8 100644
+index bd86fc2..fdc4369 100644
 --- a/configure.in
 +++ b/configure.in
-@@ -444,6 +444,7 @@ src/dhcp-manager/Makefile
+@@ -477,6 +477,7 @@ src/dhcp-manager/Makefile
  src/supplicant-manager/Makefile
  src/ppp-manager/Makefile
  src/dnsmasq-manager/Makefile
@@ -890,10 +890,10 @@ index 0000000..9b16b0b
 +#endif /* NM_GSM_MODEM_HSO_H */
 diff --git a/src/modem-manager/nm-gsm-modem.c b/src/modem-manager/nm-gsm-modem.c
 new file mode 100644
-index 0000000..0b75e6c
+index 0000000..271e23f
 --- /dev/null
 +++ b/src/modem-manager/nm-gsm-modem.c
-@@ -0,0 +1,316 @@
+@@ -0,0 +1,329 @@
 +/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
 +
 +#include <string.h>
@@ -981,20 +981,33 @@ index 0000000..0b75e6c
 +		dbus_g_proxy_end_call (proxy, call_id, &error, G_TYPE_INVALID);
 +
 +	if (error) {
-+		if (dbus_g_error_has_name (error, MM_MODEM_ERROR_PIN_NEEDED)) {
++		g_debug ("%s", dbus_g_error_get_name (error));
++
++		if (dbus_g_error_has_name (error, MM_MODEM_ERROR_SIM_PIN)) {
 +			secret = setting->pin;
 +			secret_name = NM_SETTING_GSM_PIN;
 +			priv->modem_state = MODEM_STATE_SET_PIN;
-+		} else if (dbus_g_error_has_name (error, MM_MODEM_ERROR_PUK_NEEDED)) {
++		} else if (dbus_g_error_has_name (error, MM_MODEM_ERROR_SIM_PUK)) {
 +			secret = setting->puk;
 +			secret_name = NM_SETTING_GSM_PUK;
 +			priv->modem_state = MODEM_STATE_SET_PIN;
-+		} else if (dbus_g_error_has_name (error, MM_MODEM_ERROR_INVALID_SECRET)) {
++		} else if (dbus_g_error_has_name (error, MM_MODEM_ERROR_SIM_WRONG)) {
 +			g_free (setting->pin);
 +			setting->pin = NULL;
 +			secret_name = NM_SETTING_GSM_PIN;
 +			retry_secret = TRUE;
 +			priv->modem_state = MODEM_STATE_SET_PIN;
++		}
++
++		/* FIXME: Hacks to ignore failures of setting band and network mode for now
++		   since only Huawei module supports it. Remove when ModemManager rules.
++		*/
++		else if (dbus_g_error_has_name (error, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED) &&
++			    (priv->modem_state == MODEM_STATE_SET_BAND ||
++				priv->modem_state == MODEM_STATE_SET_NETWORK_MODE)) {
++
++			nm_warning ("Modem does not support setting %s, ignoring",
++					  priv->modem_state == MODEM_STATE_SET_BAND ? "band" : "network mode");
 +		} else {
 +			priv->modem_state = MODEM_STATE_FAILED;
 +			nm_warning ("GSM modem connection failed: %s", error->message);
@@ -1019,7 +1032,7 @@ index 0000000..0b75e6c
 +		if (secret) {
 +			priv->modem_state = MODEM_STATE_ENABLE;
 +			dbus_g_proxy_begin_call (get_proxy (modem, MM_DBUS_INTERFACE_MODEM_GSM_CARD),
-+								"SetPin", state_machine,
++								"SendPin", state_machine,
 +								modem, NULL,
 +								G_TYPE_STRING, secret,
 +								G_TYPE_INVALID);
@@ -1254,10 +1267,10 @@ index 0000000..8df8265
 +#endif /* NM_GSM_MODEM_H */
 diff --git a/src/modem-manager/nm-modem-device.c b/src/modem-manager/nm-modem-device.c
 new file mode 100644
-index 0000000..0a198f7
+index 0000000..c5ea8c6
 --- /dev/null
 +++ b/src/modem-manager/nm-modem-device.c
-@@ -0,0 +1,464 @@
+@@ -0,0 +1,467 @@
 +/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
 +
 +#include <string.h>
@@ -1566,6 +1579,9 @@ index 0000000..0a198f7
 +	/* Make sure we don't leave the serial device open */
 +	switch (new_state) {
 +	case NM_DEVICE_STATE_NEED_AUTH:
++		if (priv->ppp_manager)
++			break;
++		/* else fall through */
 +	case NM_DEVICE_STATE_UNMANAGED:
 +	case NM_DEVICE_STATE_UNAVAILABLE:
 +	case NM_DEVICE_STATE_FAILED:
@@ -2230,10 +2246,10 @@ index 0000000..ec62f84
 +#endif /* NM_MODEM_MANAGER_H */
 diff --git a/src/modem-manager/nm-modem-types.h b/src/modem-manager/nm-modem-types.h
 new file mode 100644
-index 0000000..bd76796
+index 0000000..f5cbe10
 --- /dev/null
 +++ b/src/modem-manager/nm-modem-types.h
-@@ -0,0 +1,25 @@
+@@ -0,0 +1,89 @@
 +/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
 +
 +#ifndef NM_MODEM_TYPES_H
@@ -2253,10 +2269,74 @@ index 0000000..bd76796
 +#define MM_MODEM_TYPE_GSM      1
 +#define MM_MODEM_TYPE_CDMA     2
 +
-+#define MM_MODEM_ERROR_GENERAL        MM_DBUS_INTERFACE_MODEM ".GeneralError"
-+#define MM_MODEM_ERROR_PIN_NEEDED     MM_DBUS_INTERFACE_MODEM ".PINNeeded"
-+#define MM_MODEM_ERROR_PUK_NEEDED     MM_DBUS_INTERFACE_MODEM ".PUKNeeded"
-+#define MM_MODEM_ERROR_INVALID_SECRET MM_DBUS_INTERFACE_MODEM ".InvalidSecret"
++/* Errors */
++
++#define MM_SERIAL_OPEN_FAILED MM_DBUS_INTERFACE_MODEM ".SerialOpenFailed"
++#define MM_SERIAL_SEND_FAILED MM_DBUS_INTERFACE_MODEM ".SerialSendFailed"
++#define MM_SERIAL_RESPONSE_TIMEOUT MM_DBUS_INTERFACE_MODEM ".SerialResponseTimeout"
++
++#define MM_MODEM_ERROR_GENERAL MM_DBUS_INTERFACE_MODEM ".General"
++#define MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED MM_DBUS_INTERFACE_MODEM ".OperationNotSupported"
++
++#define MM_MODEM_CONNECT_ERROR_NO_CARRIER MM_DBUS_INTERFACE_MODEM ".NoCarrier"
++#define MM_MODEM_CONNECT_ERROR_NO_DIALTONE MM_DBUS_INTERFACE_MODEM ".NoDialtone"
++#define MM_MODEM_CONNECT_ERROR_BUSY MM_DBUS_INTERFACE_MODEM ".Busy"
++#define MM_MODEM_CONNECT_ERROR_NO_ANSWER MM_DBUS_INTERFACE_MODEM ".NoAnswer"
++
++#define MM_MODEM_ERROR "org.freedesktop.ModemManager.Modem.Gsm"
++
++#define MM_MODEM_ERROR_PHONE_FAILURE MM_MODEM_ERROR ".PhoneFailure"
++#define MM_MODEM_ERROR_NO_CONNECTION MM_MODEM_ERROR ".NoConnection"
++#define MM_MODEM_ERROR_LINK_RESERVED MM_MODEM_ERROR ".LinkReserved"
++#define MM_MODEM_ERROR_NOT_ALLOWED MM_MODEM_ERROR ".OperationNotAllowed"
++#define MM_MODEM_ERROR_NOT_SUPPORTED MM_MODEM_ERROR ".OperationNotSupported"
++#define MM_MODEM_ERROR_PH_SIM_PIN MM_MODEM_ERROR ".PhSimPinRequired"
++#define MM_MODEM_ERROR_PH_FSIM_PIN MM_MODEM_ERROR ".PhFSimPinRequired"
++#define MM_MODEM_ERROR_PH_FSIM_PUK MM_MODEM_ERROR ".PhFPukRequired"
++#define MM_MODEM_ERROR_SIM_NOT_INSERTED MM_MODEM_ERROR ".SimNotInserted"
++#define MM_MODEM_ERROR_SIM_PIN MM_MODEM_ERROR ".SimPinRequired"
++#define MM_MODEM_ERROR_SIM_PUK MM_MODEM_ERROR ".SimPukRequired"
++#define MM_MODEM_ERROR_SIM_FAILURE MM_MODEM_ERROR ".SimFailure"
++#define MM_MODEM_ERROR_SIM_BUSY MM_MODEM_ERROR ".SimBusy"
++#define MM_MODEM_ERROR_SIM_WRONG MM_MODEM_ERROR ".SimWrong"
++#define MM_MODEM_ERROR_WRONG_PASSWORD MM_MODEM_ERROR ".IncorrectPassword"
++#define MM_MODEM_ERROR_SIM_PIN2 MM_MODEM_ERROR ".SimPin2Required"
++#define MM_MODEM_ERROR_SIM_PUK2 MM_MODEM_ERROR ".SimPuk2Required"
++#define MM_MODEM_ERROR_MEMORY_FULL MM_MODEM_ERROR ".MemoryFull"
++#define MM_MODEM_ERROR_INVALID_INDEX MM_MODEM_ERROR ".InvalidIndex"
++#define MM_MODEM_ERROR_NOT_FOUND MM_MODEM_ERROR ".NotFound"
++#define MM_MODEM_ERROR_MEMORY_FAILURE MM_MODEM_ERROR ".MemoryFailure"
++#define MM_MODEM_ERROR_TEXT_TOO_LONG MM_MODEM_ERROR ".TextTooLong"
++#define MM_MODEM_ERROR_INVALID_CHARS MM_MODEM_ERROR ".InvalidChars"
++#define MM_MODEM_ERROR_DIAL_STRING_TOO_LONG MM_MODEM_ERROR ".DialStringTooLong"
++#define MM_MODEM_ERROR_DIAL_STRING_INVALID MM_MODEM_ERROR ".InvalidDialString"
++#define MM_MODEM_ERROR_NO_NETWORK MM_MODEM_ERROR ".NoNetwork"
++#define MM_MODEM_ERROR_NETWORK_TIMEOUT MM_MODEM_ERROR ".NetworkTimeout"
++#define MM_MODEM_ERROR_NETWORK_NOT_ALLOWED MM_MODEM_ERROR ".NetworkNotAllowed"
++#define MM_MODEM_ERROR_NETWORK_PIN MM_MODEM_ERROR ".NetworkPinRequired"
++#define MM_MODEM_ERROR_NETWORK_PUK MM_MODEM_ERROR ".NetworkPukRequired"
++#define MM_MODEM_ERROR_NETWORK_SUBSET_PIN MM_MODEM_ERROR ".NetworkSubsetPinRequired"
++#define MM_MODEM_ERROR_NETWORK_SUBSET_PUK MM_MODEM_ERROR ".NetworkSubsetPukRequired"
++#define MM_MODEM_ERROR_SERVICE_PIN MM_MODEM_ERROR ".ServicePinRequired"
++#define MM_MODEM_ERROR_SERVICE_PUK MM_MODEM_ERROR ".ServicePukRequired"
++#define MM_MODEM_ERROR_CORP_PIN MM_MODEM_ERROR ".CorporatePinRequired"
++#define MM_MODEM_ERROR_CORP_PUK MM_MODEM_ERROR ".CorporatePukRequired"
++#define MM_MODEM_ERROR_HIDDEN_KEY MM_MODEM_ERROR ".HiddenKeyRequired"
++#define MM_MODEM_ERROR_EAP_NOT_SUPPORTED MM_MODEM_ERROR ".EapMethodNotSupported"
++#define MM_MODEM_ERROR_INCORRECT_PARAMS MM_MODEM_ERROR ".IncorrectParams"
++#define MM_MODEM_ERROR_UNKNOWN MM_MODEM_ERROR ".Unknown"
++#define MM_MODEM_ERROR_GPRS_ILLEGAL_MS MM_MODEM_ERROR ".GprsIllegalMs"
++#define MM_MODEM_ERROR_GPRS_ILLEGAL_ME MM_MODEM_ERROR ".GprsIllegalMe"
++#define MM_MODEM_ERROR_GPRS_SERVICE_NOT_ALLOWED  MM_MODEM_ERROR ".GprsServiceNotAllowed"
++#define MM_MODEM_ERROR_GPRS_PLMN_NOT_ALLOWED MM_MODEM_ERROR ".GprsPlmnNotAllowed"
++#define MM_MODEM_ERROR_GPRS_LOCATION_NOT_ALLOWED MM_MODEM_ERROR ".GprsLocationNotAllowed"
++#define MM_MODEM_ERROR_GPRS_ROAMING_NOT_ALLOWED MM_MODEM_ERROR ".GprsRoamingNotAllowed"
++#define MM_MODEM_ERROR_GPRS_OPTION_NOT_SUPPORTED MM_MODEM_ERROR ".GprsOptionNotSupported"
++#define MM_MODEM_ERROR_GPRS_NOT_SUBSCRIBED MM_MODEM_ERROR ".GprsNotSubscribed"
++#define MM_MODEM_ERROR_GPRS_OUT_OF_ORDER MM_MODEM_ERROR ".GprsOutOfOrder"
++#define MM_MODEM_ERROR_GPRS_PDP_AUTH_FAILURE MM_MODEM_ERROR ".GprsPdpAuthFailure"
++#define MM_MODEM_ERROR_GPRS_UNKNOWN MM_MODEM_ERROR ".GprsUnspecified"
++#define MM_MODEM_ERROR_GPRS_INVALID_CLASS MM_MODEM_ERROR ".GprsInvalidClass"
 +
 +#endif /* NM_MODEM_TYPES_H */
 diff --git a/src/nm-cdma-device.c b/src/nm-cdma-device.c
