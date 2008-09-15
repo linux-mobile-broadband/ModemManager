@@ -280,6 +280,12 @@ mm_serial_send_command (MMSerial *self,
     const char *s;
     int status;
 
+    if (priv->fd == 0) {
+        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_SEND_FAILED,
+                     "%s", "Sending command failed: device is not enabled");
+        return FALSE;
+    }
+
     if (mm_serial_is_connected (self)) {
         g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_SEND_FAILED,
                      "%s", "Sending command failed: device is connected");
