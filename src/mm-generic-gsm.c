@@ -41,6 +41,14 @@ mm_generic_gsm_new (const char *serial_device, const char *driver)
                                    NULL));
 }
 
+void
+mm_generic_gsm_set_cid (MMGenericGsm *modem, guint32 cid)
+{
+    g_return_if_fail (MM_IS_GENERIC_GSM (modem));
+
+    MM_GENERIC_GSM_GET_PRIVATE (modem)->cid = cid;
+}
+
 guint32
 mm_generic_gsm_get_cid (MMGenericGsm *modem)
 {
@@ -717,6 +725,8 @@ scan (MMModemGsmNetwork *modem,
     mm_serial_queue_command (MM_SERIAL (modem), "+COPS=?", 60, scan_done, info);
 }
 
+/* SetApn */
+
 static void
 set_apn_done (MMSerial *serial,
               GString *response,
@@ -728,9 +738,143 @@ set_apn_done (MMSerial *serial,
     if (error)
         info->error = g_error_copy (error);
     else
-        MM_GENERIC_GSM_GET_PRIVATE (serial)->cid = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "CID"));
+        mm_generic_gsm_set_cid (MM_GENERIC_GSM (serial),
+                                GPOINTER_TO_UINT (mm_callback_info_get_data (info, "cid")));
 
     mm_callback_info_schedule (info);
+}
+
+static void
+cid_range_read (MMSerial *serial,
+                GString *response,
+                GError *error,
+                gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    guint32 cid = 0;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else if (g_str_has_prefix (response->str, "+CGDCONT: ")) {
+        GRegex *r;
+        GMatchInfo *match_info;
+
+        r = g_regex_new ("\\+CGDCONT: \\((\\d+)-(\\d+)\\),\"(\\S+)\"",
+                         G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
+                         0, &info->error);
+        if (r) {
+            g_regex_match_full (r, response->str, response->len, 0, 0, &match_info, &info->error);
+            while (cid == 0 && g_match_info_matches (match_info)) {
+                char *tmp;
+
+                tmp = g_match_info_fetch (match_info, 3);
+                if (!strcmp (tmp, "IP")) {
+                    int max_cid;
+                    int highest_cid = GPOINTER_TO_INT (mm_callback_info_get_data (info, "highest-cid"));
+
+                    g_free (tmp);
+
+                    tmp = g_match_info_fetch (match_info, 2);
+                    max_cid = atoi (tmp);
+
+                    if (highest_cid < max_cid)
+                        cid = highest_cid + 1;
+                    else
+                        cid = highest_cid;
+                }
+
+                g_free (tmp);
+                g_match_info_next (match_info, NULL);
+            }
+
+            if (cid == 0)
+                /* Choose something */
+                cid = 1;
+        }
+    } else
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse the response");
+
+    if (info->error)
+        mm_callback_info_schedule (info);
+    else {
+        const char *apn = (const char *) mm_callback_info_get_data (info, "apn");
+        char *command;
+
+        mm_callback_info_set_data (info, "cid", GUINT_TO_POINTER (cid), NULL);
+
+        command = g_strdup_printf ("+CGDCONT=%d, \"IP\", \"%s\"", cid, apn);
+        mm_serial_queue_command (serial, command, 3, set_apn_done, info);
+        g_free (command);
+    }
+}
+
+static void
+existing_apns_read (MMSerial *serial,
+                    GString *response,
+                    GError *error,
+                    gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    gboolean found = FALSE;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else if (g_str_has_prefix (response->str, "+CGDCONT: ")) {
+        GRegex *r;
+        GMatchInfo *match_info;
+
+        r = g_regex_new ("\\+CGDCONT: (\\d+)\\s*,\"(\\S+)\",\"(\\S+)\",\"(\\S+)\"",
+                         G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
+                         0, &info->error);
+        if (r) {
+            const char *new_apn = (const char *) mm_callback_info_get_data (info, "apn");
+
+            g_regex_match_full (r, response->str, response->len, 0, 0, &match_info, &info->error);
+            while (!found && g_match_info_matches (match_info)) {
+                char *cid;
+                char *pdp_type;
+                char *apn;
+                int num_cid;
+
+                cid = g_match_info_fetch (match_info, 1);
+                num_cid = atoi (cid);
+                pdp_type = g_match_info_fetch (match_info, 2);
+                apn = g_match_info_fetch (match_info, 3);
+
+                if (!strcmp (apn, new_apn)) {
+                    mm_generic_gsm_set_cid (MM_GENERIC_GSM (serial), (guint32) num_cid);
+                    found = TRUE;
+                }
+
+                if (!found && !strcmp (pdp_type, "IP")) {
+                    int highest_cid;
+
+                    highest_cid = GPOINTER_TO_INT (mm_callback_info_get_data (info, "highest-cid"));
+                    if (num_cid > highest_cid)
+                        mm_callback_info_set_data (info, "highest-cid", GINT_TO_POINTER (num_cid), NULL);
+                }
+
+                g_free (cid);
+                g_free (pdp_type);
+                g_free (apn);
+                g_match_info_next (match_info, NULL);
+            }
+
+            g_match_info_free (match_info);
+            g_regex_unref (r);
+        }
+    } else
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse the response");
+
+    if (found || info->error)
+        mm_callback_info_schedule (info);
+    else
+        /* APN not configured on the card. Get the allowed CID range */
+        mm_serial_queue_command (serial, "+CGDCONT=?", 3, cid_range_read, info);
 }
 
 static void
@@ -740,16 +884,15 @@ set_apn (MMModemGsmNetwork *modem,
          gpointer user_data)
 {
     MMCallbackInfo *info;
-    char *command;
-    guint cid = 1;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
-    mm_callback_info_set_data (info, "CID", GUINT_TO_POINTER (cid), NULL);
+    mm_callback_info_set_data (info, "apn", g_strdup (apn), g_free);
 
-    command = g_strdup_printf ("+CGDCONT=%d, \"IP\", \"%s\"", cid, apn);
-    mm_serial_queue_command (MM_SERIAL (modem), command, 3, set_apn_done, info);
-    g_free (command);
+    /* Start by searching if the APN is already in card */
+    mm_serial_queue_command (MM_SERIAL (modem), "+CGDCONT?", 3, existing_apns_read, info);
 }
+
+/* GetSignalQuality */
 
 static void
 get_signal_quality_done (MMSerial *serial,
