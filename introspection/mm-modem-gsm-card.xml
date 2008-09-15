@@ -4,7 +4,7 @@
   <interface name="org.freedesktop.ModemManager.Modem.Gsm.Card">
     <method name="GetImei">
       <tp:docstring>
-	Get the IMEI of the SIM card.
+	Get the IMEI of the card.
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_imei"/>

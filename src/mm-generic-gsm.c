@@ -275,6 +275,64 @@ send_pin (MMModemGsmCard *modem,
     g_free (command);
 }
 
+static void
+enable_pin_done (MMSerial *serial,
+                 GString *response,
+                 GError *error,
+                 gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error)
+        info->error = g_error_copy (error);
+    mm_callback_info_schedule (info);
+}
+
+static void
+enable_pin (MMModemGsmCard *modem,
+            const char *pin,
+            gboolean enabled,
+            MMModemFn callback,
+            gpointer user_data)
+{
+    MMCallbackInfo *info;
+    char *command;
+
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+    command = g_strdup_printf ("+CLCK=\"SC\",%d,\"%s\"", enabled ? 1 : 0, pin);
+    mm_serial_queue_command (MM_SERIAL (modem), command, 3, enable_pin_done, info);
+    g_free (command);
+}
+
+static void
+change_pin_done (MMSerial *serial,
+                 GString *response,
+                 GError *error,
+                 gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error)
+        info->error = g_error_copy (error);
+    mm_callback_info_schedule (info);
+}
+
+static void
+change_pin (MMModemGsmCard *modem,
+            const char *old_pin,
+            const char *new_pin,
+            MMModemFn callback,
+            gpointer user_data)
+{
+    MMCallbackInfo *info;
+    char *command;
+
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+    command = g_strdup_printf ("+CPWD=\"SC\",\"%s\",\"%s\"", old_pin, new_pin);
+    mm_serial_queue_command (MM_SERIAL (modem), command, 3, change_pin_done, info);
+    g_free (command);
+}
+
 static char *
 parse_operator (const char *reply)
 {
@@ -962,6 +1020,8 @@ modem_gsm_card_init (MMModemGsmCard *class)
     class->get_imsi = get_imsi;
     class->get_info = get_card_info;
     class->send_pin = send_pin;
+    class->enable_pin = enable_pin;
+    class->change_pin = change_pin;
 }
 
 static void
