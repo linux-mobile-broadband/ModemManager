@@ -114,7 +114,7 @@ load_plugins (MMManager *manager)
         char *path;
         MMPlugin *plugin;
 
-        if (!strstr (fname, G_MODULE_SUFFIX))
+        if (!g_str_has_suffix (fname, G_MODULE_SUFFIX))
             continue;
 
         path = g_module_build_path (PLUGINDIR, fname);
