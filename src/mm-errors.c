@@ -7,91 +7,91 @@
 GQuark
 mm_serial_error_quark (void)
 {
-	static GQuark ret = 0;
+    static GQuark ret = 0;
 
-	if (ret == 0)
-		ret = g_quark_from_static_string ("mm_serial_error");
+    if (ret == 0)
+        ret = g_quark_from_static_string ("mm_serial_error");
 
-	return ret;
+    return ret;
 }
 
 GType
 mm_serial_error_get_type (void)
 {
-	static GType etype = 0;
+    static GType etype = 0;
 
-	if (etype == 0) {
-		static const GEnumValue values[] = {
-			ENUM_ENTRY (MM_SERIAL_OPEN_FAILED,      "SerialOpenFailed"),
-			ENUM_ENTRY (MM_SERIAL_SEND_FAILED,      "SerialSendfailed"),
-			ENUM_ENTRY (MM_SERIAL_RESPONSE_TIMEOUT, "SerialResponseTimeout"),
-			{ 0, 0, 0 }
-		};
+    if (etype == 0) {
+        static const GEnumValue values[] = {
+            ENUM_ENTRY (MM_SERIAL_OPEN_FAILED,      "SerialOpenFailed"),
+            ENUM_ENTRY (MM_SERIAL_SEND_FAILED,      "SerialSendfailed"),
+            ENUM_ENTRY (MM_SERIAL_RESPONSE_TIMEOUT, "SerialResponseTimeout"),
+            { 0, 0, 0 }
+        };
 
-		etype = g_enum_register_static ("MMSerialError", values);
-	}
+        etype = g_enum_register_static ("MMSerialError", values);
+    }
 
-	return etype;
+    return etype;
 }
 
 GQuark
 mm_modem_error_quark (void)
 {
-	static GQuark ret = 0;
+    static GQuark ret = 0;
 
-	if (ret == 0)
-		ret = g_quark_from_static_string ("mm_modem_error");
+    if (ret == 0)
+        ret = g_quark_from_static_string ("mm_modem_error");
 
-	return ret;
+    return ret;
 }
 
 GType
 mm_modem_error_get_type (void)
 {
-	static GType etype = 0;
+    static GType etype = 0;
 
-	if (etype == 0) {
-		static const GEnumValue values[] = {
+    if (etype == 0) {
+        static const GEnumValue values[] = {
             ENUM_ENTRY (MM_MODEM_ERROR_GENERAL,                 "Generial"),
-			ENUM_ENTRY (MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED, "OperationNotSupported"),
-			{ 0, 0, 0 }
-		};
+            ENUM_ENTRY (MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED, "OperationNotSupported"),
+            { 0, 0, 0 }
+        };
 
-		etype = g_enum_register_static ("MMModemError", values);
-	}
+        etype = g_enum_register_static ("MMModemError", values);
+    }
 
-	return etype;
+    return etype;
 }
 
 GQuark
 mm_modem_connect_error_quark (void)
 {
-	static GQuark ret = 0;
+    static GQuark ret = 0;
 
-	if (ret == 0)
-		ret = g_quark_from_static_string ("mm_modem_connect_error");
+    if (ret == 0)
+        ret = g_quark_from_static_string ("mm_modem_connect_error");
 
-	return ret;
+    return ret;
 }
 
 GType
 mm_modem_connect_error_get_type (void)
 {
-	static GType etype = 0;
+    static GType etype = 0;
 
-	if (etype == 0) {
-		static const GEnumValue values[] = {
-			ENUM_ENTRY (MM_MODEM_CONNECT_ERROR_NO_CARRIER,  "NoCarrier"),
+    if (etype == 0) {
+        static const GEnumValue values[] = {
+            ENUM_ENTRY (MM_MODEM_CONNECT_ERROR_NO_CARRIER,  "NoCarrier"),
             ENUM_ENTRY (MM_MODEM_CONNECT_ERROR_NO_DIALTONE, "NoDialtone"),
-			ENUM_ENTRY (MM_MODEM_CONNECT_ERROR_BUSY,        "Busy"),
-			ENUM_ENTRY (MM_MODEM_CONNECT_ERROR_NO_ANSWER,   "NoAnswer"),
-			{ 0, 0, 0 }
-		};
+            ENUM_ENTRY (MM_MODEM_CONNECT_ERROR_BUSY,        "Busy"),
+            ENUM_ENTRY (MM_MODEM_CONNECT_ERROR_NO_ANSWER,   "NoAnswer"),
+            { 0, 0, 0 }
+        };
 
-		etype = g_enum_register_static ("MMModemConnectError", values);
-	}
+        etype = g_enum_register_static ("MMModemConnectError", values);
+    }
 
-	return etype;
+    return etype;
 }
 
 GError *
@@ -127,22 +127,22 @@ mm_modem_connect_error_for_code (int error_code)
 GQuark
 mm_mobile_error_quark (void)
 {
-	static GQuark ret = 0;
+    static GQuark ret = 0;
 
-	if (ret == 0)
-		ret = g_quark_from_static_string ("mm_mobile_error");
+    if (ret == 0)
+        ret = g_quark_from_static_string ("mm_mobile_error");
 
-	return ret;
+    return ret;
 }
 
 GType
 mm_mobile_error_get_type (void)
 {
-	static GType etype = 0;
+    static GType etype = 0;
 
-	if (etype == 0) {
-		static const GEnumValue values[] = {
-			ENUM_ENTRY (MM_MOBILE_ERROR_PHONE_FAILURE,             "PhoneFailure"),
+    if (etype == 0) {
+        static const GEnumValue values[] = {
+            ENUM_ENTRY (MM_MOBILE_ERROR_PHONE_FAILURE,             "PhoneFailure"),
             ENUM_ENTRY (MM_MOBILE_ERROR_NO_CONNECTION,             "NoConnection"),
             ENUM_ENTRY (MM_MOBILE_ERROR_LINK_RESERVED,             "LinkReserved"),
             ENUM_ENTRY (MM_MOBILE_ERROR_NOT_ALLOWED,               "OperationNotAllowed"),
@@ -194,13 +194,13 @@ mm_mobile_error_get_type (void)
             ENUM_ENTRY (MM_MOBILE_ERROR_GPRS_PDP_AUTH_FAILURE,     "GprsPdpAuthFailure"),
             ENUM_ENTRY (MM_MOBILE_ERROR_GPRS_UNKNOWN,              "GprsUnspecified"),
             ENUM_ENTRY (MM_MOBILE_ERROR_GPRS_INVALID_CLASS,        "GprsInvalidClass"),
-			{ 0, 0, 0 }
-		};
+            { 0, 0, 0 }
+        };
 
-		etype = g_enum_register_static ("MMMobileError", values);
-	}
+        etype = g_enum_register_static ("MMMobileError", values);
+    }
 
-	return etype;
+    return etype;
 }
 
 GError *
