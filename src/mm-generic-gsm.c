@@ -101,9 +101,16 @@ init_done (MMSerial *serial,
 }
 
 static void
-flash_done (MMSerial *serial, gpointer user_data)
+enable_flash_done (MMSerial *serial, gpointer user_data)
 {
     mm_serial_queue_command (serial, "Z E0 V1 X4 &C1 +CMEE=1", 3, init_done, user_data);
+}
+
+static void
+disable_flash_done (MMSerial *serial, gpointer user_data)
+{
+    mm_serial_close (serial);
+    mm_callback_info_schedule ((MMCallbackInfo *) user_data);
 }
 
 static void
@@ -117,16 +124,19 @@ enable (MMModem *modem,
     info = mm_callback_info_new (modem, callback, user_data);
 
     if (!enable) {
-        mm_serial_close (MM_SERIAL (modem));
-        mm_callback_info_schedule (info);
-        return;
+        if (mm_serial_is_connected (MM_SERIAL (modem)))
+            mm_serial_flash (MM_SERIAL (modem), 1000, disable_flash_done, info);
+        else {
+            mm_serial_close (MM_SERIAL (modem));
+            mm_callback_info_schedule (info);
+        }
+    } else {
+        if (mm_serial_open (MM_SERIAL (modem), &info->error))
+            mm_serial_flash (MM_SERIAL (modem), 100, enable_flash_done, info);
+
+        if (info->error)
+            mm_callback_info_schedule (info);
     }
-
-    if (mm_serial_open (MM_SERIAL (modem), &info->error))
-        mm_serial_flash (MM_SERIAL (modem), 100, flash_done, info);
-
-    if (info->error)
-        mm_callback_info_schedule (info);
 }
 
 static void
