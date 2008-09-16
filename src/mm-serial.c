@@ -387,7 +387,7 @@ mm_serial_timed_out (gpointer data)
                                  "Serial command timed out");
     /* FIXME: This is not completely correct - if the response finally arrives and there's
        some other command waiting for response right now, the other command will
-       get the output of the timed out command. Maybe flashing would help here? */
+       get the output of the timed out command. Not sure what to do here. */
     mm_serial_got_response (self, error);
 
     return FALSE;

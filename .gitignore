@@ -15,12 +15,13 @@ stamp-h1
 *.o
 *.lo
 *.la
+*.loT
 libtool
 .deps
 .libs
 *-glue.h
 org.freedesktop.ModemManager.service
 ModemManager.pc
+marshallers/mm-marshal.[ch]
 src/modem-manager
 docs/spec.html
-

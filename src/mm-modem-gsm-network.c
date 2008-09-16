@@ -6,6 +6,7 @@
 #include "mm-modem-gsm-network.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
+#include "mm-marshal.h"
 
 static void impl_gsm_modem_register (MMModemGsmNetwork *modem,
                                      const char *network_id,
@@ -451,8 +452,6 @@ mm_modem_gsm_network_init (gpointer g_iface)
                       G_TYPE_NONE, 1,
                       G_TYPE_UINT);
 
-    /* FIXME */
-#if 0
     signals[REGISTRATION_INFO] =
         g_signal_new ("registration-info",
                       iface_type,
@@ -462,7 +461,6 @@ mm_modem_gsm_network_init (gpointer g_iface)
                       mm_marshal_VOID__UINT_STRING_STRING,
                       G_TYPE_NONE, 3,
                       G_TYPE_UINT, G_TYPE_STRING, G_TYPE_STRING);
-#endif
 
     signals[NETWORK_MODE] =
         g_signal_new ("network-mode",

@@ -8,6 +8,8 @@ MM_DBUS_SERVICE='org.freedesktop.ModemManager'
 MM_DBUS_PATH='/org/freedesktop/ModemManager'
 MM_DBUS_INTERFACE='org.freedesktop.ModemManager'
 MM_DBUS_INTERFACE_MODEM='org.freedesktop.ModemManager.Modem'
+MM_DBUS_INTERFACE_MODEM_GSM_CARD='org.freedesktop.ModemManager.Modem.Gsm.Card'
+MM_DBUS_INTERFACE_MODEM_GSM_NETWORK='org.freedesktop.ModemManager.Modem.Gsm.Network'
 
 bus = dbus.SystemBus()
 manager_proxy = bus.get_object(MM_DBUS_SERVICE, MM_DBUS_PATH)

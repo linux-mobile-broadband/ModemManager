@@ -2,10 +2,12 @@ sbin_PROGRAMS = modem-manager
 
 modem_manager_CPPFLAGS = \
 	$(MM_CFLAGS) \
+	-I${top_builddir}/marshallers \
 	-DPLUGINDIR=\"$(pkglibdir)\"
 
 modem_manager_LDADD = \
-	$(MM_LIBS)
+	$(MM_LIBS) \
+	$(top_builddir)/marshallers/libmarshallers.la
 
 modem_manager_SOURCES = \
 	main.c \
