@@ -107,6 +107,59 @@ get_driver_name (LibHalContext *ctx, const char *udi)
     return driver;
 }
 
+static char *
+find_second_port (LibHalContext *ctx, const char *parent)
+{
+    char **children;
+    char *second_port = NULL;
+    int num_children = 0;
+    int i;
+
+    children = libhal_manager_find_device_string_match (ctx, "info.parent", parent, &num_children, NULL);
+    for (i = 0; i < num_children && second_port == NULL; i++) {
+        const char *child = children[i];
+
+        if (libhal_device_property_exists (ctx, child, "serial.port", NULL) &&
+            libhal_device_get_property_int (ctx, child, "serial.port", NULL) == 1)
+
+            second_port = libhal_device_get_property_string (ctx, child, "serial.device", NULL);
+    }
+
+    libhal_free_string_array (children);
+
+    return second_port;
+}
+
+static char *
+get_monitor_device (LibHalContext *ctx, const char *udi)
+{
+    char *parent;
+    char *grand_parent;
+    char **uncles;
+    char *monitor_device = NULL;
+    int num_uncles = 0;
+    int i;
+
+    parent = libhal_device_get_property_string (ctx, udi, "info.parent", NULL);
+    grand_parent = libhal_device_get_property_string (ctx, parent, "info.parent", NULL);
+
+    /* Find "uncles" */
+    uncles = libhal_manager_find_device_string_match (ctx, "info.parent", grand_parent, &num_uncles, NULL);
+    for (i = 0; i < num_uncles && monitor_device == NULL; i++) {
+        const char *uncle = uncles[i];
+
+        /* Ignore "dad" */
+        if (strcmp (uncle, parent))
+            monitor_device = find_second_port (ctx, uncle);
+    }
+
+    libhal_free_string_array (uncles);
+    libhal_free_string (parent);
+    libhal_free_string (grand_parent);
+
+    return monitor_device;
+}
+
 static MMModem *
 create_modem (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
 {
@@ -121,13 +174,14 @@ create_modem (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
     driver = get_driver_name (hal_ctx, udi);
     g_return_val_if_fail (driver != NULL, NULL);
 
-    /* FIXME: Get monitoring device from HAL */
-    monitor_device = "/dev/ttyUSB1";
+    monitor_device = get_monitor_device (hal_ctx, udi);
+    g_debug ("Got monitor device: %s", monitor_device);
 
     modem = MM_MODEM (mm_modem_huawei_new (data_device, monitor_device, driver));
 
-    g_free (data_device);
-    g_free (driver);
+    libhal_free_string (data_device);
+    libhal_free_string (monitor_device);
+    libhal_free_string (driver);
 
     return modem;
 }
