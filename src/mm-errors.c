@@ -209,64 +209,58 @@ mm_mobile_error_for_code (int error_code)
     const char *msg;
 
     switch (error_code) {
-    case MM_MOBILE_ERROR_SIM_PIN:
-        msg = "PIN code required";
-        break;
-
-    case MM_MOBILE_ERROR_PHONE_FAILURE:
-    case MM_MOBILE_ERROR_NO_CONNECTION:
-    case MM_MOBILE_ERROR_LINK_RESERVED:
-    case MM_MOBILE_ERROR_NOT_ALLOWED:
-    case MM_MOBILE_ERROR_NOT_SUPPORTED:
-    case MM_MOBILE_ERROR_PH_SIM_PIN:
-    case MM_MOBILE_ERROR_PH_FSIM_PIN:
-    case MM_MOBILE_ERROR_PH_FSIM_PUK:
-    case MM_MOBILE_ERROR_SIM_NOT_INSERTED:
-    case MM_MOBILE_ERROR_SIM_PUK:
-    case MM_MOBILE_ERROR_SIM_FAILURE:
-    case MM_MOBILE_ERROR_SIM_BUSY:
-    case MM_MOBILE_ERROR_SIM_WRONG:
-    case MM_MOBILE_ERROR_WRONG_PASSWORD:
-    case MM_MOBILE_ERROR_SIM_PIN2:
-    case MM_MOBILE_ERROR_SIM_PUK2:
-    case MM_MOBILE_ERROR_MEMORY_FULL:
-    case MM_MOBILE_ERROR_INVALID_INDEX:
-    case MM_MOBILE_ERROR_NOT_FOUND:
-    case MM_MOBILE_ERROR_MEMORY_FAILURE:
-    case MM_MOBILE_ERROR_TEXT_TOO_LONG:
-    case MM_MOBILE_ERROR_INVALID_CHARS:
-    case MM_MOBILE_ERROR_DIAL_STRING_TOO_LONG:
-    case MM_MOBILE_ERROR_DIAL_STRING_INVALID:
-    case MM_MOBILE_ERROR_NO_NETWORK:
-    case MM_MOBILE_ERROR_NETWORK_TIMEOUT:
-    case MM_MOBILE_ERROR_NETWORK_NOT_ALLOWED:
-    case MM_MOBILE_ERROR_NETWORK_PIN:
-    case MM_MOBILE_ERROR_NETWORK_PUK:
-    case MM_MOBILE_ERROR_NETWORK_SUBSET_PIN:
-    case MM_MOBILE_ERROR_NETWORK_SUBSET_PUK:
-    case MM_MOBILE_ERROR_SERVICE_PIN:
-    case MM_MOBILE_ERROR_SERVICE_PUK:
-    case MM_MOBILE_ERROR_CORP_PIN:
-    case MM_MOBILE_ERROR_CORP_PUK:
-    case MM_MOBILE_ERROR_HIDDEN_KEY:
-    case MM_MOBILE_ERROR_EAP_NOT_SUPPORTED:
-    case MM_MOBILE_ERROR_INCORRECT_PARAMS:
-    case MM_MOBILE_ERROR_UNKNOWN:
-    case MM_MOBILE_ERROR_GPRS_ILLEGAL_MS:
-    case MM_MOBILE_ERROR_GPRS_ILLEGAL_ME:
-    case MM_MOBILE_ERROR_GPRS_SERVICE_NOT_ALLOWED:
-    case MM_MOBILE_ERROR_GPRS_PLMN_NOT_ALLOWED:
-    case MM_MOBILE_ERROR_GPRS_LOCATION_NOT_ALLOWED:
-    case MM_MOBILE_ERROR_GPRS_ROAMING_NOT_ALLOWED:
-    case MM_MOBILE_ERROR_GPRS_OPTION_NOT_SUPPORTED:
-    case MM_MOBILE_ERROR_GPRS_NOT_SUBSCRIBED:
-    case MM_MOBILE_ERROR_GPRS_OUT_OF_ORDER:
-    case MM_MOBILE_ERROR_GPRS_PDP_AUTH_FAILURE:
-    case MM_MOBILE_ERROR_GPRS_UNKNOWN:
-    case MM_MOBILE_ERROR_GPRS_INVALID_CLASS:
-        /* FIXME */
-        msg = "Error";
-        break;
+    case MM_MOBILE_ERROR_PHONE_FAILURE: msg = "Phone failure"; break;
+    case MM_MOBILE_ERROR_NO_CONNECTION: msg = "No connection to phone"; break;
+    case MM_MOBILE_ERROR_LINK_RESERVED: msg = "Phone-adaptor link reserved"; break;
+    case MM_MOBILE_ERROR_NOT_ALLOWED: msg = "Operation not allowed"; break;
+    case MM_MOBILE_ERROR_NOT_SUPPORTED: msg = "Operation not supported"; break;
+    case MM_MOBILE_ERROR_PH_SIM_PIN: msg = "PH-SIM PIN required"; break;
+    case MM_MOBILE_ERROR_PH_FSIM_PIN: msg = "PH-FSIM PIN required"; break;
+    case MM_MOBILE_ERROR_PH_FSIM_PUK: msg = "PH-FSIM PUK required"; break;
+    case MM_MOBILE_ERROR_SIM_NOT_INSERTED: msg = "SIM not inserted"; break;
+    case MM_MOBILE_ERROR_SIM_PIN: msg = "SIM PIN required"; break;
+    case MM_MOBILE_ERROR_SIM_PUK: msg = "SIM PUK required"; break;
+    case MM_MOBILE_ERROR_SIM_FAILURE: msg = "SIM failure"; break;
+    case MM_MOBILE_ERROR_SIM_BUSY: msg = "SIM busy"; break;
+    case MM_MOBILE_ERROR_SIM_WRONG: msg = "SIM wrong"; break;
+    case MM_MOBILE_ERROR_WRONG_PASSWORD: msg = "Incorrect password"; break;
+    case MM_MOBILE_ERROR_SIM_PIN2: msg = "SIM PIN2 required"; break;
+    case MM_MOBILE_ERROR_SIM_PUK2: msg = "SIM PUK2 required"; break;
+    case MM_MOBILE_ERROR_MEMORY_FULL: msg = "Memory full"; break;
+    case MM_MOBILE_ERROR_INVALID_INDEX: msg = "Invalid index"; break;
+    case MM_MOBILE_ERROR_NOT_FOUND: msg = "Not found"; break;
+    case MM_MOBILE_ERROR_MEMORY_FAILURE: msg = "Memory failure"; break;
+    case MM_MOBILE_ERROR_TEXT_TOO_LONG: msg = "Text string too long"; break;
+    case MM_MOBILE_ERROR_INVALID_CHARS: msg = "Invalid characters in text string"; break;
+    case MM_MOBILE_ERROR_DIAL_STRING_TOO_LONG: msg = "Dial string too long"; break;
+    case MM_MOBILE_ERROR_DIAL_STRING_INVALID: msg = "Invalid characters in dial string"; break;
+    case MM_MOBILE_ERROR_NO_NETWORK: msg = "No network service"; break;
+    case MM_MOBILE_ERROR_NETWORK_TIMEOUT: msg = "Network timeout"; break;
+    case MM_MOBILE_ERROR_NETWORK_NOT_ALLOWED: msg = "Network not allowed - emergency calls only"; break;
+    case MM_MOBILE_ERROR_NETWORK_PIN: msg = "Network personalization PIN required"; break;
+    case MM_MOBILE_ERROR_NETWORK_PUK: msg = "Network personalization PUK required"; break;
+    case MM_MOBILE_ERROR_NETWORK_SUBSET_PIN: msg = "Network subset personalization PIN required"; break;
+    case MM_MOBILE_ERROR_NETWORK_SUBSET_PUK: msg = "Network subset personalization PUK required"; break;
+    case MM_MOBILE_ERROR_SERVICE_PIN: msg = "Service provider personalization PIN required"; break;
+    case MM_MOBILE_ERROR_SERVICE_PUK: msg = "Service provider personalization PUK required"; break;
+    case MM_MOBILE_ERROR_CORP_PIN: msg = "Corporate personalization PIN required"; break;
+    case MM_MOBILE_ERROR_CORP_PUK: msg = "Corporate personalization PUK required"; break;
+    case MM_MOBILE_ERROR_HIDDEN_KEY: msg = "Hidden key required"; break;
+    case MM_MOBILE_ERROR_EAP_NOT_SUPPORTED: msg = "EAP method not supported"; break;
+    case MM_MOBILE_ERROR_INCORRECT_PARAMS: msg = "Incorrect parameters"; break;
+    case MM_MOBILE_ERROR_UNKNOWN: msg = "Unknown error"; break;
+    case MM_MOBILE_ERROR_GPRS_ILLEGAL_MS: msg = "Illegal MS"; break;
+    case MM_MOBILE_ERROR_GPRS_ILLEGAL_ME: msg = "Illegal ME"; break;
+    case MM_MOBILE_ERROR_GPRS_SERVICE_NOT_ALLOWED: msg = "GPRS services not allowed"; break;
+    case MM_MOBILE_ERROR_GPRS_PLMN_NOT_ALLOWED: msg = "PLMN not allowed"; break;
+    case MM_MOBILE_ERROR_GPRS_LOCATION_NOT_ALLOWED: msg = "Location area not allowed"; break;
+    case MM_MOBILE_ERROR_GPRS_ROAMING_NOT_ALLOWED: msg = "Roaming not allowed in this location area"; break;
+    case MM_MOBILE_ERROR_GPRS_OPTION_NOT_SUPPORTED: msg = "Service option not supported"; break;
+    case MM_MOBILE_ERROR_GPRS_NOT_SUBSCRIBED: msg = "Requested service option not subscribed"; break;
+    case MM_MOBILE_ERROR_GPRS_OUT_OF_ORDER: msg = "Service option temporarily out of order"; break;
+    case MM_MOBILE_ERROR_GPRS_PDP_AUTH_FAILURE: msg = "PDP authentication failure"; break;
+    case MM_MOBILE_ERROR_GPRS_UNKNOWN: msg = "Unspecified GPRS error"; break;
+    case MM_MOBILE_ERROR_GPRS_INVALID_CLASS: msg = "Invalid mobile class"; break;
     default:
         g_warning ("Invalid error code");
         error_code = MM_MOBILE_ERROR_UNKNOWN;
