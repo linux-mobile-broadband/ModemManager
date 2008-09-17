@@ -53,8 +53,6 @@ remove_matches (GRegex *r, GString *string)
     g_free (str);
 }
 
-/* FIXME: V0 parser is not finished */
-#if 0
 typedef struct {
     GRegex *generic_response;
     GRegex *detailed_error;
@@ -68,20 +66,21 @@ mm_serial_parser_v0_new (void)
 
     parser = g_slice_new (MMSerialParserV0);
 
-    parser->generic_response = g_regex_new ("(\\d)\\r%", flags, 0, NULL);
-    parser->detailed_error = g_regex_new ("+CME ERROR: (\\d+)\\r\\n$", flags, 0, NULL);
+    parser->generic_response = g_regex_new ("(\\d)\\0?\\r$", flags, 0, NULL);
+    parser->detailed_error = g_regex_new ("\\+CME ERROR: (\\d+)\\r\\n$", flags, 0, NULL);
 
     return parser;
 }
 
 gboolean
-mm_serial_parser_v0_parse (gpointer parser,
+mm_serial_parser_v0_parse (gpointer data,
                            GString *response,
                            GError **error)
 {
     MMSerialParserV0 *parser = (MMSerialParserV0 *) data;
     GMatchInfo *match_info;
     char *str;
+    GError *local_error = NULL;
     int code;
     gboolean found;
 
@@ -95,31 +94,63 @@ mm_serial_parser_v0_parse (gpointer parser,
 
         g_match_info_free (match_info);
 
-        return TRUE;
+        switch (code) {
+        case 0: /* OK */
+            break;
+        case 1: /* CONNECT */
+            break;
+        case 3: /* NO CARRIER */
+            local_error = mm_modem_connect_error_for_code (MM_MODEM_CONNECT_ERROR_NO_CARRIER);
+            break;
+        case 4: /* ERROR */
+            local_error = mm_mobile_error_for_code (MM_MOBILE_ERROR_UNKNOWN);
+            break;
+        case 6: /* NO DIALTONE */
+            local_error = mm_modem_connect_error_for_code (MM_MODEM_CONNECT_ERROR_NO_DIALTONE);
+            break;
+        case 7: /* BUSY */
+            local_error = mm_modem_connect_error_for_code (MM_MODEM_CONNECT_ERROR_BUSY);
+            break;
+        case 8: /* NO ANSWER */
+            local_error = mm_modem_connect_error_for_code (MM_MODEM_CONNECT_ERROR_NO_ANSWER);
+            break;
+        default:
+            local_error = mm_mobile_error_for_code (MM_MOBILE_ERROR_UNKNOWN);
+            break;
+        }
+
+        remove_matches (parser->generic_response, response);
     }
 
-    found = g_regex_match_full (parser->detailed_error, response->str, response->len, 0, 0, &match_info, NULL);
-    if (found) {
-        str = g_match_info_fetch (match_info, 1);
-        if (str) {
-            code = atoi (str);
-            g_free (str);
-        } else
-            code = MM_MOBILE_ERROR_UNKNOWN;
+    if (!found) {
+        found = g_regex_match_full (parser->detailed_error, response->str, response->len, 0, 0, &match_info, NULL);
 
-        g_match_info_free (match_info);
+        if (found) {
+            str = g_match_info_fetch (match_info, 1);
+            if (str) {
+                code = atoi (str);
+                g_free (str);
+            } else
+                code = MM_MOBILE_ERROR_UNKNOWN;
 
-        g_debug ("Got error code %d: %s", code, msg);
-        g_set_error (error, MM_MOBILE_ERROR, code, "%s", msg);
-
-        return TRUE;
+            g_match_info_free (match_info);
+            local_error = mm_mobile_error_for_code (code);
+        }
     }
 
-    return FALSE;
+    if (found)
+        response_clean (response);
+
+    if (local_error) {
+        g_debug ("Got failure code %d: %s", local_error->code, local_error->message);
+        g_propagate_error (error, local_error);
+    }
+
+    return found;
 }
 
 void
-mm_serial_parser_v0_destroy (gpointer parser)
+mm_serial_parser_v0_destroy (gpointer data)
 {
     MMSerialParserV0 *parser = (MMSerialParserV0 *) data;
 
@@ -128,7 +159,6 @@ mm_serial_parser_v0_destroy (gpointer parser)
 
     g_slice_free (MMSerialParserV0, data);
 }
-#endif
 
 typedef struct {
     GRegex *regex_ok;
@@ -229,6 +259,9 @@ mm_serial_parser_v1_parse (gpointer data,
             local_error = mm_modem_connect_error_for_code (code);
         }
     }
+
+    if (found)
+        response_clean (response);
 
     if (local_error) {
         g_debug ("Got failure code %d: %s", local_error->code, local_error->message);

@@ -5,15 +5,12 @@
 
 #include <glib.h>
 
-/* FIXME: V0 parser is not finished */
-#if 0
 gpointer mm_serial_parser_v0_new     (void);
 gboolean mm_serial_parser_v0_parse   (gpointer parser,
                                       GString *response,
                                       GError **error);
 
 void     mm_serial_parser_v0_destroy (gpointer parser);
-#endif
 
 
 gpointer mm_serial_parser_v1_new     (void);
