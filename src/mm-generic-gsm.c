@@ -145,6 +145,9 @@ enable (MMModem *modem,
 {
     MMCallbackInfo *info;
 
+    /* First, reset the previously used CID */
+    mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
+
     info = mm_callback_info_new (modem, callback, user_data);
 
     if (!enable) {
@@ -714,6 +717,9 @@ disconnect (MMModem *modem,
             gpointer user_data)
 {
     MMCallbackInfo *info;
+
+    /* First, reset the previously used CID */
+    mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
 
     info = mm_callback_info_new (modem, callback, user_data);
     mm_serial_flash (MM_SERIAL (modem), 1000, disconnect_flash_done, info);
