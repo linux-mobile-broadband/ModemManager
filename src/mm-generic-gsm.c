@@ -118,7 +118,7 @@ init_done (MMSerial *serial,
 static void
 enable_flash_done (MMSerial *serial, gpointer user_data)
 {
-    mm_serial_queue_command (serial, "Z E0 V1 X4 &C1 +CMEE=1", 3, init_done, user_data);
+    mm_serial_queue_command (serial, "Z E0 V1 X4 &C1 +CMOD=0; +FCLASS=0; +CMEE=1", 3, init_done, user_data);
 }
 
 static void
