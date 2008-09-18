@@ -87,10 +87,10 @@ mm_generic_gsm_set_operator (MMGenericGsm *modem,
 /*****************************************************************************/
 
 static void
-init_done (MMSerial *serial,
-           GString *response,
-           GError *error,
-           gpointer user_data)
+enable_done (MMSerial *serial,
+             GString *response,
+             GError *error,
+             gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
@@ -101,16 +101,40 @@ init_done (MMSerial *serial,
 }
 
 static void
+init_done (MMSerial *serial,
+           GString *response,
+           GError *error,
+           gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+    } else
+        mm_serial_queue_command (serial, "+CFUN=1", 5, enable_done, user_data);
+}
+
+static void
 enable_flash_done (MMSerial *serial, gpointer user_data)
 {
     mm_serial_queue_command (serial, "Z E0 V1 X4 &C1 +CMEE=1", 3, init_done, user_data);
 }
 
 static void
-disable_flash_done (MMSerial *serial, gpointer user_data)
+disable_done (MMSerial *serial,
+              GString *response,
+              GError *error,
+              gpointer user_data)
 {
     mm_serial_close (serial);
     mm_callback_info_schedule ((MMCallbackInfo *) user_data);
+}
+
+static void
+disable_flash_done (MMSerial *serial, gpointer user_data)
+{
+    mm_serial_queue_command (serial, "+CFUN=0", 5, disable_done, user_data);
 }
 
 static void
@@ -126,10 +150,8 @@ enable (MMModem *modem,
     if (!enable) {
         if (mm_serial_is_connected (MM_SERIAL (modem)))
             mm_serial_flash (MM_SERIAL (modem), 1000, disable_flash_done, info);
-        else {
-            mm_serial_close (MM_SERIAL (modem));
-            mm_callback_info_schedule (info);
-        }
+        else
+            disable_flash_done (MM_SERIAL (modem), info);
     } else {
         if (mm_serial_open (MM_SERIAL (modem), &info->error))
             mm_serial_flash (MM_SERIAL (modem), 100, enable_flash_done, info);
