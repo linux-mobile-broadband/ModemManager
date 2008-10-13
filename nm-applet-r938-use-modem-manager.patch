@@ -31,7 +31,7 @@ index de8ccb4..2be2217 100644
  
  nm_applet_LDADD = \
 diff --git a/src/applet-device-gsm.c b/src/applet-device-gsm.c
-index 1641661..f0a31e6 100644
+index 90c5e5e..e28d13c 100644
 --- a/src/applet-device-gsm.c
 +++ b/src/applet-device-gsm.c
 @@ -24,6 +24,9 @@
@@ -104,7 +104,7 @@ index 1641661..f0a31e6 100644
  gsm_menu_item_deactivate (GtkMenuItem *item, gpointer user_data)
  {
  	GSMMenuItemInfo *info = (GSMMenuItemInfo *) user_data;
-@@ -270,23 +319,66 @@ gsm_add_menu_item (NMDevice *device,
+@@ -264,37 +313,68 @@ gsm_add_menu_item (NMDevice *device,
  		add_connection_items (device, connections, active, menu, applet);
  	else
  		add_default_connection_item (device, menu, applet);
@@ -124,23 +124,36 @@ index 1641661..f0a31e6 100644
 +
 +static void
  gsm_device_state_changed (NMDevice *device,
-                           NMDeviceState state,
+                           NMDeviceState new_state,
+                           NMDeviceState old_state,
+                           NMDeviceStateReason reason,
                            NMApplet *applet)
  {
--	if (state == NM_DEVICE_STATE_ACTIVATED) {
--		applet_do_notify (applet, NOTIFY_URGENCY_LOW,
--					      _("Connection Established"),
--						  _("You are now connected to the GSM network."),
--						  "nm-device-wwan", NULL, NULL, NULL, NULL);
+-	if (new_state == NM_DEVICE_STATE_ACTIVATED) {
+-		NMConnection *connection;
+-		NMSettingConnection *s_con = NULL;
+-		char *str = NULL;
+-
+-		connection = applet_find_active_connection_for_device (device, applet, NULL);
+-		if (connection) {
+-			s_con = NM_SETTING_CONNECTION (nm_connection_get_setting (connection, NM_TYPE_SETTING_CONNECTION));
+-			if (s_con && s_con->id)
+-				str = g_strdup_printf (_("You are now connected to '%s'."), s_con->id);
+-		}
 +	NMAGsmModem *modem;
 +	char *oper_code;
 +	char *oper_name;
 +	char *msg;
 +	guint32 reg_status;
 +
-+	if (state != NM_DEVICE_STATE_ACTIVATED)
++	if (new_state != NM_DEVICE_STATE_ACTIVATED)
 +		return;
-+
+ 
+-		applet_do_notify (applet, NOTIFY_URGENCY_LOW,
+-					      _("Connection Established"),
+-						  str ? str : _("You are now connected to the GSM network."),
+-						  "nm-device-wwan", NULL, NULL, NULL, NULL);
+-		g_free (str);
 +	modem = (NMAGsmModem *) g_object_get_data (G_OBJECT (device), "gsm-modem");
 +	if (!modem) {
 +			DBusGConnection *bus;
@@ -176,19 +189,22 @@ index 1641661..f0a31e6 100644
  }
  
  static GdkPixbuf *
-@@ -295,6 +387,7 @@ gsm_get_icon (NMDevice *device,
+@@ -304,6 +384,7 @@ gsm_get_icon (NMDevice *device,
                char **tip,
                NMApplet *applet)
  {
 +	NMAGsmModem *modem;
  	GdkPixbuf *pixbuf = NULL;
  	const char *iface;
- 
-@@ -311,8 +404,40 @@ gsm_get_icon (NMDevice *device,
+ 	NMSettingConnection *s_con = NULL;
+@@ -323,11 +404,40 @@ gsm_get_icon (NMDevice *device,
  		*tip = g_strdup_printf (_("Waiting for user authentication on device '%s'..."), iface);
  		break;
  	case NM_DEVICE_STATE_ACTIVATED:
--		*tip = g_strdup (_("GSM connection"));
+-		if (s_con && s_con->id)
+-			*tip = g_strdup_printf (_("Mobile broadband connection '%s'"), s_con->id);
+-		else
+-			*tip = g_strdup (_("Mobile broadband connection"));
 -		pixbuf = applet->wwan_icon;
 +		modem = (NMAGsmModem *) g_object_get_data (G_OBJECT (device), "gsm-modem");
 +		if (modem) {
@@ -227,6 +243,36 @@ index 1641661..f0a31e6 100644
  		break;
  	default:
  		break;
+diff --git a/src/connection-editor/page-mobile.c b/src/connection-editor/page-mobile.c
+index ee627f5..6fd29af 100644
+--- a/src/connection-editor/page-mobile.c
++++ b/src/connection-editor/page-mobile.c
+@@ -107,7 +107,6 @@ populate_gsm_ui (CEPageMobile *self, NMConnection *connection)
+ 	int type_idx;
+ 	GHashTable *secrets;
+ 	GValue *value;
+-	GtkWidget *widget;
+ 
+ 	if (setting->number)
+ 		gtk_entry_set_text (priv->number, setting->number);
+@@ -141,17 +140,6 @@ populate_gsm_ui (CEPageMobile *self, NMConnection *connection)
+ 	}
+ 	gtk_combo_box_set_active (priv->network_type, type_idx);
+ 
+-	/* Hide network type widgets; not supported yet */
+-	gtk_widget_hide (GTK_WIDGET (priv->network_type));
+-	widget = glade_xml_get_widget (CE_PAGE (self)->xml, "type_label");
+-	gtk_widget_hide (widget);
+-
+-	/* Hide Band widgets; not supported yet */
+-	widget = glade_xml_get_widget (CE_PAGE (self)->xml, "mobile_band");
+-	gtk_widget_hide (widget);
+-	widget = glade_xml_get_widget (CE_PAGE (self)->xml, "band_label");
+-	gtk_widget_hide (widget);
+-
+ 	secrets = get_secrets (connection, nm_setting_get_name (priv->setting));
+ 
+ 	if (setting->password)
 diff --git a/src/mm-types.h b/src/mm-types.h
 new file mode 100644
 index 0000000..a1f9979
@@ -284,10 +330,10 @@ index 0000000..206ee52
 +EXTRA_DIST = $(glade_DATA)
 diff --git a/src/modems/main.c b/src/modems/main.c
 new file mode 100644
-index 0000000..27e700c
+index 0000000..fe531f0
 --- /dev/null
 +++ b/src/modems/main.c
-@@ -0,0 +1,592 @@
+@@ -0,0 +1,547 @@
 +/* -*- Mode: C; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*- */
 +
 +#include <string.h>
@@ -323,12 +369,13 @@ index 0000000..27e700c
 +	/* UI */
 +	GladeXML *glade_xml;
 +	GtkDialog *main_dialog;
-+	GtkTable *info_table;
 +	GtkTreeView *network_list;
 +	GtkListStore *network_store;
 +	GtkWidget *scan_button;
 +	GtkWidget *create_net_button;
-+	GtkLabel *signal_quality_label;
++
++	GtkWidget *scan_dialog;
++	GtkProgressBar *scan_progress_bar;
 +
 +	GtkDialog *create_network_dialog;
 +	GtkEntry *create_network_name;
@@ -341,63 +388,17 @@ index 0000000..27e700c
 +	GMainLoop *main_loop;
 +} AppData;
 +
-+
-+typedef struct {
-+	GtkTable *table;
-+	char *label;
-+	guint row;
-+} InfoData;
-+
-+static InfoData *
-+info_data_new (GtkTable *table, const char *label, guint row)
-+{
-+	InfoData *info;
-+
-+	info = g_slice_new (InfoData);
-+	info->table = table;
-+	info->label = g_strdup (label);
-+	info->row = row;
-+
-+	return info;
-+}
-+
-+static void
-+info_data_free (gpointer data)
-+{
-+	InfoData *info = (InfoData *) data;
-+
-+	g_free (info->label);
-+	g_slice_free (InfoData, data);
-+}
-+
-+static void
-+add_info_row (GtkTable *table, guint row, const char *label, const char *value)
-+{
-+	GtkWidget *w;
-+
-+	w = gtk_label_new (label);
-+	gtk_misc_set_alignment (GTK_MISC (w), 0.0, 0.0);
-+	gtk_widget_show (w);
-+	gtk_table_attach_defaults (table, w, 0, 1, row, row + 1);
-+
-+	w = gtk_label_new (value);
-+	gtk_misc_set_alignment (GTK_MISC (w), 0.0, 0.0);
-+	gtk_widget_show (w);
-+	gtk_table_attach_defaults (table, w, 1, 2, row, row + 1);
-+}
-+
 +static void
 +get_str_done (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data)
 +{
-+	InfoData *info = (InfoData *) user_data;
 +	char *result = NULL;
 +	GError *error = NULL;
 +
 +	if (!dbus_g_proxy_end_call (proxy, call_id, &error, G_TYPE_STRING, &result, G_TYPE_INVALID)) {
-+		g_warning ("Couldn't get %s: %s", info->label, error->message);
++		g_warning ("%s", error->message);
 +		g_error_free (error);
 +	} else {
-+		add_info_row (info->table, info->row, info->label, result);
++		gtk_label_set_text (GTK_LABEL (user_data), result);
 +		g_free (result);
 +	}
 +}
@@ -405,7 +406,7 @@ index 0000000..27e700c
 +static void
 +get_card_info_done (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data)
 +{
-+	GtkTable *table = GTK_TABLE (user_data);
++	GladeXML *glade_xml = GLADE_XML (user_data);
 +	char *manufacturer = NULL;
 +	char *model = NULL;
 +	char *version = NULL;
@@ -419,13 +420,12 @@ index 0000000..27e700c
 +		g_warning ("Couldn't get modem information: %s", error->message);
 +		g_error_free (error);
 +	} else {
-+		add_info_row (table, 0, "Vendor", manufacturer);
++		gtk_label_set_text (GTK_LABEL (glade_xml_get_widget (glade_xml, "vendor_label")), manufacturer);
++		gtk_label_set_text (GTK_LABEL (glade_xml_get_widget (glade_xml, "model_label")), model);
++		gtk_label_set_text (GTK_LABEL (glade_xml_get_widget (glade_xml, "version_label")), version);
++
 +		g_free (manufacturer);
-+
-+		add_info_row (table, 1, "Model", model);
 +		g_free (model);
-+
-+		add_info_row (table, 2, "Version", version);
 +		g_free (version);
 +	}
 +}
@@ -433,15 +433,14 @@ index 0000000..27e700c
 +static void
 +get_property_done (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data)
 +{
-+	InfoData *info = (InfoData *) user_data;
 +	GValue value = { 0, };
 +	GError *error = NULL;
 +
 +	if (!dbus_g_proxy_end_call (proxy, call_id, &error, G_TYPE_VALUE, &value, G_TYPE_INVALID)) {
-+		g_warning ("Couldn't get %s: %s", info->label, error->message);
++		g_warning ("%s", error->message);
 +		g_error_free (error);
 +	} else {
-+		add_info_row (info->table, info->row, info->label, g_value_get_string (&value));
++		gtk_label_set_text (GTK_LABEL (user_data), g_value_get_string (&value));
 +		g_value_unset (&value);
 +	}
 +}
@@ -453,27 +452,27 @@ index 0000000..27e700c
 +
 +	dbus_g_proxy_set_interface (app_data->proxy, MM_DBUS_INTERFACE_MODEM_GSM_CARD);
 +	dbus_g_proxy_begin_call (app_data->proxy, "GetImsi", get_str_done,
-+							 info_data_new (app_data->info_table, "IMSI", 5), info_data_free,
++							 glade_xml_get_widget (app_data->glade_xml, "imsi_label"), NULL,
 +							 G_TYPE_INVALID);
 +
 +	dbus_g_proxy_begin_call (app_data->proxy, "GetImei", get_str_done,
-+							 info_data_new (app_data->info_table, "IMEI", 6), info_data_free,
++							 glade_xml_get_widget (app_data->glade_xml, "imei_label"), NULL,
 +							 G_TYPE_INVALID);
 +
 +	dbus_g_proxy_begin_call (app_data->proxy, "GetInfo", get_card_info_done,
-+							 app_data->info_table, NULL,
++							 app_data->glade_xml, NULL,
 +							 G_TYPE_INVALID);
 +
 +	dbus_g_proxy_set_interface (app_data->proxy, "org.freedesktop.DBus.Properties");
 +
 +	dbus_g_proxy_begin_call (app_data->proxy, "Get", get_property_done,
-+							 info_data_new (app_data->info_table, "Driver", 3), info_data_free,
++							 glade_xml_get_widget (app_data->glade_xml, "driver_label"), NULL,
 +							 G_TYPE_STRING, MM_DBUS_INTERFACE_MODEM,
 +							 G_TYPE_STRING, "Driver",
 +							 G_TYPE_INVALID);
 +
 +	dbus_g_proxy_begin_call (app_data->proxy, "Get", get_property_done,
-+							 info_data_new (app_data->info_table, "Data device", 4), info_data_free,
++							 glade_xml_get_widget (app_data->glade_xml, "device_label"), NULL,
 +							 G_TYPE_STRING, MM_DBUS_INTERFACE_MODEM,
 +							 G_TYPE_STRING, "DataDevice",
 +							 G_TYPE_INVALID);
@@ -484,18 +483,17 @@ index 0000000..27e700c
 +static void
 +got_signal_quality (DBusGProxy *proxy, DBusGProxyCall *call_id, gpointer user_data)
 +{
-+	AppData *app_data = (AppData *) user_data;
 +	guint32 quality = 0;
 +	GError *error = NULL;
 +
 +	if (!dbus_g_proxy_end_call (proxy, call_id, &error, G_TYPE_UINT, &quality, G_TYPE_INVALID)) {
-+		g_warning ("Couldn't get signal quality: %s", error->message);
++		g_warning ("%s", error->message);
 +		g_error_free (error);
 +	} else {
 +		char *tmp;
 +
 +		tmp = g_strdup_printf ("%d%%", quality);
-+		gtk_label_set_text (app_data->signal_quality_label, tmp);
++		gtk_label_set_text (GTK_LABEL (user_data), tmp);
 +		g_free (tmp);
 +	}
 +}
@@ -505,11 +503,10 @@ index 0000000..27e700c
 +						guint32 signal_quality,
 +						gpointer user_data)
 +{
-+	AppData *app_data = (AppData *) user_data;
 +	char *tmp;
 +
 +	tmp = g_strdup_printf ("%d%%", signal_quality);
-+	gtk_label_set_text (app_data->signal_quality_label, tmp);
++	gtk_label_set_text (GTK_LABEL (user_data), tmp);
 +	g_free (tmp);
 +}
 +
@@ -517,28 +514,17 @@ index 0000000..27e700c
 +monitor_signal_quality (gpointer data)
 +{
 +	AppData *app_data = (AppData *) data;
-+	GtkWidget *w;
++	GtkWidget *label;
 +
-+	w = gtk_label_new ("Signal Quality");
-+	gtk_misc_set_alignment (GTK_MISC (w), 0.0, 0.0);	
-+	gtk_widget_show (w);
-+	gtk_table_attach_defaults (app_data->info_table, w, 0, 1, 7, 8);
-+
-+	w = gtk_label_new ("");
-+	gtk_misc_set_alignment (GTK_MISC (w), 0.0, 0.0);
-+	gtk_widget_show (w);
-+	gtk_table_attach_defaults (app_data->info_table, w, 1, 2, 7, 8);
-+	app_data->signal_quality_label = GTK_LABEL (w);
++	label = glade_xml_get_widget (app_data->glade_xml, "signal_quality_label");
 +
 +	dbus_g_proxy_add_signal (app_data->gsm_net_proxy, "SignalQuality", G_TYPE_UINT, G_TYPE_INVALID);
 +	dbus_g_proxy_connect_signal (app_data->gsm_net_proxy, "SignalQuality",
 +								 G_CALLBACK (signal_quality_changed),
-+								 app_data,
-+								 NULL);
++								 label, NULL);
 +
-+	dbus_g_proxy_begin_call (app_data->gsm_net_proxy, "GetSignalQuality", got_signal_quality,
-+							 app_data, NULL,
-+							 G_TYPE_INVALID);
++	dbus_g_proxy_begin_call (app_data->gsm_net_proxy, "GetSignalQuality",
++							 got_signal_quality, label, NULL, G_TYPE_INVALID);
 +
 +	return FALSE;
 +}
@@ -588,7 +574,17 @@ index 0000000..27e700c
 +		g_ptr_array_free (array, TRUE);
 +	}
 +
++	gtk_widget_hide (app_data->scan_dialog);
 +	gtk_widget_set_sensitive (app_data->scan_button, TRUE);
++}
++
++static gboolean
++scan_pulse (gpointer data)
++{
++	GtkProgressBar *bar = GTK_PROGRESS_BAR (data);
++
++	gtk_progress_bar_pulse (bar);
++	return gdk_window_is_visible (gtk_widget_get_parent_window (GTK_WIDGET (bar)));
 +}
 +
 +static void
@@ -596,13 +592,14 @@ index 0000000..27e700c
 +{
 +	AppData *app_data = (AppData *) user_data;
 +
-+	dbus_g_proxy_begin_call (app_data->gsm_net_proxy, "Scan", got_scan_results,
-+							 app_data, NULL,
-+							 G_TYPE_INVALID);
++	dbus_g_proxy_begin_call_with_timeout (app_data->gsm_net_proxy, "Scan", got_scan_results,
++										  app_data, NULL, 120000, G_TYPE_INVALID);
 +
 +	gtk_widget_set_sensitive (app_data->scan_button, FALSE);
 +	gtk_list_store_clear (app_data->network_store);
-+	/* FIXME: Add "Scanning..." dialog */
++
++	g_timeout_add (200, scan_pulse, app_data->scan_progress_bar);
++	gtk_widget_show (app_data->scan_dialog);
 +}
 +
 +static void
@@ -836,14 +833,18 @@ index 0000000..27e700c
 +		return NULL;
 +	}
 +
-+	app_data->main_dialog = GTK_DIALOG (glade_xml_get_widget (app_data->glade_xml, "dialog"));
++	app_data->main_dialog = GTK_DIALOG (glade_xml_get_widget (app_data->glade_xml, "main_dialog"));
 +	g_signal_connect (app_data->main_dialog, "response", G_CALLBACK (close_cb), app_data);
 +
-+	app_data->info_table = GTK_TABLE (glade_xml_get_widget (app_data->glade_xml, "info_table"));
 +	app_data->network_list = GTK_TREE_VIEW (glade_xml_get_widget (app_data->glade_xml, "network_list"));
 +	app_data->network_store = prepare_network_list (app_data->network_list);
 +	app_data->scan_button = glade_xml_get_widget (app_data->glade_xml, "scan_button");
 +	g_signal_connect (app_data->scan_button, "clicked", G_CALLBACK (scan), app_data);
++
++	app_data->scan_dialog = glade_xml_get_widget (app_data->glade_xml, "scan_dialog");
++	gtk_window_set_transient_for (GTK_WINDOW (app_data->scan_dialog), GTK_WINDOW (app_data->main_dialog));
++
++	app_data->scan_progress_bar = GTK_PROGRESS_BAR (glade_xml_get_widget (app_data->glade_xml, "scan_progress_bar"));
 +
 +	app_data->create_net_button = glade_xml_get_widget (app_data->glade_xml, "create_connection_button");
 +	gtk_widget_set_sensitive (app_data->create_net_button, FALSE);
@@ -882,16 +883,16 @@ index 0000000..27e700c
 +}
 diff --git a/src/modems/nm-modem-properties.glade b/src/modems/nm-modem-properties.glade
 new file mode 100644
-index 0000000..61038b8
+index 0000000..12ccf06
 --- /dev/null
 +++ b/src/modems/nm-modem-properties.glade
-@@ -0,0 +1,381 @@
+@@ -0,0 +1,1083 @@
 +<?xml version="1.0" standalone="no"?> <!--*- mode: xml -*-->
 +<!DOCTYPE glade-interface SYSTEM "http://glade.gnome.org/glade-2.0.dtd">
 +
 +<glade-interface>
 +
-+<widget class="GtkDialog" id="dialog">
++<widget class="GtkDialog" id="main_dialog">
 +  <property name="visible">True</property>
 +  <property name="title" translatable="yes">GSM modem properties</property>
 +  <property name="type">GTK_WINDOW_TOPLEVEL</property>
@@ -947,57 +948,572 @@ index 0000000..61038b8
 +	  <property name="spacing">6</property>
 +
 +	  <child>
-+	    <widget class="GtkFrame" id="frame1">
++	    <widget class="GtkHBox" id="hbox2">
 +	      <property name="visible">True</property>
-+	      <property name="label_xalign">0</property>
-+	      <property name="label_yalign">0.5</property>
-+	      <property name="shadow_type">GTK_SHADOW_NONE</property>
++	      <property name="homogeneous">False</property>
++	      <property name="spacing">6</property>
 +
 +	      <child>
-+		<widget class="GtkAlignment" id="alignment1">
++		<widget class="GtkFrame" id="frame1">
 +		  <property name="visible">True</property>
-+		  <property name="xalign">0.5</property>
-+		  <property name="yalign">0.5</property>
-+		  <property name="xscale">1</property>
-+		  <property name="yscale">1</property>
-+		  <property name="top_padding">0</property>
-+		  <property name="bottom_padding">0</property>
-+		  <property name="left_padding">12</property>
-+		  <property name="right_padding">0</property>
++		  <property name="label_xalign">0</property>
++		  <property name="label_yalign">0.5</property>
++		  <property name="shadow_type">GTK_SHADOW_NONE</property>
 +
 +		  <child>
-+		    <widget class="GtkTable" id="info_table">
++		    <widget class="GtkAlignment" id="alignment1">
 +		      <property name="visible">True</property>
-+		      <property name="n_rows">8</property>
-+		      <property name="n_columns">2</property>
-+		      <property name="homogeneous">False</property>
-+		      <property name="row_spacing">0</property>
-+		      <property name="column_spacing">6</property>
++		      <property name="xalign">0.5</property>
++		      <property name="yalign">0.5</property>
++		      <property name="xscale">1</property>
++		      <property name="yscale">1</property>
++		      <property name="top_padding">0</property>
++		      <property name="bottom_padding">0</property>
++		      <property name="left_padding">12</property>
++		      <property name="right_padding">0</property>
++
++		      <child>
++			<widget class="GtkTable" id="info_table">
++			  <property name="visible">True</property>
++			  <property name="n_rows">8</property>
++			  <property name="n_columns">2</property>
++			  <property name="homogeneous">False</property>
++			  <property name="row_spacing">0</property>
++			  <property name="column_spacing">6</property>
++
++			  <child>
++			    <widget class="GtkLabel" id="label6">
++			      <property name="visible">True</property>
++			      <property name="label" translatable="yes">Vendor</property>
++			      <property name="use_underline">False</property>
++			      <property name="use_markup">False</property>
++			      <property name="justify">GTK_JUSTIFY_LEFT</property>
++			      <property name="wrap">False</property>
++			      <property name="selectable">False</property>
++			      <property name="xalign">0</property>
++			      <property name="yalign">0</property>
++			      <property name="xpad">0</property>
++			      <property name="ypad">0</property>
++			      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++			      <property name="width_chars">-1</property>
++			      <property name="single_line_mode">False</property>
++			      <property name="angle">0</property>
++			    </widget>
++			    <packing>
++			      <property name="left_attach">0</property>
++			      <property name="right_attach">1</property>
++			      <property name="top_attach">0</property>
++			      <property name="bottom_attach">1</property>
++			      <property name="x_options">fill</property>
++			      <property name="y_options"></property>
++			    </packing>
++			  </child>
++
++			  <child>
++			    <widget class="GtkLabel" id="label7">
++			      <property name="visible">True</property>
++			      <property name="label" translatable="yes">Model</property>
++			      <property name="use_underline">False</property>
++			      <property name="use_markup">False</property>
++			      <property name="justify">GTK_JUSTIFY_LEFT</property>
++			      <property name="wrap">False</property>
++			      <property name="selectable">False</property>
++			      <property name="xalign">0</property>
++			      <property name="yalign">0</property>
++			      <property name="xpad">0</property>
++			      <property name="ypad">0</property>
++			      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++			      <property name="width_chars">-1</property>
++			      <property name="single_line_mode">False</property>
++			      <property name="angle">0</property>
++			    </widget>
++			    <packing>
++			      <property name="left_attach">0</property>
++			      <property name="right_attach">1</property>
++			      <property name="top_attach">1</property>
++			      <property name="bottom_attach">2</property>
++			      <property name="x_options">fill</property>
++			      <property name="y_options"></property>
++			    </packing>
++			  </child>
++
++			  <child>
++			    <widget class="GtkLabel" id="label8">
++			      <property name="visible">True</property>
++			      <property name="label" translatable="yes">Version</property>
++			      <property name="use_underline">False</property>
++			      <property name="use_markup">False</property>
++			      <property name="justify">GTK_JUSTIFY_LEFT</property>
++			      <property name="wrap">False</property>
++			      <property name="selectable">False</property>
++			      <property name="xalign">0</property>
++			      <property name="yalign">0</property>
++			      <property name="xpad">0</property>
++			      <property name="ypad">0</property>
++			      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++			      <property name="width_chars">-1</property>
++			      <property name="single_line_mode">False</property>
++			      <property name="angle">0</property>
++			    </widget>
++			    <packing>
++			      <property name="left_attach">0</property>
++			      <property name="right_attach">1</property>
++			      <property name="top_attach">2</property>
++			      <property name="bottom_attach">3</property>
++			      <property name="x_options">fill</property>
++			      <property name="y_options"></property>
++			    </packing>
++			  </child>
++
++			  <child>
++			    <widget class="GtkLabel" id="label9">
++			      <property name="visible">True</property>
++			      <property name="label" translatable="yes">Driver</property>
++			      <property name="use_underline">False</property>
++			      <property name="use_markup">False</property>
++			      <property name="justify">GTK_JUSTIFY_LEFT</property>
++			      <property name="wrap">False</property>
++			      <property name="selectable">False</property>
++			      <property name="xalign">0</property>
++			      <property name="yalign">0</property>
++			      <property name="xpad">0</property>
++			      <property name="ypad">0</property>
++			      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++			      <property name="width_chars">-1</property>
++			      <property name="single_line_mode">False</property>
++			      <property name="angle">0</property>
++			    </widget>
++			    <packing>
++			      <property name="left_attach">0</property>
++			      <property name="right_attach">1</property>
++			      <property name="top_attach">3</property>
++			      <property name="bottom_attach">4</property>
++			      <property name="x_options">fill</property>
++			      <property name="y_options"></property>
++			    </packing>
++			  </child>
++
++			  <child>
++			    <widget class="GtkLabel" id="label10">
++			      <property name="visible">True</property>
++			      <property name="label" translatable="yes">Data device</property>
++			      <property name="use_underline">False</property>
++			      <property name="use_markup">False</property>
++			      <property name="justify">GTK_JUSTIFY_LEFT</property>
++			      <property name="wrap">False</property>
++			      <property name="selectable">False</property>
++			      <property name="xalign">0</property>
++			      <property name="yalign">0</property>
++			      <property name="xpad">0</property>
++			      <property name="ypad">0</property>
++			      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++			      <property name="width_chars">-1</property>
++			      <property name="single_line_mode">False</property>
++			      <property name="angle">0</property>
++			    </widget>
++			    <packing>
++			      <property name="left_attach">0</property>
++			      <property name="right_attach">1</property>
++			      <property name="top_attach">4</property>
++			      <property name="bottom_attach">5</property>
++			      <property name="x_options">fill</property>
++			      <property name="y_options"></property>
++			    </packing>
++			  </child>
++
++			  <child>
++			    <widget class="GtkLabel" id="label11">
++			      <property name="visible">True</property>
++			      <property name="label" translatable="yes">IMSI</property>
++			      <property name="use_underline">False</property>
++			      <property name="use_markup">False</property>
++			      <property name="justify">GTK_JUSTIFY_LEFT</property>
++			      <property name="wrap">False</property>
++			      <property name="selectable">False</property>
++			      <property name="xalign">0</property>
++			      <property name="yalign">0</property>
++			      <property name="xpad">0</property>
++			      <property name="ypad">0</property>
++			      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++			      <property name="width_chars">-1</property>
++			      <property name="single_line_mode">False</property>
++			      <property name="angle">0</property>
++			    </widget>
++			    <packing>
++			      <property name="left_attach">0</property>
++			      <property name="right_attach">1</property>
++			      <property name="top_attach">5</property>
++			      <property name="bottom_attach">6</property>
++			      <property name="x_options">fill</property>
++			      <property name="y_options"></property>
++			    </packing>
++			  </child>
++
++			  <child>
++			    <widget class="GtkLabel" id="label12">
++			      <property name="visible">True</property>
++			      <property name="label" translatable="yes">IMEI</property>
++			      <property name="use_underline">False</property>
++			      <property name="use_markup">False</property>
++			      <property name="justify">GTK_JUSTIFY_LEFT</property>
++			      <property name="wrap">False</property>
++			      <property name="selectable">False</property>
++			      <property name="xalign">0</property>
++			      <property name="yalign">0</property>
++			      <property name="xpad">0</property>
++			      <property name="ypad">0</property>
++			      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++			      <property name="width_chars">-1</property>
++			      <property name="single_line_mode">False</property>
++			      <property name="angle">0</property>
++			    </widget>
++			    <packing>
++			      <property name="left_attach">0</property>
++			      <property name="right_attach">1</property>
++			      <property name="top_attach">6</property>
++			      <property name="bottom_attach">7</property>
++			      <property name="x_options">fill</property>
++			      <property name="y_options"></property>
++			    </packing>
++			  </child>
++
++			  <child>
++			    <widget class="GtkLabel" id="label13">
++			      <property name="visible">True</property>
++			      <property name="label" translatable="yes">Signal quality</property>
++			      <property name="use_underline">False</property>
++			      <property name="use_markup">False</property>
++			      <property name="justify">GTK_JUSTIFY_LEFT</property>
++			      <property name="wrap">False</property>
++			      <property name="selectable">False</property>
++			      <property name="xalign">0</property>
++			      <property name="yalign">0</property>
++			      <property name="xpad">0</property>
++			      <property name="ypad">0</property>
++			      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++			      <property name="width_chars">-1</property>
++			      <property name="single_line_mode">False</property>
++			      <property name="angle">0</property>
++			    </widget>
++			    <packing>
++			      <property name="left_attach">0</property>
++			      <property name="right_attach">1</property>
++			      <property name="top_attach">7</property>
++			      <property name="bottom_attach">8</property>
++			      <property name="x_options">fill</property>
++			      <property name="y_options"></property>
++			    </packing>
++			  </child>
++
++			  <child>
++			    <widget class="GtkLabel" id="vendor_label">
++			      <property name="visible">True</property>
++			      <property name="label" translatable="yes"></property>
++			      <property name="use_underline">False</property>
++			      <property name="use_markup">False</property>
++			      <property name="justify">GTK_JUSTIFY_LEFT</property>
++			      <property name="wrap">False</property>
++			      <property name="selectable">False</property>
++			      <property name="xalign">0</property>
++			      <property name="yalign">0</property>
++			      <property name="xpad">0</property>
++			      <property name="ypad">0</property>
++			      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++			      <property name="width_chars">-1</property>
++			      <property name="single_line_mode">False</property>
++			      <property name="angle">0</property>
++			    </widget>
++			    <packing>
++			      <property name="left_attach">1</property>
++			      <property name="right_attach">2</property>
++			      <property name="top_attach">0</property>
++			      <property name="bottom_attach">1</property>
++			      <property name="x_options">fill</property>
++			      <property name="y_options"></property>
++			    </packing>
++			  </child>
++
++			  <child>
++			    <widget class="GtkLabel" id="model_label">
++			      <property name="visible">True</property>
++			      <property name="label" translatable="yes"></property>
++			      <property name="use_underline">False</property>
++			      <property name="use_markup">False</property>
++			      <property name="justify">GTK_JUSTIFY_LEFT</property>
++			      <property name="wrap">False</property>
++			      <property name="selectable">False</property>
++			      <property name="xalign">0</property>
++			      <property name="yalign">0</property>
++			      <property name="xpad">0</property>
++			      <property name="ypad">0</property>
++			      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++			      <property name="width_chars">-1</property>
++			      <property name="single_line_mode">False</property>
++			      <property name="angle">0</property>
++			    </widget>
++			    <packing>
++			      <property name="left_attach">1</property>
++			      <property name="right_attach">2</property>
++			      <property name="top_attach">1</property>
++			      <property name="bottom_attach">2</property>
++			      <property name="x_options">fill</property>
++			      <property name="y_options"></property>
++			    </packing>
++			  </child>
++
++			  <child>
++			    <widget class="GtkLabel" id="version_label">
++			      <property name="visible">True</property>
++			      <property name="label" translatable="yes"></property>
++			      <property name="use_underline">False</property>
++			      <property name="use_markup">False</property>
++			      <property name="justify">GTK_JUSTIFY_LEFT</property>
++			      <property name="wrap">False</property>
++			      <property name="selectable">False</property>
++			      <property name="xalign">0</property>
++			      <property name="yalign">0</property>
++			      <property name="xpad">0</property>
++			      <property name="ypad">0</property>
++			      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++			      <property name="width_chars">-1</property>
++			      <property name="single_line_mode">False</property>
++			      <property name="angle">0</property>
++			    </widget>
++			    <packing>
++			      <property name="left_attach">1</property>
++			      <property name="right_attach">2</property>
++			      <property name="top_attach">2</property>
++			      <property name="bottom_attach">3</property>
++			      <property name="x_options">fill</property>
++			      <property name="y_options"></property>
++			    </packing>
++			  </child>
++
++			  <child>
++			    <widget class="GtkLabel" id="driver_label">
++			      <property name="visible">True</property>
++			      <property name="label" translatable="yes"></property>
++			      <property name="use_underline">False</property>
++			      <property name="use_markup">False</property>
++			      <property name="justify">GTK_JUSTIFY_LEFT</property>
++			      <property name="wrap">False</property>
++			      <property name="selectable">False</property>
++			      <property name="xalign">0</property>
++			      <property name="yalign">0</property>
++			      <property name="xpad">0</property>
++			      <property name="ypad">0</property>
++			      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++			      <property name="width_chars">-1</property>
++			      <property name="single_line_mode">False</property>
++			      <property name="angle">0</property>
++			    </widget>
++			    <packing>
++			      <property name="left_attach">1</property>
++			      <property name="right_attach">2</property>
++			      <property name="top_attach">3</property>
++			      <property name="bottom_attach">4</property>
++			      <property name="x_options">fill</property>
++			      <property name="y_options"></property>
++			    </packing>
++			  </child>
++
++			  <child>
++			    <widget class="GtkLabel" id="device_label">
++			      <property name="visible">True</property>
++			      <property name="label" translatable="yes"></property>
++			      <property name="use_underline">False</property>
++			      <property name="use_markup">False</property>
++			      <property name="justify">GTK_JUSTIFY_LEFT</property>
++			      <property name="wrap">False</property>
++			      <property name="selectable">False</property>
++			      <property name="xalign">0</property>
++			      <property name="yalign">0</property>
++			      <property name="xpad">0</property>
++			      <property name="ypad">0</property>
++			      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++			      <property name="width_chars">-1</property>
++			      <property name="single_line_mode">False</property>
++			      <property name="angle">0</property>
++			    </widget>
++			    <packing>
++			      <property name="left_attach">1</property>
++			      <property name="right_attach">2</property>
++			      <property name="top_attach">4</property>
++			      <property name="bottom_attach">5</property>
++			      <property name="x_options">fill</property>
++			      <property name="y_options"></property>
++			    </packing>
++			  </child>
++
++			  <child>
++			    <widget class="GtkLabel" id="imsi_label">
++			      <property name="visible">True</property>
++			      <property name="label" translatable="yes"></property>
++			      <property name="use_underline">False</property>
++			      <property name="use_markup">False</property>
++			      <property name="justify">GTK_JUSTIFY_LEFT</property>
++			      <property name="wrap">False</property>
++			      <property name="selectable">False</property>
++			      <property name="xalign">0</property>
++			      <property name="yalign">0</property>
++			      <property name="xpad">0</property>
++			      <property name="ypad">0</property>
++			      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++			      <property name="width_chars">-1</property>
++			      <property name="single_line_mode">False</property>
++			      <property name="angle">0</property>
++			    </widget>
++			    <packing>
++			      <property name="left_attach">1</property>
++			      <property name="right_attach">2</property>
++			      <property name="top_attach">5</property>
++			      <property name="bottom_attach">6</property>
++			      <property name="x_options">fill</property>
++			      <property name="y_options"></property>
++			    </packing>
++			  </child>
++
++			  <child>
++			    <widget class="GtkLabel" id="imei_label">
++			      <property name="visible">True</property>
++			      <property name="label" translatable="yes"></property>
++			      <property name="use_underline">False</property>
++			      <property name="use_markup">False</property>
++			      <property name="justify">GTK_JUSTIFY_LEFT</property>
++			      <property name="wrap">False</property>
++			      <property name="selectable">False</property>
++			      <property name="xalign">0</property>
++			      <property name="yalign">0</property>
++			      <property name="xpad">0</property>
++			      <property name="ypad">0</property>
++			      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++			      <property name="width_chars">-1</property>
++			      <property name="single_line_mode">False</property>
++			      <property name="angle">0</property>
++			    </widget>
++			    <packing>
++			      <property name="left_attach">1</property>
++			      <property name="right_attach">2</property>
++			      <property name="top_attach">6</property>
++			      <property name="bottom_attach">7</property>
++			      <property name="x_options">fill</property>
++			      <property name="y_options"></property>
++			    </packing>
++			  </child>
++
++			  <child>
++			    <widget class="GtkLabel" id="signal_quality_label">
++			      <property name="visible">True</property>
++			      <property name="label" translatable="yes"></property>
++			      <property name="use_underline">False</property>
++			      <property name="use_markup">False</property>
++			      <property name="justify">GTK_JUSTIFY_LEFT</property>
++			      <property name="wrap">False</property>
++			      <property name="selectable">False</property>
++			      <property name="xalign">0</property>
++			      <property name="yalign">0</property>
++			      <property name="xpad">0</property>
++			      <property name="ypad">0</property>
++			      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++			      <property name="width_chars">-1</property>
++			      <property name="single_line_mode">False</property>
++			      <property name="angle">0</property>
++			    </widget>
++			    <packing>
++			      <property name="left_attach">1</property>
++			      <property name="right_attach">2</property>
++			      <property name="top_attach">7</property>
++			      <property name="bottom_attach">8</property>
++			      <property name="x_options">fill</property>
++			      <property name="y_options"></property>
++			    </packing>
++			  </child>
++			</widget>
++		      </child>
 +		    </widget>
 +		  </child>
++
++		  <child>
++		    <widget class="GtkLabel" id="label1">
++		      <property name="visible">True</property>
++		      <property name="label" translatable="yes">&lt;b&gt;Information&lt;/b&gt;</property>
++		      <property name="use_underline">False</property>
++		      <property name="use_markup">True</property>
++		      <property name="justify">GTK_JUSTIFY_LEFT</property>
++		      <property name="wrap">False</property>
++		      <property name="selectable">False</property>
++		      <property name="xalign">0.5</property>
++		      <property name="yalign">0.5</property>
++		      <property name="xpad">0</property>
++		      <property name="ypad">0</property>
++		      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++		      <property name="width_chars">-1</property>
++		      <property name="single_line_mode">False</property>
++		      <property name="angle">0</property>
++		    </widget>
++		    <packing>
++		      <property name="type">label_item</property>
++		    </packing>
++		  </child>
 +		</widget>
++		<packing>
++		  <property name="padding">0</property>
++		  <property name="expand">True</property>
++		  <property name="fill">True</property>
++		</packing>
 +	      </child>
 +
 +	      <child>
-+		<widget class="GtkLabel" id="label1">
-+		  <property name="visible">True</property>
-+		  <property name="label" translatable="yes">&lt;b&gt;Information&lt;/b&gt;</property>
-+		  <property name="use_underline">False</property>
-+		  <property name="use_markup">True</property>
-+		  <property name="justify">GTK_JUSTIFY_LEFT</property>
-+		  <property name="wrap">False</property>
-+		  <property name="selectable">False</property>
-+		  <property name="xalign">0.5</property>
-+		  <property name="yalign">0.5</property>
-+		  <property name="xpad">0</property>
-+		  <property name="ypad">0</property>
-+		  <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
-+		  <property name="width_chars">-1</property>
-+		  <property name="single_line_mode">False</property>
-+		  <property name="angle">0</property>
++		<widget class="GtkFrame" id="frame3">
++		  <property name="label_xalign">0</property>
++		  <property name="label_yalign">0.5</property>
++		  <property name="shadow_type">GTK_SHADOW_NONE</property>
++
++		  <child>
++		    <widget class="GtkAlignment" id="alignment3">
++		      <property name="visible">True</property>
++		      <property name="xalign">0.5</property>
++		      <property name="yalign">0.5</property>
++		      <property name="xscale">1</property>
++		      <property name="yscale">1</property>
++		      <property name="top_padding">0</property>
++		      <property name="bottom_padding">0</property>
++		      <property name="left_padding">12</property>
++		      <property name="right_padding">0</property>
++
++		      <child>
++			<placeholder/>
++		      </child>
++		    </widget>
++		  </child>
++
++		  <child>
++		    <widget class="GtkLabel" id="label4">
++		      <property name="visible">True</property>
++		      <property name="label" translatable="yes">&lt;b&gt;PIN operations&lt;/b&gt;</property>
++		      <property name="use_underline">False</property>
++		      <property name="use_markup">True</property>
++		      <property name="justify">GTK_JUSTIFY_LEFT</property>
++		      <property name="wrap">False</property>
++		      <property name="selectable">False</property>
++		      <property name="xalign">0.5</property>
++		      <property name="yalign">0.5</property>
++		      <property name="xpad">0</property>
++		      <property name="ypad">0</property>
++		      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++		      <property name="width_chars">-1</property>
++		      <property name="single_line_mode">False</property>
++		      <property name="angle">0</property>
++		    </widget>
++		    <packing>
++		      <property name="type">label_item</property>
++		    </packing>
++		  </child>
 +		</widget>
 +		<packing>
-+		  <property name="type">label_item</property>
++		  <property name="padding">0</property>
++		  <property name="expand">True</property>
++		  <property name="fill">True</property>
 +		</packing>
 +	      </child>
 +	    </widget>
@@ -1248,6 +1764,193 @@ index 0000000..61038b8
 +	      <property name="has_frame">True</property>
 +	      <property name="invisible_char">●</property>
 +	      <property name="activates_default">True</property>
++	    </widget>
++	    <packing>
++	      <property name="padding">0</property>
++	      <property name="expand">False</property>
++	      <property name="fill">False</property>
++	    </packing>
++	  </child>
++	</widget>
++	<packing>
++	  <property name="padding">0</property>
++	  <property name="expand">True</property>
++	  <property name="fill">True</property>
++	</packing>
++      </child>
++    </widget>
++  </child>
++</widget>
++
++<widget class="GtkWindow" id="scan_dialog">
++  <property name="title" translatable="yes"></property>
++  <property name="type">GTK_WINDOW_TOPLEVEL</property>
++  <property name="window_position">GTK_WIN_POS_CENTER_ON_PARENT</property>
++  <property name="modal">True</property>
++  <property name="resizable">False</property>
++  <property name="destroy_with_parent">False</property>
++  <property name="decorated">False</property>
++  <property name="skip_taskbar_hint">True</property>
++  <property name="skip_pager_hint">True</property>
++  <property name="type_hint">GDK_WINDOW_TYPE_HINT_DIALOG</property>
++  <property name="gravity">GDK_GRAVITY_CENTER</property>
++  <property name="focus_on_map">True</property>
++  <property name="urgency_hint">False</property>
++
++  <child>
++    <widget class="GtkVBox" id="vbox3">
++      <property name="border_width">6</property>
++      <property name="visible">True</property>
++      <property name="homogeneous">False</property>
++      <property name="spacing">6</property>
++
++      <child>
++	<widget class="GtkLabel" id="label5">
++	  <property name="visible">True</property>
++	  <property name="label" translatable="yes">Scanning... Please wait.</property>
++	  <property name="use_underline">False</property>
++	  <property name="use_markup">False</property>
++	  <property name="justify">GTK_JUSTIFY_LEFT</property>
++	  <property name="wrap">False</property>
++	  <property name="selectable">False</property>
++	  <property name="xalign">0.5</property>
++	  <property name="yalign">0.5</property>
++	  <property name="xpad">0</property>
++	  <property name="ypad">0</property>
++	  <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++	  <property name="width_chars">-1</property>
++	  <property name="single_line_mode">False</property>
++	  <property name="angle">0</property>
++	</widget>
++	<packing>
++	  <property name="padding">0</property>
++	  <property name="expand">False</property>
++	  <property name="fill">False</property>
++	</packing>
++      </child>
++
++      <child>
++	<widget class="GtkProgressBar" id="scan_progress_bar">
++	  <property name="visible">True</property>
++	  <property name="orientation">GTK_PROGRESS_LEFT_TO_RIGHT</property>
++	  <property name="fraction">0</property>
++	  <property name="pulse_step">0.10000000149</property>
++	  <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++	</widget>
++	<packing>
++	  <property name="padding">0</property>
++	  <property name="expand">False</property>
++	  <property name="fill">False</property>
++	</packing>
++      </child>
++    </widget>
++  </child>
++</widget>
++
++<widget class="GtkDialog" id="pin_dialog">
++  <property name="visible">True</property>
++  <property name="title" translatable="yes">PIN code required</property>
++  <property name="type">GTK_WINDOW_TOPLEVEL</property>
++  <property name="window_position">GTK_WIN_POS_NONE</property>
++  <property name="modal">False</property>
++  <property name="resizable">False</property>
++  <property name="destroy_with_parent">False</property>
++  <property name="decorated">True</property>
++  <property name="skip_taskbar_hint">False</property>
++  <property name="skip_pager_hint">False</property>
++  <property name="type_hint">GDK_WINDOW_TYPE_HINT_DIALOG</property>
++  <property name="gravity">GDK_GRAVITY_NORTH_WEST</property>
++  <property name="focus_on_map">True</property>
++  <property name="urgency_hint">False</property>
++  <property name="has_separator">True</property>
++
++  <child internal-child="vbox">
++    <widget class="GtkVBox" id="dialog-vbox3">
++      <property name="homogeneous">False</property>
++      <property name="spacing">0</property>
++
++      <child internal-child="action_area">
++	<widget class="GtkHButtonBox" id="dialog-action_area3">
++	  <property name="visible">True</property>
++	  <property name="layout_style">GTK_BUTTONBOX_END</property>
++
++	  <child>
++	    <widget class="GtkButton" id="cancelbutton2">
++	      <property name="visible">True</property>
++	      <property name="can_default">True</property>
++	      <property name="can_focus">True</property>
++	      <property name="label">gtk-cancel</property>
++	      <property name="use_stock">True</property>
++	      <property name="relief">GTK_RELIEF_NORMAL</property>
++	      <property name="focus_on_click">True</property>
++	      <property name="response_id">-6</property>
++	    </widget>
++	  </child>
++
++	  <child>
++	    <widget class="GtkButton" id="okbutton2">
++	      <property name="visible">True</property>
++	      <property name="can_default">True</property>
++	      <property name="can_focus">True</property>
++	      <property name="label">gtk-ok</property>
++	      <property name="use_stock">True</property>
++	      <property name="relief">GTK_RELIEF_NORMAL</property>
++	      <property name="focus_on_click">True</property>
++	      <property name="response_id">-5</property>
++	    </widget>
++	  </child>
++	</widget>
++	<packing>
++	  <property name="padding">0</property>
++	  <property name="expand">False</property>
++	  <property name="fill">True</property>
++	  <property name="pack_type">GTK_PACK_END</property>
++	</packing>
++      </child>
++
++      <child>
++	<widget class="GtkVBox" id="vbox4">
++	  <property name="border_width">6</property>
++	  <property name="visible">True</property>
++	  <property name="homogeneous">False</property>
++	  <property name="spacing">6</property>
++
++	  <child>
++	    <widget class="GtkLabel" id="pin_dialog_label">
++	      <property name="visible">True</property>
++	      <property name="label" translatable="yes">Please enter SIM PIN code</property>
++	      <property name="use_underline">False</property>
++	      <property name="use_markup">False</property>
++	      <property name="justify">GTK_JUSTIFY_LEFT</property>
++	      <property name="wrap">False</property>
++	      <property name="selectable">False</property>
++	      <property name="xalign">0.5</property>
++	      <property name="yalign">0.5</property>
++	      <property name="xpad">0</property>
++	      <property name="ypad">0</property>
++	      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
++	      <property name="width_chars">-1</property>
++	      <property name="single_line_mode">False</property>
++	      <property name="angle">0</property>
++	    </widget>
++	    <packing>
++	      <property name="padding">0</property>
++	      <property name="expand">False</property>
++	      <property name="fill">False</property>
++	    </packing>
++	  </child>
++
++	  <child>
++	    <widget class="GtkEntry" id="pin_dialog_entry">
++	      <property name="visible">True</property>
++	      <property name="can_focus">True</property>
++	      <property name="editable">True</property>
++	      <property name="visibility">True</property>
++	      <property name="max_length">0</property>
++	      <property name="text" translatable="yes"></property>
++	      <property name="has_frame">True</property>
++	      <property name="invisible_char">●</property>
++	      <property name="activates_default">False</property>
 +	    </widget>
 +	    <packing>
 +	      <property name="padding">0</property>
