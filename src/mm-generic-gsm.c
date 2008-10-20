@@ -765,26 +765,26 @@ scan_done (MMSerial *serial,
     else if (!strncmp (reply, "+COPS: ", 7)) {
         /* Got valid reply */
         GPtrArray *results;
-		GRegex *r;
-		GMatchInfo *match_info;
-		GError *err = NULL;
+        GRegex *r;
+        GMatchInfo *match_info;
+        GError *err = NULL;
 
-		reply += 7;
+        reply += 7;
 
-		/* Pattern without crazy escaping using | for matching: (|\d|,"|.+|","|.+|","|.+|",|\d|) */
-		r = g_regex_new ("\\((\\d),\"(.+)\",\"(.+)\",\"(.+)\",(\\d)\\)", G_REGEX_UNGREEDY, 0, &err);
-		if (err) {
-			g_error ("Invalid regular expression: %s", err->message);
-			g_error_free (err);
+        /* Pattern without crazy escaping using | for matching: (|\d|,"|.+|","|.+|","|.+|",|\d|) */
+        r = g_regex_new ("\\((\\d),\"(.+)\",\"(.+)\",\"(.+)\",(\\d)\\)", G_REGEX_UNGREEDY, 0, &err);
+        if (err) {
+            g_error ("Invalid regular expression: %s", err->message);
+            g_error_free (err);
             info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
                                                "Could not parse scan results.");
             goto out;
-		}
+        }
 
         results = g_ptr_array_new ();
 
-		g_regex_match (r, reply, 0, &match_info);
-		while (g_match_info_matches (match_info)) {
+        g_regex_match (r, reply, 0, &match_info);
+        while (g_match_info_matches (match_info)) {
             GHashTable *hash;
 
             hash = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
@@ -794,13 +794,15 @@ scan_done (MMSerial *serial,
             g_hash_table_insert (hash, g_strdup ("operator-num"), g_match_info_fetch (match_info, 4));
 
             g_ptr_array_add (results, hash);
-			g_match_info_next (match_info, NULL);
-		}
+            g_match_info_next (match_info, NULL);
+        }
 
         mm_callback_info_set_data (info, "scan-results", results, destroy_scan_data);
-		g_match_info_free (match_info);
-		g_regex_unref (r);
-    }
+        g_match_info_free (match_info);
+        g_regex_unref (r);
+    } else
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse scan results.");
 
  out:
     mm_callback_info_schedule (info);
