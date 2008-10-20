@@ -7,6 +7,7 @@
 #include "mm-modem-cdma.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
+#include "mm-serial-parsers.h"
 
 static gpointer mm_generic_cdma_parent_class = NULL;
 
