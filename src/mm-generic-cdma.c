@@ -182,6 +182,10 @@ modem_cdma_init (MMModemCdma *cdma_modem_class)
 static void
 mm_generic_cdma_init (MMGenericCdma *self)
 {
+    mm_serial_set_response_parser (MM_SERIAL (self),
+                                   mm_serial_parser_v1_parse,
+                                   mm_serial_parser_v1_new (),
+                                   mm_serial_parser_v1_destroy);
 }
 
 static void
