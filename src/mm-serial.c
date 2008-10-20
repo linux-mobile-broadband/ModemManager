@@ -279,6 +279,7 @@ mm_serial_send_command (MMSerial *self,
     MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
     const char *s;
     int status;
+    int eagain_count = 1000;
 
     if (priv->fd == 0) {
         g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_SEND_FAILED,
@@ -301,23 +302,21 @@ mm_serial_send_command (MMSerial *self,
     serial_debug ("-->", priv->command->str, -1);
 
     s = priv->command->str;
-    while (*s) {
-    again:
+    while (*s && eagain_count > 0) {
         status = write (priv->fd, s, 1);
         if (status < 0) {
             if (errno == EAGAIN)
-                goto again;
+                eagain_count--;
             else {
                 g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_SEND_FAILED,
                              "Sending command failed: '%s'", strerror (errno));
                 break;
             }
-        }
+        } else
+            s++;
 
         if (priv->send_delay)
             usleep (priv->send_delay);
-
-        s++;
     }
 
     return *s == '\0';
