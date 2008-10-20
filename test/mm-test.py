@@ -11,71 +11,6 @@ MM_DBUS_INTERFACE_MODEM='org.freedesktop.ModemManager.Modem'
 MM_DBUS_INTERFACE_MODEM_GSM_CARD='org.freedesktop.ModemManager.Modem.Gsm.Card'
 MM_DBUS_INTERFACE_MODEM_GSM_NETWORK='org.freedesktop.ModemManager.Modem.Gsm.Network'
 
-bus = dbus.SystemBus()
-manager_proxy = bus.get_object(MM_DBUS_SERVICE, MM_DBUS_PATH)
-manager_iface = dbus.Interface(manager_proxy, dbus_interface=MM_DBUS_INTERFACE)
-
-def enumerate_devices(manager):
-    modems = manager_iface.EnumerateDevices()
-    if not modems:
-        print "No modems found."
-        return
-
-    for modem_path in modems:
-        proxy = bus.get_object(MM_DBUS_SERVICE, modem_path)
-        modem = dbus.Interface(proxy, dbus_interface=DBUS_INTERFACE_PROPERTIES)
-
-        type = modem.Get(MM_DBUS_INTERFACE_MODEM, "Type")
-        if type == 1:
-            type = "GSM"
-        elif type == 2:
-            type = "CDMA"
-        else:
-            type = "(Unknown)"
-
-        print "%s\t%s\t%s" % (modem.Get(MM_DBUS_INTERFACE_MODEM, "DataDevice"),
-                              modem.Get(MM_DBUS_INTERFACE_MODEM, "Driver"),
-                              type)
-
-def get_modem(manager):
-    modems = manager_iface.EnumerateDevices()
-    if not modems:
-        print "No modems found."
-        sys.exit(1)
-    dev_proxy = bus.get_object(MM_DBUS_SERVICE, modems[0])
-    modem = dbus.Interface(dev_proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM)
-
-    need_pin = False
-    try:
-        modem.Enable(True)
-    except dbus.exceptions.DBusException, e:
-        need_pin = True
-
-    if need_pin:
-        modem.SetPin("1234")
-
-    return modem
-
-
-def scan(modem):
-    results = modem.Scan()
-    for r in results:
-        status = r['status']
-        if status == "1":
-            status = "available"
-        elif status == "2":
-            status = "current"
-        elif status == "3":
-            status = "forbidden"
-        else:
-            status = "(Unknown)"
-
-        print "%s: %s" % (r['operator-long'], status)
-
-def get_quality(modem):
-    modem.Enable(True)
-    print "Signal Quality: %d%%" % modem.GetSignalQuality()
-
 def get_network_mode(modem):
     mode = modem.GetNetworkMode()
     if mode == 1:
@@ -122,29 +57,69 @@ def get_band(modem):
 
     print "Band: %s" % band
 
-def connect(modem):
 
-    modem.Register("")
-    modem.Connect('"*99#', '')
+bus = dbus.SystemBus()
 
-if '--list' in sys.argv:
-    enumerate_devices(manager_iface)
-    sys.exit()
+# Get available modems:
+manager_proxy = bus.get_object('org.freedesktop.ModemManager', '/org/freedesktop/ModemManager')
+manager_iface = dbus.Interface(manager_proxy, dbus_interface='org.freedesktop.ModemManager')
+modems = manager_iface.EnumerateDevices()
 
-modem = get_modem(manager_iface)
+if not modems:
+    print "No modems found"
+    sys.exit(1)
 
-if '--scan' in sys.argv:
-    scan(modem)
-elif '--quality' in sys.argv:
-    get_quality(modem)
-elif '--mode' in sys.argv:
-    get_network_mode(modem)
-elif '--band' in sys.argv:
-    get_band(modem)
-elif '--disconnect' in sys.argv:
-    modem = get_modem(manager_iface)
-    modem.Disconnect()
-elif '--connect' in sys.argv:
-    connect(modem)
+for m in modems:
+    proxy = bus.get_object(MM_DBUS_SERVICE, m)
 
-modem.Enable(False)
+    # Properties
+    props_iface = dbus.Interface(proxy, dbus_interface='org.freedesktop.DBus.Properties')
+
+    type = props_iface.Get(MM_DBUS_INTERFACE_MODEM, 'Type')
+    if type == 1:
+        print "GSM modem"
+    elif type == 2:
+        print "CDMA modem"
+    else:
+        print "Invalid modem type: %d" % type
+
+    print "Driver: '%s'" % (props_iface.Get(MM_DBUS_INTERFACE_MODEM, 'Driver'))
+    print "Data device: '%s'" % (props_iface.Get(MM_DBUS_INTERFACE_MODEM, 'DataDevice'))
+
+    # Modem interface
+    modem = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM)
+    modem.Enable(True)
+
+    if type != 1:
+        continue
+
+    # Gsm.Card interface
+    card = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_GSM_CARD)
+    print "IMEI: %s" % card.GetImei()
+    print "IMSI: %s" % card.GetImsi()
+
+    info = card.GetInfo()
+    print "Vendor: '%s' Model: '%s' Version: '%s'" % info
+
+    # Gsm.Network interface
+    net = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_GSM_NETWORK)
+    print "Signal quality: %d" % net.GetSignalQuality()
+
+    print "Scanning..."
+    results = net.Scan()
+    for r in results:
+        status = r['status']
+        if status == "1":
+            status = "available"
+        elif status == "2":
+            status = "current"
+        elif status == "3":
+            status = "forbidden"
+        else:
+            status = "(Unknown)"
+
+        print "%s: %s" % (r['operator-long'], status)
+
+    print
+
+    modem.Enable(False)
