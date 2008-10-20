@@ -1052,7 +1052,7 @@ index 0000000..691f189
 +		priv->modem_state = MODEM_STATE_SET_APN;
 +		if (setting->apn)
 +			dbus_g_proxy_begin_call (get_proxy (modem, MM_DBUS_INTERFACE_MODEM_GSM_NETWORK),
-+								"SetAPN", state_machine,
++								"SetApn", state_machine,
 +								modem, NULL,
 +								G_TYPE_STRING, setting->apn,
 +								G_TYPE_INVALID);
