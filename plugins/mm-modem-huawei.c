@@ -15,14 +15,10 @@ static gpointer mm_modem_huawei_parent_class = NULL;
 
 typedef struct {
     MMSerial *monitor_device;
+    GRegex *status_regex;
+    GRegex *reg_state_regex;
+    gpointer std_parser;
 } MMModemHuaweiPrivate;
-
-enum {
-    PROP_0,
-    PROP_MONITOR_DEVICE,
-
-    LAST_PROP
-};
 
 MMModem *
 mm_modem_huawei_new (const char *data_device,
@@ -34,84 +30,24 @@ mm_modem_huawei_new (const char *data_device,
     g_return_val_if_fail (driver != NULL, NULL);
 
     return MM_MODEM (g_object_new (MM_TYPE_MODEM_HUAWEI,
-                                   MM_SERIAL_DEVICE, data_device,
+                                   MM_SERIAL_DEVICE, monitor_device,
+                                   MM_MODEM_DATA_DEVICE, data_device,
                                    MM_MODEM_DRIVER, driver,
-                                   MM_MODEM_HUAWEI_MONITOR_DEVICE, monitor_device,
                                    NULL));
 }
 
-
-/*****************************************************************************/
-
-typedef struct {
-    MMModemGsmNetwork *modem;
-    GRegex *r;
-} MonitorData;
-
 static void
-monitor_info_free (gpointer data)
+parent_enable_done (MMModem *modem, GError *error, gpointer user_data)
 {
-    MonitorData *info = (MonitorData *) data;
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemFn cb = (MMModemFn) mm_callback_info_get_data (info, "callback");
 
-    g_regex_unref (info->r);
-    g_slice_free (MonitorData, data);
-}
-
-static gboolean
-monitor_parse (gpointer data,
-               GString *response,
-               GError **error)
-{
-    MonitorData *info = (MonitorData *) data;
-    GMatchInfo *match_info;
-    gboolean found;
-
-    found = g_regex_match_full (info->r, response->str, response->len, 0, 0, &match_info, NULL);
-    if (found) {
-        char *str;
-
-        str = g_match_info_fetch (match_info, 1);
-
-        if (g_str_has_prefix (str, "^RSSI:")) {
-            int quality = atoi (str + 6);
-
-            if (quality == 99)
-                /* 99 means unknown */
-                quality = 0;
-            else
-                /* Normalize the quality */
-                quality = quality * 100 / 31;
-
-            g_debug ("Signal quality: %d", quality);
-            mm_modem_gsm_network_signal_quality (info->modem, (guint32) quality);
-        } else if (g_str_has_prefix (str, "^MODE:")) {
-            MMModemGsmNetworkMode mode = 0;
-            int a;
-            int b;
-
-            if (sscanf (str + 6, "%d,%d", &a, &b)) {
-                if (a == 3 && b == 2)
-                    mode = MM_MODEM_GSM_NETWORK_MODE_GPRS;
-                else if (a == 3 && b == 3)
-                    mode = MM_MODEM_GSM_NETWORK_MODE_EDGE;
-                else if (a == 5 && b == 4)
-                    mode = MM_MODEM_GSM_NETWORK_MODE_3G;
-                else if (a ==5 && b == 5)
-                    mode = MM_MODEM_GSM_NETWORK_MODE_HSDPA;
-
-                if (mode) {
-                    g_debug ("Mode: %d", mode);
-                    mm_modem_gsm_network_mode (info->modem, mode);
-                }
-            }
-        }
-
-        g_free (str);
-        g_match_info_free (match_info);
-
+    if (!error) {
+        /* Enable unsolicited registration state changes */
+        mm_serial_queue_command (MM_SERIAL (modem), "+CREG=1", 5, NULL, NULL);
     }
 
-    return found;
+    cb (modem, error, mm_callback_info_get_data (info, "user-data"));
 }
 
 static void
@@ -120,23 +56,20 @@ enable (MMModem *modem,
         MMModemFn callback,
         gpointer user_data)
 {
-    MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (modem);
     MMModem *parent_modem_iface;
 
     parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (modem));
-    parent_modem_iface->enable (modem, enable, callback, user_data);
 
     if (enable) {
-        GError *error = NULL;
+        MMCallbackInfo *info;
 
-        if (!mm_serial_open (priv->monitor_device, &error)) {
-            g_warning ("Could not open monitoring device %s: %s",
-                       mm_serial_get_device (priv->monitor_device),
-                       error->message);
-            g_error_free (error);
-        }
+        info = mm_callback_info_new (modem, parent_enable_done, NULL);
+        info->user_data = info;
+        mm_callback_info_set_data (info, "callback", callback, NULL);
+        mm_callback_info_set_data (info, "user-data", user_data, NULL);
+        parent_modem_iface->enable (modem, enable, parent_enable_done, info);
     } else
-        mm_serial_close (priv->monitor_device);
+        parent_modem_iface->enable (modem, enable, callback, user_data);
 }
 
 static gboolean
@@ -400,6 +333,140 @@ get_band (MMModemGsmNetwork *modem,
     mm_serial_queue_command (MM_SERIAL (modem), "AT^SYSCFG?", 3, get_band_done, info);
 }
 
+static void
+handle_status_change (const char *str, gpointer data)
+{
+    if (g_str_has_prefix (str, "RSSI:")) {
+        int quality = atoi (str + 5);
+
+        if (quality == 99)
+            /* 99 means unknown */
+            quality = 0;
+        else
+            /* Normalize the quality */
+            quality = quality * 100 / 31;
+
+        g_debug ("Signal quality: %d", quality);
+        mm_modem_gsm_network_signal_quality (MM_MODEM_GSM_NETWORK (data), (guint32) quality);
+    } else if (g_str_has_prefix (str, "MODE:")) {
+        MMModemGsmNetworkMode mode = 0;
+        int a;
+        int b;
+
+        if (sscanf (str + 5, "%d,%d", &a, &b)) {
+            if (a == 3 && b == 2)
+                mode = MM_MODEM_GSM_NETWORK_MODE_GPRS;
+            else if (a == 3 && b == 3)
+                mode = MM_MODEM_GSM_NETWORK_MODE_EDGE;
+            else if (a == 5 && b == 4)
+                mode = MM_MODEM_GSM_NETWORK_MODE_3G;
+            else if (a ==5 && b == 5)
+                mode = MM_MODEM_GSM_NETWORK_MODE_HSDPA;
+
+            if (mode) {
+                g_debug ("Mode: %d", mode);
+                mm_modem_gsm_network_mode (MM_MODEM_GSM_NETWORK (data), mode);
+            }
+        }
+    }
+}
+
+static void
+reg_state_changed (const char *str, gpointer data)
+{
+    int i;
+    MMModemGsmNetworkRegStatus status;
+
+    i = atoi (str);
+    switch (i) {
+    case 0:
+        status = MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE;
+        break;
+    case 1:
+        status = MM_MODEM_GSM_NETWORK_REG_STATUS_HOME;
+        break;
+    case 2:
+        status = MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING;
+        break;
+    case 3:
+        status = MM_MODEM_GSM_NETWORK_REG_STATUS_DENIED;
+        break;
+    case 4:
+        status = MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN;
+        break;
+    case 5:
+        status = MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING;
+        break;
+    default:
+        status = MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN;
+        break;
+    }
+
+    g_print ("Registration state changed: %d\n", status);
+    mm_generic_gsm_set_reg_status (MM_GENERIC_GSM (data), status);
+}
+
+static gboolean
+remove_eval_cb (const GMatchInfo *match_info,
+                GString *result,
+                gpointer user_data)
+{
+    int *result_len = (int *) user_data;
+    int start;
+    int end;
+
+    if (g_match_info_fetch_pos  (match_info, 0, &start, &end))
+        *result_len -= (end - start);
+
+    return FALSE;
+}
+
+typedef void (*HuaweiStripFn) (const char *str, gpointer data);
+
+static void
+huawei_strip (GRegex *r, GString *string, HuaweiStripFn fn, gpointer data)
+{
+    GMatchInfo *match_info;
+    gboolean matches;
+    char *str;
+
+    matches = g_regex_match_full (r, string->str, string->len, 0, 0, &match_info, NULL);
+    if (fn) {
+        while (g_match_info_matches (match_info)) {
+            str = g_match_info_fetch (match_info, 1);
+            fn (str, data);
+            g_free (str);
+
+            g_match_info_next (match_info, NULL);
+        }
+    }
+
+    g_match_info_free (match_info);
+
+    if (matches) {
+        /* Remove matches */
+        int result_len = string->len;
+
+        str = g_regex_replace_eval (r, string->str, string->len, 0, 0,
+                                    remove_eval_cb, &result_len, NULL);
+
+        g_string_truncate (string, 0);
+        g_string_append_len (string, str, result_len);
+        g_free (str);
+    }
+}
+
+static gboolean
+huawei_parse_response (gpointer data, GString *response, GError **error)
+{
+    MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (data);
+
+    huawei_strip (priv->status_regex, response, handle_status_change, data);
+    huawei_strip (priv->reg_state_regex, response, reg_state_changed, data);
+
+    return mm_serial_parser_v1_parse (priv->std_parser, response, error);
+}
+
 /*****************************************************************************/
 
 static void
@@ -420,82 +487,22 @@ modem_gsm_network_init (MMModemGsmNetwork *class)
 static void
 mm_modem_huawei_init (MMModemHuawei *self)
 {
+    MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (self);
+
+    priv->status_regex = g_regex_new ("\\r\\n\\^(.+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    priv->reg_state_regex = g_regex_new ("\\r\\n\\+CREG: (\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    priv->std_parser = mm_serial_parser_v1_new ();
+    mm_serial_set_response_parser (MM_SERIAL (self), huawei_parse_response, self, NULL);
 }
 
-static GObject*
-constructor (GType type,
-             guint n_construct_params,
-             GObjectConstructParam *construct_params)
-{
-    GObject *object;
-    MMModemHuaweiPrivate *priv;
-    MonitorData *info;
-
-    object = G_OBJECT_CLASS (mm_modem_huawei_parent_class)->constructor (type,
-                                                                         n_construct_params,
-                                                                         construct_params);
-    if (!object)
-        return NULL;
-
-    priv = MM_MODEM_HUAWEI_GET_PRIVATE (object);
-
-    if (!priv->monitor_device) {
-        g_warning ("No monitor device provided");
-        g_object_unref (object);
-        return NULL;
-    }
-
-    info = g_slice_new (MonitorData);
-    info->modem = MM_MODEM_GSM_NETWORK (object);
-    info->r = g_regex_new ("\\r\\n(.+)\r\n$", G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    mm_serial_set_response_parser (priv->monitor_device, monitor_parse, info, monitor_info_free);
-
-    return object;
-}
-
-static void
-set_property (GObject *object, guint prop_id,
-              const GValue *value, GParamSpec *pspec)
-{
-    MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (object);
-
-    switch (prop_id) {
-    case PROP_MONITOR_DEVICE:
-        /* Construct only */
-        priv->monitor_device = MM_SERIAL (g_object_new (MM_TYPE_SERIAL,
-                                                        MM_SERIAL_DEVICE, g_value_get_string (value),
-                                                        NULL));
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-        break;
-    }
-}
-
-static void
-get_property (GObject *object, guint prop_id,
-              GValue *value, GParamSpec *pspec)
-{
-    MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (object);
-
-    switch (prop_id) {
-    case PROP_MONITOR_DEVICE:
-        g_value_set_string (value, mm_serial_get_device (priv->monitor_device));
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-        break;
-    }
-}
 static void
 finalize (GObject *object)
 {
     MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (object);
 
-    if (priv->monitor_device) {
-        mm_serial_close (priv->monitor_device);
-        g_object_unref (priv->monitor_device);
-    }
+    mm_serial_parser_v1_destroy (priv->std_parser);
+    g_regex_unref (priv->status_regex);
+    g_regex_unref (priv->reg_state_regex);
 
     G_OBJECT_CLASS (mm_modem_huawei_parent_class)->finalize (object);
 }
@@ -509,18 +516,7 @@ mm_modem_huawei_class_init (MMModemHuaweiClass *klass)
     g_type_class_add_private (object_class, sizeof (MMModemHuaweiPrivate));
 
     /* Virtual methods */
-    object_class->constructor = constructor;
-    object_class->set_property = set_property;
-    object_class->get_property = get_property;
     object_class->finalize = finalize;
-    /* Properties */
-    g_object_class_install_property
-        (object_class, PROP_MONITOR_DEVICE,
-         g_param_spec_string (MM_MODEM_HUAWEI_MONITOR_DEVICE,
-                              "MonitorDevice",
-                              "Monitor device",
-                              NULL,
-                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
 
 GType
@@ -544,7 +540,7 @@ mm_modem_huawei_get_type (void)
         static const GInterfaceInfo modem_iface_info = { 
             (GInterfaceInitFunc) modem_init
         };
-        
+
         static const GInterfaceInfo modem_gsm_network_info = {
             (GInterfaceInitFunc) modem_gsm_network_init
         };

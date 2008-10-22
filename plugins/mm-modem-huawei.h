@@ -12,8 +12,6 @@
 #define MM_IS_MODEM_HUAWEI_CLASS(klass)	(G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_MODEM_HUAWEI))
 #define MM_MODEM_HUAWEI_GET_CLASS(obj)	(G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_MODEM_HUAWEI, MMModemHuaweiClass))
 
-#define MM_MODEM_HUAWEI_MONITOR_DEVICE "monitor-device"
-
 typedef struct {
     MMGenericGsm parent;
 } MMModemHuawei;

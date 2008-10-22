@@ -16,6 +16,7 @@ static gpointer mm_generic_gsm_parent_class = NULL;
 
 typedef struct {
     char *driver;
+    char *data_device;
     char *oper_code;
     char *oper_name;
     MMModemGsmNetworkRegStatus reg_status;
@@ -550,10 +551,12 @@ get_reg_status_done (MMSerial *serial,
                 break;
             }
         }
-    } else
+    } else {
+        g_debug ("unknown response: %s", reply);
         info->error = g_error_new_literal (MM_MODEM_ERROR,
                                            MM_MODEM_ERROR_GENERAL,
                                            "Could not parse the response");
+    }
 
  out:
     if (done || info->error)
@@ -1087,12 +1090,17 @@ static void
 set_property (GObject *object, guint prop_id,
               const GValue *value, GParamSpec *pspec)
 {
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (object);
+
     switch (prop_id) {
     case MM_MODEM_PROP_DRIVER:
         /* Construct only */
-        MM_GENERIC_GSM_GET_PRIVATE (object)->driver = g_value_dup_string (value);
+        priv->driver = g_value_dup_string (value);
         break;
     case MM_MODEM_PROP_DATA_DEVICE:
+        g_free (priv->data_device);
+        priv->data_device = g_value_dup_string (value);
+        break;
     case MM_MODEM_PROP_TYPE:
         break;
     default:
@@ -1105,9 +1113,14 @@ static void
 get_property (GObject *object, guint prop_id,
               GValue *value, GParamSpec *pspec)
 {
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (object);
+
     switch (prop_id) {
     case MM_MODEM_PROP_DATA_DEVICE:
-        g_value_set_string (value, mm_serial_get_device (MM_SERIAL (object)));
+        if (priv->data_device)
+            g_value_set_string (value, priv->data_device);
+        else
+            g_value_set_string (value, mm_serial_get_device (MM_SERIAL (object)));
         break;
     case MM_MODEM_PROP_DRIVER:
         g_value_set_string (value, MM_GENERIC_GSM_GET_PRIVATE (object)->driver);
@@ -1127,6 +1140,7 @@ finalize (GObject *object)
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (object);
 
     g_free (priv->driver);
+    g_free (priv->data_device);
     g_free (priv->oper_code);
     g_free (priv->oper_name);
 
