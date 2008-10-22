@@ -302,12 +302,17 @@ mm_serial_send_command (MMSerial *self,
     serial_debug ("-->", priv->command->str, -1);
 
     s = priv->command->str;
-    while (*s && eagain_count > 0) {
+    while (*s) {
         status = write (priv->fd, s, 1);
         if (status < 0) {
-            if (errno == EAGAIN)
+            if (errno == EAGAIN) {
                 eagain_count--;
-            else {
+                if (eagain_count <= 0) {
+                    g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_SEND_FAILED,
+                                 "Sending command failed: '%s'", strerror (errno));
+                    break;
+                }
+            } else {
                 g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_SEND_FAILED,
                              "Sending command failed: '%s'", strerror (errno));
                 break;
@@ -702,7 +707,7 @@ mm_serial_init (MMSerial *self)
     priv->bits = 8;
     priv->parity = 'n';
     priv->stopbits = 1;
-    priv->send_delay = 0;
+    priv->send_delay = 1000;
 
     priv->queue = g_queue_new ();
     priv->command  = g_string_new_len   ("AT", SERIAL_BUF_SIZE);
