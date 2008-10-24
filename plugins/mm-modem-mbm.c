@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <dbus/dbus-glib.h>
@@ -61,14 +62,14 @@ mm_modem_mbm_new (const char *serial_device,
 
     return MM_MODEM (g_object_new (MM_TYPE_MODEM_MBM,
                                    MM_SERIAL_DEVICE, serial_device,
-                                   MM_SERIAL_SEND_DELAY, (guint64) 1000,
+                                   MM_SERIAL_SEND_DELAY, (guint64) 10000,
                                    MM_MODEM_DRIVER, driver,
                                    MM_MODEM_MBM_NETWORK_DEVICE, network_device,
                                    NULL));
 }
 
 static void
-mbm_enable_done (MMSerial *serial,
+eiapsw_done (MMSerial *serial,
                  GString *response,
                  GError *error,
                  gpointer user_data)
@@ -82,37 +83,136 @@ mbm_enable_done (MMSerial *serial,
 }
 
 static void
-mbm_enable (MMModemMbm *self,
-            gboolean enabled,
-            MMModemFn callback,
-            gpointer user_data)
+eiac_done (MMSerial *serial,
+                 GString *response,
+                 GError *error,
+                 gpointer user_data)
 {
-    MMCallbackInfo *info;
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     char *command;
 
-    info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
+    if (error)
+        info->error = g_error_copy (error);
 
-    command = g_strdup_printf ("AT*ENAP=%d,%d", enabled ? 1 : 0,
-                               mm_generic_gsm_get_cid (MM_GENERIC_GSM (self)));
+    command = g_strdup_printf ("AT*EIAPSW=1,1,\"%s\"",
+                               (char *) mm_callback_info_get_data (info, "apn"));
 
-    mm_serial_queue_command (MM_SERIAL (self), command, 3, mbm_enable_done, info);
+    mm_serial_queue_command (serial, command, 10, eiapsw_done, info);
     g_free (command);
 }
 
+static void
+eiad_done (MMSerial *serial,
+                 GString *response,
+                 GError *error,
+                 gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error)
+        info->error = g_error_copy (error);
+
+    mm_serial_queue_command (serial, "AT*EIAC=1", 10, eiac_done, info);
+}
+
+static void
+set_apn (MMModemGsmNetwork *modem,
+         const char *apn,
+         MMModemFn callback,
+         gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+    mm_callback_info_set_data (info, "apn", g_strdup (apn), g_free);
+
+    mm_serial_queue_command (MM_SERIAL (modem), "AT*EIAD=0", 10, eiad_done, info);
+}
+
+static void
+do_register_done (MMSerial *serial,
+                 GString *response,
+                 GError *error,
+                 gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error)
+        info->error = g_error_copy (error);
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+do_register (MMModemGsmNetwork *modem,
+             const char *network_id,
+             MMModemFn callback,
+             gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+
+    sleep (4);
+
+    mm_serial_queue_command (MM_SERIAL (modem), "AT*ENAP=1,1", 10, do_register_done, info);
+}
+
+/*****************************************************************************/
+/*    Modem class override functions                                         */
 /*****************************************************************************/
 
 static void
-modem_enable_done (MMModem *modem, GError *error, gpointer user_data)
+enable_done (MMSerial *serial,
+             GString *response,
+             GError *error,
+             gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModem *parent_modem_iface;
 
-    parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (modem));
-    parent_modem_iface->enable (modem,
-                                GPOINTER_TO_INT (mm_callback_info_get_data (info, "enable")),
-                                (MMModemFn) mm_callback_info_get_data (info, "callback"),
-                                mm_callback_info_get_data (info, "user-data"));
+    if (error)
+        info->error = g_error_copy (error);
+
+    mm_callback_info_schedule (info);
 }
+
+static void
+init_done (MMSerial *serial,
+           GString *response,
+           GError *error,
+           gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+    } else
+        mm_serial_queue_command (serial, "+CFUN=1", 5, enable_done, user_data);
+}
+
+static void
+enable_flash_done (MMSerial *serial, gpointer user_data)
+{
+    mm_serial_queue_command (serial, "&F E0 +CMEE=1", 3, init_done, user_data);
+}
+
+static void
+disable_done (MMSerial *serial,
+              GString *response,
+              GError *error,
+              gpointer user_data)
+{
+    mm_serial_close (serial);
+    mm_callback_info_schedule ((MMCallbackInfo *) user_data);
+}
+
+static void
+disable_flash_done (MMSerial *serial, gpointer user_data)
+{
+    mm_serial_queue_command (serial, "+CFUN=4", 5, disable_done, user_data);
+}
+
 
 static void
 enable (MMModem *modem,
@@ -120,18 +220,26 @@ enable (MMModem *modem,
         MMModemFn callback,
         gpointer user_data)
 {
-    MMCallbackInfo *info;
+	MMCallbackInfo *info;
 
-    info = mm_callback_info_new (modem, modem_enable_done, NULL);
-    info->user_data = info;
-    mm_callback_info_set_data (info, "enable", GINT_TO_POINTER (enable), NULL);
-    mm_callback_info_set_data (info, "callback", callback, NULL);
-    mm_callback_info_set_data (info, "user-data", user_data, NULL);
+    /* First, reset the previously used CID */
+    mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
 
-    if (enable)
-        mm_callback_info_schedule (info);
-    else
-        mbm_enable (MM_MODEM_MBM (modem), FALSE, modem_enable_done, info);
+    info = mm_callback_info_new (modem, callback, user_data);
+
+    if (!enable) {
+        if (mm_serial_is_connected (MM_SERIAL (modem)))
+            mm_serial_flash (MM_SERIAL (modem), 1000, disable_flash_done, info);
+        else
+            disable_flash_done (MM_SERIAL (modem), info);
+    } else {
+        if (mm_serial_open (MM_SERIAL (modem), &info->error))
+            mm_serial_flash (MM_SERIAL (modem), 100, enable_flash_done, info);
+
+        if (info->error)
+            mm_callback_info_schedule (info);
+    }
+
 }
 
 /*****************************************************************************/
@@ -145,6 +253,13 @@ static void
 modem_init (MMModem *modem_class)
 {
     modem_class->enable = enable;
+}
+
+static void
+modem_gsm_network_init (MMModemGsmNetwork *class)
+{
+    class->do_register = do_register;
+    class->set_apn = set_apn;
 }
 
 static GObject*
@@ -259,8 +374,14 @@ mm_modem_mbm_get_type (void)
             (GInterfaceInitFunc) modem_init
         };
 
+        static const GInterfaceInfo modem_gsm_network_info = {
+            (GInterfaceInitFunc) modem_gsm_network_init
+        };
+
         modem_mbm_type = g_type_register_static (MM_TYPE_GENERIC_GSM, "MMModemMbm", &modem_mbm_type_info, 0);
+
         g_type_add_interface_static (modem_mbm_type, MM_TYPE_MODEM, &modem_iface_info);
+        g_type_add_interface_static (modem_mbm_type, MM_TYPE_MODEM_GSM_NETWORK, &modem_gsm_network_info);
     }
 
     return modem_mbm_type;
