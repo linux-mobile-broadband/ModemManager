@@ -7,6 +7,7 @@
 #include "mm-modem-gsm-network.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
+#include "mm-util.h"
 #include "mm-serial-parsers.h"
 
 static gpointer mm_modem_huawei_parent_class = NULL;
@@ -407,62 +408,12 @@ reg_state_changed (const char *str, gpointer data)
 }
 
 static gboolean
-remove_eval_cb (const GMatchInfo *match_info,
-                GString *result,
-                gpointer user_data)
-{
-    int *result_len = (int *) user_data;
-    int start;
-    int end;
-
-    if (g_match_info_fetch_pos  (match_info, 0, &start, &end))
-        *result_len -= (end - start);
-
-    return FALSE;
-}
-
-typedef void (*HuaweiStripFn) (const char *str, gpointer data);
-
-static void
-huawei_strip (GRegex *r, GString *string, HuaweiStripFn fn, gpointer data)
-{
-    GMatchInfo *match_info;
-    gboolean matches;
-    char *str;
-
-    matches = g_regex_match_full (r, string->str, string->len, 0, 0, &match_info, NULL);
-    if (fn) {
-        while (g_match_info_matches (match_info)) {
-            str = g_match_info_fetch (match_info, 1);
-            fn (str, data);
-            g_free (str);
-
-            g_match_info_next (match_info, NULL);
-        }
-    }
-
-    g_match_info_free (match_info);
-
-    if (matches) {
-        /* Remove matches */
-        int result_len = string->len;
-
-        str = g_regex_replace_eval (r, string->str, string->len, 0, 0,
-                                    remove_eval_cb, &result_len, NULL);
-
-        g_string_truncate (string, 0);
-        g_string_append_len (string, str, result_len);
-        g_free (str);
-    }
-}
-
-static gboolean
 huawei_parse_response (gpointer data, GString *response, GError **error)
 {
     MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (data);
 
-    huawei_strip (priv->status_regex, response, handle_status_change, data);
-    huawei_strip (priv->reg_state_regex, response, reg_state_changed, data);
+    mm_util_strip_string (response, priv->status_regex, handle_status_change, data);
+    mm_util_strip_string (response, priv->reg_state_regex, reg_state_changed, data);
 
     return mm_serial_parser_v1_parse (priv->std_parser, response, error);
 }
