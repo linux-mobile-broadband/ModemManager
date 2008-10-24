@@ -84,6 +84,9 @@ mm_serial_parser_v0_parse (gpointer data,
     int code;
     gboolean found;
 
+    g_return_val_if_fail (parser != NULL, FALSE);
+    g_return_val_if_fail (response != NULL, FALSE);
+
     found = g_regex_match_full (parser->generic_response, response->str, response->len, 0, 0, &match_info, NULL);
     if (found) {
         str = g_match_info_fetch (match_info, 1);
@@ -154,6 +157,8 @@ mm_serial_parser_v0_destroy (gpointer data)
 {
     MMSerialParserV0 *parser = (MMSerialParserV0 *) data;
 
+    g_return_if_fail (parser != NULL);
+
     g_regex_unref (parser->generic_response);
     g_regex_unref (parser->detailed_error);
 
@@ -195,6 +200,9 @@ mm_serial_parser_v1_parse (gpointer data,
     GError *local_error;
     int code;
     gboolean found = FALSE;
+
+    g_return_val_if_fail (parser != NULL, FALSE);
+    g_return_val_if_fail (response != NULL, FALSE);
 
     /* First, check for successfule responses */
 
@@ -275,6 +283,8 @@ void
 mm_serial_parser_v1_destroy (gpointer data)
 {
     MMSerialParserV1 *parser = (MMSerialParserV1 *) data;
+
+    g_return_if_fail (parser != NULL);
 
     g_regex_unref (parser->regex_ok);
     g_regex_unref (parser->regex_connect);

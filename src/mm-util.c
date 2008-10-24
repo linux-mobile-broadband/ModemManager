@@ -27,6 +27,9 @@ mm_util_strip_string (GString *string,
     gboolean matches;
     char *str;
 
+    g_return_if_fail (string != NULL);
+    g_return_if_fail (regex != NULL);
+
     matches = g_regex_match_full (regex, string->str, string->len, 0, 0, &match_info, NULL);
     if (callback) {
         while (g_match_info_matches (match_info)) {
