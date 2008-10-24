@@ -120,7 +120,7 @@ index 3c4ce75..3f24eb5 100644
  			$(top_builddir)/libnm-util/libnm-util.la
  
 diff --git a/src/NetworkManagerPolicy.c b/src/NetworkManagerPolicy.c
-index 25024c2..f7942d6 100644
+index 5f09704..bad6a34 100644
 --- a/src/NetworkManagerPolicy.c
 +++ b/src/NetworkManagerPolicy.c
 @@ -35,9 +35,6 @@
@@ -133,7 +133,7 @@ index 25024c2..f7942d6 100644
  #include "nm-dbus-manager.h"
  #include "nm-setting-ip4-config.h"
  #include "nm-setting-connection.h"
-@@ -227,7 +224,9 @@ get_best_device (NMManager *manager, NMActRequest **out_req)
+@@ -232,7 +229,9 @@ get_best_device (NMManager *manager, NMActRequest **out_req)
  		}
  
  		/* 'hso' devices never get a gateway from the remote end */
@@ -2133,10 +2133,10 @@ index 0000000..fae6d74
 +#endif /* NM_MODEM_DEVICE_H */
 diff --git a/src/modem-manager/nm-modem-manager.c b/src/modem-manager/nm-modem-manager.c
 new file mode 100644
-index 0000000..aac68c1
+index 0000000..318798d
 --- /dev/null
 +++ b/src/modem-manager/nm-modem-manager.c
-@@ -0,0 +1,391 @@
+@@ -0,0 +1,395 @@
 +/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
 +
 +#include <string.h>
@@ -2301,7 +2301,7 @@ index 0000000..aac68c1
 +	g_free (driver);
 +
 +	if (device) {
-+		g_hash_table_insert (priv->modems, g_strdup (path), g_object_ref (device));
++		g_hash_table_insert (priv->modems, g_strdup (path), device);
 +		g_signal_emit (manager, signals[DEVICE_ADDED], 0, device);
 +	}
 +}
@@ -2373,7 +2373,7 @@ index 0000000..aac68c1
 +}
 +
 +static void
-+modem_manager_appeared (NMModemManager *self)
++modem_manager_appeared (NMModemManager *self, gboolean enumerate_devices)
 +{
 +	NMModemManagerPrivate *priv = NM_MODEM_MANAGER_GET_PRIVATE (self);
 +
@@ -2395,7 +2395,8 @@ index 0000000..aac68c1
 +						    G_CALLBACK (modem_removed), self,
 +						    NULL);
 +
-+	dbus_g_proxy_begin_call (priv->proxy, "EnumerateDevices", enumerate_devices_done, self, NULL, G_TYPE_INVALID);
++	if (enumerate_devices)
++		dbus_g_proxy_begin_call (priv->proxy, "EnumerateDevices", enumerate_devices_done, self, NULL, G_TYPE_INVALID);
 +}
 +
 +static gboolean
@@ -2440,10 +2441,13 @@ index 0000000..aac68c1
 +	old_owner_good = (old_owner && strlen (old_owner));
 +	new_owner_good = (new_owner && strlen (new_owner));
 +
-+	if (!old_owner_good && new_owner_good)
++	if (!old_owner_good && new_owner_good) {
++		nm_info ("modem manager appeared");
++		modem_manager_appeared (NM_MODEM_MANAGER (user_data), FALSE);
++	} else if (old_owner_good && !new_owner_good) {
++		nm_info ("modem manager disappeared");
 +		modem_manager_disappeared (NM_MODEM_MANAGER (user_data));
-+	else if (old_owner_good && !new_owner_good)
-+		modem_manager_appeared (NM_MODEM_MANAGER (user_data));
++	}
 +}
 +
 +/*******************************************************/
@@ -2461,7 +2465,7 @@ index 0000000..aac68c1
 +	                  self);
 +
 +	if (nm_dbus_manager_name_has_owner (priv->dbus_mgr, MM_DBUS_SERVICE))
-+		modem_manager_appeared (self);
++		modem_manager_appeared (self, TRUE);
 +	else
 +		modem_manager_disappeared (self);
 +}
@@ -4074,7 +4078,7 @@ index a7498c8..0000000
 -
 -#endif /* NM_HSO_GSM_DEVICE_H */
 diff --git a/src/nm-manager.c b/src/nm-manager.c
-index b755902..3a31418 100644
+index 74345b0..828dd5e 100644
 --- a/src/nm-manager.c
 +++ b/src/nm-manager.c
 @@ -7,6 +7,7 @@
@@ -4107,7 +4111,7 @@ index b755902..3a31418 100644
  	DBusGProxy *aipd_proxy;
  
  	gboolean disposed;
-@@ -220,6 +229,33 @@ vpn_manager_connection_deactivated_cb (NMVPNManager *manager,
+@@ -220,6 +229,36 @@ vpn_manager_connection_deactivated_cb (NMVPNManager *manager,
  }
  
  static void
@@ -4126,7 +4130,7 @@ index b755902..3a31418 100644
 +	else
 +		type_name = "Unknown modem";
 +
-+	add_device (NM_MANAGER (user_data), modem, type_name);
++	add_device (NM_MANAGER (user_data), NM_DEVICE (g_object_ref (modem)), type_name);
 +}
 +
 +static void
@@ -4134,14 +4138,17 @@ index b755902..3a31418 100644
 +			NMDevice *modem,
 +			gpointer user_data)
 +{
++	NMManagerPrivate *priv = NM_MANAGER_GET_PRIVATE (user_data);
++
 +	remove_one_device (NM_MANAGER (user_data), modem);
++	priv->devices = g_slist_remove (priv->devices, modem);
 +}
 +
 +static void
  aipd_handle_event (DBusGProxy *proxy,
                     const char *event,
                     const char *iface,
-@@ -282,6 +318,12 @@ nm_manager_init (NMManager *manager)
+@@ -282,6 +321,12 @@ nm_manager_init (NMManager *manager)
  	                                                g_free,
  	                                                g_object_unref);
  
@@ -4154,7 +4161,7 @@ index b755902..3a31418 100644
  	priv->vpn_manager = nm_vpn_manager_get ();
  	id = g_signal_connect (G_OBJECT (priv->vpn_manager), "connection-deactivated",
  	                       G_CALLBACK (vpn_manager_connection_deactivated_cb), manager);
-@@ -481,6 +523,16 @@ dispose (GObject *object)
+@@ -481,6 +526,16 @@ dispose (GObject *object)
  	}
  	g_object_unref (priv->vpn_manager);
  
@@ -4171,7 +4178,7 @@ index b755902..3a31418 100644
  	g_object_unref (priv->dbus_mgr);
  	g_object_unref (priv->hal_mgr);
  
-@@ -1595,58 +1647,66 @@ next:
+@@ -1614,58 +1669,66 @@ next:
  }
  
  static void
