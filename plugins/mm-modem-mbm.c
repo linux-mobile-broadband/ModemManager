@@ -4,6 +4,7 @@
   for supporting Ericsson modules like F3507g.
 
   Author: Per Hallsmark <per@hallsmark.se>
+          Bjorn Runaker <bjorn.runaker@ericsson.com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -42,6 +43,7 @@ static gpointer mm_modem_mbm_parent_class = NULL;
 
 typedef struct {
     char *network_device;
+    guint32 signal_quality;
 } MMModemMbmPrivate;
 
 enum {
@@ -242,6 +244,117 @@ enable (MMModem *modem,
 
 }
 
+static gboolean
+parse_erinfo (const char *reply, int *mode, int *gsm_rinfo, int *umts_rinfo)
+{
+    if (reply == NULL || strncmp (reply, "*ERINFO:", 8))
+        return FALSE;
+
+    if (sscanf (reply + 8, "%d,%d,%d", mode, gsm_rinfo, umts_rinfo))
+        return TRUE;
+
+    return FALSE;
+}
+
+static void
+get_network_mode_done (MMSerial *serial,
+                       GString *response,
+                       GError *error,
+                       gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else {
+        int mode;
+        int gsm_rinfo;
+        int umts_rinfo;
+        guint32 result = 0;
+
+        if (parse_erinfo (response->str, &mode, &gsm_rinfo, &umts_rinfo)) {
+            if (umts_rinfo == 2)
+                result = MM_MODEM_GSM_NETWORK_MODE_HSDPA;
+            else if (umts_rinfo && !gsm_rinfo)
+                result = MM_MODEM_GSM_NETWORK_MODE_3G;
+            else if (umts_rinfo && gsm_rinfo)
+                result = MM_MODEM_GSM_NETWORK_MODE_PREFER_3G;
+            else if (gsm_rinfo)
+                result = MM_MODEM_GSM_NETWORK_MODE_GPRS;
+        }
+
+        if (result == 0)
+            info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                       "%s", "Could not parse network mode results");
+        else
+            mm_callback_info_set_result (info, GUINT_TO_POINTER (result), NULL);
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_network_mode (MMModemGsmNetwork *modem,
+                  MMModemUIntFn callback,
+                  gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+    mm_serial_queue_command (MM_SERIAL (modem), "AT*ERINFO?", 3, get_network_mode_done, info);
+}
+
+/* GetSignalQuality */
+
+static void
+get_signal_quality_done (MMSerial *serial,
+                         GString *response,
+                         GError *error,
+                         gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    char *reply = response->str;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else if (!strncmp (reply, "+CIND: ", 7)) {
+        /* Got valid reply */
+        int battch;
+        int signal;
+
+        reply += 7;
+
+        if (sscanf (reply, "%d,%d", &battch, &signal)) {
+            /* Normalize the quality */
+            signal = signal * 100 / 5;
+
+            MM_MODEM_MBM_GET_PRIVATE (serial)->signal_quality = signal;
+            mm_callback_info_set_result (info, GUINT_TO_POINTER (signal), NULL);
+        } else
+            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                               "Could not parse signal quality results");
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_signal_quality (MMModemGsmNetwork *modem,
+                    MMModemUIntFn callback,
+                    gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    if (mm_serial_is_connected (MM_SERIAL (modem))) {
+        g_message ("Returning saved signal quality %d", MM_MODEM_MBM_GET_PRIVATE (modem)->signal_quality);
+        callback (MM_MODEM (modem), MM_MODEM_MBM_GET_PRIVATE (modem)->signal_quality, NULL, user_data);
+        return;
+    }
+
+    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+    mm_serial_queue_command (MM_SERIAL (modem), "+CIND?", 3, get_signal_quality_done, info);
+}
+
 /*****************************************************************************/
 
 static void
@@ -260,6 +373,8 @@ modem_gsm_network_init (MMModemGsmNetwork *class)
 {
     class->do_register = do_register;
     class->set_apn = set_apn;
+    class->get_network_mode = get_network_mode;
+    class->get_signal_quality = get_signal_quality;
 }
 
 static GObject*

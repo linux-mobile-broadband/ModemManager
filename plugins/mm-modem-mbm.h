@@ -4,6 +4,7 @@
   for supporting Ericsson modules like F3507g.
 
   Author: Per Hallsmark <per@hallsmark.se>
+          Bjorn Runaker <bjorn.runaker@ericsson.com>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
