@@ -31,7 +31,7 @@ index de8ccb4..2be2217 100644
  
  nm_applet_LDADD = \
 diff --git a/src/applet-device-gsm.c b/src/applet-device-gsm.c
-index 90c5e5e..e28d13c 100644
+index aff002f..760234a 100644
 --- a/src/applet-device-gsm.c
 +++ b/src/applet-device-gsm.c
 @@ -24,6 +24,9 @@
@@ -53,7 +53,7 @@ index 90c5e5e..e28d13c 100644
  #include "utils.h"
  
  typedef struct {
-@@ -165,6 +170,50 @@ add_default_connection_item (NMDevice *device,
+@@ -174,6 +179,50 @@ add_default_connection_item (NMDevice *device,
  }
  
  static void
@@ -104,7 +104,7 @@ index 90c5e5e..e28d13c 100644
  gsm_menu_item_deactivate (GtkMenuItem *item, gpointer user_data)
  {
  	GSMMenuItemInfo *info = (GSMMenuItemInfo *) user_data;
-@@ -264,37 +313,68 @@ gsm_add_menu_item (NMDevice *device,
+@@ -273,40 +322,68 @@ gsm_add_menu_item (NMDevice *device,
  		add_connection_items (device, connections, active, menu, applet);
  	else
  		add_default_connection_item (device, menu, applet);
@@ -136,9 +136,12 @@ index 90c5e5e..e28d13c 100644
 -
 -		connection = applet_find_active_connection_for_device (device, applet, NULL);
 -		if (connection) {
+-			const char *id;
+-
 -			s_con = NM_SETTING_CONNECTION (nm_connection_get_setting (connection, NM_TYPE_SETTING_CONNECTION));
--			if (s_con && s_con->id)
--				str = g_strdup_printf (_("You are now connected to '%s'."), s_con->id);
+-			id = s_con ? nm_setting_connection_get_id (s_con) : NULL;
+-			if (id)
+-				str = g_strdup_printf (_("You are now connected to '%s'."), id);
 -		}
 +	NMAGsmModem *modem;
 +	char *oper_code;
@@ -189,7 +192,7 @@ index 90c5e5e..e28d13c 100644
  }
  
  static GdkPixbuf *
-@@ -304,6 +384,7 @@ gsm_get_icon (NMDevice *device,
+@@ -316,6 +393,7 @@ gsm_get_icon (NMDevice *device,
                char **tip,
                NMApplet *applet)
  {
@@ -197,13 +200,17 @@ index 90c5e5e..e28d13c 100644
  	GdkPixbuf *pixbuf = NULL;
  	const char *iface;
  	NMSettingConnection *s_con = NULL;
-@@ -323,11 +404,40 @@ gsm_get_icon (NMDevice *device,
+@@ -335,15 +413,40 @@ gsm_get_icon (NMDevice *device,
  		*tip = g_strdup_printf (_("Waiting for user authentication on device '%s'..."), iface);
  		break;
  	case NM_DEVICE_STATE_ACTIVATED:
--		if (s_con && s_con->id)
--			*tip = g_strdup_printf (_("Mobile broadband connection '%s'"), s_con->id);
--		else
+-		if (s_con) {
+-			const char *id;
+-
+-			id = nm_setting_connection_get_id (s_con);
+-			if (id)
+-				*tip = g_strdup_printf (_("Mobile broadband connection '%s'"), id);
+-		} else
 -			*tip = g_strdup (_("Mobile broadband connection"));
 -		pixbuf = applet->wwan_icon;
 +		modem = (NMAGsmModem *) g_object_get_data (G_OBJECT (device), "gsm-modem");
@@ -244,7 +251,7 @@ index 90c5e5e..e28d13c 100644
  	default:
  		break;
 diff --git a/src/connection-editor/page-mobile.c b/src/connection-editor/page-mobile.c
-index ee627f5..6fd29af 100644
+index 2522ff1..40f2d44 100644
 --- a/src/connection-editor/page-mobile.c
 +++ b/src/connection-editor/page-mobile.c
 @@ -107,7 +107,6 @@ populate_gsm_ui (CEPageMobile *self, NMConnection *connection)
@@ -252,10 +259,10 @@ index ee627f5..6fd29af 100644
  	GHashTable *secrets;
  	GValue *value;
 -	GtkWidget *widget;
+ 	const char *s;
  
- 	if (setting->number)
- 		gtk_entry_set_text (priv->number, setting->number);
-@@ -141,17 +140,6 @@ populate_gsm_ui (CEPageMobile *self, NMConnection *connection)
+ 	s = nm_setting_gsm_get_number (setting);
+@@ -146,17 +145,6 @@ populate_gsm_ui (CEPageMobile *self, NMConnection *connection)
  	}
  	gtk_combo_box_set_active (priv->network_type, type_idx);
  
@@ -272,7 +279,7 @@ index ee627f5..6fd29af 100644
 -
  	secrets = get_secrets (connection, nm_setting_get_name (priv->setting));
  
- 	if (setting->password)
+ 	s = nm_setting_gsm_get_password (setting);
 diff --git a/src/mm-types.h b/src/mm-types.h
 new file mode 100644
 index 0000000..a1f9979
@@ -330,10 +337,10 @@ index 0000000..206ee52
 +EXTRA_DIST = $(glade_DATA)
 diff --git a/src/modems/main.c b/src/modems/main.c
 new file mode 100644
-index 0000000..fe531f0
+index 0000000..3243a6c
 --- /dev/null
 +++ b/src/modems/main.c
-@@ -0,0 +1,547 @@
+@@ -0,0 +1,559 @@
 +/* -*- Mode: C; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*- */
 +
 +#include <string.h>
@@ -636,30 +643,42 @@ index 0000000..fe531f0
 +	NMSettingPPP *s_ppp;
 +	NMSettingConnection *s_con;
 +	GConfClient *gconf_client;
++	char *uuid;
 +
 +	connection = nm_connection_new ();
 +
 +	s_gsm = NM_SETTING_GSM (nm_setting_gsm_new ());
-+	s_gsm->number = g_strdup ("*99#"); /* This should be a sensible default as it's seems to be quite standard */
-+	s_gsm->network_id = g_strdup (oper_code);
++	g_object_set (s_gsm,
++				  NM_SETTING_GSM_NUMBER, "*99#",
++				  NM_SETTING_GSM_NETWORK_ID, oper_code,
++				  NULL);
++
 +	nm_connection_add_setting (connection, NM_SETTING (s_gsm));
 +
 +	/* Serial setting */
 +	s_serial = (NMSettingSerial *) nm_setting_serial_new ();
-+	s_serial->baud = 115200;
-+	s_serial->bits = 8;
-+	s_serial->parity = 'n';
-+	s_serial->stopbits = 1;
++	g_object_set (s_serial,
++				  NM_SETTING_SERIAL_BAUD, 115200,
++				  NM_SETTING_SERIAL_BITS, 8,
++				  NM_SETTING_SERIAL_PARITY, 'n',
++				  NM_SETTING_SERIAL_STOPBITS, 1,
++				  NULL);
++
 +	nm_connection_add_setting (connection, NM_SETTING (s_serial));
 +
 +	s_ppp = (NMSettingPPP *) nm_setting_ppp_new ();
 +	nm_connection_add_setting (connection, NM_SETTING (s_ppp));
 +
 +	s_con = NM_SETTING_CONNECTION (nm_setting_connection_new ());
-+	s_con->id = g_strdup (name);
-+	s_con->type = g_strdup (NM_SETTING (s_gsm)->name);
-+	s_con->autoconnect = FALSE;
-+	s_con->uuid = nm_utils_uuid_generate ();
++	uuid = nm_utils_uuid_generate ();
++	g_object_set (s_con,
++				  NM_SETTING_CONNECTION_ID, name,
++				  NM_SETTING_CONNECTION_TYPE, nm_setting_get_name (NM_SETTING (s_gsm)),
++				  NM_SETTING_CONNECTION_AUTOCONNECT, FALSE,
++				  NM_SETTING_CONNECTION_UUID, uuid,
++				  NULL);
++
++	g_free (uuid);
 +	nm_connection_add_setting (connection, NM_SETTING (s_con));
 +
 +	gconf_client = gconf_client_get_default ();

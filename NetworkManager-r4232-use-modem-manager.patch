@@ -120,7 +120,7 @@ index 3c4ce75..3f24eb5 100644
  			$(top_builddir)/libnm-util/libnm-util.la
  
 diff --git a/src/NetworkManagerPolicy.c b/src/NetworkManagerPolicy.c
-index 5f09704..bad6a34 100644
+index 21b24cd..78312ca 100644
 --- a/src/NetworkManagerPolicy.c
 +++ b/src/NetworkManagerPolicy.c
 @@ -35,9 +35,6 @@
@@ -197,10 +197,10 @@ index 0000000..5331f65
 +CLEANFILES = $(BUILT_SOURCES)
 diff --git a/src/modem-manager/nm-cdma-modem.c b/src/modem-manager/nm-cdma-modem.c
 new file mode 100644
-index 0000000..8e94fa1
+index 0000000..85532c0
 --- /dev/null
 +++ b/src/modem-manager/nm-cdma-modem.c
-@@ -0,0 +1,261 @@
+@@ -0,0 +1,264 @@
 +/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
 +
 +#include <string.h>
@@ -307,7 +307,7 @@ index 0000000..8e94fa1
 +		dbus_g_proxy_begin_call (nm_modem_device_get_proxy (NM_MODEM_DEVICE (modem), NULL),
 +							"Connect", state_machine,
 +							modem, NULL,
-+							G_TYPE_STRING, setting->number,
++							G_TYPE_STRING, nm_setting_cdma_get_number (setting),
 +							G_TYPE_INVALID);
 +		break;
 +	case MODEM_STATE_CONNECT:
@@ -345,10 +345,10 @@ index 0000000..8e94fa1
 +		s_con = (NMSettingConnection *) nm_connection_get_setting (connection, NM_TYPE_SETTING_CONNECTION);
 +		g_assert (s_con);
 +
-+		if (!s_con->autoconnect)
++		if (!nm_setting_connection_get_autoconnect (s_con))
 +			continue;
 +
-+		if (strcmp (s_con->type, NM_SETTING_CDMA_SETTING_NAME))
++		if (strcmp (nm_setting_connection_get_connection_type (s_con), NM_SETTING_CDMA_SETTING_NAME))
 +			continue;
 +
 +		return connection;
@@ -382,10 +382,13 @@ index 0000000..8e94fa1
 +			                               NULL,
 +			                               "missing CDMA setting; no secrets could be found.");
 +		} else {
++			const char *username = nm_setting_cdma_get_username (s_cdma);
++			const char *password = nm_setting_cdma_get_password (s_cdma);
++
 +			nm_ppp_manager_update_secrets (ppp_manager,
 +			                               nm_device_get_iface (dev),
-+			                               s_cdma->username ? s_cdma->username : "",
-+			                               s_cdma->password ? s_cdma->password : "",
++			                               username ? username : "",
++			                               password ? password : "",
 +			                               NULL);
 +		}
 +		return;
@@ -422,7 +425,7 @@ index 0000000..8e94fa1
 +	s_cdma = (NMSettingCdma *) nm_connection_get_setting (connection, NM_TYPE_SETTING_CDMA);
 +	g_assert (s_cdma);
 +
-+	return s_cdma->username;
++	return nm_setting_cdma_get_username (s_cdma);
 +}
 +
 +/*****************************************************************************/
@@ -506,10 +509,10 @@ index 0000000..5dc3c14
 +#endif /* NM_CDMA_MODEM_H */
 diff --git a/src/modem-manager/nm-gsm-modem-hso.c b/src/modem-manager/nm-gsm-modem-hso.c
 new file mode 100644
-index 0000000..2c28752
+index 0000000..bea0d31
 --- /dev/null
 +++ b/src/modem-manager/nm-gsm-modem-hso.c
-@@ -0,0 +1,342 @@
+@@ -0,0 +1,346 @@
 +/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
 +
 +#include "nm-gsm-modem-hso.h"
@@ -635,14 +638,18 @@ index 0000000..2c28752
 +do_hso_auth (NMGsmModemHso *device)
 +{
 +	NMSettingGsm *s_gsm;
++	const char *username;
++	const char *password;
 +
 +	s_gsm = NM_SETTING_GSM (get_setting (device, NM_TYPE_SETTING_GSM));
++	username = nm_setting_gsm_get_username (s_gsm);
++	password = nm_setting_gsm_get_password (s_gsm);
 +
 +	dbus_g_proxy_begin_call (nm_modem_device_get_proxy (NM_MODEM_DEVICE (device), MM_DBUS_INTERFACE_MODEM_GSM_HSO),
 +						"Authenticate", hso_auth_done,
 +						device, NULL,
-+						G_TYPE_STRING, s_gsm->username ? s_gsm->username : "",
-+						G_TYPE_STRING, s_gsm->password ? s_gsm->password : "",
++						G_TYPE_STRING, username ? username : "",
++						G_TYPE_STRING, password ? password : "",
 +						G_TYPE_INVALID);
 +}
 +
@@ -1219,10 +1226,10 @@ index 0000000..1f49fda
 +#endif /* NM_GSM_MODEM_MBM_H */
 diff --git a/src/modem-manager/nm-gsm-modem.c b/src/modem-manager/nm-gsm-modem.c
 new file mode 100644
-index 0000000..9a77abf
+index 0000000..047e76c
 --- /dev/null
 +++ b/src/modem-manager/nm-gsm-modem.c
-@@ -0,0 +1,342 @@
+@@ -0,0 +1,354 @@
 +/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
 +
 +#include <string.h>
@@ -1301,8 +1308,10 @@ index 0000000..9a77abf
 +	NMSettingGsm *setting;
 +	const char *secret = NULL;
 +	const char *secret_name = NULL;
-+	gboolean retry_secret = FALSE;
++	const char *str;
 +	GError *error = NULL;
++	int i;
++	gboolean retry_secret = FALSE;
 +
 +	setting = NM_SETTING_GSM (get_setting (modem, NM_TYPE_SETTING_GSM));
 +
@@ -1313,16 +1322,15 @@ index 0000000..9a77abf
 +		g_debug ("%s", dbus_g_error_get_name (error));
 +
 +		if (dbus_g_error_has_name (error, MM_MODEM_ERROR_SIM_PIN)) {
-+			secret = setting->pin;
++			secret = nm_setting_gsm_get_pin (setting);
 +			secret_name = NM_SETTING_GSM_PIN;
 +			priv->modem_state = MODEM_STATE_SET_PIN;
 +		} else if (dbus_g_error_has_name (error, MM_MODEM_ERROR_SIM_PUK)) {
-+			secret = setting->puk;
++			secret = nm_setting_gsm_get_puk (setting);
 +			secret_name = NM_SETTING_GSM_PUK;
 +			priv->modem_state = MODEM_STATE_SET_PIN;
 +		} else if (dbus_g_error_has_name (error, MM_MODEM_ERROR_SIM_WRONG)) {
-+			g_free (setting->pin);
-+			setting->pin = NULL;
++			g_object_set (setting, NM_SETTING_GSM_PIN, NULL, NULL);
 +			secret_name = NM_SETTING_GSM_PIN;
 +			retry_secret = TRUE;
 +			priv->modem_state = MODEM_STATE_SET_PIN;
@@ -1379,11 +1387,13 @@ index 0000000..9a77abf
 +
 +	case MODEM_STATE_ENABLE:
 +		priv->modem_state = MODEM_STATE_SET_APN;
-+		if (setting->apn)
++		str = nm_setting_gsm_get_apn (setting);
++
++		if (str)
 +			dbus_g_proxy_begin_call (get_proxy (modem, MM_DBUS_INTERFACE_MODEM_GSM_NETWORK),
 +								"SetApn", state_machine,
 +								modem, NULL,
-+								G_TYPE_STRING, setting->apn,
++								G_TYPE_STRING, str,
 +								G_TYPE_INVALID);
 +		else
 +			goto again;
@@ -1391,11 +1401,13 @@ index 0000000..9a77abf
 +		break;
 +	case MODEM_STATE_SET_APN:
 +		priv->modem_state = MODEM_STATE_SET_BAND;
-+		if (setting->band)
++		i = nm_setting_gsm_get_band (setting);
++
++		if (i)
 +			dbus_g_proxy_begin_call (get_proxy (modem, MM_DBUS_INTERFACE_MODEM_GSM_NETWORK),
 +								"SetBand", state_machine,
 +								modem, NULL,
-+								G_TYPE_UINT, (guint32) setting->band,
++								G_TYPE_UINT, (guint32) i,
 +								G_TYPE_INVALID);
 +		else
 +			goto again;
@@ -1404,11 +1416,13 @@ index 0000000..9a77abf
 +
 +	case MODEM_STATE_SET_BAND:
 +		priv->modem_state = MODEM_STATE_SET_NETWORK_MODE;
-+		if (setting->network_type)
++		i = nm_setting_gsm_get_network_type (setting);
++
++		if (i)
 +			dbus_g_proxy_begin_call (get_proxy (modem, MM_DBUS_INTERFACE_MODEM_GSM_NETWORK),
 +								"SetNetworkMode", state_machine,
 +								modem, NULL,
-+								G_TYPE_UINT, (guint32) setting->network_type,
++								G_TYPE_UINT, (guint32) i,
 +								G_TYPE_INVALID);
 +		else
 +			goto again;
@@ -1417,15 +1431,17 @@ index 0000000..9a77abf
 +
 +	case MODEM_STATE_SET_NETWORK_MODE:
 +		priv->modem_state = MODEM_STATE_REGISTER;
++
++		str = nm_setting_gsm_get_network_id (setting);
 +		dbus_g_proxy_begin_call_with_timeout (get_proxy (modem, MM_DBUS_INTERFACE_MODEM_GSM_NETWORK),
 +									   "Register", state_machine,
 +									   modem, NULL, 120000,
-+									   G_TYPE_STRING, setting->network_id ? setting->network_id : "",
++									   G_TYPE_STRING, str ? str : "",
 +									   G_TYPE_INVALID);
 +		break;
 +
 +	case MODEM_STATE_REGISTER:
-+		nm_modem_device_connect (NM_MODEM_DEVICE (modem), setting->number);
++		nm_modem_device_connect (NM_MODEM_DEVICE (modem), nm_setting_gsm_get_number (setting));
 +		break;
 +	case MODEM_STATE_FAILED:
 +	default:
@@ -1459,10 +1475,10 @@ index 0000000..9a77abf
 +		s_con = (NMSettingConnection *) nm_connection_get_setting (connection, NM_TYPE_SETTING_CONNECTION);
 +		g_assert (s_con);
 +
-+		if (!s_con->autoconnect)
++		if (!nm_setting_connection_get_autoconnect (s_con))
 +			continue;
 +
-+		if (strcmp (s_con->type, NM_SETTING_GSM_SETTING_NAME))
++		if (strcmp (nm_setting_connection_get_connection_type (s_con), NM_SETTING_GSM_SETTING_NAME))
 +			continue;
 +
 +		return connection;
@@ -1496,10 +1512,13 @@ index 0000000..9a77abf
 +			                               NULL,
 +			                               "missing GSM setting; no secrets could be found.");
 +		} else {
++			const char *username = nm_setting_gsm_get_username (s_gsm);
++			const char *password = nm_setting_gsm_get_password (s_gsm);
++
 +			nm_ppp_manager_update_secrets (ppp_manager,
 +			                               nm_device_get_iface (dev),
-+			                               s_gsm->username ? s_gsm->username : "",
-+			                               s_gsm->password ? s_gsm->password : "",
++			                               username ? username : "",
++			                               password ? password : "",
 +			                               NULL);
 +		}
 +		return;
@@ -1536,7 +1555,7 @@ index 0000000..9a77abf
 +	s_gsm = (NMSettingGsm *) nm_connection_get_setting (connection, NM_TYPE_SETTING_GSM);
 +	g_assert (s_gsm);
 +
-+	return s_gsm->username;
++	return nm_setting_gsm_get_username (s_gsm);
 +}
 +
 +/*****************************************************************************/
@@ -2671,10 +2690,10 @@ index 0000000..de1d2de
 +#endif /* NM_MODEM_TYPES_H */
 diff --git a/src/nm-cdma-device.c b/src/nm-cdma-device.c
 deleted file mode 100644
-index 63e4883..0000000
+index 628a9b7..0000000
 --- a/src/nm-cdma-device.c
 +++ /dev/null
-@@ -1,571 +0,0 @@
+@@ -1,574 +0,0 @@
 -/* -*- Mode: C; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*- */
 -
 -#include <stdio.h>
@@ -2804,7 +2823,7 @@ index 63e4883..0000000
 -
 -	setting = NM_SETTING_CDMA (cdma_device_get_setting (NM_CDMA_DEVICE (device), NM_TYPE_SETTING_CDMA));
 -
--	command = g_strconcat ("ATDT", setting->number, NULL);
+-	command = g_strconcat ("ATDT", nm_setting_cdma_get_number (setting), NULL);
 -	if (nm_serial_device_send_command_string (device, command))
 -		id = nm_serial_device_wait_for_reply (device, 60, responses, responses, dial_done, NULL);
 -	g_free (command);
@@ -2914,10 +2933,10 @@ index 63e4883..0000000
 -		s_con = (NMSettingConnection *) nm_connection_get_setting (connection, NM_TYPE_SETTING_CONNECTION);
 -		g_assert (s_con);
 -
--		if (!s_con->autoconnect)
+-		if (!nm_setting_connection_get_autoconnect (s_con))
 -			continue;
 -
--		if (strcmp (s_con->type, NM_SETTING_CDMA_SETTING_NAME))
+-		if (strcmp (nm_setting_connection_get_connection_type (s_con), NM_SETTING_CDMA_SETTING_NAME))
 -			continue;
 -
 -		return connection;
@@ -2957,10 +2976,13 @@ index 63e4883..0000000
 -			                               NULL,
 -			                               "missing CDMA setting; no secrets could be found.");
 -		} else {
+-			const char *cdma_username = nm_setting_cdma_get_username (s_cdma);
+-			const char *cdma_password = nm_setting_cdma_get_password (s_cdma);
+-
 -			nm_ppp_manager_update_secrets (ppp_manager,
 -			                               nm_device_get_iface (dev),
--			                               s_cdma->username ? s_cdma->username : "",
--			                               s_cdma->password ? s_cdma->password : "",
+-			                               cdma_username ? cdma_username : "",
+-			                               cdma_password ? cdma_password : "",
 -			                               NULL);
 -		}
 -		return;
@@ -3001,7 +3023,7 @@ index 63e4883..0000000
 -	s_cdma = (NMSettingCdma *) nm_connection_get_setting (connection, NM_TYPE_SETTING_CDMA);
 -	g_assert (s_cdma);
 -
--	return s_cdma->username;
+-	return nm_setting_cdma_get_username (s_cdma);
 -}
 -
 -/*****************************************************************************/
@@ -3469,10 +3491,10 @@ index 32cb705..8cf41e1 100644
  static void
 diff --git a/src/nm-hso-gsm-device.c b/src/nm-hso-gsm-device.c
 deleted file mode 100644
-index 30fd8d9..0000000
+index 49b6084..0000000
 --- a/src/nm-hso-gsm-device.c
 +++ /dev/null
-@@ -1,560 +0,0 @@
+@@ -1,565 +0,0 @@
 -/* -*- Mode: C; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*- */
 -
 -#include <stdio.h>
@@ -3653,6 +3675,8 @@ index 30fd8d9..0000000
 -	NMActRequest *req;
 -	const char *responses[] = { "OK", "ERROR", "ERR", NULL };
 -	char *command;
+-	const char *gsm_username;
+-	const char *gsm_password;
 -	guint cid;
 -
 -	req = nm_device_get_act_request (NM_DEVICE (device));
@@ -3662,10 +3686,13 @@ index 30fd8d9..0000000
 -
 -	s_gsm = NM_SETTING_GSM (gsm_device_get_setting (NM_GSM_DEVICE (device), NM_TYPE_SETTING_GSM));
 -
+-	gsm_username = nm_setting_gsm_get_username (s_gsm);
+-	gsm_password = nm_setting_gsm_get_password (s_gsm);
+-
 -	command = g_strdup_printf ("AT$QCPDPP=%d,1,\"%s\",\"%s\"",
 -	                           cid,
--	                           s_gsm->password ? s_gsm->password : "",
--	                           s_gsm->username ? s_gsm->username : "");
+-	                           gsm_password ? gsm_password : "",
+-	                           gsm_username ? gsm_username : "");
 -	modem_wait_for_reply (NM_GSM_DEVICE (device), command, 5, responses, responses, hso_auth_done, GUINT_TO_POINTER (cid));
 -	g_free (command);
 -}
@@ -4078,7 +4105,7 @@ index a7498c8..0000000
 -
 -#endif /* NM_HSO_GSM_DEVICE_H */
 diff --git a/src/nm-manager.c b/src/nm-manager.c
-index 74345b0..828dd5e 100644
+index def60e1..797c7b4 100644
 --- a/src/nm-manager.c
 +++ b/src/nm-manager.c
 @@ -7,6 +7,7 @@
@@ -4178,7 +4205,7 @@ index 74345b0..828dd5e 100644
  	g_object_unref (priv->dbus_mgr);
  	g_object_unref (priv->hal_mgr);
  
-@@ -1614,58 +1669,66 @@ next:
+@@ -1623,58 +1678,66 @@ next:
  }
  
  static void
@@ -4272,10 +4299,10 @@ index 74345b0..828dd5e 100644
                              gpointer user_data)
 diff --git a/src/nm-serial-device.c b/src/nm-serial-device.c
 deleted file mode 100644
-index b6f97d4..0000000
+index 4b3c102..0000000
 --- a/src/nm-serial-device.c
 +++ /dev/null
-@@ -1,1144 +0,0 @@
+@@ -1,1146 +0,0 @@
 -/* -*- Mode: C; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*- */
 -
 -#define _GNU_SOURCE  /* for strcasestr() */
@@ -4609,10 +4636,10 @@ index b6f97d4..0000000
 -	int parity;
 -	int stopbits;
 -
--	speed = parse_baudrate (setting->baud);
--	bits = parse_bits (setting->bits);
--	parity = parse_parity (setting->parity);
--	stopbits = parse_stopbits (setting->stopbits);
+-	speed = parse_baudrate (nm_setting_serial_get_baud (setting));
+-	bits = parse_bits (nm_setting_serial_get_bits (setting));
+-	parity = parse_parity (nm_setting_serial_get_parity (setting));
+-	stopbits = parse_stopbits (nm_setting_serial_get_stopbits (setting));
 -
 -	ioctl (priv->fd, TCGETA, &stbuf);
 -
@@ -4716,15 +4743,17 @@ index b6f97d4..0000000
 -	NMSettingSerial *setting;
 -	int i, eagain_count = 1000;
 -	ssize_t written;
--	guint32 send_delay = G_USEC_PER_SEC / 1000;
+-	guint32 send_delay = 0;
 -
 -	g_return_val_if_fail (NM_IS_SERIAL_DEVICE (device), FALSE);
 -	g_return_val_if_fail (command != NULL, FALSE);
 -
 -	fd = NM_SERIAL_DEVICE_GET_PRIVATE (device)->fd;
 -	setting = NM_SETTING_SERIAL (serial_device_get_setting (device, NM_TYPE_SETTING_SERIAL));
--	if (setting && setting->send_delay)
--		send_delay = setting->send_delay;
+-	if (setting)
+-		send_delay = nm_setting_serial_get_send_delay (setting);
+-	if (send_delay == 0)
+-		send_delay = G_USEC_PER_SEC / 1000;
 -
 -	nm_serial_debug ("Sending:", (char *) command->data, command->len);
 -
