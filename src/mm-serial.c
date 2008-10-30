@@ -244,6 +244,7 @@ config_fd (MMSerial *self)
 static void
 serial_debug (const char *prefix, const char *buf, int len)
 {
+    static GString *debug = NULL;
     const char *s;
 
     if (!mm_options_debug ())
@@ -252,23 +253,29 @@ serial_debug (const char *prefix, const char *buf, int len)
     if (len < 0)
         len = strlen (buf);
 
-    g_print ("%s '", prefix);
+    if (!debug)
+        debug = g_string_sized_new (256);
 
+    g_string_append (debug, prefix);
+    g_string_append (debug, " '");
+    
     s = buf;
     while (len--) {
         if (g_ascii_isprint (*s))
-            g_print ("%c", *s);
+            g_string_append_c (debug, *s);
         else if (*s == '\r')
-            g_print ("<CR>");
+            g_string_append (debug, "<CR>");
         else if (*s == '\n')
-            g_print ("<LF>");
+            g_string_append (debug, "<LF>");
         else
-            g_print ("\\%d", *s);
+            g_string_append_printf (debug, "\\%d", *s);
 
         s++;
     }
 
-    g_print ("'\n");
+    g_string_append_c (debug, '\'');
+    g_debug (debug->str);
+    g_string_truncate (debug, 0);
 }
 
 static gboolean

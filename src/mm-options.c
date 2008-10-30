@@ -29,6 +29,12 @@ mm_options_parse (int argc, char *argv[])
 	g_option_context_free (opt_ctx);
 }
 
+void
+mm_options_set_debug (gboolean enabled)
+{
+    debug = enabled;
+}
+
 gboolean
 mm_options_debug (void)
 {
