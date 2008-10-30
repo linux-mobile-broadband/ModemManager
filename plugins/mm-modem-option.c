@@ -24,59 +24,53 @@ mm_modem_option_new (const char *data_device,
 }
 
 static void
-enable_done (MMSerial *serial,
-             GString *response,
-             GError *error,
-             gpointer user_data)
+check_pin_done (MMSerial *serial,
+                GString *response,
+                GError *error,
+                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    gboolean parsed = FALSE;
 
     if (error)
         info->error = g_error_copy (error);
-    else {
-        /* Option returns OK on +CFUN=1 right away but needs some time
-           to finish initialization */
-        sleep (7);
+    else if (g_str_has_prefix (response->str, "+CPIN: ")) {
+        const char *str = response->str + 7;
+
+        if (g_str_has_prefix (str, "READY"))
+            parsed = TRUE;
+        else if (g_str_has_prefix (str, "SIM PIN"))
+            info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_SIM_PIN);
+        else if (g_str_has_prefix (str, "SIM PUK"))
+            info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_SIM_PUK);
     }
+
+    if (!info->error && !parsed)
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                   "%s", "Could not parse PIN request results");
 
     mm_callback_info_schedule (info);
 }
 
 static void
-init_done (MMSerial *serial,
-           GString *response,
-           GError *error,
-           gpointer user_data)
+parent_enable_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    if (error) {
+    if (error)
         info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-    } else
-        mm_serial_queue_command (serial, "+CFUN=1", 5, enable_done, user_data);
-}
+    else if (GPOINTER_TO_INT (mm_callback_info_get_data (info, "option-enable"))) {
+        /* Option returns OK on +CFUN=1 right away but needs some time
+           to finish initialization */
+        sleep (10);
 
-static void
-enable_flash_done (MMSerial *serial, gpointer user_data)
-{
-    mm_serial_queue_command (serial, "Z E0 V1 X4 &C1 +CMEE=1", 3, init_done, user_data);
-}
+        /* Now check the PIN explicitly, option doesn't seem to report
+           that it needs it otherwise */
+        mm_serial_queue_command (MM_SERIAL (modem), "+CPIN?", 3, check_pin_done, info);
+        return;
+    }
 
-static void
-disable_done (MMSerial *serial,
-              GString *response,
-              GError *error,
-              gpointer user_data)
-{
-    mm_serial_close (serial);
-    mm_callback_info_schedule ((MMCallbackInfo *) user_data);
-}
-
-static void
-disable_flash_done (MMSerial *serial, gpointer user_data)
-{
-    mm_serial_queue_command (serial, "+CFUN=0", 5, disable_done, user_data);
+    mm_callback_info_schedule (info);
 }
 
 static void
@@ -85,25 +79,14 @@ enable (MMModem *modem,
         MMModemFn callback,
         gpointer user_data)
 {
+    MMModem *parent_modem_iface;
     MMCallbackInfo *info;
 
-    /* First, reset the previously used CID */
-    mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
-
     info = mm_callback_info_new (modem, callback, user_data);
+    mm_callback_info_set_data (info, "option-enable", GINT_TO_POINTER (enable), NULL);
 
-    if (!enable) {
-        if (mm_serial_is_connected (MM_SERIAL (modem)))
-            mm_serial_flash (MM_SERIAL (modem), 1000, disable_flash_done, info);
-        else
-            disable_flash_done (MM_SERIAL (modem), info);
-    } else {
-        if (mm_serial_open (MM_SERIAL (modem), &info->error))
-            mm_serial_flash (MM_SERIAL (modem), 100, enable_flash_done, info);
-
-        if (info->error)
-            mm_callback_info_schedule (info);
-    }
+    parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (modem));
+    parent_modem_iface->enable (modem, enable, parent_enable_done, info);
 }
 
 static void
