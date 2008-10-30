@@ -1,7 +1,9 @@
 pkglib_LTLIBRARIES = \
 	libmm-plugin-huawei.la \
 	libmm-plugin-hso.la \
-	libmm-plugin-mbm.la
+	libmm-plugin-mbm.la \
+	libmm-plugin-option.la
+
 
 # Huawei
 
@@ -52,6 +54,20 @@ libmm_plugin_mbm_la_CPPFLAGS = \
 	-I$(top_srcdir)/src
 
 libmm_plugin_mbm_la_LDFLAGS = -module -avoid-version
+
+# Option
+
+libmm_plugin_option_la_SOURCES = \
+	mm-modem-option.c \
+	mm-modem-option.h \
+	mm-plugin-option.c \
+	mm-plugin-option.h
+
+libmm_plugin_option_la_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	-I$(top_srcdir)/src
+
+libmm_plugin_option_la_LDFLAGS = -module -avoid-version
 
 BUILT_SOURCES = \
 	mm-modem-gsm-hso-glue.h \
