@@ -524,11 +524,9 @@ get_reg_status_done (MMSerial *serial,
                 done = TRUE;
                 break;
             case MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE:
-                /* Huh? Stupid card, we already told it to register, tell again */
-                real_register (serial,
-                               (char *) mm_callback_info_get_data (info, "reg-network-id"),
-                               info);
-                break;
+                /* Huh? Stupid card, we told it to register, pretend it returned SEARCHING
+                 (hoping it will eventually start searching) */
+                /* fall through */
             case MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING:
                 /* Wait more until the timeout expires. */
                 id = GPOINTER_TO_INT (mm_callback_info_get_data (info, "reg-status-timeout"));
