@@ -3,6 +3,8 @@
   Additions to NetworkManager, network-manager-applet and modemmanager
   for supporting Ericsson modules like F3507g.
 
+  Copyright (C) 2008 Ericsson MBM
+
   Author: Per Hallsmark <per@hallsmark.se>
           Bjorn Runaker <bjorn.runaker@ericsson.com>
 
@@ -23,17 +25,21 @@
 
 */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <string.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <dbus/dbus-glib.h>
 #include "mm-modem-mbm.h"
 #include "mm-serial.h"
+#include "mm-serial-parsers.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
+#include "mm-util.h"
 
 #include "mm-modem-gsm-mbm-glue.h"
 
@@ -43,6 +49,10 @@ static gpointer mm_modem_mbm_parent_class = NULL;
 
 typedef struct {
     char *network_device;
+    GRegex *boot_trig_regex;
+    GRegex *msg_waiting_regex;
+    GRegex *ciev_regex;
+    gpointer std_parser;
     guint32 signal_quality;
 } MMModemMbmPrivate;
 
@@ -72,9 +82,9 @@ mm_modem_mbm_new (const char *serial_device,
 
 static void
 eiapsw_done (MMSerial *serial,
-                 GString *response,
-                 GError *error,
-                 gpointer user_data)
+             GString *response,
+             GError *error,
+             gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
@@ -86,9 +96,9 @@ eiapsw_done (MMSerial *serial,
 
 static void
 eiac_done (MMSerial *serial,
-                 GString *response,
-                 GError *error,
-                 gpointer user_data)
+           GString *response,
+           GError *error,
+           gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     char *command;
@@ -105,9 +115,9 @@ eiac_done (MMSerial *serial,
 
 static void
 eiad_done (MMSerial *serial,
-                 GString *response,
-                 GError *error,
-                 gpointer user_data)
+           GString *response,
+           GError *error,
+           gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
@@ -132,10 +142,10 @@ set_apn (MMModemGsmNetwork *modem,
 }
 
 static void
-do_register_done (MMSerial *serial,
-                 GString *response,
-                 GError *error,
-                 gpointer user_data)
+do_cmer_done (MMSerial *serial,
+              GString *response,
+              GError *error,
+              gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
@@ -143,6 +153,20 @@ do_register_done (MMSerial *serial,
         info->error = g_error_copy (error);
 
     mm_callback_info_schedule (info);
+}
+
+static void
+do_register_done (MMSerial *serial,
+                  GString *response,
+                  GError *error,
+                  gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error)
+        info->error = g_error_copy (error);
+
+    mm_serial_queue_command (serial, "AT+CMER=3,0,0,1", 10, do_cmer_done, info);
 }
 
 static void
@@ -222,7 +246,7 @@ enable (MMModem *modem,
         MMModemFn callback,
         gpointer user_data)
 {
-	MMCallbackInfo *info;
+    MMCallbackInfo *info;
 
     /* First, reset the previously used CID */
     mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
@@ -358,8 +382,61 @@ get_signal_quality (MMModemGsmNetwork *modem,
 /*****************************************************************************/
 
 static void
+boot_trig (const char *str, gpointer data)
+{
+    mm_serial_queue_command (MM_SERIAL(data), "AT*ENAP=1,1", 10, NULL, NULL);
+}
+
+static void
+ciev_trig (const char *str, gpointer data)
+{
+    int event, value;
+    guint32 quality;
+
+    if (!str) {
+        return;
+    }
+
+    event = str[0] - '0';
+    value = str[2] - '0';
+
+    switch (event) {
+    case 2: /* signal quality, value 0-5 */
+        quality = value * 100 / 5;
+        mm_modem_gsm_network_signal_quality (MM_MODEM_GSM_NETWORK (data), quality);
+        break;
+    case 9: /* roaming, value 0 or 1 */
+        g_debug ("%s: roaming %s\n", __FUNCTION__, value ? "active" : "inactive");
+        break;
+    default:
+        g_debug ("%s: got unknown event %d with value %d\n", __FUNCTION__, event, value);
+    }
+}
+
+static gboolean
+mbm_parse_response (gpointer data, GString *response, GError **error)
+{
+    MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (data);
+
+    mm_util_strip_string (response, priv->boot_trig_regex, boot_trig, data);
+    mm_util_strip_string (response, priv->ciev_regex, ciev_trig, data);
+    mm_util_strip_string (response, priv->msg_waiting_regex, NULL, data);
+
+    return mm_serial_parser_v1_parse (priv->std_parser, response, error);
+}
+
+static void
 mm_modem_mbm_init (MMModemMbm *self)
 {
+    MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (self);
+
+    priv->boot_trig_regex = g_regex_new ("\\r\\n\\+PACSP0\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    priv->msg_waiting_regex = g_regex_new ("\\r\\n[\\*]EMWI\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    priv->ciev_regex = g_regex_new ("\\r\\n\\+CIEV: (.,.)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+
+    priv->std_parser = (gpointer) mm_serial_parser_v1_new ();
+
+    mm_serial_set_response_parser (MM_SERIAL (self), mbm_parse_response, self, NULL);
 }
 
 static void
@@ -440,6 +517,10 @@ finalize (GObject *object)
     MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (object);
 
     g_free (priv->network_device);
+    mm_serial_parser_v1_destroy (priv->std_parser);
+    g_regex_unref (priv->boot_trig_regex);
+    g_regex_unref (priv->msg_waiting_regex);
+    g_regex_unref (priv->ciev_regex);
 
     G_OBJECT_CLASS (mm_modem_mbm_parent_class)->finalize (object);
 }
