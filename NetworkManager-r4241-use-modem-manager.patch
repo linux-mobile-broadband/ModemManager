@@ -120,7 +120,7 @@ index 3c4ce75..3f24eb5 100644
  			$(top_builddir)/libnm-util/libnm-util.la
  
 diff --git a/src/NetworkManagerPolicy.c b/src/NetworkManagerPolicy.c
-index 21b24cd..78312ca 100644
+index 8116e86..127d034 100644
 --- a/src/NetworkManagerPolicy.c
 +++ b/src/NetworkManagerPolicy.c
 @@ -35,9 +35,6 @@
@@ -133,7 +133,7 @@ index 21b24cd..78312ca 100644
  #include "nm-dbus-manager.h"
  #include "nm-setting-ip4-config.h"
  #include "nm-setting-connection.h"
-@@ -232,7 +229,9 @@ get_best_device (NMManager *manager, NMActRequest **out_req)
+@@ -236,7 +233,9 @@ get_best_device (NMManager *manager, NMActRequest **out_req)
  		}
  
  		/* 'hso' devices never get a gateway from the remote end */
@@ -509,10 +509,10 @@ index 0000000..5dc3c14
 +#endif /* NM_CDMA_MODEM_H */
 diff --git a/src/modem-manager/nm-gsm-modem-hso.c b/src/modem-manager/nm-gsm-modem-hso.c
 new file mode 100644
-index 0000000..bea0d31
+index 0000000..15b79b6
 --- /dev/null
 +++ b/src/modem-manager/nm-gsm-modem-hso.c
-@@ -0,0 +1,346 @@
+@@ -0,0 +1,348 @@
 +/* -*- Mode: C; tab-width: 5; indent-tabs-mode: t; c-basic-offset: 5 -*- */
 +
 +#include "nm-gsm-modem-hso.h"
@@ -712,13 +712,15 @@ index 0000000..bea0d31
 +						  G_TYPE_INVALID)) {
 +
 +		NMGsmModemHsoPrivate *priv = NM_GSM_MODEM_HSO_GET_PRIVATE (device);
-+		NMSettingIP4Address addr = { 0, 32, 0 };
++		NMIP4Address *addr;
 +		int i;
 +
-+		priv->pending_ip4_config = nm_ip4_config_new ();
++		addr = nm_ip4_address_new ();
++		nm_ip4_address_set_address (addr, ip4_address);
++		nm_ip4_address_set_prefix (addr, 32);
 +
-+		addr.address = ip4_address;
-+		nm_ip4_config_add_address (priv->pending_ip4_config, &addr);
++		priv->pending_ip4_config = nm_ip4_config_new ();
++		nm_ip4_config_take_address (priv->pending_ip4_config, addr);
 +
 +		for (i = 0; i < dns_array->len; i++)
 +			nm_ip4_config_add_nameserver (priv->pending_ip4_config,
@@ -3492,10 +3494,10 @@ index 32cb705..8cf41e1 100644
  static void
 diff --git a/src/nm-hso-gsm-device.c b/src/nm-hso-gsm-device.c
 deleted file mode 100644
-index 49b6084..0000000
+index 7fedbd6..0000000
 --- a/src/nm-hso-gsm-device.c
 +++ /dev/null
-@@ -1,565 +0,0 @@
+@@ -1,570 +0,0 @@
 -/* -*- Mode: C; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*- */
 -
 -#include <stdio.h>
@@ -3767,8 +3769,7 @@ index 49b6084..0000000
 -	NMActRequest *req;
 -	char **items, **iter;
 -	guint cid, i;
--	NMSettingIP4Address addr = { 0, 32, 0 };
--	guint32 dns1 = 0, dns2 = 0;
+-	guint32 dns1 = 0, dns2 = 0, ip4_address = 0;
 -
 -	if (   (reply_index < 0)
 -	    || !response
@@ -3795,8 +3796,8 @@ index 49b6084..0000000
 -				goto out;
 -			}
 -		} else if (i == 1) { /* IP address */
--			if (inet_pton (AF_INET, *iter, &(addr.address)) <= 0)
--				addr.address = 0;
+-			if (inet_pton (AF_INET, *iter, &ip4_address) <= 0)
+-				ip4_address = 0;
 -		} else if (i == 3) { /* DNS 1 */
 -			if (inet_pton (AF_INET, *iter, &dns1) <= 0)
 -				dns1 = 0;
@@ -3809,10 +3810,16 @@ index 49b6084..0000000
 -out:
 -	g_strfreev (items);
 -
--	if (addr.address) {
+-	if (ip4_address) {
+-		NMIP4Address *addr;
+-
 -		priv->pending_ip4_config = nm_ip4_config_new ();
 -
--		nm_ip4_config_add_address (priv->pending_ip4_config, &addr);
+-		addr = nm_ip4_address_new ();
+-		nm_ip4_address_set_address (addr, ip4_address);
+-		nm_ip4_address_set_prefix (addr, 32);
+-
+-		nm_ip4_config_take_address (priv->pending_ip4_config, addr);
 -
 -		if (dns1)
 -			nm_ip4_config_add_nameserver (priv->pending_ip4_config, dns1);
@@ -4300,10 +4307,10 @@ index def60e1..797c7b4 100644
                              gpointer user_data)
 diff --git a/src/nm-serial-device.c b/src/nm-serial-device.c
 deleted file mode 100644
-index 4b3c102..0000000
+index eeea3b7..0000000
 --- a/src/nm-serial-device.c
 +++ /dev/null
-@@ -1,1146 +0,0 @@
+@@ -1,1159 +0,0 @@
 -/* -*- Mode: C; tab-width: 4; indent-tabs-mode: t; c-basic-offset: 4 -*- */
 -
 -#define _GNU_SOURCE  /* for strcasestr() */
@@ -4327,6 +4334,7 @@ index 4b3c102..0000000
 -#include "nm-marshal.h"
 -#include "nm-utils.h"
 -#include "nm-serial-device-glue.h"
+-#include "NetworkManagerUtils.h"
 -
 -static gboolean serial_debug = FALSE;
 -
@@ -5363,9 +5371,21 @@ index 4b3c102..0000000
 -                                NMDeviceStateReason *reason)
 -{
 -	NMSerialDevicePrivate *priv = NM_SERIAL_DEVICE_GET_PRIVATE (device);
+-	NMConnection *connection;
+-	NMSettingIP4Config *s_ip4;
+-
+-	g_return_val_if_fail (config != NULL, NM_ACT_STAGE_RETURN_FAILURE);
+-	g_return_val_if_fail (*config == NULL, NM_ACT_STAGE_RETURN_FAILURE);
+-	g_return_val_if_fail (reason != NULL, NM_ACT_STAGE_RETURN_FAILURE);
+-
+-	connection = nm_act_request_get_connection (nm_device_get_act_request (device));
+-	g_assert (connection);
+-
+-	s_ip4 = (NMSettingIP4Config *) nm_connection_get_setting (connection, NM_TYPE_SETTING_IP4_CONFIG);
 -
 -	*config = priv->pending_ip4_config;
 -	priv->pending_ip4_config = NULL;
+-	nm_utils_merge_ip4_config (*config, s_ip4);
 -
 -	return NM_ACT_STAGE_RETURN_SUCCESS;
 -}
