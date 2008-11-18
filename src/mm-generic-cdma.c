@@ -32,6 +32,21 @@ mm_generic_cdma_new (const char *serial_device, const char *driver)
 /*****************************************************************************/
 
 static void
+enable_error_reporting_done (MMSerial *serial,
+                             GString *response,
+                             GError *error,
+                             gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error)
+        g_warning ("Your CDMA modem does not support +CMEE command");
+
+    /* Ignore errors, see FIXME in init_done() */
+    mm_callback_info_schedule (info);
+}
+
+static void
 init_done (MMSerial *serial,
            GString *response,
            GError *error,
@@ -39,16 +54,23 @@ init_done (MMSerial *serial,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    if (error)
+    if (error) {
         info->error = g_error_copy (error);
-
-    mm_callback_info_schedule (info);
+        mm_callback_info_schedule (info);
+    } else {
+        /* Try to enable better error reporting. My experience so far indicates
+           there's some CDMA modems that does not support that.
+        FIXME: It's mandatory by spec, so it really shouldn't be optional. Figure
+        out which CDMA modems have problems with it and implement plugin for them.
+        */
+        mm_serial_queue_command (serial, "+CMEE=1", 3, enable_error_reporting_done, user_data);
+    }
 }
 
 static void
 flash_done (MMSerial *serial, gpointer user_data)
 {
-    mm_serial_queue_command (serial, "Z E0 V1 X4 &C1 +CMEE=1", 3, init_done, user_data);
+    mm_serial_queue_command (serial, "Z E0 V1 X4 &C1", 3, init_done, user_data);
 }
 
 static void
