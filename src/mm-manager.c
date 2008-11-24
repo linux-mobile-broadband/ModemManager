@@ -191,6 +191,11 @@ create_generic_modem (MMManager *manager, const char *udi)
     g_free (serial_device);
     g_free (driver);
 
+    if (modem)
+        g_debug ("Created new generic modem (%s)", udi);
+    else
+        g_warning ("Failed to create generic modem (%s)", udi);
+
     return modem;
 }
 
@@ -199,7 +204,6 @@ add_modem (MMManager *manager, const char *udi, MMModem *modem)
 {
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
 
-    g_debug ("Added modem %s", udi);
     g_hash_table_insert (priv->modems, g_strdup (udi), modem);
     dbus_g_connection_register_g_object (priv->connection, udi, G_OBJECT (modem));
 
@@ -239,8 +243,6 @@ create_initial_modems_from_plugins (MMManager *manager)
                 modem = mm_plugin_create_modem (plugin, priv->hal_ctx, udi);
                 if (modem)
                     add_modem (manager, udi, modem);
-                else
-                    g_warning ("Plugin failed to create modem for UDI %s", udi);
             }
 
             g_strfreev (udis);

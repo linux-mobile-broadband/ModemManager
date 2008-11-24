@@ -37,11 +37,19 @@ mm_plugin_create_modem (MMPlugin *plugin,
                         LibHalContext *hal_ctx,
                         const char *udi)
 {
+    MMModem *modem;
+
     g_return_val_if_fail (MM_IS_PLUGIN (plugin), NULL);
     g_return_val_if_fail (hal_ctx != NULL, NULL);
     g_return_val_if_fail (udi != NULL, NULL);
 
-    return MM_PLUGIN_GET_INTERFACE (plugin)->create_modem (plugin, hal_ctx, udi);
+    modem = MM_PLUGIN_GET_INTERFACE (plugin)->create_modem (plugin, hal_ctx, udi);
+    if (modem)
+        g_debug ("Created new %s modem (%s)", mm_plugin_get_name (plugin), udi);
+    else
+        g_warning ("Failed to create %s modem (%s)", mm_plugin_get_name (plugin), udi);
+
+    return modem;
 }
 
 
