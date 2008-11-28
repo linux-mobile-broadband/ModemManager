@@ -82,8 +82,20 @@ supports_udi (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
     gboolean supported = FALSE;
 
     driver_name = get_driver_name (hal_ctx, udi);
-    if (driver_name && !strcmp (driver_name, "hso"))
-        supported = TRUE;
+    if (driver_name && !strcmp (driver_name, "hso")) {
+        char **capabilities;
+        char **iter;
+
+        capabilities = libhal_device_get_property_strlist (hal_ctx, udi, "modem.command_sets", NULL);
+        for (iter = capabilities; iter && *iter && !supported; iter++) {
+            if (!strcmp (*iter, "GSM-07.07") || !strcmp (*iter, "GSM-07.05")) {
+                supported = TRUE;
+                break;
+            }
+        }
+
+        libhal_free_string_array (capabilities);
+    }
 
     libhal_free_string (driver_name);
 
