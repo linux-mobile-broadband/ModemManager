@@ -284,6 +284,35 @@ get_card_info (MMModemGsmCard *modem,
 }
 
 static void
+send_puk_done (MMSerial *serial,
+               GString *response,
+               GError *error,
+               gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error)
+        info->error = g_error_copy (error);
+    mm_callback_info_schedule (info);
+}
+
+static void
+send_puk (MMModemGsmCard *modem,
+          const char *puk,
+          const char *pin,
+          MMModemFn callback,
+          gpointer user_data)
+{
+    MMCallbackInfo *info;
+    char *command;
+
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+    command = g_strdup_printf ("+CPIN=\"%s\",\"%s\"", puk, pin);
+    mm_serial_queue_command (MM_SERIAL (modem), command, 3, send_puk_done, info);
+    g_free (command);
+}
+
+static void
 send_pin_done (MMSerial *serial,
                GString *response,
                GError *error,
@@ -1061,6 +1090,7 @@ modem_gsm_card_init (MMModemGsmCard *class)
     class->get_imsi = get_imsi;
     class->get_info = get_card_info;
     class->send_pin = send_pin;
+    class->send_puk = send_puk;
     class->enable_pin = enable_pin;
     class->change_pin = change_pin;
 }

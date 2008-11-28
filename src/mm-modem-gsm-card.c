@@ -19,6 +19,11 @@ static void impl_gsm_modem_send_pin (MMModemGsmCard *modem,
                                      const char *pin,
                                      DBusGMethodInvocation *context);
 
+static void impl_gsm_modem_send_puk (MMModemGsmCard *modem,
+                                     const char *puk,
+                                     const char *pin,
+                                     DBusGMethodInvocation *context);
+
 static void impl_gsm_modem_enable_pin (MMModemGsmCard *modem,
                                        const char *pin,
                                        gboolean enabled,
@@ -183,6 +188,24 @@ mm_modem_gsm_card_get_info (MMModemGsmCard *self,
 }
 
 void
+mm_modem_gsm_card_send_puk (MMModemGsmCard *self,
+                            const char *puk,
+                            const char *pin,
+                            MMModemFn callback,
+                            gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_GSM_CARD (self));
+    g_return_if_fail (puk != NULL);
+    g_return_if_fail (pin != NULL);
+    g_return_if_fail (callback != NULL);
+
+    if (MM_MODEM_GSM_CARD_GET_INTERFACE (self)->send_puk)
+        MM_MODEM_GSM_CARD_GET_INTERFACE (self)->send_puk (self, puk, pin, callback, user_data);
+    else
+        async_call_not_supported (self, callback, user_data);
+}
+
+void
 mm_modem_gsm_card_send_pin (MMModemGsmCard *self,
                             const char *pin,
                             MMModemFn callback,
@@ -254,6 +277,15 @@ impl_gsm_modem_get_info (MMModemGsmCard *modem,
                          DBusGMethodInvocation *context)
 {
     mm_modem_gsm_card_get_info (modem, info_call_done, context);
+}
+
+static void
+   impl_gsm_modem_send_puk (MMModemGsmCard *modem,
+                            const char *puk,
+                            const char *pin,
+                            DBusGMethodInvocation *context)
+{
+    mm_modem_gsm_card_send_puk (modem, puk, pin, async_call_done, context);
 }
 
 static void

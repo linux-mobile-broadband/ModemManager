@@ -35,6 +35,12 @@ struct _MMModemGsmCard {
                       MMModemGsmCardInfoFn callback,
                       gpointer user_data);
 
+    void (*send_puk) (MMModemGsmCard *self,
+                      const char *puk,
+                      const char *pin,
+                      MMModemFn callback,
+                      gpointer user_data);
+    
     void (*send_pin) (MMModemGsmCard *self,
                       const char *pin,
                       MMModemFn callback,
@@ -65,6 +71,12 @@ void mm_modem_gsm_card_get_imsi (MMModemGsmCard *self,
 
 void mm_modem_gsm_card_get_info (MMModemGsmCard *self,
                                  MMModemGsmCardInfoFn callback,
+                                 gpointer user_data);
+
+void mm_modem_gsm_card_send_puk (MMModemGsmCard *self,
+                                 const char *puk,
+                                 const char *pin,
+                                 MMModemFn callback,
                                  gpointer user_data);
 
 void mm_modem_gsm_card_send_pin (MMModemGsmCard *self,
