@@ -183,15 +183,26 @@ get_driver (LibHalContext *ctx, const char *udi)
 static gboolean
 supports_udi (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
 {
+    char *driver_name;
     gboolean supported = FALSE;
-    char *netdev = NULL;
 
-    netdev = get_netdev (hal_ctx, udi);
+    driver_name = get_driver (hal_ctx, udi);
+    if (driver_name && !strcmp (driver_name, "mbm")) {
+        char **capabilities;
+        char **iter;
 
-    if (netdev) {
-        supported = TRUE;
-        libhal_free_string (netdev);
+        capabilities = libhal_device_get_property_strlist (hal_ctx, udi, "modem.command_sets", NULL);
+        for (iter = capabilities; iter && *iter && !supported; iter++) {
+            if (!strcmp (*iter, "GSM-07.07") || !strcmp (*iter, "GSM-07.05")) {
+                supported = TRUE;
+                break;
+            }
+        }
+
+        libhal_free_string_array (capabilities);
     }
+
+    libhal_free_string (driver_name);
 
     return supported;
 }
