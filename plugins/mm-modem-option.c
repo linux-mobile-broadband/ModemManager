@@ -24,31 +24,12 @@ mm_modem_option_new (const char *data_device,
 }
 
 static void
-check_pin_done (MMSerial *serial,
-                GString *response,
-                GError *error,
-                gpointer user_data)
+pin_check_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    gboolean parsed = FALSE;
 
     if (error)
         info->error = g_error_copy (error);
-    else if (g_str_has_prefix (response->str, "+CPIN: ")) {
-        const char *str = response->str + 7;
-
-        if (g_str_has_prefix (str, "READY"))
-            parsed = TRUE;
-        else if (g_str_has_prefix (str, "SIM PIN"))
-            info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_SIM_PIN);
-        else if (g_str_has_prefix (str, "SIM PUK"))
-            info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_SIM_PUK);
-    }
-
-    if (!info->error && !parsed)
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                   "%s", "Could not parse PIN request results");
-
     mm_callback_info_schedule (info);
 }
 
@@ -66,7 +47,7 @@ parent_enable_done (MMModem *modem, GError *error, gpointer user_data)
 
         /* Now check the PIN explicitly, option doesn't seem to report
            that it needs it otherwise */
-        mm_serial_queue_command (MM_SERIAL (modem), "+CPIN?", 3, check_pin_done, info);
+        mm_generic_gsm_check_pin (MM_GENERIC_GSM (modem), pin_check_done, info);
         return;
     }
 

@@ -37,4 +37,8 @@ void mm_generic_gsm_set_operator (MMGenericGsm *modem,
                                   const char *code,
                                   const char *name);
 
+void mm_generic_gsm_check_pin (MMGenericGsm *modem,
+                               MMModemFn callback,
+                               gpointer user_data);
+
 #endif /* MM_GENERIC_GSM_H */

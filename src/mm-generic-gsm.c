@@ -85,6 +85,49 @@ mm_generic_gsm_set_operator (MMGenericGsm *modem,
     priv->oper_name = g_strdup (name);
 }
 
+static void
+pin_check_done (MMSerial *serial,
+                GString *response,
+                GError *error,
+                gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    gboolean parsed = FALSE;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else if (g_str_has_prefix (response->str, "+CPIN: ")) {
+        const char *str = response->str + 7;
+
+        if (g_str_has_prefix (str, "READY"))
+            parsed = TRUE;
+        else if (g_str_has_prefix (str, "SIM PIN"))
+            info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_SIM_PIN);
+        else if (g_str_has_prefix (str, "SIM PUK"))
+            info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_SIM_PUK);
+        /* FIXME: There's more exotic ones that are not handled right now */
+    }
+
+    if (!info->error && !parsed)
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                   "%s", "Could not parse PIN request results");
+
+    mm_callback_info_schedule (info);
+}
+
+void
+mm_generic_gsm_check_pin (MMGenericGsm *modem,
+                          MMModemFn callback,
+                          gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    g_return_if_fail (MM_IS_GENERIC_GSM (modem));
+
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+    mm_serial_queue_command (MM_SERIAL (modem), "+CPIN?", 3, pin_check_done, info);
+}
+
 /*****************************************************************************/
 
 static void
