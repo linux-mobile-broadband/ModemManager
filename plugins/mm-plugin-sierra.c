@@ -80,6 +80,14 @@ supports_udi (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
                 if (vendor == 0x1199)
                     supported = TRUE;
 
+                if (vendor == 0x03f0) {
+                    int product;
+
+                    product = libhal_device_get_property_int (hal_ctx, parent_udi, "usb.product_id", NULL);
+                    if (product == 0x1e1d)
+                        supported = TRUE;
+                }
+
                 libhal_free_string (parent_udi);
             }
         }
