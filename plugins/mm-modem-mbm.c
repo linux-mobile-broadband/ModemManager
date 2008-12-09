@@ -308,8 +308,8 @@ get_network_mode_done (MMSerial *serial,
         }
 
         if (result == 0)
-            info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                       "%s", "Could not parse network mode results");
+            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                               "Could not parse network mode results");
         else
             mm_callback_info_set_result (info, GUINT_TO_POINTER (result), NULL);
     }

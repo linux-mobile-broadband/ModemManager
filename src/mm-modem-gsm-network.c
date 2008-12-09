@@ -74,8 +74,8 @@ async_call_not_supported (MMModemGsmNetwork *self,
     MMCallbackInfo *info;
 
     info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
-    info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
-                               "%s", "Operation not supported");
+    info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                       "Operation not supported");
     mm_callback_info_schedule (info);
 }
 
@@ -98,8 +98,8 @@ uint_call_not_supported (MMModemGsmNetwork *self,
     MMCallbackInfo *info;
 
     info = mm_callback_info_uint_new (MM_MODEM (self), callback, user_data);
-    info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
-                               "%s", "Operation not supported");
+    info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                       "Operation not supported");
     mm_callback_info_schedule (info);
 }
 
@@ -123,13 +123,11 @@ reg_info_call_done (MMModemGsmNetwork *self,
 }
 
 static void
-reg_info_not_supported_wrapper (MMModem *modem, GError *error, gpointer user_data)
+reg_info_invoke (MMCallbackInfo *info)
 {
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemGsmNetworkRegInfoFn callback;
+    MMModemGsmNetworkRegInfoFn callback = (MMModemGsmNetworkRegInfoFn) info->callback;
 
-    callback = (MMModemGsmNetworkRegInfoFn) mm_callback_info_get_data (info, "reg-info-callback");
-    callback (MM_MODEM_GSM_NETWORK (modem), 0, NULL, NULL, error, mm_callback_info_get_data (info, "reg-info-data"));
+    callback (MM_MODEM_GSM_NETWORK (info->modem), 0, NULL, NULL, info->error, info->user_data);
 }
 
 static void
@@ -139,12 +137,9 @@ reg_info_call_not_supported (MMModemGsmNetwork *self,
 {
     MMCallbackInfo *info;
 
-    info = mm_callback_info_new (MM_MODEM (self), reg_info_not_supported_wrapper, NULL);
-    info->user_data = info;
-    mm_callback_info_set_data (info, "reg-info-callback", callback, NULL);
-    mm_callback_info_set_data (info, "reg-info-data", user_data, NULL);
-    info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
-                               "%s", "Operation not supported");
+    info = mm_callback_info_new_full (MM_MODEM (self), reg_info_invoke, G_CALLBACK (callback), user_data);
+    info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                       "Operation not supported");
 
     mm_callback_info_schedule (info);
 }
@@ -164,13 +159,11 @@ scan_call_done (MMModemGsmNetwork *self,
 }
 
 static void
-scan_not_supported_wrapper (MMModem *modem, GError *error, gpointer user_data)
+gsm_network_scan_invoke (MMCallbackInfo *info)
 {
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemGsmNetworkScanFn callback;
+    MMModemGsmNetworkScanFn callback = (MMModemGsmNetworkScanFn) info->callback;
 
-    callback = (MMModemGsmNetworkScanFn) mm_callback_info_get_data (info, "scan-callback");
-    callback (MM_MODEM_GSM_NETWORK (modem), NULL, error, mm_callback_info_get_data (info, "scan-data"));
+    callback (MM_MODEM_GSM_NETWORK (info->modem), NULL, info->error, info->user_data);
 }
 
 static void
@@ -180,12 +173,9 @@ scan_call_not_supported (MMModemGsmNetwork *self,
 {
     MMCallbackInfo *info;
 
-    info = mm_callback_info_new (MM_MODEM (self), scan_not_supported_wrapper, NULL);
-    info->user_data = info;
-    mm_callback_info_set_data (info, "scan-callback", callback, NULL);
-    mm_callback_info_set_data (info, "scan-data", user_data, NULL);
-    info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
-                               "%s", "Operation not supported");
+    info = mm_callback_info_new_full (MM_MODEM (self), gsm_network_scan_invoke, G_CALLBACK (callback), user_data);
+    info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                       "Operation not supported");
 
     mm_callback_info_schedule (info);
 }

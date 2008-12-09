@@ -5,18 +5,26 @@
 
 #include "mm-modem.h"
 
-typedef struct {
+typedef struct _MMCallbackInfo MMCallbackInfo;
+
+typedef void (*MMCallbackInfoInvokeFn) (MMCallbackInfo *info);
+
+struct _MMCallbackInfo {
     GData *qdata;
     MMModem *modem;
 
-    MMModemFn async_callback;
-    MMModemUIntFn uint_callback;
-    MMModemStringFn str_callback;
+    MMCallbackInfoInvokeFn invoke_fn;
+    GCallback callback;
 
     gpointer user_data;
     GError *error;
     guint pending_id;
-} MMCallbackInfo;
+};
+
+MMCallbackInfo *mm_callback_info_new_full (MMModem *modem,
+                                           MMCallbackInfoInvokeFn invoke_fn,
+                                           GCallback callback,
+                                           gpointer user_data);
 
 MMCallbackInfo *mm_callback_info_new      (MMModem *modem,
                                            MMModemFn callback,

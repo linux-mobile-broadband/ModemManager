@@ -41,14 +41,14 @@ static void
 parent_enable_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemFn cb = (MMModemFn) mm_callback_info_get_data (info, "callback");
 
-    if (!error) {
+    if (error)
+        info->error = g_error_copy (error);
+    else
         /* Enable unsolicited registration state changes */
         mm_serial_queue_command (MM_SERIAL (modem), "+CREG=1", 5, NULL, NULL);
-    }
 
-    cb (modem, error, mm_callback_info_get_data (info, "user-data"));
+    mm_callback_info_schedule (info);
 }
 
 static void
@@ -64,10 +64,7 @@ enable (MMModem *modem,
     if (enable) {
         MMCallbackInfo *info;
 
-        info = mm_callback_info_new (modem, parent_enable_done, NULL);
-        info->user_data = info;
-        mm_callback_info_set_data (info, "callback", callback, NULL);
-        mm_callback_info_set_data (info, "user-data", user_data, NULL);
+        info = mm_callback_info_new (modem, callback, user_data);
         parent_modem_iface->enable (modem, enable, parent_enable_done, info);
     } else
         parent_modem_iface->enable (modem, enable, callback, user_data);
@@ -161,7 +158,7 @@ set_network_mode (MMModemGsmNetwork *modem,
         mm_callback_info_set_data (info, "mode-b", GINT_TO_POINTER (2), NULL);
         break;
     default:
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Invalid mode.");
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Invalid mode.");
         mm_callback_info_schedule (info);
         return;
         break;
@@ -197,8 +194,8 @@ get_network_mode_done (MMSerial *serial,
         }
 
         if (result == 0)
-            info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                       "%s", "Could not parse network mode results");
+            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                               "Could not parse network mode results");
         else
             mm_callback_info_set_result (info, GUINT_TO_POINTER (result), NULL);
     }
@@ -280,7 +277,7 @@ set_band (MMModemGsmNetwork *modem,
         mm_callback_info_set_data (info, "band", GUINT_TO_POINTER (0x200000), NULL);
         break;
     default:
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "%s", "Invalid band.");
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Invalid band.");
         mm_callback_info_schedule (info);
         return;
         break;
@@ -314,8 +311,8 @@ get_band_done (MMSerial *serial,
         }
 
         if (result == 0xdeadbeaf)
-            info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                       "%s", "Could not parse band results");
+            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                               "Could not parse band results");
         else
             mm_callback_info_set_result (info, GUINT_TO_POINTER (result), NULL);
     }

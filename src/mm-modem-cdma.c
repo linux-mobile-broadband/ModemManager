@@ -26,8 +26,8 @@ uint_op_not_supported (MMModem *self,
     MMCallbackInfo *info;
 
     info = mm_callback_info_uint_new (self, callback, user_data);
-    info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
-                               "%s", "Operation not supported");
+    info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                       "Operation not supported");
     mm_callback_info_schedule (info);
 }
 

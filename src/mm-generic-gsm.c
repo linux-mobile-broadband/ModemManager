@@ -109,8 +109,8 @@ pin_check_done (MMSerial *serial,
     }
 
     if (!info->error && !parsed)
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                   "%s", "Could not parse PIN request results");
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse PIN request results");
 
     mm_callback_info_schedule (info);
 }
@@ -247,22 +247,15 @@ get_imsi (MMModemGsmCard *modem,
 }
 
 static void
-card_info_wrapper (MMModem *modem,
-                   GError *error,
-                   gpointer user_data)
+gsm_card_info_invoke (MMCallbackInfo *info)
 {
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemGsmCardInfoFn info_cb;
-    gpointer data;
+    MMModemGsmCardInfoFn callback = (MMModemGsmCardInfoFn) info->callback;
 
-    info_cb = (MMModemGsmCardInfoFn) mm_callback_info_get_data (info, "card-info-callback");
-    data = mm_callback_info_get_data (info, "card-info-data");
-    
-    info_cb (MM_MODEM_GSM_CARD (modem),
-             (char *) mm_callback_info_get_data (info, "card-info-manufacturer"),
-             (char *) mm_callback_info_get_data (info, "card-info-model"),
-             (char *) mm_callback_info_get_data (info, "card-info-version"),
-             error, data);
+    callback (MM_MODEM_GSM_CARD (info->modem),
+              (char *) mm_callback_info_get_data (info, "card-info-manufacturer"),
+              (char *) mm_callback_info_get_data (info, "card-info-model"),
+              (char *) mm_callback_info_get_data (info, "card-info-version"),
+              info->error, info->user_data);
 }
 
 static void
@@ -316,10 +309,10 @@ get_card_info (MMModemGsmCard *modem,
 {
     MMCallbackInfo *info;
 
-    info = mm_callback_info_new (MM_MODEM (modem), card_info_wrapper, NULL);
-    info->user_data = info;
-    mm_callback_info_set_data (info, "card-info-callback", callback, NULL);
-    mm_callback_info_set_data (info, "card-info-data", user_data, NULL);
+    info = mm_callback_info_new_full (MM_MODEM (modem),
+                                      gsm_card_info_invoke,
+                                      G_CALLBACK (callback),
+                                      user_data);
 
     mm_serial_queue_command (MM_SERIAL (modem), "+CGMI", 3, get_manufacturer_done, info);
     mm_serial_queue_command (MM_SERIAL (modem), "+CGMM", 3, get_model_done, info);
@@ -685,19 +678,17 @@ do_register (MMModemGsmNetwork *modem,
 }
 
 static void
-get_registration_info_done (MMModem *modem, GError *error, gpointer user_data)
+gsm_network_reg_info_invoke (MMCallbackInfo *info)
 {
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemGsmNetworkRegInfoFn reg_info_fn;
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+    MMModemGsmNetworkRegInfoFn callback = (MMModemGsmNetworkRegInfoFn) info->callback;
 
-    reg_info_fn = (MMModemGsmNetworkRegInfoFn) mm_callback_info_get_data (info, "reg-info-callback");
-    reg_info_fn (MM_MODEM_GSM_NETWORK (modem),
-                 priv->reg_status,
-                 priv->oper_code,
-                 priv->oper_name,
-                 NULL,
-                 mm_callback_info_get_data (info, "reg-info-data"));
+    callback (MM_MODEM_GSM_NETWORK (info->modem),
+              priv->reg_status,
+              priv->oper_code,
+              priv->oper_name,
+              info->error,
+              info->user_data);
 }
 
 static void
@@ -707,10 +698,10 @@ get_registration_info (MMModemGsmNetwork *self,
 {
     MMCallbackInfo *info;
 
-    info = mm_callback_info_new (MM_MODEM (self), get_registration_info_done, NULL);
-    info->user_data = info;
-    mm_callback_info_set_data (info, "reg-info-callback", callback, NULL);
-    mm_callback_info_set_data (info, "reg-info-data", user_data, NULL);
+    info = mm_callback_info_new_full (MM_MODEM (self),
+                                      gsm_network_reg_info_invoke,
+                                      G_CALLBACK (callback),
+                                      user_data);
 
     mm_callback_info_schedule (info);
 }
@@ -799,20 +790,14 @@ disconnect (MMModem *modem,
 }
 
 static void
-scan_callback_wrapper (MMModem *modem,
-                       GError *error,
-                       gpointer user_data)
+gsm_network_scan_invoke (MMCallbackInfo *info)
 {
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemGsmNetworkScanFn scan_fn;
-    GPtrArray *results;
-    gpointer data;
+    MMModemGsmNetworkScanFn callback = (MMModemGsmNetworkScanFn) info->callback;
 
-    scan_fn = (MMModemGsmNetworkScanFn) mm_callback_info_get_data (info, "scan-callback");
-    results = (GPtrArray *) mm_callback_info_get_data (info, "scan-results");
-    data = mm_callback_info_get_data (info, "scan-data");
-
-    scan_fn (MM_MODEM_GSM_NETWORK (modem), results, error, data);
+    callback (MM_MODEM_GSM_NETWORK (info->modem),
+              (GPtrArray *) mm_callback_info_get_data (info, "scan-results"),
+              info->error,
+              info->user_data);
 }
 
 static void
@@ -888,10 +873,10 @@ scan (MMModemGsmNetwork *modem,
 {
     MMCallbackInfo *info;
 
-    info = mm_callback_info_new (MM_MODEM (modem), scan_callback_wrapper, NULL);
-    info->user_data = info;
-    mm_callback_info_set_data (info, "scan-callback", callback, NULL);
-    mm_callback_info_set_data (info, "scan-data", user_data, NULL);
+    info = mm_callback_info_new_full (MM_MODEM (modem),
+                                      gsm_network_scan_invoke,
+                                      G_CALLBACK (callback),
+                                      user_data);
 
     mm_serial_queue_command (MM_SERIAL (modem), "+COPS=?", 60, scan_done, info);
 }

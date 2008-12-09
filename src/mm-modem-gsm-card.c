@@ -50,28 +50,15 @@ str_call_done (MMModem *modem, const char *result, GError *error, gpointer user_
 }
 
 static void
-str_not_supported_wrapper (MMModem *modem, GError *error, gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemStringFn callback;
-
-    callback = (MMModemStringFn) mm_callback_info_get_data (info, "str-callback");
-    callback (MM_MODEM (modem), NULL, error, mm_callback_info_get_data (info, "str-data"));
-}
-
-static void
 str_call_not_supported (MMModemGsmCard *self,
                         MMModemStringFn callback,
                         gpointer user_data)
 {
     MMCallbackInfo *info;
 
-    info = mm_callback_info_new (MM_MODEM (self), str_not_supported_wrapper, NULL);
-    info->user_data = info;
-    mm_callback_info_set_data (info, "str-callback", callback, NULL);
-    mm_callback_info_set_data (info, "str-data", user_data, NULL);
-    info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
-                               "%s", "Operation not supported");
+    info = mm_callback_info_string_new (MM_MODEM (self), callback, user_data);
+    info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                       "Operation not supported");
 
     mm_callback_info_schedule (info);
 }
@@ -93,13 +80,11 @@ info_call_done (MMModemGsmCard *self,
 }
 
 static void
-info_not_supported_wrapper (MMModem *modem, GError *error, gpointer user_data)
+info_invoke (MMCallbackInfo *info)
 {
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemGsmCardInfoFn callback;
+    MMModemGsmCardInfoFn callback = (MMModemGsmCardInfoFn) info->callback;
 
-    callback = (MMModemGsmCardInfoFn) mm_callback_info_get_data (info, "info-callback");
-    callback (MM_MODEM_GSM_CARD (modem), NULL, NULL, NULL, error, mm_callback_info_get_data (info, "info-data"));
+    callback (MM_MODEM_GSM_CARD (info->modem), NULL, NULL, NULL, info->error, info->user_data);
 }
 
 static void
@@ -109,12 +94,9 @@ info_call_not_supported (MMModemGsmCard *self,
 {
     MMCallbackInfo *info;
 
-    info = mm_callback_info_new (MM_MODEM (self), info_not_supported_wrapper, NULL);
-    info->user_data = info;
-    mm_callback_info_set_data (info, "info-callback", callback, NULL);
-    mm_callback_info_set_data (info, "info-data", user_data, NULL);
-    info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
-                               "%s", "Operation not supported");
+    info = mm_callback_info_new_full (MM_MODEM (self), info_invoke, G_CALLBACK (callback), user_data);
+    info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                       "Operation not supported");
 
     mm_callback_info_schedule (info);
 }
@@ -138,8 +120,8 @@ async_call_not_supported (MMModemGsmCard *self,
     MMCallbackInfo *info;
 
     info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
-    info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
-                               "%s", "Operation not supported");
+    info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                       "Operation not supported");
     mm_callback_info_schedule (info);
 }
 

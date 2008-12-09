@@ -3,22 +3,45 @@
 #include "mm-callback-info.h"
 #include "mm-errors.h"
 
+#define CALLBACK_INFO_RESULT "callback-info-result"
+
+static void
+invoke_mm_modem_fn (MMCallbackInfo *info)
+{
+    MMModemFn callback = (MMModemFn) info->callback;
+
+    callback (info->modem, info->error, info->user_data);
+}
+
+static void
+invoke_mm_modem_uint_fn (MMCallbackInfo *info)
+{
+    MMModemUIntFn callback = (MMModemUIntFn) info->callback;
+
+    callback (info->modem,
+              GPOINTER_TO_UINT (mm_callback_info_get_data (info, CALLBACK_INFO_RESULT)),
+              info->error, info->user_data);
+}
+
+static void
+invoke_mm_modem_string_fn (MMCallbackInfo *info)
+{
+    MMModemStringFn callback = (MMModemStringFn) info->callback;
+
+    callback (info->modem,
+              (const char *) mm_callback_info_get_data (info, CALLBACK_INFO_RESULT),
+              info->error, info->user_data);
+}
+
 static void
 callback_info_done (gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    gpointer result;
 
     info->pending_id = 0;
 
-    result = mm_callback_info_get_data (info, "callback-info-result");
-
-    if (info->async_callback)
-        info->async_callback (info->modem, info->error, info->user_data);
-    else if (info->uint_callback)
-        info->uint_callback (info->modem, GPOINTER_TO_UINT (result), info->error, info->user_data);
-    else if (info->str_callback)
-        info->str_callback (info->modem, (const char *) result, info->error, info->user_data);
+    if (info->invoke_fn && info->callback)
+        info->invoke_fn (info);
 
     if (info->error)
         g_error_free (info->error);
@@ -45,17 +68,31 @@ mm_callback_info_schedule (MMCallbackInfo *info)
 }
 
 MMCallbackInfo *
-mm_callback_info_new (MMModem *modem, MMModemFn callback, gpointer user_data)
+mm_callback_info_new_full (MMModem *modem,
+                           MMCallbackInfoInvokeFn invoke_fn,
+                           GCallback callback,
+                           gpointer user_data)
 {
     MMCallbackInfo *info;
+
+    g_return_val_if_fail (modem != NULL, NULL);
 
     info = g_slice_new0 (MMCallbackInfo);
     g_datalist_init (&info->qdata);
     info->modem = g_object_ref (modem);
-    info->async_callback = callback;
+    info->invoke_fn = invoke_fn;
+    info->callback = callback;
     info->user_data = user_data;
 
     return info;
+}
+
+MMCallbackInfo *
+mm_callback_info_new (MMModem *modem, MMModemFn callback, gpointer user_data)
+{
+    g_return_val_if_fail (modem != NULL, NULL);
+
+    return mm_callback_info_new_full (modem, invoke_mm_modem_fn, (GCallback) callback, user_data);
 }
 
 MMCallbackInfo *
@@ -63,15 +100,9 @@ mm_callback_info_uint_new (MMModem *modem,
                            MMModemUIntFn callback,
                            gpointer user_data)
 {
-    MMCallbackInfo *info;
+    g_return_val_if_fail (modem != NULL, NULL);
 
-    info = g_slice_new0 (MMCallbackInfo);
-    g_datalist_init (&info->qdata);
-    info->modem = g_object_ref (modem);
-    info->uint_callback = callback;
-    info->user_data = user_data;
-
-    return info;
+    return mm_callback_info_new_full (modem, invoke_mm_modem_uint_fn, (GCallback) callback, user_data);
 }
 
 MMCallbackInfo *
@@ -79,15 +110,9 @@ mm_callback_info_string_new (MMModem *modem,
                              MMModemStringFn callback,
                              gpointer user_data)
 {
-    MMCallbackInfo *info;
+    g_return_val_if_fail (modem != NULL, NULL);
 
-    info = g_slice_new0 (MMCallbackInfo);
-    g_datalist_init (&info->qdata);
-    info->modem = g_object_ref (modem);
-    info->str_callback = callback;
-    info->user_data = user_data;
-
-    return info;
+    return mm_callback_info_new_full (modem, invoke_mm_modem_string_fn, (GCallback) callback, user_data);
 }
 
 void
@@ -95,7 +120,9 @@ mm_callback_info_set_result (MMCallbackInfo *info,
                              gpointer data,
                              GDestroyNotify destroy)
 {
-    mm_callback_info_set_data (info, "callback-info-result", data, destroy);
+    g_return_if_fail (info != NULL);
+
+    mm_callback_info_set_data (info, CALLBACK_INFO_RESULT, data, destroy);
 }
 
 void
@@ -104,6 +131,9 @@ mm_callback_info_set_data (MMCallbackInfo *info,
                            gpointer data,
                            GDestroyNotify destroy)
 {
+    g_return_if_fail (info != NULL);
+    g_return_if_fail (key != NULL);
+
     g_datalist_id_set_data_full (&info->qdata, g_quark_from_string (key), data,
                                  data ? destroy : (GDestroyNotify) NULL);
 }
@@ -112,6 +142,9 @@ gpointer
 mm_callback_info_get_data (MMCallbackInfo *info, const char *key)
 {
     GQuark quark;
+
+    g_return_val_if_fail (info != NULL, NULL);
+    g_return_val_if_fail (key != NULL, NULL);
 
     quark = g_quark_try_string (key);
 

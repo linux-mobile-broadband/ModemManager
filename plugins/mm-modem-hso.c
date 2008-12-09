@@ -223,19 +223,14 @@ free_dns_array (gpointer data)
 }
 
 static void
-ip4_callback_wrapper (MMModem *modem,
-                      GError *error,
-                      gpointer user_data)
+ip4_config_invoke (MMCallbackInfo *info)
 {
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemHsoIp4Fn callback;
+    MMModemHsoIp4Fn callback = (MMModemHsoIp4Fn) info->callback;
 
-    callback = mm_callback_info_get_data (info, "callback");
-    callback (MM_MODEM_HSO (modem),
+    callback (MM_MODEM_HSO (info->modem),
               GPOINTER_TO_UINT (mm_callback_info_get_data (info, "ip4-address")),
-              mm_callback_info_get_data (info, "ip4-dns"),
-              error,
-              mm_callback_info_get_data (info, "user-data"));
+              (GArray *) mm_callback_info_get_data (info, "ip4-dns"),
+              info->error, info->user_data);
 }
 
 static void
@@ -305,11 +300,7 @@ mm_hso_modem_get_ip4_config (MMModemHso *self,
     g_return_if_fail (MM_IS_MODEM_HSO (self));
     g_return_if_fail (callback != NULL);
 
-    info = mm_callback_info_new (MM_MODEM (self), ip4_callback_wrapper, NULL);
-    info->user_data = info;
-    mm_callback_info_set_data (info, "callback", callback, NULL);
-    mm_callback_info_set_data (info, "user-data", user_data, NULL);
-
+    info = mm_callback_info_new_full (MM_MODEM (self), ip4_config_invoke, G_CALLBACK (callback), user_data);
     command = g_strdup_printf ("AT_OWANDATA=%d", hso_get_cid (self));
     mm_serial_queue_command (MM_SERIAL (self), command, 3, get_ip4_config_done, info);
     g_free (command);
