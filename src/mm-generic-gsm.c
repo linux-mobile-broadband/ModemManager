@@ -25,7 +25,6 @@ typedef struct {
 } MMGenericGsmPrivate;
 
 static void get_registration_status (MMSerial *serial, MMCallbackInfo *info);
-static void real_register (MMSerial *serial, const char *network_id, MMCallbackInfo *info);
 static void get_signal_quality (MMModemGsmNetwork *modem,
                                 MMModemUIntFn callback,
                                 gpointer user_data);
@@ -648,33 +647,23 @@ register_done (MMSerial *serial,
 }
 
 static void
-real_register (MMSerial *serial,
-               const char *network_id,
-               MMCallbackInfo *info)
-{
-    char *command;
-
-    if (network_id)
-        command = g_strdup_printf ("+COPS=1,2,\"%s\"", network_id);
-    else
-        command = g_strdup ("+COPS=0,,");
-
-    mm_serial_queue_command (serial, command, 60, register_done, info);
-    g_free (command);
-}
-
-static void
 do_register (MMModemGsmNetwork *modem,
              const char *network_id,
              MMModemFn callback,
              gpointer user_data)
 {
     MMCallbackInfo *info;
+    char *command;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
-    mm_callback_info_set_data (info, "reg-network-id", g_strdup (network_id), g_free);
 
-    real_register (MM_SERIAL (modem), network_id, info);
+    if (network_id)
+        command = g_strdup_printf ("+COPS=1,2,\"%s\"", network_id);
+    else
+        command = g_strdup ("+COPS=0,,");
+
+    mm_serial_queue_command (MM_SERIAL (modem), command, 60, register_done, info);
+    g_free (command);
 }
 
 static void
