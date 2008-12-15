@@ -366,6 +366,13 @@ handle_status_change (const char *str, gpointer data)
                 mm_modem_gsm_network_mode (MM_MODEM_GSM_NETWORK (data), mode);
             }
         }
+    } else if (g_str_has_prefix (str, "DSFLOWRPT:")) {
+        int n1, n2, n3, n4, n5, n6, n7;
+
+        if (sscanf (str + 10, "%x,%x,%x,%x,%x,%x,%x", &n1, &n2, &n3, &n4, &n5, &n6, &n7)) {
+            g_debug ("Duration: %d Up: %d Kbps Down: %d Kbps Total: %d Total: %d\n",
+                     n1, n2 * 8 / 1000, n3  * 8 / 1000, n4 / 1024, n5 / 1024);
+        }
     }
 }
 
