@@ -75,8 +75,32 @@ info_call_done (MMModemGsmCard *self,
 
     if (error)
         dbus_g_method_return_error (context, error);
-    else
-        dbus_g_method_return (context, manufacturer, model, version);
+    else {
+        GValueArray *array;
+        GValue value = { 0, };
+
+        array = g_value_array_new (3);
+
+        /* Manufacturer */
+        g_value_init (&value, G_TYPE_STRING);
+        g_value_set_string (&value, manufacturer);
+        g_value_array_append (array, &value);
+        g_value_unset (&value);
+
+        /* Model */
+        g_value_init (&value, G_TYPE_STRING);
+        g_value_set_string (&value, model);
+        g_value_array_append (array, &value);
+        g_value_unset (&value);
+
+        /* Version */
+        g_value_init (&value, G_TYPE_STRING);
+        g_value_set_string (&value, version);
+        g_value_array_append (array, &value);
+        g_value_unset (&value);
+
+        dbus_g_method_return (context, array);
+    }
 }
 
 static void

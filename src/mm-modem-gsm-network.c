@@ -116,9 +116,30 @@ reg_info_call_done (MMModemGsmNetwork *self,
     if (error)
         dbus_g_method_return_error (context, error);
     else {
-        dbus_g_method_return (context, status, 
-                              oper_code ? oper_code : "",
-                              oper_name ? oper_name : "");
+        GValueArray *array;
+        GValue value = { 0, };
+
+        array = g_value_array_new (3);
+
+        /* Status */
+        g_value_init (&value, G_TYPE_UINT);
+        g_value_set_uint (&value, (guint32) status);
+        g_value_array_append (array, &value);
+        g_value_unset (&value);
+
+        /* Operator code */
+        g_value_init (&value, G_TYPE_STRING);
+        g_value_set_string (&value, oper_code);
+        g_value_array_append (array, &value);
+        g_value_unset (&value);
+
+        /* Operator name */
+        g_value_init (&value, G_TYPE_STRING);
+        g_value_set_string (&value, oper_name);
+        g_value_array_append (array, &value);
+        g_value_unset (&value);
+
+        dbus_g_method_return (context, array);
     }
 }
 
@@ -330,7 +351,9 @@ mm_modem_gsm_network_registration_info (MMModemGsmNetwork *self,
 {
     g_return_if_fail (MM_IS_MODEM_GSM_NETWORK (self));
 
-    g_signal_emit (self, signals[REGISTRATION_INFO], 0, status, oper_code, oper_name);
+    g_signal_emit (self, signals[REGISTRATION_INFO], 0, status,
+                   oper_code ? oper_code : "",
+                   oper_name ? oper_name : "");
 }
 
 void

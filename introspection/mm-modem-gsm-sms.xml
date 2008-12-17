@@ -26,24 +26,9 @@
 	  The index of the SMS.
 	</tp:docstring>
       </arg>
-      <arg name="found_index" type="u" direction="out">
+      <arg name="sms" type="(ussd)" direction="out">
 	<tp:docstring>
-	  The index of the SMS (same as the passed index).
-	</tp:docstring>
-      </arg>
-      <arg name="number" type="s" direction="out">
-	<tp:docstring>
-	  The number the SMS was received from.
-	</tp:docstring>
-      </arg>
-      <arg name="contents" type="s" direction="out">
-	<tp:docstring>
-	  The contents of the SMS.
-	</tp:docstring>
-      </arg>
-      <arg name="time" type="d" direction="out">
-	<tp:docstring>
-	  The timestamp.
+	  The SMS structure containing index, number, contents and time stamp.
 	</tp:docstring>
       </arg>
     </method>

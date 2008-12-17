@@ -112,19 +112,12 @@
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_reg_info"/>
-      <arg name="status" type="u" direction="out" tp:type="MM_MODEM_GSM_NETWORK_REG_STATUS">
+      <arg name="info" type="(uss)" direction="out">
 	<tp:docstring>
-	  The network status.
-	</tp:docstring>
-      </arg>
-      <arg name="operator_code" type="s" direction="out">
-	<tp:docstring>
-	  The current operator code.
-	</tp:docstring>
-      </arg>
-      <arg name="operator_name" type="s" direction="out">
-	<tp:docstring>
-	  The current operator name.
+	  The returned information contains:
+	    * Network status.
+	    * Current operator code.
+	    * Current operator name,
 	</tp:docstring>
       </arg>
     </method>

@@ -34,19 +34,9 @@
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_info"/>
-      <arg name="manufacturer" type="s" direction="out">
+      <arg name="info" type="(sss)" direction="out">
 	<tp:docstring>
-	  The manufacturer of the card.
-	</tp:docstring>
-      </arg>
-      <arg name="modem" type="s" direction="out">
-	<tp:docstring>
-	  The model of the card.
-	</tp:docstring>
-      </arg>
-      <arg name="version" type="s" direction="out">
-	<tp:docstring>
-	  The version (revision) of the card.
+	  Structure containing manufacturer, model, and version (revision) of the card.
 	</tp:docstring>
       </arg>
     </method>

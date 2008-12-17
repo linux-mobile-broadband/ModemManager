@@ -49,19 +49,9 @@
 	  The index of the contact.
 	</tp:docstring>
       </arg>
-      <arg name="found_index" type="u" direction="out">
+      <arg name="contact" type="(uss)" direction="out">
 	<tp:docstring>
-	  The index of the contact (same as the passed index).
-	</tp:docstring>
-      </arg>
-      <arg name="name" type="s" direction="out">
-	<tp:docstring>
-	  The name of the contact.
-	</tp:docstring>
-      </arg>
-      <arg name="number" type="s" direction="out">
-	<tp:docstring>
-	  The number of the contact.
+	  The contact structure containing index, name, and number.
 	</tp:docstring>
       </arg>
     </method>
