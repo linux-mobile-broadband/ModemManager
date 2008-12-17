@@ -25,8 +25,9 @@ typedef struct {
 } MMGenericGsmPrivate;
 
 static void get_registration_status (MMSerial *serial, MMCallbackInfo *info);
-static void get_signal_quality (MMModemGsmNetwork *modem,
-                                MMModemUIntFn callback,
+static void read_operator_done (MMSerial *serial,
+                                GString *response,
+                                GError *error,
                                 gpointer user_data);
 
 MMModem *
@@ -61,27 +62,29 @@ void
 mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
                                MMModemGsmNetworkRegStatus status)
 {
-    g_return_if_fail (MM_IS_GENERIC_GSM (modem));
-
-    MM_GENERIC_GSM_GET_PRIVATE (modem)->reg_status = status;
-}
-
-void
-mm_generic_gsm_set_operator (MMGenericGsm *modem,
-                             const char *code,
-                             const char *name)
-{
     MMGenericGsmPrivate *priv;
 
     g_return_if_fail (MM_IS_GENERIC_GSM (modem));
 
     priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
 
-    g_free (priv->oper_code);
-    g_free (priv->oper_name);
+    if (priv->reg_status != status) {
+        priv->reg_status = status;
 
-    priv->oper_code = g_strdup (code);
-    priv->oper_name = g_strdup (name);
+        if (status == MM_MODEM_GSM_NETWORK_REG_STATUS_HOME ||
+            status == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING) {
+            mm_serial_queue_command (MM_SERIAL (modem), "+COPS=3,2;+COPS?", 3, read_operator_done, GINT_TO_POINTER (0));
+            mm_serial_queue_command (MM_SERIAL (modem), "+COPS=3,0;+COPS?", 3, read_operator_done, GINT_TO_POINTER (1));
+            mm_modem_gsm_network_get_signal_quality (MM_MODEM_GSM_NETWORK (modem), NULL, NULL);
+        } else {
+            g_free (priv->oper_code);
+            g_free (priv->oper_name);
+            priv->oper_code = priv->oper_name = NULL;
+
+            mm_modem_gsm_network_registration_info (MM_MODEM_GSM_NETWORK (modem), priv->reg_status,
+                                                    priv->oper_code, priv->oper_name);
+        }
+    }
 }
 
 static void
@@ -460,43 +463,28 @@ parse_operator (const char *reply)
 }
 
 static void
-get_reg_code_done (MMSerial *serial,
-                   GString *response,
-                   GError *error,
-                   gpointer user_data)
+read_operator_done (MMSerial *serial,
+                    GString *response,
+                    GError *error,
+                    gpointer user_data)
 {
-    const char *reply = response->str;
-
     if (!error) {
         char *oper;
 
-        oper = parse_operator (reply);
+        oper = parse_operator (response->str);
         if (oper) {
             MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (serial);
 
-            g_free (priv->oper_code);
-            priv->oper_code = oper;
-        }
-    }
-}
+            if (GPOINTER_TO_INT (user_data) == 0) {
+                g_free (priv->oper_code);
+                priv->oper_code = oper;
+            } else {
+                g_free (priv->oper_name);
+                priv->oper_name = oper;
 
-static void
-get_reg_name_done (MMSerial *serial,
-                   GString *response,
-                   GError *error,
-                   gpointer user_data)
-{
-    const char *reply = response->str;
-
-    if (!error) {
-        char *oper;
-
-        oper = parse_operator (reply);
-        if (oper) {
-            MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (serial);
-
-            g_free (priv->oper_name);
-            priv->oper_name = oper;
+                mm_modem_gsm_network_registration_info (MM_MODEM_GSM_NETWORK (serial), priv->reg_status,
+                                                        priv->oper_code, priv->oper_name);
+            }
         }
     }
 }
@@ -582,9 +570,6 @@ get_reg_status_done (MMSerial *serial,
             case MM_MODEM_GSM_NETWORK_REG_STATUS_HOME:
             case MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING:
                 /* Done */
-                mm_serial_queue_command (serial, "+COPS=3,2;+COPS?", 3, get_reg_code_done, NULL);
-                mm_serial_queue_command (serial, "+COPS=3,0;+COPS?", 3, get_reg_name_done, NULL);
-                get_signal_quality (MM_MODEM_GSM_NETWORK (serial), NULL, NULL);
                 done = TRUE;
                 break;
             case MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE:

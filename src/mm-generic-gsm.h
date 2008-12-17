@@ -33,10 +33,6 @@ guint32 mm_generic_gsm_get_cid (MMGenericGsm *modem);
 void mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
                                     MMModemGsmNetworkRegStatus status);
 
-void mm_generic_gsm_set_operator (MMGenericGsm *modem,
-                                  const char *code,
-                                  const char *name);
-
 void mm_generic_gsm_check_pin (MMGenericGsm *modem,
                                MMModemFn callback,
                                gpointer user_data);

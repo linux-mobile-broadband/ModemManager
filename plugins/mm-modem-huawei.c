@@ -12,6 +12,8 @@
 
 static gpointer mm_modem_huawei_parent_class = NULL;
 
+static void pending_registration_stop (MMModemHuawei *self);
+
 #define MM_MODEM_HUAWEI_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_HUAWEI, MMModemHuaweiPrivate))
 
 typedef struct {
@@ -24,7 +26,11 @@ typedef struct {
     GRegex *status_regex;
     GRegex *reg_state_regex;
 
+    /* Pending operations */
+    guint pending_registration;
+
     /* Cached state */
+    MMModemGsmNetworkRegStatus reg_status;
     guint signal_quality;
     MMModemGsmNetworkMode mode;
     MMModemGsmNetworkBand band;
@@ -47,15 +53,74 @@ mm_modem_huawei_new (const char *data_device,
 }
 
 static void
+reg_status_updated (MMModemHuawei *self, int new_status)
+{
+    MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (self);
+
+    switch (new_status) {
+    case 0:
+        priv->reg_status = MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE;
+        break;
+    case 1:
+        priv->reg_status = MM_MODEM_GSM_NETWORK_REG_STATUS_HOME;
+        break;
+    case 2:
+        priv->reg_status = MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING;
+        break;
+    case 3:
+        priv->reg_status = MM_MODEM_GSM_NETWORK_REG_STATUS_DENIED;
+        break;
+    case 4:
+        priv->reg_status = MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN;
+        break;
+    case 5:
+        priv->reg_status = MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING;
+        break;
+    default:
+        priv->reg_status = MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN;
+        break;
+    }
+
+    /* Stop the pending registration in case of success or certain failure */
+    if (priv->reg_status == MM_MODEM_GSM_NETWORK_REG_STATUS_HOME ||
+        priv->reg_status == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING ||
+        priv->reg_status == MM_MODEM_GSM_NETWORK_REG_STATUS_DENIED)
+
+        pending_registration_stop (self);
+
+    g_debug ("Registration state changed: %d\n", priv->reg_status);
+    mm_generic_gsm_set_reg_status (MM_GENERIC_GSM (self), priv->reg_status);
+}
+
+static void
+got_reg_status (MMSerial *serial,
+                GString *response,
+                GError *error,
+                gpointer user_data)
+{
+    if (error)
+        g_warning ("Error getting registration status: %s", error->message);
+    else if (g_str_has_prefix (response->str, "+CREG: ")) {
+        /* Got valid reply */
+        int n, stat;
+
+        if (sscanf (response->str + 7, "%d,%d", &n, &stat))
+            reg_status_updated (MM_MODEM_HUAWEI (serial), stat);
+    }
+}
+
+static void
 parent_enable_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
     if (error)
         info->error = g_error_copy (error);
-    else
-        /* Enable unsolicited registration state changes */
+    else {
+        /* Enable unsolicited registration state changes and get the current state */
         mm_serial_queue_command (MM_SERIAL (modem), "+CREG=1", 5, NULL, NULL);
+        mm_serial_queue_command (MM_SERIAL (modem), "+CREG?", 5, got_reg_status, NULL);
+    }
 
     mm_callback_info_schedule (info);
 }
@@ -75,8 +140,105 @@ enable (MMModem *modem,
 
         info = mm_callback_info_new (modem, callback, user_data);
         parent_modem_iface->enable (modem, enable, parent_enable_done, info);
-    } else
+    } else {
+        pending_registration_stop (MM_MODEM_HUAWEI (modem));
         parent_modem_iface->enable (modem, enable, callback, user_data);
+    }
+}
+
+static void
+pending_registration_set (MMModemHuawei *self, guint tag)
+{
+    MM_MODEM_HUAWEI_GET_PRIVATE (self)->pending_registration = tag;
+}
+
+static void
+pending_registration_stop (MMModemHuawei *self)
+{
+    guint tag;
+
+    tag = MM_MODEM_HUAWEI_GET_PRIVATE (self)->pending_registration;
+    if (tag)
+        g_source_remove (tag);
+}
+
+static void
+pending_registration_cleanup (gpointer data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) data;
+
+    if (!info->error) {
+        switch (MM_MODEM_HUAWEI_GET_PRIVATE (info->modem)->reg_status) {
+        case MM_MODEM_GSM_NETWORK_REG_STATUS_HOME:
+        case MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING:
+            /* Successfully registered */
+            break;
+        case MM_MODEM_GSM_NETWORK_REG_STATUS_DENIED:
+            info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_NETWORK_NOT_ALLOWED);
+            break;
+        case MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING:
+            info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_NETWORK_TIMEOUT);
+            break;
+        case MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE:
+            info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_NO_NETWORK);
+            break;
+        default:
+            info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_UNKNOWN);
+            break;
+        }
+    }
+
+    pending_registration_set (MM_MODEM_HUAWEI (info->modem), 0);
+    mm_callback_info_schedule (info);
+}
+
+static gboolean
+pending_registration_timed_out (gpointer data)
+{
+    return FALSE;
+}
+
+static void
+register_done (MMSerial *serial,
+               GString *response,
+               GError *error,
+               gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+    } else {
+        /* Add a timeout to wait for the unsolicited "connected" message */
+        pending_registration_set (MM_MODEM_HUAWEI (serial),
+                                  g_timeout_add_seconds_full (G_PRIORITY_DEFAULT, 60,
+                                                              pending_registration_timed_out,
+                                                              info,
+                                                              pending_registration_cleanup));
+
+        mm_serial_queue_command (serial, "+CREG?", 5, got_reg_status, NULL);
+    }
+}
+
+static void
+do_register (MMModemGsmNetwork *modem,
+             const char *network_id,
+             MMModemFn callback,
+             gpointer user_data)
+{
+    MMCallbackInfo *info;
+    char *command;
+
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+
+    if (network_id)
+        command = g_strdup_printf ("+COPS=1,2,\"%s\"", network_id);
+    else
+        command = g_strdup ("+COPS=0,,");
+
+    mm_serial_queue_command (MM_SERIAL (modem), command, 5, register_done, info);
+    g_free (command);
 }
 
 static gboolean
@@ -465,36 +627,7 @@ handle_status_change (const char *str, gpointer data)
 static void
 reg_state_changed (const char *str, gpointer data)
 {
-    int i;
-    MMModemGsmNetworkRegStatus status;
-
-    i = atoi (str);
-    switch (i) {
-    case 0:
-        status = MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE;
-        break;
-    case 1:
-        status = MM_MODEM_GSM_NETWORK_REG_STATUS_HOME;
-        break;
-    case 2:
-        status = MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING;
-        break;
-    case 3:
-        status = MM_MODEM_GSM_NETWORK_REG_STATUS_DENIED;
-        break;
-    case 4:
-        status = MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN;
-        break;
-    case 5:
-        status = MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING;
-        break;
-    default:
-        status = MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN;
-        break;
-    }
-
-    g_debug ("Registration state changed: %d\n", status);
-    mm_generic_gsm_set_reg_status (MM_GENERIC_GSM (data), status);
+    reg_status_updated (MM_MODEM_HUAWEI (data), atoi (str));
 }
 
 static gboolean
@@ -521,6 +654,7 @@ modem_init (MMModem *modem_class)
 static void
 modem_gsm_network_init (MMModemGsmNetwork *class)
 {
+    class->do_register = do_register;
     class->set_network_mode = set_network_mode;
     class->get_network_mode = get_network_mode;
     class->set_band = set_band;
@@ -532,6 +666,8 @@ static void
 mm_modem_huawei_init (MMModemHuawei *self)
 {
     MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (self);
+
+    priv->reg_status = MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN;
 
     priv->signal_quality_regex = g_regex_new ("\\r\\n\\^RSSI:(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     priv->mode_regex = g_regex_new ("\\r\\n\\^MODE:(.+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
@@ -546,6 +682,8 @@ static void
 finalize (GObject *object)
 {
     MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (object);
+
+    pending_registration_stop (MM_MODEM_HUAWEI (object));
 
     mm_serial_parser_v1_destroy (priv->std_parser);
     g_regex_unref (priv->signal_quality_regex);
