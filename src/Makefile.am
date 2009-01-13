@@ -29,6 +29,8 @@ modem_manager_SOURCES = \
 	mm-modem-gsm-card.h \
 	mm-modem-gsm-network.c \
 	mm-modem-gsm-network.h \
+	mm-modem-simple.c \
+	mm-modem-simple.h \
 	mm-options.c \
 	mm-options.h \
 	mm-plugin.c \
@@ -46,6 +48,9 @@ mm-manager-glue.h: $(top_srcdir)/introspection/mm-manager.xml
 mm-modem-glue.h: $(top_srcdir)/introspection/mm-modem.xml
 	dbus-binding-tool --prefix=mm_modem --mode=glib-server --output=$@ $<
 
+mm-modem-simple-glue.h: $(top_srcdir)/introspection/mm-modem-simple.xml
+	dbus-binding-tool --prefix=mm_modem_simple --mode=glib-server --output=$@ $<
+
 mm-modem-cdma-glue.h: $(top_srcdir)/introspection/mm-modem-cdma.xml
 	dbus-binding-tool --prefix=mm_modem_cdma --mode=glib-server --output=$@ $<
 
@@ -59,6 +64,7 @@ mm-modem-gsm-network-glue.h: $(top_srcdir)/introspection/mm-modem-gsm-network.xm
 BUILT_SOURCES = \
 	mm-manager-glue.h \
 	mm-modem-glue.h \
+	mm-modem-simple-glue.h \
 	mm-modem-cdma-glue.h \
 	mm-modem-gsm-card-glue.h \
 	mm-modem-gsm-network-glue.h

@@ -6,6 +6,7 @@
 #include "mm-generic-gsm.h"
 #include "mm-modem-gsm-card.h"
 #include "mm-modem-gsm-network.h"
+#include "mm-modem-simple.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 #include "mm-serial-parsers.h"
@@ -1079,6 +1080,253 @@ get_signal_quality (MMModemGsmNetwork *modem,
 }
 
 /*****************************************************************************/
+/* MMModemSimple interface */
+
+typedef enum {
+    SIMPLE_STATE_BEGIN = 0,
+    SIMPLE_STATE_ENABLE,
+    SIMPLE_STATE_CHECK_PIN,
+    SIMPLE_STATE_REGISTER,
+    SIMPLE_STATE_SET_APN,
+    SIMPLE_STATE_CONNECT,
+    SIMPLE_STATE_DONE
+} SimpleState;
+
+static const char *
+simple_get_string_property (MMCallbackInfo *info, const char *name, GError **error)
+{
+    GHashTable *properties = (GHashTable *) mm_callback_info_get_data (info, "simple-connect-properties");
+    GValue *value;
+
+    value = (GValue *) g_hash_table_lookup (properties, name);
+    if (!value)
+        return NULL;
+
+    if (G_VALUE_HOLDS_STRING (value))
+        return g_value_get_string (value);
+
+    g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                 "Invalid property type for '%s': %s (string expected)",
+                 name, G_VALUE_TYPE_NAME (value));
+
+    return NULL;
+}
+
+static void
+simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    const char *str;
+    SimpleState state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "simple-connect-state"));
+    gboolean need_pin = FALSE;
+
+    if (error) {
+        if (state == SIMPLE_STATE_CHECK_PIN && g_error_matches (error, MM_MOBILE_ERROR, MM_MOBILE_ERROR_SIM_PIN))
+            need_pin = TRUE;
+        else {
+            info->error = g_error_copy (error);
+            goto out;
+        }
+    }
+
+    switch (state) {
+    case SIMPLE_STATE_BEGIN:
+        state = SIMPLE_STATE_ENABLE;
+        mm_modem_enable (modem, TRUE, simple_state_machine, info);
+        break;
+    case SIMPLE_STATE_ENABLE:
+        state = SIMPLE_STATE_CHECK_PIN;
+        mm_generic_gsm_check_pin (MM_GENERIC_GSM (modem), simple_state_machine, info);
+        break;
+    case SIMPLE_STATE_CHECK_PIN:
+        if (need_pin) {
+            str = simple_get_string_property (info, "pin", &info->error);
+            if (str)
+                mm_modem_gsm_card_send_pin (MM_MODEM_GSM_CARD (modem), str, simple_state_machine, info);
+            else
+                info->error = g_error_copy (error);
+        } else {
+            str = simple_get_string_property (info, "network_id", &info->error);
+            state = SIMPLE_STATE_REGISTER;
+            if (!info->error)
+                mm_modem_gsm_network_register (MM_MODEM_GSM_NETWORK (modem), str, simple_state_machine, info);
+        }
+        break;
+    case SIMPLE_STATE_REGISTER:
+        str = simple_get_string_property (info, "apn", &info->error);
+        if (str) {
+            state = SIMPLE_STATE_SET_APN;
+            mm_modem_gsm_network_set_apn (MM_MODEM_GSM_NETWORK (modem), str, simple_state_machine, info);
+            break;
+        }
+        /* Fall through */
+    case SIMPLE_STATE_SET_APN:
+        str = simple_get_string_property (info, "number", &info->error);
+        state = SIMPLE_STATE_CONNECT;
+        mm_modem_connect (modem, str, simple_state_machine, info);
+        break;
+    case SIMPLE_STATE_CONNECT:
+        state = SIMPLE_STATE_DONE;
+        break;
+    case SIMPLE_STATE_DONE:
+        break;
+    }
+
+ out:
+    if (info->error || state == SIMPLE_STATE_DONE)
+        mm_callback_info_schedule (info);
+    else
+        mm_callback_info_set_data (info, "simple-connect-state", GUINT_TO_POINTER (state), NULL);
+}
+
+static void
+simple_connect (MMModemSimple *simple,
+                GHashTable *properties,
+                MMModemFn callback,
+                gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new (MM_MODEM (simple), callback, user_data);
+    mm_callback_info_set_data (info, "simple-connect-properties", 
+                               g_hash_table_ref (properties),
+                               (GDestroyNotify) g_hash_table_unref);
+
+    /* At least number must be present */
+    if (!simple_get_string_property (info, "number", &info->error)) {
+        if (!info->error)
+            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Missing number property");
+    }
+
+    simple_state_machine (MM_MODEM (simple), NULL, info);
+}
+
+
+
+static void
+simple_free_gvalue (gpointer data)
+{
+    g_value_unset ((GValue *) data);
+    g_slice_free (GValue, data);
+}
+
+static GValue *
+simple_uint_value (guint32 i)
+{
+    GValue *val;
+
+    val = g_slice_new0 (GValue);
+    g_value_init (val, G_TYPE_UINT);
+    g_value_set_uint (val, i);
+
+    return val;
+}
+
+static GValue *
+simple_string_value (const char *str)
+{
+    GValue *val;
+
+    val = g_slice_new0 (GValue);
+    g_value_init (val, G_TYPE_STRING);
+    g_value_set_string (val, str);
+
+    return val;
+}
+
+static void
+simple_status_got_signal_quality (MMModem *modem,
+                                  guint32 result,
+                                  GError *error,
+                                  gpointer user_data)
+{
+    if (error)
+        g_warning ("Error getting signal quality: %s", error->message);
+    else
+        g_hash_table_insert ((GHashTable *) user_data, "signal_quality", simple_uint_value (result));
+}
+
+static void
+simple_status_got_band (MMModem *modem,
+                        guint32 result,
+                        GError *error,
+                        gpointer user_data)
+{
+    /* Ignore band errors since there's no generic implementation for it */
+    if (!error)
+        g_hash_table_insert ((GHashTable *) user_data, "band", simple_uint_value (result));
+}
+
+static void
+simple_status_got_mode (MMModem *modem,
+                        guint32 result,
+                        GError *error,
+                        gpointer user_data)
+{
+    /* Ignore network mode errors since there's no generic implementation for it */
+    if (!error)
+        g_hash_table_insert ((GHashTable *) user_data, "network_mode", simple_uint_value (result));
+}
+
+static void
+simple_status_got_reg_info (MMModemGsmNetwork *modem,
+                            MMModemGsmNetworkRegStatus status,
+                            const char *oper_code,
+                            const char *oper_name,
+                            GError *error,
+                            gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    GHashTable *properties;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else {
+        properties = (GHashTable *) mm_callback_info_get_data (info, "simple-get-status");
+ 
+        g_hash_table_insert (properties, "registration_status", simple_uint_value (status));
+        g_hash_table_insert (properties, "operator_code", simple_string_value (oper_code));
+        g_hash_table_insert (properties, "operator_name", simple_string_value (oper_name));
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+simple_get_status_invoke (MMCallbackInfo *info)
+{
+    MMModemSimpleGetStatusFn callback = (MMModemSimpleGetStatusFn) info->callback;
+
+    callback (MM_MODEM_SIMPLE (info->modem),
+              (GHashTable *) mm_callback_info_get_data (info, "simple-get-status"),
+              info->error, info->user_data);
+}
+
+static void
+simple_get_status (MMModemSimple *simple,
+                   MMModemSimpleGetStatusFn callback,
+                   gpointer user_data)
+{
+    MMModemGsmNetwork *gsm;
+    GHashTable *properties;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new_full (MM_MODEM (simple),
+                                      simple_get_status_invoke,
+                                      G_CALLBACK (callback),
+                                      user_data);
+
+    properties = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, simple_free_gvalue);
+    mm_callback_info_set_data (info, "simple-get-status", properties, (GDestroyNotify) g_hash_table_unref);
+
+    gsm = MM_MODEM_GSM_NETWORK (simple);
+    mm_modem_gsm_network_get_signal_quality (gsm, simple_status_got_signal_quality, properties);
+    mm_modem_gsm_network_get_band (gsm, simple_status_got_band, properties);
+    mm_modem_gsm_network_get_mode (gsm, simple_status_got_mode, properties);
+    mm_modem_gsm_network_get_registration_info (gsm, simple_status_got_reg_info, properties);
+}
+
+/*****************************************************************************/
 
 static void
 modem_init (MMModem *modem_class)
@@ -1108,6 +1356,13 @@ modem_gsm_network_init (MMModemGsmNetwork *class)
     class->set_apn = set_apn;
     class->scan = scan;
     class->get_signal_quality = get_signal_quality;
+}
+
+static void
+modem_simple_init (MMModemSimple *class)
+{
+    class->connect = simple_connect;
+    class->get_status = simple_get_status;
 }
 
 static void
@@ -1237,11 +1492,16 @@ mm_generic_gsm_get_type (void)
             (GInterfaceInitFunc) modem_gsm_network_init
         };
 
+        static const GInterfaceInfo modem_simple_info = {
+            (GInterfaceInitFunc) modem_simple_init
+        };
+
         generic_gsm_type = g_type_register_static (MM_TYPE_SERIAL, "MMGenericGsm", &generic_gsm_type_info, 0);
 
         g_type_add_interface_static (generic_gsm_type, MM_TYPE_MODEM, &modem_iface_info);
         g_type_add_interface_static (generic_gsm_type, MM_TYPE_MODEM_GSM_CARD, &modem_gsm_card_info);
         g_type_add_interface_static (generic_gsm_type, MM_TYPE_MODEM_GSM_NETWORK, &modem_gsm_network_info);
+        g_type_add_interface_static (generic_gsm_type, MM_TYPE_MODEM_SIMPLE, &modem_simple_info);
     }
 
     return generic_gsm_type;
