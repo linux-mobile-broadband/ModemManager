@@ -140,6 +140,45 @@ get_netdev (LibHalContext *ctx, const char *udi)
 
 		libhal_free_string (netdev_parent);
 	}
+
+    if (!netdev) {
+        /* Didn't find from netdev's parents. Try again with "grandparents" */
+        char *serial_grandparent;
+
+        serial_grandparent = libhal_device_get_property_string (ctx, serial_parent, "info.parent", NULL);
+        if (!serial_grandparent)
+            goto cleanup;
+
+        for (i = 0; netdevs && !netdev && (i < num); i++) {
+            char *netdev_parent, *tmp;
+
+            tmp = libhal_device_get_property_string (ctx, netdevs[i], "net.originating_device", NULL);
+            if (!tmp)
+                tmp = libhal_device_get_property_string (ctx, netdevs[i], "net.physical_device", NULL);
+            if (!tmp)
+                tmp = libhal_device_get_property_string (ctx, netdevs[i], "info.parent", NULL);
+            if (!tmp)
+                continue;
+
+            netdev_parent = libhal_device_get_property_string (ctx, tmp, "info.parent", NULL);
+            libhal_free_string (tmp);
+
+            if (netdev_parent) {
+                if (!strcmp (netdev_parent, serial_grandparent)) {
+                    /* We found it */
+                    tmp = libhal_device_get_property_string (ctx, netdevs[i], "net.interface", NULL);
+                    if (tmp) {
+                        netdev = g_strdup (tmp);
+                        libhal_free_string (tmp);
+                    }
+                }
+
+                libhal_free_string (netdev_parent);
+            }
+        }
+    }
+
+ cleanup:
 	libhal_free_string_array (netdevs);
 	libhal_free_string (serial_parent);
 
