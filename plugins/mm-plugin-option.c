@@ -77,8 +77,14 @@ supports_udi (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
                 int vendor;
 
                 vendor = libhal_device_get_property_int (hal_ctx, parent_udi, "usb.vendor_id", NULL);
-                if (vendor == 0x0af0)
-                    supported = TRUE;
+                if (vendor == 0x0af0) {
+                    char *driver;
+
+                    driver = libhal_device_get_property_string (hal_ctx, parent_udi, "info.linux.driver", NULL);
+                    if (driver && !strcmp (driver, "option"))
+                        supported = TRUE;
+                    libhal_free_string (driver);
+                }
 
                 libhal_free_string (parent_udi);
             }
