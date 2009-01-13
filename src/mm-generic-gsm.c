@@ -157,8 +157,11 @@ init_done (MMSerial *serial,
     if (error) {
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
-    } else
+    } else {
+        /* Disable unsolicited registration state changes, these will mess up our response parser */
+        mm_serial_queue_command (serial, "+CREG=0", 5, NULL, NULL);
         mm_serial_queue_command (serial, "+CFUN=1", 5, enable_done, user_data);
+    }
 }
 
 static void
