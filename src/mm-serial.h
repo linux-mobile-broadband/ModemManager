@@ -19,6 +19,7 @@
 #define MM_SERIAL_PARITY     "parity"
 #define MM_SERIAL_STOPBITS   "stopbits"
 #define MM_SERIAL_SEND_DELAY "send-delay"
+#define MM_SERIAL_CARRIER_DETECT "carrier-detect"
 
 typedef struct _MMSerial MMSerial;
 typedef struct _MMSerialClass MMSerialClass;

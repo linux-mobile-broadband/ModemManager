@@ -60,6 +60,21 @@ list_supported_udis (MMPlugin *plugin, LibHalContext *hal_ctx)
     return supported;
 }
 
+static int
+get_product (LibHalContext *hal_ctx, const char *udi)
+{
+    char *parent_udi;
+    int product = 0;
+
+    parent_udi = libhal_device_get_property_string (hal_ctx, udi, "info.parent", NULL);
+    if (parent_udi) {
+        product = libhal_device_get_property_int (hal_ctx, parent_udi, "usb.product_id", NULL);
+        libhal_free_string (parent_udi);
+    }
+
+    return product;
+}
+
 static gboolean
 supports_udi (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
 {
@@ -78,7 +93,7 @@ supports_udi (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
                 int product;
 
                 vendor = libhal_device_get_property_int (hal_ctx, parent_udi, "usb.vendor_id", NULL);
-                product = libhal_device_get_property_int (hal_ctx, parent_udi, "usb.product_id", NULL);
+                product = get_product (hal_ctx, udi);
 
                 if (vendor == 0x12d1 && (product == 0x1001 || product == 0x1003 || product == 0x1004))
                     supported = TRUE;
@@ -174,13 +189,17 @@ create_modem (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
     driver = get_driver_name (hal_ctx, udi);
     g_return_val_if_fail (driver != NULL, NULL);
 
-    monitor_device = get_monitor_device (hal_ctx, udi);
-    g_debug ("Got monitor device: %s", monitor_device);
-
-    modem = MM_MODEM (mm_modem_huawei_new (data_device, monitor_device, driver));
+    if (get_product (hal_ctx, udi) == 0x1001) {
+        /* This modem is handled by generic GSM device with carrier detection turned off */
+        modem = mm_generic_gsm_new (data_device, driver);
+        g_object_set (G_OBJECT (modem), MM_SERIAL_CARRIER_DETECT, FALSE, NULL);
+    } else {
+        monitor_device = get_monitor_device (hal_ctx, udi);
+        modem = mm_modem_huawei_new (data_device, monitor_device, driver);
+        libhal_free_string (monitor_device);
+    }
 
     libhal_free_string (data_device);
-    libhal_free_string (monitor_device);
     libhal_free_string (driver);
 
     return modem;

@@ -29,6 +29,7 @@ enum {
     PROP_PARITY,
     PROP_STOPBITS,
     PROP_SEND_DELAY,
+    PROP_CARRIER_DETECT,
 
     LAST_PROP
 };
@@ -57,6 +58,7 @@ typedef struct {
     char parity;
     guint stopbits;
     guint64 send_delay;
+    gboolean carrier_detect;
 
     guint queue_schedule;
     guint watch_id;
@@ -688,16 +690,20 @@ mm_serial_flash (MMSerial *self,
 gboolean
 mm_serial_is_connected (MMSerial *self)
 {
-    int fd;
+    MMSerialPrivate *priv;
     int mcs = 0;
 
     g_return_val_if_fail (MM_IS_SERIAL (self), FALSE);
 
-    fd = MM_SERIAL_GET_PRIVATE (self)->fd;
-    if (fd == 0)
+    priv = MM_SERIAL_GET_PRIVATE (self);
+
+    if (!priv->carrier_detect)
         return FALSE;
 
-    if (ioctl (fd, TIOCMGET, &mcs) < 0)
+    if (priv->fd == 0)
+        return FALSE;
+
+    if (ioctl (priv->fd, TIOCMGET, &mcs) < 0)
         return FALSE;
 
     return mcs & TIOCM_CAR ? TRUE : FALSE;
@@ -715,6 +721,7 @@ mm_serial_init (MMSerial *self)
     priv->parity = 'n';
     priv->stopbits = 1;
     priv->send_delay = 1000;
+    priv->carrier_detect = TRUE;
 
     priv->queue = g_queue_new ();
     priv->command  = g_string_new_len   ("AT", SERIAL_BUF_SIZE);
@@ -772,6 +779,9 @@ set_property (GObject *object, guint prop_id,
     case PROP_SEND_DELAY:
         priv->send_delay = g_value_get_uint64 (value);
         break;
+    case PROP_CARRIER_DETECT:
+        priv->carrier_detect = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -802,6 +812,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case PROP_SEND_DELAY:
         g_value_set_uint64 (value, priv->send_delay);
+        break;
+    case PROP_CARRIER_DETECT:
+        g_value_set_boolean (value, priv->carrier_detect);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -889,4 +902,12 @@ mm_serial_class_init (MMSerialClass *klass)
                               "Send delay",
                               0, G_MAXUINT64, 0,
                               G_PARAM_READWRITE));
+
+    g_object_class_install_property
+        (object_class, PROP_CARRIER_DETECT,
+         g_param_spec_boolean (MM_SERIAL_CARRIER_DETECT,
+                               "CarrierDetect",
+                               "Has carrier detect",
+                               TRUE,
+                               G_PARAM_READWRITE));
 }
