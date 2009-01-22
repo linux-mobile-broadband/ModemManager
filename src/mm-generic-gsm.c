@@ -1192,12 +1192,6 @@ simple_connect (MMModemSimple *simple,
                                g_hash_table_ref (properties),
                                (GDestroyNotify) g_hash_table_unref);
 
-    /* At least number must be present */
-    if (!simple_get_string_property (info, "number", &info->error)) {
-        if (!info->error)
-            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Missing number property");
-    }
-
     simple_state_machine (MM_MODEM (simple), NULL, info);
 }
 
