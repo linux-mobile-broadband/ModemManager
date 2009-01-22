@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <dbus/dbus-glib.h>
 #include "mm-modem-hso.h"
+#include "mm-modem-simple.h"
 #include "mm-serial.h"
 #include "mm-serial-parsers.h"
 #include "mm-errors.h"
@@ -454,6 +455,93 @@ hso_parse_response (gpointer data, GString *response, GError **error)
 }
 
 /*****************************************************************************/
+/* MMModemSimple interface */
+
+typedef enum {
+    SIMPLE_STATE_BEGIN = 0,
+    SIMPLE_STATE_PARENT_CONNECT,
+    SIMPLE_STATE_AUTHENTICATE,
+    SIMPLE_STATE_DONE
+} SimpleState;
+
+static const char *
+simple_get_string_property (MMCallbackInfo *info, const char *name, GError **error)
+{
+    GHashTable *properties = (GHashTable *) mm_callback_info_get_data (info, "simple-connect-properties");
+    GValue *value;
+
+    value = (GValue *) g_hash_table_lookup (properties, name);
+    if (!value)
+        return NULL;
+
+    if (G_VALUE_HOLDS_STRING (value))
+        return g_value_get_string (value);
+
+    g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                 "Invalid property type for '%s': %s (string expected)",
+                 name, G_VALUE_TYPE_NAME (value));
+
+    return NULL;
+}
+
+static void
+simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemSimple *parent_iface;
+    const char *username;
+    const char *password;
+    GHashTable *properties = (GHashTable *) mm_callback_info_get_data (info, "simple-connect-properties");
+    SimpleState state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "simple-connect-state"));
+
+    if (error) {
+        info->error = g_error_copy (error);
+        goto out;
+    }
+
+    switch (state) {
+    case SIMPLE_STATE_BEGIN:
+        state = SIMPLE_STATE_PARENT_CONNECT;
+        parent_iface = g_type_interface_peek_parent (MM_MODEM_SIMPLE_GET_INTERFACE (modem));
+        parent_iface->connect (MM_MODEM_SIMPLE (modem), properties, simple_state_machine, info);
+        break;
+    case SIMPLE_STATE_PARENT_CONNECT:
+        state = SIMPLE_STATE_AUTHENTICATE;
+        username = simple_get_string_property (info, "username", &info->error);
+        password = simple_get_string_property (info, "password", &info->error);
+        mm_hso_modem_authenticate (MM_MODEM_HSO (modem), username, password, simple_state_machine, info);
+        break;
+    case SIMPLE_STATE_AUTHENTICATE:
+        state = SIMPLE_STATE_DONE;
+        break;
+    default:
+        break;
+    }
+
+ out:
+    if (info->error || state == SIMPLE_STATE_DONE)
+        mm_callback_info_schedule (info);
+    else
+        mm_callback_info_set_data (info, "simple-connect-state", GUINT_TO_POINTER (state), NULL);
+}
+
+static void
+simple_connect (MMModemSimple *simple,
+                GHashTable *properties,
+                MMModemFn callback,
+                gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new (MM_MODEM (simple), callback, user_data);
+    mm_callback_info_set_data (info, "simple-connect-properties", 
+                               g_hash_table_ref (properties),
+                               (GDestroyNotify) g_hash_table_unref);
+
+    simple_state_machine (MM_MODEM (simple), NULL, info);
+}
+
+/*****************************************************************************/
 
 static void
 mm_modem_hso_init (MMModemHso *self)
@@ -465,6 +553,12 @@ mm_modem_hso_init (MMModemHso *self)
 
     priv->std_parser = (gpointer) mm_serial_parser_v1_new ();
     mm_serial_set_response_parser (MM_SERIAL (self), hso_parse_response, self, NULL);
+}
+
+static void
+modem_simple_init (MMModemSimple *class)
+{
+    class->connect = simple_connect;
 }
 
 static void
@@ -591,8 +685,14 @@ mm_modem_hso_get_type (void)
             (GInterfaceInitFunc) modem_init
         };
 
+        static const GInterfaceInfo modem_simple_info = {
+            (GInterfaceInitFunc) modem_simple_init
+        };
+
         modem_hso_type = g_type_register_static (MM_TYPE_GENERIC_GSM, "MMModemHso", &modem_hso_type_info, 0);
+
         g_type_add_interface_static (modem_hso_type, MM_TYPE_MODEM, &modem_iface_info);
+        g_type_add_interface_static (modem_hso_type, MM_TYPE_MODEM_SIMPLE, &modem_simple_info);
 
         dbus_g_object_type_install_info (modem_hso_type, &dbus_glib_mm_modem_gsm_hso_object_info);
     }
