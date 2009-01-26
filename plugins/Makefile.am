@@ -3,8 +3,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-hso.la \
 	libmm-plugin-mbm.la \
 	libmm-plugin-option.la \
-	libmm-plugin-sierra.la
-
+	libmm-plugin-sierra.la \
+	libmm-plugin-novatel.la
 
 # Huawei
 
@@ -83,6 +83,21 @@ libmm_plugin_sierra_la_CPPFLAGS = \
 	-I$(top_srcdir)/src
 
 libmm_plugin_sierra_la_LDFLAGS = -module -avoid-version
+
+# Novatel
+
+libmm_plugin_novatel_la_SOURCES = \
+	mm-modem-novatel.c \
+	mm-modem-novatel.h \
+	mm-plugin-novatel.c \
+	mm-plugin-novatel.h
+
+libmm_plugin_novatel_la_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	-I$(top_srcdir)/src
+
+libmm_plugin_novatel_la_LDFLAGS = -module -avoid-version
+
 
 BUILT_SOURCES = \
 	mm-modem-gsm-hso-glue.h \
