@@ -124,8 +124,8 @@ dbus_init (GMainLoop *loop)
     }
 
     if (request_name_result != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
-        g_warning ("Could not acquire the NetworkManagerSystemSettings service "
-                   "as it is already taken. Return: %d",
+        g_warning ("Could not acquire the " MM_DBUS_SERVICE
+                   " service as it is already taken. Return: %d",
                    request_name_result);
         goto err;
     }
