@@ -13,7 +13,7 @@
 #define MM_IS_SERIAL_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_SERIAL))
 #define MM_SERIAL_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_SERIAL, MMSerialClass))
 
-#define MM_SERIAL_DEVICE     "device"
+#define MM_SERIAL_DEVICE     "serial-device"
 #define MM_SERIAL_BAUD       "baud"
 #define MM_SERIAL_BITS       "bits"
 #define MM_SERIAL_PARITY     "parity"

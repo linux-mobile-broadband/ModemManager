@@ -27,6 +27,7 @@ mm_generic_cdma_new (const char *serial_device, const char *driver)
     return MM_MODEM (g_object_new (MM_TYPE_GENERIC_CDMA,
                                    MM_SERIAL_DEVICE, serial_device,
                                    MM_MODEM_DRIVER, driver,
+                                   MM_MODEM_TYPE, MM_MODEM_TYPE_CDMA,
                                    NULL));
 }
 
@@ -375,8 +376,9 @@ set_property (GObject *object, guint prop_id,
         /* Construct only */
         MM_GENERIC_CDMA_GET_PRIVATE (object)->driver = g_value_dup_string (value);
         break;
-    case MM_MODEM_PROP_DATA_DEVICE:
+    case MM_MODEM_PROP_DEVICE:
     case MM_MODEM_PROP_TYPE:
+    case MM_MODEM_PROP_IP_METHOD:
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -389,7 +391,7 @@ get_property (GObject *object, guint prop_id,
               GValue *value, GParamSpec *pspec)
 {
     switch (prop_id) {
-    case MM_MODEM_PROP_DATA_DEVICE:
+    case MM_MODEM_PROP_DEVICE:
         g_value_set_string (value, mm_serial_get_device (MM_SERIAL (object)));
         break;
     case MM_MODEM_PROP_DRIVER:
@@ -397,6 +399,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case MM_MODEM_PROP_TYPE:
         g_value_set_uint (value, MM_MODEM_TYPE_CDMA);
+        break;
+    case MM_MODEM_PROP_IP_METHOD:
+        g_value_set_uint (value, MM_MODEM_IP_METHOD_PPP);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -429,8 +434,8 @@ mm_generic_cdma_class_init (MMGenericCdmaClass *klass)
 
     /* Properties */
     g_object_class_override_property (object_class,
-                                      MM_MODEM_PROP_DATA_DEVICE,
-                                      MM_MODEM_DATA_DEVICE);
+                                      MM_MODEM_PROP_DEVICE,
+                                      MM_MODEM_DEVICE);
 
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_DRIVER,
@@ -439,6 +444,10 @@ mm_generic_cdma_class_init (MMGenericCdmaClass *klass)
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_TYPE,
                                       MM_MODEM_TYPE);
+
+    g_object_class_override_property (object_class,
+                                      MM_MODEM_PROP_IP_METHOD,
+                                      MM_MODEM_IP_METHOD);
 }
 
 GType

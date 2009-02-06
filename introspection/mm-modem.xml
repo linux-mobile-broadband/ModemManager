@@ -36,9 +36,22 @@
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_disconnect"/>
     </method>
 
-    <property name="DataDevice" type="s" access="read">
+    <method name="GetIP4Config">
       <tp:docstring>
-	The serial device which can be used to start pppd.
+	Request the IP4 configuration from the device.
+	Note that it'll only be supported for IPMethod MM_MODEM_IP_METHOD_STATIC.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_get_ip4_config"/>
+      <arg name="address" type="(uuuu)" direction="out">
+	Structure containing IP4 address, DNS1, DNS2, DNS3.
+	The DNS list is padded with 0's if there's less than 3 DNS servers.
+      </arg>
+    </method>
+
+    <property name="Device" type="s" access="read">
+      <tp:docstring>
+	The device to use for IP configuration and traffic.
       </tp:docstring>
     </property>
 
@@ -54,6 +67,12 @@
       </tp:docstring>
     </property>
 
+    <property name="IpMethod" type="u" access="read" tp:type="MM_MODEM_IP_METHOD">
+      <tp:docstring>
+        The IP configuration method.
+      </tp:docstring>
+    </property>
+
     <tp:enum name="MM_MODEM_TYPE" type="u">
       <tp:enumvalue suffix="GSM" value="1">
 	<tp:docstring>
@@ -63,6 +82,24 @@
       <tp:enumvalue suffix="CDMA" value="2">
 	<tp:docstring>
 	  A CDMA device.
+	</tp:docstring>
+      </tp:enumvalue>
+    </tp:enum>
+
+    <tp:enum name="MM_MODEM_IP_METHOD" type="u">
+      <tp:enumvalue suffix="PPP" value="0">
+	<tp:docstring>
+	  Use PPP to get the address.
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="STATIC" value="1">
+	<tp:docstring>
+	  Static configuration, the modem will provide IP information.
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="DHCP" value="2">
+	<tp:docstring>
+	  Use DHCP
 	</tp:docstring>
       </tp:enumvalue>
     </tp:enum>

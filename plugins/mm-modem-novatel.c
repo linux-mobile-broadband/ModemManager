@@ -20,6 +20,7 @@ mm_modem_novatel_new (const char *data_device,
     return MM_MODEM (g_object_new (MM_TYPE_MODEM_NOVATEL,
                                    MM_SERIAL_DEVICE, data_device,
                                    MM_MODEM_DRIVER, driver,
+                                   MM_MODEM_TYPE, MM_MODEM_TYPE_GSM,
                                    NULL));
 }
 
@@ -51,7 +52,7 @@ pin_check_done (MMModem *modem, GError *error, gpointer user_data)
         mm_callback_info_schedule (info);
     } else
         /* Finish the initialization */
-        mm_serial_queue_command (MM_SERIAL (modem), "Z X4 &C1 +CMEE=1;+CFUN=1", 10, init_modem_done, info);
+        mm_serial_queue_command (MM_SERIAL (modem), "Z E0 V1 X4 &C1 +CMEE=1;+CFUN=1", 10, init_modem_done, info);
 }
 
 static void

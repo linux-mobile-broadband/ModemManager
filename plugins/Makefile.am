@@ -41,14 +41,10 @@ libmm_plugin_hso_la_LDFLAGS = -module -avoid-version
 # MBM
 
 libmm_plugin_mbm_la_SOURCES = \
-	mm-modem-gsm-mbm-glue.h \
 	mm-modem-mbm.c \
 	mm-modem-mbm.h \
 	mm-plugin-mbm.c \
 	mm-plugin-mbm.h
-
-mm-modem-gsm-mbm-glue.h: $(top_srcdir)/introspection/mm-modem-gsm-mbm.xml
-	dbus-binding-tool --prefix=mm_modem_gsm_mbm --mode=glib-server --output=$@ $<
 
 libmm_plugin_mbm_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
@@ -100,7 +96,6 @@ libmm_plugin_novatel_la_LDFLAGS = -module -avoid-version
 
 
 BUILT_SOURCES = \
-	mm-modem-gsm-hso-glue.h \
-	mm-modem-gsm-mbm-glue.h
+	mm-modem-gsm-hso-glue.h
 
 CLEANFILES = $(BUILT_SOURCES)

@@ -35,8 +35,6 @@
 #define MM_IS_MODEM_MBM_CLASS(klass)   (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_MODEM_MBM))
 #define MM_MODEM_MBM_GET_CLASS(obj)    (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_MODEM_MBM, MMModemMbmClass))
 
-#define MM_MODEM_MBM_NETWORK_DEVICE "network-device"
-
 typedef struct {
     MMGenericGsm parent;
 } MMModemMbm;
@@ -45,27 +43,10 @@ typedef struct {
     MMGenericGsmClass parent;
 } MMModemMbmClass;
 
-typedef void (*MMModemMbmIp4Fn) (MMModemMbm *modem,
-                                 guint32 address,
-                                 GArray *dns,
-                                 GError *error,
-                                 gpointer user_data);
-
-
 GType mm_modem_mbm_get_type (void);
 
 MMModem *mm_modem_mbm_new (const char *serial_device,
                            const char *network_device,
                            const char *driver);
-
-void mm_mbm_modem_authenticate (MMModemMbm *self,
-                                const char *username,
-                                const char *password,
-                                MMModemFn callback,
-                                gpointer user_data);
-
-void mm_mbm_modem_get_ip4_config (MMModemMbm *self,
-                                  MMModemMbmIp4Fn callback,
-                                  gpointer user_data);
 
 #endif /* MM_MODEM_MBM_H */

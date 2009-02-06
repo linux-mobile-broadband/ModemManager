@@ -20,9 +20,6 @@ static void impl_hso_authenticate (MMModemHso *self,
                                    const char *password,
                                    DBusGMethodInvocation *context);
 
-static void impl_hso_get_ip4_config (MMModemHso *self,
-                                     DBusGMethodInvocation *context);
-
 #include "mm-modem-gsm-hso-glue.h"
 
 static gpointer mm_modem_hso_parent_class = NULL;
@@ -30,7 +27,6 @@ static gpointer mm_modem_hso_parent_class = NULL;
 #define MM_MODEM_HSO_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_HSO, MMModemHsoPrivate))
 
 typedef struct {
-    char *network_device;
     GRegex *connection_enabled_regex;
     gpointer std_parser;
 
@@ -38,13 +34,6 @@ typedef struct {
     MMCallbackInfo *connect_pending_data;
     guint connect_pending_id;
 } MMModemHsoPrivate;
-
-enum {
-    PROP_0,
-    PROP_NETWORK_DEVICE,
-
-    LAST_PROP
-};
 
 #define OWANDATA_TAG "_OWANDATA: "
 
@@ -61,7 +50,9 @@ mm_modem_hso_new (const char *serial_device,
                                    MM_SERIAL_DEVICE, serial_device,
                                    MM_SERIAL_SEND_DELAY, (guint64) 10000,
                                    MM_MODEM_DRIVER, driver,
-                                   MM_MODEM_HSO_NETWORK_DEVICE, network_device,
+                                   MM_MODEM_DEVICE, network_device,
+                                   MM_MODEM_IP_METHOD, MM_MODEM_IP_METHOD_STATIC,
+                                   MM_MODEM_TYPE, MM_MODEM_TYPE_GSM,
                                    NULL));
 }
 
@@ -217,96 +208,6 @@ mm_hso_modem_authenticate (MMModemHso *self,
         auth_done (MM_SERIAL (self), NULL, NULL, info);
 }
 
-static void
-free_dns_array (gpointer data)
-{
-    g_array_free ((GArray *) data, TRUE);
-}
-
-static void
-ip4_config_invoke (MMCallbackInfo *info)
-{
-    MMModemHsoIp4Fn callback = (MMModemHsoIp4Fn) info->callback;
-
-    callback (MM_MODEM_HSO (info->modem),
-              GPOINTER_TO_UINT (mm_callback_info_get_data (info, "ip4-address")),
-              (GArray *) mm_callback_info_get_data (info, "ip4-dns"),
-              info->error, info->user_data);
-}
-
-static void
-get_ip4_config_done (MMSerial *serial,
-                     GString *response,
-                     GError *error,
-                     gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-	char **items, **iter;
-    GArray *dns_array;
-    int i;
-    guint32 tmp;
-    guint cid;
-
-    if (error) {
-        info->error = g_error_copy (error);
-        goto out;
-    } else if (!g_str_has_prefix (response->str, OWANDATA_TAG)) {
-        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                           "Retrieving failed: invalid response.");
-        goto out;
-    }
-
-    cid = hso_get_cid (MM_MODEM_HSO (serial));
-    dns_array = g_array_sized_new (FALSE, TRUE, sizeof (guint32), 2);
-    items = g_strsplit (response->str + strlen (OWANDATA_TAG), ", ", 0);
-
-	for (iter = items, i = 0; *iter; iter++, i++) {
-		if (i == 0) { /* CID */
-			long int tmp;
-
-			errno = 0;
-			tmp = strtol (*iter, NULL, 10);
-			if (errno != 0 || tmp < 0 || (guint) tmp != cid) {
-				info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                           "Unknown CID in OWANDATA response (got %d, expected %d)", (guint) tmp, cid);
-				break;
-			}
-		} else if (i == 1) { /* IP address */
-			if (inet_pton (AF_INET, *iter, &tmp) > 0)
-                mm_callback_info_set_data (info, "ip4-address", GUINT_TO_POINTER (tmp), NULL);
-		} else if (i == 3) { /* DNS 1 */
-			if (inet_pton (AF_INET, *iter, &tmp) > 0)
-				g_array_append_val (dns_array, tmp);
-		} else if (i == 4) { /* DNS 2 */
-			if (inet_pton (AF_INET, *iter, &tmp) > 0)
-				g_array_append_val (dns_array, tmp);
-		}
-	}
-
-    g_strfreev (items);
-    mm_callback_info_set_data (info, "ip4-dns", dns_array, free_dns_array);
-
- out:
-    mm_callback_info_schedule (info);
-}
-
-void
-mm_hso_modem_get_ip4_config (MMModemHso *self,
-                             MMModemHsoIp4Fn callback,
-                             gpointer user_data)
-{
-    MMCallbackInfo *info;
-    char *command;
-
-    g_return_if_fail (MM_IS_MODEM_HSO (self));
-    g_return_if_fail (callback != NULL);
-
-    info = mm_callback_info_new_full (MM_MODEM (self), ip4_config_invoke, G_CALLBACK (callback), user_data);
-    command = g_strdup_printf ("AT_OWANDATA=%d", hso_get_cid (self));
-    mm_serial_queue_command (MM_SERIAL (self), command, 3, get_ip4_config_done, info);
-    g_free (command);
-}
-
 /*****************************************************************************/
 
 static void
@@ -380,6 +281,105 @@ do_connect (MMModem *modem,
     mm_callback_info_schedule (info);
 }
 
+
+static void
+free_dns_array (gpointer data)
+{
+    g_array_free ((GArray *) data, TRUE);
+}
+
+static void
+ip4_config_invoke (MMCallbackInfo *info)
+{
+    MMModemIp4Fn callback = (MMModemIp4Fn) info->callback;
+
+    callback (info->modem,
+              GPOINTER_TO_UINT (mm_callback_info_get_data (info, "ip4-address")),
+              (GArray *) mm_callback_info_get_data (info, "ip4-dns"),
+              info->error, info->user_data);
+}
+
+static void
+get_ip4_config_done (MMSerial *serial,
+                     GString *response,
+                     GError *error,
+                     gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+	char **items, **iter;
+    GArray *dns_array;
+    int i;
+    guint32 tmp;
+    guint cid;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        goto out;
+    } else if (!g_str_has_prefix (response->str, OWANDATA_TAG)) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                           "Retrieving failed: invalid response.");
+        goto out;
+    }
+
+    cid = hso_get_cid (MM_MODEM_HSO (serial));
+    dns_array = g_array_sized_new (FALSE, TRUE, sizeof (guint32), 2);
+    items = g_strsplit (response->str + strlen (OWANDATA_TAG), ", ", 0);
+
+	for (iter = items, i = 0; *iter; iter++, i++) {
+		if (i == 0) { /* CID */
+			long int tmp;
+
+			errno = 0;
+			tmp = strtol (*iter, NULL, 10);
+			if (errno != 0 || tmp < 0 || (guint) tmp != cid) {
+				info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                           "Unknown CID in OWANDATA response (got %d, expected %d)", (guint) tmp, cid);
+				break;
+			}
+		} else if (i == 1) { /* IP address */
+			if (inet_pton (AF_INET, *iter, &tmp) > 0)
+                mm_callback_info_set_data (info, "ip4-address", GUINT_TO_POINTER (tmp), NULL);
+		} else if (i == 3) { /* DNS 1 */
+			if (inet_pton (AF_INET, *iter, &tmp) > 0)
+				g_array_append_val (dns_array, tmp);
+		} else if (i == 4) { /* DNS 2 */
+			if (inet_pton (AF_INET, *iter, &tmp) > 0)
+				g_array_append_val (dns_array, tmp);
+		}
+	}
+
+    g_strfreev (items);
+    mm_callback_info_set_data (info, "ip4-dns", dns_array, free_dns_array);
+
+ out:
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_ip4_config (MMModem *modem,
+                MMModemIp4Fn callback,
+                gpointer user_data)
+{
+    MMCallbackInfo *info;
+    char *command;
+
+    info = mm_callback_info_new_full (modem, ip4_config_invoke, G_CALLBACK (callback), user_data);
+    command = g_strdup_printf ("AT_OWANDATA=%d", hso_get_cid (MM_MODEM_HSO (modem)));
+    mm_serial_queue_command (MM_SERIAL (modem), command, 3, get_ip4_config_done, info);
+    g_free (command);
+}
+
+static void
+disconnect (MMModem *modem,
+            MMModemFn callback,
+            gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new (modem, callback, user_data);
+    mm_serial_queue_command (MM_SERIAL (modem), "AT_OWANCALL=1,0,0", 3, NULL, info);
+}
+
 /*****************************************************************************/
 
 static void
@@ -408,28 +408,6 @@ impl_hso_authenticate (MMModemHso *self,
         password = NULL;
 
     mm_hso_modem_authenticate (self, username, password, impl_hso_auth_done, context);
-}
-
-static void
-impl_hso_ip4_config_done (MMModemHso *modem,
-                          guint32 address,
-                          GArray *dns,
-                          GError *error,
-                          gpointer user_data)
-{
-    DBusGMethodInvocation *context = (DBusGMethodInvocation *) user_data;
-
-    if (error)
-        dbus_g_method_return_error (context, error);
-    else
-        dbus_g_method_return (context, address, dns);
-}
-
-static void
-impl_hso_get_ip4_config (MMModemHso *self,
-                         DBusGMethodInvocation *context)
-{
-    mm_hso_modem_get_ip4_config (self, impl_hso_ip4_config_done, context);
 }
 
 static void
@@ -566,6 +544,8 @@ modem_init (MMModem *modem_class)
 {
     modem_class->enable = enable;
     modem_class->connect = do_connect;
+    modem_class->get_ip4_config = get_ip4_config;
+    modem_class->disconnect = disconnect;
 }
 
 static GObject*
@@ -574,7 +554,8 @@ constructor (GType type,
              GObjectConstructParam *construct_params)
 {
     GObject *object;
-    MMModemHsoPrivate *priv;
+    char *modem_device;
+    char *serial_device;
 
     object = G_OBJECT_CLASS (mm_modem_hso_parent_class)->constructor (type,
                                                                       n_construct_params,
@@ -582,49 +563,24 @@ constructor (GType type,
     if (!object)
         return NULL;
 
-    priv = MM_MODEM_HSO_GET_PRIVATE (object);
+    /* Make sure both serial device and data device are provided */
+    g_object_get (object,
+                  MM_MODEM_DEVICE, &modem_device,
+                  MM_SERIAL_DEVICE, &serial_device,
+                  NULL);
 
-    if (!priv->network_device) {
+    if (!modem_device || !serial_device || !strcmp (modem_device, serial_device)) {
         g_warning ("No network device provided");
         g_object_unref (object);
-        return NULL;
+        object = NULL;
     }
+
+    g_free (modem_device);
+    g_free (serial_device);
 
     return object;
 }
 
-static void
-set_property (GObject *object, guint prop_id,
-              const GValue *value, GParamSpec *pspec)
-{
-    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (object);
-
-    switch (prop_id) {
-    case PROP_NETWORK_DEVICE:
-        /* Construct only */
-        priv->network_device = g_value_dup_string (value);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-        break;
-    }
-}
-
-static void
-get_property (GObject *object, guint prop_id,
-              GValue *value, GParamSpec *pspec)
-{
-    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (object);
-
-    switch (prop_id) {
-    case PROP_NETWORK_DEVICE:
-        g_value_set_string (value, priv->network_device);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-        break;
-    }
-}
 static void
 finalize (GObject *object)
 {
@@ -633,7 +589,6 @@ finalize (GObject *object)
     /* Clear the pending connection if necessary */
     connect_pending_done (MM_MODEM_HSO (object));
 
-    g_free (priv->network_device);
     g_regex_unref (priv->connection_enabled_regex);
     mm_serial_parser_v1_destroy (priv->std_parser);
 
@@ -650,17 +605,7 @@ mm_modem_hso_class_init (MMModemHsoClass *klass)
 
     /* Virtual methods */
     object_class->constructor = constructor;
-    object_class->set_property = set_property;
-    object_class->get_property = get_property;
     object_class->finalize = finalize;
-    /* Properties */
-    g_object_class_install_property
-        (object_class, PROP_NETWORK_DEVICE,
-         g_param_spec_string (MM_MODEM_HSO_NETWORK_DEVICE,
-                              "NetworkDevice",
-                              "Network device",
-                              NULL,
-                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
 
 GType

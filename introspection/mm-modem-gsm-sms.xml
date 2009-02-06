@@ -26,11 +26,7 @@
 	  The index of the SMS.
 	</tp:docstring>
       </arg>
-      <arg name="sms" type="(ussd)" direction="out">
-	<tp:docstring>
-	  The SMS structure containing index, number, contents and time stamp.
-	</tp:docstring>
-      </arg>
+      <arg name="sms" type="a{sv}" direction="out"/>
     </method>
 
     <method name="GetFormat">
@@ -50,17 +46,37 @@
     </method>
 
     <method name="List">
-      <arg name="result" type="a(ussd)" direction="out"/>
+      <arg name="result" type="aa{sv}" direction="out"/>
     </method>
 
     <method name="Save">
-      <arg name="number" type="s" direction="in"/>
-      <arg name="contents" type="s" direction="in"/>
-      <arg name="index" type="u" direction="out"/>
+      <arg name="properties" type="a{sv}" direction="in">
+	<tp:docstring>
+	  SMS properties to save with the following key values:
+
+	  number   : string - Phone number (mandatory)
+	  text     : string - SMS text (mandatory)
+	  smsc     : string - SMS service center number (optional)
+	  validity : uint (0..255) - Specifies when the SMS expires in SMSC (optional)
+	  class    : uint (0..3) - Message importance and location (optional)
+	</tp:docstring>
+      </arg>
+      <arg name="index" type="au" direction="out"/>
     </method>
 
     <method name="Send">
-      <arg name="result" type="u" direction="out"/>
+      <arg name="properties" type="a{sv}" direction="in">
+	<tp:docstring>
+	  SMS properties to save with the following key values:
+
+	  number   : string - Phone number (mandatory)
+	  text     : string - SMS text (mandatory)
+	  smsc     : string - SMS service center number (optional)
+	  validity : uint (0..255) - Specifies when the SMS expires in SMSC (optional)
+	  class    : uint (0..3) - Message importance and location (optional)
+	</tp:docstring>
+      </arg>
+      <arg name="result" type="au" direction="out"/>
     </method>
 
     <method name="SendFromStorage">

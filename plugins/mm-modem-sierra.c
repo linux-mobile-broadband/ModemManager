@@ -20,6 +20,7 @@ mm_modem_sierra_new (const char *data_device,
     return MM_MODEM (g_object_new (MM_TYPE_MODEM_SIERRA,
                                    MM_SERIAL_DEVICE, data_device,
                                    MM_MODEM_DRIVER, driver,
+                                   MM_MODEM_TYPE, MM_MODEM_TYPE_GSM,
                                    NULL));
 }
 

@@ -48,20 +48,12 @@ static gpointer mm_modem_mbm_parent_class = NULL;
 #define MM_MODEM_MBM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_MBM, MMModemMbmPrivate))
 
 typedef struct {
-    char *network_device;
     GRegex *boot_trig_regex;
     GRegex *msg_waiting_regex;
     GRegex *ciev_regex;
     gpointer std_parser;
     guint32 signal_quality;
 } MMModemMbmPrivate;
-
-enum {
-    PROP_0,
-    PROP_NETWORK_DEVICE,
-
-    LAST_PROP
-};
 
 MMModem *
 mm_modem_mbm_new (const char *serial_device,
@@ -76,7 +68,9 @@ mm_modem_mbm_new (const char *serial_device,
                                    MM_SERIAL_DEVICE, serial_device,
                                    MM_SERIAL_SEND_DELAY, (guint64) 10000,
                                    MM_MODEM_DRIVER, driver,
-                                   MM_MODEM_MBM_NETWORK_DEVICE, network_device,
+                                   MM_MODEM_DEVICE, network_device,
+                                   MM_MODEM_IP_METHOD, MM_MODEM_IP_METHOD_DHCP,
+                                   MM_MODEM_TYPE, MM_MODEM_TYPE_GSM,
                                    NULL));
 }
 
@@ -460,7 +454,8 @@ constructor (GType type,
              GObjectConstructParam *construct_params)
 {
     GObject *object;
-    MMModemMbmPrivate *priv;
+    char *modem_device;
+    char *serial_device;
 
     object = G_OBJECT_CLASS (mm_modem_mbm_parent_class)->constructor (type,
                                                                       n_construct_params,
@@ -468,55 +463,29 @@ constructor (GType type,
     if (!object)
         return NULL;
 
-    priv = MM_MODEM_MBM_GET_PRIVATE (object);
+    /* Make sure both serial device and data device are provided */
+    g_object_get (object,
+                  MM_MODEM_DEVICE, &modem_device,
+                  MM_SERIAL_DEVICE, &serial_device,
+                  NULL);
 
-    if (!priv->network_device) {
+    if (!modem_device || !serial_device || !strcmp (modem_device, serial_device)) {
         g_warning ("No network device provided");
         g_object_unref (object);
-        return NULL;
+        object = NULL;
     }
+
+    g_free (modem_device);
+    g_free (serial_device);
 
     return object;
 }
 
 static void
-set_property (GObject *object, guint prop_id,
-              const GValue *value, GParamSpec *pspec)
-{
-    MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (object);
-
-    switch (prop_id) {
-    case PROP_NETWORK_DEVICE:
-        /* Construct only */
-        priv->network_device = g_value_dup_string (value);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-        break;
-    }
-}
-
-static void
-get_property (GObject *object, guint prop_id,
-              GValue *value, GParamSpec *pspec)
-{
-    MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (object);
-
-    switch (prop_id) {
-    case PROP_NETWORK_DEVICE:
-        g_value_set_string (value, priv->network_device);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-        break;
-    }
-}
-static void
 finalize (GObject *object)
 {
     MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (object);
 
-    g_free (priv->network_device);
     mm_serial_parser_v1_destroy (priv->std_parser);
     g_regex_unref (priv->boot_trig_regex);
     g_regex_unref (priv->msg_waiting_regex);
@@ -535,17 +504,7 @@ mm_modem_mbm_class_init (MMModemMbmClass *klass)
 
     /* Virtual methods */
     object_class->constructor = constructor;
-    object_class->set_property = set_property;
-    object_class->get_property = get_property;
     object_class->finalize = finalize;
-    /* Properties */
-    g_object_class_install_property
-        (object_class, PROP_NETWORK_DEVICE,
-         g_param_spec_string (MM_MODEM_MBM_NETWORK_DEVICE,
-                              "NetworkDevice",
-                              "Network device",
-                              NULL,
-                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
 
 GType

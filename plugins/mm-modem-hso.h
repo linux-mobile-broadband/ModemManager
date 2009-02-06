@@ -12,8 +12,6 @@
 #define MM_IS_MODEM_HSO_CLASS(klass)	(G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_MODEM_HSO))
 #define MM_MODEM_HSO_GET_CLASS(obj)	(G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_MODEM_HSO, MMModemHsoClass))
 
-#define MM_MODEM_HSO_NETWORK_DEVICE "network-device"
-
 typedef struct {
     MMGenericGsm parent;
 } MMModemHso;
@@ -21,13 +19,6 @@ typedef struct {
 typedef struct {
     MMGenericGsmClass parent;
 } MMModemHsoClass;
-
-typedef void (*MMModemHsoIp4Fn) (MMModemHso *modem,
-                                 guint32 address,
-                                 GArray *dns,
-                                 GError *error,
-                                 gpointer user_data);
-
 
 GType mm_modem_hso_get_type (void);
 
@@ -40,10 +31,5 @@ void mm_hso_modem_authenticate (MMModemHso *self,
                                 const char *password,
                                 MMModemFn callback,
                                 gpointer user_data);
-
-void mm_hso_modem_get_ip4_config (MMModemHso *self,
-                                  MMModemHsoIp4Fn callback,
-                                  gpointer user_data);
-
 
 #endif /* MM_MODEM_HSO_H */

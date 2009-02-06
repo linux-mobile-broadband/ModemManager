@@ -9,6 +9,7 @@
 static void impl_modem_enable (MMModem *modem, gboolean enable, DBusGMethodInvocation *context);
 static void impl_modem_connect (MMModem *modem, const char *number, DBusGMethodInvocation *context);
 static void impl_modem_disconnect (MMModem *modem, DBusGMethodInvocation *context);
+static void impl_modem_get_ip4_config (MMModem *modem, DBusGMethodInvocation *context);
 
 #include "mm-modem-glue.h"
 
@@ -83,6 +84,97 @@ impl_modem_connect (MMModem *modem,
     mm_modem_connect (modem, number, async_call_done, context);
 }
 
+static void
+get_ip4_invoke (MMCallbackInfo *info)
+{
+    MMModemIp4Fn callback = (MMModemIp4Fn) info->callback;
+
+    callback (info->modem,
+              GPOINTER_TO_UINT (mm_callback_info_get_data (info, "ip4-address")),
+              (GArray *) mm_callback_info_get_data (info, "ip4-dns"),
+              info->error, info->user_data);
+}
+
+void
+mm_modem_get_ip4_config (MMModem *self,
+                         MMModemIp4Fn callback,
+                         gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM (self));
+    g_return_if_fail (callback != NULL);
+
+    if (MM_MODEM_GET_INTERFACE (self)->get_ip4_config)
+        MM_MODEM_GET_INTERFACE (self)->get_ip4_config (self, callback, user_data);
+    else {
+        MMCallbackInfo *info;
+
+        info = mm_callback_info_new_full (self,
+                                          get_ip4_invoke,
+                                          G_CALLBACK (callback),
+                                          user_data);
+
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                           "Operation not supported");
+        mm_callback_info_schedule (info);
+    }
+}
+
+static void
+value_array_add_uint (GValueArray *array, guint32 i)
+{
+    GValue value = { 0, };
+
+    g_value_init (&value, G_TYPE_UINT);
+    g_value_set_uint (&value, i);
+    g_value_array_append (array, &value);
+    g_value_unset (&value);
+}
+
+static void
+get_ip4_done (MMModem *modem,
+              guint32 address,
+              GArray *dns,
+              GError *error,
+              gpointer user_data)
+{
+    DBusGMethodInvocation *context = (DBusGMethodInvocation *) user_data;
+
+    if (error)
+        dbus_g_method_return_error (context, error);
+    else {
+        GValueArray *array;
+        guint32 dns1 = 0;
+        guint32 dns2 = 0;
+        guint32 dns3 = 0;
+
+        array = g_value_array_new (4);
+
+        if (dns) {
+            if (dns->len > 0)
+
+                dns1 = g_array_index (dns, guint32, 0);
+            if (dns->len > 1)
+                dns2 = g_array_index (dns, guint32, 1);
+            if (dns->len > 2)
+                dns3 = g_array_index (dns, guint32, 2);
+        }
+
+        value_array_add_uint (array, address);
+        value_array_add_uint (array, dns1);
+        value_array_add_uint (array, dns2);
+        value_array_add_uint (array, dns3);
+
+        dbus_g_method_return (context, array);
+    }
+}
+
+static void
+impl_modem_get_ip4_config (MMModem *modem,
+                           DBusGMethodInvocation *context)
+{
+    mm_modem_get_ip4_config (modem, get_ip4_done, context);
+}
+
 void
 mm_modem_disconnect (MMModem *self,
                      MMModemFn callback,
@@ -118,9 +210,9 @@ mm_modem_init (gpointer g_iface)
     /* Properties */
     g_object_interface_install_property
         (g_iface,
-         g_param_spec_string (MM_MODEM_DATA_DEVICE,
-                              "DataDevice",
-                              "DataDevice",
+         g_param_spec_string (MM_MODEM_DEVICE,
+                              "Device",
+                              "Device",
                               NULL,
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
@@ -138,6 +230,16 @@ mm_modem_init (gpointer g_iface)
                             "Type",
                             "Type",
                             0, G_MAXUINT32, 0,
+                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_uint (MM_MODEM_IP_METHOD,
+                            "IP method",
+                            "IP configuration method",
+                            MM_MODEM_IP_METHOD_PPP,
+                            MM_MODEM_IP_METHOD_DHCP,
+                            MM_MODEM_IP_METHOD_PPP,
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     initialized = TRUE;

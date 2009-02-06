@@ -20,6 +20,8 @@ typedef struct {
     char *data_device;
     char *oper_code;
     char *oper_name;
+    guint32 modem_type;
+    guint32 ip_method;
     MMModemGsmNetworkRegStatus reg_status;
     guint32 signal_quality;
     guint32 cid;
@@ -40,6 +42,7 @@ mm_generic_gsm_new (const char *serial_device, const char *driver)
     return MM_MODEM (g_object_new (MM_TYPE_GENERIC_GSM,
                                    MM_SERIAL_DEVICE, serial_device,
                                    MM_MODEM_DRIVER, driver,
+                                   MM_MODEM_TYPE, MM_MODEM_TYPE_GSM,
                                    NULL));
 }
 
@@ -1121,9 +1124,10 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
     gboolean need_pin = FALSE;
 
     if (error) {
-        if (state == SIMPLE_STATE_CHECK_PIN && g_error_matches (error, MM_MOBILE_ERROR, MM_MOBILE_ERROR_SIM_PIN))
+        if (state == g_error_matches (error, MM_MOBILE_ERROR, MM_MOBILE_ERROR_SIM_PIN)) {
             need_pin = TRUE;
-        else {
+            state = SIMPLE_STATE_CHECK_PIN;
+        } else {
             info->error = g_error_copy (error);
             goto out;
         }
@@ -1379,11 +1383,15 @@ set_property (GObject *object, guint prop_id,
         /* Construct only */
         priv->driver = g_value_dup_string (value);
         break;
-    case MM_MODEM_PROP_DATA_DEVICE:
+    case MM_MODEM_PROP_DEVICE:
         g_free (priv->data_device);
         priv->data_device = g_value_dup_string (value);
         break;
     case MM_MODEM_PROP_TYPE:
+        priv->modem_type = g_value_get_uint (value);
+        break;
+    case MM_MODEM_PROP_IP_METHOD:
+        priv->ip_method = g_value_get_uint (value);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1398,7 +1406,7 @@ get_property (GObject *object, guint prop_id,
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (object);
 
     switch (prop_id) {
-    case MM_MODEM_PROP_DATA_DEVICE:
+    case MM_MODEM_PROP_DEVICE:
         if (priv->data_device)
             g_value_set_string (value, priv->data_device);
         else
@@ -1408,7 +1416,10 @@ get_property (GObject *object, guint prop_id,
         g_value_set_string (value, MM_GENERIC_GSM_GET_PRIVATE (object)->driver);
         break;
     case MM_MODEM_PROP_TYPE:
-        g_value_set_uint (value, MM_MODEM_TYPE_GSM);
+        g_value_set_uint (value, priv->modem_type);
+        break;
+    case MM_MODEM_PROP_IP_METHOD:
+        g_value_set_uint (value, priv->ip_method);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1444,8 +1455,8 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
 
     /* Properties */
     g_object_class_override_property (object_class,
-                                      MM_MODEM_PROP_DATA_DEVICE,
-                                      MM_MODEM_DATA_DEVICE);
+                                      MM_MODEM_PROP_DEVICE,
+                                      MM_MODEM_DEVICE);
 
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_DRIVER,
@@ -1454,6 +1465,11 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_TYPE,
                                       MM_MODEM_TYPE);
+
+    g_object_class_override_property (object_class,
+                                      MM_MODEM_PROP_IP_METHOD,
+                                      MM_MODEM_IP_METHOD);
+
 }
 
 GType

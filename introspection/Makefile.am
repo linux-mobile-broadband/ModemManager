@@ -8,7 +8,6 @@ EXTRA_DIST = \
 	mm-modem-gsm-card.xml \
 	mm-modem-gsm-contacts.xml \
 	mm-modem-gsm-hso.xml \
-	mm-modem-gsm-mbm.xml \
 	mm-modem-gsm-network.xml \
 	mm-modem-gsm-sms.xml \
 	mm-modem-simple.xml \

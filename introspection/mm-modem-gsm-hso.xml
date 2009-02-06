@@ -15,26 +15,5 @@
 	The password.
       </arg>
     </method>
-
-    <method name="GetIP4Config">
-      <tp:docstring>
-	Request the IP4 configuration from the device.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_hso_get_ip4_config"/>
-      <arg name="address" type="u" direction="out">
-	The IP4 address.
-      </arg>
-      <arg name="dns" type="au" direction="out">
-	The DNS addresses.
-      </arg>
-    </method>
-
-    <property name="NetworkDevice" type="s" access="read">
-      <tp:docstring>
-	The network device.
-      </tp:docstring>
-    </property>
-
   </interface>
 </node>
