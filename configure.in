@@ -1,6 +1,6 @@
 AC_PREREQ(2.52)
 
-AC_INIT(ModemManager, 0.1, tambet@gmail.com, ModemManager)
+AC_INIT(ModemManager, 0.2, tambet@gmail.com, ModemManager)
 AM_INIT_AUTOMAKE([])
 AM_MAINTAINER_MODE
 

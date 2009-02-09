@@ -41,8 +41,6 @@
 #include "mm-callback-info.h"
 #include "mm-util.h"
 
-#include "mm-modem-gsm-mbm-glue.h"
-
 static gpointer mm_modem_mbm_parent_class = NULL;
 
 #define MM_MODEM_MBM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_MBM, MMModemMbmPrivate))
