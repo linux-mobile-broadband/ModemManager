@@ -207,7 +207,7 @@ add_modem (MMManager *manager, const char *udi, MMModem *modem)
     g_hash_table_insert (priv->modems, g_strdup (udi), modem);
     dbus_g_connection_register_g_object (priv->connection, udi, G_OBJECT (modem));
 
-    g_signal_emit (manager, signals[DEVICE_ADDED], 0, udi);
+    g_signal_emit (manager, signals[DEVICE_ADDED], 0, modem);
 }
 
 static MMModem *
@@ -351,7 +351,7 @@ device_removed (LibHalContext *ctx, const char *udi)
     modem = modem_exists (manager, udi);
     if (modem) {
         g_debug ("Removed modem %s", udi);
-        g_signal_emit (manager, signals[DEVICE_REMOVED], 0, udi);
+        g_signal_emit (manager, signals[DEVICE_REMOVED], 0, modem);
         g_hash_table_remove (MM_MANAGER_GET_PRIVATE (manager)->modems, udi);
     }
 }
@@ -439,9 +439,9 @@ mm_manager_class_init (MMManagerClass *manager_class)
                       G_SIGNAL_RUN_FIRST,
                       G_STRUCT_OFFSET (MMManagerClass, device_added),
                       NULL, NULL,
-                      g_cclosure_marshal_VOID__STRING,
-                      G_TYPE_NONE, 1,
-                      G_TYPE_STRING);
+                      g_cclosure_marshal_VOID__OBJECT,
+					  G_TYPE_NONE, 1,
+					  G_TYPE_OBJECT);
 
     signals[DEVICE_REMOVED] =
         g_signal_new ("device-removed",
@@ -449,9 +449,9 @@ mm_manager_class_init (MMManagerClass *manager_class)
                       G_SIGNAL_RUN_FIRST,
                       G_STRUCT_OFFSET (MMManagerClass, device_removed),
                       NULL, NULL,
-                      g_cclosure_marshal_VOID__STRING,
+                      g_cclosure_marshal_VOID__OBJECT,
                       G_TYPE_NONE, 1,
-                      G_TYPE_STRING);
+                      G_TYPE_OBJECT);
 
     dbus_g_object_type_install_info (G_TYPE_FROM_CLASS (manager_class),
 									 &dbus_glib_mm_manager_object_info);
