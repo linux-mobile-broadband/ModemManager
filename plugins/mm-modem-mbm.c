@@ -336,16 +336,16 @@ get_signal_quality_done (MMSerial *serial,
     else if (!strncmp (reply, "+CIND: ", 7)) {
         /* Got valid reply */
         int battch;
-        int signal;
+        int quality;
 
         reply += 7;
 
-        if (sscanf (reply, "%d,%d", &battch, &signal)) {
+        if (sscanf (reply, "%d,%d", &battch, &quality)) {
             /* Normalize the quality */
-            signal = signal * 100 / 5;
+            quality = quality * 100 / 5;
 
-            MM_MODEM_MBM_GET_PRIVATE (serial)->signal_quality = signal;
-            mm_callback_info_set_result (info, GUINT_TO_POINTER (signal), NULL);
+            MM_MODEM_MBM_GET_PRIVATE (serial)->signal_quality = quality;
+            mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
         } else
             info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
                                                "Could not parse signal quality results");
