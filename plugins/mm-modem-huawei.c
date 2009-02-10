@@ -128,7 +128,7 @@ parent_enable_done (MMModem *modem, GError *error, gpointer user_data)
 
 static void
 enable (MMModem *modem,
-        gboolean enable,
+        gboolean do_enable,
         MMModemFn callback,
         gpointer user_data)
 {
@@ -136,14 +136,14 @@ enable (MMModem *modem,
 
     parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (modem));
 
-    if (enable) {
+    if (do_enable) {
         MMCallbackInfo *info;
 
         info = mm_callback_info_new (modem, callback, user_data);
-        parent_modem_iface->enable (modem, enable, parent_enable_done, info);
+        parent_modem_iface->enable (modem, do_enable, parent_enable_done, info);
     } else {
         pending_registration_stop (MM_MODEM_HUAWEI (modem));
-        parent_modem_iface->enable (modem, enable, callback, user_data);
+        parent_modem_iface->enable (modem, do_enable, callback, user_data);
     }
 }
 

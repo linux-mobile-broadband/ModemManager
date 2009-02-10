@@ -1,5 +1,6 @@
 /* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
+#include <signal.h>
 #include <syslog.h>
 #include <dbus/dbus-glib.h>
 #include "mm-manager.h"

@@ -254,7 +254,7 @@ modem_enable_done (MMSerial *serial,
 
 static void
 enable (MMModem *modem,
-        gboolean enable,
+        gboolean do_enable,
         MMModemFn callback,
         gpointer user_data)
 {
@@ -263,7 +263,7 @@ enable (MMModem *modem,
     info = mm_callback_info_new (modem, callback, user_data);
     mm_callback_info_set_data (info, "enable", GINT_TO_POINTER (enable), NULL);
 
-    if (enable)
+    if (do_enable)
         modem_enable_done (MM_SERIAL (modem), NULL, NULL, info);
     else
         mm_serial_queue_command (MM_SERIAL (modem), "AT_OWANCALL=1,0,0", 3, modem_enable_done, info);
@@ -325,28 +325,29 @@ get_ip4_config_done (MMSerial *serial,
     dns_array = g_array_sized_new (FALSE, TRUE, sizeof (guint32), 2);
     items = g_strsplit (response->str + strlen (OWANDATA_TAG), ", ", 0);
 
-	for (iter = items, i = 0; *iter; iter++, i++) {
-		if (i == 0) { /* CID */
-			long int tmp;
+    for (iter = items, i = 0; *iter; iter++, i++) {
+        if (i == 0) { /* CID */
+            long int num;
 
-			errno = 0;
-			tmp = strtol (*iter, NULL, 10);
-			if (errno != 0 || tmp < 0 || (guint) tmp != cid) {
-				info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                           "Unknown CID in OWANDATA response (got %d, expected %d)", (guint) tmp, cid);
-				break;
-			}
-		} else if (i == 1) { /* IP address */
-			if (inet_pton (AF_INET, *iter, &tmp) > 0)
+            errno = 0;
+            num = strtol (*iter, NULL, 10);
+            if (errno != 0 || num < 0 || (guint) num != cid) {
+                info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                           "Unknown CID in OWANDATA response ("
+                                           "got %d, expected %d)", (guint) num, cid);
+                break;
+            }
+        } else if (i == 1) { /* IP address */
+            if (inet_pton (AF_INET, *iter, &tmp) > 0)
                 mm_callback_info_set_data (info, "ip4-address", GUINT_TO_POINTER (tmp), NULL);
-		} else if (i == 3) { /* DNS 1 */
-			if (inet_pton (AF_INET, *iter, &tmp) > 0)
-				g_array_append_val (dns_array, tmp);
-		} else if (i == 4) { /* DNS 2 */
-			if (inet_pton (AF_INET, *iter, &tmp) > 0)
-				g_array_append_val (dns_array, tmp);
-		}
-	}
+        } else if (i == 3) { /* DNS 1 */
+            if (inet_pton (AF_INET, *iter, &tmp) > 0)
+                g_array_append_val (dns_array, tmp);
+        } else if (i == 4) { /* DNS 2 */
+            if (inet_pton (AF_INET, *iter, &tmp) > 0)
+                g_array_append_val (dns_array, tmp);
+        }
+    }
 
     g_strfreev (items);
     mm_callback_info_set_data (info, "ip4-dns", dns_array, free_dns_array);

@@ -45,4 +45,6 @@ typedef struct {
 
 GType mm_plugin_mbm_get_type (void);
 
+G_MODULE_EXPORT MMPlugin *mm_plugin_create (void);
+
 #endif /* MM_PLUGIN_MBM_H */

@@ -85,7 +85,7 @@ impl_modem_simple_connect (MMModemSimple *self,
 }
 
 static void
-get_status_done (MMModem *modem, 
+get_status_done (MMModemSimple *modem,
                  GHashTable *properties,
                  GError *error,
                  gpointer user_data)

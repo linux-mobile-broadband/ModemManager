@@ -93,7 +93,8 @@ mm_serial_parser_v0_parse (gpointer data,
         if (str) {
             code = atoi (str);
             g_free (str);
-        }
+        } else
+            code = MM_MOBILE_ERROR_UNKNOWN;
 
         g_match_info_free (match_info);
 

@@ -65,7 +65,7 @@ parent_enable_done (MMModem *modem, GError *error, gpointer user_data)
 
 static void
 enable (MMModem *modem,
-        gboolean enable,
+        gboolean do_enable,
         MMModemFn callback,
         gpointer user_data)
 {
@@ -73,10 +73,10 @@ enable (MMModem *modem,
     MMCallbackInfo *info;
 
     info = mm_callback_info_new (modem, callback, user_data);
-    mm_callback_info_set_data (info, "option-enable", GINT_TO_POINTER (enable), NULL);
+    mm_callback_info_set_data (info, "option-enable", GINT_TO_POINTER (do_enable), NULL);
 
     parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (modem));
-    parent_modem_iface->enable (modem, enable, parent_enable_done, info);
+    parent_modem_iface->enable (modem, do_enable, parent_enable_done, info);
 }
 
 static void

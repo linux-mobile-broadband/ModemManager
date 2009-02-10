@@ -82,7 +82,7 @@ disable_flash_done (MMSerial *serial, gpointer user_data)
 
 static void
 enable (MMModem *modem,
-        gboolean enable,
+        gboolean do_enable,
         MMModemFn callback,
         gpointer user_data)
 {
@@ -92,9 +92,9 @@ enable (MMModem *modem,
     mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
 
     info = mm_callback_info_new (modem, callback, user_data);
-    mm_callback_info_set_data (info, "sierra-enable", GINT_TO_POINTER (enable), NULL);
+    mm_callback_info_set_data (info, "sierra-enable", GINT_TO_POINTER (do_enable), NULL);
 
-    if (!enable) {
+    if (!do_enable) {
         if (mm_serial_is_connected (MM_SERIAL (modem)))
             mm_serial_flash (MM_SERIAL (modem), 1000, disable_flash_done, info);
         else

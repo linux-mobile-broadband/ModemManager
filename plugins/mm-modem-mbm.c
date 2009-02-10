@@ -234,7 +234,7 @@ disable_flash_done (MMSerial *serial, gpointer user_data)
 
 static void
 enable (MMModem *modem,
-        gboolean enable,
+        gboolean do_enable,
         MMModemFn callback,
         gpointer user_data)
 {
@@ -245,7 +245,7 @@ enable (MMModem *modem,
 
     info = mm_callback_info_new (modem, callback, user_data);
 
-    if (!enable) {
+    if (!do_enable) {
         if (mm_serial_is_connected (MM_SERIAL (modem)))
             mm_serial_flash (MM_SERIAL (modem), 1000, disable_flash_done, info);
         else

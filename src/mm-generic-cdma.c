@@ -77,7 +77,7 @@ flash_done (MMSerial *serial, gpointer user_data)
 
 static void
 enable (MMModem *modem,
-        gboolean enable,
+        gboolean do_enable,
         MMModemFn callback,
         gpointer user_data)
 {
@@ -85,7 +85,7 @@ enable (MMModem *modem,
 
     info = mm_callback_info_new (modem, callback, user_data);
 
-    if (!enable) {
+    if (!do_enable) {
         mm_serial_close (MM_SERIAL (modem));
         mm_callback_info_schedule (info);
         return;
