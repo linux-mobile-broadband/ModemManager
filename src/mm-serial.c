@@ -476,7 +476,13 @@ data_available (GIOChannel *source,
     gsize bytes_read;
     GIOStatus status;
 
-    if (condition & G_IO_HUP || condition & G_IO_ERR) {
+    if (condition & G_IO_HUP) {
+        g_string_truncate (priv->response, 0);
+        mm_serial_close (self);
+        return FALSE;
+    }
+
+    if (condition & G_IO_ERR) {
         g_string_truncate (priv->response, 0);
         return TRUE;
     }
