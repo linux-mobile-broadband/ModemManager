@@ -38,9 +38,7 @@ modem_manager_SOURCES = \
 	mm-serial.c \
 	mm-serial.h \
 	mm-serial-parsers.c \
-	mm-serial-parsers.h \
-	mm-util.c \
-	mm-util.h
+	mm-serial-parsers.h
 
 mm-manager-glue.h: $(top_srcdir)/introspection/mm-manager.xml
 	dbus-binding-tool --prefix=mm_manager --mode=glib-server --output=$@ $<

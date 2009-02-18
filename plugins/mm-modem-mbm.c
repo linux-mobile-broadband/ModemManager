@@ -39,17 +39,12 @@
 #include "mm-serial-parsers.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
-#include "mm-util.h"
 
 static gpointer mm_modem_mbm_parent_class = NULL;
 
 #define MM_MODEM_MBM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_MBM, MMModemMbmPrivate))
 
 typedef struct {
-    GRegex *boot_trig_regex;
-    GRegex *msg_waiting_regex;
-    GRegex *ciev_regex;
-    gpointer std_parser;
     guint32 signal_quality;
 } MMModemMbmPrivate;
 
@@ -374,28 +369,34 @@ get_signal_quality (MMModemGsmNetwork *modem,
 /*****************************************************************************/
 
 static void
-boot_trig (const char *str, gpointer data)
+boot_trig (MMSerial *serial,
+           GMatchInfo *match_info,
+           gpointer user_data)
 {
-    mm_serial_queue_command (MM_SERIAL(data), "AT*ENAP=1,1", 10, NULL, NULL);
+    mm_serial_queue_command (serial, "AT*ENAP=1,1", 10, NULL, NULL);
 }
 
 static void
-ciev_trig (const char *str, gpointer data)
+ciev_trig (MMSerial *serial,
+           GMatchInfo *match_info,
+           gpointer user_data)
 {
+    char *str;
     int event, value;
     guint32 quality;
 
-    if (!str) {
-        return;
-    }
-
+    str = g_match_info_fetch (match_info, 1);
     event = str[0] - '0';
-    value = str[2] - '0';
+    g_free (str);
+
+    str = g_match_info_fetch (match_info, 2);
+    value = str[0] - '0';
+    g_free (str);
 
     switch (event) {
     case 2: /* signal quality, value 0-5 */
         quality = value * 100 / 5;
-        mm_modem_gsm_network_signal_quality (MM_MODEM_GSM_NETWORK (data), quality);
+        mm_modem_gsm_network_signal_quality (MM_MODEM_GSM_NETWORK (serial), quality);
         break;
     case 9: /* roaming, value 0 or 1 */
         g_debug ("%s: roaming %s\n", __FUNCTION__, value ? "active" : "inactive");
@@ -405,30 +406,22 @@ ciev_trig (const char *str, gpointer data)
     }
 }
 
-static gboolean
-mbm_parse_response (gpointer data, GString *response, GError **error)
-{
-    MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (data);
-
-    mm_util_strip_string (response, priv->boot_trig_regex, boot_trig, data);
-    mm_util_strip_string (response, priv->ciev_regex, ciev_trig, data);
-    mm_util_strip_string (response, priv->msg_waiting_regex, NULL, data);
-
-    return mm_serial_parser_v1_parse (priv->std_parser, response, error);
-}
-
 static void
 mm_modem_mbm_init (MMModemMbm *self)
 {
-    MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (self);
+    GRegex *regex;
 
-    priv->boot_trig_regex = g_regex_new ("\\r\\n\\+PACSP0\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    priv->msg_waiting_regex = g_regex_new ("\\r\\n[\\*]EMWI\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    priv->ciev_regex = g_regex_new ("\\r\\n\\+CIEV: (.,.)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    regex = g_regex_new ("\\r\\n\\+PACSP0\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    mm_serial_add_unsolicited_msg_handler (MM_SERIAL (self), regex, boot_trig, NULL, NULL);
+    g_regex_unref (regex);
 
-    priv->std_parser = (gpointer) mm_serial_parser_v1_new ();
+    regex = g_regex_new ("\\r\\n[\\*]EMWI\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    mm_serial_add_unsolicited_msg_handler (MM_SERIAL (self), regex, NULL, NULL, NULL);
+    g_regex_unref (regex);
 
-    mm_serial_set_response_parser (MM_SERIAL (self), mbm_parse_response, self, NULL);
+    regex = g_regex_new ("\\r\\n\\+CIEV: (\\d),(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    mm_serial_add_unsolicited_msg_handler (MM_SERIAL (self), regex, ciev_trig, NULL, NULL);
+    g_regex_unref (regex);
 }
 
 static void
@@ -480,19 +473,6 @@ constructor (GType type,
 }
 
 static void
-finalize (GObject *object)
-{
-    MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (object);
-
-    mm_serial_parser_v1_destroy (priv->std_parser);
-    g_regex_unref (priv->boot_trig_regex);
-    g_regex_unref (priv->msg_waiting_regex);
-    g_regex_unref (priv->ciev_regex);
-
-    G_OBJECT_CLASS (mm_modem_mbm_parent_class)->finalize (object);
-}
-
-static void
 mm_modem_mbm_class_init (MMModemMbmClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
@@ -502,7 +482,6 @@ mm_modem_mbm_class_init (MMModemMbmClass *klass)
 
     /* Virtual methods */
     object_class->constructor = constructor;
-    object_class->finalize = finalize;
 }
 
 GType

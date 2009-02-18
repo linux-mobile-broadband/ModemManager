@@ -12,7 +12,6 @@
 #include "mm-serial.h"
 #include "mm-serial-parsers.h"
 #include "mm-errors.h"
-#include "mm-util.h"
 #include "mm-callback-info.h"
 
 static void impl_hso_authenticate (MMModemHso *self,
@@ -27,9 +26,6 @@ static gpointer mm_modem_hso_parent_class = NULL;
 #define MM_MODEM_HSO_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_HSO, MMModemHsoPrivate))
 
 typedef struct {
-    GRegex *connection_enabled_regex;
-    gpointer std_parser;
-
     /* Pending connection attempt */
     MMCallbackInfo *connect_pending_data;
     guint connect_pending_id;
@@ -412,25 +408,20 @@ impl_hso_authenticate (MMModemHso *self,
 }
 
 static void
-connection_enabled (const char *str, gpointer data)
+connection_enabled (MMSerial *serial,
+                    GMatchInfo *info,
+                    gpointer user_data)
 {
-    if (str && strlen (str) == 4) {
-        if (str[3] == '1')
-            connect_pending_done (MM_MODEM_HSO (data));
-        if (str[3] == '0')
-            /* FIXME: disconnected. do something when we have modem status signals */
-            ;
-    }
-}
+    char *str;
 
-static gboolean
-hso_parse_response (gpointer data, GString *response, GError **error)
-{
-    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (data);
+    str = g_match_info_fetch (info, 2);
+    if (str[0] == '1')
+        connect_pending_done (MM_MODEM_HSO (serial));
+    else if (str[0] == '0')
+        /* FIXME: disconnected. do something when we have modem status signals */
+        ;
 
-    mm_util_strip_string (response, priv->connection_enabled_regex, connection_enabled, data);
-
-    return mm_serial_parser_v1_parse (priv->std_parser, response, error);
+    g_free (str);
 }
 
 /*****************************************************************************/
@@ -525,13 +516,13 @@ simple_connect (MMModemSimple *simple,
 static void
 mm_modem_hso_init (MMModemHso *self)
 {
-    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (self);
+    GRegex *regex;
 
-    priv->connection_enabled_regex = g_regex_new ("_OWANCALL: (\\d, \\d)\\r\\n",
-                                                  G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    mm_generic_gsm_set_unsolicited_registration (MM_GENERIC_GSM (self), TRUE);
 
-    priv->std_parser = (gpointer) mm_serial_parser_v1_new ();
-    mm_serial_set_response_parser (MM_SERIAL (self), hso_parse_response, self, NULL);
+    regex = g_regex_new ("_OWANCALL: (\\d), (\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    mm_serial_add_unsolicited_msg_handler (MM_SERIAL (self), regex, connection_enabled, NULL, NULL);
+    g_regex_unref (regex);
 }
 
 static void
@@ -585,13 +576,8 @@ constructor (GType type,
 static void
 finalize (GObject *object)
 {
-    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (object);
-
     /* Clear the pending connection if necessary */
     connect_pending_done (MM_MODEM_HSO (object));
-
-    g_regex_unref (priv->connection_enabled_regex);
-    mm_serial_parser_v1_destroy (priv->std_parser);
 
     G_OBJECT_CLASS (mm_modem_hso_parent_class)->finalize (object);
 }

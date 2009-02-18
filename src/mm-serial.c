@@ -49,6 +49,7 @@ typedef struct {
     MMSerialResponseParserFn response_parser_fn;
     gpointer response_parser_user_data;
     GDestroyNotify response_parser_notify;
+    GSList *unsolicited_msg_handlers;
 
     struct termios old_t;
 
@@ -64,6 +65,13 @@ typedef struct {
     guint watch_id;
     guint timeout_id;
 } MMSerialPrivate;
+
+typedef struct {
+    GRegex *regex;
+    MMSerialUnsolicitedMsgFn callback;
+    gpointer user_data;
+    GDestroyNotify notify;
+} MMUnsolicitedMsgHandler;
 
 const char *
 mm_serial_get_device (MMSerial *serial)
@@ -436,6 +444,29 @@ mm_serial_queue_process (gpointer data)
 }
 
 void
+mm_serial_add_unsolicited_msg_handler (MMSerial *self,
+                                       GRegex *regex,
+                                       MMSerialUnsolicitedMsgFn callback,
+                                       gpointer user_data,
+                                       GDestroyNotify notify)
+{
+    MMUnsolicitedMsgHandler *handler;
+    MMSerialPrivate *priv;
+
+    g_return_if_fail (MM_IS_SERIAL (self));
+    g_return_if_fail (regex != NULL);
+
+    handler = g_slice_new (MMUnsolicitedMsgHandler);
+    handler->regex = g_regex_ref (regex);
+    handler->callback = callback;
+    handler->user_data = user_data;
+    handler->notify = notify;
+
+    priv = MM_SERIAL_GET_PRIVATE (self);
+    priv->unsolicited_msg_handlers = g_slist_append (priv->unsolicited_msg_handlers, handler);
+}
+
+void
 mm_serial_set_response_parser (MMSerial *self,
                                MMSerialResponseParserFn fn,
                                gpointer user_data,
@@ -454,6 +485,58 @@ mm_serial_set_response_parser (MMSerial *self,
 }
 
 static gboolean
+remove_eval_cb (const GMatchInfo *match_info,
+                GString *result,
+                gpointer user_data)
+{
+    int *result_len = (int *) user_data;
+    int start;
+    int end;
+
+    if (g_match_info_fetch_pos  (match_info, 0, &start, &end))
+        *result_len -= (end - start);
+
+    return FALSE;
+}
+
+static void
+parse_unsolicited_messages (MMSerial *self,
+                            GString *response)
+{
+    MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
+    GSList *iter;
+
+    for (iter = priv->unsolicited_msg_handlers; iter; iter = iter->next) {
+        MMUnsolicitedMsgHandler *handler = (MMUnsolicitedMsgHandler *) iter->data;
+        GMatchInfo *match_info;
+        gboolean matches;
+
+        matches = g_regex_match_full (handler->regex, response->str, response->len, 0, 0, &match_info, NULL);
+        if (handler->callback) {
+            while (g_match_info_matches (match_info)) {
+                handler->callback (self, match_info, handler->user_data);
+                g_match_info_next (match_info, NULL);
+            }
+        }
+
+        g_match_info_free (match_info);
+
+        if (matches) {
+            /* Remove matches */
+            char *str;
+            int result_len = response->len;
+
+            str = g_regex_replace_eval (handler->regex, response->str, response->len, 0, 0,
+                                        remove_eval_cb, &result_len, NULL);
+
+            g_string_truncate (response, 0);
+            g_string_append_len (response, str, result_len);
+            g_free (str);
+        }
+    }
+}
+
+static gboolean
 parse_response (MMSerial *self,
                 GString *response,
                 GError **error)
@@ -461,6 +544,8 @@ parse_response (MMSerial *self,
     MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
 
     g_return_val_if_fail (priv->response_parser_fn != NULL, FALSE);
+
+    parse_unsolicited_messages (self, response);
 
     return priv->response_parser_fn (priv->response_parser_user_data, response, error);
 }
@@ -840,6 +925,18 @@ finalize (GObject *object)
     g_string_free (priv->command, TRUE);
     g_string_free (priv->response, TRUE);
     g_free (priv->device);
+
+    while (priv->unsolicited_msg_handlers) {
+        MMUnsolicitedMsgHandler *handler = (MMUnsolicitedMsgHandler *) priv->unsolicited_msg_handlers->data;
+
+        if (handler->notify)
+            handler->notify (handler->user_data);
+
+        g_regex_unref (handler->regex);
+        g_slice_free (MMUnsolicitedMsgHandler, handler);
+        priv->unsolicited_msg_handlers = g_slist_delete_link (priv->unsolicited_msg_handlers,
+                                                              priv->unsolicited_msg_handlers);
+    }
 
     if (priv->response_parser_notify)
         priv->response_parser_notify (priv->response_parser_user_data);

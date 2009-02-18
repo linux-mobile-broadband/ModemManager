@@ -3,6 +3,7 @@
 #ifndef MM_SERIAL_H
 #define MM_SERIAL_H
 
+#include <glib.h>
 #include <glib/gtypes.h>
 #include <glib-object.h>
 
@@ -28,6 +29,10 @@ typedef gboolean (*MMSerialResponseParserFn) (gpointer user_data,
                                               GString *response,
                                               GError **error);
 
+typedef void (*MMSerialUnsolicitedMsgFn) (MMSerial *serial,
+                                          GMatchInfo *match_info,
+                                          gpointer user_data);
+
 typedef void (*MMSerialResponseFn)     (MMSerial *serial,
                                         GString *response,
                                         GError *error,
@@ -45,6 +50,12 @@ struct _MMSerialClass {
 };
 
 GType mm_serial_get_type (void);
+
+void     mm_serial_add_unsolicited_msg_handler (MMSerial *self,
+                                                GRegex *regex,
+                                                MMSerialUnsolicitedMsgFn callback,
+                                                gpointer user_data,
+                                                GDestroyNotify notify);
 
 void     mm_serial_set_response_parser (MMSerial *self,
                                         MMSerialResponseParserFn fn,
