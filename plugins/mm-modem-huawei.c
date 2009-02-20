@@ -472,6 +472,10 @@ mm_modem_huawei_init (MMModemHuawei *self)
     regex = g_regex_new ("\\r\\n\\^DSFLOWRPT:(.+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     mm_serial_add_unsolicited_msg_handler (MM_SERIAL (self), regex, handle_status_change, NULL, NULL);
     g_regex_unref (regex);
+
+    regex = g_regex_new ("\\r\\n\\^BOOT:.+\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    mm_serial_add_unsolicited_msg_handler (MM_SERIAL (self), regex, NULL, NULL, NULL);
+    g_regex_unref (regex);
 }
 
 static void
