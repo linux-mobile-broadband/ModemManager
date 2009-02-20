@@ -270,7 +270,7 @@ get_imei (MMModemGsmCard *modem,
     MMCallbackInfo *info;
 
     info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
-    mm_serial_queue_command (MM_SERIAL (modem), "+CGSN", 3, get_string_done, info);
+    mm_serial_queue_command_cached (MM_SERIAL (modem), "+CGSN", 3, get_string_done, info);
 }
 
 static void
@@ -281,7 +281,7 @@ get_imsi (MMModemGsmCard *modem,
     MMCallbackInfo *info;
 
     info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
-    mm_serial_queue_command (MM_SERIAL (modem), "+CIMI", 3, get_string_done, info);
+    mm_serial_queue_command_cached (MM_SERIAL (modem), "+CIMI", 3, get_string_done, info);
 }
 
 static void
@@ -346,15 +346,16 @@ get_card_info (MMModemGsmCard *modem,
                gpointer user_data)
 {
     MMCallbackInfo *info;
+    MMSerial *serial = MM_SERIAL (modem);
 
     info = mm_callback_info_new_full (MM_MODEM (modem),
                                       gsm_card_info_invoke,
                                       G_CALLBACK (callback),
                                       user_data);
 
-    mm_serial_queue_command (MM_SERIAL (modem), "+CGMI", 3, get_manufacturer_done, info);
-    mm_serial_queue_command (MM_SERIAL (modem), "+CGMM", 3, get_model_done, info);
-    mm_serial_queue_command (MM_SERIAL (modem), "+CGMR", 3, get_version_done, info);
+    mm_serial_queue_command_cached (serial, "+CGMI", 3, get_manufacturer_done, info);
+    mm_serial_queue_command_cached (serial, "+CGMM", 3, get_model_done, info);
+    mm_serial_queue_command_cached (serial, "+CGMR", 3, get_version_done, info);
 }
 
 static void
@@ -1080,7 +1081,7 @@ existing_apns_read (MMSerial *serial,
         mm_callback_info_schedule (info);
     else
         /* APN not configured on the card. Get the allowed CID range */
-        mm_serial_queue_command (serial, "+CGDCONT=?", 3, cid_range_read, info);
+        mm_serial_queue_command_cached (serial, "+CGDCONT=?", 3, cid_range_read, info);
 }
 
 static void
