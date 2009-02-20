@@ -40,6 +40,7 @@ enum {
 
 typedef struct {
     int fd;
+    GHashTable *reply_cache;
     GIOChannel *channel;
     GQueue *queue;
     GString *command;
@@ -79,6 +80,26 @@ mm_serial_get_device (MMSerial *serial)
     g_return_val_if_fail (MM_IS_SERIAL (serial), NULL);
 
     return MM_SERIAL_GET_PRIVATE (serial)->device;
+}
+
+static void
+mm_serial_set_cached_reply (MMSerial *self,
+                            const char *command,
+                            const char *reply)
+{
+    if (reply)
+        g_hash_table_insert (MM_SERIAL_GET_PRIVATE (self)->reply_cache,
+                             g_strdup (command),
+                             g_strdup (reply));
+    else
+        g_hash_table_remove (MM_SERIAL_GET_PRIVATE (self)->reply_cache, command);
+}
+
+static const char *
+mm_serial_get_cached_reply (MMSerial *self,
+                            const char *command)
+{
+    return (char *) g_hash_table_lookup (MM_SERIAL_GET_PRIVATE (self)->reply_cache, command);
 }
 
 static int
@@ -349,6 +370,7 @@ typedef struct {
     MMSerialResponseFn callback;
     gpointer user_data;
     guint32 timeout;
+    gboolean cached;
 } MMQueueData;
 
 static void
@@ -379,6 +401,9 @@ mm_serial_got_response (MMSerial *self, GError *error)
 
     info = (MMQueueData *) g_queue_pop_head (priv->queue);
     if (info) {
+        if (info->cached && !error)
+            mm_serial_set_cached_reply (self, info->command, priv->response->str);
+
         if (info->callback)
             info->callback (self, priv->response, error, info->user_data);
 
@@ -427,6 +452,16 @@ mm_serial_queue_process (gpointer data)
     info = (MMQueueData *) g_queue_peek_head (priv->queue);
     if (!info)
         return FALSE;
+
+    if (info->cached) {
+        const char *cached = mm_serial_get_cached_reply (self, info->command);
+
+        if (cached) {
+            g_string_append (priv->response, cached);
+            mm_serial_got_response (self, NULL);
+            return FALSE;
+        }
+    }
 
     if (mm_serial_send_command (self, info->command, &error)) {
         GSource *source;
@@ -671,12 +706,13 @@ mm_serial_close (MMSerial *self)
     }
 }
 
-void
-mm_serial_queue_command (MMSerial *self,
-                         const char *command,
-                         guint32 timeout_seconds,
-                         MMSerialResponseFn callback,
-                         gpointer user_data)
+static void
+internal_queue_command (MMSerial *self,
+                        const char *command,
+                        gboolean cached,
+                        guint32 timeout_seconds,
+                        MMSerialResponseFn callback,
+                        gpointer user_data)
 {
     MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
     MMQueueData *info;
@@ -686,14 +722,39 @@ mm_serial_queue_command (MMSerial *self,
 
     info = g_slice_new0 (MMQueueData);
     info->command = g_strdup (command);
+    info->cached = cached;
     info->timeout = timeout_seconds * 1000;
     info->callback = callback;
     info->user_data = user_data;
+
+    /* Clear the cached value for this command if not asking for cached value */
+    if (!cached)
+        mm_serial_set_cached_reply (self, command, NULL);
 
     g_queue_push_tail (priv->queue, info);
 
     if (g_queue_get_length (priv->queue) == 1)
         mm_serial_schedule_queue_process (self);
+}
+
+void
+mm_serial_queue_command (MMSerial *self,
+                         const char *command,
+                         guint32 timeout_seconds,
+                         MMSerialResponseFn callback,
+                         gpointer user_data)
+{
+    internal_queue_command (self, command, FALSE, timeout_seconds, callback, user_data);
+}
+
+void
+mm_serial_queue_command_cached (MMSerial *self,
+                                const char *command,
+                                guint32 timeout_seconds,
+                                MMSerialResponseFn callback,
+                                gpointer user_data)
+{
+    internal_queue_command (self, command, TRUE, timeout_seconds, callback, user_data);
 }
 
 typedef struct {
@@ -806,6 +867,8 @@ static void
 mm_serial_init (MMSerial *self)
 {
     MMSerialPrivate *priv = MM_SERIAL_GET_PRIVATE (self);
+
+    priv->reply_cache = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
 
     priv->baud = 57600;
     priv->bits = 8;
@@ -921,6 +984,7 @@ finalize (GObject *object)
 
     mm_serial_close (self);
 
+    g_hash_table_destroy (priv->reply_cache);
     g_queue_free (priv->queue);
     g_string_free (priv->command, TRUE);
     g_string_free (priv->response, TRUE);

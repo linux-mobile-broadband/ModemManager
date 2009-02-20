@@ -72,6 +72,12 @@ void     mm_serial_queue_command     (MMSerial *self,
                                       MMSerialResponseFn callback,
                                       gpointer user_data);
 
+void     mm_serial_queue_command_cached (MMSerial *self,
+                                         const char *command,
+                                         guint32 timeout_seconds,
+                                         MMSerialResponseFn callback,
+                                         gpointer user_data);
+
 guint    mm_serial_flash             (MMSerial *self,
                                       guint32 flash_time,
                                       MMSerialFlashFn callback,
