@@ -35,7 +35,7 @@ list_supported_udis (MMPlugin *plugin, LibHalContext *hal_ctx)
     int num_devices;
     int i;
 
-    devices = libhal_find_device_by_capability (hal_ctx, "modem", &num_devices, NULL);
+    devices = libhal_find_device_by_capability (hal_ctx, "serial", &num_devices, NULL);
     if (devices) {
         GPtrArray *array;
 
@@ -83,18 +83,26 @@ supports_udi (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
 
     driver_name = get_driver_name (hal_ctx, udi);
     if (driver_name && !strcmp (driver_name, "hso")) {
-        char **capabilities;
-        char **iter;
+        char *sysfs_path;
 
-        capabilities = libhal_device_get_property_strlist (hal_ctx, udi, "modem.command_sets", NULL);
-        for (iter = capabilities; iter && *iter && !supported; iter++) {
-            if (!strcmp (*iter, "GSM-07.07") || !strcmp (*iter, "GSM-07.05")) {
-                supported = TRUE;
-                break;
+        sysfs_path = libhal_device_get_property_string (hal_ctx, udi, "linux.sysfs_path", NULL);
+        if (sysfs_path) {
+            char *hso_type_path;
+            gchar *contents = NULL;
+            gsize length;
+
+            hso_type_path = g_build_filename (sysfs_path, "hsotype", NULL);
+            libhal_free_string (sysfs_path);
+
+            if (g_file_get_contents (hso_type_path, &contents, &length, NULL)) {
+                if (g_str_has_prefix (contents, "Control"))
+                    supported = TRUE;
+
+                g_free (contents);
             }
-        }
 
-        libhal_free_string_array (capabilities);
+            g_free (hso_type_path);
+        }
     }
 
     libhal_free_string (driver_name);
