@@ -4,6 +4,7 @@
 #include <gmodule.h>
 #include "mm-plugin-novatel.h"
 #include "mm-modem-novatel.h"
+#include "mm-generic-cdma.h"
 
 static void plugin_init (MMPlugin *plugin_class);
 
@@ -60,33 +61,50 @@ list_supported_udis (MMPlugin *plugin, LibHalContext *hal_ctx)
     return supported;
 }
 
-static gboolean
-supports_udi (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
+static void
+is_novatel_modem (LibHalContext *hal_ctx,
+                  const char *udi,
+                  gboolean *is_novatel_gsm,
+                  gboolean *is_novatel_cdma)
 {
     char **capabilities;
     char **iter;
-    gboolean supported = FALSE;
+
+    *is_novatel_gsm = *is_novatel_cdma = FALSE;
 
     capabilities = libhal_device_get_property_strlist (hal_ctx, udi, "modem.command_sets", NULL);
-    for (iter = capabilities; iter && *iter && !supported; iter++) {
-        if (!strcmp (*iter, "GSM-07.07")) {
-            char *parent_udi;
+    for (iter = capabilities; iter && *iter && !*is_novatel_gsm && !*is_novatel_cdma; iter++) {
+        char *parent_udi;
 
-            parent_udi = libhal_device_get_property_string (hal_ctx, udi, "info.parent", NULL);
-            if (parent_udi) {
-                int vendor;
+        parent_udi = libhal_device_get_property_string (hal_ctx, udi, "info.parent", NULL);
+        if (parent_udi) {
+            int vendor;
 
-                vendor = libhal_device_get_property_int (hal_ctx, parent_udi, "usb.vendor_id", NULL);
-                if (vendor == 0x1410)
-                    supported = TRUE;
-
-                libhal_free_string (parent_udi);
+            vendor = libhal_device_get_property_int (hal_ctx, parent_udi, "usb.vendor_id", NULL);
+            if (vendor == 0x1410) {
+                if (!strcmp (*iter, "GSM-07.07")) {
+                    *is_novatel_gsm = TRUE;
+                } else if (!strcmp (*iter, "IS-707-A")) {
+                    *is_novatel_cdma = TRUE;
+                }
             }
+
+            libhal_free_string (parent_udi);
         }
     }
-    g_strfreev (capabilities);
 
-    return supported;
+    g_strfreev (capabilities);
+}
+
+static gboolean
+supports_udi (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
+{
+    gboolean is_novatel_gsm = FALSE;
+    gboolean is_novatel_cdma = FALSE;
+
+    is_novatel_modem (hal_ctx, udi, &is_novatel_gsm, &is_novatel_cdma);
+
+    return is_novatel_gsm || is_novatel_cdma;
 }
 
 static char *
@@ -110,6 +128,11 @@ create_modem (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
     char *data_device;
     char *driver;
     MMModem *modem;
+    gboolean is_novatel_gsm = FALSE;
+    gboolean is_novatel_cdma = FALSE;
+
+    is_novatel_modem (hal_ctx, udi, &is_novatel_gsm, &is_novatel_cdma);
+    g_return_val_if_fail (!is_novatel_gsm && !is_novatel_cdma, NULL);
 
     data_device = libhal_device_get_property_string (hal_ctx, udi, "serial.device", NULL);
     g_return_val_if_fail (data_device != NULL, NULL);
@@ -117,7 +140,12 @@ create_modem (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
     driver = get_driver_name (hal_ctx, udi);
     g_return_val_if_fail (driver != NULL, NULL);
 
-    modem = MM_MODEM (mm_modem_novatel_new (data_device, driver));
+    if (is_novatel_gsm)
+        modem = MM_MODEM (mm_modem_novatel_new (data_device, driver));
+    else {
+        modem = MM_MODEM (mm_generic_cdma_new (data_device, driver));
+        g_object_set (G_OBJECT (modem), MM_SERIAL_CARRIER_DETECT, FALSE, NULL);
+    }
 
     libhal_free_string (data_device);
     libhal_free_string (driver);
