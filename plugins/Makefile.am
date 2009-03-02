@@ -83,8 +83,10 @@ libmm_plugin_sierra_la_LDFLAGS = -module -avoid-version
 # Novatel
 
 libmm_plugin_novatel_la_SOURCES = \
-	mm-modem-novatel.c \
-	mm-modem-novatel.h \
+	mm-modem-novatel-cdma.c \
+	mm-modem-novatel-cdma.h \
+	mm-modem-novatel-gsm.c \
+	mm-modem-novatel-gsm.h \
 	mm-plugin-novatel.c \
 	mm-plugin-novatel.h
 

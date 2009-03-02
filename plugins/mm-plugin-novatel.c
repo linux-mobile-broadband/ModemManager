@@ -3,8 +3,8 @@
 #include <string.h>
 #include <gmodule.h>
 #include "mm-plugin-novatel.h"
-#include "mm-modem-novatel.h"
-#include "mm-generic-cdma.h"
+#include "mm-modem-novatel-cdma.h"
+#include "mm-modem-novatel-gsm.h"
 
 static void plugin_init (MMPlugin *plugin_class);
 
@@ -141,11 +141,9 @@ create_modem (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
     g_return_val_if_fail (driver != NULL, NULL);
 
     if (is_novatel_gsm)
-        modem = MM_MODEM (mm_modem_novatel_new (data_device, driver));
-    else {
-        modem = MM_MODEM (mm_generic_cdma_new (data_device, driver));
-        g_object_set (G_OBJECT (modem), MM_SERIAL_CARRIER_DETECT, FALSE, NULL);
-    }
+        modem = MM_MODEM (mm_modem_novatel_gsm_new (data_device, driver));
+    else
+        modem = MM_MODEM (mm_modem_novatel_cdma_new (data_device, driver));
 
     libhal_free_string (data_device);
     libhal_free_string (driver);
