@@ -1,22 +1,28 @@
+commit 48892f9ff93f48fc560e706f47afcaadd002f41e
+Author: Tambet Ingo <tambet@gmail.com>
+Date:   Tue Jan 13 13:36:29 2009 +0200
+
+    Use ModemManager.
+
 diff --git a/configure.ac b/configure.ac
-index 9e64b77..77ad2ac 100644
+index 7524739..db7597a 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -221,6 +221,7 @@ src/utils/Makefile
- src/gconf-helpers/Makefile
+@@ -222,6 +222,7 @@ src/gconf-helpers/Makefile
  src/wireless-security/Makefile
+ src/polkit-helpers/Makefile
  src/connection-editor/Makefile
 +src/modems/Makefile
  icons/Makefile
  po/Makefile.in
  ])
 diff --git a/src/Makefile.am b/src/Makefile.am
-index de8ccb4..2be2217 100644
+index 3486186..33d2c49 100644
 --- a/src/Makefile.am
 +++ b/src/Makefile.am
 @@ -1,4 +1,4 @@
--SUBDIRS = marshallers utils gconf-helpers wireless-security connection-editor
-+SUBDIRS = marshallers utils gconf-helpers wireless-security connection-editor modems
+-SUBDIRS = marshallers utils gconf-helpers wireless-security polkit-helpers connection-editor
++SUBDIRS = marshallers utils gconf-helpers wireless-security polkit-helpers connection-editor modems
  
  NULL=
  
@@ -31,7 +37,7 @@ index de8ccb4..2be2217 100644
  
  nm_applet_LDADD = \
 diff --git a/src/applet-device-gsm.c b/src/applet-device-gsm.c
-index aff002f..760234a 100644
+index eaacf48..2a3d8bc 100644
 --- a/src/applet-device-gsm.c
 +++ b/src/applet-device-gsm.c
 @@ -24,6 +24,9 @@
@@ -104,7 +110,7 @@ index aff002f..760234a 100644
  gsm_menu_item_deactivate (GtkMenuItem *item, gpointer user_data)
  {
  	GSMMenuItemInfo *info = (GSMMenuItemInfo *) user_data;
-@@ -273,40 +322,68 @@ gsm_add_menu_item (NMDevice *device,
+@@ -273,41 +322,67 @@ gsm_add_menu_item (NMDevice *device,
  		add_connection_items (device, connections, active, menu, applet);
  	else
  		add_default_connection_item (device, menu, applet);
@@ -152,10 +158,11 @@ index aff002f..760234a 100644
 +	if (new_state != NM_DEVICE_STATE_ACTIVATED)
 +		return;
  
--		applet_do_notify (applet, NOTIFY_URGENCY_LOW,
--					      _("Connection Established"),
--						  str ? str : _("You are now connected to the GSM network."),
--						  "nm-device-wwan", NULL, NULL, NULL, NULL);
+-		applet_do_notify_with_pref (applet,
+-		                            _("Connection Established"),
+-		                            str ? str : _("You are now connected to the GSM network."),
+-		                            "nm-device-wwan",
+-		                            PREF_DISABLE_CONNECTED_NOTIFICATIONS);
 -		g_free (str);
 +	modem = (NMAGsmModem *) g_object_get_data (G_OBJECT (device), "gsm-modem");
 +	if (!modem) {
@@ -182,9 +189,8 @@ index aff002f..760234a 100644
 +					   reg_status == MM_GSM_MODEM_REG_STATUS_ROAMING ? _("roaming") : _("home"),
 +					   oper_name);
 +
-+	applet_do_notify (applet, NOTIFY_URGENCY_LOW,
-+				   _("Connection Established"), msg,
-+				   "nm-device-wwan", NULL, NULL, NULL, NULL);
++	applet_do_notify_with_pref (applet, _("Connection Established"), msg,
++						   "nm-device-wwan", PREF_DISABLE_CONNECTED_NOTIFICATIONS);
 +
 +	g_free (oper_code);
 +	g_free (oper_name);
@@ -192,27 +198,20 @@ index aff002f..760234a 100644
  }
  
  static GdkPixbuf *
-@@ -316,6 +393,7 @@ gsm_get_icon (NMDevice *device,
-               char **tip,
+@@ -318,6 +393,7 @@ gsm_get_icon (NMDevice *device,
                NMApplet *applet)
  {
+ 	NMSettingConnection *s_con;
 +	NMAGsmModem *modem;
  	GdkPixbuf *pixbuf = NULL;
- 	const char *iface;
- 	NMSettingConnection *s_con = NULL;
-@@ -335,15 +413,40 @@ gsm_get_icon (NMDevice *device,
- 		*tip = g_strdup_printf (_("Waiting for user authentication on device '%s'..."), iface);
+ 	const char *id;
+ 
+@@ -341,8 +417,40 @@ gsm_get_icon (NMDevice *device,
+ 		*tip = g_strdup_printf (_("Requesting a network address for '%s'..."), id);
  		break;
  	case NM_DEVICE_STATE_ACTIVATED:
--		if (s_con) {
--			const char *id;
--
--			id = nm_setting_connection_get_id (s_con);
--			if (id)
--				*tip = g_strdup_printf (_("Mobile broadband connection '%s'"), id);
--		} else
--			*tip = g_strdup (_("Mobile broadband connection"));
 -		pixbuf = applet->wwan_icon;
+-		*tip = g_strdup_printf (_("Mobile broadband connection '%s' active"), id);
 +		modem = (NMAGsmModem *) g_object_get_data (G_OBJECT (device), "gsm-modem");
 +		if (modem) {
 +			char *oper_code;
@@ -250,6 +249,14 @@ index aff002f..760234a 100644
  		break;
  	default:
  		break;
+@@ -514,6 +622,7 @@ ask_for_pin_puk (NMDevice *device,
+ 
+ 	w = gtk_entry_new ();
+ 	*out_secret_entry = GTK_ENTRY (w);
++	gtk_entry_set_visibility (GTK_ENTRY (w), FALSE);
+ 	gtk_entry_set_max_length (GTK_ENTRY (w), 4);
+ 	gtk_entry_set_width_chars (GTK_ENTRY (w), 4);
+ 	gtk_entry_set_activates_default (GTK_ENTRY (w), TRUE);
 diff --git a/src/connection-editor/page-mobile.c b/src/connection-editor/page-mobile.c
 index 2522ff1..40f2d44 100644
 --- a/src/connection-editor/page-mobile.c
@@ -902,7 +909,7 @@ index 0000000..3243a6c
 +}
 diff --git a/src/modems/nm-modem-properties.glade b/src/modems/nm-modem-properties.glade
 new file mode 100644
-index 0000000..12ccf06
+index 0000000..5c1285c
 --- /dev/null
 +++ b/src/modems/nm-modem-properties.glade
 @@ -0,0 +1,1083 @@
@@ -1867,7 +1874,7 @@ index 0000000..12ccf06
 +</widget>
 +
 +<widget class="GtkDialog" id="pin_dialog">
-+  <property name="visible">True</property>
++  <property name="visible">False</property>
 +  <property name="title" translatable="yes">PIN code required</property>
 +  <property name="type">GTK_WINDOW_TOPLEVEL</property>
 +  <property name="window_position">GTK_WIN_POS_NONE</property>
