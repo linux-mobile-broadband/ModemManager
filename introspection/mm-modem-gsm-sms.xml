@@ -30,26 +30,38 @@
     </method>
 
     <method name="GetFormat">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_sms_get_format"/>
       <arg name="result" type="u" direction="out"/>
     </method>
 
     <method name="SetFormat">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_sms_set_format"/>
       <arg name="format" type="u" direction="in"/>
     </method>
 
     <method name="GetSmsc">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_sms_get_smsc"/>
       <arg name="result" type="s" direction="out"/>
     </method>
 
     <method name="SetSmsc">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_sms_set_smsc"/>
       <arg name="smsc" type="s" direction="in"/>
     </method>
 
     <method name="List">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_sms_list"/>
       <arg name="result" type="aa{sv}" direction="out"/>
     </method>
 
     <method name="Save">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_sms_save"/>
       <arg name="properties" type="a{sv}" direction="in">
 	<tp:docstring>
 	  SMS properties to save with the following key values:
@@ -65,6 +77,8 @@
     </method>
 
     <method name="Send">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_sms_send"/>
       <arg name="properties" type="a{sv}" direction="in">
 	<tp:docstring>
 	  SMS properties to save with the following key values:
@@ -80,10 +94,14 @@
     </method>
 
     <method name="SendFromStorage">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_sms_send_from_storage"/>
       <arg name="index" type="u" direction="in"/>
     </method>
 
     <method name="SetIndication">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_sms_set_indication"/>
       <arg name="mode" type="u" direction="in"/>
       <arg name="mt" type="u" direction="in"/>
       <arg name="bm" type="u" direction="in"/>

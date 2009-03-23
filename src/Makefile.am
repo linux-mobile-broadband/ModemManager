@@ -29,6 +29,8 @@ modem_manager_SOURCES = \
 	mm-modem-gsm-card.h \
 	mm-modem-gsm-network.c \
 	mm-modem-gsm-network.h \
+	mm-modem-gsm-sms.c \
+	mm-modem-gsm-sms.h \
 	mm-modem-simple.c \
 	mm-modem-simple.h \
 	mm-options.c \
@@ -58,6 +60,9 @@ mm-modem-gsm-card-glue.h: $(top_srcdir)/introspection/mm-modem-gsm-card.xml
 mm-modem-gsm-network-glue.h: $(top_srcdir)/introspection/mm-modem-gsm-network.xml
 	dbus-binding-tool --prefix=mm_modem_gsm_network --mode=glib-server --output=$@ $<
 
+mm-modem-gsm-sms-glue.h: $(top_srcdir)/introspection/mm-modem-gsm-sms.xml
+	dbus-binding-tool --prefix=mm_modem_gsm_sms --mode=glib-server --output=$@ $<
+
 
 BUILT_SOURCES = \
 	mm-manager-glue.h \
@@ -65,6 +70,7 @@ BUILT_SOURCES = \
 	mm-modem-simple-glue.h \
 	mm-modem-cdma-glue.h \
 	mm-modem-gsm-card-glue.h \
-	mm-modem-gsm-network-glue.h
+	mm-modem-gsm-network-glue.h \
+	mm-modem-gsm-sms-glue.h
 
 CLEANFILES = $(BUILT_SOURCES)

@@ -6,6 +6,7 @@
 #include "mm-generic-gsm.h"
 #include "mm-modem-gsm-card.h"
 #include "mm-modem-gsm-network.h"
+#include "mm-modem-gsm-sms.h"
 #include "mm-modem-simple.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
@@ -1153,6 +1154,46 @@ get_signal_quality (MMModemGsmNetwork *modem,
 }
 
 /*****************************************************************************/
+/* MMModemGsmSms interface */
+
+static void
+sms_send_done (MMSerial *serial,
+               GString *response,
+               GError *error,
+               gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error)
+        info->error = g_error_copy (error);
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+sms_send (MMModemGsmSms *modem, 
+          const char *number,
+          const char *text,
+          const char *smsc,
+          guint validity,
+          guint class,
+          MMModemFn callback,
+          gpointer user_data)
+{
+    MMCallbackInfo *info;
+    char *command;
+
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+
+    /* FIXME: use the PDU mode instead */
+    mm_serial_queue_command (MM_SERIAL (modem), "AT+CMGF=1", 3, NULL, NULL);
+
+    command = g_strdup_printf ("+CMGS=\"%s\"\r%s\x1a", number, text);
+    mm_serial_queue_command (MM_SERIAL (modem), command, 10, sms_send_done, info);
+    g_free (command);
+}
+
+/*****************************************************************************/
 /* MMModemSimple interface */
 
 typedef enum {
@@ -1427,6 +1468,12 @@ modem_gsm_network_init (MMModemGsmNetwork *class)
 }
 
 static void
+modem_gsm_sms_init (MMModemGsmSms *class)
+{
+    class->send = sms_send;
+}
+
+static void
 modem_simple_init (MMModemSimple *class)
 {
     class->connect = simple_connect;
@@ -1580,6 +1627,10 @@ mm_generic_gsm_get_type (void)
             (GInterfaceInitFunc) modem_gsm_network_init
         };
 
+        static const GInterfaceInfo modem_gsm_sms_info = {
+            (GInterfaceInitFunc) modem_gsm_sms_init
+        };
+
         static const GInterfaceInfo modem_simple_info = {
             (GInterfaceInitFunc) modem_simple_init
         };
@@ -1589,6 +1640,7 @@ mm_generic_gsm_get_type (void)
         g_type_add_interface_static (generic_gsm_type, MM_TYPE_MODEM, &modem_iface_info);
         g_type_add_interface_static (generic_gsm_type, MM_TYPE_MODEM_GSM_CARD, &modem_gsm_card_info);
         g_type_add_interface_static (generic_gsm_type, MM_TYPE_MODEM_GSM_NETWORK, &modem_gsm_network_info);
+        g_type_add_interface_static (generic_gsm_type, MM_TYPE_MODEM_GSM_SMS, &modem_gsm_sms_info);
         g_type_add_interface_static (generic_gsm_type, MM_TYPE_MODEM_SIMPLE, &modem_simple_info);
     }
 
