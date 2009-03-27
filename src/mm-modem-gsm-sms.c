@@ -182,12 +182,12 @@ impl_gsm_modem_sms_send (MMModemGsmSms *modem,
                          DBusGMethodInvocation *context)
 {
     GValue *value;
-    const char *number;
-    const char *text;
-    const char *smsc;
+    const char *number = NULL;
+    const char *text = NULL ;
+    const char *smsc = NULL;
     GError *error = NULL;
-    guint validity;
-    guint class;
+    guint validity = 0;
+    guint class = 0;
 
     value = (GValue *) g_hash_table_lookup (properties, "number");
     if (value)
