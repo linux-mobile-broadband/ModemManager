@@ -305,7 +305,7 @@ serial_debug (const char *prefix, const char *buf, int len)
     }
 
     g_string_append_c (debug, '\'');
-    g_debug (debug->str);
+    g_debug ("%s", debug->str);
     g_string_truncate (debug, 0);
 }
 
