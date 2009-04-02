@@ -1235,7 +1235,7 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
     gboolean need_pin = FALSE;
 
     if (error) {
-        if (state == g_error_matches (error, MM_MOBILE_ERROR, MM_MOBILE_ERROR_SIM_PIN)) {
+        if (g_error_matches (error, MM_MOBILE_ERROR, MM_MOBILE_ERROR_SIM_PIN)) {
             need_pin = TRUE;
             state = SIMPLE_STATE_CHECK_PIN;
         } else {
