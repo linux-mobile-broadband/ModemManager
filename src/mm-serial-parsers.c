@@ -295,3 +295,54 @@ mm_serial_parser_v1_destroy (gpointer data)
 
     g_slice_free (MMSerialParserV1, data);
 }
+
+typedef struct {
+    gpointer v1;
+    GRegex *regex_echo;
+} MMSerialParserV1E1;
+
+gpointer
+mm_serial_parser_v1_e1_new (void)
+{
+    MMSerialParserV1E1 *parser;
+    GRegexCompileFlags flags = G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW | G_REGEX_OPTIMIZE;
+
+    parser = g_slice_new (MMSerialParserV1E1);
+    parser->v1 = mm_serial_parser_v1_new ();
+
+    /* Does not start with '<CR><LF>' and ends with '<CR>'. */
+    parser->regex_echo = g_regex_new ("^(?!\\r\\n).+\\r", flags, 0, NULL);
+
+    return parser;
+}
+
+gboolean
+mm_serial_parser_v1_e1_parse (gpointer data,
+                              GString *response,
+                              GError **error)
+{
+    MMSerialParserV1E1 *parser = (MMSerialParserV1E1 *) data;
+    GMatchInfo *match_info = NULL;
+
+    /* Remove the command echo */
+    if (g_regex_match_full (parser->regex_echo, response->str, response->len, 0, 0, &match_info, NULL)) {
+        gchar *match = g_match_info_fetch (match_info, 0);
+
+        g_string_erase (response, 0, strlen (match));
+        g_free (match);
+        g_match_info_free (match_info);
+    }
+
+    return mm_serial_parser_v1_parse (parser->v1, response, error);
+}
+
+void
+mm_serial_parser_v1_e1_destroy (gpointer data)
+{
+    MMSerialParserV1E1 *parser = (MMSerialParserV1E1 *) data;
+
+    g_regex_unref (parser->regex_echo);
+    mm_serial_parser_v1_destroy (parser->v1);
+
+    g_slice_free (MMSerialParserV1E1, data);
+}
