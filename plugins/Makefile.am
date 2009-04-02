@@ -5,7 +5,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-option.la \
 	libmm-plugin-sierra.la \
 	libmm-plugin-novatel.la \
-	libmm-plugin-nokia.la
+	libmm-plugin-nokia.la \
+	libmm-plugin-zte.la
 
 # Huawei
 
@@ -110,6 +111,20 @@ libmm_plugin_nokia_la_CPPFLAGS = \
 	-I$(top_srcdir)/src
 
 libmm_plugin_nokia_la_LDFLAGS = -module -avoid-version
+
+# Zte
+
+libmm_plugin_zte_la_SOURCES = \
+	mm-modem-zte.c \
+	mm-modem-zte.h \
+	mm-plugin-zte.c \
+	mm-plugin-zte.h
+
+libmm_plugin_zte_la_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	-I$(top_srcdir)/src
+
+libmm_plugin_zte_la_LDFLAGS = -module -avoid-version
 
 
 BUILT_SOURCES = \
