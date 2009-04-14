@@ -2,7 +2,6 @@
 
 #include <string.h>
 #include <gmodule.h>
-#include <libhal.h>
 #include <dbus/dbus-glib.h>
 #include <dbus/dbus-glib-lowlevel.h>
 #include "mm-manager.h"
@@ -129,9 +128,23 @@ load_plugins (MMManager *manager)
 }
 
 MMManager *
-mm_manager_new (void)
+mm_manager_new (DBusGConnection *bus)
 {
-    return g_object_new (MM_TYPE_MANAGER, NULL);
+    MMManager *manager;
+
+    g_return_val_if_fail (bus != NULL, NULL);
+
+    manager = (MMManager *) g_object_new (MM_TYPE_MANAGER, NULL);
+    if (manager) {
+        MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
+
+        priv->connection = bus;
+        dbus_g_connection_register_g_object (priv->connection,
+                                             MM_DBUS_PATH,
+                                             G_OBJECT (manager));
+    }
+
+    return manager;
 }
 
 static char *
@@ -362,43 +375,68 @@ device_new_capability (LibHalContext *ctx, const char *udi, const char *capabili
     device_added (ctx, udi);
 }
 
+
+DBusGConnection *
+mm_manager_get_bus (MMManager *manager)
+{
+    g_return_val_if_fail (MM_IS_MANAGER (manager), NULL);
+
+    return MM_MANAGER_GET_PRIVATE (manager)->connection;
+}
+
+static gboolean
+remove_one (gpointer key,
+            gpointer value,
+            gpointer user_data)
+{
+    const char *udi = (char *) key;
+    MMModem *modem = MM_MODEM (value);
+    MMManager *manager = MM_MANAGER (user_data);
+
+    g_debug ("Removed modem %s", udi);
+    g_signal_emit (manager, signals[DEVICE_REMOVED], 0, modem);
+
+    return TRUE;
+}
+
+void
+mm_manager_set_hal_ctx (MMManager *manager,
+                        LibHalContext *hal_ctx)
+{
+    MMManagerPrivate *priv;
+
+    g_return_if_fail (MM_IS_MANAGER (manager));
+
+    priv = MM_MANAGER_GET_PRIVATE (manager);
+    priv->hal_ctx = hal_ctx;
+
+    if (hal_ctx) {
+        libhal_ctx_set_user_data (hal_ctx, manager);
+        libhal_ctx_set_device_added (hal_ctx, device_added);
+        libhal_ctx_set_device_removed (hal_ctx, device_removed);
+        libhal_ctx_set_device_new_capability (hal_ctx, device_new_capability);
+
+        create_initial_modems (manager);
+    } else {
+        g_hash_table_foreach_remove (priv->modems, remove_one, manager);
+    }
+}
+
+LibHalContext *
+mm_manager_get_hal_ctx (MMManager *manager)
+{
+    g_return_val_if_fail (MM_IS_MANAGER (manager), NULL);
+
+    return MM_MANAGER_GET_PRIVATE (manager)->hal_ctx;
+}
+
 static void
 mm_manager_init (MMManager *manager)
 {
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
-    GError *err = NULL;
-	DBusError dbus_error;
 
     priv->modems = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
-
-    priv->connection = dbus_g_bus_get (DBUS_BUS_SYSTEM, &err);
-    if (!priv->connection)
-        g_error ("Could not connect to system bus.");
-
-    dbus_g_connection_register_g_object (priv->connection,
-	                                     MM_DBUS_PATH,
-	                                     G_OBJECT (manager));
-
-    priv->hal_ctx = libhal_ctx_new ();
-	if (!priv->hal_ctx)
-		g_error ("Could not get connection to the HAL service.");
-
-	libhal_ctx_set_dbus_connection (priv->hal_ctx, dbus_g_connection_get_connection (priv->connection));
-
-	dbus_error_init (&dbus_error);
-	if (!libhal_ctx_init (priv->hal_ctx, &dbus_error))
-		g_error ("libhal_ctx_init() failed: %s\n"
-                 "Make sure the hal daemon is running?", 
-                 dbus_error.message);
-
     load_plugins (manager);
-
-    libhal_ctx_set_user_data (priv->hal_ctx, manager);
-	libhal_ctx_set_device_added (priv->hal_ctx, device_added);
-	libhal_ctx_set_device_removed (priv->hal_ctx, device_removed);
-	libhal_ctx_set_device_new_capability (priv->hal_ctx, device_new_capability);
-
-    create_initial_modems (manager);
 }
 
 static void
@@ -412,6 +450,7 @@ finalize (GObject *object)
     g_slist_free (priv->plugins);
 
     if (priv->hal_ctx) {
+        mm_manager_set_hal_ctx (MM_MANAGER (object), NULL);
         libhal_ctx_shutdown (priv->hal_ctx, NULL);
         libhal_ctx_free (priv->hal_ctx);
     }

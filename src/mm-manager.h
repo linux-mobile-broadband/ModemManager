@@ -5,6 +5,8 @@
 
 #include <glib/gtypes.h>
 #include <glib-object.h>
+#include <dbus/dbus-glib.h>
+#include <libhal.h>
 #include "mm-modem.h"
 
 #define MM_TYPE_MANAGER            (mm_manager_get_type ())
@@ -31,6 +33,11 @@ typedef struct {
 
 GType mm_manager_get_type (void);
 
-MMManager *mm_manager_new (void);
+MMManager       *mm_manager_new         (DBusGConnection *bus);
+DBusGConnection *mm_manager_get_bus     (MMManager *manager);
+void             mm_manager_set_hal_ctx (MMManager *manager,
+                                         LibHalContext *hal_ctx);
+
+LibHalContext   *mm_manager_get_hal_ctx (MMManager *manager);
 
 #endif /* MM_MANAGER_H */

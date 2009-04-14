@@ -2,9 +2,14 @@
 
 #include <signal.h>
 #include <syslog.h>
+#include <string.h>
 #include <dbus/dbus-glib.h>
+#include <dbus/dbus-glib-lowlevel.h>
+#include <libhal.h>
 #include "mm-manager.h"
 #include "mm-options.h"
+
+#define HAL_DBUS_SERVICE "org.freedesktop.Hal"
 
 static void
 mm_signal_handler (int signo)
@@ -90,24 +95,14 @@ destroy_cb (DBusGProxy *proxy, gpointer user_data)
     g_main_loop_quit (loop);
 }
 
-static gboolean
-dbus_init (GMainLoop *loop)
+static DBusGProxy *
+create_dbus_proxy (DBusGConnection *bus)
 {
-    DBusGConnection *connection;
     DBusGProxy *proxy;
     GError *err = NULL;
     int request_name_result;
 
-    connection = dbus_g_bus_get (DBUS_BUS_SYSTEM, &err);
-    if (!connection) {
-        g_warning ("Could not get the system bus. Make sure "
-                   "the message bus daemon is running! Message: %s",
-                   err->message);
-        g_error_free (err);
-        return FALSE;
-    }
-
-    proxy = dbus_g_proxy_new_for_name (connection,
+    proxy = dbus_g_proxy_new_for_name (bus,
                                        "org.freedesktop.DBus",
                                        "/org/freedesktop/DBus",
                                        "org.freedesktop.DBus");
@@ -120,33 +115,117 @@ dbus_init (GMainLoop *loop)
                             G_TYPE_INVALID)) {
         g_warning ("Could not acquire the %s service.\n"
                    "  Message: '%s'", MM_DBUS_SERVICE, err->message);
-        g_error_free (err);
-        goto err;
-    }
 
-    if (request_name_result != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
+        g_error_free (err);
+        g_object_unref (proxy);
+        proxy = NULL;
+    } else if (request_name_result != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
         g_warning ("Could not acquire the " MM_DBUS_SERVICE
                    " service as it is already taken. Return: %d",
                    request_name_result);
-        goto err;
+
+        g_object_unref (proxy);
+        proxy = NULL;
+    } else {
+        dbus_g_proxy_add_signal (proxy, "NameOwnerChanged",
+                                 G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING,
+                                 G_TYPE_INVALID);
     }
 
-    g_signal_connect (proxy, "destroy", G_CALLBACK (destroy_cb), loop);
+    return proxy;
+}
 
-    return TRUE;
+static void
+hal_init (MMManager *manager)
+{
+    LibHalContext *hal_ctx;
+    DBusError dbus_error;
 
- err:
-    dbus_g_connection_unref (connection);
-    g_object_unref (proxy);
+    hal_ctx = libhal_ctx_new ();
+	if (!hal_ctx) {
+		g_warning ("Could not get connection to the HAL service.");
+    }
 
-    return FALSE;
+	libhal_ctx_set_dbus_connection (hal_ctx, dbus_g_connection_get_connection (mm_manager_get_bus (manager)));
+
+	dbus_error_init (&dbus_error);
+	if (!libhal_ctx_init (hal_ctx, &dbus_error)) {
+		g_warning ("libhal_ctx_init() failed: %s", dbus_error.message);
+        dbus_error_free (&dbus_error);
+    }
+
+    mm_manager_set_hal_ctx (manager, hal_ctx);
+}
+
+static void
+hal_deinit (MMManager *manager)
+{
+    LibHalContext *hal_ctx;
+
+    hal_ctx = mm_manager_get_hal_ctx (manager);
+    if (hal_ctx) {
+        libhal_ctx_shutdown (hal_ctx, NULL);
+        libhal_ctx_free (hal_ctx);
+        mm_manager_set_hal_ctx (manager, NULL);
+    }
+}
+
+static gboolean
+hal_on_bus (DBusGProxy *proxy)
+{
+    GError *err = NULL;
+    gboolean has_owner = FALSE;
+
+    if (!dbus_g_proxy_call (proxy,
+                            "NameHasOwner", &err,
+                            G_TYPE_STRING, HAL_DBUS_SERVICE,
+                            G_TYPE_INVALID,
+                            G_TYPE_BOOLEAN, &has_owner,
+                            G_TYPE_INVALID)) {
+        g_warning ("Error on NameHasOwner DBUS call: %s", err->message);
+        g_error_free (err);
+    }
+
+    return has_owner;
+}
+
+static void
+name_owner_changed (DBusGProxy *proxy,
+                    const char *name,
+                    const char *old_owner,
+                    const char *new_owner,
+                    gpointer user_data)
+{
+    MMManager *manager;
+    gboolean old_owner_good;
+    gboolean new_owner_good;
+
+    /* Only care about signals from HAL */
+    if (strcmp (name, HAL_DBUS_SERVICE))
+        return;
+
+    manager = MM_MANAGER (user_data);
+    old_owner_good = (old_owner && (strlen (old_owner) > 0));
+    new_owner_good = (new_owner && (strlen (new_owner) > 0));
+
+	if (!old_owner_good && new_owner_good) {
+		g_message ("HAL appeared");
+		hal_init (manager);
+	} else if (old_owner_good && !new_owner_good) {
+		/* HAL went away. Bad HAL. */
+		g_message ("HAL disappeared");
+		hal_deinit (manager);
+	}
 }
 
 int
 main (int argc, char *argv[])
 {
+    DBusGConnection *bus;
+    DBusGProxy *proxy;
     GMainLoop *loop;
     MMManager *manager;
+    GError *err = NULL;
 
     mm_options_parse (argc, argv);
     g_type_init ();
@@ -156,16 +235,39 @@ main (int argc, char *argv[])
     if (!mm_options_debug ())
         logging_setup ();
 
-    loop = g_main_loop_new (NULL, FALSE);
+    bus = dbus_g_bus_get (DBUS_BUS_SYSTEM, &err);
+    if (!bus) {
+        g_warning ("Could not get the system bus. Make sure "
+                   "the message bus daemon is running! Message: %s",
+                   err->message);
+        g_error_free (err);
+        return -1;
+    }
 
-    if (!dbus_init (loop))
+    proxy = create_dbus_proxy (bus);
+    if (!proxy)
         return -1;
 
-    manager = mm_manager_new ();
+    manager = mm_manager_new (bus);
+
+    dbus_g_proxy_connect_signal (proxy,
+                                 "NameOwnerChanged",
+                                 G_CALLBACK (name_owner_changed),
+                                 manager, NULL);
+
+    if (hal_on_bus (proxy))
+        hal_init (manager);
+
+    loop = g_main_loop_new (NULL, FALSE);
+    g_signal_connect (proxy, "destroy", G_CALLBACK (destroy_cb), loop);
 
     g_main_loop_run (loop);
 
+    hal_deinit (manager);
     g_object_unref (manager);
+    g_object_unref (proxy);
+    dbus_g_connection_unref (bus);    
+
     logging_shutdown ();
 
     return 0;
