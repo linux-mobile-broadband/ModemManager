@@ -98,16 +98,16 @@ get_network_mode_done (MMSerial *serial,
 
             switch (a) {
             case 0:
-                mode = MM_MODEM_GSM_NETWORK_MODE_GPRS;
+                mode = MM_MODEM_GSM_NETWORK_MODE_2G_ONLY;
                 break;
             case 1:
-                mode = MM_MODEM_GSM_NETWORK_MODE_3G;
+                mode = MM_MODEM_GSM_NETWORK_MODE_3G_ONLY;
                 break;
             case 2:
-                mode = MM_MODEM_GSM_NETWORK_MODE_PREFER_2G;
+                mode = MM_MODEM_GSM_NETWORK_MODE_2G_PREFERRED;
                 break;
             case 3:
-                mode = MM_MODEM_GSM_NETWORK_MODE_PREFER_3G;
+                mode = MM_MODEM_GSM_NETWORK_MODE_3G_PREFERRED;
                 break;
             default:
                 break;
@@ -165,15 +165,21 @@ set_network_mode (MMModemGsmNetwork *modem,
     switch (mode) {
     case MM_MODEM_GSM_NETWORK_MODE_ANY:
     case MM_MODEM_GSM_NETWORK_MODE_GPRS:
+    case MM_MODEM_GSM_NETWORK_MODE_EDGE:
+    case MM_MODEM_GSM_NETWORK_MODE_2G_ONLY:
         i = 0;
         break;
-    case MM_MODEM_GSM_NETWORK_MODE_3G:
+    case MM_MODEM_GSM_NETWORK_MODE_UMTS:
+    case MM_MODEM_GSM_NETWORK_MODE_HSDPA:
+    case MM_MODEM_GSM_NETWORK_MODE_HSUPA:
+    case MM_MODEM_GSM_NETWORK_MODE_HSPA:
+    case MM_MODEM_GSM_NETWORK_MODE_3G_ONLY:
         i = 1;
         break;
-    case MM_MODEM_GSM_NETWORK_MODE_PREFER_2G:
+    case MM_MODEM_GSM_NETWORK_MODE_2G_PREFERRED:
         i = 2;
         break;
-    case MM_MODEM_GSM_NETWORK_MODE_PREFER_3G:
+    case MM_MODEM_GSM_NETWORK_MODE_3G_PREFERRED:
         i = 3;
         break;
     default:

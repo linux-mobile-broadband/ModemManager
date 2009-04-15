@@ -181,9 +181,9 @@
 	  EDGE
 	</tp:docstring>
       </tp:enumvalue>
-      <tp:enumvalue suffix="3G" value="3">
+      <tp:enumvalue suffix="UMTS" value="3">
 	<tp:docstring>
-	  3G
+	  UMTS (3G)
 	</tp:docstring>
       </tp:enumvalue>
       <tp:enumvalue suffix="HSDPA" value="4">
@@ -191,14 +191,34 @@
 	  HSDPA
 	</tp:docstring>
       </tp:enumvalue>
-      <tp:enumvalue suffix="PREFER_2G" value="5">
+      <tp:enumvalue suffix="2G_PREFERRED" value="5">
 	<tp:docstring>
 	  Prefer 2G (GPRS or EDGE).
 	</tp:docstring>
       </tp:enumvalue>
-      <tp:enumvalue suffix="PREFER_3G" value="6">
+      <tp:enumvalue suffix="3G_PREFERRED" value="6">
 	<tp:docstring>
-	  Prefer 3G (3G or HSDPA).
+	  Prefer 3G (UMTS or HSDPA).
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="2G_ONLY" value="7">
+	<tp:docstring>
+	  Use only 2G (GPRS or EDGE).
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="3G_ONLY" value="8">
+	<tp:docstring>
+	  Use only 3G (UMTS or HSDPA).
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="HSUPA" value="9">
+	<tp:docstring>
+	  HSUPA.
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="HSPA" value="10">
+	<tp:docstring>
+	  HSDPA and HSUPA.
 	</tp:docstring>
       </tp:enumvalue>
     </tp:enum>

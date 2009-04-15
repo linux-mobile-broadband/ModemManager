@@ -258,7 +258,12 @@ enable (MMModem *modem,
 static gboolean
 parse_erinfo (const char *reply, int *mode, int *gsm_rinfo, int *umts_rinfo)
 {
-    if (reply == NULL || strncmp (reply, "*ERINFO:", 8))
+    g_return_val_if_fail (reply != NULL, FALSE);
+    g_return_val_if_fail (mode != NULL, FALSE);
+    g_return_val_if_fail (gsm_rinfo != NULL, FALSE);
+    g_return_val_if_fail (umts_rinfo != NULL, FALSE);
+
+    if (strncmp (reply, "*ERINFO:", 8))
         return FALSE;
 
     if (sscanf (reply + 8, "%d,%d,%d", mode, gsm_rinfo, umts_rinfo))
@@ -278,20 +283,28 @@ get_network_mode_done (MMSerial *serial,
     if (error)
         info->error = g_error_copy (error);
     else {
-        int mode;
-        int gsm_rinfo;
-        int umts_rinfo;
+        int mode = 0, gsm_rinfo = 0, umts_rinfo = 0;
         guint32 result = 0;
 
         if (parse_erinfo (response->str, &mode, &gsm_rinfo, &umts_rinfo)) {
             if (umts_rinfo == 2)
                 result = MM_MODEM_GSM_NETWORK_MODE_HSDPA;
             else if (umts_rinfo && !gsm_rinfo)
-                result = MM_MODEM_GSM_NETWORK_MODE_3G;
+                result = MM_MODEM_GSM_NETWORK_MODE_UMTS;
             else if (umts_rinfo && gsm_rinfo)
-                result = MM_MODEM_GSM_NETWORK_MODE_PREFER_3G;
-            else if (gsm_rinfo)
-                result = MM_MODEM_GSM_NETWORK_MODE_GPRS;
+                result = MM_MODEM_GSM_NETWORK_MODE_3G_PREFERRED;
+            else if (gsm_rinfo) {
+                switch (gsm_rinfo) {
+                case 2:
+                case 3:
+                    result = MM_MODEM_GSM_NETWORK_MODE_EDGE;
+                    break;
+                case 1:
+                default:
+                    result = MM_MODEM_GSM_NETWORK_MODE_GPRS;
+                    break;
+                }
+            }
         }
 
         if (result == 0)
