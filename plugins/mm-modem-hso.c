@@ -417,7 +417,15 @@ connection_enabled (MMSerial *serial,
     str = g_match_info_fetch (info, 2);
     if (str[0] == '1')
         connect_pending_done (MM_MODEM_HSO (serial));
-    else if (str[0] == '0')
+    else if (str[0] == '3') {
+        MMCallbackInfo *cb_info = MM_MODEM_HSO_GET_PRIVATE (serial)->connect_pending_data;
+
+        if (cb_info)
+            cb_info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                                  "Call setup failed");
+
+        connect_pending_done (MM_MODEM_HSO (serial));
+    } else if (str[0] == '0')
         /* FIXME: disconnected. do something when we have modem status signals */
         ;
 
