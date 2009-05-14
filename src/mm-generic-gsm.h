@@ -29,6 +29,8 @@ MMModem *mm_generic_gsm_new (const char *serial_device,
 void mm_generic_gsm_set_unsolicited_registration (MMGenericGsm *modem,
                                                   gboolean enabled);
 
+void mm_generic_gsm_pending_registration_stop    (MMGenericGsm *modem);
+
 void mm_generic_gsm_set_cid (MMGenericGsm *modem,
                              guint32 cid);
 

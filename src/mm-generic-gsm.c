@@ -32,7 +32,6 @@ typedef struct {
     guint32 cid;
 } MMGenericGsmPrivate;
 
-static void pending_registration_stop (MMGenericGsm *self);
 static void get_registration_status (MMSerial *serial, MMCallbackInfo *info);
 static void read_operator_done (MMSerial *serial,
                                 GString *response,
@@ -232,7 +231,7 @@ enable (MMModem *modem,
     info = mm_callback_info_new (modem, callback, user_data);
 
     if (!do_enable) {
-        pending_registration_stop (MM_GENERIC_GSM (modem));
+        mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
 
         if (mm_serial_is_connected (MM_SERIAL (modem)))
             mm_serial_flash (MM_SERIAL (modem), 1000, disable_flash_done, info);
@@ -539,10 +538,10 @@ pending_registration_timed_out (gpointer data)
     return FALSE;
 }
 
-static void
-pending_registration_stop (MMGenericGsm *self)
+void
+mm_generic_gsm_pending_registration_stop (MMGenericGsm *modem)
 {
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
 
     if (priv->pending_registration) {
         g_source_remove (priv->pending_registration);
@@ -615,7 +614,7 @@ reg_status_updated (MMGenericGsm *self, int new_value)
         status == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING ||
         status == MM_MODEM_GSM_NETWORK_REG_STATUS_DENIED)
 
-        pending_registration_stop (self);
+        mm_generic_gsm_pending_registration_stop (self);
 }
 
 static void
@@ -1555,7 +1554,7 @@ finalize (GObject *object)
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (object);
 
-    pending_registration_stop (MM_GENERIC_GSM (object));
+    mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (object));
 
     g_free (priv->driver);
     g_free (priv->data_device);
