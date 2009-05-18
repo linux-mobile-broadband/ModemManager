@@ -1072,6 +1072,8 @@ existing_apns_read (MMSerial *serial,
             g_match_info_free (match_info);
             g_regex_unref (r);
         }
+    } else if (strlen (response->str) == 0) {
+        /* No APNs configured, just don't set error */
     } else
         info->error = g_error_new_literal (MM_MODEM_ERROR,
                                            MM_MODEM_ERROR_GENERAL,
