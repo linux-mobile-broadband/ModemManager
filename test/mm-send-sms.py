@@ -33,7 +33,7 @@ msg_dict = dbus.Dictionary({ dbus.String('number') : dbus.String(number),
 sms_iface = dbus.Interface(proxy, dbus_interface='org.freedesktop.ModemManager.Modem.Gsm.SMS')
 try:
     sms_iface.Send(msg_dict)
-except e:
+except:
     print "Sending message failed"
 finally:
     modem.Enable(False)
