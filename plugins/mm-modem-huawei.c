@@ -34,6 +34,7 @@ mm_modem_huawei_new (const char *data_device,
     return MM_MODEM (g_object_new (MM_TYPE_MODEM_HUAWEI,
                                    MM_SERIAL_DEVICE, monitor_device,
                                    MM_MODEM_DEVICE, data_device,
+                                   MM_SERIAL_CARRIER_DETECT, FALSE,
                                    MM_MODEM_DRIVER, driver,
                                    MM_MODEM_TYPE, MM_MODEM_TYPE_GSM,
                                    NULL));

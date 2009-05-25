@@ -130,15 +130,13 @@ find_second_port (LibHalContext *ctx, const char *parent)
     int num_children = 0;
     int i;
 
+    if (!libhal_device_property_exists (ctx, parent, "usb.interface.number", NULL) ||
+        libhal_device_get_property_int (ctx, parent, "usb.interface.number", NULL) != 1)
+        return NULL;
+
     children = libhal_manager_find_device_string_match (ctx, "info.parent", parent, &num_children, NULL);
-    for (i = 0; i < num_children && second_port == NULL; i++) {
-        const char *child = children[i];
-
-        if (libhal_device_property_exists (ctx, child, "serial.port", NULL) &&
-            libhal_device_get_property_int (ctx, child, "serial.port", NULL) == 1)
-
-            second_port = libhal_device_get_property_string (ctx, child, "serial.device", NULL);
-    }
+    for (i = 0; i < num_children && second_port == NULL; i++)
+        second_port = libhal_device_get_property_string (ctx, children[i], "serial.device", NULL);
 
     libhal_free_string_array (children);
 
@@ -190,9 +188,8 @@ create_modem (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
     g_return_val_if_fail (driver != NULL, NULL);
 
     if (get_product (hal_ctx, udi) == 0x1001) {
-        /* This modem is handled by generic GSM device with carrier detection turned off */
+        /* This modem is handled by generic GSM device */
         modem = mm_generic_gsm_new (data_device, driver);
-        g_object_set (G_OBJECT (modem), MM_SERIAL_CARRIER_DETECT, FALSE, NULL);
     } else {
         monitor_device = get_monitor_device (hal_ctx, udi);
         modem = mm_modem_huawei_new (data_device, monitor_device, driver);
