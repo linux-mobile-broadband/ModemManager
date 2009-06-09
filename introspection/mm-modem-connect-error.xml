@@ -21,7 +21,7 @@
     </tp:docstring>
   </tp:error>
 
-  <tp:error name="NoAnser">
+  <tp:error name="NoAnswer">
     <tp:docstring>
       No answer.
     </tp:docstring>
