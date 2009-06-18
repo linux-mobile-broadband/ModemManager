@@ -199,6 +199,75 @@ impl_modem_disconnect (MMModem *modem,
 
 /*****************************************************************************/
 
+gboolean
+mm_modem_owns_port (MMModem *self,
+                    const char *subsys,
+                    const char *name)
+{
+    g_return_val_if_fail (self != NULL, FALSE);
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+    g_return_val_if_fail (subsys, FALSE);
+    g_return_val_if_fail (name, FALSE);
+
+    g_assert (MM_MODEM_GET_INTERFACE (self)->owns_port);
+    return MM_MODEM_GET_INTERFACE (self)->owns_port (self, subsys, name);
+}
+
+gboolean
+mm_modem_grab_port (MMModem *self,
+                    const char *subsys,
+                    const char *name,
+                    GError **error)
+{
+    g_return_val_if_fail (self != NULL, FALSE);
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+    g_return_val_if_fail (subsys, FALSE);
+    g_return_val_if_fail (name, FALSE);
+
+    g_assert (MM_MODEM_GET_INTERFACE (self)->grab_port);
+    return MM_MODEM_GET_INTERFACE (self)->grab_port (self, subsys, name, error);
+}
+
+void
+mm_modem_release_port (MMModem *self,
+                       const char *subsys,
+                       const char *name)
+{
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_MODEM (self));
+    g_return_if_fail (subsys);
+    g_return_if_fail (name);
+
+    g_assert (MM_MODEM_GET_INTERFACE (self)->release_port);
+    MM_MODEM_GET_INTERFACE (self)->release_port (self, subsys, name);
+}
+
+gboolean
+mm_modem_get_valid (MMModem *self)
+{
+    gboolean valid = FALSE;
+
+    g_return_val_if_fail (self != NULL, FALSE);
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+
+    g_object_get (G_OBJECT (self), MM_MODEM_VALID, &valid, NULL);
+    return valid;
+}
+
+char *
+mm_modem_get_device (MMModem *self)
+{
+    char *device;
+
+    g_return_val_if_fail (self != NULL, NULL);
+    g_return_val_if_fail (MM_IS_MODEM (self), NULL);
+
+    g_object_get (G_OBJECT (self), MM_MODEM_MASTER_DEVICE, &device, NULL);
+    return device;
+}
+
+/*****************************************************************************/
+
 static void
 mm_modem_init (gpointer g_iface)
 {
@@ -210,9 +279,17 @@ mm_modem_init (gpointer g_iface)
     /* Properties */
     g_object_interface_install_property
         (g_iface,
-         g_param_spec_string (MM_MODEM_DEVICE,
+         g_param_spec_string (MM_MODEM_DATA_DEVICE,
                               "Device",
-                              "Device",
+                              "Data device",
+                              NULL,
+                              G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_string (MM_MODEM_MASTER_DEVICE,
+                              "MasterDevice",
+                              "Master modem parent device of all the modem's ports",
                               NULL,
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
@@ -221,6 +298,14 @@ mm_modem_init (gpointer g_iface)
          g_param_spec_string (MM_MODEM_DRIVER,
                               "Driver",
                               "Driver",
+                              NULL,
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_string (MM_MODEM_PLUGIN,
+                              "Plugin",
+                              "Plugin name",
                               NULL,
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
@@ -241,6 +326,14 @@ mm_modem_init (gpointer g_iface)
                             MM_MODEM_IP_METHOD_DHCP,
                             MM_MODEM_IP_METHOD_PPP,
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_boolean (MM_MODEM_VALID,
+                               "Valid",
+                               "Modem is valid",
+                               FALSE,
+                               G_PARAM_READABLE));
 
     initialized = TRUE;
 }

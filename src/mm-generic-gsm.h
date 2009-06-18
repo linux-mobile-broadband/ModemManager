@@ -6,12 +6,12 @@
 #include "mm-modem-gsm-network.h"
 #include "mm-serial.h"
 
-#define MM_TYPE_GENERIC_GSM			(mm_generic_gsm_get_type ())
-#define MM_GENERIC_GSM(obj)			(G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_GENERIC_GSM, MMGenericGsm))
-#define MM_GENERIC_GSM_CLASS(klass)	(G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_GENERIC_GSM, MMGenericGsmClass))
-#define MM_IS_GENERIC_GSM(obj)		(G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_GENERIC_GSM))
-#define MM_IS_GENERIC_GSM_CLASS(klass)	(G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_GENERIC_GSM))
-#define MM_GENERIC_GSM_GET_CLASS(obj)	(G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_GENERIC_GSM, MMGenericGsmClass))
+#define MM_TYPE_GENERIC_GSM            (mm_generic_gsm_get_type ())
+#define MM_GENERIC_GSM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_GENERIC_GSM, MMGenericGsm))
+#define MM_GENERIC_GSM_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_GENERIC_GSM, MMGenericGsmClass))
+#define MM_IS_GENERIC_GSM(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_GENERIC_GSM))
+#define MM_IS_GENERIC_GSM_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_GENERIC_GSM))
+#define MM_GENERIC_GSM_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_GENERIC_GSM, MMGenericGsmClass))
 
 typedef struct {
     MMSerial parent;
@@ -23,8 +23,9 @@ typedef struct {
 
 GType mm_generic_gsm_get_type (void);
 
-MMModem *mm_generic_gsm_new (const char *serial_device,
-                             const char *driver);
+MMModem *mm_generic_gsm_new (const char *device,
+                             const char *driver,
+                             const char *plugin);
 
 void mm_generic_gsm_set_unsolicited_registration (MMGenericGsm *modem,
                                                   gboolean enabled);

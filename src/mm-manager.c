@@ -2,12 +2,12 @@
 
 #include <string.h>
 #include <gmodule.h>
+#define G_UDEV_API_IS_SUBJECT_TO_CHANGE
+#include <gudev/gudev.h>
 #include <dbus/dbus-glib.h>
 #include <dbus/dbus-glib-lowlevel.h>
 #include "mm-manager.h"
 #include "mm-errors.h"
-#include "mm-generic-gsm.h"
-#include "mm-generic-cdma.h"
 #include "mm-plugin.h"
 
 static gboolean impl_manager_enumerate_devices (MMManager *manager,
@@ -29,9 +29,11 @@ static guint signals[LAST_SIGNAL] = { 0 };
 
 #define MM_MANAGER_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MANAGER, MMManagerPrivate))
 
+#define DBUS_PATH_TAG "dbus-path"
+
 typedef struct {
     DBusGConnection *connection;
-    LibHalContext *hal_ctx;
+    GUdevClient *udev;
     GSList *plugins;
     GHashTable *modems;
 } MMManagerPrivate;
@@ -147,169 +149,78 @@ mm_manager_new (DBusGConnection *bus)
     return manager;
 }
 
-static char *
-get_driver_name (LibHalContext *ctx, const char *udi)
-{
-    char *parent_udi;
-    char *driver = NULL;
-
-    parent_udi = libhal_device_get_property_string (ctx, udi, "info.parent", NULL);
-	if (parent_udi) {
-		driver = libhal_device_get_property_string (ctx, parent_udi, "info.linux.driver", NULL);
-		libhal_free_string (parent_udi);
-	}
-
-    return driver;
-}
-
-static MMModem *
-create_generic_modem (MMManager *manager, const char *udi)
+static void
+remove_modem (MMManager *manager, MMModem *modem)
 {
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
-    MMModem *modem;
-    char **capabilities;
-    char **iter;
-    char *serial_device;
-    char *driver;
-    gboolean type_gsm = FALSE;
-    gboolean type_cdma = FALSE;
+    char *device;
 
-    capabilities = libhal_device_get_property_strlist (priv->hal_ctx, udi, "modem.command_sets", NULL);
-	for (iter = capabilities; iter && *iter; iter++) {
-		if (!strcmp (*iter, "GSM-07.07")) {
-			type_gsm = TRUE;
-			break;
-		}
-		if (!strcmp (*iter, "IS-707-A")) {
-			type_cdma = TRUE;
-			break;
-		}
-	}
-	g_strfreev (capabilities);
+    device = mm_modem_get_device (modem);
+    g_assert (device);
+    g_debug ("Removed modem %s", device);
 
-    if (!type_gsm && !type_cdma)
-        return NULL;
-
-    serial_device = libhal_device_get_property_string (priv->hal_ctx, udi, "serial.device", NULL);
-    g_return_val_if_fail (serial_device != NULL, NULL);
-
-    driver = get_driver_name (priv->hal_ctx, udi);
-    g_return_val_if_fail (driver != NULL, NULL);
-
-    if (type_gsm)
-        modem = mm_generic_gsm_new (serial_device, driver);
-    else
-        modem = mm_generic_cdma_new (serial_device, driver);
-
-    g_free (serial_device);
-    g_free (driver);
-
-    if (modem)
-        g_debug ("Created new generic modem (%s)", udi);
-    else
-        g_warning ("Failed to create generic modem (%s)", udi);
-
-    return modem;
+    g_signal_emit (manager, signals[DEVICE_REMOVED], 0, modem);
+    g_hash_table_remove (priv->modems, device);
+    g_free (device);
 }
 
 static void
-add_modem (MMManager *manager, const char *udi, MMModem *modem)
+modem_valid (MMModem *modem, GParamSpec *pspec, gpointer user_data)
 {
+    MMManager *manager = MM_MANAGER (user_data);
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
+    static guint32 id = 0;
+    char *path, *device;
 
-    g_hash_table_insert (priv->modems, g_strdup (udi), modem);
-    dbus_g_connection_register_g_object (priv->connection, udi, G_OBJECT (modem));
+    if (mm_modem_get_valid (modem)) {
+        path = g_strdup_printf (MM_DBUS_PATH"/Modems/%d", id++);
+        dbus_g_connection_register_g_object (priv->connection, path, G_OBJECT (modem));
+        g_object_set_data_full (G_OBJECT (modem), DBUS_PATH_TAG, path, (GDestroyNotify) g_free);
 
-    g_signal_emit (manager, signals[DEVICE_ADDED], 0, modem);
-}
+        device = mm_modem_get_device (modem);
+        g_assert (device);
+        g_debug ("Exported modem %s", device);
+        g_free (device);
 
-static MMModem *
-modem_exists (MMManager *manager, const char *udi)
-{
-    MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
-
-    return (MMModem *) g_hash_table_lookup (priv->modems, udi);
+        g_signal_emit (manager, signals[DEVICE_ADDED], 0, modem);
+    } else
+        remove_modem (manager, modem);
 }
 
 static void
-create_initial_modems_from_plugins (MMManager *manager)
+add_modem (MMManager *manager, MMModem *modem)
 {
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
-    GSList *iter;
+    char *device;
+    gboolean valid = FALSE;
 
-    for (iter = priv->plugins; iter; iter = iter->next) {
-        MMPlugin *plugin = MM_PLUGIN (iter->data);
-        char **udis;
-        int i;
-
-        udis = mm_plugin_list_supported_udis (plugin, priv->hal_ctx);
-        if (udis) {
-            for (i = 0; udis[i]; i++) {
-                char *udi = udis[i];
-                MMModem *modem;
-
-                if (modem_exists (manager, udi)) {
-                    g_warning ("Modem for UDI %s already exists, ignoring", udi);
-                    continue;
-                }
-
-                modem = mm_plugin_create_modem (plugin, priv->hal_ctx, udi);
-                if (modem)
-                    add_modem (manager, udi, modem);
-            }
-
-            g_strfreev (udis);
-        }
+    device = mm_modem_get_device (modem);
+    g_assert (device);
+    if (!g_hash_table_lookup (priv->modems, device)) {
+        g_hash_table_insert (priv->modems, g_strdup (device), modem);
+        g_debug ("Added modem %s", device);
+        g_signal_connect (modem, "notify::valid", G_CALLBACK (modem_valid), manager);
+        g_object_get (modem, MM_MODEM_VALID, &valid, NULL);
+        if (valid)
+            modem_valid (modem, NULL, manager);
     }
-}
-
-static void
-create_initial_modems_generic (MMManager *manager)
-{
-    MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
-    char **devices;
-    int num_devices;
-    int i;
-    DBusError err;
-
-    dbus_error_init (&err);
-    devices = libhal_find_device_by_capability (priv->hal_ctx, "modem", &num_devices, &err);
-    if (dbus_error_is_set (&err)) {
-        g_warning ("Could not list HAL devices: %s", err.message);
-        dbus_error_free (&err);
-    }
-
-    if (devices) {
-        for (i = 0; i < num_devices; i++) {
-            char *udi = devices[i];
-            MMModem *modem;
-
-            if (modem_exists (manager, udi))
-                /* Already exists, most likely handled by a plugin */
-                continue;
-
-            modem = create_generic_modem (manager, udi);
-            if (modem)
-                add_modem (manager, g_strdup (udi), modem);
-        }
-    }
-
-    g_strfreev (devices);
-}
-
-static void
-create_initial_modems (MMManager *manager)
-{
-    create_initial_modems_from_plugins (manager);
-    create_initial_modems_generic (manager);
+    g_free (device);
 }
 
 static void
 enumerate_devices_cb (gpointer key, gpointer val, gpointer user_data)
 {
+    MMModem *modem = MM_MODEM (val);
     GPtrArray **devices = (GPtrArray **) user_data;
+    const char *path;
+    gboolean valid = FALSE;
 
-    g_ptr_array_add (*devices, g_strdup ((char *) key));
+    g_object_get (G_OBJECT (modem), MM_MODEM_VALID, &valid, NULL);
+    if (valid) {
+        path = g_object_get_data (G_OBJECT (modem), DBUS_PATH_TAG);
+        g_return_if_fail (path != NULL);
+        g_ptr_array_add (*devices, g_strdup (path));
+    }
 }
 
 static gboolean
@@ -325,118 +236,164 @@ impl_manager_enumerate_devices (MMManager *manager,
     return TRUE;
 }
 
+typedef struct {
+    MMModem *modem;
+    const char *subsys;
+    const char *name;
+} FindPortInfo;
+
 static void
-device_added (LibHalContext *ctx, const char *udi)
+find_port (gpointer key, gpointer data, gpointer user_data)
 {
-    MMManager *manager = MM_MANAGER (libhal_ctx_get_user_data (ctx));
+    FindPortInfo *info = user_data;
+    MMModem *modem = MM_MODEM (data);
+
+    if (!info->modem && mm_modem_owns_port (modem, info->subsys, info->name))
+        info->modem = modem;
+}
+
+static MMModem *
+find_modem_for_port (MMManager *manager, const char *subsys, const char *name)
+{
+    MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
+    FindPortInfo info = { NULL, subsys, name };
+
+    g_hash_table_foreach (priv->modems, find_port, &info);
+    return info.modem;
+}
+
+static void
+device_added (MMManager *manager, GUdevDevice *device)
+{
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
     GSList *iter;
     MMModem *modem = NULL;
+    const char *subsys, *name;
+    MMPlugin *best_plugin = NULL;
+    guint32 best_level = 0;
+    GError *error = NULL;
 
-    if (modem_exists (manager, udi))
-        /* Shouldn't happen */
+    g_return_if_fail (device != NULL);
+
+    subsys = g_udev_device_get_subsystem (device);
+    name = g_udev_device_get_name (device);
+
+    if (find_modem_for_port (manager, subsys, name))
         return;
 
-    for (iter = priv->plugins; iter && modem == NULL; iter = iter->next) {
+    /* Build up the list of plugins that support this port */
+    for (iter = priv->plugins; iter; iter = iter->next) {
         MMPlugin *plugin = MM_PLUGIN (iter->data);
+        guint32 level;
 
-        if (mm_plugin_supports_udi (plugin, ctx, udi)) {
-            modem = mm_plugin_create_modem (plugin, ctx, udi);
-            if (modem)
-                break;
+        level = mm_plugin_supports_port (plugin, subsys, name);
+        if (level > best_level) {
+            best_plugin = plugin;
+            best_level = level;
         }
     }
 
-    if (!modem)
-        /* None of the plugins supported the udi, try generic devices */
-        modem = create_generic_modem (manager, udi);
+    /* Let the best plugin handle this port */
+    if (!best_plugin)
+        return;
 
-    if (modem)
-        add_modem (manager, udi, modem);
-}
-
-static void
-device_removed (LibHalContext *ctx, const char *udi)
-{
-    MMManager *manager = MM_MANAGER (libhal_ctx_get_user_data (ctx));
-    MMModem *modem;
-
-    modem = modem_exists (manager, udi);
+    modem = mm_plugin_grab_port (best_plugin, subsys, name, &error);
     if (modem) {
-        g_debug ("Removed modem %s", udi);
-        g_signal_emit (manager, signals[DEVICE_REMOVED], 0, modem);
-        g_hash_table_remove (MM_MANAGER_GET_PRIVATE (manager)->modems, udi);
+        guint32 modem_type = MM_MODEM_TYPE_UNKNOWN;
+        const char *type_name = "UNKNOWN";
+
+        g_object_get (G_OBJECT (modem), MM_MODEM_TYPE, &modem_type, NULL);
+        if (modem_type == MM_MODEM_TYPE_GSM)
+            type_name = "GSM";
+        else if (modem_type == MM_MODEM_TYPE_CDMA)
+            type_name = "CDMA";
+
+        g_message ("(%s): %s modem %s claimed port %s",
+                   mm_plugin_get_name (best_plugin),
+                   type_name,
+                   mm_modem_get_device (modem),
+                   name);
+    } else {
+        g_warning ("%s: plugin '%s' claimed to support %s/%s but couldn't: (%d) %s",
+                   __func__, mm_plugin_get_name (best_plugin), subsys, name,
+                   error ? error->code : -1,
+                   (error && error->message) ? error->message : "(unknown)");
+        return;
     }
+
+    add_modem (manager, modem);
 }
 
 static void
-device_new_capability (LibHalContext *ctx, const char *udi, const char *capability)
+device_removed (MMManager *manager, GUdevDevice *device)
 {
-    device_added (ctx, udi);
+    MMModem *modem;
+    const char *subsys, *name;
+
+    g_return_if_fail (device != NULL);
+
+    subsys = g_udev_device_get_subsystem (device);
+    name = g_udev_device_get_name (device);
+    modem = find_modem_for_port (manager, subsys, name);
+    if (modem)
+        mm_modem_release_port (modem, subsys, name);
 }
 
-
-DBusGConnection *
-mm_manager_get_bus (MMManager *manager)
+static void
+handle_uevent (GUdevClient *client,
+               const char *action,
+               GUdevDevice *device,
+               gpointer user_data)
 {
-    g_return_val_if_fail (MM_IS_MANAGER (manager), NULL);
+    MMManager *self = MM_MANAGER (user_data);
+	const char *subsys;
 
-    return MM_MANAGER_GET_PRIVATE (manager)->connection;
-}
+	g_return_if_fail (action != NULL);
 
-static gboolean
-remove_one (gpointer key,
-            gpointer value,
-            gpointer user_data)
-{
-    const char *udi = (char *) key;
-    MMModem *modem = MM_MODEM (value);
-    MMManager *manager = MM_MANAGER (user_data);
+	/* A bit paranoid */
+	subsys = g_udev_device_get_subsystem (device);
+	g_return_if_fail (subsys != NULL);
 
-    g_debug ("Removed modem %s", udi);
-    g_signal_emit (manager, signals[DEVICE_REMOVED], 0, modem);
+	g_return_if_fail (!strcmp (subsys, "tty") || !strcmp (subsys, "net"));
 
-    return TRUE;
+	if (!strcmp (action, "add"))
+		device_added (self, device);
+	else if (!strcmp (action, "remove"))
+		device_removed (self, device);
 }
 
 void
-mm_manager_set_hal_ctx (MMManager *manager,
-                        LibHalContext *hal_ctx)
+mm_manager_start (MMManager *manager)
 {
     MMManagerPrivate *priv;
+    GList *devices, *iter;
 
+    g_return_if_fail (manager != NULL);
     g_return_if_fail (MM_IS_MANAGER (manager));
 
     priv = MM_MANAGER_GET_PRIVATE (manager);
-    priv->hal_ctx = hal_ctx;
 
-    if (hal_ctx) {
-        libhal_ctx_set_user_data (hal_ctx, manager);
-        libhal_ctx_set_device_added (hal_ctx, device_added);
-        libhal_ctx_set_device_removed (hal_ctx, device_removed);
-        libhal_ctx_set_device_new_capability (hal_ctx, device_new_capability);
+    devices = g_udev_client_query_by_subsystem (priv->udev, "tty");
+    for (iter = devices; iter; iter = g_list_next (iter))
+        device_added (manager, G_UDEV_DEVICE (iter->data));
 
-        create_initial_modems (manager);
-    } else {
-        g_hash_table_foreach_remove (priv->modems, remove_one, manager);
-    }
-}
-
-LibHalContext *
-mm_manager_get_hal_ctx (MMManager *manager)
-{
-    g_return_val_if_fail (MM_IS_MANAGER (manager), NULL);
-
-    return MM_MANAGER_GET_PRIVATE (manager)->hal_ctx;
+    devices = g_udev_client_query_by_subsystem (priv->udev, "net");
+    for (iter = devices; iter; iter = g_list_next (iter))
+        device_added (manager, G_UDEV_DEVICE (iter->data));
 }
 
 static void
 mm_manager_init (MMManager *manager)
 {
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
+    const char *subsys[3] = { "tty", "net", NULL };
 
     priv->modems = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
     load_plugins (manager);
+
+    priv->udev = g_udev_client_new (subsys);
+    g_assert (priv->udev);
+    g_signal_connect (priv->udev, "uevent", G_CALLBACK (handle_uevent), manager);
 }
 
 static void
@@ -449,11 +406,8 @@ finalize (GObject *object)
     g_slist_foreach (priv->plugins, (GFunc) g_object_unref, NULL);
     g_slist_free (priv->plugins);
 
-    if (priv->hal_ctx) {
-        mm_manager_set_hal_ctx (MM_MANAGER (object), NULL);
-        libhal_ctx_shutdown (priv->hal_ctx, NULL);
-        libhal_ctx_free (priv->hal_ctx);
-    }
+    if (priv->udev)
+        g_object_unref (priv->udev);
 
     if (priv->connection)
         dbus_g_connection_unref (priv->connection);

@@ -51,7 +51,15 @@
 
     <property name="Device" type="s" access="read">
       <tp:docstring>
-	The device to use for IP configuration and traffic.
+	The modem port to use for IP configuration and traffic.
+      </tp:docstring>
+    </property>
+
+    <property name="MasterDevice" type="s" access="read">
+      <tp:docstring>
+	The physical modem device reference (ie, USB, PCI, PCMCIA device), which
+	may be dependent upon the operating system.  In Linux for example, this
+	points to a sysfs path of the usb_device object.
       </tp:docstring>
     </property>
 

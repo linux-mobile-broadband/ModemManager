@@ -25,3 +25,5 @@ ModemManager.pc
 marshallers/mm-marshal.[ch]
 src/modem-manager
 docs/spec.html
+callouts/mm-modem-probe
+

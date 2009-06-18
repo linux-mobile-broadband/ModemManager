@@ -2,27 +2,35 @@ sbin_PROGRAMS = modem-manager
 
 modem_manager_CPPFLAGS = \
 	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
 	-I${top_builddir}/marshallers \
 	-DPLUGINDIR=\"$(pkglibdir)\"
 
 modem_manager_LDADD = \
 	$(MM_LIBS) \
+	$(GUDEV_LIBS) \
 	$(top_builddir)/marshallers/libmarshallers.la
 
 modem_manager_SOURCES = \
 	main.c \
 	mm-callback-info.c \
 	mm-callback-info.h \
-	mm-generic-cdma.c \
-	mm-generic-cdma.h \
-	mm-generic-gsm.c \
-	mm-generic-gsm.h \
 	mm-errors.c \
 	mm-errors.h \
 	mm-manager.c \
 	mm-manager.h \
 	mm-modem.c \
 	mm-modem.h \
+	mm-serial.c \
+	mm-serial.h \
+	mm-serial-port.c \
+	mm-serial-port.h \
+	mm-serial-parsers.c \
+	mm-serial-parsers.h \
+	mm-generic-cdma.c \
+	mm-generic-cdma.h \
+	mm-generic-gsm.c \
+	mm-generic-gsm.h \
 	mm-modem-cdma.c \
 	mm-modem-cdma.h \
 	mm-modem-gsm-card.c \
@@ -36,11 +44,7 @@ modem_manager_SOURCES = \
 	mm-options.c \
 	mm-options.h \
 	mm-plugin.c \
-	mm-plugin.h \
-	mm-serial.c \
-	mm-serial.h \
-	mm-serial-parsers.c \
-	mm-serial-parsers.h
+	mm-plugin.h
 
 mm-manager-glue.h: $(top_srcdir)/introspection/mm-manager.xml
 	dbus-binding-tool --prefix=mm_manager --mode=glib-server --output=$@ $<

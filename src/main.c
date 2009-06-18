@@ -5,7 +5,6 @@
 #include <string.h>
 #include <dbus/dbus-glib.h>
 #include <dbus/dbus-glib-lowlevel.h>
-#include <libhal.h>
 #include "mm-manager.h"
 #include "mm-options.h"
 
@@ -135,87 +134,11 @@ create_dbus_proxy (DBusGConnection *bus)
     return proxy;
 }
 
-static void
-hal_init (MMManager *manager)
-{
-    LibHalContext *hal_ctx;
-    DBusError dbus_error;
-
-    hal_ctx = libhal_ctx_new ();
-	if (!hal_ctx) {
-		g_warning ("Could not get connection to the HAL service.");
-    }
-
-	libhal_ctx_set_dbus_connection (hal_ctx, dbus_g_connection_get_connection (mm_manager_get_bus (manager)));
-
-	dbus_error_init (&dbus_error);
-	if (!libhal_ctx_init (hal_ctx, &dbus_error)) {
-		g_warning ("libhal_ctx_init() failed: %s", dbus_error.message);
-        dbus_error_free (&dbus_error);
-    }
-
-    mm_manager_set_hal_ctx (manager, hal_ctx);
-}
-
-static void
-hal_deinit (MMManager *manager)
-{
-    LibHalContext *hal_ctx;
-
-    hal_ctx = mm_manager_get_hal_ctx (manager);
-    if (hal_ctx) {
-        libhal_ctx_shutdown (hal_ctx, NULL);
-        libhal_ctx_free (hal_ctx);
-        mm_manager_set_hal_ctx (manager, NULL);
-    }
-}
-
 static gboolean
-hal_on_bus (DBusGProxy *proxy)
+start_manager (gpointer user_data)
 {
-    GError *err = NULL;
-    gboolean has_owner = FALSE;
-
-    if (!dbus_g_proxy_call (proxy,
-                            "NameHasOwner", &err,
-                            G_TYPE_STRING, HAL_DBUS_SERVICE,
-                            G_TYPE_INVALID,
-                            G_TYPE_BOOLEAN, &has_owner,
-                            G_TYPE_INVALID)) {
-        g_warning ("Error on NameHasOwner DBUS call: %s", err->message);
-        g_error_free (err);
-    }
-
-    return has_owner;
-}
-
-static void
-name_owner_changed (DBusGProxy *proxy,
-                    const char *name,
-                    const char *old_owner,
-                    const char *new_owner,
-                    gpointer user_data)
-{
-    MMManager *manager;
-    gboolean old_owner_good;
-    gboolean new_owner_good;
-
-    /* Only care about signals from HAL */
-    if (strcmp (name, HAL_DBUS_SERVICE))
-        return;
-
-    manager = MM_MANAGER (user_data);
-    old_owner_good = (old_owner && (strlen (old_owner) > 0));
-    new_owner_good = (new_owner && (strlen (new_owner) > 0));
-
-	if (!old_owner_good && new_owner_good) {
-		g_message ("HAL appeared");
-		hal_init (manager);
-	} else if (old_owner_good && !new_owner_good) {
-		/* HAL went away. Bad HAL. */
-		g_message ("HAL disappeared");
-		hal_deinit (manager);
-	}
+    mm_manager_start (MM_MANAGER (user_data));
+    return FALSE;
 }
 
 int
@@ -249,21 +172,13 @@ main (int argc, char *argv[])
         return -1;
 
     manager = mm_manager_new (bus);
-
-    dbus_g_proxy_connect_signal (proxy,
-                                 "NameOwnerChanged",
-                                 G_CALLBACK (name_owner_changed),
-                                 manager, NULL);
-
-    if (hal_on_bus (proxy))
-        hal_init (manager);
+    g_idle_add (start_manager, manager);
 
     loop = g_main_loop_new (NULL, FALSE);
     g_signal_connect (proxy, "destroy", G_CALLBACK (destroy_cb), loop);
 
     g_main_loop_run (loop);
 
-    hal_deinit (manager);
     g_object_unref (manager);
     g_object_unref (proxy);
     dbus_g_connection_unref (bus);    

@@ -16,25 +16,124 @@ static gpointer mm_generic_cdma_parent_class = NULL;
 
 typedef struct {
     char *driver;
+    char *plugin;
+    char *device;
+
+    guint32 ip_method;
+    gboolean valid;
+
+    MMSerialPort *primary;
+    MMSerialPort *secondary;
 } MMGenericCdmaPrivate;
 
 MMModem *
-mm_generic_cdma_new (const char *serial_device, const char *driver)
+mm_generic_cdma_new (const char *device,
+                     const char *driver,
+                     const char *plugin)
 {
-    g_return_val_if_fail (serial_device != NULL, NULL);
+    g_return_val_if_fail (device != NULL, NULL);
     g_return_val_if_fail (driver != NULL, NULL);
+    g_return_val_if_fail (plugin != NULL, NULL);
 
     return MM_MODEM (g_object_new (MM_TYPE_GENERIC_CDMA,
-                                   MM_SERIAL_DEVICE, serial_device,
+                                   MM_MODEM_MASTER_DEVICE, device,
                                    MM_MODEM_DRIVER, driver,
-                                   MM_MODEM_TYPE, MM_MODEM_TYPE_CDMA,
+                                   MM_MODEM_PLUGIN, plugin,
                                    NULL));
 }
 
 /*****************************************************************************/
 
 static void
-enable_error_reporting_done (MMSerial *serial,
+check_valid (MMGenericCdma *self)
+{
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
+    gboolean new_valid = FALSE;
+
+    if (priv->primary)
+        new_valid = TRUE;
+
+    if (priv->valid != new_valid) {
+        priv->valid = new_valid;
+        g_object_notify (G_OBJECT (self), MM_MODEM_VALID);
+    }
+}
+
+static gboolean
+owns_port (MMModem *modem, const char *subsys, const char *name)
+{
+    MMGenericCdma *self = MM_GENERIC_CDMA (modem);
+
+    if (strcmp (subsys, "tty"))
+        return FALSE;
+
+    return !!mm_serial_get_port (MM_SERIAL (self), name);
+}
+
+static gboolean
+grab_port (MMModem *modem,
+           const char *subsys,
+           const char *name,
+           GError **error)
+{
+    MMGenericCdma *self = MM_GENERIC_CDMA (modem);
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
+    MMSerialPortType ptype = MM_SERIAL_PORT_TYPE_IGNORED;
+    MMSerialPort *port;
+
+    if (strcmp (subsys, "tty"))
+        return FALSE;
+
+    if (!priv->primary)
+        ptype = MM_SERIAL_PORT_TYPE_PRIMARY;
+    else if (!priv->secondary)
+        ptype = MM_SERIAL_PORT_TYPE_SECONDARY;
+
+    port = mm_serial_add_port (MM_SERIAL (self), name, ptype);
+    g_object_set (G_OBJECT (port), MM_SERIAL_PORT_CARRIER_DETECT, FALSE, NULL);
+    mm_serial_port_set_response_parser (port,
+                                        mm_serial_parser_v1_parse,
+                                        mm_serial_parser_v1_new (),
+                                        mm_serial_parser_v1_destroy);
+
+    if (ptype == MM_SERIAL_PORT_TYPE_PRIMARY) {
+        priv->primary = port;
+        g_object_notify (G_OBJECT (self), MM_MODEM_DATA_DEVICE);
+        check_valid (self);
+    } else if (ptype == MM_SERIAL_PORT_TYPE_SECONDARY)
+        priv->secondary = port;
+
+    return TRUE;
+}
+
+static void
+release_port (MMModem *modem, const char *subsys, const char *name)
+{
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
+    MMSerialPort *port;
+
+    if (strcmp (subsys, "tty"))
+        return;
+
+    port = mm_serial_get_port (MM_SERIAL (modem), name);
+    if (!port)
+        return;
+
+    if (port == priv->primary) {
+        mm_serial_remove_port (MM_SERIAL (modem), port);
+        priv->primary = NULL;
+    }
+
+    if (port == priv->secondary) {
+        mm_serial_remove_port (MM_SERIAL (modem), port);
+        priv->secondary = NULL;
+    }
+
+    check_valid (MM_GENERIC_CDMA (modem));
+}
+
+static void
+enable_error_reporting_done (MMSerialPort *port,
                              GString *response,
                              GError *error,
                              gpointer user_data)
@@ -49,7 +148,7 @@ enable_error_reporting_done (MMSerial *serial,
 }
 
 static void
-init_done (MMSerial *serial,
+init_done (MMSerialPort *port,
            GString *response,
            GError *error,
            gpointer user_data)
@@ -65,14 +164,14 @@ init_done (MMSerial *serial,
         FIXME: It's mandatory by spec, so it really shouldn't be optional. Figure
         out which CDMA modems have problems with it and implement plugin for them.
         */
-        mm_serial_queue_command (serial, "+CMEE=1", 3, enable_error_reporting_done, user_data);
+        mm_serial_port_queue_command (port, "+CMEE=1", 3, enable_error_reporting_done, user_data);
     }
 }
 
 static void
-flash_done (MMSerial *serial, gpointer user_data)
+flash_done (MMSerialPort *port, gpointer user_data)
 {
-    mm_serial_queue_command (serial, "Z E0 V1 X4 &C1", 3, init_done, user_data);
+    mm_serial_port_queue_command (port, "Z E0 V1 X4 &C1", 3, init_done, user_data);
 }
 
 static void
@@ -81,25 +180,26 @@ enable (MMModem *modem,
         MMModemFn callback,
         gpointer user_data)
 {
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
     MMCallbackInfo *info;
 
     info = mm_callback_info_new (modem, callback, user_data);
 
     if (!do_enable) {
-        mm_serial_close (MM_SERIAL (modem));
+        mm_serial_port_close (priv->primary);
         mm_callback_info_schedule (info);
         return;
     }
 
-    if (mm_serial_open (MM_SERIAL (modem), &info->error))
-        mm_serial_flash (MM_SERIAL (modem), 100, flash_done, info);
+    if (mm_serial_port_open (priv->primary, &info->error))
+        mm_serial_port_flash (priv->primary, 100, flash_done, info);
 
     if (info->error)
         mm_callback_info_schedule (info);
 }
 
 static void
-dial_done (MMSerial *serial,
+dial_done (MMSerialPort *port,
            GString *response,
            GError *error,
            gpointer user_data)
@@ -118,17 +218,18 @@ connect (MMModem *modem,
          MMModemFn callback,
          gpointer user_data)
 {
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
     MMCallbackInfo *info;
     char *command;
 
     info = mm_callback_info_new (modem, callback, user_data);
     command = g_strconcat ("DT", number, NULL);
-    mm_serial_queue_command (MM_SERIAL (modem), command, 60, dial_done, info);
+    mm_serial_port_queue_command (priv->primary, command, 60, dial_done, info);
     g_free (command);
 }
 
 static void
-disconnect_flash_done (MMSerial *serial, gpointer user_data)
+disconnect_flash_done (MMSerialPort *port, gpointer user_data)
 {
     mm_callback_info_schedule ((MMCallbackInfo *) user_data);
 }
@@ -138,14 +239,17 @@ disconnect (MMModem *modem,
             MMModemFn callback,
             gpointer user_data)
 {
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
     MMCallbackInfo *info;
 
+    g_return_if_fail (priv->primary != NULL);
+
     info = mm_callback_info_new (modem, callback, user_data);
-    mm_serial_flash (MM_SERIAL (modem), 1000, disconnect_flash_done, info);
+    mm_serial_port_flash (priv->primary, 1000, disconnect_flash_done, info);
 }
 
 static void
-get_signal_quality_done (MMSerial *serial,
+get_signal_quality_done (MMSerialPort *port,
                          GString *response,
                          GError *error,
                          gpointer user_data)
@@ -182,10 +286,15 @@ get_signal_quality (MMModemCdma *modem,
                     MMModemUIntFn callback,
                     gpointer user_data)
 {
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
     MMCallbackInfo *info;
 
     info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-    mm_serial_queue_command (MM_SERIAL (modem), "+CSQ", 3, get_signal_quality_done, info);
+    /* Prefer secondary port for signal strength */
+    mm_serial_port_queue_command (priv->secondary ? priv->secondary : priv->primary,
+                                  "+CSQ",
+                                  3,
+                                  get_signal_quality_done, info);
 }
 
 /*****************************************************************************/
@@ -261,6 +370,7 @@ simple_connect (MMModemSimple *simple,
                 gpointer user_data)
 {
     MMCallbackInfo *info;
+    GError *error = NULL;
 
     info = mm_callback_info_new (MM_MODEM (simple), callback, user_data);
     mm_callback_info_set_data (info, "simple-connect-properties", 
@@ -268,12 +378,12 @@ simple_connect (MMModemSimple *simple,
                                (GDestroyNotify) g_hash_table_unref);
 
     /* At least number must be present */
-    if (!simple_get_string_property (info, "number", &info->error)) {
-        if (!info->error)
-            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Missing number property");
+    if (!simple_get_string_property (info, "number", &error)) {
+        if (!error)
+            error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Missing number property");
     }
 
-    simple_state_machine (MM_MODEM (simple), NULL, info);
+    simple_state_machine (MM_MODEM (simple), error, info);
 }
 
 static void
@@ -340,6 +450,9 @@ simple_get_status (MMModemSimple *simple,
 static void
 modem_init (MMModem *modem_class)
 {
+    modem_class->owns_port = owns_port;
+    modem_class->grab_port = grab_port;
+    modem_class->release_port = release_port;
     modem_class->enable = enable;
     modem_class->connect = connect;
     modem_class->disconnect = disconnect;
@@ -361,24 +474,32 @@ modem_simple_init (MMModemSimple *class)
 static void
 mm_generic_cdma_init (MMGenericCdma *self)
 {
-    mm_serial_set_response_parser (MM_SERIAL (self),
-                                   mm_serial_parser_v1_parse,
-                                   mm_serial_parser_v1_new (),
-                                   mm_serial_parser_v1_destroy);
 }
 
 static void
 set_property (GObject *object, guint prop_id,
               const GValue *value, GParamSpec *pspec)
 {
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (object);
+
     switch (prop_id) {
     case MM_MODEM_PROP_DRIVER:
         /* Construct only */
-        MM_GENERIC_CDMA_GET_PRIVATE (object)->driver = g_value_dup_string (value);
+        priv->driver = g_value_dup_string (value);
         break;
-    case MM_MODEM_PROP_DEVICE:
-    case MM_MODEM_PROP_TYPE:
+    case MM_MODEM_PROP_PLUGIN:
+        /* Construct only */
+        priv->plugin = g_value_dup_string (value);
+        break;
+    case MM_MODEM_PROP_MASTER_DEVICE:
+        /* Constrcut only */
+        priv->device = g_value_dup_string (value);
+        break;
     case MM_MODEM_PROP_IP_METHOD:
+        priv->ip_method = g_value_get_uint (value);
+        break;
+    case MM_MODEM_PROP_TYPE:
+    case MM_MODEM_PROP_VALID:
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -390,18 +511,32 @@ static void
 get_property (GObject *object, guint prop_id,
               GValue *value, GParamSpec *pspec)
 {
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (object);
+
     switch (prop_id) {
-    case MM_MODEM_PROP_DEVICE:
-        g_value_set_string (value, mm_serial_get_device (MM_SERIAL (object)));
+    case MM_MODEM_PROP_DATA_DEVICE:
+        if (priv->primary)
+            g_value_set_string (value, mm_serial_port_get_device (priv->primary));
+        else
+            g_value_set_string (value, NULL);
+        break;
+    case MM_MODEM_PROP_MASTER_DEVICE:
+        g_value_set_string (value, priv->device);
         break;
     case MM_MODEM_PROP_DRIVER:
-        g_value_set_string (value, MM_GENERIC_CDMA_GET_PRIVATE (object)->driver);
+        g_value_set_string (value, priv->driver);
+        break;
+    case MM_MODEM_PROP_PLUGIN:
+        g_value_set_string (value, priv->plugin);
         break;
     case MM_MODEM_PROP_TYPE:
         g_value_set_uint (value, MM_MODEM_TYPE_CDMA);
         break;
     case MM_MODEM_PROP_IP_METHOD:
-        g_value_set_uint (value, MM_MODEM_IP_METHOD_PPP);
+        g_value_set_uint (value, priv->ip_method);
+        break;
+    case MM_MODEM_PROP_VALID:
+        g_value_set_boolean (value, priv->valid);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -434,12 +569,20 @@ mm_generic_cdma_class_init (MMGenericCdmaClass *klass)
 
     /* Properties */
     g_object_class_override_property (object_class,
-                                      MM_MODEM_PROP_DEVICE,
-                                      MM_MODEM_DEVICE);
+                                      MM_MODEM_PROP_DATA_DEVICE,
+                                      MM_MODEM_DATA_DEVICE);
+
+    g_object_class_override_property (object_class,
+                                      MM_MODEM_PROP_MASTER_DEVICE,
+                                      MM_MODEM_MASTER_DEVICE);
 
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_DRIVER,
                                       MM_MODEM_DRIVER);
+
+    g_object_class_override_property (object_class,
+                                      MM_MODEM_PROP_PLUGIN,
+                                      MM_MODEM_PLUGIN);
 
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_TYPE,
@@ -448,6 +591,10 @@ mm_generic_cdma_class_init (MMGenericCdmaClass *klass)
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_IP_METHOD,
                                       MM_MODEM_IP_METHOD);
+
+    g_object_class_override_property (object_class,
+                                      MM_MODEM_PROP_VALID,
+                                      MM_MODEM_VALID);
 }
 
 GType

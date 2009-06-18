@@ -18,10 +18,14 @@ static gpointer mm_generic_gsm_parent_class = NULL;
 
 typedef struct {
     char *driver;
+    char *plugin;
+    char *device;
+
+    gboolean valid;
+
     char *data_device;
     char *oper_code;
     char *oper_name;
-    guint32 modem_type;
     guint32 ip_method;
     gboolean unsolicited_registration;
 
@@ -30,24 +34,39 @@ typedef struct {
 
     guint32 signal_quality;
     guint32 cid;
+
+    MMSerialPort *primary;
+    MMSerialPort *secondary;
 } MMGenericGsmPrivate;
 
-static void get_registration_status (MMSerial *serial, MMCallbackInfo *info);
-static void read_operator_done (MMSerial *serial,
-                                GString *response,
-                                GError *error,
-                                gpointer user_data);
+static void get_registration_status (MMSerialPort *port, MMCallbackInfo *info);
+static void read_operator_code_done (MMSerialPort *port,
+                                     GString *response,
+                                     GError *error,
+                                     gpointer user_data);
+
+static void read_operator_name_done (MMSerialPort *port,
+                                     GString *response,
+                                     GError *error,
+                                     gpointer user_data);
+
+static void reg_state_changed (MMSerialPort *port,
+                               GMatchInfo *match_info,
+                               gpointer user_data);
 
 MMModem *
-mm_generic_gsm_new (const char *serial_device, const char *driver)
+mm_generic_gsm_new (const char *device,
+                    const char *driver,
+                    const char *plugin)
 {
-    g_return_val_if_fail (serial_device != NULL, NULL);
+    g_return_val_if_fail (device != NULL, NULL);
     g_return_val_if_fail (driver != NULL, NULL);
+    g_return_val_if_fail (plugin != NULL, NULL);
 
     return MM_MODEM (g_object_new (MM_TYPE_GENERIC_GSM,
-                                   MM_SERIAL_DEVICE, serial_device,
+                                   MM_MODEM_MASTER_DEVICE, device,
                                    MM_MODEM_DRIVER, driver,
-                                   MM_MODEM_TYPE, MM_MODEM_TYPE_GSM,
+                                   MM_MODEM_PLUGIN, plugin,
                                    NULL));
 }
 
@@ -101,8 +120,8 @@ mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
 
         if (status == MM_MODEM_GSM_NETWORK_REG_STATUS_HOME ||
             status == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING) {
-            mm_serial_queue_command (MM_SERIAL (modem), "+COPS=3,2;+COPS?", 3, read_operator_done, GINT_TO_POINTER (0));
-            mm_serial_queue_command (MM_SERIAL (modem), "+COPS=3,0;+COPS?", 3, read_operator_done, GINT_TO_POINTER (1));
+            mm_serial_port_queue_command (priv->primary, "+COPS=3,2;+COPS?", 3, read_operator_code_done, modem);
+            mm_serial_port_queue_command (priv->primary, "+COPS=3,0;+COPS?", 3, read_operator_name_done, modem);
             mm_modem_gsm_network_get_signal_quality (MM_MODEM_GSM_NETWORK (modem), got_signal_quality, NULL);
         } else {
             g_free (priv->oper_code);
@@ -116,7 +135,7 @@ mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
 }
 
 static void
-pin_check_done (MMSerial *serial,
+pin_check_done (MMSerialPort *port,
                 GString *response,
                 GError *error,
                 gpointer user_data)
@@ -150,18 +169,113 @@ mm_generic_gsm_check_pin (MMGenericGsm *modem,
                           MMModemFn callback,
                           gpointer user_data)
 {
+    MMGenericGsmPrivate *priv;
     MMCallbackInfo *info;
 
     g_return_if_fail (MM_IS_GENERIC_GSM (modem));
 
+    priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
-    mm_serial_queue_command (MM_SERIAL (modem), "+CPIN?", 3, pin_check_done, info);
+    mm_serial_port_queue_command (priv->primary, "+CPIN?", 3, pin_check_done, info);
 }
 
 /*****************************************************************************/
 
 static void
-enable_done (MMSerial *serial,
+check_valid (MMGenericGsm *self)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    gboolean new_valid = FALSE;
+
+    if (priv->primary)
+        new_valid = TRUE;
+
+    if (priv->valid != new_valid) {
+        priv->valid = new_valid;
+        g_object_notify (G_OBJECT (self), MM_MODEM_VALID);
+    }
+}
+
+static gboolean
+owns_port (MMModem *modem, const char *subsys, const char *name)
+{
+    MMGenericGsm *self = MM_GENERIC_GSM (modem);
+
+    if (strcmp (subsys, "tty"))
+        return FALSE;
+
+    return !!mm_serial_get_port (MM_SERIAL (self), name);
+}
+
+static gboolean
+grab_port (MMModem *modem,
+           const char *subsys,
+           const char *name,
+           GError **error)
+{
+    MMGenericGsm *self = MM_GENERIC_GSM (modem);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    MMSerialPortType ptype = MM_SERIAL_PORT_TYPE_IGNORED;
+    MMSerialPort *port;
+    GRegex *regex;
+
+    if (strcmp (subsys, "tty"))
+        return FALSE;
+
+    if (!priv->primary)
+        ptype = MM_SERIAL_PORT_TYPE_PRIMARY;
+    else if (!priv->secondary)
+        ptype = MM_SERIAL_PORT_TYPE_SECONDARY;
+
+    port = mm_serial_add_port (MM_SERIAL (self), name, ptype);
+    mm_serial_port_set_response_parser (port,
+                                        mm_serial_parser_v1_parse,
+                                        mm_serial_parser_v1_new (),
+                                        mm_serial_parser_v1_destroy);
+
+    regex = g_regex_new ("\\r\\n\\+CREG: (\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    mm_serial_port_add_unsolicited_msg_handler (port, regex, reg_state_changed, self, NULL);
+    g_regex_unref (regex);
+
+
+    if (ptype == MM_SERIAL_PORT_TYPE_PRIMARY) {
+        priv->primary = port;
+        g_object_notify (G_OBJECT (self), MM_MODEM_DATA_DEVICE);
+        check_valid (self);
+    } else if (ptype == MM_SERIAL_PORT_TYPE_SECONDARY)
+        priv->secondary = port;
+
+    return TRUE;
+}
+
+static void
+release_port (MMModem *modem, const char *subsys, const char *name)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+    MMSerialPort *port;
+
+    if (strcmp (subsys, "tty"))
+        return;
+
+    port = mm_serial_get_port (MM_SERIAL (modem), name);
+    if (!port)
+        return;
+
+    if (port == priv->primary) {
+        mm_serial_remove_port (MM_SERIAL (modem), port);
+        priv->primary = NULL;
+        check_valid (MM_GENERIC_GSM (modem));
+    }
+
+    if (port == priv->secondary) {
+        mm_serial_remove_port (MM_SERIAL (modem), port);
+        priv->secondary = NULL;
+        check_valid (MM_GENERIC_GSM (modem));
+    }
+}
+
+static void
+enable_done (MMSerialPort *port,
              GString *response,
              GError *error,
              gpointer user_data)
@@ -175,7 +289,7 @@ enable_done (MMSerial *serial,
 }
 
 static void
-init_done (MMSerial *serial,
+init_done (MMSerialPort *port,
            GString *response,
            GError *error,
            gpointer user_data)
@@ -186,35 +300,35 @@ init_done (MMSerial *serial,
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
     } else {
-        if (MM_GENERIC_GSM_GET_PRIVATE (serial)->unsolicited_registration)
-            mm_serial_queue_command (serial, "+CREG=1", 5, NULL, NULL);
+        if (MM_GENERIC_GSM_GET_PRIVATE (info->modem)->unsolicited_registration)
+            mm_serial_port_queue_command (port, "+CREG=1", 5, NULL, NULL);
         else
-            mm_serial_queue_command (serial, "+CREG=0", 5, NULL, NULL);
+            mm_serial_port_queue_command (port, "+CREG=0", 5, NULL, NULL);
 
-        mm_serial_queue_command (serial, "+CFUN=1", 5, enable_done, user_data);
+        mm_serial_port_queue_command (port, "+CFUN=1", 5, enable_done, user_data);
     }
 }
 
 static void
-enable_flash_done (MMSerial *serial, gpointer user_data)
+enable_flash_done (MMSerialPort *port, gpointer user_data)
 {
-    mm_serial_queue_command (serial, "Z E0 V1 X4 &C1 +CMEE=1", 3, init_done, user_data);
+    mm_serial_port_queue_command (port, "Z E0 V1 X4 &C1 +CMEE=1", 3, init_done, user_data);
 }
 
 static void
-disable_done (MMSerial *serial,
+disable_done (MMSerialPort *port,
               GString *response,
               GError *error,
               gpointer user_data)
 {
-    mm_serial_close (serial);
+    mm_serial_port_close (port);
     mm_callback_info_schedule ((MMCallbackInfo *) user_data);
 }
 
 static void
-disable_flash_done (MMSerial *serial, gpointer user_data)
+disable_flash_done (MMSerialPort *port, gpointer user_data)
 {
-    mm_serial_queue_command (serial, "+CFUN=0", 5, disable_done, user_data);
+    mm_serial_port_queue_command (port, "+CFUN=0", 5, disable_done, user_data);
 }
 
 static void
@@ -223,6 +337,7 @@ enable (MMModem *modem,
         MMModemFn callback,
         gpointer user_data)
 {
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
 
     /* First, reset the previously used CID */
@@ -233,13 +348,13 @@ enable (MMModem *modem,
     if (!do_enable) {
         mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
 
-        if (mm_serial_is_connected (MM_SERIAL (modem)))
-            mm_serial_flash (MM_SERIAL (modem), 1000, disable_flash_done, info);
+        if (mm_serial_port_is_connected (priv->primary))
+            mm_serial_port_flash (priv->primary, 1000, disable_flash_done, info);
         else
-            disable_flash_done (MM_SERIAL (modem), info);
+            disable_flash_done (priv->primary, info);
     } else {
-        if (mm_serial_open (MM_SERIAL (modem), &info->error))
-            mm_serial_flash (MM_SERIAL (modem), 100, enable_flash_done, info);
+        if (mm_serial_port_open (priv->primary, &info->error))
+            mm_serial_port_flash (priv->primary, 100, enable_flash_done, info);
 
         if (info->error)
             mm_callback_info_schedule (info);
@@ -247,7 +362,7 @@ enable (MMModem *modem,
 }
 
 static void
-get_string_done (MMSerial *serial,
+get_string_done (MMSerialPort *port,
                  GString *response,
                  GError *error,
                  gpointer user_data)
@@ -267,10 +382,11 @@ get_imei (MMModemGsmCard *modem,
           MMModemStringFn callback,
           gpointer user_data)
 {
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
 
     info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
-    mm_serial_queue_command_cached (MM_SERIAL (modem), "+CGSN", 3, get_string_done, info);
+    mm_serial_port_queue_command_cached (priv->primary, "+CGSN", 3, get_string_done, info);
 }
 
 static void
@@ -278,10 +394,11 @@ get_imsi (MMModemGsmCard *modem,
           MMModemStringFn callback,
           gpointer user_data)
 {
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
 
     info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
-    mm_serial_queue_command_cached (MM_SERIAL (modem), "+CIMI", 3, get_string_done, info);
+    mm_serial_port_queue_command_cached (priv->primary, "+CIMI", 3, get_string_done, info);
 }
 
 static void
@@ -297,7 +414,7 @@ gsm_card_info_invoke (MMCallbackInfo *info)
 }
 
 static void
-get_version_done (MMSerial *serial,
+get_version_done (MMSerialPort *port,
                   GString *response,
                   GError *error,
                   gpointer user_data)
@@ -313,7 +430,7 @@ get_version_done (MMSerial *serial,
 }
 
 static void
-get_model_done (MMSerial *serial,
+get_model_done (MMSerialPort *port,
                 GString *response,
                 GError *error,
                 gpointer user_data)
@@ -327,7 +444,7 @@ get_model_done (MMSerial *serial,
 }
 
 static void
-get_manufacturer_done (MMSerial *serial,
+get_manufacturer_done (MMSerialPort *port,
                        GString *response,
                        GError *error,
                        gpointer user_data)
@@ -345,21 +462,21 @@ get_card_info (MMModemGsmCard *modem,
                MMModemGsmCardInfoFn callback,
                gpointer user_data)
 {
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
-    MMSerial *serial = MM_SERIAL (modem);
 
     info = mm_callback_info_new_full (MM_MODEM (modem),
                                       gsm_card_info_invoke,
                                       G_CALLBACK (callback),
                                       user_data);
 
-    mm_serial_queue_command_cached (serial, "+CGMI", 3, get_manufacturer_done, info);
-    mm_serial_queue_command_cached (serial, "+CGMM", 3, get_model_done, info);
-    mm_serial_queue_command_cached (serial, "+CGMR", 3, get_version_done, info);
+    mm_serial_port_queue_command_cached (priv->primary, "+CGMI", 3, get_manufacturer_done, info);
+    mm_serial_port_queue_command_cached (priv->primary, "+CGMM", 3, get_model_done, info);
+    mm_serial_port_queue_command_cached (priv->primary, "+CGMR", 3, get_version_done, info);
 }
 
 static void
-send_puk_done (MMSerial *serial,
+send_puk_done (MMSerialPort *port,
                GString *response,
                GError *error,
                gpointer user_data)
@@ -378,17 +495,18 @@ send_puk (MMModemGsmCard *modem,
           MMModemFn callback,
           gpointer user_data)
 {
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
     char *command;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
     command = g_strdup_printf ("+CPIN=\"%s\",\"%s\"", puk, pin);
-    mm_serial_queue_command (MM_SERIAL (modem), command, 3, send_puk_done, info);
+    mm_serial_port_queue_command (priv->primary, command, 3, send_puk_done, info);
     g_free (command);
 }
 
 static void
-send_pin_done (MMSerial *serial,
+send_pin_done (MMSerialPort *port,
                GString *response,
                GError *error,
                gpointer user_data)
@@ -406,17 +524,18 @@ send_pin (MMModemGsmCard *modem,
           MMModemFn callback,
           gpointer user_data)
 {
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
     char *command;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
     command = g_strdup_printf ("+CPIN=\"%s\"", pin);
-    mm_serial_queue_command (MM_SERIAL (modem), command, 3, send_pin_done, info);
+    mm_serial_port_queue_command (priv->primary, command, 3, send_pin_done, info);
     g_free (command);
 }
 
 static void
-enable_pin_done (MMSerial *serial,
+enable_pin_done (MMSerialPort *port,
                  GString *response,
                  GError *error,
                  gpointer user_data)
@@ -435,17 +554,18 @@ enable_pin (MMModemGsmCard *modem,
             MMModemFn callback,
             gpointer user_data)
 {
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
     char *command;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
     command = g_strdup_printf ("+CLCK=\"SC\",%d,\"%s\"", enabled ? 1 : 0, pin);
-    mm_serial_queue_command (MM_SERIAL (modem), command, 3, enable_pin_done, info);
+    mm_serial_port_queue_command (priv->primary, command, 3, enable_pin_done, info);
     g_free (command);
 }
 
 static void
-change_pin_done (MMSerial *serial,
+change_pin_done (MMSerialPort *port,
                  GString *response,
                  GError *error,
                  gpointer user_data)
@@ -464,12 +584,13 @@ change_pin (MMModemGsmCard *modem,
             MMModemFn callback,
             gpointer user_data)
 {
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
     char *command;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
     command = g_strdup_printf ("+CPWD=\"SC\",\"%s\",\"%s\"", old_pin, new_pin);
-    mm_serial_queue_command (MM_SERIAL (modem), command, 3, change_pin_done, info);
+    mm_serial_port_queue_command (priv->primary, command, 3, change_pin_done, info);
     g_free (command);
 }
 
@@ -500,30 +621,48 @@ parse_operator (const char *reply)
 }
 
 static void
-read_operator_done (MMSerial *serial,
-                    GString *response,
-                    GError *error,
-                    gpointer user_data)
+read_operator_code_done (MMSerialPort *port,
+                         GString *response,
+                         GError *error,
+                         gpointer user_data)
 {
-    if (!error) {
-        char *oper;
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (user_data);
+    char *oper;
 
-        oper = parse_operator (response->str);
-        if (oper) {
-            MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (serial);
+    if (error)
+        return;
 
-            if (GPOINTER_TO_INT (user_data) == 0) {
-                g_free (priv->oper_code);
-                priv->oper_code = oper;
-            } else {
-                g_free (priv->oper_name);
-                priv->oper_name = oper;
+    oper = parse_operator (response->str);
+    if (!oper)
+        return;
 
-                mm_modem_gsm_network_registration_info (MM_MODEM_GSM_NETWORK (serial), priv->reg_status,
-                                                        priv->oper_code, priv->oper_name);
-            }
-        }
-    }
+    g_free (priv->oper_code);
+    priv->oper_code = oper;
+}
+
+static void
+read_operator_name_done (MMSerialPort *port,
+                         GString *response,
+                         GError *error,
+                         gpointer user_data)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (user_data);
+    char *oper;
+
+    if (error)
+        return;
+
+    oper = parse_operator (response->str);
+    if (!oper)
+        return;
+
+    g_free (priv->oper_name);
+    priv->oper_name = oper;
+
+    mm_modem_gsm_network_registration_info (MM_MODEM_GSM_NETWORK (user_data),
+                                            priv->reg_status,
+                                            priv->oper_code,
+                                            priv->oper_name);
 }
 
 /* Registration */
@@ -618,24 +757,27 @@ reg_status_updated (MMGenericGsm *self, int new_value)
 }
 
 static void
-reg_state_changed (MMSerial *serial,
+reg_state_changed (MMSerialPort *port,
                    GMatchInfo *match_info,
                    gpointer user_data)
 {
+    MMGenericGsm *self = MM_GENERIC_GSM (user_data);
     char *str;
 
     str = g_match_info_fetch (match_info, 1);
-    reg_status_updated (MM_GENERIC_GSM (serial), atoi (str));
+    reg_status_updated (self, atoi (str));
     g_free (str);
 }
 
 static gboolean
 reg_status_again (gpointer data)
 {
+    MMGenericGsmPrivate *priv;
     MMCallbackInfo *info = (MMCallbackInfo *) data;
 
-    if (MM_GENERIC_GSM_GET_PRIVATE (info->modem)->pending_registration)
-        get_registration_status (MM_SERIAL (info->modem), info);
+    priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+    if (priv->pending_registration)
+        get_registration_status (priv->primary, info);
 
     return FALSE;
 }
@@ -647,13 +789,13 @@ reg_status_again_remove (gpointer data)
 }
 
 static void
-get_reg_status_done (MMSerial *serial,
+get_reg_status_done (MMSerialPort *port,
                      GString *response,
                      GError *error,
                      gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (serial);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
 
     if (error) {
         info->error = g_error_copy (error);
@@ -666,7 +808,7 @@ get_reg_status_done (MMSerial *serial,
         int unsolicited, stat;
 
         if (sscanf (response->str + 7, "%d,%d", &unsolicited, &stat)) {
-            reg_status_updated (MM_GENERIC_GSM (serial), stat);
+            reg_status_updated (MM_GENERIC_GSM (info->modem), stat);
 
             if (!unsolicited && priv->pending_registration) {
                 guint id;
@@ -687,19 +829,19 @@ get_reg_status_done (MMSerial *serial,
 }
 
 static void
-get_registration_status (MMSerial *serial, MMCallbackInfo *info)
+get_registration_status (MMSerialPort *port, MMCallbackInfo *info)
 {
-    mm_serial_queue_command (serial, "+CREG?", 3, get_reg_status_done, info);
+    mm_serial_port_queue_command (port, "+CREG?", 3, get_reg_status_done, info);
 }
 
 static void
-register_done (MMSerial *serial,
+register_done (MMSerialPort *port,
                GString *response,
                GError *error,
                gpointer user_data)
 {
     /* Ignore errors here, get the actual registration status */
-    get_registration_status (serial, (MMCallbackInfo *) user_data);
+    get_registration_status (port, (MMCallbackInfo *) user_data);
 }
 
 static void
@@ -708,12 +850,13 @@ do_register (MMModemGsmNetwork *modem,
              MMModemFn callback,
              gpointer user_data)
 {
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
     char *command;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
-    MM_GENERIC_GSM_GET_PRIVATE (modem)->pending_registration = 
+    priv->pending_registration = 
         g_timeout_add_seconds_full (G_PRIORITY_DEFAULT, 60,
                                     pending_registration_timed_out,
                                     info,
@@ -724,7 +867,7 @@ do_register (MMModemGsmNetwork *modem,
     else
         command = g_strdup ("+COPS=0,,");
 
-    mm_serial_queue_command (MM_SERIAL (modem), command, 5, register_done, info);
+    mm_serial_port_queue_command (priv->primary, command, 5, register_done, info);
     g_free (command);
 }
 
@@ -758,7 +901,7 @@ get_registration_info (MMModemGsmNetwork *self,
 }
 
 static void
-connect_report_done (MMSerial *serial,
+connect_report_done (MMSerialPort *port,
                      GString *response,
                      GError *error,
                      gpointer user_data)
@@ -774,17 +917,19 @@ connect_report_done (MMSerial *serial,
 }
 
 static void
-connect_done (MMSerial *serial,
+connect_done (MMSerialPort *port,
               GString *response,
               GError *error,
               gpointer user_data)
 {
+    MMGenericGsmPrivate *priv;
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
     if (error) {
         info->error = g_error_copy (error);
         /* Try to get more information why it failed */
-        mm_serial_queue_command (serial, "+CEER", 3, connect_report_done, info);
+        priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+        mm_serial_port_queue_command (priv->primary, "+CEER", 3, connect_report_done, info);
     } else
         /* Done */
         mm_callback_info_schedule (info);
@@ -796,6 +941,7 @@ connect (MMModem *modem,
          MMModemFn callback,
          gpointer user_data)
 {
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
     char *command;
     guint32 cid = mm_generic_gsm_get_cid (MM_GENERIC_GSM (modem));
@@ -816,12 +962,12 @@ connect (MMModem *modem,
     } else
         command = g_strconcat ("DT", number, NULL);
 
-    mm_serial_queue_command (MM_SERIAL (modem), command, 60, connect_done, info);
+    mm_serial_port_queue_command (priv->primary, command, 60, connect_done, info);
     g_free (command);
 }
 
 static void
-disconnect_flash_done (MMSerial *serial, gpointer user_data)
+disconnect_flash_done (MMSerialPort *port, gpointer user_data)
 {
     mm_callback_info_schedule ((MMCallbackInfo *) user_data);
 }
@@ -831,13 +977,14 @@ disconnect (MMModem *modem,
             MMModemFn callback,
             gpointer user_data)
 {
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
 
     /* First, reset the previously used CID */
     mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
 
     info = mm_callback_info_new (modem, callback, user_data);
-    mm_serial_flash (MM_SERIAL (modem), 1000, disconnect_flash_done, info);
+    mm_serial_port_flash (priv->primary, 1000, disconnect_flash_done, info);
 }
 
 static void
@@ -861,7 +1008,7 @@ destroy_scan_data (gpointer data)
 }
 
 static void
-scan_done (MMSerial *serial,
+scan_done (MMSerialPort *port,
            GString *response,
            GError *error,
            gpointer user_data)
@@ -880,8 +1027,13 @@ scan_done (MMSerial *serial,
 
         reply += 7;
 
-        /* Pattern without crazy escaping using | for matching: (|\d|,"|.+|","|.+|","|.+|",|\d|) */
-        r = g_regex_new ("\\((\\d),\"(.+)\",\"(.+)\",\"(.+)\",(\\d)\\)", G_REGEX_UNGREEDY, 0, &err);
+        /* Pattern without crazy escaping using | for matching: (|\d|,"|.+|","|.+|","|.+|"\)?,|\d|) */
+
+        /* Quirk: Sony-Ericsson TM-506 sometimes includes a stray ')' like so:
+         *
+         *       +COPS: (2,"","T-Mobile","31026",0),(1,"AT&T","AT&T","310410"),0)
+         */
+        r = g_regex_new ("\\((\\d),\"(.*)\",\"(.*)\",\"(.*)\"\\)?,(\\d)\\)", G_REGEX_UNGREEDY, 0, &err);
         if (err) {
             g_error ("Invalid regular expression: %s", err->message);
             g_error_free (err);
@@ -922,6 +1074,7 @@ scan (MMModemGsmNetwork *modem,
       MMModemGsmNetworkScanFn callback,
       gpointer user_data)
 {
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
 
     info = mm_callback_info_new_full (MM_MODEM (modem),
@@ -929,13 +1082,13 @@ scan (MMModemGsmNetwork *modem,
                                       G_CALLBACK (callback),
                                       user_data);
 
-    mm_serial_queue_command (MM_SERIAL (modem), "+COPS=?", 60, scan_done, info);
+    mm_serial_port_queue_command (priv->primary, "+COPS=?", 60, scan_done, info);
 }
 
 /* SetApn */
 
 static void
-set_apn_done (MMSerial *serial,
+set_apn_done (MMSerialPort *port,
               GString *response,
               GError *error,
               gpointer user_data)
@@ -945,14 +1098,14 @@ set_apn_done (MMSerial *serial,
     if (error)
         info->error = g_error_copy (error);
     else
-        mm_generic_gsm_set_cid (MM_GENERIC_GSM (serial),
+        mm_generic_gsm_set_cid (MM_GENERIC_GSM (info->modem),
                                 GPOINTER_TO_UINT (mm_callback_info_get_data (info, "cid")));
 
     mm_callback_info_schedule (info);
 }
 
 static void
-cid_range_read (MMSerial *serial,
+cid_range_read (MMSerialPort *port,
                 GString *response,
                 GError *error,
                 gpointer user_data)
@@ -1012,13 +1165,13 @@ cid_range_read (MMSerial *serial,
         mm_callback_info_set_data (info, "cid", GUINT_TO_POINTER (cid), NULL);
 
         command = g_strdup_printf ("+CGDCONT=%d, \"IP\", \"%s\"", cid, apn);
-        mm_serial_queue_command (serial, command, 3, set_apn_done, info);
+        mm_serial_port_queue_command (port, command, 3, set_apn_done, info);
         g_free (command);
     }
 }
 
 static void
-existing_apns_read (MMSerial *serial,
+existing_apns_read (MMSerialPort *port,
                     GString *response,
                     GError *error,
                     gpointer user_data)
@@ -1051,7 +1204,7 @@ existing_apns_read (MMSerial *serial,
                 apn = g_match_info_fetch (match_info, 3);
 
                 if (!strcmp (apn, new_apn)) {
-                    mm_generic_gsm_set_cid (MM_GENERIC_GSM (serial), (guint32) num_cid);
+                    mm_generic_gsm_set_cid (MM_GENERIC_GSM (info->modem), (guint32) num_cid);
                     found = TRUE;
                 }
 
@@ -1083,7 +1236,7 @@ existing_apns_read (MMSerial *serial,
         mm_callback_info_schedule (info);
     else
         /* APN not configured on the card. Get the allowed CID range */
-        mm_serial_queue_command_cached (serial, "+CGDCONT=?", 3, cid_range_read, info);
+        mm_serial_port_queue_command_cached (port, "+CGDCONT=?", 3, cid_range_read, info);
 }
 
 static void
@@ -1092,23 +1245,25 @@ set_apn (MMModemGsmNetwork *modem,
          MMModemFn callback,
          gpointer user_data)
 {
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
     mm_callback_info_set_data (info, "apn", g_strdup (apn), g_free);
 
     /* Start by searching if the APN is already in card */
-    mm_serial_queue_command (MM_SERIAL (modem), "+CGDCONT?", 3, existing_apns_read, info);
+    mm_serial_port_queue_command (priv->primary, "+CGDCONT?", 3, existing_apns_read, info);
 }
 
 /* GetSignalQuality */
 
 static void
-get_signal_quality_done (MMSerial *serial,
+get_signal_quality_done (MMSerialPort *port,
                          GString *response,
                          GError *error,
                          gpointer user_data)
 {
+    MMGenericGsmPrivate *priv;
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     char *reply = response->str;
 
@@ -1127,7 +1282,8 @@ get_signal_quality_done (MMSerial *serial,
                 /* Normalize the quality */
                 quality = quality * 100 / 31;
 
-            MM_GENERIC_GSM_GET_PRIVATE (serial)->signal_quality = quality;
+            priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+            priv->signal_quality = quality;
             mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
         } else
             info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
@@ -1142,23 +1298,26 @@ get_signal_quality (MMModemGsmNetwork *modem,
                     MMModemUIntFn callback,
                     gpointer user_data)
 {
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
+    gboolean connected;
 
-    if (mm_serial_is_connected (MM_SERIAL (modem))) {
-        g_message ("Returning saved signal quality %d", MM_GENERIC_GSM_GET_PRIVATE (modem)->signal_quality);
-        callback (MM_MODEM (modem), MM_GENERIC_GSM_GET_PRIVATE (modem)->signal_quality, NULL, user_data);
+    connected = mm_serial_port_is_connected (priv->primary);
+    if (connected && !priv->secondary) {
+        g_message ("Returning saved signal quality %d", priv->signal_quality);
+        callback (MM_MODEM (modem), priv->signal_quality, NULL, user_data);
         return;
     }
 
     info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-    mm_serial_queue_command (MM_SERIAL (modem), "+CSQ", 3, get_signal_quality_done, info);
+    mm_serial_port_queue_command (connected ? priv->secondary : priv->primary, "+CSQ", 3, get_signal_quality_done, info);
 }
 
 /*****************************************************************************/
 /* MMModemGsmSms interface */
 
 static void
-sms_send_done (MMSerial *serial,
+sms_send_done (MMSerialPort *port,
                GString *response,
                GError *error,
                gpointer user_data)
@@ -1181,16 +1340,33 @@ sms_send (MMModemGsmSms *modem,
           MMModemFn callback,
           gpointer user_data)
 {
+    MMGenericGsmPrivate *priv;
     MMCallbackInfo *info;
     char *command;
+    gboolean connected;
+    MMSerialPort *port = NULL;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
+    priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+    connected = mm_serial_port_is_connected (priv->primary);
+    if (connected)
+        port = priv->secondary;
+    else
+        port = priv->primary;
+
+    if (!port) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                            "Cannot send SMS while connected");
+        mm_callback_info_schedule (info);
+        return;
+    }
+
     /* FIXME: use the PDU mode instead */
-    mm_serial_queue_command (MM_SERIAL (modem), "AT+CMGF=1", 3, NULL, NULL);
+    mm_serial_port_queue_command (port, "AT+CMGF=1", 3, NULL, NULL);
 
     command = g_strdup_printf ("+CMGS=\"%s\"\r%s\x1a", number, text);
-    mm_serial_queue_command (MM_SERIAL (modem), command, 10, sms_send_done, info);
+    mm_serial_port_queue_command (port, command, 10, sms_send_done, info);
     g_free (command);
 }
 
@@ -1441,6 +1617,9 @@ simple_get_status (MMModemSimple *simple,
 static void
 modem_init (MMModem *modem_class)
 {
+    modem_class->owns_port = owns_port;
+    modem_class->grab_port = grab_port;
+    modem_class->release_port = release_port;
     modem_class->enable = enable;
     modem_class->connect = connect;
     modem_class->disconnect = disconnect;
@@ -1484,16 +1663,6 @@ modem_simple_init (MMModemSimple *class)
 static void
 mm_generic_gsm_init (MMGenericGsm *self)
 {
-    GRegex *regex;
-
-    mm_serial_set_response_parser (MM_SERIAL (self),
-                                   mm_serial_parser_v1_parse,
-                                   mm_serial_parser_v1_new (),
-                                   mm_serial_parser_v1_destroy);
-
-    regex = g_regex_new ("\\r\\n\\+CREG: (\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    mm_serial_add_unsolicited_msg_handler (MM_SERIAL (self), regex, reg_state_changed, NULL, NULL);
-    g_regex_unref (regex);
 }
 
 static void
@@ -1507,15 +1676,19 @@ set_property (GObject *object, guint prop_id,
         /* Construct only */
         priv->driver = g_value_dup_string (value);
         break;
-    case MM_MODEM_PROP_DEVICE:
-        g_free (priv->data_device);
-        priv->data_device = g_value_dup_string (value);
+    case MM_MODEM_PROP_PLUGIN:
+        /* Construct only */
+        priv->plugin = g_value_dup_string (value);
         break;
-    case MM_MODEM_PROP_TYPE:
-        priv->modem_type = g_value_get_uint (value);
+    case MM_MODEM_PROP_MASTER_DEVICE:
+        /* Constrcut only */
+        priv->device = g_value_dup_string (value);
         break;
     case MM_MODEM_PROP_IP_METHOD:
         priv->ip_method = g_value_get_uint (value);
+        break;
+    case MM_MODEM_PROP_TYPE:
+    case MM_MODEM_PROP_VALID:
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1530,20 +1703,29 @@ get_property (GObject *object, guint prop_id,
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (object);
 
     switch (prop_id) {
-    case MM_MODEM_PROP_DEVICE:
-        if (priv->data_device)
-            g_value_set_string (value, priv->data_device);
+    case MM_MODEM_PROP_DATA_DEVICE:
+        if (priv->primary)
+            g_value_set_string (value, mm_serial_port_get_device (priv->primary));
         else
-            g_value_set_string (value, mm_serial_get_device (MM_SERIAL (object)));
+            g_value_set_string (value, NULL);
+        break;
+    case MM_MODEM_PROP_MASTER_DEVICE:
+        g_value_set_string (value, priv->device);
         break;
     case MM_MODEM_PROP_DRIVER:
-        g_value_set_string (value, MM_GENERIC_GSM_GET_PRIVATE (object)->driver);
+        g_value_set_string (value, priv->driver);
+        break;
+    case MM_MODEM_PROP_PLUGIN:
+        g_value_set_string (value, priv->plugin);
         break;
     case MM_MODEM_PROP_TYPE:
-        g_value_set_uint (value, priv->modem_type);
+        g_value_set_uint (value, MM_MODEM_TYPE_GSM);
         break;
     case MM_MODEM_PROP_IP_METHOD:
         g_value_set_uint (value, priv->ip_method);
+        break;
+    case MM_MODEM_PROP_VALID:
+        g_value_set_boolean (value, priv->valid);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1581,12 +1763,20 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
 
     /* Properties */
     g_object_class_override_property (object_class,
-                                      MM_MODEM_PROP_DEVICE,
-                                      MM_MODEM_DEVICE);
+                                      MM_MODEM_PROP_DATA_DEVICE,
+                                      MM_MODEM_DATA_DEVICE);
+
+    g_object_class_override_property (object_class,
+                                      MM_MODEM_PROP_MASTER_DEVICE,
+                                      MM_MODEM_MASTER_DEVICE);
 
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_DRIVER,
                                       MM_MODEM_DRIVER);
+
+    g_object_class_override_property (object_class,
+                                      MM_MODEM_PROP_PLUGIN,
+                                      MM_MODEM_PLUGIN);
 
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_TYPE,
@@ -1596,6 +1786,9 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
                                       MM_MODEM_PROP_IP_METHOD,
                                       MM_MODEM_IP_METHOD);
 
+    g_object_class_override_property (object_class,
+                                      MM_MODEM_PROP_VALID,
+                                      MM_MODEM_VALID);
 }
 
 GType

@@ -20,7 +20,7 @@ clean:
 	rm -f $(GENERATED_FILES)
 endif
 
-SUBDIRS = marshallers src plugins introspection test
+SUBDIRS = marshallers callouts src plugins introspection test
 
 dbusservicedir = $(DBUS_SYS_DIR)
 dbusservice_DATA = org.freedesktop.ModemManager.conf

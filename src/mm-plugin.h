@@ -4,10 +4,9 @@
 #define MM_PLUGIN_H
 
 #include <glib-object.h>
-#include <libhal.h>
 #include <mm-modem.h>
 
-#define MM_PLUGIN_MAJOR_VERSION 1
+#define MM_PLUGIN_MAJOR_VERSION 2
 #define MM_PLUGIN_MINOR_VERSION 0
 
 #define MM_TYPE_PLUGIN      (mm_plugin_get_type ())
@@ -23,33 +22,44 @@ struct _MMPlugin {
     GTypeInterface g_iface;
 
     /* Methods */
-    const char *(*get_name) (MMPlugin *self);
+    const char *(*get_name)   (MMPlugin *self);
 
-    char **(*list_supported_udis) (MMPlugin *self,
-                                   LibHalContext *hal_ctx);
+    /* Check whether a plugin supports a particular modem port, and what level
+     * of support the plugin has for the device.  The plugin should return a
+     * value between 0 and 100 inclusive, where 0 means the plugin has no
+     * support for the device, and 100 means the plugin has full support for the
+     * device.
+     */
+    guint32 (*supports_port)  (MMPlugin *self,
+                               const char *subsys,
+                               const char *name);
 
-    gboolean (*supports_udi) (MMPlugin *self,
-                              LibHalContext *hal_ctx,
-                              const char *udi);
-
-    MMModem *(*create_modem) (MMPlugin *self,
-                              LibHalContext *hal_ctx,
-                              const char *udi);
+    /* Will only be called if the plugin returns a value greater than 0 for
+     * the supports_port() method for this port.  The plugin should create and
+     * return a  new modem for the port's device if there is no existing modem
+     * to handle the port's hardware device, or should add the port to an
+     * existing modem and return that modem object.  If an error is encountered
+     * while claiming the port, the error information should be returned in the
+     * error argument, and the plugin should return NULL.
+     */
+    MMModem * (*grab_port)    (MMPlugin *self,
+                               const char *subsys,
+                               const char *name,
+                               GError **error);
 };
 
 GType mm_plugin_get_type (void);
 
-const char *mm_plugin_get_name (MMPlugin *plugin);
+const char *mm_plugin_get_name   (MMPlugin *plugin);
 
-char **mm_plugin_list_supported_udis (MMPlugin *plugin,
-                                      LibHalContext *hal_ctx);
+guint32 mm_plugin_supports_port  (MMPlugin *plugin,
+                                  const char *subsys,
+                                  const char *name);
 
-gboolean mm_plugin_supports_udi (MMPlugin *plugin,
-                                 LibHalContext *hal_ctx,
-                                 const char *udi);
-
-MMModem *mm_plugin_create_modem (MMPlugin *plugin,
-                                 LibHalContext *hal_ctx,
-                                 const char *udi);
+MMModem *mm_plugin_grab_port     (MMPlugin *plugin,
+                                  const char *subsys,
+                                  const char *name,
+                                  GError **error);
 
 #endif /* MM_PLUGIN_H */
+

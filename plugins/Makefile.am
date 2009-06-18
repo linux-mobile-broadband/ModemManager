@@ -1,4 +1,5 @@
 pkglib_LTLIBRARIES = \
+	libmm-plugin-generic.la \
 	libmm-plugin-huawei.la \
 	libmm-plugin-hso.la \
 	libmm-plugin-mbm.la \
@@ -7,6 +8,22 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-novatel.la \
 	libmm-plugin-nokia.la \
 	libmm-plugin-zte.la
+
+# Generic
+
+libmm_plugin_generic_la_SOURCES = \
+	mm-plugin-generic.c \
+	mm-plugin-generic.h
+
+libmm_plugin_generic_la_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
+	-I$(top_srcdir)/src
+
+libmm_plugin_generic_la_LDFLAGS = \
+	$(GUDEV_LDFLAGS) \
+	-module \
+	-avoid-version
 
 # Huawei
 

@@ -10,48 +10,30 @@ mm_plugin_get_name (MMPlugin *plugin)
     return MM_PLUGIN_GET_INTERFACE (plugin)->get_name (plugin);
 }
 
-char **
-mm_plugin_list_supported_udis (MMPlugin *plugin,
-                               LibHalContext *hal_ctx)
-{
-    g_return_val_if_fail (MM_IS_PLUGIN (plugin), NULL);
-    g_return_val_if_fail (hal_ctx != NULL, NULL);
-
-    return MM_PLUGIN_GET_INTERFACE (plugin)->list_supported_udis (plugin, hal_ctx);
-}
-
-gboolean
-mm_plugin_supports_udi (MMPlugin *plugin,
-                        LibHalContext *hal_ctx,
-                        const char *udi)
+guint32
+mm_plugin_supports_port (MMPlugin *plugin,
+                         const char *subsys,
+                         const char *name)
 {
     g_return_val_if_fail (MM_IS_PLUGIN (plugin), FALSE);
-    g_return_val_if_fail (hal_ctx != NULL, FALSE);
-    g_return_val_if_fail (udi != NULL, FALSE);
+    g_return_val_if_fail (subsys != NULL, FALSE);
+    g_return_val_if_fail (name != NULL, FALSE);
 
-    return MM_PLUGIN_GET_INTERFACE (plugin)->supports_udi (plugin, hal_ctx, udi);
+    return MM_PLUGIN_GET_INTERFACE (plugin)->supports_port (plugin, subsys, name);
 }
 
 MMModem *
-mm_plugin_create_modem (MMPlugin *plugin,
-                        LibHalContext *hal_ctx,
-                        const char *udi)
+mm_plugin_grab_port (MMPlugin *plugin,
+                     const char *subsys,
+                     const char *name,
+                     GError **error)
 {
-    MMModem *modem;
+    g_return_val_if_fail (MM_IS_PLUGIN (plugin), FALSE);
+    g_return_val_if_fail (subsys != NULL, FALSE);
+    g_return_val_if_fail (name != NULL, FALSE);
 
-    g_return_val_if_fail (MM_IS_PLUGIN (plugin), NULL);
-    g_return_val_if_fail (hal_ctx != NULL, NULL);
-    g_return_val_if_fail (udi != NULL, NULL);
-
-    modem = MM_PLUGIN_GET_INTERFACE (plugin)->create_modem (plugin, hal_ctx, udi);
-    if (modem)
-        g_debug ("Created new %s modem (%s)", mm_plugin_get_name (plugin), udi);
-    else
-        g_warning ("Failed to create %s modem (%s)", mm_plugin_get_name (plugin), udi);
-
-    return modem;
+    return MM_PLUGIN_GET_INTERFACE (plugin)->grab_port (plugin, subsys, name, error);
 }
-
 
 /*****************************************************************************/
 
