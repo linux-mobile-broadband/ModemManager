@@ -84,7 +84,7 @@ for m in modems:
         print "Invalid modem type: %d" % type
 
     print "Driver: '%s'" % (props_iface.Get(MM_DBUS_INTERFACE_MODEM, 'Driver'))
-    print "Data device: '%s'" % (props_iface.Get(MM_DBUS_INTERFACE_MODEM, 'DataDevice'))
+    print "Data device: '%s'" % (props_iface.Get(MM_DBUS_INTERFACE_MODEM, 'Device'))
 
     # Modem interface
     modem = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM)
@@ -118,7 +118,10 @@ for m in modems:
         else:
             status = "(Unknown)"
 
-        print "%s: %s" % (r['operator-long'], status)
+	if len(r['operator-long']):
+            print "%s: %s" % (r['operator-long'], status)
+        else:
+            print "%s: %s" % (r['operator-short'], status)
 
     print
 
