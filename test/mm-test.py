@@ -8,10 +8,16 @@ MM_DBUS_SERVICE='org.freedesktop.ModemManager'
 MM_DBUS_PATH='/org/freedesktop/ModemManager'
 MM_DBUS_INTERFACE='org.freedesktop.ModemManager'
 MM_DBUS_INTERFACE_MODEM='org.freedesktop.ModemManager.Modem'
+MM_DBUS_INTERFACE_MODEM_CDMA='org.freedesktop.ModemManager.Modem.Cdma'
 MM_DBUS_INTERFACE_MODEM_GSM_CARD='org.freedesktop.ModemManager.Modem.Gsm.Card'
 MM_DBUS_INTERFACE_MODEM_GSM_NETWORK='org.freedesktop.ModemManager.Modem.Gsm.Network'
 
 def inspect_cdma(proxy):
+    cdma = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_CDMA)
+    try:
+        print "ESN: %s" % cdma.GetEsn()
+    except dbus.exceptions.DBusException:
+        pass
     return
 
 

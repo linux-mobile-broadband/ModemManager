@@ -20,6 +20,10 @@ struct _MMModemCdma {
                                 MMModemUIntFn callback,
                                 gpointer user_data);
 
+    void (*get_esn) (MMModemCdma *self,
+                     MMModemStringFn callback,
+                     gpointer user_data);
+
     /* Signals */
     void (*signal_quality) (MMModemCdma *self,
                             guint32 quality);
@@ -30,6 +34,10 @@ GType mm_modem_cdma_get_type (void);
 void mm_modem_cdma_get_signal_quality (MMModemCdma *self,
                                        MMModemUIntFn callback,
                                        gpointer user_data);
+
+void mm_modem_cdma_get_esn (MMModemCdma *self,
+                            MMModemStringFn callback,
+                            gpointer user_data);
 
 /* Protected */
 

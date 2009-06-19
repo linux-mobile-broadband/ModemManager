@@ -7,6 +7,7 @@
 #include "mm-callback-info.h"
 
 static void impl_modem_cdma_get_signal_quality (MMModemCdma *modem, DBusGMethodInvocation *context);
+static void impl_modem_cdma_get_esn (MMModemCdma *modem, DBusGMethodInvocation *context);
 
 #include "mm-modem-cdma-glue.h"
 
@@ -17,6 +18,32 @@ enum {
 };
 
 static guint signals[LAST_SIGNAL] = { 0 };
+
+
+static void
+str_call_done (MMModem *modem, const char *result, GError *error, gpointer user_data)
+{
+    DBusGMethodInvocation *context = (DBusGMethodInvocation *) user_data;
+
+    if (error)
+        dbus_g_method_return_error (context, error);
+    else
+        dbus_g_method_return (context, result);
+}
+
+static void
+str_call_not_supported (MMModemCdma *self,
+                        MMModemStringFn callback,
+                        gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_string_new (MM_MODEM (self), callback, user_data);
+    info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                       "Operation not supported");
+
+    mm_callback_info_schedule (info);
+}
 
 static void
 uint_op_not_supported (MMModem *self,
@@ -40,6 +67,27 @@ uint_call_done (MMModem *modem, guint32 result, GError *error, gpointer user_dat
         dbus_g_method_return_error (context, error);
     else
         dbus_g_method_return (context, result);
+}
+
+void
+mm_modem_cdma_get_esn (MMModemCdma *self,
+                       MMModemStringFn callback,
+                       gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_CDMA (self));
+    g_return_if_fail (callback != NULL);
+
+    if (MM_MODEM_CDMA_GET_INTERFACE (self)->get_esn)
+        MM_MODEM_CDMA_GET_INTERFACE (self)->get_esn (self, callback, user_data);
+    else
+        str_call_not_supported (self, callback, user_data);
+}
+
+static void
+impl_modem_cdma_get_esn (MMModemCdma *modem,
+                         DBusGMethodInvocation *context)
+{
+    mm_modem_cdma_get_esn (modem, str_call_done, context);
 }
 
 void

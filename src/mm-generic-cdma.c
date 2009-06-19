@@ -42,6 +42,20 @@ mm_generic_cdma_new (const char *device,
                                    NULL));
 }
 
+static const char *
+strip_response (const char *resp, const char *cmd)
+{
+    const char *p = resp;
+
+    if (p) {
+        if (!strncmp (p, cmd, strlen (cmd)))
+            p += strlen (cmd);
+        while (*p == ' ')
+            p++;
+    }
+    return p;
+}
+
 /*****************************************************************************/
 
 static void
@@ -260,18 +274,6 @@ card_info_invoke (MMCallbackInfo *info)
               info->error, info->user_data);
 }
 
-static const char *
-strip_info_response (const char *resp, const char *cmd)
-{
-    const char *p = resp;
-
-    if (p) {
-        if (!strncmp (p, cmd, strlen (cmd)))
-            p += strlen (cmd);
-    }
-    return p;
-}
-
 static void
 get_version_done (MMSerialPort *port,
                   GString *response,
@@ -282,7 +284,7 @@ get_version_done (MMSerialPort *port,
     const char *p;
 
     if (!error) {
-        p = strip_info_response (response->str, "+GMR:");
+        p = strip_response (response->str, "+GMR:");
         mm_callback_info_set_data (info, "card-info-version", g_strdup (p), g_free);
     } else if (!info->error)
         info->error = g_error_copy (error);
@@ -300,7 +302,7 @@ get_model_done (MMSerialPort *port,
     const char *p;
 
     if (!error) {
-        p = strip_info_response (response->str, "+GMM:");
+        p = strip_response (response->str, "+GMM:");
         mm_callback_info_set_data (info, "card-info-model", g_strdup (p), g_free);
     } else if (!info->error)
         info->error = g_error_copy (error);
@@ -316,7 +318,7 @@ get_manufacturer_done (MMSerialPort *port,
     const char *p;
 
     if (!error) {
-        p = strip_info_response (response->str, "+GMI:");
+        p = strip_response (response->str, "+GMI:");
         mm_callback_info_set_data (info, "card-info-manufacturer", g_strdup (p), g_free);
     } else
         info->error = g_error_copy (error);
@@ -389,6 +391,37 @@ get_signal_quality (MMModemCdma *modem,
                                   "+CSQ",
                                   3,
                                   get_signal_quality_done, info);
+}
+
+static void
+get_string_done (MMSerialPort *port,
+                 GString *response,
+                 GError *error,
+                 gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    const char *p;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else {
+        p = strip_response (response->str, "+GSN:");
+        mm_callback_info_set_result (info, g_strdup (p), g_free);
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_esn (MMModemCdma *modem,
+         MMModemStringFn callback,
+         gpointer user_data)
+{
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
+    mm_serial_port_queue_command_cached (priv->primary, "+GSN", 3, get_string_done, info);
 }
 
 /*****************************************************************************/
@@ -557,6 +590,7 @@ static void
 modem_cdma_init (MMModemCdma *cdma_modem_class)
 {
     cdma_modem_class->get_signal_quality = get_signal_quality;
+    cdma_modem_class->get_esn = get_esn;
 }
 
 static void
