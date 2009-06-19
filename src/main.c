@@ -1,4 +1,18 @@
 /* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+/*
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details:
+ *
+ * Copyright (C) 2008 - 2009 Novell, Inc.
+ * Copyright (C) 2009 Red Hat, Inc.
+ */
 
 #include <signal.h>
 #include <syslog.h>
@@ -10,11 +24,17 @@
 
 #define HAL_DBUS_SERVICE "org.freedesktop.Hal"
 
+static GMainLoop *loop = NULL;
+
 static void
 mm_signal_handler (int signo)
 {
     if (signo == SIGUSR1)
         mm_options_set_debug (!mm_options_debug ());
+	else if (signo == SIGINT || signo == SIGTERM) {
+		g_message ("Caught signal %d, shutting down...", signo);
+		g_main_loop_quit (loop);
+	}
 }
 
 static void
@@ -27,7 +47,9 @@ setup_signals (void)
     action.sa_handler = mm_signal_handler;
     action.sa_mask = mask;
     action.sa_flags = 0;
-    sigaction (SIGUSR1,  &action, NULL);
+    sigaction (SIGUSR1, &action, NULL);
+    sigaction (SIGTERM, &action, NULL);
+    sigaction (SIGINT, &action, NULL);
 }
 
 static void
@@ -88,8 +110,6 @@ logging_shutdown (void)
 static void
 destroy_cb (DBusGProxy *proxy, gpointer user_data)
 {
-    GMainLoop *loop = (GMainLoop *) user_data;
-
     g_message ("disconnected from the system bus, exiting.");
     g_main_loop_quit (loop);
 }
@@ -146,9 +166,9 @@ main (int argc, char *argv[])
 {
     DBusGConnection *bus;
     DBusGProxy *proxy;
-    GMainLoop *loop;
     MMManager *manager;
     GError *err = NULL;
+    guint id;
 
     mm_options_parse (argc, argv);
     g_type_init ();
@@ -175,9 +195,11 @@ main (int argc, char *argv[])
     g_idle_add (start_manager, manager);
 
     loop = g_main_loop_new (NULL, FALSE);
-    g_signal_connect (proxy, "destroy", G_CALLBACK (destroy_cb), loop);
+    id = g_signal_connect (proxy, "destroy", G_CALLBACK (destroy_cb), loop);
 
     g_main_loop_run (loop);
+
+    g_signal_handler_disconnect (proxy, id);
 
     g_object_unref (manager);
     g_object_unref (proxy);

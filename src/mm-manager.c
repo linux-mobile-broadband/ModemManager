@@ -140,7 +140,7 @@ mm_manager_new (DBusGConnection *bus)
     if (manager) {
         MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
 
-        priv->connection = bus;
+        priv->connection = dbus_g_connection_ref (bus);
         dbus_g_connection_register_g_object (priv->connection,
                                              MM_DBUS_PATH,
                                              G_OBJECT (manager));
