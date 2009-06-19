@@ -24,7 +24,7 @@
 
 static void plugin_init (MMPlugin *plugin_class);
 
-G_DEFINE_TYPE_EXTENDED (MMPluginMotoC, mm_plugin_moto_c, G_TYPE_OBJECT,
+G_DEFINE_TYPE_EXTENDED (MMPluginMotoC, mm_plugin_moto_c, MM_TYPE_PLUGIN_BASE,
                         0, G_IMPLEMENT_INTERFACE (MM_TYPE_PLUGIN, plugin_init))
 
 int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
@@ -34,7 +34,6 @@ int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 
 typedef struct {
     GUdevClient *client;
-    GHashTable *modems;
 } MMPluginMotoCPrivate;
 
 
@@ -150,33 +149,6 @@ out:
     return level;
 }
 
-typedef struct {
-    char *key;
-    gpointer modem;
-} FindInfo;
-
-static void
-find_modem (gpointer key, gpointer data, gpointer user_data)
-{
-    FindInfo *info = user_data;
-
-    if (!info->key && data == info->modem)
-        info->key = g_strdup ((const char *) key);
-}
-
-static void
-modem_destroyed (gpointer data, GObject *modem)
-{
-    MMPluginMotoC *self = MM_PLUGIN_MOTO_C (data);
-    MMPluginMotoCPrivate *priv = MM_PLUGIN_MOTO_C_GET_PRIVATE (self);
-    FindInfo info = { NULL, modem };
-
-    g_hash_table_foreach (priv->modems, find_modem, &info);
-    if (info.key)
-        g_hash_table_remove (priv->modems, info.key);
-    g_free (info.key);
-}
-
 static MMModem *
 grab_port (MMPlugin *plugin,
            const char *subsys,
@@ -232,7 +204,7 @@ grab_port (MMPlugin *plugin,
         goto out;
     }
 
-    modem = g_hash_table_lookup (priv->modems, sysfs_path);
+    modem = mm_plugin_base_find_modem (MM_PLUGIN_BASE (self), sysfs_path);
     if (!modem) {
         modem = mm_modem_moto_c_gsm_new (sysfs_path,
                                          driver,
@@ -245,10 +217,8 @@ grab_port (MMPlugin *plugin,
             }
         }
 
-        if (modem) {
-            g_object_weak_ref (G_OBJECT (modem), modem_destroyed, self);
-            g_hash_table_insert (priv->modems, g_strdup (sysfs_path), modem);
-        }
+        if (modem)
+            mm_plugin_base_add_modem (MM_PLUGIN_BASE (self), modem);
     } else {
         if (!mm_modem_grab_port (modem, subsys, name, error))
             modem = NULL;
@@ -284,8 +254,6 @@ mm_plugin_moto_c_init (MMPluginMotoC *self)
     MMPluginMotoCPrivate *priv = MM_PLUGIN_MOTO_C_GET_PRIVATE (self);
     const char *subsys[2] = { "tty", NULL };
 
-    priv->modems = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
-
     priv->client = g_udev_client_new (subsys);
 }
 
@@ -294,7 +262,6 @@ dispose (GObject *object)
 {
     MMPluginMotoCPrivate *priv = MM_PLUGIN_MOTO_C_GET_PRIVATE (object);
 
-    g_hash_table_destroy (priv->modems);
     g_object_unref (priv->client);
 }
 

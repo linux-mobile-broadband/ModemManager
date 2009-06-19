@@ -18,6 +18,7 @@
 #define MM_PLUGIN_MOTO_C_H
 
 #include "mm-plugin.h"
+#include "mm-plugin-base.h"
 #include "mm-generic-gsm.h"
 
 #define MM_TYPE_PLUGIN_MOTO_C            (mm_plugin_moto_c_get_type ())
@@ -28,11 +29,11 @@
 #define MM_PLUGIN_MOTO_C_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PLUGIN_MOTO_C, MMPluginMotoCClass))
 
 typedef struct {
-    GObject parent;
+    MMPluginBase parent;
 } MMPluginMotoC;
 
 typedef struct {
-    GObjectClass parent;
+    MMPluginBaseClass parent;
 } MMPluginMotoCClass;
 
 GType mm_plugin_moto_c_get_type (void);
