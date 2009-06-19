@@ -95,7 +95,10 @@ for m in modems:
 
     # Gsm.Card interface
     card = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_GSM_CARD)
-    print "IMEI: %s" % card.GetImei()
+    try:
+        print "IMEI: %s" % card.GetImei()
+    except dbus.exceptions.DBusException:
+        pass
     print "IMSI: %s" % card.GetImsi()
 
     info = card.GetInfo()
