@@ -34,7 +34,7 @@
 
 static void plugin_init (MMPlugin *plugin_class);
 
-G_DEFINE_TYPE_EXTENDED (MMPluginGeneric, mm_plugin_generic, G_TYPE_OBJECT,
+G_DEFINE_TYPE_EXTENDED (MMPluginGeneric, mm_plugin_generic, MM_TYPE_PLUGIN_BASE,
                         0, G_IMPLEMENT_INTERFACE (MM_TYPE_PLUGIN, plugin_init))
 
 int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
@@ -44,7 +44,6 @@ int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 
 typedef struct {
     GUdevClient *client;
-    GHashTable *modems;
 } MMPluginGenericPrivate;
 
 
@@ -180,33 +179,6 @@ out:
     return level;
 }
 
-typedef struct {
-    char *key;
-    gpointer modem;
-} FindInfo;
-
-static void
-find_modem (gpointer key, gpointer data, gpointer user_data)
-{
-    FindInfo *info = user_data;
-
-    if (!info->key && data == info->modem)
-        info->key = g_strdup ((const char *) key);
-}
-
-static void
-modem_destroyed (gpointer data, GObject *modem)
-{
-    MMPluginGeneric *self = MM_PLUGIN_GENERIC (data);
-    MMPluginGenericPrivate *priv = MM_PLUGIN_GENERIC_GET_PRIVATE (self);
-    FindInfo info = { NULL, modem };
-
-    g_hash_table_foreach (priv->modems, find_modem, &info);
-    if (info.key)
-        g_hash_table_remove (priv->modems, info.key);
-    g_free (info.key);
-}
-
 static MMModem *
 grab_port (MMPlugin *plugin,
            const char *subsys,
@@ -214,7 +186,6 @@ grab_port (MMPlugin *plugin,
            GError **error)
 {
     MMPluginGeneric *self = MM_PLUGIN_GENERIC (plugin);
-    MMPluginGenericPrivate *priv = MM_PLUGIN_GENERIC_GET_PRIVATE (plugin);
     GUdevDevice *device = NULL, *physdev = NULL;
     const char *devfile, *sysfs_path;
     char *driver = NULL;
@@ -263,7 +234,7 @@ grab_port (MMPlugin *plugin,
         goto out;
     }
 
-    modem = g_hash_table_lookup (priv->modems, sysfs_path);
+    modem = mm_plugin_base_find_modem (MM_PLUGIN_BASE (self), sysfs_path);
     if (!modem) {
         if (gsm) {
             modem = mm_generic_gsm_new (sysfs_path,
@@ -282,10 +253,8 @@ grab_port (MMPlugin *plugin,
             }
         }
 
-        if (modem) {
-            g_object_weak_ref (G_OBJECT (modem), modem_destroyed, self);
-            g_hash_table_insert (priv->modems, g_strdup (sysfs_path), modem);
-        }
+        if (modem)
+            mm_plugin_base_add_modem (MM_PLUGIN_BASE (self), modem);
     } else {
         if (gsm || cdma) {
             if (!mm_modem_grab_port (modem, subsys, name, error))
@@ -323,8 +292,6 @@ mm_plugin_generic_init (MMPluginGeneric *self)
     MMPluginGenericPrivate *priv = MM_PLUGIN_GENERIC_GET_PRIVATE (self);
     const char *subsys[2] = { "tty", NULL };
 
-    priv->modems = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
-
     priv->client = g_udev_client_new (subsys);
 }
 
@@ -333,7 +300,6 @@ dispose (GObject *object)
 {
     MMPluginGenericPrivate *priv = MM_PLUGIN_GENERIC_GET_PRIVATE (object);
 
-    g_hash_table_destroy (priv->modems);
     g_object_unref (priv->client);
 }
 
