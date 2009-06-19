@@ -13,6 +13,21 @@
 #define MM_IS_GENERIC_GSM_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_GENERIC_GSM))
 #define MM_GENERIC_GSM_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_GENERIC_GSM, MMGenericGsmClass))
 
+#define MM_GENERIC_GSM_POWER_UP_CMD   "power-up-cmd"
+#define MM_GENERIC_GSM_POWER_DOWN_CMD "power-down-cmd"
+#define MM_GENERIC_GSM_INIT_CMD       "init-cmd"
+
+typedef enum {
+    MM_GENERIC_GSM_PROP_FIRST = 0x2000,
+
+    MM_GENERIC_GSM_PROP_POWER_UP_CMD,
+    MM_GENERIC_GSM_PROP_POWER_DOWN_CMD,
+    MM_GENERIC_GSM_PROP_INIT_CMD,
+
+    MM_GENERIC_GSM_LAST_PROP = MM_GENERIC_GSM_PROP_POWER_DOWN_CMD
+} MMGenericGsmProp;
+
+
 typedef struct {
     MMSerial parent;
 } MMGenericGsm;
@@ -42,5 +57,8 @@ void mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
 void mm_generic_gsm_check_pin (MMGenericGsm *modem,
                                MMModemFn callback,
                                gpointer user_data);
+
+MMSerialPort *mm_generic_gsm_get_port (MMGenericGsm *modem,
+                                       MMSerialPortType ptype);
 
 #endif /* MM_GENERIC_GSM_H */

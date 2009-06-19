@@ -1,5 +1,6 @@
 pkglib_LTLIBRARIES = \
 	libmm-plugin-generic.la \
+	libmm-plugin-moto-c.la \
 	libmm-plugin-huawei.la \
 	libmm-plugin-hso.la \
 	libmm-plugin-mbm.la \
@@ -21,6 +22,24 @@ libmm_plugin_generic_la_CPPFLAGS = \
 	-I$(top_srcdir)/src
 
 libmm_plugin_generic_la_LDFLAGS = \
+	$(GUDEV_LDFLAGS) \
+	-module \
+	-avoid-version
+
+# Motorola C-series phones
+
+libmm_plugin_moto_c_la_SOURCES = \
+	mm-plugin-moto-c.c \
+	mm-plugin-moto-c.h \
+	mm-modem-moto-c-gsm.c \
+	mm-modem-moto-c-gsm.h
+
+libmm_plugin_moto_c_la_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
+	-I$(top_srcdir)/src
+
+libmm_plugin_moto_c_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
 	-module \
 	-avoid-version

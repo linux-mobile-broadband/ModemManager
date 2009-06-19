@@ -295,6 +295,7 @@ init_done (MMSerialPort *port,
            gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    char *cmd = NULL;
 
     if (error) {
         info->error = g_error_copy (error);
@@ -305,14 +306,24 @@ init_done (MMSerialPort *port,
         else
             mm_serial_port_queue_command (port, "+CREG=0", 5, NULL, NULL);
 
-        mm_serial_port_queue_command (port, "+CFUN=1", 5, enable_done, user_data);
+        g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_POWER_UP_CMD, &cmd, NULL);
+        if (cmd && strlen (cmd))
+            mm_serial_port_queue_command (port, cmd, 5, enable_done, user_data);
+        else
+            enable_done (port, NULL, NULL, user_data);
+        g_free (cmd);
     }
 }
 
 static void
 enable_flash_done (MMSerialPort *port, gpointer user_data)
 {
-    mm_serial_port_queue_command (port, "Z E0 V1 X4 &C1 +CMEE=1", 3, init_done, user_data);
+    MMCallbackInfo *info = user_data;
+    char *cmd = NULL;
+
+    g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_INIT_CMD, &cmd, NULL);
+    mm_serial_port_queue_command (port, cmd, 3, init_done, user_data);
+    g_free (cmd);
 }
 
 static void
@@ -328,7 +339,15 @@ disable_done (MMSerialPort *port,
 static void
 disable_flash_done (MMSerialPort *port, gpointer user_data)
 {
-    mm_serial_port_queue_command (port, "+CFUN=0", 5, disable_done, user_data);
+    MMCallbackInfo *info = user_data;
+    char *cmd = NULL;
+
+    g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_POWER_UP_CMD, &cmd, NULL);
+    if (cmd && strlen (cmd))
+        mm_serial_port_queue_command (port, cmd, 5, disable_done, user_data);
+    else
+        disable_done (port, NULL, NULL, user_data);
+    g_free (cmd);
 }
 
 static void
@@ -1018,22 +1037,27 @@ scan_done (MMSerialPort *port,
 
     if (error)
         info->error = g_error_copy (error);
-    else if (!strncmp (reply, "+COPS: ", 7)) {
+    else if (strstr (reply, "+COPS: ")) {
         /* Got valid reply */
         GPtrArray *results;
         GRegex *r;
         GMatchInfo *match_info;
         GError *err = NULL;
 
-        reply += 7;
+        reply = strstr (reply, "+COPS: ") + 7;
 
         /* Pattern without crazy escaping using | for matching: (|\d|,"|.+|","|.+|","|.+|"\)?,|\d|) */
 
         /* Quirk: Sony-Ericsson TM-506 sometimes includes a stray ')' like so:
          *
          *       +COPS: (2,"","T-Mobile","31026",0),(1,"AT&T","AT&T","310410"),0)
+         *
+         * Quirk: Motorola C-series (BUSlink SCWi275u) don't include the operator
+         *        number, like so:
+         *
+         *       +COPS: (2,"T-Mobile","","310260"),(0,"Cingular Wireless","","310410")
          */
-        r = g_regex_new ("\\((\\d),\"(.*)\",\"(.*)\",\"(.*)\"\\)?,(\\d)\\)", G_REGEX_UNGREEDY, 0, &err);
+        r = g_regex_new ("\\((\\d),\"(.*)\",\"(.*)\",\"(.*)\"\\)?[,]?[(\\d)]?\\)", G_REGEX_UNGREEDY, 0, &err);
         if (err) {
             g_error ("Invalid regular expression: %s", err->message);
             g_error_free (err);
@@ -1370,6 +1394,21 @@ sms_send (MMModemGsmSms *modem,
     g_free (command);
 }
 
+MMSerialPort *
+mm_generic_gsm_get_port (MMGenericGsm *modem,
+                         MMSerialPortType ptype)
+{
+    g_return_val_if_fail (MM_IS_GENERIC_GSM (modem), NULL);
+    g_return_val_if_fail (ptype != MM_SERIAL_PORT_TYPE_UNKNOWN, NULL);
+
+    if (ptype == MM_SERIAL_PORT_TYPE_PRIMARY)
+        return MM_GENERIC_GSM_GET_PRIVATE (modem)->primary;
+    else if (ptype == MM_SERIAL_PORT_TYPE_SECONDARY)
+        return MM_GENERIC_GSM_GET_PRIVATE (modem)->secondary;
+
+    return NULL;
+}
+
 /*****************************************************************************/
 /* MMModemSimple interface */
 
@@ -1689,6 +1728,8 @@ set_property (GObject *object, guint prop_id,
         break;
     case MM_MODEM_PROP_TYPE:
     case MM_MODEM_PROP_VALID:
+    case MM_GENERIC_GSM_PROP_POWER_UP_CMD:
+    case MM_GENERIC_GSM_PROP_POWER_DOWN_CMD:
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1726,6 +1767,15 @@ get_property (GObject *object, guint prop_id,
         break;
     case MM_MODEM_PROP_VALID:
         g_value_set_boolean (value, priv->valid);
+        break;
+    case MM_GENERIC_GSM_PROP_POWER_UP_CMD:
+        g_value_set_string (value, "+CFUN=1");
+        break;
+    case MM_GENERIC_GSM_PROP_POWER_DOWN_CMD:
+        g_value_set_string (value, "+CFUN=0");
+        break;
+    case MM_GENERIC_GSM_PROP_INIT_CMD:
+        g_value_set_string (value, "Z E0 V1 X4 &C1 +CMEE=1");
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1789,6 +1839,30 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_VALID,
                                       MM_MODEM_VALID);
+
+    g_object_class_install_property
+        (object_class, MM_GENERIC_GSM_PROP_POWER_UP_CMD,
+         g_param_spec_string (MM_GENERIC_GSM_POWER_UP_CMD,
+                              "PowerUpCommand",
+                              "Power up command",
+                              "+CFUN=1",
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, MM_GENERIC_GSM_PROP_POWER_DOWN_CMD,
+         g_param_spec_string (MM_GENERIC_GSM_POWER_DOWN_CMD,
+                              "PowerDownCommand",
+                              "Power down command",
+                              "+CFUN=0",
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, MM_GENERIC_GSM_PROP_INIT_CMD,
+         g_param_spec_string (MM_GENERIC_GSM_INIT_CMD,
+                              "InitCommand",
+                              "Initialization command",
+                              NULL,
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
 
 GType
