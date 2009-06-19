@@ -31,7 +31,6 @@
 #include "mm-plugin-generic.h"
 #include "mm-generic-gsm.h"
 #include "mm-generic-cdma.h"
-#include "mm-serial-port.h"
 
 static void plugin_init (MMPlugin *plugin_class);
 
@@ -253,13 +252,13 @@ grab_port (MMPlugin *plugin,
     }
 
     driver = get_driver_name (device);
-    if (!devfile) {
+    if (!driver) {
         g_set_error (error, 0, 0, "Could not get port's driver name.");
         goto out;
     }
 
     sysfs_path = g_udev_device_get_sysfs_path (physdev);
-    if (!devfile) {
+    if (!sysfs_path) {
         g_set_error (error, 0, 0, "Could not get port's physical device sysfs path.");
         goto out;
     }
