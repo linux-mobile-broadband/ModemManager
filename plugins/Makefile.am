@@ -1,6 +1,7 @@
 pkglib_LTLIBRARIES = \
 	libmm-plugin-generic.la \
 	libmm-plugin-moto-c.la \
+	libmm-plugin-gobi.la \
 	libmm-plugin-huawei.la \
 	libmm-plugin-hso.la \
 	libmm-plugin-mbm.la \
@@ -40,6 +41,24 @@ libmm_plugin_moto_c_la_CPPFLAGS = \
 	-I$(top_srcdir)/src
 
 libmm_plugin_moto_c_la_LDFLAGS = \
+	$(GUDEV_LDFLAGS) \
+	-module \
+	-avoid-version
+
+# Qualcomm Gobi
+
+libmm_plugin_gobi_la_SOURCES = \
+	mm-plugin-gobi.c \
+	mm-plugin-gobi.h \
+	mm-modem-gobi-gsm.c \
+	mm-modem-gobi-gsm.h
+
+libmm_plugin_gobi_la_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
+	-I$(top_srcdir)/src
+
+libmm_plugin_gobi_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
 	-module \
 	-avoid-version

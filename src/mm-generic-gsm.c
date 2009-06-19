@@ -1730,6 +1730,7 @@ set_property (GObject *object, guint prop_id,
     case MM_MODEM_PROP_VALID:
     case MM_GENERIC_GSM_PROP_POWER_UP_CMD:
     case MM_GENERIC_GSM_PROP_POWER_DOWN_CMD:
+    case MM_GENERIC_GSM_PROP_INIT_CMD:
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
