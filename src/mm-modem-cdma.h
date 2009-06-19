@@ -12,6 +12,13 @@
 
 typedef struct _MMModemCdma MMModemCdma;
 
+typedef void (*MMModemCdmaServingSystemFn) (MMModemCdma *modem,
+                                            guint32 class,
+                                            char band,
+                                            guint32 sid,
+                                            GError *error,
+                                            gpointer user_data);
+
 struct _MMModemCdma {
     GTypeInterface g_iface;
 
@@ -23,6 +30,10 @@ struct _MMModemCdma {
     void (*get_esn) (MMModemCdma *self,
                      MMModemStringFn callback,
                      gpointer user_data);
+
+    void (*get_serving_system) (MMModemCdma *self,
+                                MMModemCdmaServingSystemFn callback,
+                                gpointer user_data);
 
     /* Signals */
     void (*signal_quality) (MMModemCdma *self,
@@ -38,6 +49,10 @@ void mm_modem_cdma_get_signal_quality (MMModemCdma *self,
 void mm_modem_cdma_get_esn (MMModemCdma *self,
                             MMModemStringFn callback,
                             gpointer user_data);
+
+void mm_modem_cdma_get_serving_system (MMModemCdma *self,
+                                       MMModemCdmaServingSystemFn callback,
+                                       gpointer user_data);
 
 /* Protected */
 

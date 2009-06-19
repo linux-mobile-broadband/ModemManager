@@ -428,6 +428,89 @@ get_esn (MMModemCdma *modem,
     mm_serial_port_queue_command_cached (priv->primary, "+GSN", 3, get_string_done, info);
 }
 
+static void
+serving_system_invoke (MMCallbackInfo *info)
+{
+    MMModemCdmaServingSystemFn callback = (MMModemCdmaServingSystemFn) info->callback;
+
+    callback (MM_MODEM_CDMA (info->modem),
+              GPOINTER_TO_UINT (mm_callback_info_get_data (info, "class")),
+              (char) GPOINTER_TO_UINT (mm_callback_info_get_data (info, "band")),
+              GPOINTER_TO_UINT (mm_callback_info_get_data (info, "sid")),
+              info->error,
+              info->user_data);
+}
+
+static void
+serving_system_done (MMSerialPort *port,
+                     GString *response,
+                     GError *error,
+                     gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    char *reply = response->str;
+    int class = 0, sid = 99999, num;
+    char band = 'Z';
+
+    if (error) {
+        info->error = g_error_copy (error);
+        goto out;
+    }
+
+    if (!strstr (reply, "+CSS: ")) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse Serving System results.");
+        goto out;
+    }
+
+    /* Got valid reply */
+    reply += 6;
+
+    num = sscanf (reply, "%d, %c, %d", &class, &band, &sid);
+    if (num != 3)
+        num = sscanf (reply, "%d,%c,%d", &class, &band, &sid);
+
+    if (num == 3) {
+        /* Normalize */
+        class = CLAMP (class, 0, 4);
+        band = CLAMP (band, 'A', 'Z');
+        if (sid < 0 || sid > 32767)
+            sid = 99999;
+
+        /* 99 means unknown/no service */
+        if (sid == 99999) {
+            info->error = g_error_new_literal (MM_MOBILE_ERROR,
+                                                MM_MOBILE_ERROR_NO_NETWORK,
+                                                "No service");
+        } else {
+            mm_callback_info_set_data (info, "class", GUINT_TO_POINTER (class), NULL);
+            mm_callback_info_set_data (info, "band", GUINT_TO_POINTER (band), NULL);
+            mm_callback_info_set_data (info, "sid", GUINT_TO_POINTER (sid), NULL);
+        }
+    } else
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                    "%s", "Could not parse signal quality results");
+
+ out:
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_serving_system (MMModemCdma *modem,
+                    MMModemCdmaServingSystemFn callback,
+                    gpointer user_data)
+{
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new_full (MM_MODEM (modem),
+                                      serving_system_invoke,
+                                      G_CALLBACK (callback),
+                                      user_data);
+
+    mm_serial_port_queue_command (priv->primary, "+CSS?", 3, serving_system_done, info);
+}
+
 /*****************************************************************************/
 /* MMModemSimple interface */
 
@@ -595,6 +678,7 @@ modem_cdma_init (MMModemCdma *cdma_modem_class)
 {
     cdma_modem_class->get_signal_quality = get_signal_quality;
     cdma_modem_class->get_esn = get_esn;
+    cdma_modem_class->get_serving_system = get_serving_system;
 }
 
 static void

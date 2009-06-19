@@ -8,6 +8,7 @@
 
 static void impl_modem_cdma_get_signal_quality (MMModemCdma *modem, DBusGMethodInvocation *context);
 static void impl_modem_cdma_get_esn (MMModemCdma *modem, DBusGMethodInvocation *context);
+static void impl_modem_cdma_get_serving_system (MMModemCdma *modem, DBusGMethodInvocation *context);
 
 #include "mm-modem-cdma-glue.h"
 
@@ -19,6 +20,7 @@ enum {
 
 static guint signals[LAST_SIGNAL] = { 0 };
 
+/*****************************************************************************/
 
 static void
 str_call_done (MMModem *modem, const char *result, GError *error, gpointer user_data)
@@ -67,6 +69,91 @@ uint_call_done (MMModem *modem, guint32 result, GError *error, gpointer user_dat
         dbus_g_method_return_error (context, error);
     else
         dbus_g_method_return (context, result);
+}
+
+static void
+serving_system_call_done (MMModemCdma *self,
+                          guint32 class,
+                          char band,
+                          guint32 sid,
+                          GError *error,
+                          gpointer user_data)
+{
+    DBusGMethodInvocation *context = (DBusGMethodInvocation *) user_data;
+
+    if (error)
+        dbus_g_method_return_error (context, error);
+    else {
+        GValueArray *array;
+        GValue value = { 0, };
+        char band_str[2] = { 0, 0 };
+
+        array = g_value_array_new (3);
+
+        /* Band Class */
+        g_value_init (&value, G_TYPE_UINT);
+        g_value_set_uint (&value, class);
+        g_value_array_append (array, &value);
+        g_value_unset (&value);
+
+        /* Band */
+        g_value_init (&value, G_TYPE_STRING);
+        band_str[0] = band;
+        g_value_set_string (&value, band_str);
+        g_value_array_append (array, &value);
+        g_value_unset (&value);
+
+        /* SID */
+        g_value_init (&value, G_TYPE_UINT);
+        g_value_set_uint (&value, sid);
+        g_value_array_append (array, &value);
+        g_value_unset (&value);
+
+        dbus_g_method_return (context, array);
+    }
+}
+
+static void
+serving_system_invoke (MMCallbackInfo *info)
+{
+    MMModemCdmaServingSystemFn callback = (MMModemCdmaServingSystemFn) info->callback;
+
+    callback (MM_MODEM_CDMA (info->modem), 0, 0, 0, info->error, info->user_data);
+}
+
+static void
+serving_system_call_not_supported (MMModemCdma *self,
+                                   MMModemCdmaServingSystemFn callback,
+                                   gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new_full (MM_MODEM (self), serving_system_invoke, G_CALLBACK (callback), user_data);
+    info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                       "Operation not supported");
+
+    mm_callback_info_schedule (info);
+}
+
+void
+mm_modem_cdma_get_serving_system (MMModemCdma *self,
+                                  MMModemCdmaServingSystemFn callback,
+                                  gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_CDMA (self));
+    g_return_if_fail (callback != NULL);
+
+    if (MM_MODEM_CDMA_GET_INTERFACE (self)->get_serving_system)
+        MM_MODEM_CDMA_GET_INTERFACE (self)->get_serving_system (self, callback, user_data);
+    else
+        serving_system_call_not_supported (self, callback, user_data);
+}
+
+static void
+impl_modem_cdma_get_serving_system (MMModemCdma *modem,
+                                    DBusGMethodInvocation *context)
+{
+    mm_modem_cdma_get_serving_system (modem, serving_system_call_done, context);
 }
 
 void
@@ -118,7 +205,6 @@ mm_modem_cdma_signal_quality (MMModemCdma *self,
 
     g_signal_emit (self, signals[SIGNAL_QUALITY], 0, quality);
 }
-
 
 /*****************************************************************************/
 

@@ -12,13 +12,25 @@ MM_DBUS_INTERFACE_MODEM_CDMA='org.freedesktop.ModemManager.Modem.Cdma'
 MM_DBUS_INTERFACE_MODEM_GSM_CARD='org.freedesktop.ModemManager.Modem.Gsm.Card'
 MM_DBUS_INTERFACE_MODEM_GSM_NETWORK='org.freedesktop.ModemManager.Modem.Gsm.Network'
 
+def get_cdma_band_class(band_class):
+    if band_class == 1:
+        return "800MHz"
+    elif band_class == 2:
+        return "1900MHz"
+    else:
+        return "Unknown"
+
 def inspect_cdma(proxy):
     cdma = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_CDMA)
     try:
         print "ESN: %s" % cdma.GetEsn()
     except dbus.exceptions.DBusException:
         pass
-    return
+    print "-------------------"
+    info = cdma.GetServingSystem()
+    print "Class: %s" % get_cdma_band_class(info[0])
+    print "Band:  %s" % info[1]
+    print "SID:   %d" % info[2]
 
 
 def get_gsm_network_mode(modem):
