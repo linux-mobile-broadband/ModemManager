@@ -357,18 +357,22 @@ get_signal_quality_done (MMSerialPort *port,
         info->error = g_error_copy (error);
     else if (!strncmp (reply, "+CSQ: ", 6)) {
         /* Got valid reply */
-        int quality;
-        int ber;
+        int quality, ber;
 
         reply += 6;
 
         if (sscanf (reply, "%d,%d", &quality, &ber)) {
-            /* 99 means unknown */
-            if (quality != 99)
+            /* 99 means unknown/no service */
+            if (quality == 99) {
+                info->error = g_error_new_literal (MM_MOBILE_ERROR,
+                                                   MM_MOBILE_ERROR_NO_NETWORK,
+                                                   "No service");
+            } else {
                 /* Normalize the quality */
-                quality = quality * 100 / 31;
+                quality = CLAMP (quality, 0, 31) * 100 / 31;
             
-            mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
+                mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
+            }
         } else
             info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
                                        "%s", "Could not parse signal quality results");
