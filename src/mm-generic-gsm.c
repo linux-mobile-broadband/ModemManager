@@ -421,11 +421,11 @@ get_imsi (MMModemGsmCard *modem,
 }
 
 static void
-gsm_card_info_invoke (MMCallbackInfo *info)
+card_info_invoke (MMCallbackInfo *info)
 {
-    MMModemGsmCardInfoFn callback = (MMModemGsmCardInfoFn) info->callback;
+    MMModemInfoFn callback = (MMModemInfoFn) info->callback;
 
-    callback (MM_MODEM_GSM_CARD (info->modem),
+    callback (info->modem,
               (char *) mm_callback_info_get_data (info, "card-info-manufacturer"),
               (char *) mm_callback_info_get_data (info, "card-info-model"),
               (char *) mm_callback_info_get_data (info, "card-info-version"),
@@ -477,15 +477,15 @@ get_manufacturer_done (MMSerialPort *port,
 }
 
 static void
-get_card_info (MMModemGsmCard *modem,
-               MMModemGsmCardInfoFn callback,
+get_card_info (MMModem *modem,
+               MMModemInfoFn callback,
                gpointer user_data)
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
 
     info = mm_callback_info_new_full (MM_MODEM (modem),
-                                      gsm_card_info_invoke,
+                                      card_info_invoke,
                                       G_CALLBACK (callback),
                                       user_data);
 
@@ -1662,6 +1662,7 @@ modem_init (MMModem *modem_class)
     modem_class->enable = enable;
     modem_class->connect = connect;
     modem_class->disconnect = disconnect;
+    modem_class->get_info = get_card_info;
 }
 
 static void
@@ -1669,7 +1670,6 @@ modem_gsm_card_init (MMModemGsmCard *class)
 {
     class->get_imei = get_imei;
     class->get_imsi = get_imsi;
-    class->get_info = get_card_info;
     class->send_pin = send_pin;
     class->send_puk = send_puk;
     class->enable_pin = enable_pin;

@@ -12,13 +12,6 @@
 
 typedef struct _MMModemGsmCard MMModemGsmCard;
 
-typedef void (*MMModemGsmCardInfoFn) (MMModemGsmCard *self,
-                                      const char *manufacturer,
-                                      const char *model,
-                                      const char *version,
-                                      GError *error,
-                                      gpointer user_data);
-
 struct _MMModemGsmCard {
     GTypeInterface g_iface;
 
@@ -29,10 +22,6 @@ struct _MMModemGsmCard {
 
     void (*get_imsi) (MMModemGsmCard *self,
                       MMModemStringFn callback,
-                      gpointer user_data);
-
-    void (*get_info) (MMModemGsmCard *self,
-                      MMModemGsmCardInfoFn callback,
                       gpointer user_data);
 
     void (*send_puk) (MMModemGsmCard *self,
@@ -67,10 +56,6 @@ void mm_modem_gsm_card_get_imei (MMModemGsmCard *self,
 
 void mm_modem_gsm_card_get_imsi (MMModemGsmCard *self,
                                  MMModemStringFn callback,
-                                 gpointer user_data);
-
-void mm_modem_gsm_card_get_info (MMModemGsmCard *self,
-                                 MMModemGsmCardInfoFn callback,
                                  gpointer user_data);
 
 void mm_modem_gsm_card_send_puk (MMModemGsmCard *self,

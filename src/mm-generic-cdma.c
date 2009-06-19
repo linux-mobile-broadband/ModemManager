@@ -249,6 +249,100 @@ disconnect (MMModem *modem,
 }
 
 static void
+card_info_invoke (MMCallbackInfo *info)
+{
+    MMModemInfoFn callback = (MMModemInfoFn) info->callback;
+
+    callback (info->modem,
+              (char *) mm_callback_info_get_data (info, "card-info-manufacturer"),
+              (char *) mm_callback_info_get_data (info, "card-info-model"),
+              (char *) mm_callback_info_get_data (info, "card-info-version"),
+              info->error, info->user_data);
+}
+
+static const char *
+strip_info_response (const char *resp, const char *cmd)
+{
+    const char *p = resp;
+
+    if (p) {
+        if (!strncmp (p, cmd, strlen (cmd)))
+            p += strlen (cmd);
+    }
+    return p;
+}
+
+static void
+get_version_done (MMSerialPort *port,
+                  GString *response,
+                  GError *error,
+                  gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    const char *p;
+
+    if (!error) {
+        p = strip_info_response (response->str, "+GMR:");
+        mm_callback_info_set_data (info, "card-info-version", g_strdup (p), g_free);
+    } else if (!info->error)
+        info->error = g_error_copy (error);
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_model_done (MMSerialPort *port,
+                GString *response,
+                GError *error,
+                gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    const char *p;
+
+    if (!error) {
+        p = strip_info_response (response->str, "+GMM:");
+        mm_callback_info_set_data (info, "card-info-model", g_strdup (p), g_free);
+    } else if (!info->error)
+        info->error = g_error_copy (error);
+}
+
+static void
+get_manufacturer_done (MMSerialPort *port,
+                       GString *response,
+                       GError *error,
+                       gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    const char *p;
+
+    if (!error) {
+        p = strip_info_response (response->str, "+GMI:");
+        mm_callback_info_set_data (info, "card-info-manufacturer", g_strdup (p), g_free);
+    } else
+        info->error = g_error_copy (error);
+}
+
+static void
+get_card_info (MMModem *modem,
+               MMModemInfoFn callback,
+               gpointer user_data)
+{
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new_full (MM_MODEM (modem),
+                                      card_info_invoke,
+                                      G_CALLBACK (callback),
+                                      user_data);
+
+    mm_serial_port_queue_command_cached (priv->primary, "+GMI", 3, get_manufacturer_done, info);
+    mm_serial_port_queue_command_cached (priv->primary, "+GMM", 3, get_model_done, info);
+    mm_serial_port_queue_command_cached (priv->primary, "+GMR", 3, get_version_done, info);
+}
+
+/*****************************************************************************/
+
+static void
 get_signal_quality_done (MMSerialPort *port,
                          GString *response,
                          GError *error,
@@ -456,6 +550,7 @@ modem_init (MMModem *modem_class)
     modem_class->enable = enable;
     modem_class->connect = connect;
     modem_class->disconnect = disconnect;
+    modem_class->get_info = get_card_info;
 }
 
 static void

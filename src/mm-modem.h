@@ -60,6 +60,13 @@ typedef void (*MMModemIp4Fn) (MMModem *modem,
                               GError *error,
                               gpointer user_data);
 
+typedef void (*MMModemInfoFn) (MMModem *modem,
+                               const char *manufacturer,
+                               const char *model,
+                               const char *version,
+                               GError *error,
+                               gpointer user_data);
+
 struct _MMModem {
     GTypeInterface g_iface;
 
@@ -94,6 +101,10 @@ struct _MMModem {
     void (*disconnect) (MMModem *self,
                         MMModemFn callback,
                         gpointer user_data);
+
+    void (*get_info) (MMModem *self,
+                      MMModemInfoFn callback,
+                      gpointer user_data);
 };
 
 GType mm_modem_get_type (void);
@@ -128,6 +139,10 @@ void mm_modem_get_ip4_config (MMModem *self,
 void mm_modem_disconnect (MMModem *self,
                           MMModemFn callback,
                           gpointer user_data);
+
+void mm_modem_get_info (MMModem *self,
+                        MMModemInfoFn callback,
+                        gpointer user_data);
 
 gboolean mm_modem_get_valid (MMModem *self);
 

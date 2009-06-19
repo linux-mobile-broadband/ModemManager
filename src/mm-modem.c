@@ -10,6 +10,7 @@ static void impl_modem_enable (MMModem *modem, gboolean enable, DBusGMethodInvoc
 static void impl_modem_connect (MMModem *modem, const char *number, DBusGMethodInvocation *context);
 static void impl_modem_disconnect (MMModem *modem, DBusGMethodInvocation *context);
 static void impl_modem_get_ip4_config (MMModem *modem, DBusGMethodInvocation *context);
+static void impl_modem_get_info (MMModem *modem, DBusGMethodInvocation *context);
 
 #include "mm-modem-glue.h"
 
@@ -196,6 +197,88 @@ impl_modem_disconnect (MMModem *modem,
     mm_modem_disconnect (modem, async_call_done, context);
 }
 
+static void
+info_call_done (MMModem *self,
+                const char *manufacturer,
+                const char *model,
+                const char *version,
+                GError *error,
+                gpointer user_data)
+{
+    DBusGMethodInvocation *context = (DBusGMethodInvocation *) user_data;
+
+    if (error)
+        dbus_g_method_return_error (context, error);
+    else {
+        GValueArray *array;
+        GValue value = { 0, };
+
+        array = g_value_array_new (3);
+
+        /* Manufacturer */
+        g_value_init (&value, G_TYPE_STRING);
+        g_value_set_string (&value, manufacturer);
+        g_value_array_append (array, &value);
+        g_value_unset (&value);
+
+        /* Model */
+        g_value_init (&value, G_TYPE_STRING);
+        g_value_set_string (&value, model);
+        g_value_array_append (array, &value);
+        g_value_unset (&value);
+
+        /* Version */
+        g_value_init (&value, G_TYPE_STRING);
+        g_value_set_string (&value, version);
+        g_value_array_append (array, &value);
+        g_value_unset (&value);
+
+        dbus_g_method_return (context, array);
+    }
+}
+
+static void
+info_invoke (MMCallbackInfo *info)
+{
+    MMModemInfoFn callback = (MMModemInfoFn) info->callback;
+
+    callback (info->modem, NULL, NULL, NULL, info->error, info->user_data);
+}
+
+static void
+info_call_not_supported (MMModem *self,
+                         MMModemInfoFn callback,
+                         gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new_full (MM_MODEM (self), info_invoke, G_CALLBACK (callback), user_data);
+    info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                       "Operation not supported");
+
+    mm_callback_info_schedule (info);
+}
+
+void
+mm_modem_get_info (MMModem *self,
+                   MMModemInfoFn callback,
+                   gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM (self));
+    g_return_if_fail (callback != NULL);
+
+    if (MM_MODEM_GET_INTERFACE (self)->get_info)
+        MM_MODEM_GET_INTERFACE (self)->get_info (self, callback, user_data);
+    else
+        info_call_not_supported (self, callback, user_data);
+}
+
+static void
+impl_modem_get_info (MMModem *modem,
+                     DBusGMethodInvocation *context)
+{
+    mm_modem_get_info (modem, info_call_done, context);
+}
 
 /*****************************************************************************/
 

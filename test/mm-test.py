@@ -71,9 +71,6 @@ def inspect_gsm(proxy):
         pass
     print "IMSI: %s" % card.GetImsi()
 
-    info = card.GetInfo()
-    print "Vendor: '%s' Model: '%s' Version: '%s'" % info
-
     # Gsm.Network interface
     net = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_GSM_NETWORK)
     print "Signal quality: %d" % net.GetSignalQuality()
@@ -129,6 +126,11 @@ for m in modems:
     # Modem interface
     modem = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM)
     modem.Enable(True)
+
+    info = modem.GetInfo()
+    print "Vendor:  %s" % info[0]
+    print "Model:   %s" % info[1]
+    print "Version: %s" % info[2]
 
     if type == 1:
         inspect_gsm(proxy)
