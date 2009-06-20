@@ -48,5 +48,11 @@ gboolean mm_plugin_base_add_modem (MMPluginBase *self,
 MMModem *mm_plugin_base_find_modem (MMPluginBase *self,
                                     const char *master_device);
 
+gboolean mm_plugin_base_get_device_ids (MMPluginBase *self,
+                                        const char *subsys,
+                                        const char *name,
+                                        guint16 *vendor,
+                                        guint16 *product);
+
 #endif /* MM_PLUGIN_BASE_H */
 

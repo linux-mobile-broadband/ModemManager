@@ -47,61 +47,6 @@ mm_plugin_create (void)
 
 /*****************************************************************************/
 
-/* From hostap, Copyright (c) 2002-2005, Jouni Malinen <jkmaline@cc.hut.fi> */
-
-static int hex2num (char c)
-{
-	if (c >= '0' && c <= '9')
-		return c - '0';
-	if (c >= 'a' && c <= 'f')
-		return c - 'a' + 10;
-	if (c >= 'A' && c <= 'F')
-		return c - 'A' + 10;
-	return -1;
-}
-
-static int hex2byte (const char *hex)
-{
-	int a, b;
-	a = hex2num(*hex++);
-	if (a < 0)
-		return -1;
-	b = hex2num(*hex++);
-	if (b < 0)
-		return -1;
-	return (a << 4) | b;
-}
-
-/* End from hostap */
-
-static gboolean
-get_ids (GUdevDevice *device, guint32 *vendor, guint32 *product)
-{
-    const char *vid, *pid;
-
-    g_return_val_if_fail (device != NULL, FALSE);
-
-    vid = g_udev_device_get_property (device, "ID_VENDOR_ID");
-    if (!vid || (strlen (vid) != 4))
-        return FALSE;
-
-    if (vendor) {
-        *vendor = (guint32) (hex2byte (vid + 2) & 0xFF);
-        *vendor |= (guint32) ((hex2byte (vid) & 0xFF) << 8);
-    }
-
-    pid = g_udev_device_get_property (device, "ID_MODEL_ID");
-    if (!pid || (strlen (pid) != 4))
-        return FALSE;
-
-    if (product) {
-        *product = (guint32) (hex2byte (pid + 2) & 0xFF);
-        *product |= (guint32) ((hex2byte (pid) & 0xFF) << 8);
-    }
-
-    return TRUE;
-}
-
 static char *
 get_driver_name (GUdevDevice *device)
 {
@@ -198,14 +143,14 @@ supports_port (MMPlugin *plugin,
     MMPluginHuaweiPrivate *priv = MM_PLUGIN_HUAWEI_GET_PRIVATE (plugin);
     GUdevDevice *device, *physdev = NULL;
     guint32 level = 0;
-    guint32 vendor = 0, product = 0;
+    guint16 vendor = 0, product = 0;
 
     device = get_device (priv->client, subsys, name, &physdev);
     if (!device)
         goto out;
     g_object_unref (physdev);
 
-    if (!get_ids (device, &vendor, &product))
+    if (!mm_plugin_base_get_device_ids (MM_PLUGIN_BASE (plugin), subsys, name, &vendor, &product))
         goto out;
 
     if (vendor != 0x12d1)
@@ -220,29 +165,6 @@ out:
     return level;
 }
 
-#if 0
-static char *
-find_second_port (LibHalContext *ctx, const char *parent)
-{
-    char **children;
-    char *second_port = NULL;
-    int num_children = 0;
-    int i;
-
-    if (!libhal_device_property_exists (ctx, parent, "usb.interface.number", NULL) ||
-        libhal_device_get_property_int (ctx, parent, "usb.interface.number", NULL) != 1)
-        return NULL;
-
-    children = libhal_manager_find_device_string_match (ctx, "info.parent", parent, &num_children, NULL);
-    for (i = 0; i < num_children && second_port == NULL; i++)
-        second_port = libhal_device_get_property_string (ctx, children[i], "serial.device", NULL);
-
-    libhal_free_string_array (children);
-
-    return second_port;
-}
-#endif
-
 static MMModem *
 grab_port (MMPlugin *plugin,
            const char *subsys,
@@ -255,7 +177,7 @@ grab_port (MMPlugin *plugin,
     const char *devfile, *sysfs_path;
     char *driver = NULL;
     MMModem *modem = NULL;
-    guint32 product = 0;
+    guint16 product = 0;
 
     g_return_val_if_fail (subsys != NULL, NULL);
     g_return_val_if_fail (name != NULL, NULL);
@@ -282,7 +204,7 @@ grab_port (MMPlugin *plugin,
         goto out;
     }
 
-    if (!get_ids (device, NULL, &product)) {
+    if (!mm_plugin_base_get_device_ids (MM_PLUGIN_BASE (plugin), subsys, name, NULL, &product)) {
         g_set_error (error, 0, 0, "Could not get modem product ID.");
         goto out;
     }

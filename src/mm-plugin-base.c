@@ -19,6 +19,9 @@
 #include <unistd.h>
 #include <string.h>
 
+#define G_UDEV_API_IS_SUBJECT_TO_CHANGE
+#include <gudev/gudev.h>
+
 #include "mm-plugin-base.h"
 
 G_DEFINE_TYPE (MMPluginBase, mm_plugin_base, G_TYPE_OBJECT)
@@ -93,6 +96,92 @@ mm_plugin_base_find_modem (MMPluginBase *self,
 
     priv = MM_PLUGIN_BASE_GET_PRIVATE (self);
     return g_hash_table_lookup (priv->modems, master_device);
+}
+
+/* From hostap, Copyright (c) 2002-2005, Jouni Malinen <jkmaline@cc.hut.fi> */
+
+static int hex2num (char c)
+{
+	if (c >= '0' && c <= '9')
+		return c - '0';
+	if (c >= 'a' && c <= 'f')
+		return c - 'a' + 10;
+	if (c >= 'A' && c <= 'F')
+		return c - 'A' + 10;
+	return -1;
+}
+
+static int hex2byte (const char *hex)
+{
+	int a, b;
+	a = hex2num(*hex++);
+	if (a < 0)
+		return -1;
+	b = hex2num(*hex++);
+	if (b < 0)
+		return -1;
+	return (a << 4) | b;
+}
+
+/* End from hostap */
+
+gboolean
+mm_plugin_base_get_device_ids (MMPluginBase *self,
+                               const char *subsys,
+                               const char *name,
+                               guint16 *vendor,
+                               guint16 *product)
+{
+    GUdevClient *client;
+    GUdevDevice *device = NULL;
+    const char *tmp[] = { subsys, NULL };
+    const char *vid, *pid;
+    gboolean success = FALSE;
+
+    g_return_val_if_fail (self != NULL, FALSE);
+    g_return_val_if_fail (MM_IS_PLUGIN_BASE (self), FALSE);
+    g_return_val_if_fail (subsys != NULL, FALSE);
+    g_return_val_if_fail (name != NULL, FALSE);
+    if (vendor)
+        g_return_val_if_fail (*vendor == 0, FALSE);
+    if (product)
+        g_return_val_if_fail (*product == 0, FALSE);
+
+    client = g_udev_client_new (tmp);
+    if (!client)
+        return FALSE;
+
+    device = g_udev_client_query_by_subsystem_and_name (client, subsys, name);
+    if (!device)
+        goto out;
+
+    vid = g_udev_device_get_property (device, "ID_VENDOR_ID");
+    if (!vid || (strlen (vid) != 4))
+        goto out;
+
+    if (vendor) {
+        *vendor = (guint16) (hex2byte (vid + 2) & 0xFF);
+        *vendor |= (guint16) ((hex2byte (vid) & 0xFF) << 8);
+    }
+
+    pid = g_udev_device_get_property (device, "ID_MODEL_ID");
+    if (!pid || (strlen (pid) != 4)) {
+        *vendor = 0;
+        goto out;
+    }
+
+    if (product) {
+        *product = (guint16) (hex2byte (pid + 2) & 0xFF);
+        *product |= (guint16) ((hex2byte (pid) & 0xFF) << 8);
+    }
+
+    success = TRUE;
+
+out:
+    if (device)
+        g_object_unref (device);
+    g_object_unref (client);
+    return success;
 }
 
 /*****************************************************************************/
