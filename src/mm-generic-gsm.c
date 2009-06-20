@@ -37,6 +37,7 @@ typedef struct {
 
     MMSerialPort *primary;
     MMSerialPort *secondary;
+    MMPort *data;
 } MMGenericGsmPrivate;
 
 static void get_registration_status (MMSerialPort *port, MMCallbackInfo *info);
@@ -187,7 +188,7 @@ check_valid (MMGenericGsm *self)
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     gboolean new_valid = FALSE;
 
-    if (priv->primary)
+    if (priv->primary && priv->data)
         new_valid = TRUE;
 
     if (priv->valid != new_valid) {
@@ -199,44 +200,50 @@ check_valid (MMGenericGsm *self)
 static gboolean
 owns_port (MMModem *modem, const char *subsys, const char *name)
 {
-    MMGenericGsm *self = MM_GENERIC_GSM (modem);
-
-    if (strcmp (subsys, "tty"))
-        return FALSE;
-
-    return !!mm_serial_get_port (MM_SERIAL (self), name);
+    return !!mm_modem_base_get_port (MM_MODEM_BASE (modem), subsys, name);
 }
 
-MMSerialPort *
+MMPort *
 mm_generic_gsm_grab_port (MMGenericGsm *self,
                           const char *subsys,
                           const char *name,
-                          MMSerialPortType ptype,
+                          MMPortType ptype,
                           GError **error)
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
-    MMSerialPort *port = NULL;
+    MMPort *port = NULL;
     GRegex *regex;
 
-    if (strcmp (subsys, "tty"))
-        return NULL;
+    g_return_val_if_fail (!strcmp (subsys, "net") || !strcmp (subsys, "tty"), FALSE);
 
-    port = mm_serial_add_port (MM_SERIAL (self), name, ptype);
-    mm_serial_port_set_response_parser (port,
-                                        mm_serial_parser_v1_parse,
-                                        mm_serial_parser_v1_new (),
-                                        mm_serial_parser_v1_destroy);
+    port = mm_modem_base_add_port (MM_MODEM_BASE (self), subsys, name, ptype);
+    if (MM_IS_SERIAL_PORT (port)) {
+        mm_serial_port_set_response_parser (MM_SERIAL_PORT (port),
+                                            mm_serial_parser_v1_parse,
+                                            mm_serial_parser_v1_new (),
+                                            mm_serial_parser_v1_destroy);
 
-    regex = g_regex_new ("\\r\\n\\+CREG: (\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    mm_serial_port_add_unsolicited_msg_handler (port, regex, reg_state_changed, self, NULL);
-    g_regex_unref (regex);
+        regex = g_regex_new ("\\r\\n\\+CREG: (\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, reg_state_changed, self, NULL);
+        g_regex_unref (regex);
 
-    if (ptype == MM_SERIAL_PORT_TYPE_PRIMARY) {
-        priv->primary = port;
-        g_object_notify (G_OBJECT (self), MM_MODEM_DATA_DEVICE);
-        check_valid (self);
-    } else if (ptype == MM_SERIAL_PORT_TYPE_SECONDARY)
-        priv->secondary = port;
+        if (ptype == MM_PORT_TYPE_PRIMARY) {
+            priv->primary = MM_SERIAL_PORT (port);
+            if (!priv->data) {
+                priv->data = port;
+                g_object_notify (G_OBJECT (self), MM_MODEM_DATA_DEVICE);
+            }
+            check_valid (self);
+        } else if (ptype == MM_PORT_TYPE_SECONDARY)
+            priv->secondary = MM_SERIAL_PORT (port);
+    } else {
+        /* Net device (if any) is the preferred data port */
+        if (priv->data && MM_IS_SERIAL_PORT (priv->data)) {
+            priv->data = port;
+            g_object_notify (G_OBJECT (self), MM_MODEM_DATA_DEVICE);
+            check_valid (self);
+        }
+    }
 
     return port;
 }
@@ -249,12 +256,14 @@ grab_port (MMModem *modem,
 {
     MMGenericGsm *self = MM_GENERIC_GSM (modem);
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
-    MMSerialPortType ptype = MM_SERIAL_PORT_TYPE_IGNORED;
+    MMPortType ptype = MM_PORT_TYPE_IGNORED;
 
-    if (!priv->primary)
-        ptype = MM_SERIAL_PORT_TYPE_PRIMARY;
-    else if (!priv->secondary)
-        ptype = MM_SERIAL_PORT_TYPE_SECONDARY;
+    if (!strcmp (subsys, "tty")) {
+        if (!priv->primary)
+            ptype = MM_PORT_TYPE_PRIMARY;
+        else if (!priv->secondary)
+            ptype = MM_PORT_TYPE_SECONDARY;
+    }
 
     return !!mm_generic_gsm_grab_port (self, subsys, name, ptype, error);
 }
@@ -263,26 +272,31 @@ static void
 release_port (MMModem *modem, const char *subsys, const char *name)
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
-    MMSerialPort *port;
+    MMPort *port;
 
     if (strcmp (subsys, "tty"))
         return;
 
-    port = mm_serial_get_port (MM_SERIAL (modem), name);
+    port = mm_modem_base_get_port (MM_MODEM_BASE (modem), subsys, name);
     if (!port)
         return;
 
-    if (port == priv->primary) {
-        mm_serial_remove_port (MM_SERIAL (modem), port);
+    if (port == MM_PORT (priv->primary)) {
+        mm_modem_base_remove_port (MM_MODEM_BASE (modem), port);
         priv->primary = NULL;
-        check_valid (MM_GENERIC_GSM (modem));
     }
 
-    if (port == priv->secondary) {
-        mm_serial_remove_port (MM_SERIAL (modem), port);
-        priv->secondary = NULL;
-        check_valid (MM_GENERIC_GSM (modem));
+    if (port == priv->data) {
+        priv->data = NULL;
+        g_object_notify (G_OBJECT (modem), MM_MODEM_DATA_DEVICE);
     }
+
+    if (port == MM_PORT (priv->secondary)) {
+        mm_modem_base_remove_port (MM_MODEM_BASE (modem), port);
+        priv->secondary = NULL;
+    }
+
+    check_valid (MM_GENERIC_GSM (modem));
 }
 
 static void
@@ -1407,14 +1421,14 @@ sms_send (MMModemGsmSms *modem,
 
 MMSerialPort *
 mm_generic_gsm_get_port (MMGenericGsm *modem,
-                         MMSerialPortType ptype)
+                         MMPortType ptype)
 {
     g_return_val_if_fail (MM_IS_GENERIC_GSM (modem), NULL);
-    g_return_val_if_fail (ptype != MM_SERIAL_PORT_TYPE_UNKNOWN, NULL);
+    g_return_val_if_fail (ptype != MM_PORT_TYPE_UNKNOWN, NULL);
 
-    if (ptype == MM_SERIAL_PORT_TYPE_PRIMARY)
+    if (ptype == MM_PORT_TYPE_PRIMARY)
         return MM_GENERIC_GSM_GET_PRIVATE (modem)->primary;
-    else if (ptype == MM_SERIAL_PORT_TYPE_SECONDARY)
+    else if (ptype == MM_PORT_TYPE_SECONDARY)
         return MM_GENERIC_GSM_GET_PRIVATE (modem)->secondary;
 
     return NULL;
@@ -1757,8 +1771,8 @@ get_property (GObject *object, guint prop_id,
 
     switch (prop_id) {
     case MM_MODEM_PROP_DATA_DEVICE:
-        if (priv->primary)
-            g_value_set_string (value, mm_serial_port_get_device (priv->primary));
+        if (priv->data)
+            g_value_set_string (value, mm_port_get_device (priv->data));
         else
             g_value_set_string (value, NULL);
         break;
@@ -1915,7 +1929,10 @@ mm_generic_gsm_get_type (void)
             (GInterfaceInitFunc) modem_simple_init
         };
 
-        generic_gsm_type = g_type_register_static (MM_TYPE_SERIAL, "MMGenericGsm", &generic_gsm_type_info, 0);
+        generic_gsm_type = g_type_register_static (MM_TYPE_MODEM_BASE,
+                                                   "MMGenericGsm",
+                                                   &generic_gsm_type_info,
+                                                   0);
 
         g_type_add_interface_static (generic_gsm_type, MM_TYPE_MODEM, &modem_iface_info);
         g_type_add_interface_static (generic_gsm_type, MM_TYPE_MODEM_GSM_CARD, &modem_gsm_card_info);

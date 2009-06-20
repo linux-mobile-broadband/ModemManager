@@ -33,17 +33,15 @@
 
 static gboolean mm_serial_port_queue_process (gpointer data);
 
-G_DEFINE_TYPE (MMSerialPort, mm_serial_port, G_TYPE_OBJECT)
+G_DEFINE_TYPE (MMSerialPort, mm_serial_port, MM_TYPE_PORT)
 
 enum {
     PROP_0,
-    PROP_DEVICE,
     PROP_BAUD,
     PROP_BITS,
     PROP_PARITY,
     PROP_STOPBITS,
     PROP_SEND_DELAY,
-    PROP_CARRIER_DETECT,
 
     LAST_PROP
 };
@@ -68,13 +66,11 @@ typedef struct {
 
     struct termios old_t;
 
-    char *device;
     guint baud;
     guint bits;
     char parity;
     guint stopbits;
     guint64 send_delay;
-    gboolean carrier_detect;
 
     guint queue_schedule;
     guint watch_id;
@@ -87,14 +83,6 @@ typedef struct {
     gpointer user_data;
     GDestroyNotify notify;
 } MMUnsolicitedMsgHandler;
-
-const char *
-mm_serial_port_get_device (MMSerialPort *self)
-{
-    g_return_val_if_fail (MM_IS_SERIAL_PORT (self), NULL);
-
-    return MM_SERIAL_PORT_GET_PRIVATE (self)->device;
-}
 
 static void
 mm_serial_port_set_cached_reply (MMSerialPort *self,
@@ -279,7 +267,8 @@ config_fd (MMSerialPort *self)
     stbuf.c_cflag |= (speed | bits | CREAD | 0 | parity | stopbits);
 
     if (ioctl (priv->fd, TCSETA, &stbuf) < 0) {
-        g_warning ("(%s) cannot control device (errno %d)", priv->device, errno);
+        g_warning ("(%s) cannot control device (errno %d)",
+                   mm_port_get_device (MM_PORT (self)), errno);
         return FALSE;
     }
 
@@ -639,7 +628,7 @@ data_available (GIOChannel *source,
         /* Make sure the string doesn't grow too long */
 		if (priv->response->len > SERIAL_BUF_SIZE) {
 			g_warning ("%s (%s): response buffer filled before repsonse received",
-			           G_STRFUNC, mm_serial_port_get_device (self));
+			           G_STRFUNC, mm_port_get_device (MM_PORT (self)));
 			g_string_erase (priv->response, 0, (SERIAL_BUF_SIZE / 2));
         }
 
@@ -655,6 +644,7 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
 {
     MMSerialPortPrivate *priv;
     char *devfile;
+    const char *device;
 
     g_return_val_if_fail (MM_IS_SERIAL_PORT (self), FALSE);
 
@@ -664,20 +654,22 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
         /* Already open */
         return TRUE;
 
-    g_debug ("(%s) opening serial device...", priv->device);
-    devfile = g_strdup_printf ("/dev/%s", priv->device);
+    device = mm_port_get_device (MM_PORT (self));
+
+    g_debug ("(%s) opening serial device...", device);
+    devfile = g_strdup_printf ("/dev/%s", device);
     priv->fd = open (devfile, O_RDWR | O_EXCL | O_NONBLOCK | O_NOCTTY);
     g_free (devfile);
 
     if (priv->fd < 0) {
         g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_OPEN_FAILED,
-                     "Could not open serial device %s: %s", priv->device, strerror (errno));
+                     "Could not open serial device %s: %s", device, strerror (errno));
         return FALSE;
     }
 
     if (ioctl (priv->fd, TCGETA, &priv->old_t) < 0) {
         g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_OPEN_FAILED,
-                     "Could not open serial device %s: %s", priv->device, strerror (errno));
+                     "Could not open serial device %s: %s", device, strerror (errno));
         close (priv->fd);
         priv->fd = -1;
         return FALSE;
@@ -685,7 +677,7 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
 
     if (!config_fd (self)) {
         g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_OPEN_FAILED,
-                     "Could not open serial device %s: %s", priv->device, strerror (errno));
+                     "Could not open serial device %s: %s", device, strerror (errno));
         close (priv->fd);
         priv->fd = -1;
         return FALSE;
@@ -709,7 +701,7 @@ mm_serial_port_close (MMSerialPort *self)
     priv = MM_SERIAL_PORT_GET_PRIVATE (self);
 
     if (priv->fd >= 0) {
-        g_message ("Closing device '%s'", priv->device);
+        g_message ("Closing device '%s'", mm_port_get_device (MM_PORT (self)));
 
         if (priv->channel) {
             g_source_remove (priv->watch_id);
@@ -867,7 +859,7 @@ mm_serial_port_is_connected (MMSerialPort *self)
 
     priv = MM_SERIAL_PORT_GET_PRIVATE (self);
 
-    if (!priv->carrier_detect)
+    if (!mm_port_get_carrier_detect (MM_PORT (self)))
         return FALSE;
 
     if (priv->fd < 0)
@@ -882,10 +874,12 @@ mm_serial_port_is_connected (MMSerialPort *self)
 /*****************************************************************************/
 
 MMSerialPort *
-mm_serial_port_new (const char *name)
+mm_serial_port_new (const char *name, MMPortType ptype)
 {
     return MM_SERIAL_PORT (g_object_new (MM_TYPE_SERIAL_PORT,
-                                         MM_SERIAL_PORT_DEVICE, name,
+                                         MM_PORT_DEVICE, name,
+                                         MM_PORT_SUBSYS, MM_PORT_SUBSYS_TTY,
+                                         MM_PORT_TYPE, ptype,
                                          NULL));
 }
 
@@ -902,36 +896,10 @@ mm_serial_port_init (MMSerialPort *self)
     priv->parity = 'n';
     priv->stopbits = 1;
     priv->send_delay = 1000;
-    priv->carrier_detect = TRUE;
 
     priv->queue = g_queue_new ();
     priv->command  = g_string_new_len   ("AT", SERIAL_BUF_SIZE);
     priv->response = g_string_sized_new (SERIAL_BUF_SIZE);
-}
-
-static GObject*
-constructor (GType type,
-             guint n_construct_params,
-             GObjectConstructParam *construct_params)
-{
-    GObject *object;
-    MMSerialPortPrivate *priv;
-
-    object = G_OBJECT_CLASS (mm_serial_port_parent_class)->constructor (type,
-                                                                        n_construct_params,
-                                                                        construct_params);
-    if (!object)
-        return NULL;
-
-    priv = MM_SERIAL_PORT_GET_PRIVATE (object);
-
-    if (!priv->device) {
-        g_warning ("No device provided");
-        g_object_unref (object);
-        return NULL;
-    }
-
-    return object;
 }
 
 static void
@@ -941,10 +909,6 @@ set_property (GObject *object, guint prop_id,
     MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (object);
 
     switch (prop_id) {
-    case PROP_DEVICE:
-        /* Construct only */
-        priv->device = g_path_get_basename (g_value_get_string (value));
-        break;
     case PROP_BAUD:
         priv->baud = g_value_get_uint (value);
         break;
@@ -960,9 +924,6 @@ set_property (GObject *object, guint prop_id,
     case PROP_SEND_DELAY:
         priv->send_delay = g_value_get_uint64 (value);
         break;
-    case PROP_CARRIER_DETECT:
-        priv->carrier_detect = g_value_get_boolean (value);
-        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -976,9 +937,6 @@ get_property (GObject *object, guint prop_id,
     MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (object);
 
     switch (prop_id) {
-    case PROP_DEVICE:
-        g_value_set_string (value, priv->device);
-        break;
     case PROP_BAUD:
         g_value_set_uint (value, priv->baud);
         break;
@@ -993,9 +951,6 @@ get_property (GObject *object, guint prop_id,
         break;
     case PROP_SEND_DELAY:
         g_value_set_uint64 (value, priv->send_delay);
-        break;
-    case PROP_CARRIER_DETECT:
-        g_value_set_boolean (value, priv->carrier_detect);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1015,7 +970,6 @@ finalize (GObject *object)
     g_queue_free (priv->queue);
     g_string_free (priv->command, TRUE);
     g_string_free (priv->response, TRUE);
-    g_free (priv->device);
 
     while (priv->unsolicited_msg_handlers) {
         MMUnsolicitedMsgHandler *handler = (MMUnsolicitedMsgHandler *) priv->unsolicited_msg_handlers->data;
@@ -1043,20 +997,11 @@ mm_serial_port_class_init (MMSerialPortClass *klass)
     g_type_class_add_private (object_class, sizeof (MMSerialPortPrivate));
 
     /* Virtual methods */
-    object_class->constructor = constructor;
     object_class->set_property = set_property;
     object_class->get_property = get_property;
     object_class->finalize = finalize;
 
     /* Properties */
-    g_object_class_install_property
-        (object_class, PROP_DEVICE,
-         g_param_spec_string (MM_SERIAL_PORT_DEVICE,
-                              "Device",
-                              "Serial device",
-                              NULL,
-                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
-
     g_object_class_install_property
         (object_class, PROP_BAUD,
          g_param_spec_uint (MM_SERIAL_PORT_BAUD,
@@ -1096,12 +1041,4 @@ mm_serial_port_class_init (MMSerialPortClass *klass)
                               "Send delay",
                               0, G_MAXUINT64, 0,
                               G_PARAM_READWRITE));
-
-    g_object_class_install_property
-        (object_class, PROP_CARRIER_DETECT,
-         g_param_spec_boolean (MM_SERIAL_PORT_CARRIER_DETECT,
-                               "CarrierDetect",
-                               "Has carrier detect",
-                               TRUE,
-                               G_PARAM_READWRITE));
 }

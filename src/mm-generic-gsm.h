@@ -4,7 +4,8 @@
 #define MM_GENERIC_GSM_H
 
 #include "mm-modem-gsm-network.h"
-#include "mm-serial.h"
+#include "mm-modem-base.h"
+#include "mm-serial-port.h"
 
 #define MM_TYPE_GENERIC_GSM            (mm_generic_gsm_get_type ())
 #define MM_GENERIC_GSM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_GENERIC_GSM, MMGenericGsm))
@@ -29,11 +30,11 @@ typedef enum {
 
 
 typedef struct {
-    MMSerial parent;
+    MMModemBase parent;
 } MMGenericGsm;
 
 typedef struct {
-    MMSerialClass parent;
+    MMModemBaseClass parent;
 } MMGenericGsmClass;
 
 GType mm_generic_gsm_get_type (void);
@@ -59,12 +60,12 @@ void mm_generic_gsm_check_pin (MMGenericGsm *modem,
                                gpointer user_data);
 
 MMSerialPort *mm_generic_gsm_get_port (MMGenericGsm *modem,
-                                       MMSerialPortType ptype);
+                                       MMPortType ptype);
 
-MMSerialPort *mm_generic_gsm_grab_port (MMGenericGsm *modem,
-                                        const char *subsys,
-                                        const char *name,
-                                        MMSerialPortType ptype,
-                                        GError **error);
+MMPort *mm_generic_gsm_grab_port (MMGenericGsm *modem,
+                                  const char *subsys,
+                                  const char *name,
+                                  MMPortType ptype,
+                                  GError **error);
 
 #endif /* MM_GENERIC_GSM_H */

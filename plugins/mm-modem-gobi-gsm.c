@@ -71,18 +71,11 @@ get_imsi (MMModemGsmCard *modem,
 {
     MMSerialPort *primary;
     MMCallbackInfo *info;
-    GError *error = NULL;
 
     info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_SERIAL_PORT_TYPE_PRIMARY);
-    if (primary)
-        mm_serial_port_queue_command_cached (primary, "+CIMI", 3, get_string_done, info);
-    else {
-        g_set_error (&error, MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
-                     "Operation not supported; primary port unusable");
-        get_string_done (primary, NULL, error, user_data);
-        g_clear_error (&error);
-    }
+    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+    mm_serial_port_queue_command_cached (primary, "+CIMI", 3, get_string_done, info);
 }
 
 static void

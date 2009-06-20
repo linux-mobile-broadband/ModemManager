@@ -277,7 +277,7 @@ grab_port (MMPlugin *plugin,
     }
 
     sysfs_path = g_udev_device_get_sysfs_path (physdev);
-    if (!devfile) {
+    if (!sysfs_path) {
         g_set_error (error, 0, 0, "Could not get port's physical device sysfs path.");
         goto out;
     }

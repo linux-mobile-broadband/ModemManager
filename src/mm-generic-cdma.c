@@ -6,6 +6,7 @@
 #include "mm-generic-cdma.h"
 #include "mm-modem-cdma.h"
 #include "mm-modem-simple.h"
+#include "mm-serial-port.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 #include "mm-serial-parsers.h"
@@ -24,6 +25,7 @@ typedef struct {
 
     MMSerialPort *primary;
     MMSerialPort *secondary;
+    MMPort *data;
 } MMGenericCdmaPrivate;
 
 MMModem *
@@ -64,7 +66,7 @@ check_valid (MMGenericCdma *self)
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
     gboolean new_valid = FALSE;
 
-    if (priv->primary)
+    if (priv->primary && priv->data)
         new_valid = TRUE;
 
     if (priv->valid != new_valid) {
@@ -76,12 +78,7 @@ check_valid (MMGenericCdma *self)
 static gboolean
 owns_port (MMModem *modem, const char *subsys, const char *name)
 {
-    MMGenericCdma *self = MM_GENERIC_CDMA (modem);
-
-    if (strcmp (subsys, "tty"))
-        return FALSE;
-
-    return !!mm_serial_get_port (MM_SERIAL (self), name);
+    return !!mm_modem_base_get_port (MM_MODEM_BASE (modem), subsys, name);
 }
 
 static gboolean
@@ -92,30 +89,45 @@ grab_port (MMModem *modem,
 {
     MMGenericCdma *self = MM_GENERIC_CDMA (modem);
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
-    MMSerialPortType ptype = MM_SERIAL_PORT_TYPE_IGNORED;
-    MMSerialPort *port;
+    MMPortType ptype = MM_PORT_TYPE_IGNORED;
+    MMPort *port;
 
-    if (strcmp (subsys, "tty"))
-        return FALSE;
+    g_return_val_if_fail (!strcmp (subsys, "net") || !strcmp (subsys, "tty"), FALSE);
 
-    if (!priv->primary)
-        ptype = MM_SERIAL_PORT_TYPE_PRIMARY;
-    else if (!priv->secondary)
-        ptype = MM_SERIAL_PORT_TYPE_SECONDARY;
+    if (!strcmp (subsys, "tty")) {
+        if (!priv->primary)
+            ptype = MM_PORT_TYPE_PRIMARY;
+        else if (!priv->secondary)
+            ptype = MM_PORT_TYPE_SECONDARY;
+    }
 
-    port = mm_serial_add_port (MM_SERIAL (self), name, ptype);
-    g_object_set (G_OBJECT (port), MM_SERIAL_PORT_CARRIER_DETECT, FALSE, NULL);
-    mm_serial_port_set_response_parser (port,
-                                        mm_serial_parser_v1_parse,
-                                        mm_serial_parser_v1_new (),
-                                        mm_serial_parser_v1_destroy);
+    port = mm_modem_base_add_port (MM_MODEM_BASE (self), subsys, name, ptype);
+    if (MM_IS_SERIAL_PORT (port)) {
+        g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
+        mm_serial_port_set_response_parser (MM_SERIAL_PORT (port),
+                                            mm_serial_parser_v1_parse,
+                                            mm_serial_parser_v1_new (),
+                                            mm_serial_parser_v1_destroy);
+    }
 
-    if (ptype == MM_SERIAL_PORT_TYPE_PRIMARY) {
-        priv->primary = port;
-        g_object_notify (G_OBJECT (self), MM_MODEM_DATA_DEVICE);
-        check_valid (self);
-    } else if (ptype == MM_SERIAL_PORT_TYPE_SECONDARY)
-        priv->secondary = port;
+    if (MM_IS_SERIAL_PORT (port)) {
+        if (ptype == MM_PORT_TYPE_PRIMARY) {
+            priv->primary = MM_SERIAL_PORT (port);
+            if (!priv->data) {
+                priv->data = port;
+                g_object_notify (G_OBJECT (self), MM_MODEM_DATA_DEVICE);
+            }
+            check_valid (self);
+        } else if (ptype == MM_PORT_TYPE_SECONDARY)
+            priv->secondary = MM_SERIAL_PORT (port);
+    } else {
+        /* Net device (if any) is the preferred data port */
+        if (priv->data && MM_IS_SERIAL_PORT (priv->data)) {
+            priv->data = port;
+            g_object_notify (G_OBJECT (self), MM_MODEM_DATA_DEVICE);
+            check_valid (self);
+        }
+    }
 
     return TRUE;
 }
@@ -124,22 +136,24 @@ static void
 release_port (MMModem *modem, const char *subsys, const char *name)
 {
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
-    MMSerialPort *port;
+    MMPort *port;
 
-    if (strcmp (subsys, "tty"))
-        return;
-
-    port = mm_serial_get_port (MM_SERIAL (modem), name);
+    port = mm_modem_base_get_port (MM_MODEM_BASE (modem), subsys, name);
     if (!port)
         return;
 
-    if (port == priv->primary) {
-        mm_serial_remove_port (MM_SERIAL (modem), port);
+    if (port == MM_PORT (priv->primary)) {
+        mm_modem_base_remove_port (MM_MODEM_BASE (modem), port);
         priv->primary = NULL;
     }
 
-    if (port == priv->secondary) {
-        mm_serial_remove_port (MM_SERIAL (modem), port);
+    if (port == priv->data) {
+        priv->data = NULL;
+        g_object_notify (G_OBJECT (modem), MM_MODEM_DATA_DEVICE);
+    }
+
+    if (port == MM_PORT (priv->secondary)) {
+        mm_modem_base_remove_port (MM_MODEM_BASE (modem), port);
         priv->secondary = NULL;
     }
 
@@ -732,8 +746,8 @@ get_property (GObject *object, guint prop_id,
 
     switch (prop_id) {
     case MM_MODEM_PROP_DATA_DEVICE:
-        if (priv->primary)
-            g_value_set_string (value, mm_serial_port_get_device (priv->primary));
+        if (priv->data)
+            g_value_set_string (value, mm_port_get_device (priv->data));
         else
             g_value_set_string (value, NULL);
         break;
@@ -844,7 +858,10 @@ mm_generic_cdma_get_type (void)
             (GInterfaceInitFunc) modem_simple_init
         };
 
-        generic_cdma_type = g_type_register_static (MM_TYPE_SERIAL, "MMGenericCdma", &generic_cdma_type_info, 0);
+        generic_cdma_type = g_type_register_static (MM_TYPE_MODEM_BASE,
+                                                    "MMGenericCdma",
+                                                    &generic_cdma_type_info,
+                                                    0);
 
         g_type_add_interface_static (generic_cdma_type, MM_TYPE_MODEM, &modem_iface_info);
         g_type_add_interface_static (generic_cdma_type, MM_TYPE_MODEM_CDMA, &modem_cdma_iface_info);

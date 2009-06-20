@@ -192,7 +192,7 @@ set_network_mode (MMModemGsmNetwork *modem,
     case MM_MODEM_GSM_NETWORK_MODE_3G_ONLY:
         /* Allowed values */
         mm_callback_info_set_data (info, "mode", GUINT_TO_POINTER (mode), NULL);
-        primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_SERIAL_PORT_TYPE_PRIMARY);
+        primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
         g_assert (primary);
         mm_serial_port_queue_command (primary, "AT^SYSCFG?", 3, set_network_mode_get_done, info);
         return;
@@ -244,7 +244,7 @@ get_network_mode (MMModemGsmNetwork *modem,
         MMSerialPort *primary;
 
         info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-        primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_SERIAL_PORT_TYPE_PRIMARY);
+        primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
         g_assert (primary);
         mm_serial_port_queue_command (primary, "AT^SYSCFG?", 3, get_network_mode_done, info);
     }
@@ -329,7 +329,7 @@ set_band (MMModemGsmNetwork *modem,
     case MM_MODEM_GSM_NETWORK_BAND_U2100:
     case MM_MODEM_GSM_NETWORK_BAND_PCS:
         mm_callback_info_set_data (info, "band", GUINT_TO_POINTER (band), NULL);
-        primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_SERIAL_PORT_TYPE_PRIMARY);
+        primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
         g_assert (primary);
         mm_serial_port_queue_command (primary, "AT^SYSCFG?", 3, set_band_get_done, info);
         return;
@@ -381,7 +381,7 @@ get_band (MMModemGsmNetwork *modem,
         MMCallbackInfo *info;
 
         info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-        primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_SERIAL_PORT_TYPE_PRIMARY);
+        primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
         g_assert (primary);
         mm_serial_port_queue_command (primary, "AT^SYSCFG?", 3, get_band_done, info);
     }
@@ -503,11 +503,11 @@ grab_port (MMModem *modem,
            GError **error)
 {
     MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
-    MMSerialPortType ptype = MM_SERIAL_PORT_TYPE_IGNORED;
+    MMPortType ptype = MM_PORT_TYPE_IGNORED;
     const char *sys[] = { "tty", NULL };
     GUdevClient *client;
     GUdevDevice *device = NULL;
-    MMSerialPort *port = NULL;
+    MMPort *port = NULL;
     int usbif;
 
     client = g_udev_client_new (sys);
@@ -529,41 +529,42 @@ grab_port (MMModem *modem,
     }
 
     if (usbif == 0) {
-        if (!mm_generic_gsm_get_port (gsm, MM_SERIAL_PORT_TYPE_PRIMARY))
-            ptype = MM_SERIAL_PORT_TYPE_PRIMARY;
+        if (!mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_PRIMARY))
+            ptype = MM_PORT_TYPE_PRIMARY;
     } else if (usbif == 1) {
-        if (!mm_generic_gsm_get_port (gsm, MM_SERIAL_PORT_TYPE_SECONDARY))
-            ptype = MM_SERIAL_PORT_TYPE_SECONDARY;
+        if (!mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_SECONDARY))
+            ptype = MM_PORT_TYPE_SECONDARY;
     }
 
     port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
     if (!port)
         goto out;
 
-    if (ptype == MM_SERIAL_PORT_TYPE_PRIMARY) {
-        g_object_set (G_OBJECT (port), MM_SERIAL_PORT_CARRIER_DETECT, FALSE, NULL);
-    } else if (ptype == MM_SERIAL_PORT_TYPE_SECONDARY) {
-        GRegex *regex;
+    if (MM_IS_SERIAL_PORT (port)) {
+        g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
+        if (ptype == MM_PORT_TYPE_SECONDARY) {
+            GRegex *regex;
 
-        g_object_set (G_OBJECT (port), MM_SERIAL_PORT_CARRIER_DETECT, FALSE, NULL);
+            g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
 
-        mm_generic_gsm_set_unsolicited_registration (MM_GENERIC_GSM (modem), TRUE);
+            mm_generic_gsm_set_unsolicited_registration (MM_GENERIC_GSM (modem), TRUE);
 
-        regex = g_regex_new ("\\r\\n\\^RSSI:(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_serial_port_add_unsolicited_msg_handler (port, regex, handle_signal_quality_change, modem, NULL);
-        g_regex_unref (regex);
+            regex = g_regex_new ("\\r\\n\\^RSSI:(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+            mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, handle_signal_quality_change, modem, NULL);
+            g_regex_unref (regex);
 
-        regex = g_regex_new ("\\r\\n\\^MODE:(\\d),(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_serial_port_add_unsolicited_msg_handler (port, regex, handle_mode_change, modem, NULL);
-        g_regex_unref (regex);
+            regex = g_regex_new ("\\r\\n\\^MODE:(\\d),(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+            mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, handle_mode_change, modem, NULL);
+            g_regex_unref (regex);
 
-        regex = g_regex_new ("\\r\\n\\^DSFLOWRPT:(.+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_serial_port_add_unsolicited_msg_handler (port, regex, handle_status_change, modem, NULL);
-        g_regex_unref (regex);
+            regex = g_regex_new ("\\r\\n\\^DSFLOWRPT:(.+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+            mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, handle_status_change, modem, NULL);
+            g_regex_unref (regex);
 
-        regex = g_regex_new ("\\r\\n\\^BOOT:.+\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_serial_port_add_unsolicited_msg_handler (port, regex, NULL, modem, NULL);
-        g_regex_unref (regex);
+            regex = g_regex_new ("\\r\\n\\^BOOT:.+\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+            mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, modem, NULL);
+            g_regex_unref (regex);
+        }
     }
 
 out:

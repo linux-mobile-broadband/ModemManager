@@ -1,4 +1,18 @@
 /* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+/*
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details:
+ *
+ * Copyright (C) 2008 - 2009 Novell, Inc.
+ * Copyright (C) 2009 Red Hat, Inc.
+ */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -7,9 +21,12 @@
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <dbus/dbus-glib.h>
+
+#define G_UDEV_API_IS_SUBJECT_TO_CHANGE
+#include <gudev/gudev.h>
+
 #include "mm-modem-hso.h"
 #include "mm-modem-simple.h"
-#include "mm-serial.h"
 #include "mm-serial-parsers.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
@@ -34,26 +51,24 @@ typedef struct {
 #define OWANDATA_TAG "_OWANDATA: "
 
 MMModem *
-mm_modem_hso_new (const char *serial_device,
-                  const char *network_device,
-                  const char *driver)
+mm_modem_hso_new (const char *device,
+                  const char *driver,
+                  const char *plugin)
 {
-    g_return_val_if_fail (serial_device != NULL, NULL);
-    g_return_val_if_fail (network_device != NULL, NULL);
+    g_return_val_if_fail (device != NULL, NULL);
     g_return_val_if_fail (driver != NULL, NULL);
+    g_return_val_if_fail (plugin != NULL, NULL);
 
     return MM_MODEM (g_object_new (MM_TYPE_MODEM_HSO,
-                                   MM_SERIAL_DEVICE, serial_device,
-                                   MM_SERIAL_SEND_DELAY, (guint64) 10000,
+                                   MM_MODEM_MASTER_DEVICE, device,
                                    MM_MODEM_DRIVER, driver,
-                                   MM_MODEM_DEVICE, network_device,
+                                   MM_MODEM_PLUGIN, plugin,
                                    MM_MODEM_IP_METHOD, MM_MODEM_IP_METHOD_STATIC,
-                                   MM_MODEM_TYPE, MM_MODEM_TYPE_GSM,
                                    NULL));
 }
 
 static void
-hso_enable_done (MMSerial *serial,
+hso_enable_done (MMSerialPort *port,
                  GString *response,
                  GError *error,
                  gpointer user_data)
@@ -86,11 +101,14 @@ hso_enable (MMModemHso *self,
 {
     MMCallbackInfo *info;
     char *command;
+    MMSerialPort *primary;
 
     info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
 
     command = g_strdup_printf ("AT_OWANCALL=%d,%d,1", hso_get_cid (self), enabled ? 1 : 0);
-    mm_serial_queue_command (MM_SERIAL (self), command, 3, hso_enable_done, info);
+    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+    mm_serial_port_queue_command (primary, command, 3, hso_enable_done, info);
     g_free (command);
 }
 
@@ -161,19 +179,20 @@ hso_disabled (MMModem *modem,
 }
 
 static void
-auth_done (MMSerial *serial,
+auth_done (MMSerialPort *port,
            GString *response,
            GError *error,
            gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemHso *self = MM_MODEM_HSO (info->modem);
 
     if (error) {
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
     } else
         /* success, kill any existing connections first */
-        hso_enable (MM_MODEM_HSO (serial), FALSE, hso_disabled, info);
+        hso_enable (self, FALSE, hso_disabled, info);
 }
 
 void
@@ -184,24 +203,32 @@ mm_hso_modem_authenticate (MMModemHso *self,
                            gpointer user_data)
 {
     MMCallbackInfo *info;
+    MMSerialPort *primary;
 
     g_return_if_fail (MM_IS_MODEM_HSO (self));
     g_return_if_fail (callback != NULL);
 
     info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
 
+    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+
     if (username || password) {
         char *command;
+
+        // FIXME: if QCPDPP fails, try OPDPP.  AT&T Quicksilver uses a different
+        // chipset (ie, not Qualcomm) and the auth command is OPDPP instead of
+        // the Qualcomm-specific QCPDPP.
 
         command = g_strdup_printf ("AT$QCPDPP=%d,1,\"%s\",\"%s\"",
                                    hso_get_cid (self),
                                    password ? password : "",
                                    username ? username : "");
 
-        mm_serial_queue_command (MM_SERIAL (self), command, 3, auth_done, info);
+        mm_serial_port_queue_command (primary, command, 3, auth_done, info);
         g_free (command);
     } else
-        auth_done (MM_SERIAL (self), NULL, NULL, info);
+        auth_done (primary, NULL, NULL, info);
 }
 
 /*****************************************************************************/
@@ -234,7 +261,7 @@ parent_enable_done (MMModem *modem, GError *error, gpointer user_data)
 }
 
 static void
-modem_enable_done (MMSerial *serial,
+modem_enable_done (MMSerialPort *port,
                    GString *response,
                    GError *error,
                    gpointer user_data)
@@ -242,8 +269,8 @@ modem_enable_done (MMSerial *serial,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMModem *parent_modem_iface;
 
-    parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (serial));
-    parent_modem_iface->enable (MM_MODEM (serial),
+    parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (info->modem));
+    parent_modem_iface->enable (info->modem,
                                 GPOINTER_TO_INT (mm_callback_info_get_data (info, "enable")),
                                 parent_enable_done, info);
 }
@@ -255,14 +282,18 @@ enable (MMModem *modem,
         gpointer user_data)
 {
     MMCallbackInfo *info;
+    MMSerialPort *primary;
 
     info = mm_callback_info_new (modem, callback, user_data);
     mm_callback_info_set_data (info, "enable", GINT_TO_POINTER (enable), NULL);
 
+    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+
     if (do_enable)
-        modem_enable_done (MM_SERIAL (modem), NULL, NULL, info);
+        modem_enable_done (primary, NULL, NULL, info);
     else
-        mm_serial_queue_command (MM_SERIAL (modem), "AT_OWANCALL=1,0,0", 3, modem_enable_done, info);
+        mm_serial_port_queue_command (primary, "AT_OWANCALL=1,0,0", 3, modem_enable_done, info);
 }
 
 static void
@@ -296,7 +327,7 @@ ip4_config_invoke (MMCallbackInfo *info)
 }
 
 static void
-get_ip4_config_done (MMSerial *serial,
+get_ip4_config_done (MMSerialPort *port,
                      GString *response,
                      GError *error,
                      gpointer user_data)
@@ -317,7 +348,7 @@ get_ip4_config_done (MMSerial *serial,
         goto out;
     }
 
-    cid = hso_get_cid (MM_MODEM_HSO (serial));
+    cid = hso_get_cid (MM_MODEM_HSO (info->modem));
     dns_array = g_array_sized_new (FALSE, TRUE, sizeof (guint32), 2);
     items = g_strsplit (response->str + strlen (OWANDATA_TAG), ", ", 0);
 
@@ -359,10 +390,13 @@ get_ip4_config (MMModem *modem,
 {
     MMCallbackInfo *info;
     char *command;
+    MMSerialPort *primary;
 
     info = mm_callback_info_new_full (modem, ip4_config_invoke, G_CALLBACK (callback), user_data);
     command = g_strdup_printf ("AT_OWANDATA=%d", hso_get_cid (MM_MODEM_HSO (modem)));
-    mm_serial_queue_command (MM_SERIAL (modem), command, 3, get_ip4_config_done, info);
+    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+    mm_serial_port_queue_command (primary, command, 3, get_ip4_config_done, info);
     g_free (command);
 }
 
@@ -372,9 +406,12 @@ disconnect (MMModem *modem,
             gpointer user_data)
 {
     MMCallbackInfo *info;
+    MMSerialPort *primary;
 
     info = mm_callback_info_new (modem, callback, user_data);
-    mm_serial_queue_command (MM_SERIAL (modem), "AT_OWANCALL=1,0,0", 3, NULL, info);
+    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+    mm_serial_port_queue_command (primary, "AT_OWANCALL=1,0,0", 3, NULL, info);
 }
 
 /*****************************************************************************/
@@ -408,23 +445,25 @@ impl_hso_authenticate (MMModemHso *self,
 }
 
 static void
-connection_enabled (MMSerial *serial,
+connection_enabled (MMSerialPort *port,
                     GMatchInfo *info,
                     gpointer user_data)
 {
+    MMModemHso *self = MM_MODEM_HSO (user_data);
+    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (self);
     char *str;
 
     str = g_match_info_fetch (info, 2);
     if (str[0] == '1')
-        connect_pending_done (MM_MODEM_HSO (serial));
+        connect_pending_done (self);
     else if (str[0] == '3') {
-        MMCallbackInfo *cb_info = MM_MODEM_HSO_GET_PRIVATE (serial)->connect_pending_data;
+        MMCallbackInfo *cb_info = priv->connect_pending_data;
 
         if (cb_info)
             cb_info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
                                                   "Call setup failed");
 
-        connect_pending_done (MM_MODEM_HSO (serial));
+        connect_pending_done (self);
     } else if (str[0] == '0')
         /* FIXME: disconnected. do something when we have modem status signals */
         ;
@@ -521,16 +560,82 @@ simple_connect (MMModemSimple *simple,
 
 /*****************************************************************************/
 
+static gboolean
+grab_port (MMModem *modem,
+           const char *subsys,
+           const char *name,
+           GError **error)
+{
+    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
+    MMPortType ptype = MM_PORT_TYPE_IGNORED;
+    const char *sys[] = { "tty", "net", NULL };
+    GUdevClient *client;
+    GUdevDevice *device = NULL;
+    MMPort *port = NULL;
+    const char *sysfs_path;
+
+    client = g_udev_client_new (sys);
+    if (!client) {
+        g_set_error (error, 0, 0, "Could not get udev client.");
+        return FALSE;
+    }
+
+    device = g_udev_client_query_by_subsystem_and_name (client, subsys, name);
+    if (!device) {
+        g_set_error (error, 0, 0, "Could not get udev device.");
+        goto out;
+    }
+
+    sysfs_path = g_udev_device_get_sysfs_path (device);
+    if (!sysfs_path) {
+        g_set_error (error, 0, 0, "Could not get udev device sysfs path.");
+        goto out;
+    }
+
+    if (!strcmp (subsys, "tty")) {
+        char *hsotype_path;
+        char *contents = NULL;
+
+        hsotype_path = g_build_filename (sysfs_path, "hsotype", NULL);
+        if (g_file_get_contents (hsotype_path, &contents, NULL, NULL)) {
+            if (g_str_has_prefix (contents, "Control"))
+                ptype = MM_PORT_TYPE_PRIMARY;
+            else
+                ptype = MM_PORT_TYPE_SECONDARY;
+            g_free (contents);
+        }
+        g_free (hsotype_path);
+    }
+
+    port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
+    if (!port)
+        goto out;
+
+    if (MM_IS_SERIAL_PORT (port)) {
+        g_object_set (G_OBJECT (port), MM_SERIAL_PORT_SEND_DELAY, (guint64) 10000, NULL);
+        if (ptype == MM_PORT_TYPE_PRIMARY) {
+            GRegex *regex;
+
+            mm_generic_gsm_set_unsolicited_registration (gsm, TRUE);
+
+            regex = g_regex_new ("_OWANCALL: (\\d), (\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+            mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, connection_enabled, modem, NULL);
+            g_regex_unref (regex);
+        }
+    }
+
+out:
+    if (device)
+        g_object_unref (device);
+    g_object_unref (client);
+    return !!port;
+}
+
+/*****************************************************************************/
+
 static void
 mm_modem_hso_init (MMModemHso *self)
 {
-    GRegex *regex;
-
-    mm_generic_gsm_set_unsolicited_registration (MM_GENERIC_GSM (self), TRUE);
-
-    regex = g_regex_new ("_OWANCALL: (\\d), (\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    mm_serial_add_unsolicited_msg_handler (MM_SERIAL (self), regex, connection_enabled, NULL, NULL);
-    g_regex_unref (regex);
 }
 
 static void
@@ -546,39 +651,7 @@ modem_init (MMModem *modem_class)
     modem_class->connect = do_connect;
     modem_class->get_ip4_config = get_ip4_config;
     modem_class->disconnect = disconnect;
-}
-
-static GObject*
-constructor (GType type,
-             guint n_construct_params,
-             GObjectConstructParam *construct_params)
-{
-    GObject *object;
-    char *modem_device;
-    char *serial_device;
-
-    object = G_OBJECT_CLASS (mm_modem_hso_parent_class)->constructor (type,
-                                                                      n_construct_params,
-                                                                      construct_params);
-    if (!object)
-        return NULL;
-
-    /* Make sure both serial device and data device are provided */
-    g_object_get (object,
-                  MM_MODEM_DEVICE, &modem_device,
-                  MM_SERIAL_DEVICE, &serial_device,
-                  NULL);
-
-    if (!modem_device || !serial_device || !strcmp (modem_device, serial_device)) {
-        g_warning ("No network device provided");
-        g_object_unref (object);
-        object = NULL;
-    }
-
-    g_free (modem_device);
-    g_free (serial_device);
-
-    return object;
+    modem_class->grab_port = grab_port;
 }
 
 static void
@@ -599,7 +672,6 @@ mm_modem_hso_class_init (MMModemHsoClass *klass)
     g_type_class_add_private (object_class, sizeof (MMModemHsoPrivate));
 
     /* Virtual methods */
-    object_class->constructor = constructor;
     object_class->finalize = finalize;
 }
 

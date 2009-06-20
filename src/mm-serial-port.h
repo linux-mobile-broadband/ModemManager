@@ -21,12 +21,7 @@
 #include <glib/gtypes.h>
 #include <glib-object.h>
 
-typedef enum {
-    MM_SERIAL_PORT_TYPE_UNKNOWN = 0x0,
-    MM_SERIAL_PORT_TYPE_PRIMARY,
-    MM_SERIAL_PORT_TYPE_SECONDARY,
-    MM_SERIAL_PORT_TYPE_IGNORED
-} MMSerialPortType;
+#include "mm-port.h"
 
 #define MM_TYPE_SERIAL_PORT            (mm_serial_port_get_type ())
 #define MM_SERIAL_PORT(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_SERIAL_PORT, MMSerialPort))
@@ -35,13 +30,11 @@ typedef enum {
 #define MM_IS_SERIAL_PORT_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_SERIAL_PORT))
 #define MM_SERIAL_PORT_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_SERIAL_PORT, MMSerialPortClass))
 
-#define MM_SERIAL_PORT_DEVICE     "serial-device"
 #define MM_SERIAL_PORT_BAUD       "baud"
 #define MM_SERIAL_PORT_BITS       "bits"
 #define MM_SERIAL_PORT_PARITY     "parity"
 #define MM_SERIAL_PORT_STOPBITS   "stopbits"
 #define MM_SERIAL_PORT_SEND_DELAY "send-delay"
-#define MM_SERIAL_PORT_CARRIER_DETECT "carrier-detect"
 
 typedef struct _MMSerialPort MMSerialPort;
 typedef struct _MMSerialPortClass MMSerialPortClass;
@@ -63,16 +56,16 @@ typedef void (*MMSerialFlashFn)        (MMSerialPort *port,
                                         gpointer user_data);
 
 struct _MMSerialPort {
-    GObject parent;
+    MMPort parent;
 };
 
 struct _MMSerialPortClass {
-    GObjectClass parent;
+    MMPortClass parent;
 };
 
 GType mm_serial_port_get_type (void);
 
-MMSerialPort *mm_serial_port_new (const char *name);
+MMSerialPort *mm_serial_port_new (const char *name, MMPortType ptype);
 
 void     mm_serial_port_add_unsolicited_msg_handler (MMSerialPort *self,
                                                      GRegex *regex,
@@ -107,8 +100,6 @@ guint    mm_serial_port_flash             (MMSerialPort *self,
                                            gpointer user_data);
 
 gboolean mm_serial_port_is_connected      (MMSerialPort *self);
-
-const char *mm_serial_port_get_device     (MMSerialPort *self);
 
 #endif /* MM_SERIAL_PORT_H */
 

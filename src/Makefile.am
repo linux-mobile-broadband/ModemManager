@@ -21,8 +21,10 @@ modem_manager_SOURCES = \
 	mm-manager.h \
 	mm-modem.c \
 	mm-modem.h \
-	mm-serial.c \
-	mm-serial.h \
+	mm-port.c \
+	mm-port.h \
+	mm-modem-base.c \
+	mm-modem-base.h \
 	mm-serial-port.c \
 	mm-serial-port.h \
 	mm-serial-parsers.c \
