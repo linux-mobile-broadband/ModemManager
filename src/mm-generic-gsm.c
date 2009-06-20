@@ -207,25 +207,19 @@ owns_port (MMModem *modem, const char *subsys, const char *name)
     return !!mm_serial_get_port (MM_SERIAL (self), name);
 }
 
-static gboolean
-grab_port (MMModem *modem,
-           const char *subsys,
-           const char *name,
-           GError **error)
+MMSerialPort *
+mm_generic_gsm_grab_port (MMGenericGsm *self,
+                          const char *subsys,
+                          const char *name,
+                          MMSerialPortType ptype,
+                          GError **error)
 {
-    MMGenericGsm *self = MM_GENERIC_GSM (modem);
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
-    MMSerialPortType ptype = MM_SERIAL_PORT_TYPE_IGNORED;
-    MMSerialPort *port;
+    MMSerialPort *port = NULL;
     GRegex *regex;
 
     if (strcmp (subsys, "tty"))
-        return FALSE;
-
-    if (!priv->primary)
-        ptype = MM_SERIAL_PORT_TYPE_PRIMARY;
-    else if (!priv->secondary)
-        ptype = MM_SERIAL_PORT_TYPE_SECONDARY;
+        return NULL;
 
     port = mm_serial_add_port (MM_SERIAL (self), name, ptype);
     mm_serial_port_set_response_parser (port,
@@ -237,7 +231,6 @@ grab_port (MMModem *modem,
     mm_serial_port_add_unsolicited_msg_handler (port, regex, reg_state_changed, self, NULL);
     g_regex_unref (regex);
 
-
     if (ptype == MM_SERIAL_PORT_TYPE_PRIMARY) {
         priv->primary = port;
         g_object_notify (G_OBJECT (self), MM_MODEM_DATA_DEVICE);
@@ -245,7 +238,25 @@ grab_port (MMModem *modem,
     } else if (ptype == MM_SERIAL_PORT_TYPE_SECONDARY)
         priv->secondary = port;
 
-    return TRUE;
+    return port;
+}
+
+static gboolean
+grab_port (MMModem *modem,
+           const char *subsys,
+           const char *name,
+           GError **error)
+{
+    MMGenericGsm *self = MM_GENERIC_GSM (modem);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    MMSerialPortType ptype = MM_SERIAL_PORT_TYPE_IGNORED;
+
+    if (!priv->primary)
+        ptype = MM_SERIAL_PORT_TYPE_PRIMARY;
+    else if (!priv->secondary)
+        ptype = MM_SERIAL_PORT_TYPE_SECONDARY;
+
+    return !!mm_generic_gsm_grab_port (self, subsys, name, ptype, error);
 }
 
 static void

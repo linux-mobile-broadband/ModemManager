@@ -61,4 +61,10 @@ void mm_generic_gsm_check_pin (MMGenericGsm *modem,
 MMSerialPort *mm_generic_gsm_get_port (MMGenericGsm *modem,
                                        MMSerialPortType ptype);
 
+MMSerialPort *mm_generic_gsm_grab_port (MMGenericGsm *modem,
+                                        const char *subsys,
+                                        const char *name,
+                                        MMSerialPortType ptype,
+                                        GError **error);
+
 #endif /* MM_GENERIC_GSM_H */

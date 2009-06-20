@@ -66,16 +66,20 @@ libmm_plugin_gobi_la_LDFLAGS = \
 # Huawei
 
 libmm_plugin_huawei_la_SOURCES = \
-	mm-modem-huawei.c \
-	mm-modem-huawei.h \
 	mm-plugin-huawei.c \
-	mm-plugin-huawei.h
+	mm-plugin-huawei.h \
+	mm-modem-huawei.c \
+	mm-modem-huawei.h
 
 libmm_plugin_huawei_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
 	-I$(top_srcdir)/src
 
-libmm_plugin_huawei_la_LDFLAGS = -module -avoid-version
+libmm_plugin_huawei_la_LDFLAGS = \
+	$(GUDEV_LDFLAGS) \
+	-module \
+	-avoid-version
 
 # HSO
 
