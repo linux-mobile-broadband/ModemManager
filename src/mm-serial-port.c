@@ -671,6 +671,14 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
         return FALSE;
     }
 
+    if (ioctl (priv->fd, TIOCEXCL) < 0) {
+        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_OPEN_FAILED,
+                     "Could not lock serial device %s: %s", device, strerror (errno));
+        close (priv->fd);
+        priv->fd = -1;
+        return FALSE;
+    }
+
     if (ioctl (priv->fd, TCGETA, &priv->old_t) < 0) {
         g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_OPEN_FAILED,
                      "Could not open serial device %s: %s", device, strerror (errno));
