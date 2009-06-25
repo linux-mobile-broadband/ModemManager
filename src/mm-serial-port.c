@@ -276,7 +276,7 @@ config_fd (MMSerialPort *self)
 }
 
 static void
-serial_debug (const char *prefix, const char *buf, int len)
+serial_debug (MMSerialPort *self, const char *prefix, const char *buf, int len)
 {
     static GString *debug = NULL;
     const char *s;
@@ -308,7 +308,7 @@ serial_debug (const char *prefix, const char *buf, int len)
     }
 
     g_string_append_c (debug, '\'');
-    g_debug ("%s", debug->str);
+    g_debug ("(%s): %s", mm_port_get_device (MM_PORT (self)), debug->str);
     g_string_truncate (debug, 0);
 }
 
@@ -340,7 +340,7 @@ mm_serial_port_send_command (MMSerialPort *self,
     if (command[strlen (command)] != '\r')
         g_string_append_c (priv->command, '\r');
 
-    serial_debug ("-->", priv->command->str, -1);
+    serial_debug (self, "-->", priv->command->str, -1);
 
     s = priv->command->str;
     while (*s) {
@@ -621,7 +621,7 @@ data_available (GIOChannel *source,
         }
 
         if (bytes_read > 0) {
-            serial_debug ("<--", buf, bytes_read);
+            serial_debug (self, "<--", buf, bytes_read);
             g_string_append_len (priv->response, buf, bytes_read);
         }
 
@@ -656,7 +656,7 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
 
     device = mm_port_get_device (MM_PORT (self));
 
-    g_debug ("(%s) opening serial device...", device);
+    g_message ("(%s) opening serial device...", device);
     devfile = g_strdup_printf ("/dev/%s", device);
     priv->fd = open (devfile, O_RDWR | O_EXCL | O_NONBLOCK | O_NOCTTY);
     g_free (devfile);
@@ -701,7 +701,7 @@ mm_serial_port_close (MMSerialPort *self)
     priv = MM_SERIAL_PORT_GET_PRIVATE (self);
 
     if (priv->fd >= 0) {
-        g_message ("Closing device '%s'", mm_port_get_device (MM_PORT (self)));
+        g_message ("(%s) closing serial device...", mm_port_get_device (MM_PORT (self)));
 
         if (priv->channel) {
             g_source_remove (priv->watch_id);
