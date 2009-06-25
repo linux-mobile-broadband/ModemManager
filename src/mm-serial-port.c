@@ -620,6 +620,10 @@ data_available (GIOChannel *source,
             err = NULL;
         }
 
+        /* If no bytes read, just let g_io_channel wait for more data */
+        if (bytes_read == 0)
+            break;
+
         if (bytes_read > 0) {
             serial_debug (self, "<--", buf, bytes_read);
             g_string_append_len (priv->response, buf, bytes_read);
