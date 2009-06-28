@@ -4,12 +4,12 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-gobi.la \
 	libmm-plugin-huawei.la \
 	libmm-plugin-hso.la \
-	libmm-plugin-mbm.la \
 	libmm-plugin-option.la \
 	libmm-plugin-sierra.la \
 	libmm-plugin-novatel.la \
 	libmm-plugin-nokia.la \
-	libmm-plugin-zte.la
+	libmm-plugin-zte.la \
+	libmm-plugin-mbm.la
 
 # Generic
 
@@ -120,74 +120,92 @@ libmm_plugin_mbm_la_LDFLAGS = -module -avoid-version
 # Option
 
 libmm_plugin_option_la_SOURCES = \
-	mm-modem-option.c \
-	mm-modem-option.h \
 	mm-plugin-option.c \
-	mm-plugin-option.h
+	mm-plugin-option.h \
+	mm-modem-option.c \
+	mm-modem-option.h
 
 libmm_plugin_option_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
 	-I$(top_srcdir)/src
 
-libmm_plugin_option_la_LDFLAGS = -module -avoid-version
+libmm_plugin_option_la_LDFLAGS = \
+	$(GUDEV_LDFLAGS) \
+	-module \
+	-avoid-version
 
 # Sierra
 
 libmm_plugin_sierra_la_SOURCES = \
-	mm-modem-sierra.c \
-	mm-modem-sierra.h \
 	mm-plugin-sierra.c \
-	mm-plugin-sierra.h
+	mm-plugin-sierra.h \
+	mm-modem-sierra.c \
+	mm-modem-sierra.h
 
 libmm_plugin_sierra_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
 	-I$(top_srcdir)/src
 
-libmm_plugin_sierra_la_LDFLAGS = -module -avoid-version
+libmm_plugin_sierra_la_LDFLAGS = \
+	$(GUDEV_LDFLAGS) \
+	-module \
+	-avoid-version
 
 # Novatel
 
 libmm_plugin_novatel_la_SOURCES = \
-	mm-modem-novatel-cdma.c \
-	mm-modem-novatel-cdma.h \
-	mm-modem-novatel-gsm.c \
-	mm-modem-novatel-gsm.h \
 	mm-plugin-novatel.c \
-	mm-plugin-novatel.h
+	mm-plugin-novatel.h \
+	mm-modem-novatel-gsm.c \
+	mm-modem-novatel-gsm.h
 
 libmm_plugin_novatel_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
 	-I$(top_srcdir)/src
 
-libmm_plugin_novatel_la_LDFLAGS = -module -avoid-version
+libmm_plugin_novatel_la_LDFLAGS = \
+	$(GUDEV_LDFLAGS) \
+	-module \
+	-avoid-version
 
 # Nokia
 
 libmm_plugin_nokia_la_SOURCES = \
-	mm-modem-nokia.c \
-	mm-modem-nokia.h \
 	mm-plugin-nokia.c \
-	mm-plugin-nokia.h
+	mm-plugin-nokia.h \
+	mm-modem-nokia.c \
+	mm-modem-nokia.h
 
 libmm_plugin_nokia_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
 	-I$(top_srcdir)/src
 
-libmm_plugin_nokia_la_LDFLAGS = -module -avoid-version
+libmm_plugin_nokia_la_LDFLAGS = \
+	$(GUDEV_LDFLAGS) \
+	-module \
+	-avoid-version
 
 # Zte
 
 libmm_plugin_zte_la_SOURCES = \
-	mm-modem-zte.c \
-	mm-modem-zte.h \
 	mm-plugin-zte.c \
-	mm-plugin-zte.h
+	mm-plugin-zte.h \
+	mm-modem-zte.c \
+	mm-modem-zte.h
 
 libmm_plugin_zte_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
 	-I$(top_srcdir)/src
 
-libmm_plugin_zte_la_LDFLAGS = -module -avoid-version
+libmm_plugin_zte_la_LDFLAGS = \
+	$(GUDEV_LDFLAGS) \
+	-module \
+	-avoid-version
 
 
 BUILT_SOURCES = \

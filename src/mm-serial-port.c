@@ -696,6 +696,7 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
     }
 
     priv->channel = g_io_channel_unix_new (priv->fd);
+    g_io_channel_set_encoding (priv->channel, NULL, NULL);
     priv->watch_id = g_io_add_watch (priv->channel,
                                      G_IO_IN | G_IO_ERR | G_IO_HUP,
                                      data_available, self);

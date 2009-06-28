@@ -1,14 +1,26 @@
 /* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+/*
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details:
+ *
+ * Copyright (C) 2008 - 2009 Novell, Inc.
+ * Copyright (C) 2009 Red Hat, Inc.
+ */
 
 #include <string.h>
 #include <gmodule.h>
 #include "mm-plugin-sierra.h"
 #include "mm-modem-sierra.h"
+#include "mm-generic-cdma.h"
 
-static void plugin_init (MMPlugin *plugin_class);
-
-G_DEFINE_TYPE_EXTENDED (MMPluginSierra, mm_plugin_sierra, G_TYPE_OBJECT,
-                        0, G_IMPLEMENT_INTERFACE (MM_TYPE_PLUGIN, plugin_init))
+G_DEFINE_TYPE (MMPluginSierra, mm_plugin_sierra, MM_TYPE_PLUGIN_BASE)
 
 int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
 int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
@@ -16,119 +28,157 @@ int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    return MM_PLUGIN (g_object_new (MM_TYPE_PLUGIN_SIERRA, NULL));
+    return MM_PLUGIN (g_object_new (MM_TYPE_PLUGIN_SIERRA,
+                                    MM_PLUGIN_BASE_NAME, "Sierra",
+                                    NULL));
 }
 
 /*****************************************************************************/
 
-static const char *
-get_name (MMPlugin *plugin)
+#define TAG_SIERRA_SECONDARY_PORT "sierra-secondary-port"
+
+#define CAP_CDMA (MM_PLUGIN_BASE_PORT_CAP_IS707_A | \
+                  MM_PLUGIN_BASE_PORT_CAP_IS707_P | \
+                  MM_PLUGIN_BASE_PORT_CAP_IS856 | \
+                  MM_PLUGIN_BASE_PORT_CAP_IS856_A)
+
+static guint32
+get_level_for_capabilities (guint32 capabilities)
 {
-    return "Sierra";
+    if (capabilities & MM_PLUGIN_BASE_PORT_CAP_GSM)
+        return 10;
+    if (capabilities & CAP_CDMA)
+        return 10;
+    return 0;
 }
 
-static char **
-list_supported_udis (MMPlugin *plugin, LibHalContext *hal_ctx)
+static void
+handle_probe_response (MMPluginBase *self,
+                       MMPluginBaseSupportsTask *task,
+                       const char *cmd,
+                       const char *response,
+                       const GError *error)
 {
-    char **supported = NULL;
-    char **devices;
-    int num_devices;
-    int i;
+    if (error || !response || strcmp (cmd, "I")) {
+        MM_PLUGIN_BASE_CLASS (mm_plugin_sierra_parent_class)->handle_probe_response (self, task, cmd, response, error);
+        return;
+    }
 
-    devices = libhal_find_device_by_capability (hal_ctx, "modem", &num_devices, NULL);
-    if (devices) {
-        GPtrArray *array;
+    if (strstr (response, "APP1") || strstr (response, "APP2") || strstr (response, "APP3")) {
+        g_object_set_data (G_OBJECT (task), TAG_SIERRA_SECONDARY_PORT, GUINT_TO_POINTER (TRUE));
+        mm_plugin_base_supports_task_complete (task, 10);
+        return;
+    }
 
-        array = g_ptr_array_new ();
+    /* Not an app port, let the superclass handle the response */
+    MM_PLUGIN_BASE_CLASS (mm_plugin_sierra_parent_class)->handle_probe_response (self, task, cmd, response, error);
+}
 
-        for (i = 0; i < num_devices; i++) {
-            char *udi = devices[i];
+static void
+probe_result (MMPluginBase *base,
+              MMPluginBaseSupportsTask *task,
+              guint32 capabilities,
+              gpointer user_data)
+{
+    mm_plugin_base_supports_task_complete (task, get_level_for_capabilities (capabilities));
+}
 
-            if (mm_plugin_supports_udi (plugin, hal_ctx, udi))
-                g_ptr_array_add (array, g_strdup (udi));
+static MMPluginSupportsResult
+supports_port (MMPluginBase *base,
+               MMModem *existing,
+               MMPluginBaseSupportsTask *task)
+{
+    GUdevDevice *port;
+    guint32 cached = 0, level;
+    const char *driver;
+
+    /* Can't do anything with non-serial ports */
+    port = mm_plugin_base_supports_task_get_port (task);
+    if (strcmp (g_udev_device_get_subsystem (port), "tty"))
+        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
+
+    driver = mm_plugin_base_supports_task_get_driver (task);
+    if (!driver || strcmp (driver, "sierra"))
+        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
+
+    if (mm_plugin_base_get_cached_port_capabilities (base, port, &cached)) {
+        level = get_level_for_capabilities (cached);
+        if (level) {
+            mm_plugin_base_supports_task_complete (task, level);
+            return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
         }
-
-        if (array->len > 0) {
-            g_ptr_array_add (array, NULL);
-            supported = (char **) g_ptr_array_free (array, FALSE);
-        } else
-            g_ptr_array_free (array, TRUE);
+        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
     }
 
-    g_strfreev (devices);
+    /* Otherwise kick off a probe */
+    if (mm_plugin_base_probe_port (base, task, NULL))
+        return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
 
-    return supported;
-}
-
-static gboolean
-supports_udi (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
-{
-    char **capabilities;
-    char **iter;
-    gboolean supported = FALSE;
-
-    capabilities = libhal_device_get_property_strlist (hal_ctx, udi, "modem.command_sets", NULL);
-    for (iter = capabilities; iter && *iter && !supported; iter++) {
-        if (!strcmp (*iter, "GSM-07.07")) {
-            char *parent_udi;
-
-            parent_udi = libhal_device_get_property_string (hal_ctx, udi, "info.parent", NULL);
-            if (parent_udi) {
-                int vendor;
-
-                vendor = libhal_device_get_property_int (hal_ctx, parent_udi, "usb.vendor_id", NULL);
-                if (vendor == 0x1199)
-                    supported = TRUE;
-
-                if (vendor == 0x03f0) {
-                    int product;
-
-                    product = libhal_device_get_property_int (hal_ctx, parent_udi, "usb.product_id", NULL);
-                    if (product == 0x1e1d)
-                        supported = TRUE;
-                }
-
-                libhal_free_string (parent_udi);
-            }
-        }
-    }
-    g_strfreev (capabilities);
-
-    return supported;
-}
-
-static char *
-get_driver_name (LibHalContext *ctx, const char *udi)
-{
-    char *parent_udi;
-    char *driver = NULL;
-
-    parent_udi = libhal_device_get_property_string (ctx, udi, "info.parent", NULL);
-    if (parent_udi) {
-        driver = libhal_device_get_property_string (ctx, parent_udi, "info.linux.driver", NULL);
-        libhal_free_string (parent_udi);
-    }
-
-    return driver;
+    return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 }
 
 static MMModem *
-create_modem (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
+grab_port (MMPluginBase *base,
+           MMModem *existing,
+           MMPluginBaseSupportsTask *task,
+           GError **error)
 {
-    char *data_device;
-    char *driver;
-    MMModem *modem;
+    GUdevDevice *port = NULL, *physdev = NULL;
+    MMModem *modem = NULL;
+    const char *name, *subsys, *devfile, *sysfs_path;
+    guint32 caps;
 
-    data_device = libhal_device_get_property_string (hal_ctx, udi, "serial.device", NULL);
-    g_return_val_if_fail (data_device != NULL, NULL);
+    port = mm_plugin_base_supports_task_get_port (task);
+    g_assert (port);
 
-    driver = get_driver_name (hal_ctx, udi);
-    g_return_val_if_fail (driver != NULL, NULL);
+    devfile = g_udev_device_get_device_file (port);
+    if (!devfile) {
+        g_set_error (error, 0, 0, "Could not get port's sysfs file.");
+        return NULL;
+    }
 
-    modem = MM_MODEM (mm_modem_sierra_new (data_device, driver));
+    physdev = mm_plugin_base_supports_task_get_physdev (task);
+    g_assert (physdev);
+    sysfs_path = g_udev_device_get_sysfs_path (physdev);
+    if (!sysfs_path) {
+        g_set_error (error, 0, 0, "Could not get port's physical device sysfs path.");
+        return NULL;
+    }
 
-    libhal_free_string (data_device);
-    libhal_free_string (driver);
+    subsys = g_udev_device_get_subsystem (port);
+    name = g_udev_device_get_name (port);
+
+    caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
+    if (!existing) {
+        if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
+            modem = mm_modem_sierra_new (sysfs_path,
+                                         mm_plugin_base_supports_task_get_driver (task),
+                                         mm_plugin_get_name (MM_PLUGIN (base)));
+        } else if (caps & CAP_CDMA) {
+            modem = mm_generic_cdma_new (sysfs_path,
+                                         mm_plugin_base_supports_task_get_driver (task),
+                                         mm_plugin_get_name (MM_PLUGIN (base)));
+        }
+
+        if (modem) {
+            if (!mm_modem_grab_port (modem, subsys, name, NULL, error)) {
+                g_object_unref (modem);
+                return NULL;
+            }
+        }
+    } else {
+        gpointer gsm_data = NULL;
+
+        /* Is this a GSM secondary port? */
+        if (g_object_get_data (G_OBJECT (task), TAG_SIERRA_SECONDARY_PORT))
+            gsm_data = GUINT_TO_POINTER (TRUE);
+
+        if ((caps & (MM_PLUGIN_BASE_PORT_CAP_GSM | CAP_CDMA)) || gsm_data) {
+            modem = existing;
+            if (!mm_modem_grab_port (modem, subsys, name, gsm_data, error))
+                return NULL;
+        }
+    }
 
     return modem;
 }
@@ -136,21 +186,17 @@ create_modem (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
 /*****************************************************************************/
 
 static void
-plugin_init (MMPlugin *plugin_class)
-{
-    /* interface implementation */
-    plugin_class->get_name = get_name;
-    plugin_class->list_supported_udis = list_supported_udis;
-    plugin_class->supports_udi = supports_udi;
-    plugin_class->create_modem = create_modem;
-}
-
-static void
 mm_plugin_sierra_init (MMPluginSierra *self)
 {
+    g_signal_connect (self, "probe-result", G_CALLBACK (probe_result), NULL);
 }
 
 static void
 mm_plugin_sierra_class_init (MMPluginSierraClass *klass)
 {
+    MMPluginBaseClass *pb_class = MM_PLUGIN_BASE_CLASS (klass);
+
+    pb_class->supports_port = supports_port;
+    pb_class->grab_port = grab_port;
+    pb_class->handle_probe_response = handle_probe_response;
 }

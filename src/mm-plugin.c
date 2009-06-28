@@ -10,16 +10,31 @@ mm_plugin_get_name (MMPlugin *plugin)
     return MM_PLUGIN_GET_INTERFACE (plugin)->get_name (plugin);
 }
 
-guint32
+MMPluginSupportsResult
 mm_plugin_supports_port (MMPlugin *plugin,
                          const char *subsys,
-                         const char *name)
+                         const char *name,
+                         MMSupportsPortResultFunc callback,
+                         gpointer user_data)
 {
     g_return_val_if_fail (MM_IS_PLUGIN (plugin), FALSE);
     g_return_val_if_fail (subsys != NULL, FALSE);
     g_return_val_if_fail (name != NULL, FALSE);
+    g_return_val_if_fail (callback != NULL, FALSE);
 
-    return MM_PLUGIN_GET_INTERFACE (plugin)->supports_port (plugin, subsys, name);
+    return MM_PLUGIN_GET_INTERFACE (plugin)->supports_port (plugin, subsys, name, callback, user_data);
+}
+
+void
+mm_plugin_cancel_supports_port (MMPlugin *plugin,
+                                const char *subsys,
+                                const char *name)
+{
+    g_return_if_fail (MM_IS_PLUGIN (plugin));
+    g_return_if_fail (subsys != NULL);
+    g_return_if_fail (name != NULL);
+
+    MM_PLUGIN_GET_INTERFACE (plugin)->cancel_supports_port (plugin, subsys, name);
 }
 
 MMModem *

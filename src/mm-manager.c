@@ -36,6 +36,8 @@ typedef struct {
     GUdevClient *udev;
     GSList *plugins;
     GHashTable *modems;
+
+    GHashTable *supports;
 } MMManagerPrivate;
 
 static MMPlugin *
@@ -99,6 +101,7 @@ load_plugins (MMManager *manager)
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
     GDir *dir;
     const char *fname;
+    MMPlugin *generic_plugin = NULL;
 
 	if (!g_module_supported ()) {
 		g_warning ("GModules are not supported on your platform!");
@@ -122,9 +125,17 @@ load_plugins (MMManager *manager)
         plugin = load_plugin (path);
         g_free (path);
 
-        if (plugin)
-            priv->plugins = g_slist_append (priv->plugins, plugin);
+        if (plugin) {
+            if (!strcmp (mm_plugin_get_name (plugin), MM_PLUGIN_GENERIC_NAME))
+                generic_plugin = plugin;
+            else
+                priv->plugins = g_slist_append (priv->plugins, plugin);
+        }
     }
+
+    /* Make sure the generic plugin is last */
+    if (generic_plugin)
+        priv->plugins = g_slist_append (priv->plugins, generic_plugin);
 
     g_dir_close (dir);
 }
@@ -179,7 +190,7 @@ modem_valid (MMModem *modem, GParamSpec *pspec, gpointer user_data)
 
         device = mm_modem_get_device (modem);
         g_assert (device);
-        g_debug ("Exported modem %s", device);
+        g_debug ("Exported modem %s as %s", device, path);
         g_free (device);
 
         g_signal_emit (manager, signals[DEVICE_ADDED], 0, modem);
@@ -236,44 +247,228 @@ impl_manager_enumerate_devices (MMManager *manager,
     return TRUE;
 }
 
-typedef struct {
-    MMModem *modem;
-    const char *subsys;
-    const char *name;
-} FindPortInfo;
-
-static void
-find_port (gpointer key, gpointer data, gpointer user_data)
-{
-    FindPortInfo *info = user_data;
-    MMModem *modem = MM_MODEM (data);
-
-    if (!info->modem && mm_modem_owns_port (modem, info->subsys, info->name))
-        info->modem = modem;
-}
-
 static MMModem *
 find_modem_for_port (MMManager *manager, const char *subsys, const char *name)
 {
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
-    FindPortInfo info = { NULL, subsys, name };
+    GHashTableIter iter;
+    gpointer key, value;
 
-    g_hash_table_foreach (priv->modems, find_port, &info);
-    return info.modem;
+    g_hash_table_iter_init (&iter, priv->modems);
+    while (g_hash_table_iter_next (&iter, &key, &value)) {
+        MMModem *modem = MM_MODEM (value);
+
+        if (mm_modem_owns_port (modem, subsys, name))
+            return modem;
+    }
+    return NULL;
+}
+
+typedef struct {
+    MMManager *manager;
+    char *subsys;
+    char *name;
+    GSList *plugins;
+    GSList *cur_plugin;
+    guint defer_id;
+
+    guint32 best_level;
+    MMPlugin *best_plugin;
+} SupportsInfo;
+
+static SupportsInfo *
+supports_info_new (MMManager *self, const char *subsys, const char *name)
+{
+    MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (self);
+    SupportsInfo *info;
+
+    info = g_malloc0 (sizeof (SupportsInfo));
+    info->manager = self;
+    info->subsys = g_strdup (subsys);
+    info->name = g_strdup (name);
+    info->plugins = g_slist_copy (priv->plugins);
+    info->cur_plugin = info->plugins;
+    return info;
+}
+
+static void
+supports_info_free (SupportsInfo *info)
+{
+    /* Cancel any in-process operation on the first plugin */
+    if (info->cur_plugin)
+        mm_plugin_cancel_supports_port (MM_PLUGIN (info->cur_plugin->data), info->subsys, info->name);
+
+    if (info->defer_id)
+        g_source_remove (info->defer_id);
+
+    g_free (info->subsys);
+    g_free (info->name);
+    g_slist_free (info->plugins);
+    memset (info, 0, sizeof (SupportsInfo));
+    g_free (info);
+}
+
+static char *
+get_key (const char *subsys, const char *name)
+{
+    return g_strdup_printf ("%s%s", subsys, name);
+}
+
+
+static void supports_callback (MMPlugin *plugin,
+                               const char *subsys,
+                               const char *name,
+                               guint32 level,
+                               gpointer user_data);
+
+static void try_supports_port (MMManager *manager,
+                               MMPlugin *plugin,
+                               const char *subsys,
+                               const char *name,
+                               SupportsInfo *info);
+
+static gboolean
+supports_defer_timeout (gpointer user_data)
+{
+    SupportsInfo *info = user_data;
+
+    g_debug ("(%s): re-checking support...", info->name);
+    try_supports_port (info->manager,
+                       MM_PLUGIN (info->cur_plugin->data),
+                       info->subsys,
+                       info->name,
+                       info);
+    return FALSE;
+}
+
+static void
+try_supports_port (MMManager *manager,
+                   MMPlugin *plugin,
+                   const char *subsys,
+                   const char *name,
+                   SupportsInfo *info)
+{
+    MMPluginSupportsResult result;
+
+    result = mm_plugin_supports_port (plugin, subsys, name, supports_callback, info);
+
+    switch (result) {
+    case MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED:
+        /* If the plugin knows it doesn't support the modem, just call the
+         * callback and indicate 0 support.
+         */
+        supports_callback (plugin, subsys, name, 0, info);
+        break;
+    case MM_PLUGIN_SUPPORTS_PORT_DEFER:
+        g_debug ("(%s): (%s) deferring support check", mm_plugin_get_name (plugin), name);
+        if (info->defer_id)
+            g_source_remove (info->defer_id);
+
+        /* defer port detection for a bit as requested by the plugin */
+        info->defer_id = g_timeout_add (3000, supports_defer_timeout, info);
+        break;
+    case MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS:
+    default:
+        break;
+    }
+}
+
+static void
+supports_callback (MMPlugin *plugin,
+                   const char *subsys,
+                   const char *name,
+                   guint32 level,
+                   gpointer user_data)
+{
+    SupportsInfo *info = user_data;
+    MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (info->manager);
+    MMModem *modem;
+    GError *error = NULL;
+    char *key;
+    GSList *iter;
+    MMPlugin *next_plugin = NULL;
+
+    info->cur_plugin = info->cur_plugin->next;
+    if (info->cur_plugin)
+        next_plugin = MM_PLUGIN (info->cur_plugin->data);
+
+    /* Is this plugin's result better than any one we've tried before? */
+    if (level > info->best_level) {
+        info->best_level = level;
+        info->best_plugin = plugin;
+    }
+
+    /* Prevent the generic plugin from probing devices that are already supported
+     * by other plugins.  For Huawei for example, secondary ports shouldn't
+     * be probed, but the generic plugin would happily do so if allowed to.
+     */
+    if (   next_plugin
+        && !strcmp (mm_plugin_get_name (next_plugin), MM_PLUGIN_GENERIC_NAME)
+        && info->best_plugin)
+        next_plugin = NULL;
+
+    /* Try the next plugin */
+    if (next_plugin) {
+        try_supports_port (info->manager, next_plugin, info->subsys, info->name, info);
+        return;
+    }
+
+    /* No more plugins to try */
+    if (info->best_plugin) {
+        /* Create the modem */
+        modem = mm_plugin_grab_port (info->best_plugin, info->subsys, info->name, &error);
+        if (modem) {
+            guint32 modem_type = MM_MODEM_TYPE_UNKNOWN;
+            const char *type_name = "UNKNOWN";
+
+            g_object_get (G_OBJECT (modem), MM_MODEM_TYPE, &modem_type, NULL);
+            if (modem_type == MM_MODEM_TYPE_GSM)
+                type_name = "GSM";
+            else if (modem_type == MM_MODEM_TYPE_CDMA)
+                type_name = "CDMA";
+
+            g_message ("(%s): %s modem %s claimed port %s",
+                        mm_plugin_get_name (info->best_plugin),
+                        type_name,
+                        mm_modem_get_device (modem),
+                        name);
+
+            add_modem (info->manager, modem);
+        } else {
+            g_warning ("%s: plugin '%s' claimed to support %s/%s but couldn't: (%d) %s",
+                        __func__,
+                        mm_plugin_get_name (info->best_plugin),
+                        subsys,
+                        name,
+                        error ? error->code : -1,
+                        (error && error->message) ? error->message : "(unknown)");
+        }
+    }
+
+    /* Tell each plugin to clean up any outstanding supports task */
+    for (iter = info->plugins; iter; iter = g_slist_next (iter))
+        mm_plugin_cancel_supports_port (MM_PLUGIN (iter->data), subsys, name);
+    g_slist_free (info->plugins);
+    info->cur_plugin = info->plugins = NULL;
+
+    key = get_key (info->subsys, info->name);
+    g_hash_table_remove (priv->supports, key);
+    g_free (key);
 }
 
 static void
 device_added (MMManager *manager, GUdevDevice *device)
 {
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
-    GSList *iter;
-    MMModem *modem = NULL;
     const char *subsys, *name;
-    MMPlugin *best_plugin = NULL;
-    guint32 best_level = 0;
-    GError *error = NULL;
+    SupportsInfo *info;
+    char *key;
+    gboolean found;
 
     g_return_if_fail (device != NULL);
+
+    if (!g_slist_length (priv->plugins))
+        return;
 
     subsys = g_udev_device_get_subsystem (device);
     name = g_udev_device_get_name (device);
@@ -281,62 +476,52 @@ device_added (MMManager *manager, GUdevDevice *device)
     if (find_modem_for_port (manager, subsys, name))
         return;
 
-    /* Build up the list of plugins that support this port */
-    for (iter = priv->plugins; iter; iter = iter->next) {
-        MMPlugin *plugin = MM_PLUGIN (iter->data);
-        guint32 level;
-
-        level = mm_plugin_supports_port (plugin, subsys, name);
-        if (level > best_level) {
-            best_plugin = plugin;
-            best_level = level;
-        }
-    }
-
-    /* Let the best plugin handle this port */
-    if (!best_plugin)
-        return;
-
-    modem = mm_plugin_grab_port (best_plugin, subsys, name, &error);
-    if (modem) {
-        guint32 modem_type = MM_MODEM_TYPE_UNKNOWN;
-        const char *type_name = "UNKNOWN";
-
-        g_object_get (G_OBJECT (modem), MM_MODEM_TYPE, &modem_type, NULL);
-        if (modem_type == MM_MODEM_TYPE_GSM)
-            type_name = "GSM";
-        else if (modem_type == MM_MODEM_TYPE_CDMA)
-            type_name = "CDMA";
-
-        g_message ("(%s): %s modem %s claimed port %s",
-                   mm_plugin_get_name (best_plugin),
-                   type_name,
-                   mm_modem_get_device (modem),
-                   name);
-    } else {
-        g_warning ("%s: plugin '%s' claimed to support %s/%s but couldn't: (%d) %s",
-                   __func__, mm_plugin_get_name (best_plugin), subsys, name,
-                   error ? error->code : -1,
-                   (error && error->message) ? error->message : "(unknown)");
+    key = get_key (subsys, name);
+    found = !!g_hash_table_lookup (priv->supports, key);
+    if (found) {
+        g_free (key);
         return;
     }
 
-    add_modem (manager, modem);
+    info = supports_info_new (manager, subsys, name);
+    g_hash_table_insert (priv->supports, key, info);
+
+    try_supports_port (manager, MM_PLUGIN (info->cur_plugin->data), subsys, name, info);
 }
 
 static void
 device_removed (MMManager *manager, GUdevDevice *device)
 {
+    MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
     MMModem *modem;
     const char *subsys, *name;
+    char *key;
+    SupportsInfo *info;
 
     g_return_if_fail (device != NULL);
+
+    if (!g_slist_length (priv->plugins))
+        return;
 
     subsys = g_udev_device_get_subsystem (device);
     name = g_udev_device_get_name (device);
     modem = find_modem_for_port (manager, subsys, name);
-    if (modem)
+    if (modem) {
         mm_modem_release_port (modem, subsys, name);
+        return;
+    }
+
+    /* Maybe a plugin is checking whether or not the port is supported */
+    key = get_key (subsys, name);
+    info = g_hash_table_lookup (priv->supports, key);
+
+    if (info) {
+        if (info->plugins)
+            mm_plugin_cancel_supports_port (MM_PLUGIN (info->plugins->data), subsys, name);
+        g_hash_table_remove (priv->supports, key);
+    }
+
+    g_free (key);
 }
 
 static void
@@ -391,6 +576,8 @@ mm_manager_init (MMManager *manager)
     priv->modems = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
     load_plugins (manager);
 
+    priv->supports = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) supports_info_free);
+
     priv->udev = g_udev_client_new (subsys);
     g_assert (priv->udev);
     g_signal_connect (priv->udev, "uevent", G_CALLBACK (handle_uevent), manager);
@@ -401,6 +588,7 @@ finalize (GObject *object)
 {
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (object);
 
+    g_hash_table_destroy (priv->supports);
     g_hash_table_destroy (priv->modems);
 
     g_slist_foreach (priv->plugins, (GFunc) g_object_unref, NULL);
@@ -454,3 +642,4 @@ mm_manager_class_init (MMManagerClass *manager_class)
     dbus_g_error_domain_register (MM_MODEM_CONNECT_ERROR, "org.freedesktop.ModemManager.Modem", MM_TYPE_MODEM_CONNECT_ERROR);
     dbus_g_error_domain_register (MM_MOBILE_ERROR, "org.freedesktop.ModemManager.Modem.Gsm", MM_TYPE_MOBILE_ERROR);
 }
+

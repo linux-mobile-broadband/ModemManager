@@ -564,6 +564,7 @@ static gboolean
 grab_port (MMModem *modem,
            const char *subsys,
            const char *name,
+           gpointer user_data,
            GError **error)
 {
     MMGenericGsm *gsm = MM_GENERIC_GSM (modem);

@@ -300,6 +300,7 @@ gboolean
 mm_modem_grab_port (MMModem *self,
                     const char *subsys,
                     const char *name,
+                    gpointer user_data,
                     GError **error)
 {
     g_return_val_if_fail (self != NULL, FALSE);
@@ -308,7 +309,7 @@ mm_modem_grab_port (MMModem *self,
     g_return_val_if_fail (name, FALSE);
 
     g_assert (MM_MODEM_GET_INTERFACE (self)->grab_port);
-    return MM_MODEM_GET_INTERFACE (self)->grab_port (self, subsys, name, error);
+    return MM_MODEM_GET_INTERFACE (self)->grab_port (self, subsys, name, user_data, error);
 }
 
 void

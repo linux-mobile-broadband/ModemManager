@@ -87,6 +87,9 @@ mm_serial_parser_v0_parse (gpointer data,
     g_return_val_if_fail (parser != NULL, FALSE);
     g_return_val_if_fail (response != NULL, FALSE);
 
+    if (G_UNLIKELY (!response->len || !strlen (response->str)))
+        return FALSE;
+
     found = g_regex_match_full (parser->generic_response, response->str, response->len, 0, 0, &match_info, NULL);
     if (found) {
         str = g_match_info_fetch (match_info, 1);
@@ -205,7 +208,10 @@ mm_serial_parser_v1_parse (gpointer data,
     g_return_val_if_fail (parser != NULL, FALSE);
     g_return_val_if_fail (response != NULL, FALSE);
 
-    /* First, check for successfule responses */
+    if (G_UNLIKELY (!response->len || !strlen (response->str)))
+        return FALSE;
+
+    /* First, check for successful responses */
 
     found = g_regex_match_full (parser->regex_ok, response->str, response->len, 0, 0, NULL, NULL);
     if (found)

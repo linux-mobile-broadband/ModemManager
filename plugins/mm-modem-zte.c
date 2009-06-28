@@ -1,26 +1,43 @@
 /* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+/*
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details:
+ *
+ * Copyright (C) 2008 - 2009 Novell, Inc.
+ * Copyright (C) 2009 Red Hat, Inc.
+ */
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include "mm-modem-zte.h"
-#include "mm-serial.h"
+#include "mm-serial-port.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 
 static gpointer mm_modem_zte_parent_class = NULL;
 
 MMModem *
-mm_modem_zte_new (const char *data_device,
-                  const char *driver)
+mm_modem_zte_new (const char *device,
+                  const char *driver,
+                  const char *plugin)
 {
-    g_return_val_if_fail (data_device != NULL, NULL);
+    g_return_val_if_fail (device != NULL, NULL);
     g_return_val_if_fail (driver != NULL, NULL);
+    g_return_val_if_fail (plugin != NULL, NULL);
 
     return MM_MODEM (g_object_new (MM_TYPE_MODEM_ZTE,
-                                   MM_SERIAL_DEVICE, data_device,
+                                   MM_MODEM_MASTER_DEVICE, device,
                                    MM_MODEM_DRIVER, driver,
+                                   MM_MODEM_PLUGIN, plugin,
                                    NULL));
 }
 
@@ -29,7 +46,7 @@ mm_modem_zte_new (const char *data_device,
 /*****************************************************************************/
 
 static void
-init_modem_done (MMSerial *serial,
+init_modem_done (MMSerialPort *port,
                  GString *response,
                  GError *error,
                  gpointer user_data)
@@ -46,17 +63,21 @@ static void
 pin_check_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMSerialPort *primary;
 
     if (error) {
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
-    } else
+    } else {
         /* Finish the initialization */
-        mm_serial_queue_command (MM_SERIAL (modem), "Z E0 V1 X4 &C1 +CMEE=1;+CFUN=1;", 10, init_modem_done, info);
+        primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+        g_assert (primary);
+        mm_serial_port_queue_command (primary, "Z E0 V1 X4 &C1 +CMEE=1;+CFUN=1;", 10, init_modem_done, info);
+    }
 }
 
 static void
-pre_init_done (MMSerial *serial,
+pre_init_done (MMSerialPort *port,
                GString *response,
                GError *error,
                gpointer user_data)
@@ -74,25 +95,25 @@ pre_init_done (MMSerial *serial,
 }
 
 static void
-enable_flash_done (MMSerial *serial, gpointer user_data)
+enable_flash_done (MMSerialPort *port, gpointer user_data)
 {
-    mm_serial_queue_command (serial, "E0 V1", 3, pre_init_done, user_data);
+    mm_serial_port_queue_command (port, "E0 V1", 3, pre_init_done, user_data);
 }
 
 static void
-disable_done (MMSerial *serial,
+disable_done (MMSerialPort *port,
               GString *response,
               GError *error,
               gpointer user_data)
 {
-    mm_serial_close (serial);
+    mm_serial_port_close (port);
     mm_callback_info_schedule ((MMCallbackInfo *) user_data);
 }
 
 static void
-disable_flash_done (MMSerial *serial, gpointer user_data)
+disable_flash_done (MMSerialPort *port, gpointer user_data)
 {
-    mm_serial_queue_command (serial, "+CFUN=0", 5, disable_done, user_data);
+    mm_serial_port_queue_command (port, "+CFUN=0", 5, disable_done, user_data);
 }
 
 static void
@@ -102,24 +123,71 @@ enable (MMModem *modem,
         gpointer user_data)
 {
     MMCallbackInfo *info;
+    MMSerialPort *primary;
 
     /* First, reset the previously used CID */
     mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
 
     info = mm_callback_info_new (modem, callback, user_data);
 
+    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+
     if (!do_enable) {
-        if (mm_serial_is_connected (MM_SERIAL (modem)))
-            mm_serial_flash (MM_SERIAL (modem), 1000, disable_flash_done, info);
+        if (mm_serial_port_is_connected (primary))
+            mm_serial_port_flash (primary, 1000, disable_flash_done, info);
         else
-            disable_flash_done (MM_SERIAL (modem), info);
+            disable_flash_done (primary, info);
     } else {
-        if (mm_serial_open (MM_SERIAL (modem), &info->error))
-            mm_serial_flash (MM_SERIAL (modem), 100, enable_flash_done, info);
+        if (mm_serial_port_open (primary, &info->error))
+            mm_serial_port_flash (primary, 100, enable_flash_done, info);
 
         if (info->error)
             mm_callback_info_schedule (info);
     }
+}
+
+static gboolean
+grab_port (MMModem *modem,
+           const char *subsys,
+           const char *name,
+           gpointer user_data,
+           GError **error)
+{
+    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
+    MMPortType ptype = MM_PORT_TYPE_IGNORED;
+    MMPort *port = NULL;
+
+    if (!mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_PRIMARY))
+        ptype = MM_PORT_TYPE_PRIMARY;
+    else if (!mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_SECONDARY))
+        ptype = MM_PORT_TYPE_SECONDARY;
+
+    port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
+    if (port && MM_IS_SERIAL_PORT (port)) {
+        GRegex *regex;
+
+        mm_generic_gsm_set_unsolicited_registration (gsm, TRUE);
+        g_object_set (port, MM_PORT_CARRIER_DETECT, FALSE, NULL);
+
+        regex = g_regex_new ("\\r\\n\\+ZUSIMR:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
+
+        regex = g_regex_new ("\\r\\n\\+ZDONR: (.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
+
+        regex = g_regex_new ("\\r\\n\\+ZPASR: (.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
+
+        regex = g_regex_new ("\\r\\n\\+ZEND\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
+    }
+
+    return !!port;
 }
 
 /*****************************************************************************/
@@ -128,31 +196,12 @@ static void
 modem_init (MMModem *modem_class)
 {
     modem_class->enable = enable;
+    modem_class->grab_port = grab_port;
 }
 
 static void
 mm_modem_zte_init (MMModemZte *self)
 {
-    GRegex *regex;
-
-    mm_generic_gsm_set_unsolicited_registration (MM_GENERIC_GSM (self), TRUE);
-    g_object_set (G_OBJECT (self), MM_SERIAL_CARRIER_DETECT, FALSE, NULL);
-
-    regex = g_regex_new ("\\r\\n\\+ZUSIMR:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    mm_serial_add_unsolicited_msg_handler (MM_SERIAL (self), regex, NULL, NULL, NULL);
-    g_regex_unref (regex);
-
-    regex = g_regex_new ("\\r\\n\\+ZDONR: (.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    mm_serial_add_unsolicited_msg_handler (MM_SERIAL (self), regex, NULL, NULL, NULL);
-    g_regex_unref (regex);
-
-    regex = g_regex_new ("\\r\\n\\+ZPASR: (.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    mm_serial_add_unsolicited_msg_handler (MM_SERIAL (self), regex, NULL, NULL, NULL);
-    g_regex_unref (regex);
-
-    regex = g_regex_new ("\\r\\n\\+ZEND\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    mm_serial_add_unsolicited_msg_handler (MM_SERIAL (self), regex, NULL, NULL, NULL);
-    g_regex_unref (regex);
 }
 
 static void

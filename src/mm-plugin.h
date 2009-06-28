@@ -6,6 +6,8 @@
 #include <glib-object.h>
 #include <mm-modem.h>
 
+#define MM_PLUGIN_GENERIC_NAME "Generic"
+
 #define MM_PLUGIN_MAJOR_VERSION 3
 #define MM_PLUGIN_MINOR_VERSION 0
 
@@ -18,6 +20,23 @@ typedef struct _MMPlugin MMPlugin;
 
 typedef MMPlugin *(*MMPluginCreateFunc) (void);
 
+/*
+ * 'level' is a value between 0 and 100 inclusive, where 0 means the plugin has
+ * no support for the port, and 100 means the plugin has full support for the
+ * port.
+ */
+typedef void (*MMSupportsPortResultFunc) (MMPlugin *plugin,
+                                          const char *subsys,
+                                          const char *name,
+                                          guint32 level,
+                                          gpointer user_data);
+
+typedef enum {
+    MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED = 0x0,
+    MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS,
+    MM_PLUGIN_SUPPORTS_PORT_DEFER
+} MMPluginSupportsResult;
+
 struct _MMPlugin {
     GTypeInterface g_iface;
 
@@ -25,14 +44,30 @@ struct _MMPlugin {
     const char *(*get_name)   (MMPlugin *self);
 
     /* Check whether a plugin supports a particular modem port, and what level
-     * of support the plugin has for the device.  The plugin should return a
-     * value between 0 and 100 inclusive, where 0 means the plugin has no
-     * support for the device, and 100 means the plugin has full support for the
-     * device.
+     * of support the plugin has for the device.  If the plugin can immediately
+     * determine whether a port is unsupported, it should return
+     * FALSE.  Otherwise, if the plugin needs to perform additional operations
+     * (ie, probing) to determine the level of support or additional details
+     * about a port, it should queue that operation (but *not* block on the
+     * result) and return TRUE to indicate the operation is ongoing.  When the
+     * operation is finished or the level of support is known, the plugin should
+     * call the provided callback and pass that callback the provided user_data.
      */
-    guint32 (*supports_port)  (MMPlugin *self,
-                               const char *subsys,
-                               const char *name);
+    MMPluginSupportsResult (*supports_port)  (MMPlugin *self,
+                                              const char *subsys,
+                                              const char *name,
+                                              MMSupportsPortResultFunc callback,
+                                              gpointer user_data);
+
+    /* Called to cancel an ongoing supports_port() operation or to notify the
+     * plugin to clean up that operation.  For example, if two plugins support
+     * a particular port, but the first plugin grabs the port, this method will
+     * be called on the second plugin to allow that plugin to clean up resources
+     * used while determining it's level of support for the port.
+     */
+    void (*cancel_supports_port) (MMPlugin *self,
+                                  const char *subsys,
+                                  const char *name);
 
     /* Will only be called if the plugin returns a value greater than 0 for
      * the supports_port() method for this port.  The plugin should create and
@@ -52,9 +87,15 @@ GType mm_plugin_get_type (void);
 
 const char *mm_plugin_get_name   (MMPlugin *plugin);
 
-guint32 mm_plugin_supports_port  (MMPlugin *plugin,
-                                  const char *subsys,
-                                  const char *name);
+MMPluginSupportsResult mm_plugin_supports_port  (MMPlugin *plugin,
+                                                 const char *subsys,
+                                                 const char *name,
+                                                 MMSupportsPortResultFunc callback,
+                                                 gpointer user_data);
+
+void mm_plugin_cancel_supports_port (MMPlugin *plugin,
+                                     const char *subsys,
+                                     const char *name);
 
 MMModem *mm_plugin_grab_port     (MMPlugin *plugin,
                                   const char *subsys,

@@ -78,6 +78,7 @@ struct _MMModem {
     gboolean (*grab_port) (MMModem *self,
                            const char *subsys,
                            const char *name,
+                           gpointer user_data,
                            GError **error);
 
     void (*release_port) (MMModem *self,
@@ -116,6 +117,7 @@ gboolean mm_modem_owns_port (MMModem *self,
 gboolean mm_modem_grab_port (MMModem *self,
                              const char *subsys,
                              const char *name,
+                             gpointer user_data,
                              GError **error);
 
 void mm_modem_release_port (MMModem *self,

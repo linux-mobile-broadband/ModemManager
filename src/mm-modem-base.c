@@ -56,7 +56,7 @@ mm_modem_base_get_port (MMModemBase *self,
     key = get_hash_key (subsys, name);
     port = g_hash_table_lookup (MM_MODEM_BASE_GET_PRIVATE (self)->ports, key);
     g_free (key);
-    return NULL;
+    return port;
 }
 
 static void

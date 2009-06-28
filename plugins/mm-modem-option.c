@@ -1,4 +1,18 @@
 /* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+/*
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details:
+ *
+ * Copyright (C) 2008 - 2009 Novell, Inc.
+ * Copyright (C) 2009 Red Hat, Inc.
+ */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -11,18 +25,22 @@
 static gpointer mm_modem_option_parent_class = NULL;
 
 MMModem *
-mm_modem_option_new (const char *data_device,
-                     const char *driver)
+mm_modem_option_new (const char *device,
+                     const char *driver,
+                     const char *plugin)
 {
-    g_return_val_if_fail (data_device != NULL, NULL);
+    g_return_val_if_fail (device != NULL, NULL);
     g_return_val_if_fail (driver != NULL, NULL);
+    g_return_val_if_fail (plugin != NULL, NULL);
 
     return MM_MODEM (g_object_new (MM_TYPE_MODEM_OPTION,
-                                   MM_SERIAL_DEVICE, data_device,
+                                   MM_MODEM_MASTER_DEVICE, device,
                                    MM_MODEM_DRIVER, driver,
-                                   MM_MODEM_TYPE, MM_MODEM_TYPE_GSM,
+                                   MM_MODEM_PLUGIN, plugin,
                                    NULL));
 }
+
+/*****************************************************************************/
 
 static void
 pin_check_done (MMModem *modem, GError *error, gpointer user_data)
@@ -80,7 +98,7 @@ enable (MMModem *modem,
 }
 
 static void
-get_network_mode_done (MMSerial *serial,
+get_network_mode_done (MMSerialPort *port,
                        GString *response,
                        GError *error,
                        gpointer user_data)
@@ -131,13 +149,16 @@ get_network_mode (MMModemGsmNetwork *modem,
                   gpointer user_data)
 {
     MMCallbackInfo *info;
+    MMSerialPort *primary;
 
     info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-    mm_serial_queue_command (MM_SERIAL (modem), "AT_OPSYS?", 3, get_network_mode_done, info);
+    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+    mm_serial_port_queue_command (primary, "AT_OPSYS?", 3, get_network_mode_done, info);
 }
 
 static void
-set_network_mode_done (MMSerial *serial,
+set_network_mode_done (MMSerialPort *port,
                        GString *response,
                        GError *error,
                        gpointer user_data)
@@ -157,6 +178,7 @@ set_network_mode (MMModemGsmNetwork *modem,
                   gpointer user_data)
 {
     MMCallbackInfo *info;
+    MMSerialPort *primary;
     char *command;
     int i;
 
@@ -188,7 +210,9 @@ set_network_mode (MMModemGsmNetwork *modem,
     }
 
     command = g_strdup_printf ("AT_OPSYS=%d,2", i);
-    mm_serial_queue_command (MM_SERIAL (modem), command, 3, set_network_mode_done, info);
+    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+    mm_serial_port_queue_command (primary, command, 3, set_network_mode_done, info);
     g_free (command);
 }
 

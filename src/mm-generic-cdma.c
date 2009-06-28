@@ -85,6 +85,7 @@ static gboolean
 grab_port (MMModem *modem,
            const char *subsys,
            const char *name,
+           gpointer user_data,
            GError **error)
 {
     MMGenericCdma *self = MM_GENERIC_CDMA (modem);

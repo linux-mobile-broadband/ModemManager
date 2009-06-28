@@ -1,4 +1,18 @@
 /* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+/*
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details:
+ *
+ * Copyright (C) 2008 - 2009 Novell, Inc.
+ * Copyright (C) 2009 Red Hat, Inc.
+ */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -11,16 +25,18 @@
 static gpointer mm_modem_sierra_parent_class = NULL;
 
 MMModem *
-mm_modem_sierra_new (const char *data_device,
-                     const char *driver)
+mm_modem_sierra_new (const char *device,
+                     const char *driver,
+                     const char *plugin)
 {
-    g_return_val_if_fail (data_device != NULL, NULL);
+    g_return_val_if_fail (device != NULL, NULL);
     g_return_val_if_fail (driver != NULL, NULL);
+    g_return_val_if_fail (plugin != NULL, NULL);
 
     return MM_MODEM (g_object_new (MM_TYPE_MODEM_SIERRA,
-                                   MM_SERIAL_DEVICE, data_device,
+                                   MM_MODEM_MASTER_DEVICE, device,
                                    MM_MODEM_DRIVER, driver,
-                                   MM_MODEM_TYPE, MM_MODEM_TYPE_GSM,
+                                   MM_MODEM_PLUGIN, plugin,
                                    NULL));
 }
 
@@ -51,7 +67,7 @@ sierra_enabled (gpointer data)
 }
 
 static void
-init_done (MMSerial *serial,
+init_done (MMSerialPort *port,
            GString *response,
            GError *error,
            gpointer user_data)
@@ -68,15 +84,15 @@ init_done (MMSerial *serial,
 }
 
 static void
-enable_flash_done (MMSerial *serial, gpointer user_data)
+enable_flash_done (MMSerialPort *port, gpointer user_data)
 {
-    mm_serial_queue_command (serial, "Z E0 V1 X4 &C1 +CMEE=1", 3, init_done, user_data);
+    mm_serial_port_queue_command (port, "Z E0 V1 X4 &C1 +CMEE=1", 3, init_done, user_data);
 }
 
 static void
-disable_flash_done (MMSerial *serial, gpointer user_data)
+disable_flash_done (MMSerialPort *port, gpointer user_data)
 {
-    mm_serial_close (serial);
+    mm_serial_port_close (port);
     mm_callback_info_schedule ((MMCallbackInfo *) user_data);
 }
 
@@ -87,6 +103,7 @@ enable (MMModem *modem,
         gpointer user_data)
 {
     MMCallbackInfo *info;
+    MMSerialPort *primary;
 
     /* First, reset the previously used CID */
     mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
@@ -94,25 +111,58 @@ enable (MMModem *modem,
     info = mm_callback_info_new (modem, callback, user_data);
     mm_callback_info_set_data (info, "sierra-enable", GINT_TO_POINTER (do_enable), NULL);
 
+    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+
     if (!do_enable) {
-        if (mm_serial_is_connected (MM_SERIAL (modem)))
-            mm_serial_flash (MM_SERIAL (modem), 1000, disable_flash_done, info);
+        if (mm_serial_port_is_connected (primary))
+            mm_serial_port_flash (primary, 1000, disable_flash_done, info);
         else
-            disable_flash_done (MM_SERIAL (modem), info);
+            disable_flash_done (primary, info);
     } else {
-        if (mm_serial_open (MM_SERIAL (modem), &info->error))
-            mm_serial_flash (MM_SERIAL (modem), 100, enable_flash_done, info);
+        if (mm_serial_port_open (primary, &info->error))
+            mm_serial_port_flash (primary, 100, enable_flash_done, info);
 
         if (info->error)
             mm_callback_info_schedule (info);
     }
 }
+
+/* user_data != NULL means the port is a secondary port */
+static gboolean
+grab_port (MMModem *modem,
+           const char *subsys,
+           const char *name,
+           gpointer user_data,
+           GError **error)
+{
+    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
+    MMPortType ptype = MM_PORT_TYPE_IGNORED;
+    MMPort *port;
+
+    if (user_data) {
+        if (!mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_SECONDARY))
+            ptype = MM_PORT_TYPE_SECONDARY;
+    } else {
+        if (!mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_PRIMARY))
+                ptype = MM_PORT_TYPE_PRIMARY;
+    }
+
+    port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
+
+    if (MM_IS_SERIAL_PORT (port))
+        g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
+
+    return !!port;
+}
+
 /*****************************************************************************/
 
 static void
 modem_init (MMModem *modem_class)
 {
     modem_class->enable = enable;
+    modem_class->grab_port = grab_port;
 }
 
 static void
