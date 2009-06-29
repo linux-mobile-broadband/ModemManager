@@ -143,10 +143,7 @@ do_register (MMModemGsmNetwork *modem,
 {
     MMModemMbm *self = MM_MODEM_MBM (modem);
     MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (self);
-    MMCallbackInfo *info;
     RegisterData *reg_data;
-
-    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
     reg_data = g_malloc0 (sizeof(RegisterData));
     reg_data->modem = modem;
@@ -169,17 +166,13 @@ mbm_cind_done (MMSerialPort *port,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    char *cind;
-    int quality = 0, batt;
+    int quality = 0, ignored;
 
     if (error)
         info->error = g_error_copy (error);
     else {
-        cind = strstr (response->str, "+CIND:");
-        if (cind) {
-            if (sscanf (cind, " %d,%d", &batt, &quality) == 2)
-                quality *= 20;  /* normalize to percent */
-        }
+        if (sscanf (response->str, "+CIND: %d,%d", &ignored, &quality) == 2)
+            quality *= 20;  /* normalize to percent */
 
         mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
     }
