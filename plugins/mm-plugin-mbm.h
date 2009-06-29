@@ -23,22 +23,22 @@
 #ifndef MM_PLUGIN_MBM_H
 #define MM_PLUGIN_MBM_H
 
-#include "mm-plugin.h"
+#include "mm-plugin-base.h"
 #include "mm-generic-gsm.h"
 
-#define MM_TYPE_PLUGIN_MBM                     (mm_plugin_mbm_get_type ())
-#define MM_PLUGIN_MBM(obj)                     (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_MBM, MMPluginMbm))
+#define MM_TYPE_PLUGIN_MBM             (mm_plugin_mbm_get_type ())
+#define MM_PLUGIN_MBM(obj)             (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_MBM, MMPluginMbm))
 #define MM_PLUGIN_MBM_CLASS(klass)     (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_PLUGIN_MBM, MMPluginMbmClass))
 #define MM_IS_PLUGIN_MBM(obj)          (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_PLUGIN_MBM))
 #define MM_IS_PLUGIN_MBM_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_PLUGIN_MBM))
 #define MM_PLUGIN_MBM_GET_CLASS(obj)   (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PLUGIN_MBM, MMPluginMbmClass))
 
 typedef struct {
-    GObject parent;
+    MMPluginBase parent;
 } MMPluginMbm;
 
 typedef struct {
-    GObjectClass parent;
+    MMPluginBaseClass parent;
 } MMPluginMbmClass;
 
 GType mm_plugin_mbm_get_type (void);

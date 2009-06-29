@@ -106,16 +106,20 @@ libmm_plugin_hso_la_LDFLAGS = \
 # MBM
 
 libmm_plugin_mbm_la_SOURCES = \
-	mm-modem-mbm.c \
-	mm-modem-mbm.h \
 	mm-plugin-mbm.c \
-	mm-plugin-mbm.h
+	mm-plugin-mbm.h \
+	mm-modem-mbm.c \
+	mm-modem-mbm.h
 
 libmm_plugin_mbm_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
 	-I$(top_srcdir)/src
 
-libmm_plugin_mbm_la_LDFLAGS = -module -avoid-version
+libmm_plugin_mbm_la_LDFLAGS = \
+	$(GUDEV_LDFLAGS) \
+	-module \
+	-avoid-version
 
 # Option
 
@@ -208,7 +212,14 @@ libmm_plugin_zte_la_LDFLAGS = \
 	-avoid-version
 
 
+udevrulesdir = $(UDEV_BASE_DIR)/rules.d
+udevrules_DATA = 77-mm-ericsson-mbm.rules
+
 BUILT_SOURCES = \
 	mm-modem-gsm-hso-glue.h
 
 CLEANFILES = $(BUILT_SOURCES)
+
+EXTRA_DIST = \
+	$(udevrules_DATA)
+

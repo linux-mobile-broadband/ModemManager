@@ -22,13 +22,14 @@
 
 #include <string.h>
 #include <gmodule.h>
+
+#define G_UDEV_API_IS_SUBJECT_TO_CHANGE
+#include <gudev/gudev.h>
+
 #include "mm-plugin-mbm.h"
 #include "mm-modem-mbm.h"
 
-static void plugin_init (MMPlugin *plugin_class);
-
-G_DEFINE_TYPE_EXTENDED (MMPluginMbm, mm_plugin_mbm, G_TYPE_OBJECT,
-                        0, G_IMPLEMENT_INTERFACE (MM_TYPE_PLUGIN, plugin_init))
+G_DEFINE_TYPE (MMPluginMbm, mm_plugin_mbm, MM_TYPE_PLUGIN_BASE)
 
 int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
 int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
@@ -36,196 +37,122 @@ int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    return MM_PLUGIN (g_object_new (MM_TYPE_PLUGIN_MBM, NULL));
+    return MM_PLUGIN (g_object_new (MM_TYPE_PLUGIN_MBM,
+                                    MM_PLUGIN_BASE_NAME, "Ericsson MBM",
+                                    NULL));
 }
 
 /*****************************************************************************/
 
-static const char *
-get_name (MMPlugin *plugin)
+static guint32
+get_level_for_capabilities (guint32 capabilities)
 {
-    return "MBM";
+    if (capabilities & MM_PLUGIN_BASE_PORT_CAP_GSM)
+        return 10;
+    return 0;
 }
 
-static char **
-list_supported_udis (MMPlugin *plugin, LibHalContext *hal_ctx)
+static void
+probe_result (MMPluginBase *base,
+              MMPluginBaseSupportsTask *task,
+              guint32 capabilities,
+              gpointer user_data)
 {
-    char **supported = NULL;
-    char **devices;
-    int num_devices;
-    int i;
-
-    devices = libhal_find_device_by_capability (hal_ctx, "modem", &num_devices, NULL);
-    if (devices) {
-        GPtrArray *array;
-
-        array = g_ptr_array_new ();
-
-        for (i = 0; i < num_devices; i++) {
-            char *udi = devices[i];
-
-            if (mm_plugin_supports_udi (plugin, hal_ctx, udi))
-                g_ptr_array_add (array, g_strdup (udi));
-        }
-
-        if (array->len > 0) {
-            g_ptr_array_add (array, NULL);
-            supported = (char **) g_ptr_array_free (array, FALSE);
-        } else
-            g_ptr_array_free (array, TRUE);
-    }
-
-    g_strfreev (devices);
-
-    return supported;
+    mm_plugin_base_supports_task_complete (task, get_level_for_capabilities (capabilities));
 }
 
-static char *
-get_netdev (LibHalContext *ctx, const char *udi)
+static MMPluginSupportsResult
+supports_port (MMPluginBase *base,
+               MMModem *existing,
+               MMPluginBaseSupportsTask *task)
 {
-    char *serial_parent, *serial_parent_parent, *netdev = NULL;
-    char **netdevs;
-    int num, i;
+    GUdevDevice *port, *physdev;
+    guint32 cached = 0, level;
+    const char *driver, *subsys;
 
-    /* Get the origin udi, which is parent of our parent */
-    serial_parent = libhal_device_get_property_string (ctx, udi, "info.parent", NULL);
-    if (!serial_parent)
-        return NULL;
-    /* Just attach to first cdc-acm interface */
-    if (strncmp (serial_parent + strlen (serial_parent) - 4, "_if1", 4))
-        return NULL;
-    serial_parent_parent = libhal_device_get_property_string (ctx, serial_parent, "info.parent", NULL);
-    if (!serial_parent_parent)
-        return NULL;
+    /* Can't do anything with non-serial ports */
+    port = mm_plugin_base_supports_task_get_port (task);
+    g_assert (port);
+    subsys = g_udev_device_get_subsystem (port);
+    g_assert (subsys);
 
-    /* Look for the originating device's netdev */
-    netdevs = libhal_find_device_by_capability (ctx, "net", &num, NULL);
-    for (i = 0; netdevs && !netdev && (i < num); i++) {
-        char *netdev_parent, *netdev_parent_parent, *tmp;
+    if (strcmp (subsys, "tty") && strcmp (subsys, "net"))
+        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
-        /* Get the origin udi, which also is parent of our parent */
-        netdev_parent = libhal_device_get_property_string (ctx, netdevs[i], "info.parent", NULL);
-        if (!netdev_parent)
-            continue;
-        netdev_parent_parent = libhal_device_get_property_string (ctx, netdev_parent, "info.parent", NULL);
-        if (!netdev_parent_parent)
-            continue;
+    driver = mm_plugin_base_supports_task_get_driver (task);
+    if (!driver)
+        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
-        if (!strcmp (netdev_parent_parent, serial_parent_parent)) {
-            /* We found it */
-            tmp = libhal_device_get_property_string (ctx, netdevs[i], "net.interface", NULL);
-            if (tmp) {
-                netdev = g_strdup (tmp);
-                libhal_free_string (tmp);
-            }
-        }
+    physdev = mm_plugin_base_supports_task_get_physdev (task);
+    g_assert (physdev);
+    if (!g_udev_device_get_property_as_boolean (physdev, "ID_MM_ERICSSON_MBM"))
+        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
-        libhal_free_string (netdev_parent);
-        libhal_free_string (netdev_parent_parent);
-    }
-    libhal_free_string_array (netdevs);
-    libhal_free_string (serial_parent);
-    libhal_free_string (serial_parent_parent);
-
-    return netdev;
-}
-
-static char *
-get_driver (LibHalContext *ctx, const char *udi)
-{
-    char *serial_parent, *serial_parent_parent, *driver = NULL;
-    char **netdevs;
-    int num, i;
-
-    /* Get the origin udi, which is parent of our parent */
-    serial_parent = libhal_device_get_property_string (ctx, udi, "info.parent", NULL);
-    if (!serial_parent)
-        return NULL;
-    serial_parent_parent = libhal_device_get_property_string (ctx, serial_parent, "info.parent", NULL);
-    if (!serial_parent_parent)
-        return NULL;
-
-    /* Look for the originating device's netdev */
-    netdevs = libhal_find_device_by_capability (ctx, "net", &num, NULL);
-    for (i = 0; netdevs && !driver && (i < num); i++) {
-        char *netdev_parent, *netdev_parent_parent, *tmp;
-
-        /* Get the origin udi, which also is parent of our parent */
-        netdev_parent = libhal_device_get_property_string (ctx, netdevs[i], "info.parent", NULL);
-        if (!netdev_parent)
-            continue;
-        netdev_parent_parent = libhal_device_get_property_string (ctx, netdev_parent, "info.parent", NULL);
-        if (!netdev_parent_parent)
-            continue;
-
-        if (!strcmp (netdev_parent_parent, serial_parent_parent)) {
-            /* We found it */
-            tmp = libhal_device_get_property_string (ctx,
-                                                     netdev_parent, "info.linux.driver", NULL);
-            if (tmp) {
-                driver = g_strdup (tmp);
-                libhal_free_string (tmp);
-            }
-        }
-
-        libhal_free_string (netdev_parent);
-        libhal_free_string (netdev_parent_parent);
-    }
-    libhal_free_string_array (netdevs);
-    libhal_free_string (serial_parent);
-    libhal_free_string (serial_parent_parent);
-
-    return driver;
-}
-
-static gboolean
-supports_udi (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
-{
-    char *driver_name;
-    gboolean supported = FALSE;
-
-    driver_name = get_driver (hal_ctx, udi);
-    if (driver_name && (!strcmp (driver_name, "cdc_ether") || !strcmp (driver_name, "mbm"))) {
-        char **capabilities;
-        char **iter;
-
-        capabilities = libhal_device_get_property_strlist (hal_ctx, udi, "modem.command_sets", NULL);
-        for (iter = capabilities; iter && *iter && !supported; iter++) {
-            if (!strcmp (*iter, "GSM-07.07") || !strcmp (*iter, "GSM-07.05")) {
-                supported = TRUE;
-                break;
-            }
-        }
-
-        libhal_free_string_array (capabilities);
+    if (!strcmp (subsys, "net")) {
+        mm_plugin_base_supports_task_complete (task, 10);
+        return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
     }
 
-    libhal_free_string (driver_name);
+    if (mm_plugin_base_get_cached_port_capabilities (base, port, &cached)) {
+        level = get_level_for_capabilities (cached);
+        if (level) {
+            mm_plugin_base_supports_task_complete (task, level);
+            return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
+        }
+        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
+    }
 
-    return supported;
+    /* Otherwise kick off a probe */
+    if (mm_plugin_base_probe_port (base, task, NULL))
+        return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
+
+    return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 }
 
 static MMModem *
-create_modem (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
+grab_port (MMPluginBase *base,
+           MMModem *existing,
+           MMPluginBaseSupportsTask *task,
+           GError **error)
 {
-    char *serial_device;
-    char *net_device;
-    char *driver;
-    MMModem *modem;
+    GUdevDevice *port = NULL, *physdev = NULL;
+    MMModem *modem = NULL;
+    const char *name, *subsys, *sysfs_path;
+    guint32 caps;
 
-    serial_device = libhal_device_get_property_string (hal_ctx, udi, "serial.device", NULL);
-    g_return_val_if_fail (serial_device != NULL, NULL);
+    port = mm_plugin_base_supports_task_get_port (task);
+    g_assert (port);
 
-    net_device = get_netdev (hal_ctx, udi);
-    g_return_val_if_fail (net_device != NULL, NULL);
+    physdev = mm_plugin_base_supports_task_get_physdev (task);
+    g_assert (physdev);
+    sysfs_path = g_udev_device_get_sysfs_path (physdev);
+    if (!sysfs_path) {
+        g_set_error (error, 0, 0, "Could not get port's physical device sysfs path.");
+        return NULL;
+    }
 
-    driver = get_driver (hal_ctx, udi);
-    g_return_val_if_fail (driver != NULL, NULL);
+    subsys = g_udev_device_get_subsystem (port);
+    name = g_udev_device_get_name (port);
 
-    modem = MM_MODEM (mm_modem_mbm_new (serial_device, net_device, driver));
+    caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
+    if (!(caps & MM_PLUGIN_BASE_PORT_CAP_GSM) && strcmp (subsys, "net"))
+        return NULL;
 
-    g_free (serial_device);
-    g_free (net_device);
+    if (!existing) {
+        modem = mm_modem_mbm_new (sysfs_path,
+                                  mm_plugin_base_supports_task_get_driver (task),
+                                  mm_plugin_get_name (MM_PLUGIN (base)));
+        if (modem) {
+            if (!mm_modem_grab_port (modem, subsys, name, NULL, error)) {
+                g_object_unref (modem);
+                return NULL;
+            }
+        }
+    } else {
+        modem = existing;
+        if (!mm_modem_grab_port (modem, subsys, name, NULL, error))
+            return NULL;
+    }
 
     return modem;
 }
@@ -233,21 +160,16 @@ create_modem (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
 /*****************************************************************************/
 
 static void
-plugin_init (MMPlugin *plugin_class)
-{
-    /* interface implementation */
-    plugin_class->get_name = get_name;
-    plugin_class->list_supported_udis = list_supported_udis;
-    plugin_class->supports_udi = supports_udi;
-    plugin_class->create_modem = create_modem;
-}
-
-static void
 mm_plugin_mbm_init (MMPluginMbm *self)
 {
+    g_signal_connect (self, "probe-result", G_CALLBACK (probe_result), NULL);
 }
 
 static void
 mm_plugin_mbm_class_init (MMPluginMbmClass *klass)
 {
+    MMPluginBaseClass *pb_class = MM_PLUGIN_BASE_CLASS (klass);
+
+    pb_class->supports_port = supports_port;
+    pb_class->grab_port = grab_port;
 }

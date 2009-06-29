@@ -35,8 +35,6 @@
 #define MM_IS_MODEM_MBM_CLASS(klass)   (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_MODEM_MBM))
 #define MM_MODEM_MBM_GET_CLASS(obj)    (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_MODEM_MBM, MMModemMbmClass))
 
-#define MM_MODEM_MBM_NETWORK_DEVICE "network-device"
-
 typedef struct {
     MMGenericGsm parent;
 } MMModemMbm;
@@ -47,8 +45,8 @@ typedef struct {
 
 GType mm_modem_mbm_get_type (void);
 
-MMModem *mm_modem_mbm_new (const char *serial_device,
-                           const char *network_device,
-                           const char *driver);
+MMModem *mm_modem_mbm_new (const char *device,
+                           const char *driver,
+                           const char *plugin_name);
 
 #endif /* MM_MODEM_MBM_H */
