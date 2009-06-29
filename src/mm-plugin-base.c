@@ -680,34 +680,49 @@ get_driver_name (GUdevDevice *device)
 static GUdevDevice *
 real_find_physical_device (MMPluginBase *plugin, GUdevDevice *child)
 {
-    GUdevDevice *iter, *old = NULL;
-    const char *bus, *type;
+    GUdevDevice *parent = NULL, *physdev = NULL;
+    const char *subsys, *type;
 
     g_return_val_if_fail (child != NULL, NULL);
 
-    bus = g_udev_device_get_property (child, "ID_BUS");
-    if (!bus)
-        return NULL;
+    subsys = g_udev_device_get_subsystem (child);
+    g_assert (subsys);
+    if (strcmp (subsys, "usb") && strcmp (subsys, "pci")) {
+        /* Try the parent */
+        parent = g_udev_device_get_parent (child);
+        if (!parent)
+            goto out;
 
-    if (!strcmp (bus, "usb")) {
+        subsys = g_udev_device_get_subsystem (parent);
+        if (strcmp (subsys, "usb") && strcmp (subsys, "pci"))
+            goto out;
+    }
+
+    if (!strcmp (subsys, "usb")) {
+        GUdevDevice *iter, *old = NULL;
+
         /* Walk the parents to find the 'usb_device' for this device. */
         iter = g_object_ref (child);
         while (iter) {
             type = g_udev_device_get_devtype (iter);
-            if (type && !strcmp (type, "usb_device"))
-                return iter;
+            if (type && !strcmp (type, "usb_device")) {
+                physdev = iter;
+                break;
+            }
 
             old = iter;
             iter = g_udev_device_get_parent (old);
             g_object_unref (old);
         }
-        g_object_unref (child);
-    } else if (!strcmp (bus, "pci")) {
-        return g_udev_device_get_parent (child);
-    }
+    } else if (!strcmp (subsys, "pci"))
+        physdev = g_udev_device_get_parent (child);
 
-    // FIXME: pci and pcmcia/cardbus? (like Sierra 850/860)
-    return NULL;
+    // FIXME: pcmcia (like Sierra 850/860)
+
+out:
+    if (parent)
+        g_object_unref (parent);
+    return physdev;
 }
 
 static MMPluginSupportsResult
