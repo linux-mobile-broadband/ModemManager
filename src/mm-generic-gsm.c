@@ -238,7 +238,7 @@ mm_generic_gsm_grab_port (MMGenericGsm *self,
             priv->secondary = MM_SERIAL_PORT (port);
     } else {
         /* Net device (if any) is the preferred data port */
-        if (priv->data && MM_IS_SERIAL_PORT (priv->data)) {
+        if (!priv->data || MM_IS_SERIAL_PORT (priv->data)) {
             priv->data = port;
             g_object_notify (G_OBJECT (self), MM_MODEM_DATA_DEVICE);
             check_valid (self);
