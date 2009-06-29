@@ -792,6 +792,7 @@ get_speed (MMSerialPort *self)
 {
     struct termios options;
 
+    memset (&options, 0, sizeof (struct termios));
     tcgetattr (MM_SERIAL_PORT_GET_PRIVATE (self)->fd, &options);
 
     return cfgetospeed (&options);
@@ -804,6 +805,7 @@ set_speed (MMSerialPort *self, speed_t speed)
     int fd;
 
     fd = MM_SERIAL_PORT_GET_PRIVATE (self)->fd;
+    memset (&options, 0, sizeof (struct termios));
     tcgetattr (fd, &options);
 
     cfsetispeed (&options, speed);
