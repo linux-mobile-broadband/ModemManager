@@ -147,10 +147,7 @@ do_register (MMModemGsmNetwork *modem,
 {
     MMModemMbm *self = MM_MODEM_MBM (modem);
     MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (self);
-    MMCallbackInfo *info;
     RegisterData *reg_data;
-
-    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
     reg_data = g_malloc0 (sizeof(RegisterData));
     reg_data->modem = modem;
