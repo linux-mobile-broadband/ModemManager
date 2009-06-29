@@ -680,48 +680,37 @@ get_driver_name (GUdevDevice *device)
 static GUdevDevice *
 real_find_physical_device (MMPluginBase *plugin, GUdevDevice *child)
 {
-    GUdevDevice *parent = NULL, *physdev = NULL;
+    GUdevDevice *iter, *old = NULL;
+    GUdevDevice *physdev = NULL;
     const char *subsys, *type;
+    guint32 i = 0;
+    gboolean is_usb = FALSE, is_pci = FALSE;
 
     g_return_val_if_fail (child != NULL, NULL);
 
-    subsys = g_udev_device_get_subsystem (child);
-    g_assert (subsys);
-    if (strcmp (subsys, "usb") && strcmp (subsys, "pci")) {
-        /* Try the parent */
-        parent = g_udev_device_get_parent (child);
-        if (!parent)
-            goto out;
-
-        subsys = g_udev_device_get_subsystem (parent);
-        if (strcmp (subsys, "usb") && strcmp (subsys, "pci"))
-            goto out;
-    }
-
-    if (!strcmp (subsys, "usb")) {
-        GUdevDevice *iter, *old = NULL;
-
-        /* Walk the parents to find the 'usb_device' for this device. */
-        iter = g_object_ref (child);
-        while (iter) {
-            type = g_udev_device_get_devtype (iter);
-            if (type && !strcmp (type, "usb_device")) {
+    iter = g_object_ref (child);
+    while (iter && i++ < 5) {
+        subsys = g_udev_device_get_subsystem (iter);
+        if (subsys) {
+            if (is_usb || !strcmp (subsys, "usb")) {
+                is_usb = TRUE;
+                type = g_udev_device_get_devtype (iter);
+                if (type && !strcmp (type, "usb_device")) {
+                    physdev = iter;
+                    break;
+                }
+            } else if (is_pci || !strcmp (subsys, "pci")) {
+                is_pci = TRUE;
                 physdev = iter;
                 break;
             }
-
-            old = iter;
-            iter = g_udev_device_get_parent (old);
-            g_object_unref (old);
         }
-    } else if (!strcmp (subsys, "pci"))
-        physdev = g_udev_device_get_parent (child);
 
-    // FIXME: pcmcia (like Sierra 850/860)
+        old = iter;
+        iter = g_udev_device_get_parent (old);
+        g_object_unref (old);
+    }
 
-out:
-    if (parent)
-        g_object_unref (parent);
     return physdev;
 }
 

@@ -102,6 +102,10 @@ struct _MMPluginBaseClass {
     void (*cancel_task)       (MMPluginBase *plugin,
                                MMPluginBaseSupportsTask *task);
 
+    /* Find a the physical device of a port, ie the USB or PCI or whatever
+     * "master" device that owns the port.  The GUdevDevice object returned
+     * will be unref-ed by the caller.
+     */
     GUdevDevice * (*find_physical_device) (MMPluginBase *plugin,
                                            GUdevDevice *port);
 
