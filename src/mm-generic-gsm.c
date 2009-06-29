@@ -881,7 +881,7 @@ scan_done (MMSerial *serial,
         reply += 7;
 
         /* Pattern without crazy escaping using | for matching: (|\d|,"|.+|","|.+|","|.+|",|\d|) */
-        r = g_regex_new ("\\((\\d),\"(.+)\",\"(.+)\",\"(.+)\",(\\d)\\)", G_REGEX_UNGREEDY, 0, &err);
+        r = g_regex_new ("\\((\\d),\"(.*)\",\"(.*)\",\"(.*)\",(\\d)\\)", G_REGEX_UNGREEDY, 0, &err);
         if (err) {
             g_error ("Invalid regular expression: %s", err->message);
             g_error_free (err);
