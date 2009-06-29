@@ -52,7 +52,7 @@ mm_modem_error_get_type (void)
 
     if (etype == 0) {
         static const GEnumValue values[] = {
-            ENUM_ENTRY (MM_MODEM_ERROR_GENERAL,                 "Generial"),
+            ENUM_ENTRY (MM_MODEM_ERROR_GENERAL,                 "General"),
             ENUM_ENTRY (MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED, "OperationNotSupported"),
             { 0, 0, 0 }
         };
