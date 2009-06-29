@@ -133,13 +133,13 @@ grab_port (MMPluginBase *base,
     }
 
     caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
-    if (!existing) {
-        if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
-            modem = mm_modem_hso_new (sysfs_path,
-                                      mm_plugin_base_supports_task_get_driver (task),
-                                      mm_plugin_get_name (MM_PLUGIN (base)));
-        }
+    if (!(caps & MM_PLUGIN_BASE_PORT_CAP_GSM) && strcmp (subsys, "net"))
+        goto out;
 
+    if (!existing) {
+        modem = mm_modem_hso_new (sysfs_path,
+                                  mm_plugin_base_supports_task_get_driver (task),
+                                  mm_plugin_get_name (MM_PLUGIN (base)));
         if (modem) {
             if (!mm_modem_grab_port (modem, subsys, name, NULL, error)) {
                 g_object_unref (modem);
@@ -147,11 +147,9 @@ grab_port (MMPluginBase *base,
             }
         }
     } else {
-        if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
-            modem = existing;
-            if (!mm_modem_grab_port (modem, subsys, name, NULL, error))
-                return NULL;
-        }
+        modem = existing;
+        if (!mm_modem_grab_port (modem, subsys, name, NULL, error))
+            return NULL;
     }
 
 out:
