@@ -169,17 +169,9 @@ mm_plugin_generic_init (MMPluginGeneric *self)
 }
 
 static void
-dispose (GObject *object)
-{
-}
-
-static void
 mm_plugin_generic_class_init (MMPluginGenericClass *klass)
 {
-    GObjectClass *object_class = G_OBJECT_CLASS (klass);
     MMPluginBaseClass *pb_class = MM_PLUGIN_BASE_CLASS (klass);
-
-    object_class->dispose = dispose;
 
     pb_class->supports_port = supports_port;
     pb_class->grab_port = grab_port;
