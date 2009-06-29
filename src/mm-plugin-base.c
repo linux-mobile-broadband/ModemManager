@@ -231,10 +231,6 @@ mm_plugin_base_supports_task_class_init (MMPluginBaseSupportsTaskClass *klass)
 
 /*****************************************************************************/
 
-#define TAG_PROBE_ID    "mm-plugin-base-probe-id"
-#define TAG_PROBE_PORT  "mm-plugin-base-probe-port"
-#define TAG_PROBE_STATE "mm-plugin-base-probe-state"
-
 #define MM_PLUGIN_BASE_PORT_CAP_CDMA (MM_PLUGIN_BASE_PORT_CAP_IS707_A | \
                                       MM_PLUGIN_BASE_PORT_CAP_IS707_P | \
                                       MM_PLUGIN_BASE_PORT_CAP_IS856 | \
@@ -511,10 +507,12 @@ mm_plugin_base_get_cached_port_capabilities (MMPluginBase *self,
                                              GUdevDevice *port,
                                              guint32 *capabilities)
 {
-    return g_hash_table_lookup_extended (cached_caps,
-                                         g_udev_device_get_name (port),
-                                         NULL,
-                                         (gpointer) capabilities);
+    gpointer tmp = NULL;
+    gboolean found;
+
+    found = g_hash_table_lookup_extended (cached_caps, g_udev_device_get_name (port), NULL, tmp);
+    *capabilities = GPOINTER_TO_UINT (tmp);
+    return found;
 }
 
 /*****************************************************************************/
