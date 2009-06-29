@@ -1,26 +1,24 @@
 /* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 /*
-  Additions to NetworkManager, network-manager-applet and modemmanager
-  for supporting Ericsson modules like F3507g.
-
-  Author: Per Hallsmark <per@hallsmark.se>
-
-  This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 2 of the License, or
-  (at your option) any later version.
-
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-
-  GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public License
-  along with this program; if not, write to the Free Software
-  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-
-*/
+ * Copyright (C) 2008 Ericsson AB
+ *
+ * Author: Per Hallsmark <per.hallsmark@ericsson.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *
+ */
 
 #include <string.h>
 #include <gmodule.h>
@@ -187,7 +185,7 @@ supports_udi (MMPlugin *plugin, LibHalContext *hal_ctx, const char *udi)
     gboolean supported = FALSE;
 
     driver_name = get_driver (hal_ctx, udi);
-    if (driver_name && !strcmp (driver_name, "mbm")) {
+    if (driver_name && (!strcmp (driver_name, "cdc_ether") || !strcmp (driver_name, "mbm"))) {
         char **capabilities;
         char **iter;
 
