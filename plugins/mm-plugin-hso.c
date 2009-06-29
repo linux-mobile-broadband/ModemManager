@@ -63,13 +63,20 @@ supports_port (MMPluginBase *base,
 {
     GUdevDevice *port;
     guint32 cached = 0, level;
-    const char *driver;
+    const char *driver, *subsys;
 
     port = mm_plugin_base_supports_task_get_port (task);
 
     driver = mm_plugin_base_supports_task_get_driver (task);
     if (!driver || strcmp (driver, "hso"))
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
+
+    subsys = g_udev_device_get_subsystem (port);
+    g_assert (subsys);
+    if (!strcmp (subsys, "net")) {
+        mm_plugin_base_supports_task_complete (task, 10);
+        return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
+    }
 
     if (mm_plugin_base_get_cached_port_capabilities (base, port, &cached)) {
         level = get_level_for_capabilities (cached);
