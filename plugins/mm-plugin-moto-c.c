@@ -102,6 +102,9 @@ grab_port (MMPluginBase *base,
     MMModem *modem = NULL;
     const char *name, *subsys, *devfile, *sysfs_path;
 
+    port = mm_plugin_base_supports_task_get_port (task);
+    g_assert (port);
+
     devfile = g_udev_device_get_device_file (port);
     if (!devfile) {
         g_set_error (error, 0, 0, "Could not get port's sysfs file.");
@@ -148,17 +151,9 @@ mm_plugin_moto_c_init (MMPluginMotoC *self)
 }
 
 static void
-dispose (GObject *object)
-{
-}
-
-static void
 mm_plugin_moto_c_class_init (MMPluginMotoCClass *klass)
 {
-    GObjectClass *object_class = G_OBJECT_CLASS (klass);
     MMPluginBaseClass *pb_class = MM_PLUGIN_BASE_CLASS (klass);
-
-    object_class->dispose = dispose;
 
     pb_class->supports_port = supports_port;
     pb_class->grab_port = grab_port;
