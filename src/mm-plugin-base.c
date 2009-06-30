@@ -70,6 +70,7 @@ typedef enum {
     PROBE_STATE_GCAP_TRY3,
     PROBE_STATE_ATI,
     PROBE_STATE_CGMM,
+    PROBE_STATE_LAST
 } ProbeState;
 
 /*****************************************************************************/
@@ -327,10 +328,17 @@ real_handle_probe_response (MMPluginBase *self,
 {
     MMPluginBaseSupportsTaskPrivate *task_priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
     MMSerialPort *port = task_priv->probe_port;
+    gboolean ignore_error = FALSE;
 
     task_priv->probe_state++;
 
-    if (error) {
+    /* Some modems (Huawei E160g) won't respond to +GCAP with no SIM, but
+     * will respond to ATI.
+     */
+    if (response && strstr (response, "+CME ERROR:"))
+        ignore_error = TRUE;
+
+    if (error && !ignore_error) {
         if (error->code == MM_SERIAL_RESPONSE_TIMEOUT) {
             /* Try GCAP again */
             if (task_priv->probe_state <= PROBE_STATE_GCAP_TRY3) {
@@ -359,7 +367,7 @@ real_handle_probe_response (MMPluginBase *self,
         task_priv->probed_caps = parse_gcap (response);
 
         /* Some models (BUSlink SCWi275u) stick stupid stuff in the GMM response */
-        if (    (task_priv->probe_state == PROBE_STATE_CGMM)
+        if (    (task_priv->probe_state == PROBE_STATE_LAST)
             && !(task_priv->probed_caps & CAP_GSM_OR_CDMA))
             task_priv->probed_caps = parse_cgmm (response);
 
