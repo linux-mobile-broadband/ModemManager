@@ -721,7 +721,7 @@ do_register (MMModemGsmNetwork *modem,
     else
         command = g_strdup ("+COPS=0,,");
 
-    mm_serial_queue_command (MM_SERIAL (modem), command, 5, register_done, info);
+    mm_serial_queue_command (MM_SERIAL (modem), command, 10, register_done, info);
     g_free (command);
 }
 
