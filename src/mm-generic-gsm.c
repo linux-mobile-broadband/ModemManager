@@ -327,6 +327,11 @@ init_done (MMSerialPort *port,
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
     } else {
+        /* Ensure echo is off after the init command; some modems ignore the
+         * E0 when it's in the same like as ATZ (Option GIO322).
+         */
+        mm_serial_port_queue_command (port, "E0 +CMEE=1", 2, NULL, NULL);
+
         if (MM_GENERIC_GSM_GET_PRIVATE (info->modem)->unsolicited_registration)
             mm_serial_port_queue_command (port, "+CREG=1", 5, NULL, NULL);
         else
