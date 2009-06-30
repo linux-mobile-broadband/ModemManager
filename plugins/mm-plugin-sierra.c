@@ -127,6 +127,7 @@ grab_port (MMPluginBase *base,
     MMModem *modem = NULL;
     const char *name, *subsys, *devfile, *sysfs_path;
     guint32 caps;
+    gpointer gsm_data = NULL;
 
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
@@ -148,9 +149,13 @@ grab_port (MMPluginBase *base,
     subsys = g_udev_device_get_subsystem (port);
     name = g_udev_device_get_name (port);
 
+    /* Is it a GSM secondary port? */
+    if (g_object_get_data (G_OBJECT (task), TAG_SIERRA_SECONDARY_PORT))
+        gsm_data = GUINT_TO_POINTER (TRUE);
+
     caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
     if (!existing) {
-        if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
+        if ((caps & MM_PLUGIN_BASE_PORT_CAP_GSM) || gsm_data) {
             modem = mm_modem_sierra_new (sysfs_path,
                                          mm_plugin_base_supports_task_get_driver (task),
                                          mm_plugin_get_name (MM_PLUGIN (base)));
@@ -161,18 +166,12 @@ grab_port (MMPluginBase *base,
         }
 
         if (modem) {
-            if (!mm_modem_grab_port (modem, subsys, name, NULL, error)) {
+            if (!mm_modem_grab_port (modem, subsys, name, gsm_data, error)) {
                 g_object_unref (modem);
                 return NULL;
             }
         }
     } else {
-        gpointer gsm_data = NULL;
-
-        /* Is this a GSM secondary port? */
-        if (g_object_get_data (G_OBJECT (task), TAG_SIERRA_SECONDARY_PORT))
-            gsm_data = GUINT_TO_POINTER (TRUE);
-
         if ((caps & (MM_PLUGIN_BASE_PORT_CAP_GSM | CAP_CDMA)) || gsm_data) {
             modem = existing;
             if (!mm_modem_grab_port (modem, subsys, name, gsm_data, error))
