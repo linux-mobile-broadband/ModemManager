@@ -150,7 +150,7 @@ grab_port (MMModem *modem,
 
     port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
 
-    if (MM_IS_SERIAL_PORT (port))
+    if (port && MM_IS_SERIAL_PORT (port))
         g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
 
     return !!port;
