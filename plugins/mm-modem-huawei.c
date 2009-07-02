@@ -496,11 +496,11 @@ handle_status_change (MMSerialPort *port,
 
 /*****************************************************************************/
 
-/* user_data != NULL means the port is a secondary port */
 static gboolean
 grab_port (MMModem *modem,
            const char *subsys,
            const char *name,
+           MMPortType suggested_type,
            gpointer user_data,
            GError **error)
 {
@@ -533,16 +533,14 @@ grab_port (MMModem *modem,
     if (usbif == 0) {
         if (!mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_PRIMARY))
             ptype = MM_PORT_TYPE_PRIMARY;
-    } else if (user_data) {
+    } else if (suggested_type == MM_PORT_TYPE_SECONDARY) {
         if (!mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_SECONDARY))
             ptype = MM_PORT_TYPE_SECONDARY;
     }
 
     port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
-    if (!port)
-        goto out;
 
-    if (MM_IS_SERIAL_PORT (port)) {
+    if (port && MM_IS_SERIAL_PORT (port)) {
         g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
         if (ptype == MM_PORT_TYPE_SECONDARY) {
             GRegex *regex;

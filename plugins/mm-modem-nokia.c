@@ -43,6 +43,7 @@ static gboolean
 grab_port (MMModem *modem,
            const char *subsys,
            const char *name,
+           MMPortType suggested_type,
            gpointer user_data,
            GError **error)
 {
@@ -50,10 +51,13 @@ grab_port (MMModem *modem,
     MMPortType ptype = MM_PORT_TYPE_IGNORED;
     MMPort *port = NULL;
 
-    if (!mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_PRIMARY))
-        ptype = MM_PORT_TYPE_PRIMARY;
-    else if (!mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_SECONDARY))
-        ptype = MM_PORT_TYPE_SECONDARY;
+    if (suggested_type == MM_PORT_TYPE_UNKNOWN) {
+        if (!mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_PRIMARY))
+                ptype = MM_PORT_TYPE_PRIMARY;
+        else if (!mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_SECONDARY))
+            ptype = MM_PORT_TYPE_SECONDARY;
+    } else
+        ptype = suggested_type;
 
     port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
     if (port && MM_IS_SERIAL_PORT (port)) {

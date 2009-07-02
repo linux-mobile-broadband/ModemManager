@@ -85,6 +85,7 @@ static gboolean
 grab_port (MMModem *modem,
            const char *subsys,
            const char *name,
+           MMPortType suggested_type,
            gpointer user_data,
            GError **error)
 {
@@ -94,24 +95,28 @@ grab_port (MMModem *modem,
     MMPort *port;
 
     g_return_val_if_fail (!strcmp (subsys, "net") || !strcmp (subsys, "tty"), FALSE);
+    if (priv->primary)
+        g_return_val_if_fail (suggested_type != MM_PORT_TYPE_PRIMARY, FALSE);
 
     if (!strcmp (subsys, "tty")) {
-        if (!priv->primary)
-            ptype = MM_PORT_TYPE_PRIMARY;
-        else if (!priv->secondary)
-            ptype = MM_PORT_TYPE_SECONDARY;
+        if (suggested_type != MM_PORT_TYPE_UNKNOWN)
+            ptype = suggested_type;
+        else {
+            if (!priv->primary)
+                ptype = MM_PORT_TYPE_PRIMARY;
+            else if (!priv->secondary)
+                ptype = MM_PORT_TYPE_SECONDARY;
+        }
     }
 
     port = mm_modem_base_add_port (MM_MODEM_BASE (self), subsys, name, ptype);
-    if (MM_IS_SERIAL_PORT (port)) {
+    if (port && MM_IS_SERIAL_PORT (port)) {
         g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
         mm_serial_port_set_response_parser (MM_SERIAL_PORT (port),
                                             mm_serial_parser_v1_parse,
                                             mm_serial_parser_v1_new (),
                                             mm_serial_parser_v1_destroy);
-    }
 
-    if (MM_IS_SERIAL_PORT (port)) {
         if (ptype == MM_PORT_TYPE_PRIMARY) {
             priv->primary = MM_SERIAL_PORT (port);
             if (!priv->data) {

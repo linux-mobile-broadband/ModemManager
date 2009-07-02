@@ -134,7 +134,7 @@ grab_port (MMPluginBase *base,
         }
 
         if (modem) {
-            if (!mm_modem_grab_port (modem, subsys, name, NULL, error)) {
+            if (!mm_modem_grab_port (modem, subsys, name, MM_PORT_TYPE_UNKNOWN, NULL, error)) {
                 g_object_unref (modem);
                 return NULL;
             }
@@ -142,7 +142,7 @@ grab_port (MMPluginBase *base,
     } else {
         if (caps & (MM_PLUGIN_BASE_PORT_CAP_GSM | CAP_CDMA)) {
             modem = existing;
-            if (!mm_modem_grab_port (modem, subsys, name, NULL, error))
+            if (!mm_modem_grab_port (modem, subsys, name, MM_PORT_TYPE_UNKNOWN, NULL, error))
                 return NULL;
         }
     }

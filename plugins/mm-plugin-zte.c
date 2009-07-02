@@ -109,9 +109,16 @@ grab_port (MMPluginBase *base,
     MMModem *modem = NULL;
     const char *name, *subsys, *sysfs_path;
     guint32 caps;
+    MMPortType ptype = MM_PORT_TYPE_UNKNOWN;
 
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
+
+    /* Look for port type hints */
+    if (g_udev_device_get_property_as_boolean (port, "ID_MM_ZTE_PORT_TYPE_MODEM"))
+        ptype = MM_PORT_TYPE_PRIMARY;
+    else if (g_udev_device_get_property_as_boolean (port, "ID_MM_ZTE_PORT_TYPE_AUX"))
+        ptype = MM_PORT_TYPE_SECONDARY;
 
     physdev = mm_plugin_base_supports_task_get_physdev (task);
     g_assert (physdev);
@@ -137,7 +144,7 @@ grab_port (MMPluginBase *base,
         }
 
         if (modem) {
-            if (!mm_modem_grab_port (modem, subsys, name, NULL, error)) {
+            if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error)) {
                 g_object_unref (modem);
                 return NULL;
             }
@@ -145,7 +152,7 @@ grab_port (MMPluginBase *base,
     } else {
         if (caps & (MM_PLUGIN_BASE_PORT_CAP_GSM | CAP_CDMA)) {
             modem = existing;
-            if (!mm_modem_grab_port (modem, subsys, name, NULL, error))
+            if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error))
                 return NULL;
         }
     }

@@ -298,21 +298,21 @@ grab_port (MMPluginBase *base,
         }
 
         if (modem) {
-            if (!mm_modem_grab_port (modem, subsys, name, NULL, error)) {
+            if (!mm_modem_grab_port (modem, subsys, name, MM_PORT_TYPE_UNKNOWN, NULL, error)) {
                 g_object_unref (modem);
                 return NULL;
             }
         }
     } else {
         HuaweiSupportsInfo *info;
-        gboolean huawei_is_secondary = FALSE;
+        MMPortType ptype = MM_PORT_TYPE_UNKNOWN;
 
         info = g_object_get_data (G_OBJECT (task), TAG_SUPPORTS_INFO);
-        if (info && (product != 0x1001))
-            huawei_is_secondary = info->secondary;
+        if (info && info->secondary && (product != 0x1001))
+            ptype = MM_PORT_TYPE_SECONDARY;
 
         modem = existing;
-        if (!mm_modem_grab_port (modem, subsys, name, GUINT_TO_POINTER (huawei_is_secondary), error))
+        if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error))
             return NULL;
     }
 

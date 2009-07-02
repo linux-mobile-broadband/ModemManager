@@ -143,14 +143,14 @@ grab_port (MMPluginBase *base,
                                   mm_plugin_base_supports_task_get_driver (task),
                                   mm_plugin_get_name (MM_PLUGIN (base)));
         if (modem) {
-            if (!mm_modem_grab_port (modem, subsys, name, NULL, error)) {
+            if (!mm_modem_grab_port (modem, subsys, name, MM_PORT_TYPE_UNKNOWN, NULL, error)) {
                 g_object_unref (modem);
                 return NULL;
             }
         }
     } else {
         modem = existing;
-        if (!mm_modem_grab_port (modem, subsys, name, NULL, error))
+        if (!mm_modem_grab_port (modem, subsys, name, MM_PORT_TYPE_UNKNOWN, NULL, error))
             return NULL;
     }
 

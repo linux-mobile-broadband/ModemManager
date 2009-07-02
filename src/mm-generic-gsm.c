@@ -217,7 +217,7 @@ mm_generic_gsm_grab_port (MMGenericGsm *self,
     g_return_val_if_fail (!strcmp (subsys, "net") || !strcmp (subsys, "tty"), FALSE);
 
     port = mm_modem_base_add_port (MM_MODEM_BASE (self), subsys, name, ptype);
-    if (MM_IS_SERIAL_PORT (port)) {
+    if (port && MM_IS_SERIAL_PORT (port)) {
         mm_serial_port_set_response_parser (MM_SERIAL_PORT (port),
                                             mm_serial_parser_v1_parse,
                                             mm_serial_parser_v1_new (),
@@ -252,6 +252,7 @@ static gboolean
 grab_port (MMModem *modem,
            const char *subsys,
            const char *name,
+           MMPortType suggested_type,
            gpointer user_data,
            GError **error)
 {
@@ -259,11 +260,18 @@ grab_port (MMModem *modem,
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     MMPortType ptype = MM_PORT_TYPE_IGNORED;
 
+    if (priv->primary)
+        g_return_val_if_fail (suggested_type != MM_PORT_TYPE_PRIMARY, FALSE);
+
     if (!strcmp (subsys, "tty")) {
-        if (!priv->primary)
-            ptype = MM_PORT_TYPE_PRIMARY;
-        else if (!priv->secondary)
-            ptype = MM_PORT_TYPE_SECONDARY;
+        if (suggested_type != MM_PORT_TYPE_UNKNOWN)
+            ptype = suggested_type;
+        else {
+            if (!priv->primary)
+                ptype = MM_PORT_TYPE_PRIMARY;
+            else if (!priv->secondary)
+                ptype = MM_PORT_TYPE_SECONDARY;
+        }
     }
 
     return !!mm_generic_gsm_grab_port (self, subsys, name, ptype, error);

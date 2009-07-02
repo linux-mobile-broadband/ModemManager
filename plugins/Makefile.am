@@ -213,7 +213,9 @@ libmm_plugin_zte_la_LDFLAGS = \
 
 
 udevrulesdir = $(UDEV_BASE_DIR)/rules.d
-udevrules_DATA = 77-mm-ericsson-mbm.rules
+udevrules_DATA = \
+	77-mm-ericsson-mbm.rules \
+	77-mm-zte-port-types.rules
 
 BUILT_SOURCES = \
 	mm-modem-gsm-hso-glue.h

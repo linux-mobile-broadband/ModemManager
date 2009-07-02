@@ -5,6 +5,8 @@
 
 #include <glib-object.h>
 
+#include "mm-port.h"
+
 #define MM_TYPE_MODEM      (mm_modem_get_type ())
 #define MM_MODEM(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_MODEM, MMModem))
 #define MM_IS_MODEM(obj)   (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_MODEM))
@@ -78,6 +80,7 @@ struct _MMModem {
     gboolean (*grab_port) (MMModem *self,
                            const char *subsys,
                            const char *name,
+                           MMPortType suggested_type,
                            gpointer user_data,
                            GError **error);
 
@@ -117,6 +120,7 @@ gboolean mm_modem_owns_port (MMModem *self,
 gboolean mm_modem_grab_port (MMModem *self,
                              const char *subsys,
                              const char *name,
+                             MMPortType suggested_type,
                              gpointer user_data,
                              GError **error);
 

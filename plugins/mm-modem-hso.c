@@ -564,6 +564,7 @@ static gboolean
 grab_port (MMModem *modem,
            const char *subsys,
            const char *name,
+           MMPortType suggested_type,
            gpointer user_data,
            GError **error)
 {
@@ -601,7 +602,7 @@ grab_port (MMModem *modem,
         if (g_file_get_contents (hsotype_path, &contents, NULL, NULL)) {
             if (g_str_has_prefix (contents, "Control"))
                 ptype = MM_PORT_TYPE_PRIMARY;
-            else
+            else if (g_str_has_prefix (contents, "Application") || g_str_has_prefix (contents, "Application2"))
                 ptype = MM_PORT_TYPE_SECONDARY;
             g_free (contents);
         }
