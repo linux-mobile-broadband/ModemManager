@@ -134,7 +134,7 @@ enable (MMModem *modem,
     g_assert (primary);
 
     if (!do_enable) {
-        if (mm_serial_port_is_connected (primary))
+        if (mm_port_get_connected (MM_PORT (primary)))
             mm_serial_port_flash (primary, 1000, disable_flash_done, info);
         else
             disable_flash_done (primary, info);

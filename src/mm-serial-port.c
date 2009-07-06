@@ -58,6 +58,8 @@ typedef struct {
     GString *command;
     GString *response;
 
+    gboolean connected;
+
     /* Response parser data */
     MMSerialResponseParserFn response_parser_fn;
     gpointer response_parser_user_data;
@@ -328,7 +330,7 @@ mm_serial_port_send_command (MMSerialPort *self,
         return FALSE;
     }
 
-    if (mm_serial_port_is_connected (self)) {
+    if (mm_port_get_connected (MM_PORT (self))) {
         g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_SEND_FAILED,
                      "%s", "Sending command failed: device is connected");
         return FALSE;
@@ -864,26 +866,35 @@ mm_serial_port_flash (MMSerialPort *self,
     return id;
 }
 
-gboolean
-mm_serial_port_is_connected (MMSerialPort *self)
+/*****************************************************************************/
+
+static void
+port_connected (MMSerialPort *self, GParamSpec *pspec, gpointer user_data)
 {
-    MMSerialPortPrivate *priv;
-    int mcs = 0;
-
-    g_return_val_if_fail (MM_IS_SERIAL_PORT (self), FALSE);
-
-    priv = MM_SERIAL_PORT_GET_PRIVATE (self);
-
-    if (!mm_port_get_carrier_detect (MM_PORT (self)))
-        return FALSE;
+    MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (self);
+    gboolean connected;
 
     if (priv->fd < 0)
-        return FALSE;
+        return;
 
-    if (ioctl (priv->fd, TIOCMGET, &mcs) < 0)
-        return FALSE;
+    /* When the port is connected, drop the serial port lock so PPP can do
+     * something with the port.  When the port is disconnected, grab the lock
+     * again.
+     */
+    connected = mm_port_get_connected (MM_PORT (self));
 
-    return mcs & TIOCM_CAR ? TRUE : FALSE;
+    if (ioctl (priv->fd, (connected ? TIOCNXCL : TIOCEXCL)) < 0) {
+        g_warning ("%s: (%s) could not %s serial port lock: (%d) %s",
+                   __func__,
+                   mm_port_get_device (MM_PORT (self)),
+                   connected ? "drop" : "re-acquire",
+                   errno,
+                   strerror (errno));
+        if (!connected) {
+            // FIXME: do something here, maybe try again in a few seconds or
+            // close the port and error out?
+        }
+    }
 }
 
 /*****************************************************************************/
@@ -915,6 +926,8 @@ mm_serial_port_init (MMSerialPort *self)
     priv->queue = g_queue_new ();
     priv->command  = g_string_new_len   ("AT", SERIAL_BUF_SIZE);
     priv->response = g_string_sized_new (SERIAL_BUF_SIZE);
+
+    g_signal_connect (self, "notify::" MM_PORT_CONNECTED, G_CALLBACK (port_connected), NULL);
 }
 
 static void

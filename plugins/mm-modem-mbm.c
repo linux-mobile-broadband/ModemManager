@@ -455,7 +455,7 @@ enable (MMModem *modem,
     } else {
         mm_serial_port_queue_command (primary, "+CREG=0", 100, NULL, NULL);
         mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
-        if (mm_serial_port_is_connected (primary))
+        if (mm_port_get_connected (MM_PORT (primary)))
             mm_serial_port_flash (primary, 1000, disable_flash_done, info);
         else
             disable_flash_done (primary, info);

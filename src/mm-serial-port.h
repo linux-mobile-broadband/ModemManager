@@ -99,7 +99,5 @@ guint    mm_serial_port_flash             (MMSerialPort *self,
                                            MMSerialFlashFn callback,
                                            gpointer user_data);
 
-gboolean mm_serial_port_is_connected      (MMSerialPort *self);
-
 #endif /* MM_SERIAL_PORT_H */
 

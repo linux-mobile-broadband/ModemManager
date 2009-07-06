@@ -23,7 +23,6 @@ typedef struct {
 
     gboolean valid;
 
-    char *data_device;
     char *oper_code;
     char *oper_name;
     guint32 ip_method;
@@ -406,7 +405,7 @@ enable (MMModem *modem,
     if (!do_enable) {
         mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
 
-        if (mm_serial_port_is_connected (priv->primary))
+        if (mm_port_get_connected (MM_PORT (priv->primary)))
             mm_serial_port_flash (priv->primary, 1000, disable_flash_done, info);
         else
             disable_flash_done (priv->primary, info);
@@ -976,17 +975,19 @@ connect_done (MMSerialPort *port,
               GError *error,
               gpointer user_data)
 {
-    MMGenericGsmPrivate *priv;
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
 
     if (error) {
         info->error = g_error_copy (error);
         /* Try to get more information why it failed */
         priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
         mm_serial_port_queue_command (priv->primary, "+CEER", 3, connect_report_done, info);
-    } else
+    } else {
         /* Done */
+        mm_port_set_connected (priv->data, TRUE);
         mm_callback_info_schedule (info);
+    }
 }
 
 static void
@@ -1023,7 +1024,11 @@ connect (MMModem *modem,
 static void
 disconnect_flash_done (MMSerialPort *port, gpointer user_data)
 {
-    mm_callback_info_schedule ((MMCallbackInfo *) user_data);
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+
+    mm_port_set_connected (priv->data, FALSE);
+    mm_callback_info_schedule (info);
 }
 
 static void
@@ -1361,7 +1366,7 @@ get_signal_quality (MMModemGsmNetwork *modem,
     MMCallbackInfo *info;
     gboolean connected;
 
-    connected = mm_serial_port_is_connected (priv->primary);
+    connected = mm_port_get_connected (MM_PORT (priv->primary));
     if (connected && !priv->secondary) {
         g_message ("Returning saved signal quality %d", priv->signal_quality);
         callback (MM_MODEM (modem), priv->signal_quality, NULL, user_data);
@@ -1408,14 +1413,14 @@ sms_send (MMModemGsmSms *modem,
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
     priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
-    connected = mm_serial_port_is_connected (priv->primary);
+    connected = mm_port_get_connected (MM_PORT (priv->primary));
     if (connected)
         port = priv->secondary;
     else
         port = priv->primary;
 
     if (!port) {
-        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
                                             "Cannot send SMS while connected");
         mm_callback_info_schedule (info);
         return;
@@ -1827,7 +1832,6 @@ finalize (GObject *object)
     mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (object));
 
     g_free (priv->driver);
-    g_free (priv->data_device);
     g_free (priv->oper_code);
     g_free (priv->oper_name);
 

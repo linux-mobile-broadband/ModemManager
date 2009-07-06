@@ -48,6 +48,7 @@ typedef enum {
 #define MM_PORT_SUBSYS         "subsys"
 #define MM_PORT_TYPE           "type"
 #define MM_PORT_CARRIER_DETECT "carrier-detect"
+#define MM_PORT_CONNECTED      "connected"
 
 typedef struct _MMPort MMPort;
 typedef struct _MMPortClass MMPortClass;
@@ -69,6 +70,10 @@ MMPortSubsys mm_port_get_subsys         (MMPort *self);
 MMPortType   mm_port_get_port_type      (MMPort *self);
 
 gboolean     mm_port_get_carrier_detect (MMPort *self);
+
+gboolean     mm_port_get_connected      (MMPort *self);
+
+void         mm_port_set_connected      (MMPort *self, gboolean connected);
 
 #endif /* MM_PORT_H */
 

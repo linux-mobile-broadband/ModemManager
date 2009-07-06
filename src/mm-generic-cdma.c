@@ -20,6 +20,7 @@ typedef struct {
     char *plugin;
     char *device;
 
+    guint32 signal_quality;
     guint32 ip_method;
     gboolean valid;
 
@@ -238,10 +239,15 @@ dial_done (MMSerialPort *port,
            GError *error,
            gpointer user_data)
 {
+    MMGenericCdmaPrivate *priv;
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
     if (error)
         info->error = g_error_copy (error);
+    else {
+        priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
+        mm_port_set_connected (priv->data, TRUE);
+    }
 
     mm_callback_info_schedule (info);
 }
@@ -265,7 +271,12 @@ connect (MMModem *modem,
 static void
 disconnect_flash_done (MMSerialPort *port, gpointer user_data)
 {
-    mm_callback_info_schedule ((MMCallbackInfo *) user_data);
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMGenericCdmaPrivate *priv;
+
+    priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
+    mm_port_set_connected (priv->data, FALSE);
+    mm_callback_info_schedule (info);
 }
 
 static void
@@ -370,6 +381,7 @@ get_signal_quality_done (MMSerialPort *port,
                          GError *error,
                          gpointer user_data)
 {
+    MMGenericCdmaPrivate *priv;
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     char *reply = response->str;
 
@@ -391,6 +403,8 @@ get_signal_quality_done (MMSerialPort *port,
                 /* Normalize the quality */
                 quality = CLAMP (quality, 0, 31) * 100 / 31;
             
+                priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
+                priv->signal_quality = quality;
                 mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
             }
         } else
@@ -408,6 +422,14 @@ get_signal_quality (MMModemCdma *modem,
 {
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
     MMCallbackInfo *info;
+    gboolean connected;
+
+    connected = mm_port_get_connected (MM_PORT (priv->primary));
+    if (connected && !priv->secondary) {
+        g_message ("Returning saved signal quality %d", priv->signal_quality);
+        callback (MM_MODEM (modem), priv->signal_quality, NULL, user_data);
+        return;
+    }
 
     info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
     /* Prefer secondary port for signal strength */
@@ -443,6 +465,17 @@ get_esn (MMModemCdma *modem,
 {
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
     MMCallbackInfo *info;
+    gboolean connected;
+    GError *error;
+
+    connected = mm_port_get_connected (MM_PORT (priv->primary));
+    if (connected && !priv->secondary) {
+        error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
+                                     "Cannot get ESN while connected");
+        callback (MM_MODEM (modem), NULL, error, user_data);
+        g_error_free (error);
+        return;
+    }
 
     info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
     mm_serial_port_queue_command_cached (priv->primary, "+GSN", 3, get_string_done, info);
@@ -522,6 +555,17 @@ get_serving_system (MMModemCdma *modem,
 {
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
     MMCallbackInfo *info;
+    gboolean connected;
+    GError *error;
+
+    connected = mm_port_get_connected (MM_PORT (priv->primary));
+    if (connected && !priv->secondary) {
+        error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
+                                     "Cannot get serving system while connected");
+        callback (modem, 0, 0, 0, error, user_data);
+        g_error_free (error);
+        return;
+    }
 
     info = mm_callback_info_new_full (MM_MODEM (modem),
                                       serving_system_invoke,

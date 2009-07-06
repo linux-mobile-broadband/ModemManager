@@ -28,6 +28,7 @@ enum {
     PROP_SUBSYS,
     PROP_TYPE,
     PROP_CARRIER_DETECT,
+    PROP_CONNECTED,
 
     LAST_PROP
 };
@@ -39,6 +40,7 @@ typedef struct {
     MMPortSubsys subsys;
     MMPortType ptype;
     gboolean carrier_detect;
+    gboolean connected;
 } MMPortPrivate;
 
 /*****************************************************************************/
@@ -117,6 +119,30 @@ mm_port_get_carrier_detect (MMPort *self)
     return MM_PORT_GET_PRIVATE (self)->carrier_detect;
 }
 
+gboolean
+mm_port_get_connected (MMPort *self)
+{
+    g_return_val_if_fail (self != NULL, FALSE);
+    g_return_val_if_fail (MM_IS_PORT (self), FALSE);
+
+    return MM_PORT_GET_PRIVATE (self)->connected;
+}
+
+void
+mm_port_set_connected (MMPort *self, gboolean connected)
+{
+    MMPortPrivate *priv;
+
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_PORT (self));
+
+    priv = MM_PORT_GET_PRIVATE (self);
+    if (priv->connected != connected) {
+        priv->connected = connected;
+        g_object_notify (G_OBJECT (self), MM_PORT_CONNECTED);
+    }
+}
+
 /*****************************************************************************/
 
 static void
@@ -146,6 +172,9 @@ set_property (GObject *object, guint prop_id,
     case PROP_CARRIER_DETECT:
         priv->carrier_detect = g_value_get_boolean (value);
         break;
+    case PROP_CONNECTED:
+        priv->connected = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -170,6 +199,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case PROP_CARRIER_DETECT:
         g_value_set_boolean (value, priv->carrier_detect);
+        break;
+    case PROP_CONNECTED:
+        g_value_set_boolean (value, priv->connected);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -235,4 +267,12 @@ mm_port_class_init (MMPortClass *klass)
                                "Has Carrier Detect",
                                TRUE,
                                G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
+
+    g_object_class_install_property
+        (object_class, PROP_CONNECTED,
+         g_param_spec_boolean (MM_PORT_CONNECTED,
+                               "Connected",
+                               "Is connected for data and not usable for control",
+                               FALSE,
+                               G_PARAM_READWRITE));
 }
