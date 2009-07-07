@@ -14,7 +14,7 @@ typedef struct _MMModemCdma MMModemCdma;
 
 typedef void (*MMModemCdmaServingSystemFn) (MMModemCdma *modem,
                                             guint32 class,
-                                            char band,
+                                            unsigned char band,
                                             guint32 sid,
                                             GError *error,
                                             gpointer user_data);

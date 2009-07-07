@@ -488,7 +488,7 @@ serving_system_invoke (MMCallbackInfo *info)
 
     callback (MM_MODEM_CDMA (info->modem),
               GPOINTER_TO_UINT (mm_callback_info_get_data (info, "class")),
-              (char) GPOINTER_TO_UINT (mm_callback_info_get_data (info, "band")),
+              (unsigned char) GPOINTER_TO_UINT (mm_callback_info_get_data (info, "band")),
               GPOINTER_TO_UINT (mm_callback_info_get_data (info, "sid")),
               info->error,
               info->user_data);
@@ -503,7 +503,7 @@ serving_system_done (MMSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     char *reply = response->str;
     int class = 0, sid = 99999, num;
-    char band = 'Z';
+    unsigned char band = 'Z';
 
     if (error) {
         info->error = g_error_copy (error);
@@ -537,7 +537,7 @@ serving_system_done (MMSerialPort *port,
                                                 "No service");
         } else {
             mm_callback_info_set_data (info, "class", GUINT_TO_POINTER (class), NULL);
-            mm_callback_info_set_data (info, "band", GUINT_TO_POINTER (band), NULL);
+            mm_callback_info_set_data (info, "band", GUINT_TO_POINTER ((guint32) band), NULL);
             mm_callback_info_set_data (info, "sid", GUINT_TO_POINTER (sid), NULL);
         }
     } else

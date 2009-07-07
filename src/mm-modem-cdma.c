@@ -74,7 +74,7 @@ uint_call_done (MMModem *modem, guint32 result, GError *error, gpointer user_dat
 static void
 serving_system_call_done (MMModemCdma *self,
                           guint32 class,
-                          char band,
+                          unsigned char band,
                           guint32 sid,
                           GError *error,
                           gpointer user_data)
