@@ -71,7 +71,6 @@ esac
 AC_CONFIG_FILES([
 Makefile
 marshallers/Makefile
-callouts/Makefile
 src/Makefile
 plugins/Makefile
 test/Makefile
