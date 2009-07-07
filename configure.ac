@@ -27,6 +27,15 @@ else
 fi
 AC_SUBST(DBUS_SYS_DIR)
 
+AC_ARG_WITH(udev-base-dir, AS_HELP_STRING([--with-udev-base-dir=DIR], [where udev base directory is]))
+
+if test -n "$with_udev_base_dir" ; then
+    UDEV_BASE_DIR="$with_udev_base_dir"
+else
+    UDEV_BASE_DIR="/lib/udev"
+fi
+AC_SUBST(UDEV_BASE_DIR)
+
 GLIB_GENMARSHAL=`pkg-config --variable=glib_genmarshal glib-2.0`
 AC_SUBST(GLIB_GENMARSHAL)
 
