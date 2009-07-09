@@ -1,7 +1,7 @@
 AC_PREREQ(2.52)
 
 AC_INIT(ModemManager, 0.2, tambet@gmail.com, ModemManager)
-AM_INIT_AUTOMAKE([])
+AM_INIT_AUTOMAKE([1.9 subdir-objects tar-ustar no-dist-gzip dist-bzip2])
 AM_MAINTAINER_MODE
 
 AC_CONFIG_HEADERS(config.h)
