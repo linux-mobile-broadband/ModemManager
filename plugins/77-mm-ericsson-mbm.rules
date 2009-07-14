@@ -4,14 +4,14 @@ ACTION!="add|change", GOTO="mm_mbm_end"
 SUBSYSTEM!="usb", GOTO="mm_mbm_end"
 ENV{DEVTYPE}!="usb_device", GOTO="mm_mbm_end"
 
-# Sony-Ericsson F3507g
+# Ericsson F3507g
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1900", ENV{ID_MM_ERICSSON_MBM}="1"
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1902", ENV{ID_MM_ERICSSON_MBM}="1"
 
-# Sony-Ericsson F3607gw
+# Ericsson F3607gw
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1904", ENV{ID_MM_ERICSSON_MBM}="1"
 
-# Sony-Ericsson F3307
+# Ericsson F3307
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1906", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # Sony-Ericsson MD300
