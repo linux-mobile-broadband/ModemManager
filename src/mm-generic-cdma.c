@@ -510,14 +510,8 @@ serving_system_done (MMSerialPort *port,
         goto out;
     }
 
-    if (!strstr (reply, "+CSS: ")) {
-        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                           "Could not parse Serving System results.");
-        goto out;
-    }
-
-    /* Got valid reply */
-    reply += 6;
+    if (strstr (reply, "+CSS: "))
+        reply += 6;
 
     num = sscanf (reply, "%d, %c, %d", &class, &band, &sid);
     if (num != 3)
@@ -541,8 +535,8 @@ serving_system_done (MMSerialPort *port,
             mm_callback_info_set_data (info, "sid", GUINT_TO_POINTER (sid), NULL);
         }
     } else
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                    "%s", "Could not parse signal quality results");
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse Serving System results.");
 
  out:
     mm_callback_info_schedule (info);
