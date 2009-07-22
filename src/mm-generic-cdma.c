@@ -513,10 +513,7 @@ serving_system_done (MMSerialPort *port,
     if (strstr (reply, "+CSS: "))
         reply += 6;
 
-    num = sscanf (reply, "%d, %c, %d", &class, &band, &sid);
-    if (num != 3)
-        num = sscanf (reply, "%d,%c,%d", &class, &band, &sid);
-
+    num = sscanf (reply, "%d , %c , %d", &class, &band, &sid);
     if (num == 3) {
         /* Normalize */
         class = CLAMP (class, 0, 4);
