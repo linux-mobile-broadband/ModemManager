@@ -26,7 +26,18 @@
 	  The index of the SMS.
 	</tp:docstring>
       </arg>
-      <arg name="sms" type="a{sv}" direction="out"/>
+      <arg name="sms" type="a{sv}" direction="out">
+        <tp:docstring>
+          A dictionary containing SMS properties of the SMS specified by the given index.  This dictionary may contain the following key/value pairs:
+
+          number   : string - Phone number (mandatory)
+          text     : string - SMS text (mandatory)
+          smsc     : string - SMS service center number (optional)
+          validity : uint (0..255) - Specifies when the SMS expires in SMSC (optional)
+          class    : uint (0..3) - Message importance and location (optional)
+          completed: boolean - Whether all message parts have been received or not (optional)
+        </tp:docstring>
+      </arg>
     </method>
 
     <method name="GetFormat">
@@ -110,7 +121,35 @@
     </method>
 
     <signal name="SmsReceived">
-      <arg name="index" type="u"/>
+      <tp:docstring>
+        Emitted when any part of a new SMS has been received (but not for subsequent parts, if any).  Not all parts may have been received and the message may not be complete; if it is, the 'complete' argument will be TRUE.
+      </tp:docstring>
+      <arg name="index" type="u">
+        <tp:docstring>
+          Index of the new SMS.
+        </tp:docstring>
+      </arg>
+      <arg name="complete" type="b">
+        <tp:docstring>
+          TRUE if all message parts have been received, otherwise FALSE.
+        </tp:docstring>
+      </arg>
+    </signal>
+
+    <signal name="Completed">
+      <tp:docstring>
+        Emitted when the complete-ness status of an SMS message changes.  An SMS may not necessarily be complete when the first part is received; this signal will be emitted when all parts have been received, even for single-part messages.
+      </tp:docstring>
+      <arg name="index" type="u">
+        <tp:docstring>
+          The index of the SMS.
+        </tp:docstring>
+      </arg>
+      <arg name="completed" type="b">
+        <tp:docstring>
+          TRUE if all message parts have been received, otherwise FALSE.
+        </tp:docstring>
+      </arg>
     </signal>
 
   </interface>
