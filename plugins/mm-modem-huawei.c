@@ -35,8 +35,8 @@ static gpointer mm_modem_huawei_parent_class = NULL;
 typedef struct {
     /* Cached state */
     guint signal_quality;
-    MMModemGsmNetworkMode mode;
-    MMModemGsmNetworkBand band;
+    MMModemGsmMode mode;
+    MMModemGsmBand band;
 } MMModemHuaweiPrivate;
 
 MMModem *
@@ -72,21 +72,21 @@ parse_syscfg (MMModemHuawei *self,
                 
         /* Network mode */
         if (*mode_a == 2 && *mode_b == 1)
-            priv->mode = MM_MODEM_GSM_NETWORK_MODE_2G_PREFERRED;
+            priv->mode = MM_MODEM_GSM_MODE_2G_PREFERRED;
         else if (*mode_a == 2 && *mode_b == 2)
-            priv->mode = MM_MODEM_GSM_NETWORK_MODE_3G_PREFERRED;
+            priv->mode = MM_MODEM_GSM_MODE_3G_PREFERRED;
         else if (*mode_a == 13 && *mode_b == 1)
-            priv->mode = MM_MODEM_GSM_NETWORK_MODE_2G_ONLY;
+            priv->mode = MM_MODEM_GSM_MODE_2G_ONLY;
         else if (*mode_a == 14 && *mode_b == 2)
-            priv->mode = MM_MODEM_GSM_NETWORK_MODE_3G_ONLY;
+            priv->mode = MM_MODEM_GSM_MODE_3G_ONLY;
 
         /* Band */
         if (*band == 0x3FFFFFFF)
-            priv->band = MM_MODEM_GSM_NETWORK_BAND_ANY;
+            priv->band = MM_MODEM_GSM_BAND_ANY;
         else if (*band == 0x400380)
-            priv->band = MM_MODEM_GSM_NETWORK_BAND_DCS;
+            priv->band = MM_MODEM_GSM_BAND_DCS;
         else if (*band == 0x200000)
-            priv->band = MM_MODEM_GSM_NETWORK_BAND_PCS;
+            priv->band = MM_MODEM_GSM_BAND_PCS;
 
         return TRUE;
     }
@@ -132,25 +132,29 @@ set_network_mode_get_done (MMSerialPort *port,
             char *command;
 
             switch (GPOINTER_TO_UINT (mm_callback_info_get_data (info, "mode"))) {
-            case MM_MODEM_GSM_NETWORK_MODE_GPRS:
-            case MM_MODEM_GSM_NETWORK_MODE_EDGE:
-            case MM_MODEM_GSM_NETWORK_MODE_2G_ONLY:
+            case MM_MODEM_GSM_MODE_ANY:
+                a = 2;
+                b = 0;
+                break;
+            case MM_MODEM_GSM_MODE_GPRS:
+            case MM_MODEM_GSM_MODE_EDGE:
+            case MM_MODEM_GSM_MODE_2G_ONLY:
                 a = 13;
                 b = 1;
                 break;
-            case MM_MODEM_GSM_NETWORK_MODE_UMTS:
-            case MM_MODEM_GSM_NETWORK_MODE_HSDPA:
-            case MM_MODEM_GSM_NETWORK_MODE_HSUPA:
-            case MM_MODEM_GSM_NETWORK_MODE_HSPA:
-            case MM_MODEM_GSM_NETWORK_MODE_3G_ONLY:
+            case MM_MODEM_GSM_MODE_UMTS:
+            case MM_MODEM_GSM_MODE_HSDPA:
+            case MM_MODEM_GSM_MODE_HSUPA:
+            case MM_MODEM_GSM_MODE_HSPA:
+            case MM_MODEM_GSM_MODE_3G_ONLY:
                 a = 14;
                 b = 2;
                 break;
-            case MM_MODEM_GSM_NETWORK_MODE_2G_PREFERRED:
+            case MM_MODEM_GSM_MODE_2G_PREFERRED:
                 a = 2;
                 b = 1;
                 break;
-            case MM_MODEM_GSM_NETWORK_MODE_3G_PREFERRED:
+            case MM_MODEM_GSM_MODE_3G_PREFERRED:
                 a = 2;
                 b = 2;
                 break;
@@ -167,7 +171,7 @@ set_network_mode_get_done (MMSerialPort *port,
 
 static void
 set_network_mode (MMModemGsmNetwork *modem,
-                  MMModemGsmNetworkMode mode,
+                  MMModemGsmMode mode,
                   MMModemFn callback,
                   gpointer user_data)
 {
@@ -177,19 +181,17 @@ set_network_mode (MMModemGsmNetwork *modem,
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
     switch (mode) {
-    case MM_MODEM_GSM_NETWORK_MODE_ANY:
-        /* Do nothing */
-        break;
-    case MM_MODEM_GSM_NETWORK_MODE_GPRS:
-    case MM_MODEM_GSM_NETWORK_MODE_EDGE:
-    case MM_MODEM_GSM_NETWORK_MODE_UMTS:
-    case MM_MODEM_GSM_NETWORK_MODE_HSDPA:
-    case MM_MODEM_GSM_NETWORK_MODE_HSUPA:
-    case MM_MODEM_GSM_NETWORK_MODE_HSPA:
-    case MM_MODEM_GSM_NETWORK_MODE_2G_PREFERRED:
-    case MM_MODEM_GSM_NETWORK_MODE_3G_PREFERRED:
-    case MM_MODEM_GSM_NETWORK_MODE_2G_ONLY:
-    case MM_MODEM_GSM_NETWORK_MODE_3G_ONLY:
+    case MM_MODEM_GSM_MODE_ANY:
+    case MM_MODEM_GSM_MODE_GPRS:
+    case MM_MODEM_GSM_MODE_EDGE:
+    case MM_MODEM_GSM_MODE_UMTS:
+    case MM_MODEM_GSM_MODE_HSDPA:
+    case MM_MODEM_GSM_MODE_HSUPA:
+    case MM_MODEM_GSM_MODE_HSPA:
+    case MM_MODEM_GSM_MODE_2G_PREFERRED:
+    case MM_MODEM_GSM_MODE_3G_PREFERRED:
+    case MM_MODEM_GSM_MODE_2G_ONLY:
+    case MM_MODEM_GSM_MODE_3G_ONLY:
         /* Allowed values */
         mm_callback_info_set_data (info, "mode", GUINT_TO_POINTER (mode), NULL);
         primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
@@ -231,7 +233,7 @@ get_network_mode (MMModemGsmNetwork *modem,
 {
     MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (modem);
 
-    if (priv->mode != MM_MODEM_GSM_NETWORK_MODE_ANY) {
+    if (priv->mode != MM_MODEM_GSM_MODE_ANY) {
         /* have cached mode (from an unsolicited message). Use that */
         MMCallbackInfo *info;
 
@@ -289,16 +291,23 @@ set_band_get_done (MMSerialPort *port,
             char *command;
 
             switch (GPOINTER_TO_UINT (mm_callback_info_get_data (info, "band"))) {
-            case MM_MODEM_GSM_NETWORK_BAND_ANY:
+            case MM_MODEM_GSM_BAND_ANY:
                 band = 0x3FFFFFFF;
                 break;
-            case MM_MODEM_GSM_NETWORK_BAND_EGSM:
-            case MM_MODEM_GSM_NETWORK_BAND_DCS:
-            case MM_MODEM_GSM_NETWORK_BAND_U2100:
-                band = 0x400380;
+            case MM_MODEM_GSM_BAND_EGSM:
+                band = 0x100;
                 break;
-            case MM_MODEM_GSM_NETWORK_BAND_PCS:
+            case MM_MODEM_GSM_BAND_DCS:
+                band = 0x80;
+                break;
+            case MM_MODEM_GSM_BAND_U2100:
+                band = 0x400000;
+                break;
+            case MM_MODEM_GSM_BAND_PCS:
                 band = 0x200000;
+                break;
+            case MM_MODEM_GSM_BAND_G850:
+                band = 0x80000;
                 break;
             default:
                 break;
@@ -313,7 +322,7 @@ set_band_get_done (MMSerialPort *port,
 
 static void
 set_band (MMModemGsmNetwork *modem,
-          MMModemGsmNetworkBand band,
+          MMModemGsmBand band,
           MMModemFn callback,
           gpointer user_data)
 {
@@ -323,11 +332,11 @@ set_band (MMModemGsmNetwork *modem,
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
     switch (band) {
-    case MM_MODEM_GSM_NETWORK_BAND_ANY:
-    case MM_MODEM_GSM_NETWORK_BAND_EGSM:
-    case MM_MODEM_GSM_NETWORK_BAND_DCS:
-    case MM_MODEM_GSM_NETWORK_BAND_U2100:
-    case MM_MODEM_GSM_NETWORK_BAND_PCS:
+    case MM_MODEM_GSM_BAND_ANY:
+    case MM_MODEM_GSM_BAND_EGSM:
+    case MM_MODEM_GSM_BAND_DCS:
+    case MM_MODEM_GSM_BAND_U2100:
+    case MM_MODEM_GSM_BAND_PCS:
         mm_callback_info_set_data (info, "band", GUINT_TO_POINTER (band), NULL);
         primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
         g_assert (primary);
@@ -369,7 +378,7 @@ get_band (MMModemGsmNetwork *modem,
     MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (modem);
     MMSerialPort *primary;
 
-    if (priv->band != MM_MODEM_GSM_NETWORK_BAND_ANY) {
+    if (priv->band != MM_MODEM_GSM_BAND_ANY) {
         /* have cached mode (from an unsolicited message). Use that */
         MMCallbackInfo *info;
 
@@ -458,17 +467,17 @@ handle_mode_change (MMSerialPort *port,
     g_free (str);
 
     if (a == 3 && b == 2)
-        priv->mode = MM_MODEM_GSM_NETWORK_MODE_GPRS;
+        priv->mode = MM_MODEM_GSM_MODE_GPRS;
     else if (a == 3 && b == 3)
-        priv->mode = MM_MODEM_GSM_NETWORK_MODE_EDGE;
+        priv->mode = MM_MODEM_GSM_MODE_EDGE;
     else if (a == 5 && b == 4)
-        priv->mode = MM_MODEM_GSM_NETWORK_MODE_UMTS;
+        priv->mode = MM_MODEM_GSM_MODE_UMTS;
     else if (a == 5 && b == 5)
-        priv->mode = MM_MODEM_GSM_NETWORK_MODE_HSDPA;
+        priv->mode = MM_MODEM_GSM_MODE_HSDPA;
     else if (a == 5 && b == 6)
-        priv->mode = MM_MODEM_GSM_NETWORK_MODE_HSUPA;
+        priv->mode = MM_MODEM_GSM_MODE_HSUPA;
     else if (a == 5 && b == 7)
-        priv->mode = MM_MODEM_GSM_NETWORK_MODE_HSPA;
+        priv->mode = MM_MODEM_GSM_MODE_HSPA;
     else {
         g_warning ("Couldn't parse mode change value: '%s'", str);
         return;

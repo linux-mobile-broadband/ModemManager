@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
+  <interface name="org.freedesktop.ModemManager.Modem.Gsm">
+    <tp:flags name="MM_MODEM_GSM_MODE" value-prefix="MM_MODEM_GSM_MODE" type="u">
+      <tp:flag suffix="UNKNOWN" value="0x0">
+        <tp:docstring>Unknown or invalid mode.</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="ANY" value="0x1">
+        <tp:docstring>For certain operations, allow the modem to pick any available mode.</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="GPRS" value="0x2">
+        <tp:docstring>GPRS</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="EDGE" value="0x4">
+        <tp:docstring>EDGE</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="UMTS" value="0x8">
+        <tp:docstring>UMTS (3G)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="HSDPA" value="0x10">
+        <tp:docstring>HSDPA</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="2G_PREFERRED" value="0x20">
+        <tp:docstring>Prefer 2G (GPRS or EDGE)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="3G_PREFERRED" value="0x40">
+        <tp:docstring>Prefer 3G (UMTS or HSDPA)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="2G_ONLY" value="0x80">
+        <tp:docstring>Use only 2G (GPRS or EDGE)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="3G_ONLY" value="0x100">
+        <tp:docstring>Use only 3G (UMTS or HSDPA)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="HSUPA" value="0x200">
+        <tp:docstring>HSUPA</tp:docstring>
+      </tp:flag>
+    </tp:flags>
+
+    <tp:flags name="MM_MODEM_GSM_BAND" value-prefix="MM_MODEM_GSM_BAND" type="u">
+      <tp:docstring>
+        GSM network and device bands.
+      </tp:docstring>
+      <tp:flag suffix="UNKNOWN" value="0x0">
+        <tp:docstring>Unknown or invalid band</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="ANY" value="0x1">
+        <tp:docstring>For certain operations, allow the modem to select a band automatically.</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="EGSM" value="0x2">
+        <tp:docstring>GSM/GPRS/EDGE 900 MHz</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="DCS" value="0x4">
+        <tp:docstring>GSM/GPRS/EDGE 1800 MHz</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="PCS" value="0x8">
+        <tp:docstring>GSM/GPRS/EDGE 1900 MHz</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="G850" value="0x10">
+        <tp:docstring>GSM/GPRS/EDGE 850 MHz</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="U2100" value="0x20">
+        <tp:docstring>WCDMA 2100 MHz (Class I)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="U1800" value="0x40">
+        <tp:docstring>WCDMA 3GPP 1800 MHz (Class III)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="U17IV" value="0x80">
+        <tp:docstring>WCDMA 3GPP AWS 1700/2100 MHz (Class IV)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="U800" value="0x100">
+        <tp:docstring>WCDMA 3GPP UMTS 800 MHz (Class VI)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="U850" value="0x200">
+        <tp:docstring>WCDMA 3GPP UMTS 850 MHz (Class V)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="U900" value="0x400">
+        <tp:docstring>WCDMA 3GPP UMTS 900 MHz (Class VIII)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="U17IX" value="0x800">
+        <tp:docstring>WCDMA 3GPP UMTS 1700 MHz (Class IX)</tp:docstring>
+      </tp:flag>
+    </tp:flags>
+  </interface>
+</node>

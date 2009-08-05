@@ -95,51 +95,13 @@
       </arg>
     </method>
 
-    <property name="SupportedBands" type="u" access="read" tp:type="MM_MODEM_GSM_CARD_BANDS">
-      <tp:docstring>Bands supported by the card.</tp:docstring>
+    <property name="SupportedBands" type="u" access="read" tp:type="MM_MODEM_GSM_BAND">
+      <tp:docstring>Bands supported by the card.  (Note for plugin writers: returned value must not contain ANY)</tp:docstring>
     </property>
 
-    <tp:flags name="MM_MODEM_GSM_CARD_BANDS" value-prefix="MM_MODEM_GSM_CARD_BAND" type="u">
-      <tp:docstring>
-        GSM bands.
-      </tp:docstring>
-      <tp:flag suffix="UNKNOWN" value="0x0">
-        <tp:docstring>Unknown or invalid band</tp:docstring>
-      </tp:flag>
-      <tp:flag suffix="EGSM" value="0x1">
-        <tp:docstring>GSM/GPRS/EDGE 900 MHz</tp:docstring>
-      </tp:flag>
-      <tp:flag suffix="DCS" value="0x2">
-        <tp:docstring>GSM/GPRS/EDGE 1800 MHz</tp:docstring>
-      </tp:flag>
-      <tp:flag suffix="PCS" value="0x4">
-        <tp:docstring>GSM/GPRS/EDGE 1900 MHz</tp:docstring>
-      </tp:flag>
-      <tp:flag suffix="G850" value="0x8">
-        <tp:docstring>GSM/GPRS/EDGE 850 MHz</tp:docstring>
-      </tp:flag>
-      <tp:flag suffix="U2100" value="0x10">
-        <tp:docstring>WCDMA 2100 MHz (Class I)</tp:docstring>
-      </tp:flag>
-      <tp:flag suffix="U1700" value="0x20">
-        <tp:docstring>WCDMA 3GPP 1800 MHz (Class III)</tp:docstring>
-      </tp:flag>
-      <tp:flag suffix="U17IV" value="0x40">
-        <tp:docstring>WCDMA 3GPP AWS 1700/2100 MHz (Class IV)</tp:docstring>
-      </tp:flag>
-      <tp:flag suffix="U800" value="0x80">
-        <tp:docstring>WCDMA 3GPP UMTS 800 MHz (Class VI)</tp:docstring>
-      </tp:flag>
-      <tp:flag suffix="U850" value="0x100">
-        <tp:docstring>WCDMA 3GPP UMTS 850 MHz (Class V)</tp:docstring>
-      </tp:flag>
-      <tp:flag suffix="U900" value="0x200">
-        <tp:docstring>WCDMA 3GPP UMTS 900 MHz (Class VIII)</tp:docstring>
-      </tp:flag>
-      <tp:flag suffix="U17IX" value="0x400">
-        <tp:docstring>WCDMA 3GPP UMTS 1700 MHz (Class IX)</tp:docstring>
-      </tp:flag>
-    </tp:flags>
+    <property name="SupportedModes" type="u" access="read" tp:type="MM_MODEM_GSM_MODE">
+      <tp:docstring>Network selection modes supported by the card. (Note for plugin writers: returned value must not contain ANY)</tp:docstring>
+    </property>
 
   </interface>
 </node>

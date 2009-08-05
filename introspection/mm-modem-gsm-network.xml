@@ -56,53 +56,53 @@
 
     <method name="SetBand">
       <tp:docstring>
-	Set the GSM band.
+        Sets the band the device is allowed to use when connecting to a mobile network.
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_set_band"/>
-      <arg name="band" type="u" direction="in" tp:type="MM_MODEM_GSM_NETWORK_BAND">
-	<tp:docstring>
-	  The band.
-	</tp:docstring>
+      <arg name="band" type="u" direction="in" tp:type="MM_MODEM_GSM_BAND">
+        <tp:docstring>
+          The desired band.  Only one band may be specified, and may not be UNKNOWN.
+        </tp:docstring>
       </arg>
     </method>
 
     <method name="GetBand">
       <tp:docstring>
-	Get the current band.
+        Returns the current band the device is using.  (Note for plugin writers: returned value must not be ANY)
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_band"/>
-      <arg name="band" type="u" direction="out" tp:type="MM_MODEM_GSM_NETWORK_BAND">
-	<tp:docstring>
-	  The current band.
-	</tp:docstring>
+      <arg name="band" type="u" direction="out" tp:type="MM_MODEM_GSM_BAND">
+        <tp:docstring>
+          The current band.
+        </tp:docstring>
       </arg>
     </method>
 
     <method name="SetNetworkMode">
       <tp:docstring>
-	Set the GSM network mode.
+        Set the desired mode the device may use when connecting to a mobile network.
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_set_network_mode"/>
-      <arg name="mode" type="u" direction="in" tp:type="MM_MODEM_GSM_NETWORK_MODE">
-	<tp:docstring>
-	  The GSM network mode.
-	</tp:docstring>
+      <arg name="mode" type="u" direction="in" tp:type="MM_MODEM_GSM_MODE">
+        <tp:docstring>
+          The desired network mode.  Only one mode may be specified, and may not be UNKNOWN.
+        </tp:docstring>
       </arg>
     </method>
 
     <method name="GetNetworkMode">
       <tp:docstring>
-	Get the network mode.
+        Returns the current network mode of the device.  (Note for plugin writers: returned value *may* be ANY)
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_network_mode"/>
-      <arg name="mode" type="u" direction="out" tp:type="MM_MODEM_GSM_NETWORK_MODE">
-	<tp:docstring>
-	  The current network mode.
-	</tp:docstring>
+      <arg name="mode" type="u" direction="out" tp:type="MM_MODEM_GSM_MODE">
+        <tp:docstring>
+          Returns the general network mode (ex. 2G/3G preference) of the device.
+        </tp:docstring>
       </arg>
     </method>
 
@@ -158,133 +158,12 @@
       <tp:docstring>
 	The network mode changed.
       </tp:docstring>
-      <arg name="mode" type="u" tp:type="MM_MODEM_GSM_NETWORK_MODE">
+      <arg name="mode" type="u" tp:type="MM_MODEM_GSM_MODE">
 	<tp:docstring>
 	  The new network mode.
 	</tp:docstring>
       </arg>
     </signal>
-
-    <tp:enum name="MM_MODEM_GSM_NETWORK_MODE" type="u">
-      <tp:enumvalue suffix="ANY" value="0">
-	<tp:docstring>
-	  Any network mode can be used.
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="GPRS" value="1">
-	<tp:docstring>
-	  GPRS
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="EDGE" value="2">
-	<tp:docstring>
-	  EDGE
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="UMTS" value="3">
-	<tp:docstring>
-	  UMTS (3G)
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="HSDPA" value="4">
-	<tp:docstring>
-	  HSDPA
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="2G_PREFERRED" value="5">
-	<tp:docstring>
-	  Prefer 2G (GPRS or EDGE).
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="3G_PREFERRED" value="6">
-	<tp:docstring>
-	  Prefer 3G (UMTS or HSDPA).
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="2G_ONLY" value="7">
-	<tp:docstring>
-	  Use only 2G (GPRS or EDGE).
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="3G_ONLY" value="8">
-	<tp:docstring>
-	  Use only 3G (UMTS or HSDPA).
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="HSUPA" value="9">
-	<tp:docstring>
-	  HSUPA.
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="HSPA" value="10">
-	<tp:docstring>
-	  HSDPA and HSUPA.
-	</tp:docstring>
-      </tp:enumvalue>
-    </tp:enum>
-
-    <tp:enum name="MM_MODEM_GSM_NETWORK_BAND" type="u">
-      <tp:enumvalue suffix="ANY" value="0">
-	<tp:docstring>
-	  Any band can be used.
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="EGSM" value="1">
-	<tp:docstring>
-	  EGSM (900 MHz).
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="DCS" value="2">
-	<tp:docstring>
-	  DCS (1800 MHz).
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="PCS" value="4">
-	<tp:docstring>
-	  PCS (1900 MHz).
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="G850" value="8">
-	<tp:docstring>
-	  G850 (850 MHz).
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="U2100" value="16">
-	<tp:docstring>
-	  U2100 (WCDMA 2100 MHz).
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="U1700" value="32">
-	<tp:docstring>
-	  U1700 (WCDMA 3GPP UMTS1800 MHz).
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="17IV" value="64">
-	<tp:docstring>
-	  17IV (WCDMA 3GPP AWS 1700/2100 MHz).
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="U800" value="128">
-	<tp:docstring>
-	  U800 (WCDMA 3GPP UMTS800 MHz).
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="U850" value="256">
-	<tp:docstring>
-	  U850 (WCDMA 3GPP UMTS850 MHz).
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="U900" value="512">
-	<tp:docstring>
-	  U900 (WCDMA 3GPP UMTS900 MHz).
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="U17IX" value="1024">
-	<tp:docstring>
-	  U17IX (WCDMA 3GPP UMTS MHz).
-	</tp:docstring>
-      </tp:enumvalue>
-    </tp:enum>
 
     <tp:enum name="MM_MODEM_GSM_NETWORK_REG_STATUS" type="u">
       <tp:enumvalue suffix="IDLE" value="0">

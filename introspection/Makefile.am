@@ -5,6 +5,7 @@ EXTRA_DIST = \
 	mm-modem-cdma.xml \
 	mm-modem-connect-error.xml \
 	mm-modem-error.xml \
+	mm-modem-gsm.xml \
 	mm-modem-gsm-card.xml \
 	mm-modem-gsm-contacts.xml \
 	mm-modem-gsm-hso.xml \

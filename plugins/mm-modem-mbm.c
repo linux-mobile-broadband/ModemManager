@@ -194,19 +194,21 @@ get_signal_quality (MMModemGsmNetwork *modem,
 }
 
 static int
-mbm_parse_network_mode (int network_mode)
+mbm_parse_network_mode (MMModemGsmMode network_mode)
 {
     switch (network_mode) {
-    case MM_MODEM_GSM_NETWORK_MODE_ANY:
-    case MM_MODEM_GSM_NETWORK_MODE_3G_PREFERRED:
-    case MM_MODEM_GSM_NETWORK_MODE_2G_PREFERRED:
+    case MM_MODEM_GSM_MODE_ANY:
+    case MM_MODEM_GSM_MODE_3G_PREFERRED:
+    case MM_MODEM_GSM_MODE_2G_PREFERRED:
         return MBM_NETWORK_MODE_ANY;
-    case MM_MODEM_GSM_NETWORK_MODE_GPRS:
-    case MM_MODEM_GSM_NETWORK_MODE_EDGE:
-    case MM_MODEM_GSM_NETWORK_MODE_2G_ONLY:
+    case MM_MODEM_GSM_MODE_GPRS:
+    case MM_MODEM_GSM_MODE_EDGE:
+    case MM_MODEM_GSM_MODE_2G_ONLY:
         return MBM_NETWORK_MODE_2G;
-    case MM_MODEM_GSM_NETWORK_MODE_3G_ONLY:
-    case MM_MODEM_GSM_NETWORK_MODE_HSDPA:
+    case MM_MODEM_GSM_MODE_3G_ONLY:
+    case MM_MODEM_GSM_MODE_HSDPA:
+    case MM_MODEM_GSM_MODE_HSUPA:
+    case MM_MODEM_GSM_MODE_HSPA:
         return MBM_NETWORK_MODE_3G;
     default:
         return MBM_NETWORK_MODE_ANY;
@@ -229,7 +231,7 @@ mbm_set_network_mode_done (MMSerialPort *port,
 
 static void
 set_network_mode (MMModemGsmNetwork *modem,
-                  MMModemGsmNetworkMode mode,
+                  MMModemGsmMode mode,
                   MMModemFn callback,
                   gpointer user_data)
 {
@@ -270,16 +272,16 @@ get_network_mode_done (MMSerialPort *port,
         goto done;
 
     if (gsm || umts) {
-        MMModemGsmNetworkMode mm_mode = MM_MODEM_GSM_NETWORK_MODE_ANY;
+        MMModemGsmMode mm_mode = MM_MODEM_GSM_MODE_ANY;
 
         if (gsm == MBM_ERINFO_2G_GPRS)
-            mm_mode = MM_MODEM_GSM_NETWORK_MODE_GPRS;
+            mm_mode = MM_MODEM_GSM_MODE_GPRS;
         else if (gsm == MBM_ERINFO_2G_EGPRS)
-            mm_mode = MM_MODEM_GSM_NETWORK_MODE_EDGE;
+            mm_mode = MM_MODEM_GSM_MODE_EDGE;
         else if (umts == MBM_ERINFO_3G_UMTS)
-            mm_mode = MM_MODEM_GSM_NETWORK_MODE_UMTS;
+            mm_mode = MM_MODEM_GSM_MODE_UMTS;
         else if (umts == MBM_ERINFO_3G_HSDPA)
-            mm_mode = MM_MODEM_GSM_NETWORK_MODE_HSDPA;
+            mm_mode = MM_MODEM_GSM_MODE_HSDPA;
         else
             g_debug ("%s unknown network mode %d,%d", __FUNCTION__, gsm, umts);
 

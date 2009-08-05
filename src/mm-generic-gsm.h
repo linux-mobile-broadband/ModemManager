@@ -3,6 +3,7 @@
 #ifndef MM_GENERIC_GSM_H
 #define MM_GENERIC_GSM_H
 
+#include "mm-modem-gsm.h"
 #include "mm-modem-gsm-network.h"
 #include "mm-modem-base.h"
 #include "mm-serial-port.h"
