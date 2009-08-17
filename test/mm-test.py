@@ -34,12 +34,17 @@ def get_cdma_band_class(band_class):
     else:
         return "Unknown"
 
-def inspect_cdma(proxy):
+def inspect_cdma(proxy, dump_private):
     cdma = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_CDMA)
-    try:
-        print "ESN: %s" % cdma.GetEsn()
-    except dbus.exceptions.DBusException:
-        pass
+
+    esn = "<private>"
+    if dump_private:
+        try:
+            esn = cdma.GetEsn()
+        except dbus.exceptions.DBusException:
+            esn = "<unavailable>"
+
+    print "ESN: %s" % esn
     print "-------------------"
     info = cdma.GetServingSystem()
     print "Class: %s" % get_cdma_band_class(info[0])
@@ -49,14 +54,30 @@ def inspect_cdma(proxy):
 
 def get_gsm_network_mode(modem):
     mode = modem.GetNetworkMode()
-    if mode == 1:
+    if mode == 0x0:
+        mode = "Unknown"
+    elif mode == 0x1:
+        mode = "Any"
+    elif mode == 0x2:
         mode = "GPRS"
-    elif mode == 2:
+    elif mode == 0x4:
         mode = "EDGE"
-    elif mode == 3:
-        mode = "3G"
-    elif mode == 4:
+    elif mode == 0x8:
+        mode = "UMTS"
+    elif mode == 0x10:
         mode = "HSDPA"
+    elif mode == 0x20:
+        mode = "2G Preferred"
+    elif mode == 0x40:
+        mode = "3G Preferred"
+    elif mode == 0x80:
+        mode = "2G Only"
+    elif mode == 0x100:
+        mode = "3G Only"
+    elif mode == 0x200:
+        mode = "HSUPA"
+    elif mode == 0x400:
+        mode = "HSPA"
     else:
         mode = "(Unknown)"
 
@@ -64,44 +85,56 @@ def get_gsm_network_mode(modem):
 
 def get_gsm_band(modem):
     band = modem.GetBand()
-    if band == 0:
+    if band == 0x0:
+        band = "Unknown"
+    elif band == 0x1:
         band = "Any"
-    elif band == 1:
+    elif band == 0x2:
         band = "EGSM (900 MHz)"
-    elif band == 2:
+    elif band == 0x4:
         band = "DCS (1800 MHz)"
-    elif band == 3:
+    elif band == 0x8:
         band = "PCS (1900 MHz)"
-    elif band == 4:
+    elif band == 0x10:
         band = "G850 (850 MHz)"
-    elif band == 5:
+    elif band == 0x20:
         band = "U2100 (WCSMA 2100 MHZ, Class I)"
-    elif band == 6:
+    elif band == 0x40:
         band = "U1700 (WCDMA 3GPP UMTS1800 MHz, Class III)"
-    elif band == 7:
+    elif band == 0x80:
         band = "17IV (WCDMA 3GPP AWS 1700/2100 MHz, Class IV)"
-    elif band == 8:
+    elif band == 0x100:
         band = "U800 (WCDMA 3GPP UMTS800 MHz, Class VI)"
-    elif band == 9:
+    elif band == 0x200:
         band = "U850 (WCDMA 3GPP UMT850 MHz, Class V)"
-    elif band == 10:
+    elif band == 0x400:
         band = "U900 (WCDMA 3GPP UMTS900 MHz, Class VIII)"
-    elif band == 11:
+    elif band == 0x800:
         band = "U17IX (WCDMA 3GPP UMTS MHz, Class IX)"
     else:
-        band = "(Unknown)"
+        band = "(invalid)"
 
     print "Band: %s" % band
 
 
-def inspect_gsm(proxy):
+def inspect_gsm(proxy, dump_private):
     # Gsm.Card interface
     card = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_GSM_CARD)
-    try:
-        print "IMEI: %s" % card.GetImei()
-    except dbus.exceptions.DBusException:
-        pass
-    print "IMSI: %s" % card.GetImsi()
+
+    imei = "<private>"
+    imsi = "<private>"
+    if dump_private:
+        try:
+            imei = card.GetImei()
+        except dbus.exceptions.DBusException:
+            imei = "<unavailable>"
+        try:
+            imsi = card.GetImsi()
+        except dbus.exceptions.DBusException:
+            imsi = "<unavailable>"
+
+    print "IMEI: %s" % imei
+    print "IMSI: %s" % imsi
 
     # Gsm.Network interface
     net = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_GSM_NETWORK)
@@ -125,6 +158,11 @@ def inspect_gsm(proxy):
         else:
             print "%s: %s" % (r['operator-short'], status)
 
+
+dump_private = False
+if len(sys.argv) == 2:
+    if sys.argv[1] == "--private":
+        dump_private = True
 
 bus = dbus.SystemBus()
 
@@ -165,9 +203,9 @@ for m in modems:
     print "Version: %s" % info[2]
 
     if type == 1:
-        inspect_gsm(proxy)
+        inspect_gsm(proxy, dump_private)
     elif type == 2:
-        inspect_cdma(proxy)
+        inspect_cdma(proxy, dump_private)
     print
 
     modem.Enable(False)
