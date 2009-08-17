@@ -40,8 +40,12 @@ struct _MMModemGsmSms {
 
     /* Signals */
     void (*sms_received) (MMModemGsmSms *self,
-                          guint32 index);
+                          guint32 index,
+                          gboolean completed);
 
+    void (*completed)    (MMModemGsmSms *self,
+                          guint32 index,
+                          gboolean completed);
 };
 
 GType mm_modem_gsm_sms_get_type (void);

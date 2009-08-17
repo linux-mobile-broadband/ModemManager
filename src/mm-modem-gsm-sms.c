@@ -70,6 +70,7 @@ static void impl_gsm_modem_sms_set_indication (MMModemGsmSms *modem,
 
 enum {
     SMS_RECEIVED,
+    COMPLETED,
 
     LAST_SIGNAL
 };
@@ -274,9 +275,17 @@ mm_modem_gsm_sms_init (gpointer g_iface)
                       G_SIGNAL_RUN_FIRST,
                       G_STRUCT_OFFSET (MMModemGsmSms, sms_received),
                       NULL, NULL,
-                      g_cclosure_marshal_VOID__UINT,
-                      G_TYPE_NONE, 1,
-                      G_TYPE_UINT);
+                      mm_marshal_VOID__UINT_BOOLEAN,
+                      G_TYPE_NONE, 2, G_TYPE_UINT, G_TYPE_BOOLEAN);
+
+    signals[COMPLETED] =
+        g_signal_new ("completed",
+                      iface_type,
+                      G_SIGNAL_RUN_FIRST,
+                      G_STRUCT_OFFSET (MMModemGsmSms, completed),
+                      NULL, NULL,
+                      mm_marshal_VOID__UINT_BOOLEAN,
+                      G_TYPE_NONE, 2, G_TYPE_UINT, G_TYPE_BOOLEAN);
 
     initialized = TRUE;
 }

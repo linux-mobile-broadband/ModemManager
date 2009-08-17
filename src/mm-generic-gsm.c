@@ -1786,6 +1786,8 @@ set_property (GObject *object, guint prop_id,
     case MM_GENERIC_GSM_PROP_POWER_UP_CMD:
     case MM_GENERIC_GSM_PROP_POWER_DOWN_CMD:
     case MM_GENERIC_GSM_PROP_INIT_CMD:
+    case MM_GENERIC_GSM_PROP_SUPPORTED_BANDS:
+    case MM_GENERIC_GSM_PROP_SUPPORTED_MODES:
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1832,6 +1834,12 @@ get_property (GObject *object, guint prop_id,
         break;
     case MM_GENERIC_GSM_PROP_INIT_CMD:
         g_value_set_string (value, "Z E0 V1 X4 &C1 +CMEE=1");
+        break;
+    case MM_GENERIC_GSM_PROP_SUPPORTED_BANDS:
+        g_value_set_uint (value, 0);
+        break;
+    case MM_GENERIC_GSM_PROP_SUPPORTED_MODES:
+        g_value_set_uint (value, 0);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1894,6 +1902,14 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_VALID,
                                       MM_MODEM_VALID);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_SUPPORTED_BANDS,
+                                      MM_MODEM_GSM_CARD_SUPPORTED_BANDS);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_SUPPORTED_MODES,
+                                      MM_MODEM_GSM_CARD_SUPPORTED_MODES);
 
     g_object_class_install_property
         (object_class, MM_GENERIC_GSM_PROP_POWER_UP_CMD,

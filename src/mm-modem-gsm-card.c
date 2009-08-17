@@ -19,6 +19,7 @@
 #include "mm-modem-gsm-card.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
+#include "mm-modem-gsm.h"
 
 static void impl_gsm_modem_get_imei (MMModemGsmCard *modem,
                                      DBusGMethodInvocation *context);
@@ -253,6 +254,32 @@ impl_gsm_modem_change_pin (MMModemGsmCard *modem,
 static void
 mm_modem_gsm_card_init (gpointer g_iface)
 {
+    static gboolean initialized = FALSE;
+
+    if (G_LIKELY (initialized))
+        return;
+
+    initialized = TRUE;
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_uint (MM_MODEM_GSM_CARD_SUPPORTED_BANDS,
+                            "Supported Modes",
+                            "Supported frequency bands of the card",
+                            MM_MODEM_GSM_BAND_UNKNOWN,
+                            MM_MODEM_GSM_BAND_LAST,
+                            MM_MODEM_GSM_BAND_UNKNOWN,
+                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_uint (MM_MODEM_GSM_CARD_SUPPORTED_MODES,
+                            "Supported Modes",
+                            "Supported modes of the card (ex 2G preferred, 3G preferred, 2G only, etc",
+                            MM_MODEM_GSM_MODE_UNKNOWN,
+                            MM_MODEM_GSM_MODE_LAST,
+                            MM_MODEM_GSM_MODE_UNKNOWN,
+                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
 
 GType
@@ -260,7 +287,7 @@ mm_modem_gsm_card_get_type (void)
 {
     static GType card_type = 0;
 
-    if (!G_UNLIKELY (card_type)) {
+    if (G_UNLIKELY (!card_type)) {
         const GTypeInfo card_info = {
             sizeof (MMModemGsmCard), /* class_size */
             mm_modem_gsm_card_init,   /* base_init */
