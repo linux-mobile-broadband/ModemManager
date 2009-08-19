@@ -74,7 +74,7 @@ supports_port (MMPluginBase *base,
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
     tmp = g_udev_device_get_property (port, "ID_MODEL_ID");
-    if (!tmp || strcmp (tmp, "3802"))
+    if (!tmp || (strcmp (tmp, "3802") && strcmp (tmp, "4902")))
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
     if (mm_plugin_base_get_cached_port_capabilities (base, port, &cached)) {
