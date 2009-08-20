@@ -297,7 +297,7 @@ release_port (MMModem *modem, const char *subsys, const char *name)
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMPort *port;
 
-    if (strcmp (subsys, "tty"))
+    if (strcmp (subsys, "tty") && strcmp (subsys, "net"))
         return;
 
     port = mm_modem_base_get_port (MM_MODEM_BASE (modem), subsys, name);
