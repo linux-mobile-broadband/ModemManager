@@ -666,7 +666,7 @@ get_driver_name (GUdevDevice *device)
 {
     GUdevDevice *parent = NULL;
     const char *driver;
-    char *ret;
+    char *ret = NULL;
 
     driver = g_udev_device_get_driver (device);
     if (!driver) {
