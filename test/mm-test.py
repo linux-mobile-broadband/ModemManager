@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# -*- Mode: python; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -46,10 +47,14 @@ def inspect_cdma(proxy, dump_private):
 
     print "ESN: %s" % esn
     print "-------------------"
-    info = cdma.GetServingSystem()
-    print "Class: %s" % get_cdma_band_class(info[0])
-    print "Band:  %s" % info[1]
-    print "SID:   %d" % info[2]
+
+    try:
+        info = cdma.GetServingSystem()
+        print "Class: %s" % get_cdma_band_class(info[0])
+        print "Band:  %s" % info[1]
+        print "SID:   %d" % info[2]
+    except dbus.exceptions.DBusException, e:
+        print "Error reading serving system: %s" % e
 
 
 def get_gsm_network_mode(modem):
