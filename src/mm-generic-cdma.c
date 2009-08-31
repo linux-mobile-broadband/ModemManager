@@ -518,6 +518,7 @@ serving_system_done (MMSerialPort *port,
     char *reply = response->str;
     int class = 0, sid = 99999, num;
     unsigned char band = 'Z';
+    gboolean success = FALSE;
 
     if (error) {
         info->error = g_error_copy (error);
@@ -527,27 +528,40 @@ serving_system_done (MMSerialPort *port,
     if (strstr (reply, "+CSS: "))
         reply += 6;
 
-    num = sscanf (reply, "%d , %c , %d", &class, &band, &sid);
-    if (num == 3) {
-        /* Normalize */
-        class = CLAMP (class, 0, 4);
-        band = CLAMP (band, 'A', 'Z');
+    num = sscanf (reply, "? , %d", &sid);
+    if (num == 1) {
+        /* UTStarcom modem that uses IS-707-A format */
+        success = TRUE;
+    } else {
+        num = sscanf (reply, "%d , %c , %d", &class, &band, &sid);
+        if (num == 3) {
+            /* Modem uses IS-707-A-2 format */
+
+            /* Normalize */
+            class = CLAMP (class, 0, 4);
+            band = CLAMP (band, 'A', 'Z');
+            success = TRUE;
+        }
+    }
+
+    if (success) {
+        /* 99999 means unknown/no service */
         if (sid < 0 || sid > 32767)
             sid = 99999;
 
-        /* 99 means unknown/no service */
-        if (sid == 99999) {
+        if (sid == 0 || sid == 99999) {
             info->error = g_error_new_literal (MM_MOBILE_ERROR,
-                                                MM_MOBILE_ERROR_NO_NETWORK,
-                                                "No service");
+                                               MM_MOBILE_ERROR_NO_NETWORK,
+                                               "No service");
         } else {
             mm_callback_info_set_data (info, "class", GUINT_TO_POINTER (class), NULL);
             mm_callback_info_set_data (info, "band", GUINT_TO_POINTER ((guint32) band), NULL);
             mm_callback_info_set_data (info, "sid", GUINT_TO_POINTER (sid), NULL);
         }
-    } else
+    } else {
         info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
                                            "Could not parse Serving System results.");
+    }
 
  out:
     mm_callback_info_schedule (info);
