@@ -262,6 +262,24 @@ impl_manager_enumerate_devices (MMManager *manager,
 }
 
 static MMModem *
+find_modem_for_device (MMManager *manager, const char *device)
+{
+    MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
+    GHashTableIter iter;
+    gpointer key, value;
+
+    g_hash_table_iter_init (&iter, priv->modems);
+    while (g_hash_table_iter_next (&iter, &key, &value)) {
+        MMModem *modem = MM_MODEM (value);
+
+        if (!strcmp (device, mm_modem_get_device (modem)))
+            return modem;
+    }
+    return NULL;
+}
+
+
+static MMModem *
 find_modem_for_port (MMManager *manager, const char *subsys, const char *name)
 {
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
@@ -533,10 +551,32 @@ device_removed (MMManager *manager, GUdevDevice *device)
 
     subsys = g_udev_device_get_subsystem (device);
     name = g_udev_device_get_name (device);
-    modem = find_modem_for_port (manager, subsys, name);
-    if (modem) {
-        mm_modem_release_port (modem, subsys, name);
-        return;
+
+    if (strcmp (subsys, "usb") != 0) {
+        /* find_modem_for_port handles tty and net removal */
+        modem = find_modem_for_port (manager, subsys, name);
+        if (modem) {
+            mm_modem_release_port (modem, subsys, name);
+            return;
+        }
+    } else {
+        /* This case is designed to handle the case where, at least with kernel 2.6.31, unplugging
+         * an in-use ttyACMx device results in udev generating remove events for the usb, but the
+         * ttyACMx device (subsystem tty) is not removed, since it was in-use.  So if we have not
+         * found a modem for the port (above), we're going to look here to see if we have a modem
+         * associated with the newly removed device.  If so, we'll remove the modem, since the
+         * device has been removed.  That way, if the device is reinserted later, we'll go through
+         * the process of exporting it.
+         */
+        const char *sysfs_path = g_udev_device_get_sysfs_path (device);
+
+        // g_debug ("Looking for a modem for removed device %s", sysfs_path);
+        modem = find_modem_for_device (manager, sysfs_path);
+        if (modem) {
+            g_debug ("Removing modem claimed by removed device %s", sysfs_path);
+            remove_modem (manager, modem);
+            return;
+        }
     }
 
     /* Maybe a plugin is checking whether or not the port is supported */
@@ -567,9 +607,12 @@ handle_uevent (GUdevClient *client,
 	subsys = g_udev_device_get_subsystem (device);
 	g_return_if_fail (subsys != NULL);
 
-	g_return_if_fail (!strcmp (subsys, "tty") || !strcmp (subsys, "net"));
+	g_return_if_fail (!strcmp (subsys, "tty") || !strcmp (subsys, "net") || !strcmp (subsys, "usb"));
 
-	if (!strcmp (action, "add"))
+	/* We only care about tty/net devices when adding modem ports,
+	 * but for remove, also handle usb parent device remove events
+	 */
+	if (!strcmp (action, "add") && strcmp (subsys, "usb") !=0 )
 		device_added (self, device);
 	else if (!strcmp (action, "remove"))
 		device_removed (self, device);
@@ -599,7 +642,7 @@ static void
 mm_manager_init (MMManager *manager)
 {
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
-    const char *subsys[3] = { "tty", "net", NULL };
+    const char *subsys[4] = { "tty", "net", "usb", NULL };
 
     priv->modems = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
     load_plugins (manager);
