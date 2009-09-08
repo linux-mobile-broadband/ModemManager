@@ -146,7 +146,7 @@ def inspect_gsm(proxy, dump_private):
     print "Signal quality: %d" % net.GetSignalQuality()
 
     print "Scanning..."
-    results = net.Scan()
+    results = net.Scan(timeout=60)
     for r in results:
         status = r['status']
         if status == "1":
