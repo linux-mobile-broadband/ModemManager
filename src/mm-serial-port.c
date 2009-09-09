@@ -812,6 +812,8 @@ mm_serial_port_close (MMSerialPort *self)
     if (priv->fd >= 0) {
         g_message ("(%s) closing serial device...", mm_port_get_device (MM_PORT (self)));
 
+        mm_port_set_connected (MM_PORT (self), FALSE);
+
         if (priv->channel) {
             g_source_remove (priv->watch_id);
             g_io_channel_shutdown (priv->channel, TRUE, NULL);
