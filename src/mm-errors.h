@@ -35,7 +35,9 @@ GType  mm_serial_error_get_type (void);
 enum {
     MM_MODEM_ERROR_GENERAL = 0,
     MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED = 1,
-    MM_MODEM_ERROR_CONNECTED = 2
+    MM_MODEM_ERROR_CONNECTED = 2,
+    MM_MODEM_ERROR_DISCONNECTED = 3,
+    MM_MODEM_ERROR_OPERATION_IN_PROGRESS = 4
 };
 
 #define MM_MODEM_ERROR (mm_modem_error_quark ())

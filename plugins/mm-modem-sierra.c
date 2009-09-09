@@ -84,16 +84,32 @@ init_done (MMSerialPort *port,
 }
 
 static void
-enable_flash_done (MMSerialPort *port, gpointer user_data)
+enable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
 {
+    MMCallbackInfo *info = user_data;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
     mm_serial_port_queue_command (port, "Z E0 V1 X4 &C1 +CMEE=1", 3, init_done, user_data);
 }
 
 static void
-disable_flash_done (MMSerialPort *port, gpointer user_data)
+disable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
 {
+    MMCallbackInfo *info = user_data;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
     mm_serial_port_close (port);
-    mm_callback_info_schedule ((MMCallbackInfo *) user_data);
+    mm_callback_info_schedule (info);
 }
 
 static void
@@ -118,13 +134,15 @@ enable (MMModem *modem,
         if (mm_port_get_connected (MM_PORT (primary)))
             mm_serial_port_flash (primary, 1000, disable_flash_done, info);
         else
-            disable_flash_done (primary, info);
+            disable_flash_done (primary, NULL, info);
     } else {
-        if (mm_serial_port_open (primary, &info->error))
-            mm_serial_port_flash (primary, 100, enable_flash_done, info);
-
-        if (info->error)
+        if (!mm_serial_port_open (primary, &info->error)) {
+            g_assert (info->error);
             mm_callback_info_schedule (info);
+            return;
+        }
+
+        mm_serial_port_flash (primary, 100, enable_flash_done, info);
     }
 }
 

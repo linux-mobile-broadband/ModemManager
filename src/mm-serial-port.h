@@ -53,6 +53,7 @@ typedef void (*MMSerialResponseFn)     (MMSerialPort *port,
                                         gpointer user_data);
 
 typedef void (*MMSerialFlashFn)        (MMSerialPort *port,
+                                        GError *error,
                                         gpointer user_data);
 
 struct _MMSerialPort {
@@ -94,10 +95,11 @@ void     mm_serial_port_queue_command_cached (MMSerialPort *self,
                                               MMSerialResponseFn callback,
                                               gpointer user_data);
 
-guint    mm_serial_port_flash             (MMSerialPort *self,
+gboolean mm_serial_port_flash             (MMSerialPort *self,
                                            guint32 flash_time,
                                            MMSerialFlashFn callback,
                                            gpointer user_data);
+void     mm_serial_port_flash_cancel      (MMSerialPort *self);
 
 #endif /* MM_SERIAL_PORT_H */
 

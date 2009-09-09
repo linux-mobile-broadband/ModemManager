@@ -402,10 +402,16 @@ mbm_emrdy_done (MMSerialPort *port,
 }
 
 static void
-enable_flash_done (MMSerialPort *port, gpointer user_data)
+enable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
     MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (info->modem);
+
+    if (error) {
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+        return;
+    }
 
     if (priv->have_emrdy) {
         /* Modem is ready, no need to check EMRDY */
@@ -427,8 +433,16 @@ disable_done (MMSerialPort *port,
 }
 
 static void
-disable_flash_done (MMSerialPort *port, gpointer user_data)
+disable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
 {
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
     mm_serial_port_queue_command (port, "+CMER=0", 5, disable_done, user_data);
 }
 
@@ -449,18 +463,20 @@ enable (MMModem *modem,
     g_assert (primary);
 
     if (do_enable) {
-        if (mm_serial_port_open (primary, &info->error))
-            mm_serial_port_flash (primary, 100, enable_flash_done, info);
-
-        if (info->error)
+        if (!mm_serial_port_open (primary, &info->error)) {
+            g_assert (info->error);
             mm_callback_info_schedule (info);
+            return;
+        }
+
+        mm_serial_port_flash (primary, 100, enable_flash_done, info);
     } else {
         mm_serial_port_queue_command (primary, "+CREG=0", 100, NULL, NULL);
         mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
         if (mm_port_get_connected (MM_PORT (primary)))
             mm_serial_port_flash (primary, 1000, disable_flash_done, info);
         else
-            disable_flash_done (primary, info);
+            disable_flash_done (primary, NULL, info);
     }
 }
 

@@ -218,8 +218,17 @@ init_done (MMSerialPort *port,
 }
 
 static void
-flash_done (MMSerialPort *port, gpointer user_data)
+flash_done (MMSerialPort *port, GError *error, gpointer user_data)
 {
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error) {
+        /* Flash failed for some reason */
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
     mm_serial_port_queue_command (port, "Z E0 V1 X4 &C1", 3, init_done, user_data);
 }
 
@@ -240,11 +249,13 @@ enable (MMModem *modem,
         return;
     }
 
-    if (mm_serial_port_open (priv->primary, &info->error))
-        mm_serial_port_flash (priv->primary, 100, flash_done, info);
-
-    if (info->error)
+    if (!mm_serial_port_open (priv->primary, &info->error)) {
+        g_assert (info->error);
         mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_serial_port_flash (priv->primary, 100, flash_done, info);
 }
 
 static void
@@ -283,12 +294,19 @@ connect (MMModem *modem,
 }
 
 static void
-disconnect_flash_done (MMSerialPort *port, gpointer user_data)
+disconnect_flash_done (MMSerialPort *port,
+                       GError *error,
+                       gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMGenericCdmaPrivate *priv;
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
 
-    priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
+    if (error) {
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
     mm_port_set_connected (priv->data, FALSE);
     mm_callback_info_schedule (info);
 }

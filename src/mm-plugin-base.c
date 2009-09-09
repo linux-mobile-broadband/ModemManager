@@ -205,6 +205,9 @@ dispose (GObject *object)
 {
     MMPluginBaseSupportsTaskPrivate *priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (object);
 
+    if (MM_IS_SERIAL_PORT (priv->port))
+        mm_serial_port_flash_cancel (MM_SERIAL_PORT (priv->port));
+
     g_object_unref (priv->port);
     g_object_unref (priv->physdev);
     g_free (priv->driver);
@@ -459,12 +462,8 @@ parse_response (MMSerialPort *port,
 }
 
 static void
-flash_done (MMSerialPort *port, gpointer user_data)
+flash_done (MMSerialPort *port, GError *error, gpointer user_data)
 {
-    MMPluginBaseSupportsTask *task = MM_PLUGIN_BASE_SUPPORTS_TASK (user_data);
-    MMPluginBaseSupportsTaskPrivate *task_priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
-
-    task_priv->probe_id = 0;
     mm_serial_port_queue_command (port, "+GCAP", 3, parse_response, user_data);
 }
 
@@ -506,7 +505,7 @@ mm_plugin_base_probe_port (MMPluginBase *self,
 
     g_debug ("(%s): probe requested by plugin '%s'", name, priv->name);
     task_priv->probe_port = serial;
-    task_priv->probe_id = mm_serial_port_flash (serial, 100, flash_done, task);
+    mm_serial_port_flash (serial, 100, flash_done, task);
     return TRUE;
 }
 

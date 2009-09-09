@@ -369,10 +369,16 @@ init_done (MMSerialPort *port,
 }
 
 static void
-enable_flash_done (MMSerialPort *port, gpointer user_data)
+enable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
     char *cmd = NULL;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+        return;
+    }
 
     g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_INIT_CMD, &cmd, NULL);
     mm_serial_port_queue_command (port, cmd, 3, init_done, user_data);
@@ -390,12 +396,20 @@ disable_done (MMSerialPort *port,
 }
 
 static void
-disable_flash_done (MMSerialPort *port, gpointer user_data)
+disable_flash_done (MMSerialPort *port,
+                    GError *error,
+                    gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
     char *cmd = NULL;
 
-    g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_POWER_UP_CMD, &cmd, NULL);
+    if (error) {
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_POWER_DOWN_CMD, &cmd, NULL);
     if (cmd && strlen (cmd))
         mm_serial_port_queue_command (port, cmd, 5, disable_done, user_data);
     else
@@ -423,13 +437,15 @@ enable (MMModem *modem,
         if (mm_port_get_connected (MM_PORT (priv->primary)))
             mm_serial_port_flash (priv->primary, 1000, disable_flash_done, info);
         else
-            disable_flash_done (priv->primary, info);
+            disable_flash_done (priv->primary, NULL, info);
     } else {
-        if (mm_serial_port_open (priv->primary, &info->error))
-            mm_serial_port_flash (priv->primary, 100, enable_flash_done, info);
-
-        if (info->error)
+        if (!mm_serial_port_open (priv->primary, &info->error)) {
+            g_assert (info->error);
             mm_callback_info_schedule (info);
+            return;
+        }
+
+        mm_serial_port_flash (priv->primary, 100, enable_flash_done, info);
     }
 }
 
@@ -1037,10 +1053,18 @@ connect (MMModem *modem,
 }
 
 static void
-disconnect_flash_done (MMSerialPort *port, gpointer user_data)
+disconnect_flash_done (MMSerialPort *port,
+                       GError *error,
+                       gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+
+    if (error) {
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+        return;
+    }
 
     mm_port_set_connected (priv->data, FALSE);
     mm_callback_info_schedule (info);

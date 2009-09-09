@@ -77,7 +77,92 @@ typedef struct {
     guint queue_schedule;
     guint watch_id;
     guint timeout_id;
+
+    guint flash_id;
 } MMSerialPortPrivate;
+
+#if 0
+static const char *
+baud_to_string (int baud)
+{
+    const char *speed = NULL;
+
+    switch (baud) {
+    case B0:
+        speed = "0";
+        break;
+    case B50:
+        speed = "50";
+        break;
+    case B75:
+        speed = "75";
+        break;
+    case B110:
+        speed = "110";
+        break;
+    case B150:
+        speed = "150";
+        break;
+    case B300:
+        speed = "300";
+        break;
+    case B600:
+        speed = "600";
+        break;
+    case B1200:
+        speed = "1200";
+        break;
+    case B2400:
+        speed = "2400";
+        break;
+    case B4800:
+        speed = "4800";
+        break;
+    case B9600:
+        speed = "9600";
+        break;
+    case B19200:
+        speed = "19200";
+        break;
+    case B38400:
+        speed = "38400";
+        break;
+    case B57600:
+        speed = "57600";
+        break;
+    case B115200:
+        speed = "115200";
+        break;
+    case B460800:
+        speed = "460800";
+        break;
+    default:
+        break;
+    }
+
+    return speed;
+}
+
+void
+mm_serial_port_print_config (MMSerialPort *port, const char *detail)
+{
+    MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (port);
+    struct termio stbuf;
+    int err;
+
+    err = ioctl (priv->fd, TCGETA, &stbuf);
+    if (err) {
+        g_warning ("*** %s (%s): (%s) TCGETA error %d",
+                   __func__, detail, mm_port_get_device (MM_PORT (port)), errno);
+        return;
+    }
+
+    g_message ("*** %s (%s): (%s) baud rate: %d (%s)",
+               __func__, detail, mm_port_get_device (MM_PORT (port)),
+               stbuf.c_cflag & CBAUD,
+               baud_to_string (stbuf.c_cflag & CBAUD));
+}
+#endif
 
 typedef struct {
     GRegex *regex;
@@ -241,7 +326,7 @@ parse_stopbits (guint i)
 }
 
 static gboolean
-config_fd (MMSerialPort *self)
+config_fd (MMSerialPort *self, GError **error)
 {
     MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (self);
     struct termio stbuf;
@@ -255,7 +340,13 @@ config_fd (MMSerialPort *self)
     parity = parse_parity (priv->parity);
     stopbits = parse_stopbits (priv->stopbits);
 
-    ioctl (priv->fd, TCGETA, &stbuf);
+    memset (&stbuf, 0, sizeof (struct termio));
+    if (ioctl (priv->fd, TCGETA, &stbuf) != 0) {
+        g_warning ("%s (%s): TCGETA error: %d",
+                   __func__,
+                   mm_port_get_device (MM_PORT (self)),
+                   errno);
+    }
 
     stbuf.c_iflag &= ~(IGNCR | ICRNL | IUCLC | INPCK | IXON | IXANY | IGNPAR );
     stbuf.c_oflag &= ~(OPOST | OLCUC | OCRNL | ONLCR | ONLRET);
@@ -269,8 +360,11 @@ config_fd (MMSerialPort *self)
     stbuf.c_cflag |= (speed | bits | CREAD | 0 | parity | stopbits);
 
     if (ioctl (priv->fd, TCSETA, &stbuf) < 0) {
-        g_warning ("(%s) cannot control device (errno %d)",
-                   mm_port_get_device (MM_PORT (self)), errno);
+        g_set_error (error,
+                     MM_MODEM_ERROR,
+                     MM_MODEM_ERROR_GENERAL,
+                     "%s: failed to set serial port attributes; errno %d",
+                     __func__, errno);
         return FALSE;
     }
 
@@ -401,8 +495,10 @@ mm_serial_port_got_response (MMSerialPort *self, GError *error)
     MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (self);
     MMQueueData *info;
 
-    if (priv->timeout_id)
+    if (priv->timeout_id) {
         g_source_remove (priv->timeout_id);
+        priv->timeout_id = 0;
+    }
 
     info = (MMQueueData *) g_queue_pop_head (priv->queue);
     if (info) {
@@ -689,9 +785,7 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
         return FALSE;
     }
 
-    if (!config_fd (self)) {
-        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_OPEN_FAILED,
-                     "Could not open serial device %s: %s", device, strerror (errno));
+    if (!config_fd (self, error)) {
         close (priv->fd);
         priv->fd = -1;
         return FALSE;
@@ -723,6 +817,11 @@ mm_serial_port_close (MMSerialPort *self)
             g_io_channel_shutdown (priv->channel, TRUE, NULL);
             g_io_channel_unref (priv->channel);
             priv->channel = NULL;
+        }
+
+        if (priv->flash_id > 0) {
+            g_source_remove (priv->flash_id);
+            priv->flash_id = 0;
         }
 
         ioctl (priv->fd, TCSETA, &priv->old_t);
@@ -789,81 +888,158 @@ typedef struct {
     gpointer user_data;
 } FlashInfo;
 
-static speed_t
-get_speed (MMSerialPort *self)
+static gboolean
+get_speed (MMSerialPort *self, speed_t *speed, GError **error)
 {
     struct termios options;
 
     memset (&options, 0, sizeof (struct termios));
-    tcgetattr (MM_SERIAL_PORT_GET_PRIVATE (self)->fd, &options);
+    if (tcgetattr (MM_SERIAL_PORT_GET_PRIVATE (self)->fd, &options) != 0) {
+        g_set_error (error,
+                     MM_MODEM_ERROR,
+                     MM_MODEM_ERROR_GENERAL,
+                     "%s: tcgetattr() error %d",
+                     __func__, errno);
+        return FALSE;
+    }
 
-    return cfgetospeed (&options);
+    *speed = cfgetospeed (&options);
+    return TRUE;
 }
 
-static void
-set_speed (MMSerialPort *self, speed_t speed)
+static gboolean
+set_speed (MMSerialPort *self, speed_t speed, GError **error)
 {
     struct termios options;
-    int fd;
+    int fd, count = 4;
+    gboolean success = FALSE;
 
     fd = MM_SERIAL_PORT_GET_PRIVATE (self)->fd;
+
     memset (&options, 0, sizeof (struct termios));
-    tcgetattr (fd, &options);
+    if (tcgetattr (fd, &options) != 0) {
+        g_set_error (error,
+                     MM_MODEM_ERROR,
+                     MM_MODEM_ERROR_GENERAL,
+                     "%s: tcgetattr() error %d",
+                     __func__, errno);
+        return FALSE;
+    }
 
     cfsetispeed (&options, speed);
     cfsetospeed (&options, speed);
-
     options.c_cflag |= (CLOCAL | CREAD);
-    tcsetattr (fd, TCSANOW, &options);
-}
 
-static void
-flash_done (gpointer data)
-{
-    FlashInfo *info = (FlashInfo *) data;
+    while (count-- > 0) {
+        if (tcsetattr (fd, TCSANOW, &options) == 0) {
+            success = TRUE;
+            break;  /* Operation successful */
+        }
 
-    info->callback (info->port, info->user_data);
+        /* Try a few times if EAGAIN */
+        if (errno == EAGAIN)
+            g_usleep (100000);
+        else {
+            /* If not EAGAIN, hard error */
+            g_set_error (error,
+                            MM_MODEM_ERROR,
+                            MM_MODEM_ERROR_GENERAL,
+                            "%s: tcsetattr() error %d",
+                            __func__, errno);
+            return FALSE;
+        }
+    }
 
-    g_slice_free (FlashInfo, info);
+    if (!success) {
+        g_set_error (error,
+                        MM_MODEM_ERROR,
+                        MM_MODEM_ERROR_GENERAL,
+                        "%s: tcsetattr() retry timeout",
+                        __func__);
+        return FALSE;
+    }
+
+    return TRUE;
 }
 
 static gboolean
 flash_do (gpointer data)
 {
     FlashInfo *info = (FlashInfo *) data;
+    MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (info->port);
+    GError *error = NULL;
 
-    set_speed (info->port, info->current_speed);
+    priv->flash_id = 0;
 
+    if (!set_speed (info->port, info->current_speed, &error))
+        g_assert (error);
+
+    info->callback (info->port, error, info->user_data);
+    g_clear_error (&error);
+    g_slice_free (FlashInfo, info);
     return FALSE;
 }
 
-guint
+gboolean
 mm_serial_port_flash (MMSerialPort *self,
                       guint32 flash_time,
                       MMSerialFlashFn callback,
                       gpointer user_data)
 {
     FlashInfo *info;
-    guint id;
+    MMSerialPortPrivate *priv;
+    speed_t cur_speed = 0;
+    GError *error = NULL;
 
-    g_return_val_if_fail (MM_IS_SERIAL_PORT (self), 0);
-    g_return_val_if_fail (callback != NULL, 0);
+    g_return_val_if_fail (MM_IS_SERIAL_PORT (self), FALSE);
+    g_return_val_if_fail (callback != NULL, FALSE);
+
+    priv = MM_SERIAL_PORT_GET_PRIVATE (self);
+
+    if (priv->flash_id > 0) {
+        error = g_error_new_literal (MM_MODEM_ERROR,
+                                     MM_MODEM_ERROR_OPERATION_IN_PROGRESS,
+                                     "Modem is already being flashed.");
+        callback (self, error, user_data);
+        g_error_free (error);
+        return FALSE;
+    }
+
+    if (!get_speed (self, &cur_speed, &error)) {
+        callback (self, error, user_data);
+        g_error_free (error);
+        return FALSE;
+    }
 
     info = g_slice_new0 (FlashInfo);
     info->port = self;
-    info->current_speed = get_speed (self);
+    info->current_speed = cur_speed;
     info->callback = callback;
     info->user_data = user_data;
 
-    set_speed (self, B0);
+    if (!set_speed (self, B0, &error)) {
+        callback (self, error, user_data);
+        g_error_free (error);
+        return FALSE;
+    }
 
-    id = g_timeout_add_full (G_PRIORITY_DEFAULT,
-                             flash_time,
-                             flash_do,
-                             info,
-                             flash_done);
+    priv->flash_id = g_timeout_add (flash_time, flash_do, info);
+    return TRUE;
+}
 
-    return id;
+void
+mm_serial_port_flash_cancel (MMSerialPort *self)
+{
+    MMSerialPortPrivate *priv;
+
+    g_return_if_fail (MM_IS_SERIAL_PORT (self));
+
+    priv = MM_SERIAL_PORT_GET_PRIVATE (self);
+
+    if (priv->flash_id > 0) {
+        g_source_remove (priv->flash_id);
+        priv->flash_id = 0;
+    }
 }
 
 /*****************************************************************************/
