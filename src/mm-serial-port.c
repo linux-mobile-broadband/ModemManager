@@ -79,6 +79,7 @@ typedef struct {
     guint timeout_id;
 
     guint flash_id;
+    guint connected_id;
 } MMSerialPortPrivate;
 
 #if 0
@@ -741,6 +742,35 @@ data_available (GIOChannel *source,
     return TRUE;
 }
 
+static void
+port_connected (MMSerialPort *self, GParamSpec *pspec, gpointer user_data)
+{
+    MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (self);
+    gboolean connected;
+
+    if (priv->fd < 0)
+        return;
+
+    /* When the port is connected, drop the serial port lock so PPP can do
+     * something with the port.  When the port is disconnected, grab the lock
+     * again.
+     */
+    connected = mm_port_get_connected (MM_PORT (self));
+
+    if (ioctl (priv->fd, (connected ? TIOCNXCL : TIOCEXCL)) < 0) {
+        g_warning ("%s: (%s) could not %s serial port lock: (%d) %s",
+                   __func__,
+                   mm_port_get_device (MM_PORT (self)),
+                   connected ? "drop" : "re-acquire",
+                   errno,
+                   strerror (errno));
+        if (!connected) {
+            // FIXME: do something here, maybe try again in a few seconds or
+            // close the port and error out?
+        }
+    }
+}
+
 gboolean
 mm_serial_port_open (MMSerialPort *self, GError **error)
 {
@@ -752,9 +782,10 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
 
     priv = MM_SERIAL_PORT_GET_PRIVATE (self);
 
-    if (priv->fd >= 0)
+    if (priv->fd >= 0) {
         /* Already open */
         return TRUE;
+    }
 
     device = mm_port_get_device (MM_PORT (self));
 
@@ -797,6 +828,10 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
                                      G_IO_IN | G_IO_ERR | G_IO_HUP,
                                      data_available, self);
 
+    g_warn_if_fail (priv->connected_id == 0);
+    priv->connected_id = g_signal_connect (self, "notify::" MM_PORT_CONNECTED,
+                                           G_CALLBACK (port_connected), NULL);
+
     return TRUE;
 }
 
@@ -808,6 +843,11 @@ mm_serial_port_close (MMSerialPort *self)
     g_return_if_fail (MM_IS_SERIAL_PORT (self));
 
     priv = MM_SERIAL_PORT_GET_PRIVATE (self);
+
+    if (priv->connected_id) {
+        g_signal_handler_disconnect (self, priv->connected_id);
+        priv->connected_id = 0;
+    }
 
     if (priv->fd >= 0) {
         g_message ("(%s) closing serial device...", mm_port_get_device (MM_PORT (self)));
@@ -1046,37 +1086,6 @@ mm_serial_port_flash_cancel (MMSerialPort *self)
 
 /*****************************************************************************/
 
-static void
-port_connected (MMSerialPort *self, GParamSpec *pspec, gpointer user_data)
-{
-    MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (self);
-    gboolean connected;
-
-    if (priv->fd < 0)
-        return;
-
-    /* When the port is connected, drop the serial port lock so PPP can do
-     * something with the port.  When the port is disconnected, grab the lock
-     * again.
-     */
-    connected = mm_port_get_connected (MM_PORT (self));
-
-    if (ioctl (priv->fd, (connected ? TIOCNXCL : TIOCEXCL)) < 0) {
-        g_warning ("%s: (%s) could not %s serial port lock: (%d) %s",
-                   __func__,
-                   mm_port_get_device (MM_PORT (self)),
-                   connected ? "drop" : "re-acquire",
-                   errno,
-                   strerror (errno));
-        if (!connected) {
-            // FIXME: do something here, maybe try again in a few seconds or
-            // close the port and error out?
-        }
-    }
-}
-
-/*****************************************************************************/
-
 MMSerialPort *
 mm_serial_port_new (const char *name, MMPortType ptype)
 {
@@ -1104,8 +1113,6 @@ mm_serial_port_init (MMSerialPort *self)
     priv->queue = g_queue_new ();
     priv->command  = g_string_new_len   ("AT", SERIAL_BUF_SIZE);
     priv->response = g_string_sized_new (SERIAL_BUF_SIZE);
-
-    g_signal_connect (self, "notify::" MM_PORT_CONNECTED, G_CALLBACK (port_connected), NULL);
 }
 
 static void
@@ -1165,12 +1172,18 @@ get_property (GObject *object, guint prop_id,
 }
 
 static void
+dispose (GObject *object)
+{
+    mm_serial_port_close (MM_SERIAL_PORT (object));
+
+    G_OBJECT_CLASS (mm_serial_port_parent_class)->dispose (object);
+}
+
+static void
 finalize (GObject *object)
 {
     MMSerialPort *self = MM_SERIAL_PORT (object);
     MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (self);
-
-    mm_serial_port_close (self);
 
     g_hash_table_destroy (priv->reply_cache);
     g_queue_free (priv->queue);
@@ -1205,6 +1218,7 @@ mm_serial_port_class_init (MMSerialPortClass *klass)
     /* Virtual methods */
     object_class->set_property = set_property;
     object_class->get_property = get_property;
+    object_class->dispose = dispose;
     object_class->finalize = finalize;
 
     /* Properties */
