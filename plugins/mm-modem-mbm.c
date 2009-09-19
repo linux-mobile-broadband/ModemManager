@@ -718,7 +718,7 @@ grab_port (MMModem *modem,
         mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, mbm_e2nap_received, modem, NULL);
         g_regex_unref (regex);
 
-        regex = g_regex_new ("\\r\\n\\+PACSP0\\r\\n\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        regex = g_regex_new ("\\r\\n\\+PACSP0\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, mbm_pacsp0_received, modem, NULL);
         g_regex_unref (regex);
 
