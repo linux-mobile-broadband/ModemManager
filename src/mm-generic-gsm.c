@@ -386,6 +386,28 @@ enable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
 }
 
 static void
+enable (MMModem *modem,
+        MMModemFn callback,
+        gpointer user_data)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+    MMCallbackInfo *info;
+
+    /* First, reset the previously used CID */
+    mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
+
+    info = mm_callback_info_new (modem, callback, user_data);
+
+    if (!mm_serial_port_open (priv->primary, &info->error)) {
+        g_assert (info->error);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_serial_port_flash (priv->primary, 100, enable_flash_done, info);
+}
+
+static void
 disable_done (MMSerialPort *port,
               GString *response,
               GError *error,
@@ -418,35 +440,23 @@ disable_flash_done (MMSerialPort *port,
 }
 
 static void
-enable (MMModem *modem,
-        gboolean do_enable,
-        MMModemFn callback,
-        gpointer user_data)
+disable (MMModem *modem,
+         MMModemFn callback,
+         gpointer user_data)
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
 
-    /* First, reset the previously used CID */
+    /* First, reset the previously used CID and clean up registration */
     mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
+    mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
 
     info = mm_callback_info_new (modem, callback, user_data);
 
-    if (!do_enable) {
-        mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
-
-        if (mm_port_get_connected (MM_PORT (priv->primary)))
-            mm_serial_port_flash (priv->primary, 1000, disable_flash_done, info);
-        else
-            disable_flash_done (priv->primary, NULL, info);
-    } else {
-        if (!mm_serial_port_open (priv->primary, &info->error)) {
-            g_assert (info->error);
-            mm_callback_info_schedule (info);
-            return;
-        }
-
-        mm_serial_port_flash (priv->primary, 100, enable_flash_done, info);
-    }
+    if (mm_port_get_connected (MM_PORT (priv->primary)))
+        mm_serial_port_flash (priv->primary, 1000, disable_flash_done, info);
+    else
+        disable_flash_done (priv->primary, NULL, info);
 }
 
 static void
@@ -1542,7 +1552,7 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
     switch (state) {
     case SIMPLE_STATE_BEGIN:
         state = SIMPLE_STATE_ENABLE;
-        mm_modem_enable (modem, TRUE, simple_state_machine, info);
+        mm_modem_enable (modem, simple_state_machine, info);
         break;
     case SIMPLE_STATE_ENABLE:
         state = SIMPLE_STATE_CHECK_PIN;
@@ -1739,6 +1749,7 @@ modem_init (MMModem *modem_class)
     modem_class->grab_port = grab_port;
     modem_class->release_port = release_port;
     modem_class->enable = enable;
+    modem_class->disable = disable;
     modem_class->connect = connect;
     modem_class->disconnect = disconnect;
     modem_class->get_info = get_card_info;

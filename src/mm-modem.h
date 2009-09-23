@@ -103,9 +103,12 @@ struct _MMModem {
                           const char *name);
 
     void (*enable) (MMModem *self,
-                    gboolean enable,
                     MMModemFn callback,
                     gpointer user_data);
+
+    void (*disable) (MMModem *self,
+                     MMModemFn callback,
+                     gpointer user_data);
 
     void (*connect) (MMModem *self,
                      const char *number,
@@ -143,9 +146,12 @@ void mm_modem_release_port (MMModem *self,
                             const char *name);
 
 void mm_modem_enable (MMModem *self,
-                      gboolean enable,
                       MMModemFn callback,
                       gpointer user_data);
+
+void mm_modem_disable (MMModem *self,
+                       MMModemFn callback,
+                       gpointer user_data);
 
 void mm_modem_connect (MMModem *self,
                        const char *number,

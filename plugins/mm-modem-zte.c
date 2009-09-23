@@ -109,32 +109,7 @@ enable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
 }
 
 static void
-disable_done (MMSerialPort *port,
-              GString *response,
-              GError *error,
-              gpointer user_data)
-{
-    mm_serial_port_close (port);
-    mm_callback_info_schedule ((MMCallbackInfo *) user_data);
-}
-
-static void
-disable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-
-    if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-        return;
-    }
-
-    mm_serial_port_queue_command (port, "+CFUN=0", 5, disable_done, user_data);
-}
-
-static void
 enable (MMModem *modem,
-        gboolean do_enable,
         MMModemFn callback,
         gpointer user_data)
 {
@@ -149,20 +124,13 @@ enable (MMModem *modem,
     primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
 
-    if (!do_enable) {
-        if (mm_port_get_connected (MM_PORT (primary)))
-            mm_serial_port_flash (primary, 1000, disable_flash_done, info);
-        else
-            disable_flash_done (primary, NULL, info);
-    } else {
-        if (!mm_serial_port_open (primary, &info->error)) {
-            g_assert (info->error);
-            mm_callback_info_schedule (info);
-            return;
-        }
-
-        mm_serial_port_flash (primary, 100, enable_flash_done, info);
+    if (!mm_serial_port_open (primary, &info->error)) {
+        g_assert (info->error);
+        mm_callback_info_schedule (info);
+        return;
     }
+
+    mm_serial_port_flash (primary, 100, enable_flash_done, info);
 }
 
 static gboolean

@@ -402,56 +402,11 @@ mbm_emrdy_done (MMSerialPort *port,
 }
 
 static void
-enable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
-{
-    MMCallbackInfo *info = user_data;
-    MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (info->modem);
-
-    if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-        return;
-    }
-
-    if (priv->have_emrdy) {
-        /* Modem is ready, no need to check EMRDY */
-        do_init (port, info);
-    } else
-        mm_serial_port_queue_command (port, "*EMRDY?", 5, mbm_emrdy_done, info);
-}
-
-static void
-disable_done (MMSerialPort *port,
-              GString *response,
-              GError *error,
-              gpointer user_data)
-{
-    MMCallbackInfo *info = user_data;
-
-    mm_serial_port_close (port);
-    mm_callback_info_schedule (info);
-}
-
-static void
-disable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-
-    if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-        return;
-    }
-
-    mm_serial_port_queue_command (port, "+CMER=0", 5, disable_done, user_data);
-}
-
-static void
 enable (MMModem *modem,
-        gboolean do_enable,
         MMModemFn callback,
         gpointer user_data)
 {
+    MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
     MMSerialPort *primary;
 
@@ -462,22 +417,49 @@ enable (MMModem *modem,
     primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
 
-    if (do_enable) {
-        if (!mm_serial_port_open (primary, &info->error)) {
-            g_assert (info->error);
-            mm_callback_info_schedule (info);
-            return;
-        }
-
-        mm_serial_port_flash (primary, 100, enable_flash_done, info);
-    } else {
-        mm_serial_port_queue_command (primary, "+CREG=0", 100, NULL, NULL);
-        mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
-        if (mm_port_get_connected (MM_PORT (primary)))
-            mm_serial_port_flash (primary, 1000, disable_flash_done, info);
-        else
-            disable_flash_done (primary, NULL, info);
+    if (!mm_serial_port_open (primary, &info->error)) {
+        g_assert (info->error);
+        mm_callback_info_schedule (info);
+        return;
     }
+
+    if (priv->have_emrdy) {
+        /* Modem is ready, no need to check EMRDY */
+        do_init (primary, info);
+    } else
+        mm_serial_port_queue_command (primary, "*EMRDY?", 5, mbm_emrdy_done, info);
+}
+
+static void
+parent_disable_done (MMModem *modem, GError *error, gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error)
+        info->error = g_error_copy (error);
+    mm_callback_info_schedule (info);
+}
+
+static void
+disable (MMModem *modem,
+         MMModemFn callback,
+         gpointer user_data)
+{
+    MMModem *parent_modem_iface;
+    MMCallbackInfo *info;
+    MMSerialPort *primary;
+
+    info = mm_callback_info_new (modem, callback, user_data);
+
+    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+
+    /* Random stuff that mbm apparently wants.  Are these really needed? */
+    mm_serial_port_queue_command (primary, "+CREG=0", 5, NULL, NULL);
+    mm_serial_port_queue_command (primary, "+CMER=0", 5, NULL, NULL);
+
+    parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (modem));
+    parent_modem_iface->enable (modem, parent_disable_done, info);
 }
 
 static void
@@ -596,7 +578,7 @@ e2nap_done (MMSerialPort *port,
         mm_callback_info_schedule (info);
     } else {
         guint32 cid = mm_generic_gsm_get_cid (MM_GENERIC_GSM (info->modem));
-        command = g_strdup_printf ("AT*ENAP=1,%d",cid);
+        command = g_strdup_printf ("AT*ENAP=1,%d", cid);
         mm_serial_port_queue_command (port, command, 3, NULL, NULL);
         g_free (command);
     }
@@ -761,6 +743,7 @@ modem_init (MMModem *modem_class)
 {
     modem_class->grab_port = grab_port;
     modem_class->enable = enable;
+    modem_class->disable = disable;
     modem_class->connect = do_connect;
     modem_class->disconnect = disconnect;
 }

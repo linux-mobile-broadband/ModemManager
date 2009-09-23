@@ -67,83 +67,31 @@ sierra_enabled (gpointer data)
 }
 
 static void
-init_done (MMSerialPort *port,
-           GString *response,
-           GError *error,
-           gpointer user_data)
+parent_enable_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
     if (error) {
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
-    } else
+    } else {
         /* Sierra returns OK on +CFUN=1 right away but needs some time
            to finish initialization */
         g_timeout_add_seconds (10, sierra_enabled, info);
-}
-
-static void
-enable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
-{
-    MMCallbackInfo *info = user_data;
-
-    if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-        return;
     }
-
-    mm_serial_port_queue_command (port, "Z E0 V1 X4 &C1 +CMEE=1", 3, init_done, user_data);
-}
-
-static void
-disable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
-{
-    MMCallbackInfo *info = user_data;
-
-    if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-        return;
-    }
-
-    mm_serial_port_close (port);
-    mm_callback_info_schedule (info);
 }
 
 static void
 enable (MMModem *modem,
-        gboolean do_enable,
         MMModemFn callback,
         gpointer user_data)
 {
+    MMModem *parent_modem_iface;
     MMCallbackInfo *info;
-    MMSerialPort *primary;
-
-    /* First, reset the previously used CID */
-    mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
 
     info = mm_callback_info_new (modem, callback, user_data);
-    mm_callback_info_set_data (info, "sierra-enable", GINT_TO_POINTER (do_enable), NULL);
-
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
-    g_assert (primary);
-
-    if (!do_enable) {
-        if (mm_port_get_connected (MM_PORT (primary)))
-            mm_serial_port_flash (primary, 1000, disable_flash_done, info);
-        else
-            disable_flash_done (primary, NULL, info);
-    } else {
-        if (!mm_serial_port_open (primary, &info->error)) {
-            g_assert (info->error);
-            mm_callback_info_schedule (info);
-            return;
-        }
-
-        mm_serial_port_flash (primary, 100, enable_flash_done, info);
-    }
+    parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (modem));
+    parent_modem_iface->enable (modem, parent_enable_done, info);
 }
 
 static gboolean

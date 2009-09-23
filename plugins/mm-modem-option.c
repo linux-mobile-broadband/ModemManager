@@ -69,21 +69,18 @@ parent_enable_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    if (error)
+    if (error) {
         info->error = g_error_copy (error);
-    else if (GPOINTER_TO_INT (mm_callback_info_get_data (info, "option-enable"))) {
+        mm_callback_info_schedule (info);
+    } else {
         /* Option returns OK on +CFUN=1 right away but needs some time
            to finish initialization */
         g_timeout_add_seconds (10, option_enabled, info);
-        return;
     }
-
-    mm_callback_info_schedule (info);
 }
 
 static void
 enable (MMModem *modem,
-        gboolean do_enable,
         MMModemFn callback,
         gpointer user_data)
 {
@@ -91,10 +88,8 @@ enable (MMModem *modem,
     MMCallbackInfo *info;
 
     info = mm_callback_info_new (modem, callback, user_data);
-    mm_callback_info_set_data (info, "option-enable", GINT_TO_POINTER (do_enable), NULL);
-
     parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (modem));
-    parent_modem_iface->enable (modem, do_enable, parent_enable_done, info);
+    parent_modem_iface->enable (modem, parent_enable_done, info);
 }
 
 static void

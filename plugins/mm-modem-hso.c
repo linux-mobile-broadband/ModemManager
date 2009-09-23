@@ -234,7 +234,7 @@ mm_hso_modem_authenticate (MMModemHso *self,
 /*****************************************************************************/
 
 static void
-pin_check_done (MMModem *modem, GError *error, gpointer user_data)
+generic_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
@@ -251,49 +251,56 @@ parent_enable_done (MMModem *modem, GError *error, gpointer user_data)
     if (error) {
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
-    } else if (GPOINTER_TO_INT (mm_callback_info_get_data (info, "enable")) == FALSE) {
-        /* Disable, we're done */
-        mm_callback_info_schedule (info);
     } else {
         /* HSO needs manual PIN checking */
-        mm_generic_gsm_check_pin (MM_GENERIC_GSM (modem), pin_check_done, info);
+        mm_generic_gsm_check_pin (MM_GENERIC_GSM (modem), generic_done, info);
     }
 }
 
 static void
-modem_enable_done (MMSerialPort *port,
-                   GString *response,
-                   GError *error,
-                   gpointer user_data)
+enable (MMModem *modem,
+        MMModemFn callback,
+        gpointer user_data)
+{
+    MMModem *parent_modem_iface;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new (modem, callback, user_data);
+    parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (info->modem));
+    parent_modem_iface->enable (info->modem, parent_enable_done, info);
+}
+
+static void
+disable_done (MMSerialPort *port,
+              GString *response,
+              GError *error,
+              gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMModem *parent_modem_iface;
 
+    /* Do the normal disable stuff */
     parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (info->modem));
-    parent_modem_iface->enable (info->modem,
-                                GPOINTER_TO_INT (mm_callback_info_get_data (info, "enable")),
-                                parent_enable_done, info);
+    parent_modem_iface->enable (info->modem, generic_done, info);
 }
 
 static void
-enable (MMModem *modem,
-        gboolean do_enable,
-        MMModemFn callback,
-        gpointer user_data)
+disable (MMModem *modem,
+         MMModemFn callback,
+         gpointer user_data)
 {
     MMCallbackInfo *info;
     MMSerialPort *primary;
 
-    info = mm_callback_info_new (modem, callback, user_data);
-    mm_callback_info_set_data (info, "enable", GINT_TO_POINTER (enable), NULL);
+    mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
+    mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
 
+    info = mm_callback_info_new (modem, callback, user_data);
+
+    /* Kill any existing connection */
     primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-
-    if (do_enable)
-        modem_enable_done (primary, NULL, NULL, info);
-    else
-        mm_serial_port_queue_command (primary, "AT_OWANCALL=1,0,0", 3, modem_enable_done, info);
+    mm_serial_port_queue_command (primary, "AT_OWANCALL=1,0,0", 3, disable_done, info);
 }
 
 static void
@@ -650,6 +657,7 @@ static void
 modem_init (MMModem *modem_class)
 {
     modem_class->enable = enable;
+    modem_class->disable = disable;
     modem_class->connect = do_connect;
     modem_class->get_ip4_config = get_ip4_config;
     modem_class->disconnect = disconnect;

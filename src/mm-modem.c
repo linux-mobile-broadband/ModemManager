@@ -54,7 +54,6 @@ async_call_done (MMModem *modem, GError *error, gpointer user_data)
 
 void
 mm_modem_enable (MMModem *self,
-                 gboolean enable,
                  MMModemFn callback,
                  gpointer user_data)
 {
@@ -62,7 +61,21 @@ mm_modem_enable (MMModem *self,
     g_return_if_fail (callback != NULL);
 
     if (MM_MODEM_GET_INTERFACE (self)->enable)
-        MM_MODEM_GET_INTERFACE (self)->enable (self, enable, callback, user_data);
+        MM_MODEM_GET_INTERFACE (self)->enable (self, callback, user_data);
+    else
+        async_op_not_supported (self, callback, user_data);
+}
+
+void
+mm_modem_disable (MMModem *self,
+                  MMModemFn callback,
+                  gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM (self));
+    g_return_if_fail (callback != NULL);
+
+    if (MM_MODEM_GET_INTERFACE (self)->disable)
+        MM_MODEM_GET_INTERFACE (self)->disable (self, callback, user_data);
     else
         async_op_not_supported (self, callback, user_data);
 }
@@ -72,7 +85,10 @@ impl_modem_enable (MMModem *modem,
                    gboolean enable,
                    DBusGMethodInvocation *context)
 {
-    mm_modem_enable (modem, enable, async_call_done, context);
+    if (enable)
+        mm_modem_enable (modem, async_call_done, context);
+    else
+        mm_modem_disable (modem, async_call_done, context);
 }
 
 void

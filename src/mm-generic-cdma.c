@@ -234,7 +234,6 @@ flash_done (MMSerialPort *port, GError *error, gpointer user_data)
 
 static void
 enable (MMModem *modem,
-        gboolean do_enable,
         MMModemFn callback,
         gpointer user_data)
 {
@@ -243,12 +242,6 @@ enable (MMModem *modem,
 
     info = mm_callback_info_new (modem, callback, user_data);
 
-    if (!do_enable) {
-        mm_serial_port_close (priv->primary);
-        mm_callback_info_schedule (info);
-        return;
-    }
-
     if (!mm_serial_port_open (priv->primary, &info->error)) {
         g_assert (info->error);
         mm_callback_info_schedule (info);
@@ -256,6 +249,37 @@ enable (MMModem *modem,
     }
 
     mm_serial_port_flash (priv->primary, 100, flash_done, info);
+}
+
+static void
+disable_flash_done (MMSerialPort *port,
+                    GError *error,
+                    gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else
+        mm_serial_port_close (port);
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+disable (MMModem *modem,
+         MMModemFn callback,
+         gpointer user_data)
+{
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new (modem, callback, user_data);
+
+    if (mm_port_get_connected (MM_PORT (priv->primary)))
+        mm_serial_port_flash (priv->primary, 1000, disable_flash_done, info);
+    else
+        disable_flash_done (priv->primary, NULL, info);
 }
 
 static void
@@ -657,7 +681,7 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
 	switch (state) {
 	case SIMPLE_STATE_BEGIN:
 		state = SIMPLE_STATE_ENABLE;
-        mm_modem_enable (modem, TRUE, simple_state_machine, info);
+        mm_modem_enable (modem, simple_state_machine, info);
         break;
     case SIMPLE_STATE_ENABLE:
         str = simple_get_string_property (info, "number", &info->error);
@@ -769,6 +793,7 @@ modem_init (MMModem *modem_class)
     modem_class->grab_port = grab_port;
     modem_class->release_port = release_port;
     modem_class->enable = enable;
+    modem_class->disable = disable;
     modem_class->connect = connect;
     modem_class->disconnect = disconnect;
     modem_class->get_info = get_card_info;
