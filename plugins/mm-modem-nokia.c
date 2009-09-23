@@ -84,9 +84,46 @@ mm_modem_nokia_init (MMModemNokia *self)
 }
 
 static void
+get_property (GObject *object, guint prop_id,
+              GValue *value, GParamSpec *pspec)
+{
+    /* Nokia headsets (at least N85) do not support "power on"; they do
+     * support "power off" but you proabably do not want to turn off the
+     * power on your telephone if something went wrong with connecting
+     * process. So, disabling both these operations.  The Nokia GSM/UMTS command
+     * reference v1.2 also states that only CFUN=0 (turn off but still charge)
+     * and CFUN=1 (full functionality) are supported, and since the phone has
+     * to be in CFUN=1 before we'll be able to talk to it in the first place,
+     * we shouldn't bother with CFUN at all.
+     */
+    switch (prop_id) {
+    case MM_GENERIC_GSM_PROP_POWER_UP_CMD:
+        g_value_set_string (value, "");
+        break;
+    case MM_GENERIC_GSM_PROP_POWER_DOWN_CMD:
+        g_value_set_string (value, "");
+        break;
+    default:
+        break;
+    }
+}
+
+static void
 mm_modem_nokia_class_init (MMModemNokiaClass *klass)
 {
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
     mm_modem_nokia_parent_class = g_type_class_peek_parent (klass);
+
+    object_class->get_property = get_property;
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_POWER_UP_CMD,
+                                      MM_GENERIC_GSM_POWER_UP_CMD);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_POWER_DOWN_CMD,
+                                      MM_GENERIC_GSM_POWER_DOWN_CMD);
 }
 
 GType
