@@ -200,7 +200,7 @@ mm_serial_parser_v1_new (void)
     parser = g_slice_new (MMSerialParserV1);
 
     parser->regex_ok = g_regex_new ("\\r\\nOK\\r\\n$", flags, 0, NULL);
-    parser->regex_connect = g_regex_new ("\\r\\nCONNECT.*\\r\\n$", flags, 0, NULL);
+    parser->regex_connect = g_regex_new ("\\r\\nCONNECT.*\\r\\n", flags, 0, NULL);
     parser->regex_detailed_error = g_regex_new ("\\r\\n\\+CME ERROR: (\\d+)\\r\\n$", flags, 0, NULL);
     parser->regex_unknown_error = g_regex_new ("\\r\\n(ERROR)|(COMMAND NOT SUPPORT)\\r\\n$", flags, 0, NULL);
     parser->regex_connect_failed = g_regex_new ("\\r\\n(NO CARRIER)|(BUSY)|(NO ANSWER)|(NO DIALTONE)\\r\\n$", flags, 0, NULL);
