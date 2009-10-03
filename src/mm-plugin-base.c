@@ -703,7 +703,7 @@ real_find_physical_device (MMPluginBase *plugin, GUdevDevice *child)
     g_return_val_if_fail (child != NULL, NULL);
 
     iter = g_object_ref (child);
-    while (iter && i++ < 5) {
+    while (iter && i++ < 8) {
         subsys = g_udev_device_get_subsystem (iter);
         if (subsys) {
             if (is_usb || !strcmp (subsys, "usb")) {
