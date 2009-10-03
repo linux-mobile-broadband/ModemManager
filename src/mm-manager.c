@@ -612,7 +612,7 @@ handle_uevent (GUdevClient *client,
 	/* We only care about tty/net devices when adding modem ports,
 	 * but for remove, also handle usb parent device remove events
 	 */
-	if (!strcmp (action, "add") && strcmp (subsys, "usb") !=0 )
+	if ((!strcmp (action, "add") || !strcmp (action, "move")) && strcmp (subsys, "usb") !=0 )
 		device_added (self, device);
 	else if (!strcmp (action, "remove"))
 		device_removed (self, device);
