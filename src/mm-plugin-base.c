@@ -664,7 +664,7 @@ static char *
 get_driver_name (GUdevDevice *device)
 {
     GUdevDevice *parent = NULL;
-    const char *driver;
+    const char *driver, *subsys;
     char *ret = NULL;
 
     driver = g_udev_device_get_driver (device);
@@ -672,6 +672,15 @@ get_driver_name (GUdevDevice *device)
         parent = g_udev_device_get_parent (device);
         if (parent)
             driver = g_udev_device_get_driver (parent);
+
+        /* Check for bluetooth; it's driver is a bunch of levels up so we
+         * just check for the subsystem of the parent being bluetooth.
+         */
+        if (!driver && parent) {
+            subsys = g_udev_device_get_subsystem (parent);
+            if (subsys && !strcmp (subsys, "bluetooth"))
+                driver = "bluetooth";
+        }
     }
 
     if (driver)
