@@ -108,16 +108,27 @@ grab_port (MMPluginBase *base,
 {
     GUdevDevice *port = NULL, *physdev = NULL;
     MMModem *modem = NULL;
-    const char *name, *subsys, *devfile, *sysfs_path;
+    const char *name, *subsys, *devfile, *sysfs_path, *driver;
     guint32 caps;
 
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
 
+    subsys = g_udev_device_get_subsystem (port);
+    name = g_udev_device_get_name (port);
+
     devfile = g_udev_device_get_device_file (port);
     if (!devfile) {
-        g_set_error (error, 0, 0, "Could not get port's sysfs file.");
-        return NULL;
+        driver = mm_plugin_base_supports_task_get_driver (task);
+        if (!driver || strcmp (driver, "bluetooth")) {
+            g_set_error (error, 0, 0, "Could not get port's sysfs file.");
+            return NULL;
+        } else {
+            g_message ("%s: (%s/%s) WARNING: missing udev 'device' file",
+                       mm_plugin_get_name (MM_PLUGIN (base)),
+                       subsys,
+                       name);
+        }
     }
 
     physdev = mm_plugin_base_supports_task_get_physdev (task);
@@ -127,9 +138,6 @@ grab_port (MMPluginBase *base,
         g_set_error (error, 0, 0, "Could not get port's physical device sysfs path.");
         return NULL;
     }
-
-    subsys = g_udev_device_get_subsystem (port);
-    name = g_udev_device_get_name (port);
 
     caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
     if (!existing) {
