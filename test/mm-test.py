@@ -146,7 +146,7 @@ def inspect_gsm(proxy, dump_private):
     print "Signal quality: %d" % net.GetSignalQuality()
 
     print "Scanning..."
-    results = net.Scan(timeout=60)
+    results = net.Scan(timeout=120)
     for r in results:
         status = r['status']
         if status == "1":
@@ -158,10 +158,30 @@ def inspect_gsm(proxy, dump_private):
         else:
             status = "(Unknown)"
 
+        access_tech = ""
+        try:
+            access_tech_num = r['access-tech']
+            if access_tech_num == "0":
+                access_tech = "(GSM)"
+            elif access_tech_num == "1":
+                access_tech = "(Compact GSM)"
+            elif access_tech_num == "2":
+                access_tech = "(UMTS)"
+            elif access_tech_num == "3":
+                access_tech = "(EDGE)"
+            elif access_tech_num == "4":
+                access_tech = "(HSDPA)"
+            elif access_tech_num == "5":
+                access_tech = "(HSUPA)"
+            elif access_tech_num == "6":
+                access_tech = "(HSPA)"
+        except KeyError:
+            pass
+
         if len(r['operator-long']):
-            print "%s: %s" % (r['operator-long'], status)
+            print "%s: %s %s" % (r['operator-long'], status, access_tech)
         else:
-            print "%s: %s" % (r['operator-short'], status)
+            print "%s: %s %s" % (r['operator-short'], status, access_tech)
 
 
 dump_private = False

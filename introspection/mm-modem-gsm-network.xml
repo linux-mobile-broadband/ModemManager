@@ -23,7 +23,7 @@
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_scan"/>
       <arg name="results" type="aa{ss}" direction="out">
 	<tp:docstring>
-	  Found networks. It's an array of dictionaries (strings for keys and values), the list of known keys is the following: status, operator-long, operator-short, operator-num.
+	  Found networks. It's an array of dictionaries (strings for keys and values), the list of known keys is the following: status, operator-long, operator-short, operator-num, access-tech.
 	</tp:docstring>
       </arg>
     </method>
