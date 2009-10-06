@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 #include "mm-generic-gsm.h"
 #include "mm-modem-gsm-card.h"
 #include "mm-modem-gsm-network.h"
@@ -511,6 +512,21 @@ card_info_invoke (MMCallbackInfo *info)
               info->error, info->user_data);
 }
 
+#define GMI_RESP_TAG "+CGMI:"
+#define GMM_RESP_TAG "+CGMM:"
+#define GMR_RESP_TAG "+CGMR:"
+
+static const char *
+strip_tag (const char *str, const char *tag)
+{
+    /* Strip the response header, if any */
+    if (strncmp (str, tag, strlen (tag)) == 0)
+        str += strlen (tag);
+    while (*str && isspace (*str))
+        str++;
+    return str;
+}
+
 static void
 get_version_done (MMSerialPort *port,
                   GString *response,
@@ -518,9 +534,10 @@ get_version_done (MMSerialPort *port,
                   gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    const char *resp = strip_tag (response->str, GMR_RESP_TAG);
 
     if (!error)
-        mm_callback_info_set_data (info, "card-info-version", g_strdup (response->str), g_free);
+        mm_callback_info_set_data (info, "card-info-version", g_strdup (resp), g_free);
     else if (!info->error)
         info->error = g_error_copy (error);
 
@@ -534,9 +551,10 @@ get_model_done (MMSerialPort *port,
                 gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    const char *resp = strip_tag (response->str, GMM_RESP_TAG);
 
     if (!error)
-        mm_callback_info_set_data (info, "card-info-model", g_strdup (response->str), g_free);
+        mm_callback_info_set_data (info, "card-info-model", g_strdup (resp), g_free);
     else if (!info->error)
         info->error = g_error_copy (error);
 }
@@ -548,9 +566,10 @@ get_manufacturer_done (MMSerialPort *port,
                        gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    const char *resp = strip_tag (response->str, GMI_RESP_TAG);
 
     if (!error)
-        mm_callback_info_set_data (info, "card-info-manufacturer", g_strdup (response->str), g_free);
+        mm_callback_info_set_data (info, "card-info-manufacturer", g_strdup (resp), g_free);
     else
         info->error = g_error_copy (error);
 }
