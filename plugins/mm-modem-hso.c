@@ -281,7 +281,7 @@ disable_done (MMSerialPort *port,
 
     /* Do the normal disable stuff */
     parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (info->modem));
-    parent_modem_iface->enable (info->modem, generic_done, info);
+    parent_modem_iface->disable (info->modem, generic_done, info);
 }
 
 static void
