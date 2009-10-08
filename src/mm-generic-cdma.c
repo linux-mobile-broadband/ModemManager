@@ -16,6 +16,9 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
+#include <errno.h>
+#include <stdlib.h>
 
 #include "mm-generic-cdma.h"
 #include "mm-modem-cdma.h"
@@ -550,6 +553,73 @@ serving_system_invoke (MMCallbackInfo *info)
               info->user_data);
 }
 
+static int
+normalize_class (const char *orig_class)
+{
+    char class;
+
+    g_return_val_if_fail (orig_class != NULL, '0');
+
+    class = toupper (orig_class[0]);
+
+    /* Cellular (850MHz) */
+    if (class == '1' || class == 'C')
+        return 1;
+    /* PCS (1900MHz) */
+    if (class == '2' || class == 'P')
+        return 2;
+
+    /* Unknown/not registered */
+    return 0;
+}
+
+static char
+normalize_band (const char *long_band, int *out_class)
+{
+    char band;
+
+    g_return_val_if_fail (long_band != NULL, 'Z');
+
+    /* There are two response formats for the band; one includes the band
+     * class and the other doesn't.  For modems that include the band class
+     * (ex Novatel S720) you'll see "Px" or "Cx" depending on whether the modem
+     * is registered on a PCS/1900 (P) or Cellular/850 (C) system.
+     */
+    band = toupper (long_band[0]);
+
+    /* Possible band class in first position; return it */
+    if (band == 'C' || band == 'P') {
+        char tmp[2] = { band, '\0' };
+
+        *out_class = normalize_class (tmp);
+        band = toupper (long_band[1]);
+    }
+
+    /* normalize to A - F, and Z */
+    if (band >= 'A' && band <= 'F')
+        return band;
+
+    /* Unknown/not registered */
+    return 'Z';
+}
+
+static int
+normalize_sid (const char *sid)
+{
+    long int tmp_sid;
+
+    g_return_val_if_fail (sid != NULL, 99999);
+
+    errno = 0;
+    tmp_sid = strtol (sid, NULL, 10);
+    if ((errno == EINVAL) || (errno == ERANGE))
+        return 99999;
+    else if (tmp_sid < G_MININT || tmp_sid > G_MAXINT)
+        return 99999;
+
+    return (int) tmp_sid;
+}
+
 static void
 serving_system_done (MMSerialPort *port,
                      GString *response,
@@ -572,18 +642,34 @@ serving_system_done (MMSerialPort *port,
 
     num = sscanf (reply, "? , %d", &sid);
     if (num == 1) {
-        /* UTStarcom modem that uses IS-707-A format */
+        /* UTStarcom and Huawei modems that use IS-707-A format */
         success = TRUE;
     } else {
-        num = sscanf (reply, "%d , %c , %d", &class, &band, &sid);
-        if (num == 3) {
-            /* Modem uses IS-707-A-2 format */
+        GRegex *r;
+        GMatchInfo *match_info;
+        int override_class = 0;
 
-            /* Normalize */
-            class = CLAMP (class, 0, 4);
-            band = CLAMP (band, 'A', 'Z');
+        /* Format is "<band_class>,<band>,<sid>" */
+        r = g_regex_new ("\\s*([^,]*?)\\s*,\\s*([^,]*?)\\s*,\\s*(\\d+)", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        if (!r) {
+            info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                               MM_MODEM_ERROR_GENERAL,
+                                               "Could not parse Serving System results (regex creation failed).");
+            goto out;
+        }
+
+        g_regex_match (r, reply, 0, &match_info);
+        if (g_match_info_get_match_count (match_info) >= 3) {
+            class = normalize_class (g_match_info_fetch (match_info, 1));
+            band = normalize_band (g_match_info_fetch (match_info, 2), &override_class);
+            if (override_class)
+                class = override_class;
+            sid = normalize_sid (g_match_info_fetch (match_info, 3));
             success = TRUE;
         }
+
+        g_match_info_free (match_info);
+        g_regex_unref (r);
     }
 
     if (success) {
