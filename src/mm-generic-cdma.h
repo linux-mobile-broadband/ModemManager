@@ -19,6 +19,7 @@
 
 #include "mm-modem.h"
 #include "mm-modem-base.h"
+#include "mm-modem-cdma.h"
 
 #define MM_TYPE_GENERIC_CDMA            (mm_generic_cdma_get_type ())
 #define MM_GENERIC_CDMA(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_GENERIC_CDMA, MMGenericCdma))
@@ -33,6 +34,10 @@ typedef struct {
 
 typedef struct {
     MMModemBaseClass parent;
+
+    void (*query_registration_status) (MMGenericCdma *self,
+                                       MMModemUIntFn callback,
+                                       gpointer user_data);
 } MMGenericCdmaClass;
 
 GType mm_generic_cdma_get_type (void);
@@ -40,5 +45,11 @@ GType mm_generic_cdma_get_type (void);
 MMModem *mm_generic_cdma_new (const char *device,
                               const char *driver,
                               const char *plugin);
+
+/* Private, for subclasses */
+void mm_generic_cdma_set_registration_state (MMGenericCdma *self,
+                                             MMModemCdmaRegistrationState new_state);
+
+MMModemCdmaRegistrationState mm_generic_cdma_get_registration_state_sync (MMGenericCdma *self);
 
 #endif /* MM_GENERIC_CDMA_H */

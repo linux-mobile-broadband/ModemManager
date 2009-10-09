@@ -23,11 +23,13 @@
 static void impl_modem_cdma_get_signal_quality (MMModemCdma *modem, DBusGMethodInvocation *context);
 static void impl_modem_cdma_get_esn (MMModemCdma *modem, DBusGMethodInvocation *context);
 static void impl_modem_cdma_get_serving_system (MMModemCdma *modem, DBusGMethodInvocation *context);
+static void impl_modem_cdma_get_registration_state (MMModemCdma *modem, DBusGMethodInvocation *context);
 
 #include "mm-modem-cdma-glue.h"
 
 enum {
     SIGNAL_QUALITY,
+    REGISTRATION_STATE_CHANGED,
 
     LAST_SIGNAL
 };
@@ -212,12 +214,40 @@ impl_modem_cdma_get_signal_quality (MMModemCdma *modem, DBusGMethodInvocation *c
 }
 
 void
-mm_modem_cdma_signal_quality (MMModemCdma *self,
-                              guint32 quality)
+mm_modem_cdma_emit_signal_quality_changed (MMModemCdma *self, guint32 quality)
 {
     g_return_if_fail (MM_IS_MODEM_CDMA (self));
 
     g_signal_emit (self, signals[SIGNAL_QUALITY], 0, quality);
+}
+
+void
+mm_modem_cdma_get_registration_state (MMModemCdma *self,
+                                      MMModemUIntFn callback,
+                                      gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_CDMA (self));
+    g_return_if_fail (callback != NULL);
+
+    if (MM_MODEM_CDMA_GET_INTERFACE (self)->get_registration_state)
+        MM_MODEM_CDMA_GET_INTERFACE (self)->get_registration_state (self, callback, user_data);
+    else
+        uint_op_not_supported (MM_MODEM (self), callback, user_data);
+}
+
+static void
+impl_modem_cdma_get_registration_state (MMModemCdma *modem, DBusGMethodInvocation *context)
+{
+    mm_modem_cdma_get_registration_state (modem, uint_call_done, context);
+}
+
+void
+mm_modem_cdma_emit_registration_state_changed (MMModemCdma *self,
+                                               MMModemCdmaRegistrationState new_state)
+{
+    g_return_if_fail (MM_IS_MODEM_CDMA (self));
+
+    g_signal_emit (self, signals[REGISTRATION_STATE_CHANGED], 0, new_state);
 }
 
 /*****************************************************************************/
@@ -239,8 +269,16 @@ mm_modem_cdma_init (gpointer g_iface)
                       G_STRUCT_OFFSET (MMModemCdma, signal_quality),
                       NULL, NULL,
                       g_cclosure_marshal_VOID__UINT,
-                      G_TYPE_NONE, 1,
-                      G_TYPE_UINT);
+                      G_TYPE_NONE, 1, G_TYPE_UINT);
+
+    signals[REGISTRATION_STATE_CHANGED] =
+        g_signal_new ("registration-state-changed",
+                      iface_type,
+                      G_SIGNAL_RUN_FIRST,
+                      G_STRUCT_OFFSET (MMModemCdma, registration_state_changed),
+                      NULL, NULL,
+                      g_cclosure_marshal_VOID__UINT,
+                      G_TYPE_NONE, 1, G_TYPE_UINT);
 
     initialized = TRUE;
 }

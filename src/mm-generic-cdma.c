@@ -40,6 +40,7 @@ typedef struct {
     guint32 signal_quality;
     guint32 ip_method;
     gboolean valid;
+    MMModemCdmaRegistrationState reg_state;
 
     MMSerialPort *primary;
     MMSerialPort *secondary;
@@ -60,20 +61,6 @@ mm_generic_cdma_new (const char *device,
                                    MM_MODEM_DRIVER, driver,
                                    MM_MODEM_PLUGIN, plugin,
                                    NULL));
-}
-
-static const char *
-strip_response (const char *resp, const char *cmd)
-{
-    const char *p = resp;
-
-    if (p) {
-        if (!strncmp (p, cmd, strlen (cmd)))
-            p += strlen (cmd);
-        while (*p == ' ')
-            p++;
-    }
-    return p;
 }
 
 /*****************************************************************************/
@@ -183,6 +170,30 @@ release_port (MMModem *modem, const char *subsys, const char *name)
 
     check_valid (MM_GENERIC_CDMA (modem));
 }
+
+/*****************************************************************************/
+
+void
+mm_generic_cdma_set_registration_state (MMGenericCdma *self,
+                                        MMModemCdmaRegistrationState new_state)
+{
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_GENERIC_CDMA (self));
+
+    MM_GENERIC_CDMA_GET_PRIVATE (self)->reg_state = new_state;
+    mm_modem_cdma_emit_registration_state_changed (MM_MODEM_CDMA (self), new_state);
+}
+
+MMModemCdmaRegistrationState
+mm_generic_cdma_get_registration_state_sync (MMGenericCdma *self)
+{
+    g_return_val_if_fail (self != NULL, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+    g_return_val_if_fail (MM_IS_GENERIC_CDMA (self), MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+
+    return MM_GENERIC_CDMA_GET_PRIVATE (self)->reg_state;
+}
+
+/*****************************************************************************/
 
 static void
 enable_error_reporting_done (MMSerialPort *port,
@@ -364,6 +375,20 @@ card_info_invoke (MMCallbackInfo *info)
               info->error, info->user_data);
 }
 
+static const char *
+strip_response (const char *resp, const char *cmd)
+{
+    const char *p = resp;
+
+    if (p) {
+        if (!strncmp (p, cmd, strlen (cmd)))
+            p += strlen (cmd);
+        while (*p == ' ')
+            p++;
+    }
+    return p;
+}
+
 static void
 get_version_done (MMSerialPort *port,
                   GString *response,
@@ -465,6 +490,7 @@ get_signal_quality_done (MMSerialPort *port,
                 priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
                 priv->signal_quality = quality;
                 mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
+                mm_modem_cdma_emit_signal_quality_changed (MM_MODEM_CDMA (info->modem), quality);
             }
         } else
             info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
@@ -678,6 +704,7 @@ serving_system_done (MMSerialPort *port,
             sid = 99999;
 
         if (sid == 0 || sid == 99999) {
+            /* NOTE: update reg_state_css_response() if this error changes */
             info->error = g_error_new_literal (MM_MOBILE_ERROR,
                                                MM_MOBILE_ERROR_NO_NETWORK,
                                                "No service");
@@ -720,6 +747,134 @@ get_serving_system (MMModemCdma *modem,
                                       user_data);
 
     mm_serial_port_queue_command (priv->primary, "+CSS?", 3, serving_system_done, info);
+}
+
+static void
+reg_state_query_done (MMModem *modem, guint32 reg_state, GError *error, gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else {
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (reg_state), NULL);
+        mm_generic_cdma_set_registration_state (MM_GENERIC_CDMA (info->modem), reg_state);
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+reg_state_css_response (MMModemCdma *cdma,
+                        guint32 class,
+                        unsigned char band,
+                        guint32 sid,
+                        GError *error,
+                        gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModem *modem = info->modem;
+
+    /* We'll get an error if the SID isn't valid, so detect that and
+     * report unknown registration status.
+     */
+    if (error) {
+        if (   (error->domain == MM_MOBILE_ERROR)
+            && (error->code == MM_MOBILE_ERROR_NO_NETWORK)) {
+            mm_callback_info_set_result (info,
+                                         GUINT_TO_POINTER (MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN),
+                                         NULL);
+            mm_generic_cdma_set_registration_state (MM_GENERIC_CDMA (modem),
+                                                    MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+        } else {
+            /* Some other error parsing CSS results */
+            info->error = g_error_copy (error);
+        }
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* SID is valid; let subclasses figure out roaming and detailed registration */
+	if (MM_GENERIC_CDMA_GET_CLASS (modem)->query_registration_status) {
+		MM_GENERIC_CDMA_GET_CLASS (modem)->query_registration_status (MM_GENERIC_CDMA (modem),
+		                                                              reg_state_query_done,
+		                                                              info);
+    } else {
+        reg_state_query_done (modem,
+                              MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED,
+                              NULL,
+                              info);
+    }
+}
+
+static void
+get_analog_digital_done (MMSerialPort *port,
+                         GString *response,
+                         GError *error,
+                         gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    const char *reply;
+    long int int_cad;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        goto error;
+    }
+
+    /* Strip any leading command tag and spaces */
+    reply = strip_response (response->str, "+CAD:");
+
+	errno = 0;
+	int_cad = strtol (reply, NULL, 10);
+	if ((errno == EINVAL) || (errno == ERANGE)) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_GENERAL,
+                                           "Failed to parse +CAD response");
+        goto error;
+    }
+
+    if (int_cad == 1) {  /* 1 == CDMA service */
+        /* Now that we have some sort of service, check if the the device is
+         * registered on some network.
+         */
+        get_serving_system (MM_MODEM_CDMA (info->modem),
+                            reg_state_css_response,
+                            info);
+        return;
+    } else {
+        /* No service */
+        info->error = g_error_new_literal (MM_MOBILE_ERROR,
+                                           MM_MOBILE_ERROR_NO_NETWORK,
+                                           "No service");
+    }
+
+error:
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_registration_state (MMModemCdma *modem,
+                        MMModemUIntFn callback,
+                        gpointer user_data)
+{
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
+    MMCallbackInfo *info;
+    gboolean connected;
+
+    connected = mm_port_get_connected (MM_PORT (priv->primary));
+    if (connected && !priv->secondary) {
+        g_message ("Returning saved registration state %d", priv->reg_state);
+        callback (MM_MODEM (modem), priv->reg_state, NULL, user_data);
+        return;
+    }
+
+    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+    /* Prefer secondary port for registration status */
+    mm_serial_port_queue_command (priv->secondary ? priv->secondary : priv->primary,
+                                  "+CAD?",
+                                  3,
+                                  get_analog_digital_done, info);
 }
 
 /*****************************************************************************/
@@ -886,11 +1041,12 @@ modem_init (MMModem *modem_class)
 }
 
 static void
-modem_cdma_init (MMModemCdma *cdma_modem_class)
+modem_cdma_init (MMModemCdma *cdma_class)
 {
-    cdma_modem_class->get_signal_quality = get_signal_quality;
-    cdma_modem_class->get_esn = get_esn;
-    cdma_modem_class->get_serving_system = get_serving_system;
+    cdma_class->get_signal_quality = get_signal_quality;
+    cdma_class->get_esn = get_esn;
+    cdma_class->get_serving_system = get_serving_system;
+    cdma_class->get_registration_state = get_registration_state;
 }
 
 static void
@@ -921,7 +1077,7 @@ set_property (GObject *object, guint prop_id,
         priv->plugin = g_value_dup_string (value);
         break;
     case MM_MODEM_PROP_MASTER_DEVICE:
-        /* Constrcut only */
+        /* Construct only */
         priv->device = g_value_dup_string (value);
         break;
     case MM_MODEM_PROP_IP_METHOD:

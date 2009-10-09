@@ -35,6 +35,16 @@ def get_cdma_band_class(band_class):
     else:
         return "Unknown"
 
+def get_reg_state(state):
+    if state == 1:
+        return "registered (roaming unknown)"
+    elif state == 2:
+        return "registered on home network"
+    elif state == 4:
+        return "registered on roaming network"
+    else:
+        return "unknown"
+
 def inspect_cdma(proxy, dump_private):
     cdma = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_CDMA)
 
@@ -45,8 +55,14 @@ def inspect_cdma(proxy, dump_private):
         except dbus.exceptions.DBusException:
             esn = "<unavailable>"
 
+    print ""
     print "ESN: %s" % esn
-    print "-------------------"
+
+    try:
+        state = cdma.GetRegistrationState()
+        print "Registration: %s" % get_reg_state (state)
+    except dbus.exceptions.DBusException, e:
+        print "Error reading registration state: %s" % e
 
     try:
         info = cdma.GetServingSystem()
