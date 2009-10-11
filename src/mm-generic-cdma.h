@@ -36,9 +36,9 @@ typedef struct {
 typedef struct {
     MMModemBaseClass parent;
 
-    void (*query_registration_status) (MMGenericCdma *self,
-                                       MMModemUIntFn callback,
-                                       gpointer user_data);
+    void (*query_registration_state) (MMGenericCdma *self,
+                                      MMModemUIntFn callback,
+                                      gpointer user_data);
 } MMGenericCdmaClass;
 
 GType mm_generic_cdma_get_type (void);

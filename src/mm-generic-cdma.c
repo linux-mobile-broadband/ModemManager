@@ -820,7 +820,7 @@ reg_state_css_response (MMModemCdma *cdma,
     MMModem *modem = info->modem;
 
     /* We'll get an error if the SID isn't valid, so detect that and
-     * report unknown registration status.
+     * report unknown registration state.
      */
     if (error) {
         if (   (error->domain == MM_MOBILE_ERROR)
@@ -839,10 +839,10 @@ reg_state_css_response (MMModemCdma *cdma,
     }
 
     /* SID is valid; let subclasses figure out roaming and detailed registration */
-	if (MM_GENERIC_CDMA_GET_CLASS (modem)->query_registration_status) {
-		MM_GENERIC_CDMA_GET_CLASS (modem)->query_registration_status (MM_GENERIC_CDMA (modem),
-		                                                              reg_state_query_done,
-		                                                              info);
+	if (MM_GENERIC_CDMA_GET_CLASS (modem)->query_registration_state) {
+		MM_GENERIC_CDMA_GET_CLASS (modem)->query_registration_state (MM_GENERIC_CDMA (modem),
+		                                                             reg_state_query_done,
+		                                                             info);
     } else {
         reg_state_query_done (modem,
                               MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED,
@@ -914,7 +914,7 @@ get_registration_state (MMModemCdma *modem,
     }
 
     info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-    /* Prefer secondary port for registration status */
+    /* Prefer secondary port for registration state */
     mm_serial_port_queue_command (priv->secondary ? priv->secondary : priv->primary,
                                   "+CAD?",
                                   3,
