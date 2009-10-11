@@ -20,6 +20,7 @@
 #include "mm-modem.h"
 #include "mm-modem-base.h"
 #include "mm-modem-cdma.h"
+#include "mm-serial-port.h"
 
 #define MM_TYPE_GENERIC_CDMA            (mm_generic_cdma_get_type ())
 #define MM_GENERIC_CDMA(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_GENERIC_CDMA, MMGenericCdma))
@@ -47,6 +48,16 @@ MMModem *mm_generic_cdma_new (const char *device,
                               const char *plugin);
 
 /* Private, for subclasses */
+
+MMPort * mm_generic_cdma_grab_port (MMGenericCdma *self,
+                                    const char *subsys,
+                                    const char *name,
+                                    MMPortType suggested_type,
+                                    gpointer user_data,
+                                    GError **error);
+
+MMSerialPort *mm_generic_cdma_get_port (MMGenericCdma *modem, MMPortType ptype);
+
 void mm_generic_cdma_set_registration_state (MMGenericCdma *self,
                                              MMModemCdmaRegistrationState new_state);
 

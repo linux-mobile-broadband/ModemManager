@@ -86,15 +86,14 @@ owns_port (MMModem *modem, const char *subsys, const char *name)
     return !!mm_modem_base_get_port (MM_MODEM_BASE (modem), subsys, name);
 }
 
-static gboolean
-grab_port (MMModem *modem,
-           const char *subsys,
-           const char *name,
-           MMPortType suggested_type,
-           gpointer user_data,
-           GError **error)
+MMPort *
+mm_generic_cdma_grab_port (MMGenericCdma *self,
+                           const char *subsys,
+                           const char *name,
+                           MMPortType suggested_type,
+                           gpointer user_data,
+                           GError **error)
 {
-    MMGenericCdma *self = MM_GENERIC_CDMA (modem);
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
     MMPortType ptype = MM_PORT_TYPE_IGNORED;
     MMPort *port;
@@ -140,7 +139,18 @@ grab_port (MMModem *modem,
         }
     }
 
-    return TRUE;
+    return port;
+}
+
+static gboolean
+grab_port (MMModem *modem,
+           const char *subsys,
+           const char *name,
+           MMPortType suggested_type,
+           gpointer user_data,
+           GError **error)
+{
+    return !!mm_generic_cdma_grab_port (MM_GENERIC_CDMA (modem), subsys, name, suggested_type, user_data, error);
 }
 
 static void
@@ -169,6 +179,21 @@ release_port (MMModem *modem, const char *subsys, const char *name)
     }
 
     check_valid (MM_GENERIC_CDMA (modem));
+}
+
+MMSerialPort *
+mm_generic_cdma_get_port (MMGenericCdma *modem,
+                          MMPortType ptype)
+{
+    g_return_val_if_fail (MM_IS_GENERIC_CDMA (modem), NULL);
+    g_return_val_if_fail (ptype != MM_PORT_TYPE_UNKNOWN, NULL);
+
+    if (ptype == MM_PORT_TYPE_PRIMARY)
+        return MM_GENERIC_CDMA_GET_PRIVATE (modem)->primary;
+    else if (ptype == MM_PORT_TYPE_SECONDARY)
+        return MM_GENERIC_CDMA_GET_PRIVATE (modem)->secondary;
+
+    return NULL;
 }
 
 /*****************************************************************************/
