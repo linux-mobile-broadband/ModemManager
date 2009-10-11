@@ -202,9 +202,16 @@ enable_error_reporting_done (MMSerialPort *port,
                              gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
 
     if (error)
         g_warning ("Your CDMA modem does not support +CMEE command");
+
+    /* Open up the second port, if one exists */
+    if (priv->secondary) {
+        if (!mm_serial_port_open (priv->secondary, &info->error))
+            g_assert (info->error);
+    }
 
     /* Ignore errors, see FIXME in init_done() */
     mm_callback_info_schedule (info);
@@ -289,6 +296,9 @@ disable (MMModem *modem,
     MMCallbackInfo *info;
 
     info = mm_callback_info_new (modem, callback, user_data);
+
+    if (priv->secondary)
+        mm_serial_port_close (priv->secondary);
 
     if (mm_port_get_connected (MM_PORT (priv->primary)))
         mm_serial_port_flash (priv->primary, 1000, disable_flash_done, info);
@@ -452,9 +462,15 @@ get_card_info (MMModem *modem,
                                       G_CALLBACK (callback),
                                       user_data);
 
-    mm_serial_port_queue_command_cached (priv->primary, "+GMI", 3, get_manufacturer_done, info);
-    mm_serial_port_queue_command_cached (priv->primary, "+GMM", 3, get_model_done, info);
-    mm_serial_port_queue_command_cached (priv->primary, "+GMR", 3, get_version_done, info);
+    mm_serial_port_queue_command_cached (priv->secondary ? priv->secondary : priv->primary,
+                                         "+GMI", 3,
+                                         get_manufacturer_done, info);
+    mm_serial_port_queue_command_cached (priv->secondary ? priv->secondary : priv->primary,
+                                         "+GMM", 3,
+                                         get_model_done, info);
+    mm_serial_port_queue_command_cached (priv->secondary ? priv->secondary : priv->primary,
+                                         "+GMR", 3,
+                                         get_version_done, info);
 }
 
 /*****************************************************************************/
@@ -519,8 +535,7 @@ get_signal_quality (MMModemCdma *modem,
     info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
     /* Prefer secondary port for signal strength */
     mm_serial_port_queue_command (priv->secondary ? priv->secondary : priv->primary,
-                                  "+CSQ",
-                                  3,
+                                  "+CSQ", 3,
                                   get_signal_quality_done, info);
 }
 
@@ -563,7 +578,9 @@ get_esn (MMModemCdma *modem,
     }
 
     info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
-    mm_serial_port_queue_command_cached (priv->primary, "+GSN", 3, get_string_done, info);
+    mm_serial_port_queue_command_cached (priv->secondary ? priv->secondary : priv->primary,
+                                         "+GSN", 3,
+                                         get_string_done, info);
 }
 
 static void
@@ -746,7 +763,9 @@ get_serving_system (MMModemCdma *modem,
                                       G_CALLBACK (callback),
                                       user_data);
 
-    mm_serial_port_queue_command (priv->primary, "+CSS?", 3, serving_system_done, info);
+    mm_serial_port_queue_command (priv->secondary ? priv->secondary : priv->primary,
+                                  "+CSS?", 3,
+                                  serving_system_done, info);
 }
 
 static void
