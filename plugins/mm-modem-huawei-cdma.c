@@ -139,7 +139,6 @@ sysinfo_done (MMSerialPort *port,
     }
 
     g_regex_match (r, reply, 0, &match_info);
-g_message ("%s: %d matches", __func__, g_match_info_get_match_count (match_info));
     if (g_match_info_get_match_count (match_info) >= 5) {
         MMModemCdmaRegistrationState reg_state;
         guint32 val = 0;
@@ -162,7 +161,6 @@ g_message ("%s: %d matches", __func__, g_match_info_get_match_count (match_info)
 
         /* FIXME: Parse sysmode */
 
-g_message ("%s: reg state %d", __func__, reg_state);
         mm_callback_info_set_result (info, GUINT_TO_POINTER (reg_state), NULL);
         success = TRUE;
     }
@@ -192,7 +190,6 @@ query_registration_state (MMGenericCdma *cdma,
     primary = mm_generic_cdma_get_port (cdma, MM_PORT_TYPE_PRIMARY);
     secondary = mm_generic_cdma_get_port (cdma, MM_PORT_TYPE_SECONDARY);
 
-g_message ("%s: adfasdf", __func__);
     if (mm_port_get_connected (MM_PORT (primary)) && !secondary) {
         error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
                                      "Cannot get query registration state while connected");
@@ -201,7 +198,6 @@ g_message ("%s: adfasdf", __func__);
         return;
     }
 
-g_message ("%s: here!", __func__);
     info = mm_callback_info_uint_new (MM_MODEM (cdma), callback, user_data);
     mm_serial_port_queue_command (secondary ? secondary : primary,
                                   "AT^SYSINFO", 3,
