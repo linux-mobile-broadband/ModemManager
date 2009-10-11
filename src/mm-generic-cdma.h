@@ -63,4 +63,6 @@ void mm_generic_cdma_set_registration_state (MMGenericCdma *self,
 
 MMModemCdmaRegistrationState mm_generic_cdma_get_registration_state_sync (MMGenericCdma *self);
 
+void mm_generic_cdma_update_signal_quality (MMGenericCdma *self, guint32 quality);
+
 #endif /* MM_GENERIC_CDMA_H */

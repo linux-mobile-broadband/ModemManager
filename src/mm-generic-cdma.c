@@ -500,6 +500,16 @@ get_card_info (MMModem *modem,
 
 /*****************************************************************************/
 
+void
+mm_generic_cdma_update_signal_quality (MMGenericCdma *self, guint32 quality)
+{
+    g_return_if_fail (MM_IS_GENERIC_CDMA (self));
+    g_return_if_fail (quality >= 0 && quality <= 100);
+
+    MM_GENERIC_CDMA_GET_PRIVATE (self)->signal_quality = quality;
+    mm_modem_cdma_emit_signal_quality_changed (MM_MODEM_CDMA (self), quality);
+}
+
 static void
 get_signal_quality_done (MMSerialPort *port,
                          GString *response,
