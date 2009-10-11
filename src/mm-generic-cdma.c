@@ -738,11 +738,25 @@ serving_system_done (MMSerialPort *port,
 
         g_regex_match (r, reply, 0, &match_info);
         if (g_match_info_get_match_count (match_info) >= 3) {
-            class = normalize_class (g_match_info_fetch (match_info, 1));
-            band = normalize_band (g_match_info_fetch (match_info, 2), &override_class);
+            char *str;
+
+            /* band class */
+            str = g_match_info_fetch (match_info, 1);
+            class = normalize_class (str);
+            g_free (str);
+
+            /* band */
+            str = g_match_info_fetch (match_info, 2);
+            band = normalize_band (str, &override_class);
             if (override_class)
                 class = override_class;
-            sid = normalize_sid (g_match_info_fetch (match_info, 3));
+            g_free (str);
+
+            /* sid */
+            str = g_match_info_fetch (match_info, 3);
+            sid = normalize_sid (str);
+            g_free (str);
+
             success = TRUE;
         }
 
