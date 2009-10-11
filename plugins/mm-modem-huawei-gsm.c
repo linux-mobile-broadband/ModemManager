@@ -21,34 +21,34 @@
 #define G_UDEV_API_IS_SUBJECT_TO_CHANGE
 #include <gudev/gudev.h>
 
-#include "mm-modem-huawei.h"
+#include "mm-modem-huawei-gsm.h"
 #include "mm-modem-gsm-network.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 #include "mm-serial-port.h"
 #include "mm-serial-parsers.h"
 
-static gpointer mm_modem_huawei_parent_class = NULL;
+static gpointer mm_modem_huawei_gsm_parent_class = NULL;
 
-#define MM_MODEM_HUAWEI_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_HUAWEI, MMModemHuaweiPrivate))
+#define MM_MODEM_HUAWEI_GSM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_HUAWEI_GSM, MMModemHuaweiGsmPrivate))
 
 typedef struct {
     /* Cached state */
     guint signal_quality;
     MMModemGsmMode mode;
     MMModemGsmBand band;
-} MMModemHuaweiPrivate;
+} MMModemHuaweiGsmPrivate;
 
 MMModem *
-mm_modem_huawei_new (const char *device,
-                     const char *driver,
-                     const char *plugin)
+mm_modem_huawei_gsm_new (const char *device,
+                         const char *driver,
+                         const char *plugin)
 {
     g_return_val_if_fail (device != NULL, NULL);
     g_return_val_if_fail (driver != NULL, NULL);
     g_return_val_if_fail (plugin != NULL, NULL);
 
-    return MM_MODEM (g_object_new (MM_TYPE_MODEM_HUAWEI,
+    return MM_MODEM (g_object_new (MM_TYPE_MODEM_HUAWEI_GSM,
                                    MM_MODEM_MASTER_DEVICE, device,
                                    MM_MODEM_DRIVER, driver,
                                    MM_MODEM_PLUGIN, plugin,
@@ -56,7 +56,7 @@ mm_modem_huawei_new (const char *device,
 }
 
 static gboolean
-parse_syscfg (MMModemHuawei *self,
+parse_syscfg (MMModemHuaweiGsm *self,
               const char *reply,
               int *mode_a,
               int *mode_b,
@@ -68,7 +68,7 @@ parse_syscfg (MMModemHuawei *self,
         return FALSE;
 
     if (sscanf (reply + 8, "%d,%d,%x,%d,%d", mode_a, mode_b, band, unknown1, unknown2)) {
-        MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (self);
+        MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (self);
                 
         /* Network mode */
         if (*mode_a == 2 && *mode_b == 1)
@@ -101,8 +101,8 @@ set_network_mode_done (MMSerialPort *port,
                        gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemHuawei *self = MM_MODEM_HUAWEI (info->modem);
-    MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (self);
+    MMModemHuaweiGsm *self = MM_MODEM_HUAWEI_GSM (info->modem);
+    MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (self);
 
     if (error)
         info->error = g_error_copy (error);
@@ -128,7 +128,7 @@ set_network_mode_get_done (MMSerialPort *port,
         int a, b, u1, u2;
         guint32 band;
 
-        if (parse_syscfg (MM_MODEM_HUAWEI (info->modem), response->str, &a, &b, &band, &u1, &u2)) {
+        if (parse_syscfg (MM_MODEM_HUAWEI_GSM (info->modem), response->str, &a, &b, &band, &u1, &u2)) {
             char *command;
 
             switch (GPOINTER_TO_UINT (mm_callback_info_get_data (info, "mode"))) {
@@ -213,8 +213,8 @@ get_network_mode_done (MMSerialPort *port,
                        gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemHuawei *self = MM_MODEM_HUAWEI (info->modem);
-    MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (self);
+    MMModemHuaweiGsm *self = MM_MODEM_HUAWEI_GSM (info->modem);
+    MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (self);
     int mode_a, mode_b, u1, u2;
     guint32 band;
 
@@ -231,7 +231,7 @@ get_network_mode (MMModemGsmNetwork *modem,
                   MMModemUIntFn callback,
                   gpointer user_data)
 {
-    MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (modem);
+    MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (modem);
 
     if (priv->mode != MM_MODEM_GSM_MODE_ANY) {
         /* have cached mode (from an unsolicited message). Use that */
@@ -259,8 +259,8 @@ set_band_done (MMSerialPort *port,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemHuawei *self = MM_MODEM_HUAWEI (info->modem);
-    MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (self);
+    MMModemHuaweiGsm *self = MM_MODEM_HUAWEI_GSM (info->modem);
+    MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (self);
 
     if (error)
         info->error = g_error_copy (error);
@@ -278,7 +278,7 @@ set_band_get_done (MMSerialPort *port,
                    gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemHuawei *self = MM_MODEM_HUAWEI (info->modem);
+    MMModemHuaweiGsm *self = MM_MODEM_HUAWEI_GSM (info->modem);
 
     if (error) {
         info->error = g_error_copy (error);
@@ -357,8 +357,8 @@ get_band_done (MMSerialPort *port,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemHuawei *self = MM_MODEM_HUAWEI (info->modem);
-    MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (self);
+    MMModemHuaweiGsm *self = MM_MODEM_HUAWEI_GSM (info->modem);
+    MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (self);
     int mode_a, mode_b, u1, u2;
     guint32 band;
 
@@ -375,7 +375,7 @@ get_band (MMModemGsmNetwork *modem,
           MMModemUIntFn callback,
           gpointer user_data)
 {
-    MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (modem);
+    MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (modem);
     MMSerialPort *primary;
 
     if (priv->band != MM_MODEM_GSM_BAND_ANY) {
@@ -401,7 +401,7 @@ get_signal_quality (MMModemGsmNetwork *modem,
                     MMModemUIntFn callback,
                     gpointer user_data)
 {
-    MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (modem);
+    MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (modem);
 
     if (priv->signal_quality) {
         /* have cached signal quality (from an unsolicited message). Use that */
@@ -426,8 +426,8 @@ handle_signal_quality_change (MMSerialPort *port,
                               GMatchInfo *match_info,
                               gpointer user_data)
 {
-    MMModemHuawei *self = MM_MODEM_HUAWEI (user_data);
-    MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (self);
+    MMModemHuaweiGsm *self = MM_MODEM_HUAWEI_GSM (user_data);
+    MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (self);
     char *str;
     int quality;
 
@@ -452,8 +452,8 @@ handle_mode_change (MMSerialPort *port,
                     GMatchInfo *match_info,
                     gpointer user_data)
 {
-    MMModemHuawei *self = MM_MODEM_HUAWEI (user_data);
-    MMModemHuaweiPrivate *priv = MM_MODEM_HUAWEI_GET_PRIVATE (self);
+    MMModemHuaweiGsm *self = MM_MODEM_HUAWEI_GSM (user_data);
+    MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (self);
     char *str;
     int a;
     int b;
@@ -600,35 +600,35 @@ modem_gsm_network_init (MMModemGsmNetwork *class)
 }
 
 static void
-mm_modem_huawei_init (MMModemHuawei *self)
+mm_modem_huawei_gsm_init (MMModemHuaweiGsm *self)
 {
 }
 
 static void
-mm_modem_huawei_class_init (MMModemHuaweiClass *klass)
+mm_modem_huawei_gsm_class_init (MMModemHuaweiGsmClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
-    mm_modem_huawei_parent_class = g_type_class_peek_parent (klass);
-    g_type_class_add_private (object_class, sizeof (MMModemHuaweiPrivate));
+    mm_modem_huawei_gsm_parent_class = g_type_class_peek_parent (klass);
+    g_type_class_add_private (object_class, sizeof (MMModemHuaweiGsmPrivate));
 }
 
 GType
-mm_modem_huawei_get_type (void)
+mm_modem_huawei_gsm_get_type (void)
 {
-    static GType modem_huawei_type = 0;
+    static GType modem_huawei_gsm_type = 0;
 
-    if (G_UNLIKELY (modem_huawei_type == 0)) {
-        static const GTypeInfo modem_huawei_type_info = {
-            sizeof (MMModemHuaweiClass),
+    if (G_UNLIKELY (modem_huawei_gsm_type == 0)) {
+        static const GTypeInfo modem_huawei_gsm_type_info = {
+            sizeof (MMModemHuaweiGsmClass),
             (GBaseInitFunc) NULL,
             (GBaseFinalizeFunc) NULL,
-            (GClassInitFunc) mm_modem_huawei_class_init,
+            (GClassInitFunc) mm_modem_huawei_gsm_class_init,
             (GClassFinalizeFunc) NULL,
             NULL,   /* class_data */
-            sizeof (MMModemHuawei),
+            sizeof (MMModemHuaweiGsm),
             0,      /* n_preallocs */
-            (GInstanceInitFunc) mm_modem_huawei_init,
+            (GInstanceInitFunc) mm_modem_huawei_gsm_init,
         };
 
         static const GInterfaceInfo modem_iface_info = {
@@ -639,10 +639,10 @@ mm_modem_huawei_get_type (void)
             (GInterfaceInitFunc) modem_gsm_network_init
         };
 
-        modem_huawei_type = g_type_register_static (MM_TYPE_GENERIC_GSM, "MMModemHuawei", &modem_huawei_type_info, 0);
-        g_type_add_interface_static (modem_huawei_type, MM_TYPE_MODEM, &modem_iface_info);
-        g_type_add_interface_static (modem_huawei_type, MM_TYPE_MODEM_GSM_NETWORK, &modem_gsm_network_info);
+        modem_huawei_gsm_type = g_type_register_static (MM_TYPE_GENERIC_GSM, "MMModemHuaweiGsm", &modem_huawei_gsm_type_info, 0);
+        g_type_add_interface_static (modem_huawei_gsm_type, MM_TYPE_MODEM, &modem_iface_info);
+        g_type_add_interface_static (modem_huawei_gsm_type, MM_TYPE_MODEM_GSM_NETWORK, &modem_gsm_network_info);
     }
 
-    return modem_huawei_type;
+    return modem_huawei_gsm_type;
 }

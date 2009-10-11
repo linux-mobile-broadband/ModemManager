@@ -68,8 +68,8 @@ libmm_plugin_gobi_la_LDFLAGS = \
 libmm_plugin_huawei_la_SOURCES = \
 	mm-plugin-huawei.c \
 	mm-plugin-huawei.h \
-	mm-modem-huawei.c \
-	mm-modem-huawei.h
+	mm-modem-huawei-gsm.c \
+	mm-modem-huawei-gsm.h
 
 libmm_plugin_huawei_la_CPPFLAGS = \
 	$(MM_CFLAGS) \

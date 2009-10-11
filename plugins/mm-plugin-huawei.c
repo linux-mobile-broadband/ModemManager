@@ -23,7 +23,7 @@
 #include "mm-plugin-huawei.h"
 #include "mm-generic-gsm.h"
 #include "mm-generic-cdma.h"
-#include "mm-modem-huawei.h"
+#include "mm-modem-huawei-gsm.h"
 #include "mm-serial-parsers.h"
 
 G_DEFINE_TYPE (MMPluginHuawei, mm_plugin_huawei, MM_TYPE_PLUGIN_BASE)
@@ -287,9 +287,9 @@ grab_port (MMPluginBase *base,
                                             mm_plugin_base_supports_task_get_driver (task),
                                             mm_plugin_get_name (MM_PLUGIN (base)));
             } else {
-                modem = mm_modem_huawei_new (sysfs_path,
-                                             mm_plugin_base_supports_task_get_driver (task),
-                                             mm_plugin_get_name (MM_PLUGIN (base)));
+                modem = mm_modem_huawei_gsm_new (sysfs_path,
+                                                 mm_plugin_base_supports_task_get_driver (task),
+                                                 mm_plugin_get_name (MM_PLUGIN (base)));
             }
         } else if (caps & CAP_CDMA) {
             modem = mm_generic_cdma_new (sysfs_path,
