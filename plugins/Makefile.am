@@ -69,7 +69,9 @@ libmm_plugin_huawei_la_SOURCES = \
 	mm-plugin-huawei.c \
 	mm-plugin-huawei.h \
 	mm-modem-huawei-gsm.c \
-	mm-modem-huawei-gsm.h
+	mm-modem-huawei-gsm.h \
+	mm-modem-huawei-cdma.c \
+	mm-modem-huawei-cdma.h
 
 libmm_plugin_huawei_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
