@@ -40,7 +40,7 @@ def get_reg_state(state):
         return "registered (roaming unknown)"
     elif state == 2:
         return "registered on home network"
-    elif state == 4:
+    elif state == 3:
         return "registered on roaming network"
     else:
         return "unknown"
