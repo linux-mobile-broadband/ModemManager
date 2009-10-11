@@ -146,8 +146,8 @@ libmm_plugin_option_la_LDFLAGS = \
 libmm_plugin_sierra_la_SOURCES = \
 	mm-plugin-sierra.c \
 	mm-plugin-sierra.h \
-	mm-modem-sierra.c \
-	mm-modem-sierra.h
+	mm-modem-sierra-gsm.c \
+	mm-modem-sierra-gsm.h
 
 libmm_plugin_sierra_la_CPPFLAGS = \
 	$(MM_CFLAGS) \

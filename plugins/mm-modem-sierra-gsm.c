@@ -18,22 +18,22 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include "mm-modem-sierra.h"
+#include "mm-modem-sierra-gsm.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 
-static gpointer mm_modem_sierra_parent_class = NULL;
+static gpointer mm_modem_sierra_gsm_parent_class = NULL;
 
 MMModem *
-mm_modem_sierra_new (const char *device,
-                     const char *driver,
-                     const char *plugin)
+mm_modem_sierra_gsm_new (const char *device,
+                         const char *driver,
+                         const char *plugin)
 {
     g_return_val_if_fail (device != NULL, NULL);
     g_return_val_if_fail (driver != NULL, NULL);
     g_return_val_if_fail (plugin != NULL, NULL);
 
-    return MM_MODEM (g_object_new (MM_TYPE_MODEM_SIERRA,
+    return MM_MODEM (g_object_new (MM_TYPE_MODEM_SIERRA_GSM,
                                    MM_MODEM_MASTER_DEVICE, device,
                                    MM_MODEM_DRIVER, driver,
                                    MM_MODEM_PLUGIN, plugin,
@@ -132,41 +132,41 @@ modem_init (MMModem *modem_class)
 }
 
 static void
-mm_modem_sierra_init (MMModemSierra *self)
+mm_modem_sierra_gsm_init (MMModemSierraGsm *self)
 {
 }
 
 static void
-mm_modem_sierra_class_init (MMModemSierraClass *klass)
+mm_modem_sierra_gsm_class_init (MMModemSierraGsmClass *klass)
 {
-    mm_modem_sierra_parent_class = g_type_class_peek_parent (klass);
+    mm_modem_sierra_gsm_parent_class = g_type_class_peek_parent (klass);
 }
 
 GType
-mm_modem_sierra_get_type (void)
+mm_modem_sierra_gsm_get_type (void)
 {
-    static GType modem_sierra_type = 0;
+    static GType modem_sierra_gsm_type = 0;
 
-    if (G_UNLIKELY (modem_sierra_type == 0)) {
-        static const GTypeInfo modem_sierra_type_info = {
-            sizeof (MMModemSierraClass),
+    if (G_UNLIKELY (modem_sierra_gsm_type == 0)) {
+        static const GTypeInfo modem_sierra_gsm_type_info = {
+            sizeof (MMModemSierraGsmClass),
             (GBaseInitFunc) NULL,
             (GBaseFinalizeFunc) NULL,
-            (GClassInitFunc) mm_modem_sierra_class_init,
+            (GClassInitFunc) mm_modem_sierra_gsm_class_init,
             (GClassFinalizeFunc) NULL,
             NULL,   /* class_data */
-            sizeof (MMModemSierra),
+            sizeof (MMModemSierraGsm),
             0,      /* n_preallocs */
-            (GInstanceInitFunc) mm_modem_sierra_init,
+            (GInstanceInitFunc) mm_modem_sierra_gsm_init,
         };
 
         static const GInterfaceInfo modem_iface_info = { 
             (GInterfaceInitFunc) modem_init
         };
 
-        modem_sierra_type = g_type_register_static (MM_TYPE_GENERIC_GSM, "MMModemSierra", &modem_sierra_type_info, 0);
-        g_type_add_interface_static (modem_sierra_type, MM_TYPE_MODEM, &modem_iface_info);
+        modem_sierra_gsm_type = g_type_register_static (MM_TYPE_GENERIC_GSM, "MMModemSierraGsm", &modem_sierra_gsm_type_info, 0);
+        g_type_add_interface_static (modem_sierra_gsm_type, MM_TYPE_MODEM, &modem_iface_info);
     }
 
-    return modem_sierra_type;
+    return modem_sierra_gsm_type;
 }
