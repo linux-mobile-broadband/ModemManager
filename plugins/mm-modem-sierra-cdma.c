@@ -67,6 +67,7 @@ mm_modem_sierra_cdma_new (const char *device,
 /*****************************************************************************/
 
 #define MODEM_REG_TAG "Modem has registered"
+#define GENERIC_ROAM_TAG "Roaming:"
 #define ROAM_1X_TAG "1xRoam:"
 #define ROAM_EVDO_TAG "HDRRoam:"
 #define SYS_MODE_TAG "Sys Mode:"
@@ -172,6 +173,17 @@ status_done (MMSerialPort *port,
             mm_generic_cdma_query_reg_state_set_callback_evdo_state (info,
                         bool_val ? MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING :
                                    MM_MODEM_CDMA_REGISTRATION_STATE_HOME);
+            evdo_set = TRUE;
+        }
+        if (get_roam_value (*iter, GENERIC_ROAM_TAG, &bool_val)) {
+            MMModemCdmaRegistrationState reg_state;
+
+            reg_state = bool_val ? MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING :
+                                   MM_MODEM_CDMA_REGISTRATION_STATE_HOME;
+
+            mm_generic_cdma_query_reg_state_set_callback_1x_state (info, reg_state);
+            mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, reg_state);
+            cdma_1x_set = TRUE;
             evdo_set = TRUE;
         }
 
