@@ -215,7 +215,7 @@ query_registration_state (MMGenericCdma *cdma,
     }
 
     mm_serial_port_queue_command (secondary ? secondary : primary,
-                                  "AT^SYSINFO", 3,
+                                  "^SYSINFO", 3,
                                   sysinfo_done, info);
 }
 
