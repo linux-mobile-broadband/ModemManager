@@ -38,7 +38,9 @@ typedef struct {
 MMModem *
 mm_modem_huawei_cdma_new (const char *device,
                          const char *driver,
-                         const char *plugin)
+                         const char *plugin,
+                         gboolean evdo_rev0,
+                         gboolean evdo_revA)
 {
     g_return_val_if_fail (device != NULL, NULL);
     g_return_val_if_fail (driver != NULL, NULL);
@@ -48,6 +50,8 @@ mm_modem_huawei_cdma_new (const char *device,
                                    MM_MODEM_MASTER_DEVICE, device,
                                    MM_MODEM_DRIVER, driver,
                                    MM_MODEM_PLUGIN, plugin,
+                                   MM_GENERIC_CDMA_EVDO_REV0, evdo_rev0,
+                                   MM_GENERIC_CDMA_EVDO_REVA, evdo_revA,
                                    NULL));
 }
 
@@ -159,9 +163,21 @@ sysinfo_done (MMSerialPort *port,
             }
         }
 
-        /* FIXME: Parse sysmode */
-
-        mm_callback_info_set_result (info, GUINT_TO_POINTER (reg_state), NULL);
+        /* Check service type */
+        val = 0;
+        if (uint_from_match_item (match_info, 4, &val)) {
+            if (val == 2)
+                mm_generic_cdma_query_reg_state_set_callback_1x_state (info, reg_state);
+            else if (val == 4)
+                mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, reg_state);
+            else if (val == 8) {
+                mm_generic_cdma_query_reg_state_set_callback_1x_state (info, reg_state);
+                mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, reg_state);
+            }
+        } else {
+            /* Say we're registered to something even though sysmode parsing failed */
+            mm_generic_cdma_query_reg_state_set_callback_1x_state (info, reg_state);
+        }
         success = TRUE;
     }
 
@@ -180,25 +196,24 @@ done:
 
 static void
 query_registration_state (MMGenericCdma *cdma,
-                          MMModemUIntFn callback,
+                          MMModemCdmaRegistrationStateFn callback,
                           gpointer user_data)
 {
     MMCallbackInfo *info;
     MMSerialPort *primary, *secondary;
-    GError *error;
 
     primary = mm_generic_cdma_get_port (cdma, MM_PORT_TYPE_PRIMARY);
     secondary = mm_generic_cdma_get_port (cdma, MM_PORT_TYPE_SECONDARY);
 
+    info = mm_generic_cdma_query_reg_state_callback_info_new (cdma, callback, user_data);
+
     if (mm_port_get_connected (MM_PORT (primary)) && !secondary) {
-        error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
-                                     "Cannot get query registration state while connected");
-        callback (MM_MODEM (cdma), MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN, error, user_data);
-        g_error_free (error);
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
+                                           "Cannot get query registration state while connected");
+        mm_callback_info_schedule (info);
         return;
     }
 
-    info = mm_callback_info_uint_new (MM_MODEM (cdma), callback, user_data);
     mm_serial_port_queue_command (secondary ? secondary : primary,
                                   "AT^SYSINFO", 3,
                                   sysinfo_done, info);

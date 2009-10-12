@@ -40,17 +40,30 @@ typedef struct {
     guint32 signal_quality;
     guint32 ip_method;
     gboolean valid;
-    MMModemCdmaRegistrationState reg_state;
+    gboolean evdo_rev0;
+    gboolean evdo_revA;
+
+    MMModemCdmaRegistrationState cdma_1x_reg_state;
+    MMModemCdmaRegistrationState evdo_reg_state;
 
     MMSerialPort *primary;
     MMSerialPort *secondary;
     MMPort *data;
 } MMGenericCdmaPrivate;
 
+enum {
+    PROP_0,
+    PROP_EVDO_REV0,
+    PROP_EVDO_REVA,
+    LAST_PROP
+};
+
 MMModem *
 mm_generic_cdma_new (const char *device,
                      const char *driver,
-                     const char *plugin)
+                     const char *plugin,
+                     gboolean evdo_rev0,
+                     gboolean evdo_revA)
 {
     g_return_val_if_fail (device != NULL, NULL);
     g_return_val_if_fail (driver != NULL, NULL);
@@ -60,6 +73,8 @@ mm_generic_cdma_new (const char *device,
                                    MM_MODEM_MASTER_DEVICE, device,
                                    MM_MODEM_DRIVER, driver,
                                    MM_MODEM_PLUGIN, plugin,
+                                   MM_GENERIC_CDMA_EVDO_REV0, evdo_rev0,
+                                   MM_GENERIC_CDMA_EVDO_REVA, evdo_revA,
                                    NULL));
 }
 
@@ -199,23 +214,67 @@ mm_generic_cdma_get_port (MMGenericCdma *modem,
 /*****************************************************************************/
 
 void
-mm_generic_cdma_set_registration_state (MMGenericCdma *self,
-                                        MMModemCdmaRegistrationState new_state)
+mm_generic_cdma_set_1x_registration_state (MMGenericCdma *self,
+                                           MMModemCdmaRegistrationState new_state)
 {
+    MMGenericCdmaPrivate *priv;
+
     g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_GENERIC_CDMA (self));
 
-    MM_GENERIC_CDMA_GET_PRIVATE (self)->reg_state = new_state;
-    mm_modem_cdma_emit_registration_state_changed (MM_MODEM_CDMA (self), new_state);
+    priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
+
+    if (priv->cdma_1x_reg_state != new_state) {
+        priv->cdma_1x_reg_state = new_state;
+
+        mm_modem_cdma_emit_registration_state_changed (MM_MODEM_CDMA (self),
+                                                       priv->cdma_1x_reg_state,
+                                                       priv->evdo_reg_state);
+    }
+}
+
+void
+mm_generic_cdma_set_evdo_registration_state (MMGenericCdma *self,
+                                             MMModemCdmaRegistrationState new_state)
+{
+    MMGenericCdmaPrivate *priv;
+
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_GENERIC_CDMA (self));
+
+    priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
+
+    if (priv->evdo_reg_state == new_state)
+        return;
+
+    /* Don't update EVDO state if the card doesn't support it */
+    if (   priv->evdo_rev0
+        || priv->evdo_revA
+        || (new_state == MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)) {
+        priv->evdo_reg_state = new_state;
+
+        mm_modem_cdma_emit_registration_state_changed (MM_MODEM_CDMA (self),
+                                                       priv->cdma_1x_reg_state,
+                                                       priv->evdo_reg_state);
+    }
 }
 
 MMModemCdmaRegistrationState
-mm_generic_cdma_get_registration_state_sync (MMGenericCdma *self)
+mm_generic_cdma_1x_get_registration_state_sync (MMGenericCdma *self)
 {
     g_return_val_if_fail (self != NULL, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
     g_return_val_if_fail (MM_IS_GENERIC_CDMA (self), MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
 
-    return MM_GENERIC_CDMA_GET_PRIVATE (self)->reg_state;
+    return MM_GENERIC_CDMA_GET_PRIVATE (self)->cdma_1x_reg_state;
+}
+
+MMModemCdmaRegistrationState
+mm_generic_cdma_evdo_get_registration_state_sync (MMGenericCdma *self)
+{
+    g_return_val_if_fail (self != NULL, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+    g_return_val_if_fail (MM_IS_GENERIC_CDMA (self), MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+
+    return MM_GENERIC_CDMA_GET_PRIVATE (self)->evdo_reg_state;
 }
 
 /*****************************************************************************/
@@ -817,16 +876,110 @@ get_serving_system (MMModemCdma *modem,
                                   serving_system_done, info);
 }
 
+#define CDMA_1X_STATE_TAG     "cdma-1x-reg-state"
+#define EVDO_STATE_TAG        "evdo-reg-state"
+
+void
+mm_generic_cdma_query_reg_state_set_callback_1x_state (MMCallbackInfo *info,
+                                                       MMModemCdmaRegistrationState new_state)
+{
+    g_return_if_fail (info != NULL);
+    g_return_if_fail (info->modem != NULL);
+    g_return_if_fail (MM_IS_GENERIC_CDMA (info->modem));
+
+    mm_callback_info_set_data (info, CDMA_1X_STATE_TAG, GUINT_TO_POINTER (new_state), NULL);
+}
+
+void
+mm_generic_cdma_query_reg_state_set_callback_evdo_state (MMCallbackInfo *info,
+                                                         MMModemCdmaRegistrationState new_state)
+{
+    g_return_if_fail (info != NULL);
+    g_return_if_fail (info->modem != NULL);
+    g_return_if_fail (MM_IS_GENERIC_CDMA (info->modem));
+
+    mm_callback_info_set_data (info, EVDO_STATE_TAG, GUINT_TO_POINTER (new_state), NULL);
+}
+
 static void
-reg_state_query_done (MMModem *modem, guint32 reg_state, GError *error, gpointer user_data)
+registration_state_invoke (MMCallbackInfo *info)
+{
+    MMModemCdmaRegistrationStateFn callback = (MMModemCdmaRegistrationStateFn) info->callback;
+
+    /* note: This is the MMModemCdma interface callback */
+    callback (MM_MODEM_CDMA (info->modem),
+              GPOINTER_TO_UINT (mm_callback_info_get_data (info, CDMA_1X_STATE_TAG)),
+              GPOINTER_TO_UINT (mm_callback_info_get_data (info, EVDO_STATE_TAG)),
+              info->error,
+              info->user_data);
+}
+
+MMCallbackInfo *
+mm_generic_cdma_query_reg_state_callback_info_new (MMGenericCdma *self,
+                                                   MMModemCdmaRegistrationStateFn callback,
+                                                   gpointer user_data)
+{
+    MMGenericCdmaPrivate *priv;
+    MMCallbackInfo *info;
+
+    g_return_val_if_fail (self != NULL, NULL);
+    g_return_val_if_fail (MM_IS_GENERIC_CDMA (self), NULL);
+    g_return_val_if_fail (callback != NULL, NULL);
+
+    info = mm_callback_info_new_full (MM_MODEM (self),
+                                      registration_state_invoke,
+                                      G_CALLBACK (callback),
+                                      user_data);
+
+    /* Fill with current state */
+    priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
+    mm_callback_info_set_data (info,
+                               CDMA_1X_STATE_TAG,
+                               GUINT_TO_POINTER (priv->cdma_1x_reg_state),
+                               NULL);
+    mm_callback_info_set_data (info,
+                               EVDO_STATE_TAG,
+                               GUINT_TO_POINTER (priv->evdo_reg_state),
+                               NULL);
+    return info;
+}
+
+static void
+set_callback_1x_state_helper (MMCallbackInfo *info,
+                              MMModemCdmaRegistrationState new_state)
+{
+    MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
+
+    mm_generic_cdma_set_1x_registration_state (self, new_state);
+    mm_generic_cdma_query_reg_state_set_callback_1x_state (info, priv->cdma_1x_reg_state);
+}
+
+static void
+set_callback_evdo_state_helper (MMCallbackInfo *info,
+                                MMModemCdmaRegistrationState new_state)
+{
+    MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
+
+    mm_generic_cdma_set_evdo_registration_state (self, new_state);
+    mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, priv->evdo_reg_state);
+}
+
+static void
+reg_state_query_done (MMModemCdma *cdma,
+                      MMModemCdmaRegistrationState cdma_1x_reg_state,
+                      MMModemCdmaRegistrationState evdo_reg_state,
+                      GError *error,
+                      gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
     if (error)
         info->error = g_error_copy (error);
     else {
-        mm_callback_info_set_result (info, GUINT_TO_POINTER (reg_state), NULL);
-        mm_generic_cdma_set_registration_state (MM_GENERIC_CDMA (info->modem), reg_state);
+        set_callback_1x_state_helper (info, cdma_1x_reg_state);
+        set_callback_evdo_state_helper (info, evdo_reg_state);
     }
 
     mm_callback_info_schedule (info);
@@ -849,11 +1002,8 @@ reg_state_css_response (MMModemCdma *cdma,
     if (error) {
         if (   (error->domain == MM_MOBILE_ERROR)
             && (error->code == MM_MOBILE_ERROR_NO_NETWORK)) {
-            mm_callback_info_set_result (info,
-                                         GUINT_TO_POINTER (MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN),
-                                         NULL);
-            mm_generic_cdma_set_registration_state (MM_GENERIC_CDMA (modem),
-                                                    MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+            set_callback_1x_state_helper (info, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+            set_callback_evdo_state_helper (info, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
         } else {
             /* Some other error parsing CSS results */
             info->error = g_error_copy (error);
@@ -863,12 +1013,14 @@ reg_state_css_response (MMModemCdma *cdma,
     }
 
     /* SID is valid; let subclasses figure out roaming and detailed registration */
-	if (MM_GENERIC_CDMA_GET_CLASS (modem)->query_registration_state) {
-		MM_GENERIC_CDMA_GET_CLASS (modem)->query_registration_state (MM_GENERIC_CDMA (modem),
-		                                                             reg_state_query_done,
-		                                                             info);
+    if (MM_GENERIC_CDMA_GET_CLASS (modem)->query_registration_state) {
+        MM_GENERIC_CDMA_GET_CLASS (modem)->query_registration_state (MM_GENERIC_CDMA (modem),
+                                                                     reg_state_query_done,
+                                                                     info);
     } else {
-        reg_state_query_done (modem,
+        /* Otherwise, success; we're registered */
+        reg_state_query_done (cdma,
+                              MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED,
                               MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED,
                               NULL,
                               info);
@@ -893,9 +1045,9 @@ get_analog_digital_done (MMSerialPort *port,
     /* Strip any leading command tag and spaces */
     reply = strip_response (response->str, "+CAD:");
 
-	errno = 0;
-	int_cad = strtol (reply, NULL, 10);
-	if ((errno == EINVAL) || (errno == ERANGE)) {
+    errno = 0;
+    int_cad = strtol (reply, NULL, 10);
+    if ((errno == EINVAL) || (errno == ERANGE)) {
         info->error = g_error_new_literal (MM_MODEM_ERROR,
                                            MM_MODEM_ERROR_GENERAL,
                                            "Failed to parse +CAD response");
@@ -904,7 +1056,7 @@ get_analog_digital_done (MMSerialPort *port,
 
     if (int_cad == 1) {  /* 1 == CDMA service */
         /* Now that we have some sort of service, check if the the device is
-         * registered on some network.
+         * registered on the network.
          */
         get_serving_system (MM_MODEM_CDMA (info->modem),
                             reg_state_css_response,
@@ -923,7 +1075,7 @@ error:
 
 static void
 get_registration_state (MMModemCdma *modem,
-                        MMModemUIntFn callback,
+                        MMModemCdmaRegistrationStateFn callback,
                         gpointer user_data)
 {
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
@@ -932,12 +1084,14 @@ get_registration_state (MMModemCdma *modem,
 
     connected = mm_port_get_connected (MM_PORT (priv->primary));
     if (connected && !priv->secondary) {
-        g_message ("Returning saved registration state %d", priv->reg_state);
-        callback (MM_MODEM (modem), priv->reg_state, NULL, user_data);
+        g_message ("Returning saved registration states: 1x: %d  EVDO: %d",
+                   priv->cdma_1x_reg_state, priv->evdo_reg_state);
+        callback (MM_MODEM_CDMA (modem), priv->cdma_1x_reg_state, priv->evdo_reg_state, NULL, user_data);
         return;
     }
 
-    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+    info = mm_generic_cdma_query_reg_state_callback_info_new (MM_GENERIC_CDMA (modem), callback, user_data);
+
     /* Prefer secondary port for registration state */
     mm_serial_port_queue_command (priv->secondary ? priv->secondary : priv->primary,
                                   "+CAD?",
@@ -1154,6 +1308,12 @@ set_property (GObject *object, guint prop_id,
     case MM_MODEM_PROP_TYPE:
     case MM_MODEM_PROP_VALID:
         break;
+    case PROP_EVDO_REV0:
+        priv->evdo_rev0 = g_value_get_boolean (value);
+        break;
+    case PROP_EVDO_REVA:
+        priv->evdo_revA = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -1190,6 +1350,12 @@ get_property (GObject *object, guint prop_id,
         break;
     case MM_MODEM_PROP_VALID:
         g_value_set_boolean (value, priv->valid);
+        break;
+    case PROP_EVDO_REV0:
+        g_value_set_boolean (value, priv->evdo_rev0);
+        break;
+    case PROP_EVDO_REVA:
+        g_value_set_boolean (value, priv->evdo_revA);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1248,6 +1414,20 @@ mm_generic_cdma_class_init (MMGenericCdmaClass *klass)
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_VALID,
                                       MM_MODEM_VALID);
+
+    g_object_class_install_property (object_class, PROP_EVDO_REV0,
+            g_param_spec_boolean (MM_GENERIC_CDMA_EVDO_REV0,
+                                  "EVDO rev0",
+                                  "Supports EVDO rev0",
+                                  FALSE,
+                                  G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property (object_class, PROP_EVDO_REVA,
+            g_param_spec_boolean (MM_GENERIC_CDMA_EVDO_REVA,
+                                  "EVDO revA",
+                                  "Supports EVDO revA",
+                                  FALSE,
+                                  G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
 
 GType

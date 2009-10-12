@@ -19,6 +19,7 @@
 #include "mm-modem-cdma.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
+#include "mm-marshal.h"
 
 static void impl_modem_cdma_get_signal_quality (MMModemCdma *modem, DBusGMethodInvocation *context);
 static void impl_modem_cdma_get_esn (MMModemCdma *modem, DBusGMethodInvocation *context);
@@ -221,9 +222,26 @@ mm_modem_cdma_emit_signal_quality_changed (MMModemCdma *self, guint32 quality)
     g_signal_emit (self, signals[SIGNAL_QUALITY], 0, quality);
 }
 
+/*****************************************************************************/
+
+static void
+get_registration_state_call_done (MMModemCdma *self,
+                                  MMModemCdmaRegistrationState cdma_1x_reg_state,
+                                  MMModemCdmaRegistrationState evdo_reg_state,
+                                  GError *error,
+                                  gpointer user_data)
+{
+    DBusGMethodInvocation *context = (DBusGMethodInvocation *) user_data;
+
+    if (error)
+        dbus_g_method_return_error (context, error);
+    else
+        dbus_g_method_return (context, cdma_1x_reg_state, evdo_reg_state);
+}
+
 void
 mm_modem_cdma_get_registration_state (MMModemCdma *self,
-                                      MMModemUIntFn callback,
+                                      MMModemCdmaRegistrationStateFn callback,
                                       gpointer user_data)
 {
     g_return_if_fail (MM_IS_MODEM_CDMA (self));
@@ -231,23 +249,37 @@ mm_modem_cdma_get_registration_state (MMModemCdma *self,
 
     if (MM_MODEM_CDMA_GET_INTERFACE (self)->get_registration_state)
         MM_MODEM_CDMA_GET_INTERFACE (self)->get_registration_state (self, callback, user_data);
-    else
-        uint_op_not_supported (MM_MODEM (self), callback, user_data);
+    else {
+        GError *error;
+
+        error = g_error_new_literal (MM_MODEM_ERROR,
+                                     MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                     "Operation not supported");
+
+        callback (self,
+                  MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN,
+                  MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN,
+                  error,
+                  user_data);
+
+        g_error_free (error);
+    }
 }
 
 static void
 impl_modem_cdma_get_registration_state (MMModemCdma *modem, DBusGMethodInvocation *context)
 {
-    mm_modem_cdma_get_registration_state (modem, uint_call_done, context);
+    mm_modem_cdma_get_registration_state (modem, get_registration_state_call_done, context);
 }
 
 void
 mm_modem_cdma_emit_registration_state_changed (MMModemCdma *self,
-                                               MMModemCdmaRegistrationState new_state)
+                                               MMModemCdmaRegistrationState cdma_1x_new_state,
+                                               MMModemCdmaRegistrationState evdo_new_state)
 {
     g_return_if_fail (MM_IS_MODEM_CDMA (self));
 
-    g_signal_emit (self, signals[REGISTRATION_STATE_CHANGED], 0, new_state);
+    g_signal_emit (self, signals[REGISTRATION_STATE_CHANGED], 0, cdma_1x_new_state, evdo_new_state);
 }
 
 /*****************************************************************************/
@@ -277,8 +309,8 @@ mm_modem_cdma_init (gpointer g_iface)
                       G_SIGNAL_RUN_FIRST,
                       G_STRUCT_OFFSET (MMModemCdma, registration_state_changed),
                       NULL, NULL,
-                      g_cclosure_marshal_VOID__UINT,
-                      G_TYPE_NONE, 1, G_TYPE_UINT);
+                      mm_marshal_VOID__UINT_UINT,
+                      G_TYPE_NONE, 2, G_TYPE_UINT, G_TYPE_UINT);
 
     initialized = TRUE;
 }

@@ -130,7 +130,9 @@ grab_port (MMPluginBase *base,
         } else if (caps & CAP_CDMA) {
             modem = mm_generic_cdma_new (sysfs_path,
                                          mm_plugin_base_supports_task_get_driver (task),
-                                         mm_plugin_get_name (MM_PLUGIN (base)));
+                                         mm_plugin_get_name (MM_PLUGIN (base)),
+                                         !!(caps & MM_PLUGIN_BASE_PORT_CAP_IS856),
+                                         !!(caps & MM_PLUGIN_BASE_PORT_CAP_IS856_A));
         }
 
         if (modem) {

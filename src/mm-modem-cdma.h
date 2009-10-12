@@ -44,6 +44,12 @@ typedef void (*MMModemCdmaServingSystemFn) (MMModemCdma *modem,
                                             GError *error,
                                             gpointer user_data);
 
+typedef void (*MMModemCdmaRegistrationStateFn) (MMModemCdma *modem,
+                                                MMModemCdmaRegistrationState cdma_1x_reg_state,
+                                                MMModemCdmaRegistrationState evdo_reg_state,
+                                                GError *error,
+                                                gpointer user_data);
+
 struct _MMModemCdma {
     GTypeInterface g_iface;
 
@@ -61,7 +67,7 @@ struct _MMModemCdma {
                                 gpointer user_data);
 
     void (*get_registration_state) (MMModemCdma *self,
-                                    MMModemUIntFn callback,
+                                    MMModemCdmaRegistrationStateFn callback,
                                     gpointer user_data);
 
     /* Signals */
@@ -69,7 +75,8 @@ struct _MMModemCdma {
                             guint32 quality);
 
     void (*registration_state_changed) (MMModemCdma *self,
-                                        MMModemCdmaRegistrationState new_state);
+                                        MMModemCdmaRegistrationState cdma_1x_new_state,
+                                        MMModemCdmaRegistrationState evdo_new_state);
 };
 
 GType mm_modem_cdma_get_type (void);
@@ -87,7 +94,7 @@ void mm_modem_cdma_get_serving_system (MMModemCdma *self,
                                        gpointer user_data);
 
 void mm_modem_cdma_get_registration_state (MMModemCdma *self,
-                                           MMModemUIntFn callback,
+                                           MMModemCdmaRegistrationStateFn callback,
                                            gpointer user_data);
 
 /* Protected */
@@ -95,6 +102,7 @@ void mm_modem_cdma_get_registration_state (MMModemCdma *self,
 void mm_modem_cdma_emit_signal_quality_changed (MMModemCdma *self, guint32 new_quality);
 
 void mm_modem_cdma_emit_registration_state_changed (MMModemCdma *self,
-                                                    MMModemCdmaRegistrationState new_state);
+                                                    MMModemCdmaRegistrationState cdma_1x_new_state,
+                                                    MMModemCdmaRegistrationState evdo_new_state);
 
 #endif  /* MM_MODEM_CDMA_H */

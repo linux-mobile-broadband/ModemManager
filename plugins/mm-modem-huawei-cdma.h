@@ -38,6 +38,8 @@ GType mm_modem_huawei_cdma_get_type (void);
 
 MMModem *mm_modem_huawei_cdma_new (const char *device,
                                    const char *driver,
-                                   const char *plugin);
+                                   const char *plugin,
+                                   gboolean evdo_rev0,
+                                   gboolean evdo_revA);
 
 #endif /* MM_MODEM_HUAWEI_CDMA_H */

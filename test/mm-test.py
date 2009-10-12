@@ -59,8 +59,9 @@ def inspect_cdma(proxy, dump_private):
     print "ESN: %s" % esn
 
     try:
-        state = cdma.GetRegistrationState()
-        print "Registration: %s" % get_reg_state (state)
+        (cdma_1x_state, evdo_state) = cdma.GetRegistrationState()
+        print "1x State:   %s" % get_reg_state (cdma_1x_state)
+        print "EVDO State: %s" % get_reg_state (evdo_state)
     except dbus.exceptions.DBusException, e:
         print "Error reading registration state: %s" % e
 
