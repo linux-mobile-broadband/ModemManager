@@ -18,7 +18,7 @@
 #include <gmodule.h>
 #include "mm-plugin-sierra.h"
 #include "mm-modem-sierra-gsm.h"
-#include "mm-generic-cdma.h"
+#include "mm-modem-sierra-cdma.h"
 
 G_DEFINE_TYPE (MMPluginSierra, mm_plugin_sierra, MM_TYPE_PLUGIN_BASE)
 
@@ -160,11 +160,11 @@ grab_port (MMPluginBase *base,
                                              mm_plugin_base_supports_task_get_driver (task),
                                              mm_plugin_get_name (MM_PLUGIN (base)));
         } else if (caps & CAP_CDMA) {
-            modem = mm_generic_cdma_new (sysfs_path,
-                                         mm_plugin_base_supports_task_get_driver (task),
-                                         mm_plugin_get_name (MM_PLUGIN (base)),
-                                         !!(caps & MM_PLUGIN_BASE_PORT_CAP_IS856),
-                                         !!(caps & MM_PLUGIN_BASE_PORT_CAP_IS856_A));
+            modem = mm_modem_sierra_cdma_new (sysfs_path,
+                                              mm_plugin_base_supports_task_get_driver (task),
+                                              mm_plugin_get_name (MM_PLUGIN (base)),
+                                              !!(caps & MM_PLUGIN_BASE_PORT_CAP_IS856),
+                                              !!(caps & MM_PLUGIN_BASE_PORT_CAP_IS856_A));
         }
 
         if (modem) {
