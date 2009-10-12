@@ -68,7 +68,7 @@ handle_signal_quality_change (MMSerialPort *port,
     quality = strtol (str, NULL, 10);
     if (errno == 0) {
         quality = CLAMP (quality, 0, 100);
-        g_debug ("Signal quality: %zd", quality);
+        g_debug ("Signal quality: %ld", quality);
         mm_generic_cdma_update_signal_quality (MM_GENERIC_CDMA (self), (guint32) quality);
     }
     g_free (str);
