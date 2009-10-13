@@ -26,6 +26,7 @@ MM_DBUS_INTERFACE_MODEM='org.freedesktop.ModemManager.Modem'
 MM_DBUS_INTERFACE_MODEM_CDMA='org.freedesktop.ModemManager.Modem.Cdma'
 MM_DBUS_INTERFACE_MODEM_GSM_CARD='org.freedesktop.ModemManager.Modem.Gsm.Card'
 MM_DBUS_INTERFACE_MODEM_GSM_NETWORK='org.freedesktop.ModemManager.Modem.Gsm.Network'
+MM_DBUS_INTERFACE_MODEM_SIMPLE='org.freedesktop.ModemManager.Modem.Simple'
 
 def get_cdma_band_class(band_class):
     if band_class == 1:
@@ -45,7 +46,7 @@ def get_reg_state(state):
     else:
         return "unknown"
 
-def inspect_cdma(proxy, dump_private):
+def cdma_inspect(proxy, dump_private):
     cdma = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_CDMA)
 
     esn = "<private>"
@@ -72,6 +73,15 @@ def inspect_cdma(proxy, dump_private):
         print "SID:   %d" % info[2]
     except dbus.exceptions.DBusException, e:
         print "Error reading serving system: %s" % e
+
+def cdma_connect(proxy, user, password):
+    # Modem.Simple interface
+    simple = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_SIMPLE)
+    try:
+        simple.Connect({'number':"#777"}, timeout=60)
+        print "\nConnected!"
+    except Exception, e:
+        print "Error connecting: %s" % e
 
 
 def get_gsm_network_mode(modem):
@@ -139,7 +149,7 @@ def get_gsm_band(modem):
     print "Band: %s" % band
 
 
-def inspect_gsm(proxy, dump_private):
+def gsm_inspect(proxy, dump_private):
     # Gsm.Card interface
     card = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_GSM_CARD)
 
@@ -200,11 +210,37 @@ def inspect_gsm(proxy, dump_private):
         else:
             print "%s: %s %s" % (r['operator-short'], status, access_tech)
 
+def gsm_connect(proxy, apn, user, password):
+    # Modem.Simple interface
+    simple = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_SIMPLE)
+    try:
+        simple.Connect({'apn': apn, 'number':"*99#"}, timeout=60)
+        print "\nConnected!"
+    except Exception, e:
+        print "Error connecting: %s" % e
+
 
 dump_private = False
-if len(sys.argv) == 2:
-    if sys.argv[1] == "--private":
+connect = False
+apn = None
+user = None
+password = None
+x = 1
+while x < len(sys.argv):
+    if sys.argv[x] == "--private":
         dump_private = True
+    elif sys.argv[x] == "--connect":
+        connect = True
+    elif sys.argv[x] == "--user":
+        x += 1
+        user = sys.argv[x]
+    elif sys.argv[x] == "--apn":
+        x += 1
+        apn = sys.argv[x]
+    elif sys.argv[x] == "--password":
+        x += 1
+        password = sys.argv[x]
+    x += 1
 
 bus = dbus.SystemBus()
 
@@ -245,9 +281,14 @@ for m in modems:
     print "Version: %s" % info[2]
 
     if type == 1:
-        inspect_gsm(proxy, dump_private)
+        gsm_inspect(proxy, dump_private)
+        if connect == True:
+            gsm_connect(proxy, apn, user, password)
     elif type == 2:
-        inspect_cdma(proxy, dump_private)
+        cdma_inspect(proxy, dump_private)
+        if connect == True:
+            cdma_connect(proxy, user, password)
     print
 
     modem.Enable(False)
+
