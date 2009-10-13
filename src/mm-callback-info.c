@@ -46,6 +46,21 @@ invoke_mm_modem_string_fn (MMCallbackInfo *info)
               info->error, info->user_data);
 }
 
+
+static void
+modem_destroyed_cb (gpointer data, GObject *destroyed)
+{
+    MMCallbackInfo *info = data;
+
+    info->modem = NULL;
+    if (!info->pending_id) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_GENERAL,
+                                           "The modem was removed or disabled.");
+        mm_callback_info_schedule (info);
+    }
+}
+
 static void
 callback_info_done (gpointer user_data)
 {
@@ -60,7 +75,7 @@ callback_info_done (gpointer user_data)
         g_error_free (info->error);
 
     if (info->modem)
-        g_object_unref (info->modem);
+        g_object_weak_unref (G_OBJECT (info->modem), modem_destroyed_cb, info);
 
     g_datalist_clear (&info->qdata);
     g_slice_free (MMCallbackInfo, info);
@@ -77,6 +92,9 @@ callback_info_do (gpointer user_data)
 void
 mm_callback_info_schedule (MMCallbackInfo *info)
 {
+    g_return_if_fail (info != NULL);
+    g_return_if_fail (info->pending_id == 0);
+
     info->pending_id = g_idle_add_full (G_PRIORITY_DEFAULT_IDLE, callback_info_do, info, callback_info_done);
 }
 
@@ -92,7 +110,8 @@ mm_callback_info_new_full (MMModem *modem,
 
     info = g_slice_new0 (MMCallbackInfo);
     g_datalist_init (&info->qdata);
-    info->modem = g_object_ref (modem);
+    info->modem = modem;
+    g_object_weak_ref (G_OBJECT (modem), modem_destroyed_cb, info);
     info->invoke_fn = invoke_fn;
     info->callback = callback;
     info->user_data = user_data;
