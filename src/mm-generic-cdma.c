@@ -1217,7 +1217,7 @@ simple_reg_callback (MMModemCdma *modem,
             && (evdo_reg_state == MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN))) {
         /* Not registered yet, queue up a retry */
         priv->reg_tries++;
-        if (priv->reg_tries > 5) {
+        if (priv->reg_tries > 15) {
             error = g_error_new_literal (MM_MOBILE_ERROR,
                                          MM_MOBILE_ERROR_NO_NETWORK,
                                          "No service");
