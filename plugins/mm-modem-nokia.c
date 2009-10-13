@@ -84,6 +84,15 @@ mm_modem_nokia_init (MMModemNokia *self)
 }
 
 static void
+set_property (GObject *object, guint prop_id,
+              const GValue *value, GParamSpec *pspec)
+{
+    /* gobject does not like to just have get_property and seems to
+     * to not honour our overriden properties ... keep this as an empty
+     * func around */
+}
+
+static void
 get_property (GObject *object, guint prop_id,
               GValue *value, GParamSpec *pspec)
 {
@@ -116,6 +125,7 @@ mm_modem_nokia_class_init (MMModemNokiaClass *klass)
     mm_modem_nokia_parent_class = g_type_class_peek_parent (klass);
 
     object_class->get_property = get_property;
+    object_class->set_property = set_property;
 
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_POWER_UP_CMD,
