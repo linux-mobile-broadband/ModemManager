@@ -28,6 +28,14 @@
 #include "mm-callback-info.h"
 #include "mm-serial-parsers.h"
 
+static void simple_reg_callback (MMModemCdma *modem,
+                                 MMModemCdmaRegistrationState cdma_1x_reg_state,
+                                 MMModemCdmaRegistrationState evdo_reg_state,
+                                 GError *error,
+                                 gpointer user_data);
+
+static void simple_state_machine (MMModem *modem, GError *error, gpointer user_data);
+
 static gpointer mm_generic_cdma_parent_class = NULL;
 
 #define MM_GENERIC_CDMA_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_GENERIC_CDMA, MMGenericCdmaPrivate))
@@ -45,6 +53,11 @@ typedef struct {
 
     MMModemCdmaRegistrationState cdma_1x_reg_state;
     MMModemCdmaRegistrationState evdo_reg_state;
+
+    guint reg_tries;
+    guint reg_retry_id;
+    guint reg_state_changed_id;
+    MMCallbackInfo *simple_connect_info;
 
     MMSerialPort *primary;
     MMSerialPort *secondary;
@@ -280,6 +293,34 @@ mm_generic_cdma_evdo_get_registration_state_sync (MMGenericCdma *self)
 /*****************************************************************************/
 
 static void
+registration_cleanup (MMGenericCdma *self, GQuark error_class, guint32 error_num)
+{
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
+    GError *error = NULL;
+
+    priv->reg_tries = 0;
+
+    if (priv->reg_state_changed_id) {
+        g_signal_handler_disconnect (self, priv->reg_state_changed_id);
+        priv->reg_state_changed_id = 0;
+    }
+
+    if (priv->reg_retry_id) {
+        g_source_remove (priv->reg_retry_id);
+        priv->reg_retry_id = 0;
+    }
+
+    /* Return an error to any explicit callers of simple_connect */
+    if (priv->simple_connect_info && error_class) {
+        error = g_error_new_literal (error_class, error_num,
+                                     "Connection attempt terminated");
+        simple_state_machine (MM_MODEM (self), error, priv->simple_connect_info);
+        g_error_free (error);
+    }
+    priv->simple_connect_info = NULL;
+}
+
+static void
 enable_error_reporting_done (MMSerialPort *port,
                              GString *response,
                              GError *error,
@@ -342,7 +383,8 @@ enable (MMModem *modem,
         MMModemFn callback,
         gpointer user_data)
 {
-    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
+    MMGenericCdma *self = MM_GENERIC_CDMA (modem);
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
     MMCallbackInfo *info;
 
     info = mm_callback_info_new (modem, callback, user_data);
@@ -376,8 +418,12 @@ disable (MMModem *modem,
          MMModemFn callback,
          gpointer user_data)
 {
-    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
+    MMGenericCdma *self = MM_GENERIC_CDMA (modem);
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
     MMCallbackInfo *info;
+
+    /* Tear down any ongoing registration */
+    registration_cleanup (self, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL);
 
     info = mm_callback_info_new (modem, callback, user_data);
 
@@ -396,13 +442,16 @@ dial_done (MMSerialPort *port,
            GError *error,
            gpointer user_data)
 {
-    MMGenericCdmaPrivate *priv;
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);;
 
     if (error)
         info->error = g_error_copy (error);
     else {
-        priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
+        /* Clear reg tries; we're obviously registered by this point */
+        registration_cleanup (self, 0, 0);
+
         mm_port_set_connected (priv->data, TRUE);
     }
 
@@ -1105,6 +1154,7 @@ get_registration_state (MMModemCdma *modem,
 typedef enum {
     SIMPLE_STATE_BEGIN = 0,
     SIMPLE_STATE_ENABLE,
+    SIMPLE_STATE_REGISTER,
     SIMPLE_STATE_CONNECT,
     SIMPLE_STATE_DONE
 } SimpleState;
@@ -1129,29 +1179,125 @@ simple_get_string_property (MMCallbackInfo *info, const char *name, GError **err
     return NULL;
 }
 
+static gboolean
+simple_reg_retry (gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    mm_modem_cdma_get_registration_state (MM_MODEM_CDMA (info->modem),
+                                          simple_reg_callback,
+                                          info);
+    return TRUE;
+}
+
+static void
+simple_reg_callback (MMModemCdma *modem,
+                     MMModemCdmaRegistrationState cdma_1x_reg_state,
+                     MMModemCdmaRegistrationState evdo_reg_state,
+                     GError *error,
+                     gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
+    gboolean no_service_error = FALSE;
+
+    if (   error
+        && (error->domain == MM_MOBILE_ERROR)
+        && (error->code == MM_MOBILE_ERROR_NO_NETWORK))
+        no_service_error = TRUE;
+
+    /* Fail immediately on anything but "no service" */
+    if (error && !no_service_error) {
+        simple_state_machine (MM_MODEM (modem), error, info);
+        return;
+    }
+
+    if (   no_service_error
+        || (   (cdma_1x_reg_state == MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
+            && (evdo_reg_state == MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN))) {
+        /* Not registered yet, queue up a retry */
+        priv->reg_tries++;
+        if (priv->reg_tries > 5) {
+            error = g_error_new_literal (MM_MOBILE_ERROR,
+                                         MM_MOBILE_ERROR_NO_NETWORK,
+                                         "No service");
+            simple_state_machine (MM_MODEM (modem), error, info);
+            g_error_free (error);
+            return;
+        }
+
+        /* otherwise, just try again in a bit */
+        if (!priv->reg_retry_id)
+            priv->reg_retry_id = g_timeout_add_seconds (4, simple_reg_retry, info);
+    } else {
+        /* Yay, at least one of 1x or EVDO is registered, we can proceed to dial */
+        simple_state_machine (MM_MODEM (modem), NULL, info);
+    }
+}
+
+static void
+reg_state_changed (MMModemCdma *self,
+                   MMModemCdmaRegistrationState cdma_1x_new_state,
+                   MMModemCdmaRegistrationState evdo_new_state,
+                   gpointer user_data)
+{
+/* Disabled for now...  changing the registration state from the 
+ * subclass' query_registration_state handler also emits the registration
+ * state changed signal, which will call this function, and execute
+ * simple_state_machine() to advance to the next state.  Then however
+ * query_registration_state will call its callback, which ends up in
+ * simple_reg_callback(), which calls simple_state_machine() too in
+ * the same mainloop iteration.  Not good.  So until that's sorted out
+ * we'll just have to poll registration state (every 4 seconds so its
+ * not that bad.
+ */
+#if 0
+    MMCallbackInfo *info = user_data;
+
+    /* If we're registered, we can proceed */
+    if (   (cdma_1x_reg_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
+        || (evdo_reg_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN))
+        simple_state_machine (MM_MODEM (modem), NULL, info);
+#endif
+}
+
 static void
 simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    const char *str;
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
     SimpleState state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "simple-connect-state"));
+    const char *str;
+    guint id;
 
     if (error) {
         info->error = g_error_copy (error);
-		goto out;
-	}
+        goto out;
+    }
 
-	switch (state) {
-	case SIMPLE_STATE_BEGIN:
-		state = SIMPLE_STATE_ENABLE;
+    switch (state) {
+    case SIMPLE_STATE_BEGIN:
+        state = SIMPLE_STATE_ENABLE;
         mm_modem_enable (modem, simple_state_machine, info);
         break;
     case SIMPLE_STATE_ENABLE:
+        state = SIMPLE_STATE_REGISTER;
+        mm_modem_cdma_get_registration_state (MM_MODEM_CDMA (modem),
+                                              simple_reg_callback,
+                                              info);
+        id = g_signal_connect (modem,
+                               MM_MODEM_CDMA_REGISTRATION_STATE_CHANGED,
+                               G_CALLBACK (reg_state_changed),
+                               info);
+        priv->reg_state_changed_id = id;
+        break;
+    case SIMPLE_STATE_REGISTER:
+        registration_cleanup (MM_GENERIC_CDMA (modem), 0, 0);
+        state = SIMPLE_STATE_CONNECT;
         str = simple_get_string_property (info, "number", &info->error);
-		state = SIMPLE_STATE_CONNECT;
         mm_modem_connect (modem, str, simple_state_machine, info);
-		break;
-	case SIMPLE_STATE_CONNECT:
+        break;
+    case SIMPLE_STATE_CONNECT:
         state = SIMPLE_STATE_DONE;
         break;
     case SIMPLE_STATE_DONE:
@@ -1159,9 +1305,10 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
     }
 
  out:
-    if (info->error || state == SIMPLE_STATE_DONE)
+    if (info->error || state == SIMPLE_STATE_DONE) {
+        registration_cleanup (MM_GENERIC_CDMA (modem), 0, 0);
         mm_callback_info_schedule (info);
-    else
+    } else
         mm_callback_info_set_data (info, "simple-connect-state", GUINT_TO_POINTER (state), NULL);
 }
 
@@ -1171,10 +1318,22 @@ simple_connect (MMModemSimple *simple,
                 MMModemFn callback,
                 gpointer user_data)
 {
+    MMGenericCdma *self = MM_GENERIC_CDMA (simple);
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
     MMCallbackInfo *info;
     GError *error = NULL;
 
+    if (priv->simple_connect_info) {
+        error = g_error_new_literal (MM_MODEM_ERROR,
+                                     MM_MODEM_ERROR_OPERATION_IN_PROGRESS,
+                                     "Connection is already in progress");
+        callback (MM_MODEM (simple), error, user_data);
+        g_error_free (error);
+        return;
+    }
+
     info = mm_callback_info_new (MM_MODEM (simple), callback, user_data);
+    priv->simple_connect_info = info;
     mm_callback_info_set_data (info, "simple-connect-properties", 
                                g_hash_table_ref (properties),
                                (GDestroyNotify) g_hash_table_unref);
@@ -1250,6 +1409,16 @@ simple_get_status (MMModemSimple *simple,
 /*****************************************************************************/
 
 static void
+modem_valid_changed (MMGenericCdma *self, GParamSpec *pspec, gpointer user_data)
+{
+    /* Be paranoid about tearing down any pending registration */
+    if (!mm_modem_get_valid (MM_MODEM (self)))
+        registration_cleanup (self, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL);
+}
+
+/*****************************************************************************/
+
+static void
 modem_init (MMModem *modem_class)
 {
     modem_class->owns_port = owns_port;
@@ -1276,6 +1445,24 @@ modem_simple_init (MMModemSimple *class)
 {
     class->connect = simple_connect;
     class->get_status = simple_get_status;
+}
+
+static GObject*
+constructor (GType type,
+             guint n_construct_params,
+             GObjectConstructParam *construct_params)
+{
+    GObject *object;
+
+    object = G_OBJECT_CLASS (mm_generic_cdma_parent_class)->constructor (type,
+                                                                         n_construct_params,
+                                                                         construct_params);
+    if (object) {
+        g_signal_connect (object, "notify::" MM_MODEM_VALID,
+                          G_CALLBACK (modem_valid_changed), NULL);
+    }
+
+    return object;
 }
 
 static void
@@ -1364,11 +1551,21 @@ get_property (GObject *object, guint prop_id,
 }
 
 static void
+dispose (GObject *object)
+{
+    registration_cleanup (MM_GENERIC_CDMA (object), MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL);
+
+    G_OBJECT_CLASS (mm_generic_cdma_parent_class)->dispose (object);
+}
+
+static void
 finalize (GObject *object)
 {
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (object);
 
     g_free (priv->driver);
+    g_free (priv->plugin);
+    g_free (priv->device);
 
     G_OBJECT_CLASS (mm_generic_cdma_parent_class)->finalize (object);
 }
@@ -1384,7 +1581,9 @@ mm_generic_cdma_class_init (MMGenericCdmaClass *klass)
     /* Virtual methods */
     object_class->set_property = set_property;
     object_class->get_property = get_property;
+    object_class->dispose = dispose;
     object_class->finalize = finalize;
+    object_class->constructor = constructor;
 
     /* Properties */
     g_object_class_override_property (object_class,
