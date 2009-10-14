@@ -1928,7 +1928,14 @@ get_property (GObject *object, guint prop_id,
         g_value_set_string (value, "+CFUN=1");
         break;
     case MM_GENERIC_GSM_PROP_POWER_DOWN_CMD:
-        g_value_set_string (value, "+CFUN=0");
+        /* CFUN=0 is dangerous and often will shoot devices in the head (that's
+         * what it's supposed to do).  So don't use CFUN=0 by default, but let
+         * specific plugins use it when they know it's safe to do so.  For
+         * example, CFUN=0 will often make phones turn themselves off, but some
+         * dedicated devices (ex Sierra WWAN cards) will just turn off their
+         * radio but otherwise still work.
+         */
+        g_value_set_string (value, "");
         break;
     case MM_GENERIC_GSM_PROP_INIT_CMD:
         g_value_set_string (value, "Z E0 V1 X4 &C1 +CMEE=1");
