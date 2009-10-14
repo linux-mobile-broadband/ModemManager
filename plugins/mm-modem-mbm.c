@@ -159,40 +159,6 @@ do_register (MMModemGsmNetwork *modem,
                                        g_free);
 }
 
-static void
-mbm_cind_done (MMSerialPort *port,
-               GString *response,
-               GError *error,
-               gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    int quality = 100, ignored;
-
-    /* cind is just used got get signal stregth; this seems to fail
-     * with some modem firmwares ... keep on going. */
-    if (!error) {
-        if (sscanf (response->str, "+CIND: %d,%d", &ignored, &quality) == 2)
-            quality *= 20;  /* normalize to percent */
-
-    }
-    mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
-    mm_callback_info_schedule (info);
-}
-
-static void
-get_signal_quality (MMModemGsmNetwork *modem,
-                    MMModemUIntFn callback,
-                    gpointer user_data)
-{
-    MMCallbackInfo *info;
-    MMSerialPort *primary;
-
-    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
-    g_assert (primary);
-    mm_serial_port_queue_command (primary, "+CIND?", 3, mbm_cind_done, info);
-}
-
 static int
 mbm_parse_network_mode (MMModemGsmMode network_mode)
 {
@@ -786,7 +752,6 @@ static void
 modem_gsm_network_init (MMModemGsmNetwork *class)
 {
     class->do_register = do_register;
-    class->get_signal_quality = get_signal_quality;
     class->get_network_mode = get_network_mode;
     class->set_network_mode = set_network_mode;
 }
