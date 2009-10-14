@@ -578,23 +578,19 @@ mbm_e2nap_received (MMSerialPort *port,
 }
 
 static void
-e2nap_done (MMSerialPort *port,
+enap_done (MMSerialPort *port,
             GString *response,
             GError *error,
             gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    char *command;
 
     if (error) {
         info->error = g_error_copy (error);
         /* TODO: Fallback to polling of enap status */
         mm_callback_info_schedule (info);
     } else {
-        guint32 cid = mm_generic_gsm_get_cid (MM_GENERIC_GSM (info->modem));
-        command = g_strdup_printf ("AT*ENAP=1,%d", cid);
-        mm_serial_port_queue_command (port, command, 3, NULL, NULL);
-        g_free (command);
+        mm_serial_port_queue_command (port, "AT*E2NAP=1", 3, NULL, NULL);
     }
 }
 
@@ -609,8 +605,13 @@ mbm_auth_done (MMSerialPort *port,
     if (error) {
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
-    } else
-        mm_serial_port_queue_command (port, "AT*E2NAP=1", 3, e2nap_done, user_data);
+    } else {
+        char *command;
+        guint32 cid = mm_generic_gsm_get_cid (MM_GENERIC_GSM (info->modem));
+        command = g_strdup_printf ("AT*ENAP=1,%d", cid);
+        mm_serial_port_queue_command (port, command, 3, enap_done, user_data);
+        g_free (command);
+    }
 }
 
 static void
