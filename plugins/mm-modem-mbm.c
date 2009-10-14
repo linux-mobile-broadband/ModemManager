@@ -166,16 +166,16 @@ mbm_cind_done (MMSerialPort *port,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    int quality = 0, ignored;
+    int quality = 100, ignored;
 
-    if (error)
-        info->error = g_error_copy (error);
-    else {
+    /* cind is just used got get signal stregth; this seems to fail
+     * with some modem firmwares ... keep on going. */
+    if (!error) {
         if (sscanf (response->str, "+CIND: %d,%d", &ignored, &quality) == 2)
             quality *= 20;  /* normalize to percent */
 
-        mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
     }
+    mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
     mm_callback_info_schedule (info);
 }
 
@@ -355,7 +355,7 @@ mbm_enable_done (MMSerialPort *port,
 }
 
 static void
-mbm_init_done (MMSerialPort *port,
+mbm_enap0_done (MMSerialPort *port,
                GString *response,
                GError *error,
                gpointer user_data)
@@ -364,15 +364,29 @@ mbm_init_done (MMSerialPort *port,
     MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (info->modem);
     char *command;
 
+    if (!priv->network_mode)
+        priv->network_mode = MBM_NETWORK_MODE_ANY;
+    command = g_strdup_printf ("+CFUN=%d", priv->network_mode);
+    mm_serial_port_queue_command (port, command, 3, mbm_enable_done, info);
+    g_free (command);
+}
+
+static void
+mbm_init_done (MMSerialPort *port,
+               GString *response,
+               GError *error,
+               gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (info->modem);
+
     if (error) {
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
     } else {
         if (!priv->network_mode)
             priv->network_mode = MBM_NETWORK_MODE_ANY;
-        command = g_strdup_printf ("+CFUN=%d", priv->network_mode);
-        mm_serial_port_queue_command (port, command, 3, mbm_enable_done, info);
-        g_free (command);
+        mm_serial_port_queue_command (port, "*ENAP=0", 3, mbm_enap0_done, info);
     }
 }
 
