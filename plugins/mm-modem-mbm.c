@@ -548,6 +548,8 @@ mbm_ciev_received (MMSerialPort *port,
 static void
 mbm_do_connect_done (MMModemMbm *self)
 {
+    /* unset the poll id which should remove the source in destroy func */
+    g_return_if_fail (MM_MODEM_MBM_GET_PRIVATE (self)->do_connect_done_info);
     mm_callback_info_schedule (MM_MODEM_MBM_GET_PRIVATE (self)->do_connect_done_info);
 }
 
@@ -578,6 +580,46 @@ mbm_e2nap_received (MMSerialPort *port,
 }
 
 static void
+enap_poll_done (MMSerialPort *port,
+            GString *response,
+            GError *error,
+            gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    guint state;
+    guint count;
+
+    g_assert (info);
+
+    count = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "mbm-enap-poll-count"));
+
+    if (sscanf (response->str, "*ENAP: %d", &state) == 1 && state == 1) {
+        mm_callback_info_schedule (info);
+    } else {
+        mm_callback_info_set_data (info, "mbm-enap-poll-count", GUINT_TO_POINTER (++count), NULL);
+
+        /* lets give it about 50 seconds */
+        if (count > 50) {
+            info -> error = mm_modem_connect_error_for_code (MM_MODEM_CONNECT_ERROR_BUSY);
+            mm_callback_info_schedule (info);
+        }
+    }
+}
+
+static gboolean
+enap_poll (gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMSerialPort *port = mm_generic_gsm_get_port (MM_GENERIC_GSM (info->modem), MM_PORT_TYPE_PRIMARY);
+
+    g_assert (port);
+
+    mm_serial_port_queue_command (port, "AT*ENAP?", 3, enap_poll_done, user_data);
+    /* we cancle this in the _done function if all is fine */
+    return TRUE;
+}
+
+static void
 enap_done (MMSerialPort *port,
             GString *response,
             GError *error,
@@ -587,9 +629,11 @@ enap_done (MMSerialPort *port,
 
     if (error) {
         info->error = g_error_copy (error);
-        /* TODO: Fallback to polling of enap status */
         mm_callback_info_schedule (info);
     } else {
+        guint tid = g_timeout_add_seconds (1, enap_poll, user_data);
+        /* remember poll id as callback info object, with source_remove as free func */
+        mm_callback_info_set_data (info, "mbm-enap-poll-id", GUINT_TO_POINTER (tid), (GFreeFunc) g_source_remove);
         mm_serial_port_queue_command (port, "AT*E2NAP=1", 3, NULL, NULL);
     }
 }
