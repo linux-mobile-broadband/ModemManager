@@ -459,7 +459,7 @@ disable (MMModem *modem,
     mm_serial_port_queue_command (primary, "+CMER=0", 5, NULL, NULL);
 
     parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (modem));
-    parent_modem_iface->enable (modem, parent_disable_done, info);
+    parent_modem_iface->disable (modem, parent_disable_done, info);
 }
 
 static void
