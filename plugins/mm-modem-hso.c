@@ -627,7 +627,7 @@ grab_port (MMModem *modem,
 
             mm_generic_gsm_set_unsolicited_registration (gsm, TRUE);
 
-            regex = g_regex_new ("_OWANCALL: (\\d), (\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+            regex = g_regex_new ("_OWANCALL: (\\d),\\s*(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
             mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, connection_enabled, modem, NULL);
             g_regex_unref (regex);
         }
