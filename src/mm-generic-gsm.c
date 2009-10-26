@@ -332,9 +332,14 @@ enable_done (MMSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    if (error)
-        info->error = g_error_copy (error);
-
+    /* Ignore power-up command errors, not all devices actually support
+     * CFUN=1.
+     */
+    /* FIXME: instead of just ignoring errors, since we allow subclasses
+     * to override the power-on command, make a class function for powering
+     * on the phone and let the subclass decided whether it wants to handle
+     * errors or ignore them.
+     */
     mm_callback_info_schedule (info);
 }
 
