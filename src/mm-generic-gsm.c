@@ -159,6 +159,8 @@ mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
             mm_modem_gsm_network_registration_info (MM_MODEM_GSM_NETWORK (modem), priv->reg_status,
                                                     priv->oper_code, priv->oper_name);
         }
+
+        mm_generic_gsm_update_enabled_state (modem, MM_MODEM_STATE_REASON_NONE);
     }
 }
 
@@ -208,6 +210,28 @@ mm_generic_gsm_check_pin (MMGenericGsm *modem,
 }
 
 /*****************************************************************************/
+
+void
+mm_generic_gsm_update_enabled_state (MMGenericGsm *self, MMModemStateReason reason)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    switch (priv->reg_status) {
+    case MM_MODEM_GSM_NETWORK_REG_STATUS_HOME:
+    case MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING:
+        mm_modem_set_state (MM_MODEM (self), MM_MODEM_STATE_REGISTERED, reason);
+        break;
+    case MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING:
+        mm_modem_set_state (MM_MODEM (self), MM_MODEM_STATE_SEARCHING, reason);
+        break;
+    case MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE:
+    case MM_MODEM_GSM_NETWORK_REG_STATUS_DENIED:
+    case MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN:
+    default:
+        mm_modem_set_state (MM_MODEM (self), MM_MODEM_STATE_ENABLED, reason);
+        break;
+    }
+}
 
 static void
 check_valid (MMGenericGsm *self)
@@ -348,6 +372,10 @@ enable_done (MMSerialPort *port,
      * on the phone and let the subclass decided whether it wants to handle
      * errors or ignore them.
      */
+
+    mm_generic_gsm_update_enabled_state (MM_GENERIC_GSM (info->modem),
+                                         MM_MODEM_STATE_REASON_NONE);
+
     mm_callback_info_schedule (info);
 }
 
@@ -428,8 +456,13 @@ disable_done (MMSerialPort *port,
               GError *error,
               gpointer user_data)
 {
+    MMCallbackInfo *info = user_data;
+
     mm_serial_port_close (port);
-    mm_callback_info_schedule ((MMCallbackInfo *) user_data);
+    mm_modem_set_state (MM_MODEM (info->modem),
+                        MM_MODEM_STATE_DISABLED,
+                        MM_MODEM_STATE_REASON_NONE);
+    mm_callback_info_schedule (info);
 }
 
 static void

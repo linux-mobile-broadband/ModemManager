@@ -19,6 +19,7 @@
 #include "mm-modem.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
+#include "mm-marshal.h"
 
 static void impl_modem_enable (MMModem *modem, gboolean enable, DBusGMethodInvocation *context);
 static void impl_modem_connect (MMModem *modem, const char *number, DBusGMethodInvocation *context);
@@ -57,8 +58,17 @@ mm_modem_enable (MMModem *self,
                  MMModemFn callback,
                  gpointer user_data)
 {
+    MMModemState state;
+
     g_return_if_fail (MM_IS_MODEM (self));
     g_return_if_fail (callback != NULL);
+
+    state = mm_modem_get_state (self);
+    if (state >= MM_MODEM_STATE_ENABLED) {
+        /* Already enabled */
+        callback (self, NULL, user_data);
+        return;
+    }
 
     if (MM_MODEM_GET_INTERFACE (self)->enable)
         MM_MODEM_GET_INTERFACE (self)->enable (self, callback, user_data);
@@ -71,8 +81,17 @@ mm_modem_disable (MMModem *self,
                   MMModemFn callback,
                   gpointer user_data)
 {
+    MMModemState state;
+
     g_return_if_fail (MM_IS_MODEM (self));
     g_return_if_fail (callback != NULL);
+
+    state = mm_modem_get_state (self);
+    if (state <= MM_MODEM_STATE_DISABLED) {
+        /* Already disabled */
+        callback (self, NULL, user_data);
+        return;
+    }
 
     if (MM_MODEM_GET_INTERFACE (self)->disable)
         MM_MODEM_GET_INTERFACE (self)->disable (self, callback, user_data);
@@ -381,11 +400,37 @@ mm_modem_get_device (MMModem *self)
     return device;
 }
 
+MMModemState
+mm_modem_get_state (MMModem *self)
+{
+    MMModemState state = MM_MODEM_STATE_UNKNOWN;
+
+    g_object_get (G_OBJECT (self), MM_MODEM_STATE, &state, NULL);
+    return state;
+}
+
+void
+mm_modem_set_state (MMModem *self,
+                    MMModemState new_state,
+                    MMModemStateReason reason)
+{
+    MMModemState old_state = MM_MODEM_STATE_UNKNOWN;
+
+    g_object_get (G_OBJECT (self), MM_MODEM_STATE, &old_state, NULL);
+
+    if (new_state != old_state) {
+        g_object_set (G_OBJECT (self), MM_MODEM_STATE, new_state, NULL);
+        g_signal_emit_by_name (G_OBJECT (self), "state-changed", new_state, old_state, reason);
+g_message ("%s: state %d -> %d", __func__, old_state, new_state);
+    }
+}
+
 /*****************************************************************************/
 
 static void
 mm_modem_init (gpointer g_iface)
 {
+    GType iface_type = G_TYPE_FROM_INTERFACE (g_iface);
     static gboolean initialized = FALSE;
 
     if (initialized)
@@ -449,6 +494,26 @@ mm_modem_init (gpointer g_iface)
                                "Modem is valid",
                                FALSE,
                                G_PARAM_READABLE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_uint (MM_MODEM_STATE,
+                            "State",
+                            "State",
+                            MM_MODEM_STATE_UNKNOWN,
+                            MM_MODEM_STATE_LAST,
+                            MM_MODEM_STATE_UNKNOWN,
+                            G_PARAM_READWRITE));
+
+    /* Signals */
+    g_signal_new ("state-changed",
+                  iface_type,
+                  G_SIGNAL_RUN_FIRST,
+                  G_STRUCT_OFFSET (MMModem, state_changed),
+                  NULL, NULL,
+                  mm_marshal_VOID__UINT_UINT_UINT,
+                  G_TYPE_NONE, 3,
+                  G_TYPE_UINT, G_TYPE_UINT, G_TYPE_UINT);
 
     initialized = TRUE;
 }

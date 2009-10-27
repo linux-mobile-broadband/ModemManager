@@ -21,6 +21,22 @@
 
 #include "mm-port.h"
 
+typedef enum {
+    MM_MODEM_STATE_UNKNOWN = 0,
+    MM_MODEM_STATE_DISABLED = 10,
+    MM_MODEM_STATE_ENABLED = 20,
+    MM_MODEM_STATE_SEARCHING = 30,
+    MM_MODEM_STATE_REGISTERED = 40,
+    MM_MODEM_STATE_CONNECTING = 50,
+    MM_MODEM_STATE_CONNECTED = 60,
+
+    MM_MODEM_STATE_LAST = MM_MODEM_STATE_CONNECTED
+} MMModemState;
+
+typedef enum {
+    MM_MODEM_STATE_REASON_NONE = 0
+} MMModemStateReason;
+
 #define MM_TYPE_MODEM      (mm_modem_get_type ())
 #define MM_MODEM(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_MODEM, MMModem))
 #define MM_IS_MODEM(obj)   (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_MODEM))
@@ -33,6 +49,7 @@
 #define MM_MODEM_IP_METHOD     "ip-method"
 #define MM_MODEM_VALID         "valid"      /* not exported */
 #define MM_MODEM_PLUGIN        "plugin"     /* not exported */
+#define MM_MODEM_STATE         "state"      /* not exported */
 
 #define MM_MODEM_TYPE_UNKNOWN  0
 #define MM_MODEM_TYPE_GSM      1
@@ -52,6 +69,7 @@ typedef enum {
     MM_MODEM_PROP_IP_METHOD,
     MM_MODEM_PROP_VALID,       /* Not exported */
     MM_MODEM_PROP_PLUGIN,      /* Not exported */
+    MM_MODEM_PROP_STATE,       /* Not exported */
 } MMModemProp;
 
 typedef struct _MMModem MMModem;
@@ -126,6 +144,12 @@ struct _MMModem {
     void (*get_info) (MMModem *self,
                       MMModemInfoFn callback,
                       gpointer user_data);
+
+    /* Signals */
+    void (*state_changed) (MMModem *self,
+                           MMModemState new_state,
+                           MMModemState old_state,
+                           MMModemStateReason reason);
 };
 
 GType mm_modem_get_type (void);
@@ -173,6 +197,12 @@ void mm_modem_get_info (MMModem *self,
 gboolean mm_modem_get_valid (MMModem *self);
 
 char *mm_modem_get_device (MMModem *self);
+
+MMModemState mm_modem_get_state (MMModem *self);
+
+void mm_modem_set_state (MMModem *self,
+                         MMModemState new_state,
+                         MMModemStateReason reason);
 
 #endif  /* MM_MODEM_H */
 

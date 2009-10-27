@@ -40,6 +40,7 @@ typedef struct {
     char *device;
     guint32 ip_method;
     gboolean valid;
+    MMModemState state;
 
     GHashTable *ports;
 } MMModemBasePrivate;
@@ -181,6 +182,9 @@ set_property (GObject *object, guint prop_id,
     MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (object);
 
     switch (prop_id) {
+    case MM_MODEM_PROP_STATE:
+        priv->state = g_value_get_uint (value);
+        break;
     case MM_MODEM_PROP_DRIVER:
         /* Construct only */
         priv->driver = g_value_dup_string (value);
@@ -212,6 +216,9 @@ get_property (GObject *object, guint prop_id,
     MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (object);
 
     switch (prop_id) {
+    case MM_MODEM_PROP_STATE:
+        g_value_set_uint (value, priv->state);
+        break;
     case MM_MODEM_PROP_MASTER_DEVICE:
         g_value_set_string (value, priv->device);
         break;
@@ -264,6 +271,10 @@ mm_modem_base_class_init (MMModemBaseClass *klass)
     object_class->get_property = get_property;
     object_class->set_property = set_property;
     object_class->finalize = finalize;
+
+    g_object_class_override_property (object_class,
+                                      MM_MODEM_PROP_STATE,
+                                      MM_MODEM_STATE);
 
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_MASTER_DEVICE,

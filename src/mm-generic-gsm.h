@@ -85,4 +85,7 @@ MMPort *mm_generic_gsm_grab_port (MMGenericGsm *modem,
                                   MMPortType ptype,
                                   GError **error);
 
+void mm_generic_gsm_update_enabled_state (MMGenericGsm *modem,
+                                          MMModemStateReason reason);
+
 #endif /* MM_GENERIC_GSM_H */
