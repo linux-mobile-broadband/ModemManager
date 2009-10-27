@@ -1112,9 +1112,8 @@ get_analog_digital_done (MMSerialPort *port,
         return;
     } else {
         /* No service */
-        info->error = g_error_new_literal (MM_MOBILE_ERROR,
-                                           MM_MOBILE_ERROR_NO_NETWORK,
-                                           "No service");
+        set_callback_1x_state_helper (info, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+        set_callback_evdo_state_helper (info, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
     }
 
 error:
