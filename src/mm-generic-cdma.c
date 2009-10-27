@@ -36,17 +36,19 @@ static void simple_reg_callback (MMModemCdma *modem,
 
 static void simple_state_machine (MMModem *modem, GError *error, gpointer user_data);
 
-static gpointer mm_generic_cdma_parent_class = NULL;
+static void modem_init (MMModem *modem_class);
+static void modem_cdma_init (MMModemCdma *cdma_class);
+static void modem_simple_init (MMModemSimple *class);
+
+G_DEFINE_TYPE_EXTENDED (MMGenericCdma, mm_generic_cdma, MM_TYPE_MODEM_BASE, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_CDMA, modem_cdma_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_SIMPLE, modem_simple_init))
 
 #define MM_GENERIC_CDMA_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_GENERIC_CDMA, MMGenericCdmaPrivate))
 
 typedef struct {
-    char *driver;
-    char *plugin;
-    char *device;
-
     guint32 signal_quality;
-    guint32 ip_method;
     gboolean valid;
     gboolean evdo_rev0;
     gboolean evdo_revA;
@@ -102,10 +104,7 @@ check_valid (MMGenericCdma *self)
     if (priv->primary && priv->data)
         new_valid = TRUE;
 
-    if (priv->valid != new_valid) {
-        priv->valid = new_valid;
-        g_object_notify (G_OBJECT (self), MM_MODEM_VALID);
-    }
+    mm_modem_base_set_valid (MM_MODEM_BASE (self), new_valid);
 }
 
 static gboolean
@@ -1477,23 +1476,7 @@ set_property (GObject *object, guint prop_id,
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (object);
 
     switch (prop_id) {
-    case MM_MODEM_PROP_DRIVER:
-        /* Construct only */
-        priv->driver = g_value_dup_string (value);
-        break;
-    case MM_MODEM_PROP_PLUGIN:
-        /* Construct only */
-        priv->plugin = g_value_dup_string (value);
-        break;
-    case MM_MODEM_PROP_MASTER_DEVICE:
-        /* Construct only */
-        priv->device = g_value_dup_string (value);
-        break;
-    case MM_MODEM_PROP_IP_METHOD:
-        priv->ip_method = g_value_get_uint (value);
-        break;
     case MM_MODEM_PROP_TYPE:
-    case MM_MODEM_PROP_VALID:
         break;
     case PROP_EVDO_REV0:
         priv->evdo_rev0 = g_value_get_boolean (value);
@@ -1520,23 +1503,8 @@ get_property (GObject *object, guint prop_id,
         else
             g_value_set_string (value, NULL);
         break;
-    case MM_MODEM_PROP_MASTER_DEVICE:
-        g_value_set_string (value, priv->device);
-        break;
-    case MM_MODEM_PROP_DRIVER:
-        g_value_set_string (value, priv->driver);
-        break;
-    case MM_MODEM_PROP_PLUGIN:
-        g_value_set_string (value, priv->plugin);
-        break;
     case MM_MODEM_PROP_TYPE:
         g_value_set_uint (value, MM_MODEM_TYPE_CDMA);
-        break;
-    case MM_MODEM_PROP_IP_METHOD:
-        g_value_set_uint (value, priv->ip_method);
-        break;
-    case MM_MODEM_PROP_VALID:
-        g_value_set_boolean (value, priv->valid);
         break;
     case PROP_EVDO_REV0:
         g_value_set_boolean (value, priv->evdo_rev0);
@@ -1561,12 +1529,6 @@ dispose (GObject *object)
 static void
 finalize (GObject *object)
 {
-    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (object);
-
-    g_free (priv->driver);
-    g_free (priv->plugin);
-    g_free (priv->device);
-
     G_OBJECT_CLASS (mm_generic_cdma_parent_class)->finalize (object);
 }
 
@@ -1591,28 +1553,8 @@ mm_generic_cdma_class_init (MMGenericCdmaClass *klass)
                                       MM_MODEM_DATA_DEVICE);
 
     g_object_class_override_property (object_class,
-                                      MM_MODEM_PROP_MASTER_DEVICE,
-                                      MM_MODEM_MASTER_DEVICE);
-
-    g_object_class_override_property (object_class,
-                                      MM_MODEM_PROP_DRIVER,
-                                      MM_MODEM_DRIVER);
-
-    g_object_class_override_property (object_class,
-                                      MM_MODEM_PROP_PLUGIN,
-                                      MM_MODEM_PLUGIN);
-
-    g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_TYPE,
                                       MM_MODEM_TYPE);
-
-    g_object_class_override_property (object_class,
-                                      MM_MODEM_PROP_IP_METHOD,
-                                      MM_MODEM_IP_METHOD);
-
-    g_object_class_override_property (object_class,
-                                      MM_MODEM_PROP_VALID,
-                                      MM_MODEM_VALID);
 
     g_object_class_install_property (object_class, PROP_EVDO_REV0,
             g_param_spec_boolean (MM_GENERIC_CDMA_EVDO_REV0,
@@ -1629,45 +1571,3 @@ mm_generic_cdma_class_init (MMGenericCdmaClass *klass)
                                   G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
 
-GType
-mm_generic_cdma_get_type (void)
-{
-    static GType generic_cdma_type = 0;
-
-    if (G_UNLIKELY (generic_cdma_type == 0)) {
-        static const GTypeInfo generic_cdma_type_info = {
-            sizeof (MMGenericCdmaClass),
-            (GBaseInitFunc) NULL,
-            (GBaseFinalizeFunc) NULL,
-            (GClassInitFunc) mm_generic_cdma_class_init,
-            (GClassFinalizeFunc) NULL,
-            NULL,   /* class_data */
-            sizeof (MMGenericCdma),
-            0,      /* n_preallocs */
-            (GInstanceInitFunc) mm_generic_cdma_init,
-        };
-
-        static const GInterfaceInfo modem_iface_info = { 
-            (GInterfaceInitFunc) modem_init
-        };
-        
-        static const GInterfaceInfo modem_cdma_iface_info = {
-            (GInterfaceInitFunc) modem_cdma_init
-        };
-
-        static const GInterfaceInfo modem_simple_info = {
-            (GInterfaceInitFunc) modem_simple_init
-        };
-
-        generic_cdma_type = g_type_register_static (MM_TYPE_MODEM_BASE,
-                                                    "MMGenericCdma",
-                                                    &generic_cdma_type_info,
-                                                    0);
-
-        g_type_add_interface_static (generic_cdma_type, MM_TYPE_MODEM, &modem_iface_info);
-        g_type_add_interface_static (generic_cdma_type, MM_TYPE_MODEM_CDMA, &modem_cdma_iface_info);
-        g_type_add_interface_static (generic_cdma_type, MM_TYPE_MODEM_SIMPLE, &modem_simple_info);
-    }
-
-    return generic_cdma_type;
-}

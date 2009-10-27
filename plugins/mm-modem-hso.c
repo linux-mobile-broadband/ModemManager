@@ -38,7 +38,12 @@ static void impl_hso_authenticate (MMModemHso *self,
 
 #include "mm-modem-gsm-hso-glue.h"
 
-static gpointer mm_modem_hso_parent_class = NULL;
+static void modem_init (MMModem *modem_class);
+static void modem_simple_init (MMModemSimple *simple_class);
+
+G_DEFINE_TYPE_EXTENDED (MMModemHso, mm_modem_hso, MM_TYPE_GENERIC_GSM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_SIMPLE, modem_simple_init))
 
 #define MM_MODEM_HSO_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_HSO, MMModemHsoPrivate))
 
@@ -685,39 +690,3 @@ mm_modem_hso_class_init (MMModemHsoClass *klass)
     object_class->finalize = finalize;
 }
 
-GType
-mm_modem_hso_get_type (void)
-{
-    static GType modem_hso_type = 0;
-
-    if (G_UNLIKELY (modem_hso_type == 0)) {
-        static const GTypeInfo modem_hso_type_info = {
-            sizeof (MMModemHsoClass),
-            (GBaseInitFunc) NULL,
-            (GBaseFinalizeFunc) NULL,
-            (GClassInitFunc) mm_modem_hso_class_init,
-            (GClassFinalizeFunc) NULL,
-            NULL,   /* class_data */
-            sizeof (MMModemHso),
-            0,      /* n_preallocs */
-            (GInstanceInitFunc) mm_modem_hso_init,
-        };
-
-        static const GInterfaceInfo modem_iface_info = { 
-            (GInterfaceInitFunc) modem_init
-        };
-
-        static const GInterfaceInfo modem_simple_info = {
-            (GInterfaceInitFunc) modem_simple_init
-        };
-
-        modem_hso_type = g_type_register_static (MM_TYPE_GENERIC_GSM, "MMModemHso", &modem_hso_type_info, 0);
-
-        g_type_add_interface_static (modem_hso_type, MM_TYPE_MODEM, &modem_iface_info);
-        g_type_add_interface_static (modem_hso_type, MM_TYPE_MODEM_SIMPLE, &modem_simple_info);
-
-        dbus_g_object_type_install_info (modem_hso_type, &dbus_glib_mm_modem_gsm_hso_object_info);
-    }
-
-    return modem_hso_type;
-}

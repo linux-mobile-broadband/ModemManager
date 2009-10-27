@@ -22,7 +22,13 @@
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 
-static gpointer mm_modem_option_parent_class = NULL;
+static void modem_init (MMModem *modem_class);
+static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
+
+G_DEFINE_TYPE_EXTENDED (MMModemOption, mm_modem_option, MM_TYPE_GENERIC_GSM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init))
+
 
 MMModem *
 mm_modem_option_new (const char *device,
@@ -237,37 +243,3 @@ mm_modem_option_class_init (MMModemOptionClass *klass)
     mm_modem_option_parent_class = g_type_class_peek_parent (klass);
 }
 
-GType
-mm_modem_option_get_type (void)
-{
-    static GType modem_option_type = 0;
-
-    if (G_UNLIKELY (modem_option_type == 0)) {
-        static const GTypeInfo modem_option_type_info = {
-            sizeof (MMModemOptionClass),
-            (GBaseInitFunc) NULL,
-            (GBaseFinalizeFunc) NULL,
-            (GClassInitFunc) mm_modem_option_class_init,
-            (GClassFinalizeFunc) NULL,
-            NULL,   /* class_data */
-            sizeof (MMModemOption),
-            0,      /* n_preallocs */
-            (GInstanceInitFunc) mm_modem_option_init,
-        };
-
-        static const GInterfaceInfo modem_iface_info = { 
-            (GInterfaceInitFunc) modem_init
-        };
-
-        static const GInterfaceInfo modem_gsm_network_info = {
-            (GInterfaceInitFunc) modem_gsm_network_init
-        };
-
-        modem_option_type = g_type_register_static (MM_TYPE_GENERIC_GSM, "MMModemOption", &modem_option_type_info, 0);
-
-        g_type_add_interface_static (modem_option_type, MM_TYPE_MODEM, &modem_iface_info);
-        g_type_add_interface_static (modem_option_type, MM_TYPE_MODEM_GSM_NETWORK, &modem_gsm_network_info);
-    }
-
-    return modem_option_type;
-}

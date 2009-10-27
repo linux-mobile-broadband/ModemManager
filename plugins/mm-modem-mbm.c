@@ -33,6 +33,15 @@
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 
+static void modem_init (MMModem *modem_class);
+static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
+static void modem_simple_init (MMModemSimple *class);
+
+G_DEFINE_TYPE_EXTENDED (MMModemMbm, mm_modem_mbm, MM_TYPE_GENERIC_GSM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_SIMPLE, modem_simple_init))
+
 #define MM_MODEM_MBM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_MBM, MMModemMbmPrivate))
 
 #define MBM_E2NAP_DISCONNECTED 0
@@ -49,8 +58,6 @@
 #define MBM_ERINFO_2G_EGPRS 2
 #define MBM_ERINFO_3G_UMTS  1
 #define MBM_ERINFO_3G_HSDPA 2
-
-static gpointer mm_modem_mbm_parent_class = NULL;
 
 typedef struct {
     guint reg_id;
@@ -802,42 +809,3 @@ mm_modem_mbm_class_init (MMModemMbmClass *klass)
     object_class->finalize = finalize;
 }
 
-GType
-mm_modem_mbm_get_type (void)
-{
-    static GType modem_mbm_type = 0;
-
-    if (G_UNLIKELY (modem_mbm_type == 0)) {
-        static const GTypeInfo modem_mbm_type_info = {
-            sizeof (MMModemMbmClass),
-            (GBaseInitFunc) NULL,
-            (GBaseFinalizeFunc) NULL,
-            (GClassInitFunc) mm_modem_mbm_class_init,
-            (GClassFinalizeFunc) NULL,
-            NULL,   /* class_data */
-            sizeof (MMModemMbm),
-            0,      /* n_preallocs */
-            (GInstanceInitFunc) mm_modem_mbm_init,
-        };
-
-        static const GInterfaceInfo modem_iface_info = {
-            (GInterfaceInitFunc) modem_init
-        };
-
-        static const GInterfaceInfo modem_simple_info = {
-            (GInterfaceInitFunc) modem_simple_init
-        };
-
-        static const GInterfaceInfo modem_gsm_network_info = {
-            (GInterfaceInitFunc) modem_gsm_network_init
-        };
-
-        modem_mbm_type = g_type_register_static (MM_TYPE_GENERIC_GSM, "MMModemMbm", &modem_mbm_type_info, 0);
-
-        g_type_add_interface_static (modem_mbm_type, MM_TYPE_MODEM, &modem_iface_info);
-        g_type_add_interface_static (modem_mbm_type, MM_TYPE_MODEM_SIMPLE, &modem_simple_info);
-        g_type_add_interface_static (modem_mbm_type, MM_TYPE_MODEM_GSM_NETWORK, &modem_gsm_network_info);
-    }
-
-    return modem_mbm_type;
-}

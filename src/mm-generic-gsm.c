@@ -28,7 +28,18 @@
 #include "mm-callback-info.h"
 #include "mm-serial-parsers.h"
 
-static gpointer mm_generic_gsm_parent_class = NULL;
+static void modem_init (MMModem *modem_class);
+static void modem_gsm_card_init (MMModemGsmCard *gsm_card_class);
+static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
+static void modem_gsm_sms_init (MMModemGsmSms *gsm_sms_class);
+static void modem_simple_init (MMModemSimple *class);
+
+G_DEFINE_TYPE_EXTENDED (MMGenericGsm, mm_generic_gsm, MM_TYPE_MODEM_BASE, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_CARD, modem_gsm_card_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_SMS, modem_gsm_sms_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_SIMPLE, modem_simple_init))
 
 #define MM_GENERIC_GSM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_GENERIC_GSM, MMGenericGsmPrivate))
 
@@ -207,10 +218,7 @@ check_valid (MMGenericGsm *self)
     if (priv->primary && priv->data)
         new_valid = TRUE;
 
-    if (priv->valid != new_valid) {
-        priv->valid = new_valid;
-        g_object_notify (G_OBJECT (self), MM_MODEM_VALID);
-    }
+    mm_modem_base_set_valid (MM_MODEM_BASE (self), new_valid);
 }
 
 static gboolean
@@ -1873,26 +1881,8 @@ static void
 set_property (GObject *object, guint prop_id,
               const GValue *value, GParamSpec *pspec)
 {
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (object);
-
     switch (prop_id) {
-    case MM_MODEM_PROP_DRIVER:
-        /* Construct only */
-        priv->driver = g_value_dup_string (value);
-        break;
-    case MM_MODEM_PROP_PLUGIN:
-        /* Construct only */
-        priv->plugin = g_value_dup_string (value);
-        break;
-    case MM_MODEM_PROP_MASTER_DEVICE:
-        /* Constrcut only */
-        priv->device = g_value_dup_string (value);
-        break;
-    case MM_MODEM_PROP_IP_METHOD:
-        priv->ip_method = g_value_get_uint (value);
-        break;
     case MM_MODEM_PROP_TYPE:
-    case MM_MODEM_PROP_VALID:
     case MM_GENERIC_GSM_PROP_POWER_UP_CMD:
     case MM_GENERIC_GSM_PROP_POWER_DOWN_CMD:
     case MM_GENERIC_GSM_PROP_INIT_CMD:
@@ -1918,23 +1908,8 @@ get_property (GObject *object, guint prop_id,
         else
             g_value_set_string (value, NULL);
         break;
-    case MM_MODEM_PROP_MASTER_DEVICE:
-        g_value_set_string (value, priv->device);
-        break;
-    case MM_MODEM_PROP_DRIVER:
-        g_value_set_string (value, priv->driver);
-        break;
-    case MM_MODEM_PROP_PLUGIN:
-        g_value_set_string (value, priv->plugin);
-        break;
     case MM_MODEM_PROP_TYPE:
         g_value_set_uint (value, MM_MODEM_TYPE_GSM);
-        break;
-    case MM_MODEM_PROP_IP_METHOD:
-        g_value_set_uint (value, priv->ip_method);
-        break;
-    case MM_MODEM_PROP_VALID:
-        g_value_set_boolean (value, priv->valid);
         break;
     case MM_GENERIC_GSM_PROP_POWER_UP_CMD:
         g_value_set_string (value, "+CFUN=1");
@@ -1971,7 +1946,6 @@ finalize (GObject *object)
 
     mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (object));
 
-    g_free (priv->driver);
     g_free (priv->oper_code);
     g_free (priv->oper_name);
 
@@ -1997,28 +1971,8 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
                                       MM_MODEM_DATA_DEVICE);
 
     g_object_class_override_property (object_class,
-                                      MM_MODEM_PROP_MASTER_DEVICE,
-                                      MM_MODEM_MASTER_DEVICE);
-
-    g_object_class_override_property (object_class,
-                                      MM_MODEM_PROP_DRIVER,
-                                      MM_MODEM_DRIVER);
-
-    g_object_class_override_property (object_class,
-                                      MM_MODEM_PROP_PLUGIN,
-                                      MM_MODEM_PLUGIN);
-
-    g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_TYPE,
                                       MM_MODEM_TYPE);
-
-    g_object_class_override_property (object_class,
-                                      MM_MODEM_PROP_IP_METHOD,
-                                      MM_MODEM_IP_METHOD);
-
-    g_object_class_override_property (object_class,
-                                      MM_MODEM_PROP_VALID,
-                                      MM_MODEM_VALID);
 
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_SUPPORTED_BANDS,
@@ -2053,55 +2007,3 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
 
-GType
-mm_generic_gsm_get_type (void)
-{
-    static GType generic_gsm_type = 0;
-
-    if (G_UNLIKELY (generic_gsm_type == 0)) {
-        static const GTypeInfo generic_gsm_type_info = {
-            sizeof (MMGenericGsmClass),
-            (GBaseInitFunc) NULL,
-            (GBaseFinalizeFunc) NULL,
-            (GClassInitFunc) mm_generic_gsm_class_init,
-            (GClassFinalizeFunc) NULL,
-            NULL,   /* class_data */
-            sizeof (MMGenericGsm),
-            0,      /* n_preallocs */
-            (GInstanceInitFunc) mm_generic_gsm_init,
-        };
-
-        static const GInterfaceInfo modem_iface_info = { 
-            (GInterfaceInitFunc) modem_init
-        };
-        
-        static const GInterfaceInfo modem_gsm_card_info = {
-            (GInterfaceInitFunc) modem_gsm_card_init
-        };
-
-        static const GInterfaceInfo modem_gsm_network_info = {
-            (GInterfaceInitFunc) modem_gsm_network_init
-        };
-
-        static const GInterfaceInfo modem_gsm_sms_info = {
-            (GInterfaceInitFunc) modem_gsm_sms_init
-        };
-
-        static const GInterfaceInfo modem_simple_info = {
-            (GInterfaceInitFunc) modem_simple_init
-        };
-
-        generic_gsm_type = g_type_register_static (MM_TYPE_MODEM_BASE,
-                                                   "MMGenericGsm",
-                                                   &generic_gsm_type_info,
-                                                   0);
-
-        g_type_add_interface_static (generic_gsm_type, MM_TYPE_MODEM, &modem_iface_info);
-        g_type_add_interface_static (generic_gsm_type, MM_TYPE_MODEM_GSM_CARD, &modem_gsm_card_info);
-        g_type_add_interface_static (generic_gsm_type, MM_TYPE_MODEM_GSM_NETWORK, &modem_gsm_network_info);
-        g_type_add_interface_static (generic_gsm_type, MM_TYPE_MODEM_GSM_SMS, &modem_gsm_sms_info);
-        g_type_add_interface_static (generic_gsm_type, MM_TYPE_MODEM_SIMPLE, &modem_simple_info);
-    }
-
-    return generic_gsm_type;
-}

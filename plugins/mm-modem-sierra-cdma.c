@@ -29,7 +29,7 @@
 #include "mm-serial-port.h"
 #include "mm-serial-parsers.h"
 
-static gpointer mm_modem_sierra_cdma_parent_class = NULL;
+G_DEFINE_TYPE (MMModemSierraCdma, mm_modem_sierra_cdma, MM_TYPE_GENERIC_CDMA)
 
 #define MM_MODEM_SIERRA_CDMA_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_SIERRA_CDMA, MMModemSierraCdmaPrivate))
 
@@ -285,26 +285,3 @@ mm_modem_sierra_cdma_class_init (MMModemSierraCdmaClass *klass)
     cdma_class->query_registration_state = query_registration_state;
 }
 
-GType
-mm_modem_sierra_cdma_get_type (void)
-{
-    static GType modem_sierra_cdma_type = 0;
-
-    if (G_UNLIKELY (modem_sierra_cdma_type == 0)) {
-        static const GTypeInfo modem_sierra_cdma_type_info = {
-            sizeof (MMModemSierraCdmaClass),
-            (GBaseInitFunc) NULL,
-            (GBaseFinalizeFunc) NULL,
-            (GClassInitFunc) mm_modem_sierra_cdma_class_init,
-            (GClassFinalizeFunc) NULL,
-            NULL,   /* class_data */
-            sizeof (MMModemSierraCdma),
-            0,      /* n_preallocs */
-            (GInstanceInitFunc) mm_modem_sierra_cdma_init,
-        };
-
-        modem_sierra_cdma_type = g_type_register_static (MM_TYPE_GENERIC_CDMA, "MMModemSierraCdma", &modem_sierra_cdma_type_info, 0);
-    }
-
-    return modem_sierra_cdma_type;
-}

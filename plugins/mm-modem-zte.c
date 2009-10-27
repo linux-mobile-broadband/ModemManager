@@ -23,7 +23,10 @@
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 
-static gpointer mm_modem_zte_parent_class = NULL;
+static void modem_init (MMModem *modem_class);
+
+G_DEFINE_TYPE_EXTENDED (MMModemZte, mm_modem_zte, MM_TYPE_GENERIC_GSM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init))
 
 MMModem *
 mm_modem_zte_new (const char *device,
@@ -200,31 +203,3 @@ mm_modem_zte_class_init (MMModemZteClass *klass)
     mm_modem_zte_parent_class = g_type_class_peek_parent (klass);
 }
 
-GType
-mm_modem_zte_get_type (void)
-{
-    static GType modem_zte_type = 0;
-
-    if (G_UNLIKELY (modem_zte_type == 0)) {
-        static const GTypeInfo modem_zte_type_info = {
-            sizeof (MMModemZteClass),
-            (GBaseInitFunc) NULL,
-            (GBaseFinalizeFunc) NULL,
-            (GClassInitFunc) mm_modem_zte_class_init,
-            (GClassFinalizeFunc) NULL,
-            NULL,   /* class_data */
-            sizeof (MMModemZte),
-            0,      /* n_preallocs */
-            (GInstanceInitFunc) mm_modem_zte_init,
-        };
-
-        static const GInterfaceInfo modem_iface_info = {
-            (GInterfaceInitFunc) modem_init
-        };
-
-        modem_zte_type = g_type_register_static (MM_TYPE_GENERIC_GSM, "MMModemZte", &modem_zte_type_info, 0);
-        g_type_add_interface_static (modem_zte_type, MM_TYPE_MODEM, &modem_iface_info);
-    }
-
-    return modem_zte_type;
-}

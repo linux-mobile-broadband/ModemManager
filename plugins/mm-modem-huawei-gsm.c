@@ -28,7 +28,13 @@
 #include "mm-serial-port.h"
 #include "mm-serial-parsers.h"
 
-static gpointer mm_modem_huawei_gsm_parent_class = NULL;
+static void modem_init (MMModem *modem_class);
+static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
+
+G_DEFINE_TYPE_EXTENDED (MMModemHuaweiGsm, mm_modem_huawei_gsm, MM_TYPE_GENERIC_GSM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init))
+
 
 #define MM_MODEM_HUAWEI_GSM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_HUAWEI_GSM, MMModemHuaweiGsmPrivate))
 
@@ -613,36 +619,3 @@ mm_modem_huawei_gsm_class_init (MMModemHuaweiGsmClass *klass)
     g_type_class_add_private (object_class, sizeof (MMModemHuaweiGsmPrivate));
 }
 
-GType
-mm_modem_huawei_gsm_get_type (void)
-{
-    static GType modem_huawei_gsm_type = 0;
-
-    if (G_UNLIKELY (modem_huawei_gsm_type == 0)) {
-        static const GTypeInfo modem_huawei_gsm_type_info = {
-            sizeof (MMModemHuaweiGsmClass),
-            (GBaseInitFunc) NULL,
-            (GBaseFinalizeFunc) NULL,
-            (GClassInitFunc) mm_modem_huawei_gsm_class_init,
-            (GClassFinalizeFunc) NULL,
-            NULL,   /* class_data */
-            sizeof (MMModemHuaweiGsm),
-            0,      /* n_preallocs */
-            (GInstanceInitFunc) mm_modem_huawei_gsm_init,
-        };
-
-        static const GInterfaceInfo modem_iface_info = {
-            (GInterfaceInitFunc) modem_init
-        };
-
-        static const GInterfaceInfo modem_gsm_network_info = {
-            (GInterfaceInitFunc) modem_gsm_network_init
-        };
-
-        modem_huawei_gsm_type = g_type_register_static (MM_TYPE_GENERIC_GSM, "MMModemHuaweiGsm", &modem_huawei_gsm_type_info, 0);
-        g_type_add_interface_static (modem_huawei_gsm_type, MM_TYPE_MODEM, &modem_iface_info);
-        g_type_add_interface_static (modem_huawei_gsm_type, MM_TYPE_MODEM_GSM_NETWORK, &modem_gsm_network_info);
-    }
-
-    return modem_huawei_gsm_type;
-}

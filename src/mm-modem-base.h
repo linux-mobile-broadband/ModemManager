@@ -55,5 +55,10 @@ MMPort *mm_modem_base_add_port     (MMModemBase *self,
 gboolean mm_modem_base_remove_port (MMModemBase *self,
                                     MMPort *port);
 
+void mm_modem_base_set_valid (MMModemBase *self,
+                              gboolean valid);
+
+gboolean mm_modem_base_get_valid (MMModemBase *self);
+
 #endif /* MM_MODEM_BASE_H */
 

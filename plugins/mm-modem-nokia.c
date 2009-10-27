@@ -21,7 +21,11 @@
 #include "mm-modem-nokia.h"
 #include "mm-serial-parsers.h"
 
-static gpointer mm_modem_nokia_parent_class = NULL;
+static void modem_init (MMModem *modem_class);
+
+G_DEFINE_TYPE_EXTENDED (MMModemNokia, mm_modem_nokia, MM_TYPE_GENERIC_GSM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init))
+
 
 MMModem *
 mm_modem_nokia_new (const char *device,
@@ -136,32 +140,3 @@ mm_modem_nokia_class_init (MMModemNokiaClass *klass)
                                       MM_GENERIC_GSM_POWER_DOWN_CMD);
 }
 
-GType
-mm_modem_nokia_get_type (void)
-{
-    static GType modem_nokia_type = 0;
-
-    if (G_UNLIKELY (modem_nokia_type == 0)) {
-        static const GTypeInfo modem_nokia_type_info = {
-            sizeof (MMModemNokiaClass),
-            (GBaseInitFunc) NULL,
-            (GBaseFinalizeFunc) NULL,
-            (GClassInitFunc) mm_modem_nokia_class_init,
-            (GClassFinalizeFunc) NULL,
-            NULL,   /* class_data */
-            sizeof (MMModemNokia),
-            0,      /* n_preallocs */
-            (GInstanceInitFunc) mm_modem_nokia_init,
-        };
-
-        static const GInterfaceInfo modem_iface_info = { 
-            (GInterfaceInitFunc) modem_init
-        };
-
-        modem_nokia_type = g_type_register_static (MM_TYPE_GENERIC_GSM, "MMModemNokia", &modem_nokia_type_info, 0);
-
-        g_type_add_interface_static (modem_nokia_type, MM_TYPE_MODEM, &modem_iface_info);
-    }
-
-    return modem_nokia_type;
-}

@@ -24,7 +24,13 @@
 #include "mm-callback-info.h"
 #include "mm-modem-gsm-card.h"
 
-static gpointer mm_modem_moto_c_gsm_parent_class = NULL;
+static void modem_init (MMModem *modem_class);
+static void modem_gsm_card_init (MMModemGsmCard *gsm_card_class);
+
+G_DEFINE_TYPE_EXTENDED (MMModemMotoCGsm, mm_modem_moto_c_gsm, MM_TYPE_GENERIC_GSM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_CARD, modem_gsm_card_init))
+
 
 MMModem *
 mm_modem_moto_c_gsm_new (const char *device,
@@ -121,38 +127,3 @@ mm_modem_moto_c_gsm_class_init (MMModemMotoCGsmClass *klass)
                                       MM_GENERIC_GSM_POWER_DOWN_CMD);
 }
 
-GType
-mm_modem_moto_c_gsm_get_type (void)
-{
-    static GType modem_moto_c_gsm_type = 0;
-
-    if (G_UNLIKELY (modem_moto_c_gsm_type == 0)) {
-        static const GTypeInfo modem_moto_c_gsm_type_info = {
-            sizeof (MMModemMotoCGsmClass),
-            (GBaseInitFunc) NULL,
-            (GBaseFinalizeFunc) NULL,
-            (GClassInitFunc) mm_modem_moto_c_gsm_class_init,
-            (GClassFinalizeFunc) NULL,
-            NULL,   /* class_data */
-            sizeof (MMModemMotoCGsm),
-            0,      /* n_preallocs */
-            (GInstanceInitFunc) mm_modem_moto_c_gsm_init,
-        };
-
-        static const GInterfaceInfo modem_iface_info = { 
-            (GInterfaceInitFunc) modem_init
-        };
-
-        static const GInterfaceInfo modem_gsm_card_info = {
-            (GInterfaceInitFunc) modem_gsm_card_init
-        };
-
-        modem_moto_c_gsm_type = g_type_register_static (MM_TYPE_GENERIC_GSM, "MMModemMotoCGsm",
-                                                         &modem_moto_c_gsm_type_info, 0);
-
-        g_type_add_interface_static (modem_moto_c_gsm_type, MM_TYPE_MODEM, &modem_iface_info);
-        g_type_add_interface_static (modem_moto_c_gsm_type, MM_TYPE_MODEM_GSM_CARD, &modem_gsm_card_info);
-    }
-
-    return modem_moto_c_gsm_type;
-}

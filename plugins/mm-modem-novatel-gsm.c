@@ -22,7 +22,11 @@
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 
-static gpointer mm_modem_novatel_gsm_parent_class = NULL;
+static void modem_init (MMModem *modem_class);
+
+G_DEFINE_TYPE_EXTENDED (MMModemNovatelGsm, mm_modem_novatel_gsm, MM_TYPE_GENERIC_GSM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init))
+
 
 MMModem *
 mm_modem_novatel_gsm_new (const char *device,
@@ -191,33 +195,3 @@ mm_modem_novatel_gsm_class_init (MMModemNovatelGsmClass *klass)
     mm_modem_novatel_gsm_parent_class = g_type_class_peek_parent (klass);
 }
 
-GType
-mm_modem_novatel_gsm_get_type (void)
-{
-    static GType modem_novatel_gsm_type = 0;
-
-    if (G_UNLIKELY (modem_novatel_gsm_type == 0)) {
-        static const GTypeInfo modem_novatel_gsm_type_info = {
-            sizeof (MMModemNovatelGsmClass),
-            (GBaseInitFunc) NULL,
-            (GBaseFinalizeFunc) NULL,
-            (GClassInitFunc) mm_modem_novatel_gsm_class_init,
-            (GClassFinalizeFunc) NULL,
-            NULL,   /* class_data */
-            sizeof (MMModemNovatelGsm),
-            0,      /* n_preallocs */
-            (GInstanceInitFunc) mm_modem_novatel_gsm_init,
-        };
-
-        static const GInterfaceInfo modem_iface_info = { 
-            (GInterfaceInitFunc) modem_init
-        };
-
-        modem_novatel_gsm_type = g_type_register_static (MM_TYPE_GENERIC_GSM, "MMModemNovatelGsm",
-                                                         &modem_novatel_gsm_type_info, 0);
-
-        g_type_add_interface_static (modem_novatel_gsm_type, MM_TYPE_MODEM, &modem_iface_info);
-    }
-
-    return modem_novatel_gsm_type;
-}

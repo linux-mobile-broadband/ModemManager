@@ -28,12 +28,11 @@
 #include "mm-serial-port.h"
 #include "mm-serial-parsers.h"
 
-static gpointer mm_modem_huawei_cdma_parent_class = NULL;
+static void modem_init (MMModem *modem_class);
 
-#define MM_MODEM_HUAWEI_CDMA_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_HUAWEI_CDMA, MMModemHuaweiCdmaPrivate))
+G_DEFINE_TYPE_EXTENDED (MMModemHuaweiCdma, mm_modem_huawei_cdma, MM_TYPE_GENERIC_CDMA, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init))
 
-typedef struct {
-} MMModemHuaweiCdmaPrivate;
 
 MMModem *
 mm_modem_huawei_cdma_new (const char *device,
@@ -260,40 +259,10 @@ mm_modem_huawei_cdma_init (MMModemHuaweiCdma *self)
 static void
 mm_modem_huawei_cdma_class_init (MMModemHuaweiCdmaClass *klass)
 {
-    GObjectClass *object_class = G_OBJECT_CLASS (klass);
     MMGenericCdmaClass *cdma_class = MM_GENERIC_CDMA_CLASS (klass);
 
     mm_modem_huawei_cdma_parent_class = g_type_class_peek_parent (klass);
-    g_type_class_add_private (object_class, sizeof (MMModemHuaweiCdmaPrivate));
 
     cdma_class->query_registration_state = query_registration_state;
 }
 
-GType
-mm_modem_huawei_cdma_get_type (void)
-{
-    static GType modem_huawei_cdma_type = 0;
-
-    if (G_UNLIKELY (modem_huawei_cdma_type == 0)) {
-        static const GTypeInfo modem_huawei_cdma_type_info = {
-            sizeof (MMModemHuaweiCdmaClass),
-            (GBaseInitFunc) NULL,
-            (GBaseFinalizeFunc) NULL,
-            (GClassInitFunc) mm_modem_huawei_cdma_class_init,
-            (GClassFinalizeFunc) NULL,
-            NULL,   /* class_data */
-            sizeof (MMModemHuaweiCdma),
-            0,      /* n_preallocs */
-            (GInstanceInitFunc) mm_modem_huawei_cdma_init,
-        };
-
-        static const GInterfaceInfo modem_iface_info = {
-            (GInterfaceInitFunc) modem_init
-        };
-
-        modem_huawei_cdma_type = g_type_register_static (MM_TYPE_GENERIC_CDMA, "MMModemHuaweiCdma", &modem_huawei_cdma_type_info, 0);
-        g_type_add_interface_static (modem_huawei_cdma_type, MM_TYPE_MODEM, &modem_iface_info);
-    }
-
-    return modem_huawei_cdma_type;
-}
