@@ -103,39 +103,7 @@ mm_modem_gobi_gsm_init (MMModemGobiGsm *self)
 }
 
 static void
-get_property (GObject *object, guint prop_id,
-              GValue *value, GParamSpec *pspec)
-{
-
-    /* These devices just don't implement AT+CFUN */
-
-    switch (prop_id) {
-    case MM_GENERIC_GSM_PROP_INIT_CMD:
-        g_value_set_string (value, "Z E0 V1 +CMEE=1");
-        break;
-    default:
-        break;
-    }
-}
-
-static void
-set_property (GObject *object, guint prop_id,
-              const GValue *value, GParamSpec *pspec)
-{
-}
-
-static void
 mm_modem_gobi_gsm_class_init (MMModemGobiGsmClass *klass)
 {
-    GObjectClass *object_class = G_OBJECT_CLASS (klass);
-
-    mm_modem_gobi_gsm_parent_class = g_type_class_peek_parent (klass);
-
-    object_class->get_property = get_property;
-    object_class->set_property = set_property;
-
-    g_object_class_override_property (object_class,
-                                      MM_GENERIC_GSM_PROP_INIT_CMD,
-                                      MM_GENERIC_GSM_INIT_CMD);
 }
 
