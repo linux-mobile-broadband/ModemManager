@@ -29,9 +29,10 @@
 #define MM_IS_GENERIC_GSM_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_GENERIC_GSM))
 #define MM_GENERIC_GSM_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_GENERIC_GSM, MMGenericGsmClass))
 
-#define MM_GENERIC_GSM_POWER_UP_CMD   "power-up-cmd"
-#define MM_GENERIC_GSM_POWER_DOWN_CMD "power-down-cmd"
-#define MM_GENERIC_GSM_INIT_CMD       "init-cmd"
+#define MM_GENERIC_GSM_POWER_UP_CMD       "power-up-cmd"
+#define MM_GENERIC_GSM_POWER_DOWN_CMD     "power-down-cmd"
+#define MM_GENERIC_GSM_INIT_CMD           "init-cmd"
+#define MM_GENERIC_GSM_INIT_CMD_OPTIONAL  "init-cmd-optional"
 
 typedef enum {
     MM_GENERIC_GSM_PROP_FIRST = 0x2000,
@@ -41,8 +42,7 @@ typedef enum {
     MM_GENERIC_GSM_PROP_INIT_CMD,
     MM_GENERIC_GSM_PROP_SUPPORTED_BANDS,
     MM_GENERIC_GSM_PROP_SUPPORTED_MODES,
-
-    MM_GENERIC_GSM_LAST_PROP = MM_GENERIC_GSM_PROP_INIT_CMD
+    MM_GENERIC_GSM_PROP_INIT_CMD_OPTIONAL
 } MMGenericGsmProp;
 
 

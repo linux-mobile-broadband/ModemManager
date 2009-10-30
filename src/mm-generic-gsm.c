@@ -369,6 +369,10 @@ init_done (MMSerialPort *port,
          */
         mm_serial_port_queue_command (port, "E0 +CMEE=1", 2, NULL, NULL);
 
+        g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_INIT_CMD_OPTIONAL, &cmd, NULL);
+        mm_serial_port_queue_command (port, cmd, 2, NULL, NULL);
+        g_free (cmd);
+
         if (MM_GENERIC_GSM_GET_PRIVATE (info->modem)->unsolicited_registration)
             mm_serial_port_queue_command (port, "+CREG=1", 5, NULL, NULL);
         else
@@ -1886,6 +1890,7 @@ set_property (GObject *object, guint prop_id,
     case MM_GENERIC_GSM_PROP_POWER_UP_CMD:
     case MM_GENERIC_GSM_PROP_POWER_DOWN_CMD:
     case MM_GENERIC_GSM_PROP_INIT_CMD:
+    case MM_GENERIC_GSM_PROP_INIT_CMD_OPTIONAL:
     case MM_GENERIC_GSM_PROP_SUPPORTED_BANDS:
     case MM_GENERIC_GSM_PROP_SUPPORTED_MODES:
         break;
@@ -1925,7 +1930,10 @@ get_property (GObject *object, guint prop_id,
         g_value_set_string (value, "");
         break;
     case MM_GENERIC_GSM_PROP_INIT_CMD:
-        g_value_set_string (value, "Z E0 V1 X4 &C1 +CMEE=1");
+        g_value_set_string (value, "Z E0 V1 +CMEE=1");
+        break;
+    case MM_GENERIC_GSM_PROP_INIT_CMD_OPTIONAL:
+        g_value_set_string (value, "X4 &C1");
         break;
     case MM_GENERIC_GSM_PROP_SUPPORTED_BANDS:
         g_value_set_uint (value, 0);
@@ -2003,6 +2011,14 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
          g_param_spec_string (MM_GENERIC_GSM_INIT_CMD,
                               "InitCommand",
                               "Initialization command",
+                              NULL,
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, MM_GENERIC_GSM_PROP_INIT_CMD_OPTIONAL,
+         g_param_spec_string (MM_GENERIC_GSM_INIT_CMD_OPTIONAL,
+                              "InitCommandOptional",
+                              "Optional initialization command (errors ignored)",
                               NULL,
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
