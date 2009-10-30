@@ -1282,7 +1282,7 @@ scan (MMModemGsmNetwork *modem,
                                       G_CALLBACK (callback),
                                       user_data);
 
-    mm_serial_port_queue_command (priv->primary, "+COPS=?", 60, scan_done, info);
+    mm_serial_port_queue_command (priv->primary, "+COPS=?", 120, scan_done, info);
 }
 
 /* SetApn */
