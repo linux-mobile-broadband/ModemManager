@@ -669,7 +669,7 @@ get_signal_quality_done (MMSerialPort *port,
             } else {
                 /* Normalize the quality */
                 quality = CLAMP (quality, 0, 31) * 100 / 31;
-            
+
                 priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
                 priv->signal_quality = quality;
                 mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
