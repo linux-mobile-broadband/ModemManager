@@ -67,6 +67,12 @@ def cdma_inspect(proxy, dump_private):
         print "Error reading registration state: %s" % e
 
     try:
+        quality = cdma.GetSignalQuality()
+        print "Signal quality: %d" % quality
+    except dbus.exceptions.DBusException, e:
+        print "Error reading signal quality: %s" % e
+
+    try:
         info = cdma.GetServingSystem()
         print "Class: %s" % get_cdma_band_class(info[0])
         print "Band:  %s" % info[1]
@@ -170,7 +176,11 @@ def gsm_inspect(proxy, dump_private):
 
     # Gsm.Network interface
     net = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_GSM_NETWORK)
-    print "Signal quality: %d" % net.GetSignalQuality()
+    try:
+        quality = net.GetSignalQuality()
+        print "Signal quality: %d" % quality
+    except dbus.exceptions.DBusException, e:
+        print "Error reading signal quality: %s" % e
 
     print "Scanning..."
     results = net.Scan(timeout=120)
