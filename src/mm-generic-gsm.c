@@ -1364,7 +1364,7 @@ cid_range_read (MMSerialPort *port,
 
         mm_callback_info_set_data (info, "cid", GUINT_TO_POINTER (cid), NULL);
 
-        command = g_strdup_printf ("+CGDCONT=%d, \"IP\", \"%s\"", cid, apn);
+        command = g_strdup_printf ("+CGDCONT=%d,\"IP\",\"%s\"", cid, apn);
         mm_serial_port_queue_command (port, command, 3, set_apn_done, info);
         g_free (command);
     }
