@@ -73,14 +73,14 @@ mm_modem_hso_new (const char *device,
 }
 
 static void
-hso_enable_done (MMSerialPort *port,
-                 GString *response,
-                 GError *error,
-                 gpointer user_data)
+hso_call_control_done (MMSerialPort *port,
+                       GString *response,
+                       GError *error,
+                       gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    if (error)
+    if (error && !mm_callback_info_get_data (info, "ignore-errors"))
         info->error = g_error_copy (error);
 
     mm_callback_info_schedule (info);
@@ -99,21 +99,23 @@ hso_get_cid (MMModemHso *self)
 }
 
 static void
-hso_enable (MMModemHso *self,
-            gboolean enabled,
-            MMModemFn callback,
-            gpointer user_data)
+hso_call_control (MMModemHso *self,
+                  gboolean activate,
+                  gboolean ignore_errors,
+                  MMModemFn callback,
+                  gpointer user_data)
 {
     MMCallbackInfo *info;
     char *command;
     MMSerialPort *primary;
 
     info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
+    mm_callback_info_set_data (info, "ignore-error", GUINT_TO_POINTER (ignore_errors), NULL);
 
-    command = g_strdup_printf ("AT_OWANCALL=%d,%d,1", hso_get_cid (self), enabled ? 1 : 0);
+    command = g_strdup_printf ("AT_OWANCALL=%d,%d,1", hso_get_cid (self), activate ? 1 : 0);
     primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-    mm_serial_port_queue_command (primary, command, 3, hso_enable_done, info);
+    mm_serial_port_queue_command (primary, command, 3, hso_call_control_done, info);
     g_free (command);
 }
 
@@ -179,8 +181,10 @@ hso_disabled (MMModem *modem,
     if (error) {
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
-    } else
-        hso_enable (MM_MODEM_HSO (modem), TRUE, hso_enabled, info);
+    } else {
+        /* Success, activate the PDP context and start the data session */
+        hso_call_control (MM_MODEM_HSO (modem), TRUE, FALSE, hso_enabled, info);
+    }
 }
 
 static void
@@ -197,7 +201,7 @@ auth_done (MMSerialPort *port,
         mm_callback_info_schedule (info);
     } else
         /* success, kill any existing connections first */
-        hso_enable (self, FALSE, hso_disabled, info);
+        hso_call_control (self, FALSE, FALSE, hso_disabled, info);
 }
 
 void
@@ -276,8 +280,7 @@ enable (MMModem *modem,
 }
 
 static void
-disable_done (MMSerialPort *port,
-              GString *response,
+disable_done (MMModem *modem,
               GError *error,
               gpointer user_data)
 {
@@ -295,28 +298,13 @@ disable (MMModem *modem,
          gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMSerialPort *primary;
-    char *cmd;
-    guint32 cid;
 
     mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
 
     info = mm_callback_info_new (modem, callback, user_data);
 
     /* Kill any existing connection */
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
-    g_assert (primary);
-
-    cid = mm_generic_gsm_get_cid (MM_GENERIC_GSM (modem));
-    mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
-
-    /* Disconnect the data session of the active connection, if any */
-    if (cid > 0) {
-        cmd = g_strdup_printf ("AT_OWANCALL=%u,0,0", cid);
-        mm_serial_port_queue_command (primary, cmd, 3, disable_done, info);
-        g_free (cmd);
-    } else
-        disable_done (primary, NULL, NULL, info);
+    hso_call_control (MM_MODEM_HSO (modem), FALSE, FALSE, disable_done, info);
 }
 
 static void
