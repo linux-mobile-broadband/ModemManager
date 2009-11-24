@@ -219,7 +219,8 @@ mm_generic_gsm_update_enabled_state (MMGenericGsm *self, MMModemStateReason reas
     switch (priv->reg_status) {
     case MM_MODEM_GSM_NETWORK_REG_STATUS_HOME:
     case MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING:
-        mm_modem_set_state (MM_MODEM (self), MM_MODEM_STATE_REGISTERED, reason);
+        if (mm_modem_get_state (MM_MODEM (self)) < MM_MODEM_STATE_CONNECTING)
+            mm_modem_set_state (MM_MODEM (self), MM_MODEM_STATE_REGISTERED, reason);
         break;
     case MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING:
         mm_modem_set_state (MM_MODEM (self), MM_MODEM_STATE_SEARCHING, reason);
