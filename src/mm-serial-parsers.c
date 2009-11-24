@@ -26,15 +26,19 @@ response_clean (GString *response)
 {
     char *s;
 
-    /* Ends with '<CR><LF>' */
+    /* Ends with one or more '<CR><LF>' */
     s = response->str + response->len - 1;
-    if (*s == '\n' && *(--s) == '\r')
+    while ((s > response->str) && (*s == '\n') && (*(s - 1) == '\r')) {
         g_string_truncate (response, response->len - 2);
+        s -= 2;
+    }
 
-    /* Starts with '<CR><LF>' */
+    /* Starts with one or more '<CR><LF>' */
     s = response->str;
-    if (*s == '\r' && *(++s) == '\n')
+    while ((response->len >= 2) && (*s == '\r') && (*(s + 1) == '\n')) {
         g_string_erase (response, 0, 2);
+        s = response->str;
+    }
 }
 
 
@@ -199,7 +203,7 @@ mm_serial_parser_v1_new (void)
 
     parser = g_slice_new (MMSerialParserV1);
 
-    parser->regex_ok = g_regex_new ("\\r\\nOK\\r\\n$", flags, 0, NULL);
+    parser->regex_ok = g_regex_new ("\\r\\nOK(\\r\\n)+$", flags, 0, NULL);
     parser->regex_connect = g_regex_new ("\\r\\nCONNECT.*\\r\\n", flags, 0, NULL);
     parser->regex_detailed_error = g_regex_new ("\\r\\n\\+CME ERROR: (\\d+)\\r\\n$", flags, 0, NULL);
     parser->regex_unknown_error = g_regex_new ("\\r\\n(ERROR)|(COMMAND NOT SUPPORT)\\r\\n$", flags, 0, NULL);
