@@ -64,7 +64,8 @@ MMPort * mm_generic_cdma_grab_port (MMGenericCdma *self,
 
 MMSerialPort *mm_generic_cdma_get_port (MMGenericCdma *modem, MMPortType ptype);
 
-void mm_generic_cdma_update_signal_quality (MMGenericCdma *self, guint32 quality);
+void mm_generic_cdma_update_cdma1x_quality (MMGenericCdma *self, guint32 quality);
+void mm_generic_cdma_update_evdo_quality (MMGenericCdma *self, guint32 quality);
 
 /* For unsolicited 1x registration state changes */
 void mm_generic_cdma_set_1x_registration_state (MMGenericCdma *self,

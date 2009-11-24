@@ -56,25 +56,53 @@ mm_modem_huawei_cdma_new (const char *device,
 
 /* Unsolicited message handlers */
 
-static void
-handle_signal_quality_change (MMSerialPort *port,
-                              GMatchInfo *match_info,
-                              gpointer user_data)
+static gint
+parse_quality (const char *str, const char *detail)
 {
-    MMModemHuaweiCdma *self = MM_MODEM_HUAWEI_CDMA (user_data);
-    char *str;
-    long int quality;
-
-    str = g_match_info_fetch (match_info, 1);
+    long int quality = 0;
 
     errno = 0;
     quality = strtol (str, NULL, 10);
     if (errno == 0) {
         quality = CLAMP (quality, 0, 100);
-        g_debug ("Signal quality: %ld", quality);
-        mm_generic_cdma_update_signal_quality (MM_GENERIC_CDMA (self), (guint32) quality);
+        g_debug ("%s: %ld", detail, quality);
+        return (gint) quality;
     }
+    return -1;
+}
+
+static void
+handle_1x_quality_change (MMSerialPort *port,
+                          GMatchInfo *match_info,
+                          gpointer user_data)
+{
+    MMModemHuaweiCdma *self = MM_MODEM_HUAWEI_CDMA (user_data);
+    char *str;
+    gint quality;
+
+    str = g_match_info_fetch (match_info, 1);
+    quality = parse_quality (str, "1X signal quality");
     g_free (str);
+
+    if (quality >= 0)
+        mm_generic_cdma_update_cdma1x_quality (MM_GENERIC_CDMA (self), (guint32) quality);
+}
+
+static void
+handle_evdo_quality_change (MMSerialPort *port,
+                          GMatchInfo *match_info,
+                          gpointer user_data)
+{
+    MMModemHuaweiCdma *self = MM_MODEM_HUAWEI_CDMA (user_data);
+    char *str;
+    gint quality;
+
+    str = g_match_info_fetch (match_info, 1);
+    quality = parse_quality (str, "EVDO signal quality");
+    g_free (str);
+
+    if (quality >= 0)
+        mm_generic_cdma_update_evdo_quality (MM_GENERIC_CDMA (self), (guint32) quality);
 }
 
 /*****************************************************************************/
@@ -233,11 +261,26 @@ grab_port (MMModem *modem,
 
 	port = mm_generic_cdma_grab_port (MM_GENERIC_CDMA (modem), subsys, name, suggested_type, user_data, error);
     if (port && MM_IS_SERIAL_PORT (port)) {
+        gboolean evdo0 = FALSE, evdoA = FALSE;
+
         g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
 
+        /* 1x signal level */
         regex = g_regex_new ("\\r\\n\\^RSSILVL:(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, handle_signal_quality_change, modem, NULL);
+        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, handle_1x_quality_change, modem, NULL);
         g_regex_unref (regex);
+
+        g_object_get (G_OBJECT (modem),
+                      MM_GENERIC_CDMA_EVDO_REV0, &evdo0,
+                      MM_GENERIC_CDMA_EVDO_REVA, &evdoA,
+                      NULL);
+
+        if (evdo0 || evdoA) {
+            /* EVDO signal level */
+            regex = g_regex_new ("\\r\\n\\^HRSSILVL:(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+            mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, handle_evdo_quality_change, modem, NULL);
+            g_regex_unref (regex);
+        }
     }
 
     return !!port;
