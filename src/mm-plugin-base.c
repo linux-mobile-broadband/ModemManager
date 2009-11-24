@@ -489,7 +489,7 @@ mm_plugin_base_probe_port (MMPluginBase *self,
 
     serial = mm_serial_port_new (name, MM_PORT_TYPE_PRIMARY);
     g_object_set (serial,
-                  MM_SERIAL_PORT_SEND_DELAY, 100000,
+                  MM_SERIAL_PORT_SEND_DELAY, (guint64) 100000,
                   MM_PORT_CARRIER_DETECT, FALSE,
                   NULL);
 

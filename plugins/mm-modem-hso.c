@@ -296,8 +296,9 @@ disable (MMModem *modem,
 {
     MMCallbackInfo *info;
     MMSerialPort *primary;
+    char *cmd;
+    guint32 cid;
 
-    mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
     mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
 
     info = mm_callback_info_new (modem, callback, user_data);
@@ -305,7 +306,17 @@ disable (MMModem *modem,
     /* Kill any existing connection */
     primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-    mm_serial_port_queue_command (primary, "AT_OWANCALL=1,0,0", 3, disable_done, info);
+
+    cid = mm_generic_gsm_get_cid (MM_GENERIC_GSM (modem));
+    mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
+
+    /* Disconnect the data session of the active connection, if any */
+    if (cid > 0) {
+        cmd = g_strdup_printf ("AT_OWANCALL=%u,0,0", cid);
+        mm_serial_port_queue_command (primary, cmd, 3, disable_done, info);
+        g_free (cmd);
+    } else
+        disable_done (primary, NULL, NULL, info);
 }
 
 static void
