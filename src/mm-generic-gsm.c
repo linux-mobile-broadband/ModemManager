@@ -1004,7 +1004,7 @@ do_register (MMModemGsmNetwork *modem,
     else
         command = g_strdup ("+COPS=0,,");
 
-    mm_serial_port_queue_command (priv->primary, command, 10, register_done, info);
+    mm_serial_port_queue_command (priv->primary, command, 30, register_done, info);
     g_free (command);
 }
 
