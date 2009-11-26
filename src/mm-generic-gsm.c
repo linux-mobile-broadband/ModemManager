@@ -1319,7 +1319,7 @@ cid_range_read (MMSerialPort *port,
         GRegex *r;
         GMatchInfo *match_info;
 
-        r = g_regex_new ("\\+CGDCONT: \\((\\d+)-(\\d+)\\),\"(\\S+)\"",
+        r = g_regex_new ("\\+CGDCONT:\\s*\\((\\d+)-(\\d+)\\),\\(?\"(\\S+)\"",
                          G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
                          0, &info->error);
         if (r) {
@@ -1385,7 +1385,7 @@ existing_apns_read (MMSerialPort *port,
         GRegex *r;
         GMatchInfo *match_info;
 
-        r = g_regex_new ("\\+CGDCONT: (\\d+)\\s*,\"(\\S+)\",\"(\\S+)\",\"(\\S+)\"",
+        r = g_regex_new ("\\+CGDCONT:\\s*(\\d+)\\s*,\"(\\S+)\",\"(\\S+)\",\"(\\S*)\"",
                          G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
                          0, &info->error);
         if (r) {
