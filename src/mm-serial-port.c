@@ -791,11 +791,18 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
 
     g_message ("(%s) opening serial device...", device);
     devfile = g_strdup_printf ("/dev/%s", device);
+    errno = 0;
     priv->fd = open (devfile, O_RDWR | O_EXCL | O_NONBLOCK | O_NOCTTY);
     g_free (devfile);
 
     if (priv->fd < 0) {
-        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_OPEN_FAILED,
+        /* nozomi isn't ready yet when the port appears, and it'll return
+         * ENODEV when open(2) is called on it.  Make sure we can handle this
+         * by returning a special error in that case.
+         */
+        g_set_error (error,
+                     MM_SERIAL_ERROR,
+                     (errno == ENODEV) ? MM_SERIAL_OPEN_FAILED_NO_DEVICE : MM_SERIAL_OPEN_FAILED,
                      "Could not open serial device %s: %s", device, strerror (errno));
         return FALSE;
     }

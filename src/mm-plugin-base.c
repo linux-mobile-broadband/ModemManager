@@ -85,6 +85,9 @@ typedef struct {
     GUdevDevice *physdev;
     char *driver;
 
+    guint open_id;
+    guint32 open_tries;
+
     MMSerialPort *probe_port;
     guint32 probed_caps;
     ProbeState probe_state;
@@ -201,7 +204,7 @@ mm_plugin_base_supports_task_init (MMPluginBaseSupportsTask *self)
 }
 
 static void
-dispose (GObject *object)
+supports_task_dispose (GObject *object)
 {
     MMPluginBaseSupportsTaskPrivate *priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (object);
 
@@ -213,6 +216,9 @@ dispose (GObject *object)
     g_free (priv->driver);
     g_free (priv->probe_resp);
     g_clear_error (&(priv->probe_error));
+
+    if (priv->open_id)
+        g_source_remove (priv->open_id);
 
     if (priv->probe_id)
         g_source_remove (priv->probe_id);
@@ -230,7 +236,7 @@ mm_plugin_base_supports_task_class_init (MMPluginBaseSupportsTaskClass *klass)
     g_type_class_add_private (object_class, sizeof (MMPluginBaseSupportsTaskPrivate));
 
     /* Virtual methods */
-    object_class->dispose = dispose;
+    object_class->dispose = supports_task_dispose;
 }
 
 /*****************************************************************************/
@@ -467,12 +473,52 @@ flash_done (MMSerialPort *port, GError *error, gpointer user_data)
     mm_serial_port_queue_command (port, "+GCAP", 3, parse_response, user_data);
 }
 
+static gboolean
+try_open (gpointer user_data)
+{
+    MMPluginBaseSupportsTask *task = MM_PLUGIN_BASE_SUPPORTS_TASK (user_data);
+    MMPluginBaseSupportsTaskPrivate *task_priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
+    GError *error = NULL;
+
+    task_priv->open_id = 0;
+
+    if (!mm_serial_port_open (task_priv->probe_port, &error)) {
+        if (++task_priv->open_tries > 4) {
+            /* took too long to open the port; give up */
+            g_warning ("(%s): failed to open after 4 tries.",
+                       mm_port_get_device (MM_PORT (task_priv->probe_port)));
+            probe_complete (task);
+        } else if (g_error_matches (error,
+                                    MM_SERIAL_ERROR,
+                                    MM_SERIAL_OPEN_FAILED_NO_DEVICE)) {
+            /* this is nozomi being dumb; try again */
+            task_priv->open_id = g_timeout_add_seconds (1, try_open, task);
+        } else {
+            /* some other hard error */
+            probe_complete (task);
+        }
+        g_clear_error (&error);
+    } else {
+        /* success, start probing */
+        GUdevDevice *port;
+
+        port = mm_plugin_base_supports_task_get_port (task);
+        g_assert (port);
+
+        g_debug ("(%s): probe requested by plugin '%s'",
+                 g_udev_device_get_name (port),
+                 mm_plugin_get_name (MM_PLUGIN (task_priv->plugin)));
+        mm_serial_port_flash (task_priv->probe_port, 100, flash_done, task);
+    }
+
+    return FALSE;
+}
+
 gboolean
 mm_plugin_base_probe_port (MMPluginBase *self,
                            MMPluginBaseSupportsTask *task,
                            GError **error)
 {
-    MMPluginBasePrivate *priv = MM_PLUGIN_BASE_GET_PRIVATE (self);
     MMPluginBaseSupportsTaskPrivate *task_priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
     MMSerialPort *serial;
     const char *name;
@@ -488,6 +534,12 @@ mm_plugin_base_probe_port (MMPluginBase *self,
     g_assert (name);
 
     serial = mm_serial_port_new (name, MM_PORT_TYPE_PRIMARY);
+    if (serial == NULL) {
+        g_set_error_literal (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             "Failed to create new serial port.");
+        return FALSE;
+    }
+
     g_object_set (serial,
                   MM_SERIAL_PORT_SEND_DELAY, (guint64) 100000,
                   MM_PORT_CARRIER_DETECT, FALSE,
@@ -498,14 +550,9 @@ mm_plugin_base_probe_port (MMPluginBase *self,
                                         mm_serial_parser_v1_new (),
                                         mm_serial_parser_v1_destroy);
 
-    if (!mm_serial_port_open (serial, error)) {
-        g_object_unref (serial);
-        return FALSE;
-    }
-
-    g_debug ("(%s): probe requested by plugin '%s'", name, priv->name);
+    /* Open the port */
     task_priv->probe_port = serial;
-    mm_serial_port_flash (serial, 100, flash_done, task);
+    task_priv->open_id = g_idle_add (try_open, task);
     return TRUE;
 }
 
