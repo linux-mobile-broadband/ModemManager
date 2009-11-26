@@ -67,6 +67,7 @@ callback_info_done (gpointer user_data)
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
     info->pending_id = 0;
+    info->called = TRUE;
 
     if (info->invoke_fn && info->callback)
         info->invoke_fn (info);
@@ -94,6 +95,7 @@ mm_callback_info_schedule (MMCallbackInfo *info)
 {
     g_return_if_fail (info != NULL);
     g_return_if_fail (info->pending_id == 0);
+    g_return_if_fail (info->called == FALSE);
 
     info->pending_id = g_idle_add_full (G_PRIORITY_DEFAULT_IDLE, callback_info_do, info, callback_info_done);
 }
