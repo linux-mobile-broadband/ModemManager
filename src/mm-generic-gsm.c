@@ -820,9 +820,6 @@ reg_status_updated (MMGenericGsm *self, int new_value, MMCallbackInfo *info)
     MMModemGsmNetworkRegStatus status;
     gboolean status_done = FALSE;
 
-    /* info must be set to process status updates - for now */
-    g_return_val_if_fail (!!info, status_done);
-
     switch (new_value) {
     case 0:
         status = MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE;
@@ -854,25 +851,31 @@ reg_status_updated (MMGenericGsm *self, int new_value, MMCallbackInfo *info)
     case MM_MODEM_GSM_NETWORK_REG_STATUS_HOME:
     case MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING:
         /* Successfully registered - stop registration */
-        mm_callback_info_schedule (info);
+        if (info)
+            mm_callback_info_schedule (info);
         mm_generic_gsm_pending_registration_stop (self);
         status_done = TRUE;
         break;
     case MM_MODEM_GSM_NETWORK_REG_STATUS_DENIED:
         /* registration failed - stop registration */
-        info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_NETWORK_NOT_ALLOWED);
-        mm_callback_info_schedule (info);
+        if (info) {
+            info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_NETWORK_NOT_ALLOWED);
+            mm_callback_info_schedule (info);
+        }
         mm_generic_gsm_pending_registration_stop (self);
         status_done = TRUE;
         break;
     case MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING:
-        info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_NETWORK_TIMEOUT);
+        if (info)
+            info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_NETWORK_TIMEOUT);
         break;
     case MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE:
-        info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_NO_NETWORK);
+        if (info)
+            info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_NO_NETWORK);
         break;
     default:
-        info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_UNKNOWN);
+        if (info)
+            info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_UNKNOWN);
         break;
     }
     return status_done;
