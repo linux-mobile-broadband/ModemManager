@@ -229,7 +229,7 @@ def gsm_connect(proxy, apn, user, password):
     # Modem.Simple interface
     simple = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_SIMPLE)
     try:
-        simple.Connect({'apn': apn, 'number':"*99#"}, timeout=60)
+        simple.Connect({'apn': apn, 'number':"*99#"}, timeout=120)
         print "\nConnected!"
     except Exception, e:
         print "Error connecting: %s" % e
