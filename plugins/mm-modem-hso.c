@@ -47,10 +47,23 @@ G_DEFINE_TYPE_EXTENDED (MMModemHso, mm_modem_hso, MM_TYPE_GENERIC_GSM, 0,
 
 #define MM_MODEM_HSO_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_HSO, MMModemHsoPrivate))
 
+static void _internal_hso_modem_authenticate (MMModemHso *self, MMCallbackInfo *info);
+
+const char *auth_commands[] = {
+	"$QCPDPP",
+	/* Icera-based devices (GI0322/Quicksilver, iCON 505) don't implement
+	 * $QCPDPP, but instead use _OPDPP with the same arguments.
+	 */
+	"_OPDPP",
+	NULL
+};
+
 typedef struct {
     /* Pending connection attempt */
     MMCallbackInfo *connect_pending_data;
     guint connect_pending_id;
+
+    guint32 auth_idx;
 } MMModemHsoPrivate;
 
 #define OWANDATA_TAG "_OWANDATA: "
@@ -195,13 +208,55 @@ auth_done (MMSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMModemHso *self = MM_MODEM_HSO (info->modem);
+    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (self);
 
     if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-    } else
+        priv->auth_idx++;
+        if (auth_commands[priv->auth_idx]) {
+            /* Try the next auth command */
+            _internal_hso_modem_authenticate (self, info);
+        } else {
+            info->error = g_error_copy (error);
+            mm_callback_info_schedule (info);
+        }
+    } else {
+        priv->auth_idx = 0;
+
         /* success, kill any existing connections first */
         hso_call_control (self, FALSE, FALSE, hso_disabled, info);
+    }
+}
+
+static void
+_internal_hso_modem_authenticate (MMModemHso *self, MMCallbackInfo *info)
+{
+    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (self);
+    MMSerialPort *primary;
+    guint32 cid;
+    char *command;
+    const char *username, *password;
+
+    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+
+    cid = hso_get_cid (self);
+
+    username = mm_callback_info_get_data (info, "username");
+    password = mm_callback_info_get_data (info, "password");
+
+    if (!username && !password)
+		command = g_strdup_printf ("%s=%d,0", auth_commands[priv->auth_idx], cid);
+    else {
+        command = g_strdup_printf ("%s=%d,1,\"%s\",\"%s\"",
+                                   auth_commands[priv->auth_idx],
+                                   cid,
+                                   password ? password : "",
+                                   username ? username : "");
+
+    }
+
+    mm_serial_port_queue_command (primary, command, 3, auth_done, info);
+    g_free (command);
 }
 
 void
@@ -212,32 +267,17 @@ mm_hso_modem_authenticate (MMModemHso *self,
                            gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMSerialPort *primary;
 
     g_return_if_fail (MM_IS_MODEM_HSO (self));
     g_return_if_fail (callback != NULL);
 
     info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
+    if (username)
+        mm_callback_info_set_data (info, "username", g_strdup (username), g_free);
+    if (password)
+        mm_callback_info_set_data (info, "password", g_strdup (password), g_free);
 
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
-    g_assert (primary);
-
-    if (username || password) {
-        char *command;
-
-        // FIXME: if QCPDPP fails, try OPDPP.  AT&T Quicksilver uses a different
-        // chipset (ie, not Qualcomm) and the auth command is OPDPP instead of
-        // the Qualcomm-specific QCPDPP.
-
-        command = g_strdup_printf ("AT$QCPDPP=%d,1,\"%s\",\"%s\"",
-                                   hso_get_cid (self),
-                                   password ? password : "",
-                                   username ? username : "");
-
-        mm_serial_port_queue_command (primary, command, 3, auth_done, info);
-        g_free (command);
-    } else
-        auth_done (primary, NULL, NULL, info);
+    _internal_hso_modem_authenticate (self, info);
 }
 
 /*****************************************************************************/
