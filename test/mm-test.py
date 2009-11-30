@@ -183,7 +183,12 @@ def gsm_inspect(proxy, dump_private):
         print "Error reading signal quality: %s" % e
 
     print "Scanning..."
-    results = net.Scan(timeout=120)
+    try:
+        results = net.Scan(timeout=120)
+    except dbus.exceptions.DBusException, e:
+        print "Error scanning: %s" % e
+        results = {}
+
     for r in results:
         status = r['status']
         if status == "1":
