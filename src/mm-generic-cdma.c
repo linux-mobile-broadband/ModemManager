@@ -48,7 +48,8 @@ G_DEFINE_TYPE_EXTENDED (MMGenericCdma, mm_generic_cdma, MM_TYPE_MODEM_BASE, 0,
 #define MM_GENERIC_CDMA_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_GENERIC_CDMA, MMGenericCdmaPrivate))
 
 typedef struct {
-    guint32 signal_quality;
+    guint32 cdma1x_quality;
+    guint32 evdo_quality;
     gboolean valid;
     gboolean evdo_rev0;
     gboolean evdo_revA;
@@ -633,13 +634,33 @@ get_card_info (MMModem *modem,
 /*****************************************************************************/
 
 void
-mm_generic_cdma_update_signal_quality (MMGenericCdma *self, guint32 quality)
+mm_generic_cdma_update_cdma1x_quality (MMGenericCdma *self, guint32 quality)
 {
+    MMGenericCdmaPrivate *priv;
+
     g_return_if_fail (MM_IS_GENERIC_CDMA (self));
     g_return_if_fail (quality >= 0 && quality <= 100);
 
-    MM_GENERIC_CDMA_GET_PRIVATE (self)->signal_quality = quality;
-    mm_modem_cdma_emit_signal_quality_changed (MM_MODEM_CDMA (self), quality);
+    priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
+    if (priv->cdma1x_quality != quality) {
+        priv->cdma1x_quality = quality;
+        mm_modem_cdma_emit_signal_quality_changed (MM_MODEM_CDMA (self), quality);
+    }
+}
+
+void
+mm_generic_cdma_update_evdo_quality (MMGenericCdma *self, guint32 quality)
+{
+    MMGenericCdmaPrivate *priv;
+
+    g_return_if_fail (MM_IS_GENERIC_CDMA (self));
+    g_return_if_fail (quality >= 0 && quality <= 100);
+
+    priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
+    if (priv->evdo_quality != quality) {
+        priv->evdo_quality = quality;
+        // FIXME: emit a signal
+    }
 }
 
 static void
@@ -671,9 +692,11 @@ get_signal_quality_done (MMSerialPort *port,
                 quality = CLAMP (quality, 0, 31) * 100 / 31;
 
                 priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
-                priv->signal_quality = quality;
                 mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
-                mm_modem_cdma_emit_signal_quality_changed (MM_MODEM_CDMA (info->modem), quality);
+                if (priv->cdma1x_quality != quality) {
+                    priv->cdma1x_quality = quality;
+                    mm_modem_cdma_emit_signal_quality_changed (MM_MODEM_CDMA (info->modem), quality);
+                }
             }
         } else
             info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
@@ -694,8 +717,8 @@ get_signal_quality (MMModemCdma *modem,
 
     connected = mm_port_get_connected (MM_PORT (priv->primary));
     if (connected && !priv->secondary) {
-        g_message ("Returning saved signal quality %d", priv->signal_quality);
-        callback (MM_MODEM (modem), priv->signal_quality, NULL, user_data);
+        g_message ("Returning saved signal quality %d", priv->cdma1x_quality);
+        callback (MM_MODEM (modem), priv->cdma1x_quality, NULL, user_data);
         return;
     }
 

@@ -835,6 +835,7 @@ read_operator_name_done (MMSerialPort *port,
 }
 
 /* Registration */
+#define REG_STATUS_AGAIN_TAG "reg-status-again"
 
 void
 mm_generic_gsm_pending_registration_stop (MMGenericGsm *modem)
@@ -842,20 +843,26 @@ mm_generic_gsm_pending_registration_stop (MMGenericGsm *modem)
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
 
     if (priv->pending_reg_id) {
+        /* Clear the registration timeout handler */
         g_source_remove (priv->pending_reg_id);
         priv->pending_reg_id = 0;
+    }
+
+    if (priv->pending_reg_info) {
+        /* Clear any ongoing registration status callback */
+        mm_callback_info_set_data (priv->pending_reg_info, REG_STATUS_AGAIN_TAG, NULL, NULL);
+
+        /* And schedule the callback */
+        mm_callback_info_schedule (priv->pending_reg_info);
         priv->pending_reg_info = NULL;
     }
 }
 
 static gboolean
-reg_status_updated (MMGenericGsm *self, int new_value, MMCallbackInfo *info)
+reg_status_updated (MMGenericGsm *self, int new_value, GError **error)
 {
     MMModemGsmNetworkRegStatus status;
     gboolean status_done = FALSE;
-
-    /* info must be set to process status updates - for now */
-    g_return_val_if_fail (!!info, status_done);
 
     switch (new_value) {
     case 0:
@@ -888,25 +895,25 @@ reg_status_updated (MMGenericGsm *self, int new_value, MMCallbackInfo *info)
     case MM_MODEM_GSM_NETWORK_REG_STATUS_HOME:
     case MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING:
         /* Successfully registered - stop registration */
-        mm_callback_info_schedule (info);
-        mm_generic_gsm_pending_registration_stop (self);
         status_done = TRUE;
         break;
     case MM_MODEM_GSM_NETWORK_REG_STATUS_DENIED:
         /* registration failed - stop registration */
-        info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_NETWORK_NOT_ALLOWED);
-        mm_callback_info_schedule (info);
-        mm_generic_gsm_pending_registration_stop (self);
+        if (error)
+            *error = mm_mobile_error_for_code (MM_MOBILE_ERROR_NETWORK_NOT_ALLOWED);
         status_done = TRUE;
         break;
     case MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING:
-        info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_NETWORK_TIMEOUT);
+        if (error)
+            *error = mm_mobile_error_for_code (MM_MOBILE_ERROR_NETWORK_TIMEOUT);
         break;
     case MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE:
-        info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_NO_NETWORK);
+        if (error)
+            *error = mm_mobile_error_for_code (MM_MOBILE_ERROR_NO_NETWORK);
         break;
     default:
-        info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_UNKNOWN);
+        if (error)
+            *error = mm_mobile_error_for_code (MM_MOBILE_ERROR_UNKNOWN);
         break;
     }
     return status_done;
@@ -918,23 +925,21 @@ reg_state_changed (MMSerialPort *port,
                    gpointer user_data)
 {
     MMGenericGsm *self = MM_GENERIC_GSM (user_data);
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     char *str;
 
     str = g_match_info_fetch (match_info, 1);
-    if (!reg_status_updated (self, atoi (str), priv->pending_reg_info) && priv->pending_reg_info)
-        g_clear_error (&priv->pending_reg_info->error);
-
+    reg_status_updated (self, atoi (str), NULL);
     g_free (str);
 }
 
 static gboolean
 reg_status_again (gpointer data)
 {
-    MMGenericGsmPrivate *priv;
     MMCallbackInfo *info = (MMCallbackInfo *) data;
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
 
-    priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+    g_warn_if_fail (info == priv->pending_reg_info);
+
     if (priv->pending_reg_id)
         get_registration_status (priv->primary, info);
 
@@ -944,7 +949,11 @@ reg_status_again (gpointer data)
 static void
 reg_status_again_remove (gpointer data)
 {
-    g_source_remove (GPOINTER_TO_INT (data));
+    guint id = GPOINTER_TO_UINT (data);
+
+    /* Technically the GSource ID can be 0, but in practice it won't be */
+    if (id > 0)
+        g_source_remove (id);
 }
 
 static void
@@ -956,41 +965,72 @@ get_reg_status_done (MMSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMGenericGsm *self = MM_GENERIC_GSM (info->modem);
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
-    int unsolicited, stat;
+    int reg_status = -1;
+    GRegex *r;
+    GMatchInfo *match_info;
+    char *tmp;
     guint id;
+
+    g_warn_if_fail (info == priv->pending_reg_info);
 
     if (error) {
         info->error = g_error_copy (error);
-        mm_generic_gsm_pending_registration_stop (self);
-        mm_callback_info_schedule (info);
-        return;
+        goto reg_done;
     }
 
-    if (   !g_str_has_prefix (response->str, "+CREG: ")
-        || (sscanf (response->str + 7, "%d,%d", &unsolicited, &stat) != 2)) {
-        g_debug ("%s: unknown response: %s", __func__, response->str);
-        info->error = g_error_new_literal (MM_MODEM_ERROR,
+    r = g_regex_new ("\\+CREG:\\s*(\\d+),\\s*(\\d+)",
+                     G_REGEX_RAW | G_REGEX_OPTIMIZE,
+                     0, &info->error);
+    if (r) {
+        g_regex_match_full (r, response->str, response->len, 0, 0, &match_info, &info->error);
+        if (g_match_info_matches (match_info)) {
+            /* Get reg status */
+            tmp = g_match_info_fetch (match_info, 2);
+            if (isdigit (tmp[0])) {
+                tmp[1] = '\0';
+                reg_status = atoi (tmp);
+            } else {
+                info->error = g_error_new (MM_MODEM_ERROR,
                                            MM_MODEM_ERROR_GENERAL,
-                                           "Could not parse the response");
-        mm_generic_gsm_pending_registration_stop (self);
-        mm_callback_info_schedule (info);
+                                           "Unknown registration status '%s'",
+                                           tmp);
+            }
+            g_free (tmp);
+        } else {
+            info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                               MM_MODEM_ERROR_GENERAL,
+                                               "Could not parse the registration status response");
+        }
+        g_match_info_free (match_info);
+        g_regex_unref (r);
+    }
+
+    if (   reg_status >= 0
+        && !reg_status_updated (self, reg_status, &info->error)
+        && priv->pending_reg_id) {
+        g_clear_error (&info->error);
+
+        /* Not registered yet; poll registration status again */
+        id = g_timeout_add_seconds (1, reg_status_again, info);
+        mm_callback_info_set_data (info, REG_STATUS_AGAIN_TAG,
+                                   GUINT_TO_POINTER (id),
+                                   reg_status_again_remove);
         return;
     }
 
-    if (!reg_status_updated (self, stat, info) && priv->pending_reg_id) {
-        g_clear_error (&info->error);
-        /* Registration is still going */
-        id = g_timeout_add_seconds (1, reg_status_again, info);
-        mm_callback_info_set_data (info, "reg-status-again",
-                                    GINT_TO_POINTER (id),
-                                    reg_status_again_remove);
-    }
+reg_done:
+    /* This will schedule the callback for us */
+    mm_generic_gsm_pending_registration_stop (self);
 }
 
 static void
 get_registration_status (MMSerialPort *port, MMCallbackInfo *info)
 {
-    mm_serial_port_queue_command (port, "+CREG?", 3, get_reg_status_done, info);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+
+    g_warn_if_fail (info == priv->pending_reg_info);
+
+    mm_serial_port_queue_command (port, "+CREG?", 10, get_reg_status_done, info);
 }
 
 static void
@@ -1008,6 +1048,8 @@ registration_timed_out (gpointer data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) data;
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+
+    g_warn_if_fail (info == priv->pending_reg_info);
 
     priv->pending_reg_id = 0;
     priv->pending_reg_info = NULL;
@@ -1028,6 +1070,9 @@ do_register (MMModemGsmNetwork *modem,
     MMCallbackInfo *info;
     char *command;
 
+    /* Clear any previous registration */
+    mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
+
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
     priv->pending_reg_id = g_timeout_add_seconds (60, registration_timed_out, info);
@@ -1038,7 +1083,7 @@ do_register (MMModemGsmNetwork *modem,
     else
         command = g_strdup ("+COPS=0,,");
 
-    mm_serial_port_queue_command (priv->primary, command, 10, register_done, info);
+    mm_serial_port_queue_command (priv->primary, command, 120, register_done, info);
     g_free (command);
 }
 
@@ -1353,7 +1398,7 @@ cid_range_read (MMSerialPort *port,
         GRegex *r;
         GMatchInfo *match_info;
 
-        r = g_regex_new ("\\+CGDCONT: \\((\\d+)-(\\d+)\\),\"(\\S+)\"",
+        r = g_regex_new ("\\+CGDCONT:\\s*\\((\\d+)-(\\d+)\\),\\(?\"(\\S+)\"",
                          G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
                          0, &info->error);
         if (r) {
@@ -1398,7 +1443,7 @@ cid_range_read (MMSerialPort *port,
 
         mm_callback_info_set_data (info, "cid", GUINT_TO_POINTER (cid), NULL);
 
-        command = g_strdup_printf ("+CGDCONT=%d, \"IP\", \"%s\"", cid, apn);
+        command = g_strdup_printf ("+CGDCONT=%d,\"IP\",\"%s\"", cid, apn);
         mm_serial_port_queue_command (port, command, 3, set_apn_done, info);
         g_free (command);
     }
@@ -1419,7 +1464,7 @@ existing_apns_read (MMSerialPort *port,
         GRegex *r;
         GMatchInfo *match_info;
 
-        r = g_regex_new ("\\+CGDCONT: (\\d+)\\s*,\"(\\S+)\",\"(\\S+)\",\"(\\S+)\"",
+        r = g_regex_new ("\\+CGDCONT:\\s*(\\d+)\\s*,\"(\\S+)\",\"(\\S+)\",\"(\\S*)\"",
                          G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
                          0, &info->error);
         if (r) {

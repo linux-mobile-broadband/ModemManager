@@ -220,6 +220,7 @@ supports_port (MMPluginBase *base,
         add_regex (info->serial, "\\r\\n\\^MODE:(\\d),(\\d)\\r\\n", task);
         add_regex (info->serial, "\\r\\n\\^DSFLOWRPT:(.+)\\r\\n", task);
         add_regex (info->serial, "\\r\\n\\^BOOT:.+\\r\\n", task);
+        add_regex (info->serial, "\\r\\r\\^BOOT:.+\\r\\r", task);
 
         info->id = g_timeout_add (5000, probe_secondary_timeout, task);
 

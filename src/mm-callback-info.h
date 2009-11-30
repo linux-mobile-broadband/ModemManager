@@ -28,6 +28,7 @@ struct _MMCallbackInfo {
 
     MMCallbackInfoInvokeFn invoke_fn;
     GCallback callback;
+    gboolean called;
 
     gpointer user_data;
     GError *error;

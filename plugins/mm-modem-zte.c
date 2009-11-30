@@ -28,6 +28,12 @@ static void modem_init (MMModem *modem_class);
 G_DEFINE_TYPE_EXTENDED (MMModemZte, mm_modem_zte, MM_TYPE_GENERIC_GSM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init))
 
+#define MM_MODEM_ZTE_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_ZTE, MMModemZtePrivate))
+
+typedef struct {
+    gboolean init_retried;
+} MMModemZtePrivate;
+
 MMModem *
 mm_modem_zte_new (const char *device,
                   const char *driver,
@@ -79,6 +85,10 @@ pin_check_done (MMModem *modem, GError *error, gpointer user_data)
     }
 }
 
+static void enable_flash_done (MMSerialPort *port,
+                               GError *error,
+                               gpointer user_data);
+
 static void
 pre_init_done (MMSerialPort *port,
                GString *response,
@@ -86,10 +96,18 @@ pre_init_done (MMSerialPort *port,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemZtePrivate *priv = MM_MODEM_ZTE_GET_PRIVATE (info->modem);
 
     if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
+        /* Retry the init string one more time; the modem sometimes throws it away */
+        if (   !priv->init_retried
+            && g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_RESPONSE_TIMEOUT)) {
+            priv->init_retried = TRUE;
+            enable_flash_done (port, NULL, user_data);
+        } else {
+            info->error = g_error_copy (error);
+            mm_callback_info_schedule (info);
+        }
     } else {
         /* Now check the PIN explicitly, zte doesn't seem to report
            that it needs it otherwise */
@@ -116,8 +134,11 @@ enable (MMModem *modem,
         MMModemFn callback,
         gpointer user_data)
 {
+    MMModemZtePrivate *priv = MM_MODEM_ZTE_GET_PRIVATE (modem);
     MMCallbackInfo *info;
     MMSerialPort *primary;
+
+    priv->init_retried = FALSE;
 
     /* First, reset the previously used CID */
     mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
@@ -134,6 +155,21 @@ enable (MMModem *modem,
     }
 
     mm_serial_port_flash (primary, 100, enable_flash_done, info);
+}
+
+static void
+disable (MMModem *modem,
+         MMModemFn callback,
+         gpointer user_data)
+{
+    MMModemZtePrivate *priv = MM_MODEM_ZTE_GET_PRIVATE (modem);
+    MMModem *parent_modem_iface;
+
+    priv->init_retried = FALSE;
+
+    /* Do the normal disable stuff */
+    parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (modem));
+    parent_modem_iface->disable (modem, callback, user_data);
 }
 
 static gboolean
@@ -189,6 +225,7 @@ static void
 modem_init (MMModem *modem_class)
 {
     modem_class->enable = enable;
+    modem_class->disable = disable;
     modem_class->grab_port = grab_port;
 }
 
@@ -200,6 +237,9 @@ mm_modem_zte_init (MMModemZte *self)
 static void
 mm_modem_zte_class_init (MMModemZteClass *klass)
 {
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
     mm_modem_zte_parent_class = g_type_class_peek_parent (klass);
+    g_type_class_add_private (object_class, sizeof (MMModemZtePrivate));
 }
 

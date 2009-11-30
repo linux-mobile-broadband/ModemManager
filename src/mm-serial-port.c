@@ -479,9 +479,15 @@ mm_serial_port_schedule_queue_process (MMSerialPort *self)
     MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (self);
     GSource *source;
 
-    if (priv->queue_schedule)
+    if (priv->timeout_id) {
+        /* A command is already in progress */
+        return;
+    }
+
+    if (priv->queue_schedule) {
         /* Already scheduled */
         return;
+    }
 
     source = g_idle_source_new ();
     g_source_set_closure (source, g_cclosure_new_object (G_CALLBACK (mm_serial_port_queue_process), G_OBJECT (self)));
@@ -568,7 +574,7 @@ mm_serial_port_queue_process (gpointer data)
     if (mm_serial_port_send_command (self, info->command, &error)) {
         GSource *source;
 
-        source = g_timeout_source_new (info->timeout);
+        source = g_timeout_source_new_seconds (info->timeout);
         g_source_set_closure (source, g_cclosure_new_object (G_CALLBACK (mm_serial_port_timed_out), G_OBJECT (self)));
         g_source_attach (source, NULL);
         priv->timeout_id = g_source_get_id (source);
@@ -791,11 +797,18 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
 
     g_message ("(%s) opening serial device...", device);
     devfile = g_strdup_printf ("/dev/%s", device);
+    errno = 0;
     priv->fd = open (devfile, O_RDWR | O_EXCL | O_NONBLOCK | O_NOCTTY);
     g_free (devfile);
 
     if (priv->fd < 0) {
-        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_OPEN_FAILED,
+        /* nozomi isn't ready yet when the port appears, and it'll return
+         * ENODEV when open(2) is called on it.  Make sure we can handle this
+         * by returning a special error in that case.
+         */
+        g_set_error (error,
+                     MM_SERIAL_ERROR,
+                     (errno == ENODEV) ? MM_SERIAL_OPEN_FAILED_NO_DEVICE : MM_SERIAL_OPEN_FAILED,
                      "Could not open serial device %s: %s", device, strerror (errno));
         return FALSE;
     }
@@ -889,7 +902,7 @@ internal_queue_command (MMSerialPort *self,
     info = g_slice_new0 (MMQueueData);
     info->command = g_strdup (command);
     info->cached = cached;
-    info->timeout = timeout_seconds * 1000;
+    info->timeout = timeout_seconds;
     info->callback = callback;
     info->user_data = user_data;
 

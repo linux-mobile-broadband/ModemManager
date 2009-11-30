@@ -39,6 +39,7 @@ mm_serial_error_get_type (void)
             ENUM_ENTRY (MM_SERIAL_OPEN_FAILED,      "SerialOpenFailed"),
             ENUM_ENTRY (MM_SERIAL_SEND_FAILED,      "SerialSendfailed"),
             ENUM_ENTRY (MM_SERIAL_RESPONSE_TIMEOUT, "SerialResponseTimeout"),
+            ENUM_ENTRY (MM_SERIAL_OPEN_FAILED_NO_DEVICE, "SerialOpenFailedNoDevice"),
             { 0, 0, 0 }
         };
 
