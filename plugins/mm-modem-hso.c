@@ -85,6 +85,8 @@ mm_modem_hso_new (const char *device,
                                    NULL));
 }
 
+#define IGNORE_ERRORS_TAG "ignore-errors"
+
 static void
 hso_call_control_done (MMSerialPort *port,
                        GString *response,
@@ -93,7 +95,7 @@ hso_call_control_done (MMSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    if (error && !mm_callback_info_get_data (info, "ignore-errors"))
+    if (error && !mm_callback_info_get_data (info, IGNORE_ERRORS_TAG))
         info->error = g_error_copy (error);
 
     mm_callback_info_schedule (info);
@@ -123,7 +125,7 @@ hso_call_control (MMModemHso *self,
     MMSerialPort *primary;
 
     info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
-    mm_callback_info_set_data (info, "ignore-error", GUINT_TO_POINTER (ignore_errors), NULL);
+    mm_callback_info_set_data (info, IGNORE_ERRORS_TAG, GUINT_TO_POINTER (ignore_errors), NULL);
 
     command = g_strdup_printf ("AT_OWANCALL=%d,%d,1", hso_get_cid (self), activate ? 1 : 0);
     primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
@@ -185,9 +187,9 @@ hso_enabled (MMModem *modem,
 }
 
 static void
-hso_disabled (MMModem *modem,
-              GError *error,
-              gpointer user_data)
+clear_old_context (MMModem *modem,
+                   GError *error,
+                   gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
@@ -223,7 +225,7 @@ auth_done (MMSerialPort *port,
         priv->auth_idx = 0;
 
         /* success, kill any existing connections first */
-        hso_call_control (self, FALSE, FALSE, hso_disabled, info);
+        hso_call_control (self, FALSE, TRUE, clear_old_context, info);
     }
 }
 
@@ -344,7 +346,7 @@ disable (MMModem *modem,
     info = mm_callback_info_new (modem, callback, user_data);
 
     /* Kill any existing connection */
-    hso_call_control (MM_MODEM_HSO (modem), FALSE, FALSE, disable_done, info);
+    hso_call_control (MM_MODEM_HSO (modem), FALSE, TRUE, disable_done, info);
 }
 
 static void
