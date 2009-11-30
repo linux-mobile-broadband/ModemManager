@@ -218,6 +218,9 @@ auth_done (MMSerialPort *port,
             /* Try the next auth command */
             _internal_hso_modem_authenticate (self, info);
         } else {
+            /* Reset to 0 so that something gets tried for the next connection */
+            priv->auth_idx = 0;
+
             info->error = g_error_copy (error);
             mm_callback_info_schedule (info);
         }
