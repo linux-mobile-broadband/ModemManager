@@ -150,12 +150,12 @@ mm_modem_base_set_valid (MMModemBase *self, gboolean new_valid)
         priv->valid = new_valid;
         g_object_notify (G_OBJECT (self), MM_MODEM_VALID);
 
-        if (!new_valid) {
-            /* If no longer valid, modem must be disabled */
-            mm_modem_set_state (MM_MODEM (self),
-                                MM_MODEM_STATE_DISABLED,
-                                MM_MODEM_STATE_REASON_NONE);
-        }
+        /* Modem starts off in disabled state, and jumps to disabled when
+         * it's no longer valid.
+         */
+        mm_modem_set_state (MM_MODEM (self),
+                            MM_MODEM_STATE_DISABLED,
+                            MM_MODEM_STATE_REASON_NONE);
     }
 }
 
