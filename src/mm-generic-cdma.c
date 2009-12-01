@@ -293,15 +293,20 @@ mm_generic_cdma_evdo_get_registration_state_sync (MMGenericCdma *self)
 /*****************************************************************************/
 
 static void
-set_state_enabled (MMGenericCdma *self, MMModemStateReason reason)
+update_enabled_state (MMGenericCdma *self,
+                      gboolean just_disconnected,
+                      MMModemStateReason reason)
 {
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
 
-    if (   priv->cdma_1x_reg_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN
-        || priv->evdo_reg_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
-        mm_modem_set_state (MM_MODEM (self), MM_MODEM_STATE_REGISTERED, reason);
-    else
-        mm_modem_set_state (MM_MODEM (self), MM_MODEM_STATE_ENABLED, reason);
+    if (   just_disconnected
+        || (mm_modem_get_state (MM_MODEM (self)) < MM_MODEM_STATE_DISCONNECTING)) {
+        if (   priv->cdma_1x_reg_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN
+            || priv->evdo_reg_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
+            mm_modem_set_state (MM_MODEM (self), MM_MODEM_STATE_REGISTERED, reason);
+        else
+            mm_modem_set_state (MM_MODEM (self), MM_MODEM_STATE_ENABLED, reason);
+    }
 }
 
 static void
@@ -350,7 +355,7 @@ enable_error_reporting_done (MMSerialPort *port,
             g_assert (info->error);
     }
 
-    set_state_enabled (MM_GENERIC_CDMA (info->modem), MM_MODEM_STATE_REASON_NONE);
+    update_enabled_state (MM_GENERIC_CDMA (info->modem), FALSE, MM_MODEM_STATE_REASON_NONE);
 
     /* Ignore errors, see FIXME in init_done() */
     mm_callback_info_schedule (info);
@@ -418,6 +423,7 @@ disable_flash_done (MMSerialPort *port,
                     gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
 
     if (error)
         info->error = g_error_copy (error);
@@ -426,6 +432,9 @@ disable_flash_done (MMSerialPort *port,
         mm_modem_set_state (MM_MODEM (info->modem),
                             MM_MODEM_STATE_DISABLED,
                             MM_MODEM_STATE_REASON_NONE);
+
+        priv->cdma_1x_reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+        priv->evdo_reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     }
 
     mm_callback_info_schedule (info);
@@ -466,7 +475,7 @@ dial_done (MMSerialPort *port,
 
     if (error) {
         info->error = g_error_copy (error);
-        set_state_enabled (MM_GENERIC_CDMA (info->modem), MM_MODEM_STATE_REASON_NONE);
+        update_enabled_state (MM_GENERIC_CDMA (info->modem), FALSE, MM_MODEM_STATE_REASON_NONE);
     } else {
         /* Clear reg tries; we're obviously registered by this point */
         registration_cleanup (self, 0, 0);
@@ -511,8 +520,7 @@ disconnect_flash_done (MMSerialPort *port,
     }
 
     mm_port_set_connected (priv->data, FALSE);
-
-    set_state_enabled (MM_GENERIC_CDMA (info->modem), MM_MODEM_STATE_REASON_NONE);
+    update_enabled_state (MM_GENERIC_CDMA (info->modem), TRUE, MM_MODEM_STATE_REASON_NONE);
 
     mm_callback_info_schedule (info);
 }
@@ -526,6 +534,8 @@ disconnect (MMModem *modem,
     MMCallbackInfo *info;
 
     g_return_if_fail (priv->primary != NULL);
+
+    mm_modem_set_state (modem, MM_MODEM_STATE_DISCONNECTING, MM_MODEM_STATE_REASON_NONE);
 
     info = mm_callback_info_new (modem, callback, user_data);
     mm_serial_port_flash (priv->primary, 1000, disconnect_flash_done, info);
@@ -1307,10 +1317,11 @@ reg_state_changed (MMModemCdma *self,
 #endif
 }
 
-static void
+static SimpleState
 set_simple_state (MMCallbackInfo *info, SimpleState state)
 {
     mm_callback_info_set_data (info, "simple-connect-state", GUINT_TO_POINTER (state), NULL);
+    return state;
 }
 
 static void
@@ -1329,11 +1340,11 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
 
     switch (state) {
     case SIMPLE_STATE_BEGIN:
-        set_simple_state (info, SIMPLE_STATE_ENABLE);
+        state = set_simple_state (info, SIMPLE_STATE_ENABLE);
         mm_modem_enable (modem, simple_state_machine, info);
         break;
     case SIMPLE_STATE_ENABLE:
-        set_simple_state (info, SIMPLE_STATE_REGISTER);
+        state = set_simple_state (info, SIMPLE_STATE_REGISTER);
         mm_modem_cdma_get_registration_state (MM_MODEM_CDMA (modem),
                                               simple_reg_callback,
                                               info);
@@ -1345,14 +1356,14 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
         break;
     case SIMPLE_STATE_REGISTER:
         registration_cleanup (MM_GENERIC_CDMA (modem), 0, 0);
-        set_simple_state (info, SIMPLE_STATE_CONNECT);
+        state = set_simple_state (info, SIMPLE_STATE_CONNECT);
         mm_modem_set_state (modem, MM_MODEM_STATE_REGISTERED, MM_MODEM_STATE_REASON_NONE);
 
         str = simple_get_string_property (info, "number", &info->error);
         mm_modem_connect (modem, str, simple_state_machine, info);
         break;
     case SIMPLE_STATE_CONNECT:
-        set_simple_state (info, SIMPLE_STATE_DONE);
+        state = set_simple_state (info, SIMPLE_STATE_DONE);
         break;
     case SIMPLE_STATE_DONE:
         break;
