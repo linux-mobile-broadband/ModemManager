@@ -55,6 +55,8 @@ MMModem *mm_generic_cdma_new (const char *device,
 
 /* Private, for subclasses */
 
+#define MM_GENERIC_GSM_PREV_STATE_TAG "prev-state"
+
 MMPort * mm_generic_cdma_grab_port (MMGenericCdma *self,
                                     const char *subsys,
                                     const char *name,

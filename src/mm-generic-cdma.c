@@ -370,6 +370,10 @@ init_done (MMSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
     if (error) {
+        mm_modem_set_state (MM_MODEM (info->modem),
+                            MM_MODEM_STATE_DISABLED,
+                            MM_MODEM_STATE_REASON_NONE);
+
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
     } else {
@@ -388,6 +392,10 @@ flash_done (MMSerialPort *port, GError *error, gpointer user_data)
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
     if (error) {
+        mm_modem_set_state (MM_MODEM (info->modem),
+                            MM_MODEM_STATE_DISABLED,
+                            MM_MODEM_STATE_REASON_NONE);
+
         /* Flash failed for some reason */
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
@@ -414,6 +422,10 @@ enable (MMModem *modem,
         return;
     }
 
+    mm_modem_set_state (MM_MODEM (info->modem),
+                        MM_MODEM_STATE_ENABLING,
+                        MM_MODEM_STATE_REASON_NONE);
+
     mm_serial_port_flash (priv->primary, 100, flash_done, info);
 }
 
@@ -425,9 +437,17 @@ disable_flash_done (MMSerialPort *port,
     MMCallbackInfo *info = user_data;
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
 
-    if (error)
+    if (error) {
+        MMModemState prev_state;
+
+        /* Reset old state since the operation failed */
+        prev_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, MM_GENERIC_GSM_PREV_STATE_TAG));
+        mm_modem_set_state (MM_MODEM (info->modem),
+                            prev_state,
+                            MM_MODEM_STATE_REASON_NONE);
+
         info->error = g_error_copy (error);
-    else {
+    } else {
         mm_serial_port_close (port);
         mm_modem_set_state (MM_MODEM (info->modem),
                             MM_MODEM_STATE_DISABLED,
@@ -448,14 +468,26 @@ disable (MMModem *modem,
     MMGenericCdma *self = MM_GENERIC_CDMA (modem);
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
     MMCallbackInfo *info;
+    MMModemState state;
 
     /* Tear down any ongoing registration */
     registration_cleanup (self, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL);
 
     info = mm_callback_info_new (modem, callback, user_data);
 
+    /* Cache the previous state so we can reset it if the operation fails */
+    state = mm_modem_get_state (modem);
+    mm_callback_info_set_data (info,
+                               MM_GENERIC_GSM_PREV_STATE_TAG,
+                               GUINT_TO_POINTER (state),
+                               NULL);
+
     if (priv->secondary)
         mm_serial_port_close (priv->secondary);
+
+    mm_modem_set_state (MM_MODEM (info->modem),
+                        MM_MODEM_STATE_DISABLING,
+                        MM_MODEM_STATE_REASON_NONE);
 
     if (mm_port_get_connected (MM_PORT (priv->primary)))
         mm_serial_port_flash (priv->primary, 1000, disable_flash_done, info);
