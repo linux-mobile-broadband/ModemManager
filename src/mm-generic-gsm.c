@@ -162,6 +162,11 @@ mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
     }
 }
 
+typedef struct {
+    const char *result;
+    guint code;
+} CPinResult;
+
 static void
 pin_check_done (MMSerialPort *port,
                 GString *response,
@@ -170,6 +175,24 @@ pin_check_done (MMSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     gboolean parsed = FALSE;
+    static CPinResult results[] = {
+        { "SIM PIN", MM_MOBILE_ERROR_SIM_PIN },
+        { "SIM PUK", MM_MOBILE_ERROR_SIM_PUK },
+        { "PH-SIM PIN", MM_MOBILE_ERROR_PH_SIM_PIN },
+        { "PH-FSIM PIN", MM_MOBILE_ERROR_PH_FSIM_PIN },
+        { "PH-FSIM PUK", MM_MOBILE_ERROR_PH_FSIM_PUK },
+        { "SIM PIN2", MM_MOBILE_ERROR_SIM_PIN2 },
+        { "SIM PUK2", MM_MOBILE_ERROR_SIM_PUK2 },
+        { "PH-NET PIN", MM_MOBILE_ERROR_NETWORK_PIN },
+        { "PH-NET PUK", MM_MOBILE_ERROR_NETWORK_PUK },
+        { "PH-NETSUB PIN", MM_MOBILE_ERROR_NETWORK_SUBSET_PIN },
+        { "PH-NETSUB PUK", MM_MOBILE_ERROR_NETWORK_SUBSET_PUK },
+        { "PH-SP PIN", MM_MOBILE_ERROR_SERVICE_PIN },
+        { "PH-SP PUK", MM_MOBILE_ERROR_SERVICE_PUK },
+        { "PH-CORP PIN", MM_MOBILE_ERROR_CORP_PIN },
+        { "PH-CORP PUK", MM_MOBILE_ERROR_CORP_PUK },
+        { NULL, MM_MOBILE_ERROR_PHONE_FAILURE },
+    };
 
     if (error)
         info->error = g_error_copy (error);
@@ -178,16 +201,27 @@ pin_check_done (MMSerialPort *port,
 
         if (g_str_has_prefix (str, "READY"))
             parsed = TRUE;
-        else if (g_str_has_prefix (str, "SIM PIN"))
-            info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_SIM_PIN);
-        else if (g_str_has_prefix (str, "SIM PUK"))
-            info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_SIM_PUK);
-        /* FIXME: There's more exotic ones that are not handled right now */
+        else {
+            CPinResult *iter = &results[0];
+
+            /* Translate the error */
+            while (iter->result) {
+                if (g_str_has_prefix (str, iter->result)) {
+                    info->error = mm_mobile_error_for_code (iter->code);
+                    parsed = TRUE;
+                    break;
+                }
+                iter++;
+            }
+        }
     }
 
-    if (!info->error && !parsed)
-        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                           "Could not parse PIN request results");
+    if (!info->error && !parsed) {
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "Could not parse PIN request response '%s'",
+                                   response->str);
+    }
 
     mm_callback_info_schedule (info);
 }
