@@ -466,7 +466,7 @@ dial_done (MMSerialPort *port,
 
     if (error) {
         info->error = g_error_copy (error);
-        mm_modem_set_state (info->modem, MM_MODEM_STATE_REGISTERED, MM_MODEM_STATE_REASON_NONE);
+        set_state_enabled (MM_GENERIC_CDMA (info->modem), MM_MODEM_STATE_REASON_NONE);
     } else {
         /* Clear reg tries; we're obviously registered by this point */
         registration_cleanup (self, 0, 0);
