@@ -65,8 +65,11 @@ mm_modem_enable (MMModem *self,
 
     state = mm_modem_get_state (self);
     if (state >= MM_MODEM_STATE_ENABLED) {
+        MMCallbackInfo *info;
+
         /* Already enabled */
-        callback (self, NULL, user_data);
+        info = mm_callback_info_new (self, callback, user_data);
+        mm_callback_info_schedule (info);
         return;
     }
 
@@ -88,8 +91,11 @@ mm_modem_disable (MMModem *self,
 
     state = mm_modem_get_state (self);
     if (state <= MM_MODEM_STATE_DISABLED) {
+        MMCallbackInfo *info;
+
         /* Already disabled */
-        callback (self, NULL, user_data);
+        info = mm_callback_info_new (self, callback, user_data);
+        mm_callback_info_schedule (info);
         return;
     }
 
