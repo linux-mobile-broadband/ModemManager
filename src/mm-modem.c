@@ -67,8 +67,16 @@ mm_modem_enable (MMModem *self,
     if (state >= MM_MODEM_STATE_ENABLED) {
         MMCallbackInfo *info;
 
-        /* Already enabled */
         info = mm_callback_info_new (self, callback, user_data);
+
+        if (state == MM_MODEM_STATE_ENABLING) {
+            info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                               MM_MODEM_ERROR_OPERATION_IN_PROGRESS,
+                                               "The device is already being enabled.");
+        } else {
+            /* Already enabled */
+        }
+
         mm_callback_info_schedule (info);
         return;
     }
@@ -77,6 +85,42 @@ mm_modem_enable (MMModem *self,
         MM_MODEM_GET_INTERFACE (self)->enable (self, callback, user_data);
     else
         async_op_not_supported (self, callback, user_data);
+}
+
+static void
+finish_disable (MMModem *self,
+                MMModemFn callback,
+                gpointer user_data)
+{
+
+    if (MM_MODEM_GET_INTERFACE (self)->disable)
+        MM_MODEM_GET_INTERFACE (self)->disable (self, callback, user_data);
+    else
+        async_op_not_supported (self, callback, user_data);
+}
+
+typedef struct {
+    MMModemFn callback;
+    gpointer user_data;
+} DisableDisconnectInfo;
+
+static void
+disable_disconnect_done (MMModem *self,
+                         GError *error,
+                         gpointer user_data)
+{
+    DisableDisconnectInfo *cb_data = user_data;
+
+    /* ignore errors */
+    if (error) {
+        g_warning ("%s: (%s): error disconnecting the modem while disabling: (%d) %s",
+                   __func__,
+                   mm_modem_get_device (self),
+                   error ? error->code : -1,
+                   error && error->message ? error->message : "(unknown)");
+    }
+    finish_disable (self, cb_data->callback, cb_data->user_data);
+    g_free (cb_data);
 }
 
 void
@@ -93,16 +137,30 @@ mm_modem_disable (MMModem *self,
     if (state <= MM_MODEM_STATE_DISABLED) {
         MMCallbackInfo *info;
 
-        /* Already disabled */
         info = mm_callback_info_new (self, callback, user_data);
+
+        if (state == MM_MODEM_STATE_DISABLING) {
+            info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                               MM_MODEM_ERROR_OPERATION_IN_PROGRESS,
+                                               "The device is already being disabled.");
+        } else {
+            /* Already disabled */
+        }
+
         mm_callback_info_schedule (info);
         return;
     }
 
-    if (MM_MODEM_GET_INTERFACE (self)->disable)
-        MM_MODEM_GET_INTERFACE (self)->disable (self, callback, user_data);
-    else
-        async_op_not_supported (self, callback, user_data);
+    /* If the modem is connected, disconnect it */
+    if (state >= MM_MODEM_STATE_CONNECTING) {
+        DisableDisconnectInfo *cb_data;
+
+        cb_data = g_malloc0 (sizeof (DisableDisconnectInfo));
+        cb_data->callback = callback;
+        cb_data->user_data = user_data;
+        mm_modem_disconnect (self, disable_disconnect_done, cb_data);
+    } else
+        finish_disable (self, callback, user_data);
 }
 
 static void
@@ -122,9 +180,29 @@ mm_modem_connect (MMModem *self,
                   MMModemFn callback,
                   gpointer user_data)
 {
+    MMModemState state;
+
     g_return_if_fail (MM_IS_MODEM (self));
     g_return_if_fail (callback != NULL);
     g_return_if_fail (number != NULL);
+
+    state = mm_modem_get_state (self);
+    if (state >= MM_MODEM_STATE_CONNECTING) {
+        MMCallbackInfo *info;
+
+        /* Already connecting */
+        info = mm_callback_info_new (self, callback, user_data);
+        if (state == MM_MODEM_STATE_CONNECTING) {
+            info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                               MM_MODEM_ERROR_OPERATION_IN_PROGRESS,
+                                               "The device is already being connected.");
+        } else {
+            /* already connected */
+        }
+
+        mm_callback_info_schedule (info);
+        return;
+    }
 
     if (MM_MODEM_GET_INTERFACE (self)->connect)
         MM_MODEM_GET_INTERFACE (self)->connect (self, number, callback, user_data);
@@ -236,8 +314,29 @@ mm_modem_disconnect (MMModem *self,
                      MMModemFn callback,
                      gpointer user_data)
 {
+    MMModemState state;
+
     g_return_if_fail (MM_IS_MODEM (self));
     g_return_if_fail (callback != NULL);
+
+    state = mm_modem_get_state (self);
+    if (state <= MM_MODEM_STATE_DISCONNECTING) {
+        MMCallbackInfo *info;
+
+        /* Already connecting */
+        info = mm_callback_info_new (self, callback, user_data);
+        if (state == MM_MODEM_STATE_DISCONNECTING) {
+            info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                               MM_MODEM_ERROR_OPERATION_IN_PROGRESS,
+                                               "The device is already being disconnected.");
+        } else {
+            /* already disconnected */
+        }
+
+        mm_callback_info_schedule (info);
+        return;
+    }
+
 
     if (MM_MODEM_GET_INTERFACE (self)->disconnect)
         MM_MODEM_GET_INTERFACE (self)->disconnect (self, callback, user_data);
