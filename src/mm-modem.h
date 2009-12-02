@@ -40,6 +40,8 @@ typedef enum {
     MM_MODEM_STATE_REASON_NONE = 0
 } MMModemStateReason;
 
+#define DBUS_PATH_TAG "dbus-path"
+
 #define MM_TYPE_MODEM      (mm_modem_get_type ())
 #define MM_MODEM(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_MODEM, MMModem))
 #define MM_IS_MODEM(obj)   (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_MODEM))

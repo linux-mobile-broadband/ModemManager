@@ -514,19 +514,60 @@ mm_modem_get_state (MMModem *self)
     return state;
 }
 
+static const char *
+state_to_string (MMModemState state)
+{
+    switch (state) {
+    case MM_MODEM_STATE_UNKNOWN:
+        return "unknown";
+    case MM_MODEM_STATE_DISABLED:
+        return "disabled";
+    case MM_MODEM_STATE_DISABLING:
+        return "disabling";
+    case MM_MODEM_STATE_ENABLING:
+        return "enabling";
+    case MM_MODEM_STATE_ENABLED:
+        return "enabled";
+    case MM_MODEM_STATE_SEARCHING:
+        return "searching";
+    case MM_MODEM_STATE_REGISTERED:
+        return "registered";
+    case MM_MODEM_STATE_DISCONNECTING:
+        return "disconnecting";
+    case MM_MODEM_STATE_CONNECTING:
+        return "connecting";
+    case MM_MODEM_STATE_CONNECTED:
+        return "connected";
+    default:
+        g_assert_not_reached ();
+        break;
+    }
+
+    g_assert_not_reached ();
+    return "(invalid)";
+}
+
 void
 mm_modem_set_state (MMModem *self,
                     MMModemState new_state,
                     MMModemStateReason reason)
 {
     MMModemState old_state = MM_MODEM_STATE_UNKNOWN;
+    const char *dbus_path;
 
     g_object_get (G_OBJECT (self), MM_MODEM_STATE, &old_state, NULL);
 
     if (new_state != old_state) {
         g_object_set (G_OBJECT (self), MM_MODEM_STATE, new_state, NULL);
         g_signal_emit_by_name (G_OBJECT (self), "state-changed", new_state, old_state, reason);
-g_message ("%s: state %d -> %d", __func__, old_state, new_state);
+
+        dbus_path = (const char *) g_object_get_data (G_OBJECT (self), DBUS_PATH_TAG);
+        if (dbus_path) {
+            g_message ("Modem %s: state changed (%s -> %s)",
+                       dbus_path,
+                       state_to_string (old_state),
+                       state_to_string (new_state));
+        }
     }
 }
 
