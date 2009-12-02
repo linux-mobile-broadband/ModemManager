@@ -441,7 +441,7 @@ disable_flash_done (MMSerialPort *port,
         MMModemState prev_state;
 
         /* Reset old state since the operation failed */
-        prev_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, MM_GENERIC_GSM_PREV_STATE_TAG));
+        prev_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, MM_GENERIC_CDMA_PREV_STATE_TAG));
         mm_modem_set_state (MM_MODEM (info->modem),
                             prev_state,
                             MM_MODEM_STATE_REASON_NONE);
@@ -478,7 +478,7 @@ disable (MMModem *modem,
     /* Cache the previous state so we can reset it if the operation fails */
     state = mm_modem_get_state (modem);
     mm_callback_info_set_data (info,
-                               MM_GENERIC_GSM_PREV_STATE_TAG,
+                               MM_GENERIC_CDMA_PREV_STATE_TAG,
                                GUINT_TO_POINTER (state),
                                NULL);
 
