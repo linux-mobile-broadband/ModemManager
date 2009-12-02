@@ -134,7 +134,7 @@ mm_modem_disable (MMModem *self,
     g_return_if_fail (callback != NULL);
 
     state = mm_modem_get_state (self);
-    if (state <= MM_MODEM_STATE_DISABLED) {
+    if (state <= MM_MODEM_STATE_DISABLING) {
         MMCallbackInfo *info;
 
         info = mm_callback_info_new (self, callback, user_data);
