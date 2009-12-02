@@ -36,6 +36,10 @@ static void simple_reg_callback (MMModemCdma *modem,
 
 static void simple_state_machine (MMModem *modem, GError *error, gpointer user_data);
 
+static void update_enabled_state (MMGenericCdma *self,
+                                  gboolean stay_connected,
+                                  MMModemStateReason reason);
+
 static void modem_init (MMModem *modem_class);
 static void modem_cdma_init (MMModemCdma *cdma_class);
 static void modem_simple_init (MMModemSimple *class);
@@ -240,6 +244,7 @@ mm_generic_cdma_set_1x_registration_state (MMGenericCdma *self,
     if (priv->cdma_1x_reg_state != new_state) {
         priv->cdma_1x_reg_state = new_state;
 
+        update_enabled_state (self, TRUE, MM_MODEM_STATE_REASON_NONE);
         mm_modem_cdma_emit_registration_state_changed (MM_MODEM_CDMA (self),
                                                        priv->cdma_1x_reg_state,
                                                        priv->evdo_reg_state);
@@ -266,6 +271,7 @@ mm_generic_cdma_set_evdo_registration_state (MMGenericCdma *self,
         || (new_state == MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)) {
         priv->evdo_reg_state = new_state;
 
+        update_enabled_state (self, TRUE, MM_MODEM_STATE_REASON_NONE);
         mm_modem_cdma_emit_registration_state_changed (MM_MODEM_CDMA (self),
                                                        priv->cdma_1x_reg_state,
                                                        priv->evdo_reg_state);
@@ -294,19 +300,22 @@ mm_generic_cdma_evdo_get_registration_state_sync (MMGenericCdma *self)
 
 static void
 update_enabled_state (MMGenericCdma *self,
-                      gboolean just_disconnected,
+                      gboolean stay_connected,
                       MMModemStateReason reason)
 {
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
 
-    if (   just_disconnected
-        || (mm_modem_get_state (MM_MODEM (self)) < MM_MODEM_STATE_DISCONNECTING)) {
-        if (   priv->cdma_1x_reg_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN
-            || priv->evdo_reg_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
-            mm_modem_set_state (MM_MODEM (self), MM_MODEM_STATE_REGISTERED, reason);
-        else
-            mm_modem_set_state (MM_MODEM (self), MM_MODEM_STATE_ENABLED, reason);
-    }
+    /* While connected we don't want registration status changes to change
+     * the modem's state away from CONNECTED.
+     */
+    if (stay_connected && (mm_modem_get_state (MM_MODEM (self)) >= MM_MODEM_STATE_DISCONNECTING))
+        return;
+
+    if (   priv->cdma_1x_reg_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN
+        || priv->evdo_reg_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
+        mm_modem_set_state (MM_MODEM (self), MM_MODEM_STATE_REGISTERED, reason);
+    else
+        mm_modem_set_state (MM_MODEM (self), MM_MODEM_STATE_ENABLED, reason);
 }
 
 static void
@@ -552,7 +561,7 @@ disconnect_flash_done (MMSerialPort *port,
     }
 
     mm_port_set_connected (priv->data, FALSE);
-    update_enabled_state (MM_GENERIC_CDMA (info->modem), TRUE, MM_MODEM_STATE_REASON_NONE);
+    update_enabled_state (MM_GENERIC_CDMA (info->modem), FALSE, MM_MODEM_STATE_REASON_NONE);
 
     mm_callback_info_schedule (info);
 }
