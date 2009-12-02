@@ -63,7 +63,7 @@ typedef struct {
     guint reg_id;
     gboolean have_emrdy;
     char  *network_device;
-    MMCallbackInfo *do_connect_done_info;
+    MMCallbackInfo *pending_connect_info;
     int account_index;
     int network_mode;
     const char *username;
@@ -322,15 +322,7 @@ mbm_enable_done (MMSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    if (error)
-        info->error = g_error_copy (error);
-    else {
-        /* We're enabled; update our state */
-        mm_generic_gsm_update_enabled_state (MM_GENERIC_GSM (info->modem),
-                                             FALSE,
-                                             MM_MODEM_STATE_REASON_NONE);
-    }
-    mm_callback_info_schedule (info);
+    mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
 }
 
 static void
@@ -345,6 +337,7 @@ mbm_enap0_done (MMSerialPort *port,
 
     if (!priv->network_mode)
         priv->network_mode = MBM_NETWORK_MODE_ANY;
+
     command = g_strdup_printf ("+CFUN=%d", priv->network_mode);
     mm_serial_port_queue_command (port, command, 3, mbm_enable_done, info);
     g_free (command);
@@ -360,19 +353,20 @@ mbm_init_done (MMSerialPort *port,
     MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (info->modem);
 
     if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-    } else {
-        if (!priv->network_mode)
-            priv->network_mode = MBM_NETWORK_MODE_ANY;
-        mm_serial_port_queue_command (port, "*ENAP=0", 3, mbm_enap0_done, info);
+        mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
+        return;
     }
+
+    if (!priv->network_mode)
+        priv->network_mode = MBM_NETWORK_MODE_ANY;
+
+    mm_serial_port_queue_command (port, "*ENAP=0", 3, mbm_enap0_done, info);
 }
 
 static void
-do_init (MMSerialPort *port, gpointer user_data)
+do_init (MMSerialPort *port, MMCallbackInfo *info)
 {
-    mm_serial_port_queue_command (port, "&F E0 V1 X4 &C1 +CMEE=1", 3, mbm_init_done, user_data);
+    mm_serial_port_queue_command (port, "&F E0 V1 X4 &C1 +CMEE=1", 3, mbm_init_done, info);
 }
 
 static void
@@ -391,30 +385,20 @@ mbm_emrdy_done (MMSerialPort *port,
     } else
         priv->have_emrdy = TRUE;
 
-    do_init (port, user_data);
+    do_init (port, info);
 }
 
 static void
-enable (MMModem *modem,
-        MMModemFn callback,
-        gpointer user_data)
+do_enable (MMGenericGsm *self, MMModemFn callback, gpointer user_data)
 {
-    MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (modem);
+    MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (self);
     MMCallbackInfo *info;
     MMSerialPort *primary;
 
-    mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
+    info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
 
-    info = mm_callback_info_new (modem, callback, user_data);
-
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_port (self, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-
-    if (!mm_serial_port_open (primary, &info->error)) {
-        g_assert (info->error);
-        mm_callback_info_schedule (info);
-        return;
-    }
 
     if (priv->have_emrdy) {
         /* Modem is ready, no need to check EMRDY */
@@ -424,25 +408,12 @@ enable (MMModem *modem,
 }
 
 static void
-parent_disable_done (MMModem *modem, GError *error, gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-
-    if (error)
-        info->error = g_error_copy (error);
-    mm_callback_info_schedule (info);
-}
-
-static void
 disable (MMModem *modem,
          MMModemFn callback,
          gpointer user_data)
 {
     MMModem *parent_modem_iface;
-    MMCallbackInfo *info;
     MMSerialPort *primary;
-
-    info = mm_callback_info_new (modem, callback, user_data);
 
     primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
@@ -452,7 +423,7 @@ disable (MMModem *modem,
     mm_serial_port_queue_command (primary, "+CMER=0", 5, NULL, NULL);
 
     parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (modem));
-    parent_modem_iface->disable (modem, parent_disable_done, info);
+    parent_modem_iface->disable (modem, callback, user_data);
 }
 
 static void
@@ -464,8 +435,10 @@ do_connect (MMModem *modem,
     MMCallbackInfo *info;
     MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (modem);
 
+    mm_modem_set_state (modem, MM_MODEM_STATE_CONNECTING, MM_MODEM_STATE_REASON_NONE);
+
     info = mm_callback_info_new (modem, callback, user_data);
-    priv->do_connect_done_info = info;
+    priv->pending_connect_info = info;
 
     mbm_modem_authenticate (MM_MODEM_MBM (modem), priv->username, priv->password, info);
 }
@@ -478,10 +451,15 @@ disconnect (MMModem *modem,
     MMCallbackInfo *info;
     MMSerialPort *primary;
 
-    info = mm_callback_info_new (modem, callback, user_data);
+    mm_modem_set_state (modem, MM_MODEM_STATE_DISCONNECTING, MM_MODEM_STATE_REASON_NONE);
+
     primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-    mm_serial_port_queue_command (primary, "AT*ENAP=0", 3, NULL, info);
+    mm_serial_port_queue_command (primary, "*ENAP=0", 3, NULL, NULL);
+
+    mm_generic_gsm_update_enabled_state (MM_GENERIC_GSM (modem), FALSE, MM_MODEM_STATE_REASON_NONE);
+
+    info = mm_callback_info_new (modem, callback, user_data);
     mm_callback_info_schedule (info);
 }
 
@@ -496,7 +474,7 @@ mbm_emrdy_received (MMSerialPort *port,
 }
 
 static void
-mbm_pacsp0_received (MMSerialPort *port,
+mbm_pacsp_received (MMSerialPort *port,
                      GMatchInfo *info,
                      gpointer user_data)
 {
@@ -527,9 +505,12 @@ mbm_ciev_received (MMSerialPort *port,
 static void
 mbm_do_connect_done (MMModemMbm *self)
 {
-    /* unset the poll id which should remove the source in destroy func */
-    g_return_if_fail (MM_MODEM_MBM_GET_PRIVATE (self)->do_connect_done_info);
-    mm_callback_info_schedule (MM_MODEM_MBM_GET_PRIVATE (self)->do_connect_done_info);
+    MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (self);
+
+    if (priv->pending_connect_info) {
+        mm_generic_gsm_connect_complete (MM_GENERIC_GSM (self), NULL, priv->pending_connect_info);
+        priv->pending_connect_info = NULL;
+    }
 }
 
 static void
@@ -559,10 +540,10 @@ mbm_e2nap_received (MMSerialPort *port,
 }
 
 static void
-enap_poll_done (MMSerialPort *port,
-            GString *response,
-            GError *error,
-            gpointer user_data)
+enap_poll_response (MMSerialPort *port,
+                    GString *response,
+                    GError *error,
+                    gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     guint state;
@@ -573,15 +554,20 @@ enap_poll_done (MMSerialPort *port,
     count = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "mbm-enap-poll-count"));
 
     if (sscanf (response->str, "*ENAP: %d", &state) == 1 && state == 1) {
-        mm_callback_info_schedule (info);
-    } else {
-        mm_callback_info_set_data (info, "mbm-enap-poll-count", GUINT_TO_POINTER (++count), NULL);
+        /* Success!  Connected... */
+        mm_generic_gsm_connect_complete (MM_GENERIC_GSM (info->modem), NULL, info);
+        return;
+    }
 
-        /* lets give it about 50 seconds */
-        if (count > 50) {
-            info -> error = mm_modem_connect_error_for_code (MM_MODEM_CONNECT_ERROR_BUSY);
-            mm_callback_info_schedule (info);
-        }
+    mm_callback_info_set_data (info, "mbm-enap-poll-count", GUINT_TO_POINTER (++count), NULL);
+
+    /* lets give it about 50 seconds */
+    if (count > 50) {
+        GError *poll_error;
+
+        poll_error = mm_modem_connect_error_for_code (MM_MODEM_CONNECT_ERROR_BUSY);
+        mm_generic_gsm_connect_complete (MM_GENERIC_GSM (info->modem), poll_error, info);
+        g_error_free (poll_error);
     }
 }
 
@@ -593,8 +579,8 @@ enap_poll (gpointer user_data)
 
     g_assert (port);
 
-    mm_serial_port_queue_command (port, "AT*ENAP?", 3, enap_poll_done, user_data);
-    /* we cancle this in the _done function if all is fine */
+    mm_serial_port_queue_command (port, "AT*ENAP?", 3, enap_poll_response, user_data);
+    /* we cancel this in the _done function if all is fine */
     return TRUE;
 }
 
@@ -605,16 +591,17 @@ enap_done (MMSerialPort *port,
             gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    guint tid;
 
     if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-    } else {
-        guint tid = g_timeout_add_seconds (1, enap_poll, user_data);
-        /* remember poll id as callback info object, with source_remove as free func */
-        mm_callback_info_set_data (info, "mbm-enap-poll-id", GUINT_TO_POINTER (tid), (GFreeFunc) g_source_remove);
-        mm_serial_port_queue_command (port, "AT*E2NAP=1", 3, NULL, NULL);
+        mm_generic_gsm_connect_complete (MM_GENERIC_GSM (info->modem), error, info);
+        return;
     }
+
+    tid = g_timeout_add_seconds (1, enap_poll, user_data);
+    /* remember poll id as callback info object, with source_remove as free func */
+    mm_callback_info_set_data (info, "mbm-enap-poll-id", GUINT_TO_POINTER (tid), (GFreeFunc) g_source_remove);
+    mm_serial_port_queue_command (port, "AT*E2NAP=1", 3, NULL, NULL);
 }
 
 static void
@@ -624,17 +611,19 @@ mbm_auth_done (MMSerialPort *port,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMGenericGsm *modem = MM_GENERIC_GSM (info->modem);
+    char *command;
+    guint32 cid;
 
     if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-    } else {
-        char *command;
-        guint32 cid = mm_generic_gsm_get_cid (MM_GENERIC_GSM (info->modem));
-        command = g_strdup_printf ("AT*ENAP=1,%d", cid);
-        mm_serial_port_queue_command (port, command, 3, enap_done, user_data);
-        g_free (command);
+        mm_generic_gsm_connect_complete (modem, error, info);
+        return;
     }
+
+    cid = mm_generic_gsm_get_cid (modem);
+    command = g_strdup_printf ("AT*ENAP=1,%d", cid);
+    mm_serial_port_queue_command (port, command, 3, enap_done, user_data);
+    g_free (command);
 }
 
 static void
@@ -738,8 +727,8 @@ grab_port (MMModem *modem,
         mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, mbm_e2nap_received, modem, NULL);
         g_regex_unref (regex);
 
-        regex = g_regex_new ("\\r\\n\\+PACSP0\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, mbm_pacsp0_received, modem, NULL);
+        regex = g_regex_new ("\\r\\n\\+PACSP(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, mbm_pacsp_received, modem, NULL);
         g_regex_unref (regex);
 
         regex = g_regex_new ("\\r\\n\\+CIEV: (\\d),(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
@@ -779,7 +768,6 @@ static void
 modem_init (MMModem *modem_class)
 {
     modem_class->grab_port = grab_port;
-    modem_class->enable = enable;
     modem_class->disable = disable;
     modem_class->connect = do_connect;
     modem_class->disconnect = disconnect;
@@ -807,11 +795,14 @@ static void
 mm_modem_mbm_class_init (MMModemMbmClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    MMGenericGsmClass *gsm_class = MM_GENERIC_GSM_CLASS (klass);
 
     mm_modem_mbm_parent_class = g_type_class_peek_parent (klass);
     g_type_class_add_private (object_class, sizeof (MMModemMbmPrivate));
 
     /* Virtual methods */
     object_class->finalize = finalize;
+
+    gsm_class->do_enable = do_enable;
 }
 

@@ -62,10 +62,7 @@ init_modem_done (MMSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    if (error)
-        info->error = g_error_copy (error);
-
-    mm_callback_info_schedule (info);
+    mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
 }
 
 static void
@@ -75,14 +72,14 @@ pin_check_done (MMModem *modem, GError *error, gpointer user_data)
     MMSerialPort *primary;
 
     if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-    } else {
-        /* Finish the initialization */
-        primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
-        g_assert (primary);
-        mm_serial_port_queue_command (primary, "Z E0 V1 X4 &C1 +CMEE=1;+CFUN=1;", 10, init_modem_done, info);
+        mm_generic_gsm_enable_complete (MM_GENERIC_GSM (modem), error, info);
+        return;
     }
+
+    /* Finish the initialization */
+    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+    mm_serial_port_queue_command (primary, "Z E0 V1 X4 &C1 +CMEE=1;+CFUN=1;", 10, init_modem_done, info);
 }
 
 static void enable_flash_done (MMSerialPort *port,
@@ -104,10 +101,8 @@ pre_init_done (MMSerialPort *port,
             && g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_RESPONSE_TIMEOUT)) {
             priv->init_retried = TRUE;
             enable_flash_done (port, NULL, user_data);
-        } else {
-            info->error = g_error_copy (error);
-            mm_callback_info_schedule (info);
-        }
+        } else
+            mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
     } else {
         /* Now check the PIN explicitly, zte doesn't seem to report
            that it needs it otherwise */
@@ -120,19 +115,14 @@ enable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-        return;
-    }
-
-    mm_serial_port_queue_command (port, "E0 V1", 3, pre_init_done, user_data);
+    if (error)
+        mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
+    else
+        mm_serial_port_queue_command (port, "E0 V1", 3, pre_init_done, user_data);
 }
 
 static void
-enable (MMModem *modem,
-        MMModemFn callback,
-        gpointer user_data)
+do_enable (MMGenericGsm *modem, MMModemFn callback, gpointer user_data)
 {
     MMModemZtePrivate *priv = MM_MODEM_ZTE_GET_PRIVATE (modem);
     MMCallbackInfo *info;
@@ -140,20 +130,10 @@ enable (MMModem *modem,
 
     priv->init_retried = FALSE;
 
-    /* First, reset the previously used CID */
-    mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
-
-    info = mm_callback_info_new (modem, callback, user_data);
-
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_port (modem, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
 
-    if (!mm_serial_port_open (primary, &info->error)) {
-        g_assert (info->error);
-        mm_callback_info_schedule (info);
-        return;
-    }
-
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
     mm_serial_port_flash (primary, 100, enable_flash_done, info);
 }
 
@@ -224,7 +204,6 @@ grab_port (MMModem *modem,
 static void
 modem_init (MMModem *modem_class)
 {
-    modem_class->enable = enable;
     modem_class->disable = disable;
     modem_class->grab_port = grab_port;
 }
@@ -238,8 +217,11 @@ static void
 mm_modem_zte_class_init (MMModemZteClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    MMGenericGsmClass *gsm_class = MM_GENERIC_GSM_CLASS (klass);
 
     mm_modem_zte_parent_class = g_type_class_peek_parent (klass);
     g_type_class_add_private (object_class, sizeof (MMModemZtePrivate));
+
+    gsm_class->do_enable = do_enable;
 }
 

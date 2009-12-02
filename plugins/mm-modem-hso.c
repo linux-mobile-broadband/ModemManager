@@ -288,33 +288,30 @@ mm_hso_modem_authenticate (MMModemHso *self,
 /*****************************************************************************/
 
 static void
-generic_done (MMModem *modem, GError *error, gpointer user_data)
+enable_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    if (error)
-        info->error = g_error_copy (error);
-    mm_callback_info_schedule (info);
+    mm_generic_gsm_enable_complete (MM_GENERIC_GSM (modem), error, info);
 }
 
 static void
 parent_enable_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMGenericGsm *self = MM_GENERIC_GSM (modem);
 
     if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-    } else {
-        /* HSO needs manual PIN checking */
-        mm_generic_gsm_check_pin (MM_GENERIC_GSM (modem), generic_done, info);
+        mm_generic_gsm_enable_complete (self, error, info);
+        return;
     }
+
+    /* HSO needs manual PIN checking */
+    mm_generic_gsm_check_pin (self, enable_done, info);
 }
 
 static void
-enable (MMModem *modem,
-        MMModemFn callback,
-        gpointer user_data)
+enable (MMModem *modem, MMModemFn callback, gpointer user_data)
 {
     MMModem *parent_modem_iface;
     MMCallbackInfo *info;
@@ -322,6 +319,16 @@ enable (MMModem *modem,
     info = mm_callback_info_new (modem, callback, user_data);
     parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (info->modem));
     parent_modem_iface->enable (info->modem, parent_enable_done, info);
+}
+
+static void
+parent_disable_done (MMModem *modem, GError *error, gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error)
+        info->error = g_error_copy (error);
+    mm_callback_info_schedule (info);
 }
 
 static void
@@ -334,7 +341,7 @@ disable_done (MMModem *modem,
 
     /* Do the normal disable stuff */
     parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (info->modem));
-    parent_modem_iface->disable (info->modem, generic_done, info);
+    parent_modem_iface->disable (info->modem, parent_disable_done, info);
 }
 
 static void

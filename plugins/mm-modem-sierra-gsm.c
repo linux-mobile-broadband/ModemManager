@@ -53,9 +53,7 @@ pin_check_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    if (error)
-        info->error = g_error_copy (error);
-    mm_callback_info_schedule (info);
+    mm_generic_gsm_enable_complete (MM_GENERIC_GSM (modem), error, info);
 }
 
 static gboolean
@@ -64,9 +62,9 @@ sierra_enabled (gpointer data)
     MMCallbackInfo *info = (MMCallbackInfo *) data;
 
     /* Now check the PIN explicitly, sierra doesn't seem to report
-       that it needs it otherwise */
+     * that it needs it otherwise.
+     */
     mm_generic_gsm_check_pin (MM_GENERIC_GSM (info->modem), pin_check_done, info);
-
     return FALSE;
 }
 
@@ -76,19 +74,18 @@ parent_enable_done (MMModem *modem, GError *error, gpointer user_data)
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
     if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-    } else {
-        /* Sierra returns OK on +CFUN=1 right away but needs some time
-           to finish initialization */
-        g_timeout_add_seconds (10, sierra_enabled, info);
+        mm_generic_gsm_enable_complete (MM_GENERIC_GSM (modem), error, info);
+        return;
     }
+
+    /* Sierra returns OK on +CFUN=1 right away but needs some time
+     * to finish initialization.
+     */
+    g_timeout_add_seconds (10, sierra_enabled, info);
 }
 
 static void
-enable (MMModem *modem,
-        MMModemFn callback,
-        gpointer user_data)
+enable (MMModem *modem, MMModemFn callback, gpointer user_data)
 {
     MMModem *parent_modem_iface;
     MMCallbackInfo *info;

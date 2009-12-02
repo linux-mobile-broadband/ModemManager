@@ -53,9 +53,7 @@ pin_check_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    if (error)
-        info->error = g_error_copy (error);
-    mm_callback_info_schedule (info);
+    mm_generic_gsm_enable_complete (MM_GENERIC_GSM (modem), error, info);
 }
 
 static gboolean
@@ -64,9 +62,9 @@ option_enabled (gpointer data)
     MMCallbackInfo *info = (MMCallbackInfo *) data;
 
     /* Now check the PIN explicitly, option doesn't seem to report
-       that it needs it otherwise */
+     * that it needs it otherwise.
+     */
     mm_generic_gsm_check_pin (MM_GENERIC_GSM (info->modem), pin_check_done, info);
-
     return FALSE;
 }
 
@@ -76,13 +74,14 @@ parent_enable_done (MMModem *modem, GError *error, gpointer user_data)
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
     if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-    } else {
-        /* Option returns OK on +CFUN=1 right away but needs some time
-           to finish initialization */
-        g_timeout_add_seconds (10, option_enabled, info);
+        mm_generic_gsm_enable_complete (MM_GENERIC_GSM (modem), error, info);
+        return;
     }
+
+    /* Option returns OK on +CFUN=1 right away but needs some time
+     * to finish initialization
+     */
+    g_timeout_add_seconds (10, option_enabled, info);
 }
 
 static void
