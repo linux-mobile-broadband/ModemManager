@@ -60,6 +60,10 @@ MMModem *mm_generic_gsm_new (const char *device,
                              const char *driver,
                              const char *plugin);
 
+/* Private, for subclasses */
+
+#define MM_GENERIC_GSM_PREV_STATE_TAG "prev-state"
+
 void mm_generic_gsm_set_unsolicited_registration (MMGenericGsm *modem,
                                                   gboolean enabled);
 
@@ -85,7 +89,13 @@ MMPort *mm_generic_gsm_grab_port (MMGenericGsm *modem,
                                   MMPortType ptype,
                                   GError **error);
 
+/* stay_connected should be TRUE for unsolicited registration updates, otherwise
+ * the registration update will clear connected/connecting/disconnecting state
+ * which we don't want.  stay_connected should be FALSE for other cases like
+ * updating the state after disconnecting, or after a connect error occurs.
+ */
 void mm_generic_gsm_update_enabled_state (MMGenericGsm *modem,
+                                          gboolean stay_connected,
                                           MMModemStateReason reason);
 
 #endif /* MM_GENERIC_GSM_H */

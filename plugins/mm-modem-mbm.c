@@ -327,6 +327,7 @@ mbm_enable_done (MMSerialPort *port,
     else {
         /* We're enabled; update our state */
         mm_generic_gsm_update_enabled_state (MM_GENERIC_GSM (info->modem),
+                                             FALSE,
                                              MM_MODEM_STATE_REASON_NONE);
     }
     mm_callback_info_schedule (info);
