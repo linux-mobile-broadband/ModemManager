@@ -1020,11 +1020,24 @@ reg_state_changed (MMSerialPort *port,
                    gpointer user_data)
 {
     MMGenericGsm *self = MM_GENERIC_GSM (user_data);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     char *str;
+    gboolean done;
 
     str = g_match_info_fetch (match_info, 1);
-    reg_status_updated (self, atoi (str), NULL);
+    done = reg_status_updated (self, atoi (str), NULL);
     g_free (str);
+
+    if (done) {
+        /* If registration is finished (either registered or failed) but the
+         * registration query hasn't completed yet, just remove the timeout and
+         * let the registration query complete.
+         */
+        if (priv->pending_reg_id) {
+            g_source_remove (priv->pending_reg_id);
+            priv->pending_reg_id = 0;
+        }
+    }
 }
 
 static gboolean
@@ -1035,7 +1048,7 @@ reg_status_again (gpointer data)
 
     g_warn_if_fail (info == priv->pending_reg_info);
 
-    if (priv->pending_reg_id)
+    if (priv->pending_reg_info)
         get_registration_status (priv->primary, info);
 
     return FALSE;
@@ -1102,7 +1115,7 @@ get_reg_status_done (MMSerialPort *port,
 
     if (   reg_status >= 0
         && !reg_status_updated (self, reg_status, &info->error)
-        && priv->pending_reg_id) {
+        && priv->pending_reg_info) {
         g_clear_error (&info->error);
 
         /* Not registered yet; poll registration status again */
@@ -1134,8 +1147,23 @@ register_done (MMSerialPort *port,
                GError *error,
                gpointer user_data)
 {
-    /* Ignore errors here, get the actual registration status */
-    get_registration_status (port, (MMCallbackInfo *) user_data);
+    MMCallbackInfo *info = user_data;
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+
+    mm_callback_info_unref (info);
+
+    /* If the registration timed out (and thus pending_reg_info will be NULL)
+     * and the modem eventually got around to sending the response for the
+     * registration request then just ignore the response since the callback is
+     * already called.
+     */
+
+    if (priv->pending_reg_info) {
+        g_warn_if_fail (info == priv->pending_reg_info);
+
+        /* Ignore errors here, get the actual registration status */
+        get_registration_status (port, info);
+    }
 }
 
 static gboolean
@@ -1146,12 +1174,11 @@ registration_timed_out (gpointer data)
 
     g_warn_if_fail (info == priv->pending_reg_info);
 
-    priv->pending_reg_id = 0;
-    priv->pending_reg_info = NULL;
     priv->reg_status = MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE;
 
     info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_NETWORK_TIMEOUT);
-    mm_callback_info_schedule (info);
+    mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (info->modem));
+
     return FALSE;
 }
 
@@ -1178,6 +1205,24 @@ do_register (MMModemGsmNetwork *modem,
     else
         command = g_strdup ("+COPS=0,,");
 
+    /* Ref the callback info to ensure it stays alive for register_done() even
+     * if the timeout triggers and ends registration (which calls the callback
+     * and unrefs the callback info).  Some devices (hso) will delay the
+     * registration response until the registration is done (and thus
+     * unsolicited registration responses will arrive before the +COPS is
+     * complete).  Most other devices will return the +COPS response immediately
+     * and the unsolicited response (if any) at a later time.
+     *
+     * To handle both these cases, unsolicited registration responses will just
+     * remove the pending registration timeout but we let the +COPS command
+     * complete.  For those devices that delay the +COPS response (hso) the
+     * callback will be called from register_done().  For those devices that
+     * return the +COPS response immediately, we'll poll the registration state
+     * and call the callback from get_reg_status_done() in response to the
+     * polled response.  The registration timeout will only be triggered when
+     * the +COPS response is never received.
+     */
+    mm_callback_info_ref (info);
     mm_serial_port_queue_command (priv->primary, command, 120, register_done, info);
     g_free (command);
 }
