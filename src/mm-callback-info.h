@@ -23,6 +23,8 @@ typedef struct _MMCallbackInfo MMCallbackInfo;
 typedef void (*MMCallbackInfoInvokeFn) (MMCallbackInfo *info);
 
 struct _MMCallbackInfo {
+    guint32 refcount;
+
     GData *qdata;
     MMModem *modem;
 
@@ -65,4 +67,8 @@ void            mm_callback_info_set_data (MMCallbackInfo *info,
 gpointer        mm_callback_info_get_data (MMCallbackInfo *info,
                                            const char *key);
 
+MMCallbackInfo *mm_callback_info_ref (MMCallbackInfo *info);
+void            mm_callback_info_unref (MMCallbackInfo *info);
+
 #endif /* MM_CALLBACK_INFO_H */
+
