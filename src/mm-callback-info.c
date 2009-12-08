@@ -72,14 +72,7 @@ callback_info_done (gpointer user_data)
     if (info->invoke_fn && info->callback)
         info->invoke_fn (info);
 
-    if (info->error)
-        g_error_free (info->error);
-
-    if (info->modem)
-        g_object_weak_unref (G_OBJECT (info->modem), modem_destroyed_cb, info);
-
-    g_datalist_clear (&info->qdata);
-    g_slice_free (MMCallbackInfo, info);
+    mm_callback_info_unref (info);
 }
 
 static gboolean
@@ -117,6 +110,7 @@ mm_callback_info_new_full (MMModem *modem,
     info->invoke_fn = invoke_fn;
     info->callback = callback;
     info->user_data = user_data;
+    info->refcount = 1;
 
     return info;
 }
@@ -184,3 +178,32 @@ mm_callback_info_get_data (MMCallbackInfo *info, const char *key)
 
     return quark ? g_datalist_id_get_data (&info->qdata, quark) : NULL;
 }
+
+MMCallbackInfo *
+mm_callback_info_ref (MMCallbackInfo *info)
+{
+    g_return_val_if_fail (info != NULL, NULL);
+    g_return_val_if_fail (info->refcount > 0, NULL);
+
+    info->refcount++;
+    return info;
+}
+
+void
+mm_callback_info_unref (MMCallbackInfo *info)
+{
+    g_return_if_fail (info != NULL);
+
+    info->refcount--;
+    if (info->refcount == 0) {
+        if (info->error)
+            g_error_free (info->error);
+
+        if (info->modem)
+            g_object_weak_unref (G_OBJECT (info->modem), modem_destroyed_cb, info);
+
+        g_datalist_clear (&info->qdata);
+        g_slice_free (MMCallbackInfo, info);
+    }
+}
+

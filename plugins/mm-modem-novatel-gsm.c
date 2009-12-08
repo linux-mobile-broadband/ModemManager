@@ -56,27 +56,25 @@ init_modem_done (MMSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    if (error)
-        info->error = g_error_copy (error);
-
-    mm_callback_info_schedule (info);
+    mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
 }
 
 static void
 pin_check_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMGenericGsm *self = MM_GENERIC_GSM (modem);
     MMSerialPort *primary;
 
     if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-    } else {
-        /* Finish the initialization */
-        primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
-        g_assert (primary);
-        mm_serial_port_queue_command (primary, "Z E0 V1 X4 &C1 +CMEE=1;+CFUN=1", 10, init_modem_done, info);
+        mm_generic_gsm_enable_complete (self, error, info);
+        return;
     }
+
+    /* Finish the initialization */
+    primary = mm_generic_gsm_get_port (self, MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+    mm_serial_port_queue_command (primary, "Z E0 V1 X4 &C1 +CMEE=1;+CFUN=1", 10, init_modem_done, info);
 }
 
 static void
@@ -88,13 +86,14 @@ pre_init_done (MMSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
     if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-    } else {
-        /* Now check the PIN explicitly, novatel doesn't seem to report
-           that it needs it otherwise */
-        mm_generic_gsm_check_pin (MM_GENERIC_GSM (info->modem), pin_check_done, info);
+        mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
+        return;
     }
+
+    /* Now check the PIN explicitly, novatel doesn't seem to report
+     * that it needs it otherwise.
+     */
+    mm_generic_gsm_check_pin (MM_GENERIC_GSM (info->modem), pin_check_done, info);
 }
 
 static void
@@ -102,37 +101,22 @@ enable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
 
-    if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-        return;
-    }
-
-    mm_serial_port_queue_command (port, "E0 V1", 3, pre_init_done, user_data);
+    if (error)
+        mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
+    else
+        mm_serial_port_queue_command (port, "E0 V1", 3, pre_init_done, user_data);
 }
 
 static void
-enable (MMModem *modem,
-        MMModemFn callback,
-        gpointer user_data)
+do_enable (MMGenericGsm *modem, MMModemFn callback, gpointer user_data)
 {
     MMCallbackInfo *info;
     MMSerialPort *primary;
 
-    /* First, reset the previously used CID */
-    mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
-
-    info = mm_callback_info_new (modem, callback, user_data);
-
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_port (modem, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
 
-    if (!mm_serial_port_open (primary, &info->error)) {
-        g_assert (info->error);
-        mm_callback_info_schedule (info);
-        return;
-    }
-
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
     mm_serial_port_flash (primary, 100, enable_flash_done, info);
 }
 
@@ -180,7 +164,6 @@ grab_port (MMModem *modem,
 static void
 modem_init (MMModem *modem_class)
 {
-    modem_class->enable = enable;
     modem_class->grab_port = grab_port;
 }
 
@@ -192,6 +175,10 @@ mm_modem_novatel_gsm_init (MMModemNovatelGsm *self)
 static void
 mm_modem_novatel_gsm_class_init (MMModemNovatelGsmClass *klass)
 {
+    MMGenericGsmClass *gsm_class = MM_GENERIC_GSM_CLASS (klass);
+
     mm_modem_novatel_gsm_parent_class = g_type_class_peek_parent (klass);
+
+    gsm_class->do_enable = do_enable;
 }
 

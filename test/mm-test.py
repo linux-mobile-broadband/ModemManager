@@ -17,6 +17,7 @@
 
 import sys
 import dbus
+import time
 
 DBUS_INTERFACE_PROPERTIES='org.freedesktop.DBus.Properties'
 MM_DBUS_SERVICE='org.freedesktop.ModemManager'
@@ -309,6 +310,8 @@ for m in modems:
         if connect == True:
             cdma_connect(proxy, user, password)
     print
+
+    time.sleep(5)
 
     modem.Enable(False)
 

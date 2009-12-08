@@ -159,6 +159,8 @@ mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
             mm_modem_gsm_network_registration_info (MM_MODEM_GSM_NETWORK (modem), priv->reg_status,
                                                     priv->oper_code, priv->oper_name);
         }
+
+        mm_generic_gsm_update_enabled_state (modem, TRUE, MM_MODEM_STATE_REASON_NONE);
     }
 }
 
@@ -242,6 +244,36 @@ mm_generic_gsm_check_pin (MMGenericGsm *modem,
 }
 
 /*****************************************************************************/
+
+void
+mm_generic_gsm_update_enabled_state (MMGenericGsm *self,
+                                     gboolean stay_connected,
+                                     MMModemStateReason reason)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    /* While connected we don't want registration status changes to change
+     * the modem's state away from CONNECTED.
+     */
+    if (stay_connected && (mm_modem_get_state (MM_MODEM (self)) >= MM_MODEM_STATE_DISCONNECTING))
+        return;
+
+    switch (priv->reg_status) {
+    case MM_MODEM_GSM_NETWORK_REG_STATUS_HOME:
+    case MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING:
+        mm_modem_set_state (MM_MODEM (self), MM_MODEM_STATE_REGISTERED, reason);
+        break;
+    case MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING:
+        mm_modem_set_state (MM_MODEM (self), MM_MODEM_STATE_SEARCHING, reason);
+        break;
+    case MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE:
+    case MM_MODEM_GSM_NETWORK_REG_STATUS_DENIED:
+    case MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN:
+    default:
+        mm_modem_set_state (MM_MODEM (self), MM_MODEM_STATE_ENABLED, reason);
+        break;
+    }
+}
 
 static void
 check_valid (MMGenericGsm *self)
@@ -366,6 +398,29 @@ release_port (MMModem *modem, const char *subsys, const char *name)
     check_valid (MM_GENERIC_GSM (modem));
 }
 
+void
+mm_generic_gsm_enable_complete (MMGenericGsm *modem,
+                                GError *error,
+                                MMCallbackInfo *info)
+{
+    g_return_if_fail (modem != NULL);
+    g_return_if_fail (MM_IS_GENERIC_GSM (modem));
+    g_return_if_fail (info != NULL);
+
+    if (error) {
+        mm_modem_set_state (MM_MODEM (modem),
+                            MM_MODEM_STATE_DISABLED,
+                            MM_MODEM_STATE_REASON_NONE);
+
+        info->error = g_error_copy (error);
+    } else {
+        /* Modem is enabled; update the state */
+        mm_generic_gsm_update_enabled_state (modem, FALSE, MM_MODEM_STATE_REASON_NONE);
+    }
+
+    mm_callback_info_schedule (info);
+}
+
 static void
 enable_done (MMSerialPort *port,
              GString *response,
@@ -382,7 +437,8 @@ enable_done (MMSerialPort *port,
      * on the phone and let the subclass decided whether it wants to handle
      * errors or ignore them.
      */
-    mm_callback_info_schedule (info);
+
+    mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), NULL, info);
 }
 
 static void
@@ -395,30 +451,30 @@ init_done (MMSerialPort *port,
     char *cmd = NULL;
 
     if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-    } else {
-        /* Ensure echo is off after the init command; some modems ignore the
-         * E0 when it's in the same like as ATZ (Option GIO322).
-         */
-        mm_serial_port_queue_command (port, "E0 +CMEE=1", 2, NULL, NULL);
-
-        g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_INIT_CMD_OPTIONAL, &cmd, NULL);
-        mm_serial_port_queue_command (port, cmd, 2, NULL, NULL);
-        g_free (cmd);
-
-        if (MM_GENERIC_GSM_GET_PRIVATE (info->modem)->unsolicited_registration)
-            mm_serial_port_queue_command (port, "+CREG=1", 5, NULL, NULL);
-        else
-            mm_serial_port_queue_command (port, "+CREG=0", 5, NULL, NULL);
-
-        g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_POWER_UP_CMD, &cmd, NULL);
-        if (cmd && strlen (cmd))
-            mm_serial_port_queue_command (port, cmd, 5, enable_done, user_data);
-        else
-            enable_done (port, NULL, NULL, user_data);
-        g_free (cmd);
+        mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
+        return;
     }
+
+    /* Ensure echo is off after the init command; some modems ignore the
+        * E0 when it's in the same like as ATZ (Option GIO322).
+        */
+    mm_serial_port_queue_command (port, "E0 +CMEE=1", 2, NULL, NULL);
+
+    g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_INIT_CMD_OPTIONAL, &cmd, NULL);
+    mm_serial_port_queue_command (port, cmd, 2, NULL, NULL);
+    g_free (cmd);
+
+    if (MM_GENERIC_GSM_GET_PRIVATE (info->modem)->unsolicited_registration)
+        mm_serial_port_queue_command (port, "+CREG=1", 5, NULL, NULL);
+    else
+        mm_serial_port_queue_command (port, "+CREG=0", 5, NULL, NULL);
+
+    g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_POWER_UP_CMD, &cmd, NULL);
+    if (cmd && strlen (cmd))
+        mm_serial_port_queue_command (port, cmd, 5, enable_done, user_data);
+    else
+        enable_done (port, NULL, NULL, user_data);
+    g_free (cmd);
 }
 
 static void
@@ -428,8 +484,7 @@ enable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
     char *cmd = NULL;
 
     if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
+        mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
         return;
     }
 
@@ -439,25 +494,40 @@ enable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
 }
 
 static void
+real_do_enable (MMGenericGsm *self, MMModemFn callback, gpointer user_data)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
+    mm_serial_port_flash (priv->primary, 100, enable_flash_done, info);
+}
+
+static void
 enable (MMModem *modem,
         MMModemFn callback,
         gpointer user_data)
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
-    MMCallbackInfo *info;
+    GError *error = NULL;
 
     /* First, reset the previously used CID */
     mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
 
-    info = mm_callback_info_new (modem, callback, user_data);
+    if (!mm_serial_port_open (priv->primary, &error)) {
+        MMCallbackInfo *info;
 
-    if (!mm_serial_port_open (priv->primary, &info->error)) {
-        g_assert (info->error);
+        g_assert (error);
+        info = mm_callback_info_new (modem, callback, user_data);
+        info->error = error;
         mm_callback_info_schedule (info);
         return;
     }
 
-    mm_serial_port_flash (priv->primary, 100, enable_flash_done, info);
+    mm_modem_set_state (modem, MM_MODEM_STATE_ENABLING, MM_MODEM_STATE_REASON_NONE);
+
+    g_assert (MM_GENERIC_GSM_GET_CLASS (modem)->do_enable);
+    MM_GENERIC_GSM_GET_CLASS (modem)->do_enable (MM_GENERIC_GSM (modem), callback, user_data);
 }
 
 static void
@@ -466,8 +536,13 @@ disable_done (MMSerialPort *port,
               GError *error,
               gpointer user_data)
 {
+    MMCallbackInfo *info = user_data;
+
     mm_serial_port_close (port);
-    mm_callback_info_schedule ((MMCallbackInfo *) user_data);
+    mm_modem_set_state (MM_MODEM (info->modem),
+                        MM_MODEM_STATE_DISABLED,
+                        MM_MODEM_STATE_REASON_NONE);
+    mm_callback_info_schedule (info);
 }
 
 static void
@@ -479,6 +554,14 @@ disable_flash_done (MMSerialPort *port,
     char *cmd = NULL;
 
     if (error) {
+        MMModemState prev_state;
+
+        /* Reset old state since the operation failed */
+        prev_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, MM_GENERIC_GSM_PREV_STATE_TAG));
+        mm_modem_set_state (MM_MODEM (info->modem),
+                            prev_state,
+                            MM_MODEM_STATE_REASON_NONE);
+
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
         return;
@@ -499,12 +582,24 @@ disable (MMModem *modem,
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
+    MMModemState state;
 
     /* First, reset the previously used CID and clean up registration */
     mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
     mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
 
     info = mm_callback_info_new (modem, callback, user_data);
+
+    /* Cache the previous state so we can reset it if the operation fails */
+    state = mm_modem_get_state (modem);
+    mm_callback_info_set_data (info,
+                               MM_GENERIC_GSM_PREV_STATE_TAG,
+                               GUINT_TO_POINTER (state),
+                               NULL);
+
+    mm_modem_set_state (MM_MODEM (info->modem),
+                        MM_MODEM_STATE_DISABLING,
+                        MM_MODEM_STATE_REASON_NONE);
 
     if (mm_port_get_connected (MM_PORT (priv->primary)))
         mm_serial_port_flash (priv->primary, 1000, disable_flash_done, info);
@@ -925,11 +1020,24 @@ reg_state_changed (MMSerialPort *port,
                    gpointer user_data)
 {
     MMGenericGsm *self = MM_GENERIC_GSM (user_data);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     char *str;
+    gboolean done;
 
     str = g_match_info_fetch (match_info, 1);
-    reg_status_updated (self, atoi (str), NULL);
+    done = reg_status_updated (self, atoi (str), NULL);
     g_free (str);
+
+    if (done) {
+        /* If registration is finished (either registered or failed) but the
+         * registration query hasn't completed yet, just remove the timeout and
+         * let the registration query complete.
+         */
+        if (priv->pending_reg_id) {
+            g_source_remove (priv->pending_reg_id);
+            priv->pending_reg_id = 0;
+        }
+    }
 }
 
 static gboolean
@@ -940,7 +1048,7 @@ reg_status_again (gpointer data)
 
     g_warn_if_fail (info == priv->pending_reg_info);
 
-    if (priv->pending_reg_id)
+    if (priv->pending_reg_info)
         get_registration_status (priv->primary, info);
 
     return FALSE;
@@ -1007,7 +1115,7 @@ get_reg_status_done (MMSerialPort *port,
 
     if (   reg_status >= 0
         && !reg_status_updated (self, reg_status, &info->error)
-        && priv->pending_reg_id) {
+        && priv->pending_reg_info) {
         g_clear_error (&info->error);
 
         /* Not registered yet; poll registration status again */
@@ -1039,8 +1147,23 @@ register_done (MMSerialPort *port,
                GError *error,
                gpointer user_data)
 {
-    /* Ignore errors here, get the actual registration status */
-    get_registration_status (port, (MMCallbackInfo *) user_data);
+    MMCallbackInfo *info = user_data;
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+
+    mm_callback_info_unref (info);
+
+    /* If the registration timed out (and thus pending_reg_info will be NULL)
+     * and the modem eventually got around to sending the response for the
+     * registration request then just ignore the response since the callback is
+     * already called.
+     */
+
+    if (priv->pending_reg_info) {
+        g_warn_if_fail (info == priv->pending_reg_info);
+
+        /* Ignore errors here, get the actual registration status */
+        get_registration_status (port, info);
+    }
 }
 
 static gboolean
@@ -1051,12 +1174,11 @@ registration_timed_out (gpointer data)
 
     g_warn_if_fail (info == priv->pending_reg_info);
 
-    priv->pending_reg_id = 0;
-    priv->pending_reg_info = NULL;
     priv->reg_status = MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE;
 
     info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_NETWORK_TIMEOUT);
-    mm_callback_info_schedule (info);
+    mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (info->modem));
+
     return FALSE;
 }
 
@@ -1083,6 +1205,24 @@ do_register (MMModemGsmNetwork *modem,
     else
         command = g_strdup ("+COPS=0,,");
 
+    /* Ref the callback info to ensure it stays alive for register_done() even
+     * if the timeout triggers and ends registration (which calls the callback
+     * and unrefs the callback info).  Some devices (hso) will delay the
+     * registration response until the registration is done (and thus
+     * unsolicited registration responses will arrive before the +COPS is
+     * complete).  Most other devices will return the +COPS response immediately
+     * and the unsolicited response (if any) at a later time.
+     *
+     * To handle both these cases, unsolicited registration responses will just
+     * remove the pending registration timeout but we let the +COPS command
+     * complete.  For those devices that delay the +COPS response (hso) the
+     * callback will be called from register_done().  For those devices that
+     * return the +COPS response immediately, we'll poll the registration state
+     * and call the callback from get_reg_status_done() in response to the
+     * polled response.  The registration timeout will only be triggered when
+     * the +COPS response is never received.
+     */
+    mm_callback_info_ref (info);
     mm_serial_port_queue_command (priv->primary, command, 120, register_done, info);
     g_free (command);
 }
@@ -1116,6 +1256,33 @@ get_registration_info (MMModemGsmNetwork *self,
     mm_callback_info_schedule (info);
 }
 
+void
+mm_generic_gsm_connect_complete (MMGenericGsm *modem,
+                                 GError *error,
+                                 MMCallbackInfo *info)
+{
+    MMGenericGsmPrivate *priv;
+
+    g_return_if_fail (modem != NULL);
+    g_return_if_fail (MM_IS_GENERIC_GSM (modem));
+    g_return_if_fail (info != NULL);
+
+    priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+
+    if (error) {
+        mm_generic_gsm_update_enabled_state (modem, FALSE, MM_MODEM_STATE_REASON_NONE);
+        info->error = g_error_copy (error);
+    } else {
+        /* Modem is connected; update the state */
+        mm_port_set_connected (priv->data, TRUE);
+        mm_modem_set_state (MM_MODEM (modem),
+                            MM_MODEM_STATE_CONNECTED,
+                            MM_MODEM_STATE_REASON_NONE);
+    }
+
+    mm_callback_info_schedule (info);
+}
+
 static void
 connect_report_done (MMSerialPort *port,
                      GString *response,
@@ -1123,13 +1290,28 @@ connect_report_done (MMSerialPort *port,
                      gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    GError *real_error;
 
-    if (!error && g_str_has_prefix (response->str, "+CEER: ")) {
-        g_free (info->error->message);
-        info->error->message = g_strdup (response->str + 7); /* skip the "+CEER: " */
+    /* If the CEER command was successful, copy that error reason into the
+     * callback's error.  If not, use the original error.
+     */
+
+    /* Have to do this little dance since mm_generic_gsm_connect_complete()
+     * copies the provided error into the callback info.
+     */
+    real_error = info->error;
+    info->error = NULL;
+
+    if (   !error
+        && g_str_has_prefix (response->str, "+CEER: ")
+        && (strlen (response->str) > 7)) {
+        /* copy the connect failure reason into the error */
+        g_free (real_error->message);
+        real_error->message = g_strdup (response->str + 7); /* skip the "+CEER: " */
     }
-    
-    mm_callback_info_schedule (info);
+
+    mm_generic_gsm_connect_complete (MM_GENERIC_GSM (info->modem), real_error, info);
+    g_error_free (real_error);
 }
 
 static void
@@ -1146,11 +1328,8 @@ connect_done (MMSerialPort *port,
         /* Try to get more information why it failed */
         priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
         mm_serial_port_queue_command (priv->primary, "+CEER", 3, connect_report_done, info);
-    } else {
-        /* Done */
-        mm_port_set_connected (priv->data, TRUE);
-        mm_callback_info_schedule (info);
-    }
+    } else
+        mm_generic_gsm_connect_complete (MM_GENERIC_GSM (info->modem), NULL, info);
 }
 
 static void
@@ -1165,6 +1344,8 @@ connect (MMModem *modem,
     guint32 cid = mm_generic_gsm_get_cid (MM_GENERIC_GSM (modem));
 
     info = mm_callback_info_new (modem, callback, user_data);
+
+    mm_modem_set_state (modem, MM_MODEM_STATE_CONNECTING, MM_MODEM_STATE_REASON_NONE);
 
     if (cid > 0) {
         GString *str;
@@ -1190,15 +1371,25 @@ disconnect_flash_done (MMSerialPort *port,
                        gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+    MMGenericGsm *self = MM_GENERIC_GSM (info->modem);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
 
     if (error) {
+        MMModemState prev_state;
+
+        /* Reset old state since the operation failed */
+        prev_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, MM_GENERIC_GSM_PREV_STATE_TAG));
+        mm_modem_set_state (MM_MODEM (info->modem),
+                            prev_state,
+                            MM_MODEM_STATE_REASON_NONE);
+
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
         return;
     }
 
     mm_port_set_connected (priv->data, FALSE);
+    mm_generic_gsm_update_enabled_state (self, FALSE, MM_MODEM_STATE_REASON_NONE);
     mm_callback_info_schedule (info);
 }
 
@@ -1209,11 +1400,21 @@ disconnect (MMModem *modem,
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
+    MMModemState state;
 
     /* First, reset the previously used CID */
     mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
 
     info = mm_callback_info_new (modem, callback, user_data);
+
+    /* Cache the previous state so we can reset it if the operation fails */
+    state = mm_modem_get_state (modem);
+    mm_callback_info_set_data (info,
+                               MM_GENERIC_GSM_PREV_STATE_TAG,
+                               GUINT_TO_POINTER (state),
+                               NULL);
+
+    mm_modem_set_state (modem, MM_MODEM_STATE_DISCONNECTING, MM_MODEM_STATE_REASON_NONE);
     mm_serial_port_flash (priv->primary, 1000, disconnect_flash_done, info);
 }
 
@@ -2056,6 +2257,8 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
     object_class->set_property = set_property;
     object_class->get_property = get_property;
     object_class->finalize = finalize;
+
+    klass->do_enable = real_do_enable;
 
     /* Properties */
     g_object_class_override_property (object_class,

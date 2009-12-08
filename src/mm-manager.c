@@ -43,8 +43,6 @@ static guint signals[LAST_SIGNAL] = { 0 };
 
 #define MM_MANAGER_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MANAGER, MMManagerPrivate))
 
-#define DBUS_PATH_TAG "dbus-path"
-
 typedef struct {
     DBusGConnection *connection;
     GUdevClient *udev;
