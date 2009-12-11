@@ -904,7 +904,7 @@ normalize_band (const char *long_band, int *out_class)
 }
 
 static int
-normalize_sid (const char *sid)
+convert_sid (const char *sid)
 {
     long int tmp_sid;
 
@@ -942,7 +942,12 @@ serving_system_done (MMSerialPort *port,
 
     num = sscanf (reply, "? , %d", &sid);
     if (num == 1) {
-        /* UTStarcom and Huawei modems that use IS-707-A format */
+        /* UTStarcom and Huawei modems that use IS-707-A format; note that
+         * this format obviously doesn't have other indicators like band and
+         * class and thus SID 0 will be reported as "no service" (see below).
+         */
+        class = 0;
+        band = 'Z';
         success = TRUE;
     } else {
         GRegex *r;
@@ -976,7 +981,7 @@ serving_system_done (MMSerialPort *port,
 
             /* sid */
             str = g_match_info_fetch (match_info, 3);
-            sid = normalize_sid (str);
+            sid = convert_sid (str);
             g_free (str);
 
             success = TRUE;
@@ -987,11 +992,28 @@ serving_system_done (MMSerialPort *port,
     }
 
     if (success) {
-        /* 99999 means unknown/no service */
+        gboolean class_ok = FALSE, band_ok = FALSE;
+
+        /* Normalize the SID */
         if (sid < 0 || sid > 32767)
             sid = 99999;
 
-        if (sid == 0 || sid == 99999) {
+        if (class == 1 || class == 2)
+            class_ok = TRUE;
+        if (band != 'Z')
+            band_ok = TRUE;
+
+        /* Return 'no service' if none of the elements of the +CSS response
+         * indicate that the modem has service.  Note that this allows SID 0
+         * when at least one of the other elements indicates service.
+         * Normally we'd treat SID 0 as 'no service' but some modems
+         * (Sierra 5725) sometimes return SID 0 even when registered.
+         */
+        if (sid == 0 && !class_ok && !band_ok)
+            sid = 99999;
+
+        /* 99999 means unknown/no service */
+        if (sid == 99999) {
             /* NOTE: update reg_state_css_response() if this error changes */
             info->error = g_error_new_literal (MM_MOBILE_ERROR,
                                                MM_MOBILE_ERROR_NO_NETWORK,
