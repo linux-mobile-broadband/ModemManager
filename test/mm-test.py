@@ -230,7 +230,9 @@ def gsm_connect(proxy, apn, user, password):
     # Modem.Simple interface
     simple = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_SIMPLE)
     try:
-        opts = {'apn': apn, 'number':"*99#"}
+        opts = {'number':"*99#"}
+        if apn is not None:
+            opts['apn'] = apn
         if user is not None:
             opts['username'] = user
         if password is not None:
@@ -252,7 +254,7 @@ while x < len(sys.argv):
         dump_private = True
     elif sys.argv[x] == "--connect":
         connect = True
-    elif sys.argv[x] == "--user":
+    elif (sys.argv[x] == "--user" or sys.argv[x] == "--username"):
         x += 1
         user = sys.argv[x]
     elif sys.argv[x] == "--apn":
