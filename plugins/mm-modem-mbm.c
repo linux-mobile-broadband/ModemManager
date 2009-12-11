@@ -407,23 +407,45 @@ do_enable (MMGenericGsm *self, MMModemFn callback, gpointer user_data)
         mm_serial_port_queue_command (primary, "*EMRDY?", 5, mbm_emrdy_done, info);
 }
 
+typedef struct {
+    MMModem *modem;
+    MMModemFn callback;
+    gpointer user_data;
+} DisableInfo;
+
+static void
+disable_creg_cmer_done (MMSerialPort *port,
+                        GString *response,
+                        GError *error,
+                        gpointer user_data)
+
+{
+    MMModem *parent_modem_iface;
+    DisableInfo *info = user_data;
+
+    parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (info->modem));
+    parent_modem_iface->disable (info->modem, info->callback, info->user_data);
+    g_free (info);
+}
+
 static void
 disable (MMModem *modem,
          MMModemFn callback,
          gpointer user_data)
 {
-    MMModem *parent_modem_iface;
     MMSerialPort *primary;
+    DisableInfo *info;
+
+    info = g_malloc0 (sizeof (DisableInfo));
+    info->callback = callback;
+    info->user_data = user_data;
+    info->modem = modem;
 
     primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
 
-    /* Random stuff that mbm apparently wants.  Are these really needed? */
-    mm_serial_port_queue_command (primary, "+CREG=0", 5, NULL, NULL);
-    mm_serial_port_queue_command (primary, "+CMER=0", 5, NULL, NULL);
-
-    parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (modem));
-    parent_modem_iface->disable (modem, callback, user_data);
+    /* Turn off unsolicited +CIEV signal strength indicator */
+    mm_serial_port_queue_command (primary, "+CREG=0;+CMER=0", 5, disable_creg_cmer_done, info);
 }
 
 static void
