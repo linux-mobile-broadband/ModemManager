@@ -730,6 +730,8 @@ mm_generic_cdma_update_evdo_quality (MMGenericCdma *self, guint32 quality)
     }
 }
 
+#define CSQ2_TRIED "csq?-tried"
+
 static void
 get_signal_quality_done (MMSerialPort *port,
                          GString *response,
@@ -740,9 +742,19 @@ get_signal_quality_done (MMSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     char *reply = response->str;
 
-    if (error)
-        info->error = g_error_copy (error);
-    else if (!strncmp (reply, "+CSQ: ", 6)) {
+    if (error) {
+        if (mm_callback_info_get_data (info, CSQ2_TRIED))
+            info->error = g_error_copy (error);
+        else {
+            /* Some modems want +CSQ, others want +CSQ?, and some of both types
+             * will return ERROR if they don't get the command they want.  So
+             * try the other command if the first one fails.
+             */
+            mm_callback_info_set_data (info, CSQ2_TRIED, GUINT_TO_POINTER (1), NULL);
+            mm_serial_port_queue_command (port, "+CSQ?", 3, get_signal_quality_done, info);
+            return;
+        }
+    } else if (!strncmp (reply, "+CSQ: ", 6)) {
         /* Got valid reply */
         int quality, ber;
 
