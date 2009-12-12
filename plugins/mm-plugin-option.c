@@ -105,6 +105,8 @@ grab_port (MMPluginBase *base,
     MMModem *modem = NULL;
     const char *name, *subsys, *devfile, *sysfs_path;
     guint32 caps;
+    int usbif;
+    MMPortType ptype = MM_PORT_TYPE_SECONDARY;
 
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
@@ -126,6 +128,15 @@ grab_port (MMPluginBase *base,
     subsys = g_udev_device_get_subsystem (port);
     name = g_udev_device_get_name (port);
 
+    /* This is the MM equivalent of NM commit 9d7f5b3d084eee2ccfff721c4beca3e3f34bdc50;
+     * Genuine Option NV devices are always supposed to use USB interface 0 as
+     * the modem/data port, per mail with Option engineers.  Only this port
+     * will emit responses to dialing commands.
+     */
+    usbif = g_udev_device_get_property_as_int (port, "ID_USB_INTERFACE_NUM");
+    if (usbif == 0)
+        ptype = MM_PORT_TYPE_PRIMARY;
+
     caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
     if (!existing) {
         if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
@@ -135,7 +146,7 @@ grab_port (MMPluginBase *base,
         }
 
         if (modem) {
-            if (!mm_modem_grab_port (modem, subsys, name, MM_PORT_TYPE_UNKNOWN, NULL, error)) {
+            if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error)) {
                 g_object_unref (modem);
                 return NULL;
             }
@@ -143,7 +154,7 @@ grab_port (MMPluginBase *base,
     } else {
         if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
             modem = existing;
-            if (!mm_modem_grab_port (modem, subsys, name, MM_PORT_TYPE_UNKNOWN, NULL, error))
+            if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error))
                 return NULL;
         }
     }
