@@ -347,27 +347,53 @@ registration_cleanup (MMGenericCdma *self, GQuark error_class, guint32 error_num
 }
 
 static void
+enable_all_done (MMModem *modem, GError *error, gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
+
+    if (error)
+        info->error = g_error_copy (error);
+    else {
+        /* Open up the second port, if one exists */
+        if (priv->secondary) {
+            if (!mm_serial_port_open (priv->secondary, &info->error)) {
+                g_assert (info->error);
+                goto out;
+            }
+        }
+
+        update_enabled_state (self, FALSE, MM_MODEM_STATE_REASON_NONE);
+    }
+
+out:
+    if (info->error) {
+        mm_modem_set_state (MM_MODEM (info->modem),
+                            MM_MODEM_STATE_DISABLED,
+                            MM_MODEM_STATE_REASON_NONE);
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+static void
 enable_error_reporting_done (MMSerialPort *port,
                              GString *response,
                              GError *error,
                              gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
+    MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
 
+    /* Just ignore errors, see comment in init_done() */
     if (error)
         g_warning ("Your CDMA modem does not support +CMEE command");
 
-    /* Open up the second port, if one exists */
-    if (priv->secondary) {
-        if (!mm_serial_port_open (priv->secondary, &info->error))
-            g_assert (info->error);
-    }
-
-    update_enabled_state (MM_GENERIC_CDMA (info->modem), FALSE, MM_MODEM_STATE_REASON_NONE);
-
-    /* Ignore errors, see FIXME in init_done() */
-    mm_callback_info_schedule (info);
+    if (MM_GENERIC_CDMA_GET_CLASS (self)->post_enable)
+        MM_GENERIC_CDMA_GET_CLASS (self)->post_enable (self, enable_all_done, info);
+    else
+        enable_all_done (MM_MODEM (self), NULL, info);
 }
 
 static void
@@ -439,34 +465,54 @@ enable (MMModem *modem,
 }
 
 static void
-disable_flash_done (MMSerialPort *port,
-                    GError *error,
-                    gpointer user_data)
+disable_set_previous_state (MMModem *modem, MMCallbackInfo *info)
+{
+    MMModemState prev_state;
+
+    /* Reset old state since the operation failed */
+    prev_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, MM_GENERIC_CDMA_PREV_STATE_TAG));
+    mm_modem_set_state (modem, prev_state, MM_MODEM_STATE_REASON_NONE);
+}
+
+static void
+disable_all_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
-    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
+    MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
 
     if (error) {
-        MMModemState prev_state;
-
-        /* Reset old state since the operation failed */
-        prev_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, MM_GENERIC_CDMA_PREV_STATE_TAG));
-        mm_modem_set_state (MM_MODEM (info->modem),
-                            prev_state,
-                            MM_MODEM_STATE_REASON_NONE);
-
+        disable_set_previous_state (MM_MODEM (modem), info);
         info->error = g_error_copy (error);
     } else {
-        mm_serial_port_close (port);
-        mm_modem_set_state (MM_MODEM (info->modem),
-                            MM_MODEM_STATE_DISABLED,
-                            MM_MODEM_STATE_REASON_NONE);
+        mm_serial_port_close (priv->primary);
+        mm_modem_set_state (modem, MM_MODEM_STATE_DISABLED, MM_MODEM_STATE_REASON_NONE);
 
         priv->cdma_1x_reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
         priv->evdo_reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     }
 
     mm_callback_info_schedule (info);
+}
+
+static void
+disable_flash_done (MMSerialPort *port,
+                    GError *error,
+                    gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
+
+    if (error) {
+        disable_set_previous_state (info->modem, info);
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+    } else {
+        if (MM_GENERIC_CDMA_GET_CLASS (self)->post_disable)
+            MM_GENERIC_CDMA_GET_CLASS (self)->post_disable (self, disable_all_done, info);
+        else
+            disable_all_done (MM_MODEM (self), NULL, info);
+    }
 }
 
 static void

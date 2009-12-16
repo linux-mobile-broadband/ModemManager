@@ -266,6 +266,50 @@ query_registration_state (MMGenericCdma *cdma,
                                   status_done, info);
 }
 
+static void
+pcstate_done (MMSerialPort *port,
+              GString *response,
+              GError *error,
+              gpointer user_data)
+{
+    /* Ignore errors for now; we're not sure if all Sierra CDMA devices support
+     * at!pcstate.
+     */
+    mm_callback_info_schedule ((MMCallbackInfo *) user_data);
+}
+
+static void
+post_enable (MMGenericCdma *cdma,
+             MMModemFn callback,
+             gpointer user_data)
+{
+    MMCallbackInfo *info;
+    MMSerialPort *primary;
+
+    info = mm_callback_info_new (MM_MODEM (cdma), callback, user_data);
+
+    primary = mm_generic_cdma_get_port (cdma, MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+
+    mm_serial_port_queue_command (primary, "!pcstate=1", 5, pcstate_done, info);
+}
+
+static void
+post_disable (MMGenericCdma *cdma,
+              MMModemFn callback,
+              gpointer user_data)
+{
+    MMCallbackInfo *info;
+    MMSerialPort *primary;
+
+    info = mm_callback_info_new (MM_MODEM (cdma), callback, user_data);
+
+    primary = mm_generic_cdma_get_port (cdma, MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+
+    mm_serial_port_queue_command (primary, "!pcstate=0", 5, pcstate_done, info);
+}
+
 /*****************************************************************************/
 
 static void
@@ -283,5 +327,7 @@ mm_modem_sierra_cdma_class_init (MMModemSierraCdmaClass *klass)
     g_type_class_add_private (object_class, sizeof (MMModemSierraCdmaPrivate));
 
     cdma_class->query_registration_state = query_registration_state;
+    cdma_class->post_enable = post_enable;
+    cdma_class->post_disable = post_disable;
 }
 

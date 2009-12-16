@@ -43,6 +43,20 @@ typedef struct {
     void (*query_registration_state) (MMGenericCdma *self,
                                       MMModemCdmaRegistrationStateFn callback,
                                       gpointer user_data);
+
+    /* Called after generic enable operations, but before the modem has entered
+     * the ENABLED state.
+     */
+    void (*post_enable) (MMGenericCdma *self,
+                         MMModemFn callback,
+                         gpointer user_data);
+
+    /* Called after generic disable operations, but before the modem has entered
+     * the DISABLED state.
+     */
+    void (*post_disable) (MMGenericCdma *self,
+                          MMModemFn callback,
+                          gpointer user_data);
 } MMGenericCdmaClass;
 
 GType mm_generic_cdma_get_type (void);
