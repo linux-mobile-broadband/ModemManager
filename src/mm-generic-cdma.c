@@ -800,13 +800,14 @@ get_signal_quality_done (MMSerialPort *port,
             mm_serial_port_queue_command (port, "+CSQ?", 3, get_signal_quality_done, info);
             return;
         }
-    } else if (!strncmp (reply, "+CSQ: ", 6)) {
-        /* Got valid reply */
+    } else {
         int quality, ber;
 
-        reply += 6;
+        /* Got valid reply */
+        if (!strncmp (reply, "+CSQ: ", 6))
+            reply += 6;
 
-        if (sscanf (reply, "%d,%d", &quality, &ber)) {
+        if (sscanf (reply, "%d, %d", &quality, &ber)) {
             /* 99 means unknown/no service */
             if (quality == 99) {
                 info->error = g_error_new_literal (MM_MOBILE_ERROR,
