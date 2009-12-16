@@ -68,6 +68,11 @@ guint32 mm_plugin_base_supports_task_get_probed_capabilities (MMPluginBaseSuppor
 void mm_plugin_base_supports_task_complete (MMPluginBaseSupportsTask *task,
                                             guint32 level);
 
+void mm_plugin_base_supports_task_set_custom_init_command (MMPluginBaseSupportsTask *task,
+                                                           const char *cmd,
+                                                           guint32 delay_seconds,
+                                                           guint32 max_tries,
+                                                           gboolean fail_if_timeout);
 
 #define MM_TYPE_PLUGIN_BASE            (mm_plugin_base_get_type ())
 #define MM_PLUGIN_BASE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_BASE, MMPluginBase))

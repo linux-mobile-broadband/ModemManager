@@ -95,6 +95,12 @@ typedef struct {
     char *probe_resp;
     GError *probe_error;
 
+    char *custom_init;
+    guint32 custom_init_max_tries;
+    guint32 custom_init_tries;
+    guint32 custom_init_delay_seconds;
+    gboolean custom_init_fail_if_timeout;
+
     MMSupportsPortResultFunc callback;
     gpointer callback_data;
 }  MMPluginBaseSupportsTaskPrivate;
@@ -198,6 +204,27 @@ mm_plugin_base_supports_task_complete (MMPluginBaseSupportsTask *task,
     priv->callback_data = NULL;
 }
 
+void
+mm_plugin_base_supports_task_set_custom_init_command (MMPluginBaseSupportsTask *task,
+                                                      const char *cmd,
+                                                      guint32 delay_seconds,
+                                                      guint32 max_tries,
+                                                      gboolean fail_if_timeout)
+{
+    MMPluginBaseSupportsTaskPrivate *priv;
+
+    g_return_if_fail (task != NULL);
+    g_return_if_fail (MM_IS_PLUGIN_BASE_SUPPORTS_TASK (task));
+
+    priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
+
+    g_free (priv->custom_init);
+    priv->custom_init = g_strdup (cmd);
+    priv->custom_init_max_tries = max_tries;
+    priv->custom_init_delay_seconds = delay_seconds;
+    priv->custom_init_fail_if_timeout = fail_if_timeout;
+}
+
 static void
 mm_plugin_base_supports_task_init (MMPluginBaseSupportsTask *self)
 {
@@ -216,6 +243,7 @@ supports_task_dispose (GObject *object)
     g_free (priv->driver);
     g_free (priv->probe_resp);
     g_clear_error (&(priv->probe_error));
+    g_free (priv->custom_init);
 
     if (priv->open_id)
         g_source_remove (priv->open_id);
@@ -467,10 +495,56 @@ parse_response (MMSerialPort *port,
     task_priv->probe_id = g_idle_add (handle_probe_response, task);
 }
 
+static void flash_done (MMSerialPort *port, GError *error, gpointer user_data);
+
+static void
+custom_init_response (MMSerialPort *port,
+                      GString *response,
+                      GError *error,
+                      gpointer user_data)
+{
+    MMPluginBaseSupportsTask *task = MM_PLUGIN_BASE_SUPPORTS_TASK (user_data);
+    MMPluginBaseSupportsTaskPrivate *task_priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
+
+    if (error) {
+        task_priv->custom_init_tries++;
+        if (task_priv->custom_init_tries < task_priv->custom_init_max_tries) {
+            /* Try the custom command again */
+            flash_done (port, NULL, user_data);
+            return;
+        } else if (task_priv->custom_init_fail_if_timeout) {
+            /* Fail the probe if the plugin wanted it and the command timed out */
+            if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_RESPONSE_TIMEOUT)) {
+                probe_complete (task);
+                return;
+            }
+        }
+    }
+
+    /* Otherwise proceed to probing */
+    mm_serial_port_queue_command (port, "+GCAP", 3, parse_response, user_data);
+}
+
 static void
 flash_done (MMSerialPort *port, GError *error, gpointer user_data)
 {
-    mm_serial_port_queue_command (port, "+GCAP", 3, parse_response, user_data);
+    MMPluginBaseSupportsTask *task = MM_PLUGIN_BASE_SUPPORTS_TASK (user_data);
+    MMPluginBaseSupportsTaskPrivate *task_priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
+    guint32 delay_secs = task_priv->custom_init_delay_seconds;
+
+    /* Send the custom init command if any */
+    if (task_priv->custom_init) {
+        if (!delay_secs)
+            delay_secs = 3;
+        mm_serial_port_queue_command (port,
+                                      task_priv->custom_init,
+                                      delay_secs,
+                                      custom_init_response,
+                                      user_data);
+    } else {
+        /* Otherwise start normal probing */
+        custom_init_response (port, NULL, NULL, user_data);
+    }
 }
 
 static gboolean
