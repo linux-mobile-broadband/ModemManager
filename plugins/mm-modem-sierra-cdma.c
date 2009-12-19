@@ -35,6 +35,7 @@ G_DEFINE_TYPE (MMModemSierraCdma, mm_modem_sierra_cdma, MM_TYPE_GENERIC_CDMA)
 
 typedef enum {
     SYS_MODE_UNKNOWN,
+    SYS_MODE_NO_SERVICE,
     SYS_MODE_CDMA_1X,
     SYS_MODE_EVDO_REV0,
     SYS_MODE_EVDO_REVA
@@ -75,6 +76,7 @@ mm_modem_sierra_cdma_new (const char *device,
 #define SYS_MODE_EVDO_TAG "HDR"
 #define SYS_MODE_1X_TAG "1x"
 #define EVDO_REV_TAG "HDR Revision:"
+#define SID_TAG "SID:"
 
 static gboolean
 get_roam_value (const char *reply, const char *tag, gboolean *roaming)
@@ -99,6 +101,14 @@ get_roam_value (const char *reply, const char *tag, gboolean *roaming)
     return FALSE;
 }
 
+static gboolean
+sys_mode_has_service (SysMode mode)
+{
+    return (   mode == SYS_MODE_CDMA_1X
+            || mode == SYS_MODE_EVDO_REV0
+            || mode == SYS_MODE_EVDO_REVA);
+}
+
 static void
 status_done (MMSerialPort *port,
              GString *response,
@@ -109,6 +119,7 @@ status_done (MMSerialPort *port,
     MMModemSierraCdmaPrivate *priv = MM_MODEM_SIERRA_CDMA_GET_PRIVATE (info->modem);
     char **lines, **iter;
     gboolean registered = FALSE;
+    gboolean have_sid = FALSE;
     SysMode evdo_mode = SYS_MODE_UNKNOWN;
     SysMode sys_mode = SYS_MODE_UNKNOWN;
     gboolean cdma_1x_set = FALSE, evdo_set = FALSE;
@@ -129,10 +140,10 @@ status_done (MMSerialPort *port,
      * while of course 1x parts only report 1x status.  Some modems also do not
      * report the Roaming information (MP 555 GPS).
      * 
+     * AT!STATUS responses:
      *
      * Unregistered MC5725:
      * -----------------------
-     * at!status
      * Current band: PCS CDMA
      * Current channel: 350
      * SID: 0  NID: 0  1xRoam: 0 HDRRoam: 0
@@ -140,8 +151,6 @@ status_done (MMSerialPort *port,
      * Pilot NOT acquired
      * Modem has NOT registered
      * 
-     * OK
-     *
      * Registered MC5725:
      * -----------------------
      * Current band: Cellular Sleep
@@ -151,6 +160,31 @@ status_done (MMSerialPort *port,
      * Pilot acquired
      * Modem has registered
      * HDR Revision: A
+     *
+     * Unregistered AC580:
+     * -----------------------
+     * Current band: PCS CDMA
+     * Current channel: 350
+     * SID: 0 NID: 0  Roaming: 0
+     * Temp: 39  State: 100  Scan Mode: 0
+     * Pilot NOT acquired
+     * Modem has NOT registered
+     *
+     * Registered AC580:
+     * -----------------------
+     * Current band: Cellular Sleep
+     * Current channel: 548
+     * SID: 26  NID: 1  Roaming: 1
+     * Temp: 39  State: 200  Scan Mode: 0
+     * Pilot Acquired
+     * Modem has registered
+     */
+
+    /* We have to handle the two formats slightly differently; for newer formats
+     * with "Sys Mode", we consider the modem registered if the Sys Mode is not
+     * "NO SRV".  The explicit registration status is just icing on the cake.
+     * For older formats (no "Sys Mode") we treat the modem as registered if
+     * the SID is non-zero.
      */
 
     for (iter = lines; iter && *iter; iter++) {
@@ -194,7 +228,7 @@ status_done (MMSerialPort *port,
             while (*p && isspace (*p))
                 p++;
             if (!strncmp (p, SYS_MODE_NO_SERVICE_TAG, strlen (SYS_MODE_NO_SERVICE_TAG)))
-                sys_mode = SYS_MODE_UNKNOWN;
+                sys_mode = SYS_MODE_NO_SERVICE;
             else if (!strncmp (p, SYS_MODE_EVDO_TAG, strlen (SYS_MODE_EVDO_TAG)))
                 sys_mode = SYS_MODE_EVDO_REV0;
             else if (!strncmp (p, SYS_MODE_1X_TAG, strlen (SYS_MODE_1X_TAG)))
@@ -212,19 +246,27 @@ status_done (MMSerialPort *port,
             else if (*p == '0')
                 evdo_mode = SYS_MODE_EVDO_REV0;
         }
+
+        /* SID */
+        p = strstr (*iter, SID_TAG);
+        if (p) {
+            p += strlen (SID_TAG);
+            while (*p && isspace (*p))
+                p++;
+            if (isdigit (*p) && (*p != '0'))
+                have_sid = TRUE;
+        }
     }
 
-    if (!registered) {
-        mm_generic_cdma_query_reg_state_set_callback_1x_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
-        mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
-    } else {
-        /* Update current system mode */
-        if (sys_mode == SYS_MODE_EVDO_REV0 || sys_mode == SYS_MODE_EVDO_REVA) {
-            /* Prefer the explicit EVDO mode from EVDO_REV_TAG */
+    /* Update current system mode */
+    if (sys_mode == SYS_MODE_EVDO_REV0 || sys_mode == SYS_MODE_EVDO_REVA) {
+        /* Prefer the explicit EVDO mode from EVDO_REV_TAG */
+        if (evdo_mode != SYS_MODE_UNKNOWN)
             sys_mode = evdo_mode;
-        }
-        priv->sys_mode = sys_mode;
+    }
+    priv->sys_mode = sys_mode;
 
+    if (registered || have_sid || sys_mode_has_service (sys_mode)) {
         /* As a backup, if for some reason the registration states didn't get
          * figured out by parsing the status info, set some generic registration
          * states here.
@@ -235,6 +277,10 @@ status_done (MMSerialPort *port,
         /* Ensure EVDO registration mode is set if we're at least in EVDO mode */
         if (!evdo_set && (sys_mode == SYS_MODE_EVDO_REV0 || sys_mode == SYS_MODE_EVDO_REVA))
             mm_generic_cdma_query_reg_state_set_callback_1x_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED);
+    } else {
+        /* Not registered */
+        mm_generic_cdma_query_reg_state_set_callback_1x_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+        mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
     }
 
 done:
