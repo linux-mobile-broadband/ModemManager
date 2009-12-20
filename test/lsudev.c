@@ -95,7 +95,7 @@ dump_device_and_parent (GUdevDevice *device, guint indent)
 	println (indent, "Properties:");
 
 	/* Get longest property name length for alignment */
-	list = g_udev_device_get_property_keys (device);
+	list = (const char **) g_udev_device_get_property_keys (device);
 	for (iter = list; iter && *iter; iter++) {
 		if (strlen (*iter) > namelen)
 			namelen = strlen (*iter);
