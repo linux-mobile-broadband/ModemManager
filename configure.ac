@@ -39,6 +39,13 @@ AC_SUBST(UDEV_BASE_DIR)
 GLIB_GENMARSHAL=`pkg-config --variable=glib_genmarshal glib-2.0`
 AC_SUBST(GLIB_GENMARSHAL)
 
+if test -n "$with_pppd_plugin_dir" ; then
+	PPPD_PLUGIN_DIR="$with_pppd_plugin_dir"
+else
+	PPPD_PLUGIN_DIR="${libdir}/pppd/2.4.4"
+fi
+AC_SUBST(PPPD_PLUGIN_DIR)
+
 AC_ARG_ENABLE(more-warnings,
 AS_HELP_STRING([--enable-more-warnings], [Maximum compiler warnings]), set_more_warnings="$enableval",set_more_warnings=yes)
 AC_MSG_CHECKING(for more warnings, including -Werror)

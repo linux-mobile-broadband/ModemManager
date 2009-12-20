@@ -15,9 +15,7 @@
 # Copyright (C) 2009 Red Hat, Inc.
 #
 
-import sys
-import dbus
-import time
+import sys, dbus, time, os, string, subprocess
 
 DBUS_INTERFACE_PROPERTIES='org.freedesktop.DBus.Properties'
 MM_DBUS_SERVICE='org.freedesktop.ModemManager'
@@ -87,8 +85,10 @@ def cdma_connect(proxy, user, password):
     try:
         simple.Connect({'number':"#777"}, timeout=60)
         print "\nConnected!"
+        return True
     except Exception, e:
         print "Error connecting: %s" % e
+    return False
 
 
 def get_gsm_network_mode(modem):
@@ -156,7 +156,7 @@ def get_gsm_band(modem):
     print "Band: %s" % band
 
 
-def gsm_inspect(proxy, dump_private):
+def gsm_inspect(proxy, dump_private, do_scan):
     # Gsm.Card interface
     card = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_GSM_CARD)
 
@@ -182,6 +182,9 @@ def gsm_inspect(proxy, dump_private):
         print "Signal quality: %d" % quality
     except dbus.exceptions.DBusException, e:
         print "Error reading signal quality: %s" % e
+
+    if not do_scan:
+        return
 
     print "Scanning..."
     try:
@@ -239,8 +242,109 @@ def gsm_connect(proxy, apn, user, password):
             opts['password'] = password
         simple.Connect(opts, timeout=120)
         print "\nConnected!"
+        return True
     except Exception, e:
         print "Error connecting: %s" % e
+    return False
+
+def pppd_find():
+    paths = ["/usr/local/sbin/pppd", "/usr/sbin/pppd", "/sbin/pppd"]
+    for p in paths:
+        if os.path.exists(p):
+            return p
+    return None
+
+def ppp_start(device, user, password, tmpfile):
+    path = pppd_find()
+    if not path:
+        return None
+
+    args = [path]
+    args += ["nodetach"]
+    args += ["lock"]
+    args += ["nodefaultroute"]
+    args += ["debug"]
+    if user:
+        args += ["user"]
+        args += [user]
+    args += ["noipdefault"]
+    args += ["115200"]
+    args += ["noauth"]
+    args += ["crtscts"]
+    args += ["modem"]
+    args += ["usepeerdns"]
+    args += ["ipparam"]
+
+    ipparam = ""
+    if user:
+        ipparam += user
+    ipparam += "+"
+    if password:
+        ipparam += password
+    ipparam += "+"
+    ipparam += tmpfile
+    args += [ipparam]
+
+    args += ["plugin"]
+    args += ["mm-test-pppd-plugin.so"]
+
+    args += [device]
+
+    return subprocess.Popen(args, close_fds=True, cwd="/", env={})
+
+def ppp_wait(p, tmpfile):
+    i = 0
+    while p.poll() == None and i < 30:
+        time.sleep(1)
+        if os.path.exists(tmpfile):
+            f = open(tmpfile, 'r')
+            stuff = f.read(500)
+            idx = string.find(stuff, "DONE")
+            f.close()
+            if idx >= 0:
+                return True
+        i += 1
+    return False
+
+def configure_iface(tmpfile):
+    addr = None
+    gw = None
+    iface = None
+    dns1 = None
+    dns2 = None
+
+    f = open(tmpfile, 'r')
+    lines = f.readlines()
+    for l in lines:
+        if l.startswith("addr"):
+            addr = l[len("addr"):].strip()
+        if l.startswith("gateway"):
+            gw = l[len("gateway"):].strip()
+        if l.startswith("iface"):
+            iface = l[len("iface"):].strip()
+        if l.startswith("dns1"):
+            dns1 = l[len("dns1"):].strip()
+        if l.startswith("dns2"):
+            dns2 = l[len("dns2"):].strip()
+    f.close()
+
+    print "\n******************************"
+    print "iface: %s" % iface
+    print "addr:  %s" % addr
+    print "gw:    %s" % gw
+    print "dns1:  %s" % dns1
+    print "dns2:  %s" % dns2
+
+    ifconfig = ["ifconfig", iface, "%s/32" % addr, "dstaddr", gw]
+    print " ".join(ifconfig)
+    print "\n******************************"
+
+    subprocess.call(ifconfig)
+
+def ppp_stop(p):
+    import signal
+    p.send_signal(signal.SIGTERM)
+    p.wait()
 
 
 dump_private = False
@@ -248,6 +352,8 @@ connect = False
 apn = None
 user = None
 password = None
+do_ip = False
+do_scan = True
 x = 1
 while x < len(sys.argv):
     if sys.argv[x] == "--private":
@@ -263,6 +369,10 @@ while x < len(sys.argv):
     elif sys.argv[x] == "--password":
         x += 1
         password = sys.argv[x]
+    elif sys.argv[x] == "--ip":
+        do_ip = True
+    elif sys.argv[x] == "--no-scan":
+        do_scan = False
     x += 1
 
 bus = dbus.SystemBus()
@@ -277,6 +387,9 @@ if not modems:
     sys.exit(1)
 
 for m in modems:
+    connect_success = False
+    data_device = None
+
     proxy = bus.get_object(MM_DBUS_SERVICE, m)
 
     # Properties
@@ -292,11 +405,17 @@ for m in modems:
 
     print "Driver: '%s'" % (props_iface.Get(MM_DBUS_INTERFACE_MODEM, 'Driver'))
     print "Modem device: '%s'" % (props_iface.Get(MM_DBUS_INTERFACE_MODEM, 'MasterDevice'))
-    print "Data device: '%s'" % (props_iface.Get(MM_DBUS_INTERFACE_MODEM, 'Device'))
+    data_device = props_iface.Get(MM_DBUS_INTERFACE_MODEM, 'Device')
+    print "Data device: '%s'" % data_device
 
     # Modem interface
     modem = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM)
-    modem.Enable(True)
+
+    try:
+        modem.Enable(True)
+    except dbus.exceptions.DBusException, e:
+        print "Error enabling modem: %s" % e
+        sys.exit(1)
 
     info = modem.GetInfo()
     print "Vendor:  %s" % info[0]
@@ -304,14 +423,31 @@ for m in modems:
     print "Version: %s" % info[2]
 
     if type == 1:
-        gsm_inspect(proxy, dump_private)
+        gsm_inspect(proxy, dump_private, do_scan)
         if connect == True:
-            gsm_connect(proxy, apn, user, password)
+            connect_success = gsm_connect(proxy, apn, user, password)
     elif type == 2:
         cdma_inspect(proxy, dump_private)
         if connect == True:
-            cdma_connect(proxy, user, password)
+            connect_success = cdma_connect(proxy, user, password)
     print
+
+    if connect_success and do_ip:
+        tmpfile = "/tmp/mm-test-%d.tmp" % os.getpid()
+        try:
+            p = ppp_start(data_device, user, password, tmpfile)
+            if ppp_wait(p, tmpfile):
+                configure_iface(tmpfile)
+                time.sleep(30)
+            ppp_stop(p)
+            modem.Disconnect()
+        except Exception, e:
+            print "Error handling PPP: %s" % e
+
+        try:
+            os.remove(tmpfile)
+        except:
+            pass
 
     time.sleep(5)
 
