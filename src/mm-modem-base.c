@@ -210,6 +210,7 @@ set_property (GObject *object, guint prop_id,
         break;
     case MM_MODEM_PROP_VALID:
     case MM_MODEM_PROP_TYPE:
+    case MM_MODEM_PROP_ENABLED:
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -247,6 +248,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case MM_MODEM_PROP_VALID:
         g_value_set_boolean (value, priv->valid);
+        break;
+    case MM_MODEM_PROP_ENABLED:
+        g_value_set_boolean (value, priv->state >= MM_MODEM_STATE_ENABLED);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -311,5 +315,9 @@ mm_modem_base_class_init (MMModemBaseClass *klass)
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_VALID,
                                       MM_MODEM_VALID);
+
+    g_object_class_override_property (object_class,
+                                      MM_MODEM_PROP_ENABLED,
+                                      MM_MODEM_ENABLED);
 }
 

@@ -52,6 +52,7 @@ typedef enum {
 #define MM_MODEM_DRIVER        "driver"
 #define MM_MODEM_TYPE          "type"
 #define MM_MODEM_IP_METHOD     "ip-method"
+#define MM_MODEM_ENABLED       "enabled"
 #define MM_MODEM_VALID         "valid"      /* not exported */
 #define MM_MODEM_PLUGIN        "plugin"     /* not exported */
 #define MM_MODEM_STATE         "state"      /* not exported */
@@ -75,6 +76,7 @@ typedef enum {
     MM_MODEM_PROP_VALID,       /* Not exported */
     MM_MODEM_PROP_PLUGIN,      /* Not exported */
     MM_MODEM_PROP_STATE,       /* Not exported */
+    MM_MODEM_PROP_ENABLED
 } MMModemProp;
 
 typedef struct _MMModem MMModem;

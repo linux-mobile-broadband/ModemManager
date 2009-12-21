@@ -88,6 +88,12 @@
       </tp:docstring>
     </property>
 
+    <property name="Enabled" type="b" access="read">
+      <tp:docstring>
+        TRUE if the modem is enabled (ie, powered and usable), FALSE if it is disabled.
+      </tp:docstring>
+    </property>
+
     <property name="IpMethod" type="u" access="read" tp:type="MM_MODEM_IP_METHOD">
       <tp:docstring>
         The IP configuration method.
