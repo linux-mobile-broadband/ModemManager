@@ -15,7 +15,7 @@
 # Copyright (C) 2009 Red Hat, Inc.
 #
 
-import sys, dbus, time, os, string, subprocess
+import sys, dbus, time, os, string, subprocess, socket
 
 DBUS_INTERFACE_PROPERTIES='org.freedesktop.DBus.Properties'
 MM_DBUS_SERVICE='org.freedesktop.ModemManager'
@@ -306,7 +306,52 @@ def ppp_wait(p, tmpfile):
         i += 1
     return False
 
-def configure_iface(tmpfile):
+def ppp_stop(p):
+    import signal
+    p.send_signal(signal.SIGTERM)
+    p.wait()
+
+def ntop_helper(ip):
+    ip = socket.ntohl(ip)
+    n1 = ip >> 24 & 0xFF
+    n2 = ip >> 16 & 0xFF
+    n3 = ip >> 8 & 0xFF
+    n4 = ip & 0xFF
+    a = "%c%c%c%c" % (n1, n2, n3, n4)
+    return socket.inet_ntop(socket.AF_INET, a)
+
+def static_start(iface, modem):
+    (addr_num, dns1_num, dns2_num, dns3_num) = modem.GetIP4Config()
+    addr = ntop_helper(addr_num)
+    dns1 = ntop_helper(dns1_num)
+    dns2 = ntop_helper(dns2_num)
+    configure_iface(iface, addr, 0, dns1, dns2)
+
+def down_iface(iface):
+    ip = ["ip", "addr", "flush", "dev", iface]
+    print " ".join(ip)
+    subprocess.call(ip)
+    ip = ["ip", "link", "set", iface, "down"]
+    print " ".join(ip)
+    subprocess.call(ip)
+
+def configure_iface(iface, addr, gw, dns1, dns2):
+    print "\n\n******************************"
+    print "iface: %s" % iface
+    print "addr:  %s" % addr
+    print "gw:    %s" % gw
+    print "dns1:  %s" % dns1
+    print "dns2:  %s" % dns2
+
+    ifconfig = ["ifconfig", iface, "%s/32" % addr]
+    if gw != 0:
+        ifconfig += ["pointopoint", gw]
+    print " ".join(ifconfig)
+    print "\n******************************\n"
+
+    subprocess.call(ifconfig)
+
+def file_configure_iface(tmpfile):
     addr = None
     gw = None
     iface = None
@@ -328,23 +373,17 @@ def configure_iface(tmpfile):
             dns2 = l[len("dns2"):].strip()
     f.close()
 
-    print "\n******************************"
-    print "iface: %s" % iface
-    print "addr:  %s" % addr
-    print "gw:    %s" % gw
-    print "dns1:  %s" % dns1
-    print "dns2:  %s" % dns2
+    configure_iface(iface, addr, gw, dns1, dns2)
+    return iface
 
-    ifconfig = ["ifconfig", iface, "%s/32" % addr, "dstaddr", gw]
-    print " ".join(ifconfig)
-    print "\n******************************"
-
-    subprocess.call(ifconfig)
-
-def ppp_stop(p):
-    import signal
-    p.send_signal(signal.SIGTERM)
-    p.wait()
+def try_ping(iface):
+    cmd = ["ping", "-I", iface, "-c", "4", "-i", "3", "-w", "20", "4.2.2.1"]
+    print " ".join(cmd)
+    retcode = subprocess.call(cmd)
+    if retcode != 0:
+        print "PING: failed"
+    else:
+        print "PING: success"
 
 
 dump_private = False
@@ -371,6 +410,9 @@ while x < len(sys.argv):
         password = sys.argv[x]
     elif sys.argv[x] == "--ip":
         do_ip = True
+        if os.geteuid() != 0:
+            print "You probably want to be root to use --ip"
+            sys.exit(1)
     elif sys.argv[x] == "--no-scan":
         do_scan = False
     x += 1
@@ -434,20 +476,48 @@ for m in modems:
 
     if connect_success and do_ip:
         tmpfile = "/tmp/mm-test-%d.tmp" % os.getpid()
+        success = False
         try:
-            p = ppp_start(data_device, user, password, tmpfile)
-            if ppp_wait(p, tmpfile):
-                configure_iface(tmpfile)
-                time.sleep(30)
-            ppp_stop(p)
+            ip_method = props_iface.Get(MM_DBUS_INTERFACE_MODEM, 'IpMethod')
+            if ip_method == 0:
+                # ppp
+                p = ppp_start(data_device, user, password, tmpfile)
+                if ppp_wait(p, tmpfile):
+                    data_device = file_configure_iface(tmpfile)
+                    success = True
+            elif ip_method == 1:
+                # static
+                static_start(data_device, modem)
+                success = True
+            elif ip_method == 2:
+                # dhcp
+                pass
+        except Exception, e:
+            print "Error setting up IP: %s" % e
+
+        if success:
+            try_ping(data_device)
+            print "Waiting for 30s..."
+            time.sleep(30)
+
+        print "Disconnecting..."
+        try:
+            if ip_method == 0:
+                ppp_stop(p)
+                try:
+                    os.remove(tmpfile)
+                except:
+                    pass
+            elif ip_method == 1:
+                # static
+                down_iface(data_device)
+            elif ip_method == 2:
+                # dhcp
+                down_iface(data_device)
+
             modem.Disconnect()
         except Exception, e:
-            print "Error handling PPP: %s" % e
-
-        try:
-            os.remove(tmpfile)
-        except:
-            pass
+            print "Error tearing down IP: %s" % e
 
     time.sleep(5)
 
