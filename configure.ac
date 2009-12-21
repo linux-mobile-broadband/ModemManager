@@ -39,6 +39,18 @@ AC_SUBST(UDEV_BASE_DIR)
 GLIB_GENMARSHAL=`pkg-config --variable=glib_genmarshal glib-2.0`
 AC_SUBST(GLIB_GENMARSHAL)
 
+# PPPD
+AC_CHECK_HEADERS(pppd/pppd.h, have_pppd_headers="yes", have_pppd_headers="no")
+AM_CONDITIONAL(HAVE_PPPD_H, test "x$have_pppd_headers" = "xyes")
+case $have_pppd_headers in
+    yes) ;;
+    *)
+        have_pppd_headers=no
+        ;;
+esac
+
+AC_ARG_WITH([pppd-plugin-dir], AS_HELP_STRING([--with-pppd-plugin-dir=DIR], [path to the pppd plugins directory]))
+
 if test -n "$with_pppd_plugin_dir" ; then
 	PPPD_PLUGIN_DIR="$with_pppd_plugin_dir"
 else
@@ -62,7 +74,7 @@ if test "$GCC" = "yes" -a "$set_more_warnings" != "no"; then
 		AC_MSG_CHECKING([whether gcc understands $option])
 		AC_TRY_COMPILE([], [],
 			has_option=yes,
-			has_option=no,)
+			has_option=no)
 		if test $has_option = no; then
 			CFLAGS="$SAVE_CFLAGS"
 		fi
@@ -93,3 +105,14 @@ test/Makefile
 introspection/Makefile
 ])
 AC_OUTPUT
+
+echo
+echo Building with D-Bus system directory: ${DBUS_SYS_DIR}
+echo
+echo Building with udev base directory: ${UDEV_BASE_DIR}
+echo
+echo Building documentation: ${with_docs}
+echo
+echo Building PPP-enabled tests: ${have_pppd_headers}
+echo
+

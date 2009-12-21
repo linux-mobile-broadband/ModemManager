@@ -1,3 +1,5 @@
+if HAVE_PPPD_H
+
 pppd_plugindir = $(PPPD_PLUGIN_DIR)
 pppd_plugin_LTLIBRARIES = mm-test-pppd-plugin.la
 
@@ -7,6 +9,8 @@ mm_test_pppd_plugin_la_SOURCES = \
 mm_test_pppd_plugin_la_CPPFLAGS = $(MM_CFLAGS)
 mm_test_pppd_plugin_la_LDFLAGS = -module -avoid-version
 mm_test_pppd_plugin_la_LIBADD = $(MM_LIBS)
+
+endif
 
 noinst_PROGRAMS = lsudev
 lsudev_SOURCES = lsudev.c
