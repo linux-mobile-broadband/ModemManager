@@ -1,6 +1,25 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
 <node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
+
+  <interface name="org.freedesktop.DBus.Properties">
+    <signal name="MmPropertiesChanged">
+      <tp:docstring>
+	One or more properties' values changed.
+      </tp:docstring>
+      <arg name="interface" type="s">
+	<tp:docstring>
+	  The D-Bus interface of the changed properties.
+	</tp:docstring>
+      </arg>
+      <arg name="properties" type="a{sv}">
+	<tp:docstring>
+	  The changed property names and their new values.
+	</tp:docstring>
+      </arg>
+    </signal>
+  </interface>
+
   <interface name="org.freedesktop.ModemManager.Modem">
     <method name="Enable">
       <tp:docstring>

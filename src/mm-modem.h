@@ -47,6 +47,8 @@ typedef enum {
 #define MM_IS_MODEM(obj)   (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_MODEM))
 #define MM_MODEM_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_MODEM, MMModem))
 
+#define MM_MODEM_DBUS_INTERFACE "org.freedesktop.ModemManager.Modem"
+
 #define MM_MODEM_DATA_DEVICE   "device"
 #define MM_MODEM_MASTER_DEVICE "master-device"
 #define MM_MODEM_DRIVER        "driver"

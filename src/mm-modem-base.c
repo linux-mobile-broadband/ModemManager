@@ -24,6 +24,7 @@
 #include "mm-serial-port.h"
 #include "mm-errors.h"
 #include "mm-options.h"
+#include "mm-properties-changed-signal.h"
 
 static void modem_init (MMModem *modem_class);
 
@@ -176,6 +177,10 @@ mm_modem_base_init (MMModemBase *self)
     MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (self);
 
     priv->ports = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
+
+    mm_properties_changed_signal_register_property (G_OBJECT (self),
+                                                    MM_MODEM_ENABLED,
+                                                    MM_MODEM_DBUS_INTERFACE);
 }
 
 static void
@@ -183,15 +188,26 @@ modem_init (MMModem *modem_class)
 {
 }
 
+static gboolean
+is_enabled (MMModemState state)
+{
+    return (state >= MM_MODEM_STATE_ENABLED);
+}
+
 static void
 set_property (GObject *object, guint prop_id,
               const GValue *value, GParamSpec *pspec)
 {
     MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (object);
+    gboolean old_enabled;
 
     switch (prop_id) {
     case MM_MODEM_PROP_STATE:
+        /* Ensure we update the 'enabled' property when the state changes */
+        old_enabled = is_enabled (priv->state);
         priv->state = g_value_get_uint (value);
+        if (old_enabled != is_enabled (priv->state))
+            g_object_notify (object, MM_MODEM_ENABLED);
         break;
     case MM_MODEM_PROP_DRIVER:
         /* Construct only */
@@ -250,7 +266,7 @@ get_property (GObject *object, guint prop_id,
         g_value_set_boolean (value, priv->valid);
         break;
     case MM_MODEM_PROP_ENABLED:
-        g_value_set_boolean (value, priv->state >= MM_MODEM_STATE_ENABLED);
+        g_value_set_boolean (value, is_enabled (priv->state));
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -319,5 +335,7 @@ mm_modem_base_class_init (MMModemBaseClass *klass)
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_ENABLED,
                                       MM_MODEM_ENABLED);
+
+    mm_properties_changed_signal_new (object_class);
 }
 
