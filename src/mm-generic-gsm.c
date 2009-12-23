@@ -537,11 +537,13 @@ disable_done (MMSerialPort *port,
               gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
 
     mm_serial_port_close (port);
     mm_modem_set_state (MM_MODEM (info->modem),
                         MM_MODEM_STATE_DISABLED,
                         MM_MODEM_STATE_REASON_NONE);
+    priv->reg_status = MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN;
     mm_callback_info_schedule (info);
 }
 
