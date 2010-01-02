@@ -439,6 +439,10 @@ mm_serial_port_send_command (MMSerialPort *self,
 
     serial_debug (self, "-->", priv->command->str, -1);
 
+    /* Only accept about 3 seconds of EAGAIN */
+    if (priv->send_delay > 0)
+        eagain_count = 3000000 / priv->send_delay;
+
     s = priv->command->str;
     while (*s) {
         status = write (priv->fd, s, 1);
