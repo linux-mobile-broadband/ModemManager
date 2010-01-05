@@ -1,3 +1,16 @@
+SUBDIRS=. tests
+
+noinst_LTLIBRARIES = libmodem-helpers.la
+
+libmodem_helpers_la_CPPFLAGS = \
+	$(MM_CFLAGS)
+
+libmodem_helpers_la_SOURCES = \
+	mm-errors.c \
+	mm-errors.h \
+	mm-modem-helpers.c \
+	mm-modem-helpers.h
+
 sbin_PROGRAMS = modem-manager
 
 modem_manager_CPPFLAGS = \
@@ -9,14 +22,13 @@ modem_manager_CPPFLAGS = \
 modem_manager_LDADD = \
 	$(MM_LIBS) \
 	$(GUDEV_LIBS) \
-	$(top_builddir)/marshallers/libmarshallers.la
+	$(top_builddir)/marshallers/libmarshallers.la \
+	$(builddir)/libmodem-helpers.la
 
 modem_manager_SOURCES = \
 	main.c \
 	mm-callback-info.c \
 	mm-callback-info.h \
-	mm-errors.c \
-	mm-errors.h \
 	mm-manager.c \
 	mm-manager.h \
 	mm-modem.c \

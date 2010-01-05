@@ -96,10 +96,25 @@ case $with_docs in
                ;;
 esac
 
+dnl
+dnl Tests
+dnl
+AC_ARG_WITH(tests, AS_HELP_STRING([--with-tests], [Build ModemManager tests]))
+AM_CONDITIONAL(WITH_TESTS, test "x$with_tests" = "xyes")
+case $with_tests in
+    yes)
+        with_tests=yes
+        ;;
+    *)
+        with_tests=no
+        ;;
+esac
+
 AC_CONFIG_FILES([
 Makefile
 marshallers/Makefile
 src/Makefile
+src/tests/Makefile
 plugins/Makefile
 test/Makefile
 introspection/Makefile

@@ -27,6 +27,7 @@
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 #include "mm-serial-parsers.h"
+#include "mm-modem-helpers.h"
 
 static void modem_init (MMModem *modem_class);
 static void modem_gsm_card_init (MMModemGsmCard *gsm_card_class);
@@ -1432,122 +1433,22 @@ gsm_network_scan_invoke (MMCallbackInfo *info)
 }
 
 static void
-destroy_scan_data (gpointer data)
-{
-    GPtrArray *results = (GPtrArray *) data;
-
-    g_ptr_array_foreach (results, (GFunc) g_hash_table_destroy, NULL);
-    g_ptr_array_free (results, TRUE);
-}
-
-static void
 scan_done (MMSerialPort *port,
            GString *response,
            GError *error,
            gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    char *reply = response->str;
+    GPtrArray *results;
 
     if (error)
         info->error = g_error_copy (error);
-    else if (strstr (reply, "+COPS: ")) {
-        /* Got valid reply */
-        GPtrArray *results;
-        GRegex *r;
-        GMatchInfo *match_info;
-        GError *err = NULL;
-        gboolean umts_format = TRUE;
+    else {
+        results = mm_gsm_parse_scan_response (response->str, &info->error);
+        if (results)
+            mm_callback_info_set_data (info, "scan-results", results, mm_gsm_destroy_scan_data);
+    }
 
-        reply = strstr (reply, "+COPS: ") + 7;
-
-        /* Pattern without crazy escaping using | for matching: (|\d|,"|.+|","|.+|","|.+|"\)?,|\d|) */
-
-        /* Cell access technology (GSM, UTRAN, etc) got added later and not all
-         * modems implement it.  Some modesm have quirks that make it hard to
-         * use one regular experession for matching both pre-UMTS and UMTS
-         * responses.  So try UMTS-format first and fall back to pre-UMTS if
-         * we get no UMTS-formst matches.
-         */
-
-        /* Quirk: Sony-Ericsson TM-506 sometimes includes a stray ')' like so,
-         *        which is what makes it hard to match both pre-UMTS and UMTS in
-         *        the same regex:
-         *
-         *       +COPS: (2,"","T-Mobile","31026",0),(1,"AT&T","AT&T","310410"),0)
-         */
-
-        r = g_regex_new ("\\((\\d),\"(.*)\",\"(.*)\",\"(.*)\"[\\)]?,(\\d)\\)", G_REGEX_UNGREEDY, 0, &err);
-        if (err) {
-            g_error ("Invalid regular expression: %s", err->message);
-            g_error_free (err);
-            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                               "Could not parse scan results.");
-            goto out;
-        }
-
-        /* If we didn't get any hits, try the pre-UMTS format match */
-        if (!g_regex_match (r, reply, 0, &match_info)) {
-            g_regex_unref (r);
-            if (match_info) {
-                g_match_info_free (match_info);
-                match_info = NULL;
-            }
-
-            /* Pre-UMTS format doesn't include the cell access technology after
-             * the numeric operator element.
-             *
-             * Ex: Motorola C-series (BUSlink SCWi275u) like so:
-             *
-             *       +COPS: (2,"T-Mobile","","310260"),(0,"Cingular Wireless","","310410")
-             */
-            r = g_regex_new ("\\((\\d),\"(.*)\",\"(.*)\",\"(.*)\"\\)", G_REGEX_UNGREEDY, 0, &err);
-            if (err) {
-                g_error ("Invalid regular expression: %s", err->message);
-                g_error_free (err);
-                info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                                   "Could not parse scan results.");
-                goto out;
-            }
-
-            g_regex_match (r, reply, 0, &match_info);
-            umts_format = FALSE;
-        }
-
-        /* Parse the results */
-        results = g_ptr_array_new ();
-        while (g_match_info_matches (match_info)) {
-            GHashTable *hash;
-            char *access_tech = NULL;
-
-            hash = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
-            g_hash_table_insert (hash, g_strdup ("status"), g_match_info_fetch (match_info, 1));
-            g_hash_table_insert (hash, g_strdup ("operator-long"), g_match_info_fetch (match_info, 2));
-            g_hash_table_insert (hash, g_strdup ("operator-short"), g_match_info_fetch (match_info, 3));
-            g_hash_table_insert (hash, g_strdup ("operator-num"), g_match_info_fetch (match_info, 4));
-
-            /* Only try for access technology with UMTS-format matches */
-            if (umts_format)
-                access_tech = g_match_info_fetch (match_info, 5);
-            if (access_tech && (strlen (access_tech) == 1)) {
-                /* Recognized access technologies are between '0' and '6' inclusive... */
-                if ((access_tech[0] >= 48) && (access_tech[0] <= 54))
-                    g_hash_table_insert (hash, g_strdup ("access-tech"), access_tech);
-            } else
-                g_free (access_tech);
-
-            g_ptr_array_add (results, hash);
-            g_match_info_next (match_info, NULL);
-        }
-
-        mm_callback_info_set_data (info, "scan-results", results, destroy_scan_data);
-        g_match_info_free (match_info);
-        g_regex_unref (r);
-    } else
-        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                           "Could not parse scan results.");
-
- out:
     mm_callback_info_schedule (info);
 }
 
