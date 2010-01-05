@@ -320,6 +320,30 @@ test_cops_response_n80 (void *f, gpointer d)
     test_results ("Nokia N80", reply, &expected[0], ARRAY_LEN (expected));
 }
 
+static void
+test_cops_response_gsm_invalid (void *f, gpointer d)
+{
+    const char *reply = "+COPS: (0,1,2,3),(1,2,3,4)";
+    GPtrArray *results;
+    GError *error = NULL;
+
+    results = mm_gsm_parse_scan_response (reply, &error);
+    g_assert (results != NULL);
+    g_assert (error == NULL);
+}
+
+static void
+test_cops_response_umts_invalid (void *f, gpointer d)
+{
+    const char *reply = "+COPS: (0,1,2,3,4),(1,2,3,4,5)";
+    GPtrArray *results;
+    GError *error = NULL;
+
+    results = mm_gsm_parse_scan_response (reply, &error);
+    g_assert (results != NULL);
+    g_assert (error == NULL);
+}
+
 
 typedef void (*TCFunc)(void);
 
@@ -351,6 +375,8 @@ int main (int argc, char **argv)
 	g_test_suite_add (suite, TESTCASE (test_cops_response_f3607gw, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_mc8775, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_n80, NULL));
+	g_test_suite_add (suite, TESTCASE (test_cops_response_gsm_invalid, NULL));
+	g_test_suite_add (suite, TESTCASE (test_cops_response_umts_invalid, NULL));
 
 	return g_test_run ();
 }

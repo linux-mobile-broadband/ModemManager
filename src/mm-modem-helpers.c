@@ -50,6 +50,9 @@ save_scan_value (GHashTable *hash, const char *key, GMatchInfo *info, guint32 nu
     g_hash_table_insert (hash, g_strdup (key), quoted);
 }
 
+/* If the response was successfully parsed (even if no valid entries were
+ * found) the pointer array will be returned.
+ */
 GPtrArray *
 mm_gsm_parse_scan_response (const char *reply, GError **error)
 {
