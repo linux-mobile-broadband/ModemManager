@@ -76,11 +76,9 @@ test_results (const char *desc,
             g_assert (value == NULL);
 
         value = g_hash_table_lookup (entry, MM_SCAN_TAG_OPER_NUM);
-        if (expected->oper_num) {
-            g_assert (value);
-            g_assert (strcmp (value, expected->oper_num) == 0);
-        } else
-            g_assert (value == NULL);
+        g_assert (expected->oper_num);
+        g_assert (value);
+        g_assert (strcmp (value, expected->oper_num) == 0);
 
         value = g_hash_table_lookup (entry, MM_SCAN_TAG_ACCESS_TECH);
         if (expected->tech) {
@@ -98,7 +96,7 @@ test_cops_response_tm506 (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"\",\"T-Mobile\",\"31026\",0),(2,\"T - Mobile\",\"T - Mobile\",\"310260\"),2),(1,\"AT&T\",\"AT&T\",\"310410\"),0)";
     static OperEntry expected[] = {
-        { "2", "", "T-Mobile", "31026", "0" },
+        { "2", NULL, "T-Mobile", "31026", "0" },
         { "2", "T - Mobile", "T - Mobile", "310260", "2" },
         { "1", "AT&T", "AT&T", "310410", "0" }
     };
@@ -175,8 +173,8 @@ test_cops_response_motoc (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"T-Mobile\",\"\",\"310260\"),(0,\"Cingular Wireless\",\"\",\"310410\")";
     static OperEntry expected[] = {
-        { "2", "T-Mobile", "", "310260", NULL },
-        { "0", "Cingular Wireless", "", "310410", NULL },
+        { "2", "T-Mobile", NULL, "310260", NULL },
+        { "0", "Cingular Wireless", NULL, "310410", NULL },
     };
 
     test_results ("BUSlink SCWi275u (Motorola C-series)", reply, &expected[0], ARRAY_LEN (expected));
@@ -200,7 +198,7 @@ test_cops_response_mf627b (void *f, gpointer d)
     const char *reply = "+COPS: (2,\"AT&Tp\",\"AT&T@\",\"310410\",0),(3,\"\",\"\",\"31026\",0),";
     static OperEntry expected[] = {
         { "2", "AT&Tp", "AT&T@", "310410", "0" },
-        { "3", "", "", "31026", "0" },
+        { "3", NULL, NULL, "31026", "0" },
     };
 
     test_results ("ZTE MF627 (B)", reply, &expected[0], ARRAY_LEN (expected));
@@ -223,7 +221,7 @@ test_cops_response_mercury (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"\",\"\",\"310410\",2),(1,\"AT&T\",\"AT&T\",\"310410\",0),(1,\"T-Mobile\",\"TMO\",\"31026\",0),,(0,1,2,3,4),(0,1,2)";
     static OperEntry expected[] = {
-        { "2", "", "", "310410", "2" },
+        { "2", NULL, NULL, "310410", "2" },
         { "1", "AT&T", "AT&T", "310410", "0" },
         { "1", "T-Mobile", "TMO", "31026", "0" },
     };
@@ -236,9 +234,9 @@ test_cops_response_quicksilver (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"AT&T\",\"\",\"310410\",0),(2,\"\",\"\",\"3104100\",2),(1,\"AT&T\",\"\",\"310260\",0),,(0-4),(0-2)";
     static OperEntry expected[] = {
-        { "2", "AT&T", "", "310410", "0" },
-        { "2", "", "", "3104100", "2" },
-        { "1", "AT&T", "", "310260", "0" },
+        { "2", "AT&T", NULL, "310410", "0" },
+        { "2", NULL, NULL, "3104100", "2" },
+        { "1", "AT&T", NULL, "310260", "0" },
     };
 
     test_results ("Option AT&T Quicksilver", reply, &expected[0], ARRAY_LEN (expected));
@@ -309,29 +307,19 @@ test_cops_response_mc8775 (void *f, gpointer d)
     test_results ("Sierra MC8775", reply, &expected[0], ARRAY_LEN (expected));
 }
 
-#if 0
 static void
 test_cops_response_n80 (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"T - Mobile\",,\"31026\"),(1,\"Einstein PCS\",,\"31064\"),(1,\"Cingular\",,\"31041\"),,(0,1,3),(0,2)";
     static OperEntry expected[] = {
-        { "2", "T - Mobile", "", "31026", NULL },
-        { "1", "Einstein PCS", "", "31064", NULL },
-        { "1", "Cingular", "", "31041", NULL },
+        { "2", "T - Mobile", NULL, "31026", NULL },
+        { "1", "Einstein PCS", NULL, "31064", NULL },
+        { "1", "Cingular", NULL, "31041", NULL },
     };
-    GError *error = NULL;
-    GPtrArray *results;
 
-    results = mm_gsm_parse_scan_response (reply, &error);
-    g_assert (results);
-    g_assert (error == NULL);
-
-    g_assert (results->len == ARRAY_LEN (expected));
-    test_results ("Nokia N80", results, &expected[0]);
-
-    mm_gsm_destroy_scan_data (results);
+    test_results ("Nokia N80", reply, &expected[0], ARRAY_LEN (expected));
 }
-#endif
+
 
 typedef void (*TCFunc)(void);
 
@@ -362,9 +350,7 @@ int main (int argc, char **argv)
 	g_test_suite_add (suite, TESTCASE (test_cops_response_f3507g, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_f3607gw, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_mc8775, NULL));
-#if 0
 	g_test_suite_add (suite, TESTCASE (test_cops_response_n80, NULL));
-#endif
 
 	return g_test_run ();
 }
