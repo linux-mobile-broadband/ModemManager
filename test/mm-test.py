@@ -224,10 +224,12 @@ def gsm_inspect(proxy, dump_private, do_scan):
         except KeyError:
             pass
 
-        if len(r['operator-long']):
+        if r.has_key('operator-long') and len(r['operator-long']):
             print "%s: %s %s" % (r['operator-long'], status, access_tech)
-        else:
+        elif r.has_key('operator-short') and len(r['operator-short']):
             print "%s: %s %s" % (r['operator-short'], status, access_tech)
+        else:
+            print "%s: %s %s" % (r['operator-num'], status, access_tech)
 
 def gsm_connect(proxy, apn, user, password):
     # Modem.Simple interface
