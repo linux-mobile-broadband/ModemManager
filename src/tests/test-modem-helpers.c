@@ -321,6 +321,43 @@ test_cops_response_n80 (void *f, gpointer d)
 }
 
 static void
+test_cops_response_e1550 (void *f, gpointer d)
+{
+    const char *reply = "+COPS: (2,\"T-Mobile\",\"TMO\",\"31026\",0),(1,\"AT&T\",\"AT&T\",\"310410\",0),,(0,1,2,3,4),(0,1,2)";
+    static OperEntry expected[] = {
+        { "2", "T-Mobile", "TMO", "31026", "0" },
+        { "1", "AT&T", "AT&T", "310410", "0" },
+    };
+
+    test_results ("Huawei E1550", reply, &expected[0], ARRAY_LEN (expected));
+}
+
+static void
+test_cops_response_mf622 (void *f, gpointer d)
+{
+    const char *reply = "+COPS: (2,\"T-Mobile\",\"T-Mobile\",\"31026\",0),(1,\"\",\"\",\"310410\",0),";
+    static OperEntry expected[] = {
+        { "2", "T-Mobile", "T-Mobile", "31026", "0" },
+        { "1", NULL, NULL, "310410", "0" },
+    };
+
+    test_results ("ZTE MF622", reply, &expected[0], ARRAY_LEN (expected));
+}
+
+static void
+test_cops_response_e226 (void *f, gpointer d)
+{
+    const char *reply = "+COPS: (1,\"\",\"\",\"31026\",0),(1,\"\",\"\",\"310410\",2),(1,\"\",\"\",\"310410\",0),,(0,1,3,4),(0,1,2)";
+    static OperEntry expected[] = {
+        { "1", NULL, NULL, "31026", "0" },
+        { "1", NULL, NULL, "310410", "2" },
+        { "1", NULL, NULL, "310410", "0" },
+    };
+
+    test_results ("Huawei E226", reply, &expected[0], ARRAY_LEN (expected));
+}
+
+static void
 test_cops_response_gsm_invalid (void *f, gpointer d)
 {
     const char *reply = "+COPS: (0,1,2,3),(1,2,3,4)";
@@ -375,6 +412,9 @@ int main (int argc, char **argv)
 	g_test_suite_add (suite, TESTCASE (test_cops_response_f3607gw, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_mc8775, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_n80, NULL));
+	g_test_suite_add (suite, TESTCASE (test_cops_response_e1550, NULL));
+	g_test_suite_add (suite, TESTCASE (test_cops_response_mf622, NULL));
+	g_test_suite_add (suite, TESTCASE (test_cops_response_e226, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_gsm_invalid, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_umts_invalid, NULL));
 
