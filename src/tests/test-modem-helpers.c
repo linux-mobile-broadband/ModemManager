@@ -396,6 +396,19 @@ test_cops_response_n2720 (void *f, gpointer d)
 }
 
 static void
+test_cops_response_gobi (void *f, gpointer d)
+{
+    const char *reply = "+COPS: (2,\"T-Mobile\",\"T-Mobile\",\"31026\",0),(1,\"AT&T\",\"AT&T\",\"310410\",2),(1,\"AT&T\",\"AT&T\",\"310410\",0),,(0,1,2,3,4),(0,1,2)";
+    static OperEntry expected[] = {
+        { "2", "T-Mobile", "T-Mobile", "31026", "0" },
+        { "1", "AT&T", "AT&T", "310410", "2" },
+        { "1", "AT&T", "AT&T", "310410", "0" },
+    };
+
+    test_results ("Qualcomm Gobi", reply, &expected[0], ARRAY_LEN (expected));
+}
+
+static void
 test_cops_response_gsm_invalid (void *f, gpointer d)
 {
     const char *reply = "+COPS: (0,1,2,3),(1,2,3,4)";
@@ -456,6 +469,7 @@ int main (int argc, char **argv)
 	g_test_suite_add (suite, TESTCASE (test_cops_response_xu870, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_gtultraexpress, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_n2720, NULL));
+	g_test_suite_add (suite, TESTCASE (test_cops_response_gobi, NULL));
 
 	g_test_suite_add (suite, TESTCASE (test_cops_response_gsm_invalid, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_umts_invalid, NULL));
