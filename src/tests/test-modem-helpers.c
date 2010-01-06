@@ -358,6 +358,32 @@ test_cops_response_e226 (void *f, gpointer d)
 }
 
 static void
+test_cops_response_xu870 (void *f, gpointer d)
+{
+    const char *reply = "+COPS: (0,\"AT&T MicroCell\",\"AT&T MicroCell\",\"310410\",2)\r\n+COPS: (1,\"AT&T MicroCell\",\"AT&T MicroCell\",\"310410\",0)\r\n+COPS: (1,\"T-Mobile\",\"TMO\",\"31026\",0)\r\n";
+    static OperEntry expected[] = {
+        { "0", "AT&T MicroCell", "AT&T MicroCell", "310410", "2" },
+        { "1", "AT&T MicroCell", "AT&T MicroCell", "310410", "0" },
+        { "1", "T-Mobile", "TMO", "31026", "0" },
+    };
+
+    test_results ("Novatel XU870", reply, &expected[0], ARRAY_LEN (expected));
+}
+
+static void
+test_cops_response_gtultraexpress (void *f, gpointer d)
+{
+    const char *reply = "+COPS: (2,\"T-Mobile US\",\"TMO US\",\"31026\",0),(1,\"AT&T\",\"AT&T\",\"310410\",2),(1,\"AT&T\",\"AT&T\",\"310410\",0),,(0,1,2,3,4),(0,1,2)";
+    static OperEntry expected[] = {
+        { "2", "T-Mobile US", "TMO US", "31026", "0" },
+        { "1", "AT&T", "AT&T", "310410", "2" },
+        { "1", "AT&T", "AT&T", "310410", "0" },
+    };
+
+    test_results ("Option GlobeTrotter Ultra Express", reply, &expected[0], ARRAY_LEN (expected));
+}
+
+static void
 test_cops_response_gsm_invalid (void *f, gpointer d)
 {
     const char *reply = "+COPS: (0,1,2,3),(1,2,3,4)";
@@ -415,6 +441,9 @@ int main (int argc, char **argv)
 	g_test_suite_add (suite, TESTCASE (test_cops_response_e1550, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_mf622, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_e226, NULL));
+	g_test_suite_add (suite, TESTCASE (test_cops_response_xu870, NULL));
+	g_test_suite_add (suite, TESTCASE (test_cops_response_gtultraexpress, NULL));
+
 	g_test_suite_add (suite, TESTCASE (test_cops_response_gsm_invalid, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_umts_invalid, NULL));
 
