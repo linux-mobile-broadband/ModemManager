@@ -114,11 +114,22 @@ grab_port (MMPluginBase *base,
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
 
-    /* Look for port type hints */
+    /* Look for port type hints; just probing can't distinguish which port should
+     * be the data/primary port on these devices.  We have to tag them based on
+     * what the Windows .INF files say the port layout should be.
+     */
     if (g_udev_device_get_property_as_boolean (port, "ID_MM_LONGCHEER_PORT_TYPE_MODEM"))
         ptype = MM_PORT_TYPE_PRIMARY;
     else if (g_udev_device_get_property_as_boolean (port, "ID_MM_LONGCHEER_PORT_TYPE_AUX"))
         ptype = MM_PORT_TYPE_SECONDARY;
+
+    /* If the device was tagged by the udev rules, then ignore any other ports
+     * to guard against race conditions if a device just happens to show up
+     * with more than two AT-capable ports.
+     */
+    if (   (ptype == MM_PORT_TYPE_UNKNOWN)
+        && g_udev_device_get_property_as_boolean (port, "ID_MM_LONGCHEER_TAGGED"))
+        ptype = MM_PORT_TYPE_IGNORED;
 
     physdev = mm_plugin_base_supports_task_get_physdev (task);
     g_assert (physdev);
