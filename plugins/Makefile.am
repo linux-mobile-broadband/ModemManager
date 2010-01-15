@@ -9,7 +9,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-novatel.la \
 	libmm-plugin-nokia.la \
 	libmm-plugin-zte.la \
-	libmm-plugin-mbm.la
+	libmm-plugin-mbm.la \
+	libmm-plugin-longcheer.la
 
 # Generic
 
@@ -211,6 +212,22 @@ libmm_plugin_zte_la_CPPFLAGS = \
 	-I$(top_srcdir)/src
 
 libmm_plugin_zte_la_LDFLAGS = \
+	$(GUDEV_LDFLAGS) \
+	-module \
+	-avoid-version
+
+# Longcheer (and rebranded dongles)
+
+libmm_plugin_longcheer_la_SOURCES = \
+	mm-plugin-longcheer.c \
+	mm-plugin-longcheer.h
+
+libmm_plugin_longcheer_la_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
+	-I$(top_srcdir)/src
+
+libmm_plugin_longcheer_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
 	-module \
 	-avoid-version
