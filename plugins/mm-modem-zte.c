@@ -183,14 +183,22 @@ grab_port (MMModem *modem,
         mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
         g_regex_unref (regex);
 
+        /* Unsolicted operator display */
         regex = g_regex_new ("\\r\\n\\+ZDONR: (.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
         g_regex_unref (regex);
 
+        /* Current network and service domain */
         regex = g_regex_new ("\\r\\n\\+ZPASR: (.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
         g_regex_unref (regex);
 
+        /* SIM request to Build Main Menu */
+        regex = g_regex_new ("\\r\\n\\+ZPSTM: (.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
+
+        /* SIM request to Rebuild Main Menu */
         regex = g_regex_new ("\\r\\n\\+ZEND\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
         g_regex_unref (regex);
