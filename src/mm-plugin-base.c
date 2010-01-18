@@ -14,9 +14,12 @@
  * Copyright (C) 2009 Red Hat, Inc.
  */
 
+#define _GNU_SOURCE  /* for strcasestr */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+
 #include <string.h>
 
 #define G_UDEV_API_IS_SUBJECT_TO_CHANGE
@@ -69,6 +72,7 @@ typedef enum {
     PROBE_STATE_GCAP_TRY2,
     PROBE_STATE_GCAP_TRY3,
     PROBE_STATE_ATI,
+    PROBE_STATE_CPIN,
     PROBE_STATE_CGMM,
     PROBE_STATE_LAST
 } ProbeState;
@@ -314,6 +318,29 @@ parse_gcap (const char *buf)
 }
 
 static guint32
+parse_cpin (const char *buf)
+{
+    if (   strcasestr (buf, "SIM PIN")
+        || strcasestr (buf, "SIM PUK")
+        || strcasestr (buf, "PH-SIM PIN")
+        || strcasestr (buf, "PH-FSIM PIN")
+        || strcasestr (buf, "PH-FSIM PUK")
+        || strcasestr (buf, "SIM PIN2")
+        || strcasestr (buf, "SIM PUK2")
+        || strcasestr (buf, "PH-NET PIN")
+        || strcasestr (buf, "PH-NET PUK")
+        || strcasestr (buf, "PH-NETSUB PIN")
+        || strcasestr (buf, "PH-NETSUB PUK")
+        || strcasestr (buf, "PH-SP PIN")
+        || strcasestr (buf, "PH-SP PUK")
+        || strcasestr (buf, "PH-CORP PIN")
+        || strcasestr (buf, "PH-CORP PUK"))
+        return MM_PLUGIN_BASE_PORT_CAP_GSM;
+
+    return 0;
+}
+
+static guint32
 parse_cgmm (const char *buf)
 {
     if (strstr (buf, "GSM900") || strstr (buf, "GSM1800") ||
@@ -367,8 +394,6 @@ real_handle_probe_response (MMPluginBase *self,
     MMSerialPort *port = task_priv->probe_port;
     gboolean ignore_error = FALSE;
 
-    task_priv->probe_state++;
-
     /* Some modems (Huawei E160g) won't respond to +GCAP with no SIM, but
      * will respond to ATI.
      */
@@ -378,35 +403,49 @@ real_handle_probe_response (MMPluginBase *self,
     if (error && !ignore_error) {
         if (error->code == MM_SERIAL_RESPONSE_TIMEOUT) {
             /* Try GCAP again */
-            if (task_priv->probe_state <= PROBE_STATE_GCAP_TRY3) {
+            if (task_priv->probe_state < PROBE_STATE_GCAP_TRY3) {
+                task_priv->probe_state++;
                 mm_serial_port_queue_command (port, "+GCAP", 3, parse_response, task);
-                return;
+            } else {
+               /* Otherwise, if all the GCAP tries timed out, ignore the port
+                * as it's probably not an AT-capable port.
+                */
+               probe_complete (task);
             }
-
-            /* Otherwise, if all the GCAP tries timed out, ignore the port
-             * as it's probably not an AT-capable port.
-             */
-            probe_complete (task);
-        } else if (task_priv->probe_state <= PROBE_STATE_GCAP_TRY3) {
-            mm_serial_port_queue_command (port, "+GCAP", 3, parse_response, task);
-        } else if (task_priv->probe_state == PROBE_STATE_ATI) {
-            /* Give ATI a try */
-            mm_serial_port_queue_command (port, "I", 3, parse_response, task);
-        } else if (task_priv->probe_state == PROBE_STATE_CGMM) {
-            /* If CGMM failed, probably not a modem port */
-            probe_complete (task);
+            return;
         }
-        return;
-    }
 
-    if (response) {
+        /* Otherwise proceed to the next command */
+    } else if (response) {
         /* Parse the response */
-        task_priv->probed_caps = parse_gcap (response);
 
-        /* Some models (BUSlink SCWi275u) stick stupid stuff in the GMM response */
-        if (    (task_priv->probe_state == PROBE_STATE_LAST)
-            && !(task_priv->probed_caps & CAP_GSM_OR_CDMA))
+        switch (task_priv->probe_state) {
+        case PROBE_STATE_GCAP_TRY1:
+        case PROBE_STATE_GCAP_TRY2:
+        case PROBE_STATE_GCAP_TRY3:
+        case PROBE_STATE_ATI:
+            /* Some modems don't respond to AT+GCAP, but often they put a
+             * GCAP-style response as a line in the ATI response.
+             */
+            task_priv->probed_caps = parse_gcap (response);
+            break;
+        case PROBE_STATE_CPIN:
+            /* Some devices (ZTE MF628 for example) reply to anything but
+             * AT+CPIN? with ERROR if the device has a PIN set.  Since no known
+             * CDMA modems support AT+CPIN? we can consider the device a GSM
+             * device if it returns a non-error response to AT+CPIN?.
+             */
+            task_priv->probed_caps = parse_cpin (response);
+            break;
+        case PROBE_STATE_CGMM:
+            /* Some models (BUSlink SCWi275u) stick stupid stuff in the CGMM
+             * response but at least it allows us to identify them.
+             */
             task_priv->probed_caps = parse_cgmm (response);
+            break;
+        default:
+            break;
+        }
 
         if (task_priv->probed_caps & CAP_GSM_OR_CDMA) {
             probe_complete (task);
@@ -414,9 +453,10 @@ real_handle_probe_response (MMPluginBase *self,
         }
     }
 
+    task_priv->probe_state++;
+
     /* Try a different command */
     switch (task_priv->probe_state) {
-    case PROBE_STATE_GCAP_TRY1:
     case PROBE_STATE_GCAP_TRY2:
     case PROBE_STATE_GCAP_TRY3:
         mm_serial_port_queue_command (port, "+GCAP", 3, parse_response, task);
@@ -425,8 +465,12 @@ real_handle_probe_response (MMPluginBase *self,
         /* After the last GCAP attempt, try ATI */
         mm_serial_port_queue_command (port, "I", 3, parse_response, task);
         break;
+    case PROBE_STATE_CPIN:
+        /* After the ATI attempt, try CPIN */
+        mm_serial_port_queue_command (port, "+CPIN?", 3, parse_response, task);
+        break;
     case PROBE_STATE_CGMM:
-        /* After the ATI attempt, try CGMM */
+        /* After the CPIN attempt, try CGMM */
         mm_serial_port_queue_command (port, "+CGMM", 3, parse_response, task);
         break;
     default:
@@ -452,6 +496,9 @@ handle_probe_response (gpointer user_data)
         break;
     case PROBE_STATE_ATI:
         cmd = "I";
+        break;
+    case PROBE_STATE_CPIN:
+        cmd = "+CPIN?";
         break;
     case PROBE_STATE_CGMM:
     default:
