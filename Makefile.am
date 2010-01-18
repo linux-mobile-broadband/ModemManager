@@ -16,8 +16,7 @@ docs/spec.html: $(XMLS) introspection/all.xml doc-generator.xsl
 
 all: $(GENERATED_FILES)
 
-clean:
-	rm -f $(GENERATED_FILES)
+CLEANFILES = $(GENERATED_FILES)
 endif
 
 SUBDIRS = marshallers src plugins introspection test
