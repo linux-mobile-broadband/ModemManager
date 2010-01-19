@@ -1,4 +1,5 @@
 EXTRA_DIST = \
+	all.xml \
 	mm-manager.xml \
 	mm-mobile-error.xml \
 	mm-modem.xml \
