@@ -36,9 +36,6 @@ static void impl_modem_get_info (MMModem *modem, DBusGMethodInvocation *context)
 GError *
 mm_modem_check_removed (MMModem *self, const GError *error)
 {
-    if (g_error_matches (error, MM_MODEM_ERROR, MM_MODEM_ERROR_REMOVED))
-        return g_error_copy (error);
-
     if (!self) {
         /* If the modem was NULL, the error *should* have been
          * MM_MODEM_ERROR_REMOVED.  If it wasn't, make it that.
@@ -48,7 +45,7 @@ mm_modem_check_removed (MMModem *self, const GError *error)
                                     "The modem was removed.");
     }
 
-    return NULL;
+    return error ? g_error_copy (error) : NULL;
 }
 
 static void
