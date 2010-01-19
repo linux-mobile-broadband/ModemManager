@@ -161,8 +161,8 @@ evdo_state_done (MMSerialPort *port,
         int_from_match_item (match_info, 6, &dbm);
 
         /* Parse the EVDO radio state */
-    	if (uint_from_match_item (match_info, 1, &val)) {
-    	    switch (val) {
+        if (uint_from_match_item (match_info, 1, &val)) {
+            switch (val) {
             case 3:  /* IDLE */
                 /* If IDLE and the EVDO dBm is -105 or lower, assume no service.
                  * It may be that IDLE actually means NO SERVICE too; not sure.
@@ -177,12 +177,12 @@ evdo_state_done (MMSerialPort *port,
             default:
                 g_message ("ANYDATA: unknown *STATE (%d); assuming no service.", val);
                 /* fall through */
-    	    case 0:  /* NO SERVICE */
-    	    case 1:  /* ACQUISITION */
-    	    case 2:  /* SYNC */
+            case 0:  /* NO SERVICE */
+            case 1:  /* ACQUISITION */
+            case 2:  /* SYNC */
                 break;
-    	    }
-    	}
+            }
+        }
     }
 
     mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, reg_state);
@@ -239,8 +239,8 @@ state_done (MMSerialPort *port,
         int_from_match_item (match_info, 6, &dbm);
 
         /* Parse the 1x radio state */
-    	if (uint_from_match_item (match_info, 5, &val)) {
-    	    switch (val) {
+        if (uint_from_match_item (match_info, 5, &val)) {
+            switch (val) {
             case 1:  /* IDLE */
                 /* If IDLE and the 1X dBm is -105 or lower, assume no service.
                  * It may be that IDLE actually means NO SERVICE too; not sure.
@@ -256,10 +256,10 @@ state_done (MMSerialPort *port,
             default:
                 g_message ("ANYDATA: unknown *STATE (%d); assuming no service.", val);
                 /* fall through */
-    	    case 0:  /* NO SERVICE */
+            case 0:  /* NO SERVICE */
                 break;
-    	    }
-    	}
+            }
+        }
     }
 
     mm_generic_cdma_query_reg_state_set_callback_1x_state (info, reg_state);
