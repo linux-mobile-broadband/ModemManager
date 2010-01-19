@@ -294,22 +294,26 @@ query_registration_state (MMGenericCdma *cdma,
 {
     MMCallbackInfo *info;
     MMSerialPort *primary, *secondary;
+    MMSerialPort *port;
 
-    primary = mm_generic_cdma_get_port (cdma, MM_PORT_TYPE_PRIMARY);
+    port = primary = mm_generic_cdma_get_port (cdma, MM_PORT_TYPE_PRIMARY);
     secondary = mm_generic_cdma_get_port (cdma, MM_PORT_TYPE_SECONDARY);
 
     info = mm_generic_cdma_query_reg_state_callback_info_new (cdma, callback, user_data);
 
-    if (mm_port_get_connected (MM_PORT (primary)) && !secondary) {
-        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
-                                           "Cannot get query registration state while connected");
-        mm_callback_info_schedule (info);
-        return;
+    if (mm_port_get_connected (MM_PORT (primary))) {
+        if (!secondary) {
+            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
+                                               "Cannot get query registration state while connected");
+            mm_callback_info_schedule (info);
+            return;
+        }
+
+        /* Use secondary port if primary is connected */
+        port = secondary;
     }
 
-    mm_serial_port_queue_command (secondary ? secondary : primary,
-                                  "!STATUS", 3,
-                                  status_done, info);
+    mm_serial_port_queue_command (port, "!STATUS", 3, status_done, info);
 }
 
 static void
