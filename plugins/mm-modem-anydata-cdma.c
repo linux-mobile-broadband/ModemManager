@@ -29,7 +29,10 @@
 #include "mm-serial-port.h"
 #include "mm-serial-parsers.h"
 
-G_DEFINE_TYPE (MMModemAnydataCdma, mm_modem_anydata_cdma, MM_TYPE_GENERIC_CDMA)
+static void modem_init (MMModem *modem_class);
+
+G_DEFINE_TYPE_EXTENDED (MMModemAnydataCdma, mm_modem_anydata_cdma, MM_TYPE_GENERIC_CDMA, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init))
 
 MMModem *
 mm_modem_anydata_cdma_new (const char *device,
@@ -294,6 +297,69 @@ query_registration_state (MMGenericCdma *cdma,
 }
 
 /*****************************************************************************/
+
+static gboolean
+grab_port (MMModem *modem,
+           const char *subsys,
+           const char *name,
+           MMPortType suggested_type,
+           gpointer user_data,
+           GError **error)
+{
+    MMPort *port = NULL;
+    GRegex *regex;
+
+    port = mm_generic_cdma_grab_port (MM_GENERIC_CDMA (modem), subsys, name, suggested_type, user_data, error);
+    if (port && MM_IS_SERIAL_PORT (port)) {
+        /* Data state notifications */
+
+        /* Data call has connected */
+        regex = g_regex_new ("\\r\\n\\*ACTIVE:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
+
+        /* Data call disconnected */
+        regex = g_regex_new ("\\r\\n\\*INACTIVE:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
+
+        /* Modem is now dormant */
+        regex = g_regex_new ("\\r\\n\\*DORMANT:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
+
+        /* Abnomral state notifications
+         *
+         * FIXME: set 1X/EVDO registration state to UNKNOWN when these
+         * notifications are received?
+         */
+
+        /* Network acquisition fail */
+        regex = g_regex_new ("\\r\\n\\*OFFLINE:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
+
+        /* Registration fail */
+        regex = g_regex_new ("\\r\\n\\*REGREQ:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
+
+        /* Authentication fail */
+        regex = g_regex_new ("\\r\\n\\*AUTHREQ:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
+    }
+
+    return !!port;
+}
+
+/*****************************************************************************/
+
+static void
+modem_init (MMModem *modem_class)
+{
+    modem_class->grab_port = grab_port;
+}
 
 static void
 mm_modem_anydata_cdma_init (MMModemAnydataCdma *self)
