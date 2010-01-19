@@ -430,10 +430,10 @@ real_handle_probe_response (MMPluginBase *self,
             task_priv->probed_caps = parse_gcap (response);
             break;
         case PROBE_STATE_CPIN:
-            /* Some devices (ZTE MF628 for example) reply to anything but
-             * AT+CPIN? with ERROR if the device has a PIN set.  Since no known
-             * CDMA modems support AT+CPIN? we can consider the device a GSM
-             * device if it returns a non-error response to AT+CPIN?.
+            /* Some devices (ZTE MF628/ONDA MT503HS for example) reply to
+             * anything but AT+CPIN? with ERROR if the device has a PIN set.
+             * Since no known CDMA modems support AT+CPIN? we can consider the
+             * device a GSM device if it returns a non-error response to AT+CPIN?.
              */
             task_priv->probed_caps = parse_cpin (response);
             break;
