@@ -129,6 +129,8 @@ uint_from_match_item (GMatchInfo *match_info, guint32 num, guint32 *val)
     gboolean success = FALSE;
 
     str = g_match_info_fetch (match_info, num);
+    g_return_val_if_fail (str != NULL, FALSE);
+
     errno = 0;
     tmp = strtol (str, NULL, 10);
     if (errno == 0 && tmp >= 0 && tmp <= G_MAXUINT) {
