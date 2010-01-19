@@ -596,7 +596,7 @@ connect (MMModem *modem,
 
     info = mm_callback_info_new (modem, callback, user_data);
     command = g_strconcat ("DT", number, NULL);
-    mm_serial_port_queue_command (priv->primary, command, 60, dial_done, info);
+    mm_serial_port_queue_command (priv->primary, command, 90, dial_done, info);
     g_free (command);
 }
 

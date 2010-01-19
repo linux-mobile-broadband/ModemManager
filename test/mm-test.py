@@ -83,7 +83,7 @@ def cdma_connect(proxy, user, password):
     # Modem.Simple interface
     simple = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_SIMPLE)
     try:
-        simple.Connect({'number':"#777"}, timeout=60)
+        simple.Connect({'number':"#777"}, timeout=92)
         print "\nConnected!"
         return True
     except Exception, e:
