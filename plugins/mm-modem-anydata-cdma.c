@@ -31,20 +31,6 @@
 
 G_DEFINE_TYPE (MMModemAnydataCdma, mm_modem_anydata_cdma, MM_TYPE_GENERIC_CDMA)
 
-#define MM_MODEM_ANYDATA_CDMA_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_ANYDATA_CDMA, MMModemAnydataCdmaPrivate))
-
-typedef enum {
-    SYS_MODE_UNKNOWN,
-    SYS_MODE_NO_SERVICE,
-    SYS_MODE_CDMA_1X,
-    SYS_MODE_EVDO_REV0,
-    SYS_MODE_EVDO_REVA
-} SysMode;
-
-typedef struct {
-    SysMode sys_mode;
-} MMModemAnydataCdmaPrivate;
-
 MMModem *
 mm_modem_anydata_cdma_new (const char *device,
                            const char *driver,
@@ -208,7 +194,6 @@ state_done (MMSerialPort *port,
             gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemAnydataCdmaPrivate *priv;
     MMModemCdmaRegistrationState reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     const char *reply;
     GRegex *r;
@@ -228,8 +213,6 @@ state_done (MMSerialPort *port,
         mm_callback_info_schedule (info);
         return;
     }
-
-    priv = MM_MODEM_ANYDATA_CDMA_GET_PRIVATE (info->modem);
 
     reply = strip_response (response->str, "*STATE:");
 
@@ -320,11 +303,9 @@ mm_modem_anydata_cdma_init (MMModemAnydataCdma *self)
 static void
 mm_modem_anydata_cdma_class_init (MMModemAnydataCdmaClass *klass)
 {
-    GObjectClass *object_class = G_OBJECT_CLASS (klass);
     MMGenericCdmaClass *cdma_class = MM_GENERIC_CDMA_CLASS (klass);
 
     mm_modem_anydata_cdma_parent_class = g_type_class_peek_parent (klass);
-    g_type_class_add_private (object_class, sizeof (MMModemAnydataCdmaPrivate));
 
     cdma_class->query_registration_state = query_registration_state;
 
