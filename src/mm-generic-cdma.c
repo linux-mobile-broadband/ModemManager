@@ -57,6 +57,7 @@ typedef struct {
     gboolean valid;
     gboolean evdo_rev0;
     gboolean evdo_revA;
+    gboolean reg_try_css;
 
     MMModemCdmaRegistrationState cdma_1x_reg_state;
     MMModemCdmaRegistrationState evdo_reg_state;
@@ -75,6 +76,7 @@ enum {
     PROP_0,
     PROP_EVDO_REV0,
     PROP_EVDO_REVA,
+    PROP_REG_TRY_CSS,
     LAST_PROP
 };
 
@@ -1247,6 +1249,26 @@ reg_state_query_done (MMModemCdma *cdma,
 }
 
 static void
+query_subclass_registration_state (MMGenericCdma *self, MMCallbackInfo *info)
+{
+    /* Let subclasses figure out roaming and detailed registration state */
+    if (MM_GENERIC_CDMA_GET_CLASS (self)->query_registration_state) {
+        MM_GENERIC_CDMA_GET_CLASS (self)->query_registration_state (self,
+                                                                    reg_state_query_done,
+                                                                    info);
+    } else {
+        /* Or if the subclass doesn't implement more specific checking,
+         * assume we're registered.
+         */
+        reg_state_query_done (MM_MODEM_CDMA (self),
+                              MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED,
+                              MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED,
+                              NULL,
+                              info);
+    }
+}
+
+static void
 reg_state_css_response (MMModemCdma *cdma,
                         guint32 class,
                         unsigned char band,
@@ -1255,7 +1277,6 @@ reg_state_css_response (MMModemCdma *cdma,
                         gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModem *modem = info->modem;
 
     /* We'll get an error if the SID isn't valid, so detect that and
      * report unknown registration state.
@@ -1273,19 +1294,7 @@ reg_state_css_response (MMModemCdma *cdma,
         return;
     }
 
-    /* SID is valid; let subclasses figure out roaming and detailed registration */
-    if (MM_GENERIC_CDMA_GET_CLASS (modem)->query_registration_state) {
-        MM_GENERIC_CDMA_GET_CLASS (modem)->query_registration_state (MM_GENERIC_CDMA (modem),
-                                                                     reg_state_query_done,
-                                                                     info);
-    } else {
-        /* Otherwise, success; we're registered */
-        reg_state_query_done (cdma,
-                              MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED,
-                              MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED,
-                              NULL,
-                              info);
-    }
+    query_subclass_registration_state (MM_GENERIC_CDMA (info->modem), info);
 }
 
 static void
@@ -1316,12 +1325,28 @@ get_analog_digital_done (MMSerialPort *port,
     }
 
     if (int_cad == 1) {  /* 1 == CDMA service */
+        MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
+
         /* Now that we have some sort of service, check if the the device is
          * registered on the network.
          */
-        get_serving_system (MM_MODEM_CDMA (info->modem),
-                            reg_state_css_response,
-                            info);
+
+        /* Some devices key the AT+CSS? response off the 1X state, but if the
+         * device has EVDO service but no 1X service, then reading AT+CSS? will
+         * error out too early.  Let subclasses that know that their AT+CSS?
+         * response is wrong in this case handle more specific registration
+         * themselves; if they do, they'll set priv->reg_try_css to FALSE.
+         */
+        if (priv->reg_try_css) {
+            get_serving_system (MM_MODEM_CDMA (info->modem),
+                                reg_state_css_response,
+                                info);
+        } else {
+            /* Subclass knows that AT+CSS? will respond incorrectly to EVDO
+             * state, so skip AT+CSS? query.
+             */
+            query_subclass_registration_state (MM_GENERIC_CDMA (info->modem), info);
+        }
         return;
     } else {
         /* No service */
@@ -1703,6 +1728,9 @@ set_property (GObject *object, guint prop_id,
     case PROP_EVDO_REVA:
         priv->evdo_revA = g_value_get_boolean (value);
         break;
+    case PROP_REG_TRY_CSS:
+        priv->reg_try_css = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -1730,6 +1758,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case PROP_EVDO_REVA:
         g_value_set_boolean (value, priv->evdo_revA);
+        break;
+    case PROP_REG_TRY_CSS:
+        g_value_set_boolean (value, priv->reg_try_css);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1787,6 +1818,14 @@ mm_generic_cdma_class_init (MMGenericCdmaClass *klass)
                                   "EVDO revA",
                                   "Supports EVDO revA",
                                   FALSE,
+                                  G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property (object_class, PROP_REG_TRY_CSS,
+            g_param_spec_boolean (MM_GENERIC_CDMA_REGISTRATION_TRY_CSS,
+                                  "RegistrationTryCss",
+                                  "Use Serving System response when checking modem"
+                                  " registration state.",
+                                  TRUE,
                                   G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
 

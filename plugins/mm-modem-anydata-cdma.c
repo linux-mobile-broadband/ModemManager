@@ -62,6 +62,7 @@ mm_modem_anydata_cdma_new (const char *device,
                                    MM_MODEM_PLUGIN, plugin,
                                    MM_GENERIC_CDMA_EVDO_REV0, evdo_rev0,
                                    MM_GENERIC_CDMA_EVDO_REVA, evdo_revA,
+                                   MM_GENERIC_CDMA_REGISTRATION_TRY_CSS, FALSE,
                                    NULL));
 }
 
