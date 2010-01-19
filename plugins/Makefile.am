@@ -10,7 +10,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-nokia.la \
 	libmm-plugin-zte.la \
 	libmm-plugin-mbm.la \
-	libmm-plugin-longcheer.la
+	libmm-plugin-longcheer.la \
+	libmm-plugin-anydata.la
 
 # Generic
 
@@ -228,6 +229,24 @@ libmm_plugin_longcheer_la_CPPFLAGS = \
 	-I$(top_srcdir)/src
 
 libmm_plugin_longcheer_la_LDFLAGS = \
+	$(GUDEV_LDFLAGS) \
+	-module \
+	-avoid-version
+
+# AnyData CDMA
+
+libmm_plugin_anydata_la_SOURCES = \
+	mm-plugin-anydata.c \
+	mm-plugin-anydata.h \
+	mm-modem-anydata-cdma.c \
+	mm-modem-anydata-cdma.h
+
+libmm_plugin_anydata_la_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
+	-I$(top_srcdir)/src
+
+libmm_plugin_anydata_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
 	-module \
 	-avoid-version

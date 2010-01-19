@@ -30,8 +30,10 @@
 #define MM_IS_GENERIC_CDMA_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_GENERIC_CDMA))
 #define MM_GENERIC_CDMA_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_GENERIC_CDMA, MMGenericCdmaClass))
 
-#define MM_GENERIC_CDMA_EVDO_REV0 "evdo-rev0"
-#define MM_GENERIC_CDMA_EVDO_REVA "evdo-revA"
+#define MM_GENERIC_CDMA_EVDO_REV0            "evdo-rev0"
+#define MM_GENERIC_CDMA_EVDO_REVA            "evdo-revA"
+
+#define MM_GENERIC_CDMA_REGISTRATION_TRY_CSS "registration-try-css"
 
 typedef struct {
     MMModemBase parent;
