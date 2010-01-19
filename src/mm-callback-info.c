@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 Novell, Inc.
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
 #include "mm-callback-info.h"
@@ -55,8 +56,8 @@ modem_destroyed_cb (gpointer data, GObject *destroyed)
     info->modem = NULL;
     if (!info->pending_id) {
         info->error = g_error_new_literal (MM_MODEM_ERROR,
-                                           MM_MODEM_ERROR_GENERAL,
-                                           "The modem was removed or disabled.");
+                                           MM_MODEM_ERROR_REMOVED,
+                                           "The modem was removed.");
         mm_callback_info_schedule (info);
     }
 }

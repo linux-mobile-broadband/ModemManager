@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
 #include <string.h>
@@ -28,6 +28,28 @@ static void impl_modem_get_ip4_config (MMModem *modem, DBusGMethodInvocation *co
 static void impl_modem_get_info (MMModem *modem, DBusGMethodInvocation *context);
 
 #include "mm-modem-glue.h"
+
+/* Should be used from callbacks to check whether the modem was removed after
+ * the callback's operation was started, but before the callback itself was
+ * called, in which case the MMModem passed to the callback is NULL.
+ */
+GError *
+mm_modem_check_removed (MMModem *self, const GError *error)
+{
+    if (g_error_matches (error, MM_MODEM_ERROR, MM_MODEM_ERROR_REMOVED))
+        return g_error_copy (error);
+
+    if (!self) {
+        /* If the modem was NULL, the error *should* have been
+         * MM_MODEM_ERROR_REMOVED.  If it wasn't, make it that.
+         */
+        return g_error_new_literal (MM_MODEM_ERROR,
+                                    MM_MODEM_ERROR_REMOVED,
+                                    "The modem was removed.");
+    }
+
+    return NULL;
+}
 
 static void
 async_op_not_supported (MMModem *self,
@@ -92,7 +114,6 @@ finish_disable (MMModem *self,
                 MMModemFn callback,
                 gpointer user_data)
 {
-
     if (MM_MODEM_GET_INTERFACE (self)->disable)
         MM_MODEM_GET_INTERFACE (self)->disable (self, callback, user_data);
     else
@@ -110,9 +131,27 @@ disable_disconnect_done (MMModem *self,
                          gpointer user_data)
 {
     DisableDisconnectInfo *cb_data = user_data;
+    GError *tmp_error = NULL;
 
-    /* ignore errors */
+    /* Check for modem removal */
+    if (g_error_matches (error, MM_MODEM_ERROR, MM_MODEM_ERROR_REMOVED))
+        tmp_error = g_error_copy (error);
+    else if (!self) {
+        tmp_error = g_error_new_literal (MM_MODEM_ERROR,
+                                         MM_MODEM_ERROR_REMOVED,
+                                         "The modem was removed.");
+    }
+
+    /* And send an immediate error reply if the modem was removed */
+    if (tmp_error) {
+        cb_data->callback (NULL, tmp_error, cb_data->user_data);
+        g_free (cb_data);
+        g_error_free (tmp_error);
+        return;
+    }
+
     if (error) {
+        /* Don't really care what the error was; log it and proceed to disable */
         g_warning ("%s: (%s): error disconnecting the modem while disabling: (%d) %s",
                    __func__,
                    mm_modem_get_device (self),
@@ -336,7 +375,6 @@ mm_modem_disconnect (MMModem *self,
         mm_callback_info_schedule (info);
         return;
     }
-
 
     if (MM_MODEM_GET_INTERFACE (self)->disconnect)
         MM_MODEM_GET_INTERFACE (self)->disconnect (self, callback, user_data);

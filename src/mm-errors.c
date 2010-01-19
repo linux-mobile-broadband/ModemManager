@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
 #include "mm-errors.h"
@@ -72,6 +72,7 @@ mm_modem_error_get_type (void)
             ENUM_ENTRY (MM_MODEM_ERROR_CONNECTED,               "Connected"),
             ENUM_ENTRY (MM_MODEM_ERROR_DISCONNECTED,            "Disconnected"),
             ENUM_ENTRY (MM_MODEM_ERROR_OPERATION_IN_PROGRESS,   "OperationInProgress"),
+            ENUM_ENTRY (MM_MODEM_ERROR_REMOVED,                 "Removed"),
             { 0, 0, 0 }
         };
 

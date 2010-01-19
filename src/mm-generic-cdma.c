@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
 #include <string.h>
@@ -478,13 +478,15 @@ static void
 disable_all_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
-    MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
-    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
 
-    if (error) {
-        disable_set_previous_state (MM_MODEM (modem), info);
-        info->error = g_error_copy (error);
+    info->error = mm_modem_check_removed (modem, error);
+    if (info->error) {
+        if (modem)
+            disable_set_previous_state (modem, info);
     } else {
+        MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
+        MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
+
         mm_serial_port_close (priv->primary);
         mm_modem_set_state (modem, MM_MODEM_STATE_DISABLED, MM_MODEM_STATE_REASON_NONE);
 
@@ -501,18 +503,22 @@ disable_flash_done (MMSerialPort *port,
                     gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
-    MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
+    MMGenericCdma *self;
 
-    if (error) {
-        disable_set_previous_state (info->modem, info);
-        info->error = g_error_copy (error);
+    info->error = mm_modem_check_removed (info->modem, error);
+    if (info->error) {
+        if (info->modem)
+            disable_set_previous_state (info->modem, info);
         mm_callback_info_schedule (info);
-    } else {
-        if (MM_GENERIC_CDMA_GET_CLASS (self)->post_disable)
-            MM_GENERIC_CDMA_GET_CLASS (self)->post_disable (self, disable_all_done, info);
-        else
-            disable_all_done (MM_MODEM (self), NULL, info);
+        return;
     }
+
+    self = MM_GENERIC_CDMA (info->modem);
+
+    if (MM_GENERIC_CDMA_GET_CLASS (self)->post_disable)
+        MM_GENERIC_CDMA_GET_CLASS (self)->post_disable (self, disable_all_done, info);
+    else
+        disable_all_done (MM_MODEM (self), NULL, info);
 }
 
 static void
@@ -557,13 +563,15 @@ dial_done (MMSerialPort *port,
            gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
-    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);;
 
-    if (error) {
-        info->error = g_error_copy (error);
-        update_enabled_state (MM_GENERIC_CDMA (info->modem), FALSE, MM_MODEM_STATE_REASON_NONE);
+    info->error = mm_modem_check_removed (info->modem, error);
+    if (info->error) {
+        if (info->modem)
+            update_enabled_state (MM_GENERIC_CDMA (info->modem), FALSE, MM_MODEM_STATE_REASON_NONE);
     } else {
+        MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
+        MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
+
         /* Clear reg tries; we're obviously registered by this point */
         registration_cleanup (self, 0, 0);
 
@@ -598,24 +606,21 @@ disconnect_flash_done (MMSerialPort *port,
                        gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
+    MMModemState prev_state;
 
-    if (error) {
-        MMModemState prev_state;
-
-        /* Reset old state since the operation failed */
-        prev_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, MM_GENERIC_CDMA_PREV_STATE_TAG));
-        mm_modem_set_state (MM_MODEM (info->modem),
-                            prev_state,
-                            MM_MODEM_STATE_REASON_NONE);
-
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-        return;
+    info->error = mm_modem_check_removed (info->modem, error);
+    if (info->error) {
+        if (info->modem) {
+            /* Reset old state since the operation failed */
+            prev_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, MM_GENERIC_CDMA_PREV_STATE_TAG));
+            mm_modem_set_state (MM_MODEM (info->modem),
+                                prev_state,
+                                MM_MODEM_STATE_REASON_NONE);
+        }
+    } else {
+        mm_port_set_connected (MM_GENERIC_CDMA_GET_PRIVATE (info->modem)->data, FALSE);
+        update_enabled_state (MM_GENERIC_CDMA (info->modem), FALSE, MM_MODEM_STATE_REASON_NONE);
     }
-
-    mm_port_set_connected (priv->data, FALSE);
-    update_enabled_state (MM_GENERIC_CDMA (info->modem), FALSE, MM_MODEM_STATE_REASON_NONE);
 
     mm_callback_info_schedule (info);
 }

@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  * Copyright (C) 2009 Ericsson
  */
 
@@ -538,13 +538,17 @@ disable_done (MMSerialPort *port,
               gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
 
-    mm_serial_port_close (port);
-    mm_modem_set_state (MM_MODEM (info->modem),
-                        MM_MODEM_STATE_DISABLED,
-                        MM_MODEM_STATE_REASON_NONE);
-    priv->reg_status = MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN;
+    info->error = mm_modem_check_removed (info->modem, error);
+    if (!info->error) {
+        MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+
+        mm_serial_port_close (port);
+        mm_modem_set_state (MM_MODEM (info->modem),
+                            MM_MODEM_STATE_DISABLED,
+                            MM_MODEM_STATE_REASON_NONE);
+        priv->reg_status = MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN;
+    }
     mm_callback_info_schedule (info);
 }
 
@@ -554,18 +558,19 @@ disable_flash_done (MMSerialPort *port,
                     gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
+    MMModemState prev_state;
     char *cmd = NULL;
 
-    if (error) {
-        MMModemState prev_state;
+    info->error = mm_modem_check_removed (info->modem, error);
+    if (info->error) {
+        if (info->modem) {
+            /* Reset old state since the operation failed */
+            prev_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, MM_GENERIC_GSM_PREV_STATE_TAG));
+            mm_modem_set_state (MM_MODEM (info->modem),
+                                prev_state,
+                                MM_MODEM_STATE_REASON_NONE);
+        }
 
-        /* Reset old state since the operation failed */
-        prev_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, MM_GENERIC_GSM_PREV_STATE_TAG));
-        mm_modem_set_state (MM_MODEM (info->modem),
-                            prev_state,
-                            MM_MODEM_STATE_REASON_NONE);
-
-        info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
         return;
     }
@@ -1374,25 +1379,25 @@ disconnect_flash_done (MMSerialPort *port,
                        gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMGenericGsm *self = MM_GENERIC_GSM (info->modem);
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    MMModemState prev_state;
 
-    if (error) {
-        MMModemState prev_state;
+    info->error = mm_modem_check_removed (info->modem, error);
+    if (info->error) {
+        if (info->modem) {
+            /* Reset old state since the operation failed */
+            prev_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, MM_GENERIC_GSM_PREV_STATE_TAG));
+            mm_modem_set_state (MM_MODEM (info->modem),
+                                prev_state,
+                                MM_MODEM_STATE_REASON_NONE);
+        }
+    } else {
+        MMGenericGsm *self = MM_GENERIC_GSM (info->modem);
+        MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
 
-        /* Reset old state since the operation failed */
-        prev_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, MM_GENERIC_GSM_PREV_STATE_TAG));
-        mm_modem_set_state (MM_MODEM (info->modem),
-                            prev_state,
-                            MM_MODEM_STATE_REASON_NONE);
-
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-        return;
+        mm_port_set_connected (priv->data, FALSE);
+        mm_generic_gsm_update_enabled_state (self, FALSE, MM_MODEM_STATE_REASON_NONE);
     }
 
-    mm_port_set_connected (priv->data, FALSE);
-    mm_generic_gsm_update_enabled_state (self, FALSE, MM_MODEM_STATE_REASON_NONE);
     mm_callback_info_schedule (info);
 }
 
