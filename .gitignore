@@ -20,12 +20,15 @@ libtool
 .deps
 .libs
 *-glue.h
+*.tar.bz2
 org.freedesktop.ModemManager.service
 ModemManager.pc
 marshallers/mm-marshal.[ch]
 src/modem-manager
 docs/spec.html
 callouts/mm-modem-probe
+test/lsudev
+src/tests/test-modem-helpers
 
 m4/gtk-doc.m4
 m4/intltool.m4
