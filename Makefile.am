@@ -47,3 +47,5 @@ EXTRA_DIST = \
 	doc-generator.xsl \
 	$(dbusservice_DATA) \
 	$(dbusactivation_in_files)
+
+ACLOCAL_AMFLAGS = -I m4
