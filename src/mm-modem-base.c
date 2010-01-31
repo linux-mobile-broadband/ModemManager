@@ -173,6 +173,7 @@ mm_modem_base_get_valid (MMModemBase *self)
 void mm_modem_base_set_unlock_required (MMModemBase *self, const char *unlock_required)
 {
     MMModemBasePrivate *priv;
+    const char *dbus_path;
 
     g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_MODEM_BASE (self));
@@ -188,6 +189,15 @@ void mm_modem_base_set_unlock_required (MMModemBase *self, const char *unlock_re
 
     g_free (priv->unlock_required);
     priv->unlock_required = g_strdup (unlock_required);
+
+    dbus_path = (const char *) g_object_get_data (G_OBJECT (self), DBUS_PATH_TAG);
+    if (dbus_path) {
+        if (priv->unlock_required)
+            g_message ("Modem %s: unlock required (%s)", dbus_path, priv->unlock_required);
+        else
+            g_message ("Modem %s: unlock no longer required", dbus_path);
+    }
+
     g_object_notify (G_OBJECT (self), MM_MODEM_UNLOCK_REQUIRED);
 }
 
