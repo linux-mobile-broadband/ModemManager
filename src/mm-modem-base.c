@@ -172,22 +172,23 @@ mm_modem_base_get_valid (MMModemBase *self)
 
 void mm_modem_base_set_unlock_required (MMModemBase *self, const char *unlock_required)
 {
-   MMModemBasePrivate *priv;
+    MMModemBasePrivate *priv;
 
-   g_return_if_fail (self != NULL);
-   g_return_if_fail (MM_IS_MODEM_BASE (self));
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_MODEM_BASE (self));
 
-   priv = MM_MODEM_BASE_GET_PRIVATE (self);
+    priv = MM_MODEM_BASE_GET_PRIVATE (self);
 
-   /* Only do something if the value changes */
-   if (priv->unlock_required == unlock_required
-      || (priv->unlock_required && unlock_required
-      && !strcmp(priv->unlock_required, unlock_required)))
-      return;
+    /* Only do something if the value changes */
+    if (  (priv->unlock_required == unlock_required)
+       || (   priv->unlock_required
+           && unlock_required
+           && !strcmp (priv->unlock_required, unlock_required)))
+       return;
 
-   g_free (priv->unlock_required);
-   priv->unlock_required = g_strdup (unlock_required);
-   g_object_notify (G_OBJECT (self), MM_MODEM_UNLOCK_REQUIRED);
+    g_free (priv->unlock_required);
+    priv->unlock_required = g_strdup (unlock_required);
+    g_object_notify (G_OBJECT (self), MM_MODEM_UNLOCK_REQUIRED);
 }
 
 /*****************************************************************************/
