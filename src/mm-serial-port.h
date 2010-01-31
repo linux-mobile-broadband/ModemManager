@@ -79,6 +79,8 @@ void     mm_serial_port_set_response_parser (MMSerialPort *self,
                                              gpointer user_data,
                                              GDestroyNotify notify);
 
+gboolean mm_serial_port_is_open           (MMSerialPort *self);
+
 gboolean mm_serial_port_open              (MMSerialPort *self,
                                            GError  **error);
 

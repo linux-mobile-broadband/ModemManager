@@ -852,6 +852,15 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
     return TRUE;
 }
 
+gboolean
+mm_serial_port_is_open (MMSerialPort *self)
+{
+    g_return_val_if_fail (self != NULL, FALSE);
+    g_return_val_if_fail (MM_IS_SERIAL_PORT (self), FALSE);
+
+    return (MM_SERIAL_PORT_GET_PRIVATE (self)->fd >= 0);
+}
+
 void
 mm_serial_port_close (MMSerialPort *self)
 {
