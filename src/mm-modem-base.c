@@ -39,6 +39,7 @@ typedef struct {
     char *driver;
     char *plugin;
     char *device;
+    char *unlock_required;
     guint32 ip_method;
     gboolean valid;
     MMModemState state;
@@ -169,6 +170,26 @@ mm_modem_base_get_valid (MMModemBase *self)
     return MM_MODEM_BASE_GET_PRIVATE (self)->valid;
 }
 
+void mm_modem_base_set_unlock_required (MMModemBase *self, const char *unlock_required)
+{
+   MMModemBasePrivate *priv;
+
+   g_return_if_fail (self != NULL);
+   g_return_if_fail (MM_IS_MODEM_BASE (self));
+
+   priv = MM_MODEM_BASE_GET_PRIVATE (self);
+
+   /* Only do something if the value changes */
+   if (priv->unlock_required == unlock_required
+      || (priv->unlock_required && unlock_required
+      && !strcmp(priv->unlock_required, unlock_required)))
+      return;
+
+   g_free (priv->unlock_required);
+   priv->unlock_required = g_strdup (unlock_required);
+   g_object_notify (G_OBJECT (self), MM_MODEM_UNLOCK_REQUIRED);
+}
+
 /*****************************************************************************/
 
 static void
@@ -227,6 +248,7 @@ set_property (GObject *object, guint prop_id,
     case MM_MODEM_PROP_VALID:
     case MM_MODEM_PROP_TYPE:
     case MM_MODEM_PROP_ENABLED:
+    case MM_MODEM_PROP_UNLOCK_REQUIRED:
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -268,6 +290,9 @@ get_property (GObject *object, guint prop_id,
     case MM_MODEM_PROP_ENABLED:
         g_value_set_boolean (value, is_enabled (priv->state));
         break;
+    case MM_MODEM_PROP_UNLOCK_REQUIRED:
+        g_value_set_string (value, priv->unlock_required);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -284,6 +309,7 @@ finalize (GObject *object)
     g_free (priv->driver);
     g_free (priv->plugin);
     g_free (priv->device);
+    g_free (priv->unlock_required);
 
     G_OBJECT_CLASS (mm_modem_base_parent_class)->finalize (object);
 }
@@ -335,6 +361,10 @@ mm_modem_base_class_init (MMModemBaseClass *klass)
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_ENABLED,
                                       MM_MODEM_ENABLED);
+
+    g_object_class_override_property (object_class,
+                                      MM_MODEM_PROP_UNLOCK_REQUIRED,
+                                      MM_MODEM_UNLOCK_REQUIRED);
 
     mm_properties_changed_signal_new (object_class);
 }

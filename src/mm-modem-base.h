@@ -60,5 +60,8 @@ void mm_modem_base_set_valid (MMModemBase *self,
 
 gboolean mm_modem_base_get_valid (MMModemBase *self);
 
+void mm_modem_base_set_unlock_required (MMModemBase *self,
+                                        const char *unlock_required);
+
 #endif /* MM_MODEM_BASE_H */
 

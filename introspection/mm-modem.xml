@@ -113,6 +113,18 @@
       </tp:docstring>
     </property>
 
+    <property name="UnlockRequired" type="s" access="read">
+      <tp:docstring>
+        Empty if the device is usable without an unlock code or has already
+        been unlocked. If the device needs to be unlocked before becoming usable this
+        property contains the specific unlock code required.  Valid unlock code values
+        are "" (blank), "sim-pin", "sim-puk", "ph-sim-pin", "ph-fsim-pin",
+        "ph-fsim-puk", "sim-pin2", "sim-puk2", "ph-net-pin", "ph-net-puk",
+        "ph-netsub-pin", "ph-netsub-puk", "ph-sp-pin", "ph-sp-puk", "ph-corp-pin", and
+        "ph-corp-puk".
+      </tp:docstring>
+    </property>
+
     <property name="IpMethod" type="u" access="read" tp:type="MM_MODEM_IP_METHOD">
       <tp:docstring>
         The IP configuration method.

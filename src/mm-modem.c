@@ -694,6 +694,15 @@ mm_modem_init (gpointer g_iface)
                                FALSE,
                                G_PARAM_READABLE));
 
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_string (MM_MODEM_UNLOCK_REQUIRED,
+                               "UnlockRequired",
+                               "Whether or not the modem requires an unlock "
+                               "code to become usable, and if so, which unlock code is required",
+                               NULL,
+                               G_PARAM_READABLE));
+
     /* Signals */
     g_signal_new ("state-changed",
                   iface_type,
