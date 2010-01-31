@@ -50,6 +50,7 @@ typedef struct {
     char *device;
 
     gboolean valid;
+    gboolean pin_checked;
 
     char *oper_code;
     char *oper_name;
@@ -167,6 +168,7 @@ mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
 
 typedef struct {
     const char *result;
+    const char *normalized;
     guint code;
 } CPinResult;
 
@@ -179,22 +181,22 @@ pin_check_done (MMSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     gboolean parsed = FALSE;
     static CPinResult results[] = {
-        { "SIM PIN", MM_MOBILE_ERROR_SIM_PIN },
-        { "SIM PUK", MM_MOBILE_ERROR_SIM_PUK },
-        { "PH-SIM PIN", MM_MOBILE_ERROR_PH_SIM_PIN },
-        { "PH-FSIM PIN", MM_MOBILE_ERROR_PH_FSIM_PIN },
-        { "PH-FSIM PUK", MM_MOBILE_ERROR_PH_FSIM_PUK },
-        { "SIM PIN2", MM_MOBILE_ERROR_SIM_PIN2 },
-        { "SIM PUK2", MM_MOBILE_ERROR_SIM_PUK2 },
-        { "PH-NET PIN", MM_MOBILE_ERROR_NETWORK_PIN },
-        { "PH-NET PUK", MM_MOBILE_ERROR_NETWORK_PUK },
-        { "PH-NETSUB PIN", MM_MOBILE_ERROR_NETWORK_SUBSET_PIN },
-        { "PH-NETSUB PUK", MM_MOBILE_ERROR_NETWORK_SUBSET_PUK },
-        { "PH-SP PIN", MM_MOBILE_ERROR_SERVICE_PIN },
-        { "PH-SP PUK", MM_MOBILE_ERROR_SERVICE_PUK },
-        { "PH-CORP PIN", MM_MOBILE_ERROR_CORP_PIN },
-        { "PH-CORP PUK", MM_MOBILE_ERROR_CORP_PUK },
-        { NULL, MM_MOBILE_ERROR_PHONE_FAILURE },
+        { "SIM PIN",       "sim-pin",       MM_MOBILE_ERROR_SIM_PIN },
+        { "SIM PUK",       "sim-puk",       MM_MOBILE_ERROR_SIM_PUK },
+        { "PH-SIM PIN",    "ph-sim-pin",    MM_MOBILE_ERROR_PH_SIM_PIN },
+        { "PH-FSIM PIN",   "ph-fsim-pin",   MM_MOBILE_ERROR_PH_FSIM_PIN },
+        { "PH-FSIM PUK",   "ph-fsim-puk",   MM_MOBILE_ERROR_PH_FSIM_PUK },
+        { "SIM PIN2",      "sim-pin2",      MM_MOBILE_ERROR_SIM_PIN2 },
+        { "SIM PUK2",      "sim-puk2",      MM_MOBILE_ERROR_SIM_PUK2 },
+        { "PH-NET PIN",    "ph-net-pin",    MM_MOBILE_ERROR_NETWORK_PIN },
+        { "PH-NET PUK",    "ph-net-puk",    MM_MOBILE_ERROR_NETWORK_PUK },
+        { "PH-NETSUB PIN", "ph-netsub-pin", MM_MOBILE_ERROR_NETWORK_SUBSET_PIN },
+        { "PH-NETSUB PUK", "ph-netsub-puk", MM_MOBILE_ERROR_NETWORK_SUBSET_PUK },
+        { "PH-SP PIN",     "ph-sp-pin",     MM_MOBILE_ERROR_SERVICE_PIN },
+        { "PH-SP PUK",     "ph-sp-puk",     MM_MOBILE_ERROR_SERVICE_PUK },
+        { "PH-CORP PIN",   "ph-corp-pin",   MM_MOBILE_ERROR_CORP_PIN },
+        { "PH-CORP PUK",   "ph-corp-puk",   MM_MOBILE_ERROR_CORP_PUK },
+        { NULL,            NULL,            MM_MOBILE_ERROR_PHONE_FAILURE },
     };
 
     if (error)
@@ -202,15 +204,17 @@ pin_check_done (MMSerialPort *port,
     else if (g_str_has_prefix (response->str, "+CPIN: ")) {
         const char *str = response->str + 7;
 
-        if (g_str_has_prefix (str, "READY"))
+        if (g_str_has_prefix (str, "READY")) {
+            mm_modem_base_set_unlock_required (MM_MODEM_BASE (info->modem), NULL);
             parsed = TRUE;
-        else {
+        } else {
             CPinResult *iter = &results[0];
 
             /* Translate the error */
             while (iter->result) {
                 if (g_str_has_prefix (str, iter->result)) {
                     info->error = mm_mobile_error_for_code (iter->code);
+                    mm_modem_base_set_unlock_required (MM_MODEM_BASE (info->modem), iter->normalized);
                     parsed = TRUE;
                     break;
                 }
@@ -219,11 +223,16 @@ pin_check_done (MMSerialPort *port,
         }
     }
 
-    if (!info->error && !parsed) {
-        info->error = g_error_new (MM_MODEM_ERROR,
-                                   MM_MODEM_ERROR_GENERAL,
-                                   "Could not parse PIN request response '%s'",
-                                   response->str);
+    if (!parsed) {
+        /* Assume unlocked if we don't recognize the pin request result */
+        mm_modem_base_set_unlock_required (MM_MODEM_BASE (info->modem), NULL);
+
+        if (!info->error) {
+            info->error = g_error_new (MM_MODEM_ERROR,
+                                       MM_MODEM_ERROR_GENERAL,
+                                       "Could not parse PIN request response '%s'",
+                                       response->str);
+        }
     }
 
     mm_callback_info_schedule (info);
@@ -282,10 +291,57 @@ check_valid (MMGenericGsm *self)
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     gboolean new_valid = FALSE;
 
-    if (priv->primary && priv->data)
+    if (priv->primary && priv->data && priv->pin_checked)
         new_valid = TRUE;
 
     mm_modem_base_set_valid (MM_MODEM_BASE (self), new_valid);
+}
+
+static void
+initial_pin_check_done (MMModem *modem, GError *error, gpointer user_data)
+{
+    MMGenericGsmPrivate *priv;
+    gboolean close_port = !!user_data;
+
+    /* modem could have been removed before we get here, in which case
+     * 'modem' will be NULL.
+     */
+    if (modem) {
+        g_return_if_fail (MM_IS_GENERIC_GSM (modem));
+        priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+
+        priv->pin_checked = TRUE;
+        if (close_port)
+            mm_serial_port_close (priv->primary);
+        check_valid (MM_GENERIC_GSM (modem));
+    }
+}
+
+static void
+initial_pin_check (MMGenericGsm *self)
+{
+    GError *error = NULL;
+    MMGenericGsmPrivate *priv;
+
+    g_return_if_fail (MM_IS_GENERIC_GSM (self));
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    g_return_if_fail (priv->primary != NULL);
+
+    if (mm_serial_port_open (priv->primary, &error))
+        mm_generic_gsm_check_pin (self, initial_pin_check_done, GUINT_TO_POINTER (TRUE));
+    else {
+        g_warning ("%s: failed to open serial port: (%d) %s",
+                   __func__,
+                   error ? error->code : -1,
+                   error && error->message ? error->message : "(unknown)");
+        g_clear_error (&error);
+
+        /* Ensure the modem is still somewhat usable if opening the serial
+         * port fails for some reason.
+         */
+        initial_pin_check_done (MM_MODEM (self), NULL, GUINT_TO_POINTER (FALSE));
+    }
 }
 
 static gboolean
@@ -324,7 +380,10 @@ mm_generic_gsm_grab_port (MMGenericGsm *self,
                 priv->data = port;
                 g_object_notify (G_OBJECT (self), MM_MODEM_DATA_DEVICE);
             }
-            check_valid (self);
+
+            /* Get modem's initial lock/unlock state */
+            initial_pin_check (self);
+
         } else if (ptype == MM_PORT_TYPE_SECONDARY)
             priv->secondary = MM_SERIAL_PORT (port);
     } else {
