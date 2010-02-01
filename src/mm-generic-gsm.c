@@ -807,15 +807,40 @@ get_card_info (MMModem *modem,
 }
 
 static void
+pin_puk_recheck_done (MMModem *modem, GError *error, gpointer user_data)
+{
+    gboolean close_port = !!user_data;
+
+    /* modem could have been removed before we get here, in which case
+     * 'modem' will be NULL.
+     */
+    if (modem) {
+        g_return_if_fail (MM_IS_GENERIC_GSM (modem));
+
+        if (close_port)
+            mm_serial_port_close (MM_GENERIC_GSM_GET_PRIVATE (modem)->primary);
+    }
+}
+
+#define PIN_CLOSE_PORT_TAG "close-port"
+
+static void
 send_puk_done (MMSerialPort *port,
                GString *response,
                GError *error,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    gboolean close_port = !!mm_callback_info_get_data (info, PIN_CLOSE_PORT_TAG);
 
     if (error)
         info->error = g_error_copy (error);
+
+    /* Get latest PUK status */
+    mm_generic_gsm_check_pin (MM_GENERIC_GSM (info->modem),
+                              pin_puk_recheck_done,
+                              GUINT_TO_POINTER (close_port));
+
     mm_callback_info_schedule (info);
 }
 
@@ -829,10 +854,33 @@ send_puk (MMModemGsmCard *modem,
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
     char *command;
+    gboolean connected;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+
+    connected = mm_port_get_connected (MM_PORT (priv->primary));
+    if (connected && !priv->secondary) {
+        /* Ensure we have a usable port to use for the unlock */
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_CONNECTED,
+                                           "Cannot unlock device while connected");
+        mm_callback_info_schedule (info);
+        return;
+    } else if (!mm_serial_port_is_open (priv->primary)) {
+        /* Modem may not be enabled yet, which sometimes can't be done until
+         * the device has been unlocked.
+         */
+        if (!mm_serial_port_open (priv->primary, &info->error)) {
+            mm_callback_info_schedule (info);
+            return;
+        }
+
+        /* Clean up after ourselves if we opened the port */
+        mm_callback_info_set_data (info, PIN_CLOSE_PORT_TAG, GUINT_TO_POINTER (TRUE), NULL);
+    }
+
     command = g_strdup_printf ("+CPIN=\"%s\",\"%s\"", puk, pin);
-    mm_serial_port_queue_command (priv->primary, command, 3, send_puk_done, info);
+    mm_serial_port_queue_command (connected ? priv->secondary : priv->primary, command, 3, send_puk_done, info);
     g_free (command);
 }
 
@@ -843,9 +891,16 @@ send_pin_done (MMSerialPort *port,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    gboolean close_port = !!mm_callback_info_get_data (info, PIN_CLOSE_PORT_TAG);
 
     if (error)
         info->error = g_error_copy (error);
+
+    /* Get latest PIN status */
+    mm_generic_gsm_check_pin (MM_GENERIC_GSM (info->modem),
+                              pin_puk_recheck_done,
+                              GUINT_TO_POINTER (close_port));
+
     mm_callback_info_schedule (info);
 }
 
@@ -858,10 +913,33 @@ send_pin (MMModemGsmCard *modem,
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
     char *command;
+    gboolean connected;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+
+    connected = mm_port_get_connected (MM_PORT (priv->primary));
+    if (connected && !priv->secondary) {
+        /* Ensure we have a usable port to use for the unlock */
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_CONNECTED,
+                                           "Cannot unlock device while connected");
+        mm_callback_info_schedule (info);
+        return;
+    } else if (!mm_serial_port_is_open (priv->primary)) {
+        /* Modem may not be enabled yet, which sometimes can't be done until
+         * the device has been unlocked.
+         */
+        if (!mm_serial_port_open (priv->primary, &info->error)) {
+            mm_callback_info_schedule (info);
+            return;
+        }
+
+        /* Clean up after ourselves if we opened the port */
+        mm_callback_info_set_data (info, PIN_CLOSE_PORT_TAG, GUINT_TO_POINTER (TRUE), NULL);
+    }
+
     command = g_strdup_printf ("+CPIN=\"%s\"", pin);
-    mm_serial_port_queue_command (priv->primary, command, 3, send_pin_done, info);
+    mm_serial_port_queue_command (connected ? priv->secondary : priv->primary, command, 3, send_pin_done, info);
     g_free (command);
 }
 
