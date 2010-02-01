@@ -190,7 +190,8 @@ mm_serial_parser_v0_destroy (gpointer data)
 typedef struct {
     GRegex *regex_ok;
     GRegex *regex_connect;
-    GRegex *regex_detailed_error;
+    GRegex *regex_cme_error;
+    GRegex *regex_cme_error_str;
     GRegex *regex_unknown_error;
     GRegex *regex_connect_failed;
 } MMSerialParserV1;
@@ -205,7 +206,8 @@ mm_serial_parser_v1_new (void)
 
     parser->regex_ok = g_regex_new ("\\r\\nOK(\\r\\n)+$", flags, 0, NULL);
     parser->regex_connect = g_regex_new ("\\r\\nCONNECT.*\\r\\n", flags, 0, NULL);
-    parser->regex_detailed_error = g_regex_new ("\\r\\n\\+CME ERROR: (\\d+)\\r\\n$", flags, 0, NULL);
+    parser->regex_cme_error = g_regex_new ("\\r\\n\\+CME ERROR: (\\d+)\\r\\n$", flags, 0, NULL);
+    parser->regex_cme_error_str = g_regex_new ("\\r\\n\\+CME ERROR: ([^\\n\\r]+)\\r\\n$", flags, 0, NULL);
     parser->regex_unknown_error = g_regex_new ("\\r\\n(ERROR)|(COMMAND NOT SUPPORT)\\r\\n$", flags, 0, NULL);
     parser->regex_connect_failed = g_regex_new ("\\r\\n(NO CARRIER)|(BUSY)|(NO ANSWER)|(NO DIALTONE)\\r\\n$", flags, 0, NULL);
 
@@ -219,9 +221,10 @@ mm_serial_parser_v1_parse (gpointer data,
 {
     MMSerialParserV1 *parser = (MMSerialParserV1 *) data;
     GMatchInfo *match_info;
-    GError *local_error;
-    int code;
+    GError *local_error = NULL;
     gboolean found = FALSE;
+    char *str;
+    int code;
 
     g_return_val_if_fail (parser != NULL, FALSE);
     g_return_val_if_fail (response != NULL, FALSE);
@@ -243,56 +246,70 @@ mm_serial_parser_v1_parse (gpointer data,
     }
 
     /* Now failures */
-    code = MM_MOBILE_ERROR_UNKNOWN;
-    local_error = NULL;
 
-    found = g_regex_match_full (parser->regex_detailed_error,
+    /* Numeric CME errors */
+    found = g_regex_match_full (parser->regex_cme_error,
                                 response->str, response->len,
                                 0, 0, &match_info, NULL);
-
     if (found) {
-        char *str;
-
         str = g_match_info_fetch (match_info, 1);
-        if (str) {
-            code = atoi (str);
-            g_free (str);
-        }
+        g_assert (str);
+        local_error = mm_mobile_error_for_code (atoi (str));
+        g_free (str);
         g_match_info_free (match_info);
-    } else 
-        found = g_regex_match_full (parser->regex_unknown_error, response->str, response->len, 0, 0, NULL, NULL);
-
-    if (found)
-        local_error = mm_mobile_error_for_code (code);
-    else {
-        found = g_regex_match_full (parser->regex_connect_failed,
-                                    response->str, response->len,
-                                    0, 0, &match_info, NULL);
-        if (found) {
-            char *str;
-
-            str = g_match_info_fetch (match_info, 1);
-            if (str) {
-                if (!strcmp (str, "NO CARRIER"))
-                    code = MM_MODEM_CONNECT_ERROR_NO_CARRIER;
-                else if (!strcmp (str, "BUSY"))
-                    code = MM_MODEM_CONNECT_ERROR_BUSY;
-                else if (!strcmp (str, "NO ANSWER"))
-                    code = MM_MODEM_CONNECT_ERROR_NO_ANSWER;
-                else if (!strcmp (str, "NO DIALTONE"))
-                    code = MM_MODEM_CONNECT_ERROR_NO_DIALTONE;
-                else
-                    /* uhm... make something up (yes, ok, lie!). */
-                    code = MM_MODEM_CONNECT_ERROR_NO_CARRIER;
-
-                g_free (str);
-            }
-            g_match_info_free (match_info);
-
-            local_error = mm_modem_connect_error_for_code (code);
-        }
+        goto done;
     }
 
+    /* String CME errors */
+    found = g_regex_match_full (parser->regex_cme_error_str,
+                                response->str, response->len,
+                                0, 0, &match_info, NULL);
+    if (found) {
+        str = g_match_info_fetch (match_info, 1);
+        g_assert (str);
+        local_error = mm_mobile_error_for_string (str);
+        g_free (str);
+        g_match_info_free (match_info);
+        goto done;
+    }
+
+    /* Last resort; unknown error */
+    found = g_regex_match_full (parser->regex_unknown_error,
+                                response->str, response->len,
+                                0, 0, NULL, NULL);
+    if (found) {
+        local_error = mm_mobile_error_for_code (MM_MOBILE_ERROR_UNKNOWN);
+        goto done;
+    }
+
+    /* Connection failures */
+    found = g_regex_match_full (parser->regex_connect_failed,
+                                response->str, response->len,
+                                0, 0, &match_info, NULL);
+    if (found) {
+        str = g_match_info_fetch (match_info, 1);
+        g_assert (str);
+
+        if (!strcmp (str, "NO CARRIER"))
+            code = MM_MODEM_CONNECT_ERROR_NO_CARRIER;
+        else if (!strcmp (str, "BUSY"))
+            code = MM_MODEM_CONNECT_ERROR_BUSY;
+        else if (!strcmp (str, "NO ANSWER"))
+            code = MM_MODEM_CONNECT_ERROR_NO_ANSWER;
+        else if (!strcmp (str, "NO DIALTONE"))
+            code = MM_MODEM_CONNECT_ERROR_NO_DIALTONE;
+        else {
+            /* uhm... make something up (yes, ok, lie!). */
+            code = MM_MODEM_CONNECT_ERROR_NO_CARRIER;
+        }
+
+        g_free (str);
+        g_match_info_free (match_info);
+
+        local_error = mm_modem_connect_error_for_code (code);
+    }
+
+done:
     if (found)
         response_clean (response);
 
@@ -313,7 +330,8 @@ mm_serial_parser_v1_destroy (gpointer data)
 
     g_regex_unref (parser->regex_ok);
     g_regex_unref (parser->regex_connect);
-    g_regex_unref (parser->regex_detailed_error);
+    g_regex_unref (parser->regex_cme_error);
+    g_regex_unref (parser->regex_cme_error_str);
     g_regex_unref (parser->regex_unknown_error);
     g_regex_unref (parser->regex_connect_failed);
 
