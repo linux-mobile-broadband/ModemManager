@@ -16,6 +16,9 @@
 
 #include "mm-errors.h"
 
+#include <string.h>
+#include <ctype.h>
+
 #define ENUM_ENTRY(NAME, DESC) { NAME, "" #NAME "", DESC }
 
 GQuark
@@ -222,69 +225,127 @@ mm_mobile_error_get_type (void)
     return etype;
 }
 
+typedef struct {
+    int code;
+    const char *error;  /* lowercase, and stripped of special chars and whitespace */
+    const char *message;
+} ErrorTable;
+
+static ErrorTable errors[] = {
+    { MM_MOBILE_ERROR_PHONE_FAILURE,             "phonefailure",                              "Phone failure" },
+    { MM_MOBILE_ERROR_NO_CONNECTION,             "noconnectiontophone",                       "No connection to phone" },
+    { MM_MOBILE_ERROR_LINK_RESERVED,             "phoneadapterlinkreserved",                  "Phone-adaptor link reserved" },
+    { MM_MOBILE_ERROR_NOT_ALLOWED,               "operationnotallowed",                       "Operation not allowed" },
+    { MM_MOBILE_ERROR_NOT_SUPPORTED,             "operationnotsupported",                     "Operation not supported" },
+    { MM_MOBILE_ERROR_PH_SIM_PIN,                "phsimpinrequired",                          "PH-SIM PIN required" },
+    { MM_MOBILE_ERROR_PH_FSIM_PIN,               "phfsimpinrequired",                         "PH-FSIM PIN required" },
+    { MM_MOBILE_ERROR_PH_FSIM_PUK,               "phfsimpukrequired",                         "PH-FSIM PUK required" },
+    { MM_MOBILE_ERROR_SIM_NOT_INSERTED,          "simnotinserted",                            "SIM not inserted" },
+    { MM_MOBILE_ERROR_SIM_PIN,                   "simpinrequired",                            "SIM PIN required" },
+    { MM_MOBILE_ERROR_SIM_PUK,                   "simpukrequired",                            "SIM PUK required" },
+    { MM_MOBILE_ERROR_SIM_FAILURE,               "simfailure",                                "SIM failure" },
+    { MM_MOBILE_ERROR_SIM_BUSY,                  "simbusy",                                   "SIM busy" },
+    { MM_MOBILE_ERROR_SIM_WRONG,                 "simwrong",                                  "SIM wrong" },
+    { MM_MOBILE_ERROR_WRONG_PASSWORD,            "incorrectpassword",                         "Incorrect password" },
+    { MM_MOBILE_ERROR_SIM_PIN2,                  "simpin2required",                           "SIM PIN2 required" },
+    { MM_MOBILE_ERROR_SIM_PUK2,                  "simpuk2required",                           "SIM PUK2 required" },
+    { MM_MOBILE_ERROR_MEMORY_FULL,               "memoryfull",                                "Memory full" },
+    { MM_MOBILE_ERROR_INVALID_INDEX,             "invalidindex",                              "Invalid index" },
+    { MM_MOBILE_ERROR_NOT_FOUND,                 "notfound",                                  "Not found" },
+    { MM_MOBILE_ERROR_MEMORY_FAILURE,            "memoryfailure",                             "Memory failure" },
+    { MM_MOBILE_ERROR_TEXT_TOO_LONG,             "textstringtoolong",                         "Text string too long" },
+    { MM_MOBILE_ERROR_INVALID_CHARS,             "invalidcharactersintextstring",             "Invalid characters in text string" },
+    { MM_MOBILE_ERROR_DIAL_STRING_TOO_LONG,      "dialstringtoolong",                         "Dial string too long" },
+    { MM_MOBILE_ERROR_DIAL_STRING_INVALID,       "invalidcharactersindialstring",             "Invalid characters in dial string" },
+    { MM_MOBILE_ERROR_NO_NETWORK,                "nonetworkservice",                          "No network service" },
+    { MM_MOBILE_ERROR_NETWORK_TIMEOUT,           "networktimeout",                            "Network timeout" },
+    { MM_MOBILE_ERROR_NETWORK_NOT_ALLOWED,       "networknotallowedemergencycallsonly",       "Network not allowed - emergency calls only" },
+    { MM_MOBILE_ERROR_NETWORK_PIN,               "networkpersonalizationpinrequired",         "Network personalization PIN required" },
+    { MM_MOBILE_ERROR_NETWORK_PUK,               "networkpersonalizationpukrequired",         "Network personalization PUK required" },
+    { MM_MOBILE_ERROR_NETWORK_SUBSET_PIN,        "networksubsetpersonalizationpinrequired",   "Network subset personalization PIN required" },
+    { MM_MOBILE_ERROR_NETWORK_SUBSET_PUK,        "networksubsetpersonalizationpukrequired",   "Network subset personalization PUK required" },
+    { MM_MOBILE_ERROR_SERVICE_PIN,               "serviceproviderpersonalizationpinrequired", "Service provider personalization PIN required" },
+    { MM_MOBILE_ERROR_SERVICE_PUK,               "serviceproviderpersonalizationpukrequired", "Service provider personalization PUK required" },
+    { MM_MOBILE_ERROR_CORP_PIN,                  "corporatepersonalizationpinrequired",       "Corporate personalization PIN required" },
+    { MM_MOBILE_ERROR_CORP_PUK,                  "corporatepersonalizationpukrequired",       "Corporate personalization PUK required" },
+    { MM_MOBILE_ERROR_HIDDEN_KEY,                "phsimpukrequired",                          "Hidden key required" },
+    { MM_MOBILE_ERROR_EAP_NOT_SUPPORTED,         "eapmethodnotsupported",                     "EAP method not supported" },
+    { MM_MOBILE_ERROR_INCORRECT_PARAMS,          "incorrectparameters",                       "Incorrect parameters" },
+    { MM_MOBILE_ERROR_UNKNOWN,                   "unknownerror",                              "Unknown error" },
+    { MM_MOBILE_ERROR_GPRS_ILLEGAL_MS,           "illegalms",                                 "Illegal MS" },
+    { MM_MOBILE_ERROR_GPRS_ILLEGAL_ME,           "illegalme",                                 "Illegal ME" },
+    { MM_MOBILE_ERROR_GPRS_SERVICE_NOT_ALLOWED,  "gprsservicesnotallowed",                    "GPRS services not allowed" },
+    { MM_MOBILE_ERROR_GPRS_PLMN_NOT_ALLOWED,     "plmnnotallowed",                            "PLMN not allowed" },
+    { MM_MOBILE_ERROR_GPRS_LOCATION_NOT_ALLOWED, "locationareanotallowed",                    "Location area not allowed" },
+    { MM_MOBILE_ERROR_GPRS_ROAMING_NOT_ALLOWED,  "roamingnotallowedinthislocationarea",       "Roaming not allowed in this location area" },
+    { MM_MOBILE_ERROR_GPRS_OPTION_NOT_SUPPORTED, "serviceoperationnotsupported",              "Service option not supported" },
+    { MM_MOBILE_ERROR_GPRS_NOT_SUBSCRIBED,       "requestedserviceoptionnotsubscribed",       "Requested service option not subscribed" },
+    { MM_MOBILE_ERROR_GPRS_OUT_OF_ORDER,         "serviceoptiontemporarilyoutoforder",        "Service option temporarily out of order" },
+    { MM_MOBILE_ERROR_GPRS_UNKNOWN,              "unspecifiedgprserror",                      "Unspecified GPRS error" },
+    { MM_MOBILE_ERROR_GPRS_PDP_AUTH_FAILURE,     "pdpauthenticationfailure",                  "PDP authentication failure" },
+    { MM_MOBILE_ERROR_GPRS_INVALID_CLASS,        "invalidmobileclass",                        "Invalid mobile class" },
+    { -1,                                        NULL,                                        NULL }
+};
+
 GError *
 mm_mobile_error_for_code (int error_code)
 {
-    const char *msg;
+    const char *msg = NULL;
+    const ErrorTable *ptr = &errors[0];
 
-    switch (error_code) {
-    case MM_MOBILE_ERROR_PHONE_FAILURE: msg = "Phone failure"; break;
-    case MM_MOBILE_ERROR_NO_CONNECTION: msg = "No connection to phone"; break;
-    case MM_MOBILE_ERROR_LINK_RESERVED: msg = "Phone-adaptor link reserved"; break;
-    case MM_MOBILE_ERROR_NOT_ALLOWED: msg = "Operation not allowed"; break;
-    case MM_MOBILE_ERROR_NOT_SUPPORTED: msg = "Operation not supported"; break;
-    case MM_MOBILE_ERROR_PH_SIM_PIN: msg = "PH-SIM PIN required"; break;
-    case MM_MOBILE_ERROR_PH_FSIM_PIN: msg = "PH-FSIM PIN required"; break;
-    case MM_MOBILE_ERROR_PH_FSIM_PUK: msg = "PH-FSIM PUK required"; break;
-    case MM_MOBILE_ERROR_SIM_NOT_INSERTED: msg = "SIM not inserted"; break;
-    case MM_MOBILE_ERROR_SIM_PIN: msg = "SIM PIN required"; break;
-    case MM_MOBILE_ERROR_SIM_PUK: msg = "SIM PUK required"; break;
-    case MM_MOBILE_ERROR_SIM_FAILURE: msg = "SIM failure"; break;
-    case MM_MOBILE_ERROR_SIM_BUSY: msg = "SIM busy"; break;
-    case MM_MOBILE_ERROR_SIM_WRONG: msg = "SIM wrong"; break;
-    case MM_MOBILE_ERROR_WRONG_PASSWORD: msg = "Incorrect password"; break;
-    case MM_MOBILE_ERROR_SIM_PIN2: msg = "SIM PIN2 required"; break;
-    case MM_MOBILE_ERROR_SIM_PUK2: msg = "SIM PUK2 required"; break;
-    case MM_MOBILE_ERROR_MEMORY_FULL: msg = "Memory full"; break;
-    case MM_MOBILE_ERROR_INVALID_INDEX: msg = "Invalid index"; break;
-    case MM_MOBILE_ERROR_NOT_FOUND: msg = "Not found"; break;
-    case MM_MOBILE_ERROR_MEMORY_FAILURE: msg = "Memory failure"; break;
-    case MM_MOBILE_ERROR_TEXT_TOO_LONG: msg = "Text string too long"; break;
-    case MM_MOBILE_ERROR_INVALID_CHARS: msg = "Invalid characters in text string"; break;
-    case MM_MOBILE_ERROR_DIAL_STRING_TOO_LONG: msg = "Dial string too long"; break;
-    case MM_MOBILE_ERROR_DIAL_STRING_INVALID: msg = "Invalid characters in dial string"; break;
-    case MM_MOBILE_ERROR_NO_NETWORK: msg = "No network service"; break;
-    case MM_MOBILE_ERROR_NETWORK_TIMEOUT: msg = "Network timeout"; break;
-    case MM_MOBILE_ERROR_NETWORK_NOT_ALLOWED: msg = "Network not allowed - emergency calls only"; break;
-    case MM_MOBILE_ERROR_NETWORK_PIN: msg = "Network personalization PIN required"; break;
-    case MM_MOBILE_ERROR_NETWORK_PUK: msg = "Network personalization PUK required"; break;
-    case MM_MOBILE_ERROR_NETWORK_SUBSET_PIN: msg = "Network subset personalization PIN required"; break;
-    case MM_MOBILE_ERROR_NETWORK_SUBSET_PUK: msg = "Network subset personalization PUK required"; break;
-    case MM_MOBILE_ERROR_SERVICE_PIN: msg = "Service provider personalization PIN required"; break;
-    case MM_MOBILE_ERROR_SERVICE_PUK: msg = "Service provider personalization PUK required"; break;
-    case MM_MOBILE_ERROR_CORP_PIN: msg = "Corporate personalization PIN required"; break;
-    case MM_MOBILE_ERROR_CORP_PUK: msg = "Corporate personalization PUK required"; break;
-    case MM_MOBILE_ERROR_HIDDEN_KEY: msg = "Hidden key required"; break;
-    case MM_MOBILE_ERROR_EAP_NOT_SUPPORTED: msg = "EAP method not supported"; break;
-    case MM_MOBILE_ERROR_INCORRECT_PARAMS: msg = "Incorrect parameters"; break;
-    case MM_MOBILE_ERROR_UNKNOWN: msg = "Unknown error"; break;
-    case MM_MOBILE_ERROR_GPRS_ILLEGAL_MS: msg = "Illegal MS"; break;
-    case MM_MOBILE_ERROR_GPRS_ILLEGAL_ME: msg = "Illegal ME"; break;
-    case MM_MOBILE_ERROR_GPRS_SERVICE_NOT_ALLOWED: msg = "GPRS services not allowed"; break;
-    case MM_MOBILE_ERROR_GPRS_PLMN_NOT_ALLOWED: msg = "PLMN not allowed"; break;
-    case MM_MOBILE_ERROR_GPRS_LOCATION_NOT_ALLOWED: msg = "Location area not allowed"; break;
-    case MM_MOBILE_ERROR_GPRS_ROAMING_NOT_ALLOWED: msg = "Roaming not allowed in this location area"; break;
-    case MM_MOBILE_ERROR_GPRS_OPTION_NOT_SUPPORTED: msg = "Service option not supported"; break;
-    case MM_MOBILE_ERROR_GPRS_NOT_SUBSCRIBED: msg = "Requested service option not subscribed"; break;
-    case MM_MOBILE_ERROR_GPRS_OUT_OF_ORDER: msg = "Service option temporarily out of order"; break;
-    case MM_MOBILE_ERROR_GPRS_PDP_AUTH_FAILURE: msg = "PDP authentication failure"; break;
-    case MM_MOBILE_ERROR_GPRS_UNKNOWN: msg = "Unspecified GPRS error"; break;
-    case MM_MOBILE_ERROR_GPRS_INVALID_CLASS: msg = "Invalid mobile class"; break;
-    default:
-        g_warning ("Invalid error code");
+    while (ptr->code >= 0) {
+        if (ptr->code == error_code) {
+            msg = ptr->message;
+            break;
+        }
+        ptr++;
+    }
+
+    if (!msg) {
+        g_warning ("Invalid error code: %d", error_code);
         error_code = MM_MOBILE_ERROR_UNKNOWN;
         msg = "Unknown error";
     }
 
     return g_error_new_literal (MM_MOBILE_ERROR, error_code, msg);
 }
+
+#define BUF_SIZE 100
+
+GError *
+mm_mobile_error_for_string (const char *str)
+{
+    int error_code = -1;
+    const ErrorTable *ptr = &errors[0];
+    char buf[BUF_SIZE + 1];
+    const char *msg = NULL, *p = str;
+    int i = 0;
+
+    g_return_val_if_fail (str != NULL, NULL);
+
+    /* Normalize the error code by stripping whitespace and odd characters */
+    while (*p && i < BUF_SIZE) {
+        if (isalnum (*p))
+            buf[i++] = tolower (*p);
+        p++;
+    }
+    buf[i] = '\0';
+
+    while (ptr->code >= 0) {
+        if (!strcmp (buf, ptr->error)) {
+            error_code = ptr->code;
+            msg = ptr->message;
+            break;
+        }
+        ptr++;
+    }
+
+    if (!msg) {
+        g_warning ("Invalid error code: %d", error_code);
+        error_code = MM_MOBILE_ERROR_UNKNOWN;
+        msg = "Unknown error";
+    }
+
+    return g_error_new_literal (MM_MOBILE_ERROR, error_code, msg);
+}
+

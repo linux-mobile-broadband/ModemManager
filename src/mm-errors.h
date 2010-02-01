@@ -64,6 +64,7 @@ GType   mm_modem_connect_error_get_type (void);
 GError *mm_modem_connect_error_for_code (int error_code);
 
 
+/* 3GPP TS 07.07 version 7.8.0 Release 1998 (page 90) ETSI TS 100 916 V7.8.0 (2003-03) */
 enum {
     MM_MOBILE_ERROR_PHONE_FAILURE = 0,
     MM_MOBILE_ERROR_NO_CONNECTION = 1,
@@ -115,8 +116,8 @@ enum {
     MM_MOBILE_ERROR_GPRS_OPTION_NOT_SUPPORTED = 132,
     MM_MOBILE_ERROR_GPRS_NOT_SUBSCRIBED = 133,
     MM_MOBILE_ERROR_GPRS_OUT_OF_ORDER = 134,
-    MM_MOBILE_ERROR_GPRS_PDP_AUTH_FAILURE = 149,
     MM_MOBILE_ERROR_GPRS_UNKNOWN = 148,
+    MM_MOBILE_ERROR_GPRS_PDP_AUTH_FAILURE = 149,
     MM_MOBILE_ERROR_GPRS_INVALID_CLASS = 150
 };
 
@@ -127,5 +128,6 @@ enum {
 GQuark  mm_mobile_error_quark    (void);
 GType   mm_mobile_error_get_type (void);
 GError *mm_mobile_error_for_code (int error_code);
+GError *mm_mobile_error_for_string (const char *str);
 
 #endif /* MM_MODEM_ERROR_H */
