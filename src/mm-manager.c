@@ -15,6 +15,7 @@
  */
 
 #include <string.h>
+#include <ctype.h>
 #include <gmodule.h>
 #define G_UDEV_API_IS_SUBJECT_TO_CHANGE
 #include <gudev/gudev.h>
@@ -516,6 +517,10 @@ device_added (MMManager *manager, GUdevDevice *device)
 
     subsys = g_udev_device_get_subsystem (device);
     name = g_udev_device_get_name (device);
+
+    /* ignore VTs */
+    if (strncmp (name, "tty", 3) == 0 && isdigit (name[3]))
+	return;
 
     if (find_modem_for_port (manager, subsys, name))
         return;
