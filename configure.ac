@@ -88,6 +88,9 @@ NM_COMPILER_WARNINGS
 AC_CONFIG_FILES([
 Makefile
 marshallers/Makefile
+libqcdm/Makefile
+libqcdm/src/Makefile
+libqcdm/tests/Makefile
 src/Makefile
 src/tests/Makefile
 plugins/Makefile

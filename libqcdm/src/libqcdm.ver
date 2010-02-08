@@ -1,0 +1,6 @@
+{
+global:
+	nm_vpn_connection_new;
+local:
+	*;
+};

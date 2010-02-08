@@ -30,6 +30,8 @@ callouts/mm-modem-probe
 test/lsudev
 src/tests/test-modem-helpers
 
+libqcdm/tests/test-qcdm
+
 m4/gtk-doc.m4
 m4/intltool.m4
 m4/libtool.m4

@@ -19,7 +19,7 @@ all: $(GENERATED_FILES)
 CLEANFILES = $(GENERATED_FILES)
 endif
 
-SUBDIRS = marshallers src plugins introspection test
+SUBDIRS = marshallers libqcdm src plugins introspection test
 
 dbusservicedir = $(DBUS_SYS_DIR)
 dbusservice_DATA = org.freedesktop.ModemManager.conf
