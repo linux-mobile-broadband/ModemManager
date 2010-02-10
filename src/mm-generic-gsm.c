@@ -51,6 +51,8 @@ typedef struct {
 
     gboolean valid;
     gboolean pin_checked;
+    guint32 pin_check_tries;
+    guint pin_check_timeout;
 
     char *oper_code;
     char *oper_name;
@@ -297,6 +299,20 @@ check_valid (MMGenericGsm *self)
     mm_modem_base_set_valid (MM_MODEM_BASE (self), new_valid);
 }
 
+
+static void initial_pin_check_done (MMModem *modem, GError *error, gpointer user_data);
+
+static gboolean
+pin_check_again (gpointer user_data)
+{
+    MMGenericGsm *self = MM_GENERIC_GSM (user_data);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    priv->pin_check_timeout = 0;
+    mm_generic_gsm_check_pin (self, initial_pin_check_done, GUINT_TO_POINTER (TRUE));
+    return FALSE;
+}
+
 static void
 initial_pin_check_done (MMModem *modem, GError *error, gpointer user_data)
 {
@@ -306,10 +322,18 @@ initial_pin_check_done (MMModem *modem, GError *error, gpointer user_data)
     /* modem could have been removed before we get here, in which case
      * 'modem' will be NULL.
      */
-    if (modem) {
-        g_return_if_fail (MM_IS_GENERIC_GSM (modem));
-        priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+    if (!modem)
+        return;
 
+    g_return_if_fail (MM_IS_GENERIC_GSM (modem));
+    priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+
+    if (error && priv->pin_check_tries++ < 3) {
+        /* Try it again a few times */
+        if (priv->pin_check_timeout)
+            g_source_remove (priv->pin_check_timeout);
+        priv->pin_check_timeout = g_timeout_add_seconds (2, pin_check_again, modem);
+    } else {
         priv->pin_checked = TRUE;
         if (close_port)
             mm_serial_port_close (priv->primary);
@@ -2283,6 +2307,9 @@ finalize (GObject *object)
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (object);
 
     mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (object));
+
+    if (priv->pin_check_timeout)
+        g_source_remove (priv->pin_check_timeout);
 
     g_free (priv->oper_code);
     g_free (priv->oper_name);
