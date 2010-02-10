@@ -170,7 +170,17 @@ mm_modem_base_get_valid (MMModemBase *self)
     return MM_MODEM_BASE_GET_PRIVATE (self)->valid;
 }
 
-void mm_modem_base_set_unlock_required (MMModemBase *self, const char *unlock_required)
+const char *
+mm_modem_base_get_unlock_required (MMModemBase *self)
+{
+    g_return_val_if_fail (self != NULL, NULL);
+    g_return_val_if_fail (MM_IS_MODEM_BASE (self), NULL);
+
+    return MM_MODEM_BASE_GET_PRIVATE (self)->unlock_required;
+}
+
+void
+mm_modem_base_set_unlock_required (MMModemBase *self, const char *unlock_required)
 {
     MMModemBasePrivate *priv;
     const char *dbus_path;

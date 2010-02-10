@@ -203,8 +203,8 @@ pin_check_done (MMSerialPort *port,
 
     if (error)
         info->error = g_error_copy (error);
-    else if (g_str_has_prefix (response->str, "+CPIN: ")) {
-        const char *str = response->str + 7;
+    else if (response && strstr (response->str, "+CPIN: ")) {
+        const char *str = strstr (response->str, "+CPIN: ") + 7;
 
         if (g_str_has_prefix (str, "READY")) {
             mm_modem_base_set_unlock_required (MM_MODEM_BASE (info->modem), NULL);
@@ -328,7 +328,9 @@ initial_pin_check_done (MMModem *modem, GError *error, gpointer user_data)
     g_return_if_fail (MM_IS_GENERIC_GSM (modem));
     priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
 
-    if (error && priv->pin_check_tries++ < 3) {
+    if (   error
+        && priv->pin_check_tries++ < 3
+        && !mm_modem_base_get_unlock_required (MM_MODEM_BASE (modem))) {
         /* Try it again a few times */
         if (priv->pin_check_timeout)
             g_source_remove (priv->pin_check_timeout);
