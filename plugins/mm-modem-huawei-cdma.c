@@ -41,9 +41,18 @@ mm_modem_huawei_cdma_new (const char *device,
                          gboolean evdo_rev0,
                          gboolean evdo_revA)
 {
+    gboolean try_css = TRUE;
+
     g_return_val_if_fail (device != NULL, NULL);
     g_return_val_if_fail (driver != NULL, NULL);
     g_return_val_if_fail (plugin != NULL, NULL);
+
+    /* Don't use AT+CSS on EVDO-capable hardware for determining registration
+     * status, because often the device will have only an EVDO connection and
+     * AT+CSS won't necessarily report EVDO registration status, only 1X.
+     */
+    if (evdo_rev0 || evdo_revA)
+        try_css = FALSE;
 
     return MM_MODEM (g_object_new (MM_TYPE_MODEM_HUAWEI_CDMA,
                                    MM_MODEM_MASTER_DEVICE, device,
@@ -51,6 +60,7 @@ mm_modem_huawei_cdma_new (const char *device,
                                    MM_MODEM_PLUGIN, plugin,
                                    MM_GENERIC_CDMA_EVDO_REV0, evdo_rev0,
                                    MM_GENERIC_CDMA_EVDO_REVA, evdo_revA,
+                                   MM_GENERIC_CDMA_REGISTRATION_TRY_CSS, try_css,
                                    NULL));
 }
 
