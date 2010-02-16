@@ -15,32 +15,28 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef UTILS_H
-#define UTILS_H
+#ifndef LIBQCDM_RESULT_H
+#define LIBQCDM_RESULT_H
 
 #include <glib.h>
 
-#define DIAG_CONTROL_CHAR 0x7E
-#define DIAG_TRAILER_LEN  3
+typedef struct QCDMResult QCDMResult;
 
-guint16 crc16 (const char *buffer, gsize len);
+gboolean qcdm_result_get_string (QCDMResult *result,
+                                 const char *key,
+                                 const char **out_val);
 
-gsize dm_escape (const char *inbuf,
-                 gsize inbuf_len,
-                 char *outbuf,
-                 gsize outbuf_len);
+gboolean qcdm_result_get_uint8  (QCDMResult *result,
+                                 const char *key,
+                                 guint8 *out_val);
 
-gsize dm_unescape (const char *inbuf,
-                   gsize inbuf_len,
-                   char *outbuf,
-                   gsize outbuf_len,
-                   gboolean *escaping);
+gboolean qcdm_result_get_uint32 (QCDMResult *result,
+                                 const char *key,
+                                 guint32 *out_val);
 
-gsize dm_prepare_buffer (char *inbuf,
-                         gsize cmd_len,
-                         gsize inbuf_len,
-                         char *outbuf,
-                         gsize outbuf_len);
+QCDMResult *qcdm_result_ref     (QCDMResult *result);
 
-#endif  /* UTILS_H */
+void        qcdm_result_unref   (QCDMResult *result);
+
+#endif  /* LIBQCDM_RESULT_H */
 

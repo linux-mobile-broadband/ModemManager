@@ -15,32 +15,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef UTILS_H
-#define UTILS_H
+#ifndef TEST_QCDM_COM_H
+#define TEST_QCDM_COM_H
 
-#include <glib.h>
+gpointer test_com_setup (const char *port);
+void test_com_teardown (gpointer d);
 
-#define DIAG_CONTROL_CHAR 0x7E
-#define DIAG_TRAILER_LEN  3
+void test_com (void *f, void *data);
 
-guint16 crc16 (const char *buffer, gsize len);
-
-gsize dm_escape (const char *inbuf,
-                 gsize inbuf_len,
-                 char *outbuf,
-                 gsize outbuf_len);
-
-gsize dm_unescape (const char *inbuf,
-                   gsize inbuf_len,
-                   char *outbuf,
-                   gsize outbuf_len,
-                   gboolean *escaping);
-
-gsize dm_prepare_buffer (char *inbuf,
-                         gsize cmd_len,
-                         gsize inbuf_len,
-                         char *outbuf,
-                         gsize outbuf_len);
-
-#endif  /* UTILS_H */
+#endif  /* TEST_QCDM_COM_H */
 

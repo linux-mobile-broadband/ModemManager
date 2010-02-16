@@ -78,7 +78,6 @@ crc16 (const char *buffer, gsize len)
     return ~crc;
 }
 
-#define DIAG_CONTROL_CHAR 0x7E
 #define DIAG_ESC_CHAR     0x7D  /* Escape sequence 1st character value */
 #define DIAG_ESC_MASK     0x20  /* Escape sequence complement value */
 
@@ -165,5 +164,31 @@ dm_unescape (const char *inbuf,
     }
 
     return outsize;
+}
+
+gsize
+dm_prepare_buffer (char *inbuf,
+                   gsize cmd_len,
+                   gsize inbuf_len,
+                   char *outbuf,
+                   gsize outbuf_len)
+{
+    guint16 crc;
+    gsize escaped_len;
+
+    g_return_val_if_fail (inbuf != NULL, 0);
+    g_return_val_if_fail (cmd_len >= 1, 0);
+    g_return_val_if_fail (inbuf_len >= cmd_len + 2, 0); /* space for CRC */
+    g_return_val_if_fail (outbuf != NULL, 0);
+
+    crc = GUINT16_TO_LE (crc16 (inbuf, cmd_len));
+    inbuf[cmd_len++] = crc & 0xFF;
+    inbuf[cmd_len++] = (crc >> 8) & 0xFF;
+
+    escaped_len = dm_escape (inbuf, cmd_len, outbuf, outbuf_len);
+    g_return_val_if_fail (outbuf_len > escaped_len, 0);
+    outbuf[escaped_len++] = DIAG_CONTROL_CHAR;
+
+    return escaped_len;
 }
 

@@ -5,6 +5,16 @@ libqcdm_la_CPPFLAGS = \
 	$(MM_CFLAGS)
 
 libqcdm_la_SOURCES = \
+	dm-commands.h \
+	com.c \
+	com.h \
+	commands.c \
+	commands.h \
+	error.c \
+	error.h \
+	result.c \
+	result.h \
+	result-private.h \
 	utils.c \
 	utils.h
 

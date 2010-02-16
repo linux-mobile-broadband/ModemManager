@@ -15,32 +15,34 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef UTILS_H
-#define UTILS_H
+#ifndef LIBQCDM_ERROR_H
+#define LIBQCDM_ERROR_H
 
 #include <glib.h>
+#include <glib-object.h>
 
-#define DIAG_CONTROL_CHAR 0x7E
-#define DIAG_TRAILER_LEN  3
+enum {
+    QCDM_SERIAL_CONFIG_FAILED = 0,
+};
 
-guint16 crc16 (const char *buffer, gsize len);
+#define QCDM_SERIAL_ERROR (qcdm_serial_error_quark ())
+#define QCDM_TYPE_SERIAL_ERROR (qcdm_serial_error_get_type ())
 
-gsize dm_escape (const char *inbuf,
-                 gsize inbuf_len,
-                 char *outbuf,
-                 gsize outbuf_len);
+GQuark qcdm_serial_error_quark    (void);
+GType  qcdm_serial_error_get_type (void);
 
-gsize dm_unescape (const char *inbuf,
-                   gsize inbuf_len,
-                   char *outbuf,
-                   gsize outbuf_len,
-                   gboolean *escaping);
 
-gsize dm_prepare_buffer (char *inbuf,
-                         gsize cmd_len,
-                         gsize inbuf_len,
-                         char *outbuf,
-                         gsize outbuf_len);
+enum {
+    QCDM_COMMAND_MALFORMED_RESPONSE = 0,
+    QCDM_COMMAND_UNEXPECTED = 1,
+    QCDM_COMMAND_BAD_LENGTH = 2,
+};
 
-#endif  /* UTILS_H */
+#define QCDM_COMMAND_ERROR (qcdm_command_error_quark ())
+#define QCDM_TYPE_COMMAND_ERROR (qcdm_command_error_get_type ())
+
+GQuark qcdm_command_error_quark    (void);
+GType  qcdm_command_error_get_type (void);
+
+#endif  /* LIBQCDM_ERROR_H */
 
