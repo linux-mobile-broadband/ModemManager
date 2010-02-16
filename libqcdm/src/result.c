@@ -31,10 +31,10 @@ struct QCDMResult {
 static void
 gvalue_destroy (gpointer data)
 {
-	GValue *value = (GValue *) data;
+    GValue *value = (GValue *) data;
 
-	g_value_unset (value);
-	g_slice_free (GValue, value);
+    g_value_unset (value);
+    g_slice_free (GValue, value);
 }
 
 QCDMResult *
@@ -86,9 +86,9 @@ qcdm_result_add_string (QCDMResult *result,
     g_return_if_fail (key != NULL);
     g_return_if_fail (str != NULL);
 
-	val = g_slice_new0 (GValue);
-	g_value_init (val, G_TYPE_STRING);
-	g_value_set_string (val, str);
+    val = g_slice_new0 (GValue);
+    g_value_init (val, G_TYPE_STRING);
+    g_value_set_string (val, str);
 
     g_hash_table_insert (result->hash, (gpointer) key, val);
 }
@@ -129,9 +129,9 @@ qcdm_result_add_uint8 (QCDMResult *result,
     g_return_if_fail (result->refcount > 0);
     g_return_if_fail (key != NULL);
 
-	val = g_slice_new0 (GValue);
-	g_value_init (val, G_TYPE_UCHAR);
-	g_value_set_uchar (val, (unsigned char) num);
+    val = g_slice_new0 (GValue);
+    g_value_init (val, G_TYPE_UCHAR);
+    g_value_set_uchar (val, (unsigned char) num);
 
     g_hash_table_insert (result->hash, (gpointer) key, val);
 }
@@ -171,9 +171,9 @@ qcdm_result_add_uint32 (QCDMResult *result,
     g_return_if_fail (result->refcount > 0);
     g_return_if_fail (key != NULL);
 
-	val = g_slice_new0 (GValue);
-	g_value_init (val, G_TYPE_UINT);
-	g_value_set_uint (val, num);
+    val = g_slice_new0 (GValue);
+    g_value_init (val, G_TYPE_UINT);
+    g_value_set_uint (val, num);
 
     g_hash_table_insert (result->hash, (gpointer) key, val);
 }
