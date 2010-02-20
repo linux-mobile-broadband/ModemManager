@@ -20,6 +20,9 @@ ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1909", ENV{ID_MM_ERICSSON_MBM}="1"
 # Ericsson C3607w
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1049", ENV{ID_MM_ERICSSON_MBM}="1"
 
+# Ericsson C3607w v2
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="190b", ENV{ID_MM_ERICSSON_MBM}="1"
+
 # Sony-Ericsson MD300
 ATTRS{idVendor}=="0fce", ATTRS{idProduct}=="d0cf", ENV{ID_MM_ERICSSON_MBM}="1"
 

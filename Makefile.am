@@ -19,7 +19,7 @@ all: $(GENERATED_FILES)
 CLEANFILES = $(GENERATED_FILES)
 endif
 
-SUBDIRS = marshallers libqcdm src plugins introspection test
+SUBDIRS = marshallers libqcdm src plugins introspection po policy test
 
 dbusservicedir = $(DBUS_SYS_DIR)
 dbusservice_DATA = org.freedesktop.ModemManager.conf
@@ -39,13 +39,22 @@ edit = @sed \
 
 DISTCHECK_CONFIGURE_FLAGS = --with-udev-base-dir=$dc_install_base
 
-DISTCLEANFILES = \
-	$(dbusactivation_DATA)
+INTLTOOL_FILES = \
+	intltool-extract.in \
+	intltool-merge.in \
+	intltool-update.in
 
+DISTCLEANFILES = \
+	$(dbusactivation_DATA) \
+	intltool-extract \
+	intltool-merge \
+	intltool-update \
+	po/.intltool-merge-cache
 
 EXTRA_DIST = \
 	doc-generator.xsl \
 	$(dbusservice_DATA) \
-	$(dbusactivation_in_files)
+	$(dbusactivation_in_files) \
+	$(INTLTOOL_FILES)
 
 ACLOCAL_AMFLAGS = -I m4

@@ -409,6 +409,27 @@ test_cops_response_gobi (void *f, gpointer d)
 }
 
 static void
+test_cops_response_sek600i (void *f, gpointer d)
+{
+    /* Phone is stupid enough to support 3G but not report cell technology,
+     * mixing together 2G and 3G cells without any way of distinguishing
+     * which is which...
+     */
+    const char *reply = "+COPS: (2,\"blau\",\"\",\"26203\"),(2,\"blau\",\"\",\"26203\"),(3,\"\",\"\",\"26201\"),(3,\"\",\"\",\"26202\"),(3,\"\",\"\",\"26207\"),(3,\"\",\"\",\"26201\"),(3,\"\",\"\",\"26207\")";
+    static OperEntry expected[] = {
+        { "2", "blau", NULL, "26203", NULL },
+        { "2", "blau", NULL, "26203", NULL },
+        { "3", NULL, NULL, "26201", NULL },
+        { "3", NULL, NULL, "26202", NULL },
+        { "3", NULL, NULL, "26207", NULL },
+        { "3", NULL, NULL, "26201", NULL },
+        { "3", NULL, NULL, "26207", NULL },
+    };
+
+    test_results ("Sony-Ericsson K600i", reply, &expected[0], ARRAY_LEN (expected));
+}
+
+static void
 test_cops_response_gsm_invalid (void *f, gpointer d)
 {
     const char *reply = "+COPS: (0,1,2,3),(1,2,3,4)";
@@ -470,6 +491,7 @@ int main (int argc, char **argv)
 	g_test_suite_add (suite, TESTCASE (test_cops_response_gtultraexpress, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_n2720, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_gobi, NULL));
+	g_test_suite_add (suite, TESTCASE (test_cops_response_sek600i, NULL));
 
 	g_test_suite_add (suite, TESTCASE (test_cops_response_gsm_invalid, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_umts_invalid, NULL));

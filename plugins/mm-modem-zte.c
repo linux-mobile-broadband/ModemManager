@@ -32,6 +32,8 @@ G_DEFINE_TYPE_EXTENDED (MMModemZte, mm_modem_zte, MM_TYPE_GENERIC_GSM, 0,
 
 typedef struct {
     gboolean init_retried;
+    guint32 cpms_tries;
+    guint cpms_timeout;
 } MMModemZtePrivate;
 
 MMModem *
@@ -54,6 +56,52 @@ mm_modem_zte_new (const char *device,
 /*    Modem class override functions                                         */
 /*****************************************************************************/
 
+static void cpms_try_done (MMSerialPort *port,
+                           GString *response,
+                           GError *error,
+                           gpointer user_data);
+
+static gboolean
+cpms_timeout_cb (gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMModem *modem = info->modem;
+    MMModemZtePrivate *priv = MM_MODEM_ZTE_GET_PRIVATE (modem);
+    MMSerialPort *primary;
+
+    priv->cpms_timeout = 0;
+
+    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    mm_serial_port_queue_command (primary, "+CPMS?", 10, cpms_try_done, info);
+    return FALSE;
+}
+
+static void
+cpms_try_done (MMSerialPort *port,
+               GString *response,
+               GError *error,
+               gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMModemZtePrivate *priv = MM_MODEM_ZTE_GET_PRIVATE (info->modem);
+
+    if (error && g_error_matches (error, MM_MOBILE_ERROR, MM_MOBILE_ERROR_SIM_BUSY)) {
+        if (priv->cpms_tries++ < 4) {
+            if (priv->cpms_timeout)
+                g_source_remove (priv->cpms_timeout);
+
+            /* Have to try a few times; sometimes the SIM is busy */
+            priv->cpms_timeout = g_timeout_add_seconds (2, cpms_timeout_cb, info);
+            return;
+        } else {
+            /* oh well, proceed... */
+            error = NULL;
+        }
+    }
+
+    mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
+}
+
 static void
 init_modem_done (MMSerialPort *port,
                  GString *response,
@@ -62,7 +110,12 @@ init_modem_done (MMSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
+    /* Attempt to disable floods of "+ZUSIMR:2" unsolicited responses that
+     * eventually fill up the device's buffers and make it crash.  Normally
+     * done during probing, but if the device has a PIN enabled it won't
+     * accept the +CPMS? during the probe and we have to do it here.
+     */
+    mm_serial_port_queue_command (port, "+CPMS?", 10, cpms_try_done, info);
 }
 
 static void
@@ -222,6 +275,16 @@ mm_modem_zte_init (MMModemZte *self)
 }
 
 static void
+dispose (GObject *object)
+{
+    MMModemZte *self = MM_MODEM_ZTE (object);
+    MMModemZtePrivate *priv = MM_MODEM_ZTE_GET_PRIVATE (self);
+
+    if (priv->cpms_timeout)
+        g_source_remove (priv->cpms_timeout);
+}
+
+static void
 mm_modem_zte_class_init (MMModemZteClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
@@ -230,6 +293,7 @@ mm_modem_zte_class_init (MMModemZteClass *klass)
     mm_modem_zte_parent_class = g_type_class_peek_parent (klass);
     g_type_class_add_private (object_class, sizeof (MMModemZtePrivate));
 
+    object_class->dispose = dispose;
     gsm_class->do_enable = do_enable;
 }
 

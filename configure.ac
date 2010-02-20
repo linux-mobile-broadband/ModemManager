@@ -14,6 +14,15 @@ AM_PROG_CC_C_O
 AC_PROG_INSTALL
 AC_PROG_LIBTOOL
 
+dnl
+dnl translation support
+dnl
+GETTEXT_PACKAGE=ModemManager
+AC_SUBST(GETTEXT_PACKAGE)
+AC_DEFINE_UNQUOTED(GETTEXT_PACKAGE,"$GETTEXT_PACKAGE", [Gettext package])
+IT_PROG_INTLTOOL([0.35.0])
+AM_GLIB_GNU_GETTEXT
+
 PKG_CHECK_MODULES(MM, dbus-glib-1 >= 0.75 glib-2.0 >= 2.18 gmodule-2.0 gobject-2.0)
 
 PKG_CHECK_MODULES(GUDEV, gudev-1.0)
@@ -96,6 +105,8 @@ src/tests/Makefile
 plugins/Makefile
 test/Makefile
 introspection/Makefile
+po/Makefile.in
+policy/Makefile
 ])
 AC_OUTPUT
 

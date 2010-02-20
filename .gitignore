@@ -9,6 +9,7 @@ configure
 depcomp
 install-sh
 ltmain.sh
+intltool-*
 missing
 stamp-h1
 *~
@@ -31,6 +32,10 @@ test/lsudev
 src/tests/test-modem-helpers
 
 libqcdm/tests/test-qcdm
+
+po/Makefile.in.in
+po/POTFILES
+po/stamp-it
 
 m4/gtk-doc.m4
 m4/intltool.m4
