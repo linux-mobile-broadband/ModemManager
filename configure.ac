@@ -103,6 +103,7 @@ plugins/Makefile
 test/Makefile
 introspection/Makefile
 po/Makefile.in
+policy/Makefile
 ])
 AC_OUTPUT
 

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+
+<policyconfig>
+
+  <vendor>ModemManager</vendor>
+  <vendor_url>http://www.freedesktop.org/wiki/ModemManager</vendor_url>
+  <icon_name>modem-manager</icon_name>
+
+  <action id="org.freedesktop.ModemManager.Device">
+    <_description>Unlock and retrieve mobile broadband device information</_description>
+    <_message>System policy prevents unlocking the device or requesting information from it.</_message>
+    <defaults>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_self_keep</allow_active>
+    </defaults>
+  </action>
+
+  <action id="org.freedesktop.ModemManager.Contacts">
+    <_description>Add, modify, and delete mobile broadband contacts</_description>
+    <_message>System policy prevents adding, modifying, or deleteing this device's contacts.</_message>
+    <defaults>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_self_keep</allow_active>
+    </defaults>
+  </action>
+
+  <action id="org.freedesktop.ModemManager.SMS">
+    <_description>Send, save, modify, and delete text messages</_description>
+    <_message>System policy prevents sending or maniuplating this device's text messages.</_message>
+    <defaults>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_self_keep</allow_active>
+    </defaults>
+  </action>
+
+</policyconfig>
