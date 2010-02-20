@@ -520,7 +520,7 @@ device_added (MMManager *manager, GUdevDevice *device)
 
     /* ignore VTs */
     if (strncmp (name, "tty", 3) == 0 && isdigit (name[3]))
-	return;
+        return;
 
     if (find_modem_for_port (manager, subsys, name))
         return;
@@ -633,12 +633,18 @@ mm_manager_start (MMManager *manager)
     priv = MM_MANAGER_GET_PRIVATE (manager);
 
     devices = g_udev_client_query_by_subsystem (priv->udev, "tty");
-    for (iter = devices; iter; iter = g_list_next (iter))
+    for (iter = devices; iter; iter = g_list_next (iter)) {
         device_added (manager, G_UDEV_DEVICE (iter->data));
+        g_object_unref (G_OBJECT (iter->data));
+    }
+    g_list_free (devices);
 
     devices = g_udev_client_query_by_subsystem (priv->udev, "net");
-    for (iter = devices; iter; iter = g_list_next (iter))
+    for (iter = devices; iter; iter = g_list_next (iter)) {
         device_added (manager, G_UDEV_DEVICE (iter->data));
+        g_object_unref (G_OBJECT (iter->data));
+    }
+    g_list_free (devices);
 }
 
 static void
