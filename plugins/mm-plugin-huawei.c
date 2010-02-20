@@ -26,6 +26,7 @@
 #include "mm-modem-huawei-gsm.h"
 #include "mm-modem-huawei-cdma.h"
 #include "mm-serial-parsers.h"
+#include "mm-at-serial-port.h"
 
 G_DEFINE_TYPE (MMPluginHuawei, mm_plugin_huawei, MM_TYPE_PLUGIN_BASE)
 
@@ -69,7 +70,7 @@ probe_result (MMPluginBase *base,
 #define TAG_SUPPORTS_INFO "huawei-supports-info"
 
 typedef struct {
-    MMSerialPort *serial;
+    MMAtSerialPort *serial;
     guint id;
     gboolean secondary;
 } HuaweiSupportsInfo;
@@ -106,7 +107,7 @@ probe_secondary_supported (gpointer user_data)
 }
 
 static void
-probe_secondary_handle_msg (MMSerialPort *port,
+probe_secondary_handle_msg (MMAtSerialPort *port,
                             GMatchInfo *match_info,
                             gpointer user_data)
 {
@@ -135,12 +136,12 @@ probe_secondary_timeout (gpointer user_data)
 }
 
 static void
-add_regex (MMSerialPort *port, const char *match, gpointer user_data)
+add_regex (MMAtSerialPort *port, const char *match, gpointer user_data)
 {
     GRegex *regex;
 
     regex = g_regex_new (match, G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    mm_serial_port_add_unsolicited_msg_handler (port, regex, probe_secondary_handle_msg, user_data, NULL);
+    mm_at_serial_port_add_unsolicited_msg_handler (port, regex, probe_secondary_handle_msg, user_data, NULL);
     g_regex_unref (regex);
 }
 
@@ -208,13 +209,13 @@ supports_port (MMPluginBase *base,
         /* Listen for Huawei-specific unsolicited messages */
         info = g_malloc0 (sizeof (HuaweiSupportsInfo));
 
-        info->serial = mm_serial_port_new (name, MM_PORT_TYPE_PRIMARY);
+        info->serial = mm_at_serial_port_new (name, MM_PORT_TYPE_PRIMARY);
         g_object_set (G_OBJECT (info->serial), MM_PORT_CARRIER_DETECT, FALSE, NULL);
 
-        mm_serial_port_set_response_parser (info->serial,
-                                            mm_serial_parser_v1_parse,
-                                            mm_serial_parser_v1_new (),
-                                            mm_serial_parser_v1_destroy);
+        mm_at_serial_port_set_response_parser (info->serial,
+                                               mm_serial_parser_v1_parse,
+                                               mm_serial_parser_v1_new (),
+                                               mm_serial_parser_v1_destroy);
 
         add_regex (info->serial, "\\r\\n\\^RSSI:(\\d+)\\r\\n", task);
         add_regex (info->serial, "\\r\\n\\^MODE:(\\d),(\\d)\\r\\n", task);
@@ -227,7 +228,7 @@ supports_port (MMPluginBase *base,
         g_object_set_data_full (G_OBJECT (task), TAG_SUPPORTS_INFO,
                                 info, huawei_supports_info_destroy);
 
-        if (!mm_serial_port_open (info->serial, &error)) {
+        if (!mm_serial_port_open (MM_SERIAL_PORT (info->serial), &error)) {
             g_warning ("%s: (Huawei) %s: couldn't open serial port: (%d) %s",
                        __func__, name,
                        error ? error->code : -1,

@@ -20,7 +20,7 @@
 #include "mm-modem.h"
 #include "mm-modem-base.h"
 #include "mm-modem-cdma.h"
-#include "mm-serial-port.h"
+#include "mm-at-serial-port.h"
 #include "mm-callback-info.h"
 
 #define MM_TYPE_GENERIC_CDMA            (mm_generic_cdma_get_type ())
@@ -80,7 +80,7 @@ MMPort * mm_generic_cdma_grab_port (MMGenericCdma *self,
                                     gpointer user_data,
                                     GError **error);
 
-MMSerialPort *mm_generic_cdma_get_port (MMGenericCdma *modem, MMPortType ptype);
+MMAtSerialPort *mm_generic_cdma_get_at_port (MMGenericCdma *modem, MMPortType ptype);
 
 void mm_generic_cdma_update_cdma1x_quality (MMGenericCdma *self, guint32 quality);
 void mm_generic_cdma_update_evdo_quality (MMGenericCdma *self, guint32 quality);

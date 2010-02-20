@@ -23,6 +23,7 @@
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 #include "mm-modem-gsm-card.h"
+#include "mm-at-serial-port.h"
 
 static void modem_init (MMModem *modem_class);
 static void modem_gsm_card_init (MMModemGsmCard *gsm_card_class);
@@ -51,7 +52,7 @@ mm_modem_gobi_gsm_new (const char *device,
 /*****************************************************************************/
 
 static void
-get_string_done (MMSerialPort *port,
+get_string_done (MMAtSerialPort *port,
                  GString *response,
                  GError *error,
                  gpointer user_data)
@@ -75,13 +76,13 @@ get_imsi (MMModemGsmCard *modem,
           MMModemStringFn callback,
           gpointer user_data)
 {
-    MMSerialPort *primary;
+    MMAtSerialPort *primary;
     MMCallbackInfo *info;
 
     info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-    mm_serial_port_queue_command_cached (primary, "+CIMI", 3, get_string_done, info);
+    mm_at_serial_port_queue_command_cached (primary, "+CIMI", 3, get_string_done, info);
 }
 
 static void

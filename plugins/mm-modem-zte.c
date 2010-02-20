@@ -56,7 +56,7 @@ mm_modem_zte_new (const char *device,
 /*    Modem class override functions                                         */
 /*****************************************************************************/
 
-static void cpms_try_done (MMSerialPort *port,
+static void cpms_try_done (MMAtSerialPort *port,
                            GString *response,
                            GError *error,
                            gpointer user_data);
@@ -67,17 +67,17 @@ cpms_timeout_cb (gpointer user_data)
     MMCallbackInfo *info = user_data;
     MMModem *modem = info->modem;
     MMModemZtePrivate *priv = MM_MODEM_ZTE_GET_PRIVATE (modem);
-    MMSerialPort *primary;
+    MMAtSerialPort *primary;
 
     priv->cpms_timeout = 0;
 
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
-    mm_serial_port_queue_command (primary, "+CPMS?", 10, cpms_try_done, info);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    mm_at_serial_port_queue_command (primary, "+CPMS?", 10, cpms_try_done, info);
     return FALSE;
 }
 
 static void
-cpms_try_done (MMSerialPort *port,
+cpms_try_done (MMAtSerialPort *port,
                GString *response,
                GError *error,
                gpointer user_data)
@@ -103,7 +103,7 @@ cpms_try_done (MMSerialPort *port,
 }
 
 static void
-init_modem_done (MMSerialPort *port,
+init_modem_done (MMAtSerialPort *port,
                  GString *response,
                  GError *error,
                  gpointer user_data)
@@ -115,14 +115,14 @@ init_modem_done (MMSerialPort *port,
      * done during probing, but if the device has a PIN enabled it won't
      * accept the +CPMS? during the probe and we have to do it here.
      */
-    mm_serial_port_queue_command (port, "+CPMS?", 10, cpms_try_done, info);
+    mm_at_serial_port_queue_command (port, "+CPMS?", 10, cpms_try_done, info);
 }
 
 static void
 pin_check_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMSerialPort *primary;
+    MMAtSerialPort *primary;
 
     if (error) {
         mm_generic_gsm_enable_complete (MM_GENERIC_GSM (modem), error, info);
@@ -130,9 +130,9 @@ pin_check_done (MMModem *modem, GError *error, gpointer user_data)
     }
 
     /* Finish the initialization */
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-    mm_serial_port_queue_command (primary, "Z E0 V1 X4 &C1 +CMEE=1;+CFUN=1;", 10, init_modem_done, info);
+    mm_at_serial_port_queue_command (primary, "Z E0 V1 X4 &C1 +CMEE=1;+CFUN=1;", 10, init_modem_done, info);
 }
 
 static void enable_flash_done (MMSerialPort *port,
@@ -140,7 +140,7 @@ static void enable_flash_done (MMSerialPort *port,
                                gpointer user_data);
 
 static void
-pre_init_done (MMSerialPort *port,
+pre_init_done (MMAtSerialPort *port,
                GString *response,
                GError *error,
                gpointer user_data)
@@ -153,7 +153,7 @@ pre_init_done (MMSerialPort *port,
         if (   !priv->init_retried
             && g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_RESPONSE_TIMEOUT)) {
             priv->init_retried = TRUE;
-            enable_flash_done (port, NULL, user_data);
+            enable_flash_done (MM_SERIAL_PORT (port), NULL, user_data);
         } else
             mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
     } else {
@@ -171,7 +171,7 @@ enable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
     if (error)
         mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
     else
-        mm_serial_port_queue_command (port, "E0 V1", 3, pre_init_done, user_data);
+        mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "E0 V1", 3, pre_init_done, user_data);
 }
 
 static void
@@ -179,15 +179,15 @@ do_enable (MMGenericGsm *modem, MMModemFn callback, gpointer user_data)
 {
     MMModemZtePrivate *priv = MM_MODEM_ZTE_GET_PRIVATE (modem);
     MMCallbackInfo *info;
-    MMSerialPort *primary;
+    MMAtSerialPort *primary;
 
     priv->init_retried = FALSE;
 
-    primary = mm_generic_gsm_get_port (modem, MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (modem, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
-    mm_serial_port_flash (primary, 100, enable_flash_done, info);
+    mm_serial_port_flash (MM_SERIAL_PORT (primary), 100, enable_flash_done, info);
 }
 
 static void
@@ -218,42 +218,42 @@ grab_port (MMModem *modem,
     MMPort *port = NULL;
 
     if (suggested_type == MM_PORT_TYPE_UNKNOWN) {
-        if (!mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_PRIMARY))
+        if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY))
                 ptype = MM_PORT_TYPE_PRIMARY;
-        else if (!mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_SECONDARY))
+        else if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY))
             ptype = MM_PORT_TYPE_SECONDARY;
     } else
         ptype = suggested_type;
 
     port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
-    if (port && MM_IS_SERIAL_PORT (port)) {
+    if (port && MM_IS_AT_SERIAL_PORT (port)) {
         GRegex *regex;
 
         mm_generic_gsm_set_unsolicited_registration (gsm, TRUE);
         g_object_set (port, MM_PORT_CARRIER_DETECT, FALSE, NULL);
 
         regex = g_regex_new ("\\r\\n\\+ZUSIMR:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
         g_regex_unref (regex);
 
         /* Unsolicted operator display */
         regex = g_regex_new ("\\r\\n\\+ZDONR: (.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
         g_regex_unref (regex);
 
         /* Current network and service domain */
         regex = g_regex_new ("\\r\\n\\+ZPASR: (.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
         g_regex_unref (regex);
 
         /* SIM request to Build Main Menu */
         regex = g_regex_new ("\\r\\n\\+ZPSTM: (.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
         g_regex_unref (regex);
 
         /* SIM request to Rebuild Main Menu */
         regex = g_regex_new ("\\r\\n\\+ZEND\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
         g_regex_unref (regex);
     }
 

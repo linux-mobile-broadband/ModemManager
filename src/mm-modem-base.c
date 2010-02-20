@@ -21,7 +21,7 @@
 
 #include "mm-modem-base.h"
 #include "mm-modem.h"
-#include "mm-serial-port.h"
+#include "mm-at-serial-port.h"
 #include "mm-errors.h"
 #include "mm-options.h"
 #include "mm-properties-changed-signal.h"
@@ -113,7 +113,7 @@ mm_modem_base_add_port (MMModemBase *self,
     }
 
     if (!strcmp (subsys, "tty"))
-        port = MM_PORT (mm_serial_port_new (name, ptype));
+        port = MM_PORT (mm_at_serial_port_new (name, ptype));
     else if (!strcmp (subsys, "net")) {
         port = MM_PORT (g_object_new (MM_TYPE_PORT,
                                       MM_PORT_DEVICE, name,

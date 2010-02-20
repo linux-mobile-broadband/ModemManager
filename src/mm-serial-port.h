@@ -39,19 +39,6 @@
 typedef struct _MMSerialPort MMSerialPort;
 typedef struct _MMSerialPortClass MMSerialPortClass;
 
-typedef gboolean (*MMSerialResponseParserFn) (gpointer user_data,
-                                              GString *response,
-                                              GError **error);
-
-typedef void (*MMSerialUnsolicitedMsgFn) (MMSerialPort *port,
-                                          GMatchInfo *match_info,
-                                          gpointer user_data);
-
-typedef void (*MMSerialResponseFn)     (MMSerialPort *port,
-                                        GString *response,
-                                        GError *error,
-                                        gpointer user_data);
-
 typedef void (*MMSerialFlashFn)        (MMSerialPort *port,
                                         GError *error,
                                         gpointer user_data);
@@ -62,22 +49,37 @@ struct _MMSerialPort {
 
 struct _MMSerialPortClass {
     MMPortClass parent;
+
+    /* Called for subclasses to parse unsolicited responses.  If any recognized
+     * unsolicited response is found, it should be removed from the 'response'
+     * byte array before returning.
+     */
+    void     (*parse_unsolicited) (MMSerialPort *self, GByteArray *response);
+
+    /* Called to parse the device's response to a command or determine if the
+     * response was an error response.  If the response indicates an error, an
+     * appropriate error should be returned in the 'error' argument.  The
+     * function should return FALSE if there is not enough data yet to determine
+     * the device's reply (whether success *or* error), and should return TRUE
+     * when the device's response has been recognized and parsed.
+     */
+    gboolean (*parse_response)    (MMSerialPort *self,
+                                   GByteArray *response,
+                                   GError **error);
+
+    /* Called after parsing to allow the command response to be delivered to
+     * it's callback to be handled.
+     */
+    void     (*handle_response)   (MMSerialPort *self,
+                                   GByteArray *response,
+                                   GError *error,
+                                   GCallback callback,
+                                   gpointer callback_data);
 };
 
 GType mm_serial_port_get_type (void);
 
 MMSerialPort *mm_serial_port_new (const char *name, MMPortType ptype);
-
-void     mm_serial_port_add_unsolicited_msg_handler (MMSerialPort *self,
-                                                     GRegex *regex,
-                                                     MMSerialUnsolicitedMsgFn callback,
-                                                     gpointer user_data,
-                                                     GDestroyNotify notify);
-
-void     mm_serial_port_set_response_parser (MMSerialPort *self,
-                                             MMSerialResponseParserFn fn,
-                                             gpointer user_data,
-                                             GDestroyNotify notify);
 
 gboolean mm_serial_port_is_open           (MMSerialPort *self);
 
@@ -85,23 +87,26 @@ gboolean mm_serial_port_open              (MMSerialPort *self,
                                            GError  **error);
 
 void     mm_serial_port_close             (MMSerialPort *self);
-void     mm_serial_port_queue_command     (MMSerialPort *self,
-                                           const char *command,
-                                           guint32 timeout_seconds,
-                                           MMSerialResponseFn callback,
-                                           gpointer user_data);
-
-void     mm_serial_port_queue_command_cached (MMSerialPort *self,
-                                              const char *command,
-                                              guint32 timeout_seconds,
-                                              MMSerialResponseFn callback,
-                                              gpointer user_data);
 
 gboolean mm_serial_port_flash             (MMSerialPort *self,
                                            guint32 flash_time,
                                            MMSerialFlashFn callback,
                                            gpointer user_data);
 void     mm_serial_port_flash_cancel      (MMSerialPort *self);
+
+void     mm_serial_port_queue_command     (MMSerialPort *self,
+                                           GByteArray *command,
+                                           gboolean take_command,
+                                           guint32 timeout_seconds,
+                                           GCallback callback,
+                                           gpointer user_data);
+
+void     mm_serial_port_queue_command_cached (MMSerialPort *self,
+                                              GByteArray *command,
+                                              gboolean take_command,
+                                              guint32 timeout_seconds,
+                                              GCallback callback,
+                                              gpointer user_data);
 
 #endif /* MM_SERIAL_PORT_H */
 

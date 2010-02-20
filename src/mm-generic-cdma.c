@@ -23,7 +23,7 @@
 #include "mm-generic-cdma.h"
 #include "mm-modem-cdma.h"
 #include "mm-modem-simple.h"
-#include "mm-serial-port.h"
+#include "mm-at-serial-port.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 #include "mm-serial-parsers.h"
@@ -67,8 +67,8 @@ typedef struct {
     guint reg_state_changed_id;
     MMCallbackInfo *simple_connect_info;
 
-    MMSerialPort *primary;
-    MMSerialPort *secondary;
+    MMAtSerialPort *primary;
+    MMAtSerialPort *secondary;
     MMPort *data;
 } MMGenericCdmaPrivate;
 
@@ -148,22 +148,22 @@ mm_generic_cdma_grab_port (MMGenericCdma *self,
     }
 
     port = mm_modem_base_add_port (MM_MODEM_BASE (self), subsys, name, ptype);
-    if (port && MM_IS_SERIAL_PORT (port)) {
+    if (port && MM_IS_AT_SERIAL_PORT (port)) {
         g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
-        mm_serial_port_set_response_parser (MM_SERIAL_PORT (port),
-                                            mm_serial_parser_v1_parse,
-                                            mm_serial_parser_v1_new (),
-                                            mm_serial_parser_v1_destroy);
+        mm_at_serial_port_set_response_parser (MM_AT_SERIAL_PORT (port),
+                                               mm_serial_parser_v1_parse,
+                                               mm_serial_parser_v1_new (),
+                                               mm_serial_parser_v1_destroy);
 
         if (ptype == MM_PORT_TYPE_PRIMARY) {
-            priv->primary = MM_SERIAL_PORT (port);
+            priv->primary = MM_AT_SERIAL_PORT (port);
             if (!priv->data) {
                 priv->data = port;
                 g_object_notify (G_OBJECT (self), MM_MODEM_DATA_DEVICE);
             }
             check_valid (self);
         } else if (ptype == MM_PORT_TYPE_SECONDARY)
-            priv->secondary = MM_SERIAL_PORT (port);
+            priv->secondary = MM_AT_SERIAL_PORT (port);
     } else {
         /* Net device (if any) is the preferred data port */
         if (!priv->data || MM_IS_SERIAL_PORT (priv->data)) {
@@ -215,9 +215,9 @@ release_port (MMModem *modem, const char *subsys, const char *name)
     check_valid (MM_GENERIC_CDMA (modem));
 }
 
-MMSerialPort *
-mm_generic_cdma_get_port (MMGenericCdma *modem,
-                          MMPortType ptype)
+MMAtSerialPort *
+mm_generic_cdma_get_at_port (MMGenericCdma *modem,
+                             MMPortType ptype)
 {
     g_return_val_if_fail (MM_IS_GENERIC_CDMA (modem), NULL);
     g_return_val_if_fail (ptype != MM_PORT_TYPE_UNKNOWN, NULL);
@@ -360,7 +360,7 @@ enable_all_done (MMModem *modem, GError *error, gpointer user_data)
     else {
         /* Open up the second port, if one exists */
         if (priv->secondary) {
-            if (!mm_serial_port_open (priv->secondary, &info->error)) {
+            if (!mm_serial_port_open (MM_SERIAL_PORT (priv->secondary), &info->error)) {
                 g_assert (info->error);
                 goto out;
             }
@@ -380,7 +380,7 @@ out:
 }
 
 static void
-enable_error_reporting_done (MMSerialPort *port,
+enable_error_reporting_done (MMAtSerialPort *port,
                              GString *response,
                              GError *error,
                              gpointer user_data)
@@ -399,7 +399,7 @@ enable_error_reporting_done (MMSerialPort *port,
 }
 
 static void
-init_done (MMSerialPort *port,
+init_done (MMAtSerialPort *port,
            GString *response,
            GError *error,
            gpointer user_data)
@@ -419,7 +419,7 @@ init_done (MMSerialPort *port,
         FIXME: It's mandatory by spec, so it really shouldn't be optional. Figure
         out which CDMA modems have problems with it and implement plugin for them.
         */
-        mm_serial_port_queue_command (port, "+CMEE=1", 3, enable_error_reporting_done, user_data);
+        mm_at_serial_port_queue_command (port, "+CMEE=1", 3, enable_error_reporting_done, user_data);
     }
 }
 
@@ -439,7 +439,7 @@ flash_done (MMSerialPort *port, GError *error, gpointer user_data)
         return;
     }
 
-    mm_serial_port_queue_command (port, "Z E0 V1 X4 &C1", 3, init_done, user_data);
+    mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "Z E0 V1 X4 &C1", 3, init_done, user_data);
 }
 
 static void
@@ -453,7 +453,7 @@ enable (MMModem *modem,
 
     info = mm_callback_info_new (modem, callback, user_data);
 
-    if (!mm_serial_port_open (priv->primary, &info->error)) {
+    if (!mm_serial_port_open (MM_SERIAL_PORT (priv->primary), &info->error)) {
         g_assert (info->error);
         mm_callback_info_schedule (info);
         return;
@@ -463,7 +463,7 @@ enable (MMModem *modem,
                         MM_MODEM_STATE_ENABLING,
                         MM_MODEM_STATE_REASON_NONE);
 
-    mm_serial_port_flash (priv->primary, 100, flash_done, info);
+    mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 100, flash_done, info);
 }
 
 static void
@@ -489,7 +489,7 @@ disable_all_done (MMModem *modem, GError *error, gpointer user_data)
         MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
         MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
 
-        mm_serial_port_close (priv->primary);
+        mm_serial_port_close (MM_SERIAL_PORT (priv->primary));
         mm_modem_set_state (modem, MM_MODEM_STATE_DISABLED, MM_MODEM_STATE_REASON_NONE);
 
         priv->cdma_1x_reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
@@ -546,20 +546,20 @@ disable (MMModem *modem,
                                NULL);
 
     if (priv->secondary)
-        mm_serial_port_close (priv->secondary);
+        mm_serial_port_close (MM_SERIAL_PORT (priv->secondary));
 
     mm_modem_set_state (MM_MODEM (info->modem),
                         MM_MODEM_STATE_DISABLING,
                         MM_MODEM_STATE_REASON_NONE);
 
     if (mm_port_get_connected (MM_PORT (priv->primary)))
-        mm_serial_port_flash (priv->primary, 1000, disable_flash_done, info);
+        mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 1000, disable_flash_done, info);
     else
-        disable_flash_done (priv->primary, NULL, info);
+        disable_flash_done (MM_SERIAL_PORT (priv->primary), NULL, info);
 }
 
 static void
-dial_done (MMSerialPort *port,
+dial_done (MMAtSerialPort *port,
            GString *response,
            GError *error,
            gpointer user_data)
@@ -598,7 +598,7 @@ connect (MMModem *modem,
 
     info = mm_callback_info_new (modem, callback, user_data);
     command = g_strconcat ("DT", number, NULL);
-    mm_serial_port_queue_command (priv->primary, command, 90, dial_done, info);
+    mm_at_serial_port_queue_command (priv->primary, command, 90, dial_done, info);
     g_free (command);
 }
 
@@ -648,7 +648,7 @@ disconnect (MMModem *modem,
                                NULL);
 
     mm_modem_set_state (modem, MM_MODEM_STATE_DISCONNECTING, MM_MODEM_STATE_REASON_NONE);
-    mm_serial_port_flash (priv->primary, 1000, disconnect_flash_done, info);
+    mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 1000, disconnect_flash_done, info);
 }
 
 static void
@@ -678,7 +678,7 @@ strip_response (const char *resp, const char *cmd)
 }
 
 static void
-get_version_done (MMSerialPort *port,
+get_version_done (MMAtSerialPort *port,
                   GString *response,
                   GError *error,
                   gpointer user_data)
@@ -696,7 +696,7 @@ get_version_done (MMSerialPort *port,
 }
 
 static void
-get_model_done (MMSerialPort *port,
+get_model_done (MMAtSerialPort *port,
                 GString *response,
                 GError *error,
                 gpointer user_data)
@@ -712,7 +712,7 @@ get_model_done (MMSerialPort *port,
 }
 
 static void
-get_manufacturer_done (MMSerialPort *port,
+get_manufacturer_done (MMAtSerialPort *port,
                        GString *response,
                        GError *error,
                        gpointer user_data)
@@ -734,7 +734,7 @@ get_card_info (MMModem *modem,
 {
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
     MMCallbackInfo *info;
-    MMSerialPort *port = priv->primary;
+    MMAtSerialPort *port = priv->primary;
 
     info = mm_callback_info_new_full (MM_MODEM (modem),
                                       card_info_invoke,
@@ -753,9 +753,9 @@ get_card_info (MMModem *modem,
         port = priv->secondary;
     }
 
-    mm_serial_port_queue_command_cached (port, "+GMI", 3, get_manufacturer_done, info);
-    mm_serial_port_queue_command_cached (port, "+GMM", 3, get_model_done, info);
-    mm_serial_port_queue_command_cached (port, "+GMR", 3, get_version_done, info);
+    mm_at_serial_port_queue_command_cached (port, "+GMI", 3, get_manufacturer_done, info);
+    mm_at_serial_port_queue_command_cached (port, "+GMM", 3, get_model_done, info);
+    mm_at_serial_port_queue_command_cached (port, "+GMR", 3, get_version_done, info);
 }
 
 /*****************************************************************************/
@@ -793,7 +793,7 @@ mm_generic_cdma_update_evdo_quality (MMGenericCdma *self, guint32 quality)
 #define CSQ2_TRIED "csq?-tried"
 
 static void
-get_signal_quality_done (MMSerialPort *port,
+get_signal_quality_done (MMAtSerialPort *port,
                          GString *response,
                          GError *error,
                          gpointer user_data)
@@ -811,7 +811,7 @@ get_signal_quality_done (MMSerialPort *port,
              * try the other command if the first one fails.
              */
             mm_callback_info_set_data (info, CSQ2_TRIED, GUINT_TO_POINTER (1), NULL);
-            mm_serial_port_queue_command (port, "+CSQ?", 3, get_signal_quality_done, info);
+            mm_at_serial_port_queue_command (port, "+CSQ?", 3, get_signal_quality_done, info);
             return;
         }
     } else {
@@ -853,7 +853,7 @@ get_signal_quality (MMModemCdma *modem,
 {
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
     MMCallbackInfo *info;
-    MMSerialPort *port = priv->primary;
+    MMAtSerialPort *port = priv->primary;
 
     if (mm_port_get_connected (MM_PORT (priv->primary))) {
         if (!priv->secondary) {
@@ -867,11 +867,11 @@ get_signal_quality (MMModemCdma *modem,
     }
 
     info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-    mm_serial_port_queue_command (port, "+CSQ", 3, get_signal_quality_done, info);
+    mm_at_serial_port_queue_command (port, "+CSQ", 3, get_signal_quality_done, info);
 }
 
 static void
-get_string_done (MMSerialPort *port,
+get_string_done (MMAtSerialPort *port,
                  GString *response,
                  GError *error,
                  gpointer user_data)
@@ -897,7 +897,7 @@ get_esn (MMModemCdma *modem,
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
     MMCallbackInfo *info;
     GError *error;
-    MMSerialPort *port = priv->primary;
+    MMAtSerialPort *port = priv->primary;
 
     if (mm_port_get_connected (MM_PORT (priv->primary))) {
         if (!priv->secondary) {
@@ -913,7 +913,7 @@ get_esn (MMModemCdma *modem,
     }
 
     info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
-    mm_serial_port_queue_command_cached (port, "+GSN", 3, get_string_done, info);
+    mm_at_serial_port_queue_command_cached (port, "+GSN", 3, get_string_done, info);
 }
 
 static void
@@ -997,7 +997,7 @@ convert_sid (const char *sid)
 }
 
 static void
-serving_system_done (MMSerialPort *port,
+serving_system_done (MMAtSerialPort *port,
                      GString *response,
                      GError *error,
                      gpointer user_data)
@@ -1116,7 +1116,7 @@ get_serving_system (MMModemCdma *modem,
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
     MMCallbackInfo *info;
     GError *error;
-    MMSerialPort *port = priv->primary;
+    MMAtSerialPort *port = priv->primary;
 
     if (mm_port_get_connected (MM_PORT (priv->primary))) {
         if (!priv->secondary) {
@@ -1136,7 +1136,7 @@ get_serving_system (MMModemCdma *modem,
                                       G_CALLBACK (callback),
                                       user_data);
 
-    mm_serial_port_queue_command (port, "+CSS?", 3, serving_system_done, info);
+    mm_at_serial_port_queue_command (port, "+CSS?", 3, serving_system_done, info);
 }
 
 #define CDMA_1X_STATE_TAG     "cdma-1x-reg-state"
@@ -1298,7 +1298,7 @@ reg_state_css_response (MMModemCdma *cdma,
 }
 
 static void
-get_analog_digital_done (MMSerialPort *port,
+get_analog_digital_done (MMAtSerialPort *port,
                          GString *response,
                          GError *error,
                          gpointer user_data)
@@ -1365,7 +1365,7 @@ get_registration_state (MMModemCdma *modem,
 {
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
     MMCallbackInfo *info;
-    MMSerialPort *port = priv->primary;
+    MMAtSerialPort *port = priv->primary;
 
     if (mm_port_get_connected (MM_PORT (priv->primary))) {
         if (!priv->secondary) {
@@ -1380,7 +1380,7 @@ get_registration_state (MMModemCdma *modem,
     }
 
     info = mm_generic_cdma_query_reg_state_callback_info_new (MM_GENERIC_CDMA (modem), callback, user_data);
-    mm_serial_port_queue_command (port, "+CAD?", 3, get_analog_digital_done, info);
+    mm_at_serial_port_queue_command (port, "+CAD?", 3, get_analog_digital_done, info);
 }
 
 /*****************************************************************************/

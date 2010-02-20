@@ -82,7 +82,7 @@ parse_quality (const char *str, const char *detail)
 }
 
 static void
-handle_1x_quality_change (MMSerialPort *port,
+handle_1x_quality_change (MMAtSerialPort *port,
                           GMatchInfo *match_info,
                           gpointer user_data)
 {
@@ -99,9 +99,9 @@ handle_1x_quality_change (MMSerialPort *port,
 }
 
 static void
-handle_evdo_quality_change (MMSerialPort *port,
-                          GMatchInfo *match_info,
-                          gpointer user_data)
+handle_evdo_quality_change (MMAtSerialPort *port,
+                            GMatchInfo *match_info,
+                            gpointer user_data)
 {
     MMModemHuaweiCdma *self = MM_MODEM_HUAWEI_CDMA (user_data);
     char *str;
@@ -152,7 +152,7 @@ uint_from_match_item (GMatchInfo *match_info, guint32 num, guint32 *val)
 }
 
 static void
-sysinfo_done (MMSerialPort *port,
+sysinfo_done (MMAtSerialPort *port,
               GString *response,
               GError *error,
               gpointer user_data)
@@ -239,10 +239,10 @@ query_registration_state (MMGenericCdma *cdma,
                           gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMSerialPort *primary, *secondary, *port;
+    MMAtSerialPort *primary, *secondary, *port;
 
-    port = primary = mm_generic_cdma_get_port (cdma, MM_PORT_TYPE_PRIMARY);
-    secondary = mm_generic_cdma_get_port (cdma, MM_PORT_TYPE_SECONDARY);
+    port = primary = mm_generic_cdma_get_at_port (cdma, MM_PORT_TYPE_PRIMARY);
+    secondary = mm_generic_cdma_get_at_port (cdma, MM_PORT_TYPE_SECONDARY);
 
     info = mm_generic_cdma_query_reg_state_callback_info_new (cdma, callback, user_data);
 
@@ -258,7 +258,7 @@ query_registration_state (MMGenericCdma *cdma,
         port = secondary;
     }
 
-    mm_serial_port_queue_command (port, "^SYSINFO", 3, sysinfo_done, info);
+    mm_at_serial_port_queue_command (port, "^SYSINFO", 3, sysinfo_done, info);
 }
 
 /*****************************************************************************/
@@ -275,14 +275,14 @@ grab_port (MMModem *modem,
     GRegex *regex;
 
 	port = mm_generic_cdma_grab_port (MM_GENERIC_CDMA (modem), subsys, name, suggested_type, user_data, error);
-    if (port && MM_IS_SERIAL_PORT (port)) {
+    if (port && MM_IS_AT_SERIAL_PORT (port)) {
         gboolean evdo0 = FALSE, evdoA = FALSE;
 
         g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
 
         /* 1x signal level */
         regex = g_regex_new ("\\r\\n\\^RSSILVL:(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, handle_1x_quality_change, modem, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_1x_quality_change, modem, NULL);
         g_regex_unref (regex);
 
         g_object_get (G_OBJECT (modem),
@@ -293,7 +293,7 @@ grab_port (MMModem *modem,
         if (evdo0 || evdoA) {
             /* EVDO signal level */
             regex = g_regex_new ("\\r\\n\\^HRSSILVL:(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-            mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, handle_evdo_quality_change, modem, NULL);
+            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_evdo_quality_change, modem, NULL);
             g_regex_unref (regex);
         }
     }

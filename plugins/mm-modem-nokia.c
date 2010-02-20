@@ -56,19 +56,19 @@ grab_port (MMModem *modem,
     MMPort *port = NULL;
 
     if (suggested_type == MM_PORT_TYPE_UNKNOWN) {
-        if (!mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_PRIMARY))
+        if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY))
                 ptype = MM_PORT_TYPE_PRIMARY;
-        else if (!mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_SECONDARY))
+        else if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY))
             ptype = MM_PORT_TYPE_SECONDARY;
     } else
         ptype = suggested_type;
 
     port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
-    if (port && MM_IS_SERIAL_PORT (port)) {
-        mm_serial_port_set_response_parser (MM_SERIAL_PORT (port),
-                                            mm_serial_parser_v1_e1_parse,
-                                            mm_serial_parser_v1_e1_new (),
-                                            mm_serial_parser_v1_e1_destroy);
+    if (port && MM_IS_AT_SERIAL_PORT (port)) {
+        mm_at_serial_port_set_response_parser (MM_AT_SERIAL_PORT (port),
+                                               mm_serial_parser_v1_e1_parse,
+                                               mm_serial_parser_v1_e1_new (),
+                                               mm_serial_parser_v1_e1_destroy);
     }
 
     return !!port;

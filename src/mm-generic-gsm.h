@@ -20,7 +20,7 @@
 #include "mm-modem-gsm.h"
 #include "mm-modem-gsm-network.h"
 #include "mm-modem-base.h"
-#include "mm-serial-port.h"
+#include "mm-at-serial-port.h"
 #include "mm-callback-info.h"
 
 #define MM_TYPE_GENERIC_GSM            (mm_generic_gsm_get_type ())
@@ -90,8 +90,8 @@ void mm_generic_gsm_check_pin (MMGenericGsm *modem,
                                MMModemFn callback,
                                gpointer user_data);
 
-MMSerialPort *mm_generic_gsm_get_port (MMGenericGsm *modem,
-                                       MMPortType ptype);
+MMAtSerialPort *mm_generic_gsm_get_at_port (MMGenericGsm *modem,
+                                            MMPortType ptype);
 
 MMPort *mm_generic_gsm_grab_port (MMGenericGsm *modem,
                                   const char *subsys,

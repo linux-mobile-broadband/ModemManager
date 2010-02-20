@@ -98,7 +98,7 @@ enable (MMModem *modem,
 }
 
 static void
-get_network_mode_done (MMSerialPort *port,
+get_network_mode_done (MMAtSerialPort *port,
                        GString *response,
                        GError *error,
                        gpointer user_data)
@@ -149,16 +149,16 @@ get_network_mode (MMModemGsmNetwork *modem,
                   gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMSerialPort *primary;
+    MMAtSerialPort *primary;
 
     info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-    mm_serial_port_queue_command (primary, "AT_OPSYS?", 3, get_network_mode_done, info);
+    mm_at_serial_port_queue_command (primary, "AT_OPSYS?", 3, get_network_mode_done, info);
 }
 
 static void
-set_network_mode_done (MMSerialPort *port,
+set_network_mode_done (MMAtSerialPort *port,
                        GString *response,
                        GError *error,
                        gpointer user_data)
@@ -178,7 +178,7 @@ set_network_mode (MMModemGsmNetwork *modem,
                   gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMSerialPort *primary;
+    MMAtSerialPort *primary;
     char *command;
     int i;
 
@@ -210,9 +210,9 @@ set_network_mode (MMModemGsmNetwork *modem,
     }
 
     command = g_strdup_printf ("AT_OPSYS=%d,2", i);
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-    mm_serial_port_queue_command (primary, command, 3, set_network_mode_done, info);
+    mm_at_serial_port_queue_command (primary, command, 3, set_network_mode_done, info);
     g_free (command);
 }
 

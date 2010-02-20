@@ -26,7 +26,7 @@
 #include <gudev/gudev.h>
 
 #include "mm-plugin-base.h"
-#include "mm-serial-port.h"
+#include "mm-at-serial-port.h"
 #include "mm-serial-parsers.h"
 #include "mm-errors.h"
 #include "mm-marshal.h"
@@ -92,7 +92,7 @@ typedef struct {
     guint open_id;
     guint32 open_tries;
 
-    MMSerialPort *probe_port;
+    MMAtSerialPort *probe_port;
     guint32 probed_caps;
     ProbeState probe_state;
     guint probe_id;
@@ -378,7 +378,7 @@ probe_complete (MMPluginBaseSupportsTask *task)
 }
 
 static void
-parse_response (MMSerialPort *port,
+parse_response (MMAtSerialPort *port,
                 GString *response,
                 GError *error,
                 gpointer user_data);
@@ -391,7 +391,7 @@ real_handle_probe_response (MMPluginBase *self,
                             const GError *error)
 {
     MMPluginBaseSupportsTaskPrivate *task_priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
-    MMSerialPort *port = task_priv->probe_port;
+    MMAtSerialPort *port = task_priv->probe_port;
     gboolean ignore_error = FALSE;
 
     /* Some modems (Huawei E160g) won't respond to +GCAP with no SIM, but
@@ -405,7 +405,7 @@ real_handle_probe_response (MMPluginBase *self,
             /* Try GCAP again */
             if (task_priv->probe_state < PROBE_STATE_GCAP_TRY3) {
                 task_priv->probe_state++;
-                mm_serial_port_queue_command (port, "+GCAP", 3, parse_response, task);
+                mm_at_serial_port_queue_command (port, "+GCAP", 3, parse_response, task);
             } else {
                /* Otherwise, if all the GCAP tries timed out, ignore the port
                 * as it's probably not an AT-capable port.
@@ -459,19 +459,19 @@ real_handle_probe_response (MMPluginBase *self,
     switch (task_priv->probe_state) {
     case PROBE_STATE_GCAP_TRY2:
     case PROBE_STATE_GCAP_TRY3:
-        mm_serial_port_queue_command (port, "+GCAP", 3, parse_response, task);
+        mm_at_serial_port_queue_command (port, "+GCAP", 3, parse_response, task);
         break;
     case PROBE_STATE_ATI:
         /* After the last GCAP attempt, try ATI */
-        mm_serial_port_queue_command (port, "I", 3, parse_response, task);
+        mm_at_serial_port_queue_command (port, "I", 3, parse_response, task);
         break;
     case PROBE_STATE_CPIN:
         /* After the ATI attempt, try CPIN */
-        mm_serial_port_queue_command (port, "+CPIN?", 3, parse_response, task);
+        mm_at_serial_port_queue_command (port, "+CPIN?", 3, parse_response, task);
         break;
     case PROBE_STATE_CGMM:
         /* After the CPIN attempt, try CGMM */
-        mm_serial_port_queue_command (port, "+CGMM", 3, parse_response, task);
+        mm_at_serial_port_queue_command (port, "+CGMM", 3, parse_response, task);
         break;
     default:
         /* Probably not GSM or CDMA */
@@ -515,7 +515,7 @@ handle_probe_response (gpointer user_data)
 }
 
 static void
-parse_response (MMSerialPort *port,
+parse_response (MMAtSerialPort *port,
                 GString *response,
                 GError *error,
                 gpointer user_data)
@@ -545,7 +545,7 @@ parse_response (MMSerialPort *port,
 static void flash_done (MMSerialPort *port, GError *error, gpointer user_data);
 
 static void
-custom_init_response (MMSerialPort *port,
+custom_init_response (MMAtSerialPort *port,
                       GString *response,
                       GError *error,
                       gpointer user_data)
@@ -557,7 +557,7 @@ custom_init_response (MMSerialPort *port,
         task_priv->custom_init_tries++;
         if (task_priv->custom_init_tries < task_priv->custom_init_max_tries) {
             /* Try the custom command again */
-            flash_done (port, NULL, user_data);
+            flash_done (MM_SERIAL_PORT (port), NULL, user_data);
             return;
         } else if (task_priv->custom_init_fail_if_timeout) {
             /* Fail the probe if the plugin wanted it and the command timed out */
@@ -569,7 +569,7 @@ custom_init_response (MMSerialPort *port,
     }
 
     /* Otherwise proceed to probing */
-    mm_serial_port_queue_command (port, "+GCAP", 3, parse_response, user_data);
+    mm_at_serial_port_queue_command (port, "+GCAP", 3, parse_response, user_data);
 }
 
 static void
@@ -583,14 +583,14 @@ flash_done (MMSerialPort *port, GError *error, gpointer user_data)
     if (task_priv->custom_init) {
         if (!delay_secs)
             delay_secs = 3;
-        mm_serial_port_queue_command (port,
-                                      task_priv->custom_init,
-                                      delay_secs,
-                                      custom_init_response,
-                                      user_data);
+        mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port),
+                                         task_priv->custom_init,
+                                         delay_secs,
+                                         custom_init_response,
+                                         user_data);
     } else {
         /* Otherwise start normal probing */
-        custom_init_response (port, NULL, NULL, user_data);
+        custom_init_response (MM_AT_SERIAL_PORT (port), NULL, NULL, user_data);
     }
 }
 
@@ -603,7 +603,7 @@ try_open (gpointer user_data)
 
     task_priv->open_id = 0;
 
-    if (!mm_serial_port_open (task_priv->probe_port, &error)) {
+    if (!mm_serial_port_open (MM_SERIAL_PORT (task_priv->probe_port), &error)) {
         if (++task_priv->open_tries > 4) {
             /* took too long to open the port; give up */
             g_warning ("(%s): failed to open after 4 tries.",
@@ -629,7 +629,7 @@ try_open (gpointer user_data)
         g_debug ("(%s): probe requested by plugin '%s'",
                  g_udev_device_get_name (port),
                  mm_plugin_get_name (MM_PLUGIN (task_priv->plugin)));
-        mm_serial_port_flash (task_priv->probe_port, 100, flash_done, task);
+        mm_serial_port_flash (MM_SERIAL_PORT (task_priv->probe_port), 100, flash_done, task);
     }
 
     return FALSE;
@@ -641,7 +641,7 @@ mm_plugin_base_probe_port (MMPluginBase *self,
                            GError **error)
 {
     MMPluginBaseSupportsTaskPrivate *task_priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
-    MMSerialPort *serial;
+    MMAtSerialPort *serial;
     const char *name;
     GUdevDevice *port;
 
@@ -654,7 +654,7 @@ mm_plugin_base_probe_port (MMPluginBase *self,
     name = g_udev_device_get_name (port);
     g_assert (name);
 
-    serial = mm_serial_port_new (name, MM_PORT_TYPE_PRIMARY);
+    serial = mm_at_serial_port_new (name, MM_PORT_TYPE_PRIMARY);
     if (serial == NULL) {
         g_set_error_literal (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
                              "Failed to create new serial port.");
@@ -666,10 +666,10 @@ mm_plugin_base_probe_port (MMPluginBase *self,
                   MM_PORT_CARRIER_DETECT, FALSE,
                   NULL);
 
-    mm_serial_port_set_response_parser (serial,
-                                        mm_serial_parser_v1_parse,
-                                        mm_serial_parser_v1_new (),
-                                        mm_serial_parser_v1_destroy);
+    mm_at_serial_port_set_response_parser (serial,
+                                           mm_serial_parser_v1_parse,
+                                           mm_serial_parser_v1_new (),
+                                           mm_serial_parser_v1_destroy);
 
     /* Open the port */
     task_priv->probe_port = serial;

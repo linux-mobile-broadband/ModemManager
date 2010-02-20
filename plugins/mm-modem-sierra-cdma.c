@@ -110,7 +110,7 @@ sys_mode_has_service (SysMode mode)
 }
 
 static void
-status_done (MMSerialPort *port,
+status_done (MMAtSerialPort *port,
              GString *response,
              GError *error,
              gpointer user_data)
@@ -293,11 +293,11 @@ query_registration_state (MMGenericCdma *cdma,
                           gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMSerialPort *primary, *secondary;
-    MMSerialPort *port;
+    MMAtSerialPort *primary, *secondary;
+    MMAtSerialPort *port;
 
-    port = primary = mm_generic_cdma_get_port (cdma, MM_PORT_TYPE_PRIMARY);
-    secondary = mm_generic_cdma_get_port (cdma, MM_PORT_TYPE_SECONDARY);
+    port = primary = mm_generic_cdma_get_at_port (cdma, MM_PORT_TYPE_PRIMARY);
+    secondary = mm_generic_cdma_get_at_port (cdma, MM_PORT_TYPE_SECONDARY);
 
     info = mm_generic_cdma_query_reg_state_callback_info_new (cdma, callback, user_data);
 
@@ -313,11 +313,11 @@ query_registration_state (MMGenericCdma *cdma,
         port = secondary;
     }
 
-    mm_serial_port_queue_command (port, "!STATUS", 3, status_done, info);
+    mm_at_serial_port_queue_command (port, "!STATUS", 3, status_done, info);
 }
 
 static void
-pcstate_done (MMSerialPort *port,
+pcstate_done (MMAtSerialPort *port,
               GString *response,
               GError *error,
               gpointer user_data)
@@ -334,14 +334,14 @@ post_enable (MMGenericCdma *cdma,
              gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMSerialPort *primary;
+    MMAtSerialPort *primary;
 
     info = mm_callback_info_new (MM_MODEM (cdma), callback, user_data);
 
-    primary = mm_generic_cdma_get_port (cdma, MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_cdma_get_at_port (cdma, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
 
-    mm_serial_port_queue_command (primary, "!pcstate=1", 5, pcstate_done, info);
+    mm_at_serial_port_queue_command (primary, "!pcstate=1", 5, pcstate_done, info);
 }
 
 static void
@@ -350,14 +350,14 @@ post_disable (MMGenericCdma *cdma,
               gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMSerialPort *primary;
+    MMAtSerialPort *primary;
 
     info = mm_callback_info_new (MM_MODEM (cdma), callback, user_data);
 
-    primary = mm_generic_cdma_get_port (cdma, MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_cdma_get_at_port (cdma, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
 
-    mm_serial_port_queue_command (primary, "!pcstate=0", 5, pcstate_done, info);
+    mm_at_serial_port_queue_command (primary, "!pcstate=0", 5, pcstate_done, info);
 }
 
 /*****************************************************************************/

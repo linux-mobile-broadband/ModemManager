@@ -49,7 +49,7 @@ mm_modem_novatel_gsm_new (const char *device,
 /*****************************************************************************/
 
 static void
-init_modem_done (MMSerialPort *port,
+init_modem_done (MMAtSerialPort *port,
                  GString *response,
                  GError *error,
                  gpointer user_data)
@@ -64,7 +64,7 @@ pin_check_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMGenericGsm *self = MM_GENERIC_GSM (modem);
-    MMSerialPort *primary;
+    MMAtSerialPort *primary;
 
     if (error) {
         mm_generic_gsm_enable_complete (self, error, info);
@@ -72,13 +72,13 @@ pin_check_done (MMModem *modem, GError *error, gpointer user_data)
     }
 
     /* Finish the initialization */
-    primary = mm_generic_gsm_get_port (self, MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (self, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-    mm_serial_port_queue_command (primary, "Z E0 V1 X4 &C1 +CMEE=1;+CFUN=1", 10, init_modem_done, info);
+    mm_at_serial_port_queue_command (primary, "Z E0 V1 X4 &C1 +CMEE=1;+CFUN=1", 10, init_modem_done, info);
 }
 
 static void
-pre_init_done (MMSerialPort *port,
+pre_init_done (MMAtSerialPort *port,
                GString *response,
                GError *error,
                gpointer user_data)
@@ -104,29 +104,29 @@ enable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
     if (error)
         mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
     else
-        mm_serial_port_queue_command (port, "E0 V1", 3, pre_init_done, user_data);
+        mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "E0 V1", 3, pre_init_done, user_data);
 }
 
 static void
 do_enable (MMGenericGsm *modem, MMModemFn callback, gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMSerialPort *primary;
+    MMAtSerialPort *primary;
 
-    primary = mm_generic_gsm_get_port (modem, MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (modem, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
-    mm_serial_port_flash (primary, 100, enable_flash_done, info);
+    mm_serial_port_flash (MM_SERIAL_PORT (primary), 100, enable_flash_done, info);
 }
 
 static void
-dmat_callback (MMSerialPort *port,
+dmat_callback (MMAtSerialPort *port,
                GString *response,
                GError *error,
                gpointer user_data)
 {
-    mm_serial_port_close (port);
+    mm_serial_port_close (MM_SERIAL_PORT (port));
 }
 
 static gboolean
@@ -142,18 +142,18 @@ grab_port (MMModem *modem,
     MMPort *port = NULL;
 
     if (suggested_type == MM_PORT_TYPE_UNKNOWN) {
-        if (!mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_PRIMARY))
+        if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY))
                 ptype = MM_PORT_TYPE_PRIMARY;
-        else if (!mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_SECONDARY))
+        else if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY))
             ptype = MM_PORT_TYPE_SECONDARY;
     } else
         ptype = suggested_type;
 
     port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
-    if (port && MM_IS_SERIAL_PORT (port) && (ptype == MM_PORT_TYPE_PRIMARY)) {
+    if (port && MM_IS_AT_SERIAL_PORT (port) && (ptype == MM_PORT_TYPE_PRIMARY)) {
         /* Flip secondary ports to AT mode */
         if (mm_serial_port_open (MM_SERIAL_PORT (port), NULL))
-            mm_serial_port_queue_command (MM_SERIAL_PORT (port), "$NWDMAT=1", 2, dmat_callback, NULL);
+            mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "$NWDMAT=1", 2, dmat_callback, NULL);
     }
 
     return !!port;

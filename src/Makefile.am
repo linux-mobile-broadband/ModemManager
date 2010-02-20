@@ -35,12 +35,14 @@ modem_manager_SOURCES = \
 	mm-modem.h \
 	mm-port.c \
 	mm-port.h \
-	mm-modem-base.c \
-	mm-modem-base.h \
 	mm-serial-port.c \
 	mm-serial-port.h \
+	mm-at-serial-port.c \
+	mm-at-serial-port.h \
 	mm-serial-parsers.c \
 	mm-serial-parsers.h \
+	mm-modem-base.c \
+	mm-modem-base.h \
 	mm-generic-cdma.c \
 	mm-generic-cdma.h \
 	mm-generic-gsm.c \

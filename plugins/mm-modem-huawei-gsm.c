@@ -25,7 +25,7 @@
 #include "mm-modem-gsm-network.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
-#include "mm-serial-port.h"
+#include "mm-at-serial-port.h"
 #include "mm-serial-parsers.h"
 
 static void modem_init (MMModem *modem_class);
@@ -101,7 +101,7 @@ parse_syscfg (MMModemHuaweiGsm *self,
 }
 
 static void
-set_network_mode_done (MMSerialPort *port,
+set_network_mode_done (MMAtSerialPort *port,
                        GString *response,
                        GError *error,
                        gpointer user_data)
@@ -120,7 +120,7 @@ set_network_mode_done (MMSerialPort *port,
 }
 
 static void
-set_network_mode_get_done (MMSerialPort *port,
+set_network_mode_get_done (MMAtSerialPort *port,
                            GString *response,
                            GError *error,
                            gpointer user_data)
@@ -169,7 +169,7 @@ set_network_mode_get_done (MMSerialPort *port,
             }
 
             command = g_strdup_printf ("AT^SYSCFG=%d,%d,%X,%d,%d", a, b, band, u1, u2);
-            mm_serial_port_queue_command (port, command, 3, set_network_mode_done, info);
+            mm_at_serial_port_queue_command (port, command, 3, set_network_mode_done, info);
             g_free (command);
         }
     }
@@ -182,7 +182,7 @@ set_network_mode (MMModemGsmNetwork *modem,
                   gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMSerialPort *primary;
+    MMAtSerialPort *primary;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
@@ -200,9 +200,9 @@ set_network_mode (MMModemGsmNetwork *modem,
     case MM_MODEM_GSM_MODE_3G_ONLY:
         /* Allowed values */
         mm_callback_info_set_data (info, "mode", GUINT_TO_POINTER (mode), NULL);
-        primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+        primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
         g_assert (primary);
-        mm_serial_port_queue_command (primary, "AT^SYSCFG?", 3, set_network_mode_get_done, info);
+        mm_at_serial_port_queue_command (primary, "AT^SYSCFG?", 3, set_network_mode_get_done, info);
         return;
     default:
         info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Invalid mode.");
@@ -213,7 +213,7 @@ set_network_mode (MMModemGsmNetwork *modem,
 }
 
 static void
-get_network_mode_done (MMSerialPort *port,
+get_network_mode_done (MMAtSerialPort *port,
                        GString *response,
                        GError *error,
                        gpointer user_data)
@@ -249,17 +249,17 @@ get_network_mode (MMModemGsmNetwork *modem,
     } else {
         /* Get it from modem */
         MMCallbackInfo *info;
-        MMSerialPort *primary;
+        MMAtSerialPort *primary;
 
         info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-        primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+        primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
         g_assert (primary);
-        mm_serial_port_queue_command (primary, "AT^SYSCFG?", 3, get_network_mode_done, info);
+        mm_at_serial_port_queue_command (primary, "AT^SYSCFG?", 3, get_network_mode_done, info);
     }
 }
 
 static void
-set_band_done (MMSerialPort *port,
+set_band_done (MMAtSerialPort *port,
                GString *response,
                GError *error,
                gpointer user_data)
@@ -278,7 +278,7 @@ set_band_done (MMSerialPort *port,
 }
 
 static void
-set_band_get_done (MMSerialPort *port,
+set_band_get_done (MMAtSerialPort *port,
                    GString *response,
                    GError *error,
                    gpointer user_data)
@@ -320,7 +320,7 @@ set_band_get_done (MMSerialPort *port,
             }
 
             command = g_strdup_printf ("AT^SYSCFG=%d,%d,%X,%d,%d", a, b, band, u1, u2);
-            mm_serial_port_queue_command (port, command, 3, set_band_done, info);
+            mm_at_serial_port_queue_command (port, command, 3, set_band_done, info);
             g_free (command);
         }
     }
@@ -333,7 +333,7 @@ set_band (MMModemGsmNetwork *modem,
           gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMSerialPort *primary;
+    MMAtSerialPort *primary;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
@@ -344,9 +344,9 @@ set_band (MMModemGsmNetwork *modem,
     case MM_MODEM_GSM_BAND_U2100:
     case MM_MODEM_GSM_BAND_PCS:
         mm_callback_info_set_data (info, "band", GUINT_TO_POINTER (band), NULL);
-        primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+        primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
         g_assert (primary);
-        mm_serial_port_queue_command (primary, "AT^SYSCFG?", 3, set_band_get_done, info);
+        mm_at_serial_port_queue_command (primary, "AT^SYSCFG?", 3, set_band_get_done, info);
         return;
     default:
         info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Invalid band.");
@@ -357,7 +357,7 @@ set_band (MMModemGsmNetwork *modem,
 }
 
 static void
-get_band_done (MMSerialPort *port,
+get_band_done (MMAtSerialPort *port,
                GString *response,
                GError *error,
                gpointer user_data)
@@ -382,7 +382,7 @@ get_band (MMModemGsmNetwork *modem,
           gpointer user_data)
 {
     MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (modem);
-    MMSerialPort *primary;
+    MMAtSerialPort *primary;
 
     if (priv->band != MM_MODEM_GSM_BAND_ANY) {
         /* have cached mode (from an unsolicited message). Use that */
@@ -396,9 +396,9 @@ get_band (MMModemGsmNetwork *modem,
         MMCallbackInfo *info;
 
         info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-        primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+        primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
         g_assert (primary);
-        mm_serial_port_queue_command (primary, "AT^SYSCFG?", 3, get_band_done, info);
+        mm_at_serial_port_queue_command (primary, "AT^SYSCFG?", 3, get_band_done, info);
     }
 }
 
@@ -428,7 +428,7 @@ get_signal_quality (MMModemGsmNetwork *modem,
 /* Unsolicited message handlers */
 
 static void
-handle_signal_quality_change (MMSerialPort *port,
+handle_signal_quality_change (MMAtSerialPort *port,
                               GMatchInfo *match_info,
                               gpointer user_data)
 {
@@ -454,7 +454,7 @@ handle_signal_quality_change (MMSerialPort *port,
 }
 
 static void
-handle_mode_change (MMSerialPort *port,
+handle_mode_change (MMAtSerialPort *port,
                     GMatchInfo *match_info,
                     gpointer user_data)
 {
@@ -494,7 +494,7 @@ handle_mode_change (MMSerialPort *port,
 }
 
 static void
-handle_status_change (MMSerialPort *port,
+handle_status_change (MMAtSerialPort *port,
                       GMatchInfo *match_info,
                       gpointer user_data)
 {
@@ -546,16 +546,16 @@ grab_port (MMModem *modem,
     }
 
     if (usbif == 0) {
-        if (!mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_PRIMARY))
+        if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY))
             ptype = MM_PORT_TYPE_PRIMARY;
     } else if (suggested_type == MM_PORT_TYPE_SECONDARY) {
-        if (!mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_SECONDARY))
+        if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY))
             ptype = MM_PORT_TYPE_SECONDARY;
     }
 
     port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
 
-    if (port && MM_IS_SERIAL_PORT (port)) {
+    if (port && MM_IS_AT_SERIAL_PORT (port)) {
         g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
         if (ptype == MM_PORT_TYPE_SECONDARY) {
             GRegex *regex;
@@ -563,19 +563,19 @@ grab_port (MMModem *modem,
             mm_generic_gsm_set_unsolicited_registration (MM_GENERIC_GSM (modem), TRUE);
 
             regex = g_regex_new ("\\r\\n\\^RSSI:(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-            mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, handle_signal_quality_change, modem, NULL);
+            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_signal_quality_change, modem, NULL);
             g_regex_unref (regex);
 
             regex = g_regex_new ("\\r\\n\\^MODE:(\\d),(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-            mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, handle_mode_change, modem, NULL);
+            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_mode_change, modem, NULL);
             g_regex_unref (regex);
 
             regex = g_regex_new ("\\r\\n\\^DSFLOWRPT:(.+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-            mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, handle_status_change, modem, NULL);
+            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_status_change, modem, NULL);
             g_regex_unref (regex);
 
             regex = g_regex_new ("\\r\\n\\^BOOT:.+\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-            mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, modem, NULL);
+            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, modem, NULL);
             g_regex_unref (regex);
         }
     }

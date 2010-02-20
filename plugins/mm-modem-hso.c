@@ -88,7 +88,7 @@ mm_modem_hso_new (const char *device,
 #define IGNORE_ERRORS_TAG "ignore-errors"
 
 static void
-hso_call_control_done (MMSerialPort *port,
+hso_call_control_done (MMAtSerialPort *port,
                        GString *response,
                        GError *error,
                        gpointer user_data)
@@ -122,15 +122,15 @@ hso_call_control (MMModemHso *self,
 {
     MMCallbackInfo *info;
     char *command;
-    MMSerialPort *primary;
+    MMAtSerialPort *primary;
 
     info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
     mm_callback_info_set_data (info, IGNORE_ERRORS_TAG, GUINT_TO_POINTER (ignore_errors), NULL);
 
     command = g_strdup_printf ("AT_OWANCALL=%d,%d,1", hso_get_cid (self), activate ? 1 : 0);
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-    mm_serial_port_queue_command (primary, command, 3, hso_call_control_done, info);
+    mm_at_serial_port_queue_command (primary, command, 3, hso_call_control_done, info);
     g_free (command);
 }
 
@@ -203,7 +203,7 @@ clear_old_context (MMModem *modem,
 }
 
 static void
-auth_done (MMSerialPort *port,
+auth_done (MMAtSerialPort *port,
            GString *response,
            GError *error,
            gpointer user_data)
@@ -236,12 +236,12 @@ static void
 _internal_hso_modem_authenticate (MMModemHso *self, MMCallbackInfo *info)
 {
     MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (self);
-    MMSerialPort *primary;
+    MMAtSerialPort *primary;
     guint32 cid;
     char *command;
     const char *username, *password;
 
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
 
     cid = hso_get_cid (self);
@@ -260,7 +260,7 @@ _internal_hso_modem_authenticate (MMModemHso *self, MMCallbackInfo *info)
 
     }
 
-    mm_serial_port_queue_command (primary, command, 3, auth_done, info);
+    mm_at_serial_port_queue_command (primary, command, 3, auth_done, info);
     g_free (command);
 }
 
@@ -390,7 +390,7 @@ ip4_config_invoke (MMCallbackInfo *info)
 }
 
 static void
-get_ip4_config_done (MMSerialPort *port,
+get_ip4_config_done (MMAtSerialPort *port,
                      GString *response,
                      GError *error,
                      gpointer user_data)
@@ -453,13 +453,13 @@ get_ip4_config (MMModem *modem,
 {
     MMCallbackInfo *info;
     char *command;
-    MMSerialPort *primary;
+    MMAtSerialPort *primary;
 
     info = mm_callback_info_new_full (modem, ip4_config_invoke, G_CALLBACK (callback), user_data);
     command = g_strdup_printf ("AT_OWANDATA=%d", hso_get_cid (MM_MODEM_HSO (modem)));
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-    mm_serial_port_queue_command (primary, command, 3, get_ip4_config_done, info);
+    mm_at_serial_port_queue_command (primary, command, 3, get_ip4_config_done, info);
     g_free (command);
 }
 
@@ -469,12 +469,12 @@ disconnect (MMModem *modem,
             gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMSerialPort *primary;
+    MMAtSerialPort *primary;
 
     info = mm_callback_info_new (modem, callback, user_data);
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-    mm_serial_port_queue_command (primary, "AT_OWANCALL=1,0,0", 3, NULL, info);
+    mm_at_serial_port_queue_command (primary, "AT_OWANCALL=1,0,0", 3, NULL, info);
 }
 
 /*****************************************************************************/
@@ -508,7 +508,7 @@ impl_hso_authenticate (MMModemHso *self,
 }
 
 static void
-connection_enabled (MMSerialPort *port,
+connection_enabled (MMAtSerialPort *port,
                     GMatchInfo *info,
                     gpointer user_data)
 {
@@ -676,7 +676,7 @@ grab_port (MMModem *modem,
     if (!port)
         goto out;
 
-    if (MM_IS_SERIAL_PORT (port)) {
+    if (MM_IS_AT_SERIAL_PORT (port)) {
         g_object_set (G_OBJECT (port), MM_SERIAL_PORT_SEND_DELAY, (guint64) 10000, NULL);
         if (ptype == MM_PORT_TYPE_PRIMARY) {
             GRegex *regex;
@@ -684,7 +684,7 @@ grab_port (MMModem *modem,
             mm_generic_gsm_set_unsolicited_registration (gsm, TRUE);
 
             regex = g_regex_new ("_OWANCALL: (\\d),\\s*(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-            mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, connection_enabled, modem, NULL);
+            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, connection_enabled, modem, NULL);
             g_regex_unref (regex);
         }
     }
