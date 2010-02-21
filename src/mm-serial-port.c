@@ -291,7 +291,7 @@ parse_stopbits (guint i)
 }
 
 static gboolean
-config_fd (MMSerialPort *self, GError **error)
+real_config_fd (MMSerialPort *self, int fd, GError **error)
 {
     MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (self);
     struct termio stbuf;
@@ -306,7 +306,7 @@ config_fd (MMSerialPort *self, GError **error)
     stopbits = parse_stopbits (priv->stopbits);
 
     memset (&stbuf, 0, sizeof (struct termio));
-    if (ioctl (priv->fd, TCGETA, &stbuf) != 0) {
+    if (ioctl (fd, TCGETA, &stbuf) != 0) {
         g_warning ("%s (%s): TCGETA error: %d",
                    __func__,
                    mm_port_get_device (MM_PORT (self)),
@@ -324,7 +324,7 @@ config_fd (MMSerialPort *self, GError **error)
     stbuf.c_cflag &= ~(CBAUD | CSIZE | CSTOPB | CLOCAL | PARENB);
     stbuf.c_cflag |= (speed | bits | CREAD | 0 | parity | stopbits);
 
-    if (ioctl (priv->fd, TCSETA, &stbuf) < 0) {
+    if (ioctl (fd, TCSETA, &stbuf) < 0) {
         g_set_error (error,
                      MM_MODEM_ERROR,
                      MM_MODEM_ERROR_GENERAL,
@@ -731,7 +731,8 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
         return FALSE;
     }
 
-    if (!config_fd (self, error)) {
+    g_warn_if_fail (MM_SERIAL_PORT_GET_CLASS (self)->config_fd);
+    if (!MM_SERIAL_PORT_GET_CLASS (self)->config_fd (self, priv->fd, error)) {
         close (priv->fd);
         priv->fd = -1;
         return FALSE;
@@ -1187,6 +1188,8 @@ mm_serial_port_class_init (MMSerialPortClass *klass)
     object_class->get_property = get_property;
     object_class->dispose = dispose;
     object_class->finalize = finalize;
+
+    klass->config_fd = real_config_fd;
 
     /* Properties */
     g_object_class_install_property

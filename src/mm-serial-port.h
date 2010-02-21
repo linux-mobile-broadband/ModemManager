@@ -75,6 +75,11 @@ struct _MMSerialPortClass {
                                    GError *error,
                                    GCallback callback,
                                    gpointer callback_data);
+
+    /* Called to configure the serial port after it's opened.  On error, should
+     * return FALSE and set 'error' as appropriate.
+     */
+    gboolean (*config_fd)         (MMSerialPort *self, int fd, GError **error);
 };
 
 GType mm_serial_port_get_type (void);
