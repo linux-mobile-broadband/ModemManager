@@ -204,7 +204,7 @@ test_com (void *f, void *data)
     TestComData *d = data;
     gboolean success;
     GError *error = NULL;
-    char buf[100];
+    char buf[512];
     const char *str;
     gint len;
     QCDMResult *result;
@@ -218,6 +218,8 @@ test_com (void *f, void *data)
                    error && error->message ? error->message : "(unknown)");
     }
     g_assert (success);
+
+    /*** Get the device's firmware version information ***/
 
     len = qcdm_cmd_version_info_new (buf, sizeof (buf), NULL);
     g_assert (len == 4);
@@ -255,7 +257,7 @@ test_com (void *f, void *data)
 
     qcdm_result_unref (result);
 
-    /* Get the device's ESN */
+    /*** Get the device's ESN ***/
 
     len = qcdm_cmd_esn_new (buf, sizeof (buf), NULL);
     g_assert (len == 4);
@@ -274,6 +276,29 @@ test_com (void *f, void *data)
     str = NULL;
     qcdm_result_get_string (result, QCDM_CMD_ESN_ITEM_ESN, &str);
     g_message ("%s: ESN: %s", __func__, str);
+
+    qcdm_result_unref (result);
+
+
+    /*** Get the device's phone number ***/
+
+    len = qcdm_cmd_nv_get_mdn_new (buf, sizeof (buf), 0, NULL);
+    g_assert (len > 0);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_nv_get_mdn_result (buf, reply_len, &error);
+    g_assert (result);
+
+    str = NULL;
+    qcdm_result_get_string (result, QCDM_CMD_NV_GET_MDN_ITEM_MDN, &str);
+    g_message ("%s: MDN: %s", __func__, str);
 
     qcdm_result_unref (result);
 }

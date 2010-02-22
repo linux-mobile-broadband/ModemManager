@@ -20,6 +20,7 @@
 #include "commands.h"
 #include "error.h"
 #include "dm-commands.h"
+#include "nv-items.h"
 #include "result-private.h"
 #include "utils.h"
 
@@ -214,4 +215,56 @@ qcdm_cmd_esn_result (const char *buf, gsize len, GError **error)
 
     return result;
 }
+
+/**********************************************************************/
+
+gsize
+qcdm_cmd_nv_get_mdn_new (char *buf, gsize len, guint8 profile, GError **error)
+{
+    char cmdbuf[sizeof (DMCmdNVReadWrite) + DIAG_TRAILER_LEN];
+    DMCmdNVReadWrite *cmd = (DMCmdNVReadWrite *) &cmdbuf[0];
+    DMNVItemMdn *req;
+
+    g_return_val_if_fail (buf != NULL, 0);
+    g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->code = DIAG_CMD_NV_READ;
+    cmd->nv_item = GUINT16_TO_LE (DIAG_NV_DIR_NUMBER);
+
+    req = (DMNVItemMdn *) &cmd->data[0];
+    req->profile = profile;
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QCDMResult *
+qcdm_cmd_nv_get_mdn_result (const char *buf, gsize len, GError **error)
+{
+    QCDMResult *result = NULL;
+    DMCmdNVReadWrite *rsp = (DMCmdNVReadWrite *) buf;
+    DMNVItemMdn *mdn;
+    char tmp[11];
+
+    g_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_NV_READ, sizeof (DMCmdNVReadWrite), error))
+        return NULL;
+
+    mdn = (DMNVItemMdn *) &rsp->data[0];
+
+    result = qcdm_result_new ();
+
+    qcdm_result_add_uint8 (result, QCDM_CMD_NV_GET_MDN_ITEM_PROFILE, mdn->profile);
+
+    memset (tmp, 0, sizeof (tmp));
+    g_assert (sizeof (mdn->mdn) <= sizeof (tmp));
+    memcpy (tmp, mdn->mdn, sizeof (mdn->mdn));
+    qcdm_result_add_string (result, QCDM_CMD_NV_GET_MDN_ITEM_MDN, tmp);
+
+    return result;
+}
+
+/**********************************************************************/
+
 

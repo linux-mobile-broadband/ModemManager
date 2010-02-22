@@ -52,4 +52,18 @@ QCDMResult *qcdm_cmd_esn_result (const char *buf,
 
 /**********************************************************************/
 
+#define QCDM_CMD_NV_GET_MDN_ITEM_PROFILE "profile"
+#define QCDM_CMD_NV_GET_MDN_ITEM_MDN "mdn"
+
+gsize       qcdm_cmd_nv_get_mdn_new    (char *buf,
+                                        gsize len,
+                                        guint8 profile,
+                                        GError **error);
+
+QCDMResult *qcdm_cmd_nv_get_mdn_result (const char *buf,
+                                        gsize len,
+                                        GError **error);
+
+/**********************************************************************/
+
 #endif  /* LIBQCDM_COMMANDS_H */
