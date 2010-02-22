@@ -152,11 +152,11 @@ qcdm_result_get_uint8  (QCDMResult *result,
     if (!val)
         return FALSE;
 
-    g_warn_if_fail (G_VALUE_HOLDS_CHAR (val));
-    if (!G_VALUE_HOLDS_CHAR (val))
+    g_warn_if_fail (G_VALUE_HOLDS_UCHAR (val));
+    if (!G_VALUE_HOLDS_UCHAR (val))
         return FALSE;
 
-    *out_val = (guint8) g_value_get_char (val);
+    *out_val = (guint8) g_value_get_uchar (val);
     return TRUE;
 }
 
