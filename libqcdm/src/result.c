@@ -63,7 +63,7 @@ void
 qcdm_result_unref (QCDMResult *result)
 {
     g_return_if_fail (result != NULL);
-    g_return_if_fail (result->refcount == 0);
+    g_return_if_fail (result->refcount > 0);
 
     result->refcount--;
     if (result->refcount == 0) {
