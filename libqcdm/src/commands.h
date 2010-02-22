@@ -22,9 +22,7 @@
 
 #include "result.h"
 
-gsize        qcdm_cmd_version_info_new    (char *buf,
-                                           gsize len,
-                                           GError **error);
+/**********************************************************************/
 
 #define QCDM_CMD_VERSION_INFO_ITEM_COMP_DATE "comp-date"
 #define QCDM_CMD_VERSION_INFO_ITEM_COMP_TIME "comp-time"
@@ -32,8 +30,26 @@ gsize        qcdm_cmd_version_info_new    (char *buf,
 #define QCDM_CMD_VERSION_INFO_ITEM_RELEASE_TIME "release-time"
 #define QCDM_CMD_VERSION_INFO_ITEM_MODEL "model"
 
+gsize       qcdm_cmd_version_info_new    (char *buf,
+                                          gsize len,
+                                          GError **error);
+
 QCDMResult *qcdm_cmd_version_info_result (const char *buf,
                                           gsize len,
                                           GError **error);
+
+/**********************************************************************/
+
+#define QCDM_CMD_ESN_ITEM_ESN "esn"
+
+gsize       qcdm_cmd_esn_new    (char *buf,
+                                 gsize len,
+                                 GError **error);
+
+QCDMResult *qcdm_cmd_esn_result (const char *buf,
+                                 gsize len,
+                                 GError **error);
+
+/**********************************************************************/
 
 #endif  /* LIBQCDM_COMMANDS_H */

@@ -183,5 +183,12 @@ struct DMCmdVersionInfoRsp {
 } __attribute__ ((packed));
 typedef struct DMCmdVersionInfoRsp DMCmdVersionInfoRsp;
 
+/* DIAG_CMD_ESN */
+struct DMCmdEsnRsp {
+    guint8 code;
+    guint8 esn[4];
+} __attribute__ ((packed));
+typedef struct DMCmdEsnRsp DMCmdEsnRsp;
+
 #endif  /* LIBQCDM_DM_COMMANDS_H */
 

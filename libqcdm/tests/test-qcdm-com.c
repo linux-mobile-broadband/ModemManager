@@ -252,5 +252,29 @@ test_com (void *f, void *data)
     str = NULL;
     qcdm_result_get_string (result, QCDM_CMD_VERSION_INFO_ITEM_MODEL, &str);
     g_message ("%s: Model: %s", __func__, str);
+
+    qcdm_result_unref (result);
+
+    /* Get the device's ESN */
+
+    len = qcdm_cmd_esn_new (buf, sizeof (buf), NULL);
+    g_assert (len == 4);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_esn_result (buf, reply_len, &error);
+    g_assert (result);
+
+    str = NULL;
+    qcdm_result_get_string (result, QCDM_CMD_ESN_ITEM_ESN, &str);
+    g_message ("%s: ESN: %s", __func__, str);
+
+    qcdm_result_unref (result);
 }
 
