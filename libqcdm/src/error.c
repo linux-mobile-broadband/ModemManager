@@ -70,6 +70,10 @@ qcdm_command_error_get_type (void)
             ENUM_ENTRY (QCDM_COMMAND_MALFORMED_RESPONSE, "QcdmCommandMalformedResponse"),
             ENUM_ENTRY (QCDM_COMMAND_UNEXPECTED, "QcdmCommandUnexpected"),
             ENUM_ENTRY (QCDM_COMMAND_BAD_LENGTH, "QcdmCommandBadLength"),
+            ENUM_ENTRY (QCDM_COMMAND_BAD_COMMAND, "QcdmCommandBadCommand"),
+            ENUM_ENTRY (QCDM_COMMAND_BAD_PARAMETER, "QcdmCommandBadParameter"),
+            ENUM_ENTRY (QCDM_COMMAND_NOT_ACCEPTED, "QcdmCommandNotAccepted"),
+            ENUM_ENTRY (QCDM_COMMAND_BAD_MODE, "QcdmCommandBadMode"),
             { 0, 0, 0 }
         };
 

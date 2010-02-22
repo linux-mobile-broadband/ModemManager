@@ -32,7 +32,37 @@ check_command (const char *buf, gsize len, guint8 cmd, gsize min_len, GError **e
         return FALSE;
     }
 
-    if (buf[0] != (guint8) cmd) {
+    switch (buf[0]) {
+    case DIAG_CMD_BAD_CMD:
+        g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_BAD_COMMAND,
+                     "DM command %d unknown or unimplemented by the device",
+                     cmd);
+        return FALSE;
+    case DIAG_CMD_BAD_PARM:
+        g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_BAD_PARAMETER,
+                     "DM command %d contained invalid parameter",
+                     cmd);
+        return FALSE;
+    case DIAG_CMD_BAD_LEN:
+        g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_BAD_LENGTH,
+                     "DM command %d was the wrong size",
+                     cmd);
+        return FALSE;
+    case DIAG_CMD_BAD_DEV:
+        g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_NOT_ACCEPTED,
+                     "DM command %d was not accepted by the device",
+                     cmd);
+        return FALSE;
+    case DIAG_CMD_BAD_MODE:
+        g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_BAD_MODE,
+                     "DM command %d not allowed in the current device mode",
+                     cmd);
+        return FALSE;
+    default:
+        break;
+    }
+
+    if (buf[0] != cmd) {
         g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_UNEXPECTED,
                      "Unexpected DM command response (expected %d, got %d)",
                      cmd, buf[0]);
