@@ -276,10 +276,10 @@ qcdm_cmd_cdma_status_result (const char *buf, gsize len, GError **error)
     qcdm_result_add_uint32 (result, QCDM_CMD_CDMA_STATUS_ITEM_PILOT_BASE, tmp_num);
 
     tmp_num = (guint32) GUINT16_FROM_LE (rsp->sid);
-    qcdm_result_add_uint32 (result, QCDM_CMD_CDMA_STATUS_ITEM_RX_STATE, tmp_num);
+    qcdm_result_add_uint32 (result, QCDM_CMD_CDMA_STATUS_ITEM_SID, tmp_num);
 
     tmp_num = (guint32) GUINT16_FROM_LE (rsp->nid);
-    qcdm_result_add_uint32 (result, QCDM_CMD_CDMA_STATUS_ITEM_RX_STATE, tmp_num);
+    qcdm_result_add_uint32 (result, QCDM_CMD_CDMA_STATUS_ITEM_NID, tmp_num);
 
     return result;
 }
@@ -334,5 +334,4 @@ qcdm_cmd_nv_get_mdn_result (const char *buf, gsize len, GError **error)
 }
 
 /**********************************************************************/
-
 
