@@ -42,6 +42,8 @@ qcdm_result_new (void)
 {
     QCDMResult *result;
 
+    g_type_init ();
+
     result = g_malloc0 (sizeof (QCDMResult));
     result->hash = g_hash_table_new_full (g_str_hash, g_str_equal,
                                           NULL, gvalue_destroy);
