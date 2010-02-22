@@ -144,9 +144,8 @@ wait_reply (TestComData *d, char *buf, gsize len)
     struct timeval timeout = { 1, 0 };
     char readbuf[1024];
     ssize_t bytes_read;
-    char *p = &readbuf[0];
     int total = 0, retries = 0;
-    gboolean escaping = FALSE;
+    gsize decap_len = 0;
 
     FD_ZERO (&in);
     FD_SET (d->fd, &in);
@@ -156,7 +155,7 @@ wait_reply (TestComData *d, char *buf, gsize len)
 
     do {
         errno = 0;
-        bytes_read = read (d->fd, p, 1);
+        bytes_read = read (d->fd, &readbuf[total], 1);
         if ((bytes_read == 0) || (errno == EAGAIN)) {
             /* Haven't gotten the async control char yet */
             if (retries > 20)
@@ -167,20 +166,36 @@ wait_reply (TestComData *d, char *buf, gsize len)
             retries++;
             continue;
         } else if (bytes_read == 1) {
-            /* Check for the async control char */
-            if (*p++ == DIAG_CONTROL_CHAR)
-                break;
+            gboolean more = FALSE, success;
+            gsize used = 0;
+
             total++;
+            decap_len = 0;
+            print_buf ("<<<", readbuf, total);
+            success = dm_decapsulate_buffer (readbuf, total, buf, len, &decap_len, &used, &more);
+
+            /* Discard used data */
+            if (used > 0) {
+                total -= used;
+                memmove (readbuf, &readbuf[used], total);
+            }
+
+            if (success && !more) {
+                /* Success; we have a packet */
+                break;
+            }
         } else {
             /* Some error occurred */
             return 0;
         }
-    } while (total <= sizeof (readbuf));
+    } while (total < sizeof (readbuf));
 
-    if (d->debug)
+    if (d->debug) {
         print_buf ("<<<", readbuf, total);
+        print_buf ("D<<", buf, decap_len);
+    }
 
-    return dm_unescape (readbuf, total, buf, len, &escaping);
+    return decap_len;
 }
 
 void

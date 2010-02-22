@@ -61,7 +61,7 @@ qcdm_cmd_version_info_new (char *buf, gsize len, GError **error)
     memset (cmd, 0, sizeof (cmd));
     cmd->code = DIAG_CMD_VERSION_INFO;
 
-    return dm_prepare_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
 }
 
 QCDMResult *

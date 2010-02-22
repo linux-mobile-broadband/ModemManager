@@ -36,11 +36,19 @@ gsize dm_unescape (const char *inbuf,
                    gsize outbuf_len,
                    gboolean *escaping);
 
-gsize dm_prepare_buffer (char *inbuf,
-                         gsize cmd_len,
-                         gsize inbuf_len,
-                         char *outbuf,
-                         gsize outbuf_len);
+gsize dm_encapsulate_buffer (char *inbuf,
+                             gsize cmd_len,
+                             gsize inbuf_len,
+                             char *outbuf,
+                             gsize outbuf_len);
+
+gboolean dm_decapsulate_buffer (const char *inbuf,
+                                gsize inbuf_len,
+                                char *outbuf,
+                                gsize outbuf_len,
+                                gsize *out_decap_len,
+                                gsize *out_used,
+                                gboolean *out_need_more);
 
 #endif  /* UTILS_H */
 

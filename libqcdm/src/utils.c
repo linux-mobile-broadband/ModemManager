@@ -166,12 +166,25 @@ dm_unescape (const char *inbuf,
     return outsize;
 }
 
+/**
+ * dm_encapsulate_buffer:
+ * @inbuf: buffer in which a valid QCDM packet exists
+ * @cmd_len: size of the QCDM packet contained in @inbuf
+ * @inbuf_len: total size of @inbuf itself (not just the packet)
+ * @outbuf: buffer in which to put the encapsulated QCDM packet
+ * @outbuf_len: total size of @outbuf
+ *
+ * Escapes and CRCs a QCDM packet, and finally adds the trailing control
+ * character that denotes the end of the QCDM packet.
+ *
+ * Returns: size of the encapsulated QCDM command writted to @outbuf.
+ **/
 gsize
-dm_prepare_buffer (char *inbuf,
-                   gsize cmd_len,
-                   gsize inbuf_len,
-                   char *outbuf,
-                   gsize outbuf_len)
+dm_encapsulate_buffer (char *inbuf,
+                       gsize cmd_len,
+                       gsize inbuf_len,
+                       char *outbuf,
+                       gsize outbuf_len)
 {
     guint16 crc;
     gsize escaped_len;
@@ -190,5 +203,107 @@ dm_prepare_buffer (char *inbuf,
     outbuf[escaped_len++] = DIAG_CONTROL_CHAR;
 
     return escaped_len;
+}
+
+/**
+ * dm_decapsulate_buffer:
+ * @inbuf: buffer in which to look for a QCDM packet
+ * @inbuf_len: length of valid data in @inbuf
+ * @outbuf: buffer in which to put decapsulated QCDM packet
+ * @outbuf_len: max size of @outbuf
+ * @out_decap_len: on success, size of the decapsulated QCDM packet
+ * @out_used: on either success or failure, amount of data used; caller should
+ *  discard this much data from @inbuf before the next call to this function
+ * @out_need_more: when TRUE, indicates that more data is required before
+ *  and determination about a valid QCDM packet can be made; caller should add
+ *  more data to @inbuf before calling this function again.
+ *
+ * Attempts to retrieve, unescape, and CRC-check a QCDM packet from the given
+ * buffer.
+ *
+ * Returns: FALSE on error (packet was invalid or malformed, or the CRC check
+ *  failed, etc) and places number of bytes to discard from @inbuf in @out_used.
+ *  When TRUE, either more data is required (in which case @out_need_more will
+ *  be TRUE), or a QCDM packet was successfully retrieved from @inbuf and the
+ *  decapsulated packet of length @out_decap_len was placed into @outbuf.  In
+ *  all cases the caller should advance the buffer by the number of bytes
+ *  returned in @out_used before calling this function again.
+ **/
+gboolean
+dm_decapsulate_buffer (const char *inbuf,
+                       gsize inbuf_len,
+                       char *outbuf,
+                       gsize outbuf_len,
+                       gsize *out_decap_len,
+                       gsize *out_used,
+                       gboolean *out_need_more)
+{
+    gboolean escaping = FALSE;
+    gsize i, pkt_len = 0, unesc_len;
+    guint16 crc, pkt_crc;
+
+    g_return_val_if_fail (inbuf != NULL, FALSE);
+    g_return_val_if_fail (outbuf != NULL, FALSE);
+    g_return_val_if_fail (outbuf_len > 0, FALSE);
+    g_return_val_if_fail (out_decap_len != NULL, FALSE);
+    g_return_val_if_fail (out_used != NULL, FALSE);
+    g_return_val_if_fail (out_need_more != NULL, FALSE);
+
+    *out_decap_len = 0;
+    *out_used = 0;
+    *out_need_more = FALSE;
+
+    if (inbuf_len < 4) {
+        *out_need_more = TRUE;
+        return TRUE;
+    }
+
+    /* Find the async control character */
+    for (i = 0; i < inbuf_len; i++) {
+        if (inbuf[i] == DIAG_CONTROL_CHAR) {
+            /* If the control character shows up in a position before a valid
+             * QCDM packet length (4), the packet is malformed.
+             */
+            if (i < 3) {
+                /* Tell the caller to advance the buffer past the control char */
+                *out_used = i + 1;
+                return FALSE;
+            }
+
+            pkt_len = i;
+            break;
+        }
+    }
+
+    /* No control char yet, need more data */
+    if (!pkt_len) {
+        *out_need_more = TRUE;
+        return TRUE;
+    }
+
+    /* Unescape first; note that pkt_len */
+    unesc_len = dm_unescape (inbuf, pkt_len, outbuf, outbuf_len, &escaping);
+    if (!unesc_len) {
+        /* Tell the caller to advance the buffer past the control char */
+        *out_used = pkt_len + 1;
+        return FALSE;
+    }
+
+    if (escaping) {
+        *out_need_more = TRUE;
+        return TRUE;
+    }
+
+    /* Check the CRC of the packet's data */
+    crc = crc16 (outbuf, unesc_len - 2);
+    pkt_crc = *((guint16 *) &outbuf[pkt_len - 2]);
+    if (crc != GUINT_FROM_LE (pkt_crc)) {
+        *out_used = pkt_len + 1; /* packet + CRC + 0x7E */
+        return FALSE;
+    }
+
+    *out_used = pkt_len + 1; /* packet + CRC + 0x7E */
+    *out_decap_len = unesc_len - 2; /* decap_len should not include the CRC */
+    return TRUE;
 }
 
