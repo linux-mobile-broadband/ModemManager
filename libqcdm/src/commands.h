@@ -52,6 +52,25 @@ QCDMResult *qcdm_cmd_esn_result (const char *buf,
 
 /**********************************************************************/
 
+#define QCDM_CMD_CDMA_STATUS_ITEM_ESN             "esn"
+#define QCDM_CMD_CDMA_STATUS_ITEM_RX_STATE        "rx-state"
+#define QCDM_CMD_CDMA_STATUS_ITEM_ENTRY_REASON    "entry-reason"
+#define QCDM_CMD_CDMA_STATUS_ITEM_CURRENT_CHANNEL "current-channel"
+#define QCDM_CMD_CDMA_STATUS_ITEM_CODE_CHANNEL    "code-channel"
+#define QCDM_CMD_CDMA_STATUS_ITEM_PILOT_BASE      "pilot-base"
+#define QCDM_CMD_CDMA_STATUS_ITEM_SID             "sid"
+#define QCDM_CMD_CDMA_STATUS_ITEM_NID             "nid"
+
+gsize       qcdm_cmd_cdma_status_new    (char *buf,
+                                         gsize len,
+                                         GError **error);
+
+QCDMResult *qcdm_cmd_cdma_status_result (const char *buf,
+                                         gsize len,
+                                         GError **error);
+
+/**********************************************************************/
+
 #define QCDM_CMD_NV_GET_MDN_ITEM_PROFILE "profile"
 #define QCDM_CMD_NV_GET_MDN_ITEM_MDN "mdn"
 

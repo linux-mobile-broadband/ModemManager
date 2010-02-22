@@ -190,5 +190,21 @@ struct DMCmdEsnRsp {
 } __attribute__ ((packed));
 typedef struct DMCmdEsnRsp DMCmdEsnRsp;
 
+/* DIAG_CMD_STATUS */
+struct DMCmdStatusRsp {
+    guint8 code;
+    guint8 _unknown[3];
+    guint8 esn[4];
+    guint16 cdma_rx_state;
+    guint16 entry_reason;
+    guint16 curr_chan;
+    guint8 cdma_code_chan;
+    guint16 pilot_base;
+    guint16 sid;
+    guint16 nid;
+} __attribute__ ((packed));
+typedef struct DMCmdStatusRsp DMCmdStatusRsp;
+
+
 #endif  /* LIBQCDM_DM_COMMANDS_H */
 

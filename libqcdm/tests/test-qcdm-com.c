@@ -199,16 +199,11 @@ wait_reply (TestComData *d, char *buf, gsize len)
 }
 
 void
-test_com (void *f, void *data)
+test_com_port_init (void *f, void *data)
 {
     TestComData *d = data;
-    gboolean success;
     GError *error = NULL;
-    char buf[512];
-    const char *str;
-    gint len;
-    QCDMResult *result;
-    gsize reply_len;
+    gboolean success;
 
     success = qcdm_port_setup (d->fd, &error);
     if (!success) {
@@ -218,8 +213,19 @@ test_com (void *f, void *data)
                    error && error->message ? error->message : "(unknown)");
     }
     g_assert (success);
+}
 
-    /*** Get the device's firmware version information ***/
+void
+test_com_version_info (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    GError *error = NULL;
+    char buf[512];
+    const char *str;
+    gint len;
+    QCDMResult *result;
+    gsize reply_len;
 
     len = qcdm_cmd_version_info_new (buf, sizeof (buf), NULL);
     g_assert (len == 4);
@@ -256,8 +262,19 @@ test_com (void *f, void *data)
     g_message ("%s: Model: %s", __func__, str);
 
     qcdm_result_unref (result);
+}
 
-    /*** Get the device's ESN ***/
+void
+test_com_esn (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    GError *error = NULL;
+    char buf[512];
+    const char *str;
+    gint len;
+    QCDMResult *result;
+    gsize reply_len;
 
     len = qcdm_cmd_esn_new (buf, sizeof (buf), NULL);
     g_assert (len == 4);
@@ -278,9 +295,19 @@ test_com (void *f, void *data)
     g_message ("%s: ESN: %s", __func__, str);
 
     qcdm_result_unref (result);
+}
 
-
-    /*** Get the device's phone number ***/
+void
+test_com_mdn (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    GError *error = NULL;
+    char buf[512];
+    const char *str;
+    gint len;
+    QCDMResult *result;
+    gsize reply_len;
 
     len = qcdm_cmd_nv_get_mdn_new (buf, sizeof (buf), 0, NULL);
     g_assert (len > 0);
@@ -299,6 +326,69 @@ test_com (void *f, void *data)
     str = NULL;
     qcdm_result_get_string (result, QCDM_CMD_NV_GET_MDN_ITEM_MDN, &str);
     g_message ("%s: MDN: %s", __func__, str);
+
+    qcdm_result_unref (result);
+}
+
+void
+test_com_status (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    GError *error = NULL;
+    char buf[100];
+    const char *str;
+    gint len;
+    QCDMResult *result;
+    gsize reply_len;
+    guint32 n32;
+    guint8 n8;
+
+    len = qcdm_cmd_cdma_status_new (buf, sizeof (buf), NULL);
+    g_assert (len == 4);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_cdma_status_result (buf, reply_len, &error);
+    g_assert (result);
+
+    str = NULL;
+    qcdm_result_get_string (result, QCDM_CMD_CDMA_STATUS_ITEM_ESN, &str);
+    g_message ("%s: ESN: %s", __func__, str);
+
+    n32 = 0;
+    qcdm_result_get_uint32 (result, QCDM_CMD_CDMA_STATUS_ITEM_RX_STATE, &n32);
+    g_message ("%s: CDMA RX State: %u", __func__, n32);
+
+    n32 = 0;
+    qcdm_result_get_uint32 (result, QCDM_CMD_CDMA_STATUS_ITEM_ENTRY_REASON, &n32);
+    g_message ("%s: Entry Reason: %u", __func__, n32);
+
+    n32 = 0;
+    qcdm_result_get_uint32 (result, QCDM_CMD_CDMA_STATUS_ITEM_CURRENT_CHANNEL, &n32);
+    g_message ("%s: Current Channel: %u", __func__, n32);
+
+    n8 = 0;
+    qcdm_result_get_uint8 (result, QCDM_CMD_CDMA_STATUS_ITEM_CODE_CHANNEL, &n8);
+    g_message ("%s: Code Channel: %u", __func__, n8);
+
+    n32 = 0;
+    qcdm_result_get_uint32 (result, QCDM_CMD_CDMA_STATUS_ITEM_PILOT_BASE, &n32);
+    g_message ("%s: Pilot Base: %u", __func__, n32);
+
+    n32 = 0;
+    qcdm_result_get_uint32 (result, QCDM_CMD_CDMA_STATUS_ITEM_SID, &n32);
+    g_message ("%s: CDMA System ID: %u", __func__, n32);
+
+    n32 = 0;
+    qcdm_result_get_uint32 (result, QCDM_CMD_CDMA_STATUS_ITEM_NID, &n32);
+    g_message ("%s: CDMA Network ID: %u", __func__, n32);
 
     qcdm_result_unref (result);
 }

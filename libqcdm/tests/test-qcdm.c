@@ -83,8 +83,13 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_escape_unescape, NULL));
 
     /* Live tests */
-    if (port)
-        g_test_suite_add (suite, TESTCASE (test_com, data->com_data));
+    if (port) {
+        g_test_suite_add (suite, TESTCASE (test_com_port_init, data->com_data));
+        g_test_suite_add (suite, TESTCASE (test_com_version_info, data->com_data));
+        g_test_suite_add (suite, TESTCASE (test_com_esn, data->com_data));
+        g_test_suite_add (suite, TESTCASE (test_com_mdn, data->com_data));
+        g_test_suite_add (suite, TESTCASE (test_com_status, data->com_data));
+    }
 
 	result = g_test_run ();
 

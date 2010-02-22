@@ -21,7 +21,15 @@
 gpointer test_com_setup (const char *port);
 void test_com_teardown (gpointer d);
 
-void test_com (void *f, void *data);
+void test_com_port_init (void *f, void *data);
+
+void test_com_version_info (void *f, void *data);
+
+void test_com_esn (void *f, void *data);
+
+void test_com_mdn (void *f, void *data);
+
+void test_com_status (void *f, void *data);
 
 #endif  /* TEST_QCDM_COM_H */
 
