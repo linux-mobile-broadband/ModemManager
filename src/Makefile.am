@@ -16,6 +16,7 @@ sbin_PROGRAMS = modem-manager
 modem_manager_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
+	$(top_srcdir) \
 	-I${top_builddir}/marshallers \
 	-DPLUGINDIR=\"$(pkglibdir)\"
 
@@ -23,6 +24,7 @@ modem_manager_LDADD = \
 	$(MM_LIBS) \
 	$(GUDEV_LIBS) \
 	$(top_builddir)/marshallers/libmarshallers.la \
+	$(top_builddir)/libqcdm/src/libqcdm.la \
 	$(builddir)/libmodem-helpers.la
 
 modem_manager_SOURCES = \
@@ -39,6 +41,8 @@ modem_manager_SOURCES = \
 	mm-serial-port.h \
 	mm-at-serial-port.c \
 	mm-at-serial-port.h \
+	mm-qcdm-serial-port.c \
+	mm-qcdm-serial-port.h \
 	mm-serial-parsers.c \
 	mm-serial-parsers.h \
 	mm-modem-base.c \
