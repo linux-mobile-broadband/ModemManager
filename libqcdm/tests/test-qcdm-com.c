@@ -172,7 +172,6 @@ wait_reply (TestComData *d, char *buf, gsize len)
 
             total++;
             decap_len = 0;
-            print_buf ("<<<", readbuf, total);
             success = dm_decapsulate_buffer (readbuf, total, buf, len, &decap_len, &used, &more);
 
             /* Discard used data */
@@ -242,6 +241,8 @@ test_com_version_info (void *f, void *data)
     result = qcdm_cmd_version_info_result (buf, reply_len, &error);
     g_assert (result);
 
+    g_print ("\n");
+
     str = NULL;
     qcdm_result_get_string (result, QCDM_CMD_VERSION_INFO_ITEM_COMP_DATE, &str);
     g_message ("%s: Compiled Date: %s", __func__, str);
@@ -291,6 +292,8 @@ test_com_esn (void *f, void *data)
     result = qcdm_cmd_esn_result (buf, reply_len, &error);
     g_assert (result);
 
+    g_print ("\n");
+
     str = NULL;
     qcdm_result_get_string (result, QCDM_CMD_ESN_ITEM_ESN, &str);
     g_message ("%s: ESN: %s", __func__, str);
@@ -323,6 +326,8 @@ test_com_mdn (void *f, void *data)
     /* Parse the response into a result structure */
     result = qcdm_cmd_nv_get_mdn_result (buf, reply_len, &error);
     g_assert (result);
+
+    g_print ("\n");
 
     str = NULL;
     qcdm_result_get_string (result, QCDM_CMD_NV_GET_MDN_ITEM_MDN, &str);
@@ -358,6 +363,8 @@ test_com_status (void *f, void *data)
     /* Parse the response into a result structure */
     result = qcdm_cmd_cdma_status_result (buf, reply_len, &error);
     g_assert (result);
+
+    g_print ("\n");
 
     str = NULL;
     qcdm_result_get_string (result, QCDM_CMD_CDMA_STATUS_ITEM_ESN, &str);
@@ -466,6 +473,8 @@ test_com_cm_subsys_state_info (void *f, void *data)
     result = qcdm_cmd_cm_subsys_state_info_result (buf, reply_len, &error);
     g_assert (result);
 
+    g_print ("\n");
+
     n32 = 0;
     qcdm_result_get_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_CALL_STATE, &n32);
     g_message ("%s: Call State: %u", __func__, n32);
@@ -571,6 +580,8 @@ test_com_hdr_subsys_state_info (void *f, void *data)
         return;
     }
     g_assert (result);
+
+    g_print ("\n");
 
     num = 0;
     detail = NULL;
