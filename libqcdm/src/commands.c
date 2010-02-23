@@ -338,7 +338,7 @@ qcdm_cmd_sw_version_result (const char *buf, gsize len, GError **error)
 gsize
 qcdm_cmd_nv_get_mdn_new (char *buf, gsize len, guint8 profile, GError **error)
 {
-    char cmdbuf[sizeof (DMCmdNVReadWrite) + DIAG_TRAILER_LEN];
+    char cmdbuf[sizeof (DMCmdNVReadWrite) + 2];
     DMCmdNVReadWrite *cmd = (DMCmdNVReadWrite *) &cmdbuf[0];
     DMNVItemMdn *req;
 
@@ -378,6 +378,72 @@ qcdm_cmd_nv_get_mdn_result (const char *buf, gsize len, GError **error)
     g_assert (sizeof (mdn->mdn) <= sizeof (tmp));
     memcpy (tmp, mdn->mdn, sizeof (mdn->mdn));
     qcdm_result_add_string (result, QCDM_CMD_NV_GET_MDN_ITEM_MDN, tmp);
+
+    return result;
+}
+
+/**********************************************************************/
+
+gsize
+qcdm_cmd_cm_subsys_state_info_new (char *buf, gsize len, GError **error)
+{
+    char cmdbuf[sizeof (DMCmdSubsysHeader) + 2];
+    DMCmdSubsysHeader *cmd = (DMCmdSubsysHeader *) &cmdbuf[0];
+
+    g_return_val_if_fail (buf != NULL, 0);
+    g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    memset (cmd, 0, sizeof (cmd));
+    cmd->code = DIAG_CMD_SUBSYS;
+    cmd->subsys_id = DIAG_SUBSYS_CM;
+    cmd->subsys_cmd = GUINT16_TO_LE (DIAG_SUBSYS_CM_STATE_INFO);
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QCDMResult *
+qcdm_cmd_cm_subsys_state_info_result (const char *buf, gsize len, GError **error)
+{
+    QCDMResult *result = NULL;
+    DMCmdSubsysCMStateInfoRsp *rsp = (DMCmdSubsysCMStateInfoRsp *) buf;
+    guint32 tmp_num;
+
+    g_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_SUBSYS, sizeof (DMCmdSubsysCMStateInfoRsp), error))
+        return NULL;
+
+    result = qcdm_result_new ();
+
+    tmp_num = (guint32) GUINT32_FROM_LE (rsp->call_state);
+    qcdm_result_add_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_CALL_STATE, tmp_num);
+
+    tmp_num = (guint32) GUINT32_FROM_LE (rsp->oper_mode);
+    qcdm_result_add_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_OPERATING_MODE, tmp_num);
+
+    tmp_num = (guint32) GUINT32_FROM_LE (rsp->system_mode);
+    qcdm_result_add_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_SYSTEM_MODE, tmp_num);
+
+    tmp_num = (guint32) GUINT32_FROM_LE (rsp->mode_pref);
+    qcdm_result_add_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_MODE_PREF, tmp_num);
+
+    tmp_num = (guint32) GUINT32_FROM_LE (rsp->band_pref);
+    qcdm_result_add_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_BAND_PREF, tmp_num);
+
+    tmp_num = (guint32) GUINT32_FROM_LE (rsp->roam_pref);
+    qcdm_result_add_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_ROAM_PREF, tmp_num);
+
+    tmp_num = (guint32) GUINT32_FROM_LE (rsp->srv_domain_pref);
+    qcdm_result_add_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_SERVICE_DOMAIN_PREF, tmp_num);
+
+    tmp_num = (guint32) GUINT32_FROM_LE (rsp->acq_order_pref);
+    qcdm_result_add_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_ACQ_ORDER_PREF, tmp_num);
+
+    tmp_num = (guint32) GUINT32_FROM_LE (rsp->hybrid_pref);
+    qcdm_result_add_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_HYBRID_PREF, tmp_num);
+
+    tmp_num = (guint32) GUINT32_FROM_LE (rsp->network_sel_mode_pref);
+    qcdm_result_add_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_NETWORK_SELECTION_PREF, tmp_num);
 
     return result;
 }

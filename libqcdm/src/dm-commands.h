@@ -219,5 +219,21 @@ struct DMCmdSwVersionRsp {
 } __attribute__ ((packed));
 typedef struct DMCmdSwVersionRsp DMCmdSwVersionRsp;
 
+/* DIAG_SUBSYS_CM_STATE_INFO subsys command */
+struct DMCmdSubsysCMStateInfoRsp {
+    DMCmdSubsysHeader header;
+    guint32 call_state;
+    guint32 oper_mode;
+    guint32 system_mode;
+    guint32 mode_pref;
+    guint32 band_pref;
+    guint32 roam_pref;
+    guint32 srv_domain_pref;
+    guint32 acq_order_pref;
+    guint32 hybrid_pref;
+    guint32 network_sel_mode_pref;
+} __attribute__ ((packed));
+typedef struct DMCmdSubsysCMStateInfoRsp DMCmdSubsysCMStateInfoRsp;
+
 #endif  /* LIBQCDM_DM_COMMANDS_H */
 

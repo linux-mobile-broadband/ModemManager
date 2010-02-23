@@ -112,4 +112,41 @@ QCDMResult *qcdm_cmd_nv_get_mdn_result (const char *buf,
 
 /**********************************************************************/
 
+/**********************************************************************/
+
+/* Values for QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_OPERATING_MODE */
+enum {
+    QCDM_CMD_CM_SUBSYS_STATE_INFO_OPERATING_MODE_ONLINE = 5
+};
+
+/* Values for QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_SYSTEM_MODE */
+enum {
+    QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_NO_SERVICE = 0,
+    QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_AMPS = 1,
+    QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_CDMA = 2,
+    QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_HDR = 4,
+    QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_WCDMA = 5
+};
+
+#define QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_CALL_STATE             "call-state"
+#define QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_OPERATING_MODE         "operating-mode"
+#define QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_SYSTEM_MODE            "system-mode"
+#define QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_MODE_PREF              "mode-pref"
+#define QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_BAND_PREF              "band-pref"
+#define QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_ROAM_PREF              "roam-pref"
+#define QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_SERVICE_DOMAIN_PREF    "service-domain-pref"
+#define QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_ACQ_ORDER_PREF         "acq-order-pref"
+#define QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_HYBRID_PREF            "hybrid-pref"
+#define QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_NETWORK_SELECTION_PREF "network-selection-pref"
+
+gsize       qcdm_cmd_cm_subsys_state_info_new    (char *buf,
+                                                  gsize len,
+                                                  GError **error);
+
+QCDMResult *qcdm_cmd_cm_subsys_state_info_result (const char *buf,
+                                                  gsize len,
+                                                  GError **error);
+
+/**********************************************************************/
+
 #endif  /* LIBQCDM_COMMANDS_H */

@@ -33,5 +33,7 @@ void test_com_status (void *f, void *data);
 
 void test_com_sw_version (void *f, void *data);
 
+void test_com_cm_subsys_state_info (void *f, void *data);
+
 #endif  /* TEST_QCDM_COM_H */
 

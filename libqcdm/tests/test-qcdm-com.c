@@ -439,3 +439,103 @@ test_com_sw_version (void *f, void *data)
 */
 }
 
+void
+test_com_cm_subsys_state_info (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    GError *error = NULL;
+    char buf[100];
+    gint len;
+    QCDMResult *result;
+    gsize reply_len;
+    guint32 n32;
+    const char *detail;
+
+    len = qcdm_cmd_cm_subsys_state_info_new (buf, sizeof (buf), NULL);
+    g_assert (len == 7);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_cm_subsys_state_info_result (buf, reply_len, &error);
+    g_assert (result);
+
+    n32 = 0;
+    qcdm_result_get_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_CALL_STATE, &n32);
+    g_message ("%s: Call State: %u", __func__, n32);
+
+    n32 = 0;
+    detail = NULL;
+    qcdm_result_get_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_OPERATING_MODE, &n32);
+    switch (n32) {
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_OPERATING_MODE_ONLINE:
+        detail = "online";
+        break;
+    default:
+        detail = "unknown";
+        break;
+    }
+    g_message ("%s: Operating Mode: %u (%s)", __func__, n32, detail);
+
+    n32 = 0;
+    detail = NULL;
+    qcdm_result_get_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_SYSTEM_MODE, &n32);
+    switch (n32) {
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_NO_SERVICE:
+        detail = "no service";
+        break;
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_AMPS:
+        detail = "AMPS";
+        break;
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_CDMA:
+        detail = "CDMA";
+        break;
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_HDR:
+        detail = "HDR/EVDO";
+        break;
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_WCDMA:
+        detail = "WCDMA";
+        break;
+    default:
+        detail = "unknown";
+        break;
+    }
+    g_message ("%s: System Mode: %u (%s)", __func__, n32, detail);
+
+    n32 = 0;
+    qcdm_result_get_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_MODE_PREF, &n32);
+    g_message ("%s: Mode Preference: %u", __func__, n32);
+
+    n32 = 0;
+    qcdm_result_get_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_BAND_PREF, &n32);
+    g_message ("%s: Band Preference: %u", __func__, n32);
+
+    n32 = 0;
+    qcdm_result_get_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_ROAM_PREF, &n32);
+    g_message ("%s: Roam Preference: %u", __func__, n32);
+
+    n32 = 0;
+    qcdm_result_get_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_SERVICE_DOMAIN_PREF, &n32);
+    g_message ("%s: Service Domain Preference: %u", __func__, n32);
+
+    n32 = 0;
+    qcdm_result_get_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_ACQ_ORDER_PREF, &n32);
+    g_message ("%s: Acquisition Order Preference: %u", __func__, n32);
+
+    n32 = 0;
+    qcdm_result_get_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_HYBRID_PREF, &n32);
+    g_message ("%s: Hybrid Preference: %u", __func__, n32);
+
+    n32 = 0;
+    qcdm_result_get_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_NETWORK_SELECTION_PREF, &n32);
+    g_message ("%s: Network Selection Preference: %u", __func__, n32);
+
+    qcdm_result_unref (result);
+}
+
