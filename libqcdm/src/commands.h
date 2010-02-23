@@ -52,6 +52,15 @@ QCDMResult *qcdm_cmd_esn_result (const char *buf,
 
 /**********************************************************************/
 
+/* Values for QCDM_CMD_CDMA_STATUS_ITEM_RX_STATE */
+enum {
+    QCDM_CMD_CDMA_STATUS_RX_STATE_NO_SERVICE = 0,
+    QCDM_CMD_CDMA_STATUS_RX_STATE_IDLE = 1,
+    QCDM_CMD_CDMA_STATUS_RX_STATE_ACCESS = 2,
+    QCDM_CMD_CDMA_STATUS_RX_STATE_PAGING = 3,
+    QCDM_CMD_CDMA_STATUS_RX_STATE_TRAFFIC = 4,
+};
+
 #define QCDM_CMD_CDMA_STATUS_ITEM_ESN             "esn"
 #define QCDM_CMD_CDMA_STATUS_ITEM_RX_STATE        "rx-state"
 #define QCDM_CMD_CDMA_STATUS_ITEM_ENTRY_REASON    "entry-reason"
