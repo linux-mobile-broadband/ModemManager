@@ -112,8 +112,6 @@ QCDMResult *qcdm_cmd_nv_get_mdn_result (const char *buf,
 
 /**********************************************************************/
 
-/**********************************************************************/
-
 /* Values for QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_OPERATING_MODE */
 enum {
     QCDM_CMD_CM_SUBSYS_STATE_INFO_OPERATING_MODE_ONLINE = 5
@@ -146,6 +144,54 @@ gsize       qcdm_cmd_cm_subsys_state_info_new    (char *buf,
 QCDMResult *qcdm_cmd_cm_subsys_state_info_result (const char *buf,
                                                   gsize len,
                                                   GError **error);
+
+/**********************************************************************/
+
+/* Values for QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_AT_STATE */
+enum {
+    QCDM_CMD_HDR_SUBSYS_STATE_INFO_AT_STATE_INACTIVE = 0,
+    QCDM_CMD_HDR_SUBSYS_STATE_INFO_AT_STATE_ACQUISITION = 1,
+    QCDM_CMD_HDR_SUBSYS_STATE_INFO_AT_STATE_SYNC = 2,
+    QCDM_CMD_HDR_SUBSYS_STATE_INFO_AT_STATE_IDLE = 3,
+    QCDM_CMD_HDR_SUBSYS_STATE_INFO_AT_STATE_ACCESS = 4,
+    QCDM_CMD_HDR_SUBSYS_STATE_INFO_AT_STATE_CONNECTED = 5
+};
+
+/* Values for QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_SESSION_STATE */
+enum {
+    QCDM_CMD_HDR_SUBSYS_STATE_INFO_SESSION_STATE_CLOSED = 0,
+    QCDM_CMD_HDR_SUBSYS_STATE_INFO_SESSION_STATE_SETUP = 1,
+    QCDM_CMD_HDR_SUBSYS_STATE_INFO_SESSION_STATE_AT_INIT = 2,  /* initiated by Access Terminal */
+    QCDM_CMD_HDR_SUBSYS_STATE_INFO_SESSION_STATE_AN_INIT = 3,  /* initiated by Access Node */
+    QCDM_CMD_HDR_SUBSYS_STATE_INFO_SESSION_STATE_OPEN = 4,
+    QCDM_CMD_HDR_SUBSYS_STATE_INFO_SESSION_STATE_CLOSING = 5
+};
+
+/* Values for QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_ALMP_STATE */
+enum {
+    QCDM_CMD_HDR_SUBSYS_STATE_INFO_ALMP_STATE_INACTIVE = 0,  /* initial state */
+    QCDM_CMD_HDR_SUBSYS_STATE_INFO_ALMP_STATE_INIT = 1,  /* terminal has yet to acquire network */
+    QCDM_CMD_HDR_SUBSYS_STATE_INFO_ALMP_STATE_IDLE = 2,  /* network acquired but no connection */
+    QCDM_CMD_HDR_SUBSYS_STATE_INFO_ALMP_STATE_CONNECTED = 3,  /* open connection to the network */
+};
+
+#define QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_AT_STATE           "at-state"  /* State of Access Terminal */
+#define QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_SESSION_STATE      "session-state"  /* Current session state */
+#define QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_ALMP_STATE         "almp-state"  /* Air Link Management Protocol (ALMP) state */
+#define QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_INIT_STATE         "init-state"  /* Initialization State Protocol (ISP) state */
+#define QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_IDLE_STATE         "idle-state"  /* Idle State Protocol (IDP) state */
+#define QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_CONNECTED_STATE    "connected-state"  /* Connected State Protocol (CSP) state */
+#define QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_ROUTE_UPDATE_STATE "route-update-state"  /* Route Update Protocol (RUP) state */
+#define QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_OVERHEAD_MSG_STATE "overhead-msg-state"
+#define QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_HDR_HYBRID_MODE    "hdr-hybrid-mode"
+
+gsize       qcdm_cmd_hdr_subsys_state_info_new    (char *buf,
+                                                   gsize len,
+                                                   GError **error);
+
+QCDMResult *qcdm_cmd_hdr_subsys_state_info_result (const char *buf,
+                                                   gsize len,
+                                                   GError **error);
 
 /**********************************************************************/
 

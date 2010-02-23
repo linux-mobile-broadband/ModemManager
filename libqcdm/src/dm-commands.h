@@ -235,5 +235,20 @@ struct DMCmdSubsysCMStateInfoRsp {
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysCMStateInfoRsp DMCmdSubsysCMStateInfoRsp;
 
+/* DIAG_SUBSYS_HDR_STATE_INFO subsys command */
+struct DMCmdSubsysHDRStateInfoRsp {
+    DMCmdSubsysHeader header;
+    guint8 at_state;
+    guint8 session_state;
+    guint8 almp_state;
+    guint8 init_state;
+    guint8 idle_state;
+    guint8 connected_state;
+    guint8 route_update_state;
+    guint8 overhead_msg_state;
+    guint8 hdr_hybrid_mode;
+} __attribute__ ((packed));
+typedef struct DMCmdSubsysHDRStateInfoRsp DMCmdSubsysHDRStateInfoRsp;
+
 #endif  /* LIBQCDM_DM_COMMANDS_H */
 

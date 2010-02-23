@@ -450,3 +450,48 @@ qcdm_cmd_cm_subsys_state_info_result (const char *buf, gsize len, GError **error
 
 /**********************************************************************/
 
+gsize
+qcdm_cmd_hdr_subsys_state_info_new (char *buf, gsize len, GError **error)
+{
+    char cmdbuf[sizeof (DMCmdSubsysHeader) + 2];
+    DMCmdSubsysHeader *cmd = (DMCmdSubsysHeader *) &cmdbuf[0];
+
+    g_return_val_if_fail (buf != NULL, 0);
+    g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    memset (cmd, 0, sizeof (cmd));
+    cmd->code = DIAG_CMD_SUBSYS;
+    cmd->subsys_id = DIAG_SUBSYS_HDR;
+    cmd->subsys_cmd = GUINT16_TO_LE (DIAG_SUBSYS_HDR_STATE_INFO);
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QCDMResult *
+qcdm_cmd_hdr_subsys_state_info_result (const char *buf, gsize len, GError **error)
+{
+    QCDMResult *result = NULL;
+    DMCmdSubsysHDRStateInfoRsp *rsp = (DMCmdSubsysHDRStateInfoRsp *) buf;
+
+    g_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_SUBSYS, sizeof (DMCmdSubsysHDRStateInfoRsp), error))
+        return NULL;
+
+    result = qcdm_result_new ();
+
+    qcdm_result_add_uint8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_AT_STATE, rsp->at_state);
+    qcdm_result_add_uint8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_SESSION_STATE, rsp->session_state);
+    qcdm_result_add_uint8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_ALMP_STATE, rsp->almp_state);
+    qcdm_result_add_uint8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_INIT_STATE, rsp->init_state);
+    qcdm_result_add_uint8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_IDLE_STATE, rsp->idle_state);
+    qcdm_result_add_uint8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_CONNECTED_STATE, rsp->connected_state);
+    qcdm_result_add_uint8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_ROUTE_UPDATE_STATE, rsp->route_update_state);
+    qcdm_result_add_uint8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_OVERHEAD_MSG_STATE, rsp->overhead_msg_state);
+    qcdm_result_add_uint8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_HDR_HYBRID_MODE, rsp->hdr_hybrid_mode);
+
+    return result;
+}
+
+/**********************************************************************/
+
