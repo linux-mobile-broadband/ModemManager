@@ -651,24 +651,105 @@ test_com_hdr_subsys_state_info (void *f, void *data)
     g_message ("%s: ALMP State: %u (%s)", __func__, num, detail);
 
     num = 0;
+    detail = NULL;
     qcdm_result_get_uint8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_INIT_STATE, &num);
-    g_message ("%s: Init State: %u", __func__, num);
+    switch (num) {
+    case QCDM_CMD_HDR_SUBSYS_STATE_INFO_INIT_STATE_INACTIVE:
+        detail = "inactive";
+        break;
+    case QCDM_CMD_HDR_SUBSYS_STATE_INFO_INIT_STATE_NET_DETERMINE:
+        detail = "searching";
+        break;
+    case QCDM_CMD_HDR_SUBSYS_STATE_INFO_INIT_STATE_ACQUISITION:
+        detail = "acquisition";
+        break;
+    case QCDM_CMD_HDR_SUBSYS_STATE_INFO_INIT_STATE_SYNC:
+        detail = "sync";
+        break;
+    default:
+        detail = "unknown";
+        break;
+    }
+    g_message ("%s: Init State: %u (%s)", __func__, num, detail);
 
     num = 0;
+    detail = NULL;
     qcdm_result_get_uint8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_IDLE_STATE, &num);
-    g_message ("%s: Idle State: %u", __func__, num);
+    switch (num) {
+    case QCDM_CMD_HDR_SUBSYS_STATE_INFO_IDLE_STATE_INACTIVE:
+        detail = "inactive";
+        break;
+    case QCDM_CMD_HDR_SUBSYS_STATE_INFO_IDLE_STATE_SLEEP:
+        detail = "sleep";
+        break;
+    case QCDM_CMD_HDR_SUBSYS_STATE_INFO_IDLE_STATE_MONITOR:
+        detail = "monitor";
+        break;
+    case QCDM_CMD_HDR_SUBSYS_STATE_INFO_IDLE_STATE_SETUP:
+        detail = "setup";
+        break;
+    default:
+        detail = "unknown";
+        break;
+    }
+    g_message ("%s: Idle State: %u (%s)", __func__, num, detail);
 
     num = 0;
+    detail = NULL;
     qcdm_result_get_uint8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_CONNECTED_STATE, &num);
-    g_message ("%s: Connected State: %u", __func__, num);
+    switch (num) {
+    case QCDM_CMD_HDR_SUBSYS_STATE_INFO_CONNECTED_STATE_INACTIVE:
+        detail = "inactive";
+        break;
+    case QCDM_CMD_HDR_SUBSYS_STATE_INFO_CONNECTED_STATE_OPEN:
+        detail = "open";
+        break;
+    case QCDM_CMD_HDR_SUBSYS_STATE_INFO_CONNECTED_STATE_CLOSING:
+        detail = "closing";
+        break;
+    default:
+        detail = "unknown";
+        break;
+    }
+    g_message ("%s: Connected State: %u (%s)", __func__, num, detail);
 
     num = 0;
+    detail = NULL;
     qcdm_result_get_uint8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_ROUTE_UPDATE_STATE, &num);
-    g_message ("%s: Route Update State: %u", __func__, num);
+    switch (num) {
+    case QCDM_CMD_HDR_SUBSYS_STATE_INFO_ROUTE_UPDATE_STATE_INACTIVE:
+        detail = "inactive";
+        break;
+    case QCDM_CMD_HDR_SUBSYS_STATE_INFO_ROUTE_UPDATE_STATE_IDLE:
+        detail = "idle";
+        break;
+    case QCDM_CMD_HDR_SUBSYS_STATE_INFO_ROUTE_UPDATE_STATE_CONNECTED:
+        detail = "connected";
+        break;
+    default:
+        detail = "unknown";
+        break;
+    }
+    g_message ("%s: Route Update State: %u (%s)", __func__, num, detail);
 
     num = 0;
+    detail = NULL;
     qcdm_result_get_uint8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_OVERHEAD_MSG_STATE, &num);
-    g_message ("%s: Overhead Msg State: %u", __func__, num);
+    switch (num) {
+    case QCDM_CMD_HDR_SUBSYS_STATE_INFO_OVERHEAD_MSG_STATE_INIT:
+        detail = "initial";
+        break;
+    case QCDM_CMD_HDR_SUBSYS_STATE_INFO_OVERHEAD_MSG_STATE_INACTIVE:
+        detail = "inactive";
+        break;
+    case QCDM_CMD_HDR_SUBSYS_STATE_INFO_OVERHEAD_MSG_STATE_ACTIVE:
+        detail = "active";
+        break;
+    default:
+        detail = "unknown";
+        break;
+    }
+    g_message ("%s: Overhead Msg State: %u (%s)", __func__, num, detail);
 
     num = 0;
     qcdm_result_get_uint8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_HDR_HYBRID_MODE, &num);
