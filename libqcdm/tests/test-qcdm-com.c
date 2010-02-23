@@ -29,6 +29,7 @@
 #include "utils.h"
 #include "result.h"
 #include "commands.h"
+#include "error.h"
 
 typedef struct {
     char *port;
@@ -391,5 +392,50 @@ test_com_status (void *f, void *data)
     g_message ("%s: CDMA Network ID: %u", __func__, n32);
 
     qcdm_result_unref (result);
+}
+
+void
+test_com_sw_version (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    GError *error = NULL;
+    char buf[100];
+    gint len;
+    QCDMResult *result;
+    gsize reply_len;
+
+    len = qcdm_cmd_sw_version_new (buf, sizeof (buf), NULL);
+    g_assert (len == 4);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_sw_version_result (buf, reply_len, &error);
+
+    /* Recent devices don't appear to implement this command */
+    g_assert (result == NULL);
+    g_assert_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_BAD_COMMAND);
+
+/*
+    str = NULL;
+    qcdm_result_get_string (result, QCDM_CMD_SW_VERSION_ITEM_VERSION, &str);
+    g_message ("%s: SW Version: %s", __func__, str);
+
+    str = NULL;
+    qcdm_result_get_string (result, QCDM_CMD_SW_VERSION_ITEM_COMP_DATE, &str);
+    g_message ("%s: Compiled Date: %s", __func__, str);
+
+    str = NULL;
+    qcdm_result_get_string (result, QCDM_CMD_SW_VERSION_ITEM_COMP_TIME, &str);
+    g_message ("%s: Compiled Time: %s", __func__, str);
+
+    qcdm_result_unref (result);
+*/
 }
 

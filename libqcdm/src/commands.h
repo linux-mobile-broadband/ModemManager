@@ -71,6 +71,24 @@ QCDMResult *qcdm_cmd_cdma_status_result (const char *buf,
 
 /**********************************************************************/
 
+/* NOTE: this command does not appear to be implemented in recent
+ * devices and probably returns (QCDM_COMMAND_ERROR, QCDM_COMMAND_BAD_COMMAND).
+ */
+
+#define QCDM_CMD_SW_VERSION_ITEM_VERSION   "version"
+#define QCDM_CMD_SW_VERSION_ITEM_COMP_DATE "comp-date"
+#define QCDM_CMD_SW_VERSION_ITEM_COMP_TIME "comp-time"
+
+gsize       qcdm_cmd_sw_version_new    (char *buf,
+                                        gsize len,
+                                        GError **error);
+
+QCDMResult *qcdm_cmd_sw_version_result (const char *buf,
+                                        gsize len,
+                                        GError **error);
+
+/**********************************************************************/
+
 #define QCDM_CMD_NV_GET_MDN_ITEM_PROFILE "profile"
 #define QCDM_CMD_NV_GET_MDN_ITEM_MDN "mdn"
 

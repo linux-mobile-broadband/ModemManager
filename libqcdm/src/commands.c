@@ -287,6 +287,55 @@ qcdm_cmd_cdma_status_result (const char *buf, gsize len, GError **error)
 /**********************************************************************/
 
 gsize
+qcdm_cmd_sw_version_new (char *buf, gsize len, GError **error)
+{
+    char cmdbuf[3];
+    DMCmdHeader *cmd = (DMCmdHeader *) &cmdbuf[0];
+
+    g_return_val_if_fail (buf != NULL, 0);
+    g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    memset (cmd, 0, sizeof (cmd));
+    cmd->code = DIAG_CMD_SW_VERSION;
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QCDMResult *
+qcdm_cmd_sw_version_result (const char *buf, gsize len, GError **error)
+{
+    QCDMResult *result = NULL;
+    DMCmdSwVersionRsp *rsp = (DMCmdSwVersionRsp *) buf;
+    char tmp[25];
+
+    g_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_SW_VERSION, sizeof (*rsp), error))
+        return NULL;
+
+    result = qcdm_result_new ();
+
+    memset (tmp, 0, sizeof (tmp));
+    g_assert (sizeof (rsp->version) <= sizeof (tmp));
+    memcpy (tmp, rsp->version, sizeof (rsp->version));
+    qcdm_result_add_string (result, QCDM_CMD_SW_VERSION_ITEM_VERSION, tmp);
+
+    memset (tmp, 0, sizeof (tmp));
+    g_assert (sizeof (rsp->comp_date) <= sizeof (tmp));
+    memcpy (tmp, rsp->comp_date, sizeof (rsp->comp_date));
+    qcdm_result_add_string (result, QCDM_CMD_SW_VERSION_ITEM_COMP_DATE, tmp);
+
+    memset (tmp, 0, sizeof (tmp));
+    g_assert (sizeof (rsp->comp_time) <= sizeof (tmp));
+    memcpy (tmp, rsp->comp_time, sizeof (rsp->comp_time));
+    qcdm_result_add_string (result, QCDM_CMD_SW_VERSION_ITEM_COMP_TIME, tmp);
+
+    return result;
+}
+
+/**********************************************************************/
+
+gsize
 qcdm_cmd_nv_get_mdn_new (char *buf, gsize len, guint8 profile, GError **error)
 {
     char cmdbuf[sizeof (DMCmdNVReadWrite) + DIAG_TRAILER_LEN];

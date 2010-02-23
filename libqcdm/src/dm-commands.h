@@ -210,6 +210,14 @@ struct DMCmdStatusRsp {
 } __attribute__ ((packed));
 typedef struct DMCmdStatusRsp DMCmdStatusRsp;
 
+/* DIAG_CMD_SW_VERSION */
+struct DMCmdSwVersionRsp {
+    guint8 code;
+    char version[20];
+    char comp_date[11];
+    char comp_time[8];
+} __attribute__ ((packed));
+typedef struct DMCmdSwVersionRsp DMCmdSwVersionRsp;
 
 #endif  /* LIBQCDM_DM_COMMANDS_H */
 
