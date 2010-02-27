@@ -56,7 +56,7 @@ AM_CONDITIONAL(WITH_POLKIT, test "x$with_polkit" = "xyes")
 case $with_polkit in
     yes)
         with_polkit=yes
-	PKG_CHECK_MODULES(POLKIT, polkit >= 0.95 polkit-gobject-1)
+	PKG_CHECK_MODULES(POLKIT, polkit-gobject-1 >= 0.95)
 	AC_DEFINE(WITH_POLKIT, 1, [Define if you want to use PolicyKit])
 	AC_SUBST(POLKIT_CFLAGS)
 	AC_SUBST(POLKIT_LIBS)
