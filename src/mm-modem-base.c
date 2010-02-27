@@ -44,6 +44,11 @@ typedef struct {
     gboolean valid;
     MMModemState state;
 
+    MMAuthProvider *authp;
+    guint authp_added_id;
+    guint authp_removed_id;
+    GSList *auth_reqs;
+
     GHashTable *ports;
 } MMModemBasePrivate;
 
@@ -213,10 +218,103 @@ mm_modem_base_set_unlock_required (MMModemBase *self, const char *unlock_require
 
 /*****************************************************************************/
 
+static gboolean
+modem_auth_request (MMModem *modem,
+                    const char *authorization,
+                    MMAuthRequestCb callback,
+                    gpointer callback_data,
+                    GDestroyNotify notify,
+                    GError **error)
+{
+    MMModemBase *self = MM_MODEM_BASE (modem);
+    MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (self);
+
+    g_assert (priv->authp);
+    return !!mm_auth_provider_request_auth (priv->authp,
+                                            authorization,
+                                            G_OBJECT (self),
+                                            callback,
+                                            callback_data,
+                                            notify,
+                                            error);
+}
+
+static gboolean
+modem_auth_finish (MMModem *modem,
+                   guint32 reqid,
+                   MMAuthResult result,
+                   GError **error)
+{
+    MMModemBase *self = MM_MODEM_BASE (modem);
+    MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (self);
+
+    if (result != MM_AUTH_RESULT_AUTHORIZED) {
+        const char *auth;
+
+        auth = mm_auth_provider_get_authorization_for_id (priv->authp, reqid);
+        g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_AUTHORIZATION_REQUIRED,
+                     "This request requires the '%s' authorization",
+                     auth ? auth : "(unknown)");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static void
+authp_request_added (MMAuthProvider *provider,
+                     gpointer parent,
+                     guint32 reqid,
+                     gpointer user_data)
+{
+    MMModemBase *self;
+    MMModemBasePrivate *priv;
+
+    /* Make sure it's our auth request */
+    if (parent != user_data)
+        return;
+
+    self = MM_MODEM_BASE (user_data);
+    priv = MM_MODEM_BASE_GET_PRIVATE (self);
+
+    /* Add this request to our table so we can cancel it when we die */
+    priv->auth_reqs = g_slist_prepend (priv->auth_reqs, GUINT_TO_POINTER (reqid));
+}
+
+static void
+authp_request_removed (MMAuthProvider *provider,
+                       gpointer parent,
+                       guint32 reqid,
+                       gpointer user_data)
+{
+    MMModemBase *self;
+    MMModemBasePrivate *priv;
+
+    /* Make sure it's our auth request */
+    if (parent != user_data)
+        return;
+
+    self = MM_MODEM_BASE (user_data);
+    priv = MM_MODEM_BASE_GET_PRIVATE (self);
+
+    /* Request finished; remove cleanly */
+    priv->auth_reqs = g_slist_remove (priv->auth_reqs, GUINT_TO_POINTER (reqid));
+}
+
+/*****************************************************************************/
+
 static void
 mm_modem_base_init (MMModemBase *self)
 {
     MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (self);
+
+    priv->authp = mm_auth_provider_get ();
+    priv->authp_added_id = g_signal_connect (priv->authp, "request-added",
+                                             (GCallback) authp_request_added,
+                                             self);
+    priv->authp_removed_id = g_signal_connect (priv->authp, "request-removed",
+                                               (GCallback) authp_request_removed,
+                                               self);
 
     priv->ports = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
 
@@ -228,6 +326,8 @@ mm_modem_base_init (MMModemBase *self)
 static void
 modem_init (MMModem *modem_class)
 {
+    modem_class->auth_request = modem_auth_request;
+    modem_class->auth_finish = modem_auth_finish;
 }
 
 static gboolean
@@ -325,6 +425,14 @@ finalize (GObject *object)
 {
     MMModemBase *self = MM_MODEM_BASE (object);
     MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (self);
+    GSList *iter;
+
+    g_signal_handler_disconnect (priv->authp, priv->authp_added_id);
+    g_signal_handler_disconnect (priv->authp, priv->authp_removed_id);
+
+    for (iter = priv->auth_reqs; iter; iter = g_slist_next (iter))
+        mm_auth_provider_cancel_request (priv->authp, GPOINTER_TO_UINT (iter->data));
+    g_slist_free (priv->auth_reqs);
 
     g_hash_table_destroy (priv->ports);
     g_free (priv->driver);

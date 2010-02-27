@@ -19,7 +19,11 @@ all: $(GENERATED_FILES)
 CLEANFILES = $(GENERATED_FILES)
 endif
 
-SUBDIRS = marshallers src plugins introspection po policy test
+SUBDIRS = marshallers src plugins introspection po test
+
+if WITH_POLKIT
+SUBDIRS += policy
+endif
 
 dbusservicedir = $(DBUS_SYS_DIR)
 dbusservice_DATA = org.freedesktop.ModemManager.conf

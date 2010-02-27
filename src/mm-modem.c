@@ -608,6 +608,52 @@ mm_modem_set_state (MMModem *self,
 
 /*****************************************************************************/
 
+gboolean
+mm_modem_auth_request (MMModem *self,
+                       const char *authorization,
+                       MMAuthRequestCb callback,
+                       gpointer callback_data,
+                       GDestroyNotify notify,
+                       GError **error)
+{
+    g_return_val_if_fail (self != NULL, FALSE);
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+    g_return_val_if_fail (authorization != NULL, FALSE);
+    g_return_val_if_fail (callback != NULL, FALSE);
+
+    g_return_val_if_fail (MM_MODEM_GET_INTERFACE (self)->auth_request, FALSE);
+    return MM_MODEM_GET_INTERFACE (self)->auth_request (self,
+                                                        authorization,
+                                                        callback,
+                                                        callback_data,
+                                                        notify,
+                                                        error);
+}
+
+gboolean
+mm_modem_auth_finish (MMModem *self,
+                      guint32 reqid,
+                      MMAuthResult result,
+                      GError **error)
+{
+    gboolean success;
+
+    g_return_val_if_fail (self != NULL, FALSE);
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+    g_return_val_if_fail (reqid > 0, FALSE);
+
+    g_return_val_if_fail (MM_MODEM_GET_INTERFACE (self)->auth_finish, FALSE);
+    success = MM_MODEM_GET_INTERFACE (self)->auth_finish (self, reqid, result, error);
+
+    /* If the request failed, the implementor *should* return an error */
+    if (!success && error)
+        g_warn_if_fail (*error != NULL);
+
+    return success;
+}
+
+/*****************************************************************************/
+
 static void
 mm_modem_init (gpointer g_iface)
 {

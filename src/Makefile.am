@@ -19,11 +19,19 @@ modem_manager_CPPFLAGS = \
 	-I${top_builddir}/marshallers \
 	-DPLUGINDIR=\"$(pkglibdir)\"
 
+if WITH_POLKIT
+modem_manager_CPPFLAGS += $(POLKIT_CFLAGS)
+endif
+
 modem_manager_LDADD = \
 	$(MM_LIBS) \
 	$(GUDEV_LIBS) \
 	$(top_builddir)/marshallers/libmarshallers.la \
 	$(builddir)/libmodem-helpers.la
+
+if WITH_POLKIT
+modem_manager_LDADD += $(POLKIT_LIBS)
+endif
 
 modem_manager_SOURCES = \
 	main.c \
@@ -63,7 +71,16 @@ modem_manager_SOURCES = \
 	mm-plugin-base.c \
 	mm-plugin-base.h \
 	mm-properties-changed-signal.c \
-	mm-properties-changed-signal.h
+	mm-properties-changed-signal.h \
+	mm-auth-provider.h \
+	mm-auth-provider.c \
+	mm-auth-provider-factory.c
+
+if WITH_POLKIT
+modem_manager_SOURCES += \
+	mm-auth-provider-polkit.c \
+	mm-auth-provider-polkit.h
+endif
 
 mm-manager-glue.h: $(top_srcdir)/introspection/mm-manager.xml
 	dbus-binding-tool --prefix=mm_manager --mode=glib-server --output=$@ $<

@@ -20,6 +20,7 @@
 #include <glib-object.h>
 
 #include "mm-port.h"
+#include "mm-auth-provider.h"
 
 typedef enum {
     MM_MODEM_STATE_UNKNOWN = 0,
@@ -156,6 +157,21 @@ struct _MMModem {
                       MMModemInfoFn callback,
                       gpointer user_data);
 
+    /* Normally implemented by the modem base class; plugins should
+     * never need to implement this.
+     */
+    gboolean (*auth_request) (MMModem *self,
+                              const char *authorization,
+                              MMAuthRequestCb callback,
+                              gpointer callback_data,
+                              GDestroyNotify notify,
+                              GError **error);
+
+    gboolean (*auth_finish)  (MMModem *self,
+                              guint32 reqid,
+                              MMAuthResult result,
+                              GError **error);
+
     /* Signals */
     void (*state_changed) (MMModem *self,
                            MMModemState new_state,
@@ -216,6 +232,22 @@ void mm_modem_set_state (MMModem *self,
                          MMModemStateReason reason);
 
 GError *mm_modem_check_removed (MMModem *self, const GError *error);
+
+/* Request authorization to perform an action.  Used by D-Bus method
+ * handlers to ensure that the incoming request is authorized to perform
+ * the action it's requesting.
+ */
+gboolean mm_modem_auth_request (MMModem *self,
+                                const char *authorization,
+                                MMAuthRequestCb callback,
+                                gpointer callback_data,
+                                GDestroyNotify notify,
+                                GError **error);
+
+gboolean mm_modem_auth_finish (MMModem *self,
+                               guint32 reqid,
+                               MMAuthResult result,
+                               GError **error);
 
 #endif  /* MM_MODEM_H */
 
