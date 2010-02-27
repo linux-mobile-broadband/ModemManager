@@ -127,6 +127,14 @@
     <allow send_destination="org.freedesktop.ModemManager"
            send_interface="org.freedesktop.ModemManager.Modem.Gsm.SMS"
            send_member="SetIndication"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.SMS"
+           send_member="GetSmsc"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.SMS"
+           send_member="SetSmsc"/>
   </policy>
 
   <policy user="root">

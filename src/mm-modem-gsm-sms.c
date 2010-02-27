@@ -129,12 +129,141 @@ mm_modem_gsm_sms_send (MMModemGsmSms *self,
 
 /*****************************************************************************/
 
+typedef struct {
+    guint num1;
+    guint num2;
+    guint num3;
+    guint num4;
+    guint num5;
+    char *str;
+    GHashTable *hash;
+    DBusGMethodInvocation *context;
+} SmsAuthInfo;
+
+static void
+sms_auth_info_destroy (gpointer data)
+{
+    SmsAuthInfo *info = data;
+
+    g_hash_table_destroy (info->hash);
+    g_free (info->str);
+    memset (info, 0, sizeof (SmsAuthInfo));
+    g_free (info);
+}
+
+static void
+destroy_gvalue (gpointer data)
+{
+    GValue *value = (GValue *) data;
+
+    g_value_unset (value);
+    g_slice_free (GValue, value);
+}
+
+static SmsAuthInfo *
+sms_auth_info_new (guint num1,
+                   guint num2,
+                   guint num3,
+                   guint num4,
+                   guint num5,
+                   const char *str,
+                   GHashTable *hash,
+                   DBusGMethodInvocation *context)
+{
+    SmsAuthInfo *info;
+
+    info = g_malloc0 (sizeof (SmsAuthInfo));
+    info->num1 = num1;
+    info->num2 = num2;
+    info->num3 = num3;
+    info->num4 = num4;
+    info->num5 = num5;
+    info->str = g_strdup (str);
+    info->context = context;
+
+    /* Copy the hash table if we're given one */
+    if (hash) {
+        GHashTableIter iter;
+        gpointer key, value;
+
+        info->hash = g_hash_table_new_full (g_str_hash, g_str_equal,
+                                            g_free, destroy_gvalue);
+
+        g_hash_table_iter_init (&iter, hash);
+        while (g_hash_table_iter_next (&iter, &key, &value)) {
+            const char *str_key = (const char *) key;
+            GValue *src = (GValue *) value;
+            GValue *dst;
+
+            dst = g_slice_new0 (GValue);
+            g_value_init (dst, G_VALUE_TYPE (src));
+            g_hash_table_insert (info->hash, g_strdup (str_key), dst);
+        }
+    }
+
+    return info;
+}
+
+/*****************************************************************************/
+
+static void
+sms_delete_auth_cb (GObject *instance,
+                    guint32 reqid,
+                    MMAuthResult result,
+                    gpointer user_data)
+{
+    MMModemGsmSms *self = MM_MODEM_GSM_SMS (instance);
+    SmsAuthInfo *info = user_data;
+    GError *error = NULL;
+
+    /* Return any authorization error, otherwise delete the SMS */
+    if (!mm_modem_auth_finish (MM_MODEM (self), reqid, result, &error)) {
+        dbus_g_method_return_error (info->context, error);
+        g_error_free (error);
+    } else
+        async_call_not_supported (self, async_call_done, info->context);
+}
+
 static void
 impl_gsm_modem_sms_delete (MMModemGsmSms *modem,
                            guint idx,
                            DBusGMethodInvocation *context)
 {
-    async_call_not_supported (modem, async_call_done, context);
+    GError *error = NULL;
+    SmsAuthInfo *info;
+
+    info = sms_auth_info_new (idx, 0, 0, 0, 0, NULL, NULL, context);
+
+    /* Make sure the caller is authorized to send the PUK */
+    if (!mm_modem_auth_request (MM_MODEM (modem),
+                                MM_AUTHORIZATION_SMS,
+                                sms_delete_auth_cb,
+                                info,
+                                sms_auth_info_destroy,
+                                &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    }
+}
+
+/*****************************************************************************/
+
+static void
+sms_get_auth_cb (GObject *instance,
+                 guint32 reqid,
+                 MMAuthResult result,
+                 gpointer user_data)
+{
+    MMModemGsmSms *self = MM_MODEM_GSM_SMS (instance);
+    SmsAuthInfo *info = user_data;
+    GError *error = NULL;
+
+    /* Return any authorization error, otherwise delete the SMS */
+    if (!mm_modem_auth_finish (MM_MODEM (self), reqid, result, &error)) {
+        dbus_g_method_return_error (info->context, error);
+        g_error_free (error);
+    } else
+        async_call_not_supported (self, async_call_done, info->context);
 }
 
 static void
@@ -142,8 +271,24 @@ impl_gsm_modem_sms_get (MMModemGsmSms *modem,
                         guint idx,
                         DBusGMethodInvocation *context)
 {
-    async_call_not_supported (modem, async_call_done, context);
+    GError *error = NULL;
+    SmsAuthInfo *info;
+
+    info = sms_auth_info_new (idx, 0, 0, 0, 0, NULL, NULL, context);
+
+    /* Make sure the caller is authorized to send the PUK */
+    if (!mm_modem_auth_request (MM_MODEM (modem),
+                                MM_AUTHORIZATION_SMS,
+                                sms_get_auth_cb,
+                                info,
+                                sms_auth_info_destroy,
+                                &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    }
 }
+
+/*****************************************************************************/
 
 static void
 impl_gsm_modem_sms_get_format (MMModemGsmSms *modem,
@@ -167,19 +312,107 @@ impl_gsm_modem_sms_get_smsc (MMModemGsmSms *modem,
     async_call_not_supported (modem, async_call_done, context);
 }
 
+/*****************************************************************************/
+
+static void
+sms_set_smsc_auth_cb (GObject *instance,
+                      guint32 reqid,
+                      MMAuthResult result,
+                      gpointer user_data)
+{
+    MMModemGsmSms *self = MM_MODEM_GSM_SMS (instance);
+    SmsAuthInfo *info = user_data;
+    GError *error = NULL;
+
+    /* Return any authorization error, otherwise delete the SMS */
+    if (!mm_modem_auth_finish (MM_MODEM (self), reqid, result, &error)) {
+        dbus_g_method_return_error (info->context, error);
+        g_error_free (error);
+    } else
+        async_call_not_supported (self, async_call_done, info->context);
+}
+
 static void
 impl_gsm_modem_sms_set_smsc (MMModemGsmSms *modem,
                              const char *smsc,
                              DBusGMethodInvocation *context)
 {
-    async_call_not_supported (modem, async_call_done, context);
+    GError *error = NULL;
+    SmsAuthInfo *info;
+
+    info = sms_auth_info_new (0, 0, 0, 0, 0, smsc, NULL, context);
+
+    /* Make sure the caller is authorized to send the PUK */
+    if (!mm_modem_auth_request (MM_MODEM (modem),
+                                MM_AUTHORIZATION_SMS,
+                                sms_set_smsc_auth_cb,
+                                info,
+                                sms_auth_info_destroy,
+                                &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    }
+}
+
+/*****************************************************************************/
+
+static void
+sms_list_auth_cb (GObject *instance,
+                  guint32 reqid,
+                  MMAuthResult result,
+                  gpointer user_data)
+{
+    MMModemGsmSms *self = MM_MODEM_GSM_SMS (instance);
+    SmsAuthInfo *info = user_data;
+    GError *error = NULL;
+
+    /* Return any authorization error, otherwise delete the SMS */
+    if (!mm_modem_auth_finish (MM_MODEM (self), reqid, result, &error)) {
+        dbus_g_method_return_error (info->context, error);
+        g_error_free (error);
+    } else
+        async_call_not_supported (self, async_call_done, info->context);
 }
 
 static void
 impl_gsm_modem_sms_list (MMModemGsmSms *modem,
                          DBusGMethodInvocation *context)
 {
-    async_call_not_supported (modem, async_call_done, context);
+    GError *error = NULL;
+    SmsAuthInfo *info;
+
+    info = sms_auth_info_new (0, 0, 0, 0, 0, NULL, NULL, context);
+
+    /* Make sure the caller is authorized to send the PUK */
+    if (!mm_modem_auth_request (MM_MODEM (modem),
+                                MM_AUTHORIZATION_SMS,
+                                sms_list_auth_cb,
+                                info,
+                                sms_auth_info_destroy,
+                                &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    }
+}
+
+/*****************************************************************************/
+
+static void
+sms_save_auth_cb (GObject *instance,
+                  guint32 reqid,
+                  MMAuthResult result,
+                  gpointer user_data)
+{
+    MMModemGsmSms *self = MM_MODEM_GSM_SMS (instance);
+    SmsAuthInfo *info = user_data;
+    GError *error = NULL;
+
+    /* Return any authorization error, otherwise delete the SMS */
+    if (!mm_modem_auth_finish (MM_MODEM (self), reqid, result, &error)) {
+        dbus_g_method_return_error (info->context, error);
+        g_error_free (error);
+    } else
+        async_call_not_supported (self, async_call_done, info->context);
 }
 
 static void
@@ -187,7 +420,79 @@ impl_gsm_modem_sms_save (MMModemGsmSms *modem,
                          GHashTable *properties,
                          DBusGMethodInvocation *context)
 {
-    async_call_not_supported (modem, async_call_done, context);
+    GError *error = NULL;
+    SmsAuthInfo *info;
+
+    info = sms_auth_info_new (0, 0, 0, 0, 0, NULL, properties, context);
+
+    /* Make sure the caller is authorized to send the PUK */
+    if (!mm_modem_auth_request (MM_MODEM (modem),
+                                MM_AUTHORIZATION_SMS,
+                                sms_save_auth_cb,
+                                info,
+                                sms_auth_info_destroy,
+                                &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    }
+}
+
+/*****************************************************************************/
+
+static void
+sms_send_auth_cb (GObject *instance,
+                  guint32 reqid,
+                  MMAuthResult result,
+                  gpointer user_data)
+{
+    MMModemGsmSms *self = MM_MODEM_GSM_SMS (instance);
+    SmsAuthInfo *info = user_data;
+    GError *error = NULL;
+    GValue *value;
+    const char *number = NULL;
+    const char *text = NULL ;
+    const char *smsc = NULL;
+    guint validity = 0;
+    guint class = 0;
+
+    /* Return any authorization error, otherwise delete the SMS */
+    if (!mm_modem_auth_finish (MM_MODEM (self), reqid, result, &error))
+        goto done;
+
+    value = (GValue *) g_hash_table_lookup (info->hash, "number");
+    if (value)
+        number = g_value_get_string (value);
+
+    value = (GValue *) g_hash_table_lookup (info->hash, "text");
+    if (value)
+        text = g_value_get_string (value);
+
+    value = (GValue *) g_hash_table_lookup (info->hash, "smsc");
+    if (value)
+        smsc = g_value_get_string (value);
+
+    value = (GValue *) g_hash_table_lookup (info->hash, "validity");
+    if (value)
+        validity = g_value_get_uint (value);
+
+    value = (GValue *) g_hash_table_lookup (info->hash, "class");
+    if (value)
+        class = g_value_get_uint (value);
+
+    if (!number) {
+        error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                     "Missing number");
+    } else if (!text) {
+        error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                     "Missing message text");
+    }
+
+done:
+    if (error) {
+        async_call_done (MM_MODEM (self), error, info->context);
+        g_error_free (error);
+    } else
+        mm_modem_gsm_sms_send (self, number, text, smsc, validity, class, async_call_done, info->context);
 }
 
 static void
@@ -195,46 +500,41 @@ impl_gsm_modem_sms_send (MMModemGsmSms *modem,
                          GHashTable *properties,
                          DBusGMethodInvocation *context)
 {
-    GValue *value;
-    const char *number = NULL;
-    const char *text = NULL ;
-    const char *smsc = NULL;
     GError *error = NULL;
-    guint validity = 0;
-    guint class = 0;
+    SmsAuthInfo *info;
 
-    value = (GValue *) g_hash_table_lookup (properties, "number");
-    if (value)
-        number = g_value_get_string (value);
+    info = sms_auth_info_new (0, 0, 0, 0, 0, NULL, properties, context);
 
-    value = (GValue *) g_hash_table_lookup (properties, "text");
-    if (value)
-        text = g_value_get_string (value);
+    /* Make sure the caller is authorized to send the PUK */
+    if (!mm_modem_auth_request (MM_MODEM (modem),
+                                MM_AUTHORIZATION_SMS,
+                                sms_send_auth_cb,
+                                info,
+                                sms_auth_info_destroy,
+                                &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    }
+}
 
-    value = (GValue *) g_hash_table_lookup (properties, "smsc");
-    if (value)
-        smsc = g_value_get_string (value);
+/*****************************************************************************/
 
-    value = (GValue *) g_hash_table_lookup (properties, "validity");
-    if (value)
-        validity = g_value_get_uint (value);
+static void
+sms_send_from_storage_auth_cb (GObject *instance,
+                               guint32 reqid,
+                               MMAuthResult result,
+                               gpointer user_data)
+{
+    MMModemGsmSms *self = MM_MODEM_GSM_SMS (instance);
+    SmsAuthInfo *info = user_data;
+    GError *error = NULL;
 
-    value = (GValue *) g_hash_table_lookup (properties, "class");
-    if (value)
-        class = g_value_get_uint (value);
-
-    if (!number)
-        error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                     "Missing number");
-    else if (!text)
-        error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                     "Missing message text");
-
-    if (error) {
-        async_call_done (MM_MODEM (modem), error, context);
+    /* Return any authorization error, otherwise delete the SMS */
+    if (!mm_modem_auth_finish (MM_MODEM (self), reqid, result, &error)) {
+        dbus_g_method_return_error (info->context, error);
         g_error_free (error);
     } else
-        mm_modem_gsm_sms_send (modem, number, text, smsc, validity, class, async_call_done, context);
+        async_call_not_supported (self, async_call_done, info->context);
 }
 
 static void
@@ -242,7 +542,41 @@ impl_gsm_modem_sms_send_from_storage (MMModemGsmSms *modem,
                                       guint idx,
                                       DBusGMethodInvocation *context)
 {
-    async_call_not_supported (modem, async_call_done, context);
+    GError *error = NULL;
+    SmsAuthInfo *info;
+
+    info = sms_auth_info_new (0, 0, 0, 0, 0, NULL, NULL, context);
+
+    /* Make sure the caller is authorized to send the PUK */
+    if (!mm_modem_auth_request (MM_MODEM (modem),
+                                MM_AUTHORIZATION_SMS,
+                                sms_send_from_storage_auth_cb,
+                                info,
+                                sms_auth_info_destroy,
+                                &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    }
+}
+
+/*****************************************************************************/
+
+static void
+sms_set_indication_auth_cb (GObject *instance,
+                            guint32 reqid,
+                            MMAuthResult result,
+                            gpointer user_data)
+{
+    MMModemGsmSms *self = MM_MODEM_GSM_SMS (instance);
+    SmsAuthInfo *info = user_data;
+    GError *error = NULL;
+
+    /* Return any authorization error, otherwise delete the SMS */
+    if (!mm_modem_auth_finish (MM_MODEM (self), reqid, result, &error)) {
+        dbus_g_method_return_error (info->context, error);
+        g_error_free (error);
+    } else
+        async_call_not_supported (self, async_call_done, info->context);
 }
 
 static void
@@ -254,7 +588,21 @@ impl_gsm_modem_sms_set_indication (MMModemGsmSms *modem,
                                    guint bfr,
                                    DBusGMethodInvocation *context)
 {
-    async_call_not_supported (modem, async_call_done, context);
+    GError *error = NULL;
+    SmsAuthInfo *info;
+
+    info = sms_auth_info_new (mode, mt, bm, ds, bfr, NULL, NULL, context);
+
+    /* Make sure the caller is authorized to send the PUK */
+    if (!mm_modem_auth_request (MM_MODEM (modem),
+                                MM_AUTHORIZATION_SMS,
+                                sms_set_indication_auth_cb,
+                                info,
+                                sms_auth_info_destroy,
+                                &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    }
 }
 
 /*****************************************************************************/
