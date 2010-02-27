@@ -23,6 +23,7 @@ libtool
 *-glue.h
 *.tar.bz2
 org.freedesktop.ModemManager.service
+org.freedesktop.ModemManager.conf
 ModemManager.pc
 marshallers/mm-marshal.[ch]
 src/modem-manager

@@ -28,6 +28,15 @@ endif
 dbusservicedir = $(DBUS_SYS_DIR)
 dbusservice_DATA = org.freedesktop.ModemManager.conf
 
+dbusservice_file_polkit = org.freedesktop.ModemManager.conf.polkit
+dbusservice_file_nopolkit = org.freedesktop.ModemManager.conf.nopolkit
+
+if WITH_POLKIT
+	cp -f $(top_srcdir)/$(dbusservice_file_polkit) $(dbusservice_DATA)
+else
+	cp -f $(top_srcdir)/$(dbusservice_file_nopolkit) $(dbusservice_DATA)
+endif
+
 dbusactivationdir = $(datadir)/dbus-1/system-services
 dbusactivation_in_files = org.freedesktop.ModemManager.service.in
 dbusactivation_DATA = $(dbusactivation_in_files:.service.in=.service)
@@ -57,8 +66,9 @@ DISTCLEANFILES = \
 
 EXTRA_DIST = \
 	doc-generator.xsl \
-	$(dbusservice_DATA) \
 	$(dbusactivation_in_files) \
-	$(INTLTOOL_FILES)
+	$(INTLTOOL_FILES) \
+	$(dbusservice_file_polkit) \
+	$(dbusservice_file_nopolkit)
 
 ACLOCAL_AMFLAGS = -I m4
