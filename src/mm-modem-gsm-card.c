@@ -202,10 +202,12 @@ mm_modem_gsm_card_change_pin (MMModemGsmCard *self,
 /*****************************************************************************/
 
 static void
-imei_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
+imei_auth_cb (MMAuthRequest *req,
+              GObject *owner,
+              DBusGMethodInvocation *context,
+              gpointer user_data)
 {
     MMModemGsmCard *self = MM_MODEM_GSM_CARD (owner);
-    DBusGMethodInvocation *context = user_data;
     GError *error = NULL;
 
     /* Return any authorization error, otherwise get the IMEI */
@@ -224,8 +226,9 @@ impl_gsm_modem_get_imei (MMModemGsmCard *modem, DBusGMethodInvocation *context)
     /* Make sure the caller is authorized to get the IMEI */
     if (!mm_modem_auth_request (MM_MODEM (modem),
                                 MM_AUTHORIZATION_DEVICE,
-                                imei_auth_cb,
                                 context,
+                                imei_auth_cb,
+                                NULL,
                                 NULL,
                                 &error)) {
         dbus_g_method_return_error (context, error);
@@ -236,10 +239,12 @@ impl_gsm_modem_get_imei (MMModemGsmCard *modem, DBusGMethodInvocation *context)
 /*****************************************************************************/
 
 static void
-imsi_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
+imsi_auth_cb (MMAuthRequest *req,
+              GObject *owner,
+              DBusGMethodInvocation *context,
+              gpointer user_data)
 {
     MMModemGsmCard *self = MM_MODEM_GSM_CARD (owner);
-    DBusGMethodInvocation *context = user_data;
     GError *error = NULL;
 
     /* Return any authorization error, otherwise get the IMSI */
@@ -258,8 +263,9 @@ impl_gsm_modem_get_imsi (MMModemGsmCard *modem, DBusGMethodInvocation *context)
     /* Make sure the caller is authorized to get the IMSI */
     if (!mm_modem_auth_request (MM_MODEM (modem),
                                 MM_AUTHORIZATION_DEVICE,
-                                imsi_auth_cb,
                                 context,
+                                imsi_auth_cb,
+                                NULL,
                                 NULL,
                                 &error)) {
         dbus_g_method_return_error (context, error);
@@ -274,7 +280,6 @@ typedef struct {
     char *pin;
     char *pin2;
     gboolean enabled;
-    DBusGMethodInvocation *context;
 } SendPinPukInfo;
 
 static void
@@ -293,8 +298,7 @@ static SendPinPukInfo *
 send_pin_puk_info_new (const char *puk,
                        const char *pin,
                        const char *pin2,
-                       gboolean enabled,
-                       DBusGMethodInvocation *context)
+                       gboolean enabled)
 {
     SendPinPukInfo *info;
 
@@ -303,14 +307,16 @@ send_pin_puk_info_new (const char *puk,
     info->pin = g_strdup (pin);
     info->pin2 = g_strdup (pin2);
     info->enabled = enabled;
-    info->context = context;
     return info;
 }
 
 /*****************************************************************************/
 
 static void
-send_puk_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
+send_puk_auth_cb (MMAuthRequest *req,
+                  GObject *owner,
+                  DBusGMethodInvocation *context,
+                  gpointer user_data)
 {
     MMModemGsmCard *self = MM_MODEM_GSM_CARD (owner);
     SendPinPukInfo *info = user_data;
@@ -318,10 +324,10 @@ send_puk_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
 
     /* Return any authorization error, otherwise send the PUK */
     if (!mm_modem_auth_finish (MM_MODEM (self), req, &error)) {
-        dbus_g_method_return_error (info->context, error);
+        dbus_g_method_return_error (context, error);
         g_error_free (error);
     } else
-        mm_modem_gsm_card_send_puk (self, info->puk, info->pin, async_call_done, info->context);
+        mm_modem_gsm_card_send_puk (self, info->puk, info->pin, async_call_done, context);
 }
 
 static void
@@ -333,11 +339,12 @@ impl_gsm_modem_send_puk (MMModemGsmCard *modem,
     GError *error = NULL;
     SendPinPukInfo *info;
 
-    info = send_pin_puk_info_new (puk, pin, NULL, FALSE, context);
+    info = send_pin_puk_info_new (puk, pin, NULL, FALSE);
 
     /* Make sure the caller is authorized to send the PUK */
     if (!mm_modem_auth_request (MM_MODEM (modem),
                                 MM_AUTHORIZATION_DEVICE,
+                                context,
                                 send_puk_auth_cb,
                                 info,
                                 send_pin_puk_info_destroy,
@@ -350,7 +357,10 @@ impl_gsm_modem_send_puk (MMModemGsmCard *modem,
 /*****************************************************************************/
 
 static void
-send_pin_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
+send_pin_auth_cb (MMAuthRequest *req,
+                  GObject *owner,
+                  DBusGMethodInvocation *context,
+                  gpointer user_data)
 {
     MMModemGsmCard *self = MM_MODEM_GSM_CARD (owner);
     SendPinPukInfo *info = user_data;
@@ -358,10 +368,10 @@ send_pin_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
 
     /* Return any authorization error, otherwise unlock the modem */
     if (!mm_modem_auth_finish (MM_MODEM (self), req, &error)) {
-        dbus_g_method_return_error (info->context, error);
+        dbus_g_method_return_error (context, error);
         g_error_free (error);
     } else
-        mm_modem_gsm_card_send_pin (self, info->pin, async_call_done, info->context);
+        mm_modem_gsm_card_send_pin (self, info->pin, async_call_done, context);
 }
 
 static void
@@ -372,11 +382,12 @@ impl_gsm_modem_send_pin (MMModemGsmCard *modem,
     GError *error = NULL;
     SendPinPukInfo *info;
 
-    info = send_pin_puk_info_new (NULL, pin, NULL, FALSE, context);
+    info = send_pin_puk_info_new (NULL, pin, NULL, FALSE);
 
     /* Make sure the caller is authorized to unlock the modem */
     if (!mm_modem_auth_request (MM_MODEM (modem),
                                 MM_AUTHORIZATION_DEVICE,
+                                context,
                                 send_pin_auth_cb,
                                 info,
                                 send_pin_puk_info_destroy,
@@ -389,7 +400,10 @@ impl_gsm_modem_send_pin (MMModemGsmCard *modem,
 /*****************************************************************************/
 
 static void
-enable_pin_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
+enable_pin_auth_cb (MMAuthRequest *req,
+                    GObject *owner,
+                    DBusGMethodInvocation *context,
+                    gpointer user_data)
 {
     MMModemGsmCard *self = MM_MODEM_GSM_CARD (owner);
     SendPinPukInfo *info = user_data;
@@ -397,10 +411,10 @@ enable_pin_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
 
     /* Return any authorization error, otherwise enable the PIN */
     if (!mm_modem_auth_finish (MM_MODEM (self), req, &error)) {
-        dbus_g_method_return_error (info->context, error);
+        dbus_g_method_return_error (context, error);
         g_error_free (error);
     } else
-        mm_modem_gsm_card_enable_pin (self, info->pin, info->enabled, async_call_done, info->context);
+        mm_modem_gsm_card_enable_pin (self, info->pin, info->enabled, async_call_done, context);
 }
 
 static void
@@ -412,11 +426,12 @@ impl_gsm_modem_enable_pin (MMModemGsmCard *modem,
     GError *error = NULL;
     SendPinPukInfo *info;
 
-    info = send_pin_puk_info_new (NULL, pin, NULL, enabled, context);
+    info = send_pin_puk_info_new (NULL, pin, NULL, enabled);
 
     /* Make sure the caller is authorized to enable a PIN */
     if (!mm_modem_auth_request (MM_MODEM (modem),
                                 MM_AUTHORIZATION_DEVICE,
+                                context,
                                 enable_pin_auth_cb,
                                 info,
                                 send_pin_puk_info_destroy,
@@ -429,7 +444,10 @@ impl_gsm_modem_enable_pin (MMModemGsmCard *modem,
 /*****************************************************************************/
 
 static void
-change_pin_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
+change_pin_auth_cb (MMAuthRequest *req,
+                    GObject *owner,
+                    DBusGMethodInvocation *context,
+                    gpointer user_data)
 {
     MMModemGsmCard *self = MM_MODEM_GSM_CARD (owner);
     SendPinPukInfo *info = user_data;
@@ -437,10 +455,10 @@ change_pin_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
 
     /* Return any authorization error, otherwise change the PIN */
     if (!mm_modem_auth_finish (MM_MODEM (self), req, &error)) {
-        dbus_g_method_return_error (info->context, error);
+        dbus_g_method_return_error (context, error);
         g_error_free (error);
     } else
-        mm_modem_gsm_card_change_pin (self, info->pin, info->pin2, async_call_done, info->context);
+        mm_modem_gsm_card_change_pin (self, info->pin, info->pin2, async_call_done, context);
 }
 
 static void
@@ -452,11 +470,12 @@ impl_gsm_modem_change_pin (MMModemGsmCard *modem,
     GError *error = NULL;
     SendPinPukInfo *info;
 
-    info = send_pin_puk_info_new (NULL, old_pin, new_pin, FALSE, context);
+    info = send_pin_puk_info_new (NULL, old_pin, new_pin, FALSE);
 
     /* Make sure the caller is authorized to change the PIN */
     if (!mm_modem_auth_request (MM_MODEM (modem),
                                 MM_AUTHORIZATION_DEVICE,
+                                context,
                                 change_pin_auth_cb,
                                 info,
                                 send_pin_puk_info_destroy,

@@ -17,6 +17,7 @@
 #define MM_AUTH_PROVIDER_H
 
 #include <glib-object.h>
+#include <dbus/dbus-glib-lowlevel.h>
 
 #include "mm-auth-request.h"
 
@@ -43,13 +44,10 @@ typedef struct {
 typedef struct {
     GObjectClass parent;
 
-    gboolean (*request_auth) (MMAuthProvider *provider,
-                              MMAuthRequest *req,
-                              GError **error);
-
     MMAuthRequest * (*create_request) (MMAuthProvider *provider,
                                        const char *authorization,
                                        GObject *owner,
+                                       DBusGMethodInvocation *context,
                                        MMAuthRequestCb callback,
                                        gpointer callback_data,
                                        GDestroyNotify notify);
@@ -57,9 +55,11 @@ typedef struct {
 
 GType mm_auth_provider_get_type (void);
 
+/* Don't do anything clever from the notify callback... */
 MMAuthRequest *mm_auth_provider_request_auth (MMAuthProvider *provider,
                                               const char *authorization,
                                               GObject *owner,
+                                              DBusGMethodInvocation *context,
                                               MMAuthRequestCb callback,
                                               gpointer callback_data,
                                               GDestroyNotify notify,
@@ -67,6 +67,8 @@ MMAuthRequest *mm_auth_provider_request_auth (MMAuthProvider *provider,
 
 void mm_auth_provider_cancel_for_owner (MMAuthProvider *provider,
                                         GObject *owner);
+
+/* Subclass API */
 
 /* To get an auth provider instance, implemented in mm-auth-provider-factory.c */
 MMAuthProvider *mm_auth_provider_get (void);

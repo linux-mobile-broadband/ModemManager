@@ -18,6 +18,7 @@
 #define MM_MODEM_H
 
 #include <glib-object.h>
+#include <dbus/dbus-glib-lowlevel.h>
 
 #include "mm-port.h"
 #include "mm-auth-provider.h"
@@ -162,6 +163,7 @@ struct _MMModem {
      */
     gboolean (*auth_request) (MMModem *self,
                               const char *authorization,
+                              DBusGMethodInvocation *context,
                               MMAuthRequestCb callback,
                               gpointer callback_data,
                               GDestroyNotify notify,
@@ -238,6 +240,7 @@ GError *mm_modem_check_removed (MMModem *self, const GError *error);
  */
 gboolean mm_modem_auth_request (MMModem *self,
                                 const char *authorization,
+                                DBusGMethodInvocation *context,
                                 MMAuthRequestCb callback,
                                 gpointer callback_data,
                                 GDestroyNotify notify,

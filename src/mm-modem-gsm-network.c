@@ -398,10 +398,12 @@ impl_gsm_modem_register (MMModemGsmNetwork *modem,
 }
 
 static void
-scan_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
+scan_auth_cb (MMAuthRequest *req,
+              GObject *owner,
+              DBusGMethodInvocation *context,
+              gpointer user_data)
 {
     MMModemGsmNetwork *self = MM_MODEM_GSM_NETWORK (owner);
-    DBusGMethodInvocation *context = user_data;
     GError *error = NULL;
 
     /* Return any authorization error, otherwise get the IMEI */
@@ -421,8 +423,9 @@ impl_gsm_modem_scan (MMModemGsmNetwork *modem,
     /* Make sure the caller is authorized to request a scan */
     if (!mm_modem_auth_request (MM_MODEM (modem),
                                 MM_AUTHORIZATION_DEVICE,
-                                scan_auth_cb,
                                 context,
+                                scan_auth_cb,
+                                NULL,
                                 NULL,
                                 &error)) {
         dbus_g_method_return_error (context, error);

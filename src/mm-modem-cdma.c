@@ -189,10 +189,12 @@ mm_modem_cdma_get_esn (MMModemCdma *self,
 }
 
 static void
-esn_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
+esn_auth_cb (MMAuthRequest *req,
+             GObject *owner,
+             DBusGMethodInvocation *context,
+             gpointer user_data)
 {
     MMModemCdma *self = MM_MODEM_CDMA (owner);
-    DBusGMethodInvocation *context = user_data;
     GError *error = NULL;
 
     /* Return any authorization error, otherwise get the ESN */
@@ -211,8 +213,9 @@ impl_modem_cdma_get_esn (MMModemCdma *self, DBusGMethodInvocation *context)
     /* Make sure the caller is authorized to get the ESN */
     if (!mm_modem_auth_request (MM_MODEM (self),
                                 MM_AUTHORIZATION_DEVICE,
-                                esn_auth_cb,
                                 context,
+                                esn_auth_cb,
+                                NULL,
                                 NULL,
                                 &error)) {
         dbus_g_method_return_error (context, error);

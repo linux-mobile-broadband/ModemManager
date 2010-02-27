@@ -611,6 +611,7 @@ mm_modem_set_state (MMModem *self,
 gboolean
 mm_modem_auth_request (MMModem *self,
                        const char *authorization,
+                       DBusGMethodInvocation *context,
                        MMAuthRequestCb callback,
                        gpointer callback_data,
                        GDestroyNotify notify,
@@ -619,11 +620,13 @@ mm_modem_auth_request (MMModem *self,
     g_return_val_if_fail (self != NULL, FALSE);
     g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
     g_return_val_if_fail (authorization != NULL, FALSE);
+    g_return_val_if_fail (context != NULL, FALSE);
     g_return_val_if_fail (callback != NULL, FALSE);
 
     g_return_val_if_fail (MM_MODEM_GET_INTERFACE (self)->auth_request, FALSE);
     return MM_MODEM_GET_INTERFACE (self)->auth_request (self,
                                                         authorization,
+                                                        context,
                                                         callback,
                                                         callback_data,
                                                         notify,

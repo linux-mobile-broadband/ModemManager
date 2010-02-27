@@ -13,6 +13,13 @@
       -->
 
     <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager"
+           send_member="EnumerateDevices"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.DBus.Properties"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
            send_interface="org.freedesktop.ModemManager.Modem"
            send_member="GetInfo"/>
 
