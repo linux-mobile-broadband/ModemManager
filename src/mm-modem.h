@@ -168,8 +168,7 @@ struct _MMModem {
                               GError **error);
 
     gboolean (*auth_finish)  (MMModem *self,
-                              guint32 reqid,
-                              MMAuthResult result,
+                              MMAuthRequest *req,
                               GError **error);
 
     /* Signals */
@@ -245,8 +244,7 @@ gboolean mm_modem_auth_request (MMModem *self,
                                 GError **error);
 
 gboolean mm_modem_auth_finish (MMModem *self,
-                               guint32 reqid,
-                               MMAuthResult result,
+                               MMAuthRequest *req,
                                GError **error);
 
 #endif  /* MM_MODEM_H */

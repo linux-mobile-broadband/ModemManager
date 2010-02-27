@@ -632,18 +632,17 @@ mm_modem_auth_request (MMModem *self,
 
 gboolean
 mm_modem_auth_finish (MMModem *self,
-                      guint32 reqid,
-                      MMAuthResult result,
+                      MMAuthRequest *req,
                       GError **error)
 {
     gboolean success;
 
     g_return_val_if_fail (self != NULL, FALSE);
     g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
-    g_return_val_if_fail (reqid > 0, FALSE);
+    g_return_val_if_fail (req != NULL, FALSE);
 
     g_return_val_if_fail (MM_MODEM_GET_INTERFACE (self)->auth_finish, FALSE);
-    success = MM_MODEM_GET_INTERFACE (self)->auth_finish (self, reqid, result, error);
+    success = MM_MODEM_GET_INTERFACE (self)->auth_finish (self, req, error);
 
     /* If the request failed, the implementor *should* return an error */
     if (!success && error)

@@ -398,17 +398,14 @@ impl_gsm_modem_register (MMModemGsmNetwork *modem,
 }
 
 static void
-scan_auth_cb (GObject *instance,
-              guint32 reqid,
-              MMAuthResult result,
-              gpointer user_data)
+scan_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
 {
-    MMModemGsmNetwork *self = MM_MODEM_GSM_NETWORK (instance);
+    MMModemGsmNetwork *self = MM_MODEM_GSM_NETWORK (owner);
     DBusGMethodInvocation *context = user_data;
     GError *error = NULL;
 
     /* Return any authorization error, otherwise get the IMEI */
-    if (!mm_modem_auth_finish (MM_MODEM (self), reqid, result, &error)) {
+    if (!mm_modem_auth_finish (MM_MODEM (self), req, &error)) {
         dbus_g_method_return_error (context, error);
         g_error_free (error);
     } else

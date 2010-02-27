@@ -37,6 +37,11 @@ modem_manager_SOURCES = \
 	main.c \
 	mm-callback-info.c \
 	mm-callback-info.h \
+	mm-auth-request.c \
+	mm-auth-request.h \
+	mm-auth-provider.h \
+	mm-auth-provider.c \
+	mm-auth-provider-factory.c \
 	mm-manager.c \
 	mm-manager.h \
 	mm-modem.c \
@@ -71,13 +76,12 @@ modem_manager_SOURCES = \
 	mm-plugin-base.c \
 	mm-plugin-base.h \
 	mm-properties-changed-signal.c \
-	mm-properties-changed-signal.h \
-	mm-auth-provider.h \
-	mm-auth-provider.c \
-	mm-auth-provider-factory.c
+	mm-properties-changed-signal.h
 
 if WITH_POLKIT
 modem_manager_SOURCES += \
+	mm-auth-request-polkit.c \
+	mm-auth-request-polkit.h \
 	mm-auth-provider-polkit.c \
 	mm-auth-provider-polkit.h
 endif

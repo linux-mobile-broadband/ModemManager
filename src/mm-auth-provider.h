@@ -18,6 +18,8 @@
 
 #include <glib-object.h>
 
+#include "mm-auth-request.h"
+
 /* Authorizations */
 #define MM_AUTHORIZATION_DEVICE   "org.freedesktop.ModemManager.Device"
 #define MM_AUTHORIZATION_CONTACTS "org.freedesktop.ModemManager.Contacts"
@@ -34,66 +36,47 @@
 
 #define MM_AUTH_PROVIDER_NAME "name"
 
-typedef enum MMAuthResult {
-    MM_AUTH_RESULT_UNKNOWN = 0,
-    MM_AUTH_RESULT_INTERNAL_FAILURE,
-    MM_AUTH_RESULT_NOT_AUTHORIZED,
-    MM_AUTH_RESULT_CHALLENGE,
-    MM_AUTH_RESULT_AUTHORIZED
-} MMAuthResult;
-
-typedef struct MMAuthRequest MMAuthRequest;
-typedef struct _MMAuthProvider MMAuthProvider;
-typedef struct _MMAuthProviderClass MMAuthProviderClass;
-
-typedef void (*MMAuthRequestCb) (GObject *instance,
-                                 guint32 reqid,
-                                 MMAuthResult result,
-                                 gpointer user_data);
-
-struct _MMAuthProvider {
+typedef struct {
     GObject parent;
-};
+} MMAuthProvider;
 
-struct _MMAuthProviderClass {
+typedef struct {
     GObjectClass parent;
 
     gboolean (*request_auth) (MMAuthProvider *provider,
                               MMAuthRequest *req,
                               GError **error);
-};
+
+    MMAuthRequest * (*create_request) (MMAuthProvider *provider,
+                                       const char *authorization,
+                                       GObject *owner,
+                                       MMAuthRequestCb callback,
+                                       gpointer callback_data,
+                                       GDestroyNotify notify);
+} MMAuthProviderClass;
 
 GType mm_auth_provider_get_type (void);
 
-guint32 mm_auth_provider_request_auth (MMAuthProvider *provider,
-                                       const char *authorization,
-                                       GObject *instance,
-                                       MMAuthRequestCb callback,
-                                       gpointer callback_data,
-                                       GDestroyNotify notify,
-                                       GError **error);
+MMAuthRequest *mm_auth_provider_request_auth (MMAuthProvider *provider,
+                                              const char *authorization,
+                                              GObject *owner,
+                                              MMAuthRequestCb callback,
+                                              gpointer callback_data,
+                                              GDestroyNotify notify,
+                                              GError **error);
+
+void mm_auth_provider_cancel_for_owner (MMAuthProvider *provider,
+                                        GObject *owner);
 
 /* To get an auth provider instance, implemented in mm-auth-provider-factory.c */
 MMAuthProvider *mm_auth_provider_get (void);
 
-/* For subclasses only */
-MMAuthRequest *mm_auth_provider_get_request      (MMAuthProvider *provider, guint32 reqid);
-MMAuthRequest *mm_auth_request_ref               (MMAuthRequest *req);
-void           mm_auth_request_unref             (MMAuthRequest *req);
-guint32        mm_auth_request_get_id            (MMAuthRequest *req);
-const char *   mm_auth_request_get_authorization (MMAuthRequest *req);
-
-/* Normal API */
-
 /* schedules the request's completion */
 void mm_auth_provider_finish_request (MMAuthProvider *provider,
-                                      guint32 reqid,
+                                      MMAuthRequest *req,
                                       MMAuthResult result);
 
-void mm_auth_provider_cancel_request (MMAuthProvider *provider, guint32 reqid);
-
-const char *mm_auth_provider_get_authorization_for_id (MMAuthProvider *provider,
-                                                       guint32 reqid);
+void mm_auth_provider_cancel_request (MMAuthProvider *provider, MMAuthRequest *req);
 
 #endif /* MM_AUTH_PROVIDER_H */
 

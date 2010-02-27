@@ -207,17 +207,14 @@ sms_auth_info_new (guint num1,
 /*****************************************************************************/
 
 static void
-sms_delete_auth_cb (GObject *instance,
-                    guint32 reqid,
-                    MMAuthResult result,
-                    gpointer user_data)
+sms_delete_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
 {
-    MMModemGsmSms *self = MM_MODEM_GSM_SMS (instance);
+    MMModemGsmSms *self = MM_MODEM_GSM_SMS (owner);
     SmsAuthInfo *info = user_data;
     GError *error = NULL;
 
     /* Return any authorization error, otherwise delete the SMS */
-    if (!mm_modem_auth_finish (MM_MODEM (self), reqid, result, &error)) {
+    if (!mm_modem_auth_finish (MM_MODEM (self), req, &error)) {
         dbus_g_method_return_error (info->context, error);
         g_error_free (error);
     } else
@@ -249,17 +246,14 @@ impl_gsm_modem_sms_delete (MMModemGsmSms *modem,
 /*****************************************************************************/
 
 static void
-sms_get_auth_cb (GObject *instance,
-                 guint32 reqid,
-                 MMAuthResult result,
-                 gpointer user_data)
+sms_get_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
 {
-    MMModemGsmSms *self = MM_MODEM_GSM_SMS (instance);
+    MMModemGsmSms *self = MM_MODEM_GSM_SMS (owner);
     SmsAuthInfo *info = user_data;
     GError *error = NULL;
 
     /* Return any authorization error, otherwise delete the SMS */
-    if (!mm_modem_auth_finish (MM_MODEM (self), reqid, result, &error)) {
+    if (!mm_modem_auth_finish (MM_MODEM (self), req, &error)) {
         dbus_g_method_return_error (info->context, error);
         g_error_free (error);
     } else
@@ -315,17 +309,14 @@ impl_gsm_modem_sms_get_smsc (MMModemGsmSms *modem,
 /*****************************************************************************/
 
 static void
-sms_set_smsc_auth_cb (GObject *instance,
-                      guint32 reqid,
-                      MMAuthResult result,
-                      gpointer user_data)
+sms_set_smsc_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
 {
-    MMModemGsmSms *self = MM_MODEM_GSM_SMS (instance);
+    MMModemGsmSms *self = MM_MODEM_GSM_SMS (owner);
     SmsAuthInfo *info = user_data;
     GError *error = NULL;
 
     /* Return any authorization error, otherwise delete the SMS */
-    if (!mm_modem_auth_finish (MM_MODEM (self), reqid, result, &error)) {
+    if (!mm_modem_auth_finish (MM_MODEM (self), req, &error)) {
         dbus_g_method_return_error (info->context, error);
         g_error_free (error);
     } else
@@ -357,17 +348,14 @@ impl_gsm_modem_sms_set_smsc (MMModemGsmSms *modem,
 /*****************************************************************************/
 
 static void
-sms_list_auth_cb (GObject *instance,
-                  guint32 reqid,
-                  MMAuthResult result,
-                  gpointer user_data)
+sms_list_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
 {
-    MMModemGsmSms *self = MM_MODEM_GSM_SMS (instance);
+    MMModemGsmSms *self = MM_MODEM_GSM_SMS (owner);
     SmsAuthInfo *info = user_data;
     GError *error = NULL;
 
     /* Return any authorization error, otherwise delete the SMS */
-    if (!mm_modem_auth_finish (MM_MODEM (self), reqid, result, &error)) {
+    if (!mm_modem_auth_finish (MM_MODEM (self), req, &error)) {
         dbus_g_method_return_error (info->context, error);
         g_error_free (error);
     } else
@@ -398,17 +386,14 @@ impl_gsm_modem_sms_list (MMModemGsmSms *modem,
 /*****************************************************************************/
 
 static void
-sms_save_auth_cb (GObject *instance,
-                  guint32 reqid,
-                  MMAuthResult result,
-                  gpointer user_data)
+sms_save_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
 {
-    MMModemGsmSms *self = MM_MODEM_GSM_SMS (instance);
+    MMModemGsmSms *self = MM_MODEM_GSM_SMS (owner);
     SmsAuthInfo *info = user_data;
     GError *error = NULL;
 
     /* Return any authorization error, otherwise delete the SMS */
-    if (!mm_modem_auth_finish (MM_MODEM (self), reqid, result, &error)) {
+    if (!mm_modem_auth_finish (MM_MODEM (self), req, &error)) {
         dbus_g_method_return_error (info->context, error);
         g_error_free (error);
     } else
@@ -440,12 +425,9 @@ impl_gsm_modem_sms_save (MMModemGsmSms *modem,
 /*****************************************************************************/
 
 static void
-sms_send_auth_cb (GObject *instance,
-                  guint32 reqid,
-                  MMAuthResult result,
-                  gpointer user_data)
+sms_send_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
 {
-    MMModemGsmSms *self = MM_MODEM_GSM_SMS (instance);
+    MMModemGsmSms *self = MM_MODEM_GSM_SMS (owner);
     SmsAuthInfo *info = user_data;
     GError *error = NULL;
     GValue *value;
@@ -456,7 +438,7 @@ sms_send_auth_cb (GObject *instance,
     guint class = 0;
 
     /* Return any authorization error, otherwise delete the SMS */
-    if (!mm_modem_auth_finish (MM_MODEM (self), reqid, result, &error))
+    if (!mm_modem_auth_finish (MM_MODEM (self), req, &error))
         goto done;
 
     value = (GValue *) g_hash_table_lookup (info->hash, "number");
@@ -520,17 +502,14 @@ impl_gsm_modem_sms_send (MMModemGsmSms *modem,
 /*****************************************************************************/
 
 static void
-sms_send_from_storage_auth_cb (GObject *instance,
-                               guint32 reqid,
-                               MMAuthResult result,
-                               gpointer user_data)
+sms_send_from_storage_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
 {
-    MMModemGsmSms *self = MM_MODEM_GSM_SMS (instance);
+    MMModemGsmSms *self = MM_MODEM_GSM_SMS (owner);
     SmsAuthInfo *info = user_data;
     GError *error = NULL;
 
     /* Return any authorization error, otherwise delete the SMS */
-    if (!mm_modem_auth_finish (MM_MODEM (self), reqid, result, &error)) {
+    if (!mm_modem_auth_finish (MM_MODEM (self), req, &error)) {
         dbus_g_method_return_error (info->context, error);
         g_error_free (error);
     } else
@@ -562,17 +541,14 @@ impl_gsm_modem_sms_send_from_storage (MMModemGsmSms *modem,
 /*****************************************************************************/
 
 static void
-sms_set_indication_auth_cb (GObject *instance,
-                            guint32 reqid,
-                            MMAuthResult result,
-                            gpointer user_data)
+sms_set_indication_auth_cb (MMAuthRequest *req, GObject *owner, gpointer user_data)
 {
-    MMModemGsmSms *self = MM_MODEM_GSM_SMS (instance);
+    MMModemGsmSms *self = MM_MODEM_GSM_SMS (owner);
     SmsAuthInfo *info = user_data;
     GError *error = NULL;
 
     /* Return any authorization error, otherwise delete the SMS */
-    if (!mm_modem_auth_finish (MM_MODEM (self), reqid, result, &error)) {
+    if (!mm_modem_auth_finish (MM_MODEM (self), req, &error)) {
         dbus_g_method_return_error (info->context, error);
         g_error_free (error);
     } else

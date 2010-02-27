@@ -35,14 +35,6 @@ enum {
     LAST_PROP
 };
 
-enum {
-	REQUEST_ADDED,
-	REQUEST_REMOVED,
-	LAST_SIGNAL
-};
-static guint signals[LAST_SIGNAL] = { 0 };
-
-
 /*****************************************************************************/
 
 GObject *
@@ -53,99 +45,17 @@ mm_auth_provider_new (void)
 
 /*****************************************************************************/
 
-struct MMAuthRequest {
-    guint32 refcount;
-    guint32 id;
-    char *auth;
-    GObject *instance;
-
-    MMAuthResult result;
-
-    MMAuthRequestCb callback;
-    gpointer callback_data;
-    GDestroyNotify notify;
-};
-
-static MMAuthRequest *
-mm_auth_request_new (const char *authorization,
-                     GObject *instance,
-                     MMAuthRequestCb callback,
-                     gpointer callback_data,
-                     GDestroyNotify notify)
+static void
+remove_requests (MMAuthProvider *self, GSList *remove)
 {
-    static guint32 id = 1;
+    MMAuthProviderPrivate *priv = MM_AUTH_PROVIDER_GET_PRIVATE (self);
     MMAuthRequest *req;
 
-    g_return_val_if_fail (authorization != NULL, NULL);
-    g_return_val_if_fail (callback != NULL, NULL);
-
-    req = g_malloc0 (sizeof (MMAuthRequest));
-    req->id = id++;
-    req->refcount = 1;
-    req->auth = g_strdup (authorization);
-    req->instance = instance;
-    req->callback = callback;
-    req->callback_data = callback_data;
-    req->notify = notify;
-
-    return req;
-}
-
-MMAuthRequest *
-mm_auth_request_ref (MMAuthRequest *req)
-{
-    g_return_val_if_fail (req != NULL, NULL);
-    g_return_val_if_fail (req->refcount > 0, NULL);
-
-    req->refcount++;
-    return req;
-}
-
-void
-mm_auth_request_unref (MMAuthRequest *req)
-{
-    g_return_if_fail (req != NULL);
-    g_return_if_fail (req->refcount > 0);
-
-    req->refcount--;
-    if (req->refcount == 0) {
-        g_free (req->auth);
-        memset (req, 0, sizeof (MMAuthRequest));
-        g_free (req);
+    while (remove) {
+        req = MM_AUTH_REQUEST (remove->data);
+        g_hash_table_remove (priv->requests, req);
+        remove = g_slist_remove (remove, req);
     }
-}
-
-guint32
-mm_auth_request_get_id (MMAuthRequest *req)
-{
-    g_return_val_if_fail (req != NULL, 0);
-    g_return_val_if_fail (req->refcount > 0, 0);
-
-    return req->id;
-}
-
-const char *
-mm_auth_request_get_authorization (MMAuthRequest *req)
-{
-    g_return_val_if_fail (req != NULL, 0);
-    g_return_val_if_fail (req->refcount > 0, 0);
-
-    return req->auth;
-}
-
-/*****************************************************************************/
-
-MMAuthRequest *
-mm_auth_provider_get_request (MMAuthProvider *provider, guint32 reqid)
-{
-    MMAuthProviderPrivate *priv;
-
-    g_return_val_if_fail (provider != NULL, NULL);
-    g_return_val_if_fail (MM_IS_AUTH_PROVIDER (provider), NULL);
-    g_return_val_if_fail (reqid > 0, NULL);
-
-    priv = MM_AUTH_PROVIDER_GET_PRIVATE (provider);
-    return (MMAuthRequest *) g_hash_table_lookup (priv->requests, GUINT_TO_POINTER (reqid));
 }
 
 static gboolean
@@ -163,92 +73,78 @@ process_complete_requests (gpointer user_data)
     /* Call finished request's callbacks */
     g_hash_table_iter_init (&iter, priv->requests);
     while (g_hash_table_iter_next (&iter, NULL, &value)) {
-        req = (MMAuthRequest *) value;
-        if (req->result != MM_AUTH_RESULT_UNKNOWN) {
-            req->callback (req->instance, req->id, req->result, req->callback_data);
+        req = MM_AUTH_REQUEST (value);
 
-            /* Let the caller clean up the request's callback data */
-            if (req->notify)
-                req->notify (req->callback_data);
-
+        if (mm_auth_request_get_authorization (req) != MM_AUTH_RESULT_UNKNOWN) {
+            mm_auth_request_complete (req);
             remove = g_slist_prepend (remove, req);
         }
     }
 
     /* And remove those requests from our pending request list */
-    while (remove) {
-        req = (MMAuthRequest *) remove->data;
-        g_signal_emit (self, signals[REQUEST_REMOVED], 0, req->instance, req->id);
-        g_hash_table_remove (priv->requests, GUINT_TO_POINTER (req->id));
-        remove = g_slist_remove (remove, req);
-    }
+    remove_requests (self, remove);
 
     return FALSE;
 }
 
 void
 mm_auth_provider_finish_request (MMAuthProvider *provider,
-                                 guint32 reqid,
+                                 MMAuthRequest *req,
                                  MMAuthResult result)
 {
     MMAuthProviderPrivate *priv;
-    MMAuthRequest *req;
 
     g_return_if_fail (provider != NULL);
     g_return_if_fail (MM_IS_AUTH_PROVIDER (provider));
-    g_return_if_fail (reqid > 0);
+    g_return_if_fail (req != NULL);
     g_return_if_fail (result != MM_AUTH_RESULT_UNKNOWN);
 
     priv = MM_AUTH_PROVIDER_GET_PRIVATE (provider);
-    req = (MMAuthRequest *) g_hash_table_lookup (priv->requests, GUINT_TO_POINTER (reqid));
-    g_return_if_fail (req != NULL);
+    g_return_if_fail (g_hash_table_lookup (priv->requests, req) != NULL);
 
-    req->result = result;
-
+    mm_auth_request_set_result (req, result);
     if (priv->process_id == 0)
         priv->process_id = g_idle_add (process_complete_requests, provider);
 }
 
 void
-mm_auth_provider_cancel_request (MMAuthProvider *provider, guint32 reqid)
+mm_auth_provider_cancel_request (MMAuthProvider *provider, MMAuthRequest *req)
 {
     MMAuthProviderPrivate *priv;
-    MMAuthRequest *req;
 
     g_return_if_fail (provider != NULL);
     g_return_if_fail (MM_IS_AUTH_PROVIDER (provider));
-    g_return_if_fail (reqid > 0);
-
-    priv = MM_AUTH_PROVIDER_GET_PRIVATE (provider);
-
-    req = (MMAuthRequest *) g_hash_table_lookup (priv->requests, GUINT_TO_POINTER (reqid));
     g_return_if_fail (req != NULL);
 
-    /* Let the caller clean up the request's callback data */
-    if (req->notify)
-        req->notify (req->callback_data);
+    priv = MM_AUTH_PROVIDER_GET_PRIVATE (provider);
 
-    /* We don't signal removal here as it's assumed the caller
-     * handles that itself instead of by the signal.
-     */
-    g_hash_table_remove (priv->requests, GUINT_TO_POINTER (reqid));
+    g_return_if_fail (g_hash_table_lookup (priv->requests, req) != NULL);
+    g_hash_table_remove (priv->requests, req);
 }
 
-const char *
-mm_auth_provider_get_authorization_for_id (MMAuthProvider *provider, guint32 reqid)
+void
+mm_auth_provider_cancel_for_owner (MMAuthProvider *self, GObject *owner)
 {
     MMAuthProviderPrivate *priv;
+    GHashTableIter iter;
     MMAuthRequest *req;
+    gpointer value;
+    GSList *remove = NULL;
 
-    g_return_val_if_fail (provider != NULL, NULL);
-    g_return_val_if_fail (MM_IS_AUTH_PROVIDER (provider), NULL);
-    g_return_val_if_fail (reqid > 0, NULL);
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_AUTH_PROVIDER (self));
 
-    priv = MM_AUTH_PROVIDER_GET_PRIVATE (provider);
-    req = (MMAuthRequest *) g_hash_table_lookup (priv->requests, GUINT_TO_POINTER (reqid));
-    g_return_val_if_fail (req != NULL, NULL);
+    /* Find all requests from this owner */
+    priv = MM_AUTH_PROVIDER_GET_PRIVATE (self);
+    g_hash_table_iter_init (&iter, priv->requests);
+    while (g_hash_table_iter_next (&iter, NULL, &value)) {
+        req = MM_AUTH_REQUEST (value);
+        if (mm_auth_request_get_owner (req) == owner)
+            remove = g_slist_prepend (remove, req);
+    }
 
-    return mm_auth_request_get_authorization (req);
+    /* And cancel/remove them */
+    remove_requests (self, remove);
 }
 
 /*****************************************************************************/
@@ -259,16 +155,25 @@ real_request_auth (MMAuthProvider *provider,
                    GError **error)
 {
     /* This class provides null authentication; all requests pass */
-    mm_auth_provider_finish_request (provider,
-                                     mm_auth_request_get_id (req),
-                                     MM_AUTH_RESULT_AUTHORIZED);
+    mm_auth_provider_finish_request (provider, req, MM_AUTH_RESULT_AUTHORIZED);
     return TRUE;
 }
 
-guint32
-mm_auth_provider_request_auth (MMAuthProvider *provider,
+static MMAuthRequest *
+real_create_request (MMAuthProvider *provider,
+                     const char *authorization,
+                     GObject *owner,
+                     MMAuthRequestCb callback,
+                     gpointer callback_data,
+                     GDestroyNotify notify)
+{
+    return (MMAuthRequest *) mm_auth_request_new (authorization, owner, callback, callback_data, notify);
+}
+
+MMAuthRequest *
+mm_auth_provider_request_auth (MMAuthProvider *self,
                                const char *authorization,
-                               GObject *instance,
+                               GObject *owner,
                                MMAuthRequestCb callback,
                                gpointer callback_data,
                                GDestroyNotify notify,
@@ -277,32 +182,29 @@ mm_auth_provider_request_auth (MMAuthProvider *provider,
     MMAuthProviderPrivate *priv;
     MMAuthRequest *req;
 
-    g_return_val_if_fail (provider != NULL, 0);
-    g_return_val_if_fail (MM_IS_AUTH_PROVIDER (provider), 0);
+    g_return_val_if_fail (self != NULL, 0);
+    g_return_val_if_fail (MM_IS_AUTH_PROVIDER (self), 0);
     g_return_val_if_fail (authorization != NULL, 0);
     g_return_val_if_fail (callback != NULL, 0);
 
-    priv = MM_AUTH_PROVIDER_GET_PRIVATE (provider);
+    priv = MM_AUTH_PROVIDER_GET_PRIVATE (self);
 
-    req = mm_auth_request_new (authorization, instance, callback, callback_data, notify);
+    req = MM_AUTH_PROVIDER_GET_CLASS (self)->create_request (self,
+                                                             authorization,
+                                                             owner,
+                                                             callback,
+                                                             callback_data,
+                                                             notify);
     g_assert (req);
 
-    g_hash_table_insert (priv->requests, GUINT_TO_POINTER (req->id), req);
-    g_signal_emit (provider, signals[REQUEST_ADDED], 0, instance, req->id);
-
-    if (!MM_AUTH_PROVIDER_GET_CLASS (provider)->request_auth (provider, req, error)) {
+    g_hash_table_insert (priv->requests, req, req);
+    if (!MM_AUTH_PROVIDER_GET_CLASS (self)->request_auth (self, req, error)) {
         /* Error */
-        g_signal_emit (provider, signals[REQUEST_REMOVED], 0, instance, req->id);
-
-        /* Let the caller clean up the request's callback data */
-        if (req->notify)
-            req->notify (req->callback_data);
-
-        g_hash_table_remove (priv->requests, GUINT_TO_POINTER (req->id));
-        return 0;
+        g_hash_table_remove (priv->requests, req);
+        return NULL;
     }
 
-    return req->id;
+    return req;
 }
 
 /*****************************************************************************/
@@ -315,7 +217,7 @@ mm_auth_provider_init (MMAuthProvider *self)
     priv->requests = g_hash_table_new_full (g_direct_hash,
                                             g_direct_equal,
                                             NULL,
-                                            (GDestroyNotify) mm_auth_request_unref);
+                                            (GDestroyNotify) g_object_unref);
 }
 
 static void
@@ -352,7 +254,7 @@ get_property (GObject *object,
 }
 
 static void
-finalize (GObject *object)
+dispose (GObject *object)
 {
     MMAuthProviderPrivate *priv = MM_AUTH_PROVIDER_GET_PRIVATE (object);
 
@@ -360,7 +262,7 @@ finalize (GObject *object)
         g_source_remove (priv->process_id);
     g_hash_table_destroy (priv->requests);
 
-    G_OBJECT_CLASS (mm_auth_provider_parent_class)->finalize (object);
+    G_OBJECT_CLASS (mm_auth_provider_parent_class)->dispose (object);
 }
 
 static void
@@ -374,8 +276,9 @@ mm_auth_provider_class_init (MMAuthProviderClass *class)
     /* Virtual methods */
     object_class->set_property = set_property;
     object_class->get_property = get_property;
-    object_class->finalize = finalize;
+    object_class->dispose = dispose;
     class->request_auth = real_request_auth;
+    class->create_request = real_create_request;
 
     /* Properties */
     g_object_class_install_property (object_class, PROP_NAME,
@@ -384,22 +287,5 @@ mm_auth_provider_class_init (MMAuthProviderClass *class)
                               "Provider name",
                               NULL_PROVIDER,
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
-
-    /* Signals */
-	signals[REQUEST_ADDED] =
-		g_signal_new ("request-added",
-		              G_OBJECT_CLASS_TYPE (object_class),
-		              G_SIGNAL_RUN_FIRST,
-		              0, NULL, NULL,
-		              mm_marshal_VOID__POINTER_UINT,
-		              G_TYPE_NONE, 2, G_TYPE_POINTER, G_TYPE_UINT);
-
-	signals[REQUEST_REMOVED] =
-		g_signal_new ("request-removed",
-		              G_OBJECT_CLASS_TYPE (object_class),
-		              G_SIGNAL_RUN_FIRST,
-		              0, NULL, NULL,
-		              mm_marshal_VOID__POINTER_UINT,
-		              G_TYPE_NONE, 2, G_TYPE_POINTER, G_TYPE_UINT);
 }
 
