@@ -31,6 +31,7 @@ docs/spec.html
 callouts/mm-modem-probe
 test/lsudev
 src/tests/test-modem-helpers
+policy/org.freedesktop.modem-manager.policy
 
 po/Makefile.in.in
 po/POTFILES
