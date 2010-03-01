@@ -20,6 +20,7 @@
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 #include "mm-marshal.h"
+#include "mm-auth-provider.h"
 
 static void impl_modem_cdma_get_signal_quality (MMModemCdma *modem, DBusGMethodInvocation *context);
 static void impl_modem_cdma_get_esn (MMModemCdma *modem, DBusGMethodInvocation *context);
@@ -188,10 +189,38 @@ mm_modem_cdma_get_esn (MMModemCdma *self,
 }
 
 static void
-impl_modem_cdma_get_esn (MMModemCdma *modem,
-                         DBusGMethodInvocation *context)
+esn_auth_cb (MMAuthRequest *req,
+             GObject *owner,
+             DBusGMethodInvocation *context,
+             gpointer user_data)
 {
-    mm_modem_cdma_get_esn (modem, str_call_done, context);
+    MMModemCdma *self = MM_MODEM_CDMA (owner);
+    GError *error = NULL;
+
+    /* Return any authorization error, otherwise get the ESN */
+    if (!mm_modem_auth_finish (MM_MODEM (self), req, &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    } else
+        mm_modem_cdma_get_esn (self, str_call_done, context);
+}
+
+static void
+impl_modem_cdma_get_esn (MMModemCdma *self, DBusGMethodInvocation *context)
+{
+    GError *error = NULL;
+
+    /* Make sure the caller is authorized to get the ESN */
+    if (!mm_modem_auth_request (MM_MODEM (self),
+                                MM_AUTHORIZATION_DEVICE,
+                                context,
+                                esn_auth_cb,
+                                NULL,
+                                NULL,
+                                &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    }
 }
 
 void

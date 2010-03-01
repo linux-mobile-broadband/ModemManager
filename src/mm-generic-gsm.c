@@ -136,39 +136,6 @@ got_signal_quality (MMModem *modem,
 {
 }
 
-void
-mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
-                               MMModemGsmNetworkRegStatus status)
-{
-    MMGenericGsmPrivate *priv;
-
-    g_return_if_fail (MM_IS_GENERIC_GSM (modem));
-
-    priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
-
-    if (priv->reg_status != status) {
-        priv->reg_status = status;
-
-        g_debug ("Registration state changed: %d", status);
-
-        if (status == MM_MODEM_GSM_NETWORK_REG_STATUS_HOME ||
-            status == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING) {
-            mm_at_serial_port_queue_command (priv->primary, "+COPS=3,2;+COPS?", 3, read_operator_code_done, modem);
-            mm_at_serial_port_queue_command (priv->primary, "+COPS=3,0;+COPS?", 3, read_operator_name_done, modem);
-            mm_modem_gsm_network_get_signal_quality (MM_MODEM_GSM_NETWORK (modem), got_signal_quality, NULL);
-        } else {
-            g_free (priv->oper_code);
-            g_free (priv->oper_name);
-            priv->oper_code = priv->oper_name = NULL;
-
-            mm_modem_gsm_network_registration_info (MM_MODEM_GSM_NETWORK (modem), priv->reg_status,
-                                                    priv->oper_code, priv->oper_name);
-        }
-
-        mm_generic_gsm_update_enabled_state (modem, TRUE, MM_MODEM_STATE_REASON_NONE);
-    }
-}
-
 typedef struct {
     const char *result;
     const char *normalized;
@@ -1130,6 +1097,40 @@ mm_generic_gsm_pending_registration_stop (MMGenericGsm *modem)
     }
 }
 
+void
+mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
+                               MMModemGsmNetworkRegStatus status)
+{
+    MMGenericGsmPrivate *priv;
+
+    g_return_if_fail (MM_IS_GENERIC_GSM (modem));
+
+    priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+
+    if (priv->reg_status != status) {
+        priv->reg_status = status;
+
+        g_debug ("Registration state changed: %d", status);
+
+        if (status == MM_MODEM_GSM_NETWORK_REG_STATUS_HOME ||
+            status == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING) {
+            mm_at_serial_port_queue_command (priv->primary, "+COPS=3,2;+COPS?", 3, read_operator_code_done, modem);
+            mm_at_serial_port_queue_command (priv->primary, "+COPS=3,0;+COPS?", 3, read_operator_name_done, modem);
+            mm_modem_gsm_network_get_signal_quality (MM_MODEM_GSM_NETWORK (modem), got_signal_quality, NULL);
+        } else {
+            g_free (priv->oper_code);
+            g_free (priv->oper_name);
+            priv->oper_code = priv->oper_name = NULL;
+
+            mm_modem_gsm_network_registration_info (MM_MODEM_GSM_NETWORK (modem), priv->reg_status,
+                                                    priv->oper_code, priv->oper_name);
+        }
+
+        mm_generic_gsm_update_enabled_state (modem, TRUE, MM_MODEM_STATE_REASON_NONE);
+    }
+}
+
+/* Returns TRUE if the modem is "done", ie has registered or been denied */
 static gboolean
 reg_status_updated (MMGenericGsm *self, int new_value, GError **error)
 {
@@ -1255,8 +1256,7 @@ get_reg_status_done (MMAtSerialPort *port,
     GMatchInfo *match_info;
     char *tmp;
     guint id;
-
-    g_warn_if_fail (info == priv->pending_reg_info);
+    gboolean status_done;
 
     if (error) {
         info->error = g_error_copy (error);
@@ -1290,31 +1290,38 @@ get_reg_status_done (MMAtSerialPort *port,
         g_regex_unref (r);
     }
 
-    if (   reg_status >= 0
-        && !reg_status_updated (self, reg_status, &info->error)
-        && priv->pending_reg_info) {
-        g_clear_error (&info->error);
+    if (reg_status >= 0) {
+        /* Update cached registration status */
+        status_done = reg_status_updated (self, reg_status, &info->error);
 
-        /* Not registered yet; poll registration status again */
-        id = g_timeout_add_seconds (1, reg_status_again, info);
-        mm_callback_info_set_data (info, REG_STATUS_AGAIN_TAG,
-                                   GUINT_TO_POINTER (id),
-                                   reg_status_again_remove);
-        return;
+        /* If we're waiting for automatic registration to complete and it's
+         * not done yet, check again in a few seconds.
+         */
+        if ((info == priv->pending_reg_info) && !status_done) {
+            g_clear_error (&info->error);
+
+            /* Not registered yet; poll registration status again */
+            id = g_timeout_add_seconds (1, reg_status_again, info);
+            mm_callback_info_set_data (info, REG_STATUS_AGAIN_TAG,
+                                        GUINT_TO_POINTER (id),
+                                        reg_status_again_remove);
+            return;
+        }
     }
 
 reg_done:
-    /* This will schedule the callback for us */
-    mm_generic_gsm_pending_registration_stop (self);
+    if (info == priv->pending_reg_info) {
+        /* For pending registration, this will schedule the callback for us */
+        mm_generic_gsm_pending_registration_stop (self);
+    } else {
+        /* Otherwise for a direct registration request, schedule the callback now */
+        mm_callback_info_schedule (info);
+    }
 }
 
 static void
 get_registration_status (MMAtSerialPort *port, MMCallbackInfo *info)
 {
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
-
-    g_warn_if_fail (info == priv->pending_reg_info);
-
     mm_at_serial_port_queue_command (port, "+CREG?", 10, get_reg_status_done, info);
 }
 
@@ -1423,14 +1430,28 @@ get_registration_info (MMModemGsmNetwork *self,
                        MMModemGsmNetworkRegInfoFn callback,
                        gpointer user_data)
 {
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     MMCallbackInfo *info;
+    MMSerialPort *port = priv->primary;
 
     info = mm_callback_info_new_full (MM_MODEM (self),
                                       gsm_network_reg_info_invoke,
                                       G_CALLBACK (callback),
                                       user_data);
 
-    mm_callback_info_schedule (info);
+    if (mm_port_get_connected (MM_PORT (priv->primary))) {
+        if (!priv->secondary) {
+            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
+                                               "Cannot get registration info while connected");
+            mm_callback_info_schedule (info);
+            return;
+        }
+
+        /* Use secondary port if primary is connected */
+        port = priv->secondary;
+    }
+
+    get_registration_status (port, info);
 }
 
 void

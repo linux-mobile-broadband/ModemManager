@@ -44,6 +44,8 @@ typedef struct {
     gboolean valid;
     MMModemState state;
 
+    MMAuthProvider *authp;
+
     GHashTable *ports;
 } MMModemBasePrivate;
 
@@ -213,10 +215,50 @@ mm_modem_base_set_unlock_required (MMModemBase *self, const char *unlock_require
 
 /*****************************************************************************/
 
+static gboolean
+modem_auth_request (MMModem *modem,
+                    const char *authorization,
+                    DBusGMethodInvocation *context,
+                    MMAuthRequestCb callback,
+                    gpointer callback_data,
+                    GDestroyNotify notify,
+                    GError **error)
+{
+    MMModemBase *self = MM_MODEM_BASE (modem);
+    MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (self);
+
+    g_assert (priv->authp);
+    return !!mm_auth_provider_request_auth (priv->authp,
+                                            authorization,
+                                            G_OBJECT (self),
+                                            context,
+                                            callback,
+                                            callback_data,
+                                            notify,
+                                            error);
+}
+
+static gboolean
+modem_auth_finish (MMModem *modem, MMAuthRequest *req, GError **error)
+{
+    if (mm_auth_request_get_result (req) != MM_AUTH_RESULT_AUTHORIZED) {
+        g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_AUTHORIZATION_REQUIRED,
+                     "This request requires the '%s' authorization",
+                     mm_auth_request_get_authorization (req));
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+/*****************************************************************************/
+
 static void
 mm_modem_base_init (MMModemBase *self)
 {
     MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (self);
+
+    priv->authp = mm_auth_provider_get ();
 
     priv->ports = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
 
@@ -228,6 +270,8 @@ mm_modem_base_init (MMModemBase *self)
 static void
 modem_init (MMModem *modem_class)
 {
+    modem_class->auth_request = modem_auth_request;
+    modem_class->auth_finish = modem_auth_finish;
 }
 
 static gboolean
@@ -325,6 +369,8 @@ finalize (GObject *object)
 {
     MMModemBase *self = MM_MODEM_BASE (object);
     MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (self);
+
+    mm_auth_provider_cancel_for_owner (priv->authp, object);
 
     g_hash_table_destroy (priv->ports);
     g_free (priv->driver);

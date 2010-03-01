@@ -1,0 +1,154 @@
+<!DOCTYPE busconfig PUBLIC
+ "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+  <policy context="default">
+    <deny send_destination="org.freedesktop.ModemManager"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.DBus.Introspectable"/>
+
+    <!-- Methods listed here are explicitly allowed or PolicyKit protected.
+         The rest are restricted to root for security.
+      -->
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager"
+           send_member="EnumerateDevices"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.DBus.Properties"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem"
+           send_member="GetInfo"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Cdma"
+           send_member="GetSignalQuality"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Cdma"
+           send_member="GetServingSystem"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Cdma"
+           send_member="GetRegistrationState"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Cdma"
+           send_member="GetEsn"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.Network"
+           send_member="GetSignalQuality"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.Network"
+           send_member="GetBand"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.Network"
+           send_member="GetNetworkMode"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.Network"
+           send_member="GetRegistrationInfo"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.Network"
+           send_member="Scan"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.Card"
+           send_member="GetImei"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.Card"
+           send_member="GetImsi"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.Card"
+           send_member="SendPuk"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.Card"
+           send_member="SendPin"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.Card"
+           send_member="EnablePin"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.Card"
+           send_member="ChangePin"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.Contacts"
+           send_member="Add"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.Contacts"
+           send_member="Delete"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.Contacts"
+           send_member="Get"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.Contacts"
+           send_member="List"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.Contacts"
+           send_member="Find"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.Contacts"
+           send_member="GetCount"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.SMS"
+           send_member="Delete"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.SMS"
+           send_member="Get"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.SMS"
+           send_member="List"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.SMS"
+           send_member="Save"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.SMS"
+           send_member="Send"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.SMS"
+           send_member="SendFromStorage"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.SMS"
+           send_member="SetIndication"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.SMS"
+           send_member="GetSmsc"/>
+
+    <allow send_destination="org.freedesktop.ModemManager"
+           send_interface="org.freedesktop.ModemManager.Modem.Gsm.SMS"
+           send_member="SetSmsc"/>
+  </policy>
+
+  <policy user="root">
+    <allow own="org.freedesktop.ModemManager"/>
+    <allow send_destination="org.freedesktop.ModemManager"/>
+  </policy>
+
+  <limit name="max_replies_per_connection">512</limit>
+</busconfig>
+

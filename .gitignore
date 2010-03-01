@@ -23,6 +23,7 @@ libtool
 *-glue.h
 *.tar.bz2
 org.freedesktop.ModemManager.service
+org.freedesktop.ModemManager.conf
 ModemManager.pc
 marshallers/mm-marshal.[ch]
 src/modem-manager
@@ -30,6 +31,7 @@ docs/spec.html
 callouts/mm-modem-probe
 test/lsudev
 src/tests/test-modem-helpers
+policy/org.freedesktop.modem-manager.policy
 
 libqcdm/tests/test-qcdm
 

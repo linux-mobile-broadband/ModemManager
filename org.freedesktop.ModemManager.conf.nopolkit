@@ -2,6 +2,8 @@
  "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
  "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
 <busconfig>
+  <!-- This config allows anyone to control ModemManager -->
+
   <policy context="default">
     <allow send_destination="org.freedesktop.ModemManager"/>
   </policy>
@@ -12,3 +14,4 @@
 
   <limit name="max_replies_per_connection">512</limit>
 </busconfig>
+

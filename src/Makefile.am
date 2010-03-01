@@ -20,6 +20,10 @@ modem_manager_CPPFLAGS = \
 	-I${top_builddir}/marshallers \
 	-DPLUGINDIR=\"$(pkglibdir)\"
 
+if WITH_POLKIT
+modem_manager_CPPFLAGS += $(POLKIT_CFLAGS)
+endif
+
 modem_manager_LDADD = \
 	$(MM_LIBS) \
 	$(GUDEV_LIBS) \
@@ -27,10 +31,30 @@ modem_manager_LDADD = \
 	$(top_builddir)/libqcdm/src/libqcdm.la \
 	$(builddir)/libmodem-helpers.la
 
+if WITH_POLKIT
+modem_manager_LDADD += $(POLKIT_LIBS)
+endif
+
+auth_sources = \
+	mm-auth-request.c \
+	mm-auth-request.h \
+	mm-auth-provider.h \
+	mm-auth-provider.c \
+	mm-auth-provider-factory.c
+
+if WITH_POLKIT
+auth_sources += \
+	mm-auth-request-polkit.c \
+	mm-auth-request-polkit.h \
+	mm-auth-provider-polkit.c \
+	mm-auth-provider-polkit.h
+endif
+
 modem_manager_SOURCES = \
 	main.c \
 	mm-callback-info.c \
 	mm-callback-info.h \
+	$(auth_sources) \
 	mm-manager.c \
 	mm-manager.h \
 	mm-modem.c \

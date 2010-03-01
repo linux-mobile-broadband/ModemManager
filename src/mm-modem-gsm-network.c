@@ -398,10 +398,39 @@ impl_gsm_modem_register (MMModemGsmNetwork *modem,
 }
 
 static void
+scan_auth_cb (MMAuthRequest *req,
+              GObject *owner,
+              DBusGMethodInvocation *context,
+              gpointer user_data)
+{
+    MMModemGsmNetwork *self = MM_MODEM_GSM_NETWORK (owner);
+    GError *error = NULL;
+
+    /* Return any authorization error, otherwise get the IMEI */
+    if (!mm_modem_auth_finish (MM_MODEM (self), req, &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    } else
+        mm_modem_gsm_network_scan (self, scan_call_done, context);
+}
+
+static void
 impl_gsm_modem_scan (MMModemGsmNetwork *modem,
                      DBusGMethodInvocation *context)
 {
-    mm_modem_gsm_network_scan (modem, scan_call_done, context);
+    GError *error = NULL;
+
+    /* Make sure the caller is authorized to request a scan */
+    if (!mm_modem_auth_request (MM_MODEM (modem),
+                                MM_AUTHORIZATION_DEVICE,
+                                context,
+                                scan_auth_cb,
+                                NULL,
+                                NULL,
+                                &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    }
 }
 
 static void
@@ -562,6 +591,7 @@ mm_modem_gsm_network_get_type (void)
                                                &network_info, 0);
 
         g_type_interface_add_prerequisite (network_type, G_TYPE_OBJECT);
+        g_type_interface_add_prerequisite (network_type, MM_TYPE_MODEM);
         dbus_g_object_type_install_info (network_type, &dbus_glib_mm_modem_gsm_network_object_info);
     }
 
