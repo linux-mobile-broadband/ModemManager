@@ -135,39 +135,6 @@ got_signal_quality (MMModem *modem,
 {
 }
 
-void
-mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
-                               MMModemGsmNetworkRegStatus status)
-{
-    MMGenericGsmPrivate *priv;
-
-    g_return_if_fail (MM_IS_GENERIC_GSM (modem));
-
-    priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
-
-    if (priv->reg_status != status) {
-        priv->reg_status = status;
-
-        g_debug ("Registration state changed: %d", status);
-
-        if (status == MM_MODEM_GSM_NETWORK_REG_STATUS_HOME ||
-            status == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING) {
-            mm_serial_port_queue_command (priv->primary, "+COPS=3,2;+COPS?", 3, read_operator_code_done, modem);
-            mm_serial_port_queue_command (priv->primary, "+COPS=3,0;+COPS?", 3, read_operator_name_done, modem);
-            mm_modem_gsm_network_get_signal_quality (MM_MODEM_GSM_NETWORK (modem), got_signal_quality, NULL);
-        } else {
-            g_free (priv->oper_code);
-            g_free (priv->oper_name);
-            priv->oper_code = priv->oper_name = NULL;
-
-            mm_modem_gsm_network_registration_info (MM_MODEM_GSM_NETWORK (modem), priv->reg_status,
-                                                    priv->oper_code, priv->oper_name);
-        }
-
-        mm_generic_gsm_update_enabled_state (modem, TRUE, MM_MODEM_STATE_REASON_NONE);
-    }
-}
-
 typedef struct {
     const char *result;
     const char *normalized;
@@ -1124,6 +1091,40 @@ mm_generic_gsm_pending_registration_stop (MMGenericGsm *modem)
     }
 }
 
+void
+mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
+                               MMModemGsmNetworkRegStatus status)
+{
+    MMGenericGsmPrivate *priv;
+
+    g_return_if_fail (MM_IS_GENERIC_GSM (modem));
+
+    priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+
+    if (priv->reg_status != status) {
+        priv->reg_status = status;
+
+        g_debug ("Registration state changed: %d", status);
+
+        if (status == MM_MODEM_GSM_NETWORK_REG_STATUS_HOME ||
+            status == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING) {
+            mm_serial_port_queue_command (priv->primary, "+COPS=3,2;+COPS?", 3, read_operator_code_done, modem);
+            mm_serial_port_queue_command (priv->primary, "+COPS=3,0;+COPS?", 3, read_operator_name_done, modem);
+            mm_modem_gsm_network_get_signal_quality (MM_MODEM_GSM_NETWORK (modem), got_signal_quality, NULL);
+        } else {
+            g_free (priv->oper_code);
+            g_free (priv->oper_name);
+            priv->oper_code = priv->oper_name = NULL;
+
+            mm_modem_gsm_network_registration_info (MM_MODEM_GSM_NETWORK (modem), priv->reg_status,
+                                                    priv->oper_code, priv->oper_name);
+        }
+
+        mm_generic_gsm_update_enabled_state (modem, TRUE, MM_MODEM_STATE_REASON_NONE);
+    }
+}
+
+/* Returns TRUE if the modem is "done", ie has registered or been denied */
 static gboolean
 reg_status_updated (MMGenericGsm *self, int new_value, GError **error)
 {
