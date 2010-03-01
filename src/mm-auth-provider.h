@@ -22,9 +22,10 @@
 #include "mm-auth-request.h"
 
 /* Authorizations */
-#define MM_AUTHORIZATION_DEVICE   "org.freedesktop.ModemManager.Device"
-#define MM_AUTHORIZATION_CONTACTS "org.freedesktop.ModemManager.Contacts"
-#define MM_AUTHORIZATION_SMS      "org.freedesktop.ModemManager.SMS"
+#define MM_AUTHORIZATION_DEVICE_INFO    "org.freedesktop.ModemManager.Device.Info"
+#define MM_AUTHORIZATION_DEVICE_CONTROL "org.freedesktop.ModemManager.Device.Control"
+#define MM_AUTHORIZATION_CONTACTS       "org.freedesktop.ModemManager.Contacts"
+#define MM_AUTHORIZATION_SMS            "org.freedesktop.ModemManager.SMS"
 /******************/
 
 

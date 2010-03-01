@@ -212,7 +212,7 @@ impl_modem_cdma_get_esn (MMModemCdma *self, DBusGMethodInvocation *context)
 
     /* Make sure the caller is authorized to get the ESN */
     if (!mm_modem_auth_request (MM_MODEM (self),
-                                MM_AUTHORIZATION_DEVICE,
+                                MM_AUTHORIZATION_DEVICE_INFO,
                                 context,
                                 esn_auth_cb,
                                 NULL,

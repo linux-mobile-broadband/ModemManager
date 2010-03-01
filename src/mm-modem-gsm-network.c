@@ -422,7 +422,7 @@ impl_gsm_modem_scan (MMModemGsmNetwork *modem,
 
     /* Make sure the caller is authorized to request a scan */
     if (!mm_modem_auth_request (MM_MODEM (modem),
-                                MM_AUTHORIZATION_DEVICE,
+                                MM_AUTHORIZATION_DEVICE_CONTROL,
                                 context,
                                 scan_auth_cb,
                                 NULL,
