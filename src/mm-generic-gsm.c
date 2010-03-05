@@ -496,6 +496,16 @@ mm_generic_gsm_enable_complete (MMGenericGsm *modem,
 }
 
 static void
+real_do_enable_power_up_done (MMGenericGsm *self,
+                              GString *response,
+                              GError *error,
+                              MMCallbackInfo *info)
+{
+    /* Ignore power-up errors as not all devices actually support CFUN=1 */
+    mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), NULL, info);
+}
+
+static void
 enable_done (MMSerialPort *port,
              GString *response,
              GError *error,
@@ -503,16 +513,15 @@ enable_done (MMSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    /* Ignore power-up command errors, not all devices actually support
-     * CFUN=1.
+    /* Let subclasses handle the power up command response/error; many devices
+     * don't support +CFUN, but for those that do let them handle the error
+     * correctly.
      */
-    /* FIXME: instead of just ignoring errors, since we allow subclasses
-     * to override the power-on command, make a class function for powering
-     * on the phone and let the subclass decided whether it wants to handle
-     * errors or ignore them.
-     */
-
-    mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), NULL, info);
+    g_assert (MM_GENERIC_GSM_GET_CLASS (info->modem)->do_enable_power_up_done);
+    MM_GENERIC_GSM_GET_CLASS (info->modem)->do_enable_power_up_done (MM_GENERIC_GSM (info->modem),
+                                                                     response,
+                                                                     error,
+                                                                     info);
 }
 
 static void
@@ -2396,6 +2405,7 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
     object_class->finalize = finalize;
 
     klass->do_enable = real_do_enable;
+    klass->do_enable_power_up_done = real_do_enable_power_up_done;
 
     /* Properties */
     g_object_class_override_property (object_class,

@@ -65,6 +65,17 @@ typedef struct {
      * callback and user_data passed in here.
      */
     void (*do_enable) (MMGenericGsm *self, MMModemFn callback, gpointer user_data);
+
+    /* Called after the generic class has attempted to power up the modem.
+     * Subclasses can handle errors here if they know the device supports their
+     * power up command.  Will only be called if the device does *not* override
+     * the MMModem enable() command or allows the generic class' do_enable()
+     * handler to execute.
+     */
+    void (*do_enable_power_up_done) (MMGenericGsm *self,
+                                     GString *response,
+                                     GError *error,
+                                     MMCallbackInfo *info);
 } MMGenericGsmClass;
 
 GType mm_generic_gsm_get_type (void);
