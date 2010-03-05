@@ -78,7 +78,7 @@ parent_enable_done (MMModem *modem, GError *error, gpointer user_data)
         return;
     }
 
-    /* Sierra returns OK on +CFUN=1 right away but needs some time
+    /* Some Sierra devices return OK on +CFUN=1 right away but need some time
      * to finish initialization.
      */
     g_timeout_add_seconds (10, sierra_enabled, info);
