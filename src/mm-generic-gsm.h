@@ -59,7 +59,10 @@ typedef struct {
      * that need to perform custom initialization sequences or other setup should
      * generally override this method instead of the MMModem interface's enable()
      * method, unless the customization must happen *after* the generic init
-     * sequence has completed.
+     * sequence has completed.  When the subclass' enable attempt is complete
+     * the subclass should call mm_generic_gsm_enable_complete() with any error
+     * encountered during the process and the MMCallbackInfo created from the
+     * callback and user_data passed in here.
      */
     void (*do_enable) (MMGenericGsm *self, MMModemFn callback, gpointer user_data);
 } MMGenericGsmClass;
