@@ -36,6 +36,7 @@ gboolean mm_gsm_parse_creg_response (GMatchInfo *info,
                                      gulong *out_lac,
                                      gulong *out_ci,
                                      gint *out_act,
+                                     gboolean *out_greg,
                                      GError **error);
 
 #endif  /* MM_MODEM_HELPERS_H */

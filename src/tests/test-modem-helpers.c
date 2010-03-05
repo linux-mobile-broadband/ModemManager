@@ -465,6 +465,7 @@ typedef struct {
     gint act;
 
     guint regex_num;
+    gboolean cgreg;
 } CregResult;
 
 static void
@@ -480,7 +481,7 @@ test_creg_match (const char *test,
     gulong lac = 0, ci = 0;
     gint access_tech = -1;
     GError *error = NULL;
-    gboolean success;
+    gboolean success, cgreg = FALSE;
     guint regex_num = 0;
     GPtrArray *array;
 
@@ -508,13 +509,14 @@ test_creg_match (const char *test,
     g_assert (info != NULL);
     g_assert (regex_num == result->regex_num);
 
-    success = mm_gsm_parse_creg_response (info, &state, &lac, &ci, &access_tech, &error);
+    success = mm_gsm_parse_creg_response (info, &state, &lac, &ci, &access_tech, &cgreg, &error);
     g_assert (success);
     g_assert (error == NULL);
     g_assert (state == result->state);
     g_assert (lac == result->lac);
     g_assert (ci == result->ci);
     g_assert (access_tech == result->act);
+    g_assert (cgreg == result->cgreg);
 }
 
 static void
@@ -522,7 +524,7 @@ test_creg1_solicited (void *f, gpointer d)
 {
     TestData *data = (TestData *) d;
     const char *reply = "+CREG: 1,3";
-    const CregResult result = { 3, 0, 0, -1 , 2};
+    const CregResult result = { 3, 0, 0, -1 , 2, FALSE};
 
     test_creg_match ("CREG=1", TRUE, reply, data, &result);
 }
@@ -532,7 +534,7 @@ test_creg1_unsolicited (void *f, gpointer d)
 {
     TestData *data = (TestData *) d;
     const char *reply = "\r\n+CREG: 3\r\n";
-    const CregResult result = { 3, 0, 0, -1 , 1};
+    const CregResult result = { 3, 0, 0, -1 , 1, FALSE};
 
     test_creg_match ("CREG=1", FALSE, reply, data, &result);
 }
@@ -542,7 +544,7 @@ test_creg2_mercury_solicited (void *f, gpointer d)
 {
     TestData *data = (TestData *) d;
     const char *reply = "+CREG: 0,1,84CD,00D30173";
-    const CregResult result = { 1, 0x84cd, 0xd30173, -1 , 4};
+    const CregResult result = { 1, 0x84cd, 0xd30173, -1 , 4, FALSE};
 
     test_creg_match ("Sierra Mercury CREG=2", TRUE, reply, data, &result);
 }
@@ -552,7 +554,7 @@ test_creg2_mercury_unsolicited (void *f, gpointer d)
 {
     TestData *data = (TestData *) d;
     const char *reply = "\r\n+CREG: 1,84CD,00D30156\r\n";
-    const CregResult result = { 1, 0x84cd, 0xd30156, -1 , 3};
+    const CregResult result = { 1, 0x84cd, 0xd30156, -1 , 3, FALSE};
 
     test_creg_match ("Sierra Mercury CREG=2", FALSE, reply, data, &result);
 }
@@ -562,7 +564,7 @@ test_creg2_sek850i_solicited (void *f, gpointer d)
 {
     TestData *data = (TestData *) d;
     const char *reply = "+CREG: 2,1,\"CE00\",\"01CEAD8F\"";
-    const CregResult result = { 1, 0xce00, 0x01cead8f, -1 , 4};
+    const CregResult result = { 1, 0xce00, 0x01cead8f, -1 , 4, FALSE};
 
     test_creg_match ("Sony Ericsson K850i CREG=2", TRUE, reply, data, &result);
 }
@@ -572,7 +574,7 @@ test_creg2_sek850i_unsolicited (void *f, gpointer d)
 {
     TestData *data = (TestData *) d;
     const char *reply = "\r\n+CREG: 1,\"CE00\",\"00005449\"\r\n";
-    const CregResult result = { 1, 0xce00, 0x5449, -1 , 3};
+    const CregResult result = { 1, 0xce00, 0x5449, -1 , 3, FALSE};
 
     test_creg_match ("Sony Ericsson K850i CREG=2", FALSE, reply, data, &result);
 }
@@ -582,7 +584,7 @@ test_creg2_e160g_solicited_unregistered (void *f, gpointer d)
 {
     TestData *data = (TestData *) d;
     const char *reply = "+CREG: 2,0,00,0";
-    const CregResult result = { 0, 0, 0, -1 , 4};
+    const CregResult result = { 0, 0, 0, -1 , 4, FALSE};
 
     test_creg_match ("Huawei E160G unregistered CREG=2", TRUE, reply, data, &result);
 }
@@ -592,7 +594,7 @@ test_creg2_e160g_solicited (void *f, gpointer d)
 {
     TestData *data = (TestData *) d;
     const char *reply = "+CREG: 2,1,8BE3,2BAF";
-    const CregResult result = { 1, 0x8be3, 0x2baf, -1 , 4};
+    const CregResult result = { 1, 0x8be3, 0x2baf, -1 , 4, FALSE};
 
     test_creg_match ("Huawei E160G CREG=2", TRUE, reply, data, &result);
 }
@@ -602,7 +604,7 @@ test_creg2_e160g_unsolicited (void *f, gpointer d)
 {
     TestData *data = (TestData *) d;
     const char *reply = "\r\n+CREG: 2,8BE3,2BAF\r\n";
-    const CregResult result = { 2, 0x8be3, 0x2baf, -1 , 3};
+    const CregResult result = { 2, 0x8be3, 0x2baf, -1 , 3, FALSE};
 
     test_creg_match ("Huawei E160G CREG=2", FALSE, reply, data, &result);
 }
@@ -612,7 +614,7 @@ test_creg2_tm506_solicited (void *f, gpointer d)
 {
     TestData *data = (TestData *) d;
     const char *reply = "+CREG: 2,1,\"8BE3\",\"00002BAF\"";
-    const CregResult result = { 1, 0x8BE3, 0x2BAF, -1 , 4};
+    const CregResult result = { 1, 0x8BE3, 0x2BAF, -1 , 4, FALSE};
 
     /* Test leading zeros in the CI */
     test_creg_match ("Sony Ericsson TM-506 CREG=2", TRUE, reply, data, &result);
@@ -623,9 +625,29 @@ test_creg2_xu870_unsolicited_unregistered (void *f, gpointer d)
 {
     TestData *data = (TestData *) d;
     const char *reply = "\r\n+CREG: 2,,\r\n";
-    const CregResult result = { 2, 0, 0, -1 , 3};
+    const CregResult result = { 2, 0, 0, -1 , 3, FALSE};
 
     test_creg_match ("Novatel XU870 unregistered CREG=2", FALSE, reply, data, &result);
+}
+
+static void
+test_cgreg1_solicited (void *f, gpointer d)
+{
+    TestData *data = (TestData *) d;
+    const char *reply = "+CGREG: 1,3";
+    const CregResult result = { 3, 0, 0, -1 , 2, TRUE};
+
+    test_creg_match ("CGREG=1", TRUE, reply, data, &result);
+}
+
+static void
+test_cgreg1_unsolicited (void *f, gpointer d)
+{
+    TestData *data = (TestData *) d;
+    const char *reply = "\r\n+CGREG: 3\r\n";
+    const CregResult result = { 3, 0, 0, -1 , 1, TRUE};
+
+    test_creg_match ("CGREG=1", FALSE, reply, data, &result);
 }
 
 static void
@@ -633,7 +655,7 @@ test_cgreg2_f3607gw_solicited (void *f, gpointer d)
 {
     TestData *data = (TestData *) d;
     const char *reply = "+CGREG: 2,1,\"8BE3\",\"00002B5D\",3";
-    const CregResult result = { 1, 0x8BE3, 0x2B5D, 3 , 6};
+    const CregResult result = { 1, 0x8BE3, 0x2B5D, 3 , 6, TRUE};
 
     test_creg_match ("Ericsson F3607gw CGREG=2", TRUE, reply, data, &result);
 }
@@ -643,7 +665,7 @@ test_cgreg2_f3607gw_unsolicited (void *f, gpointer d)
 {
     TestData *data = (TestData *) d;
     const char *reply = "\r\n+CGREG: 1,\"8BE3\",\"00002B5D\",3\r\n";
-    const CregResult result = { 1, 0x8BE3, 0x2B5D, 3 , 5};
+    const CregResult result = { 1, 0x8BE3, 0x2B5D, 3 , 5, TRUE};
 
     test_creg_match ("Ericsson F3607gw CGREG=2", FALSE, reply, data, &result);
 }
@@ -725,6 +747,9 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_creg2_e160g_unsolicited, data));
     g_test_suite_add (suite, TESTCASE (test_creg2_tm506_solicited, data));
     g_test_suite_add (suite, TESTCASE (test_creg2_xu870_unsolicited_unregistered, data));
+
+    g_test_suite_add (suite, TESTCASE (test_cgreg1_solicited, data));
+    g_test_suite_add (suite, TESTCASE (test_cgreg1_unsolicited, data));
     g_test_suite_add (suite, TESTCASE (test_cgreg2_f3607gw_solicited, data));
     g_test_suite_add (suite, TESTCASE (test_cgreg2_f3607gw_unsolicited, data));
 

@@ -319,6 +319,7 @@ mm_gsm_parse_creg_response (GMatchInfo *info,
                             gulong *out_lac,
                             gulong *out_ci,
                             gint *out_act,
+                            gboolean *out_greg,
                             GError **error)
 {
     gboolean success = FALSE, foo;
@@ -326,12 +327,14 @@ mm_gsm_parse_creg_response (GMatchInfo *info,
     gulong stat = 0, lac = 0, ci = 0;
     guint istat = 0, ilac = 0, ici = 0, iact = 0;
     char *str;
+    const char *orig_str;
 
     g_return_val_if_fail (info != NULL, FALSE);
     g_return_val_if_fail (out_reg_state != NULL, FALSE);
     g_return_val_if_fail (out_lac != NULL, FALSE);
     g_return_val_if_fail (out_ci != NULL, FALSE);
     g_return_val_if_fail (out_act != NULL, FALSE);
+    g_return_val_if_fail (out_greg != NULL, FALSE);
 
     /* Normally the number of matches could be used to determine what each
      * item is, but we have overlap in one case.
@@ -412,6 +415,9 @@ mm_gsm_parse_creg_response (GMatchInfo *info,
         if (!foo)
             act = -1;
     }
+
+    orig_str = g_match_info_get_string (info);
+    *out_greg = !!strstr (orig_str, "+CGREG");
 
     *out_reg_state = (guint32) stat;
     if (stat != 4) {
