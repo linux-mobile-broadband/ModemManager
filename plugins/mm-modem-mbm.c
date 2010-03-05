@@ -521,14 +521,23 @@ mbm_ciev_received (MMSerialPort *port,
 }
 
 static void
-mbm_do_connect_done (MMModemMbm *self)
+mbm_do_connect_done (MMModemMbm *self, gboolean success)
 {
     MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (self);
 
-    if (priv->pending_connect_info) {
+    if (!priv->pending_connect_info)
+        return;
+
+    if (success)
         mm_generic_gsm_connect_complete (MM_GENERIC_GSM (self), NULL, priv->pending_connect_info);
-        priv->pending_connect_info = NULL;
+    else {
+        GError *connect_error;
+
+        connect_error = mm_modem_connect_error_for_code (MM_MODEM_CONNECT_ERROR_BUSY);
+        mm_generic_gsm_connect_complete (MM_GENERIC_GSM (self), connect_error, priv->pending_connect_info);
+        g_error_free (connect_error);
     }
+    priv->pending_connect_info = NULL;
 }
 
 static void
@@ -543,17 +552,18 @@ mbm_e2nap_received (MMSerialPort *port,
     if (str)
         state = atoi (str);
 
-    if (MBM_E2NAP_DISCONNECTED == state)
-        g_debug ("%s, disconnected", __func__);
-    else if (MBM_E2NAP_CONNECTED == state) {
-        g_debug ("%s, connected", __func__);
-        mbm_do_connect_done (MM_MODEM_MBM (user_data));
+    if (MBM_E2NAP_DISCONNECTED == state) {
+        g_debug ("%s: disconnected", __func__);
+        mbm_do_connect_done (MM_MODEM_MBM (user_data), FALSE);
+    } else if (MBM_E2NAP_CONNECTED == state) {
+        g_debug ("%s: connected", __func__);
+        mbm_do_connect_done (MM_MODEM_MBM (user_data), TRUE);
     } else if (MBM_E2NAP_CONNECTING == state)
-        g_debug("%s, connecting", __func__);
+        g_debug("%s: connecting", __func__);
     else {
         /* Should not happen */
-        g_debug("%s, undefined e2nap status",__FUNCTION__);
-        g_assert_not_reached ();
+        g_debug("%s: unhandled E2NAP state %d", __func__, state);
+        mbm_do_connect_done (MM_MODEM_MBM (user_data), FALSE);
     }
 }
 
@@ -619,7 +629,6 @@ enap_done (MMSerialPort *port,
     tid = g_timeout_add_seconds (1, enap_poll, user_data);
     /* remember poll id as callback info object, with source_remove as free func */
     mm_callback_info_set_data (info, "mbm-enap-poll-id", GUINT_TO_POINTER (tid), (GFreeFunc) g_source_remove);
-    mm_serial_port_queue_command (port, "AT*E2NAP=1", 3, NULL, NULL);
 }
 
 static void
@@ -639,6 +648,9 @@ mbm_auth_done (MMSerialPort *port,
     }
 
     cid = mm_generic_gsm_get_cid (modem);
+
+    mm_serial_port_queue_command (port, "AT*E2NAP=1", 3, NULL, NULL);
+
     command = g_strdup_printf ("AT*ENAP=1,%d", cid);
     mm_serial_port_queue_command (port, command, 3, enap_done, user_data);
     g_free (command);
