@@ -17,6 +17,7 @@
 #include <glib.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdlib.h>
 
 #include "mm-errors.h"
 #include "mm-modem-helpers.h"
@@ -199,5 +200,226 @@ mm_gsm_destroy_scan_data (gpointer data)
 
     g_ptr_array_foreach (results, (GFunc) g_hash_table_destroy, NULL);
     g_ptr_array_free (results, TRUE);
+}
+
+/*************************************************************************/
+
+/* +CREG: <stat>                       (GSM 07.07 CREG=1 unsolicited) */
+#define CREG1 "\\+CG?REG:\\s*(\\d{1})"
+
+/* +CREG: <n>,<stat>                   (GSM 07.07 CREG=1 solicited) */
+#define CREG2 "\\+CG?REG:\\s*(\\d{1}),\\s*(\\d{1})"
+
+/* +CREG: <stat>,<lac>,<ci>           (GSM 07.07 CREG=2 unsolicited) */
+#define CREG3 "\\+CG?REG:\\s*(\\d{1}),\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)"
+
+/* +CREG: <n>,<stat>,<lac>,<ci>       (GSM 07.07 solicited and some CREG=2 unsolicited) */
+#define CREG4 "\\+CG?REG:\\s*(\\d{1}),\\s*(\\d{1})\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)"
+
+/* +CREG: <stat>,<lac>,<ci>,<AcT>     (ETSI 27.007 CREG=2 unsolicited) */
+#define CREG5 "\\+CG?REG:\\s*(\\d{1})\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*(\\d{1,2})"
+
+/* +CREG: <n>,<stat>,<lac>,<ci>,<AcT> (ETSI 27.007 solicited and some CREG=2 unsolicited) */
+#define CREG6 "\\+CG?REG:\\s*(\\d{1}),\\s*(\\d{1})\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*(\\d{1,2})"
+
+GPtrArray *
+mm_gsm_creg_regex_get (gboolean solicited)
+{
+    GPtrArray *array = g_ptr_array_sized_new (6);
+    GRegex *regex;
+
+    /* #1 */
+    if (solicited)
+        regex = g_regex_new (CREG1 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" CREG1 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    /* #2 */
+    if (solicited)
+        regex = g_regex_new (CREG2 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" CREG2 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    /* #3 */
+    if (solicited)
+        regex = g_regex_new (CREG3 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" CREG3 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    /* #4 */
+    if (solicited)
+        regex = g_regex_new (CREG4 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" CREG4 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    /* #5 */
+    if (solicited)
+        regex = g_regex_new (CREG5 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" CREG5 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    /* #6 */
+    if (solicited)
+        regex = g_regex_new (CREG6 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" CREG6 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    return array;
+}
+
+void
+mm_gsm_creg_regex_destroy (GPtrArray *array)
+{
+    g_ptr_array_foreach (array, (GFunc) g_regex_unref, NULL);
+    g_ptr_array_free (array, TRUE);
+}
+
+/*************************************************************************/
+
+static gulong
+parse_uint (char *str, int base, glong nmin, glong nmax, gboolean *valid)
+{
+    gulong ret = 0;
+    char *endquote;
+
+    *valid = FALSE;
+    if (!str)
+        return 0;
+
+    /* Strip quotes */
+    if (str[0] == '"')
+        str++;
+    endquote = strchr (str, '"');
+    if (endquote)
+        *endquote = '\0';
+
+    if (strlen (str)) {
+        ret = strtol (str, NULL, base);
+        if ((nmin == nmax) || (ret >= nmin && ret <= nmax))
+            *valid = TRUE;
+    }
+    return *valid ? (guint) ret : 0;
+}
+
+gboolean
+mm_gsm_parse_creg_response (GMatchInfo *info,
+                            guint32 *out_reg_state,
+                            gulong *out_lac,
+                            gulong *out_ci,
+                            gint *out_act,
+                            GError **error)
+{
+    gboolean success = FALSE, foo;
+    gint n_matches, act = -1;
+    gulong stat = 0, lac = 0, ci = 0;
+    guint istat = 0, ilac = 0, ici = 0, iact = 0;
+    char *str;
+
+    g_return_val_if_fail (info != NULL, FALSE);
+    g_return_val_if_fail (out_reg_state != NULL, FALSE);
+    g_return_val_if_fail (out_lac != NULL, FALSE);
+    g_return_val_if_fail (out_ci != NULL, FALSE);
+    g_return_val_if_fail (out_act != NULL, FALSE);
+
+    /* Normally the number of matches could be used to determine what each
+     * item is, but we have overlap in one case.
+     */
+    n_matches = g_match_info_get_match_count (info);
+    if (n_matches == 2) {
+        /* CREG=1: +CREG: <stat> */
+        istat = 1;
+    } else if (n_matches == 3) {
+        /* Solicited response: +CREG: <n>,<stat> */
+        istat = 2;
+    } else if (n_matches == 4) {
+        /* CREG=2 (GSM 07.07): +CREG: <stat>,<lac>,<ci> */
+        istat = 1;
+        ilac = 2;
+        ici = 3;
+    } else if (n_matches == 5) {
+        /* CREG=2 (ETSI 27.007): +CREG: <stat>,<lac>,<ci>,<AcT>
+         * CREG=2 (non-standard): +CREG: <n>,<stat>,<lac>,<ci>
+         */
+
+        /* To distinguish, check length of the second match item.  If it's
+         * more than one digit or has quotes in it, then we have the first format.
+         */
+        str = g_match_info_fetch (info, 2);
+        if (str && (strchr (str, '"') || strlen (str) > 1)) {
+            g_free (str);
+            istat = 1;
+            ilac = 2;
+            ici = 3;
+            iact = 4;
+        } else {
+            istat = 2;
+            ilac = 3;
+            ici = 4;
+        }
+    } else if (n_matches == 6) {
+        /* CREG=2 (non-standard): +CREG: <n>,<stat>,<lac>,<ci>,<AcT> */
+        istat = 2;
+        ilac = 3;
+        ici = 4;
+        iact = 5;
+    }
+
+    /* Status */
+    str = g_match_info_fetch (info, istat);
+    stat = parse_uint (str, 10, 0, 5, &success);
+    g_free (str);
+    if (!success) {
+        g_set_error_literal (error,
+                             MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             "Could not parse the registration status response");
+        return FALSE;
+    }
+
+    /* Location Area Code */
+    if (ilac) {
+        /* FIXME: some phones apparently swap the LAC bytes (LG, SonyEricsson,
+         * Sagem).  Need to handle that.
+         */
+        str = g_match_info_fetch (info, ilac);
+        lac = parse_uint (str, 16, 1, 0xFFFF, &foo);
+        g_free (str);
+    }
+
+    /* Cell ID */
+    if (ici) {
+        str = g_match_info_fetch (info, ici);
+        ci = parse_uint (str, 16, 1, 0x0FFFFFFE, &foo);
+        g_free (str);
+    }
+
+    /* Access Technology */
+    if (iact) {
+        str = g_match_info_fetch (info, iact);
+        act = (gint) parse_uint (str, 10, 0, 7, &foo);
+        g_free (str);
+        if (!foo)
+            act = -1;
+    }
+
+    *out_reg_state = (guint32) stat;
+    if (stat != 4) {
+        /* Don't fill in lac/ci/act if the device's state is unknown */
+        *out_lac = lac;
+        *out_ci = ci;
+        *out_act = act;
+    }
+    return TRUE;
 }
 
