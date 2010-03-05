@@ -22,13 +22,16 @@
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 
-static void modem_init (MMModem *modem_class);
 static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
 
 G_DEFINE_TYPE_EXTENDED (MMModemOption, mm_modem_option, MM_TYPE_GENERIC_GSM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init))
 
+#define MM_MODEM_OPTION_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_OPTION, MMModemOptionPrivate))
+
+typedef struct {
+    guint enable_wait_id;
+} MMModemOptionPrivate;
 
 MMModem *
 mm_modem_option_new (const char *device,
@@ -48,53 +51,42 @@ mm_modem_option_new (const char *device,
 
 /*****************************************************************************/
 
-static void
-pin_check_done (MMModem *modem, GError *error, gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-
-    mm_generic_gsm_enable_complete (MM_GENERIC_GSM (modem), error, info);
-}
-
 static gboolean
-option_enabled (gpointer data)
+option_enabled (gpointer user_data)
 {
-    MMCallbackInfo *info = (MMCallbackInfo *) data;
+    MMCallbackInfo *info = user_data;
+    MMGenericGsm *modem;
+    MMModemOptionPrivate *priv;
 
-    /* Now check the PIN explicitly, option doesn't seem to report
-     * that it needs it otherwise.
-     */
-    mm_generic_gsm_check_pin (MM_GENERIC_GSM (info->modem), pin_check_done, info);
+    /* Make sure we don't use an invalid modem that may have been removed */
+    if (info->modem) {
+        modem = MM_GENERIC_GSM (info->modem);
+        priv = MM_MODEM_OPTION_GET_PRIVATE (modem);
+        priv->enable_wait_id = 0;
+        MM_GENERIC_GSM_CLASS (mm_modem_option_parent_class)->do_enable_power_up_done (modem, NULL, NULL, info);
+    }
     return FALSE;
 }
 
 static void
-parent_enable_done (MMModem *modem, GError *error, gpointer user_data)
+real_do_enable_power_up_done (MMGenericGsm *gsm,
+                              GString *response,
+                              GError *error,
+                              MMCallbackInfo *info)
 {
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemOptionPrivate *priv = MM_MODEM_OPTION_GET_PRIVATE (gsm);
 
     if (error) {
-        mm_generic_gsm_enable_complete (MM_GENERIC_GSM (modem), error, info);
+        /* Chain up to parent */
+        MM_GENERIC_GSM_CLASS (mm_modem_option_parent_class)->do_enable_power_up_done (gsm, NULL, error, info);
         return;
     }
 
-    /* Option returns OK on +CFUN=1 right away but needs some time
-     * to finish initialization
+    /* Some Option devices return OK on +CFUN=1 right away but need some time
+     * to finish initialization.
      */
-    g_timeout_add_seconds (10, option_enabled, info);
-}
-
-static void
-enable (MMModem *modem,
-        MMModemFn callback,
-        gpointer user_data)
-{
-    MMModem *parent_modem_iface;
-    MMCallbackInfo *info;
-
-    info = mm_callback_info_new (modem, callback, user_data);
-    parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (modem));
-    parent_modem_iface->enable (modem, parent_enable_done, info);
+    g_warn_if_fail (priv->enable_wait_id == 0);
+    priv->enable_wait_id = g_timeout_add_seconds (10, option_enabled, info);
 }
 
 static void
@@ -219,12 +211,6 @@ set_network_mode (MMModemGsmNetwork *modem,
 /*****************************************************************************/
 
 static void
-modem_init (MMModem *modem_class)
-{
-    modem_class->enable = enable;
-}
-
-static void
 modem_gsm_network_init (MMModemGsmNetwork *class)
 {
     class->set_network_mode = set_network_mode;
@@ -237,8 +223,24 @@ mm_modem_option_init (MMModemOption *self)
 }
 
 static void
+dispose (GObject *object)
+{
+    MMModemOptionPrivate *priv = MM_MODEM_OPTION_GET_PRIVATE (object);
+
+    if (priv->enable_wait_id)
+        g_source_remove (priv->enable_wait_id);
+}
+
+static void
 mm_modem_option_class_init (MMModemOptionClass *klass)
 {
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    MMGenericGsmClass *gsm_class = MM_GENERIC_GSM_CLASS (klass);
+
     mm_modem_option_parent_class = g_type_class_peek_parent (klass);
+    g_type_class_add_private (object_class, sizeof (MMModemOptionPrivate));
+
+    object_class->dispose = dispose;
+    gsm_class->do_enable_power_up_done = real_do_enable_power_up_done;
 }
 
