@@ -141,6 +141,45 @@ typedef struct {
     guint code;
 } CPinResult;
 
+static CPinResult unlock_results[] = {
+    { "SIM PIN",       "sim-pin",       MM_MOBILE_ERROR_SIM_PIN },
+    { "SIM PUK",       "sim-puk",       MM_MOBILE_ERROR_SIM_PUK },
+    { "PH-SIM PIN",    "ph-sim-pin",    MM_MOBILE_ERROR_PH_SIM_PIN },
+    { "PH-FSIM PIN",   "ph-fsim-pin",   MM_MOBILE_ERROR_PH_FSIM_PIN },
+    { "PH-FSIM PUK",   "ph-fsim-puk",   MM_MOBILE_ERROR_PH_FSIM_PUK },
+    { "SIM PIN2",      "sim-pin2",      MM_MOBILE_ERROR_SIM_PIN2 },
+    { "SIM PUK2",      "sim-puk2",      MM_MOBILE_ERROR_SIM_PUK2 },
+    { "PH-NET PIN",    "ph-net-pin",    MM_MOBILE_ERROR_NETWORK_PIN },
+    { "PH-NET PUK",    "ph-net-puk",    MM_MOBILE_ERROR_NETWORK_PUK },
+    { "PH-NETSUB PIN", "ph-netsub-pin", MM_MOBILE_ERROR_NETWORK_SUBSET_PIN },
+    { "PH-NETSUB PUK", "ph-netsub-puk", MM_MOBILE_ERROR_NETWORK_SUBSET_PUK },
+    { "PH-SP PIN",     "ph-sp-pin",     MM_MOBILE_ERROR_SERVICE_PIN },
+    { "PH-SP PUK",     "ph-sp-puk",     MM_MOBILE_ERROR_SERVICE_PUK },
+    { "PH-CORP PIN",   "ph-corp-pin",   MM_MOBILE_ERROR_CORP_PIN },
+    { "PH-CORP PUK",   "ph-corp-puk",   MM_MOBILE_ERROR_CORP_PUK },
+    { NULL,            NULL,            MM_MOBILE_ERROR_PHONE_FAILURE },
+};
+
+static GError *
+error_for_unlock_required (const char *unlock)
+{
+    CPinResult *iter = &unlock_results[0];
+
+    if (!unlock || !strlen (unlock))
+        return NULL;
+
+    /* Translate the error */
+    while (iter->result) {
+        if (!strcmp (iter->normalized, unlock))
+            return mm_mobile_error_for_code (iter->code);
+        iter++;
+    }
+
+    return g_error_new (MM_MOBILE_ERROR,
+                        MM_MOBILE_ERROR_UNKNOWN,
+                        "Unknown unlock request '%s'", unlock);
+}
+
 static void
 pin_check_done (MMSerialPort *port,
                 GString *response,
@@ -149,24 +188,6 @@ pin_check_done (MMSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     gboolean parsed = FALSE;
-    static CPinResult results[] = {
-        { "SIM PIN",       "sim-pin",       MM_MOBILE_ERROR_SIM_PIN },
-        { "SIM PUK",       "sim-puk",       MM_MOBILE_ERROR_SIM_PUK },
-        { "PH-SIM PIN",    "ph-sim-pin",    MM_MOBILE_ERROR_PH_SIM_PIN },
-        { "PH-FSIM PIN",   "ph-fsim-pin",   MM_MOBILE_ERROR_PH_FSIM_PIN },
-        { "PH-FSIM PUK",   "ph-fsim-puk",   MM_MOBILE_ERROR_PH_FSIM_PUK },
-        { "SIM PIN2",      "sim-pin2",      MM_MOBILE_ERROR_SIM_PIN2 },
-        { "SIM PUK2",      "sim-puk2",      MM_MOBILE_ERROR_SIM_PUK2 },
-        { "PH-NET PIN",    "ph-net-pin",    MM_MOBILE_ERROR_NETWORK_PIN },
-        { "PH-NET PUK",    "ph-net-puk",    MM_MOBILE_ERROR_NETWORK_PUK },
-        { "PH-NETSUB PIN", "ph-netsub-pin", MM_MOBILE_ERROR_NETWORK_SUBSET_PIN },
-        { "PH-NETSUB PUK", "ph-netsub-puk", MM_MOBILE_ERROR_NETWORK_SUBSET_PUK },
-        { "PH-SP PIN",     "ph-sp-pin",     MM_MOBILE_ERROR_SERVICE_PIN },
-        { "PH-SP PUK",     "ph-sp-puk",     MM_MOBILE_ERROR_SERVICE_PUK },
-        { "PH-CORP PIN",   "ph-corp-pin",   MM_MOBILE_ERROR_CORP_PIN },
-        { "PH-CORP PUK",   "ph-corp-puk",   MM_MOBILE_ERROR_CORP_PUK },
-        { NULL,            NULL,            MM_MOBILE_ERROR_PHONE_FAILURE },
-    };
 
     if (error)
         info->error = g_error_copy (error);
@@ -177,7 +198,7 @@ pin_check_done (MMSerialPort *port,
             mm_modem_base_set_unlock_required (MM_MODEM_BASE (info->modem), NULL);
             parsed = TRUE;
         } else {
-            CPinResult *iter = &results[0];
+            CPinResult *iter = &unlock_results[0];
 
             /* Translate the error */
             while (iter->result) {
@@ -563,6 +584,18 @@ enable (MMModem *modem,
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     GError *error = NULL;
+    const char *unlock;
+
+    /* If the device needs a PIN, deal with that now */
+    unlock = mm_modem_base_get_unlock_required (MM_MODEM_BASE (modem));
+    if (unlock) {
+        MMCallbackInfo *info;
+
+        info = mm_callback_info_new (modem, callback, user_data);
+        info->error = error_for_unlock_required (unlock);
+        mm_callback_info_schedule (info);
+        return;
+    }
 
     /* First, reset the previously used CID */
     mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
@@ -1969,9 +2002,8 @@ mm_generic_gsm_get_port (MMGenericGsm *modem,
 /* MMModemSimple interface */
 
 typedef enum {
-    SIMPLE_STATE_BEGIN = 0,
+    SIMPLE_STATE_CHECK_PIN = 0,
     SIMPLE_STATE_ENABLE,
-    SIMPLE_STATE_CHECK_PIN,
     SIMPLE_STATE_REGISTER,
     SIMPLE_STATE_SET_APN,
     SIMPLE_STATE_CONNECT,
@@ -2002,68 +2034,75 @@ static void
 simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    const char *str;
+    const char *str, *unlock = NULL;
     SimpleState state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "simple-connect-state"));
-    gboolean need_pin = FALSE;
+    SimpleState next_state = state;
+    gboolean done = FALSE;
 
     if (error) {
-        if (g_error_matches (error, MM_MOBILE_ERROR, MM_MOBILE_ERROR_SIM_PIN)) {
-            need_pin = TRUE;
-            state = SIMPLE_STATE_CHECK_PIN;
-        } else {
-            info->error = g_error_copy (error);
-            goto out;
-        }
+        info->error = g_error_copy (error);
+        goto out;
     }
 
     switch (state) {
-    case SIMPLE_STATE_BEGIN:
-        state = SIMPLE_STATE_ENABLE;
-        mm_modem_enable (modem, simple_state_machine, info);
-        break;
-    case SIMPLE_STATE_ENABLE:
-        state = SIMPLE_STATE_CHECK_PIN;
-        mm_generic_gsm_check_pin (MM_GENERIC_GSM (modem), simple_state_machine, info);
-        break;
     case SIMPLE_STATE_CHECK_PIN:
-        if (need_pin) {
-            str = simple_get_string_property (info, "pin", &info->error);
-            if (str)
-                mm_modem_gsm_card_send_pin (MM_MODEM_GSM_CARD (modem), str, simple_state_machine, info);
-            else
-                info->error = g_error_copy (error);
-        } else {
-            str = simple_get_string_property (info, "network_id", &info->error);
-            state = SIMPLE_STATE_REGISTER;
-            if (!info->error)
-                mm_modem_gsm_network_register (MM_MODEM_GSM_NETWORK (modem), str, simple_state_machine, info);
-        }
-        break;
-    case SIMPLE_STATE_REGISTER:
-        str = simple_get_string_property (info, "apn", &info->error);
-        if (str) {
-            state = SIMPLE_STATE_SET_APN;
-            mm_modem_gsm_network_set_apn (MM_MODEM_GSM_NETWORK (modem), str, simple_state_machine, info);
+        next_state = SIMPLE_STATE_ENABLE;
+
+        /* If we need a PIN, send it now */
+        unlock = mm_modem_base_get_unlock_required (MM_MODEM_BASE (modem));
+        if (unlock) {
+            gboolean success = FALSE;
+
+            if (!strcmp (unlock, "sim-pin")) {
+                str = simple_get_string_property (info, "pin", &info->error);
+                if (str) {
+                    mm_modem_gsm_card_send_pin (MM_MODEM_GSM_CARD (modem), str, simple_state_machine, info);
+                    success = TRUE;
+                }
+            }
+            if (!success && !info->error)
+                info->error = error_for_unlock_required (unlock);
             break;
         }
-        /* Fall through */
-    case SIMPLE_STATE_SET_APN:
-        str = simple_get_string_property (info, "number", &info->error);
-        state = SIMPLE_STATE_CONNECT;
-        mm_modem_connect (modem, str, simple_state_machine, info);
+        /* Fall through if no PIN required */
+    case SIMPLE_STATE_ENABLE:
+        next_state = SIMPLE_STATE_REGISTER;
+        mm_modem_enable (modem, simple_state_machine, info);
         break;
+    case SIMPLE_STATE_REGISTER:
+        next_state = SIMPLE_STATE_SET_APN;
+        str = simple_get_string_property (info, "network_id", &info->error);
+        if (str || info->error) {
+            if (str)
+                mm_modem_gsm_network_register (MM_MODEM_GSM_NETWORK (modem), str, simple_state_machine, info);
+            break;
+        }
+        /* Fall through if no explicit network registration is required */
+    case SIMPLE_STATE_SET_APN:
+        next_state = SIMPLE_STATE_CONNECT;
+        str = simple_get_string_property (info, "apn", &info->error);
+        if (str || info->error) {
+            if (str)
+                mm_modem_gsm_network_set_apn (MM_MODEM_GSM_NETWORK (modem), str, simple_state_machine, info);
+            break;
+        }
+        /* Fall through if no APN or no 'apn' property error */
     case SIMPLE_STATE_CONNECT:
-        state = SIMPLE_STATE_DONE;
+        next_state = SIMPLE_STATE_DONE;
+        str = simple_get_string_property (info, "number", &info->error);
+        if (!info->error)
+            mm_modem_connect (modem, str, simple_state_machine, info);
         break;
     case SIMPLE_STATE_DONE:
+        done = TRUE;
         break;
     }
 
  out:
-    if (info->error || state == SIMPLE_STATE_DONE)
+    if (info->error || done)
         mm_callback_info_schedule (info);
     else
-        mm_callback_info_set_data (info, "simple-connect-state", GUINT_TO_POINTER (state), NULL);
+        mm_callback_info_set_data (info, "simple-connect-state", GUINT_TO_POINTER (next_state), NULL);
 }
 
 static void
