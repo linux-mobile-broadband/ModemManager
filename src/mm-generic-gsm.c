@@ -799,23 +799,24 @@ get_card_info (MMModem *modem,
     mm_serial_port_queue_command_cached (priv->primary, "+CGMR", 3, get_version_done, info);
 }
 
+#define PIN_CLOSE_PORT_TAG "close-port"
+
 static void
 pin_puk_recheck_done (MMModem *modem, GError *error, gpointer user_data)
 {
-    gboolean close_port = !!user_data;
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    gboolean close_port = !!mm_callback_info_get_data (info, PIN_CLOSE_PORT_TAG);
 
     /* modem could have been removed before we get here, in which case
      * 'modem' will be NULL.
      */
-    if (modem) {
-        g_return_if_fail (MM_IS_GENERIC_GSM (modem));
+    info->error = mm_modem_check_removed (modem, error);
 
-        if (close_port)
-            mm_serial_port_close (MM_GENERIC_GSM_GET_PRIVATE (modem)->primary);
-    }
+    if (modem && close_port)
+        mm_serial_port_close (MM_GENERIC_GSM_GET_PRIVATE (modem)->primary);
+
+    mm_callback_info_schedule (info);
 }
-
-#define PIN_CLOSE_PORT_TAG "close-port"
 
 static void
 send_puk_done (MMSerialPort *port,
@@ -826,15 +827,16 @@ send_puk_done (MMSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     gboolean close_port = !!mm_callback_info_get_data (info, PIN_CLOSE_PORT_TAG);
 
-    if (error)
+    if (error) {
         info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+        if (close_port)
+            mm_serial_port_close (port);
+        return;
+    }
 
-    /* Get latest PUK status */
-    mm_generic_gsm_check_pin (MM_GENERIC_GSM (info->modem),
-                              pin_puk_recheck_done,
-                              GUINT_TO_POINTER (close_port));
-
-    mm_callback_info_schedule (info);
+    /* Get latest PIN status */
+    mm_generic_gsm_check_pin (MM_GENERIC_GSM (info->modem), pin_puk_recheck_done, info);
 }
 
 static void
@@ -886,15 +888,16 @@ send_pin_done (MMSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     gboolean close_port = !!mm_callback_info_get_data (info, PIN_CLOSE_PORT_TAG);
 
-    if (error)
+    if (error) {
         info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+        if (close_port)
+            mm_serial_port_close (port);
+        return;
+    }
 
     /* Get latest PIN status */
-    mm_generic_gsm_check_pin (MM_GENERIC_GSM (info->modem),
-                              pin_puk_recheck_done,
-                              GUINT_TO_POINTER (close_port));
-
-    mm_callback_info_schedule (info);
+    mm_generic_gsm_check_pin (MM_GENERIC_GSM (info->modem), pin_puk_recheck_done, info);
 }
 
 static void
