@@ -674,6 +674,23 @@ mm_generic_gsm_enable_complete (MMGenericGsm *modem,
     }
 
     priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+
+    /* Open the second port here if the modem has one.  We'll use it for
+     * signal strength and registration updates when the device is connected,
+     * but also many devices will send unsolicited registration or other
+     * messages to the secondary port but not the primary.
+     */
+    if (priv->secondary) {
+        if (!mm_serial_port_open (priv->secondary, &error)) {
+            if (mm_options_debug ()) {
+                g_warning ("%s: error opening secondary port: (%d) %s",
+                           __func__,
+                           error ? error->code : -1,
+                           error && error->message ? error->message : "(unknown)");
+            }
+        }
+    }
+
     mm_serial_port_queue_command (priv->primary, "+CREG=2", 3, creg2_done, info);
 }
 
@@ -883,6 +900,10 @@ disable (MMModem *modem,
     priv->cell_id[1] = 0;
     priv->access_tech[0] = -1;
     priv->access_tech[1] = -1;
+
+    /* Close the secondary port if its open */
+    if (priv->secondary && mm_serial_port_is_open (priv->secondary))
+        mm_serial_port_close (priv->secondary);
 
     info = mm_callback_info_new (modem, callback, user_data);
 
