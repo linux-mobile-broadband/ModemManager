@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
+  <interface name="org.freedesktop.ModemManager.Modem.Location">
+
+    <property name="Capabilities" type="u" access="read" tp:type="MM_MODEM_LOCATION_CAPABILITIES">
+      <tp:docstring>
+        Location capabilities of the device.
+      </tp:docstring>
+    </property>
+
+    <property name="Enabled" type="b" access="read">
+      <tp:docstring>
+        TRUE if location information gathering is enabled for this device, FALSE if it is disabled.  When disabled, the device will not provide location information.
+      </tp:docstring>
+    </property>
+
+    <method name="Enable">
+      <tp:docstring>
+	Enable or disable location information gathering.  When enabled, *all* clients can retrieve location information unless restricted through D-Bus service permissions; this could allow malicious applications to track your location so use this functionality carefully.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_location_enable"/>
+      <arg name="enable" type="b" direction="in">
+	<tp:docstring>
+	  TRUE to enable location information gathering, FALSE to disable.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <property name="Location" type="a{uv}" access="read" tp:type="Location_Information_Map">
+      <tp:docstring>
+          Dict of available location information when location information gathering is enabled.  If the modem supports multiple location types it may return more than one here.
+      </tp:docstring>
+    </property>
+
+    <tp:mapping name="Location_Information_Map">
+      <tp:docstring>
+        A mapping from unsigned integers to a variant representing location information.
+      </tp:docstring>
+      <tp:member type="u" name="Type" tp:type="MM_MODEM_LOCATION_CAPABILITIES">
+        <tp:docstring>
+          Identifies the type and format of the associated location information.  Contrary to the value description, this is not a bitfield but uses the same values as the MM_MODEM_LOCATION_CAPABILITIES bitfield.
+        </tp:docstring>
+      </tp:member>
+      <tp:member type="v" name="Data">
+        <tp:docstring>
+          Contains type-specific location information.  GSM_LAC_CI data is a string with the format "LAC,CI" (ex "84CD,00D30156") while GPS_NMEA is a string in NMEA-compatible format.
+        </tp:docstring>
+      </tp:member>
+    </tp:mapping>
+
+    <tp:flags name="MM_MODEM_LOCATION_CAPABILITIES" value-prefix="MM_MODEM_LOCATION_CAPABILITY" type="u">
+      <tp:flag suffix="UNKNOWN" value="0x0">
+        <tp:docstring>Unknown or no capabilties.</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="ANY" value="0x1">
+        <tp:docstring>Reserved.</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="GPS_NMEA" value="0x2">
+        <tp:docstring>The device is capable of providing GPS NMEA-format location information.</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="GSM_LAC_CI" value="0x4">
+        <tp:docstring>The device is capable of providing GSM Location Area Code/Cell ID location information.</tp:docstring>
+      </tp:flag>
+    </tp:flags>
+
+  </interface>
+</node>
+
