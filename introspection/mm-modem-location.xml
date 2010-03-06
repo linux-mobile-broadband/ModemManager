@@ -36,7 +36,7 @@
 
     <tp:mapping name="Location_Information_Map">
       <tp:docstring>
-        A mapping from unsigned integers to a variant representing location information.
+        A mapping from location type to type-specific location information.
       </tp:docstring>
       <tp:member type="u" name="Type" tp:type="MM_MODEM_LOCATION_CAPABILITIES">
         <tp:docstring>
