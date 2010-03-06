@@ -211,7 +211,6 @@ grab_port (MMModem *modem,
     if (port && MM_IS_SERIAL_PORT (port)) {
         GRegex *regex;
 
-        mm_generic_gsm_set_unsolicited_registration (gsm, TRUE);
         g_object_set (port, MM_PORT_CARRIER_DETECT, FALSE, NULL);
 
         regex = g_regex_new ("\\r\\n\\+ZUSIMR:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);

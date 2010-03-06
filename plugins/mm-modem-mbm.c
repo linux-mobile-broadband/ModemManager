@@ -747,8 +747,6 @@ grab_port (MMModem *modem,
     if (port && MM_IS_SERIAL_PORT (port) && (ptype == MM_PORT_TYPE_PRIMARY)) {
         GRegex *regex;
 
-        mm_generic_gsm_set_unsolicited_registration (MM_GENERIC_GSM (modem), TRUE);
-
         regex = g_regex_new ("\\r\\n\\*EMRDY: \\d\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, mbm_emrdy_received, modem, NULL);
         g_regex_unref (regex);

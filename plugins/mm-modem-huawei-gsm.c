@@ -560,8 +560,6 @@ grab_port (MMModem *modem,
         if (ptype == MM_PORT_TYPE_SECONDARY) {
             GRegex *regex;
 
-            mm_generic_gsm_set_unsolicited_registration (MM_GENERIC_GSM (modem), TRUE);
-
             regex = g_regex_new ("\\r\\n\\^RSSI:(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
             mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, handle_signal_quality_change, modem, NULL);
             g_regex_unref (regex);
