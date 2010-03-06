@@ -2,6 +2,12 @@
 
 <node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
   <interface name="org.freedesktop.ModemManager.Modem.Location">
+    <tp:docstring>
+      This interface allows devices to provide location information to client
+      applications.  Not all devices can provide this information, or even if
+      they do, they may not be able to provide it while a data session is
+      active.
+    </tp:docstring>
 
     <property name="Capabilities" type="u" access="read" tp:type="MM_MODEM_LOCATION_CAPABILITIES">
       <tp:docstring>
@@ -11,13 +17,16 @@
 
     <property name="Enabled" type="b" access="read">
       <tp:docstring>
-        TRUE if location information gathering is enabled for this device, FALSE if it is disabled.  When disabled, the device will not provide location information.
+        TRUE if location information gathering is enabled for this device, FALSE
+        if it is disabled. When disabled, the device will not provide location
+        information.
       </tp:docstring>
     </property>
 
     <method name="Enable">
       <tp:docstring>
-	Enable or disable location information gathering.  When enabled, *all* clients can retrieve location information unless restricted through D-Bus service permissions; this could allow malicious applications to track your location so use this functionality carefully.
+	Enable or disable location information gathering.  This method may
+	require the client to authenticate itself.
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_location_enable"/>
@@ -26,11 +35,54 @@
 	  TRUE to enable location information gathering, FALSE to disable.
 	</tp:docstring>
       </arg>
+      <arg name="signal_location" type="b" direction="in">
+	<tp:docstring>
+	  When enabling location information gathering, this argument controls
+	  whether the device emits signals with new location information or not.
+	  When signals are emitted, any client application (including malicious
+	  ones!) can listen for location updates unless D-Bus permissions
+	  restrict these signals from certain users.  If further security is
+	  desired, this argument can be set to FALSE to disable location
+	  updates via D-Bus signals and require applications to call
+	  authenticated APIs (like GetLocation) to get location information.
+	  This argument is ignored when disabling location information
+	  gathering.
+	</tp:docstring>
+      </arg>
     </method>
+
+    <method name="GetLocation">
+      <tp:docstring>
+        Return current location information, if any.  This method may require
+        the client to authenticate itself.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_location_get_location"/>
+      <arg name="Location" type="a{uv}" access="read" direction="out" tp:type="Location_Information_Map">
+        <tp:docstring>
+            Dict of available location information when location information
+            gathering is enabled.  If the modem supports multiple location types
+            it may return more than one here.
+        </tp:docstring>
+      </arg>
+    </method>
+
+    <property name="SignalsLocation" type="b" access="read">
+      <tp:docstring>
+        TRUE if location updates will be emitted via D-Bus signals, FALSE
+        if location updates will not be emitted.  See the Enable method for
+        more information.
+      </tp:docstring>
+    </property>
 
     <property name="Location" type="a{uv}" access="read" tp:type="Location_Information_Map">
       <tp:docstring>
-          Dict of available location information when location information gathering is enabled.  If the modem supports multiple location types it may return more than one here.
+          Dict of available location information when location information
+          gathering is enabled.  If the modem supports multiple location types
+          it may return more than one here.  Note that if the device was told
+          not to emit updated location information when location information
+          gathering was initially enabled, this property may not return 
+          any location information for security reasons.
       </tp:docstring>
     </property>
 
