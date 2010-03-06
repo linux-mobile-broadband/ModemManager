@@ -2081,12 +2081,10 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
     case SIMPLE_STATE_REGISTER:
         next_state = SIMPLE_STATE_SET_APN;
         str = simple_get_string_property (info, "network_id", &info->error);
-        if (str || info->error) {
-            if (str)
-                mm_modem_gsm_network_register (MM_MODEM_GSM_NETWORK (modem), str, simple_state_machine, info);
-            break;
-        }
-        /* Fall through if no explicit network registration is required */
+        if (info->error)
+            str = NULL;
+        mm_modem_gsm_network_register (MM_MODEM_GSM_NETWORK (modem), str, simple_state_machine, info);
+        break;
     case SIMPLE_STATE_SET_APN:
         next_state = SIMPLE_STATE_CONNECT;
         str = simple_get_string_property (info, "apn", &info->error);
