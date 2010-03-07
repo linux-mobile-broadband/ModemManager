@@ -548,7 +548,7 @@ cgreg1_done (MMSerialPort *port,
                 priv->poll_id = g_timeout_add_seconds (10, periodic_poll_cb, info->modem);
         }
         /* Success; get initial state */
-        mm_serial_port_queue_command (port, "+CGREG?", 10, reg_poll_response, info);
+        mm_serial_port_queue_command (port, "+CGREG?", 10, reg_poll_response, info->modem);
     }
     mm_callback_info_schedule (info);
 }
@@ -570,7 +570,7 @@ cgreg2_done (MMSerialPort *port,
             mm_serial_port_queue_command (port, "+CGREG=1", 3, cgreg1_done, info);
         } else {
             /* Success; get initial state */
-            mm_serial_port_queue_command (port, "+CGREG?", 10, reg_poll_response, info);
+            mm_serial_port_queue_command (port, "+CGREG?", 10, reg_poll_response, info->modem);
 
             /* All done */
             mm_callback_info_schedule (info);
@@ -602,7 +602,7 @@ creg1_done (MMSerialPort *port,
                 priv->poll_id = g_timeout_add_seconds (10, periodic_poll_cb, info->modem);
         }
         /* Success; get initial state */
-        mm_serial_port_queue_command (port, "+CREG?", 10, reg_poll_response, info);
+        mm_serial_port_queue_command (port, "+CREG?", 10, reg_poll_response, info->modem);
 
         /* Now try to set up CGREG messages */
         mm_serial_port_queue_command (port, "+CGREG=2", 3, cgreg2_done, info);
@@ -628,7 +628,7 @@ creg2_done (MMSerialPort *port,
             mm_serial_port_queue_command (port, "+CREG=1", 3, creg1_done, info);
         } else {
             /* Success; get initial state */
-            mm_serial_port_queue_command (port, "+CREG?", 10, reg_poll_response, info);
+            mm_serial_port_queue_command (port, "+CREG?", 10, reg_poll_response, info->modem);
 
             /* Now try to set up CGREG messages */
             mm_serial_port_queue_command (port, "+CGREG=2", 3, cgreg2_done, info);
