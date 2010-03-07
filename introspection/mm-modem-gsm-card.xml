@@ -96,11 +96,17 @@
     </method>
 
     <property name="SupportedBands" type="u" access="read" tp:type="MM_MODEM_GSM_BAND">
-      <tp:docstring>Bands supported by the card.  (Note for plugin writers: returned value must not contain ANY)</tp:docstring>
+      <tp:docstring>
+        Bands supported by the card.  (Note for plugin writers:
+        returned value must not contain ANY)
+      </tp:docstring>
     </property>
 
     <property name="SupportedModes" type="u" access="read" tp:type="MM_MODEM_GSM_MODE">
-      <tp:docstring>Network selection modes supported by the card. (Note for plugin writers: returned value must not contain ANY)</tp:docstring>
+      <tp:docstring>
+        Network selection modes supported by the card. (Note for plugin writers:
+        returned value must not contain ANY)
+      </tp:docstring>
     </property>
 
   </interface>
