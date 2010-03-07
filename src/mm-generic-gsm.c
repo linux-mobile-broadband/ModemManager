@@ -61,9 +61,11 @@ typedef struct {
 
     GPtrArray *reg_regex;
 
+    guint poll_id;
+
     /* CREG and CGREG info */
-    guint reg_poll_id;
-    guint greg_poll_id;
+    gboolean creg_poll;
+    gboolean cgreg_poll;
     /* Index 0 for CREG, index 1 for CGREG */
     gulong lac[2];
     gulong cell_id[2];
@@ -503,7 +505,7 @@ reg_poll_response (MMSerialPort *port,
 }
 
 static gboolean
-greg_poll_cb (gpointer user_data)
+periodic_poll_cb (gpointer user_data)
 {
     MMGenericGsm *self = MM_GENERIC_GSM (user_data);
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
@@ -517,36 +519,19 @@ greg_poll_cb (gpointer user_data)
         port = priv->secondary;
     }
 
-    mm_serial_port_queue_command (port, "+CGREG?", 10, reg_poll_response, self);
-
-    return TRUE;  /* continue running */
-}
-
-static gboolean
-reg_poll_cb (gpointer user_data)
-{
-    MMGenericGsm *self = MM_GENERIC_GSM (user_data);
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
-    MMSerialPort *port = priv->primary;
-
-    if (mm_port_get_connected (MM_PORT (priv->primary))) {
-        if (!priv->secondary)
-            return TRUE;  /* oh well, try later */
-
-        /* Use secondary port if primary is connected */
-        port = priv->secondary;
-    }
-
-    mm_serial_port_queue_command (port, "+CREG?", 10, reg_poll_response, self);
+    if (priv->creg_poll)
+        mm_serial_port_queue_command (port, "+CREG?", 10, reg_poll_response, self);
+    if (priv->cgreg_poll)
+        mm_serial_port_queue_command (port, "+CGREG?", 10, reg_poll_response, self);
 
     return TRUE;  /* continue running */
 }
 
 static void
-greg1_done (MMSerialPort *port,
-            GString *response,
-            GError *error,
-            gpointer user_data)
+cgreg1_done (MMSerialPort *port,
+             GString *response,
+             GError *error,
+             gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
 
@@ -558,19 +543,21 @@ greg1_done (MMSerialPort *port,
             g_clear_error (&info->error);
 
             /* The modem doesn't like unsolicited CGREG, so we'll need to poll */
-            priv->greg_poll_id = g_timeout_add_seconds (10, greg_poll_cb, info->modem);
+            priv->cgreg_poll = TRUE;
+            if (!priv->poll_id)
+                priv->poll_id = g_timeout_add_seconds (10, periodic_poll_cb, info->modem);
         }
         /* Success; get initial state */
-        greg_poll_cb (info->modem);
+        mm_serial_port_queue_command (port, "+CGREG?", 10, reg_poll_response, info);
     }
     mm_callback_info_schedule (info);
 }
 
 static void
-greg2_done (MMSerialPort *port,
-            GString *response,
-            GError *error,
-            gpointer user_data)
+cgreg2_done (MMSerialPort *port,
+             GString *response,
+             GError *error,
+             gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
 
@@ -580,10 +567,10 @@ greg2_done (MMSerialPort *port,
         if (info->error) {
             g_clear_error (&info->error);
             /* Try CGREG=1 instead */
-            mm_serial_port_queue_command (port, "+CGREG=1", 3, greg1_done, info);
+            mm_serial_port_queue_command (port, "+CGREG=1", 3, cgreg1_done, info);
         } else {
             /* Success; get initial state */
-            greg_poll_cb (info->modem);
+            mm_serial_port_queue_command (port, "+CGREG?", 10, reg_poll_response, info);
 
             /* All done */
             mm_callback_info_schedule (info);
@@ -610,14 +597,15 @@ creg1_done (MMSerialPort *port,
             g_clear_error (&info->error);
 
             /* The modem doesn't like unsolicited CREG, so we'll need to poll */
-            priv->reg_poll_id = g_timeout_add_seconds (10, reg_poll_cb, info->modem);
-            reg_poll_cb (info->modem);
+            priv->creg_poll = TRUE;
+            if (!priv->poll_id)
+                priv->poll_id = g_timeout_add_seconds (10, periodic_poll_cb, info->modem);
         }
         /* Success; get initial state */
-        reg_poll_cb (info->modem);
+        mm_serial_port_queue_command (port, "+CREG?", 10, reg_poll_response, info);
 
         /* Now try to set up CGREG messages */
-        mm_serial_port_queue_command (port, "+CGREG=2", 3, greg2_done, info);
+        mm_serial_port_queue_command (port, "+CGREG=2", 3, cgreg2_done, info);
     } else {
         /* Modem got removed */
         mm_callback_info_schedule (info);
@@ -640,10 +628,10 @@ creg2_done (MMSerialPort *port,
             mm_serial_port_queue_command (port, "+CREG=1", 3, creg1_done, info);
         } else {
             /* Success; get initial state */
-            reg_poll_cb (info->modem);
+            mm_serial_port_queue_command (port, "+CREG?", 10, reg_poll_response, info);
 
             /* Now try to set up CGREG messages */
-            mm_serial_port_queue_command (port, "+CGREG=2", 3, greg2_done, info);
+            mm_serial_port_queue_command (port, "+CGREG=2", 3, cgreg2_done, info);
         }
     } else {
         /* Modem got removed */
@@ -884,14 +872,9 @@ disable (MMModem *modem,
     mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
     mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
 
-    if (priv->reg_poll_id) {
-        g_source_remove (priv->reg_poll_id);
-        priv->reg_poll_id = 0;
-    }
-
-    if (priv->greg_poll_id) {
-        g_source_remove (priv->greg_poll_id);
-        priv->greg_poll_id = 0;
+    if (priv->poll_id) {
+        g_source_remove (priv->poll_id);
+        priv->poll_id = 0;
     }
 
     priv->lac[0] = 0;
@@ -2630,14 +2613,9 @@ finalize (GObject *object)
     if (priv->pin_check_timeout)
         g_source_remove (priv->pin_check_timeout);
 
-    if (priv->reg_poll_id) {
-        g_source_remove (priv->reg_poll_id);
-        priv->reg_poll_id = 0;
-    }
-
-    if (priv->greg_poll_id) {
-        g_source_remove (priv->greg_poll_id);
-        priv->greg_poll_id = 0;
+    if (priv->poll_id) {
+        g_source_remove (priv->poll_id);
+        priv->poll_id = 0;
     }
 
     mm_gsm_creg_regex_destroy (priv->reg_regex);
