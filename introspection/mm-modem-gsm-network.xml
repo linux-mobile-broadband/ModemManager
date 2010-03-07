@@ -98,7 +98,8 @@
       <tp:docstring>
         Returns the current network mode of the device (DEPRECATED; does not
         allow returning both the saved mode preference *and* the current access
-        technology of the device at the same time.  See GetAllowedModes instead).
+        technology of the device at the same time.  See the AllowedModes
+        property instead).
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_network_mode"/>
@@ -124,6 +125,41 @@
 	</tp:docstring>
       </arg>
     </method>
+
+    <method name="SetAllowedModes">
+      <tp:docstring>
+        Set the allowed access technologies to use when connecting to a mobile
+        network.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_set_allowed_modes"/>
+      <arg name="mode" type="u" direction="in" tp:type="MM_MODEM_GSM_MODE">
+        <tp:docstring>
+          The allowed access technologies.  Only one mode flag may be specified,
+          and it may not be UNKNOWN.  The device may not support all modes; see
+          the org.freedesktop.ModemManager.Gsm.Card.SupportedModes property for
+          allowed modes for each device.  All devices support the "ANY" flag.
+        </tp:docstring>
+      </arg>
+    </method>
+
+    <property name="AllowedModes" type="u" access="read" tp:type="MM_MODEM_GSM_MODE">
+      <tp:docstring>
+        The allowed access technologies (eg 2G/3G preference or specific access
+        technology) to use when connecting to a mobile network.  (Note for plugin
+        writers: this value may be ANY)
+      </tp:docstring>
+    </property>
+
+    <property name="AccessTechnology" type="u" access="read" tp:type="MM_MODEM_GSM_MODE">
+      <tp:docstring>
+        The current network access technology used by the device to communicate
+        with the base station.  (Note to plugin writers: if the device's access
+        technology cannot be determined, use UNKNOWN.  Using any of the
+        PREFER flags or the ANY in this field is invalid as they are not a
+        specific access technology.)
+      </tp:docstring>
+    </property>
 
     <signal name="SignalQuality">
       <tp:docstring>
