@@ -19,22 +19,28 @@
         <tp:docstring>UMTS (3G)</tp:docstring>
       </tp:flag>
       <tp:flag suffix="HSDPA" value="0x10">
-        <tp:docstring>HSDPA</tp:docstring>
+        <tp:docstring>HSDPA (3G)</tp:docstring>
       </tp:flag>
       <tp:flag suffix="2G_PREFERRED" value="0x20">
         <tp:docstring>Prefer 2G (GPRS or EDGE)</tp:docstring>
       </tp:flag>
       <tp:flag suffix="3G_PREFERRED" value="0x40">
-        <tp:docstring>Prefer 3G (UMTS or HSDPA)</tp:docstring>
+        <tp:docstring>Prefer 3G (UMTS/HSDPA/HSUPA/HSPA)</tp:docstring>
       </tp:flag>
       <tp:flag suffix="2G_ONLY" value="0x80">
         <tp:docstring>Use only 2G (GPRS or EDGE)</tp:docstring>
       </tp:flag>
       <tp:flag suffix="3G_ONLY" value="0x100">
-        <tp:docstring>Use only 3G (UMTS or HSDPA)</tp:docstring>
+        <tp:docstring>Use only 3G (UMTS/HSDPA/HSUPA/HSPA)</tp:docstring>
       </tp:flag>
       <tp:flag suffix="HSUPA" value="0x200">
-        <tp:docstring>HSUPA</tp:docstring>
+        <tp:docstring>HSUPA (3G)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="GSM" value="0x400">
+        <tp:docstring>GSM</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="GSM_COMPACT" value="0x800">
+        <tp:docstring>GSM Compact</tp:docstring>
       </tp:flag>
     </tp:flags>
 
