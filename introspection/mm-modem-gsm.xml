@@ -3,6 +3,11 @@
 <node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
   <interface name="org.freedesktop.ModemManager.Modem.Gsm">
     <tp:flags name="MM_MODEM_GSM_MODE" value-prefix="MM_MODEM_GSM_MODE" type="u">
+      <tp:docstring>
+        A bitfield describing the specifc access modes and technologies
+        supported by a device, the device's current access mode preference, and
+        the access technology in-use when connected to a mobile network.
+      </tp:docstring>
       <tp:flag suffix="UNKNOWN" value="0x0">
         <tp:docstring>Unknown or invalid mode.</tp:docstring>
       </tp:flag>
@@ -46,7 +51,9 @@
 
     <tp:flags name="MM_MODEM_GSM_BAND" value-prefix="MM_MODEM_GSM_BAND" type="u">
       <tp:docstring>
-        GSM network and device bands.
+        A bitfield describing the specific radio bands supported by the device
+        and the radio bands the device is allowed to use when connecting to a
+        mobile network.
       </tp:docstring>
       <tp:flag suffix="UNKNOWN" value="0x0">
         <tp:docstring>Unknown or invalid band</tp:docstring>
