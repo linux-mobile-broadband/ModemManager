@@ -82,11 +82,12 @@
 
     <method name="SetNetworkMode">
       <tp:docstring>
-        Set the desired mode the device may use when connecting to a mobile network.
+        Set the desired mode the device may use when connecting to a mobile
+        network (DEPRECATED; see SetAllowedModes instead).
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_set_network_mode"/>
-      <arg name="mode" type="u" direction="in" tp:type="MM_MODEM_GSM_MODE">
+      <arg name="mode" type="u" direction="in" tp:type="MM_MODEM_GSM_NETWORK_DEPRECATED_MODE">
         <tp:docstring>
           The desired network mode.  Only one mode may be specified, and may not be UNKNOWN.
         </tp:docstring>
@@ -95,11 +96,13 @@
 
     <method name="GetNetworkMode">
       <tp:docstring>
-        Returns the current network mode of the device.  (Note for plugin writers: returned value *may* be ANY)
+        Returns the current network mode of the device (DEPRECATED; does not
+        allow returning both the saved mode preference *and* the current access
+        technology of the device at the same time.  See GetAllowedModes instead).
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_network_mode"/>
-      <arg name="mode" type="u" direction="out" tp:type="MM_MODEM_GSM_MODE">
+      <arg name="mode" type="u" direction="out" tp:type="MM_MODEM_GSM_NETWORK_DEPRECATED_MODE">
         <tp:docstring>
           Returns the general network mode (ex. 2G/3G preference) of the device.
         </tp:docstring>
@@ -156,12 +159,11 @@
 
     <signal name="NetworkMode">
       <tp:docstring>
-	The network mode changed.
+	The network mode preference changed. (DEPRECATED; see documentation
+	for GetNetworkMode/SetNetworkMode)
       </tp:docstring>
-      <arg name="mode" type="u" tp:type="MM_MODEM_GSM_MODE">
-	<tp:docstring>
-	  The new network mode.
-	</tp:docstring>
+      <arg name="mode" type="u" tp:type="MM_MODEM_GSM_NETWORK_DEPRECATED_MODE">
+	<tp:docstring>The new network mode.</tp:docstring>
       </arg>
     </signal>
 
@@ -195,6 +197,42 @@
 	<tp:docstring>
 	  Registered on a roaming network.
 	</tp:docstring>
+      </tp:enumvalue>
+    </tp:enum>
+
+    <tp:enum name="MM_MODEM_GSM_NETWORK_DEPRECATED_MODE" type="u">
+      <tp:enumvalue suffix="ANY" value="0">
+	<tp:docstring>Any network mode can be used</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="GPRS" value="1">
+	<tp:docstring>GPRS</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="EDGE" value="2">
+	<tp:docstring>EDGE</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="UMTS" value="3">
+	<tp:docstring>UMTS (3G)</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="HSDPA" value="4">
+	<tp:docstring>HSDPA</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="2G_PREFERRED" value="5">
+	<tp:docstring>Prefer 2G (GPRS or EDGE)</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="3G_PREFERRED" value="6">
+	<tp:docstring>Prefer 3G (UMTS/HSDPA/HSUPA/HSPA)</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="2G_ONLY" value="7">
+	<tp:docstring>Use only 2G (GPRS or EDGE)</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="3G_ONLY" value="8">
+	<tp:docstring>Use only 3G (UMTS/HSDPA/HSUPA/HSPA)</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="HSUPA" value="9">
+	<tp:docstring>HSUPA</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="HSPA" value="10">
+	<tp:docstring>HSPA (HSDPA + HSUPA)</tp:docstring>
       </tp:enumvalue>
     </tp:enum>
 
