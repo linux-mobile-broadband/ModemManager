@@ -32,8 +32,6 @@ typedef enum {
     MM_MODEM_GSM_MODE_HSPA         = 0x00000400,
     MM_MODEM_GSM_MODE_GSM          = 0x00000800,
     MM_MODEM_GSM_MODE_GSM_COMPACT  = 0x00001000,
-
-    MM_MODEM_GSM_MODE_LAST = MM_MODEM_GSM_MODE_GSM_COMPACT
 } MMModemGsmMode;
 
 typedef enum {

@@ -22,10 +22,7 @@
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 
-static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
-
-G_DEFINE_TYPE_EXTENDED (MMModemOption, mm_modem_option, MM_TYPE_GENERIC_GSM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init))
+G_DEFINE_TYPE (MMModemOption, mm_modem_option, MM_TYPE_GENERIC_GSM)
 
 #define MM_MODEM_OPTION_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_OPTION, MMModemOptionPrivate))
 
@@ -90,7 +87,7 @@ real_do_enable_power_up_done (MMGenericGsm *gsm,
 }
 
 static void
-get_network_mode_done (MMSerialPort *port,
+get_allowed_mode_done (MMSerialPort *port,
                        GString *response,
                        GError *error,
                        gpointer user_data)
@@ -130,27 +127,27 @@ get_network_mode_done (MMSerialPort *port,
 
     if (!error && !parsed)
         info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                           "Could not parse network mode results");
+                                           "Could not parse allowed mode results");
 
     mm_callback_info_schedule (info);
 }
 
 static void
-get_network_mode (MMModemGsmNetwork *modem,
+get_allowed_mode (MMGenericGsm *gsm,
                   MMModemUIntFn callback,
                   gpointer user_data)
 {
     MMCallbackInfo *info;
     MMSerialPort *primary;
 
-    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    info = mm_callback_info_uint_new (MM_MODEM (gsm), callback, user_data);
+    primary = mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-    mm_serial_port_queue_command (primary, "AT_OPSYS?", 3, get_network_mode_done, info);
+    mm_serial_port_queue_command (primary, "AT_OPSYS?", 3, get_allowed_mode_done, info);
 }
 
 static void
-set_network_mode_done (MMSerialPort *port,
+set_allowed_mode_done (MMSerialPort *port,
                        GString *response,
                        GError *error,
                        gpointer user_data)
@@ -159,12 +156,12 @@ set_network_mode_done (MMSerialPort *port,
 
     if (error)
         info->error = g_error_copy (error);
- 
+
    mm_callback_info_schedule (info);
 }
 
 static void
-set_network_mode (MMModemGsmNetwork *modem,
+set_allowed_mode (MMGenericGsm *gsm,
                   MMModemGsmMode mode,
                   MMModemFn callback,
                   gpointer user_data)
@@ -174,19 +171,12 @@ set_network_mode (MMModemGsmNetwork *modem,
     char *command;
     int i;
 
-    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+    info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
 
     switch (mode) {
-    case MM_MODEM_GSM_MODE_ANY:
-    case MM_MODEM_GSM_MODE_GPRS:
-    case MM_MODEM_GSM_MODE_EDGE:
     case MM_MODEM_GSM_MODE_2G_ONLY:
         i = 0;
         break;
-    case MM_MODEM_GSM_MODE_UMTS:
-    case MM_MODEM_GSM_MODE_HSDPA:
-    case MM_MODEM_GSM_MODE_HSUPA:
-    case MM_MODEM_GSM_MODE_HSPA:
     case MM_MODEM_GSM_MODE_3G_ONLY:
         i = 1;
         break;
@@ -196,26 +186,20 @@ set_network_mode (MMModemGsmNetwork *modem,
     case MM_MODEM_GSM_MODE_3G_PREFERRED:
         i = 3;
         break;
+    case MM_MODEM_GSM_MODE_ANY:
     default:
         i = 5;
         break;
     }
 
     command = g_strdup_printf ("AT_OPSYS=%d,2", i);
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-    mm_serial_port_queue_command (primary, command, 3, set_network_mode_done, info);
+    mm_serial_port_queue_command (primary, command, 3, set_allowed_mode_done, info);
     g_free (command);
 }
 
 /*****************************************************************************/
-
-static void
-modem_gsm_network_init (MMModemGsmNetwork *class)
-{
-    class->set_network_mode = set_network_mode;
-    class->get_network_mode = get_network_mode;
-}
 
 static void
 mm_modem_option_init (MMModemOption *self)
@@ -242,5 +226,7 @@ mm_modem_option_class_init (MMModemOptionClass *klass)
 
     object_class->dispose = dispose;
     gsm_class->do_enable_power_up_done = real_do_enable_power_up_done;
+    gsm_class->set_allowed_mode = set_allowed_mode;
+    gsm_class->get_allowed_mode = get_allowed_mode;
 }
 

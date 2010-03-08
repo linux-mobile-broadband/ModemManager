@@ -44,6 +44,7 @@ typedef enum {
     MM_GENERIC_GSM_PROP_SUPPORTED_BANDS,
     MM_GENERIC_GSM_PROP_SUPPORTED_MODES,
     MM_GENERIC_GSM_PROP_INIT_CMD_OPTIONAL,
+    MM_GENERIC_GSM_PROP_ALLOWED_MODE,
     MM_GENERIC_GSM_PROP_ACCESS_TECHNOLOGY
 } MMGenericGsmProp;
 
@@ -78,6 +79,17 @@ typedef struct {
                                      GError *error,
                                      MMCallbackInfo *info);
 
+    /* Called by the generic class to set the allowed operating mode of the device */
+    void (*set_allowed_mode) (MMGenericGsm *self,
+                               MMModemGsmMode mode,
+                               MMModemFn callback,
+                               gpointer user_data);
+
+    /* Called by the generic class to get the allowed operating mode of the device */
+    void (*get_allowed_mode) (MMGenericGsm *self,
+                               MMModemUIntFn callback,
+                               gpointer user_data);
+
     /* Called by the generic class to the current radio access technology the
      * device is using while communicating with the base station.
      */
@@ -104,6 +116,15 @@ void mm_generic_gsm_set_cid (MMGenericGsm *modem,
 guint32 mm_generic_gsm_get_cid (MMGenericGsm *modem);
 void mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
                                     MMModemGsmNetworkRegStatus status);
+
+/* Called to asynchronously update the current allowed operating mode that the
+ * device is allowed to use when connecting to a network.  This isn't the
+ * specific access technology the device is currently using (see 
+ * mm_generic_gsm_set_access_technology() for that) but the mode the device is
+ * allowed to choose from when connecting.
+ */
+void mm_generic_gsm_update_allowed_mode (MMGenericGsm *modem,
+                                         MMModemGsmMode mode);
 
 /* Called to asynchronously update the current access technology of the device;
  * this is NOT the 2G/3G mode preference, but the current radio access

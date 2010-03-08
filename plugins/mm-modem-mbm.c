@@ -1,11 +1,13 @@
 /* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 /*
- * Copyright (C) 2008 Ericsson AB
+ * Copyright (C) 2008 - 2010 Ericsson AB
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  *
  * Author: Per Hallsmark <per.hallsmark@ericsson.com>
  *         Bjorn Runaker <bjorn.runaker@ericsson.com>
  *         Torgny Johansson <torgny.johansson@ericsson.com>
  *         Jonas Sjöquist <jonas.sjoquist@ericsson.com>
+ *         Dan Williams <dcbw@redhat.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -170,14 +172,9 @@ mbm_parse_network_mode (MMModemGsmMode network_mode)
     case MM_MODEM_GSM_MODE_3G_PREFERRED:
     case MM_MODEM_GSM_MODE_2G_PREFERRED:
         return MBM_NETWORK_MODE_ANY;
-    case MM_MODEM_GSM_MODE_GPRS:
-    case MM_MODEM_GSM_MODE_EDGE:
     case MM_MODEM_GSM_MODE_2G_ONLY:
         return MBM_NETWORK_MODE_2G;
     case MM_MODEM_GSM_MODE_3G_ONLY:
-    case MM_MODEM_GSM_MODE_HSDPA:
-    case MM_MODEM_GSM_MODE_HSUPA:
-    case MM_MODEM_GSM_MODE_HSPA:
         return MBM_NETWORK_MODE_3G;
     default:
         return MBM_NETWORK_MODE_ANY;
@@ -185,7 +182,7 @@ mbm_parse_network_mode (MMModemGsmMode network_mode)
 }
 
 static void
-mbm_set_network_mode_done (MMSerialPort *port,
+mbm_set_allowed_mode_done (MMSerialPort *port,
                            GString *response,
                            GError *error,
                            gpointer user_data)
@@ -199,7 +196,7 @@ mbm_set_network_mode_done (MMSerialPort *port,
 }
 
 static void
-set_network_mode (MMModemGsmNetwork *modem,
+set_allowed_mode (MMGenericGsm *gsm,
                   MMModemGsmMode mode,
                   MMModemFn callback,
                   gpointer user_data)
@@ -208,15 +205,16 @@ set_network_mode (MMModemGsmNetwork *modem,
     char *command;
     MMSerialPort *primary;
 
-    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
+    primary = mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
 
     command = g_strdup_printf ("+CFUN=%d", mbm_parse_network_mode (mode));
-    mm_serial_port_queue_command (primary, command, 3, mbm_set_network_mode_done, info);
+    mm_serial_port_queue_command (primary, command, 3, mbm_set_allowed_mode_done, info);
     g_free (command);
 }
 
+#if 0
 static void
 get_network_mode_done (MMSerialPort *port,
                        GString *response,
@@ -266,19 +264,52 @@ done:
 
     mm_callback_info_schedule (info);
 }
+#endif
 
 static void
-get_network_mode (MMModemGsmNetwork *modem,
+get_allowed_mode_done (MMSerialPort *port,
+                       GString *response,
+                       GError *error,
+                       gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    gboolean parsed = FALSE;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else if (!g_str_has_prefix (response->str, "CFUN: ")) {
+        MMModemGsmMode mode = MM_MODEM_GSM_MODE_ANY;
+        int a;
+
+        a = atoi (response->str + 6);
+        if (a == MBM_NETWORK_MODE_2G)
+            mode = MM_MODEM_GSM_MODE_2G_ONLY;
+        else if (a == MBM_NETWORK_MODE_3G)
+            mode = MM_MODEM_GSM_MODE_3G_ONLY;
+
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (mode), NULL);
+        parsed = TRUE;
+    }
+
+    if (!error && !parsed)
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse allowed mode results");
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_allowed_mode (MMGenericGsm *gsm,
                   MMModemUIntFn callback,
                   gpointer user_data)
 {
     MMCallbackInfo *info;
     MMSerialPort *primary;
 
-    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    info = mm_callback_info_uint_new (MM_MODEM (gsm), callback, user_data);
+    primary = mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-    mm_serial_port_queue_command (primary, "*ERINFO?", 3, get_network_mode_done, info);
+    mm_serial_port_queue_command (primary, "CFUN?", 3, get_allowed_mode_done, info);
 }
 
 /*****************************************************************************/
@@ -782,8 +813,6 @@ static void
 modem_gsm_network_init (MMModemGsmNetwork *class)
 {
     class->do_register = do_register;
-    class->get_network_mode = get_network_mode;
-    class->set_network_mode = set_network_mode;
 }
 
 static void
@@ -832,5 +861,7 @@ mm_modem_mbm_class_init (MMModemMbmClass *klass)
     object_class->finalize = finalize;
 
     gsm_class->do_enable = do_enable;
+    gsm_class->get_allowed_mode = get_allowed_mode;
+    gsm_class->set_allowed_mode = set_allowed_mode;
 }
 

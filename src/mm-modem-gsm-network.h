@@ -27,12 +27,14 @@
 #define MM_IS_MODEM_GSM_NETWORK(obj)   (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_MODEM_GSM_NETWORK))
 #define MM_MODEM_GSM_NETWORK_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_MODEM_GSM_NETWORK, MMModemGsmNetwork))
 
+#define MM_MODEM_GSM_NETWORK_ALLOWED_MODE      "allowed-mode"
 #define MM_MODEM_GSM_NETWORK_ACCESS_TECHNOLOGY "access-technology"
 
 typedef enum {
     MM_MODEM_GSM_NETWORK_PROP_FIRST = 0x1200,
 
-    MM_MODEM_GSM_NETWORK_PROP_ACCESS_TECHNOLOGY = MM_MODEM_GSM_NETWORK_PROP_FIRST,
+    MM_MODEM_GSM_NETWORK_PROP_ALLOWED_MODE = MM_MODEM_GSM_NETWORK_PROP_FIRST,
+    MM_MODEM_GSM_NETWORK_PROP_ACCESS_TECHNOLOGY,
 } MMModemGsmNetworkProp;
 
 typedef enum {
@@ -90,13 +92,9 @@ struct _MMModemGsmNetwork {
                       MMModemUIntFn callback,
                       gpointer user_data);
 
-    void (*set_network_mode) (MMModemGsmNetwork *self,
+    void (*set_allowed_mode) (MMModemGsmNetwork *self,
                               MMModemGsmMode mode,
                               MMModemFn callback,
-                              gpointer user_data);
-
-    void (*get_network_mode) (MMModemGsmNetwork *self,
-                              MMModemUIntFn callback,
                               gpointer user_data);
 
     void (*get_registration_info) (MMModemGsmNetwork *self,
@@ -111,9 +109,6 @@ struct _MMModemGsmNetwork {
                                MMModemGsmNetworkRegStatus status,
                                const char *open_code,
                                const char *oper_name);
-
-    void (*network_mode) (MMModemGsmNetwork *self,
-                          MMModemGsmMode mode);
 };
 
 GType mm_modem_gsm_network_get_type (void);
@@ -163,14 +158,17 @@ void mm_modem_gsm_network_get_registration_info (MMModemGsmNetwork *self,
 void mm_modem_gsm_network_signal_quality (MMModemGsmNetwork *self,
                                           guint32 quality);
 
+void mm_modem_gsm_network_set_allowed_mode (MMModemGsmNetwork *self,
+                                            MMModemGsmMode mode,
+                                            MMModemFn callback,
+                                            gpointer user_data);
+
 void mm_modem_gsm_network_registration_info (MMModemGsmNetwork *self,
                                              MMModemGsmNetworkRegStatus status,
                                              const char *oper_code,
                                              const char *oper_name);
 
-void mm_modem_gsm_network_mode (MMModemGsmNetwork *self,
-                                MMModemGsmMode mode);
-
+/* Private */
 MMModemDeprecatedMode mm_modem_gsm_network_new_mode_to_old (MMModemGsmMode new_mode);
 
 MMModemGsmMode mm_modem_gsm_network_old_mode_to_new (MMModemDeprecatedMode old_mode);

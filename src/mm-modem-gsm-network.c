@@ -43,12 +43,12 @@ static void impl_gsm_modem_set_band (MMModemGsmNetwork *modem,
 static void impl_gsm_modem_get_band (MMModemGsmNetwork *modem,
                                      DBusGMethodInvocation *context);
 
-static void impl_gsm_modem_set_allowed_modes (MMModemGsmNetwork *modem,
-                                              MMModemGsmMode mode,
-                                              DBusGMethodInvocation *context);
+static void impl_gsm_modem_set_allowed_mode (MMModemGsmNetwork *modem,
+                                             MMModemGsmMode mode,
+                                             DBusGMethodInvocation *context);
 
 static void impl_gsm_modem_set_network_mode (MMModemGsmNetwork *modem,
-                                             MMModemGsmMode mode,
+                                             MMModemDeprecatedMode old_mode,
                                              DBusGMethodInvocation *context);
 
 static void impl_gsm_modem_get_network_mode (MMModemGsmNetwork *modem,
@@ -371,32 +371,18 @@ mm_modem_gsm_network_get_band (MMModemGsmNetwork *self,
 }
 
 void
-mm_modem_gsm_network_set_mode (MMModemGsmNetwork *self,
-                               MMModemGsmMode mode,
-                               MMModemFn callback,
-                               gpointer user_data)
+mm_modem_gsm_network_set_allowed_mode (MMModemGsmNetwork *self,
+                                       MMModemGsmMode mode,
+                                       MMModemFn callback,
+                                       gpointer user_data)
 {
     g_return_if_fail (MM_IS_MODEM_GSM_NETWORK (self));
     g_return_if_fail (callback != NULL);
 
-    if (MM_MODEM_GSM_NETWORK_GET_INTERFACE (self)->set_network_mode)
-        MM_MODEM_GSM_NETWORK_GET_INTERFACE (self)->set_network_mode (self, mode, callback, user_data);
+    if (MM_MODEM_GSM_NETWORK_GET_INTERFACE (self)->set_allowed_mode)
+        MM_MODEM_GSM_NETWORK_GET_INTERFACE (self)->set_allowed_mode (self, mode, callback, user_data);
     else
         async_call_not_supported (self, callback, user_data);
-}
-
-void
-mm_modem_gsm_network_get_mode (MMModemGsmNetwork *self,
-                               MMModemUIntFn callback,
-                               gpointer user_data)
-{
-    g_return_if_fail (MM_IS_MODEM_GSM_NETWORK (self));
-    g_return_if_fail (callback != NULL);
-
-    if (MM_MODEM_GSM_NETWORK_GET_INTERFACE (self)->get_network_mode)
-        MM_MODEM_GSM_NETWORK_GET_INTERFACE (self)->get_network_mode (self, callback, user_data);
-    else
-        uint_call_not_supported (self, callback, user_data);
 }
 
 void
@@ -433,15 +419,6 @@ mm_modem_gsm_network_registration_info (MMModemGsmNetwork *self,
     g_signal_emit (self, signals[REGISTRATION_INFO], 0, status,
                    oper_code ? oper_code : "",
                    oper_name ? oper_name : "");
-}
-
-void
-mm_modem_gsm_network_mode (MMModemGsmNetwork *self,
-                           MMModemGsmMode mode)
-{
-    g_return_if_fail (MM_IS_MODEM_GSM_NETWORK (self));
-
-    g_signal_emit (self, signals[NETWORK_MODE], 0, mode);
 }
 
 /*****************************************************************************/
@@ -558,15 +535,28 @@ impl_gsm_modem_get_band (MMModemGsmNetwork *modem,
 }
 
 static void
-impl_gsm_modem_set_allowed_modes (MMModemGsmNetwork *modem,
-                                  MMModemGsmMode mode,
-                                  DBusGMethodInvocation *context)
+impl_gsm_modem_set_network_mode (MMModemGsmNetwork *modem,
+                                 MMModemDeprecatedMode old_mode,
+                                 DBusGMethodInvocation *context)
 {
-    dbus_g_method_return (context);
+    if (!check_for_single_value (old_mode)) {
+        GError *error;
+
+        error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                     "Invalid arguments (more than one value given)");
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+        return;
+    }
+
+    mm_modem_gsm_network_set_allowed_mode (modem,
+                                           mm_modem_gsm_network_old_mode_to_new (old_mode),
+                                           async_call_done,
+                                           context);
 }
 
 static void
-impl_gsm_modem_set_network_mode (MMModemGsmNetwork *modem,
+impl_gsm_modem_set_allowed_mode (MMModemGsmNetwork *modem,
                                  MMModemGsmMode mode,
                                  DBusGMethodInvocation *context)
 {
@@ -580,14 +570,20 @@ impl_gsm_modem_set_network_mode (MMModemGsmNetwork *modem,
         return;
     }
 
-    mm_modem_gsm_network_set_mode (modem, mode, async_call_done, context);
+    mm_modem_gsm_network_set_allowed_mode (modem, mode, async_call_done, context);
 }
 
 static void
 impl_gsm_modem_get_network_mode (MMModemGsmNetwork *modem,
                                  DBusGMethodInvocation *context)
 {
-    mm_modem_gsm_network_get_mode (modem, uint_call_done, context);
+    MMModemGsmMode mode = MM_MODEM_GSM_MODE_ANY;
+
+    /* DEPRECATED; it's now a property so it's quite easy to handle */
+    g_object_get (G_OBJECT (modem),
+                  MM_MODEM_GSM_NETWORK_ALLOWED_MODE, &mode,
+                  NULL);
+    dbus_g_method_return (context, mm_modem_gsm_network_new_mode_to_old (mode));
 }
 
 static void
@@ -608,6 +604,17 @@ mm_modem_gsm_network_init (gpointer g_iface)
     if (initialized)
         return;
 
+    /* Properties */
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_uint (MM_MODEM_GSM_NETWORK_ALLOWED_MODE,
+                            "Allowed Mode",
+                            "Allowed network access mode",
+                            MM_MODEM_GSM_MODE_UNKNOWN,
+                            G_MAXUINT32,
+                            MM_MODEM_GSM_MODE_UNKNOWN,
+                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
     g_object_interface_install_property
         (g_iface,
          g_param_spec_uint (MM_MODEM_GSM_NETWORK_ACCESS_TECHNOLOGY,
@@ -615,7 +622,7 @@ mm_modem_gsm_network_init (gpointer g_iface)
                             "Current access technology in use when connected to "
                             "a mobile network.",
                             MM_MODEM_GSM_MODE_UNKNOWN,
-                            MM_MODEM_GSM_MODE_LAST,
+                            G_MAXUINT32,
                             MM_MODEM_GSM_MODE_UNKNOWN,
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
@@ -644,8 +651,7 @@ mm_modem_gsm_network_init (gpointer g_iface)
         g_signal_new ("network-mode",
                       iface_type,
                       G_SIGNAL_RUN_FIRST,
-                      G_STRUCT_OFFSET (MMModemGsmNetwork, network_mode),
-                      NULL, NULL,
+                      0, NULL, NULL,
                       g_cclosure_marshal_VOID__UINT,
                       G_TYPE_NONE, 1,
                       G_TYPE_UINT);

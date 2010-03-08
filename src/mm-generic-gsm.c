@@ -56,6 +56,8 @@ typedef struct {
     guint32 pin_check_tries;
     guint pin_check_timeout;
 
+    guint32 allowed_mode;
+
     char *oper_code;
     char *oper_name;
     guint32 ip_method;
@@ -642,29 +644,43 @@ creg2_done (MMSerialPort *port,
     }
 }
 
+static void
+get_allowed_mode_done (MMModem *modem,
+                        MMModemGsmMode mode,
+                        GError *error,
+                        gpointer user_data)
+{
+    if (modem) {
+        mm_generic_gsm_update_allowed_mode (MM_GENERIC_GSM (modem),
+                                            error ? MM_MODEM_GSM_MODE_UNKNOWN : mode);
+    }
+}
+
 void
-mm_generic_gsm_enable_complete (MMGenericGsm *modem,
+mm_generic_gsm_enable_complete (MMGenericGsm *self,
                                 GError *error,
                                 MMCallbackInfo *info)
 {
     MMGenericGsmPrivate *priv;
 
-    g_return_if_fail (modem != NULL);
-    g_return_if_fail (MM_IS_GENERIC_GSM (modem));
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_GENERIC_GSM (self));
     g_return_if_fail (info != NULL);
 
     if (error) {
-        mm_modem_set_state (MM_MODEM (modem),
+        mm_modem_set_state (MM_MODEM (self),
                             MM_MODEM_STATE_DISABLED,
                             MM_MODEM_STATE_REASON_NONE);
 
         info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+        return;
     } else {
         /* Modem is enabled; update the state */
-        mm_generic_gsm_update_enabled_state (modem, FALSE, MM_MODEM_STATE_REASON_NONE);
+        mm_generic_gsm_update_enabled_state (self, FALSE, MM_MODEM_STATE_REASON_NONE);
     }
 
-    priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
 
     /* Open the second port here if the modem has one.  We'll use it for
      * signal strength and registration updates when the device is connected,
@@ -682,6 +698,11 @@ mm_generic_gsm_enable_complete (MMGenericGsm *modem,
         }
     }
 
+    /* Get allowed mode */
+    if (MM_GENERIC_GSM_GET_CLASS (self)->get_allowed_mode)
+        MM_GENERIC_GSM_GET_CLASS (self)->get_allowed_mode (self, get_allowed_mode_done, NULL);
+
+    /* Set up unsolicited registration notifications */
     mm_serial_port_queue_command (priv->primary, "+CREG=2", 3, creg2_done, info);
 }
 
@@ -2228,7 +2249,7 @@ mm_generic_gsm_update_access_technology (MMGenericGsm *modem,
     g_return_if_fail (modem != NULL);
     g_return_if_fail (MM_IS_GENERIC_GSM (modem));
 
-    g_return_if_fail (check_for_single_value (mode) || (mode == MM_MODEM_GSM_MODE_HSPA));
+    g_return_if_fail (check_for_single_value (mode));
     g_return_if_fail ((mode & MM_MODEM_GSM_MODE_ANY) == 0);
     g_return_if_fail ((mode & MM_MODEM_GSM_MODE_2G_PREFERRED) == 0);
     g_return_if_fail ((mode & MM_MODEM_GSM_MODE_3G_PREFERRED) == 0);
@@ -2242,7 +2263,63 @@ mm_generic_gsm_update_access_technology (MMGenericGsm *modem,
         g_object_notify (G_OBJECT (modem), MM_MODEM_GSM_NETWORK_ACCESS_TECHNOLOGY);
 
         /* Deprecated value */
-        g_signal_emit_by_name (G_OBJECT (modem), "NetworkMode", mode);
+        g_signal_emit_by_name (G_OBJECT (modem), "network-mode", mode);
+    }
+}
+
+void
+mm_generic_gsm_update_allowed_mode (MMGenericGsm *self,
+                                    MMModemGsmMode mode)
+{
+    MMGenericGsmPrivate *priv;
+
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_GENERIC_GSM (self));
+
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    if (mode != priv->allowed_mode) {
+        priv->allowed_mode = mode;
+        g_object_notify (G_OBJECT (self), MM_MODEM_GSM_NETWORK_ALLOWED_MODE);
+    }
+}
+
+static void
+set_allowed_mode_done (MMModem *modem, GError *error, gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+
+    info->error = mm_modem_check_removed (info->modem, error);
+    if (!info->error) {
+        MMModemGsmMode mode = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "mode"));
+
+        mm_generic_gsm_update_allowed_mode (MM_GENERIC_GSM (info->modem), mode);
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+set_allowed_mode (MMModemGsmNetwork *net,
+                  MMModemGsmMode mode,
+                  MMModemFn callback,
+                  gpointer user_data)
+{
+    MMGenericGsm *self = MM_GENERIC_GSM (net);
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
+
+    if (mode == MM_MODEM_GSM_MODE_UNKNOWN) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Invalid mode.");
+        mm_callback_info_schedule (info);
+    } else if (!MM_GENERIC_GSM_GET_CLASS (self)->set_allowed_mode) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                           "Operation not supported");
+        mm_callback_info_schedule (info);
+    } else {
+        mm_callback_info_set_data (info, "mode", GUINT_TO_POINTER (mode), NULL);
+        MM_GENERIC_GSM_GET_CLASS (self)->set_allowed_mode (self, mode, set_allowed_mode_done, info);
     }
 }
 
@@ -2593,6 +2670,7 @@ modem_gsm_network_init (MMModemGsmNetwork *class)
 {
     class->do_register = do_register;
     class->get_registration_info = get_registration_info;
+    class->set_allowed_mode = set_allowed_mode;
     class->set_apn = set_apn;
     class->scan = scan;
     class->get_signal_quality = get_signal_quality;
@@ -2620,6 +2698,10 @@ mm_generic_gsm_init (MMGenericGsm *self)
     priv->reg_regex = mm_gsm_creg_regex_get (TRUE);
 
     mm_properties_changed_signal_register_property (G_OBJECT (self),
+                                                    MM_MODEM_GSM_NETWORK_ALLOWED_MODE,
+                                                    MM_MODEM_GSM_NETWORK_DBUS_INTERFACE);
+
+    mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_GSM_NETWORK_ACCESS_TECHNOLOGY,
                                                     MM_MODEM_GSM_NETWORK_DBUS_INTERFACE);
 }
@@ -2636,6 +2718,7 @@ set_property (GObject *object, guint prop_id,
     case MM_GENERIC_GSM_PROP_INIT_CMD_OPTIONAL:
     case MM_GENERIC_GSM_PROP_SUPPORTED_BANDS:
     case MM_GENERIC_GSM_PROP_SUPPORTED_MODES:
+    case MM_GENERIC_GSM_PROP_ALLOWED_MODE:
     case MM_GENERIC_GSM_PROP_ACCESS_TECHNOLOGY:
         break;
     default:
@@ -2684,6 +2767,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case MM_GENERIC_GSM_PROP_SUPPORTED_MODES:
         g_value_set_uint (value, 0);
+        break;
+    case MM_GENERIC_GSM_PROP_ALLOWED_MODE:
+        g_value_set_uint (value, priv->allowed_mode);
         break;
     case MM_GENERIC_GSM_PROP_ACCESS_TECHNOLOGY:
         if (mm_modem_get_state (MM_MODEM (object)) >= MM_MODEM_STATE_ENABLED)
@@ -2752,6 +2838,10 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_SUPPORTED_MODES,
                                       MM_MODEM_GSM_CARD_SUPPORTED_MODES);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_ALLOWED_MODE,
+                                      MM_MODEM_GSM_NETWORK_ALLOWED_MODE);
 
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_ACCESS_TECHNOLOGY,
