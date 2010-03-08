@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
 #include <stdlib.h>
@@ -459,7 +459,7 @@ handle_mode_change (MMSerialPort *port,
                     gpointer user_data)
 {
     MMModemHuaweiGsm *self = MM_MODEM_HUAWEI_GSM (user_data);
-    MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (self);
+    MMModemGsmMode new_mode = MM_MODEM_GSM_MODE_UNKNOWN;
     char *str;
     int a;
     int b;
@@ -473,24 +473,24 @@ handle_mode_change (MMSerialPort *port,
     g_free (str);
 
     if (a == 3 && b == 2)
-        priv->mode = MM_MODEM_GSM_MODE_GPRS;
+        new_mode = MM_MODEM_GSM_MODE_GPRS;
     else if (a == 3 && b == 3)
-        priv->mode = MM_MODEM_GSM_MODE_EDGE;
+        new_mode = MM_MODEM_GSM_MODE_EDGE;
     else if (a == 5 && b == 4)
-        priv->mode = MM_MODEM_GSM_MODE_UMTS;
+        new_mode = MM_MODEM_GSM_MODE_UMTS;
     else if (a == 5 && b == 5)
-        priv->mode = MM_MODEM_GSM_MODE_HSDPA;
+        new_mode = MM_MODEM_GSM_MODE_HSDPA;
     else if (a == 5 && b == 6)
-        priv->mode = MM_MODEM_GSM_MODE_HSUPA;
+        new_mode = MM_MODEM_GSM_MODE_HSUPA;
     else if (a == 5 && b == 7)
-        priv->mode = MM_MODEM_GSM_MODE_HSPA;
+        new_mode = MM_MODEM_GSM_MODE_HSPA;
     else {
         g_warning ("Couldn't parse mode change value: '%s'", str);
         return;
     }
 
-    g_debug ("Mode: %d", priv->mode);
-    mm_modem_gsm_network_mode (MM_MODEM_GSM_NETWORK (self), priv->mode);
+    g_debug ("Access Technology: %d", new_mode);
+    mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (self), new_mode);
 }
 
 static void

@@ -29,6 +29,7 @@
 #include "mm-serial-parsers.h"
 #include "mm-modem-helpers.h"
 #include "mm-options.h"
+#include "mm-properties-changed-signal.h"
 
 static void modem_init (MMModem *modem_class);
 static void modem_gsm_card_init (MMModemGsmCard *gsm_card_class);
@@ -69,7 +70,7 @@ typedef struct {
     /* Index 0 for CREG, index 1 for CGREG */
     gulong lac[2];
     gulong cell_id[2];
-    gint access_tech[2];
+    MMModemGsmMode access_tech;
 
     MMModemGsmNetworkRegStatus reg_status;
     guint pending_reg_id;
@@ -106,6 +107,8 @@ static void get_reg_status_done (MMSerialPort *port,
 static gboolean handle_reg_status_response (MMGenericGsm *self,
                                             GString *response,
                                             GError **error);
+
+static MMModemGsmMode etsi_act_to_mm_mode (gint act);
 
 MMModem *
 mm_generic_gsm_new (const char *device,
@@ -864,7 +867,8 @@ disable (MMModem *modem,
          MMModemFn callback,
          gpointer user_data)
 {
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+    MMGenericGsm *self = MM_GENERIC_GSM (modem);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     MMCallbackInfo *info;
     MMModemState state;
 
@@ -881,8 +885,7 @@ disable (MMModem *modem,
     priv->lac[1] = 0;
     priv->cell_id[0] = 0;
     priv->cell_id[1] = 0;
-    priv->access_tech[0] = -1;
-    priv->access_tech[1] = -1;
+    mm_generic_gsm_update_access_technology (self, MM_MODEM_GSM_MODE_UNKNOWN);
 
     /* Close the secondary port if its open */
     if (priv->secondary && mm_serial_port_is_open (priv->secondary))
@@ -1465,7 +1468,10 @@ reg_state_changed (MMSerialPort *port,
     idx = cgreg ? 1 : 0;
     priv->lac[idx] = lac;
     priv->cell_id[idx] = cell_id;
-    priv->access_tech[idx] = access_tech;
+
+    /* Only update access technology if it appeared in the CREG/CGREG response */
+    if (access_tech != -1)
+        mm_generic_gsm_update_access_technology (self, etsi_act_to_mm_mode (access_tech));
 }
 
 static gboolean
@@ -1531,8 +1537,10 @@ handle_reg_status_response (MMGenericGsm *self,
     idx = cgreg ? 1 : 0;
     priv->lac[idx] = lac;
     priv->cell_id[idx] = ci;
-    if (act >= 0)  /* Let subclasses handle if they want */
-        priv->access_tech[idx] = act;
+
+    /* Only update access technology if it appeared in the CREG/CGREG response */
+    if (act != -1)
+        mm_generic_gsm_update_access_technology (self, etsi_act_to_mm_mode (act));
 
     if ((cgreg == FALSE) && status >= 0) {
         /* Update cached registration status */
@@ -2161,6 +2169,84 @@ get_signal_quality (MMModemGsmNetwork *modem,
 }
 
 /*****************************************************************************/
+
+typedef struct {
+    MMModemGsmMode mode;
+    gint etsi_act;
+} ModeEtsi;
+
+static ModeEtsi modes_table[] = {
+    { MM_MODEM_GSM_MODE_GSM,         0 },
+    { MM_MODEM_GSM_MODE_GSM_COMPACT, 1 },
+    { MM_MODEM_GSM_MODE_UMTS,        2 },
+    { MM_MODEM_GSM_MODE_EDGE,        3 },
+    { MM_MODEM_GSM_MODE_HSDPA,       4 },
+    { MM_MODEM_GSM_MODE_HSUPA,       5 },
+    { MM_MODEM_GSM_MODE_HSDPA |
+      MM_MODEM_GSM_MODE_HSUPA,       6 },
+    { MM_MODEM_GSM_MODE_HSDPA |
+      MM_MODEM_GSM_MODE_HSUPA,       7 }, /* E-UTRAN/LTE */
+    { MM_MODEM_GSM_MODE_UNKNOWN,    -1 },
+};
+
+static MMModemGsmMode
+etsi_act_to_mm_mode (gint act)
+{
+    ModeEtsi *iter = &modes_table[0];
+
+    while (iter->mode != MM_MODEM_GSM_MODE_UNKNOWN) {
+        if (iter->etsi_act == act)
+            return iter->mode;
+    }
+    return MM_MODEM_GSM_MODE_UNKNOWN;
+}
+
+static gboolean
+check_for_single_value (guint32 value)
+{
+    gboolean found = FALSE;
+    guint32 i;
+
+    for (i = 1; i <= 32; i++) {
+        if (value & 0x1) {
+            if (found)
+                return FALSE;  /* More than one bit set */
+            found = TRUE;
+        }
+        value >>= 1;
+    }
+
+    return TRUE;
+}
+
+void
+mm_generic_gsm_update_access_technology (MMGenericGsm *modem,
+                                         MMModemGsmMode mode)
+{
+    MMGenericGsmPrivate *priv;
+
+    g_return_if_fail (modem != NULL);
+    g_return_if_fail (MM_IS_GENERIC_GSM (modem));
+
+    g_return_if_fail (check_for_single_value (mode) || (mode == MM_MODEM_GSM_MODE_HSPA));
+    g_return_if_fail ((mode & MM_MODEM_GSM_MODE_ANY) == 0);
+    g_return_if_fail ((mode & MM_MODEM_GSM_MODE_2G_PREFERRED) == 0);
+    g_return_if_fail ((mode & MM_MODEM_GSM_MODE_3G_PREFERRED) == 0);
+    g_return_if_fail ((mode & MM_MODEM_GSM_MODE_2G_ONLY) == 0);
+    g_return_if_fail ((mode & MM_MODEM_GSM_MODE_3G_ONLY) == 0);
+
+    priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+
+    if (mode != priv->access_tech) {
+        priv->access_tech = mode;
+        g_object_notify (G_OBJECT (modem), MM_MODEM_GSM_NETWORK_ACCESS_TECHNOLOGY);
+
+        /* Deprecated value */
+        g_signal_emit_by_name (G_OBJECT (modem), "NetworkMode", mode);
+    }
+}
+
+/*****************************************************************************/
 /* MMModemGsmSms interface */
 
 static void
@@ -2410,17 +2496,6 @@ simple_status_got_band (MMModem *modem,
 }
 
 static void
-simple_status_got_mode (MMModem *modem,
-                        guint32 result,
-                        GError *error,
-                        gpointer user_data)
-{
-    /* Ignore network mode errors since there's no generic implementation for it */
-    if (!error)
-        g_hash_table_insert ((GHashTable *) user_data, "network_mode", simple_uint_value (result));
-}
-
-static void
 simple_status_got_reg_info (MMModemGsmNetwork *modem,
                             MMModemGsmNetworkRegStatus status,
                             const char *oper_code,
@@ -2459,9 +2534,11 @@ simple_get_status (MMModemSimple *simple,
                    MMModemSimpleGetStatusFn callback,
                    gpointer user_data)
 {
-    MMModemGsmNetwork *gsm;
+    MMModemGsmNetwork *gsm = MM_MODEM_GSM_NETWORK (simple);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (simple);
     GHashTable *properties;
     MMCallbackInfo *info;
+    MMModemDeprecatedMode old_mode;
 
     info = mm_callback_info_new_full (MM_MODEM (simple),
                                       simple_get_status_invoke,
@@ -2471,11 +2548,18 @@ simple_get_status (MMModemSimple *simple,
     properties = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, simple_free_gvalue);
     mm_callback_info_set_data (info, "simple-get-status", properties, (GDestroyNotify) g_hash_table_unref);
 
-    gsm = MM_MODEM_GSM_NETWORK (simple);
     mm_modem_gsm_network_get_signal_quality (gsm, simple_status_got_signal_quality, properties);
     mm_modem_gsm_network_get_band (gsm, simple_status_got_band, properties);
-    mm_modem_gsm_network_get_mode (gsm, simple_status_got_mode, properties);
     mm_modem_gsm_network_get_registration_info (gsm, simple_status_got_reg_info, properties);
+
+    if (priv->access_tech > -1) {
+        /* Deprecated key */
+        old_mode = mm_modem_gsm_network_new_mode_to_old (priv->access_tech);
+        g_hash_table_insert (properties, "network_mode", simple_uint_value (old_mode));
+
+        /* New key */
+        g_hash_table_insert (properties, "access_technology", simple_uint_value (priv->access_tech));
+    }
 }
 
 /*****************************************************************************/
@@ -2532,9 +2616,12 @@ mm_generic_gsm_init (MMGenericGsm *self)
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
 
-    priv->access_tech[0] = -1;
-    priv->access_tech[1] = -1;
+    priv->access_tech = MM_MODEM_GSM_MODE_UNKNOWN;
     priv->reg_regex = mm_gsm_creg_regex_get (TRUE);
+
+    mm_properties_changed_signal_register_property (G_OBJECT (self),
+                                                    MM_MODEM_GSM_NETWORK_ACCESS_TECHNOLOGY,
+                                                    MM_MODEM_GSM_NETWORK_DBUS_INTERFACE);
 }
 
 static void
@@ -2549,6 +2636,7 @@ set_property (GObject *object, guint prop_id,
     case MM_GENERIC_GSM_PROP_INIT_CMD_OPTIONAL:
     case MM_GENERIC_GSM_PROP_SUPPORTED_BANDS:
     case MM_GENERIC_GSM_PROP_SUPPORTED_MODES:
+    case MM_GENERIC_GSM_PROP_ACCESS_TECHNOLOGY:
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -2596,6 +2684,12 @@ get_property (GObject *object, guint prop_id,
         break;
     case MM_GENERIC_GSM_PROP_SUPPORTED_MODES:
         g_value_set_uint (value, 0);
+        break;
+    case MM_GENERIC_GSM_PROP_ACCESS_TECHNOLOGY:
+        if (mm_modem_get_state (MM_MODEM (object)) >= MM_MODEM_STATE_ENABLED)
+            g_value_set_uint (value, priv->access_tech);
+        else
+            g_value_set_uint (value, MM_MODEM_GSM_MODE_UNKNOWN);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -2658,6 +2752,10 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_SUPPORTED_MODES,
                                       MM_MODEM_GSM_CARD_SUPPORTED_MODES);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_ACCESS_TECHNOLOGY,
+                                      MM_MODEM_GSM_NETWORK_ACCESS_TECHNOLOGY);
 
     g_object_class_install_property
         (object_class, MM_GENERIC_GSM_PROP_POWER_UP_CMD,

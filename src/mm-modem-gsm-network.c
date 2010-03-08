@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 Novell, Inc.
+ * Copyright (C) 2010 Red Hat, Inc.
  */
 
 #include <string.h>
@@ -42,6 +43,10 @@ static void impl_gsm_modem_set_band (MMModemGsmNetwork *modem,
 static void impl_gsm_modem_get_band (MMModemGsmNetwork *modem,
                                      DBusGMethodInvocation *context);
 
+static void impl_gsm_modem_set_allowed_modes (MMModemGsmNetwork *modem,
+                                              MMModemGsmMode mode,
+                                              DBusGMethodInvocation *context);
+
 static void impl_gsm_modem_set_network_mode (MMModemGsmNetwork *modem,
                                              MMModemGsmMode mode,
                                              DBusGMethodInvocation *context);
@@ -65,6 +70,67 @@ enum {
 };
 
 static guint signals[LAST_SIGNAL] = { 0 };
+
+/*****************************************************************************/
+
+MMModemGsmMode
+mm_modem_gsm_network_old_mode_to_new (MMModemDeprecatedMode old_mode)
+{
+    /* Translate deprecated mode into new mode */
+    switch (old_mode) {
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_GPRS:
+        return MM_MODEM_GSM_MODE_GPRS;
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_EDGE:
+        return MM_MODEM_GSM_MODE_EDGE;
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_UMTS:
+        return MM_MODEM_GSM_MODE_UMTS;
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_HSDPA:
+        return MM_MODEM_GSM_MODE_HSDPA;
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_2G_PREFERRED:
+        return MM_MODEM_GSM_MODE_2G_PREFERRED;
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_3G_PREFERRED:
+        return MM_MODEM_GSM_MODE_3G_PREFERRED;
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_2G_ONLY:
+        return MM_MODEM_GSM_MODE_2G_ONLY;
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_3G_ONLY:
+        return MM_MODEM_GSM_MODE_3G_ONLY;
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_HSUPA:
+        return MM_MODEM_GSM_MODE_HSUPA;
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_HSPA:
+        return MM_MODEM_GSM_MODE_HSDPA | MM_MODEM_GSM_MODE_HSUPA;
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_ANY:
+    default:
+        break;
+    }
+
+    return MM_MODEM_GSM_MODE_ANY;
+}
+
+MMModemDeprecatedMode
+mm_modem_gsm_network_new_mode_to_old (MMModemGsmMode new_mode)
+{
+    /* Translate new mode into old deprecated mode */
+    if (new_mode & MM_MODEM_GSM_MODE_GPRS)
+        return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_GPRS;
+    else if (new_mode & MM_MODEM_GSM_MODE_EDGE)
+        return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_EDGE;
+    else if (new_mode & MM_MODEM_GSM_MODE_UMTS)
+        return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_UMTS;
+    else if (new_mode & MM_MODEM_GSM_MODE_HSDPA)
+        return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_HSDPA;
+    else if (new_mode & MM_MODEM_GSM_MODE_2G_PREFERRED)
+        return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_2G_PREFERRED;
+    else if (new_mode & MM_MODEM_GSM_MODE_3G_PREFERRED)
+        return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_3G_PREFERRED;
+    else if (new_mode & MM_MODEM_GSM_MODE_2G_ONLY)
+        return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_2G_ONLY;
+    else if (new_mode & MM_MODEM_GSM_MODE_3G_ONLY)
+        return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_3G_ONLY;
+    else if (new_mode & MM_MODEM_GSM_MODE_HSUPA)
+        return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_HSUPA;
+
+    return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_ANY;
+}
 
 /*****************************************************************************/
 
@@ -492,6 +558,14 @@ impl_gsm_modem_get_band (MMModemGsmNetwork *modem,
 }
 
 static void
+impl_gsm_modem_set_allowed_modes (MMModemGsmNetwork *modem,
+                                  MMModemGsmMode mode,
+                                  DBusGMethodInvocation *context)
+{
+    dbus_g_method_return (context);
+}
+
+static void
 impl_gsm_modem_set_network_mode (MMModemGsmNetwork *modem,
                                  MMModemGsmMode mode,
                                  DBusGMethodInvocation *context)
@@ -533,6 +607,17 @@ mm_modem_gsm_network_init (gpointer g_iface)
 
     if (initialized)
         return;
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_uint (MM_MODEM_GSM_NETWORK_ACCESS_TECHNOLOGY,
+                            "Access Technology",
+                            "Current access technology in use when connected to "
+                            "a mobile network.",
+                            MM_MODEM_GSM_MODE_UNKNOWN,
+                            MM_MODEM_GSM_MODE_LAST,
+                            MM_MODEM_GSM_MODE_UNKNOWN,
+                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     /* Signals */
     signals[SIGNAL_QUALITY] =

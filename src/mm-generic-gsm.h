@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
 #ifndef MM_GENERIC_GSM_H
@@ -43,7 +43,8 @@ typedef enum {
     MM_GENERIC_GSM_PROP_INIT_CMD,
     MM_GENERIC_GSM_PROP_SUPPORTED_BANDS,
     MM_GENERIC_GSM_PROP_SUPPORTED_MODES,
-    MM_GENERIC_GSM_PROP_INIT_CMD_OPTIONAL
+    MM_GENERIC_GSM_PROP_INIT_CMD_OPTIONAL,
+    MM_GENERIC_GSM_PROP_ACCESS_TECHNOLOGY
 } MMGenericGsmProp;
 
 
@@ -76,6 +77,13 @@ typedef struct {
                                      GString *response,
                                      GError *error,
                                      MMCallbackInfo *info);
+
+    /* Called by the generic class to the current radio access technology the
+     * device is using while communicating with the base station.
+     */
+    void (*get_access_technology) (MMGenericGsm *self,
+                                   MMModemUIntFn callback,
+                                   gpointer user_data);
 } MMGenericGsmClass;
 
 GType mm_generic_gsm_get_type (void);
@@ -96,6 +104,13 @@ void mm_generic_gsm_set_cid (MMGenericGsm *modem,
 guint32 mm_generic_gsm_get_cid (MMGenericGsm *modem);
 void mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
                                     MMModemGsmNetworkRegStatus status);
+
+/* Called to asynchronously update the current access technology of the device;
+ * this is NOT the 2G/3G mode preference, but the current radio access
+ * technology being used to communicate with the base station.
+ */
+void mm_generic_gsm_update_access_technology (MMGenericGsm *modem,
+                                              MMModemGsmMode mode);
 
 void mm_generic_gsm_check_pin (MMGenericGsm *modem,
                                MMModemFn callback,

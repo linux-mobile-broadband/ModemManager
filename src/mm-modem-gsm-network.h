@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
 #ifndef MM_MODEM_GSM_NETWORK_H
@@ -20,10 +20,20 @@
 #include <mm-modem.h>
 #include <mm-modem-gsm.h>
 
+#define MM_MODEM_GSM_NETWORK_DBUS_INTERFACE "org.freedesktop.ModemManager.Modem.Gsm.Network"
+
 #define MM_TYPE_MODEM_GSM_NETWORK      (mm_modem_gsm_network_get_type ())
 #define MM_MODEM_GSM_NETWORK(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_MODEM_GSM_NETWORK, MMModemGsmNetwork))
 #define MM_IS_MODEM_GSM_NETWORK(obj)   (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_MODEM_GSM_NETWORK))
 #define MM_MODEM_GSM_NETWORK_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_MODEM_GSM_NETWORK, MMModemGsmNetwork))
+
+#define MM_MODEM_GSM_NETWORK_ACCESS_TECHNOLOGY "access-technology"
+
+typedef enum {
+    MM_MODEM_GSM_NETWORK_PROP_FIRST = 0x1200,
+
+    MM_MODEM_GSM_NETWORK_PROP_ACCESS_TECHNOLOGY = MM_MODEM_GSM_NETWORK_PROP_FIRST,
+} MMModemGsmNetworkProp;
 
 typedef enum {
     MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE = 0,
@@ -160,5 +170,9 @@ void mm_modem_gsm_network_registration_info (MMModemGsmNetwork *self,
 
 void mm_modem_gsm_network_mode (MMModemGsmNetwork *self,
                                 MMModemGsmMode mode);
+
+MMModemDeprecatedMode mm_modem_gsm_network_new_mode_to_old (MMModemGsmMode new_mode);
+
+MMModemGsmMode mm_modem_gsm_network_old_mode_to_new (MMModemDeprecatedMode old_mode);
 
 #endif /* MM_MODEM_GSM_NETWORK_H */
