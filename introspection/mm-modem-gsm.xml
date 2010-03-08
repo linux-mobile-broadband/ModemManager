@@ -41,10 +41,13 @@
       <tp:flag suffix="HSUPA" value="0x200">
         <tp:docstring>HSUPA (3G)</tp:docstring>
       </tp:flag>
-      <tp:flag suffix="GSM" value="0x400">
+      <tp:flag suffix="HSPA" value="0x400">
+        <tp:docstring>HSPA (3G)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="GSM" value="0x800">
         <tp:docstring>GSM</tp:docstring>
       </tp:flag>
-      <tp:flag suffix="GSM_COMPACT" value="0x800">
+      <tp:flag suffix="GSM_COMPACT" value="0x1000">
         <tp:docstring>GSM Compact</tp:docstring>
       </tp:flag>
     </tp:flags>
