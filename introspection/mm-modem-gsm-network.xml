@@ -83,7 +83,7 @@
     <method name="SetNetworkMode">
       <tp:docstring>
         Set the desired mode the device may use when connecting to a mobile
-        network (DEPRECATED; see SetAllowedModes instead).
+        network (DEPRECATED; see SetAllowedMode instead).
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_set_network_mode"/>
@@ -98,7 +98,7 @@
       <tp:docstring>
         Returns the current network mode of the device (DEPRECATED; does not
         allow returning both the saved mode preference *and* the current access
-        technology of the device at the same time.  See the AllowedModes
+        technology of the device at the same time.  See the AllowedMode
         property instead).
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
@@ -126,13 +126,13 @@
       </arg>
     </method>
 
-    <method name="SetAllowedModes">
+    <method name="SetAllowedMode">
       <tp:docstring>
         Set the allowed access technologies to use when connecting to a mobile
         network.
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_set_allowed_modes"/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_set_allowed_mode"/>
       <arg name="mode" type="u" direction="in" tp:type="MM_MODEM_GSM_MODE">
         <tp:docstring>
           The allowed access technologies.  Only one mode flag may be specified,
@@ -143,9 +143,9 @@
       </arg>
     </method>
 
-    <property name="AllowedModes" type="u" access="read" tp:type="MM_MODEM_GSM_MODE">
+    <property name="AllowedMode" type="u" access="read" tp:type="MM_MODEM_GSM_MODE">
       <tp:docstring>
-        The allowed access technologies (eg 2G/3G preference or specific access
+        The allowed access technologies (eg 2G/3G preference or a specific access
         technology) to use when connecting to a mobile network.  (Note for plugin
         writers: this value may be ANY)
       </tp:docstring>
