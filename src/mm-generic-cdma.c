@@ -358,6 +358,9 @@ enable_all_done (MMModem *modem, GError *error, gpointer user_data)
     if (error)
         info->error = g_error_copy (error);
     else {
+        /* Try to enable XON/XOFF flow control */
+        mm_serial_port_queue_command (priv->primary, "+IFC=1,1", 3, NULL, NULL);
+
         /* Open up the second port, if one exists */
         if (priv->secondary) {
             if (!mm_serial_port_open (priv->secondary, &info->error)) {
