@@ -149,13 +149,11 @@
       </tp:docstring>
     </property>
 
-    <property name="AccessTechnology" type="u" access="read" tp:type="MM_MODEM_GSM_MODE">
+    <property name="AccessTechnology" type="u" access="read" tp:type="MM_MODEM_GSM_ACCESS_TECH">
       <tp:docstring>
         The current network access technology used by the device to communicate
         with the base station.  (Note to plugin writers: if the device's access
-        technology cannot be determined, use UNKNOWN.  Using any of the
-        PREFER flags or the ANY in this field is invalid as they are not a
-        specific access technology.)
+        technology cannot be determined, use UNKNOWN)
       </tp:docstring>
     </property>
 
@@ -235,6 +233,10 @@
     </tp:enum>
 
     <tp:enum name="MM_MODEM_GSM_NETWORK_DEPRECATED_MODE" type="u">
+      <tp:docstring>
+        DEPRECATED; should not be used in new applications.  Use
+        AccessTechnology, AllowedMode, and SetAllowedMode() instead.
+      </tp:docstring>
       <tp:enumvalue suffix="ANY" value="0">
 	<tp:docstring>Any network mode can be used</tp:docstring>
       </tp:enumvalue>

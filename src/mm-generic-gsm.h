@@ -131,7 +131,7 @@ void mm_generic_gsm_update_allowed_mode (MMGenericGsm *modem,
  * technology being used to communicate with the base station.
  */
 void mm_generic_gsm_update_access_technology (MMGenericGsm *modem,
-                                              MMModemGsmMode mode);
+                                              MMModemGsmAccessTech act);
 
 void mm_generic_gsm_check_pin (MMGenericGsm *modem,
                                MMModemFn callback,

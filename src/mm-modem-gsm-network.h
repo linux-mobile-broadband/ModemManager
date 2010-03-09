@@ -160,7 +160,7 @@ void mm_modem_gsm_network_registration_info (MMModemGsmNetwork *self,
                                              const char *oper_name);
 
 /* Private */
-MMModemDeprecatedMode mm_modem_gsm_network_act_to_old_mode (MMModemGsmMode new_mode);
+MMModemDeprecatedMode mm_modem_gsm_network_act_to_old_mode (MMModemGsmAccessTech act);
 
 MMModemGsmAllowedMode mm_modem_gsm_network_old_mode_to_allowed (MMModemDeprecatedMode old_mode);
 

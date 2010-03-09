@@ -93,27 +93,21 @@ mm_modem_gsm_network_old_mode_to_allowed (MMModemDeprecatedMode old_mode)
 }
 
 MMModemDeprecatedMode
-mm_modem_gsm_network_act_to_old_mode (MMModemGsmMode new_mode)
+mm_modem_gsm_network_act_to_old_mode (MMModemGsmAccessTech act)
 {
     /* Translate new mode into old deprecated mode */
-    if (new_mode & MM_MODEM_GSM_MODE_GPRS)
+    if (act & MM_MODEM_GSM_ACCESS_TECH_GPRS)
         return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_GPRS;
-    else if (new_mode & MM_MODEM_GSM_MODE_EDGE)
+    else if (act & MM_MODEM_GSM_ACCESS_TECH_EDGE)
         return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_EDGE;
-    else if (new_mode & MM_MODEM_GSM_MODE_UMTS)
+    else if (act & MM_MODEM_GSM_ACCESS_TECH_UMTS)
         return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_UMTS;
-    else if (new_mode & MM_MODEM_GSM_MODE_HSDPA)
+    else if (act & MM_MODEM_GSM_ACCESS_TECH_HSDPA)
         return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_HSDPA;
-    else if (new_mode & MM_MODEM_GSM_MODE_2G_PREFERRED)
-        return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_2G_PREFERRED;
-    else if (new_mode & MM_MODEM_GSM_MODE_3G_PREFERRED)
-        return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_3G_PREFERRED;
-    else if (new_mode & MM_MODEM_GSM_MODE_2G_ONLY)
-        return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_2G_ONLY;
-    else if (new_mode & MM_MODEM_GSM_MODE_3G_ONLY)
-        return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_3G_ONLY;
-    else if (new_mode & MM_MODEM_GSM_MODE_HSUPA)
+    else if (act & MM_MODEM_GSM_ACCESS_TECH_HSUPA)
         return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_HSUPA;
+    else if (act & MM_MODEM_GSM_ACCESS_TECH_HSPA)
+        return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_HSPA;
 
     return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_ANY;
 }
@@ -563,13 +557,13 @@ static void
 impl_gsm_modem_get_network_mode (MMModemGsmNetwork *modem,
                                  DBusGMethodInvocation *context)
 {
-    MMModemGsmMode mode = MM_MODEM_GSM_MODE_ANY;
+    MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
 
     /* DEPRECATED; it's now a property so it's quite easy to handle */
     g_object_get (G_OBJECT (modem),
-                  MM_MODEM_GSM_NETWORK_ACCESS_TECHNOLOGY, &mode,
+                  MM_MODEM_GSM_NETWORK_ACCESS_TECHNOLOGY, &act,
                   NULL);
-    dbus_g_method_return (context, mm_modem_gsm_network_act_to_old_mode (mode));
+    dbus_g_method_return (context, mm_modem_gsm_network_act_to_old_mode (act));
 }
 
 static void
@@ -598,7 +592,7 @@ mm_modem_gsm_network_init (gpointer g_iface)
                             "Allowed network access mode",
                             MM_MODEM_GSM_ALLOWED_MODE_ANY,
                             MM_MODEM_GSM_ALLOWED_MODE_LAST,
-                            MM_MODEM_GSM_MODE_UNKNOWN,
+                            MM_MODEM_GSM_ALLOWED_MODE_ANY,
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_interface_install_property
@@ -607,9 +601,9 @@ mm_modem_gsm_network_init (gpointer g_iface)
                             "Access Technology",
                             "Current access technology in use when connected to "
                             "a mobile network.",
-                            MM_MODEM_GSM_MODE_UNKNOWN,
-                            G_MAXUINT32,
-                            MM_MODEM_GSM_MODE_UNKNOWN,
+                            MM_MODEM_GSM_ACCESS_TECH_UNKNOWN,
+                            MM_MODEM_GSM_ACCESS_TECH_LAST,
+                            MM_MODEM_GSM_ACCESS_TECH_UNKNOWN,
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     /* Signals */

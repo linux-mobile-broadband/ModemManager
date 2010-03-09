@@ -72,7 +72,7 @@ typedef struct {
     /* Index 0 for CREG, index 1 for CGREG */
     gulong lac[2];
     gulong cell_id[2];
-    MMModemGsmMode access_tech;
+    MMModemGsmAccessTech act;
 
     MMModemGsmNetworkRegStatus reg_status;
     guint pending_reg_id;
@@ -110,7 +110,7 @@ static gboolean handle_reg_status_response (MMGenericGsm *self,
                                             GString *response,
                                             GError **error);
 
-static MMModemGsmMode etsi_act_to_mm_mode (gint act);
+static MMModemGsmAccessTech etsi_act_to_mm_act (gint act);
 
 MMModem *
 mm_generic_gsm_new (const char *device,
@@ -906,7 +906,7 @@ disable (MMModem *modem,
     priv->lac[1] = 0;
     priv->cell_id[0] = 0;
     priv->cell_id[1] = 0;
-    mm_generic_gsm_update_access_technology (self, MM_MODEM_GSM_MODE_UNKNOWN);
+    mm_generic_gsm_update_access_technology (self, MM_MODEM_GSM_ACCESS_TECH_UNKNOWN);
 
     /* Close the secondary port if its open */
     if (priv->secondary && mm_serial_port_is_open (priv->secondary))
@@ -1462,11 +1462,11 @@ reg_state_changed (MMSerialPort *port,
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     guint32 state = 0, idx;
     gulong lac = 0, cell_id = 0;
-    gint access_tech = -1;
+    gint act = -1;
     gboolean cgreg = FALSE;
     GError *error = NULL;
 
-    if (!mm_gsm_parse_creg_response (match_info, &state, &lac, &cell_id, &access_tech, &cgreg, &error)) {
+    if (!mm_gsm_parse_creg_response (match_info, &state, &lac, &cell_id, &act, &cgreg, &error)) {
         if (mm_options_debug ()) {
             g_warning ("%s: error parsing unsolicited registration: %s",
                        __func__,
@@ -1491,8 +1491,8 @@ reg_state_changed (MMSerialPort *port,
     priv->cell_id[idx] = cell_id;
 
     /* Only update access technology if it appeared in the CREG/CGREG response */
-    if (access_tech != -1)
-        mm_generic_gsm_update_access_technology (self, etsi_act_to_mm_mode (access_tech));
+    if (act != -1)
+        mm_generic_gsm_update_access_technology (self, etsi_act_to_mm_act (act));
 }
 
 static gboolean
@@ -1561,7 +1561,7 @@ handle_reg_status_response (MMGenericGsm *self,
 
     /* Only update access technology if it appeared in the CREG/CGREG response */
     if (act != -1)
-        mm_generic_gsm_update_access_technology (self, etsi_act_to_mm_mode (act));
+        mm_generic_gsm_update_access_technology (self, etsi_act_to_mm_act (act));
 
     if ((cgreg == FALSE) && status >= 0) {
         /* Update cached registration status */
@@ -2192,78 +2192,56 @@ get_signal_quality (MMModemGsmNetwork *modem,
 /*****************************************************************************/
 
 typedef struct {
-    MMModemGsmMode mode;
+    MMModemGsmAccessTech mm_act;
     gint etsi_act;
 } ModeEtsi;
 
 static ModeEtsi modes_table[] = {
-    { MM_MODEM_GSM_MODE_GSM,         0 },
-    { MM_MODEM_GSM_MODE_GSM_COMPACT, 1 },
-    { MM_MODEM_GSM_MODE_UMTS,        2 },
-    { MM_MODEM_GSM_MODE_EDGE,        3 },
-    { MM_MODEM_GSM_MODE_HSDPA,       4 },
-    { MM_MODEM_GSM_MODE_HSUPA,       5 },
-    { MM_MODEM_GSM_MODE_HSDPA |
-      MM_MODEM_GSM_MODE_HSUPA,       6 },
-    { MM_MODEM_GSM_MODE_HSDPA |
-      MM_MODEM_GSM_MODE_HSUPA,       7 }, /* E-UTRAN/LTE */
-    { MM_MODEM_GSM_MODE_UNKNOWN,    -1 },
+    { MM_MODEM_GSM_ACCESS_TECH_GSM,         0 },
+    { MM_MODEM_GSM_ACCESS_TECH_GSM_COMPACT, 1 },
+    { MM_MODEM_GSM_ACCESS_TECH_UMTS,        2 },
+    { MM_MODEM_GSM_ACCESS_TECH_EDGE,        3 },
+    { MM_MODEM_GSM_ACCESS_TECH_HSDPA,       4 },
+    { MM_MODEM_GSM_ACCESS_TECH_HSUPA,       5 },
+    { MM_MODEM_GSM_ACCESS_TECH_HSPA,        6 },
+    { MM_MODEM_GSM_ACCESS_TECH_HSPA,        7 },  /* E-UTRAN/LTE => HSPA for now */
+    { MM_MODEM_GSM_ACCESS_TECH_UNKNOWN,    -1 },
 };
 
-static MMModemGsmMode
-etsi_act_to_mm_mode (gint act)
+static MMModemGsmAccessTech
+etsi_act_to_mm_act (gint act)
 {
     ModeEtsi *iter = &modes_table[0];
 
-    while (iter->mode != MM_MODEM_GSM_MODE_UNKNOWN) {
+    while (iter->mm_act != MM_MODEM_GSM_ACCESS_TECH_UNKNOWN) {
         if (iter->etsi_act == act)
-            return iter->mode;
+            return iter->mm_act;
     }
-    return MM_MODEM_GSM_MODE_UNKNOWN;
-}
-
-static gboolean
-check_for_single_value (guint32 value)
-{
-    gboolean found = FALSE;
-    guint32 i;
-
-    for (i = 1; i <= 32; i++) {
-        if (value & 0x1) {
-            if (found)
-                return FALSE;  /* More than one bit set */
-            found = TRUE;
-        }
-        value >>= 1;
-    }
-
-    return TRUE;
+    return MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
 }
 
 void
 mm_generic_gsm_update_access_technology (MMGenericGsm *modem,
-                                         MMModemGsmMode mode)
+                                         MMModemGsmAccessTech act)
 {
     MMGenericGsmPrivate *priv;
 
     g_return_if_fail (modem != NULL);
     g_return_if_fail (MM_IS_GENERIC_GSM (modem));
 
-    g_return_if_fail (check_for_single_value (mode));
-    g_return_if_fail ((mode & MM_MODEM_GSM_MODE_ANY) == 0);
-    g_return_if_fail ((mode & MM_MODEM_GSM_MODE_2G_PREFERRED) == 0);
-    g_return_if_fail ((mode & MM_MODEM_GSM_MODE_3G_PREFERRED) == 0);
-    g_return_if_fail ((mode & MM_MODEM_GSM_MODE_2G_ONLY) == 0);
-    g_return_if_fail ((mode & MM_MODEM_GSM_MODE_3G_ONLY) == 0);
+    g_return_if_fail (act >= MM_MODEM_GSM_ACCESS_TECH_UNKNOWN && act <= MM_MODEM_GSM_ACCESS_TECH_LAST);
 
     priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
 
-    if (mode != priv->access_tech) {
-        priv->access_tech = mode;
+    if (act != priv->act) {
+        MMModemDeprecatedMode old_mode;
+
+        priv->act = act;
         g_object_notify (G_OBJECT (modem), MM_MODEM_GSM_NETWORK_ACCESS_TECHNOLOGY);
 
         /* Deprecated value */
-        g_signal_emit_by_name (G_OBJECT (modem), "network-mode", mode);
+        old_mode = mm_modem_gsm_network_act_to_old_mode (act);
+        g_signal_emit_by_name (G_OBJECT (modem), "network-mode", old_mode);
     }
 }
 
@@ -2639,13 +2617,13 @@ simple_get_status (MMModemSimple *simple,
     mm_modem_gsm_network_get_band (gsm, simple_status_got_band, properties);
     mm_modem_gsm_network_get_registration_info (gsm, simple_status_got_reg_info, properties);
 
-    if (priv->access_tech > -1) {
+    if (priv->act > -1) {
         /* Deprecated key */
-        old_mode = mm_modem_gsm_network_act_to_old_mode (priv->access_tech);
+        old_mode = mm_modem_gsm_network_act_to_old_mode (priv->act);
         g_hash_table_insert (properties, "network_mode", simple_uint_value (old_mode));
 
         /* New key */
-        g_hash_table_insert (properties, "access_technology", simple_uint_value (priv->access_tech));
+        g_hash_table_insert (properties, "access_technology", simple_uint_value (priv->act));
     }
 }
 
@@ -2704,7 +2682,7 @@ mm_generic_gsm_init (MMGenericGsm *self)
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
 
-    priv->access_tech = MM_MODEM_GSM_MODE_UNKNOWN;
+    priv->act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     priv->reg_regex = mm_gsm_creg_regex_get (TRUE);
 
     mm_properties_changed_signal_register_property (G_OBJECT (self),
@@ -2783,9 +2761,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case MM_GENERIC_GSM_PROP_ACCESS_TECHNOLOGY:
         if (mm_modem_get_state (MM_MODEM (object)) >= MM_MODEM_STATE_ENABLED)
-            g_value_set_uint (value, priv->access_tech);
+            g_value_set_uint (value, priv->act);
         else
-            g_value_set_uint (value, MM_MODEM_GSM_MODE_UNKNOWN);
+            g_value_set_uint (value, MM_MODEM_GSM_ACCESS_TECH_UNKNOWN);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);

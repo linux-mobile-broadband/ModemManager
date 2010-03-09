@@ -426,7 +426,7 @@ handle_mode_change (MMSerialPort *port,
                     gpointer user_data)
 {
     MMModemHuaweiGsm *self = MM_MODEM_HUAWEI_GSM (user_data);
-    MMModemGsmMode new_mode = MM_MODEM_GSM_MODE_UNKNOWN;
+    MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     char *str;
     int a;
     int b;
@@ -439,25 +439,29 @@ handle_mode_change (MMSerialPort *port,
     b = atoi (str);
     g_free (str);
 
-    if (a == 3 && b == 2)
-        new_mode = MM_MODEM_GSM_MODE_GPRS;
-    else if (a == 3 && b == 3)
-        new_mode = MM_MODEM_GSM_MODE_EDGE;
-    else if (a == 5 && b == 4)
-        new_mode = MM_MODEM_GSM_MODE_UMTS;
-    else if (a == 5 && b == 5)
-        new_mode = MM_MODEM_GSM_MODE_HSDPA;
-    else if (a == 5 && b == 6)
-        new_mode = MM_MODEM_GSM_MODE_HSUPA;
-    else if (a == 5 && b == 7)
-        new_mode = MM_MODEM_GSM_MODE_HSPA;
-    else {
+    if (a == 3) {   /* GSM/GPRS mode */
+        if (b == 1)
+            act = MM_MODEM_GSM_ACCESS_TECH_GSM;
+        else if (b == 2)
+            act = MM_MODEM_GSM_ACCESS_TECH_GPRS;
+        else if (b == 3)
+            act = MM_MODEM_GSM_ACCESS_TECH_EDGE;
+    } else if (a == 5) {  /* WCDMA mode */
+        if (b == 4)
+            act = MM_MODEM_GSM_ACCESS_TECH_UMTS;
+        else if (b == 5)
+            act = MM_MODEM_GSM_ACCESS_TECH_HSDPA;
+        else if (b == 6)
+            act = MM_MODEM_GSM_ACCESS_TECH_HSUPA;
+        else if (b == 7)
+            act = MM_MODEM_GSM_ACCESS_TECH_HSPA;
+    } else {
         g_warning ("Couldn't parse mode change value: '%s'", str);
         return;
     }
 
-    g_debug ("Access Technology: %d", new_mode);
-    mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (self), new_mode);
+    g_debug ("Access Technology: %d", act);
+    mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (self), act);
 }
 
 static void
