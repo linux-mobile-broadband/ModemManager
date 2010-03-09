@@ -5,8 +5,8 @@
     <tp:flags name="MM_MODEM_GSM_MODE" value-prefix="MM_MODEM_GSM_MODE" type="u">
       <tp:docstring>
         A bitfield describing the specifc access modes and technologies
-        supported by a device, the device's current access mode preference, and
-        the access technology in-use when connected to a mobile network.
+        supported by a device and the access technology in-use when connected to
+        a mobile network.
       </tp:docstring>
       <tp:flag suffix="UNKNOWN" value="0x0">
         <tp:docstring>Unknown or invalid mode.</tp:docstring>
@@ -98,5 +98,30 @@
         <tp:docstring>WCDMA 3GPP UMTS 1700 MHz (Class IX)</tp:docstring>
       </tp:flag>
     </tp:flags>
+
+    <tp:enum name="MM_MODEM_GSM_ALLOWED_MODE" type="u">
+      <tp:docstring>
+        Describes the device's current access mode preference; ie the specific
+        technology preferences the device is allowed to use when connecting to
+        a mobile network.
+      </tp:docstring>
+      <tp:enumvalue suffix="ANY" value="0">
+	<tp:docstring>Any mode can be used</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="2G_PREFERRED" value="1">
+	<tp:docstring>Prefer 2G (GPRS or EDGE)</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="3G_PREFERRED" value="2">
+	<tp:docstring>Prefer 3G (UMTS or HSxPA)</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="2G_ONLY" value="3">
+	<tp:docstring>Use only 2G (GPRS or EDGE)</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="3G_ONLY" value="4">
+	<tp:docstring>Use only 3G (UMTS or HSxPA)</tp:docstring>
+      </tp:enumvalue>
+    </tp:enum>
+
   </interface>
 </node>
+

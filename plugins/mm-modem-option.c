@@ -101,20 +101,20 @@ get_allowed_mode_done (MMSerialPort *port,
         int a, b;
 
         if (sscanf (response->str + 8, "%d,%d", &a, &b)) {
-            MMModemGsmMode mode = MM_MODEM_GSM_MODE_ANY;
+            MMModemGsmAllowedMode mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
 
             switch (a) {
             case 0:
-                mode = MM_MODEM_GSM_MODE_2G_ONLY;
+                mode = MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY;
                 break;
             case 1:
-                mode = MM_MODEM_GSM_MODE_3G_ONLY;
+                mode = MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY;
                 break;
             case 2:
-                mode = MM_MODEM_GSM_MODE_2G_PREFERRED;
+                mode = MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED;
                 break;
             case 3:
-                mode = MM_MODEM_GSM_MODE_3G_PREFERRED;
+                mode = MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED;
                 break;
             default:
                 break;
@@ -162,7 +162,7 @@ set_allowed_mode_done (MMSerialPort *port,
 
 static void
 set_allowed_mode (MMGenericGsm *gsm,
-                  MMModemGsmMode mode,
+                  MMModemGsmAllowedMode mode,
                   MMModemFn callback,
                   gpointer user_data)
 {
@@ -174,19 +174,19 @@ set_allowed_mode (MMGenericGsm *gsm,
     info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
 
     switch (mode) {
-    case MM_MODEM_GSM_MODE_2G_ONLY:
+    case MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY:
         i = 0;
         break;
-    case MM_MODEM_GSM_MODE_3G_ONLY:
+    case MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY:
         i = 1;
         break;
-    case MM_MODEM_GSM_MODE_2G_PREFERRED:
+    case MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED:
         i = 2;
         break;
-    case MM_MODEM_GSM_MODE_3G_PREFERRED:
+    case MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED:
         i = 3;
         break;
-    case MM_MODEM_GSM_MODE_ANY:
+    case MM_MODEM_GSM_ALLOWED_MODE_ANY:
     default:
         i = 5;
         break;

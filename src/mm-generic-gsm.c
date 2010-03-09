@@ -56,7 +56,7 @@ typedef struct {
     guint32 pin_check_tries;
     guint pin_check_timeout;
 
-    guint32 allowed_mode;
+    MMModemGsmAllowedMode allowed_mode;
 
     char *oper_code;
     char *oper_name;
@@ -646,13 +646,13 @@ creg2_done (MMSerialPort *port,
 
 static void
 get_allowed_mode_done (MMModem *modem,
-                        MMModemGsmMode mode,
+                        MMModemGsmAllowedMode mode,
                         GError *error,
                         gpointer user_data)
 {
     if (modem) {
         mm_generic_gsm_update_allowed_mode (MM_GENERIC_GSM (modem),
-                                            error ? MM_MODEM_GSM_MODE_UNKNOWN : mode);
+                                            error ? MM_MODEM_GSM_ALLOWED_MODE_ANY : mode);
     }
 }
 
@@ -2269,7 +2269,7 @@ mm_generic_gsm_update_access_technology (MMGenericGsm *modem,
 
 void
 mm_generic_gsm_update_allowed_mode (MMGenericGsm *self,
-                                    MMModemGsmMode mode)
+                                    MMModemGsmAllowedMode mode)
 {
     MMGenericGsmPrivate *priv;
 
@@ -2291,7 +2291,7 @@ set_allowed_mode_done (MMModem *modem, GError *error, gpointer user_data)
 
     info->error = mm_modem_check_removed (info->modem, error);
     if (!info->error) {
-        MMModemGsmMode mode = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "mode"));
+        MMModemGsmAllowedMode mode = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "mode"));
 
         mm_generic_gsm_update_allowed_mode (MM_GENERIC_GSM (info->modem), mode);
     }
@@ -2301,7 +2301,7 @@ set_allowed_mode_done (MMModem *modem, GError *error, gpointer user_data)
 
 static void
 set_allowed_mode (MMModemGsmNetwork *net,
-                  MMModemGsmMode mode,
+                  MMModemGsmAllowedMode mode,
                   MMModemFn callback,
                   gpointer user_data)
 {
@@ -2310,17 +2310,27 @@ set_allowed_mode (MMModemGsmNetwork *net,
 
     info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
 
-    if (mode == MM_MODEM_GSM_MODE_UNKNOWN) {
+    switch (mode) {
+    case MM_MODEM_GSM_ALLOWED_MODE_ANY:
+    case MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED:
+    case MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED:
+    case MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY:
+    case MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY:
+        if (!MM_GENERIC_GSM_GET_CLASS (self)->set_allowed_mode) {
+            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                               "Operation not supported");
+        } else {
+            mm_callback_info_set_data (info, "mode", GUINT_TO_POINTER (mode), NULL);
+            MM_GENERIC_GSM_GET_CLASS (self)->set_allowed_mode (self, mode, set_allowed_mode_done, info);
+        }
+        break;
+    default:
         info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Invalid mode.");
-        mm_callback_info_schedule (info);
-    } else if (!MM_GENERIC_GSM_GET_CLASS (self)->set_allowed_mode) {
-        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
-                                           "Operation not supported");
-        mm_callback_info_schedule (info);
-    } else {
-        mm_callback_info_set_data (info, "mode", GUINT_TO_POINTER (mode), NULL);
-        MM_GENERIC_GSM_GET_CLASS (self)->set_allowed_mode (self, mode, set_allowed_mode_done, info);
+        break;
     }
+
+    if (info->error)
+        mm_callback_info_schedule (info);
 }
 
 /*****************************************************************************/
@@ -2631,7 +2641,7 @@ simple_get_status (MMModemSimple *simple,
 
     if (priv->access_tech > -1) {
         /* Deprecated key */
-        old_mode = mm_modem_gsm_network_new_mode_to_old (priv->access_tech);
+        old_mode = mm_modem_gsm_network_act_to_old_mode (priv->access_tech);
         g_hash_table_insert (properties, "network_mode", simple_uint_value (old_mode));
 
         /* New key */

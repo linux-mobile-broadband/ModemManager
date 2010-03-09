@@ -44,7 +44,7 @@ static void impl_gsm_modem_get_band (MMModemGsmNetwork *modem,
                                      DBusGMethodInvocation *context);
 
 static void impl_gsm_modem_set_allowed_mode (MMModemGsmNetwork *modem,
-                                             MMModemGsmMode mode,
+                                             MMModemGsmAllowedMode mode,
                                              DBusGMethodInvocation *context);
 
 static void impl_gsm_modem_set_network_mode (MMModemGsmNetwork *modem,
@@ -73,41 +73,27 @@ static guint signals[LAST_SIGNAL] = { 0 };
 
 /*****************************************************************************/
 
-MMModemGsmMode
-mm_modem_gsm_network_old_mode_to_new (MMModemDeprecatedMode old_mode)
+MMModemGsmAllowedMode
+mm_modem_gsm_network_old_mode_to_allowed (MMModemDeprecatedMode old_mode)
 {
     /* Translate deprecated mode into new mode */
     switch (old_mode) {
-    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_GPRS:
-        return MM_MODEM_GSM_MODE_GPRS;
-    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_EDGE:
-        return MM_MODEM_GSM_MODE_EDGE;
-    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_UMTS:
-        return MM_MODEM_GSM_MODE_UMTS;
-    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_HSDPA:
-        return MM_MODEM_GSM_MODE_HSDPA;
     case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_2G_PREFERRED:
-        return MM_MODEM_GSM_MODE_2G_PREFERRED;
+        return MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED;
     case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_3G_PREFERRED:
-        return MM_MODEM_GSM_MODE_3G_PREFERRED;
+        return MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED;
     case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_2G_ONLY:
-        return MM_MODEM_GSM_MODE_2G_ONLY;
+        return MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY;
     case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_3G_ONLY:
-        return MM_MODEM_GSM_MODE_3G_ONLY;
-    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_HSUPA:
-        return MM_MODEM_GSM_MODE_HSUPA;
-    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_HSPA:
-        return MM_MODEM_GSM_MODE_HSDPA | MM_MODEM_GSM_MODE_HSUPA;
+        return MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY;
     case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_ANY:
     default:
-        break;
+        return MM_MODEM_GSM_ALLOWED_MODE_ANY;
     }
-
-    return MM_MODEM_GSM_MODE_ANY;
 }
 
 MMModemDeprecatedMode
-mm_modem_gsm_network_new_mode_to_old (MMModemGsmMode new_mode)
+mm_modem_gsm_network_act_to_old_mode (MMModemGsmMode new_mode)
 {
     /* Translate new mode into old deprecated mode */
     if (new_mode & MM_MODEM_GSM_MODE_GPRS)
@@ -372,7 +358,7 @@ mm_modem_gsm_network_get_band (MMModemGsmNetwork *self,
 
 void
 mm_modem_gsm_network_set_allowed_mode (MMModemGsmNetwork *self,
-                                       MMModemGsmMode mode,
+                                       MMModemGsmAllowedMode mode,
                                        MMModemFn callback,
                                        gpointer user_data)
 {
@@ -550,14 +536,14 @@ impl_gsm_modem_set_network_mode (MMModemGsmNetwork *modem,
     }
 
     mm_modem_gsm_network_set_allowed_mode (modem,
-                                           mm_modem_gsm_network_old_mode_to_new (old_mode),
+                                           mm_modem_gsm_network_old_mode_to_allowed (old_mode),
                                            async_call_done,
                                            context);
 }
 
 static void
 impl_gsm_modem_set_allowed_mode (MMModemGsmNetwork *modem,
-                                 MMModemGsmMode mode,
+                                 MMModemGsmAllowedMode mode,
                                  DBusGMethodInvocation *context)
 {
     if (!check_for_single_value (mode)) {
@@ -581,9 +567,9 @@ impl_gsm_modem_get_network_mode (MMModemGsmNetwork *modem,
 
     /* DEPRECATED; it's now a property so it's quite easy to handle */
     g_object_get (G_OBJECT (modem),
-                  MM_MODEM_GSM_NETWORK_ALLOWED_MODE, &mode,
+                  MM_MODEM_GSM_NETWORK_ACCESS_TECHNOLOGY, &mode,
                   NULL);
-    dbus_g_method_return (context, mm_modem_gsm_network_new_mode_to_old (mode));
+    dbus_g_method_return (context, mm_modem_gsm_network_act_to_old_mode (mode));
 }
 
 static void
@@ -610,8 +596,8 @@ mm_modem_gsm_network_init (gpointer g_iface)
          g_param_spec_uint (MM_MODEM_GSM_NETWORK_ALLOWED_MODE,
                             "Allowed Mode",
                             "Allowed network access mode",
-                            MM_MODEM_GSM_MODE_UNKNOWN,
-                            G_MAXUINT32,
+                            MM_MODEM_GSM_ALLOWED_MODE_ANY,
+                            MM_MODEM_GSM_ALLOWED_MODE_LAST,
                             MM_MODEM_GSM_MODE_UNKNOWN,
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 

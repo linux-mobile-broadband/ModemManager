@@ -93,7 +93,7 @@ struct _MMModemGsmNetwork {
                       gpointer user_data);
 
     void (*set_allowed_mode) (MMModemGsmNetwork *self,
-                              MMModemGsmMode mode,
+                              MMModemGsmAllowedMode mode,
                               MMModemFn callback,
                               gpointer user_data);
 
@@ -140,15 +140,6 @@ void mm_modem_gsm_network_get_band (MMModemGsmNetwork *self,
                                     MMModemUIntFn callback,
                                     gpointer user_data);
 
-void mm_modem_gsm_network_set_mode (MMModemGsmNetwork *self,
-                                    MMModemGsmMode mode,
-                                    MMModemFn callback,
-                                    gpointer user_data);
-
-void mm_modem_gsm_network_get_mode (MMModemGsmNetwork *self,
-                                    MMModemUIntFn callback,
-                                    gpointer user_data);
-
 void mm_modem_gsm_network_get_registration_info (MMModemGsmNetwork *self,
                                                  MMModemGsmNetworkRegInfoFn callback,
                                                  gpointer user_data);
@@ -159,7 +150,7 @@ void mm_modem_gsm_network_signal_quality (MMModemGsmNetwork *self,
                                           guint32 quality);
 
 void mm_modem_gsm_network_set_allowed_mode (MMModemGsmNetwork *self,
-                                            MMModemGsmMode mode,
+                                            MMModemGsmAllowedMode mode,
                                             MMModemFn callback,
                                             gpointer user_data);
 
@@ -169,8 +160,8 @@ void mm_modem_gsm_network_registration_info (MMModemGsmNetwork *self,
                                              const char *oper_name);
 
 /* Private */
-MMModemDeprecatedMode mm_modem_gsm_network_new_mode_to_old (MMModemGsmMode new_mode);
+MMModemDeprecatedMode mm_modem_gsm_network_act_to_old_mode (MMModemGsmMode new_mode);
 
-MMModemGsmMode mm_modem_gsm_network_old_mode_to_new (MMModemDeprecatedMode old_mode);
+MMModemGsmAllowedMode mm_modem_gsm_network_old_mode_to_allowed (MMModemDeprecatedMode old_mode);
 
 #endif /* MM_MODEM_GSM_NETWORK_H */

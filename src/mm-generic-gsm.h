@@ -81,7 +81,7 @@ typedef struct {
 
     /* Called by the generic class to set the allowed operating mode of the device */
     void (*set_allowed_mode) (MMGenericGsm *self,
-                               MMModemGsmMode mode,
+                               MMModemGsmAllowedMode mode,
                                MMModemFn callback,
                                gpointer user_data);
 
@@ -124,7 +124,7 @@ void mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
  * allowed to choose from when connecting.
  */
 void mm_generic_gsm_update_allowed_mode (MMGenericGsm *modem,
-                                         MMModemGsmMode mode);
+                                         MMModemGsmAllowedMode mode);
 
 /* Called to asynchronously update the current access technology of the device;
  * this is NOT the 2G/3G mode preference, but the current radio access

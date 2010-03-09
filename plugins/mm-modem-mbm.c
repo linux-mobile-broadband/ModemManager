@@ -165,16 +165,16 @@ do_register (MMModemGsmNetwork *modem,
 }
 
 static int
-mbm_parse_network_mode (MMModemGsmMode network_mode)
+mbm_parse_allowed_mode (MMModemGsmAllowedMode network_mode)
 {
     switch (network_mode) {
-    case MM_MODEM_GSM_MODE_ANY:
-    case MM_MODEM_GSM_MODE_3G_PREFERRED:
-    case MM_MODEM_GSM_MODE_2G_PREFERRED:
+    case MM_MODEM_GSM_ALLOWED_MODE_ANY:
+    case MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED:
+    case MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED:
         return MBM_NETWORK_MODE_ANY;
-    case MM_MODEM_GSM_MODE_2G_ONLY:
+    case MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY:
         return MBM_NETWORK_MODE_2G;
-    case MM_MODEM_GSM_MODE_3G_ONLY:
+    case MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY:
         return MBM_NETWORK_MODE_3G;
     default:
         return MBM_NETWORK_MODE_ANY;
@@ -197,7 +197,7 @@ mbm_set_allowed_mode_done (MMSerialPort *port,
 
 static void
 set_allowed_mode (MMGenericGsm *gsm,
-                  MMModemGsmMode mode,
+                  MMModemGsmAllowedMode mode,
                   MMModemFn callback,
                   gpointer user_data)
 {
@@ -209,7 +209,7 @@ set_allowed_mode (MMGenericGsm *gsm,
     primary = mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
 
-    command = g_strdup_printf ("+CFUN=%d", mbm_parse_network_mode (mode));
+    command = g_strdup_printf ("+CFUN=%d", mbm_parse_allowed_mode (mode));
     mm_serial_port_queue_command (primary, command, 3, mbm_set_allowed_mode_done, info);
     g_free (command);
 }
@@ -278,14 +278,14 @@ get_allowed_mode_done (MMSerialPort *port,
     if (error)
         info->error = g_error_copy (error);
     else if (!g_str_has_prefix (response->str, "CFUN: ")) {
-        MMModemGsmMode mode = MM_MODEM_GSM_MODE_ANY;
+        MMModemGsmAllowedMode mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
         int a;
 
         a = atoi (response->str + 6);
         if (a == MBM_NETWORK_MODE_2G)
-            mode = MM_MODEM_GSM_MODE_2G_ONLY;
+            mode = MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY;
         else if (a == MBM_NETWORK_MODE_3G)
-            mode = MM_MODEM_GSM_MODE_3G_ONLY;
+            mode = MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY;
 
         mm_callback_info_set_result (info, GUINT_TO_POINTER (mode), NULL);
         parsed = TRUE;
@@ -331,7 +331,22 @@ simple_connect (MMModemSimple *simple,
     priv->password = mbm_simple_get_string_property (properties, "password", &info->error);
 
     network_mode = mbm_simple_get_uint_property (properties, "network_mode", &info->error);
-    priv->network_mode = mbm_parse_network_mode (network_mode);
+    switch (network_mode) {
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_ANY:
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_3G_PREFERRED:
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_2G_PREFERRED:
+        priv->network_mode = MBM_NETWORK_MODE_ANY;
+        break;
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_2G_ONLY:
+        priv->network_mode = MBM_NETWORK_MODE_2G;
+        break;
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_3G_ONLY:
+        priv->network_mode = MBM_NETWORK_MODE_3G;
+        break;
+    default:
+        priv->network_mode = MBM_NETWORK_MODE_ANY;
+        break;
+    }
 
     parent_iface = g_type_interface_peek_parent (MM_MODEM_SIMPLE_GET_INTERFACE (simple));
     parent_iface->connect (MM_MODEM_SIMPLE (simple), properties, callback, info);
