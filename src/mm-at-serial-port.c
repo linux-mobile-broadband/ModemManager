@@ -78,7 +78,8 @@ parse_response (MMSerialPort *port, GByteArray *response, GError **error)
     /* And copy it back into the response array after the parser has removed
      * matches and cleaned it up.
      */
-    g_byte_array_remove_range (response, 0, response->len);
+    if (response->len)
+        g_byte_array_remove_range (response, 0, response->len);
     g_byte_array_append (response, (const guint8 *) string->str, string->len);
     g_string_free (string, TRUE);
     return found;
