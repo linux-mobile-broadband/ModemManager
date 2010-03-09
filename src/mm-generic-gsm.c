@@ -1475,14 +1475,21 @@ reg_state_changed (MMSerialPort *port,
         return;
     }
 
-    if (reg_status_updated (self, state, NULL)) {
-        /* If registration is finished (either registered or failed) but the
-         * registration query hasn't completed yet, just remove the timeout and
-         * let the registration query complete.
-         */
-        if (priv->pending_reg_id) {
-            g_source_remove (priv->pending_reg_id);
-            priv->pending_reg_id = 0;
+    /* Don't update reg state on CGREG responses since for many devices it's
+     * unclear what that registration state that actually reflects.  We'll
+     * take CGREG registration state into account later when we have a more
+     * consistent way of handling it.
+     */
+    if (cgreg == FALSE) {
+        if (reg_status_updated (self, state, NULL)) {
+            /* If registration is finished (either registered or failed) but the
+             * registration query hasn't completed yet, just remove the timeout and
+             * let the registration query complete.
+             */
+            if (priv->pending_reg_id) {
+                g_source_remove (priv->pending_reg_id);
+                priv->pending_reg_id = 0;
+            }
         }
     }
 
