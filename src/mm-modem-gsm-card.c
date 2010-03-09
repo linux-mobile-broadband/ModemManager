@@ -225,7 +225,7 @@ impl_gsm_modem_get_imei (MMModemGsmCard *modem, DBusGMethodInvocation *context)
 
     /* Make sure the caller is authorized to get the IMEI */
     if (!mm_modem_auth_request (MM_MODEM (modem),
-                                MM_AUTHORIZATION_DEVICE,
+                                MM_AUTHORIZATION_DEVICE_INFO,
                                 context,
                                 imei_auth_cb,
                                 NULL,
@@ -262,7 +262,7 @@ impl_gsm_modem_get_imsi (MMModemGsmCard *modem, DBusGMethodInvocation *context)
 
     /* Make sure the caller is authorized to get the IMSI */
     if (!mm_modem_auth_request (MM_MODEM (modem),
-                                MM_AUTHORIZATION_DEVICE,
+                                MM_AUTHORIZATION_DEVICE_INFO,
                                 context,
                                 imsi_auth_cb,
                                 NULL,
@@ -343,7 +343,7 @@ impl_gsm_modem_send_puk (MMModemGsmCard *modem,
 
     /* Make sure the caller is authorized to send the PUK */
     if (!mm_modem_auth_request (MM_MODEM (modem),
-                                MM_AUTHORIZATION_DEVICE,
+                                MM_AUTHORIZATION_DEVICE_CONTROL,
                                 context,
                                 send_puk_auth_cb,
                                 info,
@@ -386,7 +386,7 @@ impl_gsm_modem_send_pin (MMModemGsmCard *modem,
 
     /* Make sure the caller is authorized to unlock the modem */
     if (!mm_modem_auth_request (MM_MODEM (modem),
-                                MM_AUTHORIZATION_DEVICE,
+                                MM_AUTHORIZATION_DEVICE_CONTROL,
                                 context,
                                 send_pin_auth_cb,
                                 info,
@@ -430,7 +430,7 @@ impl_gsm_modem_enable_pin (MMModemGsmCard *modem,
 
     /* Make sure the caller is authorized to enable a PIN */
     if (!mm_modem_auth_request (MM_MODEM (modem),
-                                MM_AUTHORIZATION_DEVICE,
+                                MM_AUTHORIZATION_DEVICE_CONTROL,
                                 context,
                                 enable_pin_auth_cb,
                                 info,
@@ -474,7 +474,7 @@ impl_gsm_modem_change_pin (MMModemGsmCard *modem,
 
     /* Make sure the caller is authorized to change the PIN */
     if (!mm_modem_auth_request (MM_MODEM (modem),
-                                MM_AUTHORIZATION_DEVICE,
+                                MM_AUTHORIZATION_DEVICE_CONTROL,
                                 context,
                                 change_pin_auth_cb,
                                 info,
@@ -503,7 +503,7 @@ mm_modem_gsm_card_init (gpointer g_iface)
                             "Supported Modes",
                             "Supported frequency bands of the card",
                             MM_MODEM_GSM_BAND_UNKNOWN,
-                            MM_MODEM_GSM_BAND_LAST,
+                            G_MAXUINT32,
                             MM_MODEM_GSM_BAND_UNKNOWN,
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
@@ -513,7 +513,7 @@ mm_modem_gsm_card_init (gpointer g_iface)
                             "Supported Modes",
                             "Supported modes of the card (ex 2G preferred, 3G preferred, 2G only, etc",
                             MM_MODEM_GSM_MODE_UNKNOWN,
-                            MM_MODEM_GSM_MODE_LAST,
+                            G_MAXUINT32,
                             MM_MODEM_GSM_MODE_UNKNOWN,
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }

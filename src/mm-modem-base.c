@@ -265,6 +265,9 @@ mm_modem_base_init (MMModemBase *self)
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_ENABLED,
                                                     MM_MODEM_DBUS_INTERFACE);
+    mm_properties_changed_signal_register_property (G_OBJECT (self),
+                                                    MM_MODEM_UNLOCK_REQUIRED,
+                                                    MM_MODEM_DBUS_INTERFACE);
 }
 
 static void

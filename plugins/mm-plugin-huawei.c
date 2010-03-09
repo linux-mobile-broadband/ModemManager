@@ -284,16 +284,9 @@ grab_port (MMPluginBase *base,
     caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
     if (!existing) {
         if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
-            if (product == 0x1001) {
-                /* This modem is handled by generic GSM driver */
-                modem = mm_generic_gsm_new (sysfs_path,
-                                            mm_plugin_base_supports_task_get_driver (task),
-                                            mm_plugin_get_name (MM_PLUGIN (base)));
-            } else {
-                modem = mm_modem_huawei_gsm_new (sysfs_path,
-                                                 mm_plugin_base_supports_task_get_driver (task),
-                                                 mm_plugin_get_name (MM_PLUGIN (base)));
-            }
+            modem = mm_modem_huawei_gsm_new (sysfs_path,
+                                                mm_plugin_base_supports_task_get_driver (task),
+                                                mm_plugin_get_name (MM_PLUGIN (base)));
         } else if (caps & CAP_CDMA) {
             modem = mm_modem_huawei_cdma_new (sysfs_path,
                                               mm_plugin_base_supports_task_get_driver (task),
@@ -313,7 +306,7 @@ grab_port (MMPluginBase *base,
         MMPortType ptype = MM_PORT_TYPE_UNKNOWN;
 
         info = g_object_get_data (G_OBJECT (task), TAG_SUPPORTS_INFO);
-        if (info && info->secondary && (product != 0x1001))
+        if (info && info->secondary)
             ptype = MM_PORT_TYPE_SECONDARY;
 
         modem = existing;

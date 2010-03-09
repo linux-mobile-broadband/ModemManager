@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
 #ifndef MM_MODEM_GSM_NETWORK_H
@@ -20,10 +20,22 @@
 #include <mm-modem.h>
 #include <mm-modem-gsm.h>
 
+#define MM_MODEM_GSM_NETWORK_DBUS_INTERFACE "org.freedesktop.ModemManager.Modem.Gsm.Network"
+
 #define MM_TYPE_MODEM_GSM_NETWORK      (mm_modem_gsm_network_get_type ())
 #define MM_MODEM_GSM_NETWORK(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_MODEM_GSM_NETWORK, MMModemGsmNetwork))
 #define MM_IS_MODEM_GSM_NETWORK(obj)   (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_MODEM_GSM_NETWORK))
 #define MM_MODEM_GSM_NETWORK_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_MODEM_GSM_NETWORK, MMModemGsmNetwork))
+
+#define MM_MODEM_GSM_NETWORK_ALLOWED_MODE      "allowed-mode"
+#define MM_MODEM_GSM_NETWORK_ACCESS_TECHNOLOGY "access-technology"
+
+typedef enum {
+    MM_MODEM_GSM_NETWORK_PROP_FIRST = 0x1200,
+
+    MM_MODEM_GSM_NETWORK_PROP_ALLOWED_MODE = MM_MODEM_GSM_NETWORK_PROP_FIRST,
+    MM_MODEM_GSM_NETWORK_PROP_ACCESS_TECHNOLOGY,
+} MMModemGsmNetworkProp;
 
 typedef enum {
     MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE = 0,
@@ -80,13 +92,9 @@ struct _MMModemGsmNetwork {
                       MMModemUIntFn callback,
                       gpointer user_data);
 
-    void (*set_network_mode) (MMModemGsmNetwork *self,
-                              MMModemGsmMode mode,
+    void (*set_allowed_mode) (MMModemGsmNetwork *self,
+                              MMModemGsmAllowedMode mode,
                               MMModemFn callback,
-                              gpointer user_data);
-
-    void (*get_network_mode) (MMModemGsmNetwork *self,
-                              MMModemUIntFn callback,
                               gpointer user_data);
 
     void (*get_registration_info) (MMModemGsmNetwork *self,
@@ -101,9 +109,6 @@ struct _MMModemGsmNetwork {
                                MMModemGsmNetworkRegStatus status,
                                const char *open_code,
                                const char *oper_name);
-
-    void (*network_mode) (MMModemGsmNetwork *self,
-                          MMModemGsmMode mode);
 };
 
 GType mm_modem_gsm_network_get_type (void);
@@ -135,15 +140,6 @@ void mm_modem_gsm_network_get_band (MMModemGsmNetwork *self,
                                     MMModemUIntFn callback,
                                     gpointer user_data);
 
-void mm_modem_gsm_network_set_mode (MMModemGsmNetwork *self,
-                                    MMModemGsmMode mode,
-                                    MMModemFn callback,
-                                    gpointer user_data);
-
-void mm_modem_gsm_network_get_mode (MMModemGsmNetwork *self,
-                                    MMModemUIntFn callback,
-                                    gpointer user_data);
-
 void mm_modem_gsm_network_get_registration_info (MMModemGsmNetwork *self,
                                                  MMModemGsmNetworkRegInfoFn callback,
                                                  gpointer user_data);
@@ -153,12 +149,19 @@ void mm_modem_gsm_network_get_registration_info (MMModemGsmNetwork *self,
 void mm_modem_gsm_network_signal_quality (MMModemGsmNetwork *self,
                                           guint32 quality);
 
+void mm_modem_gsm_network_set_allowed_mode (MMModemGsmNetwork *self,
+                                            MMModemGsmAllowedMode mode,
+                                            MMModemFn callback,
+                                            gpointer user_data);
+
 void mm_modem_gsm_network_registration_info (MMModemGsmNetwork *self,
                                              MMModemGsmNetworkRegStatus status,
                                              const char *oper_code,
                                              const char *oper_name);
 
-void mm_modem_gsm_network_mode (MMModemGsmNetwork *self,
-                                MMModemGsmMode mode);
+/* Private */
+MMModemDeprecatedMode mm_modem_gsm_network_act_to_old_mode (MMModemGsmAccessTech act);
+
+MMModemGsmAllowedMode mm_modem_gsm_network_old_mode_to_allowed (MMModemDeprecatedMode old_mode);
 
 #endif /* MM_MODEM_GSM_NETWORK_H */

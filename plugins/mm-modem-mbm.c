@@ -1,11 +1,13 @@
 /* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 /*
- * Copyright (C) 2008 Ericsson AB
+ * Copyright (C) 2008 - 2010 Ericsson AB
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  *
  * Author: Per Hallsmark <per.hallsmark@ericsson.com>
  *         Bjorn Runaker <bjorn.runaker@ericsson.com>
  *         Torgny Johansson <torgny.johansson@ericsson.com>
  *         Jonas Sjöquist <jonas.sjoquist@ericsson.com>
+ *         Dan Williams <dcbw@redhat.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -163,21 +165,16 @@ do_register (MMModemGsmNetwork *modem,
 }
 
 static int
-mbm_parse_network_mode (MMModemGsmMode network_mode)
+mbm_parse_allowed_mode (MMModemGsmAllowedMode network_mode)
 {
     switch (network_mode) {
-    case MM_MODEM_GSM_MODE_ANY:
-    case MM_MODEM_GSM_MODE_3G_PREFERRED:
-    case MM_MODEM_GSM_MODE_2G_PREFERRED:
+    case MM_MODEM_GSM_ALLOWED_MODE_ANY:
+    case MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED:
+    case MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED:
         return MBM_NETWORK_MODE_ANY;
-    case MM_MODEM_GSM_MODE_GPRS:
-    case MM_MODEM_GSM_MODE_EDGE:
-    case MM_MODEM_GSM_MODE_2G_ONLY:
+    case MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY:
         return MBM_NETWORK_MODE_2G;
-    case MM_MODEM_GSM_MODE_3G_ONLY:
-    case MM_MODEM_GSM_MODE_HSDPA:
-    case MM_MODEM_GSM_MODE_HSUPA:
-    case MM_MODEM_GSM_MODE_HSPA:
+    case MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY:
         return MBM_NETWORK_MODE_3G;
     default:
         return MBM_NETWORK_MODE_ANY;
@@ -185,7 +182,7 @@ mbm_parse_network_mode (MMModemGsmMode network_mode)
 }
 
 static void
-mbm_set_network_mode_done (MMAtSerialPort *port,
+mbm_set_allowed_mode_done (MMAtSerialPort *port,
                            GString *response,
                            GError *error,
                            gpointer user_data)
@@ -199,8 +196,8 @@ mbm_set_network_mode_done (MMAtSerialPort *port,
 }
 
 static void
-set_network_mode (MMModemGsmNetwork *modem,
-                  MMModemGsmMode mode,
+set_allowed_mode (MMGenericGsm *gsm,
+                  MMModemGsmAllowedMode mode,
                   MMModemFn callback,
                   gpointer user_data)
 {
@@ -208,15 +205,16 @@ set_network_mode (MMModemGsmNetwork *modem,
     char *command;
     MMAtSerialPort *primary;
 
-    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
+    primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
 
-    command = g_strdup_printf ("+CFUN=%d", mbm_parse_network_mode (mode));
-    mm_at_serial_port_queue_command (primary, command, 3, mbm_set_network_mode_done, info);
+    command = g_strdup_printf ("+CFUN=%d", mbm_parse_allowed_mode (mode));
+    mm_at_serial_port_queue_command (primary, command, 3, mbm_set_allowed_mode_done, info);
     g_free (command);
 }
 
+#if 0
 static void
 get_network_mode_done (MMAtSerialPort *port,
                        GString *response,
@@ -266,19 +264,52 @@ done:
 
     mm_callback_info_schedule (info);
 }
+#endif
 
 static void
-get_network_mode (MMModemGsmNetwork *modem,
+get_allowed_mode_done (MMAtSerialPort *port,
+                       GString *response,
+                       GError *error,
+                       gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    gboolean parsed = FALSE;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else if (!g_str_has_prefix (response->str, "CFUN: ")) {
+        MMModemGsmAllowedMode mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
+        int a;
+
+        a = atoi (response->str + 6);
+        if (a == MBM_NETWORK_MODE_2G)
+            mode = MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY;
+        else if (a == MBM_NETWORK_MODE_3G)
+            mode = MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY;
+
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (mode), NULL);
+        parsed = TRUE;
+    }
+
+    if (!error && !parsed)
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse allowed mode results");
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_allowed_mode (MMGenericGsm *gsm,
                   MMModemUIntFn callback,
                   gpointer user_data)
 {
     MMCallbackInfo *info;
     MMAtSerialPort *primary;
 
-    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    info = mm_callback_info_uint_new (MM_MODEM (gsm), callback, user_data);
+    primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-    mm_at_serial_port_queue_command (primary, "*ERINFO?", 3, get_network_mode_done, info);
+    mm_at_serial_port_queue_command (primary, "CFUN?", 3, get_allowed_mode_done, info);
 }
 
 /*****************************************************************************/
@@ -300,7 +331,22 @@ simple_connect (MMModemSimple *simple,
     priv->password = mbm_simple_get_string_property (properties, "password", &info->error);
 
     network_mode = mbm_simple_get_uint_property (properties, "network_mode", &info->error);
-    priv->network_mode = mbm_parse_network_mode (network_mode);
+    switch (network_mode) {
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_ANY:
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_3G_PREFERRED:
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_2G_PREFERRED:
+        priv->network_mode = MBM_NETWORK_MODE_ANY;
+        break;
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_2G_ONLY:
+        priv->network_mode = MBM_NETWORK_MODE_2G;
+        break;
+    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_3G_ONLY:
+        priv->network_mode = MBM_NETWORK_MODE_3G;
+        break;
+    default:
+        priv->network_mode = MBM_NETWORK_MODE_ANY;
+        break;
+    }
 
     parent_iface = g_type_interface_peek_parent (MM_MODEM_SIMPLE_GET_INTERFACE (simple));
     parent_iface->connect (MM_MODEM_SIMPLE (simple), properties, callback, info);
@@ -521,14 +567,23 @@ mbm_ciev_received (MMAtSerialPort *port,
 }
 
 static void
-mbm_do_connect_done (MMModemMbm *self)
+mbm_do_connect_done (MMModemMbm *self, gboolean success)
 {
     MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (self);
 
-    if (priv->pending_connect_info) {
+    if (!priv->pending_connect_info)
+        return;
+
+    if (success)
         mm_generic_gsm_connect_complete (MM_GENERIC_GSM (self), NULL, priv->pending_connect_info);
-        priv->pending_connect_info = NULL;
+    else {
+        GError *connect_error;
+
+        connect_error = mm_modem_connect_error_for_code (MM_MODEM_CONNECT_ERROR_BUSY);
+        mm_generic_gsm_connect_complete (MM_GENERIC_GSM (self), connect_error, priv->pending_connect_info);
+        g_error_free (connect_error);
     }
+    priv->pending_connect_info = NULL;
 }
 
 static void
@@ -543,17 +598,18 @@ mbm_e2nap_received (MMAtSerialPort *port,
     if (str)
         state = atoi (str);
 
-    if (MBM_E2NAP_DISCONNECTED == state)
-        g_debug ("%s, disconnected", __func__);
-    else if (MBM_E2NAP_CONNECTED == state) {
-        g_debug ("%s, connected", __func__);
-        mbm_do_connect_done (MM_MODEM_MBM (user_data));
+    if (MBM_E2NAP_DISCONNECTED == state) {
+        g_debug ("%s: disconnected", __func__);
+        mbm_do_connect_done (MM_MODEM_MBM (user_data), FALSE);
+    } else if (MBM_E2NAP_CONNECTED == state) {
+        g_debug ("%s: connected", __func__);
+        mbm_do_connect_done (MM_MODEM_MBM (user_data), TRUE);
     } else if (MBM_E2NAP_CONNECTING == state)
-        g_debug("%s, connecting", __func__);
+        g_debug("%s: connecting", __func__);
     else {
         /* Should not happen */
-        g_debug("%s, undefined e2nap status",__FUNCTION__);
-        g_assert_not_reached ();
+        g_debug("%s: unhandled E2NAP state %d", __func__, state);
+        mbm_do_connect_done (MM_MODEM_MBM (user_data), FALSE);
     }
 }
 
@@ -620,7 +676,6 @@ enap_done (MMAtSerialPort *port,
     tid = g_timeout_add_seconds (1, enap_poll, user_data);
     /* remember poll id as callback info object, with source_remove as free func */
     mm_callback_info_set_data (info, "mbm-enap-poll-id", GUINT_TO_POINTER (tid), (GFreeFunc) g_source_remove);
-    mm_at_serial_port_queue_command (port, "AT*E2NAP=1", 3, NULL, NULL);
 }
 
 static void
@@ -640,6 +695,9 @@ mbm_auth_done (MMAtSerialPort *port,
     }
 
     cid = mm_generic_gsm_get_cid (modem);
+
+    mm_at_serial_port_queue_command (port, "AT*E2NAP=1", 3, NULL, NULL);
+
     command = g_strdup_printf ("AT*ENAP=1,%d", cid);
     mm_at_serial_port_queue_command (port, command, 3, enap_done, user_data);
     g_free (command);
@@ -736,8 +794,6 @@ grab_port (MMModem *modem,
     if (port && MM_IS_AT_SERIAL_PORT (port) && (ptype == MM_PORT_TYPE_PRIMARY)) {
         GRegex *regex;
 
-        mm_generic_gsm_set_unsolicited_registration (MM_GENERIC_GSM (modem), TRUE);
-
         regex = g_regex_new ("\\r\\n\\*EMRDY: \\d\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, mbm_emrdy_received, modem, NULL);
         g_regex_unref (regex);
@@ -773,8 +829,6 @@ static void
 modem_gsm_network_init (MMModemGsmNetwork *class)
 {
     class->do_register = do_register;
-    class->get_network_mode = get_network_mode;
-    class->set_network_mode = set_network_mode;
 }
 
 static void
@@ -823,5 +877,7 @@ mm_modem_mbm_class_init (MMModemMbmClass *klass)
     object_class->finalize = finalize;
 
     gsm_class->do_enable = do_enable;
+    gsm_class->get_allowed_mode = get_allowed_mode;
+    gsm_class->set_allowed_mode = set_allowed_mode;
 }
 

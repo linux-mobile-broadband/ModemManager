@@ -118,23 +118,6 @@ init_modem_done (MMAtSerialPort *port,
     mm_at_serial_port_queue_command (port, "+CPMS?", 10, cpms_try_done, info);
 }
 
-static void
-pin_check_done (MMModem *modem, GError *error, gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMAtSerialPort *primary;
-
-    if (error) {
-        mm_generic_gsm_enable_complete (MM_GENERIC_GSM (modem), error, info);
-        return;
-    }
-
-    /* Finish the initialization */
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
-    g_assert (primary);
-    mm_at_serial_port_queue_command (primary, "Z E0 V1 X4 &C1 +CMEE=1;+CFUN=1;", 10, init_modem_done, info);
-}
-
 static void enable_flash_done (MMSerialPort *port,
                                GError *error,
                                gpointer user_data);
@@ -157,9 +140,8 @@ pre_init_done (MMAtSerialPort *port,
         } else
             mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
     } else {
-        /* Now check the PIN explicitly, zte doesn't seem to report
-           that it needs it otherwise */
-        mm_generic_gsm_check_pin (MM_GENERIC_GSM (info->modem), pin_check_done, info);
+        /* Finish the initialization */
+        mm_at_serial_port_queue_command (port, "Z E0 V1 X4 &C1 +CMEE=1;+CFUN=1;", 10, init_modem_done, info);
     }
 }
 
@@ -229,7 +211,6 @@ grab_port (MMModem *modem,
     if (port && MM_IS_AT_SERIAL_PORT (port)) {
         GRegex *regex;
 
-        mm_generic_gsm_set_unsolicited_registration (gsm, TRUE);
         g_object_set (port, MM_PORT_CARRIER_DETECT, FALSE, NULL);
 
         regex = g_regex_new ("\\r\\n\\+ZUSIMR:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);

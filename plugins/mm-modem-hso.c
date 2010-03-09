@@ -288,40 +288,6 @@ mm_hso_modem_authenticate (MMModemHso *self,
 /*****************************************************************************/
 
 static void
-enable_done (MMModem *modem, GError *error, gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-
-    mm_generic_gsm_enable_complete (MM_GENERIC_GSM (modem), error, info);
-}
-
-static void
-parent_enable_done (MMModem *modem, GError *error, gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMGenericGsm *self = MM_GENERIC_GSM (modem);
-
-    if (error) {
-        mm_generic_gsm_enable_complete (self, error, info);
-        return;
-    }
-
-    /* HSO needs manual PIN checking */
-    mm_generic_gsm_check_pin (self, enable_done, info);
-}
-
-static void
-enable (MMModem *modem, MMModemFn callback, gpointer user_data)
-{
-    MMModem *parent_modem_iface;
-    MMCallbackInfo *info;
-
-    info = mm_callback_info_new (modem, callback, user_data);
-    parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (info->modem));
-    parent_modem_iface->enable (info->modem, parent_enable_done, info);
-}
-
-static void
 parent_disable_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
@@ -681,8 +647,6 @@ grab_port (MMModem *modem,
         if (ptype == MM_PORT_TYPE_PRIMARY) {
             GRegex *regex;
 
-            mm_generic_gsm_set_unsolicited_registration (gsm, TRUE);
-
             regex = g_regex_new ("_OWANCALL: (\\d),\\s*(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
             mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, connection_enabled, modem, NULL);
             g_regex_unref (regex);
@@ -712,7 +676,6 @@ modem_simple_init (MMModemSimple *class)
 static void
 modem_init (MMModem *modem_class)
 {
-    modem_class->enable = enable;
     modem_class->disable = disable;
     modem_class->connect = do_connect;
     modem_class->get_ip4_config = get_ip4_config;

@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
 #ifndef MM_GENERIC_GSM_H
@@ -43,7 +43,9 @@ typedef enum {
     MM_GENERIC_GSM_PROP_INIT_CMD,
     MM_GENERIC_GSM_PROP_SUPPORTED_BANDS,
     MM_GENERIC_GSM_PROP_SUPPORTED_MODES,
-    MM_GENERIC_GSM_PROP_INIT_CMD_OPTIONAL
+    MM_GENERIC_GSM_PROP_INIT_CMD_OPTIONAL,
+    MM_GENERIC_GSM_PROP_ALLOWED_MODE,
+    MM_GENERIC_GSM_PROP_ACCESS_TECHNOLOGY
 } MMGenericGsmProp;
 
 
@@ -59,9 +61,41 @@ typedef struct {
      * that need to perform custom initialization sequences or other setup should
      * generally override this method instead of the MMModem interface's enable()
      * method, unless the customization must happen *after* the generic init
-     * sequence has completed.
+     * sequence has completed.  When the subclass' enable attempt is complete
+     * the subclass should call mm_generic_gsm_enable_complete() with any error
+     * encountered during the process and the MMCallbackInfo created from the
+     * callback and user_data passed in here.
      */
     void (*do_enable) (MMGenericGsm *self, MMModemFn callback, gpointer user_data);
+
+    /* Called after the generic class has attempted to power up the modem.
+     * Subclasses can handle errors here if they know the device supports their
+     * power up command.  Will only be called if the device does *not* override
+     * the MMModem enable() command or allows the generic class' do_enable()
+     * handler to execute.
+     */
+    void (*do_enable_power_up_done) (MMGenericGsm *self,
+                                     GString *response,
+                                     GError *error,
+                                     MMCallbackInfo *info);
+
+    /* Called by the generic class to set the allowed operating mode of the device */
+    void (*set_allowed_mode) (MMGenericGsm *self,
+                               MMModemGsmAllowedMode mode,
+                               MMModemFn callback,
+                               gpointer user_data);
+
+    /* Called by the generic class to get the allowed operating mode of the device */
+    void (*get_allowed_mode) (MMGenericGsm *self,
+                               MMModemUIntFn callback,
+                               gpointer user_data);
+
+    /* Called by the generic class to the current radio access technology the
+     * device is using while communicating with the base station.
+     */
+    void (*get_access_technology) (MMGenericGsm *self,
+                                   MMModemUIntFn callback,
+                                   gpointer user_data);
 } MMGenericGsmClass;
 
 GType mm_generic_gsm_get_type (void);
@@ -74,10 +108,7 @@ MMModem *mm_generic_gsm_new (const char *device,
 
 #define MM_GENERIC_GSM_PREV_STATE_TAG "prev-state"
 
-void mm_generic_gsm_set_unsolicited_registration (MMGenericGsm *modem,
-                                                  gboolean enabled);
-
-void mm_generic_gsm_pending_registration_stop    (MMGenericGsm *modem);
+void mm_generic_gsm_pending_registration_stop (MMGenericGsm *modem);
 
 void mm_generic_gsm_set_cid (MMGenericGsm *modem,
                              guint32 cid);
@@ -85,6 +116,22 @@ void mm_generic_gsm_set_cid (MMGenericGsm *modem,
 guint32 mm_generic_gsm_get_cid (MMGenericGsm *modem);
 void mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
                                     MMModemGsmNetworkRegStatus status);
+
+/* Called to asynchronously update the current allowed operating mode that the
+ * device is allowed to use when connecting to a network.  This isn't the
+ * specific access technology the device is currently using (see 
+ * mm_generic_gsm_set_access_technology() for that) but the mode the device is
+ * allowed to choose from when connecting.
+ */
+void mm_generic_gsm_update_allowed_mode (MMGenericGsm *modem,
+                                         MMModemGsmAllowedMode mode);
+
+/* Called to asynchronously update the current access technology of the device;
+ * this is NOT the 2G/3G mode preference, but the current radio access
+ * technology being used to communicate with the base station.
+ */
+void mm_generic_gsm_update_access_technology (MMGenericGsm *modem,
+                                              MMModemGsmAccessTech act);
 
 void mm_generic_gsm_check_pin (MMGenericGsm *modem,
                                MMModemFn callback,

@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
 #include <stdlib.h>
@@ -41,7 +41,6 @@ G_DEFINE_TYPE_EXTENDED (MMModemHuaweiGsm, mm_modem_huawei_gsm, MM_TYPE_GENERIC_G
 typedef struct {
     /* Cached state */
     guint signal_quality;
-    MMModemGsmMode mode;
     MMModemGsmBand band;
 } MMModemHuaweiGsmPrivate;
 
@@ -68,23 +67,28 @@ parse_syscfg (MMModemHuaweiGsm *self,
               int *mode_b,
               guint32 *band,
               int *unknown1,
-              int *unknown2)
+              int *unknown2,
+              MMModemGsmAllowedMode *out_mode)
 {
     if (reply == NULL || strncmp (reply, "^SYSCFG:", 8))
         return FALSE;
 
     if (sscanf (reply + 8, "%d,%d,%x,%d,%d", mode_a, mode_b, band, unknown1, unknown2)) {
         MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (self);
-                
+        MMModemGsmAllowedMode new_mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
+
         /* Network mode */
         if (*mode_a == 2 && *mode_b == 1)
-            priv->mode = MM_MODEM_GSM_MODE_2G_PREFERRED;
+            new_mode = MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED;
         else if (*mode_a == 2 && *mode_b == 2)
-            priv->mode = MM_MODEM_GSM_MODE_3G_PREFERRED;
+            new_mode = MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED;
         else if (*mode_a == 13 && *mode_b == 1)
-            priv->mode = MM_MODEM_GSM_MODE_2G_ONLY;
+            new_mode = MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY;
         else if (*mode_a == 14 && *mode_b == 2)
-            priv->mode = MM_MODEM_GSM_MODE_3G_ONLY;
+            new_mode = MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY;
+
+        if (out_mode)
+            *out_mode = new_mode;
 
         /* Band */
         if (*band == 0x3FFFFFFF)
@@ -101,26 +105,21 @@ parse_syscfg (MMModemHuaweiGsm *self,
 }
 
 static void
-set_network_mode_done (MMAtSerialPort *port,
+set_allowed_mode_done (MMAtSerialPort *port,
                        GString *response,
                        GError *error,
                        gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemHuaweiGsm *self = MM_MODEM_HUAWEI_GSM (info->modem);
-    MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (self);
 
     if (error)
         info->error = g_error_copy (error);
-    else
-        /* Success, cache the value */
-        priv->mode = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "mode"));
 
     mm_callback_info_schedule (info);
 }
 
 static void
-set_network_mode_get_done (MMAtSerialPort *port,
+set_allowed_mode_get_done (MMAtSerialPort *port,
                            GString *response,
                            GError *error,
                            gpointer user_data)
@@ -134,33 +133,29 @@ set_network_mode_get_done (MMAtSerialPort *port,
         int a, b, u1, u2;
         guint32 band;
 
-        if (parse_syscfg (MM_MODEM_HUAWEI_GSM (info->modem), response->str, &a, &b, &band, &u1, &u2)) {
+        if (parse_syscfg (MM_MODEM_HUAWEI_GSM (info->modem), response->str, &a, &b, &band, &u1, &u2, NULL)) {
+            MMModemGsmAllowedMode mode;
             char *command;
 
-            switch (GPOINTER_TO_UINT (mm_callback_info_get_data (info, "mode"))) {
-            case MM_MODEM_GSM_MODE_ANY:
+            mode = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "mode"));
+            switch (mode) {
+            case MM_MODEM_GSM_ALLOWED_MODE_ANY:
                 a = 2;
                 b = 0;
                 break;
-            case MM_MODEM_GSM_MODE_GPRS:
-            case MM_MODEM_GSM_MODE_EDGE:
-            case MM_MODEM_GSM_MODE_2G_ONLY:
+            case MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY:
                 a = 13;
                 b = 1;
                 break;
-            case MM_MODEM_GSM_MODE_UMTS:
-            case MM_MODEM_GSM_MODE_HSDPA:
-            case MM_MODEM_GSM_MODE_HSUPA:
-            case MM_MODEM_GSM_MODE_HSPA:
-            case MM_MODEM_GSM_MODE_3G_ONLY:
+            case MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY:
                 a = 14;
                 b = 2;
                 break;
-            case MM_MODEM_GSM_MODE_2G_PREFERRED:
+            case MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED:
                 a = 2;
                 b = 1;
                 break;
-            case MM_MODEM_GSM_MODE_3G_PREFERRED:
+            case MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED:
                 a = 2;
                 b = 2;
                 break;
@@ -169,93 +164,65 @@ set_network_mode_get_done (MMAtSerialPort *port,
             }
 
             command = g_strdup_printf ("AT^SYSCFG=%d,%d,%X,%d,%d", a, b, band, u1, u2);
-            mm_at_serial_port_queue_command (port, command, 3, set_network_mode_done, info);
+            mm_at_serial_port_queue_command (port, command, 3, set_allowed_mode_done, info);
             g_free (command);
         }
     }
 }
 
 static void
-set_network_mode (MMModemGsmNetwork *modem,
-                  MMModemGsmMode mode,
+set_allowed_mode (MMGenericGsm *gsm,
+                  MMModemGsmAllowedMode mode,
                   MMModemFn callback,
                   gpointer user_data)
 {
     MMCallbackInfo *info;
     MMAtSerialPort *primary;
 
-    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+    info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
 
-    switch (mode) {
-    case MM_MODEM_GSM_MODE_ANY:
-    case MM_MODEM_GSM_MODE_GPRS:
-    case MM_MODEM_GSM_MODE_EDGE:
-    case MM_MODEM_GSM_MODE_UMTS:
-    case MM_MODEM_GSM_MODE_HSDPA:
-    case MM_MODEM_GSM_MODE_HSUPA:
-    case MM_MODEM_GSM_MODE_HSPA:
-    case MM_MODEM_GSM_MODE_2G_PREFERRED:
-    case MM_MODEM_GSM_MODE_3G_PREFERRED:
-    case MM_MODEM_GSM_MODE_2G_ONLY:
-    case MM_MODEM_GSM_MODE_3G_ONLY:
-        /* Allowed values */
-        mm_callback_info_set_data (info, "mode", GUINT_TO_POINTER (mode), NULL);
-        primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
-        g_assert (primary);
-        mm_at_serial_port_queue_command (primary, "AT^SYSCFG?", 3, set_network_mode_get_done, info);
-        return;
-    default:
-        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Invalid mode.");
-        break;
-    }
+    mm_callback_info_set_data (info, "mode", GUINT_TO_POINTER (mode), NULL);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (gsm), MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
 
-    mm_callback_info_schedule (info);
+    /* Get current configuration first so we don't change band and other
+        * stuff when updating the mode.
+        */
+    mm_at_serial_port_queue_command (primary, "AT^SYSCFG?", 3, set_allowed_mode_get_done, info);
 }
 
 static void
-get_network_mode_done (MMAtSerialPort *port,
+get_allowed_mode_done (MMAtSerialPort *port,
                        GString *response,
                        GError *error,
                        gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMModemHuaweiGsm *self = MM_MODEM_HUAWEI_GSM (info->modem);
-    MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (self);
     int mode_a, mode_b, u1, u2;
     guint32 band;
+    MMModemGsmAllowedMode mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
 
     if (error)
         info->error = g_error_copy (error);
-    else if (parse_syscfg (self, response->str, &mode_a, &mode_b, &band, &u1, &u2))
-        mm_callback_info_set_result (info, GUINT_TO_POINTER (priv->mode), NULL);
+    else if (parse_syscfg (self, response->str, &mode_a, &mode_b, &band, &u1, &u2, &mode))
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (mode), NULL);
 
     mm_callback_info_schedule (info);
 }
 
 static void
-get_network_mode (MMModemGsmNetwork *modem,
+get_allowed_mode (MMGenericGsm *gsm,
                   MMModemUIntFn callback,
                   gpointer user_data)
 {
-    MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (modem);
+    MMCallbackInfo *info;
+    MMAtSerialPort *primary;
 
-    if (priv->mode != MM_MODEM_GSM_MODE_ANY) {
-        /* have cached mode (from an unsolicited message). Use that */
-        MMCallbackInfo *info;
-
-        info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-        mm_callback_info_set_result (info, GUINT_TO_POINTER (priv->mode), NULL);
-        mm_callback_info_schedule (info);
-    } else {
-        /* Get it from modem */
-        MMCallbackInfo *info;
-        MMAtSerialPort *primary;
-
-        info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-        primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
-        g_assert (primary);
-        mm_at_serial_port_queue_command (primary, "AT^SYSCFG?", 3, get_network_mode_done, info);
-    }
+    info = mm_callback_info_uint_new (MM_MODEM (gsm), callback, user_data);
+    primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+    mm_at_serial_port_queue_command (primary, "AT^SYSCFG?", 3, get_allowed_mode_done, info);
 }
 
 static void
@@ -293,7 +260,7 @@ set_band_get_done (MMAtSerialPort *port,
         int a, b, u1, u2;
         guint32 band;
 
-        if (parse_syscfg (self, response->str, &a, &b, &band, &u1, &u2)) {
+        if (parse_syscfg (self, response->str, &a, &b, &band, &u1, &u2, NULL)) {
             char *command;
 
             switch (GPOINTER_TO_UINT (mm_callback_info_get_data (info, "band"))) {
@@ -370,7 +337,7 @@ get_band_done (MMAtSerialPort *port,
 
     if (error)
         info->error = g_error_copy (error);
-    else if (parse_syscfg (self, response->str, &mode_a, &mode_b, &band, &u1, &u2))
+    else if (parse_syscfg (self, response->str, &mode_a, &mode_b, &band, &u1, &u2, NULL))
         mm_callback_info_set_result (info, GUINT_TO_POINTER (priv->band), NULL);
 
     mm_callback_info_schedule (info);
@@ -459,7 +426,7 @@ handle_mode_change (MMAtSerialPort *port,
                     gpointer user_data)
 {
     MMModemHuaweiGsm *self = MM_MODEM_HUAWEI_GSM (user_data);
-    MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (self);
+    MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     char *str;
     int a;
     int b;
@@ -472,25 +439,29 @@ handle_mode_change (MMAtSerialPort *port,
     b = atoi (str);
     g_free (str);
 
-    if (a == 3 && b == 2)
-        priv->mode = MM_MODEM_GSM_MODE_GPRS;
-    else if (a == 3 && b == 3)
-        priv->mode = MM_MODEM_GSM_MODE_EDGE;
-    else if (a == 5 && b == 4)
-        priv->mode = MM_MODEM_GSM_MODE_UMTS;
-    else if (a == 5 && b == 5)
-        priv->mode = MM_MODEM_GSM_MODE_HSDPA;
-    else if (a == 5 && b == 6)
-        priv->mode = MM_MODEM_GSM_MODE_HSUPA;
-    else if (a == 5 && b == 7)
-        priv->mode = MM_MODEM_GSM_MODE_HSPA;
-    else {
+    if (a == 3) {   /* GSM/GPRS mode */
+        if (b == 1)
+            act = MM_MODEM_GSM_ACCESS_TECH_GSM;
+        else if (b == 2)
+            act = MM_MODEM_GSM_ACCESS_TECH_GPRS;
+        else if (b == 3)
+            act = MM_MODEM_GSM_ACCESS_TECH_EDGE;
+    } else if (a == 5) {  /* WCDMA mode */
+        if (b == 4)
+            act = MM_MODEM_GSM_ACCESS_TECH_UMTS;
+        else if (b == 5)
+            act = MM_MODEM_GSM_ACCESS_TECH_HSDPA;
+        else if (b == 6)
+            act = MM_MODEM_GSM_ACCESS_TECH_HSUPA;
+        else if (b == 7)
+            act = MM_MODEM_GSM_ACCESS_TECH_HSPA;
+    } else {
         g_warning ("Couldn't parse mode change value: '%s'", str);
         return;
     }
 
-    g_debug ("Mode: %d", priv->mode);
-    mm_modem_gsm_network_mode (MM_MODEM_GSM_NETWORK (self), priv->mode);
+    g_debug ("Access Technology: %d", act);
+    mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (self), act);
 }
 
 static void
@@ -556,28 +527,25 @@ grab_port (MMModem *modem,
     port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
 
     if (port && MM_IS_AT_SERIAL_PORT (port)) {
+        GRegex *regex;
+
         g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
-        if (ptype == MM_PORT_TYPE_SECONDARY) {
-            GRegex *regex;
 
-            mm_generic_gsm_set_unsolicited_registration (MM_GENERIC_GSM (modem), TRUE);
+        regex = g_regex_new ("\\r\\n\\^RSSI:(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_signal_quality_change, modem, NULL);
+        g_regex_unref (regex);
 
-            regex = g_regex_new ("\\r\\n\\^RSSI:(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_signal_quality_change, modem, NULL);
-            g_regex_unref (regex);
+        regex = g_regex_new ("\\r\\n\\^MODE:(\\d),(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_mode_change, modem, NULL);
+        g_regex_unref (regex);
 
-            regex = g_regex_new ("\\r\\n\\^MODE:(\\d),(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_mode_change, modem, NULL);
-            g_regex_unref (regex);
+        regex = g_regex_new ("\\r\\n\\^DSFLOWRPT:(.+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_status_change, modem, NULL);
+        g_regex_unref (regex);
 
-            regex = g_regex_new ("\\r\\n\\^DSFLOWRPT:(.+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_status_change, modem, NULL);
-            g_regex_unref (regex);
-
-            regex = g_regex_new ("\\r\\n\\^BOOT:.+\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, modem, NULL);
-            g_regex_unref (regex);
-        }
+        regex = g_regex_new ("\\r\\n\\^BOOT:.+\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, modem, NULL);
+        g_regex_unref (regex);
     }
 
 out:
@@ -598,8 +566,6 @@ modem_init (MMModem *modem_class)
 static void
 modem_gsm_network_init (MMModemGsmNetwork *class)
 {
-    class->set_network_mode = set_network_mode;
-    class->get_network_mode = get_network_mode;
     class->set_band = set_band;
     class->get_band = get_band;
     class->get_signal_quality = get_signal_quality;
@@ -614,8 +580,12 @@ static void
 mm_modem_huawei_gsm_class_init (MMModemHuaweiGsmClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    MMGenericGsmClass *gsm_class = MM_GENERIC_GSM_CLASS (klass);
 
     mm_modem_huawei_gsm_parent_class = g_type_class_peek_parent (klass);
     g_type_class_add_private (object_class, sizeof (MMModemHuaweiGsmPrivate));
+
+    gsm_class->set_allowed_mode = set_allowed_mode;
+    gsm_class->get_allowed_mode = get_allowed_mode;
 }
 

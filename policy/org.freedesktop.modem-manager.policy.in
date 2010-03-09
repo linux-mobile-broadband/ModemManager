@@ -9,9 +9,18 @@
   <vendor_url>http://www.freedesktop.org/wiki/ModemManager</vendor_url>
   <icon_name>modem-manager</icon_name>
 
-  <action id="org.freedesktop.ModemManager.Device">
-    <_description>Unlock and retrieve mobile broadband device information</_description>
-    <_message>System policy prevents unlocking the device or requesting information from it.</_message>
+  <action id="org.freedesktop.ModemManager.Device.Control">
+    <_description>Unlock and control a mobile broadband device</_description>
+    <_message>System policy prevents unlocking or controlling the mobile broadband device.</_message>
+    <defaults>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_self_keep</allow_active>
+    </defaults>
+  </action>
+
+  <action id="org.freedesktop.ModemManager.Device.Info">
+    <_description>Request mobile broadband device identifying information</_description>
+    <_message>System policy prevents requesting identifying information from the mobile broadband device.</_message>
     <defaults>
       <allow_inactive>no</allow_inactive>
       <allow_active>auth_self_keep</allow_active>
