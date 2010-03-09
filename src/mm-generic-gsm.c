@@ -2216,6 +2216,7 @@ etsi_act_to_mm_act (gint act)
     while (iter->mm_act != MM_MODEM_GSM_ACCESS_TECH_UNKNOWN) {
         if (iter->etsi_act == act)
             return iter->mm_act;
+        iter++;
     }
     return MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
 }
