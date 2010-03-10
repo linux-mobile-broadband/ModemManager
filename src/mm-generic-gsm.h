@@ -79,6 +79,14 @@ typedef struct {
                                      GError *error,
                                      MMCallbackInfo *info);
 
+    /* Called to terminate the active data call and deactivate the given PDP
+     * context.
+     */
+    void (*do_disconnect) (MMGenericGsm *self,
+                           gint cid,
+                           MMModemFn callback,
+                           gpointer user_data);
+
     /* Called by the generic class to set the allowed operating mode of the device */
     void (*set_allowed_mode) (MMGenericGsm *self,
                                MMModemGsmAllowedMode mode,
@@ -110,10 +118,8 @@ MMModem *mm_generic_gsm_new (const char *device,
 
 void mm_generic_gsm_pending_registration_stop (MMGenericGsm *modem);
 
-void mm_generic_gsm_set_cid (MMGenericGsm *modem,
-                             guint32 cid);
+gint mm_generic_gsm_get_cid (MMGenericGsm *modem);
 
-guint32 mm_generic_gsm_get_cid (MMGenericGsm *modem);
 void mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
                                     MMModemGsmNetworkRegStatus status);
 

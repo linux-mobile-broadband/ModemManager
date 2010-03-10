@@ -494,23 +494,18 @@ do_connect (MMModem *modem,
 }
 
 static void
-disconnect (MMModem *modem,
-            MMModemFn callback,
-            gpointer user_data)
+do_disconnect (MMGenericGsm *gsm,
+               gint cid,
+               MMModemFn callback,
+               gpointer user_data)
 {
-    MMCallbackInfo *info;
     MMAtSerialPort *primary;
 
-    mm_modem_set_state (modem, MM_MODEM_STATE_DISCONNECTING, MM_MODEM_STATE_REASON_NONE);
-
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
     mm_at_serial_port_queue_command (primary, "*ENAP=0", 3, NULL, NULL);
 
-    mm_generic_gsm_update_enabled_state (MM_GENERIC_GSM (modem), FALSE, MM_MODEM_STATE_REASON_NONE);
-
-    info = mm_callback_info_new (modem, callback, user_data);
-    mm_callback_info_schedule (info);
+    MM_GENERIC_GSM_CLASS (mm_modem_mbm_parent_class)->do_disconnect (gsm, cid, callback, user_data);
 }
 
 /*****************************************************************************/
@@ -838,7 +833,6 @@ modem_init (MMModem *modem_class)
     modem_class->grab_port = grab_port;
     modem_class->disable = disable;
     modem_class->connect = do_connect;
-    modem_class->disconnect = disconnect;
 }
 
 static void
@@ -872,6 +866,7 @@ mm_modem_mbm_class_init (MMModemMbmClass *klass)
     object_class->finalize = finalize;
 
     gsm_class->do_enable = do_enable;
+    gsm_class->do_disconnect = do_disconnect;
     gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->set_allowed_mode = set_allowed_mode;
 }

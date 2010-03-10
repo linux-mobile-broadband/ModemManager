@@ -82,7 +82,7 @@ typedef struct {
     guint signal_quality_id;
     time_t signal_quality_timestamp;
     guint32 signal_quality;
-    guint32 cid;
+    gint cid;
 
     MMAtSerialPort *primary;
     MMAtSerialPort *secondary;
@@ -142,15 +142,7 @@ mm_generic_gsm_new (const char *device,
                                    NULL));
 }
 
-void
-mm_generic_gsm_set_cid (MMGenericGsm *modem, guint32 cid)
-{
-    g_return_if_fail (MM_IS_GENERIC_GSM (modem));
-
-    MM_GENERIC_GSM_GET_PRIVATE (modem)->cid = cid;
-}
-
-guint32
+gint
 mm_generic_gsm_get_cid (MMGenericGsm *modem)
 {
     g_return_val_if_fail (MM_IS_GENERIC_GSM (modem), 0);
@@ -822,7 +814,7 @@ enable (MMModem *modem,
     }
 
     /* First, reset the previously used CID */
-    mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
+    priv->cid = -1;
 
     if (!mm_serial_port_open (MM_SERIAL_PORT (priv->primary), &error)) {
         MMCallbackInfo *info;
@@ -908,7 +900,9 @@ disable (MMModem *modem,
     MMModemState state;
 
     /* First, reset the previously used CID and clean up registration */
-    mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
+    g_warn_if_fail (priv->cid == -1);
+    priv->cid = -1;
+
     mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
 
     if (priv->poll_id) {
@@ -1924,16 +1918,16 @@ connect (MMModem *modem,
 }
 
 static void
-disconnect_flash_done (MMSerialPort *port,
-                       GError *error,
-                       gpointer user_data)
+disconnect_done (MMModem *modem,
+                 GError *error,
+                 gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMModemState prev_state;
 
-    info->error = mm_modem_check_removed (info->modem, error);
+    info->error = mm_modem_check_removed (modem, error);
     if (info->error) {
-        if (info->modem) {
+        if (info->modem && modem) {
             /* Reset old state since the operation failed */
             prev_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, MM_GENERIC_GSM_PREV_STATE_TAG));
             mm_modem_set_state (MM_MODEM (info->modem),
@@ -1941,10 +1935,11 @@ disconnect_flash_done (MMSerialPort *port,
                                 MM_MODEM_STATE_REASON_NONE);
         }
     } else {
-        MMGenericGsm *self = MM_GENERIC_GSM (info->modem);
+        MMGenericGsm *self = MM_GENERIC_GSM (modem);
         MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
 
         mm_port_set_connected (priv->data, FALSE);
+        priv->cid = -1;
         mm_generic_gsm_update_enabled_state (self, FALSE, MM_MODEM_STATE_REASON_NONE);
     }
 
@@ -1952,16 +1947,64 @@ disconnect_flash_done (MMSerialPort *port,
 }
 
 static void
+disconnect_cgact_done (MMAtSerialPort *port,
+                       GString *response,
+                       GError *error,
+                       gpointer user_data)
+{
+    mm_callback_info_schedule ((MMCallbackInfo *) user_data);
+}
+
+static void
+disconnect_flash_done (MMSerialPort *port,
+                       GError *error,
+                       gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMGenericGsmPrivate *priv;
+    char *command;
+
+    info->error = mm_modem_check_removed (info->modem, error);
+    if (info->error) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* Disconnect the PDP context */
+    priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+    if (priv->cid >= 0)
+        command = g_strdup_printf ("+CGACT=0,%d", priv->cid);
+    else {
+        /* Disable all PDP contexts */
+        command = g_strdup_printf ("+CGACT=0");
+    }
+
+    mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), command, 60, disconnect_cgact_done, info);
+    g_free (command);
+}
+
+static void
+real_do_disconnect (MMGenericGsm *self,
+                    gint cid,
+                    MMModemFn callback,
+                    gpointer user_data)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
+    mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 1000, disconnect_flash_done, info);
+}
+
+static void
 disconnect (MMModem *modem,
             MMModemFn callback,
             gpointer user_data)
 {
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+    MMGenericGsm *self = MM_GENERIC_GSM (modem);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     MMCallbackInfo *info;
     MMModemState state;
-
-    /* First, reset the previously used CID */
-    mm_generic_gsm_set_cid (MM_GENERIC_GSM (modem), 0);
 
     info = mm_callback_info_new (modem, callback, user_data);
 
@@ -1973,7 +2016,9 @@ disconnect (MMModem *modem,
                                NULL);
 
     mm_modem_set_state (modem, MM_MODEM_STATE_DISCONNECTING, MM_MODEM_STATE_REASON_NONE);
-    mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 1000, disconnect_flash_done, info);
+
+    g_assert (MM_GENERIC_GSM_GET_CLASS (self)->do_disconnect);
+    MM_GENERIC_GSM_GET_CLASS (self)->do_disconnect (self, priv->cid, disconnect_done, info);
 }
 
 static void
@@ -2025,6 +2070,8 @@ scan (MMModemGsmNetwork *modem,
 
 /* SetApn */
 
+#define APN_CID_TAG "generic-gsm-cid"
+
 static void
 set_apn_done (MMAtSerialPort *port,
               GString *response,
@@ -2033,11 +2080,12 @@ set_apn_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    if (error)
-        info->error = g_error_copy (error);
-    else
-        mm_generic_gsm_set_cid (MM_GENERIC_GSM (info->modem),
-                                GPOINTER_TO_UINT (mm_callback_info_get_data (info, "cid")));
+    info->error = mm_modem_check_removed (info->modem, error);
+    if (!info->error) {
+        MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+
+        priv->cid = GPOINTER_TO_INT (mm_callback_info_get_data (info, APN_CID_TAG));
+    }
 
     mm_callback_info_schedule (info);
 }
@@ -2100,7 +2148,7 @@ cid_range_read (MMAtSerialPort *port,
         const char *apn = (const char *) mm_callback_info_get_data (info, "apn");
         char *command;
 
-        mm_callback_info_set_data (info, "cid", GUINT_TO_POINTER (cid), NULL);
+        mm_callback_info_set_data (info, APN_CID_TAG, GINT_TO_POINTER (cid), NULL);
 
         command = g_strdup_printf ("+CGDCONT=%d,\"IP\",\"%s\"", cid, apn);
         mm_at_serial_port_queue_command (port, command, 3, set_apn_done, info);
@@ -2117,8 +2165,9 @@ existing_apns_read (MMAtSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     gboolean found = FALSE;
 
-    if (error)
-        info->error = g_error_copy (error);
+    info->error = mm_modem_check_removed (info->modem, error);
+    if (info->error)
+        goto done;
     else if (g_str_has_prefix (response->str, "+CGDCONT: ")) {
         GRegex *r;
         GMatchInfo *match_info;
@@ -2142,7 +2191,7 @@ existing_apns_read (MMAtSerialPort *port,
                 apn = g_match_info_fetch (match_info, 3);
 
                 if (!strcmp (apn, new_apn)) {
-                    mm_generic_gsm_set_cid (MM_GENERIC_GSM (info->modem), (guint32) num_cid);
+                    MM_GENERIC_GSM_GET_PRIVATE (info->modem)->cid = num_cid;
                     found = TRUE;
                 }
 
@@ -2170,11 +2219,13 @@ existing_apns_read (MMAtSerialPort *port,
                                            MM_MODEM_ERROR_GENERAL,
                                            "Could not parse the response");
 
+done:
     if (found || info->error)
         mm_callback_info_schedule (info);
-    else
+    else {
         /* APN not configured on the card. Get the allowed CID range */
         mm_at_serial_port_queue_command_cached (port, "+CGDCONT=?", 3, cid_range_read, info);
+    }
 }
 
 static void
@@ -2988,6 +3039,7 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
 
     klass->do_enable = real_do_enable;
     klass->do_enable_power_up_done = real_do_enable_power_up_done;
+    klass->do_disconnect = real_do_disconnect;
 
     /* Properties */
     g_object_class_override_property (object_class,
