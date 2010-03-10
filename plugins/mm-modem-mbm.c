@@ -52,11 +52,6 @@ G_DEFINE_TYPE_EXTENDED (MMModemMbm, mm_modem_mbm, MM_TYPE_GENERIC_GSM, 0,
 #define MBM_NETWORK_MODE_2G   5
 #define MBM_NETWORK_MODE_3G   6
 
-#define MBM_ERINFO_2G_GPRS  1
-#define MBM_ERINFO_2G_EGPRS 2
-#define MBM_ERINFO_3G_UMTS  1
-#define MBM_ERINFO_3G_HSDPA 2
-
 typedef struct {
     guint reg_id;
     gboolean have_emrdy;
@@ -128,9 +123,6 @@ register_done (gpointer user_data)
 
     primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-
-    mm_at_serial_port_queue_command (primary, "+CREG=1", 3, NULL, NULL);
-    mm_at_serial_port_queue_command (primary, "+CMER=3,0,0,1", 3, NULL, NULL);
 
     parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GSM_NETWORK_GET_INTERFACE (self));
     parent_modem_iface->do_register (MM_MODEM_GSM_NETWORK (self),
@@ -214,57 +206,47 @@ set_allowed_mode (MMGenericGsm *gsm,
     g_free (command);
 }
 
-#if 0
 static void
-get_network_mode_done (MMAtSerialPort *port,
-                       GString *response,
-                       GError *error,
-                       gpointer user_data)
+mbm_erinfo_received (MMAtSerialPort *port,
+                     GMatchInfo *info,
+                     gpointer user_data)
 {
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    char *erinfo;
-    int mode = 0, gsm = 0, umts = 0;
-    gboolean parsed = FALSE;
+    MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
+    char *str;
 
-    if (error) {
-        info->error = g_error_copy (error);
-        goto done;
+    str = g_match_info_fetch (info, 2);
+    if (str) {
+        switch (atoi (str)) {
+        case 1:
+            act = MM_MODEM_GSM_ACCESS_TECH_GPRS;
+            break;
+        case 2:
+            act = MM_MODEM_GSM_ACCESS_TECH_EDGE;
+            break;
+        default:
+            break;
+        }
     }
+    g_free (str);
 
-    erinfo = strstr (response->str, "*ERINFO:");
-    if (!erinfo)
-        goto done;
-
-    if (sscanf (erinfo + 8, "%d,%d,%d", &mode, &gsm, &umts) != 3)
-        goto done;
-
-    if (gsm || umts) {
-        MMModemGsmMode mm_mode = MM_MODEM_GSM_MODE_ANY;
-
-        if (gsm == MBM_ERINFO_2G_GPRS)
-            mm_mode = MM_MODEM_GSM_MODE_GPRS;
-        else if (gsm == MBM_ERINFO_2G_EGPRS)
-            mm_mode = MM_MODEM_GSM_MODE_EDGE;
-        else if (umts == MBM_ERINFO_3G_UMTS)
-            mm_mode = MM_MODEM_GSM_MODE_UMTS;
-        else if (umts == MBM_ERINFO_3G_HSDPA)
-            mm_mode = MM_MODEM_GSM_MODE_HSDPA;
-        else
-            g_debug ("%s unknown network mode %d,%d", __FUNCTION__, gsm, umts);
-
-        mm_callback_info_set_result (info, GUINT_TO_POINTER (mm_mode), NULL);
-        parsed = TRUE;
+    /* 3G modes take precedence */
+    str = g_match_info_fetch (info, 3);
+    if (str) {
+        switch (atoi (str)) {
+        case 1:
+            act = MM_MODEM_GSM_ACCESS_TECH_UMTS;
+            break;
+        case 2:
+            act = MM_MODEM_GSM_ACCESS_TECH_HSDPA;
+            break;
+        default:
+            break;
+        }
     }
+    g_free (str);
 
-done:
-    if (!error && !parsed) {
-        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                           "Could not parse network mode results");
-    }
-
-    mm_callback_info_schedule (info);
+    mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (user_data), act);
 }
-#endif
 
 static void
 get_allowed_mode_done (MMAtSerialPort *port,
@@ -364,6 +346,10 @@ mbm_enable_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
+    /* Start unsolicited signal strength and access technology responses */
+    mm_at_serial_port_queue_command (port, "+CMER=3,0,0,1", 3, NULL, NULL);
+    mm_at_serial_port_queue_command (port, "*ERINFO=1", 3, NULL, NULL);
+
     mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
 }
 
@@ -456,10 +442,10 @@ typedef struct {
 } DisableInfo;
 
 static void
-disable_creg_cmer_done (MMAtSerialPort *port,
-                        GString *response,
-                        GError *error,
-                        gpointer user_data)
+disable_unsolicited_done (MMAtSerialPort *port,
+                          GString *response,
+                          GError *error,
+                          gpointer user_data)
 
 {
     MMModem *parent_modem_iface;
@@ -486,8 +472,8 @@ disable (MMModem *modem,
     primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
 
-    /* Turn off unsolicited +CIEV signal strength indicator */
-    mm_at_serial_port_queue_command (primary, "+CREG=0;+CMER=0", 5, disable_creg_cmer_done, info);
+    /* Turn off unsolicited responses */
+    mm_at_serial_port_queue_command (primary, "+CMER=0;*ERINFO=0", 5, disable_unsolicited_done, info);
 }
 
 static void
@@ -551,18 +537,20 @@ mbm_ciev_received (MMAtSerialPort *port,
                    gpointer user_data)
 {
     int quality = 0, ind = 0;
-    const char *str;
+    char *str;
 
     str = g_match_info_fetch (info, 1);
     if (str)
         ind = atoi (str);
+    g_free (str);
 
     if (ind == MBM_SIGNAL_INDICATOR) {
         str = g_match_info_fetch (info, 2);
         if (str) {
             quality = atoi (str);
-            mm_modem_gsm_network_signal_quality (MM_MODEM_GSM_NETWORK (user_data), quality * 20);
+            mm_generic_gsm_update_signal_quality (MM_GENERIC_GSM (user_data), quality * 20);
         }
+        g_free (str);
     }
 }
 
@@ -592,11 +580,12 @@ mbm_e2nap_received (MMAtSerialPort *port,
                     gpointer user_data)
 {
     int state = 0;
-    const char *str;
+    char *str;
 
     str = g_match_info_fetch (info, 1);
     if (str)
         state = atoi (str);
+    g_free (str);
 
     if (MBM_E2NAP_DISCONNECTED == state) {
         g_debug ("%s: disconnected", __func__);
@@ -791,15 +780,17 @@ grab_port (MMModem *modem,
     }
 
     port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
-    if (port && MM_IS_AT_SERIAL_PORT (port) && (ptype == MM_PORT_TYPE_PRIMARY)) {
+    if (port && MM_IS_AT_SERIAL_PORT (port)) {
         GRegex *regex;
+
+        if (ptype == MM_PORT_TYPE_PRIMARY) {
+            regex = g_regex_new ("\\r\\n\\*E2NAP: (\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, mbm_e2nap_received, modem, NULL);
+            g_regex_unref (regex);
+        }
 
         regex = g_regex_new ("\\r\\n\\*EMRDY: \\d\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, mbm_emrdy_received, modem, NULL);
-        g_regex_unref (regex);
-
-        regex = g_regex_new ("\\r\\n\\*E2NAP: (\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, mbm_e2nap_received, modem, NULL);
         g_regex_unref (regex);
 
         regex = g_regex_new ("\\r\\n\\+PACSP(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
@@ -812,11 +803,15 @@ grab_port (MMModem *modem,
 
         /* also consume unsolicited mbm messages we are not interested in them - see LP: #416418 */
         regex = g_regex_new ("\\R\\*ESTKSMENU:.*\\R", G_REGEX_RAW | G_REGEX_OPTIMIZE | G_REGEX_MULTILINE | G_REGEX_NEWLINE_CRLF, G_REGEX_MATCH_NEWLINE_CRLF, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, modem, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
         g_regex_unref (regex);
 
         regex = g_regex_new ("\\r\\n\\*EMWI: (\\d),(\\d).*\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
+
+        regex = g_regex_new ("\\r\\n\\*ERINFO:\\s*(\\d),(\\d),(\\d).*\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, mbm_erinfo_received, modem, NULL);
         g_regex_unref (regex);
     }
 

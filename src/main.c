@@ -17,6 +17,7 @@
 #include <signal.h>
 #include <syslog.h>
 #include <string.h>
+#include <unistd.h>
 #include <dbus/dbus-glib.h>
 #include <dbus/dbus-glib-lowlevel.h>
 #include "mm-manager.h"
@@ -33,8 +34,11 @@ mm_signal_handler (int signo)
         mm_options_set_debug (!mm_options_debug ());
 	else if (signo == SIGINT || signo == SIGTERM) {
 		g_message ("Caught signal %d, shutting down...", signo);
-		g_main_loop_quit (loop);
-	}
+        if (loop)
+            g_main_loop_quit (loop);
+        else
+            _exit (0);
+    }
 }
 
 static void

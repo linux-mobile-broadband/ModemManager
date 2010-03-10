@@ -79,6 +79,8 @@ typedef struct {
     guint pending_reg_id;
     MMCallbackInfo *pending_reg_info;
 
+    guint signal_quality_id;
+    time_t signal_quality_timestamp;
     guint32 signal_quality;
     guint32 cid;
 
@@ -113,6 +115,17 @@ static gboolean handle_reg_status_response (MMGenericGsm *self,
 
 static MMModemGsmAccessTech etsi_act_to_mm_act (gint act);
 
+static void _internal_update_access_technology (MMGenericGsm *modem,
+                                                MMModemGsmAccessTech act);
+
+static void reg_info_updated (MMGenericGsm *self,
+                              gboolean update_rs,
+                              MMModemGsmNetworkRegStatus status,
+                              gboolean update_code,
+                              const char *oper_code,
+                              gboolean update_name,
+                              const char *oper_name);
+
 MMModem *
 mm_generic_gsm_new (const char *device,
                     const char *driver,
@@ -143,14 +156,6 @@ mm_generic_gsm_get_cid (MMGenericGsm *modem)
     g_return_val_if_fail (MM_IS_GENERIC_GSM (modem), 0);
 
     return MM_GENERIC_GSM_GET_PRIVATE (modem)->cid;
-}
-
-static void
-got_signal_quality (MMModem *modem,
-                    guint32 result,
-                    GError *error,
-                    gpointer user_data)
-{
 }
 
 typedef struct {
@@ -699,6 +704,9 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
         }
     }
 
+    /* Try to enable XON/XOFF flow control */
+    mm_at_serial_port_queue_command (priv->primary, "+IFC=1,1", 3, NULL, NULL);
+
     /* Get allowed mode */
     if (MM_GENERIC_GSM_GET_CLASS (self)->get_allowed_mode)
         MM_GENERIC_GSM_GET_CLASS (self)->get_allowed_mode (self, get_allowed_mode_done, NULL);
@@ -842,13 +850,18 @@ disable_done (MMAtSerialPort *port,
 
     info->error = mm_modem_check_removed (info->modem, error);
     if (!info->error) {
-        MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+        MMGenericGsm *self = MM_GENERIC_GSM (info->modem);
 
         mm_serial_port_close (MM_SERIAL_PORT (port));
         mm_modem_set_state (MM_MODEM (info->modem),
                             MM_MODEM_STATE_DISABLED,
                             MM_MODEM_STATE_REASON_NONE);
-        priv->reg_status = MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN;
+
+        /* Clear out registration info */
+        reg_info_updated (self,
+                          TRUE, MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN,
+                          TRUE, NULL,
+                          TRUE, NULL);
     }
     mm_callback_info_schedule (info);
 }
@@ -903,11 +916,16 @@ disable (MMModem *modem,
         priv->poll_id = 0;
     }
 
+    if (priv->signal_quality_id) {
+        g_source_remove (priv->signal_quality_id);
+        priv->signal_quality_id = 0;
+    }
+
     priv->lac[0] = 0;
     priv->lac[1] = 0;
     priv->cell_id[0] = 0;
     priv->cell_id[1] = 0;
-    mm_generic_gsm_update_access_technology (self, MM_MODEM_GSM_ACCESS_TECH_UNKNOWN);
+    _internal_update_access_technology (self, MM_MODEM_GSM_ACCESS_TECH_UNKNOWN);
 
     /* Close the secondary port if its open */
     if (priv->secondary && mm_serial_port_is_open (MM_SERIAL_PORT (priv->secondary)))
@@ -1268,6 +1286,49 @@ change_pin (MMModemGsmCard *modem,
     g_free (command);
 }
 
+static void
+reg_info_updated (MMGenericGsm *self,
+                  gboolean update_rs,
+                  MMModemGsmNetworkRegStatus status,
+                  gboolean update_code,
+                  const char *oper_code,
+                  gboolean update_name,
+                  const char *oper_name)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    gboolean changed = FALSE;
+
+    if (update_rs) {
+        if (status != priv->reg_status) {
+            priv->reg_status = status;
+            changed = TRUE;
+        }
+    }
+
+    if (update_code) {
+        if (g_strcmp0 (oper_code, priv->oper_code) != 0) {
+            g_free (priv->oper_code);
+            priv->oper_code = g_strdup (oper_code);
+            changed = TRUE;
+        }
+    }
+
+    if (update_name) {
+        if (g_strcmp0 (oper_name, priv->oper_name) != 0) {
+            g_free (priv->oper_name);
+            priv->oper_name = g_strdup (oper_name);
+            changed = TRUE;
+        }
+    }
+
+    if (changed) {
+        mm_modem_gsm_network_registration_info (MM_MODEM_GSM_NETWORK (self),
+                                                priv->reg_status,
+                                                priv->oper_code,
+                                                priv->oper_name);
+    }
+}
+
 static char *
 parse_operator (const char *reply)
 {
@@ -1300,18 +1361,14 @@ read_operator_code_done (MMAtSerialPort *port,
                          GError *error,
                          gpointer user_data)
 {
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (user_data);
+    MMGenericGsm *self = MM_GENERIC_GSM (user_data);
     char *oper;
 
-    if (error)
-        return;
-
-    oper = parse_operator (response->str);
-    if (!oper)
-        return;
-
-    g_free (priv->oper_code);
-    priv->oper_code = oper;
+    if (!error) {
+        oper = parse_operator (response->str);
+        if (oper)
+            reg_info_updated (self, FALSE, 0, TRUE, oper, FALSE, NULL);
+    }
 }
 
 static void
@@ -1320,23 +1377,14 @@ read_operator_name_done (MMAtSerialPort *port,
                          GError *error,
                          gpointer user_data)
 {
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (user_data);
+    MMGenericGsm *self = MM_GENERIC_GSM (user_data);
     char *oper;
 
-    if (error)
-        return;
-
-    oper = parse_operator (response->str);
-    if (!oper)
-        return;
-
-    g_free (priv->oper_name);
-    priv->oper_name = oper;
-
-    mm_modem_gsm_network_registration_info (MM_MODEM_GSM_NETWORK (user_data),
-                                            priv->reg_status,
-                                            priv->oper_code,
-                                            priv->oper_name);
+    if (!error) {
+        oper = parse_operator (response->str);
+        if (oper)
+            reg_info_updated (self, FALSE, 0, FALSE, NULL, TRUE, oper);
+    }
 }
 
 /* Registration */
@@ -1363,6 +1411,15 @@ mm_generic_gsm_pending_registration_stop (MMGenericGsm *modem)
     }
 }
 
+static void
+got_signal_quality (MMModem *modem,
+                    guint32 quality,
+                    GError *error,
+                    gpointer user_data)
+{
+    mm_generic_gsm_update_signal_quality (MM_GENERIC_GSM (modem), quality);
+}
+
 void
 mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
                                MMModemGsmNetworkRegStatus status)
@@ -1383,14 +1440,8 @@ mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
             mm_at_serial_port_queue_command (priv->primary, "+COPS=3,2;+COPS?", 3, read_operator_code_done, modem);
             mm_at_serial_port_queue_command (priv->primary, "+COPS=3,0;+COPS?", 3, read_operator_name_done, modem);
             mm_modem_gsm_network_get_signal_quality (MM_MODEM_GSM_NETWORK (modem), got_signal_quality, NULL);
-        } else {
-            g_free (priv->oper_code);
-            g_free (priv->oper_name);
-            priv->oper_code = priv->oper_name = NULL;
-
-            mm_modem_gsm_network_registration_info (MM_MODEM_GSM_NETWORK (modem), priv->reg_status,
-                                                    priv->oper_code, priv->oper_name);
-        }
+        } else
+            reg_info_updated (MM_GENERIC_GSM (modem), FALSE, 0, TRUE, NULL, TRUE, NULL);
 
         mm_generic_gsm_update_enabled_state (modem, TRUE, MM_MODEM_STATE_REASON_NONE);
     }
@@ -1480,14 +1531,21 @@ reg_state_changed (MMAtSerialPort *port,
         return;
     }
 
-    if (reg_status_updated (self, state, NULL)) {
-        /* If registration is finished (either registered or failed) but the
-         * registration query hasn't completed yet, just remove the timeout and
-         * let the registration query complete.
-         */
-        if (priv->pending_reg_id) {
-            g_source_remove (priv->pending_reg_id);
-            priv->pending_reg_id = 0;
+    /* Don't update reg state on CGREG responses since for many devices it's
+     * unclear what that registration state that actually reflects.  We'll
+     * take CGREG registration state into account later when we have a more
+     * consistent way of handling it.
+     */
+    if (cgreg == FALSE) {
+        if (reg_status_updated (self, state, NULL)) {
+            /* If registration is finished (either registered or failed) but the
+             * registration query hasn't completed yet, just remove the timeout and
+             * let the registration query complete.
+             */
+            if (priv->pending_reg_id) {
+                g_source_remove (priv->pending_reg_id);
+                priv->pending_reg_id = 0;
+            }
         }
     }
 
@@ -1668,7 +1726,11 @@ registration_timed_out (gpointer data)
 
     g_warn_if_fail (info == priv->pending_reg_info);
 
-    priv->reg_status = MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE;
+    /* Clear out registration info */
+    reg_info_updated (MM_GENERIC_GSM (info->modem),
+                      TRUE, MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE,
+                      TRUE, NULL,
+                      TRUE, NULL);
 
     info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_NETWORK_TIMEOUT);
     mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (info->modem));
@@ -2133,26 +2195,91 @@ set_apn (MMModemGsmNetwork *modem,
 
 /* GetSignalQuality */
 
+static gboolean
+emit_signal_quality_change (gpointer user_data)
+{
+    MMGenericGsm *self = MM_GENERIC_GSM (user_data);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    priv->signal_quality_id = 0;
+    priv->signal_quality_timestamp = time (NULL);
+    mm_modem_gsm_network_signal_quality (MM_MODEM_GSM_NETWORK (self), priv->signal_quality);
+    return FALSE;
+}
+
+void
+mm_generic_gsm_update_signal_quality (MMGenericGsm *self, guint32 quality)
+{
+    MMGenericGsmPrivate *priv;
+    guint delay = 0;
+
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_GENERIC_GSM (self));
+    g_return_if_fail (quality <= 100);
+
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    if (priv->signal_quality == quality)
+        return;
+
+    priv->signal_quality = quality;
+
+    /* Some modems will send unsolcited signal quality changes quite often,
+     * so rate-limit them to every few seconds.  Track the last time we
+     * emitted signal quality so that we send the signal immediately if there
+     * haven't been any updates in a while.
+     */
+    if (!priv->signal_quality_id) {
+        if (priv->signal_quality_timestamp > 0) {
+            time_t curtime;
+            long int diff;
+
+            curtime = time (NULL);
+            diff = curtime - priv->signal_quality_timestamp;
+            if (diff == 0) {
+                /* If the device is sending more than one update per second,
+                 * make sure we don't spam clients with signals.
+                 */
+                delay = 3;
+            } else if ((diff > 0) && (diff <= 3)) {
+                /* Emitted an update less than 3 seconds ago; schedule an update
+                 * 3 seconds after the previous one.
+                 */
+                delay = (guint) diff;
+            } else {
+                /* Otherwise, we haven't emitted an update in the last 3 seconds,
+                 * or the user turned their clock back, or something like that.
+                 */
+                delay = 0;
+            }
+        }
+
+        priv->signal_quality_id = g_timeout_add_seconds (delay,
+                                                         emit_signal_quality_change,
+                                                         self);
+    }
+}
+
 static void
 get_signal_quality_done (MMAtSerialPort *port,
                          GString *response,
                          GError *error,
                          gpointer user_data)
 {
-    MMGenericGsmPrivate *priv;
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     char *reply = response->str;
+    gboolean parsed = FALSE;
 
-    if (error)
-        info->error = g_error_copy (error);
-    else if (!strncmp (reply, "+CSQ: ", 6)) {
+    info->error = mm_modem_check_removed (info->modem, error);
+    if (info->error)
+        goto done;
+
+    if (!strncmp (reply, "+CSQ: ", 6)) {
         /* Got valid reply */
         int quality;
         int ber;
 
-        reply += 6;
-
-        if (sscanf (reply, "%d, %d", &quality, &ber)) {
+        if (sscanf (reply + 6, "%d, %d", &quality, &ber)) {
             /* 99 means unknown */
             if (quality == 99) {
                 info->error = g_error_new_literal (MM_MOBILE_ERROR,
@@ -2162,15 +2289,19 @@ get_signal_quality_done (MMAtSerialPort *port,
                 /* Normalize the quality */
                 quality = CLAMP (quality, 0, 31) * 100 / 31;
 
-                priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
-                priv->signal_quality = quality;
+                mm_generic_gsm_update_signal_quality (MM_GENERIC_GSM (info->modem), quality);
                 mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
             }
-        } else
-            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                               "Could not parse signal quality results");
+            parsed = TRUE;
+        }
     }
 
+    if (!parsed && !info->error) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse signal quality results");
+    }
+
+done:
     mm_callback_info_schedule (info);
 }
 
@@ -2185,7 +2316,6 @@ get_signal_quality (MMModemGsmNetwork *modem,
 
     connected = mm_port_get_connected (MM_PORT (priv->primary));
     if (connected && !priv->secondary) {
-        g_message ("Returning saved signal quality %d", priv->signal_quality);
         callback (MM_MODEM (modem), priv->signal_quality, NULL, user_data);
         return;
     }
@@ -2221,19 +2351,19 @@ etsi_act_to_mm_act (gint act)
     while (iter->mm_act != MM_MODEM_GSM_ACCESS_TECH_UNKNOWN) {
         if (iter->etsi_act == act)
             return iter->mm_act;
+        iter++;
     }
     return MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
 }
 
-void
-mm_generic_gsm_update_access_technology (MMGenericGsm *modem,
-                                         MMModemGsmAccessTech act)
+static void
+_internal_update_access_technology (MMGenericGsm *modem,
+                                    MMModemGsmAccessTech act)
 {
     MMGenericGsmPrivate *priv;
 
     g_return_if_fail (modem != NULL);
     g_return_if_fail (MM_IS_GENERIC_GSM (modem));
-
     g_return_if_fail (act >= MM_MODEM_GSM_ACCESS_TECH_UNKNOWN && act <= MM_MODEM_GSM_ACCESS_TECH_LAST);
 
     priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
@@ -2248,6 +2378,18 @@ mm_generic_gsm_update_access_technology (MMGenericGsm *modem,
         old_mode = mm_modem_gsm_network_act_to_old_mode (act);
         g_signal_emit_by_name (G_OBJECT (modem), "network-mode", old_mode);
     }
+}
+
+void
+mm_generic_gsm_update_access_technology (MMGenericGsm *self,
+                                         MMModemGsmAccessTech act)
+{
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_GENERIC_GSM (self));
+
+    /* For plugins, don't update the access tech when the modem isn't enabled */
+    if (mm_modem_get_state (MM_MODEM (self)) >= MM_MODEM_STATE_ENABLED)
+        _internal_update_access_technology (self, act);
 }
 
 void
@@ -2509,8 +2651,6 @@ simple_connect (MMModemSimple *simple,
     simple_state_machine (MM_MODEM (simple), NULL, info);
 }
 
-
-
 static void
 simple_free_gvalue (gpointer data)
 {
@@ -2542,16 +2682,39 @@ simple_string_value (const char *str)
     return val;
 }
 
+#define NOTDONE_TAG "not-done"
+#define SS_HASH_TAG "simple-get-status"
+
+static void
+simple_status_complete_item (MMCallbackInfo *info)
+{
+    guint32 completed = GPOINTER_TO_UINT (mm_callback_info_get_data (info, NOTDONE_TAG));
+
+    g_warn_if_fail (completed > 0);
+
+    /* Decrement the number of outstanding calls and if there aren't any left,
+     * schedule the callback info completion.
+     */
+    completed--;
+    mm_callback_info_set_data (info, NOTDONE_TAG, GUINT_TO_POINTER (completed), NULL);
+    if (completed == 0)
+        mm_callback_info_schedule (info);
+}
+
 static void
 simple_status_got_signal_quality (MMModem *modem,
                                   guint32 result,
                                   GError *error,
                                   gpointer user_data)
 {
-    if (error)
-        g_warning ("Error getting signal quality: %s", error->message);
-    else
-        g_hash_table_insert ((GHashTable *) user_data, "signal_quality", simple_uint_value (result));
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    GHashTable *properties;
+
+    if (!error) {
+        properties = (GHashTable *) mm_callback_info_get_data (info, SS_HASH_TAG);
+        g_hash_table_insert (properties, "signal_quality", simple_uint_value (result));
+    }
+    simple_status_complete_item (info);
 }
 
 static void
@@ -2560,9 +2723,14 @@ simple_status_got_band (MMModem *modem,
                         GError *error,
                         gpointer user_data)
 {
-    /* Ignore band errors since there's no generic implementation for it */
-    if (!error)
-        g_hash_table_insert ((GHashTable *) user_data, "band", simple_uint_value (result));
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    GHashTable *properties;
+
+    if (!error) {
+        properties = (GHashTable *) mm_callback_info_get_data (info, SS_HASH_TAG);
+        g_hash_table_insert (properties, "band", simple_uint_value (result));
+    }
+    simple_status_complete_item (info);
 }
 
 static void
@@ -2576,17 +2744,15 @@ simple_status_got_reg_info (MMModemGsmNetwork *modem,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     GHashTable *properties;
 
-    if (error)
-        info->error = g_error_copy (error);
-    else {
-        properties = (GHashTable *) mm_callback_info_get_data (info, "simple-get-status");
- 
+    info->error = mm_modem_check_removed ((MMModem *) modem, error);
+    if (!info->error) {
+        properties = (GHashTable *) mm_callback_info_get_data (info, SS_HASH_TAG);
+
         g_hash_table_insert (properties, "registration_status", simple_uint_value (status));
         g_hash_table_insert (properties, "operator_code", simple_string_value (oper_code));
         g_hash_table_insert (properties, "operator_name", simple_string_value (oper_name));
     }
-
-    mm_callback_info_schedule (info);
+    simple_status_complete_item (info);
 }
 
 static void
@@ -2595,7 +2761,7 @@ simple_get_status_invoke (MMCallbackInfo *info)
     MMModemSimpleGetStatusFn callback = (MMModemSimpleGetStatusFn) info->callback;
 
     callback (MM_MODEM_SIMPLE (info->modem),
-              (GHashTable *) mm_callback_info_get_data (info, "simple-get-status"),
+              (GHashTable *) mm_callback_info_get_data (info, SS_HASH_TAG),
               info->error, info->user_data);
 }
 
@@ -2615,12 +2781,15 @@ simple_get_status (MMModemSimple *simple,
                                       G_CALLBACK (callback),
                                       user_data);
 
-    properties = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, simple_free_gvalue);
-    mm_callback_info_set_data (info, "simple-get-status", properties, (GDestroyNotify) g_hash_table_unref);
+    properties = g_hash_table_new_full (g_str_hash, g_str_equal, NULL, simple_free_gvalue);
+    mm_callback_info_set_data (info, SS_HASH_TAG, properties, (GDestroyNotify) g_hash_table_unref);
 
-    mm_modem_gsm_network_get_signal_quality (gsm, simple_status_got_signal_quality, properties);
-    mm_modem_gsm_network_get_band (gsm, simple_status_got_band, properties);
-    mm_modem_gsm_network_get_registration_info (gsm, simple_status_got_reg_info, properties);
+    mm_modem_gsm_network_get_signal_quality (gsm, simple_status_got_signal_quality, info);
+    mm_modem_gsm_network_get_band (gsm, simple_status_got_band, info);
+    mm_modem_gsm_network_get_registration_info (gsm, simple_status_got_reg_info, info);
+
+    /* 3 calls to complete before scheduling the callback: (signal, band, reginfo) */
+    mm_callback_info_set_data (info, NOTDONE_TAG, GUINT_TO_POINTER (3), NULL);
 
     if (priv->act > -1) {
         /* Deprecated key */
@@ -2789,6 +2958,11 @@ finalize (GObject *object)
     if (priv->poll_id) {
         g_source_remove (priv->poll_id);
         priv->poll_id = 0;
+    }
+
+    if (priv->signal_quality_id) {
+        g_source_remove (priv->signal_quality_id);
+        priv->signal_quality_id = 0;
     }
 
     mm_gsm_creg_regex_destroy (priv->reg_regex);

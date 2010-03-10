@@ -49,12 +49,26 @@ mm_modem_novatel_gsm_new (const char *device,
 /*****************************************************************************/
 
 static void
+dmat_callback2 (MMAtSerialPort *port,
+                GString *response,
+                GError *error,
+                gpointer user_data)
+{
+    mm_serial_port_close (MM_SERIAL_PORT (port));
+}
+
+static void
 dmat_callback (MMAtSerialPort *port,
                GString *response,
                GError *error,
                gpointer user_data)
 {
-    mm_serial_port_close (MM_SERIAL_PORT (port));
+    if (error) {
+        /* Try it again */
+        if (mm_serial_port_open (MM_SERIAL_PORT (port), NULL))
+            mm_at_serial_port_queue_command (port, "$NWDMAT=1", 2, dmat_callback2, NULL);
+    } else
+        mm_serial_port_close (MM_SERIAL_PORT (port));
 }
 
 static gboolean

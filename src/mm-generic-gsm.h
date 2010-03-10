@@ -133,6 +133,11 @@ void mm_generic_gsm_update_allowed_mode (MMGenericGsm *modem,
 void mm_generic_gsm_update_access_technology (MMGenericGsm *modem,
                                               MMModemGsmAccessTech act);
 
+/* Called to asynchronously update the current signal quality of the device;
+ * 'quality' is a 0 - 100% quality.
+ */
+void mm_generic_gsm_update_signal_quality (MMGenericGsm *modem, guint32 quality);
+
 void mm_generic_gsm_check_pin (MMGenericGsm *modem,
                                MMModemFn callback,
                                gpointer user_data);

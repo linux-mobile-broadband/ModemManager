@@ -321,8 +321,14 @@ real_config_fd (MMSerialPort *self, int fd, GError **error)
     stbuf.c_cc[VTIME] = 0;
     stbuf.c_cc[VEOF] = 1;
 
-    stbuf.c_cflag &= ~(CBAUD | CSIZE | CSTOPB | CLOCAL | PARENB);
-    stbuf.c_cflag |= (speed | bits | CREAD | 0 | parity | stopbits);
+    /* Use software handshaking */
+    stbuf.c_iflag |= (IXON | IXOFF | IXANY);
+
+    /* Set up port speed and serial attributes; also ignore modem control
+     * lines since most drivers don't implement RTS/CTS anyway.
+     */
+    stbuf.c_cflag &= ~(CBAUD | CSIZE | CSTOPB | PARENB | CRTSCTS);
+    stbuf.c_cflag |= (speed | bits | CREAD | 0 | parity | stopbits | CLOCAL);
 
     if (ioctl (fd, TCSETA, &stbuf) < 0) {
         g_set_error (error,
