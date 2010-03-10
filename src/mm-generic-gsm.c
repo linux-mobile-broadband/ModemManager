@@ -117,6 +117,14 @@ static MMModemGsmAccessTech etsi_act_to_mm_act (gint act);
 static void _internal_update_access_technology (MMGenericGsm *modem,
                                                 MMModemGsmAccessTech act);
 
+static void reg_info_updated (MMGenericGsm *self,
+                              gboolean update_rs,
+                              MMModemGsmNetworkRegStatus status,
+                              gboolean update_code,
+                              const char *oper_code,
+                              gboolean update_name,
+                              const char *oper_name);
+
 MMModem *
 mm_generic_gsm_new (const char *device,
                     const char *driver,
@@ -841,13 +849,18 @@ disable_done (MMSerialPort *port,
 
     info->error = mm_modem_check_removed (info->modem, error);
     if (!info->error) {
-        MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+        MMGenericGsm *self = MM_GENERIC_GSM (info->modem);
 
         mm_serial_port_close (port);
         mm_modem_set_state (MM_MODEM (info->modem),
                             MM_MODEM_STATE_DISABLED,
                             MM_MODEM_STATE_REASON_NONE);
-        priv->reg_status = MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN;
+
+        /* Clear out registration info */
+        reg_info_updated (self,
+                          TRUE, MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN,
+                          TRUE, NULL,
+                          TRUE, NULL);
     }
     mm_callback_info_schedule (info);
 }
@@ -1268,6 +1281,49 @@ change_pin (MMModemGsmCard *modem,
     g_free (command);
 }
 
+static void
+reg_info_updated (MMGenericGsm *self,
+                  gboolean update_rs,
+                  MMModemGsmNetworkRegStatus status,
+                  gboolean update_code,
+                  const char *oper_code,
+                  gboolean update_name,
+                  const char *oper_name)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    gboolean changed = FALSE;
+
+    if (update_rs) {
+        if (status != priv->reg_status) {
+            priv->reg_status = status;
+            changed = TRUE;
+        }
+    }
+
+    if (update_code) {
+        if (g_strcmp0 (oper_code, priv->oper_code) != 0) {
+            g_free (priv->oper_code);
+            priv->oper_code = g_strdup (oper_code);
+            changed = TRUE;
+        }
+    }
+
+    if (update_name) {
+        if (g_strcmp0 (oper_name, priv->oper_name) != 0) {
+            g_free (priv->oper_name);
+            priv->oper_name = g_strdup (oper_name);
+            changed = TRUE;
+        }
+    }
+
+    if (changed) {
+        mm_modem_gsm_network_registration_info (MM_MODEM_GSM_NETWORK (self),
+                                                priv->reg_status,
+                                                priv->oper_code,
+                                                priv->oper_name);
+    }
+}
+
 static char *
 parse_operator (const char *reply)
 {
@@ -1300,18 +1356,14 @@ read_operator_code_done (MMSerialPort *port,
                          GError *error,
                          gpointer user_data)
 {
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (user_data);
+    MMGenericGsm *self = MM_GENERIC_GSM (user_data);
     char *oper;
 
-    if (error)
-        return;
-
-    oper = parse_operator (response->str);
-    if (!oper)
-        return;
-
-    g_free (priv->oper_code);
-    priv->oper_code = oper;
+    if (!error) {
+        oper = parse_operator (response->str);
+        if (oper)
+            reg_info_updated (self, FALSE, 0, TRUE, oper, FALSE, NULL);
+    }
 }
 
 static void
@@ -1320,23 +1372,14 @@ read_operator_name_done (MMSerialPort *port,
                          GError *error,
                          gpointer user_data)
 {
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (user_data);
+    MMGenericGsm *self = MM_GENERIC_GSM (user_data);
     char *oper;
 
-    if (error)
-        return;
-
-    oper = parse_operator (response->str);
-    if (!oper)
-        return;
-
-    g_free (priv->oper_name);
-    priv->oper_name = oper;
-
-    mm_modem_gsm_network_registration_info (MM_MODEM_GSM_NETWORK (user_data),
-                                            priv->reg_status,
-                                            priv->oper_code,
-                                            priv->oper_name);
+    if (!error) {
+        oper = parse_operator (response->str);
+        if (oper)
+            reg_info_updated (self, FALSE, 0, FALSE, NULL, TRUE, oper);
+    }
 }
 
 /* Registration */
@@ -1392,14 +1435,8 @@ mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
             mm_serial_port_queue_command (priv->primary, "+COPS=3,2;+COPS?", 3, read_operator_code_done, modem);
             mm_serial_port_queue_command (priv->primary, "+COPS=3,0;+COPS?", 3, read_operator_name_done, modem);
             mm_modem_gsm_network_get_signal_quality (MM_MODEM_GSM_NETWORK (modem), got_signal_quality, NULL);
-        } else {
-            g_free (priv->oper_code);
-            g_free (priv->oper_name);
-            priv->oper_code = priv->oper_name = NULL;
-
-            mm_modem_gsm_network_registration_info (MM_MODEM_GSM_NETWORK (modem), priv->reg_status,
-                                                    priv->oper_code, priv->oper_name);
-        }
+        } else
+            reg_info_updated (MM_GENERIC_GSM (modem), FALSE, 0, TRUE, NULL, TRUE, NULL);
 
         mm_generic_gsm_update_enabled_state (modem, TRUE, MM_MODEM_STATE_REASON_NONE);
     }
@@ -1684,7 +1721,11 @@ registration_timed_out (gpointer data)
 
     g_warn_if_fail (info == priv->pending_reg_info);
 
-    priv->reg_status = MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE;
+    /* Clear out registration info */
+    reg_info_updated (MM_GENERIC_GSM (info->modem),
+                      TRUE, MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE,
+                      TRUE, NULL,
+                      TRUE, NULL);
 
     info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_NETWORK_TIMEOUT);
     mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (info->modem));
@@ -2705,6 +2746,11 @@ simple_status_got_reg_info (MMModemGsmNetwork *modem,
         g_hash_table_insert (properties, "registration_status", simple_uint_value (status));
         g_hash_table_insert (properties, "operator_code", simple_string_value (oper_code));
         g_hash_table_insert (properties, "operator_name", simple_string_value (oper_name));
+
+        reg_info_updated (MM_GENERIC_GSM (info->modem),
+                          TRUE, status,
+                          TRUE, oper_code,
+                          TRUE, oper_name);
     }
     simple_status_complete_item (info);
 }
