@@ -52,6 +52,39 @@ mm_modem_zte_new (const char *device,
                                    NULL));
 }
 
+static void
+zte_access_tech_changed (MMSerialPort *port,
+                         GMatchInfo *info,
+                         gpointer user_data)
+{
+    MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
+    char *str;
+
+    str = g_match_info_fetch (info, 1);
+    if (str) {
+        /* Better technologies are listed first since modem sometimes says
+         * stuff like "GPRS/EDGE" and that should be handled as EDGE.
+         */
+        if (strstr (str, "HSPA"))
+            act = MM_MODEM_GSM_ACCESS_TECH_HSPA;
+        else if (strstr (str, "HSUPA"))
+            act = MM_MODEM_GSM_ACCESS_TECH_HSUPA;
+        else if (strstr (str, "HSDPA"))
+            act = MM_MODEM_GSM_ACCESS_TECH_HSDPA;
+        else if (strstr (str, "UMTS"))
+            act = MM_MODEM_GSM_ACCESS_TECH_UMTS;
+        else if (strstr (str, "EDGE"))
+            act = MM_MODEM_GSM_ACCESS_TECH_EDGE;
+        else if (strstr (str, "GPRS"))
+            act = MM_MODEM_GSM_ACCESS_TECH_GPRS;
+        else if (strstr (str, "GSM"))
+            act = MM_MODEM_GSM_ACCESS_TECH_GSM;
+    }
+    g_free (str);
+
+    mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (user_data), act);
+}
+
 /*****************************************************************************/
 /*    Modem class override functions                                         */
 /*****************************************************************************/
@@ -223,8 +256,8 @@ grab_port (MMModem *modem,
         g_regex_unref (regex);
 
         /* Current network and service domain */
-        regex = g_regex_new ("\\r\\n\\+ZPASR: (.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        regex = g_regex_new ("\\r\\n\\+ZPASR:\\s*(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, zte_access_tech_changed, modem, NULL);
         g_regex_unref (regex);
 
         /* SIM request to Build Main Menu */
