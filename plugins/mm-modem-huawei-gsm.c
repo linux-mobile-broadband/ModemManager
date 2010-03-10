@@ -40,7 +40,6 @@ G_DEFINE_TYPE_EXTENDED (MMModemHuaweiGsm, mm_modem_huawei_gsm, MM_TYPE_GENERIC_G
 
 typedef struct {
     /* Cached state */
-    guint signal_quality;
     MMModemGsmBand band;
 } MMModemHuaweiGsmPrivate;
 
@@ -369,29 +368,6 @@ get_band (MMModemGsmNetwork *modem,
     }
 }
 
-static void
-get_signal_quality (MMModemGsmNetwork *modem,
-                    MMModemUIntFn callback,
-                    gpointer user_data)
-{
-    MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (modem);
-
-    if (priv->signal_quality) {
-        /* have cached signal quality (from an unsolicited message). Use that */
-        MMCallbackInfo *info;
-
-        info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-        mm_callback_info_set_result (info, GUINT_TO_POINTER (priv->signal_quality), NULL);
-        mm_callback_info_schedule (info);
-    } else {
-        /* Use the generic implementation */
-        MMModemGsmNetwork *parent_gsm_network_iface;
-
-        parent_gsm_network_iface = g_type_interface_peek_parent (MM_MODEM_GSM_NETWORK_GET_INTERFACE (modem));
-        parent_gsm_network_iface->get_signal_quality (modem, callback, user_data);
-    }
-}
-
 /* Unsolicited message handlers */
 
 static void
@@ -400,24 +376,22 @@ handle_signal_quality_change (MMSerialPort *port,
                               gpointer user_data)
 {
     MMModemHuaweiGsm *self = MM_MODEM_HUAWEI_GSM (user_data);
-    MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (self);
     char *str;
-    int quality;
+    int quality = 0;
 
     str = g_match_info_fetch (match_info, 1);
     quality = atoi (str);
     g_free (str);
 
-    if (quality == 99)
+    if (quality == 99) {
         /* 99 means unknown */
         quality = 0;
-    else
+    } else {
         /* Normalize the quality */
-        quality = quality * 100 / 31;
+        quality = CLAMP (quality, 0, 31) * 100 / 31;
+    }
 
-    g_debug ("Signal quality: %d", quality);
-    priv->signal_quality = (guint32) quality;
-    mm_modem_gsm_network_signal_quality (MM_MODEM_GSM_NETWORK (self), (guint32) quality);
+    mm_generic_gsm_update_signal_quality (MM_GENERIC_GSM (self), (guint32) quality);
 }
 
 static void
@@ -568,7 +542,6 @@ modem_gsm_network_init (MMModemGsmNetwork *class)
 {
     class->set_band = set_band;
     class->get_band = get_band;
-    class->get_signal_quality = get_signal_quality;
 }
 
 static void

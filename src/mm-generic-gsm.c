@@ -78,6 +78,8 @@ typedef struct {
     guint pending_reg_id;
     MMCallbackInfo *pending_reg_info;
 
+    guint signal_quality_id;
+    time_t signal_quality_timestamp;
     guint32 signal_quality;
     guint32 cid;
 
@@ -142,14 +144,6 @@ mm_generic_gsm_get_cid (MMGenericGsm *modem)
     g_return_val_if_fail (MM_IS_GENERIC_GSM (modem), 0);
 
     return MM_GENERIC_GSM_GET_PRIVATE (modem)->cid;
-}
-
-static void
-got_signal_quality (MMModem *modem,
-                    guint32 result,
-                    GError *error,
-                    gpointer user_data)
-{
 }
 
 typedef struct {
@@ -905,6 +899,11 @@ disable (MMModem *modem,
         priv->poll_id = 0;
     }
 
+    if (priv->signal_quality_id) {
+        g_source_remove (priv->signal_quality_id);
+        priv->signal_quality_id = 0;
+    }
+
     priv->lac[0] = 0;
     priv->lac[1] = 0;
     priv->cell_id[0] = 0;
@@ -1359,6 +1358,15 @@ mm_generic_gsm_pending_registration_stop (MMGenericGsm *modem)
         mm_callback_info_schedule (priv->pending_reg_info);
         priv->pending_reg_info = NULL;
     }
+}
+
+static void
+got_signal_quality (MMModem *modem,
+                    guint32 quality,
+                    GError *error,
+                    gpointer user_data)
+{
+    mm_generic_gsm_update_signal_quality (MM_GENERIC_GSM (modem), quality);
 }
 
 void
@@ -2138,26 +2146,91 @@ set_apn (MMModemGsmNetwork *modem,
 
 /* GetSignalQuality */
 
+static gboolean
+emit_signal_quality_change (gpointer user_data)
+{
+    MMGenericGsm *self = MM_GENERIC_GSM (user_data);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    priv->signal_quality_id = 0;
+    priv->signal_quality_timestamp = time (NULL);
+    mm_modem_gsm_network_signal_quality (MM_MODEM_GSM_NETWORK (self), priv->signal_quality);
+    return FALSE;
+}
+
+void
+mm_generic_gsm_update_signal_quality (MMGenericGsm *self, guint32 quality)
+{
+    MMGenericGsmPrivate *priv;
+    guint delay = 0;
+
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_GENERIC_GSM (self));
+    g_return_if_fail (quality <= 100);
+
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    if (priv->signal_quality == quality)
+        return;
+
+    priv->signal_quality = quality;
+
+    /* Some modems will send unsolcited signal quality changes quite often,
+     * so rate-limit them to every few seconds.  Track the last time we
+     * emitted signal quality so that we send the signal immediately if there
+     * haven't been any updates in a while.
+     */
+    if (!priv->signal_quality_id) {
+        if (priv->signal_quality_timestamp > 0) {
+            time_t curtime;
+            long int diff;
+
+            curtime = time (NULL);
+            diff = curtime - priv->signal_quality_timestamp;
+            if (diff == 0) {
+                /* If the device is sending more than one update per second,
+                 * make sure we don't spam clients with signals.
+                 */
+                delay = 3;
+            } else if ((diff > 0) && (diff <= 3)) {
+                /* Emitted an update less than 3 seconds ago; schedule an update
+                 * 3 seconds after the previous one.
+                 */
+                delay = (guint) diff;
+            } else {
+                /* Otherwise, we haven't emitted an update in the last 3 seconds,
+                 * or the user turned their clock back, or something like that.
+                 */
+                delay = 0;
+            }
+        }
+
+        priv->signal_quality_id = g_timeout_add_seconds (delay,
+                                                         emit_signal_quality_change,
+                                                         self);
+    }
+}
+
 static void
 get_signal_quality_done (MMSerialPort *port,
                          GString *response,
                          GError *error,
                          gpointer user_data)
 {
-    MMGenericGsmPrivate *priv;
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     char *reply = response->str;
+    gboolean parsed = FALSE;
 
-    if (error)
-        info->error = g_error_copy (error);
-    else if (!strncmp (reply, "+CSQ: ", 6)) {
+    info->error = mm_modem_check_removed (info->modem, error);
+    if (info->error)
+        goto done;
+
+    if (!strncmp (reply, "+CSQ: ", 6)) {
         /* Got valid reply */
         int quality;
         int ber;
 
-        reply += 6;
-
-        if (sscanf (reply, "%d, %d", &quality, &ber)) {
+        if (sscanf (reply + 6, "%d, %d", &quality, &ber)) {
             /* 99 means unknown */
             if (quality == 99) {
                 info->error = g_error_new_literal (MM_MOBILE_ERROR,
@@ -2167,15 +2240,19 @@ get_signal_quality_done (MMSerialPort *port,
                 /* Normalize the quality */
                 quality = CLAMP (quality, 0, 31) * 100 / 31;
 
-                priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
-                priv->signal_quality = quality;
+                mm_generic_gsm_update_signal_quality (MM_GENERIC_GSM (info->modem), quality);
                 mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
             }
-        } else
-            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                               "Could not parse signal quality results");
+            parsed = TRUE;
+        }
     }
 
+    if (!parsed && !info->error) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse signal quality results");
+    }
+
+done:
     mm_callback_info_schedule (info);
 }
 
@@ -2190,7 +2267,6 @@ get_signal_quality (MMModemGsmNetwork *modem,
 
     connected = mm_port_get_connected (MM_PORT (priv->primary));
     if (connected && !priv->secondary) {
-        g_message ("Returning saved signal quality %d", priv->signal_quality);
         callback (MM_MODEM (modem), priv->signal_quality, NULL, user_data);
         return;
     }
@@ -2822,6 +2898,11 @@ finalize (GObject *object)
     if (priv->poll_id) {
         g_source_remove (priv->poll_id);
         priv->poll_id = 0;
+    }
+
+    if (priv->signal_quality_id) {
+        g_source_remove (priv->signal_quality_id);
+        priv->signal_quality_id = 0;
     }
 
     mm_gsm_creg_regex_destroy (priv->reg_regex);

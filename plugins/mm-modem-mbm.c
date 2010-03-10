@@ -561,7 +561,7 @@ mbm_ciev_received (MMSerialPort *port,
         str = g_match_info_fetch (info, 2);
         if (str) {
             quality = atoi (str);
-            mm_modem_gsm_network_signal_quality (MM_MODEM_GSM_NETWORK (user_data), quality * 20);
+            mm_generic_gsm_update_signal_quality (MM_GENERIC_GSM (user_data), quality * 20);
         }
     }
 }
@@ -790,15 +790,17 @@ grab_port (MMModem *modem,
     }
 
     port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
-    if (port && MM_IS_SERIAL_PORT (port) && (ptype == MM_PORT_TYPE_PRIMARY)) {
+    if (port && MM_IS_SERIAL_PORT (port)) {
         GRegex *regex;
+
+        if (ptype == MM_PORT_TYPE_PRIMARY) {
+            regex = g_regex_new ("\\r\\n\\*E2NAP: (\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+            mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, mbm_e2nap_received, modem, NULL);
+            g_regex_unref (regex);
+        }
 
         regex = g_regex_new ("\\r\\n\\*EMRDY: \\d\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, mbm_emrdy_received, modem, NULL);
-        g_regex_unref (regex);
-
-        regex = g_regex_new ("\\r\\n\\*E2NAP: (\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_serial_port_add_unsolicited_msg_handler (MM_SERIAL_PORT (port), regex, mbm_e2nap_received, modem, NULL);
         g_regex_unref (regex);
 
         regex = g_regex_new ("\\r\\n\\+PACSP(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
