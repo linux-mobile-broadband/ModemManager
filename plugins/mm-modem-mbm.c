@@ -537,11 +537,12 @@ mbm_ciev_received (MMSerialPort *port,
                    gpointer user_data)
 {
     int quality = 0, ind = 0;
-    const char *str;
+    char *str;
 
     str = g_match_info_fetch (info, 1);
     if (str)
         ind = atoi (str);
+    g_free (str);
 
     if (ind == MBM_SIGNAL_INDICATOR) {
         str = g_match_info_fetch (info, 2);
@@ -549,6 +550,7 @@ mbm_ciev_received (MMSerialPort *port,
             quality = atoi (str);
             mm_generic_gsm_update_signal_quality (MM_GENERIC_GSM (user_data), quality * 20);
         }
+        g_free (str);
     }
 }
 
