@@ -18,6 +18,11 @@
           The command to start the USSD session with.
         </tp:docstring>
       </arg>
+      <arg name="reply" type="s" direction="out">
+        <tp:docstring>
+          The network response to the command which started the USSD session.
+        </tp:docstring>
+      </arg>
     </method>
 
     <method name="Respond">
