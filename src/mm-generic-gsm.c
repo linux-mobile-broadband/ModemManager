@@ -2746,11 +2746,6 @@ simple_status_got_reg_info (MMModemGsmNetwork *modem,
         g_hash_table_insert (properties, "registration_status", simple_uint_value (status));
         g_hash_table_insert (properties, "operator_code", simple_string_value (oper_code));
         g_hash_table_insert (properties, "operator_name", simple_string_value (oper_name));
-
-        reg_info_updated (MM_GENERIC_GSM (info->modem),
-                          TRUE, status,
-                          TRUE, oper_code,
-                          TRUE, oper_name);
     }
     simple_status_complete_item (info);
 }
