@@ -665,10 +665,17 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
     g_return_if_fail (MM_IS_GENERIC_GSM (self));
     g_return_if_fail (info != NULL);
 
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
     if (error) {
         mm_modem_set_state (MM_MODEM (self),
                             MM_MODEM_STATE_DISABLED,
                             MM_MODEM_STATE_REASON_NONE);
+
+        if (priv->primary && mm_serial_port_is_open (priv->primary))
+            mm_serial_port_close (priv->primary);
+        if (priv->secondary && mm_serial_port_is_open (priv->secondary))
+            mm_serial_port_close (priv->secondary);
 
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
@@ -677,8 +684,6 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
         /* Modem is enabled; update the state */
         mm_generic_gsm_update_enabled_state (self, FALSE, MM_MODEM_STATE_REASON_NONE);
     }
-
-    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
 
     /* Open the second port here if the modem has one.  We'll use it for
      * signal strength and registration updates when the device is connected,
