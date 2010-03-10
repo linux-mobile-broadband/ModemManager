@@ -63,6 +63,9 @@ typedef struct {
     MMCallbackInfo *connect_pending_data;
     guint connect_pending_id;
 
+    char *username;
+    char *password;
+
     guint32 auth_idx;
 } MMModemHsoPrivate;
 
@@ -85,6 +88,157 @@ mm_modem_hso_new (const char *device,
                                    NULL));
 }
 
+/*****************************************************************************/
+
+static gint
+hso_get_cid (MMModemHso *self)
+{
+    gint cid;
+
+    cid = mm_generic_gsm_get_cid (MM_GENERIC_GSM (self));
+    if (cid < 0) {
+        g_warn_if_fail (cid >= 0);
+        cid = 0;
+    }
+
+    return cid;
+}
+
+static void
+auth_done (MMSerialPort *port,
+           GString *response,
+           GError *error,
+           gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemHso *self = MM_MODEM_HSO (info->modem);
+    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (self);
+
+    if (error) {
+        priv->auth_idx++;
+        if (auth_commands[priv->auth_idx]) {
+            /* Try the next auth command */
+            _internal_hso_modem_authenticate (self, info);
+            return;
+        } else
+            info->error = g_error_copy (error);
+    }
+
+    /* Reset to 0 so something gets tried the next connection */
+    priv->auth_idx = 0;
+    mm_callback_info_schedule (info);
+}
+
+static void
+_internal_hso_modem_authenticate (MMModemHso *self, MMCallbackInfo *info)
+{
+    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (self);
+    MMSerialPort *primary;
+    gint cid;
+    char *command;
+
+    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+
+    cid = hso_get_cid (self);
+
+    if (!priv->username && !priv->password)
+		command = g_strdup_printf ("%s=%d,0", auth_commands[priv->auth_idx], cid);
+    else {
+        command = g_strdup_printf ("%s=%d,1,\"%s\",\"%s\"",
+                                   auth_commands[priv->auth_idx],
+                                   cid,
+                                   priv->password ? priv->password : "",
+                                   priv->username ? priv->username : "");
+
+    }
+
+    mm_serial_port_queue_command (primary, command, 3, auth_done, info);
+    g_free (command);
+}
+
+void
+mm_hso_modem_authenticate (MMModemHso *self,
+                           const char *username,
+                           const char *password,
+                           MMModemFn callback,
+                           gpointer user_data)
+{
+    MMModemHsoPrivate *priv;
+    MMCallbackInfo *info;
+
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_MODEM_HSO (self));
+    g_return_if_fail (callback != NULL);
+
+    info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
+
+    priv = MM_MODEM_HSO_GET_PRIVATE (self);
+
+    g_free (priv->username);
+    priv->username = (username && strlen (username)) ? g_strdup (username) : NULL;
+
+    g_free (priv->password);
+    priv->password = (password && strlen (password)) ? g_strdup (password) : NULL;
+
+    _internal_hso_modem_authenticate (self, info);
+}
+
+/*****************************************************************************/
+
+static void
+connect_pending_done (MMModemHso *self)
+{
+    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (self);
+    GError *error = NULL;
+
+    if (priv->connect_pending_data) {
+        if (priv->connect_pending_data->error) {
+            error = priv->connect_pending_data->error;
+            priv->connect_pending_data->error = NULL;
+        }
+
+        /* Complete the connect */
+        mm_generic_gsm_connect_complete (MM_GENERIC_GSM (self), error, priv->connect_pending_data);
+        priv->connect_pending_data = NULL;
+    }
+
+    if (priv->connect_pending_id) {
+        g_source_remove (priv->connect_pending_id);
+        priv->connect_pending_id = 0;
+    }
+}
+
+static void
+connection_enabled (MMSerialPort *port,
+                    GMatchInfo *match_info,
+                    gpointer user_data)
+{
+    MMModemHso *self = MM_MODEM_HSO (user_data);
+    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (self);
+    char *str;
+
+    str = g_match_info_fetch (match_info, 2);
+    if (str[0] == '1')
+        connect_pending_done (self);
+    else if (str[0] == '3') {
+        MMCallbackInfo *info = priv->connect_pending_data;
+
+        if (info) {
+            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                               "Call setup failed");
+        }
+
+        connect_pending_done (self);
+    } else if (str[0] == '0') {
+        /* FIXME: disconnected. do something when we have modem status signals */
+    }
+
+    g_free (str);
+}
+
+/*****************************************************************************/
+
 #define IGNORE_ERRORS_TAG "ignore-errors"
 
 static void
@@ -99,18 +253,6 @@ hso_call_control_done (MMSerialPort *port,
         info->error = g_error_copy (error);
 
     mm_callback_info_schedule (info);
-}
-
-static guint32
-hso_get_cid (MMModemHso *self)
-{
-    guint32 cid;
-
-    cid = mm_generic_gsm_get_cid (MM_GENERIC_GSM (self));
-    if (cid == 0)
-        cid = 1;
-
-    return cid;
 }
 
 static void
@@ -135,31 +277,30 @@ hso_call_control (MMModemHso *self,
 }
 
 static void
-connect_pending_done (MMModemHso *self)
+timeout_done (MMModem *modem,
+              GError *error,
+              gpointer user_data)
 {
-    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (self);
-
-    if (priv->connect_pending_data) {
-        mm_callback_info_schedule (priv->connect_pending_data);
-        priv->connect_pending_data = NULL;
-    }
-
-    if (priv->connect_pending_id) {
-        g_source_remove (priv->connect_pending_id);
-        priv->connect_pending_id = 0;
-    }
+    if (modem)
+        connect_pending_done (MM_MODEM_HSO (modem));
 }
 
 static gboolean
 hso_connect_timed_out (gpointer data)
 {
-    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (data);
+    MMModemHso *self = MM_MODEM_HSO (data);
+    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (self);
+    MMCallbackInfo *info = priv->connect_pending_data;
 
-    priv->connect_pending_data->error = g_error_new_literal (MM_SERIAL_ERROR,
-                                                             MM_SERIAL_RESPONSE_TIMEOUT,
-                                                             "Connection timed out");
-    connect_pending_done (MM_MODEM_HSO (data));
+    priv->connect_pending_id = 0;
 
+    if (info) {
+        info->error = g_error_new_literal (MM_SERIAL_ERROR,
+                                           MM_SERIAL_RESPONSE_TIMEOUT,
+                                           "Connection timed out");
+    }
+
+    hso_call_control (self, FALSE, TRUE, timeout_done, self);
     return FALSE;
 }
 
@@ -169,33 +310,32 @@ hso_enabled (MMModem *modem,
              gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    GError *tmp_error;
 
-    if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
+    tmp_error = mm_modem_check_removed (modem, error);
+    if (tmp_error) {
+        mm_generic_gsm_connect_complete (MM_GENERIC_GSM (modem), tmp_error, info);
+        g_clear_error (&tmp_error);
     } else {
         MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (modem);
-        GSource *source;
 
-        source = g_timeout_source_new_seconds (30);
-        g_source_set_closure (source, g_cclosure_new_object (G_CALLBACK (hso_connect_timed_out), G_OBJECT (modem)));
-        g_source_attach (source, NULL);
         priv->connect_pending_data = info;
-        priv->connect_pending_id = g_source_get_id (source);
-        g_source_unref (source);
+        priv->connect_pending_id = g_timeout_add_seconds (30, hso_connect_timed_out, modem);
     }
 }
 
 static void
-clear_old_context (MMModem *modem,
-                   GError *error,
-                   gpointer user_data)
+old_context_clear_done (MMModem *modem,
+                        GError *error,
+                        gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    GError *tmp_error;
 
-    if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
+    tmp_error = mm_modem_check_removed (modem, error);
+    if (tmp_error) {
+        mm_generic_gsm_connect_complete (MM_GENERIC_GSM (modem), tmp_error, info);
+        g_clear_error (&tmp_error);
     } else {
         /* Success, activate the PDP context and start the data session */
         hso_call_control (MM_MODEM_HSO (modem), TRUE, FALSE, hso_enabled, info);
@@ -203,86 +343,38 @@ clear_old_context (MMModem *modem,
 }
 
 static void
-auth_done (MMSerialPort *port,
-           GString *response,
-           GError *error,
-           gpointer user_data)
+connect_auth_done (MMModem *modem,
+                   GError *error,
+                   gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemHso *self = MM_MODEM_HSO (info->modem);
-    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (self);
+    GError *tmp_error;
 
-    if (error) {
-        priv->auth_idx++;
-        if (auth_commands[priv->auth_idx]) {
-            /* Try the next auth command */
-            _internal_hso_modem_authenticate (self, info);
-        } else {
-            /* Reset to 0 so that something gets tried for the next connection */
-            priv->auth_idx = 0;
-
-            info->error = g_error_copy (error);
-            mm_callback_info_schedule (info);
-        }
+    tmp_error = mm_modem_check_removed (modem, error);
+    if (tmp_error) {
+        mm_generic_gsm_connect_complete (MM_GENERIC_GSM (modem), tmp_error, info);
+        g_clear_error (&tmp_error);
     } else {
-        priv->auth_idx = 0;
-
-        /* success, kill any existing connections first */
-        hso_call_control (self, FALSE, TRUE, clear_old_context, info);
+        /* Now connect; kill any existing connections first */
+        hso_call_control (MM_MODEM_HSO (modem), FALSE, TRUE, old_context_clear_done, info);
     }
 }
 
 static void
-_internal_hso_modem_authenticate (MMModemHso *self, MMCallbackInfo *info)
+do_connect (MMModem *modem,
+            const char *number,
+            MMModemFn callback,
+            gpointer user_data)
 {
+    MMModemHso *self = MM_MODEM_HSO (modem);
     MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (self);
-    MMSerialPort *primary;
-    guint32 cid;
-    char *command;
-    const char *username, *password;
-
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
-    g_assert (primary);
-
-    cid = hso_get_cid (self);
-
-    username = mm_callback_info_get_data (info, "username");
-    password = mm_callback_info_get_data (info, "password");
-
-    if (!username && !password)
-		command = g_strdup_printf ("%s=%d,0", auth_commands[priv->auth_idx], cid);
-    else {
-        command = g_strdup_printf ("%s=%d,1,\"%s\",\"%s\"",
-                                   auth_commands[priv->auth_idx],
-                                   cid,
-                                   password ? password : "",
-                                   username ? username : "");
-
-    }
-
-    mm_serial_port_queue_command (primary, command, 3, auth_done, info);
-    g_free (command);
-}
-
-void
-mm_hso_modem_authenticate (MMModemHso *self,
-                           const char *username,
-                           const char *password,
-                           MMModemFn callback,
-                           gpointer user_data)
-{
     MMCallbackInfo *info;
 
-    g_return_if_fail (MM_IS_MODEM_HSO (self));
-    g_return_if_fail (callback != NULL);
+    mm_modem_set_state (modem, MM_MODEM_STATE_CONNECTING, MM_MODEM_STATE_REASON_NONE);
 
-    info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
-    if (username)
-        mm_callback_info_set_data (info, "username", g_strdup (username), g_free);
-    if (password)
-        mm_callback_info_set_data (info, "password", g_strdup (password), g_free);
+    info = mm_callback_info_new (modem, callback, user_data);
 
-    _internal_hso_modem_authenticate (self, info);
+    mm_hso_modem_authenticate (self, priv->username, priv->password, connect_auth_done, info);
 }
 
 /*****************************************************************************/
@@ -315,9 +407,16 @@ disable (MMModem *modem,
          MMModemFn callback,
          gpointer user_data)
 {
+    MMModemHso *self = MM_MODEM_HSO (modem);
+    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (self);
     MMCallbackInfo *info;
 
-    mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
+    mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (self));
+
+    g_free (priv->username);
+    priv->username = NULL;
+    g_free (priv->password);
+    priv->password = NULL;
 
     info = mm_callback_info_new (modem, callback, user_data);
 
@@ -325,18 +424,7 @@ disable (MMModem *modem,
     hso_call_control (MM_MODEM_HSO (modem), FALSE, TRUE, disable_done, info);
 }
 
-static void
-do_connect (MMModem *modem,
-            const char *number,
-            MMModemFn callback,
-            gpointer user_data)
-{
-    MMCallbackInfo *info;
-
-    info = mm_callback_info_new (modem, callback, user_data);
-    mm_callback_info_schedule (info);
-}
-
+/*****************************************************************************/
 
 static void
 free_dns_array (gpointer data)
@@ -366,7 +454,7 @@ get_ip4_config_done (MMSerialPort *port,
     GArray *dns_array;
     int i;
     guint32 tmp;
-    guint cid;
+    gint cid;
 
     if (error) {
         info->error = g_error_copy (error);
@@ -387,7 +475,7 @@ get_ip4_config_done (MMSerialPort *port,
 
             errno = 0;
             num = strtol (*iter, NULL, 10);
-            if (errno != 0 || num < 0 || (guint) num != cid) {
+            if (errno != 0 || num < 0 || (gint) num != cid) {
                 info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
                                            "Unknown CID in OWANDATA response ("
                                            "got %d, expected %d)", (guint) num, cid);
@@ -429,18 +517,35 @@ get_ip4_config (MMModem *modem,
     g_free (command);
 }
 
+/*****************************************************************************/
+
 static void
-disconnect (MMModem *modem,
-            MMModemFn callback,
-            gpointer user_data)
+disconnect_owancall_done (MMSerialPort *port,
+                          GString *response,
+                          GError *error,
+                          gpointer user_data)
+{
+    mm_callback_info_schedule ((MMCallbackInfo *) user_data);
+}
+
+static void
+do_disconnect (MMGenericGsm *gsm,
+               gint cid,
+               MMModemFn callback,
+               gpointer user_data)
 {
     MMCallbackInfo *info;
     MMSerialPort *primary;
+    char *command;
 
-    info = mm_callback_info_new (modem, callback, user_data);
-    primary = mm_generic_gsm_get_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
+
+    primary = mm_generic_gsm_get_port (gsm, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-    mm_serial_port_queue_command (primary, "AT_OWANCALL=1,0,0", 3, NULL, info);
+
+    command = g_strdup_printf ("AT_OWANCALL=%d,0,0", cid);
+    mm_serial_port_queue_command (primary, command, 3, disconnect_owancall_done, info);
+    g_free (command);
 }
 
 /*****************************************************************************/
@@ -473,47 +578,11 @@ impl_hso_authenticate (MMModemHso *self,
     mm_hso_modem_authenticate (self, username, password, impl_hso_auth_done, context);
 }
 
-static void
-connection_enabled (MMSerialPort *port,
-                    GMatchInfo *info,
-                    gpointer user_data)
-{
-    MMModemHso *self = MM_MODEM_HSO (user_data);
-    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (self);
-    char *str;
-
-    str = g_match_info_fetch (info, 2);
-    if (str[0] == '1')
-        connect_pending_done (self);
-    else if (str[0] == '3') {
-        MMCallbackInfo *cb_info = priv->connect_pending_data;
-
-        if (cb_info)
-            cb_info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                                  "Call setup failed");
-
-        connect_pending_done (self);
-    } else if (str[0] == '0')
-        /* FIXME: disconnected. do something when we have modem status signals */
-        ;
-
-    g_free (str);
-}
-
 /*****************************************************************************/
-/* MMModemSimple interface */
-
-typedef enum {
-    SIMPLE_STATE_BEGIN = 0,
-    SIMPLE_STATE_PARENT_CONNECT,
-    SIMPLE_STATE_AUTHENTICATE,
-    SIMPLE_STATE_DONE
-} SimpleState;
 
 static const char *
-simple_get_string_property (MMCallbackInfo *info, const char *name, GError **error)
+hso_simple_get_string_property (GHashTable *properties, const char *name, GError **error)
 {
-    GHashTable *properties = (GHashTable *) mm_callback_info_get_data (info, "simple-connect-properties");
     GValue *value;
 
     value = (GValue *) g_hash_table_lookup (properties, name);
@@ -531,60 +600,20 @@ simple_get_string_property (MMCallbackInfo *info, const char *name, GError **err
 }
 
 static void
-simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemSimple *parent_iface;
-    const char *username;
-    const char *password;
-    GHashTable *properties = (GHashTable *) mm_callback_info_get_data (info, "simple-connect-properties");
-    SimpleState state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "simple-connect-state"));
-
-    if (error) {
-        info->error = g_error_copy (error);
-        goto out;
-    }
-
-    switch (state) {
-    case SIMPLE_STATE_BEGIN:
-        state = SIMPLE_STATE_PARENT_CONNECT;
-        parent_iface = g_type_interface_peek_parent (MM_MODEM_SIMPLE_GET_INTERFACE (modem));
-        parent_iface->connect (MM_MODEM_SIMPLE (modem), properties, simple_state_machine, info);
-        break;
-    case SIMPLE_STATE_PARENT_CONNECT:
-        state = SIMPLE_STATE_AUTHENTICATE;
-        username = simple_get_string_property (info, "username", &info->error);
-        password = simple_get_string_property (info, "password", &info->error);
-        mm_hso_modem_authenticate (MM_MODEM_HSO (modem), username, password, simple_state_machine, info);
-        break;
-    case SIMPLE_STATE_AUTHENTICATE:
-        state = SIMPLE_STATE_DONE;
-        break;
-    default:
-        break;
-    }
-
- out:
-    if (info->error || state == SIMPLE_STATE_DONE)
-        mm_callback_info_schedule (info);
-    else
-        mm_callback_info_set_data (info, "simple-connect-state", GUINT_TO_POINTER (state), NULL);
-}
-
-static void
 simple_connect (MMModemSimple *simple,
                 GHashTable *properties,
                 MMModemFn callback,
                 gpointer user_data)
 {
-    MMCallbackInfo *info;
+    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (simple);
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemSimple *parent_iface;
 
-    info = mm_callback_info_new (MM_MODEM (simple), callback, user_data);
-    mm_callback_info_set_data (info, "simple-connect-properties", 
-                               g_hash_table_ref (properties),
-                               (GDestroyNotify) g_hash_table_unref);
+    priv->username = g_strdup (hso_simple_get_string_property (properties, "username", NULL));
+    priv->password = g_strdup (hso_simple_get_string_property (properties, "password", NULL));
 
-    simple_state_machine (MM_MODEM (simple), NULL, info);
+    parent_iface = g_type_interface_peek_parent (MM_MODEM_SIMPLE_GET_INTERFACE (simple));
+    parent_iface->connect (MM_MODEM_SIMPLE (simple), properties, callback, info);
 }
 
 /*****************************************************************************/
@@ -679,15 +708,20 @@ modem_init (MMModem *modem_class)
     modem_class->disable = disable;
     modem_class->connect = do_connect;
     modem_class->get_ip4_config = get_ip4_config;
-    modem_class->disconnect = disconnect;
     modem_class->grab_port = grab_port;
 }
 
 static void
 finalize (GObject *object)
 {
+    MMModemHso *self = MM_MODEM_HSO (object);
+    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (self);
+
     /* Clear the pending connection if necessary */
-    connect_pending_done (MM_MODEM_HSO (object));
+    connect_pending_done (self);
+
+    g_free (priv->username);
+    g_free (priv->password);
 
     G_OBJECT_CLASS (mm_modem_hso_parent_class)->finalize (object);
 }
@@ -696,11 +730,13 @@ static void
 mm_modem_hso_class_init (MMModemHsoClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    MMGenericGsmClass *gsm_class = MM_GENERIC_GSM_CLASS (klass);
 
     mm_modem_hso_parent_class = g_type_class_peek_parent (klass);
     g_type_class_add_private (object_class, sizeof (MMModemHsoPrivate));
 
     /* Virtual methods */
     object_class->finalize = finalize;
+    gsm_class->do_disconnect = do_disconnect;
 }
 
