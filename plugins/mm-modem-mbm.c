@@ -580,11 +580,12 @@ mbm_e2nap_received (MMSerialPort *port,
                     gpointer user_data)
 {
     int state = 0;
-    const char *str;
+    char *str;
 
     str = g_match_info_fetch (info, 1);
     if (str)
         state = atoi (str);
+    g_free (str);
 
     if (MBM_E2NAP_DISCONNECTED == state) {
         g_debug ("%s: disconnected", __func__);
