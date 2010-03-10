@@ -1,4 +1,3 @@
-/* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 /*
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -508,12 +507,14 @@ mm_serial_port_got_response (MMSerialPort *self, GError *error)
         if (info->cached && !error)
             mm_serial_port_set_cached_reply (self, info->command, priv->response);
 
-        g_warn_if_fail (MM_SERIAL_PORT_GET_CLASS (self)->handle_response != NULL);
-        MM_SERIAL_PORT_GET_CLASS (self)->handle_response (self,
-                                                          priv->response,
-                                                          error,
-                                                          info->callback,
-                                                          info->user_data);
+        if (info->callback) {
+            g_warn_if_fail (MM_SERIAL_PORT_GET_CLASS (self)->handle_response != NULL);
+            MM_SERIAL_PORT_GET_CLASS (self)->handle_response (self,
+                                                              priv->response,
+                                                              error,
+                                                              info->callback,
+                                                              info->user_data);
+        }
 
         g_byte_array_free (info->command, TRUE);
         g_slice_free (MMQueueData, info);
