@@ -114,6 +114,9 @@ static gboolean handle_reg_status_response (MMGenericGsm *self,
 
 static MMModemGsmAccessTech etsi_act_to_mm_act (gint act);
 
+static void _internal_update_access_technology (MMGenericGsm *modem,
+                                                MMModemGsmAccessTech act);
+
 MMModem *
 mm_generic_gsm_new (const char *device,
                     const char *driver,
@@ -908,7 +911,7 @@ disable (MMModem *modem,
     priv->lac[1] = 0;
     priv->cell_id[0] = 0;
     priv->cell_id[1] = 0;
-    mm_generic_gsm_update_access_technology (self, MM_MODEM_GSM_ACCESS_TECH_UNKNOWN);
+    _internal_update_access_technology (self, MM_MODEM_GSM_ACCESS_TECH_UNKNOWN);
 
     /* Close the secondary port if its open */
     if (priv->secondary && mm_serial_port_is_open (priv->secondary))
@@ -2307,15 +2310,14 @@ etsi_act_to_mm_act (gint act)
     return MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
 }
 
-void
-mm_generic_gsm_update_access_technology (MMGenericGsm *modem,
-                                         MMModemGsmAccessTech act)
+static void
+_internal_update_access_technology (MMGenericGsm *modem,
+                                    MMModemGsmAccessTech act)
 {
     MMGenericGsmPrivate *priv;
 
     g_return_if_fail (modem != NULL);
     g_return_if_fail (MM_IS_GENERIC_GSM (modem));
-
     g_return_if_fail (act >= MM_MODEM_GSM_ACCESS_TECH_UNKNOWN && act <= MM_MODEM_GSM_ACCESS_TECH_LAST);
 
     priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
@@ -2330,6 +2332,18 @@ mm_generic_gsm_update_access_technology (MMGenericGsm *modem,
         old_mode = mm_modem_gsm_network_act_to_old_mode (act);
         g_signal_emit_by_name (G_OBJECT (modem), "network-mode", old_mode);
     }
+}
+
+void
+mm_generic_gsm_update_access_technology (MMGenericGsm *self,
+                                         MMModemGsmAccessTech act)
+{
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_GENERIC_GSM (self));
+
+    /* For plugins, don't update the access tech when the modem isn't enabled */
+    if (mm_modem_get_state (MM_MODEM (self)) >= MM_MODEM_STATE_ENABLED)
+        _internal_update_access_technology (self, act);
 }
 
 void
