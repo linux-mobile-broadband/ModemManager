@@ -670,6 +670,25 @@ test_cgreg2_f3607gw_unsolicited (void *f, gpointer d)
     test_creg_match ("Ericsson F3607gw CGREG=2", FALSE, reply, data, &result);
 }
 
+static void
+test_creg_cgreg_multi_unsolicited (void *f, gpointer d)
+{
+    TestData *data = (TestData *) d;
+    const char *reply = "\r\n+CREG: 5\r\n\r\n+CGREG: 0\r\n";
+    const CregResult result = { 5, 0, 0, -1, 1, FALSE};
+
+    test_creg_match ("Multi CREG/CGREG", FALSE, reply, data, &result);
+}
+
+static void
+test_creg_cgreg_multi2_unsolicited (void *f, gpointer d)
+{
+    TestData *data = (TestData *) d;
+    const char *reply = "\r\n+CGREG: 0\r\n\r\n+CREG: 5\r\n";
+    const CregResult result = { 0, 0, 0, -1, 1, TRUE};
+
+    test_creg_match ("Multi CREG/CGREG #2", FALSE, reply, data, &result);
+}
 
 static TestData *
 test_data_new (void)
@@ -752,6 +771,9 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cgreg1_unsolicited, data));
     g_test_suite_add (suite, TESTCASE (test_cgreg2_f3607gw_solicited, data));
     g_test_suite_add (suite, TESTCASE (test_cgreg2_f3607gw_unsolicited, data));
+
+    g_test_suite_add (suite, TESTCASE (test_creg_cgreg_multi_unsolicited, data));
+    g_test_suite_add (suite, TESTCASE (test_creg_cgreg_multi2_unsolicited, data));
 
     result = g_test_run ();
 

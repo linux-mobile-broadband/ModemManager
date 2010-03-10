@@ -205,22 +205,22 @@ mm_gsm_destroy_scan_data (gpointer data)
 /*************************************************************************/
 
 /* +CREG: <stat>                       (GSM 07.07 CREG=1 unsolicited) */
-#define CREG1 "\\+CG?REG:\\s*(\\d{1})"
+#define CREG1 "\\+(CREG|CGREG):\\s*(\\d{1})"
 
 /* +CREG: <n>,<stat>                   (GSM 07.07 CREG=1 solicited) */
-#define CREG2 "\\+CG?REG:\\s*(\\d{1}),\\s*(\\d{1})"
+#define CREG2 "\\+(CREG|CGREG):\\s*(\\d{1}),\\s*(\\d{1})"
 
 /* +CREG: <stat>,<lac>,<ci>           (GSM 07.07 CREG=2 unsolicited) */
-#define CREG3 "\\+CG?REG:\\s*(\\d{1}),\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)"
+#define CREG3 "\\+(CREG|CGREG):\\s*(\\d{1}),\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)"
 
 /* +CREG: <n>,<stat>,<lac>,<ci>       (GSM 07.07 solicited and some CREG=2 unsolicited) */
-#define CREG4 "\\+CG?REG:\\s*(\\d{1}),\\s*(\\d{1})\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)"
+#define CREG4 "\\+(CREG|CGREG):\\s*(\\d{1}),\\s*(\\d{1})\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)"
 
 /* +CREG: <stat>,<lac>,<ci>,<AcT>     (ETSI 27.007 CREG=2 unsolicited) */
-#define CREG5 "\\+CG?REG:\\s*(\\d{1})\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*(\\d{1,2})"
+#define CREG5 "\\+(CREG|CGREG):\\s*(\\d{1})\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*(\\d{1,2})"
 
 /* +CREG: <n>,<stat>,<lac>,<ci>,<AcT> (ETSI 27.007 solicited and some CREG=2 unsolicited) */
-#define CREG6 "\\+CG?REG:\\s*(\\d{1}),\\s*(\\d{1})\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*(\\d{1,2})"
+#define CREG6 "\\+(CREG|CGREG):\\s*(\\d{1}),\\s*(\\d{1})\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*(\\d{1,2})"
 
 GPtrArray *
 mm_gsm_creg_regex_get (gboolean solicited)
@@ -319,7 +319,7 @@ mm_gsm_parse_creg_response (GMatchInfo *info,
                             gulong *out_lac,
                             gulong *out_ci,
                             gint *out_act,
-                            gboolean *out_greg,
+                            gboolean *out_cgreg,
                             GError **error)
 {
     gboolean success = FALSE, foo;
@@ -327,56 +327,60 @@ mm_gsm_parse_creg_response (GMatchInfo *info,
     gulong stat = 0, lac = 0, ci = 0;
     guint istat = 0, ilac = 0, ici = 0, iact = 0;
     char *str;
-    const char *orig_str;
 
     g_return_val_if_fail (info != NULL, FALSE);
     g_return_val_if_fail (out_reg_state != NULL, FALSE);
     g_return_val_if_fail (out_lac != NULL, FALSE);
     g_return_val_if_fail (out_ci != NULL, FALSE);
     g_return_val_if_fail (out_act != NULL, FALSE);
-    g_return_val_if_fail (out_greg != NULL, FALSE);
+    g_return_val_if_fail (out_cgreg != NULL, FALSE);
+
+    str = g_match_info_fetch (info, 1);
+    if (str && strstr (str, "CGREG"))
+        *out_cgreg = TRUE;
 
     /* Normally the number of matches could be used to determine what each
      * item is, but we have overlap in one case.
      */
     n_matches = g_match_info_get_match_count (info);
-    if (n_matches == 2) {
+    if (n_matches == 3) {
         /* CREG=1: +CREG: <stat> */
-        istat = 1;
-    } else if (n_matches == 3) {
-        /* Solicited response: +CREG: <n>,<stat> */
         istat = 2;
     } else if (n_matches == 4) {
-        /* CREG=2 (GSM 07.07): +CREG: <stat>,<lac>,<ci> */
-        istat = 1;
-        ilac = 2;
-        ici = 3;
+        /* Solicited response: +CREG: <n>,<stat> */
+        istat = 3;
     } else if (n_matches == 5) {
+        /* CREG=2 (GSM 07.07): +CREG: <stat>,<lac>,<ci> */
+        istat = 2;
+        ilac = 3;
+        ici = 4;
+    } else if (n_matches == 6) {
         /* CREG=2 (ETSI 27.007): +CREG: <stat>,<lac>,<ci>,<AcT>
          * CREG=2 (non-standard): +CREG: <n>,<stat>,<lac>,<ci>
          */
 
-        /* To distinguish, check length of the second match item.  If it's
-         * more than one digit or has quotes in it, then we have the first format.
+        /* To distinguish, check length of the third match item.  If it's
+         * more than one digit or has quotes in it then it's a LAC and we
+         * got the first format.
          */
-        str = g_match_info_fetch (info, 2);
+        str = g_match_info_fetch (info, 3);
         if (str && (strchr (str, '"') || strlen (str) > 1)) {
             g_free (str);
-            istat = 1;
-            ilac = 2;
-            ici = 3;
-            iact = 4;
-        } else {
             istat = 2;
             ilac = 3;
             ici = 4;
+            iact = 5;
+        } else {
+            istat = 3;
+            ilac = 4;
+            ici = 5;
         }
-    } else if (n_matches == 6) {
+    } else if (n_matches == 7) {
         /* CREG=2 (non-standard): +CREG: <n>,<stat>,<lac>,<ci>,<AcT> */
-        istat = 2;
-        ilac = 3;
-        ici = 4;
-        iact = 5;
+        istat = 3;
+        ilac = 4;
+        ici = 5;
+        iact = 6;
     }
 
     /* Status */
@@ -415,9 +419,6 @@ mm_gsm_parse_creg_response (GMatchInfo *info,
         if (!foo)
             act = -1;
     }
-
-    orig_str = g_match_info_get_string (info);
-    *out_greg = !!strstr (orig_str, "+CGREG");
 
     *out_reg_state = (guint32) stat;
     if (stat != 4) {
