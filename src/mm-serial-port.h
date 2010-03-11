@@ -62,6 +62,9 @@ struct _MMSerialPort {
 
 struct _MMSerialPortClass {
     MMPortClass parent;
+
+    /* Signals */
+    void (*buffer_full) (MMSerialPort *port, const GString *buffer);
 };
 
 GType mm_serial_port_get_type (void);

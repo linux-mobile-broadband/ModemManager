@@ -77,6 +77,8 @@ typedef enum {
     PROBE_STATE_LAST
 } ProbeState;
 
+static void probe_complete (MMPluginBaseSupportsTask *task);
+
 /*****************************************************************************/
 
 G_DEFINE_TYPE (MMPluginBaseSupportsTask, mm_plugin_base_supports_task, G_TYPE_OBJECT)
@@ -91,6 +93,7 @@ typedef struct {
 
     guint open_id;
     guint32 open_tries;
+    guint full_id;
 
     MMSerialPort *probe_port;
     guint32 probed_caps;
@@ -198,6 +201,11 @@ mm_plugin_base_supports_task_complete (MMPluginBaseSupportsTask *task,
     priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
     g_return_if_fail (priv->callback != NULL);
 
+    if (priv->full_id) {
+        g_source_remove (priv->full_id);
+        priv->full_id = 0;
+    }
+
     subsys = g_udev_device_get_subsystem (priv->port);
     name = g_udev_device_get_name (priv->port);
 
@@ -251,11 +259,15 @@ supports_task_dispose (GObject *object)
 
     if (priv->open_id)
         g_source_remove (priv->open_id);
+    if (priv->full_id)
+        g_source_remove (priv->full_id);
 
     if (priv->probe_id)
         g_source_remove (priv->probe_id);
-    if (priv->probe_port)
+    if (priv->probe_port) {
+        mm_serial_port_close (priv->probe_port);
         g_object_unref (priv->probe_port);
+    }
 
     G_OBJECT_CLASS (mm_plugin_base_supports_task_parent_class)->dispose (object);
 }
@@ -347,6 +359,44 @@ parse_cgmm (const char *buf)
         strstr (buf, "GSM1900") || strstr (buf, "GSM850"))
         return MM_PLUGIN_BASE_PORT_CAP_GSM;
     return 0;
+}
+
+static const char *dq_strings[] = {
+    "option/faema_", "os_logids.h", NULL
+};
+
+static void
+port_buffer_full (MMSerialPort *port, GString *buffer, gpointer user_data)
+{
+    MMPluginBaseSupportsTask *task = MM_PLUGIN_BASE_SUPPORTS_TASK (user_data);
+    MMPluginBaseSupportsTaskPrivate *priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (user_data);
+    const char **iter;
+    size_t iter_len;
+    int i;
+
+    /* Check for an immediate disqualification response.  There are some
+     * ports (Option Icera-based chipsets have them, as do Qualcomm Gobi
+     * devices before their firmware is loaded) that just shouldn't be
+     * probed if we get a certain response because we know they can't be
+     * used.  Kernel bugs (at least with 2.6.31 and 2.6.32) also trigger port
+     * flow control kernel oopses if we read too much data for these ports.
+     */
+
+    for (iter = &dq_strings[0]; iter && *iter; iter++) {
+        /* Search in the response for the item; the response could have embedded
+         * nulls so we can't use memcmp() or strstr() on the whole response.
+         */
+        iter_len = strlen (*iter);
+        for (i = 0; i < buffer->len - iter_len; i++) {
+            if (!memcmp (&buffer->str[i], *iter, iter_len)) {
+                /* Immediately close the port and complete probing */
+                priv->probed_caps = 0;
+                mm_serial_port_close (priv->probe_port);
+                probe_complete (task);
+                return;
+            }
+        }
+    }
 }
 
 static gboolean
@@ -625,6 +675,9 @@ try_open (gpointer user_data)
 
         port = mm_plugin_base_supports_task_get_port (task);
         g_assert (port);
+
+        task_priv->full_id = g_signal_connect (task_priv->probe_port, "buffer-full",
+                                               G_CALLBACK (port_buffer_full), task);
 
         g_debug ("(%s): probe requested by plugin '%s'",
                  g_udev_device_get_name (port),
