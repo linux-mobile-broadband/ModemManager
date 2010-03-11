@@ -1966,13 +1966,19 @@ disconnect_flash_done (MMSerialPort *port,
     char *command;
 
     info->error = mm_modem_check_removed (info->modem, error);
-    if (info->error) {
+    /* Ignore NO_CARRIER errors and proceed with the PDP context deactivation */
+    if (   info->error
+        && !g_error_matches (info->error,
+                             MM_MODEM_CONNECT_ERROR,
+                             MM_MODEM_CONNECT_ERROR_NO_CARRIER)) {
         mm_callback_info_schedule (info);
         return;
     }
 
-    /* Disconnect the PDP context */
     priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+    mm_port_set_connected (priv->data, FALSE);
+
+    /* Disconnect the PDP context */
     if (priv->cid >= 0)
         command = g_strdup_printf ("+CGACT=0,%d", priv->cid);
     else {
@@ -1980,7 +1986,7 @@ disconnect_flash_done (MMSerialPort *port,
         command = g_strdup_printf ("+CGACT=0");
     }
 
-    mm_serial_port_queue_command (port, command, 60, disconnect_cgact_done, info);
+    mm_serial_port_queue_command (port, command, 3, disconnect_cgact_done, info);
     g_free (command);
 }
 
