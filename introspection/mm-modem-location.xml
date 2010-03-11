@@ -26,7 +26,9 @@
     <method name="Enable">
       <tp:docstring>
 	Enable or disable location information gathering.  This method may
-	require the client to authenticate itself.
+	require the client to authenticate itself.  This method may also cause
+	any necessary functionality of the mobile be be turned on, including
+	enabling the modem device itself.
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_location_enable"/>
@@ -92,28 +94,116 @@
       </tp:docstring>
       <tp:member type="u" name="Type" tp:type="MM_MODEM_LOCATION_CAPABILITIES">
         <tp:docstring>
-          Identifies the type and format of the associated location information.  Contrary to the value description, this is not a bitfield but uses the same values as the MM_MODEM_LOCATION_CAPABILITIES bitfield.
+          Identifies the type and format of the associated location information.
+          Contrary to the value description, this is not a bitfield but uses the
+          same values as the MM_MODEM_LOCATION_CAPABILITIES bitfield.
         </tp:docstring>
       </tp:member>
       <tp:member type="v" name="Data">
         <tp:docstring>
-          Contains type-specific location information.  GSM_LAC_CI data is a string with the format "LAC,CI" (ex "84CD,00D30156") while GPS_NMEA is a string in NMEA-compatible format.
+          Contains type-specific location information.  See the documentation for
+          each type for a description of its data format.
         </tp:docstring>
       </tp:member>
     </tp:mapping>
 
     <tp:flags name="MM_MODEM_LOCATION_CAPABILITIES" value-prefix="MM_MODEM_LOCATION_CAPABILITY" type="u">
       <tp:flag suffix="UNKNOWN" value="0x0">
-        <tp:docstring>Unknown or no capabilties.</tp:docstring>
+        <tp:docstring><p>Unknown or no capabilties.</p></tp:docstring>
       </tp:flag>
-      <tp:flag suffix="ANY" value="0x1">
-        <tp:docstring>Reserved.</tp:docstring>
+      <tp:flag suffix="GPS_NMEA" value="0x1">
+        <tp:docstring>
+          <p>For capability reporting, indicates the device is capable of
+          providing GPS NMEA-format location information.</p>
+
+          <p>For location reporting, devices supporting this capability return
+          an array mapping timestamps to specific NMEA sentences (D-Bus
+          signature 'a(ss)').  The manager will cache the most recent NMEA
+          sentence of each type for a period of time not less than 30 seconds
+          and must indicate the time that sentence was receieved from the device
+          using the timestamp.  Timestamps are provided as strings in the "Unix
+          epoch" format (i.e. number of seconds since 1970-01-01 00:00:00 UTC
+          with microsecond resolution if available).
+          </p>
+          <p>
+          For example, if at time 1268336242.282202 the device sends a $GPRMC
+          sentence immediately followed by a $GPGGA sentence, the reported
+          location array would be:
+          <pre>
+          [ '1268336242.282202': '$GPRMC,134523.92,V,,,,,,,030136,,,N*73',
+            '1268336242.282202': '$GPGGA,,,,,,0,00,0.5,,M,0.0001999,M,0.0000099,0000*45' ]
+          </pre>
+          If the device sends a new $GPRMC three seconds later, the new $GPRMC
+          replaces the previously received $GPRMC sentence, and the updated array
+          would be:
+          <pre>
+          [ '1268336245.282202': '$GPRMC,134526.92,V,,,,,,,030136,,,N*76',
+            '1268336242.282202': '$GPGGA,,,,,,0,00,0.5,,M,0.0001999,M,0.0000099,0000*45' ]
+          </pre>
+          If the device then sends a $GPGSA sentence about 5 seconds later, the
+          $GPGSA sentence is added to the array (since no $GPGSA sentence was
+          previously received in this session), the updated array would be:
+          <pre>
+          [ '1268336245.282202': '$GPRMC,134526.92,V,,,,,,,030136,,,N*76',
+            '1268336242.282202': '$GPGGA,,,,,,0,00,0.5,,M,0.0001999,M,0.0000099,0000*45'
+            '1268336250.395423': '$GPGSA,A,1,,,,,,,,,,,,,1.1,0.5,1.0*34' ]
+          </pre>
+          The manager may discard any entries older than 30 seconds.
+          </p>
+          <p>This allows clients to read the latest positioning data as soon as
+          possible after they start, even if the device is not providing
+          frequent location data updates.  Using the timestamp the client can
+          determine which data is most relevant to its particular uses.
+          </p>
+        </tp:docstring>
       </tp:flag>
-      <tp:flag suffix="GPS_NMEA" value="0x2">
-        <tp:docstring>The device is capable of providing GPS NMEA-format location information.</tp:docstring>
-      </tp:flag>
-      <tp:flag suffix="GSM_LAC_CI" value="0x4">
-        <tp:docstring>The device is capable of providing GSM Location Area Code/Cell ID location information.</tp:docstring>
+      <tp:flag suffix="GSM_LAC_CI" value="0x2">
+        <tp:docstring>
+          <p>For capability reporting, indicates the device is capable of
+          providing GSM Location Area Code/Cell ID location information.</p>
+
+          <p>For location reporting, devices supporting this
+          capability return a string in the format "MCC,MNC,LAC,CI" (without the
+          quotes of course) where the following applies:</p>
+          <ul>
+            <li>
+              MCC is the three-digit ITU E.212 Mobile Country Code of the
+              network provider to which the mobile is currently registered.
+              This value should be the same MCC as reported by the
+              org.freedesktop.Modem.Gsm.Network.GetRegistrationInfo() method's
+              returned "operator code" argument.
+              e.g. "310"
+            </li>
+            <li>
+              MNC is the two- or three-digit GSM Mobile Network Code of the
+              network provider to which the mobile is currently registered.
+              This value should be the same MCC as reported by the
+              org.freedesktop.Modem.Gsm.Network.GetRegistrationInfo() method's
+              returned "operator code" argument.
+              e.g. "26" or "260"
+            </li>
+            <li>
+              LAC is the two-byte Location Area Code of the base station with
+              which the mobile is registered, in upper-case hexadecimal format
+              without leading zeros, as specified in 3GPP TS 27.007 section
+              10.1.19.  e.g. "84CD".
+            </li>
+            <li>
+              CI is the two- or four-byte Cell Identifier with which the mobile
+              is registered, in upper-case hexadecimal format without leading
+              zeros, as specified in 3GPP TS 27.007.  e.g. "2BAF" or "D30156".
+            </li>
+          </ul>
+          <p>The entire string may only be composed of the ASCII digits [0-9], 
+          the alphabetical characters [A-F], and the comma (,) character.  No
+          other characters are allowed.  For example: "310,260,8BE3,2BAF" or
+          "250,40,CE00,1CEAD8F0".</p>
+
+          <p>If any of these four items (MCC,MNC,LAC,CI) is unknown or the
+          mobile is not registered with a network, then the GSM_LAC_CI location
+          information item should not be provided as a returned value from the
+          GetLocation() method or in the Location property.</p>
+        </tp:docstring>
       </tp:flag>
     </tp:flags>
 

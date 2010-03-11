@@ -629,9 +629,13 @@ data_available (GIOChannel *source,
 
         status = g_io_channel_read_chars (source, buf, SERIAL_BUF_SIZE, &bytes_read, &err);
         if (status == G_IO_STATUS_ERROR) {
-            g_warning ("%s", err->message);
-            g_error_free (err);
-            err = NULL;
+            if (err && err->message)
+                g_warning ("%s", err->message);
+            g_clear_error (&err);
+
+            /* Serial port is closed; we're done */
+            if (priv->watch_id == 0)
+                break;
         }
 
         /* If no bytes read, just let g_io_channel wait for more data */
@@ -644,9 +648,9 @@ data_available (GIOChannel *source,
         }
 
         /* Make sure the response doesn't grow too long */
-		if (priv->response->len > SERIAL_BUF_SIZE) {
-			g_warning ("%s (%s): response buffer filled before repsonse received",
-			           G_STRFUNC, mm_port_get_device (MM_PORT (self)));
+        if (priv->response->len > SERIAL_BUF_SIZE) {
+            /* Notify listeners and then trim the buffer */
+            g_signal_emit_by_name (self, "buffer-full", priv->response);
             g_byte_array_remove_range (priv->response, 0, (SERIAL_BUF_SIZE / 2));
         }
 
@@ -789,6 +793,7 @@ mm_serial_port_close (MMSerialPort *self)
 
         if (priv->channel) {
             g_source_remove (priv->watch_id);
+            priv->watch_id = 0;
             g_io_channel_shutdown (priv->channel, TRUE, NULL);
             g_io_channel_unref (priv->channel);
             priv->channel = NULL;
@@ -1238,4 +1243,14 @@ mm_serial_port_class_init (MMSerialPortClass *klass)
                               "Send delay",
                               0, G_MAXUINT64, 0,
                               G_PARAM_READWRITE));
+
+    /* Signals */
+    g_signal_new ("buffer-full",
+                  G_OBJECT_CLASS_TYPE (object_class),
+                  G_SIGNAL_RUN_FIRST,
+                  G_STRUCT_OFFSET (MMSerialPortClass, buffer_full),
+                  NULL, NULL,
+                  g_cclosure_marshal_VOID__POINTER,
+                  G_TYPE_NONE, 1, G_TYPE_POINTER);
 }
+

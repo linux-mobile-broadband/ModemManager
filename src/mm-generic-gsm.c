@@ -157,21 +157,22 @@ typedef struct {
 } CPinResult;
 
 static CPinResult unlock_results[] = {
-    { "SIM PIN",       "sim-pin",       MM_MOBILE_ERROR_SIM_PIN },
-    { "SIM PUK",       "sim-puk",       MM_MOBILE_ERROR_SIM_PUK },
-    { "PH-SIM PIN",    "ph-sim-pin",    MM_MOBILE_ERROR_PH_SIM_PIN },
-    { "PH-FSIM PIN",   "ph-fsim-pin",   MM_MOBILE_ERROR_PH_FSIM_PIN },
-    { "PH-FSIM PUK",   "ph-fsim-puk",   MM_MOBILE_ERROR_PH_FSIM_PUK },
-    { "SIM PIN2",      "sim-pin2",      MM_MOBILE_ERROR_SIM_PIN2 },
-    { "SIM PUK2",      "sim-puk2",      MM_MOBILE_ERROR_SIM_PUK2 },
-    { "PH-NET PIN",    "ph-net-pin",    MM_MOBILE_ERROR_NETWORK_PIN },
-    { "PH-NET PUK",    "ph-net-puk",    MM_MOBILE_ERROR_NETWORK_PUK },
+    /* Longer entries first so we catch the correct one with strcmp() */
     { "PH-NETSUB PIN", "ph-netsub-pin", MM_MOBILE_ERROR_NETWORK_SUBSET_PIN },
     { "PH-NETSUB PUK", "ph-netsub-puk", MM_MOBILE_ERROR_NETWORK_SUBSET_PUK },
-    { "PH-SP PIN",     "ph-sp-pin",     MM_MOBILE_ERROR_SERVICE_PIN },
-    { "PH-SP PUK",     "ph-sp-puk",     MM_MOBILE_ERROR_SERVICE_PUK },
+    { "PH-FSIM PIN",   "ph-fsim-pin",   MM_MOBILE_ERROR_PH_FSIM_PIN },
+    { "PH-FSIM PUK",   "ph-fsim-puk",   MM_MOBILE_ERROR_PH_FSIM_PUK },
     { "PH-CORP PIN",   "ph-corp-pin",   MM_MOBILE_ERROR_CORP_PIN },
     { "PH-CORP PUK",   "ph-corp-puk",   MM_MOBILE_ERROR_CORP_PUK },
+    { "PH-SIM PIN",    "ph-sim-pin",    MM_MOBILE_ERROR_PH_SIM_PIN },
+    { "PH-NET PIN",    "ph-net-pin",    MM_MOBILE_ERROR_NETWORK_PIN },
+    { "PH-NET PUK",    "ph-net-puk",    MM_MOBILE_ERROR_NETWORK_PUK },
+    { "PH-SP PIN",     "ph-sp-pin",     MM_MOBILE_ERROR_SERVICE_PIN },
+    { "PH-SP PUK",     "ph-sp-puk",     MM_MOBILE_ERROR_SERVICE_PUK },
+    { "SIM PIN2",      "sim-pin2",      MM_MOBILE_ERROR_SIM_PIN2 },
+    { "SIM PUK2",      "sim-puk2",      MM_MOBILE_ERROR_SIM_PUK2 },
+    { "SIM PIN",       "sim-pin",       MM_MOBILE_ERROR_SIM_PIN },
+    { "SIM PUK",       "sim-puk",       MM_MOBILE_ERROR_SIM_PUK },
     { NULL,            NULL,            MM_MOBILE_ERROR_PHONE_FAILURE },
 };
 
@@ -665,10 +666,17 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
     g_return_if_fail (MM_IS_GENERIC_GSM (self));
     g_return_if_fail (info != NULL);
 
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
     if (error) {
         mm_modem_set_state (MM_MODEM (self),
                             MM_MODEM_STATE_DISABLED,
                             MM_MODEM_STATE_REASON_NONE);
+
+        if (priv->primary && mm_serial_port_is_open (priv->primary))
+            mm_serial_port_close (priv->primary);
+        if (priv->secondary && mm_serial_port_is_open (priv->secondary))
+            mm_serial_port_close (priv->secondary);
 
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
@@ -677,8 +685,6 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
         /* Modem is enabled; update the state */
         mm_generic_gsm_update_enabled_state (self, FALSE, MM_MODEM_STATE_REASON_NONE);
     }
-
-    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
 
     /* Open the second port here if the modem has one.  We'll use it for
      * signal strength and registration updates when the device is connected,
@@ -1965,13 +1971,19 @@ disconnect_flash_done (MMSerialPort *port,
     char *command;
 
     info->error = mm_modem_check_removed (info->modem, error);
-    if (info->error) {
+    /* Ignore NO_CARRIER errors and proceed with the PDP context deactivation */
+    if (   info->error
+        && !g_error_matches (info->error,
+                             MM_MODEM_CONNECT_ERROR,
+                             MM_MODEM_CONNECT_ERROR_NO_CARRIER)) {
         mm_callback_info_schedule (info);
         return;
     }
 
-    /* Disconnect the PDP context */
     priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+    mm_port_set_connected (priv->data, FALSE);
+
+    /* Disconnect the PDP context */
     if (priv->cid >= 0)
         command = g_strdup_printf ("+CGACT=0,%d", priv->cid);
     else {
@@ -1979,7 +1991,7 @@ disconnect_flash_done (MMSerialPort *port,
         command = g_strdup_printf ("+CGACT=0");
     }
 
-    mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), command, 60, disconnect_cgact_done, info);
+    mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), command, 3, disconnect_cgact_done, info);
     g_free (command);
 }
 

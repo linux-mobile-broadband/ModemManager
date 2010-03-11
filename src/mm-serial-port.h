@@ -50,6 +50,7 @@ struct _MMSerialPort {
 struct _MMSerialPortClass {
     MMPortClass parent;
 
+<<<<<<< HEAD
     /* Called for subclasses to parse unsolicited responses.  If any recognized
      * unsolicited response is found, it should be removed from the 'response'
      * byte array before returning.
@@ -80,6 +81,9 @@ struct _MMSerialPortClass {
      * return FALSE and set 'error' as appropriate.
      */
     gboolean (*config_fd)         (MMSerialPort *self, int fd, GError **error);
+
+    /* Signals */
+    void (*buffer_full)           (MMSerialPort *port, const GByteArray *buffer);
 };
 
 GType mm_serial_port_get_type (void);
