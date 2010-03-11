@@ -118,10 +118,30 @@
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_reg_info"/>
       <arg name="info" type="(uss)" direction="out">
 	<tp:docstring>
-	  The returned information contains:
-	    * Network status.
-	    * Current operator code.
-	    * Current operator name,
+          The returned information is composed of the following items in the
+          following order:
+          <ul>
+            <li>
+              Mobile registration status as defined in 3GPP TS 27.007 section
+              10.1.19.  See the MM_MODEM_GSM_NETWORK_REG_STATUS enumeration for
+              possible values.
+            </li>
+            <li>
+              Current operator code of the operator to which the mobile is
+              currently registered.  Returned in the format "MCCMNC", where MCC
+              is the three-digit ITU E.212 Mobile Country Code and MNC is the 
+              two- or three-digit GSM Mobile Network Code.  If the MCC and MNC
+              are not known or the mobile is not registered to a mobile network,
+              this value should be a zero-length (blank) string. e.g. "31026"
+              or "310260".
+            </li>
+            <li>
+              Current operator name of the operator to which the mobile is
+              currently registered.  If the operator name is not knowon or the
+              mobile is not registered to a mobile network, this value should
+              be a zero-length (blank) string.
+            </li>
+          </ul>
 	</tp:docstring>
       </arg>
     </method>
@@ -174,17 +194,27 @@
       </tp:docstring>
       <arg name="status" type="u" tp:type="MM_MODEM_GSM_NETWORK_REG_STATUS">
 	<tp:docstring>
-	  The network status.
+          Mobile registration status as defined in 3GPP TS 27.007 section
+          10.1.19.
 	</tp:docstring>
       </arg>
       <arg name="operator_code" type="s">
 	<tp:docstring>
-	  The current operator code.
+          Current operator code of the operator to which the mobile is
+          currently registered.  Returned in the format "MCCMNC", where MCC
+          is the three-digit ITU E.212 Mobile Country Code and MNC is the 
+          two- or three-digit GSM Mobile Network Code.  If the MCC and MNC
+          are not known or the mobile is not registered to a mobile network,
+          this value should be a zero-length (blank) string.  e.g. "31026" or
+          "310260".
 	</tp:docstring>
       </arg>
       <arg name="operator_name" type="s">
 	<tp:docstring>
-	  The current operator name.
+          Current operator name of the operator to which the mobile is
+          currently registered.  If the operator name is not knowon or the
+          mobile is not registered to a mobile network, this value should
+          be a zero-length (blank) string.
 	</tp:docstring>
       </arg>
     </signal>
@@ -200,6 +230,9 @@
     </signal>
 
     <tp:enum name="MM_MODEM_GSM_NETWORK_REG_STATUS" type="u">
+      <tp:docstring>
+        GSM registration code as defined in 3GPP TS 27.007 section 10.1.19.
+      </tp:docstring>
       <tp:enumvalue suffix="IDLE" value="0">
 	<tp:docstring>
 	  Not registered, not searching for new operator to register.
