@@ -169,7 +169,9 @@ libmm_plugin_novatel_la_SOURCES = \
 	mm-plugin-novatel.c \
 	mm-plugin-novatel.h \
 	mm-modem-novatel-gsm.c \
-	mm-modem-novatel-gsm.h
+	mm-modem-novatel-gsm.h \
+	mm-modem-novatel-cdma.c \
+	mm-modem-novatel-cdma.h
 
 libmm_plugin_novatel_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
