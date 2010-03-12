@@ -16,7 +16,7 @@ sbin_PROGRAMS = modem-manager
 modem_manager_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
-	$(top_srcdir) \
+	-I$(top_srcdir) \
 	-I${top_builddir}/marshallers \
 	-DPLUGINDIR=\"$(pkglibdir)\"
 
