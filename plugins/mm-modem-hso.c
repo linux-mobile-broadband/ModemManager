@@ -141,8 +141,10 @@ _internal_hso_modem_authenticate (MMModemHso *self, MMCallbackInfo *info)
     g_assert (primary);
 
     cid = hso_get_cid (self);
+    g_warn_if_fail (cid >= 0);
 
-    if (!priv->username && !priv->password)
+    /* Both user and password are required; otherwise firmware returns an error */
+    if (!priv->username || !priv->password)
 		command = g_strdup_printf ("%s=%d,0", auth_commands[priv->auth_idx], cid);
     else {
         command = g_strdup_printf ("%s=%d,1,\"%s\",\"%s\"",
@@ -367,14 +369,13 @@ do_connect (MMModem *modem,
             gpointer user_data)
 {
     MMModemHso *self = MM_MODEM_HSO (modem);
-    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (self);
-    MMCallbackInfo *info;
+    MMCallbackInfo *auth_info, *connect_info;
 
     mm_modem_set_state (modem, MM_MODEM_STATE_CONNECTING, MM_MODEM_STATE_REASON_NONE);
 
-    info = mm_callback_info_new (modem, callback, user_data);
-
-    mm_hso_modem_authenticate (self, priv->username, priv->password, connect_auth_done, info);
+    connect_info = mm_callback_info_new (modem, callback, user_data);
+    auth_info = mm_callback_info_new (modem, connect_auth_done, connect_info);
+    _internal_hso_modem_authenticate (self, auth_info);
 }
 
 /*****************************************************************************/
