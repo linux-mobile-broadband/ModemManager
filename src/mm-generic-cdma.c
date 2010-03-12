@@ -151,9 +151,9 @@ mm_generic_cdma_grab_port (MMGenericCdma *self,
     if (port && MM_IS_SERIAL_PORT (port)) {
         g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
         mm_serial_port_set_response_parser (MM_SERIAL_PORT (port),
-                                            mm_serial_parser_v1_parse,
-                                            mm_serial_parser_v1_new (),
-                                            mm_serial_parser_v1_destroy);
+                                            mm_serial_parser_v1_e1_parse,
+                                            mm_serial_parser_v1_e1_new (),
+                                            mm_serial_parser_v1_e1_destroy);
 
         if (ptype == MM_PORT_TYPE_PRIMARY) {
             priv->primary = MM_SERIAL_PORT (port);
