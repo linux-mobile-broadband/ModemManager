@@ -60,6 +60,7 @@ INTLTOOL_FILES = \
 
 DISTCLEANFILES = \
 	$(dbusactivation_DATA) \
+	$(dbusservice_DATA) \
 	intltool-extract \
 	intltool-merge \
 	intltool-update \
