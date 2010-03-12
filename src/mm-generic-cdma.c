@@ -1612,16 +1612,26 @@ simple_uint_value (guint32 i)
     return val;
 }
 
+#define SS_HASH_TAG "simple-get-status"
+
 static void
 simple_status_got_signal_quality (MMModem *modem,
                                   guint32 result,
                                   GError *error,
                                   gpointer user_data)
 {
-    if (error)
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    GHashTable *properties;
+
+    if (error) {
+        info->error = g_error_copy (error);
         g_warning ("Error getting signal quality: %s", error->message);
-    else
-        g_hash_table_insert ((GHashTable *) user_data, "signal_quality", simple_uint_value (result));
+    } else {
+        properties = (GHashTable *) mm_callback_info_get_data (info, SS_HASH_TAG);
+        g_hash_table_insert (properties, "signal_quality", simple_uint_value (result));
+    }
+
+    mm_callback_info_schedule (info);
 }
 
 static void
@@ -1630,7 +1640,7 @@ simple_get_status_invoke (MMCallbackInfo *info)
     MMModemSimpleGetStatusFn callback = (MMModemSimpleGetStatusFn) info->callback;
 
     callback (MM_MODEM_SIMPLE (info->modem),
-              (GHashTable *) mm_callback_info_get_data (info, "simple-get-status"),
+              (GHashTable *) mm_callback_info_get_data (info, SS_HASH_TAG),
               info->error, info->user_data);
 }
 
@@ -1647,9 +1657,9 @@ simple_get_status (MMModemSimple *simple,
                                       G_CALLBACK (callback),
                                       user_data);
 
-    properties = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, simple_free_gvalue);
-    mm_callback_info_set_data (info, "simple-get-status", properties, (GDestroyNotify) g_hash_table_unref);
-    mm_modem_cdma_get_signal_quality (MM_MODEM_CDMA (simple), simple_status_got_signal_quality, properties);
+    properties = g_hash_table_new_full (g_str_hash, g_str_equal, NULL, simple_free_gvalue);
+    mm_callback_info_set_data (info, SS_HASH_TAG, properties, (GDestroyNotify) g_hash_table_unref);
+    mm_modem_cdma_get_signal_quality (MM_MODEM_CDMA (simple), simple_status_got_signal_quality, info);
 }
 
 /*****************************************************************************/
