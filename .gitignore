@@ -38,6 +38,8 @@ libqcdm/tests/test-qcdm
 po/Makefile.in.in
 po/POTFILES
 po/stamp-it
+po/.intltool-merge-cache
+po/ModemManager.pot
 
 m4/gtk-doc.m4
 m4/intltool.m4
