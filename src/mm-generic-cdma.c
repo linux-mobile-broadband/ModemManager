@@ -28,6 +28,8 @@
 #include "mm-callback-info.h"
 #include "mm-serial-parsers.h"
 
+#define MM_GENERIC_CDMA_PREV_STATE_TAG "prev-state"
+
 static void simple_reg_callback (MMModemCdma *modem,
                                  MMModemCdmaRegistrationState cdma_1x_reg_state,
                                  MMModemCdmaRegistrationState evdo_reg_state,
