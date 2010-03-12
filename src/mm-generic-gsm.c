@@ -673,10 +673,10 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
                             MM_MODEM_STATE_DISABLED,
                             MM_MODEM_STATE_REASON_NONE);
 
-        if (priv->primary && mm_serial_port_is_open (priv->primary))
-            mm_serial_port_close (priv->primary);
-        if (priv->secondary && mm_serial_port_is_open (priv->secondary))
-            mm_serial_port_close (priv->secondary);
+        if (priv->primary && mm_serial_port_is_open (MM_SERIAL_PORT (priv->primary)))
+            mm_serial_port_close (MM_SERIAL_PORT (priv->primary));
+        if (priv->secondary && mm_serial_port_is_open (MM_SERIAL_PORT (priv->secondary)))
+            mm_serial_port_close (MM_SERIAL_PORT (priv->secondary));
 
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);

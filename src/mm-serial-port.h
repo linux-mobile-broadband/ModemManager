@@ -50,7 +50,6 @@ struct _MMSerialPort {
 struct _MMSerialPortClass {
     MMPortClass parent;
 
-<<<<<<< HEAD
     /* Called for subclasses to parse unsolicited responses.  If any recognized
      * unsolicited response is found, it should be removed from the 'response'
      * byte array before returning.

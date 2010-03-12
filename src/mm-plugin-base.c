@@ -265,7 +265,7 @@ supports_task_dispose (GObject *object)
     if (priv->probe_id)
         g_source_remove (priv->probe_id);
     if (priv->probe_port) {
-        mm_serial_port_close (priv->probe_port);
+        mm_serial_port_close (MM_SERIAL_PORT (priv->probe_port));
         g_object_unref (priv->probe_port);
     }
 
@@ -391,7 +391,7 @@ port_buffer_full (MMSerialPort *port, GString *buffer, gpointer user_data)
             if (!memcmp (&buffer->str[i], *iter, iter_len)) {
                 /* Immediately close the port and complete probing */
                 priv->probed_caps = 0;
-                mm_serial_port_close (priv->probe_port);
+                mm_serial_port_close (MM_SERIAL_PORT (priv->probe_port));
                 probe_complete (task);
                 return;
             }
