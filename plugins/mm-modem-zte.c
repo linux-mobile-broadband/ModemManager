@@ -86,6 +86,144 @@ zte_access_tech_changed (MMAtSerialPort *port,
 }
 
 /*****************************************************************************/
+
+static void
+get_allowed_mode_done (MMAtSerialPort *port,
+                       GString *response,
+                       GError *error,
+                       gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+	GRegex *r = NULL;
+	GMatchInfo *match_info;
+
+    info->error = mm_modem_check_removed (info->modem, error);
+    if (info->error)
+        goto done;
+
+	r = g_regex_new ("+ZSNT:\\s*(\\d),(\\d),(\\d)", G_REGEX_UNGREEDY, 0, NULL);
+	if (!r) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_GENERAL,
+                                           "Failed to parse the allowed mode response");
+        goto done;
+    }
+
+    if (g_regex_match_full (r, response->str, response->len, 0, 0, &match_info, &info->error)) {
+        MMModemGsmAllowedMode mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
+        char *str;
+        int cm_mode = -1, pref_acq = -1;
+
+        str = g_match_info_fetch (match_info, 1);
+        cm_mode = atoi (str);
+        g_free (str);
+
+        str = g_match_info_fetch (match_info, 3);
+        pref_acq = atoi (str);
+        g_free (str);
+
+        g_match_info_free (match_info);
+
+        if (cm_mode >=0 && cm_mode <= 2 && pref_acq >= 0 && pref_acq <= 2) {
+            info->error = g_error_new (MM_MODEM_ERROR,
+                                       MM_MODEM_ERROR_GENERAL,
+                                       "Failed to parse the allowed mode response: '%s'",
+                                       response->str);
+            goto done;
+        }
+
+        if (cm_mode == 0) {  /* Both 2G and 3G allowed */
+            if (pref_acq == 0)
+                mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
+            else if (pref_acq == 1)
+                mode = MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED;
+            else if (pref_acq == 2)
+                mode = MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED;
+        } else if (cm_mode == 1) /* GSM only */
+            mode = MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY;
+        else if (cm_mode == 2) /* WCDMA only */
+            mode = MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY;
+
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (mode), NULL);
+    }
+
+done:
+    if (r)
+        g_regex_unref (r);
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_allowed_mode (MMGenericGsm *gsm,
+                  MMModemUIntFn callback,
+                  gpointer user_data)
+{
+    MMCallbackInfo *info;
+    MMAtSerialPort *primary;
+
+    info = mm_callback_info_uint_new (MM_MODEM (gsm), callback, user_data);
+    primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+    mm_at_serial_port_queue_command (primary, "AT+ZSNT?", 3, get_allowed_mode_done, info);
+}
+
+static void
+set_allowed_mode_done (MMAtSerialPort *port,
+                       GString *response,
+                       GError *error,
+                       gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error)
+        info->error = g_error_copy (error);
+
+   mm_callback_info_schedule (info);
+}
+
+static void
+set_allowed_mode (MMGenericGsm *gsm,
+                  MMModemGsmAllowedMode mode,
+                  MMModemFn callback,
+                  gpointer user_data)
+{
+    MMCallbackInfo *info;
+    MMAtSerialPort *primary;
+    char *command;
+    int cm_mode = 0, pref_acq = 0;
+
+    info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
+
+    switch (mode) {
+    case MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY:
+        cm_mode = 1;
+        pref_acq = 0;
+        break;
+    case MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY:
+        cm_mode = 2;
+        pref_acq = 0;
+        break;
+    case MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED:
+        cm_mode = 0;
+        pref_acq = 1;
+        break;
+    case MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED:
+        cm_mode = 0;
+        pref_acq = 2;
+        break;
+    case MM_MODEM_GSM_ALLOWED_MODE_ANY:
+    default:
+        break;
+    }
+
+    command = g_strdup_printf ("AT+ZSNT=%d,0,%d", cm_mode, pref_acq);
+    primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+    mm_at_serial_port_queue_command (primary, command, 3, set_allowed_mode_done, info);
+    g_free (command);
+}
+
+/*****************************************************************************/
 /*    Modem class override functions                                         */
 /*****************************************************************************/
 
@@ -309,5 +447,7 @@ mm_modem_zte_class_init (MMModemZteClass *klass)
 
     object_class->dispose = dispose;
     gsm_class->do_enable = do_enable;
+    gsm_class->set_allowed_mode = set_allowed_mode;
+    gsm_class->get_allowed_mode = get_allowed_mode;
 }
 
