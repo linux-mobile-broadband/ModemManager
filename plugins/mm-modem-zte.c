@@ -94,15 +94,15 @@ get_allowed_mode_done (MMAtSerialPort *port,
                        gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-	GRegex *r = NULL;
-	GMatchInfo *match_info;
+    GRegex *r = NULL;
+    GMatchInfo *match_info;
 
     info->error = mm_modem_check_removed (info->modem, error);
     if (info->error)
         goto done;
 
-	r = g_regex_new ("+ZSNT:\\s*(\\d),(\\d),(\\d)", G_REGEX_UNGREEDY, 0, NULL);
-	if (!r) {
+    r = g_regex_new ("+ZSNT:\\s*(\\d),(\\d),(\\d)", G_REGEX_UNGREEDY, 0, NULL);
+    if (!r) {
         info->error = g_error_new_literal (MM_MODEM_ERROR,
                                            MM_MODEM_ERROR_GENERAL,
                                            "Failed to parse the allowed mode response");
