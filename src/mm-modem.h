@@ -42,6 +42,18 @@ typedef enum {
     MM_MODEM_STATE_REASON_NONE = 0
 } MMModemStateReason;
 
+typedef enum {
+    MM_MODEM_CHARSET_UNKNOWN = 0x00000000,
+    MM_MODEM_CHARSET_GSM     = 0x00000001,
+    MM_MODEM_CHARSET_IRA     = 0x00000002,
+    MM_MODEM_CHARSET_8859_1  = 0x00000004,
+    MM_MODEM_CHARSET_UTF8    = 0x00000008,
+    MM_MODEM_CHARSET_UCS2    = 0x00000010,
+    MM_MODEM_CHARSET_PCCP437 = 0x00000020,
+    MM_MODEM_CHARSET_PCDN    = 0x00000040,
+    MM_MODEM_CHARSET_HEX     = 0x00000080
+} MMModemCharset;
+
 #define DBUS_PATH_TAG "dbus-path"
 
 #define MM_TYPE_MODEM      (mm_modem_get_type ())
@@ -158,6 +170,16 @@ struct _MMModem {
                       MMModemInfoFn callback,
                       gpointer user_data);
 
+    void (*get_supported_charsets) (MMModem *self,
+                                    MMModemUIntFn callback,
+                                    gpointer user_data);
+
+    void (*set_charset) (MMModem *self,
+                         MMModemCharset charset,
+                         MMModemFn callback,
+                         gpointer user_data);
+
+
     /* Normally implemented by the modem base class; plugins should
      * never need to implement this.
      */
@@ -221,6 +243,19 @@ void mm_modem_disconnect (MMModem *self,
 void mm_modem_get_info (MMModem *self,
                         MMModemInfoFn callback,
                         gpointer user_data);
+
+void mm_modem_get_supported_charsets (MMModem *self,
+                                      MMModemUIntFn callback,
+                                      gpointer user_data);
+
+void mm_modem_set_charset (MMModem *self,
+                           MMModemCharset charset,
+                           MMModemFn callback,
+                           gpointer user_data);
+
+const char *mm_modem_charset_to_string (MMModemCharset charset);
+
+MMModemCharset mm_modem_charset_from_string (const char *string);
 
 gboolean mm_modem_get_valid (MMModem *self);
 

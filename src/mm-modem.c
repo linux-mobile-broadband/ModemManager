@@ -14,6 +14,7 @@
  * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
+#include <config.h>
 #include <string.h>
 #include <dbus/dbus-glib.h>
 #include "mm-modem.h"
@@ -467,6 +468,98 @@ impl_modem_get_info (MMModem *modem,
                      DBusGMethodInvocation *context)
 {
     mm_modem_get_info (modem, info_call_done, context);
+}
+
+/*****************************************************************************/
+
+void
+mm_modem_get_supported_charsets (MMModem *self,
+                                 MMModemUIntFn callback,
+                                 gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    g_return_if_fail (MM_IS_MODEM (self));
+    g_return_if_fail (callback != NULL);
+
+    if (MM_MODEM_GET_INTERFACE (self)->get_supported_charsets)
+        MM_MODEM_GET_INTERFACE (self)->get_supported_charsets (self, callback, user_data);
+    else {
+        info = mm_callback_info_uint_new (MM_MODEM (self), callback, user_data);
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                           "Operation not supported");
+        mm_callback_info_schedule (info);
+    }
+}
+
+void
+mm_modem_set_charset (MMModem *self,
+                      MMModemCharset charset,
+                      MMModemFn callback,
+                      gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    g_return_if_fail (charset != MM_MODEM_CHARSET_UNKNOWN);
+    g_return_if_fail (MM_IS_MODEM (self));
+    g_return_if_fail (callback != NULL);
+
+    if (MM_MODEM_GET_INTERFACE (self)->set_charset)
+        MM_MODEM_GET_INTERFACE (self)->set_charset (self, charset, callback, user_data);
+    else {
+        info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                           "Operation not supported");
+        mm_callback_info_schedule (info);
+    }
+}
+
+typedef struct {
+    const char *name;
+    MMModemCharset charset;
+} CharsetEntry;
+
+static CharsetEntry charset_map[] = {
+    { "UTF-8",   MM_MODEM_CHARSET_UTF8 },
+    { "UCS2",    MM_MODEM_CHARSET_UCS2 },
+    { "IRA",     MM_MODEM_CHARSET_IRA },
+    { "GSM",     MM_MODEM_CHARSET_GSM },
+    { "8859-1",  MM_MODEM_CHARSET_8859_1 },
+    { "PCCP437", MM_MODEM_CHARSET_PCCP437 },
+    { "PCDN",    MM_MODEM_CHARSET_PCDN },
+    { "HEX",     MM_MODEM_CHARSET_HEX },
+    { NULL,      MM_MODEM_CHARSET_UNKNOWN }
+};
+
+const char *
+mm_modem_charset_to_string (MMModemCharset charset)
+{
+    CharsetEntry *iter = &charset_map[0];
+
+    g_return_val_if_fail (charset != MM_MODEM_CHARSET_UNKNOWN, NULL);
+
+    while (iter->name) {
+        if (iter->charset == charset)
+            return iter->name;
+        iter++;
+    }
+    g_warn_if_reached ();
+    return NULL;
+}
+
+MMModemCharset
+mm_modem_charset_from_string (const char *string)
+{
+    CharsetEntry *iter = &charset_map[0];
+
+    g_return_val_if_fail (string != NULL, MM_MODEM_CHARSET_UNKNOWN);
+
+    while (iter->name) {
+        if (strcasestr (string, iter->name))
+            return iter->charset;
+        iter++;
+    }
+    return MM_MODEM_CHARSET_UNKNOWN;
 }
 
 /*****************************************************************************/

@@ -15,6 +15,7 @@
  * Copyright (C) 2009 Ericsson
  */
 
+#include <config.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -83,6 +84,9 @@ typedef struct {
     time_t signal_quality_timestamp;
     guint32 signal_quality;
     gint cid;
+
+    guint32 charsets;
+    guint32 cur_charset;
 
     MMAtSerialPort *primary;
     MMAtSerialPort *secondary;
@@ -644,10 +648,99 @@ creg2_done (MMAtSerialPort *port,
 }
 
 static void
+enable_failed (MMModem *modem, GError *error, MMCallbackInfo *info)
+{
+    MMGenericGsmPrivate *priv;
+
+    info->error = mm_modem_check_removed (modem, error);
+
+    if (modem) {
+        mm_modem_set_state (modem,
+                            MM_MODEM_STATE_DISABLED,
+                            MM_MODEM_STATE_REASON_NONE);
+
+        priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+
+        if (priv->primary && mm_serial_port_is_open (MM_SERIAL_PORT (priv->primary)))
+            mm_serial_port_close (MM_SERIAL_PORT (priv->primary));
+        if (priv->secondary && mm_serial_port_is_open (MM_SERIAL_PORT (priv->secondary)))
+            mm_serial_port_close (MM_SERIAL_PORT (priv->secondary));
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+static guint32 best_charsets[] = {
+    MM_MODEM_CHARSET_UTF8,
+    MM_MODEM_CHARSET_UCS2,
+    MM_MODEM_CHARSET_8859_1,
+    MM_MODEM_CHARSET_IRA,
+    MM_MODEM_CHARSET_UNKNOWN
+};
+
+static void
+enabled_set_charset_done (MMModem *modem,
+                          GError *error,
+                          gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    guint idx;
+
+    /* only modem removals are really a hard error */
+    if (error) {
+        if (!modem) {
+            enable_failed (modem, error, info);
+            return;
+        }
+
+        /* Try the next best charset */
+        idx = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "best-charset")) + 1;
+        if (best_charsets[idx] == MM_MODEM_CHARSET_UNKNOWN) {
+            GError *tmp_error;
+
+            /* No more character sets we can use */
+            tmp_error = g_error_new_literal (MM_MODEM_ERROR,
+                                             MM_MODEM_ERROR_UNSUPPORTED_CHARSET,
+                                             "Failed to find a usable modem character set");
+            enable_failed (modem, tmp_error, info);
+            g_error_free (tmp_error);
+        } else {
+            /* Send the new charset */
+            mm_callback_info_set_data (info, "best-charset", GUINT_TO_POINTER (idx), NULL);
+            mm_modem_set_charset (modem, best_charsets[idx], enabled_set_charset_done, info);
+        }
+    } else {
+        /* Modem is now enabled; update the state */
+        mm_generic_gsm_update_enabled_state (MM_GENERIC_GSM (modem), FALSE, MM_MODEM_STATE_REASON_NONE);
+
+        /* Set up unsolicited registration notifications */
+        mm_at_serial_port_queue_command (MM_GENERIC_GSM_GET_PRIVATE (modem)->primary,
+                                         "+CREG=2", 3, creg2_done, info);
+    }
+}
+
+static void
+supported_charsets_done (MMModem *modem,
+                         guint32 charsets,
+                         GError *error,
+                         gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (!modem) {
+        enable_failed (modem, error, info);
+        return;
+    }
+
+    /* Switch the device's charset; we prefer UTF-8, but UCS2 will do too */
+    mm_modem_set_charset (modem, MM_MODEM_CHARSET_UTF8, enabled_set_charset_done, info);
+}
+
+static void
 get_allowed_mode_done (MMModem *modem,
-                        MMModemGsmAllowedMode mode,
-                        GError *error,
-                        gpointer user_data)
+                       MMModemGsmAllowedMode mode,
+                       GError *error,
+                       gpointer user_data)
 {
     if (modem) {
         mm_generic_gsm_update_allowed_mode (MM_GENERIC_GSM (modem),
@@ -669,21 +762,8 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
     priv = MM_GENERIC_GSM_GET_PRIVATE (self);
 
     if (error) {
-        mm_modem_set_state (MM_MODEM (self),
-                            MM_MODEM_STATE_DISABLED,
-                            MM_MODEM_STATE_REASON_NONE);
-
-        if (priv->primary && mm_serial_port_is_open (MM_SERIAL_PORT (priv->primary)))
-            mm_serial_port_close (MM_SERIAL_PORT (priv->primary));
-        if (priv->secondary && mm_serial_port_is_open (MM_SERIAL_PORT (priv->secondary)))
-            mm_serial_port_close (MM_SERIAL_PORT (priv->secondary));
-
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
+        enable_failed ((MMModem *) self, error, info);
         return;
-    } else {
-        /* Modem is enabled; update the state */
-        mm_generic_gsm_update_enabled_state (self, FALSE, MM_MODEM_STATE_REASON_NONE);
     }
 
     /* Open the second port here if the modem has one.  We'll use it for
@@ -709,8 +789,8 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
     if (MM_GENERIC_GSM_GET_CLASS (self)->get_allowed_mode)
         MM_GENERIC_GSM_GET_CLASS (self)->get_allowed_mode (self, get_allowed_mode_done, NULL);
 
-    /* Set up unsolicited registration notifications */
-    mm_at_serial_port_queue_command (priv->primary, "+CREG=2", 3, creg2_done, info);
+    /* And supported character sets */
+    mm_modem_get_supported_charsets (MM_MODEM (self), supported_charsets_done, info);
 }
 
 static void
@@ -2522,6 +2602,240 @@ set_allowed_mode (MMModemGsmNetwork *net,
 }
 
 /*****************************************************************************/
+/* Charset stuff */
+
+static void
+get_charsets_done (MMAtSerialPort *port,
+                   GString *response,
+                   GError *error,
+                   gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMGenericGsmPrivate *priv;
+    GRegex *r = NULL;
+    GMatchInfo *match_info;
+    const char *p;
+
+    info->error = mm_modem_check_removed (info->modem, error);
+    if (info->error) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+
+    /* Find the first '(' */
+    p = strchr (response->str, '(');
+    if (!p)
+        goto done;
+    p++;
+
+    /* Now parse each charset */
+    r = g_regex_new ("\\s*([^,\\)]+)\\s*", 0, 0, NULL);
+    if (!r)
+        goto done;
+
+    if (!g_regex_match_full (r, p, strlen (p), 0, 0, &match_info, NULL))
+        goto done;
+
+    priv->charsets = MM_MODEM_CHARSET_UNKNOWN;
+
+    while (g_match_info_matches (match_info)) {
+        char *str;
+
+        str = g_match_info_fetch (match_info, 1);
+        priv->charsets |= mm_modem_charset_from_string (str);
+        g_free (str);
+
+        g_match_info_next (match_info, NULL);
+    }
+    g_match_info_free (match_info);
+
+    mm_callback_info_set_result (info, GUINT_TO_POINTER (priv->charsets), NULL);
+
+done:
+    if (!info->error && !priv->charsets) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_GENERAL,
+                                           "Failed to parse the supported character sets response");
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_supported_charsets (MMModem *modem,
+                        MMModemUIntFn callback,
+                        gpointer user_data)
+{
+    MMGenericGsm *self = MM_GENERIC_GSM (modem);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    MMCallbackInfo *info;
+    MMAtSerialPort *port = priv->primary;
+
+    info = mm_callback_info_uint_new (MM_MODEM (self), callback, user_data);
+
+    if (mm_port_get_connected (MM_PORT (priv->primary))) {
+        if (!priv->secondary) {
+            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
+                                               "Cannot get serving system while connected");
+            mm_callback_info_schedule (info);
+            return;
+        }
+
+        /* Use secondary port if primary is connected */
+        port = priv->secondary;
+    }
+
+    /* Use cached value if we have one */
+    if (MM_GENERIC_GSM_GET_PRIVATE (self)->charsets) {
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (priv->charsets), NULL);
+        mm_callback_info_schedule (info);
+    } else
+        mm_at_serial_port_queue_command (port, "+CSCS=?", 3, get_charsets_done, info);
+}
+
+static void
+set_get_charset_done (MMAtSerialPort *port,
+                      GString *response,
+                      GError *error,
+                      gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMGenericGsmPrivate *priv;
+    MMModemCharset tried_charset;
+    const char *p;
+
+    info->error = mm_modem_check_removed (info->modem, error);
+    if (info->error) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    p = response->str;
+    if (g_str_has_prefix (p, "+CSCS:"))
+        p += 6;
+    while (*p == ' ')
+        p++;
+
+    priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+    priv->cur_charset = mm_modem_charset_from_string (p);
+
+    tried_charset = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "charset"));
+
+    if (tried_charset != priv->cur_charset) {
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_UNSUPPORTED_CHARSET,
+                                   "Modem failed to change character set to %s",
+                                   mm_modem_charset_to_string (tried_charset));
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+#define TRIED_NO_QUOTES_TAG "tried-no-quotes"
+
+static void
+set_charset_done (MMAtSerialPort *port,
+                  GString *response,
+                  GError *error,
+                  gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    info->error = mm_modem_check_removed (info->modem, error);
+    if (info->error) {
+        gboolean tried_no_quotes = !!mm_callback_info_get_data (info, TRIED_NO_QUOTES_TAG);
+        MMModemCharset charset = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "charset"));
+        char *command;
+
+        if (!info->modem || tried_no_quotes) {
+            mm_callback_info_schedule (info);
+            return;
+        }
+
+        /* Some modems puke if you include the quotes around the character
+         * set name, so lets try it again without them.
+         */
+        mm_callback_info_set_data (info, TRIED_NO_QUOTES_TAG, GUINT_TO_POINTER (TRUE), NULL);
+        command = g_strdup_printf ("+CSCS=%s", mm_modem_charset_to_string (charset));
+        mm_at_serial_port_queue_command (port, command, 3, set_charset_done, info);
+        g_free (command);
+    } else
+        mm_at_serial_port_queue_command (port, "+CSCS?", 3, set_get_charset_done, info);
+}
+
+static gboolean
+check_for_single_value (guint32 value)
+{
+    gboolean found = FALSE;
+    guint32 i;
+
+    for (i = 1; i <= 32; i++) {
+        if (value & 0x1) {
+            if (found)
+                return FALSE;  /* More than one bit set */
+            found = TRUE;
+        }
+        value >>= 1;
+    }
+
+    return TRUE;
+}
+
+static void
+set_charset (MMModem *modem,
+             MMModemCharset charset,
+             MMModemFn callback,
+             gpointer user_data)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+    MMCallbackInfo *info;
+    const char *str;
+    char *command;
+    MMAtSerialPort *port = priv->primary;
+
+    info = mm_callback_info_new (modem, callback, user_data);
+
+    if (!(priv->charsets & charset) || !check_for_single_value (charset)) {
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_UNSUPPORTED_CHARSET,
+                                   "Character set 0x%X not supported",
+                                   charset);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    str = mm_modem_charset_to_string (charset);
+    if (!str) {
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_UNSUPPORTED_CHARSET,
+                                   "Unhandled character set 0x%X",
+                                   charset);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    if (mm_port_get_connected (MM_PORT (priv->primary))) {
+        if (!priv->secondary) {
+            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
+                                               "Cannot get set character set while connected");
+            mm_callback_info_schedule (info);
+            return;
+        }
+
+        /* Use secondary port if primary is connected */
+        port = priv->secondary;
+    }
+
+    mm_callback_info_set_data (info, "charset", GUINT_TO_POINTER (charset), NULL);
+
+    command = g_strdup_printf ("+CSCS=\"%s\"", str);
+    mm_at_serial_port_queue_command (port, command, 3, set_charset_done, info);
+    g_free (command);
+}
+
+/*****************************************************************************/
 /* MMModemGsmSms interface */
 
 static void
@@ -2877,6 +3191,8 @@ modem_init (MMModem *modem_class)
     modem_class->connect = connect;
     modem_class->disconnect = disconnect;
     modem_class->get_info = get_card_info;
+    modem_class->get_supported_charsets = get_supported_charsets;
+    modem_class->set_charset = set_charset;
 }
 
 static void

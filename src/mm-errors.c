@@ -77,6 +77,7 @@ mm_modem_error_get_type (void)
             ENUM_ENTRY (MM_MODEM_ERROR_OPERATION_IN_PROGRESS,   "OperationInProgress"),
             ENUM_ENTRY (MM_MODEM_ERROR_REMOVED,                 "Removed"),
             ENUM_ENTRY (MM_MODEM_ERROR_AUTHORIZATION_REQUIRED,  "AuthorizationRequired"),
+            ENUM_ENTRY (MM_MODEM_ERROR_UNSUPPORTED_CHARSET,     "UnsupportedCharset"),
             { 0, 0, 0 }
         };
 
