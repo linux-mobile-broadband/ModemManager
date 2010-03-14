@@ -54,6 +54,8 @@ modem_manager_SOURCES = \
 	main.c \
 	mm-callback-info.c \
 	mm-callback-info.h \
+	mm-charsets.c \
+	mm-charsets.h \
 	$(auth_sources) \
 	mm-manager.c \
 	mm-manager.h \
