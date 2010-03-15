@@ -104,7 +104,7 @@ mm_qcdm_serial_port_queue_command (MMQcdmSerialPort *self,
                                   command,
                                   TRUE,
                                   timeout_seconds,
-                                  G_CALLBACK (callback),
+                                  (MMSerialResponseFn) callback,
                                   user_data);
 }
 
@@ -124,7 +124,7 @@ mm_qcdm_serial_port_queue_command_cached (MMQcdmSerialPort *self,
                                          command,
                                          TRUE,
                                          timeout_seconds,
-                                         G_CALLBACK (callback),
+                                         (MMSerialResponseFn) callback,
                                          user_data);
 }
 

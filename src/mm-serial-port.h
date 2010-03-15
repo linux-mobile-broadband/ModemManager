@@ -43,6 +43,12 @@ typedef void (*MMSerialFlashFn)        (MMSerialPort *port,
                                         GError *error,
                                         gpointer user_data);
 
+typedef void (*MMSerialResponseFn)     (MMSerialPort *port,
+                                        GByteArray *response,
+                                        GError *error,
+                                        gpointer user_data);
+
+
 struct _MMSerialPort {
     MMPort parent;
 };
@@ -106,14 +112,14 @@ void     mm_serial_port_queue_command     (MMSerialPort *self,
                                            GByteArray *command,
                                            gboolean take_command,
                                            guint32 timeout_seconds,
-                                           GCallback callback,
+                                           MMSerialResponseFn callback,
                                            gpointer user_data);
 
 void     mm_serial_port_queue_command_cached (MMSerialPort *self,
                                               GByteArray *command,
                                               gboolean take_command,
                                               guint32 timeout_seconds,
-                                              GCallback callback,
+                                              MMSerialResponseFn callback,
                                               gpointer user_data);
 
 #endif /* MM_SERIAL_PORT_H */

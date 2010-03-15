@@ -1,3 +1,4 @@
+/* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 /*
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -492,6 +493,18 @@ mm_serial_port_schedule_queue_process (MMSerialPort *self)
 }
 
 static void
+real_handle_response (MMSerialPort *self,
+                      GByteArray *response,
+                      GError *error,
+                      GCallback callback,
+                      gpointer callback_data)
+{
+    MMSerialResponseFn response_callback = (MMSerialResponseFn) callback;
+
+    response_callback (self, response, error, callback_data);
+}
+
+static void
 mm_serial_port_got_response (MMSerialPort *self, GError *error)
 {
     MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (self);
@@ -825,7 +838,7 @@ internal_queue_command (MMSerialPort *self,
                         gboolean take_command,
                         gboolean cached,
                         guint32 timeout_seconds,
-                        GCallback callback,
+                        MMSerialResponseFn callback,
                         gpointer user_data)
 {
     MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (self);
@@ -843,7 +856,7 @@ internal_queue_command (MMSerialPort *self,
     }
     info->cached = cached;
     info->timeout = timeout_seconds;
-    info->callback = callback;
+    info->callback = (GCallback) callback;
     info->user_data = user_data;
 
     /* Clear the cached value for this command if not asking for cached value */
@@ -861,7 +874,7 @@ mm_serial_port_queue_command (MMSerialPort *self,
                               GByteArray *command,
                               gboolean take_command,
                               guint32 timeout_seconds,
-                              GCallback callback,
+                              MMSerialResponseFn callback,
                               gpointer user_data)
 {
     internal_queue_command (self, command, take_command, FALSE, timeout_seconds, callback, user_data);
@@ -872,7 +885,7 @@ mm_serial_port_queue_command_cached (MMSerialPort *self,
                                      GByteArray *command,
                                      gboolean take_command,
                                      guint32 timeout_seconds,
-                                     GCallback callback,
+                                     MMSerialResponseFn callback,
                                      gpointer user_data)
 {
     internal_queue_command (self, command, take_command, TRUE, timeout_seconds, callback, user_data);
@@ -1202,6 +1215,7 @@ mm_serial_port_class_init (MMSerialPortClass *klass)
     object_class->finalize = finalize;
 
     klass->config_fd = real_config_fd;
+    klass->handle_response = real_handle_response;
 
     /* Properties */
     g_object_class_install_property
