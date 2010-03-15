@@ -2835,6 +2835,15 @@ set_charset (MMModem *modem,
     g_free (command);
 }
 
+MMModemCharset
+mm_generic_gsm_get_charset (MMGenericGsm *self)
+{
+    g_return_val_if_fail (self != NULL, MM_MODEM_CHARSET_UNKNOWN);
+    g_return_val_if_fail (MM_IS_GENERIC_GSM (self), MM_MODEM_CHARSET_UNKNOWN);
+
+    return MM_GENERIC_GSM_GET_PRIVATE (self)->cur_charset;
+}
+
 /*****************************************************************************/
 /* MMModemGsmSms interface */
 

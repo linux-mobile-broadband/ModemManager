@@ -22,6 +22,7 @@
 #include "mm-modem-base.h"
 #include "mm-at-serial-port.h"
 #include "mm-callback-info.h"
+#include "mm-charsets.h"
 
 #define MM_TYPE_GENERIC_GSM            (mm_generic_gsm_get_type ())
 #define MM_GENERIC_GSM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_GENERIC_GSM, MMGenericGsm))
@@ -122,6 +123,8 @@ gint mm_generic_gsm_get_cid (MMGenericGsm *modem);
 
 void mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
                                     MMModemGsmNetworkRegStatus status);
+
+MMModemCharset mm_generic_gsm_get_charset (MMGenericGsm *modem);
 
 /* Called to asynchronously update the current allowed operating mode that the
  * device is allowed to use when connecting to a network.  This isn't the
