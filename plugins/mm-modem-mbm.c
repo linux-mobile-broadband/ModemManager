@@ -663,8 +663,8 @@ enap_done (MMAtSerialPort *port,
 }
 
 static void
-mbm_auth_done (MMAtSerialPort *port,
-               GString *response,
+mbm_auth_done (MMSerialPort *port,
+               GByteArray *response,
                GError *error,
                gpointer user_data)
 {
@@ -680,10 +680,10 @@ mbm_auth_done (MMAtSerialPort *port,
 
     cid = mm_generic_gsm_get_cid (modem);
 
-    mm_at_serial_port_queue_command (port, "AT*E2NAP=1", 3, NULL, NULL);
+    mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "AT*E2NAP=1", 3, NULL, NULL);
 
     command = g_strdup_printf ("AT*ENAP=1,%d", cid);
-    mm_at_serial_port_queue_command (port, command, 3, enap_done, user_data);
+    mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), command, 3, enap_done, user_data);
     g_free (command);
 }
 
@@ -699,17 +699,42 @@ mbm_modem_authenticate (MMModemMbm *self,
     g_assert (primary);
 
     if (username || password) {
-        char *command;
+        GByteArray *command;
+        MMModemCharset cur_set;
+        char *tmp;
 
-        command = g_strdup_printf ("*EIAAUW=%d,1,\"%s\",\"%s\"",
-                                   mm_generic_gsm_get_cid (MM_GENERIC_GSM (self)),
-                                   username ? username : "",
-                                   password ? password : "");
+        /* F3507g at least wants the username and password to be sent in the
+         * modem's current character set.
+         */
+        cur_set = mm_generic_gsm_get_charset (MM_GENERIC_GSM (self));
 
-        mm_at_serial_port_queue_command (primary, command, 3, mbm_auth_done, user_data);
-        g_free (command);
+        command = g_byte_array_sized_new (75);
+        tmp = g_strdup_printf ("AT*EIAAUW=%d,1,", mm_generic_gsm_get_cid (MM_GENERIC_GSM (self)));
+        g_byte_array_append (command, (const guint8 *) tmp, strlen (tmp));
+        g_free (tmp);
+
+        if (username)
+            mm_modem_charset_byte_array_append (command, username, TRUE, cur_set);
+        else
+            g_byte_array_append (command, (const guint8 *) "\"\"", 2);
+
+        g_byte_array_append (command, (const guint8 *) ",", 1);
+
+        if (password)
+            mm_modem_charset_byte_array_append (command, password, TRUE, cur_set);
+        else
+            g_byte_array_append (command, (const guint8 *) "\"\"", 2);
+
+        g_byte_array_append (command, (const guint8 *) "\r", 1);
+
+        mm_serial_port_queue_command (MM_SERIAL_PORT (primary),
+                                      command,
+                                      TRUE,
+                                      3,
+                                      mbm_auth_done,
+                                      user_data);
     } else
-        mbm_auth_done (primary, NULL, NULL, user_data);
+        mbm_auth_done (MM_SERIAL_PORT (primary), NULL, NULL, user_data);
 }
 
 static const char *
