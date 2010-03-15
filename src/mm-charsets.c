@@ -22,20 +22,22 @@
 #include "mm-charsets.h"
 
 typedef struct {
-    const char *name;
+    const char *gsm_name;
+    const char *iconv_from_name;
+    const char *iconv_to_name;
     MMModemCharset charset;
 } CharsetEntry;
 
 static CharsetEntry charset_map[] = {
-    { "UTF-8",   MM_MODEM_CHARSET_UTF8 },
-    { "UCS2",    MM_MODEM_CHARSET_UCS2 },
-    { "IRA",     MM_MODEM_CHARSET_IRA },
-    { "GSM",     MM_MODEM_CHARSET_GSM },
-    { "8859-1",  MM_MODEM_CHARSET_8859_1 },
-    { "PCCP437", MM_MODEM_CHARSET_PCCP437 },
-    { "PCDN",    MM_MODEM_CHARSET_PCDN },
-    { "HEX",     MM_MODEM_CHARSET_HEX },
-    { NULL,      MM_MODEM_CHARSET_UNKNOWN }
+    { "UTF-8",   "UTF-8",     "UTF-8//TRANSLIT",     MM_MODEM_CHARSET_UTF8 },
+    { "UCS2",    "UCS-2BE",   "UCS-2BE//TRANSLIT",   MM_MODEM_CHARSET_UCS2 },
+    { "IRA",     "ASCII",     "ASCII//TRANSLIT",     MM_MODEM_CHARSET_IRA },
+    { "GSM",     NULL,        NULL,                  MM_MODEM_CHARSET_GSM },
+    { "8859-1",  "ISO8859-1", "ISO8859-1//TRANSLIT", MM_MODEM_CHARSET_8859_1 },
+    { "PCCP437", NULL,        NULL,                  MM_MODEM_CHARSET_PCCP437 },
+    { "PCDN",    NULL,        NULL,                  MM_MODEM_CHARSET_PCDN },
+    { "HEX",     NULL,        NULL,                  MM_MODEM_CHARSET_HEX },
+    { NULL,      NULL,        NULL,                  MM_MODEM_CHARSET_UNKNOWN }
 };
 
 const char *
@@ -45,9 +47,9 @@ mm_modem_charset_to_string (MMModemCharset charset)
 
     g_return_val_if_fail (charset != MM_MODEM_CHARSET_UNKNOWN, NULL);
 
-    while (iter->name) {
+    while (iter->gsm_name) {
         if (iter->charset == charset)
-            return iter->name;
+            return iter->gsm_name;
         iter++;
     }
     g_warn_if_reached ();
@@ -61,11 +63,71 @@ mm_modem_charset_from_string (const char *string)
 
     g_return_val_if_fail (string != NULL, MM_MODEM_CHARSET_UNKNOWN);
 
-    while (iter->name) {
-        if (strcasestr (string, iter->name))
+    while (iter->gsm_name) {
+        if (strcasestr (string, iter->gsm_name))
             return iter->charset;
         iter++;
     }
     return MM_MODEM_CHARSET_UNKNOWN;
+}
+
+static const char *
+charset_iconv_to (MMModemCharset charset)
+{
+    CharsetEntry *iter = &charset_map[0];
+
+    g_return_val_if_fail (charset != MM_MODEM_CHARSET_UNKNOWN, NULL);
+
+    while (iter->gsm_name) {
+        if (iter->charset == charset)
+            return iter->iconv_to_name;
+        iter++;
+    }
+    g_warn_if_reached ();
+    return NULL;
+}
+
+gboolean
+mm_modem_charset_byte_array_append (GByteArray *array,
+                                    const char *string,
+                                    gboolean quoted,
+                                    MMModemCharset charset)
+{
+    const char *iconv_to;
+    char *converted;
+    GError *error = NULL;
+    gsize written = 0;
+
+    g_return_val_if_fail (array != NULL, FALSE);
+    g_return_val_if_fail (string != NULL, FALSE);
+
+    iconv_to = charset_iconv_to (charset);
+    g_return_val_if_fail (iconv_to != NULL, FALSE);
+
+    converted = g_convert (string,
+                           g_utf8_strlen (string, -1),
+                           iconv_to,
+                           "UTF-8",
+                           NULL,
+                           &written,
+                           &error);
+    if (!converted) {
+        if (error) {
+            g_warning ("%s: failed to convert '%s' to %s character set: (%d) %s",
+                       __func__, string, iconv_to,
+                       error->code, error->message);
+            g_error_free (error);
+        }
+        return FALSE;
+    }
+
+    if (quoted)
+        g_byte_array_append (array, (const guint8 *) "\"", 1);
+    g_byte_array_append (array, (const guint8 *) converted, written);
+    if (quoted)
+        g_byte_array_append (array, (const guint8 *) "\"", 1);
+
+    g_free (converted);
+    return TRUE;
 }
 
