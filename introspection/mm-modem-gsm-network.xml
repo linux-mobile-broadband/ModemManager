@@ -23,7 +23,38 @@
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_scan"/>
       <arg name="results" type="aa{ss}" direction="out">
 	<tp:docstring>
-	  Found networks. It's an array of dictionaries (strings for keys and values), the list of known keys is the following: status, operator-long, operator-short, operator-num, access-tech.
+          <p>Found networks. It's an array of dictionaries (strings for both
+          keys and values) with each array element describing a mobile network
+          found in the scan.  Each dict may include one or more of the following
+          keys:</p>
+          <ul>
+            <li>
+              "status": a number representing network availability status as
+              defined in 3GPP TS 27.007 section 7.3.  e.g. "0" (unknown), "1"
+              (available), "2" (current), or "3" (forbidden).  This key will
+              always be present.
+            </li>
+            <li>
+              "operator-long": long-format name of operator.  If the name is
+              unknown, this field should not be present.
+            </li>
+            <li>
+              "operator-short": short-format name of operator.  If the name is
+              unknown, this field should not be present.
+            </li>
+            <li>
+              "operator-num": mobile code of the operator.  Returned in the
+              format "MCCMNC", where MCC is the three-digit ITU E.212 Mobile
+              Country Code and MNC is the  two- or three-digit GSM Mobile
+              Network Code.  e.g. "31026" or "310260".
+            </li>
+            <li>
+              "access-tech": a number representing the access technology used by
+              this mobile network as described in 3GPP TS 27.007 section 7.3.
+              e.g. "0" (GSM), "1" (GSM Compact), "2" (UTRAN/UMTS), "3" (EDGE),
+              etc.
+            </li>
+          </ul>
 	</tp:docstring>
       </arg>
     </method>
