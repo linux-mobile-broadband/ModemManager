@@ -22,7 +22,10 @@
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 
-G_DEFINE_TYPE (MMModemOption, mm_modem_option, MM_TYPE_GENERIC_GSM)
+static void modem_init (MMModem *modem_class);
+
+G_DEFINE_TYPE_EXTENDED (MMModemOption, mm_modem_option, MM_TYPE_GENERIC_GSM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init))
 
 #define MM_MODEM_OPTION_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_OPTION, MMModemOptionPrivate))
 
@@ -46,6 +49,8 @@ mm_modem_option_new (const char *device,
                                    NULL));
 }
 
+#include "mm-modem-option-utils.c"
+
 /*****************************************************************************/
 
 static gboolean
@@ -60,6 +65,9 @@ option_enabled (gpointer user_data)
         modem = MM_GENERIC_GSM (info->modem);
         priv = MM_MODEM_OPTION_GET_PRIVATE (modem);
         priv->enable_wait_id = 0;
+
+        option_change_unsolicited_messages (modem, TRUE);
+
         MM_GENERIC_GSM_CLASS (mm_modem_option_parent_class)->do_enable_power_up_done (modem, NULL, NULL, info);
     }
     return FALSE;
@@ -86,82 +94,14 @@ real_do_enable_power_up_done (MMGenericGsm *gsm,
     priv->enable_wait_id = g_timeout_add_seconds (10, option_enabled, info);
 }
 
-static void
-get_allowed_mode_done (MMAtSerialPort *port,
-                       GString *response,
-                       GError *error,
-                       gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    gboolean parsed = FALSE;
-
-    if (error)
-        info->error = g_error_copy (error);
-    else if (!g_str_has_prefix (response->str, "_OPSYS: ")) {
-        int a, b;
-
-        if (sscanf (response->str + 8, "%d,%d", &a, &b)) {
-            MMModemGsmAllowedMode mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
-
-            switch (a) {
-            case 0:
-                mode = MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY;
-                break;
-            case 1:
-                mode = MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY;
-                break;
-            case 2:
-                mode = MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED;
-                break;
-            case 3:
-                mode = MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED;
-                break;
-            default:
-                break;
-            }
-
-            mm_callback_info_set_result (info, GUINT_TO_POINTER (mode), NULL);
-            parsed = TRUE;
-        }
-    }
-
-    if (!error && !parsed)
-        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                           "Could not parse allowed mode results");
-
-    mm_callback_info_schedule (info);
-}
+/*****************************************************************************/
 
 static void
 get_allowed_mode (MMGenericGsm *gsm,
                   MMModemUIntFn callback,
                   gpointer user_data)
 {
-    MMCallbackInfo *info;
-    MMAtSerialPort *port;
-
-    info = mm_callback_info_uint_new (MM_MODEM (gsm), callback, user_data);
-
-    port = mm_generic_gsm_get_best_at_port (gsm, &info->error);
-    if (!port) {
-        mm_callback_info_schedule (info);
-        return;
-    }
-    mm_at_serial_port_queue_command (port, "AT_OPSYS?", 3, get_allowed_mode_done, info);
-}
-
-static void
-set_allowed_mode_done (MMAtSerialPort *port,
-                       GString *response,
-                       GError *error,
-                       gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-
-    if (error)
-        info->error = g_error_copy (error);
-
-   mm_callback_info_schedule (info);
+    option_get_allowed_mode (gsm, callback, user_data);
 }
 
 static void
@@ -170,44 +110,51 @@ set_allowed_mode (MMGenericGsm *gsm,
                   MMModemFn callback,
                   gpointer user_data)
 {
-    MMCallbackInfo *info;
-    MMAtSerialPort *port;
-    char *command;
-    int i;
-
-    info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
-
-    port = mm_generic_gsm_get_best_at_port (gsm, &info->error);
-    if (!port) {
-        mm_callback_info_schedule (info);
-        return;
-    }
-
-    switch (mode) {
-    case MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY:
-        i = 0;
-        break;
-    case MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY:
-        i = 1;
-        break;
-    case MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED:
-        i = 2;
-        break;
-    case MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED:
-        i = 3;
-        break;
-    case MM_MODEM_GSM_ALLOWED_MODE_ANY:
-    default:
-        i = 5;
-        break;
-    }
-
-    command = g_strdup_printf ("AT_OPSYS=%d,2", i);
-    mm_at_serial_port_queue_command (port, command, 3, set_allowed_mode_done, info);
-    g_free (command);
+    option_set_allowed_mode (gsm, mode, callback, user_data);
 }
 
 /*****************************************************************************/
+
+static void
+disable (MMModem *modem,
+         MMModemFn callback,
+         gpointer user_data)
+{
+    MMModem *parent_modem_iface;
+
+    option_change_unsolicited_messages (MM_GENERIC_GSM (modem), FALSE);
+
+    /* Chain up to parent */
+    parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (modem));
+    parent_modem_iface->disable (modem, callback, user_data);
+}
+
+static gboolean
+grab_port (MMModem *modem,
+           const char *subsys,
+           const char *name,
+           MMPortType suggested_type,
+           gpointer user_data,
+           GError **error)
+{
+    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
+    MMPort *port = NULL;
+
+    port = mm_generic_gsm_grab_port (gsm, subsys, name, suggested_type, error);
+    if (port && MM_IS_AT_SERIAL_PORT (port))
+        option_register_unsolicted_handlers (gsm, MM_AT_SERIAL_PORT (port));
+
+    return !!port;
+}
+
+/*****************************************************************************/
+
+static void
+modem_init (MMModem *modem_class)
+{
+    modem_class->disable = disable;
+    modem_class->grab_port = grab_port;
+}
 
 static void
 mm_modem_option_init (MMModemOption *self)

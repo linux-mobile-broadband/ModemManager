@@ -266,5 +266,6 @@ BUILT_SOURCES = \
 CLEANFILES = $(BUILT_SOURCES)
 
 EXTRA_DIST = \
-	$(udevrules_DATA)
+	$(udevrules_DATA) \
+	mm-modem-option-utils.c
 
