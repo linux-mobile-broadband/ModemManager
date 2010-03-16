@@ -40,7 +40,7 @@ G_DEFINE_TYPE_EXTENDED (MMModemHuaweiGsm, mm_modem_huawei_gsm, MM_TYPE_GENERIC_G
 
 typedef struct {
     /* Cached state */
-    MMModemGsmBand band;
+    guint32 band;
 } MMModemHuaweiGsmPrivate;
 
 MMModem *
@@ -58,6 +58,61 @@ mm_modem_huawei_gsm_new (const char *device,
                                    MM_MODEM_PLUGIN, plugin,
                                    NULL));
 }
+
+/*****************************************************************************/
+
+typedef struct {
+    MMModemGsmBand mm;
+    guint32 huawei;
+} BandTable;
+
+static BandTable bands[] = {
+    /* Sort 3G first since it's preferred */
+    { MM_MODEM_GSM_BAND_U2100, 0x00400000 },
+    { MM_MODEM_GSM_BAND_U1900, 0x00800000 },
+    { MM_MODEM_GSM_BAND_U850,  0x04000000 },
+    { MM_MODEM_GSM_BAND_U900,  0x00020000 },
+    { MM_MODEM_GSM_BAND_G850,  0x00080000 },
+    /* 2G second */
+    { MM_MODEM_GSM_BAND_DCS,   0x00000080 },
+    { MM_MODEM_GSM_BAND_EGSM,  0x00000300 }, /* 0x100 = Extended GSM, 0x200 = Primary GSM */
+    { MM_MODEM_GSM_BAND_PCS,   0x00200000 },
+    /* And ANY last since it's most inclusive */
+    { MM_MODEM_GSM_BAND_ANY,   0x3FFFFFFF },
+};
+
+static gboolean
+band_mm_to_huawei (MMModemGsmBand band, guint32 *out_huawei)
+{
+    int i;
+
+    for (i = 0; i < sizeof (bands) / sizeof (BandTable); i++) {
+        if (bands[i].mm == band) {
+            *out_huawei = bands[i].huawei;
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+static gboolean
+band_huawei_to_mm (guint32 huawei, MMModemGsmBand *out_mm)
+{
+    int i;
+
+    for (i = 0; i < sizeof (bands) / sizeof (BandTable); i++) {
+        /* The dongle returns a bitfield, but since we don't support that
+         * yet in MM, take the "best" band and return it.
+         */
+        if (bands[i].huawei & huawei) {
+            *out_mm = bands[i].mm;
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+/*****************************************************************************/
 
 static gboolean
 parse_syscfg (MMModemHuaweiGsm *self,
@@ -90,12 +145,7 @@ parse_syscfg (MMModemHuaweiGsm *self,
             *out_mode = new_mode;
 
         /* Band */
-        if (*band == 0x3FFFFFFF)
-            priv->band = MM_MODEM_GSM_BAND_ANY;
-        else if (*band == 0x400380)
-            priv->band = MM_MODEM_GSM_BAND_DCS;
-        else if (*band == 0x200000)
-            priv->band = MM_MODEM_GSM_BAND_PCS;
+        priv->band = *band;
 
         return TRUE;
     }
@@ -236,60 +286,12 @@ set_band_done (MMAtSerialPort *port,
 
     if (error)
         info->error = g_error_copy (error);
-    else
+    else {
         /* Success, cache the value */
         priv->band = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "band"));
+    }
 
     mm_callback_info_schedule (info);
-}
-
-static void
-set_band_get_done (MMAtSerialPort *port,
-                   GString *response,
-                   GError *error,
-                   gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemHuaweiGsm *self = MM_MODEM_HUAWEI_GSM (info->modem);
-
-    if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-    } else {
-        int a, b, u1, u2;
-        guint32 band;
-
-        if (parse_syscfg (self, response->str, &a, &b, &band, &u1, &u2, NULL)) {
-            char *command;
-
-            switch (GPOINTER_TO_UINT (mm_callback_info_get_data (info, "band"))) {
-            case MM_MODEM_GSM_BAND_ANY:
-                band = 0x3FFFFFFF;
-                break;
-            case MM_MODEM_GSM_BAND_EGSM:
-                band = 0x100;
-                break;
-            case MM_MODEM_GSM_BAND_DCS:
-                band = 0x80;
-                break;
-            case MM_MODEM_GSM_BAND_U2100:
-                band = 0x400000;
-                break;
-            case MM_MODEM_GSM_BAND_PCS:
-                band = 0x200000;
-                break;
-            case MM_MODEM_GSM_BAND_G850:
-                band = 0x80000;
-                break;
-            default:
-                break;
-            }
-
-            command = g_strdup_printf ("AT^SYSCFG=%d,%d,%X,%d,%d", a, b, band, u1, u2);
-            mm_at_serial_port_queue_command (port, command, 3, set_band_done, info);
-            g_free (command);
-        }
-    }
 }
 
 static void
@@ -299,27 +301,35 @@ set_band (MMModemGsmNetwork *modem,
           gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMAtSerialPort *primary;
+    MMAtSerialPort *port, *primary, *secondary;
+    char *command;
+    guint32 huawei_band = 0x3FFFFFFF;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
-    switch (band) {
-    case MM_MODEM_GSM_BAND_ANY:
-    case MM_MODEM_GSM_BAND_EGSM:
-    case MM_MODEM_GSM_BAND_DCS:
-    case MM_MODEM_GSM_BAND_U2100:
-    case MM_MODEM_GSM_BAND_PCS:
-        mm_callback_info_set_data (info, "band", GUINT_TO_POINTER (band), NULL);
-        primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
-        g_assert (primary);
-        mm_at_serial_port_queue_command (primary, "AT^SYSCFG?", 3, set_band_get_done, info);
-        return;
-    default:
-        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Invalid band.");
-        break;
+    port = primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    if (mm_port_get_connected (MM_PORT (primary))) {
+        secondary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_SECONDARY);
+        if (!secondary) {
+            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
+                                               "Cannot set band while connected");
+            mm_callback_info_schedule (info);
+            return;
+        }
+
+        /* Use secondary port if primary is connected */
+        port = secondary;
     }
 
-    mm_callback_info_schedule (info);
+    if (!band_mm_to_huawei (band, &huawei_band)) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Invalid band.");
+        mm_callback_info_schedule (info);
+    } else {
+        mm_callback_info_set_data (info, "band", GUINT_TO_POINTER (huawei_band), NULL);
+        command = g_strdup_printf ("AT^SYSCFG=16,3,%X,2,4", huawei_band);
+        mm_at_serial_port_queue_command (port, command, 3, set_band_done, info);
+        g_free (command);
+    }
 }
 
 static void
@@ -330,14 +340,17 @@ get_band_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMModemHuaweiGsm *self = MM_MODEM_HUAWEI_GSM (info->modem);
-    MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (self);
     int mode_a, mode_b, u1, u2;
     guint32 band;
 
     if (error)
         info->error = g_error_copy (error);
-    else if (parse_syscfg (self, response->str, &mode_a, &mode_b, &band, &u1, &u2, NULL))
-        mm_callback_info_set_result (info, GUINT_TO_POINTER (priv->band), NULL);
+    else if (parse_syscfg (self, response->str, &mode_a, &mode_b, &band, &u1, &u2, NULL)) {
+        MMModemGsmBand mm_band = MM_MODEM_GSM_BAND_ANY;
+
+        band_huawei_to_mm (band, &mm_band);
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (mm_band), NULL);
+    }
 
     mm_callback_info_schedule (info);
 }
@@ -350,12 +363,15 @@ get_band (MMModemGsmNetwork *modem,
     MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (modem);
     MMAtSerialPort *primary;
 
-    if (priv->band != MM_MODEM_GSM_BAND_ANY) {
-        /* have cached mode (from an unsolicited message). Use that */
+    if (priv->band != 0) {
+        /* have cached band (from an unsolicited message). Use that */
         MMCallbackInfo *info;
+        MMModemGsmBand mm_band = MM_MODEM_GSM_BAND_ANY;
+
+        band_huawei_to_mm (priv->band, &mm_band);
 
         info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-        mm_callback_info_set_result (info, GUINT_TO_POINTER (priv->band), NULL);
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (mm_band), NULL);
         mm_callback_info_schedule (info);
     } else {
         /* Get it from modem */
