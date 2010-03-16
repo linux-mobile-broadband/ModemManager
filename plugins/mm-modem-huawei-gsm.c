@@ -429,7 +429,9 @@ handle_mode_change (MMAtSerialPort *port,
             act = MM_MODEM_GSM_ACCESS_TECH_HSUPA;
         else if (b == 7)
             act = MM_MODEM_GSM_ACCESS_TECH_HSPA;
-    } else {
+    } else if (a == 0)
+        act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
+    else {
         g_warning ("Couldn't parse mode change value: '%s'", str);
         return;
     }
