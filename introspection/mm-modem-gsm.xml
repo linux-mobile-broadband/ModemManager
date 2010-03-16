@@ -97,6 +97,9 @@
       <tp:flag suffix="U17IX" value="0x800">
         <tp:docstring>WCDMA 3GPP UMTS 1700 MHz (Class IX)</tp:docstring>
       </tp:flag>
+      <tp:flag suffix="U17IX" value="0x1000">
+        <tp:docstring>WCDMA 3GPP UMTS 1900 MHz (Class II)</tp:docstring>
+      </tp:flag>
     </tp:flags>
 
     <tp:enum name="MM_MODEM_GSM_ALLOWED_MODE" type="u">
