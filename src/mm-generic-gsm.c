@@ -3070,7 +3070,8 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
         break;
     case SIMPLE_STATE_ALLOWED_MODE:
         next_state = SIMPLE_STATE_REGISTER;
-        if (simple_get_allowed_mode (info, &allowed_mode, &info->error)) {
+        if (   simple_get_allowed_mode (info, &allowed_mode, &info->error)
+            && (allowed_mode != MM_GENERIC_GSM_GET_PRIVATE (modem)->allowed_mode)) {
             mm_modem_gsm_network_set_allowed_mode (MM_MODEM_GSM_NETWORK (modem),
                                                    allowed_mode,
                                                    simple_state_machine,
