@@ -362,7 +362,12 @@ parse_cgmm (const char *buf)
 }
 
 static const char *dq_strings[] = {
-    "option/faema_", "os_logids.h", NULL
+    /* Option Icera-based devices */
+    "option/faema_",
+    "os_logids.h",
+    /* Sierra CnS port */
+    "NETWORK SERVICE CHANGE",
+    NULL
 };
 
 static void
