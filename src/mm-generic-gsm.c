@@ -963,6 +963,10 @@ disable_flash_done (MMSerialPort *port,
         return;
     }
 
+    /* Disable unsolicited messages */
+    mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "AT+CREG=0", 3, NULL, NULL);
+    mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "AT+CGREG=0", 3, NULL, NULL);
+
     g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_POWER_DOWN_CMD, &cmd, NULL);
     if (cmd && strlen (cmd))
         mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), cmd, 5, disable_done, user_data);
