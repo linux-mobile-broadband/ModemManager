@@ -88,6 +88,8 @@ mm_modem_hso_new (const char *device,
                                    NULL));
 }
 
+#include "mm-modem-option-utils.c"
+
 /*****************************************************************************/
 
 static gint
@@ -410,19 +412,25 @@ disable (MMModem *modem,
 {
     MMModemHso *self = MM_MODEM_HSO (modem);
     MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (self);
+    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
     MMCallbackInfo *info;
 
-    mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (self));
+    mm_generic_gsm_pending_registration_stop (gsm);
 
     g_free (priv->username);
     priv->username = NULL;
     g_free (priv->password);
     priv->password = NULL;
 
+    option_change_unsolicited_messages (gsm, FALSE);
+
     info = mm_callback_info_new (modem, callback, user_data);
 
     /* Kill any existing connection */
-    hso_call_control (MM_MODEM_HSO (modem), FALSE, TRUE, disable_done, info);
+    if (mm_generic_gsm_get_cid (gsm) >= 0)
+        hso_call_control (MM_MODEM_HSO (modem), FALSE, TRUE, disable_done, info);
+    else
+        disable_done (modem, NULL, info);
 }
 
 /*****************************************************************************/
@@ -552,6 +560,22 @@ do_disconnect (MMGenericGsm *gsm,
 /*****************************************************************************/
 
 static void
+real_do_enable_power_up_done (MMGenericGsm *gsm,
+                              GString *response,
+                              GError *error,
+                              MMCallbackInfo *info)
+{
+    /* Enable Option unsolicited messages */
+    if (gsm && !error)
+        option_change_unsolicited_messages (gsm, TRUE);
+
+    /* Chain up to parent */
+    MM_GENERIC_GSM_CLASS (mm_modem_hso_parent_class)->do_enable_power_up_done (gsm, response, error, info);
+}
+
+/*****************************************************************************/
+
+static void
 impl_hso_auth_done (MMModem *modem,
                     GError *error,
                     gpointer user_data)
@@ -619,6 +643,25 @@ simple_connect (MMModemSimple *simple,
 
 /*****************************************************************************/
 
+static void
+get_allowed_mode (MMGenericGsm *gsm,
+                  MMModemUIntFn callback,
+                  gpointer user_data)
+{
+    option_get_allowed_mode (gsm, callback, user_data);
+}
+
+static void
+set_allowed_mode (MMGenericGsm *gsm,
+                  MMModemGsmAllowedMode mode,
+                  MMModemFn callback,
+                  gpointer user_data)
+{
+    option_set_allowed_mode (gsm, mode, callback, user_data);
+}
+
+/*****************************************************************************/
+
 static gboolean
 grab_port (MMModem *modem,
            const char *subsys,
@@ -681,6 +724,7 @@ grab_port (MMModem *modem,
             mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, connection_enabled, modem, NULL);
             g_regex_unref (regex);
         }
+        option_register_unsolicted_handlers (gsm, MM_AT_SERIAL_PORT (port));
     }
 
 out:
@@ -739,5 +783,8 @@ mm_modem_hso_class_init (MMModemHsoClass *klass)
     /* Virtual methods */
     object_class->finalize = finalize;
     gsm_class->do_disconnect = do_disconnect;
+    gsm_class->do_enable_power_up_done = real_do_enable_power_up_done;
+    gsm_class->set_allowed_mode = set_allowed_mode;
+    gsm_class->get_allowed_mode = get_allowed_mode;
 }
 
