@@ -2922,30 +2922,111 @@ mm_generic_gsm_get_at_port (MMGenericGsm *modem,
 typedef enum {
     SIMPLE_STATE_CHECK_PIN = 0,
     SIMPLE_STATE_ENABLE,
+    SIMPLE_STATE_ALLOWED_MODE,
     SIMPLE_STATE_REGISTER,
     SIMPLE_STATE_SET_APN,
     SIMPLE_STATE_CONNECT,
     SIMPLE_STATE_DONE
 } SimpleState;
 
-static const char *
-simple_get_string_property (MMCallbackInfo *info, const char *name, GError **error)
+/* Looks a value up in the simple connect properties dictionary.  If the
+ * requested key is not present in the dict, NULL is returned.  If the
+ * requested key is present but is not a string, an error is returned.
+ */
+static gboolean
+simple_get_property (MMCallbackInfo *info,
+                     const char *name,
+                     GType expected_type,
+                     const char **out_str,
+                     guint32 *out_num,
+                     GError **error)
 {
     GHashTable *properties = (GHashTable *) mm_callback_info_get_data (info, "simple-connect-properties");
     GValue *value;
+    gint foo;
+
+    g_return_val_if_fail (properties != NULL, FALSE);
+    g_return_val_if_fail (name != NULL, FALSE);
+    if (out_str)
+        g_return_val_if_fail (*out_str == NULL, FALSE);
 
     value = (GValue *) g_hash_table_lookup (properties, name);
     if (!value)
-        return NULL;
+        return FALSE;
 
-    if (G_VALUE_HOLDS_STRING (value))
-        return g_value_get_string (value);
+    if ((expected_type == G_TYPE_STRING) && G_VALUE_HOLDS_STRING (value)) {
+        *out_str = g_value_get_string (value);
+        return TRUE;
+    } else if (expected_type == G_TYPE_UINT) {
+        if (G_VALUE_HOLDS_UINT (value)) {
+            *out_num = g_value_get_uint (value);
+            return TRUE;
+        } else if (G_VALUE_HOLDS_INT (value)) {
+            /* handle ints for convenience, but only if they are >= 0 */
+            foo = g_value_get_int (value);
+            if (foo >= 0) {
+                *out_num = (guint) foo;
+                return TRUE;
+            }
+        }
+    }
 
     g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                 "Invalid property type for '%s': %s (string expected)",
-                 name, G_VALUE_TYPE_NAME (value));
+                 "Invalid property type for '%s': %s (%s expected)",
+                 name, G_VALUE_TYPE_NAME (value), g_type_name (expected_type));
 
-    return NULL;
+    return FALSE;
+}
+
+static const char *
+simple_get_string_property (MMCallbackInfo *info, const char *name, GError **error)
+{
+    const char *str = NULL;
+
+    simple_get_property (info, name, G_TYPE_STRING, &str, NULL, error);
+    return str;
+}
+
+static gboolean
+simple_get_uint_property (MMCallbackInfo *info, const char *name, guint32 *out_val, GError **error)
+{
+    return simple_get_property (info, name, G_TYPE_UINT, NULL, out_val, error);
+}
+
+static gboolean
+simple_get_allowed_mode (MMCallbackInfo *info,
+                         MMModemGsmAllowedMode *out_mode,
+                         GError **error)
+{
+    MMModemDeprecatedMode old_mode = MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_ANY;
+    MMModemGsmAllowedMode allowed_mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
+    GError *tmp_error = NULL;
+
+    /* check for new allowed mode first */
+    if (simple_get_uint_property (info, "allowed_mode", &allowed_mode, &tmp_error)) {
+        if (allowed_mode > MM_MODEM_GSM_ALLOWED_MODE_LAST) {
+            g_set_error (&tmp_error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                         "Invalid allowed mode %d", old_mode);
+        } else {
+            *out_mode = allowed_mode;
+            return TRUE;
+        }
+    } else if (!tmp_error) {
+        /* and if not, the old allowed mode */
+        if (simple_get_uint_property (info, "network_mode", &old_mode, &tmp_error)) {
+            if (old_mode > MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_LAST) {
+                g_set_error (&tmp_error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             "Invalid allowed mode %d", old_mode);
+            } else {
+                *out_mode = mm_modem_gsm_network_old_mode_to_allowed (old_mode);
+                return TRUE;
+            }
+        }
+    }
+
+    if (error)
+        *error = tmp_error;
+    return FALSE;
 }
 
 static void
@@ -2956,6 +3037,7 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
     SimpleState state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "simple-connect-state"));
     SimpleState next_state = state;
     gboolean done = FALSE;
+    MMModemGsmAllowedMode allowed_mode;
 
     if (error) {
         info->error = g_error_copy (error);
@@ -2984,9 +3066,20 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
         }
         /* Fall through if no PIN required */
     case SIMPLE_STATE_ENABLE:
-        next_state = SIMPLE_STATE_REGISTER;
+        next_state = SIMPLE_STATE_ALLOWED_MODE;
         mm_modem_enable (modem, simple_state_machine, info);
         break;
+    case SIMPLE_STATE_ALLOWED_MODE:
+        next_state = SIMPLE_STATE_REGISTER;
+        if (simple_get_allowed_mode (info, &allowed_mode, &info->error)) {
+            mm_modem_gsm_network_set_allowed_mode (MM_MODEM_GSM_NETWORK (modem),
+                                                   allowed_mode,
+                                                   simple_state_machine,
+                                                   info);
+            break;
+        } else if (info->error)
+            break;
+        /* otherwise fall through as no allowed mode was sent */
     case SIMPLE_STATE_REGISTER:
         next_state = SIMPLE_STATE_SET_APN;
         str = simple_get_string_property (info, "network_id", &info->error);

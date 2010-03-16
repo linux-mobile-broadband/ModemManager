@@ -76,12 +76,6 @@ mbm_modem_authenticate (MMModemMbm *self,
                         const char *password,
                         gpointer user_data);
 
-static const char *
-mbm_simple_get_string_property (GHashTable *properties, const char *name, GError **error);
-
-static uint
-mbm_simple_get_uint_property (GHashTable *properties, const char *name, GError **error);
-
 MMModem *
 mm_modem_mbm_new (const char *device,
                   const char *driver,
@@ -298,6 +292,25 @@ get_allowed_mode (MMGenericGsm *gsm,
 /*    Simple Modem class override functions                                  */
 /*****************************************************************************/
 
+static const char *
+mbm_simple_get_string_property (GHashTable *properties, const char *name, GError **error)
+{
+    GValue *value;
+
+    value = (GValue *) g_hash_table_lookup (properties, name);
+    if (!value)
+        return NULL;
+
+    if (G_VALUE_HOLDS_STRING (value))
+        return g_value_get_string (value);
+
+    g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                 "Invalid property type for '%s': %s (string expected)",
+                 name, G_VALUE_TYPE_NAME (value));
+
+    return NULL;
+}
+
 static void
 simple_connect (MMModemSimple *simple,
                 GHashTable *properties,
@@ -307,28 +320,9 @@ simple_connect (MMModemSimple *simple,
     MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (simple);
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMModemSimple *parent_iface;
-    uint network_mode = 0;
 
     priv->username = mbm_simple_get_string_property (properties, "username", &info->error);
     priv->password = mbm_simple_get_string_property (properties, "password", &info->error);
-
-    network_mode = mbm_simple_get_uint_property (properties, "network_mode", &info->error);
-    switch (network_mode) {
-    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_ANY:
-    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_3G_PREFERRED:
-    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_2G_PREFERRED:
-        priv->network_mode = MBM_NETWORK_MODE_ANY;
-        break;
-    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_2G_ONLY:
-        priv->network_mode = MBM_NETWORK_MODE_2G;
-        break;
-    case MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_3G_ONLY:
-        priv->network_mode = MBM_NETWORK_MODE_3G;
-        break;
-    default:
-        priv->network_mode = MBM_NETWORK_MODE_ANY;
-        break;
-    }
 
     parent_iface = g_type_interface_peek_parent (MM_MODEM_SIMPLE_GET_INTERFACE (simple));
     parent_iface->connect (MM_MODEM_SIMPLE (simple), properties, callback, info);
@@ -735,44 +729,6 @@ mbm_modem_authenticate (MMModemMbm *self,
                                       user_data);
     } else
         mbm_auth_done (MM_SERIAL_PORT (primary), NULL, NULL, user_data);
-}
-
-static const char *
-mbm_simple_get_string_property (GHashTable *properties, const char *name, GError **error)
-{
-    GValue *value;
-
-    value = (GValue *) g_hash_table_lookup (properties, name);
-    if (!value)
-        return NULL;
-
-    if (G_VALUE_HOLDS_STRING (value))
-        return g_value_get_string (value);
-
-    g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                 "Invalid property type for '%s': %s (string expected)",
-                 name, G_VALUE_TYPE_NAME (value));
-
-    return NULL;
-}
-
-static uint
-mbm_simple_get_uint_property (GHashTable *properties, const char *name, GError **error)
-{
-    GValue *value;
-
-    value = (GValue *) g_hash_table_lookup (properties, name);
-    if (!value)
-        return 0;
-
-    if (G_VALUE_HOLDS_UINT (value))
-        return g_value_get_uint (value);
-
-    g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                 "Invalid property type for '%s': %s (uint expected)",
-                 name, G_VALUE_TYPE_NAME (value));
-
-    return 0;
 }
 
 /*****************************************************************************/
