@@ -248,10 +248,10 @@ pin_check_done (MMAtSerialPort *port,
     mm_callback_info_schedule (info);
 }
 
-void
-mm_generic_gsm_check_pin (MMGenericGsm *modem,
-                          MMModemFn callback,
-                          gpointer user_data)
+static void
+check_pin (MMGenericGsm *modem,
+           MMModemFn callback,
+           gpointer user_data)
 {
     MMGenericGsmPrivate *priv;
     MMCallbackInfo *info;
@@ -317,7 +317,7 @@ pin_check_again (gpointer user_data)
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
 
     priv->pin_check_timeout = 0;
-    mm_generic_gsm_check_pin (self, initial_pin_check_done, GUINT_TO_POINTER (TRUE));
+    check_pin (self, initial_pin_check_done, GUINT_TO_POINTER (TRUE));
     return FALSE;
 }
 
@@ -363,7 +363,7 @@ initial_pin_check (MMGenericGsm *self)
     g_return_if_fail (priv->primary != NULL);
 
     if (mm_serial_port_open (MM_SERIAL_PORT (priv->primary), &error))
-        mm_generic_gsm_check_pin (self, initial_pin_check_done, GUINT_TO_POINTER (TRUE));
+        check_pin (self, initial_pin_check_done, GUINT_TO_POINTER (TRUE));
     else {
         g_warning ("%s: failed to open serial port: (%d) %s",
                    __func__,
@@ -1203,7 +1203,7 @@ send_puk_done (MMAtSerialPort *port,
     }
 
     /* Get latest PIN status */
-    mm_generic_gsm_check_pin (MM_GENERIC_GSM (info->modem), pin_puk_recheck_done, info);
+    check_pin (MM_GENERIC_GSM (info->modem), pin_puk_recheck_done, info);
 }
 
 static void
@@ -1264,7 +1264,7 @@ send_pin_done (MMAtSerialPort *port,
     }
 
     /* Get latest PIN status */
-    mm_generic_gsm_check_pin (MM_GENERIC_GSM (info->modem), pin_puk_recheck_done, info);
+    check_pin (MM_GENERIC_GSM (info->modem), pin_puk_recheck_done, info);
 }
 
 static void

@@ -147,10 +147,6 @@ void mm_generic_gsm_update_access_technology (MMGenericGsm *modem,
  */
 void mm_generic_gsm_update_signal_quality (MMGenericGsm *modem, guint32 quality);
 
-void mm_generic_gsm_check_pin (MMGenericGsm *modem,
-                               MMModemFn callback,
-                               gpointer user_data);
-
 MMAtSerialPort *mm_generic_gsm_get_at_port (MMGenericGsm *modem,
                                             MMPortType ptype);
 
