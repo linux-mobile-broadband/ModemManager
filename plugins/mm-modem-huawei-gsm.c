@@ -168,76 +168,60 @@ set_allowed_mode_done (MMAtSerialPort *port,
 }
 
 static void
-set_allowed_mode_get_done (MMAtSerialPort *port,
-                           GString *response,
-                           GError *error,
-                           gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-
-    if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-    } else {
-        int a, b, u1, u2;
-        guint32 band;
-
-        if (parse_syscfg (MM_MODEM_HUAWEI_GSM (info->modem), response->str, &a, &b, &band, &u1, &u2, NULL)) {
-            MMModemGsmAllowedMode mode;
-            char *command;
-
-            mode = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "mode"));
-            switch (mode) {
-            case MM_MODEM_GSM_ALLOWED_MODE_ANY:
-                a = 2;
-                b = 0;
-                break;
-            case MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY:
-                a = 13;
-                b = 1;
-                break;
-            case MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY:
-                a = 14;
-                b = 2;
-                break;
-            case MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED:
-                a = 2;
-                b = 1;
-                break;
-            case MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED:
-                a = 2;
-                b = 2;
-                break;
-            default:
-                break;
-            }
-
-            command = g_strdup_printf ("AT^SYSCFG=%d,%d,%X,%d,%d", a, b, band, u1, u2);
-            mm_at_serial_port_queue_command (port, command, 3, set_allowed_mode_done, info);
-            g_free (command);
-        }
-    }
-}
-
-static void
 set_allowed_mode (MMGenericGsm *gsm,
                   MMModemGsmAllowedMode mode,
                   MMModemFn callback,
                   gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMAtSerialPort *primary;
+    MMAtSerialPort *port, *primary, *secondary;
+    int a, b;
+    char *command;
 
     info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
 
-    mm_callback_info_set_data (info, "mode", GUINT_TO_POINTER (mode), NULL);
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (gsm), MM_PORT_TYPE_PRIMARY);
-    g_assert (primary);
+    port = primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
+    if (mm_port_get_connected (MM_PORT (primary))) {
+        secondary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY);
+        if (!secondary) {
+            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
+                                               "Cannot set allowed mode while connected");
+            mm_callback_info_schedule (info);
+            return;
+        }
 
-    /* Get current configuration first so we don't change band and other
-        * stuff when updating the mode.
-        */
-    mm_at_serial_port_queue_command (primary, "AT^SYSCFG?", 3, set_allowed_mode_get_done, info);
+        /* Use secondary port if primary is connected */
+        port = secondary;
+    }
+    g_assert (port);
+
+    switch (mode) {
+    case MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY:
+        a = 13;
+        b = 1;
+        break;
+    case MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY:
+        a = 14;
+        b = 2;
+        break;
+    case MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED:
+        a = 2;
+        b = 1;
+        break;
+    case MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED:
+        a = 2;
+        b = 2;
+        break;
+    case MM_MODEM_GSM_ALLOWED_MODE_ANY:
+    default:
+        a = 2;
+        b = 0;
+        break;
+    }
+
+    command = g_strdup_printf ("AT^SYSCFG=%d,%d,40000000,2,4", a, b);
+    mm_at_serial_port_queue_command (port, command, 3, set_allowed_mode_done, info);
+    g_free (command);
 }
 
 static void
