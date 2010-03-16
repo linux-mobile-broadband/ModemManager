@@ -43,5 +43,10 @@ gboolean mm_modem_charset_byte_array_append (GByteArray *array,
                                              gboolean quoted,
                                              MMModemCharset charset);
 
+/* Take a string in hex representation ("00430052" or "A4BE11" for example)
+ * and convert it from the given character set to UTF-8.
+ */
+char *mm_modem_charset_hex_to_utf8 (const char *src, MMModemCharset charset);
+
 #endif /* MM_CHARSETS_H */
 

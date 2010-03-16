@@ -1408,8 +1408,37 @@ reg_info_updated (MMGenericGsm *self,
     }
 }
 
+static void
+convert_operator_from_ucs2 (char **operator)
+{
+    const char *p;
+    char *converted;
+    size_t len;
+
+    g_return_if_fail (operator != NULL);
+    g_return_if_fail (*operator != NULL);
+
+    p = *operator;
+    len = strlen (p);
+
+    /* Len needs to be a multiple of 4 for UCS2 */
+    if ((len < 4) && ((len % 4) != 0))
+        return;
+
+    while (*p) {
+        if (!isxdigit (*p++))
+            return;
+    }
+
+    converted = mm_modem_charset_hex_to_utf8 (*operator, MM_MODEM_CHARSET_UCS2);
+    if (converted) {
+        g_free (*operator);
+        *operator = converted;
+    }
+}
+
 static char *
-parse_operator (const char *reply)
+parse_operator (const char *reply, MMModemCharset cur_charset)
 {
     char *operator = NULL;
 
@@ -1431,6 +1460,13 @@ parse_operator (const char *reply)
 		g_regex_unref (r);
     }
 
+    /* Some modems (Option & HSO) return the operator name as a hexadecimal
+     * string of the bytes of the operator name as encoded by the current
+     * character set.
+     */
+    if (operator && (cur_charset == MM_MODEM_CHARSET_UCS2))
+        convert_operator_from_ucs2 (&operator);
+
     return operator;
 }
 
@@ -1444,7 +1480,7 @@ read_operator_code_done (MMAtSerialPort *port,
     char *oper;
 
     if (!error) {
-        oper = parse_operator (response->str);
+        oper = parse_operator (response->str, MM_MODEM_CHARSET_UNKNOWN);
         if (oper)
             reg_info_updated (self, FALSE, 0, TRUE, oper, FALSE, NULL);
     }
@@ -1457,10 +1493,11 @@ read_operator_name_done (MMAtSerialPort *port,
                          gpointer user_data)
 {
     MMGenericGsm *self = MM_GENERIC_GSM (user_data);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     char *oper;
 
     if (!error) {
-        oper = parse_operator (response->str);
+        oper = parse_operator (response->str, priv->cur_charset);
         if (oper)
             reg_info_updated (self, FALSE, 0, FALSE, NULL, TRUE, oper);
     }

@@ -87,6 +87,22 @@ charset_iconv_to (MMModemCharset charset)
     return NULL;
 }
 
+static const char *
+charset_iconv_from (MMModemCharset charset)
+{
+    CharsetEntry *iter = &charset_map[0];
+
+    g_return_val_if_fail (charset != MM_MODEM_CHARSET_UNKNOWN, NULL);
+
+    while (iter->gsm_name) {
+        if (iter->charset == charset)
+            return iter->iconv_from_name;
+        iter++;
+    }
+    g_warn_if_reached ();
+    return NULL;
+}
+
 gboolean
 mm_modem_charset_byte_array_append (GByteArray *array,
                                     const char *string,
@@ -129,5 +145,81 @@ mm_modem_charset_byte_array_append (GByteArray *array,
 
     g_free (converted);
     return TRUE;
+}
+
+/* From hostap, Copyright (c) 2002-2005, Jouni Malinen <jkmaline@cc.hut.fi> */
+
+static int hex2num (char c)
+{
+	if (c >= '0' && c <= '9')
+		return c - '0';
+	if (c >= 'a' && c <= 'f')
+		return c - 'a' + 10;
+	if (c >= 'A' && c <= 'F')
+		return c - 'A' + 10;
+	return -1;
+}
+
+static int hex2byte (const char *hex)
+{
+	int a, b;
+	a = hex2num(*hex++);
+	if (a < 0)
+		return -1;
+	b = hex2num(*hex++);
+	if (b < 0)
+		return -1;
+	return (a << 4) | b;
+}
+
+static char *
+hexstr2bin (const char *hex, gsize *out_len)
+{
+    size_t len = strlen (hex);
+	size_t       i;
+	int          a;
+	const char * ipos = hex;
+	char *       buf = NULL;
+	char *       opos;
+
+	/* Length must be a multiple of 2 */
+    g_return_val_if_fail ((len % 2) == 0, NULL);
+
+	opos = buf = g_malloc0 ((len / 2) + 1);
+	for (i = 0; i < len; i += 2) {
+		a = hex2byte (ipos);
+		if (a < 0) {
+			g_free (buf);
+			return NULL;
+		}
+		*opos++ = a;
+		ipos += 2;
+	}
+    *out_len = len / 2;
+	return buf;
+}
+
+/* End from hostap */
+
+char *
+mm_modem_charset_hex_to_utf8 (const char *src, MMModemCharset charset)
+{
+    char *unconverted;
+    const char *iconv_from;
+    gsize unconverted_len = 0;
+
+    g_return_val_if_fail (src != NULL, NULL);
+    g_return_val_if_fail (charset != MM_MODEM_CHARSET_UNKNOWN, NULL);
+
+    iconv_from = charset_iconv_from (charset);
+    g_return_val_if_fail (iconv_from != NULL, FALSE);
+
+    unconverted = hexstr2bin (src, &unconverted_len);
+    g_return_val_if_fail (unconverted != NULL, NULL);
+
+    if (charset == MM_MODEM_CHARSET_UTF8 || charset == MM_MODEM_CHARSET_IRA)
+        return unconverted;
+
+    return g_convert (unconverted, unconverted_len, "UTF-8//TRANSLIT", iconv_from, NULL, NULL, NULL);
 }
 
