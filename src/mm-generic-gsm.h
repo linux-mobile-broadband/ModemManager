@@ -150,6 +150,9 @@ void mm_generic_gsm_update_signal_quality (MMGenericGsm *modem, guint32 quality)
 MMAtSerialPort *mm_generic_gsm_get_at_port (MMGenericGsm *modem,
                                             MMPortType ptype);
 
+MMAtSerialPort *mm_generic_gsm_get_best_at_port (MMGenericGsm *modem,
+                                                 GError **error);
+
 MMPort *mm_generic_gsm_grab_port (MMGenericGsm *modem,
                                   const char *subsys,
                                   const char *name,

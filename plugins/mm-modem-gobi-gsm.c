@@ -76,13 +76,16 @@ get_imsi (MMModemGsmCard *modem,
           MMModemStringFn callback,
           gpointer user_data)
 {
-    MMAtSerialPort *primary;
+    MMAtSerialPort *port;
     MMCallbackInfo *info;
 
     info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
-    g_assert (primary);
-    mm_at_serial_port_queue_command_cached (primary, "+CIMI", 3, get_string_done, info);
+
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    if (port)
+        mm_at_serial_port_queue_command_cached (port, "+CIMI", 3, get_string_done, info);
+    else
+        mm_callback_info_schedule (info);
 }
 
 static void

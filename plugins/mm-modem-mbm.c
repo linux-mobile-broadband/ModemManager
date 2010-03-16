@@ -111,12 +111,8 @@ register_done (gpointer user_data)
     MMModemMbm *self = MM_MODEM_MBM (reg_data->modem);
     MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (self);
     MMModemGsmNetwork *parent_modem_iface;
-    MMAtSerialPort *primary;
 
     priv->reg_id = 0;
-
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
-    g_assert (primary);
 
     parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GSM_NETWORK_GET_INTERFACE (self));
     parent_modem_iface->do_register (MM_MODEM_GSM_NETWORK (self),
@@ -189,14 +185,18 @@ set_allowed_mode (MMGenericGsm *gsm,
 {
     MMCallbackInfo *info;
     char *command;
-    MMAtSerialPort *primary;
+    MMAtSerialPort *port;
 
     info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
-    primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
-    g_assert (primary);
+
+    port = mm_generic_gsm_get_best_at_port (gsm, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
 
     command = g_strdup_printf ("+CFUN=%d", mbm_parse_allowed_mode (mode));
-    mm_at_serial_port_queue_command (primary, command, 3, mbm_set_allowed_mode_done, info);
+    mm_at_serial_port_queue_command (port, command, 3, mbm_set_allowed_mode_done, info);
     g_free (command);
 }
 
@@ -280,12 +280,17 @@ get_allowed_mode (MMGenericGsm *gsm,
                   gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMAtSerialPort *primary;
+    MMAtSerialPort *port;
 
     info = mm_callback_info_uint_new (MM_MODEM (gsm), callback, user_data);
-    primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
-    g_assert (primary);
-    mm_at_serial_port_queue_command (primary, "CFUN?", 3, get_allowed_mode_done, info);
+
+    port = mm_generic_gsm_get_best_at_port (gsm, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_at_serial_port_queue_command (port, "CFUN?", 3, get_allowed_mode_done, info);
 }
 
 /*****************************************************************************/

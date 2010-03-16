@@ -174,26 +174,17 @@ set_allowed_mode (MMGenericGsm *gsm,
                   gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMAtSerialPort *port, *primary, *secondary;
+    MMAtSerialPort *port;
     int a, b;
     char *command;
 
     info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
 
-    port = primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
-    if (mm_port_get_connected (MM_PORT (primary))) {
-        secondary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY);
-        if (!secondary) {
-            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
-                                               "Cannot set allowed mode while connected");
-            mm_callback_info_schedule (info);
-            return;
-        }
-
-        /* Use secondary port if primary is connected */
-        port = secondary;
+    port = mm_generic_gsm_get_best_at_port (gsm, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
     }
-    g_assert (port);
 
     switch (mode) {
     case MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY:
@@ -250,12 +241,17 @@ get_allowed_mode (MMGenericGsm *gsm,
                   gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMAtSerialPort *primary;
+    MMAtSerialPort *port;
 
     info = mm_callback_info_uint_new (MM_MODEM (gsm), callback, user_data);
-    primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
-    g_assert (primary);
-    mm_at_serial_port_queue_command (primary, "AT^SYSCFG?", 3, get_allowed_mode_done, info);
+
+    port = mm_generic_gsm_get_best_at_port (gsm, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_at_serial_port_queue_command (port, "AT^SYSCFG?", 3, get_allowed_mode_done, info);
 }
 
 static void
@@ -285,24 +281,16 @@ set_band (MMModemGsmNetwork *modem,
           gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMAtSerialPort *port, *primary, *secondary;
+    MMAtSerialPort *port;
     char *command;
     guint32 huawei_band = 0x3FFFFFFF;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
-    port = primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
-    if (mm_port_get_connected (MM_PORT (primary))) {
-        secondary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_SECONDARY);
-        if (!secondary) {
-            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
-                                               "Cannot set band while connected");
-            mm_callback_info_schedule (info);
-            return;
-        }
-
-        /* Use secondary port if primary is connected */
-        port = secondary;
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
     }
 
     if (!band_mm_to_huawei (band, &huawei_band)) {
@@ -345,27 +333,29 @@ get_band (MMModemGsmNetwork *modem,
           gpointer user_data)
 {
     MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (modem);
-    MMAtSerialPort *primary;
+    MMAtSerialPort *port;
+    MMCallbackInfo *info;
 
+    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+
+    /* Prefer cached band from unsolicited messages if we have it */
     if (priv->band != 0) {
-        /* have cached band (from an unsolicited message). Use that */
-        MMCallbackInfo *info;
         MMModemGsmBand mm_band = MM_MODEM_GSM_BAND_ANY;
 
         band_huawei_to_mm (priv->band, &mm_band);
-
-        info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
         mm_callback_info_set_result (info, GUINT_TO_POINTER (mm_band), NULL);
         mm_callback_info_schedule (info);
-    } else {
-        /* Get it from modem */
-        MMCallbackInfo *info;
-
-        info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-        primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
-        g_assert (primary);
-        mm_at_serial_port_queue_command (primary, "AT^SYSCFG?", 3, get_band_done, info);
+        return;
     }
+
+    /* Otherwise ask the modem */
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_at_serial_port_queue_command (port, "AT^SYSCFG?", 3, get_band_done, info);
 }
 
 /* Unsolicited message handlers */

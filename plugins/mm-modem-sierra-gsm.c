@@ -122,8 +122,16 @@ get_allowed_mode (MMGenericGsm *gsm,
     MMAtSerialPort *primary;
 
     info = mm_callback_info_uint_new (MM_MODEM (gsm), callback, user_data);
+
+    /* Sierra secondary ports don't have full AT command interpreters */
     primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
-    g_assert (primary);
+    if (!primary || mm_port_get_connected (MM_PORT (primary))) {
+        g_set_error_literal (&info->error, MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
+                             "Cannot perform this operation while connected");
+        mm_callback_info_schedule (info);
+        return;
+    }
+
     mm_at_serial_port_queue_command (primary, "!SELRAT?", 3, get_allowed_mode_done, info);
 }
 
@@ -154,6 +162,15 @@ set_allowed_mode (MMGenericGsm *gsm,
 
     info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
 
+    /* Sierra secondary ports don't have full AT command interpreters */
+    primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
+    if (!primary || mm_port_get_connected (MM_PORT (primary))) {
+        g_set_error_literal (&info->error, MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
+                             "Cannot perform this operation while connected");
+        mm_callback_info_schedule (info);
+        return;
+    }
+
     switch (mode) {
     case MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY:
         idx = 2;
@@ -173,8 +190,6 @@ set_allowed_mode (MMGenericGsm *gsm,
     }
 
     command = g_strdup_printf ("!SELRAT=%d", idx);
-    primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
-    g_assert (primary);
     mm_at_serial_port_queue_command (primary, command, 3, set_allowed_mode_done, info);
     g_free (command);
 }

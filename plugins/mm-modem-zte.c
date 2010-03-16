@@ -159,12 +159,17 @@ get_allowed_mode (MMGenericGsm *gsm,
                   gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMAtSerialPort *primary;
+    MMAtSerialPort *port;
 
     info = mm_callback_info_uint_new (MM_MODEM (gsm), callback, user_data);
-    primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
-    g_assert (primary);
-    mm_at_serial_port_queue_command (primary, "AT+ZSNT?", 3, get_allowed_mode_done, info);
+
+    port = mm_generic_gsm_get_best_at_port (gsm, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_at_serial_port_queue_command (port, "AT+ZSNT?", 3, get_allowed_mode_done, info);
 }
 
 static void
@@ -188,11 +193,17 @@ set_allowed_mode (MMGenericGsm *gsm,
                   gpointer user_data)
 {
     MMCallbackInfo *info;
-    MMAtSerialPort *primary;
+    MMAtSerialPort *port;
     char *command;
     int cm_mode = 0, pref_acq = 0;
 
     info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
+
+    port = mm_generic_gsm_get_best_at_port (gsm, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
 
     switch (mode) {
     case MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY:
@@ -217,9 +228,7 @@ set_allowed_mode (MMGenericGsm *gsm,
     }
 
     command = g_strdup_printf ("AT+ZSNT=%d,0,%d", cm_mode, pref_acq);
-    primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
-    g_assert (primary);
-    mm_at_serial_port_queue_command (primary, command, 3, set_allowed_mode_done, info);
+    mm_at_serial_port_queue_command (port, command, 3, set_allowed_mode_done, info);
     g_free (command);
 }
 
@@ -237,13 +246,14 @@ cpms_timeout_cb (gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
     MMModem *modem = info->modem;
-    MMModemZtePrivate *priv = MM_MODEM_ZTE_GET_PRIVATE (modem);
     MMAtSerialPort *primary;
 
-    priv->cpms_timeout = 0;
-
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
-    mm_at_serial_port_queue_command (primary, "+CPMS?", 10, cpms_try_done, info);
+    if (modem) {
+        MM_MODEM_ZTE_GET_PRIVATE (modem)->cpms_timeout = 0;
+        primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+        g_assert (primary);
+        mm_at_serial_port_queue_command (primary, "+CPMS?", 10, cpms_try_done, info);
+    }
     return FALSE;
 }
 

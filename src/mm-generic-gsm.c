@@ -517,15 +517,11 @@ periodic_poll_cb (gpointer user_data)
 {
     MMGenericGsm *self = MM_GENERIC_GSM (user_data);
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
-    MMAtSerialPort *port = priv->primary;
+    MMAtSerialPort *port;
 
-    if (mm_port_get_connected (MM_PORT (priv->primary))) {
-        if (!priv->secondary)
-            return TRUE;  /* oh well, try later */
-
-        /* Use secondary port if primary is connected */
-        port = priv->secondary;
-    }
+    port = mm_generic_gsm_get_best_at_port (self, NULL);
+    if (!port)
+        return TRUE;  /* oh well, try later */
 
     if (priv->creg_poll)
         mm_at_serial_port_queue_command (port, "+CREG?", 10, reg_poll_response, self);
@@ -1162,7 +1158,8 @@ get_card_info (MMModem *modem,
     mm_at_serial_port_queue_command_cached (priv->primary, "+CGMR", 3, get_version_done, info);
 }
 
-#define PIN_CLOSE_PORT_TAG "close-port"
+#define PIN_CLOSE_PORT_TAG "pin-close-port"
+#define PIN_PORT_TAG "pin-port"
 
 static void
 pin_puk_recheck_done (MMModem *modem, GError *error, gpointer user_data)
@@ -1176,10 +1173,10 @@ pin_puk_recheck_done (MMModem *modem, GError *error, gpointer user_data)
     info->error = mm_modem_check_removed (modem, error);
 
     if (modem && close_port) {
-        MMSerialPort *port;
+        MMSerialPort *port = mm_callback_info_get_data (info, PIN_PORT_TAG);
 
-        port = MM_SERIAL_PORT (MM_GENERIC_GSM_GET_PRIVATE (modem)->primary);
-        mm_serial_port_close (port);
+        if (port && MM_IS_SERIAL_PORT (port))
+            mm_serial_port_close (port);
     }
 
     mm_callback_info_schedule (info);
@@ -1213,36 +1210,35 @@ send_puk (MMModemGsmCard *modem,
           MMModemFn callback,
           gpointer user_data)
 {
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
     char *command;
-    gboolean connected;
+    MMAtSerialPort *port;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
-    connected = mm_port_get_connected (MM_PORT (priv->primary));
-    if (connected && !priv->secondary) {
-        /* Ensure we have a usable port to use for the unlock */
-        info->error = g_error_new_literal (MM_MODEM_ERROR,
-                                           MM_MODEM_ERROR_CONNECTED,
-                                           "Cannot unlock device while connected");
+    /* Ensure we have a usable port to use for the unlock */
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    if (!port) {
         mm_callback_info_schedule (info);
         return;
-    } else if (!mm_serial_port_is_open (MM_SERIAL_PORT (priv->primary))) {
+    }
+
+    if (!mm_serial_port_is_open (MM_SERIAL_PORT (port))) {
         /* Modem may not be enabled yet, which sometimes can't be done until
          * the device has been unlocked.
          */
-        if (!mm_serial_port_open (MM_SERIAL_PORT (priv->primary), &info->error)) {
+        if (!mm_serial_port_open (MM_SERIAL_PORT (port), &info->error)) {
             mm_callback_info_schedule (info);
             return;
         }
 
         /* Clean up after ourselves if we opened the port */
         mm_callback_info_set_data (info, PIN_CLOSE_PORT_TAG, GUINT_TO_POINTER (TRUE), NULL);
+        mm_callback_info_set_data (info, PIN_PORT_TAG, port, NULL);
     }
 
     command = g_strdup_printf ("+CPIN=\"%s\",\"%s\"", puk, pin);
-    mm_at_serial_port_queue_command (connected ? priv->secondary : priv->primary, command, 3, send_puk_done, info);
+    mm_at_serial_port_queue_command (port, command, 3, send_puk_done, info);
     g_free (command);
 }
 
@@ -1273,36 +1269,35 @@ send_pin (MMModemGsmCard *modem,
           MMModemFn callback,
           gpointer user_data)
 {
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
     char *command;
-    gboolean connected;
+    MMAtSerialPort *port;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
-    connected = mm_port_get_connected (MM_PORT (priv->primary));
-    if (connected && !priv->secondary) {
-        /* Ensure we have a usable port to use for the unlock */
-        info->error = g_error_new_literal (MM_MODEM_ERROR,
-                                           MM_MODEM_ERROR_CONNECTED,
-                                           "Cannot unlock device while connected");
+    /* Ensure we have a usable port to use for the unlock */
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    if (!port) {
         mm_callback_info_schedule (info);
         return;
-    } else if (!mm_serial_port_is_open (MM_SERIAL_PORT (priv->primary))) {
+    }
+
+    if (!mm_serial_port_is_open (MM_SERIAL_PORT (port))) {
         /* Modem may not be enabled yet, which sometimes can't be done until
          * the device has been unlocked.
          */
-        if (!mm_serial_port_open (MM_SERIAL_PORT (priv->primary), &info->error)) {
+        if (!mm_serial_port_open (MM_SERIAL_PORT (port), &info->error)) {
             mm_callback_info_schedule (info);
             return;
         }
 
         /* Clean up after ourselves if we opened the port */
         mm_callback_info_set_data (info, PIN_CLOSE_PORT_TAG, GUINT_TO_POINTER (TRUE), NULL);
+        mm_callback_info_set_data (info, PIN_PORT_TAG, port, NULL);
     }
 
     command = g_strdup_printf ("+CPIN=\"%s\"", pin);
-    mm_at_serial_port_queue_command (connected ? priv->secondary : priv->primary, command, 3, send_pin_done, info);
+    mm_at_serial_port_queue_command (port, command, 3, send_pin_done, info);
     g_free (command);
 }
 
@@ -2455,16 +2450,18 @@ get_signal_quality (MMModemGsmNetwork *modem,
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
-    gboolean connected;
-
-    connected = mm_port_get_connected (MM_PORT (priv->primary));
-    if (connected && !priv->secondary) {
-        callback (MM_MODEM (modem), priv->signal_quality, NULL, user_data);
-        return;
-    }
+    MMAtSerialPort *port;
 
     info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-    mm_at_serial_port_queue_command (connected ? priv->secondary : priv->primary, "+CSQ", 3, get_signal_quality_done, info);
+
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), NULL);
+    if (port)
+        mm_at_serial_port_queue_command (port, "+CSQ", 3, get_signal_quality_done, info);
+    else {
+        /* Use cached signal quality */
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (priv->signal_quality), NULL);
+        mm_callback_info_schedule (info);
+    }
 }
 
 /*****************************************************************************/
@@ -2671,28 +2668,25 @@ get_supported_charsets (MMModem *modem,
     MMGenericGsm *self = MM_GENERIC_GSM (modem);
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     MMCallbackInfo *info;
-    MMAtSerialPort *port = priv->primary;
+    MMAtSerialPort *port;
 
     info = mm_callback_info_uint_new (MM_MODEM (self), callback, user_data);
 
-    if (mm_port_get_connected (MM_PORT (priv->primary))) {
-        if (!priv->secondary) {
-            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
-                                               "Cannot get serving system while connected");
-            mm_callback_info_schedule (info);
-            return;
-        }
-
-        /* Use secondary port if primary is connected */
-        port = priv->secondary;
-    }
-
     /* Use cached value if we have one */
-    if (MM_GENERIC_GSM_GET_PRIVATE (self)->charsets) {
+    if (priv->charsets) {
         mm_callback_info_set_result (info, GUINT_TO_POINTER (priv->charsets), NULL);
         mm_callback_info_schedule (info);
-    } else
-        mm_at_serial_port_queue_command (port, "+CSCS=?", 3, get_charsets_done, info);
+        return;
+    }
+
+    /* Otherwise hit up the modem */
+    port = mm_generic_gsm_get_best_at_port (self, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_at_serial_port_queue_command (port, "+CSCS=?", 3, get_charsets_done, info);
 }
 
 static void
@@ -2793,7 +2787,7 @@ set_charset (MMModem *modem,
     MMCallbackInfo *info;
     const char *str;
     char *command;
-    MMAtSerialPort *port = priv->primary;
+    MMAtSerialPort *port;
 
     info = mm_callback_info_new (modem, callback, user_data);
 
@@ -2816,16 +2810,10 @@ set_charset (MMModem *modem,
         return;
     }
 
-    if (mm_port_get_connected (MM_PORT (priv->primary))) {
-        if (!priv->secondary) {
-            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
-                                               "Cannot get set character set while connected");
-            mm_callback_info_schedule (info);
-            return;
-        }
-
-        /* Use secondary port if primary is connected */
-        port = priv->secondary;
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
     }
 
     mm_callback_info_set_data (info, "charset", GUINT_TO_POINTER (charset), NULL);
@@ -2871,24 +2859,14 @@ sms_send (MMModemGsmSms *modem,
           MMModemFn callback,
           gpointer user_data)
 {
-    MMGenericGsmPrivate *priv;
     MMCallbackInfo *info;
     char *command;
-    gboolean connected;
-    MMAtSerialPort *port = NULL;
+    MMAtSerialPort *port;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
-    priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
-    connected = mm_port_get_connected (MM_PORT (priv->primary));
-    if (connected)
-        port = priv->secondary;
-    else
-        port = priv->primary;
-
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
     if (!port) {
-        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
-                                            "Cannot send SMS while connected");
         mm_callback_info_schedule (info);
         return;
     }
@@ -2914,6 +2892,27 @@ mm_generic_gsm_get_at_port (MMGenericGsm *modem,
         return MM_GENERIC_GSM_GET_PRIVATE (modem)->secondary;
 
     return NULL;
+}
+
+MMAtSerialPort *
+mm_generic_gsm_get_best_at_port (MMGenericGsm *self, GError **error)
+{
+    MMGenericGsmPrivate *priv;
+
+    g_return_val_if_fail (self != NULL, NULL);
+    g_return_val_if_fail (MM_IS_GENERIC_GSM (self), NULL);
+
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    if (!mm_port_get_connected (MM_PORT (priv->primary)))
+        return priv->primary;
+
+    if (!priv->secondary) {
+        g_set_error_literal (error, MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
+                             "Cannot perform this operation while connected");
+    }
+
+    return priv->secondary;
 }
 
 /*****************************************************************************/
