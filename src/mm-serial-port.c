@@ -18,7 +18,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <termio.h>
+#include <termios.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -139,12 +139,12 @@ void
 mm_serial_port_print_config (MMSerialPort *port, const char *detail)
 {
     MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (port);
-    struct termio stbuf;
+    struct termios stbuf;
     int err;
 
-    err = ioctl (priv->fd, TCGETA, &stbuf);
+    err = tcgetattr (priv->fd, &stbuf);
     if (err) {
-        g_warning ("*** %s (%s): (%s) TCGETA error %d",
+        g_warning ("*** %s (%s): (%s) tcgetattr() error %d",
                    __func__, detail, mm_port_get_device (MM_PORT (port)), errno);
         return;
     }
@@ -294,7 +294,7 @@ static gboolean
 real_config_fd (MMSerialPort *self, int fd, GError **error)
 {
     MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (self);
-    struct termio stbuf;
+    struct termios stbuf;
     int speed;
     int bits;
     int parity;
@@ -305,9 +305,9 @@ real_config_fd (MMSerialPort *self, int fd, GError **error)
     parity = parse_parity (priv->parity);
     stopbits = parse_stopbits (priv->stopbits);
 
-    memset (&stbuf, 0, sizeof (struct termio));
-    if (ioctl (fd, TCGETA, &stbuf) != 0) {
-        g_warning ("%s (%s): TCGETA error: %d",
+    memset (&stbuf, 0, sizeof (struct termios));
+    if (tcgetattr (fd, &stbuf) != 0) {
+        g_warning ("%s (%s): tcgetattr() error: %d",
                    __func__,
                    mm_port_get_device (MM_PORT (self)),
                    errno);
@@ -330,7 +330,7 @@ real_config_fd (MMSerialPort *self, int fd, GError **error)
     stbuf.c_cflag &= ~(CBAUD | CSIZE | CSTOPB | PARENB | CRTSCTS);
     stbuf.c_cflag |= (speed | bits | CREAD | 0 | parity | stopbits | CLOCAL);
 
-    if (ioctl (fd, TCSETA, &stbuf) < 0) {
+    if (tcsetattr (fd, TCSANOW, &stbuf) < 0) {
         g_set_error (error,
                      MM_MODEM_ERROR,
                      MM_MODEM_ERROR_GENERAL,
@@ -747,7 +747,7 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
         return FALSE;
     }
 
-    if (ioctl (priv->fd, TCGETA, &priv->old_t) < 0) {
+    if (tcgetattr (priv->fd, &priv->old_t) < 0) {
         g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_OPEN_FAILED,
                      "Could not open serial device %s: %s", device, strerror (errno));
         close (priv->fd);
@@ -817,7 +817,7 @@ mm_serial_port_close (MMSerialPort *self)
             priv->flash_id = 0;
         }
 
-        ioctl (priv->fd, TCSETA, &priv->old_t);
+        tcsetattr (priv->fd, TCSANOW, &priv->old_t);
         close (priv->fd);
         priv->fd = -1;
     }
