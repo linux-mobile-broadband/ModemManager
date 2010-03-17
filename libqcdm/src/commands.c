@@ -121,7 +121,7 @@ qcdm_cmd_version_info_new (char *buf, gsize len, GError **error)
     g_return_val_if_fail (buf != NULL, 0);
     g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
 
-    memset (cmd, 0, sizeof (cmd));
+    memset (cmd, 0, sizeof (*cmd));
     cmd->code = DIAG_CMD_VERSION_INFO;
 
     return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
@@ -180,7 +180,7 @@ qcdm_cmd_esn_new (char *buf, gsize len, GError **error)
     g_return_val_if_fail (buf != NULL, 0);
     g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
 
-    memset (cmd, 0, sizeof (cmd));
+    memset (cmd, 0, sizeof (*cmd));
     cmd->code = DIAG_CMD_ESN;
 
     return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
@@ -227,7 +227,7 @@ qcdm_cmd_cdma_status_new (char *buf, gsize len, GError **error)
     g_return_val_if_fail (buf != NULL, 0);
     g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
 
-    memset (cmd, 0, sizeof (cmd));
+    memset (cmd, 0, sizeof (*cmd));
     cmd->code = DIAG_CMD_STATUS;
 
     return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
@@ -295,7 +295,7 @@ qcdm_cmd_sw_version_new (char *buf, gsize len, GError **error)
     g_return_val_if_fail (buf != NULL, 0);
     g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
 
-    memset (cmd, 0, sizeof (cmd));
+    memset (cmd, 0, sizeof (*cmd));
     cmd->code = DIAG_CMD_SW_VERSION;
 
     return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
@@ -393,7 +393,7 @@ qcdm_cmd_cm_subsys_state_info_new (char *buf, gsize len, GError **error)
     g_return_val_if_fail (buf != NULL, 0);
     g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
 
-    memset (cmd, 0, sizeof (cmd));
+    memset (cmd, 0, sizeof (*cmd));
     cmd->code = DIAG_CMD_SUBSYS;
     cmd->subsys_id = DIAG_SUBSYS_CM;
     cmd->subsys_cmd = GUINT16_TO_LE (DIAG_SUBSYS_CM_STATE_INFO);
@@ -459,7 +459,7 @@ qcdm_cmd_hdr_subsys_state_info_new (char *buf, gsize len, GError **error)
     g_return_val_if_fail (buf != NULL, 0);
     g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
 
-    memset (cmd, 0, sizeof (cmd));
+    memset (cmd, 0, sizeof (*cmd));
     cmd->code = DIAG_CMD_SUBSYS;
     cmd->subsys_id = DIAG_SUBSYS_HDR;
     cmd->subsys_cmd = GUINT16_TO_LE (DIAG_SUBSYS_HDR_STATE_INFO);
