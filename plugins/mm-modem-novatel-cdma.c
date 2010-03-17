@@ -141,25 +141,15 @@ get_signal_quality (MMModemCdma *modem,
                     MMModemUIntFn callback,
                     gpointer user_data)
 {
-    MMGenericCdma *cdma = MM_GENERIC_CDMA (modem);
     MMCallbackInfo *info;
-    MMAtSerialPort *primary, *secondary, *port;
-
-    port = primary = mm_generic_cdma_get_at_port (cdma, MM_PORT_TYPE_PRIMARY);
-    secondary = mm_generic_cdma_get_at_port (cdma, MM_PORT_TYPE_SECONDARY);
+    MMAtSerialPort *port;
 
     info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
 
-    if (mm_port_get_connected (MM_PORT (primary))) {
-        if (!secondary) {
-            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
-                                               "Cannot query signal quality while connected");
-            mm_callback_info_schedule (info);
-            return;
-        }
-
-        /* Use secondary port if primary is connected */
-        port = secondary;
+    port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (modem), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
     }
 
     /* Many Novatel CDMA cards don't report CSQ in standard 0 - 31 and the CSQ

@@ -232,6 +232,27 @@ mm_generic_cdma_get_at_port (MMGenericCdma *modem,
     return NULL;
 }
 
+MMAtSerialPort *
+mm_generic_cdma_get_best_at_port (MMGenericCdma *self, GError **error)
+{
+    MMGenericCdmaPrivate *priv;
+
+    g_return_val_if_fail (self != NULL, NULL);
+    g_return_val_if_fail (MM_IS_GENERIC_CDMA (self), NULL);
+
+    priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
+
+    if (!mm_port_get_connected (MM_PORT (priv->primary)))
+        return priv->primary;
+
+    if (!priv->secondary) {
+        g_set_error_literal (error, MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
+                             "Cannot perform this operation while connected");
+    }
+
+    return priv->secondary;
+}
+
 /*****************************************************************************/
 
 void
@@ -737,25 +758,19 @@ get_card_info (MMModem *modem,
                MMModemInfoFn callback,
                gpointer user_data)
 {
-    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
+    MMGenericCdma *self = MM_GENERIC_CDMA (modem);
     MMCallbackInfo *info;
-    MMAtSerialPort *port = priv->primary;
+    MMAtSerialPort *port;
 
     info = mm_callback_info_new_full (MM_MODEM (modem),
                                       card_info_invoke,
                                       G_CALLBACK (callback),
                                       user_data);
 
-    if (mm_port_get_connected (MM_PORT (priv->primary))) {
-        if (!priv->secondary) {
-            info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
-                                               "Cannot modem info while connected");
-            mm_callback_info_schedule (info);
-            return;
-        }
-
-        /* Use secondary port if primary is connected */
-        port = priv->secondary;
+    port = mm_generic_cdma_get_best_at_port (self, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
     }
 
     mm_at_serial_port_queue_command_cached (port, "+GMI", 3, get_manufacturer_done, info);
@@ -858,20 +873,18 @@ get_signal_quality (MMModemCdma *modem,
 {
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
     MMCallbackInfo *info;
-    MMAtSerialPort *port = priv->primary;
-
-    if (mm_port_get_connected (MM_PORT (priv->primary))) {
-        if (!priv->secondary) {
-            g_message ("Returning saved signal quality %d", priv->cdma1x_quality);
-            callback (MM_MODEM (modem), priv->cdma1x_quality, NULL, user_data);
-            return;
-        }
-
-        /* Use secondary port if primary is connected */
-        port = priv->secondary;
-    }
+    MMAtSerialPort *port;
 
     info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+
+    port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (modem), &info->error);
+    if (!port) {
+        g_message ("Returning saved signal quality %d", priv->cdma1x_quality);
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (priv->cdma1x_quality), NULL);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
     mm_at_serial_port_queue_command (port, "+CSQ", 3, get_signal_quality_done, info);
 }
 
@@ -899,25 +912,17 @@ get_esn (MMModemCdma *modem,
          MMModemStringFn callback,
          gpointer user_data)
 {
-    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
     MMCallbackInfo *info;
-    GError *error;
-    MMAtSerialPort *port = priv->primary;
-
-    if (mm_port_get_connected (MM_PORT (priv->primary))) {
-        if (!priv->secondary) {
-            error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
-                                         "Cannot get ESN while connected");
-            callback (MM_MODEM (modem), NULL, error, user_data);
-            g_error_free (error);
-            return;
-        }
-
-        /* Use secondary port if primary is connected */
-        port = priv->secondary;
-    }
+    MMAtSerialPort *port;
 
     info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
+
+    port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (modem), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
     mm_at_serial_port_queue_command_cached (port, "+GSN", 3, get_string_done, info);
 }
 
@@ -1118,28 +1123,19 @@ get_serving_system (MMModemCdma *modem,
                     MMModemCdmaServingSystemFn callback,
                     gpointer user_data)
 {
-    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
     MMCallbackInfo *info;
-    GError *error;
-    MMAtSerialPort *port = priv->primary;
-
-    if (mm_port_get_connected (MM_PORT (priv->primary))) {
-        if (!priv->secondary) {
-            error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
-                                         "Cannot get serving system while connected");
-            callback (modem, 0, 0, 0, error, user_data);
-            g_error_free (error);
-            return;
-        }
-
-        /* Use secondary port if primary is connected */
-        port = priv->secondary;
-    }
+    MMAtSerialPort *port;
 
     info = mm_callback_info_new_full (MM_MODEM (modem),
                                       serving_system_invoke,
                                       G_CALLBACK (callback),
                                       user_data);
+
+    port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (modem), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
 
     mm_at_serial_port_queue_command (port, "+CSS?", 3, serving_system_done, info);
 }
@@ -1370,21 +1366,26 @@ get_registration_state (MMModemCdma *modem,
 {
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
     MMCallbackInfo *info;
-    MMAtSerialPort *port = priv->primary;
-
-    if (mm_port_get_connected (MM_PORT (priv->primary))) {
-        if (!priv->secondary) {
-            g_message ("Returning saved registration states: 1x: %d  EVDO: %d",
-                       priv->cdma_1x_reg_state, priv->evdo_reg_state);
-            callback (MM_MODEM_CDMA (modem), priv->cdma_1x_reg_state, priv->evdo_reg_state, NULL, user_data);
-            return;
-        }
-
-        /* Use secondary port if primary is connected */
-        port = priv->secondary;
-    }
+    MMAtSerialPort *port;
 
     info = mm_generic_cdma_query_reg_state_callback_info_new (MM_GENERIC_CDMA (modem), callback, user_data);
+
+    port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (modem), &info->error);
+    if (!port) {
+        g_message ("Returning saved registration states: 1x: %d  EVDO: %d",
+                   priv->cdma_1x_reg_state, priv->evdo_reg_state);
+        mm_callback_info_set_data (info,
+                                   CDMA_1X_STATE_TAG,
+                                   GUINT_TO_POINTER (priv->cdma_1x_reg_state),
+                                   NULL);
+        mm_callback_info_set_data (info,
+                                   EVDO_STATE_TAG,
+                                   GUINT_TO_POINTER (priv->evdo_reg_state),
+                                   NULL);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
     mm_at_serial_port_queue_command (port, "+CAD?", 3, get_analog_digital_done, info);
 }
 

@@ -80,6 +80,9 @@ MMPort * mm_generic_cdma_grab_port (MMGenericCdma *self,
 
 MMAtSerialPort *mm_generic_cdma_get_at_port (MMGenericCdma *modem, MMPortType ptype);
 
+MMAtSerialPort *mm_generic_cdma_get_best_at_port (MMGenericCdma *modem,
+                                                  GError **error);
+
 void mm_generic_cdma_update_cdma1x_quality (MMGenericCdma *self, guint32 quality);
 void mm_generic_cdma_update_evdo_quality (MMGenericCdma *self, guint32 quality);
 
