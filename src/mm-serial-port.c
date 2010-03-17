@@ -747,6 +747,9 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
         return FALSE;
     }
 
+    /* Flush any waiting IO */
+    tcflush (priv->fd, TCIOFLUSH);
+
     if (tcgetattr (priv->fd, &priv->old_t) < 0) {
         g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_OPEN_FAILED,
                      "Could not open serial device %s: %s", device, strerror (errno));
