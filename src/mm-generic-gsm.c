@@ -60,6 +60,8 @@ typedef struct {
 
     MMModemGsmAllowedMode allowed_mode;
 
+    gboolean roam_allowed;
+
     char *oper_code;
     char *oper_name;
     guint32 ip_method;
@@ -1538,31 +1540,56 @@ got_signal_quality (MMModem *modem,
     mm_generic_gsm_update_signal_quality (MM_GENERIC_GSM (modem), quality);
 }
 
+static void
+roam_disconnect_done (MMModem *modem,
+                      GError *error,
+                      gpointer user_data)
+{
+    g_message ("Disconnected because roaming is not allowed");
+}
+
 void
-mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
+mm_generic_gsm_set_reg_status (MMGenericGsm *self,
                                MMModemGsmNetworkRegStatus status)
 {
     MMGenericGsmPrivate *priv;
+    MMAtSerialPort *port;
 
-    g_return_if_fail (MM_IS_GENERIC_GSM (modem));
+    g_return_if_fail (MM_IS_GENERIC_GSM (self));
 
-    priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
 
-    if (priv->reg_status != status) {
-        priv->reg_status = status;
+    if (priv->reg_status == status)
+        return;
 
-        g_debug ("Registration state changed: %d", status);
+    g_debug ("Registration state changed: %d", status);
+    priv->reg_status = status;
 
-        if (status == MM_MODEM_GSM_NETWORK_REG_STATUS_HOME ||
-            status == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING) {
-            mm_at_serial_port_queue_command (priv->primary, "+COPS=3,2;+COPS?", 3, read_operator_code_done, modem);
-            mm_at_serial_port_queue_command (priv->primary, "+COPS=3,0;+COPS?", 3, read_operator_name_done, modem);
-            mm_modem_gsm_network_get_signal_quality (MM_MODEM_GSM_NETWORK (modem), got_signal_quality, NULL);
-        } else
-            reg_info_updated (MM_GENERIC_GSM (modem), FALSE, 0, TRUE, NULL, TRUE, NULL);
+    port = mm_generic_gsm_get_best_at_port (self, NULL);
 
-        mm_generic_gsm_update_enabled_state (modem, TRUE, MM_MODEM_STATE_REASON_NONE);
-    }
+    if (status == MM_MODEM_GSM_NETWORK_REG_STATUS_HOME ||
+        status == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING) {
+
+        /* If we're connected and we're not supposed to roam, but the device
+         * just roamed, disconnect the connection to avoid charging the user
+         * loads of money.
+         */
+        if (   (status == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING)
+            && (mm_modem_get_state (MM_MODEM (self)) == MM_MODEM_STATE_CONNECTED)
+            && (priv->roam_allowed == FALSE)) {
+            mm_modem_disconnect (MM_MODEM (self), roam_disconnect_done, NULL);
+        } else {
+            /* Grab the new operator name and MCC/MNC */
+            if (port) {
+                mm_at_serial_port_queue_command (port, "+COPS=3,2;+COPS?", 3, read_operator_code_done, self);
+                mm_at_serial_port_queue_command (port, "+COPS=3,0;+COPS?", 3, read_operator_name_done, self);
+            }
+            mm_modem_gsm_network_get_signal_quality (MM_MODEM_GSM_NETWORK (self), got_signal_quality, NULL);
+        }
+    } else
+        reg_info_updated (self, FALSE, 0, TRUE, NULL, TRUE, NULL);
+
+    mm_generic_gsm_update_enabled_state (self, TRUE, MM_MODEM_STATE_REASON_NONE);
 }
 
 /* Returns TRUE if the modem is "done", ie has registered or been denied */
@@ -2135,6 +2162,8 @@ disconnect (MMModem *modem,
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     MMCallbackInfo *info;
     MMModemState state;
+
+    priv->roam_allowed = TRUE;
 
     info = mm_callback_info_new (modem, callback, user_data);
 
@@ -2981,6 +3010,7 @@ simple_get_property (MMCallbackInfo *info,
                      GType expected_type,
                      const char **out_str,
                      guint32 *out_num,
+                     gboolean *out_bool,
                      GError **error)
 {
     GHashTable *properties = (GHashTable *) mm_callback_info_get_data (info, "simple-connect-properties");
@@ -3011,6 +3041,9 @@ simple_get_property (MMCallbackInfo *info,
                 return TRUE;
             }
         }
+    } else if (expected_type == G_TYPE_BOOLEAN && G_VALUE_HOLDS_BOOLEAN (value)) {
+        *out_bool = g_value_get_boolean (value);
+        return TRUE;
     }
 
     g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
@@ -3025,14 +3058,20 @@ simple_get_string_property (MMCallbackInfo *info, const char *name, GError **err
 {
     const char *str = NULL;
 
-    simple_get_property (info, name, G_TYPE_STRING, &str, NULL, error);
+    simple_get_property (info, name, G_TYPE_STRING, &str, NULL, NULL, error);
     return str;
 }
 
 static gboolean
 simple_get_uint_property (MMCallbackInfo *info, const char *name, guint32 *out_val, GError **error)
 {
-    return simple_get_property (info, name, G_TYPE_UINT, NULL, out_val, error);
+    return simple_get_property (info, name, G_TYPE_UINT, NULL, out_val, NULL, error);
+}
+
+static gboolean
+simple_get_bool_property (MMCallbackInfo *info, const char *name, gboolean *out_val, GError **error)
+{
+    return simple_get_property (info, name, G_TYPE_BOOLEAN, NULL, NULL, out_val, error);
 }
 
 static gboolean
@@ -3075,16 +3114,19 @@ static void
 simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMGenericGsmPrivate *priv;
     const char *str, *unlock = NULL;
     SimpleState state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "simple-connect-state"));
     SimpleState next_state = state;
     gboolean done = FALSE;
     MMModemGsmAllowedMode allowed_mode;
+    gboolean home_only = FALSE;
 
-    if (error) {
-        info->error = g_error_copy (error);
+    info->error = mm_modem_check_removed (modem, error);
+    if (info->error)
         goto out;
-    }
+
+    priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
 
     switch (state) {
     case SIMPLE_STATE_CHECK_PIN:
@@ -3116,7 +3158,7 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
     case SIMPLE_STATE_ALLOWED_MODE:
         next_state = SIMPLE_STATE_REGISTER;
         if (   simple_get_allowed_mode (info, &allowed_mode, &info->error)
-            && (allowed_mode != MM_GENERIC_GSM_GET_PRIVATE (modem)->allowed_mode)) {
+            && (allowed_mode != priv->allowed_mode)) {
             mm_modem_gsm_network_set_allowed_mode (MM_MODEM_GSM_NETWORK (modem),
                                                    allowed_mode,
                                                    simple_state_machine,
@@ -3144,8 +3186,22 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
     case SIMPLE_STATE_CONNECT:
         next_state = SIMPLE_STATE_DONE;
         str = simple_get_string_property (info, "number", &info->error);
-        if (!info->error)
+        if (!info->error) {
+            if (simple_get_bool_property (info, "home_only", &home_only, &info->error)) {
+                priv->roam_allowed = !home_only;
+
+                /* Don't connect if we're not supposed to be roaming */
+                if (home_only && (priv->reg_status == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING)) {
+                    info->error = g_error_new_literal (MM_MOBILE_ERROR,
+                                                       MM_MOBILE_ERROR_GPRS_ROAMING_NOT_ALLOWED,
+                                                       "Roaming is not allowed.");
+                    break;
+                }
+            } else if (info->error)
+                break;
+
             mm_modem_connect (modem, str, simple_state_machine, info);
+        }
         break;
     case SIMPLE_STATE_DONE:
         done = TRUE;
@@ -3384,6 +3440,7 @@ mm_generic_gsm_init (MMGenericGsm *self)
 
     priv->act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     priv->reg_regex = mm_gsm_creg_regex_get (TRUE);
+    priv->roam_allowed = TRUE;
 
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_GSM_NETWORK_ALLOWED_MODE,
