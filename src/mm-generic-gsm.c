@@ -3197,24 +3197,7 @@ simple_string_value (const char *str)
     return val;
 }
 
-#define NOTDONE_TAG "not-done"
 #define SS_HASH_TAG "simple-get-status"
-
-static void
-simple_status_complete_item (MMCallbackInfo *info)
-{
-    guint32 completed = GPOINTER_TO_UINT (mm_callback_info_get_data (info, NOTDONE_TAG));
-
-    g_warn_if_fail (completed > 0);
-
-    /* Decrement the number of outstanding calls and if there aren't any left,
-     * schedule the callback info completion.
-     */
-    completed--;
-    mm_callback_info_set_data (info, NOTDONE_TAG, GUINT_TO_POINTER (completed), NULL);
-    if (completed == 0)
-        mm_callback_info_schedule (info);
-}
 
 static void
 simple_status_got_signal_quality (MMModem *modem,
@@ -3229,7 +3212,7 @@ simple_status_got_signal_quality (MMModem *modem,
         properties = (GHashTable *) mm_callback_info_get_data (info, SS_HASH_TAG);
         g_hash_table_insert (properties, "signal_quality", simple_uint_value (result));
     }
-    simple_status_complete_item (info);
+    mm_callback_info_chain_complete_one (info);
 }
 
 static void
@@ -3245,7 +3228,7 @@ simple_status_got_band (MMModem *modem,
         properties = (GHashTable *) mm_callback_info_get_data (info, SS_HASH_TAG);
         g_hash_table_insert (properties, "band", simple_uint_value (result));
     }
-    simple_status_complete_item (info);
+    mm_callback_info_chain_complete_one (info);
 }
 
 static void
@@ -3267,7 +3250,7 @@ simple_status_got_reg_info (MMModemGsmNetwork *modem,
         g_hash_table_insert (properties, "operator_code", simple_string_value (oper_code));
         g_hash_table_insert (properties, "operator_name", simple_string_value (oper_name));
     }
-    simple_status_complete_item (info);
+    mm_callback_info_chain_complete_one (info);
 }
 
 static void
@@ -3299,12 +3282,10 @@ simple_get_status (MMModemSimple *simple,
     properties = g_hash_table_new_full (g_str_hash, g_str_equal, NULL, simple_free_gvalue);
     mm_callback_info_set_data (info, SS_HASH_TAG, properties, (GDestroyNotify) g_hash_table_unref);
 
+    mm_callback_info_chain_start (info, 3);
     mm_modem_gsm_network_get_signal_quality (gsm, simple_status_got_signal_quality, info);
     mm_modem_gsm_network_get_band (gsm, simple_status_got_band, info);
     mm_modem_gsm_network_get_registration_info (gsm, simple_status_got_reg_info, info);
-
-    /* 3 calls to complete before scheduling the callback: (signal, band, reginfo) */
-    mm_callback_info_set_data (info, NOTDONE_TAG, GUINT_TO_POINTER (3), NULL);
 
     if (priv->act > -1) {
         /* Deprecated key */
