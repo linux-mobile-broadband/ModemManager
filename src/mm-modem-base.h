@@ -22,6 +22,8 @@
 #include <glib-object.h>
 
 #include "mm-port.h"
+#include "mm-at-serial-port.h"
+#include "mm-modem.h"
 
 #define MM_TYPE_MODEM_BASE            (mm_modem_base_get_type ())
 #define MM_MODEM_BASE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_MODEM_BASE, MMModemBase))
@@ -64,6 +66,21 @@ const char *mm_modem_base_get_unlock_required (MMModemBase *self);
 
 void mm_modem_base_set_unlock_required (MMModemBase *self,
                                         const char *unlock_required);
+
+const char *mm_modem_base_get_manf (MMModemBase *self);
+void        mm_modem_base_set_manf (MMModemBase *self, const char *manf);
+
+const char *mm_modem_base_get_model (MMModemBase *self);
+void        mm_modem_base_set_model (MMModemBase *self, const char *model);
+
+const char *mm_modem_base_get_revision (MMModemBase *self);
+void        mm_modem_base_set_revision (MMModemBase *self, const char *revision);
+
+void mm_modem_base_get_card_info (MMModemBase *self,
+                                  MMAtSerialPort *port,
+                                  GError *port_error,
+                                  MMModemInfoFn callback,
+                                  gpointer user_data);
 
 #endif /* MM_MODEM_BASE_H */
 

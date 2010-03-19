@@ -27,6 +27,7 @@
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 #include "mm-serial-parsers.h"
+#include "mm-modem-helpers.h"
 
 #define MM_GENERIC_CDMA_PREV_STATE_TAG "prev-state"
 
@@ -372,6 +373,17 @@ registration_cleanup (MMGenericCdma *self, GQuark error_class, guint32 error_num
 }
 
 static void
+get_enable_info_done (MMModem *modem,
+                      const char *manufacturer,
+                      const char *model,
+                      const char *version,
+                      GError *error,
+                      gpointer user_data)
+{
+    /* Modem base class handles the response for us */
+}
+
+static void
 enable_all_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
@@ -393,6 +405,9 @@ enable_all_done (MMModem *modem, GError *error, gpointer user_data)
         }
 
         update_enabled_state (self, FALSE, MM_MODEM_STATE_REASON_NONE);
+
+        /* Grab device info right away */
+        mm_modem_get_info (modem, get_enable_info_done, NULL);
     }
 
 out:
@@ -678,104 +693,16 @@ disconnect (MMModem *modem,
 }
 
 static void
-card_info_invoke (MMCallbackInfo *info)
-{
-    MMModemInfoFn callback = (MMModemInfoFn) info->callback;
-
-    callback (info->modem,
-              (char *) mm_callback_info_get_data (info, "card-info-manufacturer"),
-              (char *) mm_callback_info_get_data (info, "card-info-model"),
-              (char *) mm_callback_info_get_data (info, "card-info-version"),
-              info->error, info->user_data);
-}
-
-static const char *
-strip_response (const char *resp, const char *cmd)
-{
-    const char *p = resp;
-
-    if (p) {
-        if (!strncmp (p, cmd, strlen (cmd)))
-            p += strlen (cmd);
-        while (*p == ' ')
-            p++;
-    }
-    return p;
-}
-
-static void
-get_version_done (MMAtSerialPort *port,
-                  GString *response,
-                  GError *error,
-                  gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    const char *p;
-
-    if (!error) {
-        p = strip_response (response->str, "+GMR:");
-        mm_callback_info_set_data (info, "card-info-version", g_strdup (p), g_free);
-    } else if (!info->error)
-        info->error = g_error_copy (error);
-
-    mm_callback_info_schedule (info);
-}
-
-static void
-get_model_done (MMAtSerialPort *port,
-                GString *response,
-                GError *error,
-                gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    const char *p;
-
-    if (!error) {
-        p = strip_response (response->str, "+GMM:");
-        mm_callback_info_set_data (info, "card-info-model", g_strdup (p), g_free);
-    } else if (!info->error)
-        info->error = g_error_copy (error);
-}
-
-static void
-get_manufacturer_done (MMAtSerialPort *port,
-                       GString *response,
-                       GError *error,
-                       gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    const char *p;
-
-    if (!error) {
-        p = strip_response (response->str, "+GMI:");
-        mm_callback_info_set_data (info, "card-info-manufacturer", g_strdup (p), g_free);
-    } else
-        info->error = g_error_copy (error);
-}
-
-static void
 get_card_info (MMModem *modem,
                MMModemInfoFn callback,
                gpointer user_data)
 {
-    MMGenericCdma *self = MM_GENERIC_CDMA (modem);
-    MMCallbackInfo *info;
     MMAtSerialPort *port;
+    GError *error = NULL;
 
-    info = mm_callback_info_new_full (MM_MODEM (modem),
-                                      card_info_invoke,
-                                      G_CALLBACK (callback),
-                                      user_data);
-
-    port = mm_generic_cdma_get_best_at_port (self, &info->error);
-    if (!port) {
-        mm_callback_info_schedule (info);
-        return;
-    }
-
-    mm_at_serial_port_queue_command_cached (port, "+GMI", 3, get_manufacturer_done, info);
-    mm_at_serial_port_queue_command_cached (port, "+GMM", 3, get_model_done, info);
-    mm_at_serial_port_queue_command_cached (port, "+GMR", 3, get_version_done, info);
+    port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (modem), &error);
+    mm_modem_base_get_card_info (MM_MODEM_BASE (modem), port, error, callback, user_data);
+    g_clear_error (&error);
 }
 
 /*****************************************************************************/
@@ -900,7 +827,7 @@ get_string_done (MMAtSerialPort *port,
     if (error)
         info->error = g_error_copy (error);
     else {
-        p = strip_response (response->str, "+GSN:");
+        p = mm_strip_tag (response->str, "+GSN:");
         mm_callback_info_set_result (info, g_strdup (p), g_free);
     }
 
@@ -1314,7 +1241,7 @@ get_analog_digital_done (MMAtSerialPort *port,
     }
 
     /* Strip any leading command tag and spaces */
-    reply = strip_response (response->str, "+CAD:");
+    reply = mm_strip_tag (response->str, "+CAD:");
 
     errno = 0;
     int_cad = strtol (reply, NULL, 10);

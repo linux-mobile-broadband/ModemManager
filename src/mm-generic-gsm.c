@@ -746,6 +746,17 @@ get_allowed_mode_done (MMModem *modem,
     }
 }
 
+static void
+get_enable_info_done (MMModem *modem,
+                      const char *manufacturer,
+                      const char *model,
+                      const char *version,
+                      GError *error,
+                      gpointer user_data)
+{
+    /* Modem base class handles the response for us */
+}
+
 void
 mm_generic_gsm_enable_complete (MMGenericGsm *self,
                                 GError *error,
@@ -782,6 +793,9 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
 
     /* Try to enable XON/XOFF flow control */
     mm_at_serial_port_queue_command (priv->primary, "+IFC=1,1", 3, NULL, NULL);
+
+    /* Grab device info right away */
+    mm_modem_get_info (MM_MODEM (self), get_enable_info_done, NULL);
 
     /* Get allowed mode */
     if (MM_GENERIC_GSM_GET_CLASS (self)->get_allowed_mode)
@@ -1075,95 +1089,16 @@ get_imsi (MMModemGsmCard *modem,
 }
 
 static void
-card_info_invoke (MMCallbackInfo *info)
-{
-    MMModemInfoFn callback = (MMModemInfoFn) info->callback;
-
-    callback (info->modem,
-              (char *) mm_callback_info_get_data (info, "card-info-manufacturer"),
-              (char *) mm_callback_info_get_data (info, "card-info-model"),
-              (char *) mm_callback_info_get_data (info, "card-info-version"),
-              info->error, info->user_data);
-}
-
-#define GMI_RESP_TAG "+CGMI:"
-#define GMM_RESP_TAG "+CGMM:"
-#define GMR_RESP_TAG "+CGMR:"
-
-static const char *
-strip_tag (const char *str, const char *tag)
-{
-    /* Strip the response header, if any */
-    if (strncmp (str, tag, strlen (tag)) == 0)
-        str += strlen (tag);
-    while (*str && isspace (*str))
-        str++;
-    return str;
-}
-
-static void
-get_version_done (MMAtSerialPort *port,
-                  GString *response,
-                  GError *error,
-                  gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    const char *resp = strip_tag (response->str, GMR_RESP_TAG);
-
-    if (!error)
-        mm_callback_info_set_data (info, "card-info-version", g_strdup (resp), g_free);
-    else if (!info->error)
-        info->error = g_error_copy (error);
-
-    mm_callback_info_schedule (info);
-}
-
-static void
-get_model_done (MMAtSerialPort *port,
-                GString *response,
-                GError *error,
-                gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    const char *resp = strip_tag (response->str, GMM_RESP_TAG);
-
-    if (!error)
-        mm_callback_info_set_data (info, "card-info-model", g_strdup (resp), g_free);
-    else if (!info->error)
-        info->error = g_error_copy (error);
-}
-
-static void
-get_manufacturer_done (MMAtSerialPort *port,
-                       GString *response,
-                       GError *error,
-                       gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    const char *resp = strip_tag (response->str, GMI_RESP_TAG);
-
-    if (!error)
-        mm_callback_info_set_data (info, "card-info-manufacturer", g_strdup (resp), g_free);
-    else
-        info->error = g_error_copy (error);
-}
-
-static void
 get_card_info (MMModem *modem,
                MMModemInfoFn callback,
                gpointer user_data)
 {
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
-    MMCallbackInfo *info;
+    MMAtSerialPort *port;
+    GError *error = NULL;
 
-    info = mm_callback_info_new_full (MM_MODEM (modem),
-                                      card_info_invoke,
-                                      G_CALLBACK (callback),
-                                      user_data);
-
-    mm_at_serial_port_queue_command_cached (priv->primary, "+CGMI", 3, get_manufacturer_done, info);
-    mm_at_serial_port_queue_command_cached (priv->primary, "+CGMM", 3, get_model_done, info);
-    mm_at_serial_port_queue_command_cached (priv->primary, "+CGMR", 3, get_version_done, info);
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &error);
+    mm_modem_base_get_card_info (MM_MODEM_BASE (modem), port, error, callback, user_data);
+    g_clear_error (&error);
 }
 
 #define PIN_CLOSE_PORT_TAG "pin-close-port"

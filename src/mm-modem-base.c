@@ -25,6 +25,8 @@
 #include "mm-errors.h"
 #include "mm-options.h"
 #include "mm-properties-changed-signal.h"
+#include "mm-callback-info.h"
+#include "mm-modem-helpers.h"
 
 static void modem_init (MMModem *modem_class);
 
@@ -43,6 +45,10 @@ typedef struct {
     guint32 ip_method;
     gboolean valid;
     MMModemState state;
+
+    char *manf;
+    char *model;
+    char *revision;
 
     MMAuthProvider *authp;
 
@@ -211,6 +217,209 @@ mm_modem_base_set_unlock_required (MMModemBase *self, const char *unlock_require
     }
 
     g_object_notify (G_OBJECT (self), MM_MODEM_UNLOCK_REQUIRED);
+}
+
+const char *
+mm_modem_base_get_manf (MMModemBase *self)
+{
+    g_return_val_if_fail (self != NULL, NULL);
+    g_return_val_if_fail (MM_IS_MODEM_BASE (self), NULL);
+
+    return MM_MODEM_BASE_GET_PRIVATE (self)->manf;
+}
+
+void
+mm_modem_base_set_manf (MMModemBase *self, const char *manf)
+{
+    MMModemBasePrivate *priv;
+
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_MODEM_BASE (self));
+
+    priv = MM_MODEM_BASE_GET_PRIVATE (self);
+    g_free (priv->manf);
+    priv->manf = g_strdup (manf);
+}
+
+const char *
+mm_modem_base_get_model (MMModemBase *self)
+{
+    g_return_val_if_fail (self != NULL, NULL);
+    g_return_val_if_fail (MM_IS_MODEM_BASE (self), NULL);
+
+    return MM_MODEM_BASE_GET_PRIVATE (self)->model;
+}
+
+void
+mm_modem_base_set_model (MMModemBase *self, const char *model)
+{
+    MMModemBasePrivate *priv;
+
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_MODEM_BASE (self));
+
+    priv = MM_MODEM_BASE_GET_PRIVATE (self);
+    g_free (priv->model);
+    priv->model = g_strdup (model);
+}
+
+const char *
+mm_modem_base_get_revision (MMModemBase *self)
+{
+    g_return_val_if_fail (self != NULL, NULL);
+    g_return_val_if_fail (MM_IS_MODEM_BASE (self), NULL);
+
+    return MM_MODEM_BASE_GET_PRIVATE (self)->revision;
+}
+
+void
+mm_modem_base_set_revision (MMModemBase *self, const char *revision)
+{
+    MMModemBasePrivate *priv;
+
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_MODEM_BASE (self));
+
+    priv = MM_MODEM_BASE_GET_PRIVATE (self);
+    g_free (priv->revision);
+    priv->revision = g_strdup (revision);
+}
+
+/*************************************************************************/
+static void
+card_info_simple_invoke (MMCallbackInfo *info)
+{
+    MMModemBase *self = MM_MODEM_BASE (info->modem);
+    MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (self);
+    MMModemInfoFn callback = (MMModemInfoFn) info->callback;
+
+    callback (info->modem, priv->manf, priv->model, priv->revision, info->error, info->user_data);
+}
+
+static void
+card_info_cache_invoke (MMCallbackInfo *info)
+{
+    MMModemBase *self = MM_MODEM_BASE (info->modem);
+    MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (self);
+    MMModemInfoFn callback = (MMModemInfoFn) info->callback;
+    const char *manf, *cmanf, *model, *cmodel, *rev, *crev;
+
+    manf = mm_callback_info_get_data (info, "card-info-manf");
+    cmanf = mm_callback_info_get_data (info, "card-info-c-manf");
+
+    model = mm_callback_info_get_data (info, "card-info-model");
+    cmodel = mm_callback_info_get_data (info, "card-info-c-model");
+
+    rev = mm_callback_info_get_data (info, "card-info-revision");
+    crev = mm_callback_info_get_data (info, "card-info-c-revision");
+
+    /* Prefer the 'C' responses over the plain responses */
+    g_free (priv->manf);
+    priv->manf = g_strdup (cmanf ? cmanf : manf);
+    g_free (priv->model);
+    priv->model = g_strdup (cmodel ? cmodel : model);
+    g_free (priv->revision);
+    priv->revision = g_strdup (crev ? crev : rev);
+
+    callback (info->modem, priv->manf, priv->model, priv->revision, info->error, info->user_data);
+}
+
+static void
+info_item_done (MMCallbackInfo *info,
+                GString *response,
+                GError *error,
+                const char *tag,
+                const char *desc)
+{
+    const char *p;
+
+    if (!error) {
+        p = mm_strip_tag (response->str, tag);
+        mm_callback_info_set_data (info, desc, strlen (p) ? g_strdup (p) : NULL, g_free);
+    }
+
+    mm_callback_info_chain_complete_one (info);
+}
+
+#define GET_INFO_RESP_FN(func_name, tag, desc) \
+static void \
+func_name (MMAtSerialPort *port, \
+           GString *response, \
+           GError *error, \
+           gpointer user_data) \
+{ \
+    info_item_done ((MMCallbackInfo *) user_data, response, error, tag , desc ); \
+}
+
+GET_INFO_RESP_FN(get_revision_done, "+GMR:", "card-info-revision")
+GET_INFO_RESP_FN(get_model_done, "+GMM:", "card-info-model")
+GET_INFO_RESP_FN(get_manf_done, "+GMI:", "card-info-manf")
+
+GET_INFO_RESP_FN(get_c_revision_done, "+CGMR:", "card-info-c-revision")
+GET_INFO_RESP_FN(get_c_model_done, "+CGMM:", "card-info-c-model")
+GET_INFO_RESP_FN(get_c_manf_done, "+CGMI:", "card-info-c-manf")
+
+void
+mm_modem_base_get_card_info (MMModemBase *self,
+                             MMAtSerialPort *port,
+                             GError *port_error,
+                             MMModemInfoFn callback,
+                             gpointer user_data)
+{
+    MMModemBasePrivate *priv;
+    MMCallbackInfo *info;
+    MMModemState state;
+    gboolean cached = FALSE;
+    GError *error = port_error;
+
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_MODEM_BASE (self));
+    g_return_if_fail (port != NULL);
+    g_return_if_fail (MM_IS_AT_SERIAL_PORT (port));
+    g_return_if_fail (callback != NULL);
+
+    priv = MM_MODEM_BASE_GET_PRIVATE (self);
+
+    /* Cached info and errors schedule the callback immediately and do 
+     * not hit up the card for it's model information.
+     */
+    if (priv->manf || priv->model || priv->revision)
+        cached = TRUE;
+    else {
+        state = mm_modem_get_state (MM_MODEM (self));
+
+        if (port_error)
+            error = g_error_copy (port_error);
+        else if (state < MM_MODEM_STATE_ENABLING) {
+            error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                         "The modem is not enabled.");
+        }
+    }
+
+    /* If we have cached info or an error, don't hit up the card */
+    if (cached || error) {
+        info = mm_callback_info_new_full (MM_MODEM (self),
+                                          card_info_simple_invoke,
+                                          G_CALLBACK (callback),
+                                          user_data);
+        info->error = error;
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* Otherwise, ask the card */
+    info = mm_callback_info_new_full (MM_MODEM (self),
+                                      card_info_cache_invoke,
+                                      G_CALLBACK (callback),
+                                      user_data);
+
+    mm_callback_info_chain_start (info, 6);
+    mm_at_serial_port_queue_command_cached (port, "+GMI", 3, get_manf_done, info);
+    mm_at_serial_port_queue_command_cached (port, "+GMM", 3, get_model_done, info);
+    mm_at_serial_port_queue_command_cached (port, "+GMR", 3, get_revision_done, info);
+    mm_at_serial_port_queue_command_cached (port, "+CGMI", 3, get_c_manf_done, info);
+    mm_at_serial_port_queue_command_cached (port, "+CGMM", 3, get_c_model_done, info);
+    mm_at_serial_port_queue_command_cached (port, "+CGMR", 3, get_c_revision_done, info);
 }
 
 /*****************************************************************************/
