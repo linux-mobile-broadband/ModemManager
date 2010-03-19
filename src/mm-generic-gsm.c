@@ -901,10 +901,10 @@ enable (MMModem *modem,
     const char *unlock;
 
     /* If the device needs a PIN, deal with that now, but we don't care
-     * about SIM-PUK2 since the device is operational without it.
+     * about SIM-PIN2/SIM-PUK2 since the device is operational without it.
      */
     unlock = mm_modem_base_get_unlock_required (MM_MODEM_BASE (modem));
-    if (unlock && strcmp (unlock, "sim-puk2")) {
+    if (unlock && strcmp (unlock, "sim-puk2") && strcmp (unlock, "sim-pin2")) {
         MMCallbackInfo *info;
 
         info = mm_callback_info_new (modem, callback, user_data);
@@ -3067,11 +3067,11 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
     case SIMPLE_STATE_CHECK_PIN:
         next_state = SIMPLE_STATE_ENABLE;
 
-        /* If we need a PIN, send it now, but we don't care about SIM-PUK2
+        /* If we need a PIN, send it now, but we don't care about SIM-PIN2/SIM-PUK2
          * since the device is operational without it.
          */
         unlock = mm_modem_base_get_unlock_required (MM_MODEM_BASE (modem));
-        if (unlock && strcmp (unlock, "sim-puk2")) {
+        if (unlock && strcmp (unlock, "sim-puk2") && strcmp (unlock, "sim-pin2")) {
             gboolean success = FALSE;
 
             if (!strcmp (unlock, "sim-pin")) {
