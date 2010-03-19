@@ -430,3 +430,19 @@ mm_gsm_parse_creg_response (GMatchInfo *info,
     return TRUE;
 }
 
+/*************************************************************************/
+
+const char *
+mm_strip_tag (const char *str, const char *cmd)
+{
+    const char *p = str;
+
+    if (p) {
+        if (!strncmp (p, cmd, strlen (cmd)))
+            p += strlen (cmd);
+        while (isspace (*p))
+            p++;
+    }
+    return p;
+}
+

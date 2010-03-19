@@ -39,5 +39,7 @@ gboolean mm_gsm_parse_creg_response (GMatchInfo *info,
                                      gboolean *out_cgreg,
                                      GError **error);
 
+const char *mm_strip_tag (const char *str, const char *cmd);
+
 #endif  /* MM_MODEM_HELPERS_H */
 
