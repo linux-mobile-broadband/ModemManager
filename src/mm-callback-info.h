@@ -25,6 +25,9 @@ typedef void (*MMCallbackInfoInvokeFn) (MMCallbackInfo *info);
 struct _MMCallbackInfo {
     guint32 refcount;
 
+    /* # of ops left in this callback chain */
+    guint32 chain_left;
+
     GData *qdata;
     MMModem *modem;
 
@@ -69,6 +72,9 @@ gpointer        mm_callback_info_get_data (MMCallbackInfo *info,
 
 MMCallbackInfo *mm_callback_info_ref (MMCallbackInfo *info);
 void            mm_callback_info_unref (MMCallbackInfo *info);
+
+void            mm_callback_info_chain_start (MMCallbackInfo *info, guint num);
+void            mm_callback_info_chain_complete_one (MMCallbackInfo *info);
 
 #endif /* MM_CALLBACK_INFO_H */
 

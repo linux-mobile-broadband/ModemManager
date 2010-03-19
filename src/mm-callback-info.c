@@ -91,6 +91,8 @@ mm_callback_info_schedule (MMCallbackInfo *info)
     g_return_if_fail (info->pending_id == 0);
     g_return_if_fail (info->called == FALSE);
 
+    g_warn_if_fail (info->chain_left == 0);
+
     info->pending_id = g_idle_add_full (G_PRIORITY_DEFAULT_IDLE, callback_info_do, info, callback_info_done);
 }
 
@@ -206,5 +208,26 @@ mm_callback_info_unref (MMCallbackInfo *info)
         g_datalist_clear (&info->qdata);
         g_slice_free (MMCallbackInfo, info);
     }
+}
+
+void
+mm_callback_info_chain_start (MMCallbackInfo *info, guint num)
+{
+    g_return_if_fail (info != NULL);
+    g_return_if_fail (num > 0);
+    g_return_if_fail (info->chain_left == 0);
+
+    info->chain_left = num;
+}
+
+void
+mm_callback_info_chain_complete_one (MMCallbackInfo *info)
+{
+    g_return_if_fail (info != NULL);
+    g_return_if_fail (info->chain_left > 0);
+
+    info->chain_left--;
+    if (info->chain_left == 0)
+        mm_callback_info_schedule (info);
 }
 
