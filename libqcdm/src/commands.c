@@ -107,17 +107,31 @@ check_command (const char *buf, gsize len, guint8 cmd, gsize min_len, GError **e
         return FALSE;
     }
 
-    /* NV read/write have a status byte at the end too */
-    if (cmd == DIAG_CMD_NV_READ || cmd == DIAG_CMD_NV_WRITE) {
-        DMCmdNVReadWrite *nvcmd = (DMCmdNVReadWrite *) buf;
+    return TRUE;
+}
 
-        g_warn_if_fail (len >= sizeof (DMCmdNVReadWrite));
-        if (nvcmd->status != 0) {
-            g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_NVCMD_FAILED,
-                         "The NV operation failed (status 0x%X).",
-                         GUINT16_FROM_LE (nvcmd->status));
-            return FALSE;
-        }
+static gboolean
+check_nv_cmd (DMCmdNVReadWrite *cmd, guint16 nv_item, GError **error)
+{
+    guint16 cmd_item;
+
+    g_return_val_if_fail (cmd != NULL, FALSE);
+    g_return_val_if_fail ((cmd->code == DIAG_CMD_NV_READ) || (cmd->code == DIAG_CMD_NV_WRITE), FALSE);
+
+    /* NV read/write have a status byte at the end */
+    if (cmd->status != 0) {
+        g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_NVCMD_FAILED,
+                        "The NV operation failed (status 0x%X).",
+                        GUINT16_FROM_LE (cmd->status));
+        return FALSE;
+    }
+
+    cmd_item = GUINT16_FROM_LE (cmd->nv_item);
+    if (cmd_item != nv_item) {
+        g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_UNEXPECTED,
+                     "Unexpected DM NV command response (expected item %d, got "
+                     "item %d)", nv_item, cmd_item);
+        return FALSE;
     }
 
     return TRUE;
@@ -381,6 +395,9 @@ qcdm_cmd_nv_get_mdn_result (const char *buf, gsize len, GError **error)
     if (!check_command (buf, len, DIAG_CMD_NV_READ, sizeof (DMCmdNVReadWrite), error))
         return NULL;
 
+    if (!check_nv_cmd (rsp, DIAG_NV_DIR_NUMBER, error))
+        return NULL;
+
     mdn = (DMNVItemMdn *) &rsp->data[0];
 
     result = qcdm_result_new ();
@@ -439,6 +456,9 @@ qcdm_cmd_nv_get_roam_pref_result (const char *buf, gsize len, GError **error)
     if (!check_command (buf, len, DIAG_CMD_NV_READ, sizeof (DMCmdNVReadWrite), error))
         return NULL;
 
+    if (!check_nv_cmd (rsp, DIAG_NV_ROAM_PREF, error))
+        return NULL;
+
     roam = (DMNVItemRoamPref *) &rsp->data[0];
 
     if (!roam_pref_validate (roam->roam_pref)) {
@@ -494,6 +514,9 @@ qcdm_cmd_nv_set_roam_pref_result (const char *buf, gsize len, GError **error)
     if (!check_command (buf, len, DIAG_CMD_NV_WRITE, sizeof (DMCmdNVReadWrite), error))
         return NULL;
 
+    if (!check_nv_cmd ((DMCmdNVReadWrite *) buf, DIAG_NV_ROAM_PREF, error))
+        return NULL;
+
     return qcdm_result_new ();
 }
 
@@ -539,6 +562,9 @@ qcdm_cmd_nv_get_mode_pref_result (const char *buf, gsize len, GError **error)
     g_return_val_if_fail (buf != NULL, NULL);
 
     if (!check_command (buf, len, DIAG_CMD_NV_READ, sizeof (DMCmdNVReadWrite), error))
+        return NULL;
+
+    if (!check_nv_cmd (rsp, DIAG_NV_MODE_PREF, error))
         return NULL;
 
     mode = (DMNVItemModePref *) &rsp->data[0];
@@ -594,6 +620,9 @@ qcdm_cmd_nv_set_mode_pref_result (const char *buf, gsize len, GError **error)
     g_return_val_if_fail (buf != NULL, NULL);
 
     if (!check_command (buf, len, DIAG_CMD_NV_WRITE, sizeof (DMCmdNVReadWrite), error))
+        return NULL;
+
+    if (!check_nv_cmd ((DMCmdNVReadWrite *) buf, DIAG_NV_MODE_PREF, error))
         return NULL;
 
     return qcdm_result_new ();
