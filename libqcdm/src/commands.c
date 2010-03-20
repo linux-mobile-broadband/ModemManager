@@ -107,6 +107,19 @@ check_command (const char *buf, gsize len, guint8 cmd, gsize min_len, GError **e
         return FALSE;
     }
 
+    /* NV read/write have a status byte at the end too */
+    if (cmd == DIAG_CMD_NV_READ || cmd == DIAG_CMD_NV_WRITE) {
+        DMCmdNVReadWrite *nvcmd = (DMCmdNVReadWrite *) buf;
+
+        g_warn_if_fail (len >= sizeof (DMCmdNVReadWrite));
+        if (nvcmd->status != 0) {
+            g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_NVCMD_FAILED,
+                         "The NV operation failed (status 0x%X).",
+                         GUINT16_FROM_LE (nvcmd->status));
+            return FALSE;
+        }
+    }
+
     return TRUE;
 }
 
@@ -384,6 +397,108 @@ qcdm_cmd_nv_get_mdn_result (const char *buf, gsize len, GError **error)
 
 /**********************************************************************/
 
+static gboolean
+roam_pref_validate (guint8 dm)
+{
+    if (   dm == DIAG_NV_ROAM_PREF_HOME_ONLY
+        || dm == DIAG_NV_ROAM_PREF_ROAM_ONLY
+        || dm == DIAG_NV_ROAM_PREF_AUTO)
+        return TRUE;
+    return FALSE;
+}
+
+gsize
+qcdm_cmd_nv_get_roam_pref_new (char *buf, gsize len, guint8 profile, GError **error)
+{
+    char cmdbuf[sizeof (DMCmdNVReadWrite) + 2];
+    DMCmdNVReadWrite *cmd = (DMCmdNVReadWrite *) &cmdbuf[0];
+    DMNVItemRoamPref *req;
+
+    g_return_val_if_fail (buf != NULL, 0);
+    g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->code = DIAG_CMD_NV_READ;
+    cmd->nv_item = GUINT16_TO_LE (DIAG_NV_ROAM_PREF);
+
+    req = (DMNVItemRoamPref *) &cmd->data[0];
+    req->profile = profile;
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QCDMResult *
+qcdm_cmd_nv_get_roam_pref_result (const char *buf, gsize len, GError **error)
+{
+    QCDMResult *result = NULL;
+    DMCmdNVReadWrite *rsp = (DMCmdNVReadWrite *) buf;
+    DMNVItemRoamPref *roam;
+
+    g_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_NV_READ, sizeof (DMCmdNVReadWrite), error))
+        return NULL;
+
+    roam = (DMNVItemRoamPref *) &rsp->data[0];
+
+    if (!roam_pref_validate (roam->roam_pref)) {
+        g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_BAD_PARAMETER,
+                     "Unknown roam preference 0x%X",
+                     roam->roam_pref);
+        return NULL;
+    }
+
+    result = qcdm_result_new ();
+    qcdm_result_add_uint8 (result, QCDM_CMD_NV_GET_ROAM_PREF_ITEM_PROFILE, roam->profile);
+    qcdm_result_add_uint8 (result, QCDM_CMD_NV_GET_ROAM_PREF_ITEM_ROAM_PREF, roam->roam_pref);
+
+    return result;
+}
+
+gsize
+qcdm_cmd_nv_set_roam_pref_new (char *buf,
+                               gsize len,
+                               guint8 profile,
+                               guint8 roam_pref,
+                               GError **error)
+{
+    char cmdbuf[sizeof (DMCmdNVReadWrite) + 2];
+    DMCmdNVReadWrite *cmd = (DMCmdNVReadWrite *) &cmdbuf[0];
+    DMNVItemRoamPref *req;
+
+    g_return_val_if_fail (buf != NULL, 0);
+    g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    if (!roam_pref_validate (roam_pref)) {
+        g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_BAD_PARAMETER,
+                     "Invalid roam preference %d", roam_pref);
+        return 0;
+    }
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->code = DIAG_CMD_NV_WRITE;
+    cmd->nv_item = GUINT16_TO_LE (DIAG_NV_ROAM_PREF);
+
+    req = (DMNVItemRoamPref *) &cmd->data[0];
+    req->profile = profile;
+    req->roam_pref = roam_pref;
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QCDMResult *
+qcdm_cmd_nv_set_roam_pref_result (const char *buf, gsize len, GError **error)
+{
+    g_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_NV_WRITE, sizeof (DMCmdNVReadWrite), error))
+        return NULL;
+
+    return qcdm_result_new ();
+}
+
+/**********************************************************************/
+
 gsize
 qcdm_cmd_cm_subsys_state_info_new (char *buf, gsize len, GError **error)
 {
@@ -407,11 +522,20 @@ qcdm_cmd_cm_subsys_state_info_result (const char *buf, gsize len, GError **error
     QCDMResult *result = NULL;
     DMCmdSubsysCMStateInfoRsp *rsp = (DMCmdSubsysCMStateInfoRsp *) buf;
     guint32 tmp_num;
+    guint32 roam_pref;
 
     g_return_val_if_fail (buf != NULL, NULL);
 
     if (!check_command (buf, len, DIAG_CMD_SUBSYS, sizeof (DMCmdSubsysCMStateInfoRsp), error))
         return NULL;
+
+    roam_pref = (guint32) GUINT32_FROM_LE (rsp->roam_pref);
+    if (!roam_pref_validate (roam_pref)) {
+        g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_BAD_PARAMETER,
+                     "Unknown roam preference 0x%X",
+                     roam_pref);
+        return NULL;
+    }
 
     result = qcdm_result_new ();
 
@@ -430,8 +554,7 @@ qcdm_cmd_cm_subsys_state_info_result (const char *buf, gsize len, GError **error
     tmp_num = (guint32) GUINT32_FROM_LE (rsp->band_pref);
     qcdm_result_add_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_BAND_PREF, tmp_num);
 
-    tmp_num = (guint32) GUINT32_FROM_LE (rsp->roam_pref);
-    qcdm_result_add_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_ROAM_PREF, tmp_num);
+    qcdm_result_add_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_ROAM_PREF, roam_pref);
 
     tmp_num = (guint32) GUINT32_FROM_LE (rsp->srv_domain_pref);
     qcdm_result_add_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_SERVICE_DOMAIN_PREF, tmp_num);

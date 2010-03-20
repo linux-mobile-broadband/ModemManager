@@ -74,6 +74,7 @@ qcdm_command_error_get_type (void)
             ENUM_ENTRY (QCDM_COMMAND_BAD_PARAMETER, "QcdmCommandBadParameter"),
             ENUM_ENTRY (QCDM_COMMAND_NOT_ACCEPTED, "QcdmCommandNotAccepted"),
             ENUM_ENTRY (QCDM_COMMAND_BAD_MODE, "QcdmCommandBadMode"),
+            ENUM_ENTRY (QCDM_COMMAND_NVCMD_FAILED, "QcdmCommandNvCmdFailed"),
             { 0, 0, 0 }
         };
 

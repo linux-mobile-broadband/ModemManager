@@ -112,6 +112,37 @@ QCDMResult *qcdm_cmd_nv_get_mdn_result (const char *buf,
 
 /**********************************************************************/
 
+/* Values for QCDM_CMD_NV_GET_ROAM_PREF_ITEM_ROAM_PREF */
+enum {
+    QCDM_CMD_NV_ROAM_PREF_ITEM_ROAM_PREF_HOME_ONLY = 0x01,
+    QCDM_CMD_NV_ROAM_PREF_ITEM_ROAM_PREF_ROAM_ONLY = 0x06,
+    QCDM_CMD_NV_ROAM_PREF_ITEM_ROAM_PREF_AUTO = 0xFF,
+};
+
+#define QCDM_CMD_NV_GET_ROAM_PREF_ITEM_PROFILE   "profile"
+#define QCDM_CMD_NV_GET_ROAM_PREF_ITEM_ROAM_PREF "roam-pref"
+
+gsize       qcdm_cmd_nv_get_roam_pref_new    (char *buf,
+                                              gsize len,
+                                              guint8 profile,
+                                              GError **error);
+
+QCDMResult *qcdm_cmd_nv_get_roam_pref_result (const char *buf,
+                                              gsize len,
+                                              GError **error);
+
+gsize       qcdm_cmd_nv_set_roam_pref_new    (char *buf,
+                                              gsize len,
+                                              guint8 profile,
+                                              guint8 roam_pref,
+                                              GError **error);
+
+QCDMResult *qcdm_cmd_nv_set_roam_pref_result (const char *buf,
+                                              gsize len,
+                                              GError **error);
+
+/**********************************************************************/
+
 /* Values for QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_OPERATING_MODE */
 enum {
     QCDM_CMD_CM_SUBSYS_STATE_INFO_OPERATING_MODE_ONLINE = 5
@@ -124,6 +155,18 @@ enum {
     QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_CDMA = 2,
     QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_HDR = 4,
     QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_WCDMA = 5
+};
+
+/* Values for QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_ROAM_PREF */
+enum {
+    QCDM_CMD_CM_SUBSYS_STATE_INFO_ROAM_PREF_HOME_ONLY = 0x01,
+    QCDM_CMD_CM_SUBSYS_STATE_INFO_ROAM_PREF_ROAM_ONLY = 0x06,
+    QCDM_CMD_CM_SUBSYS_STATE_INFO_ROAM_PREF_AUTO = 0xFF,
+};
+
+/* Values for QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_MODE_PREF */
+enum {
+    QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_AUTO = 0x02,
 };
 
 #define QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_CALL_STATE             "call-state"
