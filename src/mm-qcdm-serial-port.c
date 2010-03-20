@@ -77,7 +77,7 @@ handle_response (MMSerialPort *port,
         success = dm_decapsulate_buffer ((const char *) response->data,
                                          response->len,
                                          (char *) unescaped->data,
-                                         sizeof (1024),
+                                         1024,
                                          &unescaped->len,
                                          &used,
                                          &more);
