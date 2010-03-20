@@ -370,18 +370,18 @@ test_com_read_roam_pref (void *f, void *data)
 
     switch (pref) {
     case QCDM_CMD_NV_ROAM_PREF_ITEM_ROAM_PREF_HOME_ONLY:
-        msg = "Home only";
+        msg = "home only";
         break;
     case QCDM_CMD_NV_ROAM_PREF_ITEM_ROAM_PREF_ROAM_ONLY:
-        msg = "Roaming only";
+        msg = "roaming only";
         break;
     case QCDM_CMD_NV_ROAM_PREF_ITEM_ROAM_PREF_AUTO:
-        msg = "Automatic";
+        msg = "automatic";
         break;
     default:
         g_assert_not_reached ();
     }
-    g_message ("%s: Roam preference: %s", __func__, msg);
+    g_message ("%s: Roam preference: 0x%02X (%s)", __func__, pref, msg);
 
     qcdm_result_unref (result);
 }
@@ -426,12 +426,12 @@ test_com_read_mode_pref (void *f, void *data)
         msg = "HDR only";
         break;
     case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_AUTO:
-        msg = "Automatic";
+        msg = "automatic";
         break;
     default:
         g_assert_not_reached ();
     }
-    g_message ("%s: Mode preference: %s", __func__, msg);
+    g_message ("%s: Mode preference: 0x%02X (%s)", __func__, pref, msg);
 
     qcdm_result_unref (result);
 }
@@ -621,18 +621,18 @@ test_com_cm_subsys_state_info (void *f, void *data)
     qcdm_result_get_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_MODE_PREF, &n32);
     switch (n32) {
     case QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_AUTO:
-        detail = "Automatic";
+        detail = "automatic";
         break;
     case QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_1X_ONLY:
         detail = "1X only";
         break;
     case QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_HDR_ONLY:
-        detail = "EVDO only";
+        detail = "HDR only";
         break;
     default:
         g_assert_not_reached ();
     }
-    g_message ("%s: Mode Preference: %s", __func__, detail);
+    g_message ("%s: Mode Preference: 0x%02X (%s)", __func__, n32 & 0xFF, detail);
 
     n32 = 0;
     qcdm_result_get_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_BAND_PREF, &n32);
@@ -642,18 +642,18 @@ test_com_cm_subsys_state_info (void *f, void *data)
     qcdm_result_get_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_ROAM_PREF, &n32);
     switch (n32) {
     case QCDM_CMD_CM_SUBSYS_STATE_INFO_ROAM_PREF_HOME_ONLY:
-        detail = "Home only";
+        detail = "home only";
         break;
     case QCDM_CMD_CM_SUBSYS_STATE_INFO_ROAM_PREF_ROAM_ONLY:
-        detail = "Roaming only";
+        detail = "roaming only";
         break;
     case QCDM_CMD_CM_SUBSYS_STATE_INFO_ROAM_PREF_AUTO:
-        detail = "Automatic";
+        detail = "automatic";
         break;
     default:
         g_assert_not_reached ();
     }
-    g_message ("%s: Roam Preference: %s", __func__, detail);
+    g_message ("%s: Roam Preference: 0x%02X (%s)", __func__, n32 & 0xFF, detail);
 
     n32 = 0;
     qcdm_result_get_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_SERVICE_DOMAIN_PREF, &n32);
