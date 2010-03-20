@@ -74,9 +74,10 @@ struct _MMSerialPortClass {
                                    GError **error);
 
     /* Called after parsing to allow the command response to be delivered to
-     * it's callback to be handled.
+     * it's callback to be handled.  Returns the # of bytes of the response
+     * consumed.
      */
-    void     (*handle_response)   (MMSerialPort *self,
+    gsize     (*handle_response)  (MMSerialPort *self,
                                    GByteArray *response,
                                    GError *error,
                                    GCallback callback,

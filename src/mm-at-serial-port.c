@@ -85,7 +85,7 @@ parse_response (MMSerialPort *port, GByteArray *response, GError **error)
     return found;
 }
 
-static void
+static gsize
 handle_response (MMSerialPort *port,
                  GByteArray *response,
                  GError *error,
@@ -101,6 +101,8 @@ handle_response (MMSerialPort *port,
     g_string_append_len (string, (const char *) response->data, response->len);
     response_callback (self, string, error, callback_data);
     g_string_free (string, TRUE);
+
+    return response->len;
 }
 
 /*****************************************************************************/

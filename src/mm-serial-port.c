@@ -492,7 +492,7 @@ mm_serial_port_schedule_queue_process (MMSerialPort *self)
     g_source_unref (source);
 }
 
-static void
+static gsize
 real_handle_response (MMSerialPort *self,
                       GByteArray *response,
                       GError *error,
@@ -502,6 +502,7 @@ real_handle_response (MMSerialPort *self,
     MMSerialResponseFn response_callback = (MMSerialResponseFn) callback;
 
     response_callback (self, response, error, callback_data);
+    return response->len;
 }
 
 static void
@@ -509,6 +510,7 @@ mm_serial_port_got_response (MMSerialPort *self, GError *error)
 {
     MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (self);
     MMQueueData *info;
+    gsize consumed = priv->response->len;
 
     if (priv->timeout_id) {
         g_source_remove (priv->timeout_id);
@@ -522,11 +524,11 @@ mm_serial_port_got_response (MMSerialPort *self, GError *error)
 
         if (info->callback) {
             g_warn_if_fail (MM_SERIAL_PORT_GET_CLASS (self)->handle_response != NULL);
-            MM_SERIAL_PORT_GET_CLASS (self)->handle_response (self,
-                                                              priv->response,
-                                                              error,
-                                                              info->callback,
-                                                              info->user_data);
+            consumed = MM_SERIAL_PORT_GET_CLASS (self)->handle_response (self,
+                                                                         priv->response,
+                                                                         error,
+                                                                         info->callback,
+                                                                         info->user_data);
         }
 
         g_byte_array_free (info->command, TRUE);
@@ -536,8 +538,8 @@ mm_serial_port_got_response (MMSerialPort *self, GError *error)
     if (error)
         g_error_free (error);
 
-    if (priv->response->len)
-        g_byte_array_remove_range (priv->response, 0, priv->response->len);
+    if (consumed)
+        g_byte_array_remove_range (priv->response, 0, consumed);
     if (!g_queue_is_empty (priv->queue))
         mm_serial_port_schedule_queue_process (self);
 }

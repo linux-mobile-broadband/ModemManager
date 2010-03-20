@@ -53,7 +53,7 @@ parse_response (MMSerialPort *port, GByteArray *response, GError **error)
     return FALSE;
 }
 
-static void
+static gsize
 handle_response (MMSerialPort *port,
                  GByteArray *response,
                  GError *error,
@@ -62,18 +62,34 @@ handle_response (MMSerialPort *port,
 {
     MMQcdmSerialResponseFn response_callback = (MMQcdmSerialResponseFn) callback;
     GByteArray *unescaped = NULL;
-    gboolean escaping = FALSE;
     GError *dm_error = NULL;
+    gsize used = 0;
+
+    /* Ignore empty frames */
+    if (!response->len > 0 && response->data[0] == 0x7E)
+        return 1;
 
     if (!error) {
-        unescaped = g_byte_array_sized_new (response->len);
-        unescaped->len = dm_unescape ((const char *) response->data, response->len,
-                                      (char *) unescaped->data, unescaped->len,
-                                      &escaping);
-        if (unescaped->len == 0) {
+        gboolean more = FALSE, success;
+
+        /* FIXME: don't munge around with byte array internals */
+        unescaped = g_byte_array_sized_new (1024);
+        success = dm_decapsulate_buffer ((const char *) response->data,
+                                         response->len,
+                                         (char *) unescaped->data,
+                                         sizeof (1024),
+                                         &unescaped->len,
+                                         &used,
+                                         &more);
+        if (!success) {
             g_set_error_literal (&dm_error, 0, 0, "Failed to unescape QCDM packet.");
             g_byte_array_free (unescaped, TRUE);
             unescaped = NULL;
+        } else if (more) {
+            /* Need more data; we shouldn't have gotten here since the parse
+             * function checks for the end-of-frame marker, but whatever.
+             */
+            return 0;
         }
     }
 
@@ -84,6 +100,8 @@ handle_response (MMSerialPort *port,
 
     if (unescaped)
         g_byte_array_free (unescaped, TRUE);
+
+    return used;
 }
 
 /*****************************************************************************/
