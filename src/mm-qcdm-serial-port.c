@@ -71,6 +71,7 @@ handle_response (MMSerialPort *port,
 
     if (!error) {
         gboolean more = FALSE, success;
+        gsize unescaped_len = 0;
 
         /* FIXME: don't munge around with byte array internals */
         unescaped = g_byte_array_sized_new (1024);
@@ -78,7 +79,7 @@ handle_response (MMSerialPort *port,
                                          response->len,
                                          (char *) unescaped->data,
                                          1024,
-                                         &unescaped->len,
+                                         &unescaped_len,
                                          &used,
                                          &more);
         if (!success) {
@@ -90,6 +91,9 @@ handle_response (MMSerialPort *port,
              * function checks for the end-of-frame marker, but whatever.
              */
             return 0;
+        } else {
+            /* Successfully decapsulated the DM command */
+            unescaped->len = (guint) unescaped_len;
         }
     }
 
