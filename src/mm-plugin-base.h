@@ -37,6 +37,7 @@
 #define MM_PLUGIN_BASE_PORT_CAP_W           0x0080 /* Wireless commands */
 #define MM_PLUGIN_BASE_PORT_CAP_IS856       0x0100 /* CDMA 3G EVDO rev 0 */
 #define MM_PLUGIN_BASE_PORT_CAP_IS856_A     0x0200 /* CDMA 3G EVDO rev A */
+#define MM_PLUGIN_BASE_PORT_CAP_QCDM        0x0400 /* QCDM-capable port */
 
 #define MM_TYPE_PLUGIN_BASE_SUPPORTS_TASK            (mm_plugin_base_supports_task_get_type ())
 #define MM_PLUGIN_BASE_SUPPORTS_TASK(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_BASE_SUPPORTS_TASK, MMPluginBaseSupportsTask))

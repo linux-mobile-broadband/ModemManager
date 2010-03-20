@@ -27,9 +27,12 @@
 
 #include "mm-plugin-base.h"
 #include "mm-at-serial-port.h"
+#include "mm-qcdm-serial-port.h"
 #include "mm-serial-parsers.h"
 #include "mm-errors.h"
 #include "mm-marshal.h"
+#include "libqcdm/src/commands.h"
+#include "libqcdm/src/utils.h"
 
 static void plugin_init (MMPlugin *plugin_class);
 
@@ -96,6 +99,7 @@ typedef struct {
     guint full_id;
 
     MMAtSerialPort *probe_port;
+    MMQcdmSerialPort *qcdm_port;
     guint32 probed_caps;
     ProbeState probe_state;
     guint probe_id;
@@ -247,8 +251,8 @@ supports_task_dispose (GObject *object)
 {
     MMPluginBaseSupportsTaskPrivate *priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (object);
 
-    if (MM_IS_SERIAL_PORT (priv->port))
-        mm_serial_port_flash_cancel (MM_SERIAL_PORT (priv->port));
+    if (MM_IS_SERIAL_PORT (priv->probe_port))
+        mm_serial_port_flash_cancel (MM_SERIAL_PORT (priv->probe_port));
 
     g_object_unref (priv->port);
     g_object_unref (priv->physdev);
@@ -267,6 +271,10 @@ supports_task_dispose (GObject *object)
     if (priv->probe_port) {
         mm_serial_port_close (MM_SERIAL_PORT (priv->probe_port));
         g_object_unref (priv->probe_port);
+    }
+    if (priv->qcdm_port) {
+        mm_serial_port_close (MM_SERIAL_PORT (priv->qcdm_port));
+        g_object_unref (priv->qcdm_port);
     }
 
     G_OBJECT_CLASS (mm_plugin_base_supports_task_parent_class)->dispose (object);
@@ -411,9 +419,15 @@ emit_probe_result (gpointer user_data)
     MMPluginBaseSupportsTaskPrivate *task_priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
     MMPlugin *self = mm_plugin_base_supports_task_get_plugin (task);
 
-    /* Close the serial port */
-    g_object_unref (task_priv->probe_port);
-    task_priv->probe_port = NULL;
+    /* Close the serial ports */
+    if (task_priv->probe_port) {
+        g_object_unref (task_priv->probe_port);
+        task_priv->probe_port = NULL;
+    }
+    if (task_priv->qcdm_port) {
+        g_object_unref (task_priv->qcdm_port);
+        task_priv->qcdm_port = NULL;
+    }
 
     task_priv->probe_id = 0;
     g_signal_emit (self, signals[PROBE_RESULT], 0, task, task_priv->probed_caps);
@@ -423,13 +437,118 @@ emit_probe_result (gpointer user_data)
 static void
 probe_complete (MMPluginBaseSupportsTask *task)
 {
-    MMPluginBaseSupportsTaskPrivate *task_priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
+    MMPluginBaseSupportsTaskPrivate *priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
+    MMPort *port;
 
+    port = priv->probe_port ? MM_PORT (priv->probe_port) : MM_PORT (priv->qcdm_port);
+    g_assert (port);
     g_hash_table_insert (cached_caps,
-                         g_strdup (mm_port_get_device (MM_PORT (task_priv->probe_port))),
-                         GUINT_TO_POINTER (task_priv->probed_caps));
+                         g_strdup (mm_port_get_device (port)),
+                         GUINT_TO_POINTER (priv->probed_caps));
 
-    task_priv->probe_id = g_idle_add (emit_probe_result, task);
+    priv->probe_id = g_idle_add (emit_probe_result, task);
+}
+
+static void
+qcdm_verinfo_cb (MMQcdmSerialPort *port,
+                 GByteArray *response,
+                 GError *error,
+                 gpointer user_data)
+{
+    MMPluginBaseSupportsTask *task;
+    MMPluginBaseSupportsTaskPrivate *priv;
+    QCDMResult *result;
+    GError *dm_error = NULL;
+
+    /* Just the initial poke; ignore it */
+    if (!user_data)
+        return;
+
+    task = MM_PLUGIN_BASE_SUPPORTS_TASK (user_data);
+    priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
+
+    if (error) {
+        /* Probably not a QCDM port */
+        goto done;
+    }
+
+    /* Parse the response */
+    result = qcdm_cmd_version_info_result ((const char *) response, response->len, &dm_error);
+    if (!result) {
+        g_warning ("(%s) failed to parse QCDM version info command result: (%d) %s.",
+                   g_udev_device_get_name (priv->port),
+                   dm_error ? dm_error->code : -1,
+                   dm_error && dm_error->message ? dm_error->message : "(unknown)");
+        g_clear_error (&dm_error);
+        goto done;
+    }
+
+    /* yay, probably a QCDM port */
+    qcdm_result_unref (result);
+    priv->probed_caps |= MM_PLUGIN_BASE_PORT_CAP_QCDM;
+
+done:
+    probe_complete (task);
+}
+
+static void
+try_qcdm_probe (MMPluginBaseSupportsTask *task)
+{
+    MMPluginBaseSupportsTaskPrivate *priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
+    const char *name;
+    GError *error = NULL;
+    GByteArray *verinfo = NULL, *verinfo2;
+    gint len;
+
+    /* Close the AT port */
+    if (priv->probe_port) {
+        mm_serial_port_close (MM_SERIAL_PORT (priv->probe_port));
+        g_object_unref (priv->probe_port);
+        priv->probe_port = NULL;
+    }
+
+    /* Open the QCDM port */
+    name = g_udev_device_get_name (priv->port);
+    g_assert (name);
+    priv->qcdm_port = mm_qcdm_serial_port_new (name, MM_PORT_TYPE_PRIMARY);
+    if (priv->qcdm_port == NULL) {
+        g_warning ("(%s) failed to create new QCDM serial port.", name);
+        probe_complete (task);
+        return;
+    }
+
+    if (!mm_serial_port_open (MM_SERIAL_PORT (priv->qcdm_port), &error)) {
+        g_warning ("(%s) failed to open new QCDM serial port: (%d) %s.",
+                   name,
+                   error ? error->code : -1,
+                   error && error->message ? error->message : "(unknown)");
+        g_clear_error (&error);
+        probe_complete (task);
+        return;
+    }
+
+    /* Build up the probe command */
+    verinfo = g_byte_array_sized_new (50);
+    len = qcdm_cmd_version_info_new ((char *) verinfo->data, 50, &error);
+    if (len <= 0) {
+        g_byte_array_free (verinfo, TRUE);
+        g_warning ("(%s) failed to create QCDM version info command: (%d) %s.",
+                   name,
+                   error ? error->code : -1,
+                   error && error->message ? error->message : "(unknown)");
+        g_clear_error (&error);
+        probe_complete (task);
+        return;
+    }
+    verinfo->len = len;
+
+    /* Queuing the command takes ownership over it; copy it for the second try */
+    verinfo2 = g_byte_array_sized_new (verinfo->len);
+    g_byte_array_append (verinfo2, verinfo->data, verinfo->len);
+
+    /* Send the command twice; the ports often need to be woken up */
+    mm_qcdm_serial_port_queue_command (priv->qcdm_port, verinfo, 3, qcdm_verinfo_cb, NULL);
+    mm_qcdm_serial_port_queue_command (priv->qcdm_port, verinfo2, 3, qcdm_verinfo_cb, task);
 }
 
 static void
@@ -463,9 +582,9 @@ real_handle_probe_response (MMPluginBase *self,
                 mm_at_serial_port_queue_command (port, "+GCAP", 3, parse_response, task);
             } else {
                /* Otherwise, if all the GCAP tries timed out, ignore the port
-                * as it's probably not an AT-capable port.
+                * as it's probably not an AT-capable port.  Try QCDM.
                 */
-               probe_complete (task);
+               try_qcdm_probe (task);
             }
             return;
         }
