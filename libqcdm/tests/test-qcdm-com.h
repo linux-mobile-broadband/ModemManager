@@ -31,6 +31,8 @@ void test_com_mdn (void *f, void *data);
 
 void test_com_read_roam_pref (void *f, void *data);
 
+void test_com_read_mode_pref (void *f, void *data);
+
 void test_com_status (void *f, void *data);
 
 void test_com_sw_version (void *f, void *data);

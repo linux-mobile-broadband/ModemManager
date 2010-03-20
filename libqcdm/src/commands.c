@@ -499,6 +499,108 @@ qcdm_cmd_nv_set_roam_pref_result (const char *buf, gsize len, GError **error)
 
 /**********************************************************************/
 
+static gboolean
+mode_pref_validate (guint8 dm)
+{
+    if (   dm == DIAG_NV_MODE_PREF_1X_ONLY
+        || dm == DIAG_NV_MODE_PREF_HDR_ONLY
+        || dm == DIAG_NV_MODE_PREF_AUTO)
+        return TRUE;
+    return FALSE;
+}
+
+gsize
+qcdm_cmd_nv_get_mode_pref_new (char *buf, gsize len, guint8 profile, GError **error)
+{
+    char cmdbuf[sizeof (DMCmdNVReadWrite) + 2];
+    DMCmdNVReadWrite *cmd = (DMCmdNVReadWrite *) &cmdbuf[0];
+    DMNVItemModePref *req;
+
+    g_return_val_if_fail (buf != NULL, 0);
+    g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->code = DIAG_CMD_NV_READ;
+    cmd->nv_item = GUINT16_TO_LE (DIAG_NV_MODE_PREF);
+
+    req = (DMNVItemModePref *) &cmd->data[0];
+    req->profile = profile;
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QCDMResult *
+qcdm_cmd_nv_get_mode_pref_result (const char *buf, gsize len, GError **error)
+{
+    QCDMResult *result = NULL;
+    DMCmdNVReadWrite *rsp = (DMCmdNVReadWrite *) buf;
+    DMNVItemModePref *mode;
+
+    g_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_NV_READ, sizeof (DMCmdNVReadWrite), error))
+        return NULL;
+
+    mode = (DMNVItemModePref *) &rsp->data[0];
+
+    if (!mode_pref_validate (mode->mode_pref)) {
+        g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_BAD_PARAMETER,
+                     "Unknown mode preference 0x%X",
+                     mode->mode_pref);
+        return NULL;
+    }
+
+    result = qcdm_result_new ();
+    qcdm_result_add_uint8 (result, QCDM_CMD_NV_GET_MODE_PREF_ITEM_PROFILE, mode->profile);
+    qcdm_result_add_uint8 (result, QCDM_CMD_NV_GET_MODE_PREF_ITEM_MODE_PREF, mode->mode_pref);
+
+    return result;
+}
+
+gsize
+qcdm_cmd_nv_set_mode_pref_new (char *buf,
+                               gsize len,
+                               guint8 profile,
+                               guint8 mode_pref,
+                               GError **error)
+{
+    char cmdbuf[sizeof (DMCmdNVReadWrite) + 2];
+    DMCmdNVReadWrite *cmd = (DMCmdNVReadWrite *) &cmdbuf[0];
+    DMNVItemModePref *req;
+
+    g_return_val_if_fail (buf != NULL, 0);
+    g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    if (!mode_pref_validate (mode_pref)) {
+        g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_BAD_PARAMETER,
+                     "Invalid mode preference %d", mode_pref);
+        return 0;
+    }
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->code = DIAG_CMD_NV_WRITE;
+    cmd->nv_item = GUINT16_TO_LE (DIAG_NV_MODE_PREF);
+
+    req = (DMNVItemModePref *) &cmd->data[0];
+    req->profile = profile;
+    req->mode_pref = mode_pref;
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QCDMResult *
+qcdm_cmd_nv_set_mode_pref_result (const char *buf, gsize len, GError **error)
+{
+    g_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_NV_WRITE, sizeof (DMCmdNVReadWrite), error))
+        return NULL;
+
+    return qcdm_result_new ();
+}
+
+/**********************************************************************/
+
 gsize
 qcdm_cmd_cm_subsys_state_info_new (char *buf, gsize len, GError **error)
 {

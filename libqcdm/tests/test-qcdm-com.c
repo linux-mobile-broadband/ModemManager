@@ -387,6 +387,56 @@ test_com_read_roam_pref (void *f, void *data)
 }
 
 void
+test_com_read_mode_pref (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    GError *error = NULL;
+    char buf[512];
+    guint8 pref;
+    const char *msg;
+    gint len;
+    QCDMResult *result;
+    gsize reply_len;
+
+    len = qcdm_cmd_nv_get_mode_pref_new (buf, sizeof (buf), 0, NULL);
+    g_assert (len > 0);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_nv_get_mode_pref_result (buf, reply_len, &error);
+    g_assert (result);
+
+    g_print ("\n");
+
+    success = qcdm_result_get_uint8 (result, QCDM_CMD_NV_GET_MODE_PREF_ITEM_MODE_PREF, &pref);
+    g_assert (success);
+
+    switch (pref) {
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_1X_ONLY:
+        msg = "1X only";
+        break;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_HDR_ONLY:
+        msg = "HDR only";
+        break;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_AUTO:
+        msg = "Automatic";
+        break;
+    default:
+        g_assert_not_reached ();
+    }
+    g_message ("%s: Mode preference: %s", __func__, msg);
+
+    qcdm_result_unref (result);
+}
+
+void
 test_com_status (void *f, void *data)
 {
     TestComData *d = data;
@@ -572,6 +622,12 @@ test_com_cm_subsys_state_info (void *f, void *data)
     switch (n32) {
     case QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_AUTO:
         detail = "Automatic";
+        break;
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_1X_ONLY:
+        detail = "1X only";
+        break;
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_HDR_ONLY:
+        detail = "EVDO only";
         break;
     default:
         g_assert_not_reached ();

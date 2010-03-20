@@ -35,7 +35,6 @@ enum {
 /* DIAG_NV_MODE_PREF */
 struct DMNVItemModePref {
     guint8 profile;
-    guint8 _unknown1;
     guint8 mode_pref;
 } __attribute__ ((packed));
 typedef struct DMNVItemModePref DMNVItemModePref;

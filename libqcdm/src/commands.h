@@ -143,6 +143,37 @@ QCDMResult *qcdm_cmd_nv_set_roam_pref_result (const char *buf,
 
 /**********************************************************************/
 
+/* Values for QCDM_CMD_NV_GET_MODE_PREF_ITEM_MODE_PREF */
+enum {
+    QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_AUTO = 0x04,
+    QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_1X_ONLY = 0x09,
+    QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_HDR_ONLY = 0x0A,
+};
+
+#define QCDM_CMD_NV_GET_MODE_PREF_ITEM_PROFILE   "profile"
+#define QCDM_CMD_NV_GET_MODE_PREF_ITEM_MODE_PREF "mode-pref"
+
+gsize       qcdm_cmd_nv_get_mode_pref_new    (char *buf,
+                                              gsize len,
+                                              guint8 profile,
+                                              GError **error);
+
+QCDMResult *qcdm_cmd_nv_get_mode_pref_result (const char *buf,
+                                              gsize len,
+                                              GError **error);
+
+gsize       qcdm_cmd_nv_set_mode_pref_new    (char *buf,
+                                              gsize len,
+                                              guint8 profile,
+                                              guint8 mode_pref,
+                                              GError **error);
+
+QCDMResult *qcdm_cmd_nv_set_mode_pref_result (const char *buf,
+                                              gsize len,
+                                              GError **error);
+
+/**********************************************************************/
+
 /* Values for QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_OPERATING_MODE */
 enum {
     QCDM_CMD_CM_SUBSYS_STATE_INFO_OPERATING_MODE_ONLINE = 5
@@ -167,6 +198,8 @@ enum {
 /* Values for QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_MODE_PREF */
 enum {
     QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_AUTO = 0x02,
+    QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_1X_ONLY = 0x09,
+    QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_HDR_ONLY = 0x0A,
 };
 
 #define QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_CALL_STATE             "call-state"
