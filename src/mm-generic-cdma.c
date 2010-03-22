@@ -61,6 +61,8 @@ typedef struct {
     gboolean evdo_rev0;
     gboolean evdo_revA;
     gboolean reg_try_css;
+    gboolean has_spservice;
+    gboolean has_speri;
 
     MMModemCdmaRegistrationState cdma_1x_reg_state;
     MMModemCdmaRegistrationState evdo_reg_state;
@@ -384,6 +386,26 @@ get_enable_info_done (MMModem *modem,
 }
 
 static void
+spservice_done (MMAtSerialPort *port,
+                GString *response,
+                GError *error,
+                gpointer user_data)
+{
+    if (!error)
+        MM_GENERIC_CDMA_GET_PRIVATE (user_data)->has_spservice = TRUE;
+}
+
+static void
+speri_done (MMAtSerialPort *port,
+            GString *response,
+            GError *error,
+            gpointer user_data)
+{
+    if (!error)
+        MM_GENERIC_CDMA_GET_PRIVATE (user_data)->has_speri = TRUE;
+}
+
+static void
 enable_all_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
@@ -408,6 +430,10 @@ enable_all_done (MMModem *modem, GError *error, gpointer user_data)
 
         /* Grab device info right away */
         mm_modem_get_info (modem, get_enable_info_done, NULL);
+
+        /* Check for support of Sprint-specific phone commands */
+        mm_at_serial_port_queue_command (priv->primary, "+SPSERVICE?", 3, spservice_done, self);
+        mm_at_serial_port_queue_command (priv->primary, "$SPERI?", 3, speri_done, self);
     }
 
 out:

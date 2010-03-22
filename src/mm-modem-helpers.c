@@ -432,6 +432,43 @@ mm_gsm_parse_creg_response (GMatchInfo *info,
 
 /*************************************************************************/
 
+gboolean
+mm_cdma_parse_spservice_response (const char *reply,
+                                  MMModemCdmaRegistrationState *out_cdma_1x_state,
+                                  MMModemCdmaRegistrationState *out_evdo_state)
+{
+    const char *p;
+
+    g_return_val_if_fail (reply != NULL, FALSE);
+    g_return_val_if_fail (out_cdma_1x_state != NULL, FALSE);
+    g_return_val_if_fail (out_evdo_state != NULL, FALSE);
+
+    p = mm_strip_tag (reply, "+SPSERVICE:");
+    if (!isdigit (*p))
+        return FALSE;
+
+    switch (atoi (p)) {
+    case 0:   /* no service */
+        *out_cdma_1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+        *out_evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+        break;
+    case 1:   /* 1xRTT */
+        *out_cdma_1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
+        *out_evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+        break;
+    case 2:   /* EVDO rev 0 */
+    case 3:   /* EVDO rev A */
+        *out_cdma_1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+        *out_evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
+        break;
+    default:
+        return FALSE;
+    }
+    return TRUE;
+}
+
+/*************************************************************************/
+
 const char *
 mm_strip_tag (const char *str, const char *cmd)
 {

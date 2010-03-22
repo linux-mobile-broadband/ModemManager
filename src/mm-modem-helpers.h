@@ -17,6 +17,8 @@
 #ifndef MM_MODEM_HELPERS_H
 #define MM_MODEM_HELPERS_H
 
+#include "mm-modem-cdma.h"
+
 #define MM_SCAN_TAG_STATUS "status"
 #define MM_SCAN_TAG_OPER_LONG "operator-long"
 #define MM_SCAN_TAG_OPER_SHORT "operator-short"
@@ -40,6 +42,10 @@ gboolean mm_gsm_parse_creg_response (GMatchInfo *info,
                                      GError **error);
 
 const char *mm_strip_tag (const char *str, const char *cmd);
+
+gboolean mm_cdma_parse_spservice_response (const char *reply,
+                                           MMModemCdmaRegistrationState *out_cdma_1x_state,
+                                           MMModemCdmaRegistrationState *out_evdo_state);
 
 #endif  /* MM_MODEM_HELPERS_H */
 
