@@ -406,31 +406,53 @@ disable_done (MMModem *modem,
 }
 
 static void
+unsolicited_disable_done (MMModem *modem,
+                          GError *error,
+                          gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+
+    /* Handle modem removal, but ignore other errors */
+    if (g_error_matches (error, MM_MODEM_ERROR, MM_MODEM_ERROR_REMOVED))
+        info->error = g_error_copy (error);
+    else if (!modem) {
+        info->error =  g_error_new_literal (MM_MODEM_ERROR,
+                                            MM_MODEM_ERROR_REMOVED,
+                                            "The modem was removed.");
+    }
+
+    if (info->error) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* Otherwise, kill any existing connection */
+    if (mm_generic_gsm_get_cid (MM_GENERIC_GSM (modem)) >= 0)
+        hso_call_control (MM_MODEM_HSO (modem), FALSE, TRUE, disable_done, info);
+    else
+        disable_done (modem, NULL, info);
+}
+
+static void
 disable (MMModem *modem,
          MMModemFn callback,
          gpointer user_data)
 {
     MMModemHso *self = MM_MODEM_HSO (modem);
     MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (self);
-    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
     MMCallbackInfo *info;
 
-    mm_generic_gsm_pending_registration_stop (gsm);
+    mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
 
     g_free (priv->username);
     priv->username = NULL;
     g_free (priv->password);
     priv->password = NULL;
 
-    option_change_unsolicited_messages (gsm, FALSE);
-
     info = mm_callback_info_new (modem, callback, user_data);
 
-    /* Kill any existing connection */
-    if (mm_generic_gsm_get_cid (gsm) >= 0)
-        hso_call_control (MM_MODEM_HSO (modem), FALSE, TRUE, disable_done, info);
-    else
-        disable_done (modem, NULL, info);
+    /* Turn off unsolicited messages so they don't pile up in the modem */
+    option_change_unsolicited_messages (MM_GENERIC_GSM (modem), FALSE, unsolicited_disable_done, info);
 }
 
 /*****************************************************************************/
@@ -567,7 +589,7 @@ real_do_enable_power_up_done (MMGenericGsm *gsm,
 {
     /* Enable Option unsolicited messages */
     if (gsm && !error)
-        option_change_unsolicited_messages (gsm, TRUE);
+        option_change_unsolicited_messages (gsm, TRUE, NULL, NULL);
 
     /* Chain up to parent */
     MM_GENERIC_GSM_CLASS (mm_modem_hso_parent_class)->do_enable_power_up_done (gsm, response, error, info);

@@ -66,7 +66,7 @@ option_enabled (gpointer user_data)
         priv = MM_MODEM_OPTION_GET_PRIVATE (modem);
         priv->enable_wait_id = 0;
 
-        option_change_unsolicited_messages (modem, TRUE);
+        option_change_unsolicited_messages (modem, TRUE, NULL, NULL);
 
         MM_GENERIC_GSM_CLASS (mm_modem_option_parent_class)->do_enable_power_up_done (modem, NULL, NULL, info);
     }
@@ -116,17 +116,55 @@ set_allowed_mode (MMGenericGsm *gsm,
 /*****************************************************************************/
 
 static void
+parent_disable_done (MMModem *modem, GError *error, gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error)
+        info->error = g_error_copy (error);
+    mm_callback_info_schedule (info);
+}
+
+static void
+unsolicited_disable_done (MMModem *modem,
+                          GError *error,
+                          gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMModem *parent_modem_iface;
+    GError *tmp_error = NULL;
+
+    /* Handle modem removal, but ignore other errors */
+    if (g_error_matches (error, MM_MODEM_ERROR, MM_MODEM_ERROR_REMOVED)) {
+        parent_disable_done (modem, error, user_data);
+        return;
+    } else if (!modem) {
+        tmp_error =  g_error_new_literal (MM_MODEM_ERROR,
+                                          MM_MODEM_ERROR_REMOVED,
+                                          "The modem was removed.");
+        parent_disable_done (modem, tmp_error, user_data);
+        g_error_free (tmp_error);
+        return;
+    }
+
+    /* Chain up to parent */
+    parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (modem));
+    parent_modem_iface->disable (info->modem, parent_disable_done, info);
+}
+
+static void
 disable (MMModem *modem,
          MMModemFn callback,
          gpointer user_data)
 {
-    MMModem *parent_modem_iface;
+    MMCallbackInfo *info;
 
-    option_change_unsolicited_messages (MM_GENERIC_GSM (modem), FALSE);
+    mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
 
-    /* Chain up to parent */
-    parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (modem));
-    parent_modem_iface->disable (modem, callback, user_data);
+    info = mm_callback_info_new (modem, callback, user_data);
+
+    /* Turn off unsolicited messages so they don't pile up in the modem */
+    option_change_unsolicited_messages (MM_GENERIC_GSM (modem), FALSE, unsolicited_disable_done, info);
 }
 
 static gboolean

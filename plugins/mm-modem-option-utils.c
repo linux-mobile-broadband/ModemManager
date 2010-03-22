@@ -333,16 +333,37 @@ option_register_unsolicted_handlers (MMGenericGsm *modem, MMAtSerialPort *port)
 }
 
 static void
-option_change_unsolicited_messages (MMGenericGsm *modem, gboolean enabled)
+unsolicited_msg_done (MMAtSerialPort *port,
+                      GString *response,
+                      GError *error,
+                      gpointer user_data)
 {
+    MMCallbackInfo *info = user_data;
+
+    if (info)
+        mm_callback_info_chain_complete_one (info);
+}
+
+static void
+option_change_unsolicited_messages (MMGenericGsm *modem,
+                                    gboolean enabled,
+                                    MMModemFn callback,
+                                    gpointer user_data)
+{
+    MMCallbackInfo *info = NULL;
     MMAtSerialPort *primary;
+
+    if (callback) {
+        info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+        mm_callback_info_chain_start (info, 4);
+    }
 
     primary = mm_generic_gsm_get_at_port (modem, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
 
-    mm_at_serial_port_queue_command (primary, enabled ? "_OSSYS=1" : "_OSSYS=0", 3, NULL, NULL);
-    mm_at_serial_port_queue_command (primary, enabled ? "_OCTI=1" : "_OCTI=0", 3, NULL, NULL);
-    mm_at_serial_port_queue_command (primary, enabled ? "_OUWCTI=1" : "_OUWCTI=0", 3, NULL, NULL);
-    mm_at_serial_port_queue_command (primary, enabled ? "_OSQI=1" : "_OSQI=0", 3, NULL, NULL);
+    mm_at_serial_port_queue_command (primary, enabled ? "_OSSYS=1" : "_OSSYS=0", 3, unsolicited_msg_done, info);
+    mm_at_serial_port_queue_command (primary, enabled ? "_OCTI=1" : "_OCTI=0", 3, unsolicited_msg_done, info);
+    mm_at_serial_port_queue_command (primary, enabled ? "_OUWCTI=1" : "_OUWCTI=0", 3, unsolicited_msg_done, info);
+    mm_at_serial_port_queue_command (primary, enabled ? "_OSQI=1" : "_OSQI=0", 3, unsolicited_msg_done, info);
 }
 
