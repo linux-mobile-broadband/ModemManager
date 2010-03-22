@@ -50,4 +50,8 @@ MMManager       *mm_manager_new         (DBusGConnection *bus);
 
 void             mm_manager_start       (MMManager *manager);
 
+void             mm_manager_shutdown    (MMManager *manager);
+
+guint32          mm_manager_num_modems  (MMManager *manager);
+
 #endif /* MM_MANAGER_H */

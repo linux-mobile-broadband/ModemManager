@@ -205,6 +205,16 @@ main (int argc, char *argv[])
 
     g_signal_handler_disconnect (proxy, id);
 
+    mm_manager_shutdown (manager);
+
+    /* Wait for all modems to be removed */
+    while (mm_manager_num_modems (manager)) {
+        GMainContext *ctx = g_main_loop_get_context (loop);
+
+        g_main_context_iteration (ctx, FALSE);
+        g_usleep (50);
+    }
+
     g_object_unref (manager);
     g_object_unref (proxy);
     dbus_g_connection_unref (bus);    

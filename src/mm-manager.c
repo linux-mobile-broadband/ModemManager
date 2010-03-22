@@ -647,6 +647,71 @@ mm_manager_start (MMManager *manager)
     g_list_free (devices);
 }
 
+typedef struct {
+    MMManager *manager;
+    MMModem *modem;
+} RemoveInfo;
+
+static gboolean
+remove_disable_one (gpointer user_data)
+{
+    RemoveInfo *info = user_data;
+
+    remove_modem (info->manager, info->modem);
+    g_free (info);
+    return FALSE;
+}
+
+static void
+remove_disable_done (MMModem *modem,
+                     GError *error,
+                     gpointer user_data)
+{
+    RemoveInfo *info;
+
+    /* Schedule modem removal from an idle handler since we get here deep
+     * in the modem removal callchain and can't remove it quite yet from here.
+     */
+    info = g_malloc0 (sizeof (RemoveInfo));
+    info->manager = MM_MANAGER (user_data);
+    info->modem = modem;
+    g_idle_add (remove_disable_one, info);
+}
+
+void
+mm_manager_shutdown (MMManager *self)
+{
+    GList *modems, *iter;
+
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_MANAGER (self));
+
+    modems = g_hash_table_get_values (MM_MANAGER_GET_PRIVATE (self)->modems);
+    for (iter = modems; iter; iter = g_list_next (iter)) {
+        MMModem *modem = MM_MODEM (iter->data);
+
+        if (mm_modem_get_state (modem) >= MM_MODEM_STATE_ENABLING)
+            mm_modem_disable (modem, remove_disable_done, self);
+        else
+            remove_disable_done (modem, NULL, self);
+    }
+    g_list_free (modems);
+
+    /* Disabling may take a few iterations of the mainloop, so the caller
+     * has to iterate the mainloop until all devices have been disabled and
+     * removed.
+     */
+}
+
+guint32
+mm_manager_num_modems (MMManager *self)
+{
+    g_return_val_if_fail (self != NULL, 0);
+    g_return_val_if_fail (MM_IS_MANAGER (self), 0);
+
+    return g_hash_table_size (MM_MANAGER_GET_PRIVATE (self)->modems);
+}
+
 static void
 mm_manager_init (MMManager *manager)
 {
