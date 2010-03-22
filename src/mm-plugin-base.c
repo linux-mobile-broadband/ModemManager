@@ -473,7 +473,7 @@ qcdm_verinfo_cb (MMQcdmSerialPort *port,
     }
 
     /* Parse the response */
-    result = qcdm_cmd_version_info_result ((const char *) response, response->len, &dm_error);
+    result = qcdm_cmd_version_info_result ((const char *) response->data, response->len, &dm_error);
     if (!result) {
         g_warning ("(%s) failed to parse QCDM version info command result: (%d) %s.",
                    g_udev_device_get_name (priv->port),
