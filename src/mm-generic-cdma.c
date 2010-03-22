@@ -391,8 +391,14 @@ spservice_done (MMAtSerialPort *port,
                 GError *error,
                 gpointer user_data)
 {
-    if (!error)
+    if (!error) {
         MM_GENERIC_CDMA_GET_PRIVATE (user_data)->has_spservice = TRUE;
+
+        /* +SPSERVICE provides a better indicator of registration status than
+         * +CSS, which some devices implement inconsistently.
+         */
+        MM_GENERIC_CDMA_GET_PRIVATE (user_data)->reg_try_css = FALSE;
+    }
 }
 
 static void
@@ -1165,22 +1171,26 @@ static void
 set_callback_1x_state_helper (MMCallbackInfo *info,
                               MMModemCdmaRegistrationState new_state)
 {
-    MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
-    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
+    if (info->modem) {
+        MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
+        MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
 
-    mm_generic_cdma_set_1x_registration_state (self, new_state);
-    mm_generic_cdma_query_reg_state_set_callback_1x_state (info, priv->cdma_1x_reg_state);
+        mm_generic_cdma_set_1x_registration_state (self, new_state);
+        mm_generic_cdma_query_reg_state_set_callback_1x_state (info, priv->cdma_1x_reg_state);
+    }
 }
 
 static void
 set_callback_evdo_state_helper (MMCallbackInfo *info,
                                 MMModemCdmaRegistrationState new_state)
 {
-    MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
-    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
+    if (info->modem) {
+        MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
+        MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
 
-    mm_generic_cdma_set_evdo_registration_state (self, new_state);
-    mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, priv->evdo_reg_state);
+        mm_generic_cdma_set_evdo_registration_state (self, new_state);
+        mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, priv->evdo_reg_state);
+    }
 }
 
 static void
@@ -1203,22 +1213,87 @@ reg_state_query_done (MMModemCdma *cdma,
 }
 
 static void
-query_subclass_registration_state (MMGenericCdma *self, MMCallbackInfo *info)
+reg_query_speri_done (MMAtSerialPort *port,
+                      GString *response,
+                      GError *error,
+                      gpointer user_data)
 {
-    /* Let subclasses figure out roaming and detailed registration state */
-    if (MM_GENERIC_CDMA_GET_CLASS (self)->query_registration_state) {
-        MM_GENERIC_CDMA_GET_CLASS (self)->query_registration_state (self,
-                                                                    reg_state_query_done,
-                                                                    info);
+    MMCallbackInfo *info = user_data;
+    MMModemCdmaRegistrationState cdma_state;
+    MMModemCdmaRegistrationState evdo_state;
+
+    cdma_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "tmp-cdma-state"));
+    evdo_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "tmp-evdo-state"));
+
+    if (!error) {
+        gboolean roam = FALSE;
+
+        if (mm_cdma_parse_speri_response (response->str, &roam, NULL)) {
+            cdma_state = roam ? MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING
+                              : MM_MODEM_CDMA_REGISTRATION_STATE_HOME;
+            evdo_state = roam ? MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING
+                              : MM_MODEM_CDMA_REGISTRATION_STATE_HOME;
+        }
+    }
+
+    set_callback_1x_state_helper (info, cdma_state);
+    set_callback_evdo_state_helper (info, evdo_state);
+    mm_callback_info_schedule (info);
+}
+
+static void
+reg_query_spservice_done (MMAtSerialPort *port,
+                          GString *response,
+                          GError *error,
+                          gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMModemCdmaRegistrationState cdma_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+    MMModemCdmaRegistrationState evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else if (mm_cdma_parse_spservice_response (response->str,
+                                               &cdma_state,
+                                               &evdo_state)) {
+        if (MM_GENERIC_CDMA_GET_PRIVATE (info->modem)->has_speri) {
+            /* Get roaming status to override generic registration state */
+            mm_callback_info_set_data (info, "tmp-cdma-state", GUINT_TO_POINTER (cdma_state), NULL);
+            mm_callback_info_set_data (info, "tmp-evdo-state", GUINT_TO_POINTER (evdo_state), NULL);
+            mm_at_serial_port_queue_command (port, "$SPERI?", 3, reg_query_speri_done, info);
+            return;
+        }
+    }
+
+    set_callback_1x_state_helper (info, cdma_state);
+    set_callback_evdo_state_helper (info, evdo_state);
+    mm_callback_info_schedule (info);
+}
+
+static void
+real_query_registration_state (MMGenericCdma *self,
+                               MMModemCdmaRegistrationStateFn callback,
+                               gpointer user_data)
+{
+    MMCallbackInfo *info;
+    MMAtSerialPort *port;
+
+    info = mm_generic_cdma_query_reg_state_callback_info_new (self, callback, user_data);
+
+    port = mm_generic_cdma_get_best_at_port (self, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    if (MM_GENERIC_CDMA_GET_PRIVATE (self)->has_spservice) {
+        /* Try Sprint-specific commands */
+        mm_at_serial_port_queue_command (port, "+SPSERVICE?", 3, reg_query_spservice_done, info);
     } else {
-        /* Or if the subclass doesn't implement more specific checking,
-         * assume we're registered.
-         */
-        reg_state_query_done (MM_MODEM_CDMA (self),
-                              MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED,
-                              MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED,
-                              NULL,
-                              info);
+        /* Assume we're registered if we passed CAD and CSS checking */
+        set_callback_1x_state_helper (info, MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED);
+        set_callback_evdo_state_helper (info, MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED);
+        mm_callback_info_schedule (info);
     }
 }
 
@@ -1248,7 +1323,9 @@ reg_state_css_response (MMModemCdma *cdma,
         return;
     }
 
-    query_subclass_registration_state (MM_GENERIC_CDMA (info->modem), info);
+    MM_GENERIC_CDMA_GET_CLASS (cdma)->query_registration_state (MM_GENERIC_CDMA (info->modem),
+                                                                reg_state_query_done,
+                                                                info);
 }
 
 static void
@@ -1299,7 +1376,9 @@ get_analog_digital_done (MMAtSerialPort *port,
             /* Subclass knows that AT+CSS? will respond incorrectly to EVDO
              * state, so skip AT+CSS? query.
              */
-            query_subclass_registration_state (MM_GENERIC_CDMA (info->modem), info);
+            MM_GENERIC_CDMA_GET_CLASS (info->modem)->query_registration_state (MM_GENERIC_CDMA (info->modem),
+                                                                               reg_state_query_done,
+                                                                               info);
         }
         return;
     } else {
@@ -1765,6 +1844,7 @@ mm_generic_cdma_class_init (MMGenericCdmaClass *klass)
     object_class->dispose = dispose;
     object_class->finalize = finalize;
     object_class->constructor = constructor;
+    klass->query_registration_state = real_query_registration_state;
 
     /* Properties */
     g_object_class_override_property (object_class,

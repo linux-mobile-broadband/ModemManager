@@ -47,5 +47,9 @@ gboolean mm_cdma_parse_spservice_response (const char *reply,
                                            MMModemCdmaRegistrationState *out_cdma_1x_state,
                                            MMModemCdmaRegistrationState *out_evdo_state);
 
+gboolean mm_cdma_parse_speri_response (const char *reply,
+                                       gboolean *out_roaming,
+                                       const char **out_desc);
+
 #endif  /* MM_MODEM_HELPERS_H */
 

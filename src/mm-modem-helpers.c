@@ -18,6 +18,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include <errno.h>
 
 #include "mm-errors.h"
 #include "mm-modem-helpers.h"
@@ -465,6 +466,238 @@ mm_cdma_parse_spservice_response (const char *reply,
         return FALSE;
     }
     return TRUE;
+}
+
+/*************************************************************************/
+
+typedef struct {
+    int num;
+    gboolean roam_ind;
+    const char *banner;
+} EriItem;
+
+/* NOTE: these may be Sprint-specific for now... */
+static const EriItem eris[] = {
+    { 0,  TRUE,  "Digital or Analog Roaming" },
+    { 1,  FALSE, "Home" },
+    { 2,  TRUE,  "Digital or Analog Roaming" },
+    { 3,  TRUE,  "Out of neighborhood" },
+    { 4,  TRUE,  "Out of building" },
+    { 5,  TRUE,  "Preferred system" },
+    { 6,  TRUE,  "Available System" },
+    { 7,  TRUE,  "Alliance Partner" },
+    { 8,  TRUE,  "Premium Partner" },
+    { 9,  TRUE,  "Full Service Functionality" },
+    { 10, TRUE,  "Partial Service Functionality" },
+    { 64, TRUE,  "Preferred system" },
+    { 65, TRUE,  "Available System" },
+    { 66, TRUE,  "Alliance Partner" },
+    { 67, TRUE,  "Premium Partner" },
+    { 68, TRUE,  "Full Service Functionality" },
+    { 69, TRUE,  "Partial Service Functionality" },
+    { 70, TRUE,  "Analog A" },
+    { 71, TRUE,  "Analog B" },
+    { 72, TRUE,  "CDMA 800 A" },
+    { 73, TRUE,  "CDMA 800 B" },
+    { 74, TRUE,  "International Roaming" },
+    { 75, TRUE,  "Extended Network" },
+    { 76, FALSE,  "Campus" },
+    { 77, FALSE,  "In Building" },
+    { 78, TRUE,  "Regional" },
+    { 79, TRUE,  "Community" },
+    { 80, TRUE,  "Business" },
+    { 81, TRUE,  "Zone 1" },
+    { 82, TRUE,  "Zone 2" },
+    { 83, TRUE,  "National" },
+    { 84, TRUE,  "Local" },
+    { 85, TRUE,  "City" },
+    { 86, TRUE,  "Government" },
+    { 87, TRUE,  "USA" },
+    { 88, TRUE,  "State" },
+    { 89, TRUE,  "Resort" },
+    { 90, TRUE,  "Headquarters" },
+    { 91, TRUE,  "Personal" },
+    { 92, FALSE,  "Home" },
+    { 93, TRUE,  "Residential" },
+    { 94, TRUE,  "University" },
+    { 95, TRUE,  "College" },
+    { 96, TRUE,  "Hotel Guest" },
+    { 97, TRUE,  "Rental" },
+    { 98, FALSE,  "Corporate" },
+    { 99, FALSE,  "Home Provider" },
+    { 100, FALSE,  "Campus" },
+    { 101, FALSE,  "In Building" },
+    { 102, TRUE,  "Regional" },
+    { 103, TRUE,  "Community" },
+    { 104, TRUE,  "Business" },
+    { 105, TRUE,  "Zone 1" },
+    { 106, TRUE,  "Zone 2" },
+    { 107, TRUE,  "National" },
+    { 108, TRUE,  "Local" },
+    { 109, TRUE,  "City" },
+    { 110, TRUE,  "Government" },
+    { 111, TRUE,  "USA" },
+    { 112, TRUE,  "State" },
+    { 113, TRUE,  "Resort" },
+    { 114, TRUE,  "Headquarters" },
+    { 115, TRUE,  "Personal" },
+    { 116, FALSE,  "Home" },
+    { 117, TRUE,  "Residential" },
+    { 118, TRUE,  "University" },
+    { 119, TRUE,  "College" },
+    { 120, TRUE,  "Hotel Guest" },
+    { 121, TRUE,  "Rental" },
+    { 122, FALSE,  "Corporate" },
+    { 123, FALSE,  "Home Provider" },
+    { 124, TRUE,  "International" },
+    { 125, TRUE,  "International" },
+    { 126, TRUE,  "International" },
+    { 127, FALSE,  "Premium Service" },
+    { 128, FALSE,  "Enhanced Service" },
+    { 129, FALSE,  "Enhanced Digital" },
+    { 130, FALSE,  "Enhanced Roaming" },
+    { 131, FALSE,  "Alliance Service" },
+    { 132, FALSE,  "Alliance Network" },
+    { 133, FALSE,  "Data Roaming" },    /* Sprint: Vision Roaming */
+    { 134, FALSE,  "Extended Service" },
+    { 135, FALSE,  "Expanded Services" },
+    { 136, FALSE,  "Expanded Network" },
+    { 137, TRUE,  "Premium Service" },
+    { 138, TRUE,  "Enhanced Service" },
+    { 139, TRUE,  "Enhanced Digital" },
+    { 140, TRUE,  "Enhanced Roaming" },
+    { 141, TRUE,  "Alliance Service" },
+    { 142, TRUE,  "Alliance Network" },
+    { 143, TRUE,  "Data Roaming" },    /* Sprint: Vision Roaming */
+    { 144, TRUE,  "Extended Service" },
+    { 145, TRUE,  "Expanded Services" },
+    { 146, TRUE,  "Expanded Network" },
+    { 147, TRUE,  "Premium Service" },
+    { 148, TRUE,  "Enhanced Service" },
+    { 149, TRUE,  "Enhanced Digital" },
+    { 150, TRUE,  "Enhanced Roaming" },
+    { 151, TRUE,  "Alliance Service" },
+    { 152, TRUE,  "Alliance Network" },
+    { 153, TRUE,  "Data Roaming" },    /* Sprint: Vision Roaming */
+    { 154, TRUE,  "Extended Service" },
+    { 155, TRUE,  "Expanded Services" },
+    { 156, TRUE,  "Expanded Network" },
+    { 157, TRUE,  "Premium International" },
+    { 158, TRUE,  "Premium International" },
+    { 159, TRUE,  "Premium International" },
+    { 160, TRUE,  NULL },
+    { 161, TRUE,  NULL },
+    { 162, FALSE,  NULL },
+    { 163, FALSE,  NULL },
+    { 164, FALSE,  "Extended Voice/Data Network" },
+    { 165, FALSE,  "Extended Voice/Data Network" },
+    { 166, TRUE,  "Extended Voice/Data Network" },
+    { 167, FALSE,  "Extended Broadband" },
+    { 168, FALSE,  "Extended Broadband" },
+    { 169, TRUE,  "Extended Broadband" },
+    { 170, FALSE,  "Extended Data" },
+    { 171, FALSE,  "Extended Data" },
+    { 172, TRUE,  "Extended Data" },
+    { 173, FALSE,  "Extended Data Network" },
+    { 174, FALSE,  "Extended Data Network" },
+    { 175, TRUE,  "Extended Data Network" },
+    { 176, FALSE,  "Extended Network" },
+    { 177, FALSE,  "Extended Network" },
+    { 178, TRUE,  "Extended Network" },
+    { 179, FALSE,  "Extended Service" },
+    { 180, TRUE,  "Extended Service" },
+    { 181, FALSE,  "Extended Voice" },
+    { 182, FALSE,  "Extended Voice" },
+    { 183, TRUE,  "Extended Voice" },
+    { 184, FALSE,  "Extended Voice/Data" },
+    { 185, FALSE,  "Extended Voice/Data" },
+    { 186, TRUE,  "Extended Voice/Data" },
+    { 187, FALSE,  "Extended Voice Network" },
+    { 188, FALSE,  "Extended Voice Network" },
+    { 189, TRUE,  "Extended Voice Network" },
+    { 190, FALSE,  "Extended Voice/Data" },
+    { 191, FALSE,  "Extended Voice/Data" },
+    { 192, TRUE,  "Extended Voice/Data" },
+    { 193, TRUE,  "International" },
+    { 194, FALSE,  "International Services" },
+    { 195, FALSE,  "International Voice" },
+    { 196, FALSE,  "International Voice/Data" },
+    { 197, FALSE,  "International Voice/Data" },
+    { 198, TRUE,  "International Voice/Data" },
+    { 199, FALSE,  "Extended Voice/Data Network" },
+    { 200, TRUE,  "Extended Voice/Data Network" },
+    { 201, TRUE,  "Extended Voice/Data Network" },
+    { 202, FALSE,  "Extended Broadband" },
+    { 203, TRUE,  "Extended Broadband" },
+    { 204, TRUE,  "Extended Broadband" },
+    { 205, FALSE,  "Extended Data" },
+    { 206, TRUE,  "Extended Data" },
+    { 207, TRUE,  "Extended Data" },
+    { 208, FALSE,  "Extended Data Network" },
+    { 209, TRUE,  "Extended Data Network" },
+    { 210, TRUE,  "Extended Data Network" },
+    { 211, FALSE,  "Extended Network" },
+    { 212, TRUE,  "Extended Network" },
+    { 213, FALSE,  "Extended Service" },
+    { 214, TRUE,  "Extended Service" },
+    { 215, TRUE,  "Extended Service" },
+    { 216, FALSE,  "Extended Voice" },
+    { 217, TRUE,  "Extended Voice" },
+    { 218, TRUE,  "Extended Voice" },
+    { 219, FALSE,  "Extended Voice/Data" },
+    { 220, TRUE,  "Extended Voice/Data" },
+    { 221, TRUE,  "Extended Voice/Data" },
+    { 222, FALSE,  "Extended Voice Network" },
+    { 223, FALSE,  "Extended Voice Network" },
+    { 224, TRUE,  "Extended Voice Network" },
+    { 225, FALSE,  "Extended Voice/Data" },
+    { 226, TRUE,  "Extended Voice/Data" },
+    { 227, TRUE,  "Extended Voice/Data" },
+    { 228, TRUE,  "International" },
+    { 229, TRUE,  "International" },
+    { 230, TRUE,  "International Services" },
+    { 231, TRUE,  "International Voice" },
+    { 232, FALSE,  "International Voice/Data" },
+    { 233, TRUE,  "International Voice/Data" },
+    { 234, TRUE,  "International Voice/Data" },
+    { 235, TRUE,  "Premium International" },
+    { 236, TRUE,  NULL },
+    { 237, TRUE,  NULL },
+    { 238, FALSE,  NULL },
+    { 239, FALSE,  NULL },
+    { -1, FALSE, NULL },
+};
+
+gboolean
+mm_cdma_parse_speri_response (const char *reply,
+                              gboolean *out_roaming,
+                              const char **out_desc)
+{
+    const char *p;
+    long int ind;
+    const EriItem *iter = &eris[0];
+    gboolean found = FALSE;
+
+    g_return_val_if_fail (reply != NULL, FALSE);
+    g_return_val_if_fail (out_roaming != NULL, FALSE);
+
+    p = mm_strip_tag (reply, "$SPERI:");
+    errno = 0;
+    ind = strtol (p, NULL, 10);
+    if (errno == 0) {
+        while (iter->num != -1) {
+            if (iter->num == ind) {
+                *out_roaming = iter->roam_ind;
+                if (out_desc)
+                    *out_desc = iter->banner;
+                found = TRUE;
+                break;
+            }
+            iter++;
+        }
+    }
+
+    return found;
 }
 
 /*************************************************************************/
