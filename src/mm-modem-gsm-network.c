@@ -540,11 +540,11 @@ impl_gsm_modem_set_allowed_mode (MMModemGsmNetwork *modem,
                                  MMModemGsmAllowedMode mode,
                                  DBusGMethodInvocation *context)
 {
-    if (!check_for_single_value (mode)) {
+    if (mode > MM_MODEM_GSM_ALLOWED_MODE_LAST) {
         GError *error;
 
-        error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
-                                     "Invalid arguments (more than one value given)");
+        error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                             "Unknown allowed mode %d", mode);
         dbus_g_method_return_error (context, error);
         g_error_free (error);
         return;
