@@ -311,4 +311,16 @@ QCDMResult *qcdm_cmd_hdr_subsys_state_info_result (const char *buf,
 
 /**********************************************************************/
 
+#define QCDM_CMD_ZTE_SUBSYS_STATUS_ITEM_SIGNAL_INDICATOR    "signal-indicator"
+
+gsize       qcdm_cmd_zte_subsys_status_new    (char *buf,
+                                               gsize len,
+                                               GError **error);
+
+QCDMResult *qcdm_cmd_zte_subsys_status_result (const char *buf,
+                                               gsize len,
+                                               GError **error);
+
+/**********************************************************************/
+
 #endif  /* LIBQCDM_COMMANDS_H */

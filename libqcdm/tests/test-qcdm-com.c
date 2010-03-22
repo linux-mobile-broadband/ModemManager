@@ -895,3 +895,39 @@ test_com_hdr_subsys_state_info (void *f, void *data)
     qcdm_result_unref (result);
 }
 
+void
+test_com_zte_subsys_status (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    GError *error = NULL;
+    char buf[100];
+    gint len;
+    QCDMResult *result;
+    gsize reply_len;
+    guint8 ind = 0;
+
+    len = qcdm_cmd_zte_subsys_status_new (buf, sizeof (buf), NULL);
+    g_assert (len == 7);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_zte_subsys_status_result (buf, reply_len, &error);
+    if (!result) {
+        /* Obviously not all devices implement this command */
+        g_assert_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_BAD_COMMAND);
+        return;
+    }
+
+    qcdm_result_get_uint8 (result, QCDM_CMD_ZTE_SUBSYS_STATUS_ITEM_SIGNAL_INDICATOR, &ind);
+    g_message ("%s: Signal Indicator: %d", __func__, ind);
+
+    qcdm_result_unref (result);
+}
+

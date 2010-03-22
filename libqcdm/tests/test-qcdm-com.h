@@ -41,5 +41,7 @@ void test_com_cm_subsys_state_info (void *f, void *data);
 
 void test_com_hdr_subsys_state_info (void *f, void *data);
 
+void test_com_zte_subsys_status (void *f, void *data);
+
 #endif  /* TEST_QCDM_COM_H */
 

@@ -122,6 +122,7 @@ enum {
     DIAG_SUBSYS_SMS             = 14,
     DIAG_SUBSYS_CM              = 15, /* Call manager */
     DIAG_SUBSYS_NW_CONTROL_6500 = 50, /* for Novatel Wireless MSM6500-based devices */
+    DIAG_SUBSYS_ZTE             = 101, /* for ZTE EVDO devices */
     DIAG_SUBSYS_NW_CONTROL_6800 = 250 /* for Novatel Wireless MSM6800-based devices */
 };
 
@@ -146,6 +147,10 @@ enum {
 enum {
     DIAG_SUBSYS_NW_CONTROL_MODEM_STATUS_CDMA = 7,
     DIAG_SUBSYS_NW_CONTROL_MODEM_STATUS_WCDMA = 20,
+};
+
+enum {
+    DIAG_SUBSYS_ZTE_STATUS = 0,
 };
 
 /* Generic DM command header */
@@ -249,6 +254,16 @@ struct DMCmdSubsysHDRStateInfoRsp {
     guint8 hdr_hybrid_mode;
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysHDRStateInfoRsp DMCmdSubsysHDRStateInfoRsp;
+
+
+/* DIAG_SUBSYS_ZTE_STATUS subsys command */
+struct DMCmdSubsysZteStatusRsp {
+    DMCmdSubsysHeader header;
+    guint8 _unknown1[8];
+    guint8 signal_ind;
+    guint8 _unknown2;
+} __attribute__ ((packed));
+typedef struct DMCmdSubsysZteStatusRsp DMCmdSubsysZteStatusRsp;
 
 #endif  /* LIBQCDM_DM_COMMANDS_H */
 

@@ -749,3 +749,40 @@ qcdm_cmd_hdr_subsys_state_info_result (const char *buf, gsize len, GError **erro
 
 /**********************************************************************/
 
+gsize
+qcdm_cmd_zte_subsys_status_new (char *buf, gsize len, GError **error)
+{
+    char cmdbuf[sizeof (DMCmdSubsysHeader) + 2];
+    DMCmdSubsysHeader *cmd = (DMCmdSubsysHeader *) &cmdbuf[0];
+
+    g_return_val_if_fail (buf != NULL, 0);
+    g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->code = DIAG_CMD_SUBSYS;
+    cmd->subsys_id = DIAG_SUBSYS_ZTE;
+    cmd->subsys_cmd = GUINT16_TO_LE (DIAG_SUBSYS_ZTE_STATUS);
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QCDMResult *
+qcdm_cmd_zte_subsys_status_result (const char *buf, gsize len, GError **error)
+{
+    QCDMResult *result = NULL;
+    DMCmdSubsysZteStatusRsp *rsp = (DMCmdSubsysZteStatusRsp *) buf;
+
+    g_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_SUBSYS, sizeof (DMCmdSubsysZteStatusRsp), error))
+        return NULL;
+
+    result = qcdm_result_new ();
+
+    qcdm_result_add_uint8 (result, QCDM_CMD_ZTE_SUBSYS_STATUS_ITEM_SIGNAL_INDICATOR, rsp->signal_ind);
+
+    return result;
+}
+
+/**********************************************************************/
+
