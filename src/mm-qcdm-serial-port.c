@@ -83,7 +83,9 @@ handle_response (MMSerialPort *port,
                                          &used,
                                          &more);
         if (!success) {
-            g_set_error_literal (&dm_error, 0, 0, "Failed to unescape QCDM packet.");
+            g_set_error_literal (&dm_error,
+                                 MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                 "Failed to unescape QCDM packet.");
             g_byte_array_free (unescaped, TRUE);
             unescaped = NULL;
         } else if (more) {
