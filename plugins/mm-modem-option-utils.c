@@ -21,6 +21,7 @@
 #include "mm-callback-info.h"
 #include "mm-at-serial-port.h"
 #include "mm-generic-gsm.h"
+#include "mm-modem-helpers.h"
 
 static void
 option_get_allowed_mode_done (MMAtSerialPort *port,
@@ -143,6 +144,87 @@ option_set_allowed_mode (MMGenericGsm *gsm,
     g_free (command);
 }
 
+static gboolean
+octi_to_mm (char octi, MMModemGsmAccessTech *out_act)
+{
+    if (octi == '1') {
+        *out_act = MM_MODEM_GSM_ACCESS_TECH_GSM;
+        return TRUE;
+    } else if (octi == '2') {
+        *out_act = MM_MODEM_GSM_ACCESS_TECH_GPRS;
+        return TRUE;
+    } else if (octi == '3') {
+        *out_act = MM_MODEM_GSM_ACCESS_TECH_EDGE;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static gboolean
+owcti_to_mm (char owcti, MMModemGsmAccessTech *out_act)
+{
+    if (owcti == '1') {
+        *out_act = MM_MODEM_GSM_ACCESS_TECH_UMTS;
+        return TRUE;
+    } else if (owcti == '2') {
+        *out_act = MM_MODEM_GSM_ACCESS_TECH_HSDPA;
+        return TRUE;
+    } else if (owcti == '3') {
+        *out_act = MM_MODEM_GSM_ACCESS_TECH_HSUPA;
+        return TRUE;
+    } else if (owcti == '4') {
+        *out_act = MM_MODEM_GSM_ACCESS_TECH_HSPA;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static void
+octi_request_done (MMAtSerialPort *port,
+                   GString *response,
+                   GError *error,
+                   gpointer user_data)
+{
+    const char *p;
+    MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
+    GRegex *r;
+    GMatchInfo *match_info;
+    char *str;
+
+    if (!error) {
+        p = mm_strip_tag (response->str, "_OCTI:");
+
+        r = g_regex_new ("(\\d),(\\d)", G_REGEX_UNGREEDY, 0, NULL);
+        g_return_if_fail (r != NULL);
+
+        g_regex_match (r, p, 0, &match_info);
+        if (g_match_info_matches (match_info)) {
+            str = g_match_info_fetch (match_info, 2);
+            if (str && octi_to_mm (str[0], &act))
+                mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (user_data), act);
+            g_free (str);
+        }
+        g_match_info_free (match_info);
+        g_regex_unref (r);
+    }
+}
+
+static void
+owcti_request_done (MMAtSerialPort *port,
+                    GString *response,
+                    GError *error,
+                    gpointer user_data)
+{
+    const char *p;
+    MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
+
+    if (!error) {
+        p = mm_strip_tag (response->str, "_OWCTI:");
+        if (owcti_to_mm (*p, &act))
+            mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (user_data), act);
+    }
+}
+
 static void
 option_ossys_tech_changed (MMAtSerialPort *port,
                            GMatchInfo *info,
@@ -161,13 +243,20 @@ option_ossys_tech_changed (MMAtSerialPort *port,
             act = MM_MODEM_GSM_ACCESS_TECH_UMTS;
             break;
         default:
-            /* _OSSYSI only indicates general 2G/3G mode */
             break;
         }
     }
     g_free (str);
 
     mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (user_data), act);
+
+    /* _OSSYSI only indicates general 2G/3G mode, so queue up some explicit
+     * access technology requests.
+     */
+    if (act == MM_MODEM_GSM_ACCESS_TECH_GPRS)
+        mm_at_serial_port_queue_command (port, "AT_OCTI?", 3, octi_request_done, user_data);
+    else if (act == MM_MODEM_GSM_ACCESS_TECH_UMTS)
+        mm_at_serial_port_queue_command (port, "AT_OWCTI?", 3, owcti_request_done, user_data);
 }
 
 static void
@@ -179,27 +268,9 @@ option_2g_tech_changed (MMAtSerialPort *port,
     char *str;
 
     str = g_match_info_fetch (match_info, 1);
-    switch (atoi (str)) {
-    case 1:
-        act = MM_MODEM_GSM_ACCESS_TECH_GSM;
-        break;
-    case 2:
-        act = MM_MODEM_GSM_ACCESS_TECH_GPRS;
-        break;
-    case 3:
-        act = MM_MODEM_GSM_ACCESS_TECH_EDGE;
-        break;
-    default:
-        break;
-    }
+    if (octi_to_mm (str[0], &act))
+        mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (user_data), act);
     g_free (str);
-
-    /* At the moment we can't do much with this since it's not consistently
-     * reported by the modem.  _OSSYSI appears to always be reported, but 
-     * doesn't provide the granularity that _OCTI and _OWCTI do, and so it
-     * would overwrite any _OCTI or _OWCTI response, and cause the access tech
-     * to flip-flop often.
-     */
 }
 
 static void
@@ -211,30 +282,9 @@ option_3g_tech_changed (MMAtSerialPort *port,
     char *str;
 
     str = g_match_info_fetch (match_info, 1);
-    switch (atoi (str)) {
-    case 1:
-        act = MM_MODEM_GSM_ACCESS_TECH_UMTS;
-        break;
-    case 2:
-        act = MM_MODEM_GSM_ACCESS_TECH_HSDPA;
-        break;
-    case 3:
-        act = MM_MODEM_GSM_ACCESS_TECH_HSUPA;
-        break;
-    case 4:
-        act = MM_MODEM_GSM_ACCESS_TECH_HSPA;
-        break;
-    default:
-        break;
-    }
+    if (owcti_to_mm (str[0], &act))
+        mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (user_data), act);
     g_free (str);
-
-    /* At the moment we can't do much with this since it's not consistently
-     * reported by the modem.  _OSSYSI appears to always be reported, but 
-     * doesn't provide the granularity that _OCTI and _OWCTI do, and so it
-     * would overwrite any _OCTI or _OWCTI response, and cause the access tech
-     * to flip-flop often.
-     */
 }
 
 static void
@@ -273,7 +323,7 @@ option_register_unsolicted_handlers (MMGenericGsm *modem, MMAtSerialPort *port)
     mm_at_serial_port_add_unsolicited_msg_handler (port, regex, option_2g_tech_changed, modem, NULL);
     g_regex_unref (regex);
 
-    regex = g_regex_new ("\\r\\n_OWCTI:\\s*(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    regex = g_regex_new ("\\r\\n_OUWCTI:\\s*(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     mm_at_serial_port_add_unsolicited_msg_handler (port, regex, option_3g_tech_changed, modem, NULL);
     g_regex_unref (regex);
 
@@ -292,6 +342,7 @@ option_change_unsolicited_messages (MMGenericGsm *modem, gboolean enabled)
 
     mm_at_serial_port_queue_command (primary, enabled ? "_OSSYS=1" : "_OSSYS=0", 3, NULL, NULL);
     mm_at_serial_port_queue_command (primary, enabled ? "_OCTI=1" : "_OCTI=0", 3, NULL, NULL);
+    mm_at_serial_port_queue_command (primary, enabled ? "_OUWCTI=1" : "_OUWCTI=0", 3, NULL, NULL);
     mm_at_serial_port_queue_command (primary, enabled ? "_OSQI=1" : "_OSQI=0", 3, NULL, NULL);
 }
 
