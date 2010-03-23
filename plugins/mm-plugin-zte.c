@@ -47,6 +47,8 @@ get_level_for_capabilities (guint32 capabilities)
         return 10;
     if (capabilities & CAP_CDMA)
         return 10;
+    if (capabilities & MM_PLUGIN_BASE_PORT_CAP_QCDM)
+        return 10;
     return 0;
 }
 
@@ -100,7 +102,7 @@ supports_port (MMPluginBase *base,
      * 	1235f71b20c92cded4abd976ccc5010649aae1a0 and
      * 	f38ad328acfdc6ce29dd1380602c546b064161ae for more details.
      */
-    mm_plugin_base_supports_task_set_custom_init_command (task, "ATE0+CPMS?", 3, 4, TRUE);
+    mm_plugin_base_supports_task_set_custom_init_command (task, "ATE0+CPMS?", 3, 4, FALSE);
 
     if (mm_plugin_base_probe_port (base, task, NULL))
         return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
@@ -160,12 +162,13 @@ grab_port (MMPluginBase *base,
                 return NULL;
             }
         }
-    } else {
-        if (caps & (MM_PLUGIN_BASE_PORT_CAP_GSM | CAP_CDMA)) {
-            modem = existing;
-            if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error))
-                return NULL;
-        }
+    } else if (get_level_for_capabilities (caps)) {
+        if (caps & MM_PLUGIN_BASE_PORT_CAP_QCDM)
+            ptype = MM_PORT_TYPE_QCDM;
+
+        modem = existing;
+        if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error))
+            return NULL;
     }
 
     return modem;

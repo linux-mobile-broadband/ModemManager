@@ -173,13 +173,10 @@ grab_port (MMPluginBase *base,
                 return NULL;
             }
         }
-    } else {
-        if (   (caps & (MM_PLUGIN_BASE_PORT_CAP_GSM | CAP_CDMA))
-            || (ptype != MM_PORT_TYPE_UNKNOWN)) {
-            modem = existing;
-            if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error))
-                return NULL;
-        }
+    } else if (get_level_for_capabilities (caps) || (ptype != MM_PORT_TYPE_UNKNOWN)) {
+        modem = existing;
+        if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error))
+            return NULL;
     }
 
     return modem;

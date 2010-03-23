@@ -55,6 +55,8 @@ get_level_for_capabilities (guint32 capabilities)
         return 10;
     if (capabilities & CAP_CDMA)
         return 10;
+    if (capabilities & MM_PLUGIN_BASE_PORT_CAP_QCDM)
+        return 10;
     return 0;
 }
 
@@ -308,6 +310,8 @@ grab_port (MMPluginBase *base,
         info = g_object_get_data (G_OBJECT (task), TAG_SUPPORTS_INFO);
         if (info && info->secondary)
             ptype = MM_PORT_TYPE_SECONDARY;
+        else if (caps & MM_PLUGIN_BASE_PORT_CAP_QCDM)
+            ptype = MM_PORT_TYPE_QCDM;
 
         modem = existing;
         if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error))

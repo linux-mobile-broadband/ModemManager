@@ -28,6 +28,7 @@
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 #include "mm-at-serial-port.h"
+#include "mm-qcdm-serial-port.h"
 #include "mm-serial-parsers.h"
 #include "mm-modem-helpers.h"
 #include "mm-options.h"
@@ -92,6 +93,7 @@ typedef struct {
 
     MMAtSerialPort *primary;
     MMAtSerialPort *secondary;
+    MMQcdmSerialPort *qcdm;
     MMPort *data;
 } MMGenericGsmPrivate;
 
@@ -430,6 +432,8 @@ mm_generic_gsm_grab_port (MMGenericGsm *self,
 
         } else if (ptype == MM_PORT_TYPE_SECONDARY)
             priv->secondary = MM_AT_SERIAL_PORT (port);
+    } else if (MM_IS_QCDM_SERIAL_PORT (port) && !priv->qcdm) {
+        priv->qcdm = MM_QCDM_SERIAL_PORT (port);
     } else {
         /* Net device (if any) is the preferred data port */
         if (!priv->data || MM_IS_SERIAL_PORT (priv->data)) {
@@ -484,7 +488,7 @@ release_port (MMModem *modem, const char *subsys, const char *name)
     if (!port)
         return;
 
-    if (port == MM_PORT (priv->primary)) {
+    if (port == (MMPort *) priv->primary) {
         mm_modem_base_remove_port (MM_MODEM_BASE (modem), port);
         priv->primary = NULL;
     }
@@ -494,9 +498,14 @@ release_port (MMModem *modem, const char *subsys, const char *name)
         g_object_notify (G_OBJECT (modem), MM_MODEM_DATA_DEVICE);
     }
 
-    if (port == MM_PORT (priv->secondary)) {
+    if (port == (MMPort *) priv->secondary) {
         mm_modem_base_remove_port (MM_MODEM_BASE (modem), port);
         priv->secondary = NULL;
+    }
+
+    if (port == (MMPort *) priv->qcdm) {
+        mm_modem_base_remove_port (MM_MODEM_BASE (modem), port);
+        priv->qcdm = NULL;
     }
 
     check_valid (MM_GENERIC_GSM (modem));

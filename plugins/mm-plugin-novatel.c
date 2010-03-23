@@ -47,6 +47,8 @@ get_level_for_capabilities (guint32 capabilities)
         return 10;
     if (capabilities & CAP_CDMA)
         return 10;
+    if (capabilities & MM_PLUGIN_BASE_PORT_CAP_QCDM)
+        return 10;
     return 0;
 }
 
@@ -154,12 +156,15 @@ grab_port (MMPluginBase *base,
                 return NULL;
             }
         }
-    } else {
-        if (caps & (MM_PLUGIN_BASE_PORT_CAP_GSM | CAP_CDMA)) {
-            modem = existing;
-            if (!mm_modem_grab_port (modem, subsys, name, MM_PORT_TYPE_UNKNOWN, NULL, error))
-                return NULL;
-        }
+    } else if (get_level_for_capabilities (caps)) {
+        MMPortType ptype = MM_PORT_TYPE_UNKNOWN;
+
+        if (caps & MM_PLUGIN_BASE_PORT_CAP_QCDM)
+            ptype = MM_PORT_TYPE_QCDM;
+
+        modem = existing;
+        if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error))
+            return NULL;
     }
 
     return modem;

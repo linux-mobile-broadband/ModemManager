@@ -33,8 +33,9 @@ typedef enum {
     MM_PORT_TYPE_PRIMARY,
     MM_PORT_TYPE_SECONDARY,
     MM_PORT_TYPE_IGNORED,
+    MM_PORT_TYPE_QCDM,
 
-    MM_PORT_TYPE_LAST = MM_PORT_TYPE_IGNORED
+    MM_PORT_TYPE_LAST = MM_PORT_TYPE_QCDM
 } MMPortType;
 
 #define MM_TYPE_PORT            (mm_port_get_type ())

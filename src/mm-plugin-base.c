@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
 #define _GNU_SOURCE  /* for strcasestr */
@@ -575,7 +575,7 @@ real_handle_probe_response (MMPluginBase *self,
         ignore_error = TRUE;
 
     if (error && !ignore_error) {
-        if (error->code == MM_SERIAL_RESPONSE_TIMEOUT) {
+        if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_RESPONSE_TIMEOUT)) {
             /* Try GCAP again */
             if (task_priv->probe_state < PROBE_STATE_GCAP_TRY3) {
                 task_priv->probe_state++;
