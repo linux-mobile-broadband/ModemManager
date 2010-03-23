@@ -16,10 +16,9 @@
  */
 
 #include <errno.h>
-#include <sys/ioctl.h>
+#include <termios.h>
 #include <fcntl.h>
 #include <string.h>
-#include <termio.h>
 
 #include "com.h"
 #include "error.h"
@@ -27,20 +26,20 @@
 gboolean
 qcdm_port_setup (int fd, GError **error)
 {
-    struct termio stbuf;
+    struct termios stbuf;
 
     g_type_init ();
 
     errno = 0;
-    memset (&stbuf, 0, sizeof (struct termio));
-    if (ioctl (fd, TCGETA, &stbuf) != 0) {
+    memset (&stbuf, 0, sizeof (stbuf));
+    if (tcgetattr (fd, &stbuf) != 0) {
         g_set_error (error,
                      QCDM_SERIAL_ERROR, QCDM_SERIAL_CONFIG_FAILED,
-                     "TCGETA error: %d", errno);
+                     "tcgetattr() error: %d", errno);
     }
 
     stbuf.c_cflag &= ~(CBAUD | CSIZE | CSTOPB | CLOCAL | PARENB);
-    stbuf.c_iflag &= ~(HUPCL | IUTF8 | IUCLC | ISTRIP | IXON | ICRNL);
+    stbuf.c_iflag &= ~(HUPCL | IUTF8 | IUCLC | ISTRIP | IXON | IXOFF | IXANY | ICRNL);
     stbuf.c_oflag &= ~(OPOST | OCRNL | ONLCR | OLCUC | ONLRET);
     stbuf.c_lflag &= ~(ICANON | ISIG | IEXTEN | ECHO | ECHOE | ECHOK | ECHONL);
     stbuf.c_lflag &= ~(NOFLSH | XCASE | TOSTOP | ECHOPRT | ECHOCTL | ECHOKE);
@@ -50,10 +49,10 @@ qcdm_port_setup (int fd, GError **error)
     stbuf.c_cflag |= (B115200 | CS8 | CREAD | 0 | 0);  /* No parity, 1 stop bit */
 
     errno = 0;
-    if (ioctl (fd, TCSETA, &stbuf) < 0) {
+    if (tcsetattr (fd, TCSANOW, &stbuf) < 0) {
         g_set_error (error,
                      QCDM_SERIAL_ERROR, QCDM_SERIAL_CONFIG_FAILED,
-                     "TCSETA error: %d", errno);
+                     "tcsetattr() error: %d", errno);
         return FALSE;
     }
 
