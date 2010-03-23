@@ -354,7 +354,8 @@ parse_cpin (const char *buf)
         || strcasestr (buf, "PH-SP PIN")
         || strcasestr (buf, "PH-SP PUK")
         || strcasestr (buf, "PH-CORP PIN")
-        || strcasestr (buf, "PH-CORP PUK"))
+        || strcasestr (buf, "PH-CORP PUK")
+        || strcasestr (buf, "READY"))
         return MM_PLUGIN_BASE_PORT_CAP_GSM;
 
     return 0;
