@@ -29,6 +29,7 @@
 #include "mm-callback-info.h"
 #include "mm-serial-parsers.h"
 #include "mm-modem-helpers.h"
+#include "libqcdm/src/commands.h"
 
 #define MM_GENERIC_CDMA_PREV_STATE_TAG "prev-state"
 
@@ -1412,6 +1413,73 @@ error:
 }
 
 static void
+reg_cmstate_cb (MMQcdmSerialPort *port,
+                GByteArray *response,
+                GError *error,
+                gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMAtSerialPort *at_port;
+    QCDMResult *result;
+    guint32 opmode = 0, sysmode = 0;
+    MMModemCdmaRegistrationState cdma_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+    MMModemCdmaRegistrationState evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+
+    if (error)
+        goto error;
+
+    /* Parse the response */
+    result = qcdm_cmd_cm_subsys_state_info_result ((const char *) response->data, response->len, &info->error);
+    if (!result)
+        goto error;
+
+    qcdm_result_get_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_OPERATING_MODE, &opmode);
+    qcdm_result_get_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_SYSTEM_MODE, &sysmode);
+    qcdm_result_unref (result);
+
+    if (opmode == QCDM_CMD_CM_SUBSYS_STATE_INFO_OPERATING_MODE_ONLINE) {
+        switch (sysmode) {
+        case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_CDMA:
+            cdma_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
+            break;
+        case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_HDR:
+            evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
+            break;
+        case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_AMPS:
+        case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_NO_SERVICE:
+        case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_WCDMA:
+        default:
+            break;
+        }
+
+        if (cdma_state || evdo_state) {
+            /* Device is registered to something; see if the subclass has a
+             * better idea of whether we're roaming or not and what the
+             * access technology is.
+             */
+            if (MM_GENERIC_CDMA_GET_CLASS (info->modem)->query_registration_state)
+                MM_GENERIC_CDMA_GET_CLASS (info->modem)->query_registration_state (MM_GENERIC_CDMA (info->modem),
+                                                                                   reg_state_query_done,
+                                                                                   info);
+            return;
+        }
+    }
+
+    set_callback_1x_state_helper (info, cdma_state);
+    set_callback_evdo_state_helper (info, evdo_state);
+    mm_callback_info_schedule (info);
+    return;
+
+error:
+    /* If there was some error, fall back to use +CAD like we did before QCDM */
+    at_port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (info->modem), &info->error);
+    if (at_port)
+        mm_at_serial_port_queue_command (at_port, "+CAD?", 3, get_analog_digital_done, info);
+    else
+        mm_callback_info_schedule (info);
+}
+
+static void
 get_registration_state (MMModemCdma *modem,
                         MMModemCdmaRegistrationStateFn callback,
                         gpointer user_data)
@@ -1423,7 +1491,7 @@ get_registration_state (MMModemCdma *modem,
     info = mm_generic_cdma_query_reg_state_callback_info_new (MM_GENERIC_CDMA (modem), callback, user_data);
 
     port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (modem), &info->error);
-    if (!port) {
+    if (!port && !priv->qcdm) {
         g_message ("Returning saved registration states: 1x: %d  EVDO: %d",
                    priv->cdma_1x_reg_state, priv->evdo_reg_state);
         mm_callback_info_set_data (info,
@@ -1438,7 +1506,19 @@ get_registration_state (MMModemCdma *modem,
         return;
     }
 
-    mm_at_serial_port_queue_command (port, "+CAD?", 3, get_analog_digital_done, info);
+    /* Use QCDM for Call Manager state or HDR state before trying CAD, since
+     * CAD doesn't always reflect the state of the HDR radio's registration
+     * status.
+     */
+    if (priv->qcdm) {
+        GByteArray *cmstate;
+
+        cmstate = g_byte_array_sized_new (25);
+        cmstate->len = qcdm_cmd_cm_subsys_state_info_new ((char *) cmstate->data, 25, NULL);
+        g_assert (cmstate->len);
+        mm_qcdm_serial_port_queue_command (priv->qcdm, cmstate, 3, reg_cmstate_cb, info);
+    } else
+        mm_at_serial_port_queue_command (port, "+CAD?", 3, get_analog_digital_done, info);
 }
 
 /*****************************************************************************/
