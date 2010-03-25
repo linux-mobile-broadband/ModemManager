@@ -1370,7 +1370,7 @@ convert_operator_from_ucs2 (char **operator)
     len = strlen (p);
 
     /* Len needs to be a multiple of 4 for UCS2 */
-    if ((len < 4) && ((len % 4) != 0))
+    if ((len < 4) || ((len % 4) != 0))
         return;
 
     while (*p) {
