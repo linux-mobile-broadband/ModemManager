@@ -358,6 +358,96 @@ get_band (MMModemGsmNetwork *modem,
     mm_at_serial_port_queue_command (port, "AT^SYSCFG?", 3, get_band_done, info);
 }
 
+static void
+get_act_request_done (MMAtSerialPort *port,
+                      GString *response,
+                      GError *error,
+                      gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
+    GRegex *r = NULL;
+    GMatchInfo *match_info = NULL;
+    char *str;
+    int srv_stat = 0;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        goto done;
+    }
+
+    /* Can't just use \d here since sometimes you get "^SYSINFO:2,1,0,3,1,,3" */
+    r = g_regex_new ("\\^SYSINFO:\\s*(\\d?),(\\d?),(\\d?),(\\d?),(\\d?),(\\d?),(\\d?)$", G_REGEX_UNGREEDY, 0, NULL);
+    if (!r) {
+        g_set_error_literal (&info->error,
+                             MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             "Could not parse ^SYSINFO results.");
+        goto done;
+    }
+
+    if (!g_regex_match_full (r, response->str, response->len, 0, 0, &match_info, &info->error)) {
+        g_set_error_literal (&info->error,
+                             MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             "Could not parse ^SYSINFO results.");
+        goto done;
+    }
+
+    str = g_match_info_fetch (match_info, 1);
+    if (str && strlen (str))
+        srv_stat = atoi (str);
+    g_free (str);
+
+    if (srv_stat != 0) {
+        /* Valid service */
+        str = g_match_info_fetch (match_info, 7);
+        if (str && strlen (str)) {
+            if (str[0] == '1')
+                act = MM_MODEM_GSM_ACCESS_TECH_GSM;
+            else if (str[0] == '2')
+                act = MM_MODEM_GSM_ACCESS_TECH_GPRS;
+            else if (str[0] == '3')
+                act = MM_MODEM_GSM_ACCESS_TECH_EDGE;
+            else if (str[0] == '4')
+                act = MM_MODEM_GSM_ACCESS_TECH_UMTS;
+            else if (str[0] == '5')
+                act = MM_MODEM_GSM_ACCESS_TECH_HSDPA;
+            else if (str[0] == '6')
+                act = MM_MODEM_GSM_ACCESS_TECH_HSUPA;
+            else if (str[0] == '7')
+                act = MM_MODEM_GSM_ACCESS_TECH_HSPA;
+        }
+        g_free (str);
+    }
+
+done:
+    if (match_info)
+        g_match_info_free (match_info);
+    if (r)
+        g_regex_unref (r);
+    mm_callback_info_set_result (info, GUINT_TO_POINTER (act), NULL);
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_access_technology (MMGenericGsm *modem,
+                       MMModemUIntFn callback,
+                       gpointer user_data)
+{
+    MMAtSerialPort *port;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+
+    port = mm_generic_gsm_get_best_at_port (modem, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_at_serial_port_queue_command (port, "^SYSINFO", 3, get_act_request_done, info);
+}
+
+/*****************************************************************************/
 /* Unsolicited message handlers */
 
 static void
@@ -552,5 +642,6 @@ mm_modem_huawei_gsm_class_init (MMModemHuaweiGsmClass *klass)
 
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;
+    gsm_class->get_access_technology = get_access_technology;
 }
 
