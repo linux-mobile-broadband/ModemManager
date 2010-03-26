@@ -11,9 +11,10 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
+#include <config.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -21,6 +22,7 @@
 #include "mm-modem-sierra-gsm.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
+#include "mm-modem-helpers.h"
 
 static void modem_init (MMModem *modem_class);
 
@@ -194,6 +196,65 @@ set_allowed_mode (MMGenericGsm *gsm,
     g_free (command);
 }
 
+static void
+get_act_request_done (MMAtSerialPort *port,
+                      GString *response,
+                      GError *error,
+                      gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
+    const char *p;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        goto done;
+    }
+
+    p = mm_strip_tag (response->str, "*CNTI:");
+    p = strchr (p, ',');
+    if (p) {
+        p++;
+        if (strcasestr (p, "HSDPA/HSUPA"))
+            act = MM_MODEM_GSM_ACCESS_TECH_HSPA;
+        else if (strcasestr (p, "HSUPA"))
+            act = MM_MODEM_GSM_ACCESS_TECH_HSUPA;
+        else if (strcasestr (p, "HSDPA"))
+            act = MM_MODEM_GSM_ACCESS_TECH_HSDPA;
+        else if (strcasestr (p, "UMTS"))
+            act = MM_MODEM_GSM_ACCESS_TECH_UMTS;
+        else if (strcasestr (p, "EDGE"))
+            act = MM_MODEM_GSM_ACCESS_TECH_EDGE;
+        else if (strcasestr (p, "GPRS"))
+            act = MM_MODEM_GSM_ACCESS_TECH_GPRS;
+        else if (strcasestr (p, "GSM"))
+            act = MM_MODEM_GSM_ACCESS_TECH_GSM;
+    }
+
+done:
+    mm_callback_info_set_result (info, GUINT_TO_POINTER (act), NULL);
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_access_technology (MMGenericGsm *modem,
+                       MMModemUIntFn callback,
+                       gpointer user_data)
+{
+    MMAtSerialPort *port;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+
+    port = mm_generic_gsm_get_best_at_port (modem, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_at_serial_port_queue_command (port, "*CNTI=0", 3, get_act_request_done, info);
+}
+
 /*****************************************************************************/
 /*    Modem class override functions                                         */
 /*****************************************************************************/
@@ -306,5 +367,6 @@ mm_modem_sierra_gsm_class_init (MMModemSierraGsmClass *klass)
     gsm_class->do_enable_power_up_done = real_do_enable_power_up_done;
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;
+    gsm_class->get_access_technology = get_access_technology;
 }
 
