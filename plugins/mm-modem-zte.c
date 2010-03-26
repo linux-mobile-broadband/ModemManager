@@ -11,9 +11,10 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
+#include <config.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -22,6 +23,7 @@
 #include "mm-serial-port.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
+#include "mm-modem-helpers.h"
 
 static void modem_init (MMModem *modem_class);
 
@@ -52,6 +54,34 @@ mm_modem_zte_new (const char *device,
                                    NULL));
 }
 
+/*****************************************************************************/
+
+static MMModemGsmAccessTech
+zte_act_to_mm (const char *str)
+{
+    g_return_val_if_fail (str != NULL, MM_MODEM_GSM_ACCESS_TECH_UNKNOWN);
+
+    /* Better technologies are listed first since modem sometimes says
+     * stuff like "GPRS/EDGE" and that should be handled as EDGE.
+     */
+    if (strcasestr (str, "HSPA"))
+        return MM_MODEM_GSM_ACCESS_TECH_HSPA;
+    else if (strcasestr (str, "HSUPA"))
+        return MM_MODEM_GSM_ACCESS_TECH_HSUPA;
+    else if (strcasestr (str, "HSDPA"))
+        return MM_MODEM_GSM_ACCESS_TECH_HSDPA;
+    else if (strcasestr (str, "UMTS"))
+        return MM_MODEM_GSM_ACCESS_TECH_UMTS;
+    else if (strcasestr (str, "EDGE"))
+        return MM_MODEM_GSM_ACCESS_TECH_EDGE;
+    else if (strcasestr (str, "GPRS"))
+        return MM_MODEM_GSM_ACCESS_TECH_GPRS;
+    else if (strcasestr (str, "GSM"))
+        return MM_MODEM_GSM_ACCESS_TECH_GSM;
+
+    return MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
+}
+
 static void
 zte_access_tech_changed (MMAtSerialPort *port,
                          GMatchInfo *info,
@@ -61,25 +91,8 @@ zte_access_tech_changed (MMAtSerialPort *port,
     char *str;
 
     str = g_match_info_fetch (info, 1);
-    if (str) {
-        /* Better technologies are listed first since modem sometimes says
-         * stuff like "GPRS/EDGE" and that should be handled as EDGE.
-         */
-        if (strstr (str, "HSPA"))
-            act = MM_MODEM_GSM_ACCESS_TECH_HSPA;
-        else if (strstr (str, "HSUPA"))
-            act = MM_MODEM_GSM_ACCESS_TECH_HSUPA;
-        else if (strstr (str, "HSDPA"))
-            act = MM_MODEM_GSM_ACCESS_TECH_HSDPA;
-        else if (strstr (str, "UMTS"))
-            act = MM_MODEM_GSM_ACCESS_TECH_UMTS;
-        else if (strstr (str, "EDGE"))
-            act = MM_MODEM_GSM_ACCESS_TECH_EDGE;
-        else if (strstr (str, "GPRS"))
-            act = MM_MODEM_GSM_ACCESS_TECH_GPRS;
-        else if (strstr (str, "GSM"))
-            act = MM_MODEM_GSM_ACCESS_TECH_GSM;
-    }
+    if (str)
+        act = zte_act_to_mm (str);
     g_free (str);
 
     mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (user_data), act);
@@ -230,6 +243,49 @@ set_allowed_mode (MMGenericGsm *gsm,
     command = g_strdup_printf ("AT+ZSNT=%d,0,%d", cm_mode, pref_acq);
     mm_at_serial_port_queue_command (port, command, 3, set_allowed_mode_done, info);
     g_free (command);
+}
+
+static void
+get_act_request_done (MMAtSerialPort *port,
+                      GString *response,
+                      GError *error,
+                      gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
+    const char *p;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else {
+        /* Sample response from an MF626:
+         *   +ZPAS: "GPRS/EDGE","CS_ONLY"
+         */
+        p = mm_strip_tag (response->str, "+ZPAS:");
+        act = zte_act_to_mm (p);
+    }
+
+    mm_callback_info_set_result (info, GUINT_TO_POINTER (act), NULL);
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_access_technology (MMGenericGsm *modem,
+                       MMModemUIntFn callback,
+                       gpointer user_data)
+{
+    MMAtSerialPort *port;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+
+    port = mm_generic_gsm_get_best_at_port (modem, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_at_serial_port_queue_command (port, "+ZPAS?", 3, get_act_request_done, info);
 }
 
 /*****************************************************************************/
@@ -459,5 +515,6 @@ mm_modem_zte_class_init (MMModemZteClass *klass)
     gsm_class->do_enable = do_enable;
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;
+    gsm_class->get_access_technology = get_access_technology;
 }
 
