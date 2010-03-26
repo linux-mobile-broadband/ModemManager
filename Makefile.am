@@ -1,10 +1,11 @@
+XSLTPROC = xsltproc --xinclude --nonet
+
+XMLS = $(wildcard introspection/mm-*.xml)
+
 if WITH_DOCS
 
 all:
 
-XSLTPROC = xsltproc --xinclude --nonet
-
-XMLS = $(wildcard introspection/mm-*.xml)
 # Figure out if we need ASYNC_INTROSPECT and add it later
 
 GENERATED_FILES = \
@@ -41,6 +42,14 @@ endif
 dbusactivationdir = $(datadir)/dbus-1/system-services
 dbusactivation_in_files = org.freedesktop.ModemManager.service.in
 dbusactivation_DATA = $(dbusactivation_in_files:.service.in=.service)
+
+includedir = @includedir@/mm
+
+include_HEADERS = include/mm-modem.h
+
+include/mm-modem.h: $(XMLS) introspection/all.xml header-generator.xsl
+	@install -d include
+	$(XSLTPROC) header-generator.xsl introspection/all.xml > $@
 
 %service: %service.in
 	$(edit) $< >$@
