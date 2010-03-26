@@ -1498,7 +1498,7 @@ get_reg_act_done (MMModem *modem,
                   GError *error,
                   gpointer user_data)
 {
-    if (modem && !error)
+    if (modem && !error && act)
         mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (modem), act);
 }
 
