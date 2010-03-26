@@ -1492,6 +1492,16 @@ roam_disconnect_done (MMModem *modem,
     g_message ("Disconnected because roaming is not allowed");
 }
 
+static void
+get_reg_act_done (MMModem *modem,
+                  guint32 act,
+                  GError *error,
+                  gpointer user_data)
+{
+    if (modem && !error)
+        mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (modem), act);
+}
+
 void
 mm_generic_gsm_set_reg_status (MMGenericGsm *self,
                                MMModemGsmNetworkRegStatus status)
@@ -1528,7 +1538,11 @@ mm_generic_gsm_set_reg_status (MMGenericGsm *self,
                 mm_at_serial_port_queue_command (port, "+COPS=3,2;+COPS?", 3, read_operator_code_done, self);
                 mm_at_serial_port_queue_command (port, "+COPS=3,0;+COPS?", 3, read_operator_name_done, self);
             }
+
+            /* And update signal quality and access technology */
             mm_modem_gsm_network_get_signal_quality (MM_MODEM_GSM_NETWORK (self), got_signal_quality, NULL);
+            if (MM_GENERIC_GSM_GET_CLASS (self)->get_access_technology)
+                MM_GENERIC_GSM_GET_CLASS (self)->get_access_technology (self, get_reg_act_done, NULL);
         }
     } else
         reg_info_updated (self, FALSE, 0, TRUE, NULL, TRUE, NULL);
