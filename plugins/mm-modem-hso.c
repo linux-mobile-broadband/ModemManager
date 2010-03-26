@@ -682,6 +682,14 @@ set_allowed_mode (MMGenericGsm *gsm,
     option_set_allowed_mode (gsm, mode, callback, user_data);
 }
 
+static void
+get_access_technology (MMGenericGsm *gsm,
+                       MMModemUIntFn callback,
+                       gpointer user_data)
+{
+    option_get_access_technology (gsm, callback, user_data);
+}
+
 /*****************************************************************************/
 
 static gboolean
@@ -808,5 +816,6 @@ mm_modem_hso_class_init (MMModemHsoClass *klass)
     gsm_class->do_enable_power_up_done = real_do_enable_power_up_done;
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;
+    gsm_class->get_access_technology = get_access_technology;
 }
 
