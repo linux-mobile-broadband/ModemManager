@@ -74,7 +74,12 @@ probe_result (MMPluginBase *base,
 typedef struct {
     MMAtSerialPort *serial;
     guint id;
-    gboolean secondary;
+    MMPortType ptype;
+    /* Whether or not there's already a detected modem that "owns" this port,
+     * in which case we'll claim it, but if no capabilities are detected it'll
+     * just be ignored.
+     */
+    gboolean parent_modem;
 } HuaweiSupportsInfo;
 
 static void
@@ -103,7 +108,7 @@ probe_secondary_supported (gpointer user_data)
     info->serial = NULL;
 
     /* Yay, supported, we got an unsolicited message */
-    info->secondary = TRUE;
+    info->ptype = MM_PORT_TYPE_SECONDARY;
     mm_plugin_base_supports_task_complete (task, 10);
     return FALSE;
 }
@@ -126,14 +131,20 @@ probe_secondary_timeout (gpointer user_data)
 {
     MMPluginBaseSupportsTask *task = user_data;
     HuaweiSupportsInfo *info;
+    guint level = 0;
 
     info = g_object_get_data (G_OBJECT (task), TAG_SUPPORTS_INFO);
     info->id = 0;
     g_object_unref (info->serial);
     info->serial = NULL;
 
-    /* Not supported by this plugin */
-    mm_plugin_base_supports_task_complete (task, 0);
+    /* Supported, but ignored if this port's parent device is already a modem */
+    if (info->parent_modem) {
+        info->ptype = MM_PORT_TYPE_IGNORED;
+        level = 10;
+    }
+
+    mm_plugin_base_supports_task_complete (task, level);
     return FALSE;
 }
 
@@ -210,6 +221,7 @@ supports_port (MMPluginBase *base,
 
         /* Listen for Huawei-specific unsolicited messages */
         info = g_malloc0 (sizeof (HuaweiSupportsInfo));
+        info->parent_modem = !!existing;
 
         info->serial = mm_at_serial_port_new (name, MM_PORT_TYPE_PRIMARY);
         g_object_set (G_OBJECT (info->serial), MM_PORT_CARRIER_DETECT, FALSE, NULL);
@@ -308,8 +320,8 @@ grab_port (MMPluginBase *base,
         MMPortType ptype = MM_PORT_TYPE_UNKNOWN;
 
         info = g_object_get_data (G_OBJECT (task), TAG_SUPPORTS_INFO);
-        if (info && info->secondary)
-            ptype = MM_PORT_TYPE_SECONDARY;
+        if (info)
+            ptype = info->ptype;
         else if (caps & MM_PLUGIN_BASE_PORT_CAP_QCDM)
             ptype = MM_PORT_TYPE_QCDM;
 
