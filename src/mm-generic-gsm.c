@@ -82,6 +82,7 @@ typedef struct {
     MMModemGsmNetworkRegStatus reg_status;
     guint pending_reg_id;
     MMCallbackInfo *pending_reg_info;
+    gboolean manual_reg;
 
     guint signal_quality_id;
     time_t signal_quality_timestamp;
@@ -1841,6 +1842,16 @@ registration_timed_out (gpointer data)
     return FALSE;
 }
 
+static gboolean
+reg_is_idle (MMModemGsmNetworkRegStatus status)
+{
+    if (   status == MM_MODEM_GSM_NETWORK_REG_STATUS_HOME
+        || status == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING
+        || status == MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING)
+        return FALSE;
+    return TRUE;
+}
+
 static void
 do_register (MMModemGsmNetwork *modem,
              const char *network_id,
@@ -1849,7 +1860,7 @@ do_register (MMModemGsmNetwork *modem,
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
-    char *command;
+    char *command = NULL;
 
     /* Clear any previous registration */
     mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
@@ -1859,10 +1870,18 @@ do_register (MMModemGsmNetwork *modem,
     priv->pending_reg_id = g_timeout_add_seconds (60, registration_timed_out, info);
     priv->pending_reg_info = info;
 
-    if (network_id)
+    /* If the user sent a specific network to use, lock it in.  If no specific
+     * network was given, and the modem is not registered and not searching,
+     * kick it to search for a network.  Also do auto registration if the modem
+     * had been set to manual registration last time but now is not.
+     */
+    if (network_id) {
         command = g_strdup_printf ("+COPS=1,2,\"%s\"", network_id);
-    else
+        priv->manual_reg = TRUE;
+    } else if (reg_is_idle (priv->reg_status) || priv->manual_reg) {
         command = g_strdup ("+COPS=0,,");
+        priv->manual_reg = FALSE;
+    }
 
     /* Ref the callback info to ensure it stays alive for register_done() even
      * if the timeout triggers and ends registration (which calls the callback
@@ -1882,8 +1901,12 @@ do_register (MMModemGsmNetwork *modem,
      * the +COPS response is never received.
      */
     mm_callback_info_ref (info);
-    mm_at_serial_port_queue_command (priv->primary, command, 120, register_done, info);
-    g_free (command);
+
+    if (command) {
+        mm_at_serial_port_queue_command (priv->primary, command, 120, register_done, info);
+        g_free (command);
+    } else
+        register_done (priv->primary, NULL, NULL, info);
 }
 
 static void
