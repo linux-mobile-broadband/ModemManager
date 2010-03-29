@@ -8,6 +8,8 @@ test_qcdm_SOURCES = \
 	test-qcdm-crc.h \
 	test-qcdm-escaping.c \
 	test-qcdm-escaping.h \
+	test-qcdm-utils.c \
+	test-qcdm-utils.h \
 	test-qcdm-com.c \
 	test-qcdm-com.h \
 	test-qcdm-result.c \

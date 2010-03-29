@@ -22,6 +22,7 @@
 #include "test-qcdm-escaping.h"
 #include "test-qcdm-com.h"
 #include "test-qcdm-result.h"
+#include "test-qcdm-utils.h"
 
 typedef struct {
     gpointer com_data;
@@ -82,6 +83,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_escape1, NULL));
     g_test_suite_add (suite, TESTCASE (test_escape2, NULL));
     g_test_suite_add (suite, TESTCASE (test_escape_unescape, NULL));
+    g_test_suite_add (suite, TESTCASE (test_utils_decapsulate_buffer, NULL));
     g_test_suite_add (suite, TESTCASE (test_result_string, NULL));
     g_test_suite_add (suite, TESTCASE (test_result_uint32, NULL));
     g_test_suite_add (suite, TESTCASE (test_result_uint8, NULL));

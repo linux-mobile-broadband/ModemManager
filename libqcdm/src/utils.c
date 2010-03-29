@@ -296,7 +296,7 @@ dm_decapsulate_buffer (const char *inbuf,
 
     /* Check the CRC of the packet's data */
     crc = crc16 (outbuf, unesc_len - 2);
-    pkt_crc = *((guint16 *) &outbuf[pkt_len - 2]);
+    pkt_crc = *((guint16 *) &outbuf[unesc_len - 2]);
     if (crc != GUINT_FROM_LE (pkt_crc)) {
         *out_used = pkt_len + 1; /* packet + CRC + 0x7E */
         return FALSE;
