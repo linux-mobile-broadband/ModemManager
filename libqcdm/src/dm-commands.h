@@ -184,7 +184,13 @@ struct DMCmdVersionInfoRsp {
     char rel_date[11];
     char rel_time[8];
     char model[8];
-    guint8 _unknown[8];
+    guint8 scm;
+    guint8 mob_cai_rev;
+    guint8 mob_model;
+    guint16 mob_firmware_rev;
+    guint8 slot_cycle_index;
+    guint8 msm_ver;
+    guint8 _unknown;
 } __attribute__ ((packed));
 typedef struct DMCmdVersionInfoRsp DMCmdVersionInfoRsp;
 
