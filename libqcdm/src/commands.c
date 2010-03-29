@@ -288,6 +288,9 @@ qcdm_cmd_cdma_status_result (const char *buf, gsize len, GError **error)
     qcdm_result_add_string (result, QCDM_CMD_CDMA_STATUS_ITEM_ESN, tmp);
     g_free (tmp);
 
+    tmp_num = (guint32) GUINT16_FROM_LE (rsp->rf_mode);
+    qcdm_result_add_uint32 (result, QCDM_CMD_CDMA_STATUS_ITEM_RF_MODE, tmp_num);
+
     tmp_num = (guint32) GUINT16_FROM_LE (rsp->cdma_rx_state);
     qcdm_result_add_uint32 (result, QCDM_CMD_CDMA_STATUS_ITEM_RX_STATE, tmp_num);
 

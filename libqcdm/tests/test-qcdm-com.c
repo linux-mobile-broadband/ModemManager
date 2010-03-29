@@ -443,7 +443,7 @@ test_com_status (void *f, void *data)
     gboolean success;
     GError *error = NULL;
     char buf[100];
-    const char *str;
+    const char *str, *detail;
     gint len;
     QCDMResult *result;
     gsize reply_len;
@@ -471,8 +471,60 @@ test_com_status (void *f, void *data)
     g_message ("%s: ESN: %s", __func__, str);
 
     n32 = 0;
+    detail = NULL;
+    qcdm_result_get_uint32 (result, QCDM_CMD_CDMA_STATUS_ITEM_RF_MODE, &n32);
+    switch (n32) {
+    case QCDM_CMD_CDMA_STATUS_RF_MODE_ANALOG:
+        detail = "analog";
+        break;
+    case QCDM_CMD_CDMA_STATUS_RF_MODE_CDMA_CELLULAR:
+        detail = "CDMA cellular";
+        break;
+    case QCDM_CMD_CDMA_STATUS_RF_MODE_CDMA_PCS:
+        detail = "CDMA PCS";
+        break;
+    case QCDM_CMD_CDMA_STATUS_RF_MODE_SLEEP:
+        detail = "sleep";
+        break;
+    case QCDM_CMD_CDMA_STATUS_RF_MODE_GPS:
+        detail = "GPS";
+        break;
+    case QCDM_CMD_CDMA_STATUS_RF_MODE_HDR:
+        detail = "HDR";
+        break;
+    default:
+        detail = "unknown";
+        break;
+    }
+    g_message ("%s: CDMA RF Mode: %u (%s)", __func__, n32, detail);
+
+    n32 = 0;
+    detail = NULL;
     qcdm_result_get_uint32 (result, QCDM_CMD_CDMA_STATUS_ITEM_RX_STATE, &n32);
-    g_message ("%s: CDMA RX State: %u", __func__, n32);
+    switch (n32) {
+    case QCDM_CMD_CDMA_STATUS_RX_STATE_ENTERING_CDMA:
+        detail = "entering CDMA";
+        break;
+    case QCDM_CMD_CDMA_STATUS_RX_STATE_SYNC_CHANNEL:
+        detail = "sync channel";
+        break;
+    case QCDM_CMD_CDMA_STATUS_RX_STATE_PAGING_CHANNEL:
+        detail = "paging channel";
+        break;
+    case QCDM_CMD_CDMA_STATUS_RX_STATE_TRAFFIC_CHANNEL_INIT:
+        detail = "traffic channel init";
+        break;
+    case QCDM_CMD_CDMA_STATUS_RX_STATE_TRAFFIC_CHANNEL:
+        detail = "traffic channel";
+        break;
+    case QCDM_CMD_CDMA_STATUS_RX_STATE_EXITING_CDMA:
+        detail = "exiting CDMA";
+        break;
+    default:
+        detail = "unknown";
+        break;
+    }
+    g_message ("%s: CDMA RX State: %u (%s)", __func__, n32, detail);
 
     n32 = 0;
     qcdm_result_get_uint32 (result, QCDM_CMD_CDMA_STATUS_ITEM_ENTRY_REASON, &n32);
