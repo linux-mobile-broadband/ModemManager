@@ -325,7 +325,10 @@ test_com_mdn (void *f, void *data)
 
     /* Parse the response into a result structure */
     result = qcdm_cmd_nv_get_mdn_result (buf, reply_len, &error);
-    g_assert (result);
+    if (!result) {
+        g_assert_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_NVCMD_FAILED);
+        return;
+    }
 
     g_print ("\n");
 
@@ -736,7 +739,8 @@ test_com_cm_subsys_state_info (void *f, void *data)
         detail = "HDR only";
         break;
     default:
-        g_assert_not_reached ();
+        detail = "unknown";
+        break;
     }
     g_message ("%s: Mode Preference: 0x%02X (%s)", __func__, n32 & 0xFF, detail);
 
