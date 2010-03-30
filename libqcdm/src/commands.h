@@ -110,6 +110,34 @@ QCDMResult *qcdm_cmd_sw_version_result (const char *buf,
 
 /**********************************************************************/
 
+enum {
+    QCDM_CMD_PILOT_SETS_TYPE_UNKNOWN = 0,
+    QCDM_CMD_PILOT_SETS_TYPE_ACTIVE = 1,
+    QCDM_CMD_PILOT_SETS_TYPE_CANDIDATE = 2,
+    QCDM_CMD_PILOT_SETS_TYPE_NEIGHBOR = 3,
+};
+
+gsize       qcdm_cmd_pilot_sets_new    (char *buf,
+                                        gsize len,
+                                        GError **error);
+
+QCDMResult *qcdm_cmd_pilot_sets_result (const char *buf,
+                                        gsize len,
+                                        GError **error);
+
+gboolean    qcdm_cmd_pilot_sets_result_get_num   (QCDMResult *result,
+                                                  guint32 set_type,
+                                                  guint32 *out_num);
+
+gboolean    qcdm_cmd_pilot_sets_result_get_pilot (QCDMResult *result,
+                                                  guint32 set_type,
+                                                  guint32 num,
+                                                  guint32 *out_pn_offset,
+                                                  guint32 *out_ecio,
+                                                  float *out_db);
+
+/**********************************************************************/
+
 #define QCDM_CMD_NV_GET_MDN_ITEM_PROFILE "profile"
 #define QCDM_CMD_NV_GET_MDN_ITEM_MDN "mdn"
 

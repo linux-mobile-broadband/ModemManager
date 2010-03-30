@@ -279,5 +279,21 @@ struct DMCmdSubsysZteStatusRsp {
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysZteStatusRsp DMCmdSubsysZteStatusRsp;
 
+struct DMCmdPilotSetsSet {
+    guint16 pn_offset;
+    guint16 ecio;
+} __attribute__ ((packed));
+typedef struct DMCmdPilotSetsSet DMCmdPilotSetsSet;
+
+struct DMCmdPilotSetsRsp {
+    guint8 code;
+    guint16 pilot_inc;
+    guint8 active_count;
+    guint8 candidate_count;
+    guint8 neighbor_count;
+    DMCmdPilotSetsSet sets[52];
+} __attribute__ ((packed));
+typedef struct DMCmdPilotSetsRsp DMCmdPilotSetsRsp;
+
 #endif  /* LIBQCDM_DM_COMMANDS_H */
 

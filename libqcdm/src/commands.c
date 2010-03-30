@@ -366,6 +366,128 @@ qcdm_cmd_sw_version_result (const char *buf, gsize len, GError **error)
 /**********************************************************************/
 
 gsize
+qcdm_cmd_pilot_sets_new (char *buf, gsize len, GError **error)
+{
+    char cmdbuf[3];
+    DMCmdHeader *cmd = (DMCmdHeader *) &cmdbuf[0];
+
+    g_return_val_if_fail (buf != NULL, 0);
+    g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->code = DIAG_CMD_PILOT_SETS;
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+#define PILOT_SETS_CMD_ACTIVE_SET    "active-set"
+#define PILOT_SETS_CMD_CANDIDATE_SET "candidate-set"
+#define PILOT_SETS_CMD_NEIGHBOR_SET  "neighbor-set"
+
+static const char *
+set_num_to_str (guint32 num)
+{
+    if (num == QCDM_CMD_PILOT_SETS_TYPE_ACTIVE)
+        return PILOT_SETS_CMD_ACTIVE_SET;
+    if (num == QCDM_CMD_PILOT_SETS_TYPE_CANDIDATE)
+        return PILOT_SETS_CMD_CANDIDATE_SET;
+    if (num == QCDM_CMD_PILOT_SETS_TYPE_NEIGHBOR)
+        return PILOT_SETS_CMD_NEIGHBOR_SET;
+    return NULL;
+}
+
+QCDMResult *
+qcdm_cmd_pilot_sets_result (const char *buf, gsize len, GError **error)
+{
+    QCDMResult *result = NULL;
+    DMCmdPilotSetsRsp *rsp = (DMCmdPilotSetsRsp *) buf;
+    GByteArray *array;
+    gsize sets_len;
+
+    g_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_PILOT_SETS, sizeof (DMCmdPilotSetsRsp), error))
+        return NULL;
+
+    result = qcdm_result_new ();
+
+    sets_len = rsp->active_count * sizeof (DMCmdPilotSetsSet);
+    if (sets_len > 0) {
+        array = g_byte_array_sized_new (sets_len);
+        g_byte_array_append (array, (const guint8 *) &rsp->sets[0], sets_len);
+        qcdm_result_add_boxed (result, PILOT_SETS_CMD_ACTIVE_SET, G_TYPE_BYTE_ARRAY, array);
+    }
+
+    sets_len = rsp->candidate_count * sizeof (DMCmdPilotSetsSet);
+    if (sets_len > 0) {
+        array = g_byte_array_sized_new (sets_len);
+        g_byte_array_append (array, (const guint8 *) &rsp->sets[rsp->active_count], sets_len);
+        qcdm_result_add_boxed (result, PILOT_SETS_CMD_CANDIDATE_SET, G_TYPE_BYTE_ARRAY, array);
+    }
+
+    sets_len = rsp->neighbor_count * sizeof (DMCmdPilotSetsSet);
+    if (sets_len > 0) {
+        array = g_byte_array_sized_new (sets_len);
+        g_byte_array_append (array, (const guint8 *) &rsp->sets[rsp->active_count + rsp->candidate_count], sets_len);
+        qcdm_result_add_boxed (result, PILOT_SETS_CMD_NEIGHBOR_SET, G_TYPE_BYTE_ARRAY, array);
+    }
+
+    return result;
+}
+
+gboolean
+qcdm_cmd_pilot_sets_result_get_num (QCDMResult *result,
+                                    guint32 set_type,
+                                    guint32 *out_num)
+{
+    const char *set_name;
+    GByteArray *array = NULL;
+
+    g_return_val_if_fail (result != NULL, FALSE);
+
+    set_name = set_num_to_str (set_type);
+    g_return_val_if_fail (set_name != NULL, FALSE);
+
+    if (!qcdm_result_get_boxed (result, set_name, (gpointer) &array))
+        return FALSE;
+
+    *out_num = array->len / sizeof (DMCmdPilotSetsSet);
+    return TRUE;
+}
+
+gboolean
+qcdm_cmd_pilot_sets_result_get_pilot (QCDMResult *result,
+                                      guint32 set_type,
+                                      guint32 num,
+                                      guint32 *out_pn_offset,
+                                      guint32 *out_ecio,
+                                      float *out_db)
+{
+    const char *set_name;
+    GByteArray *array = NULL;
+    DMCmdPilotSetsSet *set;
+
+    g_return_val_if_fail (result != NULL, FALSE);
+
+    set_name = set_num_to_str (set_type);
+    g_return_val_if_fail (set_name != NULL, FALSE);
+
+    if (!qcdm_result_get_boxed (result, set_name, (gpointer) &array))
+        return FALSE;
+
+    g_return_val_if_fail (num < array->len / sizeof (DMCmdPilotSetsSet), FALSE);
+
+    set = (DMCmdPilotSetsSet *) &array->data[num * sizeof (DMCmdPilotSetsSet)];
+    *out_pn_offset = set->pn_offset;
+    *out_ecio = set->ecio;
+    /* EC/IO is in units of -0.5 dB per the specs */
+    *out_db = (float) set->ecio * -0.5;
+    return TRUE;
+}
+
+/**********************************************************************/
+
+gsize
 qcdm_cmd_nv_get_mdn_new (char *buf, gsize len, guint8 profile, GError **error)
 {
     char cmdbuf[sizeof (DMCmdNVReadWrite) + 2];

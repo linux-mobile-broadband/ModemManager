@@ -599,6 +599,60 @@ test_com_sw_version (void *f, void *data)
 }
 
 void
+test_com_pilot_sets (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    GError *error = NULL;
+    char buf[256];
+    gint len;
+    QCDMResult *result;
+    gsize reply_len;
+    guint32 num, i;
+
+    len = qcdm_cmd_pilot_sets_new (buf, sizeof (buf), NULL);
+    g_assert (len == 4);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_pilot_sets_result (buf, reply_len, &error);
+    g_assert (result);
+
+    num = 0;
+    qcdm_cmd_pilot_sets_result_get_num (result, QCDM_CMD_PILOT_SETS_TYPE_ACTIVE, &num);
+    g_message ("%s: Active Pilots: %d", __func__, num);
+    for (i = 0; i < num; i++) {
+        guint32 pn_offset = 0, ecio = 0;
+        float db = 0;
+
+        qcdm_cmd_pilot_sets_result_get_pilot (result,
+                                              QCDM_CMD_PILOT_SETS_TYPE_ACTIVE,
+                                              i,
+                                              &pn_offset,
+                                              &ecio,
+                                              &db);
+        g_message ("   %d: PN offset %d", i, pn_offset);
+        g_message ("      EC/IO     %d  (%.1f dB)", ecio, db);
+    }
+
+    num = 0;
+    qcdm_cmd_pilot_sets_result_get_num (result, QCDM_CMD_PILOT_SETS_TYPE_CANDIDATE, &num);
+    g_message ("%s: Candidate Pilots: %d", __func__, num);
+
+    num = 0;
+    qcdm_cmd_pilot_sets_result_get_num (result, QCDM_CMD_PILOT_SETS_TYPE_NEIGHBOR, &num);
+    g_message ("%s: Neighbor Pilots: %d", __func__, num);
+
+    qcdm_result_unref (result);
+}
+
+void
 test_com_cm_subsys_state_info (void *f, void *data)
 {
     TestComData *d = data;

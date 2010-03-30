@@ -98,6 +98,7 @@ int main (int argc, char **argv)
         g_test_suite_add (suite, TESTCASE (test_com_read_mode_pref, data->com_data));
         g_test_suite_add (suite, TESTCASE (test_com_status, data->com_data));
         g_test_suite_add (suite, TESTCASE (test_com_sw_version, data->com_data));
+        g_test_suite_add (suite, TESTCASE (test_com_pilot_sets, data->com_data));
         g_test_suite_add (suite, TESTCASE (test_com_cm_subsys_state_info, data->com_data));
         g_test_suite_add (suite, TESTCASE (test_com_hdr_subsys_state_info, data->com_data));
         g_test_suite_add (suite, TESTCASE (test_com_zte_subsys_status, data->com_data));
