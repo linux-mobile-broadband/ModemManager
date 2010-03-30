@@ -19,6 +19,7 @@
 #define LIBQCDM_RESULT_PRIVATE_H
 
 #include <glib.h>
+#include <glib-object.h>
 #include "result.h"
 
 QCDMResult *qcdm_result_new (void);
@@ -36,6 +37,15 @@ void qcdm_result_add_uint8  (QCDMResult *result,
 void qcdm_result_add_uint32 (QCDMResult *result,
                              const char *key,
                              guint32 num);
+
+void qcdm_result_add_boxed  (QCDMResult *result,
+                             const char *key,
+                             GType btype,
+                             gpointer boxed);
+
+gboolean qcdm_result_get_boxed (QCDMResult *result,
+                                const char *key,
+                                gpointer *out_val);
 
 #endif  /* LIBQCDM_RESULT_PRIVATE_H */
 

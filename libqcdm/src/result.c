@@ -75,7 +75,6 @@ qcdm_result_unref (QCDMResult *result)
     }
 }
 
-
 void
 qcdm_result_add_string (QCDMResult *result,
                         const char *key,
@@ -201,6 +200,49 @@ qcdm_result_get_uint32 (QCDMResult *result,
         return FALSE;
 
     *out_val = (guint32) g_value_get_uint (val);
+    return TRUE;
+}
+
+void
+qcdm_result_add_boxed (QCDMResult *result,
+                       const char *key,
+                       GType btype,
+                       gpointer boxed)
+{
+    GValue *val;
+
+    g_return_if_fail (result != NULL);
+    g_return_if_fail (result->refcount > 0);
+    g_return_if_fail (key != NULL);
+
+    val = g_slice_new0 (GValue);
+    g_value_init (val, btype);
+    g_value_set_static_boxed (val, boxed);
+
+    g_hash_table_insert (result->hash, (gpointer) key, val);
+}
+
+gboolean
+qcdm_result_get_boxed (QCDMResult *result,
+                       const char *key,
+                       gpointer *out_val)
+{
+    GValue *val;
+
+    g_return_val_if_fail (result != NULL, FALSE);
+    g_return_val_if_fail (result->refcount > 0, FALSE);
+    g_return_val_if_fail (key != NULL, FALSE);
+    g_return_val_if_fail (out_val != NULL, FALSE);
+
+    val = g_hash_table_lookup (result->hash, key);
+    if (!val)
+        return FALSE;
+
+    g_warn_if_fail (G_VALUE_HOLDS_BOXED (val));
+    if (!G_VALUE_HOLDS_BOXED (val))
+        return FALSE;
+
+    *out_val = g_value_get_boxed (val);
     return TRUE;
 }
 
