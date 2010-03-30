@@ -986,6 +986,15 @@ convert_sid (const char *sid)
     return (int) tmp_sid;
 }
 
+static GError *
+new_css_no_service_error (void)
+{
+    /* NOTE: update reg_state_css_response() if this error changes */
+    return g_error_new_literal (MM_MOBILE_ERROR,
+                                MM_MOBILE_ERROR_NO_NETWORK,
+                                "No service");
+}
+
 static void
 serving_system_done (MMAtSerialPort *port,
                      GString *response,
@@ -1079,12 +1088,9 @@ serving_system_done (MMAtSerialPort *port,
             sid = 99999;
 
         /* 99999 means unknown/no service */
-        if (sid == 99999) {
-            /* NOTE: update reg_state_css_response() if this error changes */
-            info->error = g_error_new_literal (MM_MOBILE_ERROR,
-                                               MM_MOBILE_ERROR_NO_NETWORK,
-                                               "No service");
-        } else {
+        if (sid == 99999)
+            info->error = new_css_no_service_error ();
+        else {
             mm_callback_info_set_data (info, "class", GUINT_TO_POINTER (class), NULL);
             mm_callback_info_set_data (info, "band", GUINT_TO_POINTER ((guint32) band), NULL);
             mm_callback_info_set_data (info, "sid", GUINT_TO_POINTER (sid), NULL);
@@ -1099,25 +1105,78 @@ serving_system_done (MMAtSerialPort *port,
 }
 
 static void
+legacy_get_serving_system (MMGenericCdma *self, MMCallbackInfo *info)
+{
+    MMAtSerialPort *port;
+
+    port = mm_generic_cdma_get_best_at_port (self, &info->error);
+    if (port)
+        mm_at_serial_port_queue_command (port, "+CSS?", 3, serving_system_done, info);
+    else
+        mm_callback_info_schedule (info);
+}
+
+static void
+cdma_status_cb (MMQcdmSerialPort *port,
+                GByteArray *response,
+                GError *error,
+                gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    QCDMResult *result;
+    guint32 sid, rxstate;
+
+    if (error)
+        goto error;
+
+    /* Parse the response */
+    result = qcdm_cmd_cdma_status_result ((const char *) response->data, response->len, &info->error);
+    if (!result)
+        goto error;
+
+    qcdm_result_get_uint32 (result, QCDM_CMD_CDMA_STATUS_ITEM_RX_STATE, &rxstate);
+    qcdm_result_get_uint32 (result, QCDM_CMD_CDMA_STATUS_ITEM_SID, &sid);
+    qcdm_result_unref (result);
+
+    if (rxstate == QCDM_CMD_CDMA_STATUS_RX_STATE_ENTERING_CDMA)
+        info->error = new_css_no_service_error ();
+    else {
+        mm_callback_info_set_data (info, "class", GUINT_TO_POINTER (0), NULL);
+        mm_callback_info_set_data (info, "band", GUINT_TO_POINTER ((guint32) 'Z'), NULL);
+        mm_callback_info_set_data (info, "sid", GUINT_TO_POINTER (sid), NULL);
+    }
+
+    mm_callback_info_schedule (info);
+    return;
+
+error:
+    /* If there was some error, fall back to use +CSS like we did before QCDM */
+    legacy_get_serving_system (MM_GENERIC_CDMA (info->modem), info);
+}
+
+static void
 get_serving_system (MMModemCdma *modem,
                     MMModemCdmaServingSystemFn callback,
                     gpointer user_data)
 {
+    MMGenericCdma *self = MM_GENERIC_CDMA (modem);
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
     MMCallbackInfo *info;
-    MMAtSerialPort *port;
 
     info = mm_callback_info_new_full (MM_MODEM (modem),
                                       serving_system_invoke,
                                       G_CALLBACK (callback),
                                       user_data);
 
-    port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (modem), &info->error);
-    if (!port) {
-        mm_callback_info_schedule (info);
-        return;
-    }
+    if (priv->qcdm) {
+        GByteArray *cdma_status;
 
-    mm_at_serial_port_queue_command (port, "+CSS?", 3, serving_system_done, info);
+        cdma_status = g_byte_array_sized_new (25);
+        cdma_status->len = qcdm_cmd_cdma_status_new ((char *) cdma_status->data, 25, NULL);
+        g_assert (cdma_status->len);
+        mm_qcdm_serial_port_queue_command (priv->qcdm, cdma_status, 3, cdma_status_cb, info);
+    } else
+        legacy_get_serving_system (self, info);
 }
 
 #define CDMA_1X_STATE_TAG     "cdma-1x-reg-state"
