@@ -53,6 +53,21 @@ typedef struct {
     GHashTable *supports;
 } MMManagerPrivate;
 
+typedef struct {
+    MMManager *manager;
+    char *subsys;
+    char *name;
+    char *physdev_path;
+    GSList *plugins;
+    GSList *cur_plugin;
+    guint defer_id;
+    guint done_id;
+
+    guint32 best_level;
+    MMPlugin *best_plugin;
+} SupportsInfo;
+
+
 static MMPlugin *
 load_plugin (const char *path)
 {
@@ -189,14 +204,47 @@ remove_modem (MMManager *manager, MMModem *modem)
 }
 
 static void
-modem_valid (MMModem *modem, GParamSpec *pspec, gpointer user_data)
+check_export_modem (MMManager *self, MMModem *modem)
 {
-    MMManager *manager = MM_MANAGER (user_data);
-    MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
-    static guint32 id = 0;
-    char *path, *device;
+    MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (self);
+    const char *modem_physdev;
+    GHashTableIter iter;
+    gpointer value;
 
+    /* A modem is only exported to D-Bus when both of the following are true:
+     *
+     *   1) the modem is valid
+     *   2) all ports the modem provides have either been grabbed or are
+     *       unsupported by any plugin
+     *
+     * This ensures that all the modem's ports are completely ready before
+     * any clients can do anything with it.
+     *
+     * FIXME: if udev or the kernel are really slow giving us ports, there's a
+     * chance that a port could show up after the modem is already created and
+     * all other ports are already handled.  That chance is very small though.
+     */
+
+    modem_physdev = mm_modem_get_device (modem);
+    g_assert (modem_physdev);
+
+    /* Check for ports that are in the process of being interrogated by plugins */
+    g_hash_table_iter_init (&iter, priv->supports);
+    while (g_hash_table_iter_next (&iter, NULL, &value)) {
+        SupportsInfo *info = value;
+
+        if (!strcmp (info->physdev_path, modem_physdev)) {
+            g_debug ("(%s/%s): outstanding support task prevents export of %s",
+                     info->subsys, info->name, mm_modem_get_device (modem));
+            return;
+        }
+    }
+
+    /* No outstanding port tasks, so if the modem is valid we can export it */
     if (mm_modem_get_valid (modem)) {
+        static guint32 id = 0;
+        char *path, *device;
+
         path = g_strdup_printf (MM_DBUS_PATH"/Modems/%d", id++);
         dbus_g_connection_register_g_object (priv->connection, path, G_OBJECT (modem));
         g_object_set_data_full (G_OBJECT (modem), DBUS_PATH_TAG, path, (GDestroyNotify) g_free);
@@ -206,27 +254,38 @@ modem_valid (MMModem *modem, GParamSpec *pspec, gpointer user_data)
         g_debug ("Exported modem %s as %s", device, path);
         g_free (device);
 
-        g_signal_emit (manager, signals[DEVICE_ADDED], 0, modem);
-    } else
-        remove_modem (manager, modem);
+        g_signal_emit (self, signals[DEVICE_ADDED], 0, modem);
+    }
 }
 
 static void
-add_modem (MMManager *manager, MMModem *modem)
+modem_valid (MMModem *modem, GParamSpec *pspec, gpointer user_data)
+{
+    MMManager *manager = MM_MANAGER (user_data);
+
+    if (mm_modem_get_valid (modem))
+        check_export_modem (manager, modem);
+    else
+        remove_modem (manager, modem);
+}
+
+#define MANAGER_PLUGIN_TAG "manager-plugin"
+
+static void
+add_modem (MMManager *manager, MMModem *modem, MMPlugin *plugin)
 {
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
     char *device;
-    gboolean valid = FALSE;
 
     device = mm_modem_get_device (modem);
     g_assert (device);
     if (!g_hash_table_lookup (priv->modems, device)) {
         g_hash_table_insert (priv->modems, g_strdup (device), modem);
+        g_object_set_data (G_OBJECT (modem), MANAGER_PLUGIN_TAG, plugin);
+
         g_debug ("Added modem %s", device);
         g_signal_connect (modem, "notify::valid", G_CALLBACK (modem_valid), manager);
-        g_object_get (modem, MM_MODEM_VALID, &valid, NULL);
-        if (valid)
-            modem_valid (modem, NULL, manager);
+        check_export_modem (manager, modem);
     }
     g_free (device);
 }
@@ -237,10 +296,8 @@ enumerate_devices_cb (gpointer key, gpointer val, gpointer user_data)
     MMModem *modem = MM_MODEM (val);
     GPtrArray **devices = (GPtrArray **) user_data;
     const char *path;
-    gboolean valid = FALSE;
 
-    g_object_get (G_OBJECT (modem), MM_MODEM_VALID, &valid, NULL);
-    if (valid) {
+    if (mm_modem_get_valid (modem)) {
         path = g_object_get_data (G_OBJECT (modem), DBUS_PATH_TAG);
         g_return_if_fail (path != NULL);
         g_ptr_array_add (*devices, g_strdup (path));
@@ -294,20 +351,6 @@ find_modem_for_port (MMManager *manager, const char *subsys, const char *name)
     }
     return NULL;
 }
-
-typedef struct {
-    MMManager *manager;
-    char *subsys;
-    char *name;
-    char *physdev_path;
-    GSList *plugins;
-    GSList *cur_plugin;
-    guint defer_id;
-    guint done_id;
-
-    guint32 best_level;
-    MMPlugin *best_plugin;
-} SupportsInfo;
 
 static SupportsInfo *
 supports_info_new (MMManager *self,
@@ -418,14 +461,40 @@ try_supports_port (MMManager *manager,
     }
 }
 
+static void
+supports_cleanup (MMManager *self,
+                  const char *subsys,
+                  const char *name,
+                  MMModem *modem)
+{
+    MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (self);
+    char *key;
+
+    g_return_if_fail (subsys != NULL);
+    g_return_if_fail (name != NULL);
+
+    key = get_key (subsys, name);
+    g_hash_table_remove (priv->supports, key);
+    g_free (key);
+
+    /* Each time a supports task is cleaned up, check whether the modem is
+     * now completely probed/handled and should be exported to D-Bus clients.
+     *
+     * IMPORTANT: this must be done after removing the supports into from
+     * priv->supports since check_export_modem() searches through priv->supports
+     * for outstanding supports tasks.
+     */
+    if (modem)
+        check_export_modem (self, modem);
+}
+
 static gboolean
 do_grab_port (gpointer user_data)
 {
     SupportsInfo *info = user_data;
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (info->manager);
-    MMModem *modem;
+    MMModem *modem = NULL;
     GError *error = NULL;
-    char *key;
     GSList *iter;
 
     /* No more plugins to try */
@@ -452,7 +521,7 @@ do_grab_port (gpointer user_data)
                         mm_modem_get_device (modem),
                         info->name);
 
-            add_modem (info->manager, modem);
+            add_modem (info->manager, modem, info->best_plugin);
         } else {
             g_warning ("%s: plugin '%s' claimed to support %s/%s but couldn't: (%d) %s",
                         __func__,
@@ -461,6 +530,7 @@ do_grab_port (gpointer user_data)
                         info->name,
                         error ? error->code : -1,
                         (error && error->message) ? error->message : "(unknown)");
+            modem = existing;
         }
     }
 
@@ -470,10 +540,7 @@ do_grab_port (gpointer user_data)
     g_slist_free (info->plugins);
     info->cur_plugin = info->plugins = NULL;
 
-    key = get_key (info->subsys, info->name);
-    g_hash_table_remove (priv->supports, key);
-    g_free (key);
-
+    supports_cleanup (info->manager, info->subsys, info->name, modem);
     return FALSE;
 }
 
@@ -486,6 +553,7 @@ supports_callback (MMPlugin *plugin,
 {
     SupportsInfo *info = user_data;
     MMPlugin *next_plugin = NULL;
+    MMModem *existing;
 
     info->cur_plugin = info->cur_plugin->next;
     if (info->cur_plugin)
@@ -497,14 +565,43 @@ supports_callback (MMPlugin *plugin,
         info->best_plugin = plugin;
     }
 
-    /* Prevent the generic plugin from probing devices that are already supported
-     * by other plugins.  For Huawei for example, secondary ports shouldn't
-     * be probed, but the generic plugin would happily do so if allowed to.
+    /* If there's already a modem for this port's physical device, stop asking
+     * plugins because the same plugin that owns the modem gets this port no
+     * matter what.
      */
-    if (   next_plugin
-        && !strcmp (mm_plugin_get_name (next_plugin), MM_PLUGIN_GENERIC_NAME)
-        && info->best_plugin)
-        next_plugin = NULL;
+    existing = find_modem_for_device (info->manager, info->physdev_path);
+    if (existing) {
+        MMPlugin *existing_plugin;
+
+        existing_plugin = MM_PLUGIN (g_object_get_data (G_OBJECT (existing), MANAGER_PLUGIN_TAG));
+        g_assert (existing_plugin);
+
+        if (plugin == existing_plugin) {
+            if (level == 0) {
+                /* If the plugin that just completed the support check claims not to
+                 * support this port, but this plugin is clearly the right plugin
+                 * since it claimed this port's physical modem, just drop the port.
+                 */
+                g_debug ("(%s/%s): ignoring port unsupported by physical modem's plugin",
+                         info->subsys, info->name);
+                supports_cleanup (info->manager, info->subsys, info->name, existing);
+                return;
+            }
+
+            /* Otherwise, this port was supported by the plugin that owns the
+             * port's physical modem, so we stop the supports checks anyway.
+             */
+            next_plugin = NULL;
+        } else if (info->best_plugin != existing_plugin) {
+            /* If this port hasn't yet been handled by the right plugin, stop
+             * asking all other plugins if they support this port, just let the
+             * plugin that handles this port's physical device see if it
+             * supports it.
+             */
+            next_plugin = existing_plugin;
+        } else
+            g_assert_not_reached ();
+    }
 
     if (next_plugin) {
         /* Try the next plugin */
@@ -561,6 +658,8 @@ device_added (MMManager *manager, GUdevDevice *device)
     char *key;
     gboolean found;
     GUdevDevice *physdev = NULL;
+    MMPlugin *plugin;
+    MMModem *existing;
 
     g_return_if_fail (device != NULL);
 
@@ -611,7 +710,16 @@ device_added (MMManager *manager, GUdevDevice *device)
     info = supports_info_new (manager, subsys, name, physdev_path);
     g_hash_table_insert (priv->supports, g_strdup (key), info);
 
-    try_supports_port (manager, MM_PLUGIN (info->cur_plugin->data), info);
+    /* If this port's physical modem is already owned by a plugin, don't bother
+     * asking all plugins whether they support this port, just let the owning
+     * plugin check if it supports the port.
+     */
+    plugin = MM_PLUGIN (info->cur_plugin->data);
+    existing = find_modem_for_device (manager, physdev_path);
+    if (existing)
+        plugin = MM_PLUGIN (g_object_get_data (G_OBJECT (existing), MANAGER_PLUGIN_TAG));
+
+    try_supports_port (manager, plugin, info);
 
 out:
     if (physdev)
