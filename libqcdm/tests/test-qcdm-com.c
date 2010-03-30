@@ -729,6 +729,9 @@ test_com_cm_subsys_state_info (void *f, void *data)
     n32 = 0;
     qcdm_result_get_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_MODE_PREF, &n32);
     switch (n32) {
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_DIGITAL_ONLY:
+        detail = "digital only";
+        break;
     case QCDM_CMD_CM_SUBSYS_STATE_INFO_MODE_PREF_AUTO:
         detail = "automatic";
         break;
