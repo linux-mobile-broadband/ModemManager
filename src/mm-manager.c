@@ -383,11 +383,15 @@ try_supports_port (MMManager *manager,
                    SupportsInfo *info)
 {
     MMPluginSupportsResult result;
+    MMModem *existing;
+
+    existing = find_modem_for_device (manager, info->physdev_path);
 
     result = mm_plugin_supports_port (plugin,
                                       info->subsys,
                                       info->name,
                                       info->physdev_path,
+                                      existing,
                                       supports_callback,
                                       info);
 
@@ -426,8 +430,12 @@ do_grab_port (gpointer user_data)
 
     /* No more plugins to try */
     if (info->best_plugin) {
+        MMModem *existing;
+
+        existing = g_hash_table_lookup (priv->modems, info->physdev_path);
+
         /* Create the modem */
-        modem = mm_plugin_grab_port (info->best_plugin, info->subsys, info->name, &error);
+        modem = mm_plugin_grab_port (info->best_plugin, info->subsys, info->name, existing, &error);
         if (modem) {
             guint32 modem_type = MM_MODEM_TYPE_UNKNOWN;
             const char *type_name = "UNKNOWN";

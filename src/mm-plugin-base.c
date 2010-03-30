@@ -51,8 +51,6 @@ static GHashTable *cached_caps = NULL;
 typedef struct {
     char *name;
     GUdevClient *client;
-
-    GHashTable *modems;
     GHashTable *tasks;
 } MMPluginBasePrivate;
 
@@ -873,20 +871,6 @@ mm_plugin_base_get_cached_port_capabilities (MMPluginBase *self,
 static void
 modem_destroyed (gpointer data, GObject *modem)
 {
-    MMPluginBase *self = MM_PLUGIN_BASE (data);
-    MMPluginBasePrivate *priv = MM_PLUGIN_BASE_GET_PRIVATE (self);
-    GHashTableIter iter;
-    gpointer key, value;
-
-    /* Remove it from the modems info */
-    g_hash_table_iter_init (&iter, priv->modems);
-    while (g_hash_table_iter_next (&iter, &key, &value)) {
-        if (value == modem) {
-            g_hash_table_iter_remove (&iter);
-            break;
-        }
-    }
-
     /* Since we don't track port cached capabilities on a per-modem basis,
      * we just have to live with blowing away the cached capabilities whenever
      * a modem gets removed.  Could do better here by storing a structure
@@ -895,21 +879,6 @@ modem_destroyed (gpointer data, GObject *modem)
      * that the modem that was just removed owned, but whatever.
      */
     g_hash_table_remove_all (cached_caps);
-}
-
-MMModem *
-mm_plugin_base_find_modem (MMPluginBase *self,
-                           const char *master_device)
-{
-    MMPluginBasePrivate *priv;
-
-    g_return_val_if_fail (self != NULL, NULL);
-    g_return_val_if_fail (MM_IS_PLUGIN_BASE (self), NULL);
-    g_return_val_if_fail (master_device != NULL, NULL);
-    g_return_val_if_fail (strlen (master_device) > 0, NULL);
-
-    priv = MM_PLUGIN_BASE_GET_PRIVATE (self);
-    return g_hash_table_lookup (priv->modems, master_device);
 }
 
 /* From hostap, Copyright (c) 2002-2005, Jouni Malinen <jkmaline@cc.hut.fi> */
@@ -1042,6 +1011,7 @@ supports_port (MMPlugin *plugin,
                const char *subsys,
                const char *name,
                const char *physdev_path,
+               MMModem *existing,
                MMSupportsPortResultFunc callback,
                gpointer callback_data)
 {
@@ -1051,7 +1021,6 @@ supports_port (MMPlugin *plugin,
     char *driver = NULL, *key = NULL;
     MMPluginBaseSupportsTask *task;
     MMPluginSupportsResult result = MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
-    MMModem *existing;
 
     key = get_key (subsys, name);
     task = g_hash_table_lookup (priv->tasks, key);
@@ -1071,9 +1040,6 @@ supports_port (MMPlugin *plugin,
     task = supports_task_new (self, port, physdev_path, driver, callback, callback_data);
     g_assert (task);
     g_hash_table_insert (priv->tasks, g_strdup (key), g_object_ref (task));
-
-    /* Help the plugin out a bit by finding an existing modem for this port */
-    existing = g_hash_table_lookup (priv->modems, physdev_path);
 
     result = MM_PLUGIN_BASE_GET_CLASS (self)->supports_port (self, existing, task);
     if (result != MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS) {
@@ -1118,14 +1084,14 @@ static MMModem *
 grab_port (MMPlugin *plugin,
            const char *subsys,
            const char *name,
+           MMModem *existing,
            GError **error)
 {
     MMPluginBase *self = MM_PLUGIN_BASE (plugin);
     MMPluginBasePrivate *priv = MM_PLUGIN_BASE_GET_PRIVATE (self);
     MMPluginBaseSupportsTask *task;
+    MMModem *modem = NULL;
     char *key;
-    MMModem *existing = NULL, *modem = NULL;
-    const char *physdev_path;
 
     key = get_key (subsys, name);
     task = g_hash_table_lookup (priv->tasks, key);
@@ -1134,16 +1100,10 @@ grab_port (MMPlugin *plugin,
         g_return_val_if_fail (task != NULL, FALSE);
     }
 
-    /* Help the plugin out a bit by finding an existing modem for this port */
-    physdev_path = mm_plugin_base_supports_task_get_physdev_path (task);
-    existing = g_hash_table_lookup (priv->modems, physdev_path);
-
     /* Let the modem grab the port */
     modem = MM_PLUGIN_BASE_GET_CLASS (self)->grab_port (self, existing, task, error);
-    if (modem && !existing) {
-        g_hash_table_insert (priv->modems, g_strdup (physdev_path), modem);
+    if (modem && !existing)
         g_object_weak_ref (G_OBJECT (modem), modem_destroyed, self);
-    }
 
     g_hash_table_remove (priv->tasks, key);
     g_free (key);
@@ -1173,7 +1133,6 @@ mm_plugin_base_init (MMPluginBase *self)
 
     priv->client = g_udev_client_new (subsys);
 
-    priv->modems = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
     priv->tasks = g_hash_table_new_full (g_str_hash, g_str_equal, g_free,
                                          (GDestroyNotify) g_object_unref);
 }
@@ -1220,7 +1179,6 @@ finalize (GObject *object)
 
     g_object_unref (priv->client);
 
-    g_hash_table_destroy (priv->modems);
     g_hash_table_destroy (priv->tasks);
 
     G_OBJECT_CLASS (mm_plugin_base_parent_class)->finalize (object);

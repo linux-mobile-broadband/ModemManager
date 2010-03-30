@@ -29,6 +29,7 @@ mm_plugin_supports_port (MMPlugin *plugin,
                          const char *subsys,
                          const char *name,
                          const char *physdev_path,
+                         MMModem *existing,
                          MMSupportsPortResultFunc callback,
                          gpointer user_data)
 {
@@ -42,6 +43,7 @@ mm_plugin_supports_port (MMPlugin *plugin,
                                                             subsys,
                                                             name,
                                                             physdev_path,
+                                                            existing,
                                                             callback,
                                                             user_data);
 }
@@ -62,13 +64,14 @@ MMModem *
 mm_plugin_grab_port (MMPlugin *plugin,
                      const char *subsys,
                      const char *name,
+                     MMModem *existing,
                      GError **error)
 {
     g_return_val_if_fail (MM_IS_PLUGIN (plugin), FALSE);
     g_return_val_if_fail (subsys != NULL, FALSE);
     g_return_val_if_fail (name != NULL, FALSE);
 
-    return MM_PLUGIN_GET_INTERFACE (plugin)->grab_port (plugin, subsys, name, error);
+    return MM_PLUGIN_GET_INTERFACE (plugin)->grab_port (plugin, subsys, name, existing, error);
 }
 
 /*****************************************************************************/
