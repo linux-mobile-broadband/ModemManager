@@ -414,7 +414,10 @@ test_com_read_mode_pref (void *f, void *data)
 
     /* Parse the response into a result structure */
     result = qcdm_cmd_nv_get_mode_pref_result (buf, reply_len, &error);
-    g_assert (result);
+    if (!result) {
+        g_assert_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_NVCMD_FAILED);
+        return;
+    }
 
     g_print ("\n");
 
@@ -432,7 +435,8 @@ test_com_read_mode_pref (void *f, void *data)
         msg = "automatic";
         break;
     default:
-        g_assert_not_reached ();
+        msg = "unknown";
+        break;
     }
     g_message ("%s: Mode preference: 0x%02X (%s)", __func__, pref, msg);
 
