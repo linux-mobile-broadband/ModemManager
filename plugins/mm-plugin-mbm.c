@@ -62,9 +62,12 @@ supports_port (MMPluginBase *base,
                MMModem *existing,
                MMPluginBaseSupportsTask *task)
 {
+    GUdevClient *client;
+    const char *sys[] = { "tty", "net", NULL };
     GUdevDevice *port, *physdev;
     guint32 cached = 0, level;
-    const char *driver, *subsys;
+    const char *driver, *subsys, *physdev_path;
+    gboolean is_mbm;
 
     /* Can't do anything with non-serial ports */
     port = mm_plugin_base_supports_task_get_port (task);
@@ -79,9 +82,23 @@ supports_port (MMPluginBase *base,
     if (!driver)
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
-    physdev = mm_plugin_base_supports_task_get_physdev (task);
+    client = g_udev_client_new (sys);
+    if (!client) {
+        g_warning ("mbm: could not get udev client.");
+        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
+    }
+
+    /* Look up the port's physical device and see if this port is really an
+     * 'mbm' modem, since we have no other way of telling.
+     */
+    physdev_path = mm_plugin_base_supports_task_get_physdev_path (task);
+    physdev = g_udev_client_query_by_sysfs_path (client, physdev_path);
     g_assert (physdev);
-    if (!g_udev_device_get_property_as_boolean (physdev, "ID_MM_ERICSSON_MBM"))
+
+    is_mbm = g_udev_device_get_property_as_boolean (physdev, "ID_MM_ERICSSON_MBM");
+    g_object_unref (client);
+
+    if (!is_mbm)
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
     if (!strcmp (subsys, "net")) {
@@ -111,21 +128,13 @@ grab_port (MMPluginBase *base,
            MMPluginBaseSupportsTask *task,
            GError **error)
 {
-    GUdevDevice *port = NULL, *physdev = NULL;
+    GUdevDevice *port = NULL;
     MMModem *modem = NULL;
     const char *name, *subsys, *sysfs_path;
     guint32 caps;
 
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
-
-    physdev = mm_plugin_base_supports_task_get_physdev (task);
-    g_assert (physdev);
-    sysfs_path = g_udev_device_get_sysfs_path (physdev);
-    if (!sysfs_path) {
-        g_set_error (error, 0, 0, "Could not get port's physical device sysfs path.");
-        return NULL;
-    }
 
     subsys = g_udev_device_get_subsystem (port);
     name = g_udev_device_get_name (port);
@@ -134,6 +143,7 @@ grab_port (MMPluginBase *base,
     if (!(caps & MM_PLUGIN_BASE_PORT_CAP_GSM) && strcmp (subsys, "net"))
         return NULL;
 
+    sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
     if (!existing) {
         modem = mm_modem_mbm_new (sysfs_path,
                                   mm_plugin_base_supports_task_get_driver (task),

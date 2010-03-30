@@ -91,7 +91,7 @@ G_DEFINE_TYPE (MMPluginBaseSupportsTask, mm_plugin_base_supports_task, G_TYPE_OB
 typedef struct {
     MMPluginBase *plugin;
     GUdevDevice *port;
-    GUdevDevice *physdev;
+    char *physdev_path;
     char *driver;
 
     guint open_id;
@@ -119,7 +119,7 @@ typedef struct {
 static MMPluginBaseSupportsTask *
 supports_task_new (MMPluginBase *self,
                    GUdevDevice *port,
-                   GUdevDevice *physdev,
+                   const char *physdev_path,
                    const char *driver,
                    MMSupportsPortResultFunc callback,
                    gpointer callback_data)
@@ -130,7 +130,7 @@ supports_task_new (MMPluginBase *self,
     g_return_val_if_fail (self != NULL, NULL);
     g_return_val_if_fail (MM_IS_PLUGIN_BASE (self), NULL);
     g_return_val_if_fail (port != NULL, NULL);
-    g_return_val_if_fail (physdev != NULL, NULL);
+    g_return_val_if_fail (physdev_path != NULL, NULL);
     g_return_val_if_fail (driver != NULL, NULL);
     g_return_val_if_fail (callback != NULL, NULL);
 
@@ -139,7 +139,7 @@ supports_task_new (MMPluginBase *self,
     priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
     priv->plugin = self;
     priv->port = g_object_ref (port);
-    priv->physdev = g_object_ref (physdev);
+    priv->physdev_path = g_strdup (physdev_path);
     priv->driver = g_strdup (driver);
     priv->callback = callback;
     priv->callback_data = callback_data;
@@ -165,13 +165,13 @@ mm_plugin_base_supports_task_get_port (MMPluginBaseSupportsTask *task)
     return MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task)->port;
 }
 
-GUdevDevice *
-mm_plugin_base_supports_task_get_physdev (MMPluginBaseSupportsTask *task)
+const char *
+mm_plugin_base_supports_task_get_physdev_path (MMPluginBaseSupportsTask *task)
 {
     g_return_val_if_fail (task != NULL, NULL);
     g_return_val_if_fail (MM_IS_PLUGIN_BASE_SUPPORTS_TASK (task), NULL);
 
-    return MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task)->physdev;
+    return MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task)->physdev_path;
 }
 
 const char *
@@ -255,7 +255,7 @@ supports_task_dispose (GObject *object)
         mm_serial_port_flash_cancel (MM_SERIAL_PORT (priv->probe_port));
 
     g_object_unref (priv->port);
-    g_object_unref (priv->physdev);
+    g_free (priv->physdev_path);
     g_free (priv->driver);
     g_free (priv->probe_resp);
     g_clear_error (&(priv->probe_error));
@@ -1037,58 +1037,21 @@ get_driver_name (GUdevDevice *device)
     return ret;
 }
 
-static GUdevDevice *
-real_find_physical_device (MMPluginBase *plugin, GUdevDevice *child)
-{
-    GUdevDevice *iter, *old = NULL;
-    GUdevDevice *physdev = NULL;
-    const char *subsys, *type;
-    guint32 i = 0;
-    gboolean is_usb = FALSE, is_pci = FALSE;
-
-    g_return_val_if_fail (child != NULL, NULL);
-
-    iter = g_object_ref (child);
-    while (iter && i++ < 8) {
-        subsys = g_udev_device_get_subsystem (iter);
-        if (subsys) {
-            if (is_usb || !strcmp (subsys, "usb")) {
-                is_usb = TRUE;
-                type = g_udev_device_get_devtype (iter);
-                if (type && !strcmp (type, "usb_device")) {
-                    physdev = iter;
-                    break;
-                }
-            } else if (is_pci || !strcmp (subsys, "pci")) {
-                is_pci = TRUE;
-                physdev = iter;
-                break;
-            }
-        }
-
-        old = iter;
-        iter = g_udev_device_get_parent (old);
-        g_object_unref (old);
-    }
-
-    return physdev;
-}
-
 static MMPluginSupportsResult
 supports_port (MMPlugin *plugin,
                const char *subsys,
                const char *name,
+               const char *physdev_path,
                MMSupportsPortResultFunc callback,
                gpointer callback_data)
 {
     MMPluginBase *self = MM_PLUGIN_BASE (plugin);
     MMPluginBasePrivate *priv = MM_PLUGIN_BASE_GET_PRIVATE (self);
-    GUdevDevice *port = NULL, *physdev = NULL;
+    GUdevDevice *port = NULL;
     char *driver = NULL, *key = NULL;
     MMPluginBaseSupportsTask *task;
     MMPluginSupportsResult result = MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
     MMModem *existing;
-    const char *master_path;
 
     key = get_key (subsys, name);
     task = g_hash_table_lookup (priv->tasks, key);
@@ -1101,21 +1064,16 @@ supports_port (MMPlugin *plugin,
     if (!port)
         goto out;
 
-    physdev = MM_PLUGIN_BASE_GET_CLASS (self)->find_physical_device (self, port);
-    if (!physdev)
-        goto out;
-
     driver = get_driver_name (port);
     if (!driver)
         goto out;
 
-    task = supports_task_new (self, port, physdev, driver, callback, callback_data);
+    task = supports_task_new (self, port, physdev_path, driver, callback, callback_data);
     g_assert (task);
     g_hash_table_insert (priv->tasks, g_strdup (key), g_object_ref (task));
 
     /* Help the plugin out a bit by finding an existing modem for this port */
-    master_path = g_udev_device_get_sysfs_path (physdev);
-    existing = g_hash_table_lookup (priv->modems, master_path);
+    existing = g_hash_table_lookup (priv->modems, physdev_path);
 
     result = MM_PLUGIN_BASE_GET_CLASS (self)->supports_port (self, existing, task);
     if (result != MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS) {
@@ -1127,8 +1085,6 @@ supports_port (MMPlugin *plugin,
     g_object_unref (task);
 
 out:
-    if (physdev)
-        g_object_unref (physdev);
     if (port)
         g_object_unref (port);
     g_free (key);
@@ -1169,7 +1125,7 @@ grab_port (MMPlugin *plugin,
     MMPluginBaseSupportsTask *task;
     char *key;
     MMModem *existing = NULL, *modem = NULL;
-    const char *master_path;
+    const char *physdev_path;
 
     key = get_key (subsys, name);
     task = g_hash_table_lookup (priv->tasks, key);
@@ -1179,13 +1135,13 @@ grab_port (MMPlugin *plugin,
     }
 
     /* Help the plugin out a bit by finding an existing modem for this port */
-    master_path = g_udev_device_get_sysfs_path (mm_plugin_base_supports_task_get_physdev (task));
-    existing = g_hash_table_lookup (priv->modems, master_path);
+    physdev_path = mm_plugin_base_supports_task_get_physdev_path (task);
+    existing = g_hash_table_lookup (priv->modems, physdev_path);
 
     /* Let the modem grab the port */
     modem = MM_PLUGIN_BASE_GET_CLASS (self)->grab_port (self, existing, task, error);
     if (modem && !existing) {
-        g_hash_table_insert (priv->modems, g_strdup (master_path), modem);
+        g_hash_table_insert (priv->modems, g_strdup (physdev_path), modem);
         g_object_weak_ref (G_OBJECT (modem), modem_destroyed, self);
     }
 
@@ -1277,7 +1233,6 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
 
     g_type_class_add_private (object_class, sizeof (MMPluginBasePrivate));
 
-    klass->find_physical_device = real_find_physical_device;
     klass->handle_probe_response = real_handle_probe_response;
 
     /* Virtual methods */

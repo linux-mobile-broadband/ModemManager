@@ -101,7 +101,7 @@ grab_port (MMPluginBase *base,
            MMPluginBaseSupportsTask *task,
            GError **error)
 {
-    GUdevDevice *port = NULL, *physdev = NULL;
+    GUdevDevice *port = NULL;
     MMModem *modem = NULL;
     const char *name, *subsys, *devfile, *sysfs_path;
     guint32 caps;
@@ -114,14 +114,6 @@ grab_port (MMPluginBase *base,
     devfile = g_udev_device_get_device_file (port);
     if (!devfile) {
         g_set_error (error, 0, 0, "Could not get port's sysfs file.");
-        return NULL;
-    }
-
-    physdev = mm_plugin_base_supports_task_get_physdev (task);
-    g_assert (physdev);
-    sysfs_path = g_udev_device_get_sysfs_path (physdev);
-    if (!sysfs_path) {
-        g_set_error (error, 0, 0, "Could not get port's physical device sysfs path.");
         return NULL;
     }
 
@@ -138,6 +130,7 @@ grab_port (MMPluginBase *base,
         ptype = MM_PORT_TYPE_PRIMARY;
 
     caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
+    sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
     if (!existing) {
         if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
             modem = mm_modem_option_new (sysfs_path,

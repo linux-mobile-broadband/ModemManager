@@ -60,7 +60,7 @@ MMPlugin *mm_plugin_base_supports_task_get_plugin (MMPluginBaseSupportsTask *tas
 
 GUdevDevice *mm_plugin_base_supports_task_get_port (MMPluginBaseSupportsTask *task);
 
-GUdevDevice *mm_plugin_base_supports_task_get_physdev (MMPluginBaseSupportsTask *task);
+const char *mm_plugin_base_supports_task_get_physdev_path (MMPluginBaseSupportsTask *task);
 
 const char *mm_plugin_base_supports_task_get_driver (MMPluginBaseSupportsTask *task);
 
@@ -107,13 +107,6 @@ struct _MMPluginBaseClass {
     /* Optional subclass functions */
     void (*cancel_task)       (MMPluginBase *plugin,
                                MMPluginBaseSupportsTask *task);
-
-    /* Find a the physical device of a port, ie the USB or PCI or whatever
-     * "master" device that owns the port.  The GUdevDevice object returned
-     * will be unref-ed by the caller.
-     */
-    GUdevDevice * (*find_physical_device) (MMPluginBase *plugin,
-                                           GUdevDevice *port);
 
     void (*handle_probe_response) (MMPluginBase *plugin,
                                    MMPluginBaseSupportsTask *task,

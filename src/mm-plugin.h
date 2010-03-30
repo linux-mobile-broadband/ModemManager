@@ -70,6 +70,7 @@ struct _MMPlugin {
     MMPluginSupportsResult (*supports_port)  (MMPlugin *self,
                                               const char *subsys,
                                               const char *name,
+                                              const char *physdev_path,
                                               MMSupportsPortResultFunc callback,
                                               gpointer user_data);
 
@@ -104,6 +105,7 @@ const char *mm_plugin_get_name   (MMPlugin *plugin);
 MMPluginSupportsResult mm_plugin_supports_port  (MMPlugin *plugin,
                                                  const char *subsys,
                                                  const char *name,
+                                                 const char *physdev_path,
                                                  MMSupportsPortResultFunc callback,
                                                  gpointer user_data);
 

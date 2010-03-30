@@ -106,7 +106,7 @@ grab_port (MMPluginBase *base,
            MMPluginBaseSupportsTask *task,
            GError **error)
 {
-    GUdevDevice *port = NULL, *physdev = NULL;
+    GUdevDevice *port = NULL;
     MMModem *modem = NULL;
     const char *name, *subsys, *devfile, *sysfs_path;
     guint32 caps;
@@ -120,14 +120,6 @@ grab_port (MMPluginBase *base,
         return NULL;
     }
 
-    physdev = mm_plugin_base_supports_task_get_physdev (task);
-    g_assert (physdev);
-    sysfs_path = g_udev_device_get_sysfs_path (physdev);
-    if (!sysfs_path) {
-        g_set_error (error, 0, 0, "Could not get port's physical device sysfs path.");
-        return NULL;
-    }
-
     subsys = g_udev_device_get_subsystem (port);
     name = g_udev_device_get_name (port);
 
@@ -137,6 +129,7 @@ grab_port (MMPluginBase *base,
         return NULL;
     }
 
+    sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
     if (!existing) {
         if (caps & CAP_CDMA) {
             modem = mm_modem_anydata_cdma_new (sysfs_path,

@@ -28,15 +28,22 @@ MMPluginSupportsResult
 mm_plugin_supports_port (MMPlugin *plugin,
                          const char *subsys,
                          const char *name,
+                         const char *physdev_path,
                          MMSupportsPortResultFunc callback,
                          gpointer user_data)
 {
     g_return_val_if_fail (MM_IS_PLUGIN (plugin), FALSE);
     g_return_val_if_fail (subsys != NULL, FALSE);
     g_return_val_if_fail (name != NULL, FALSE);
+    g_return_val_if_fail (physdev_path != NULL, FALSE);
     g_return_val_if_fail (callback != NULL, FALSE);
 
-    return MM_PLUGIN_GET_INTERFACE (plugin)->supports_port (plugin, subsys, name, callback, user_data);
+    return MM_PLUGIN_GET_INTERFACE (plugin)->supports_port (plugin,
+                                                            subsys,
+                                                            name,
+                                                            physdev_path,
+                                                            callback,
+                                                            user_data);
 }
 
 void

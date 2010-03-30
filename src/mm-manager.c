@@ -299,6 +299,7 @@ typedef struct {
     MMManager *manager;
     char *subsys;
     char *name;
+    char *physdev_path;
     GSList *plugins;
     GSList *cur_plugin;
     guint defer_id;
@@ -309,7 +310,10 @@ typedef struct {
 } SupportsInfo;
 
 static SupportsInfo *
-supports_info_new (MMManager *self, const char *subsys, const char *name)
+supports_info_new (MMManager *self,
+                   const char *subsys,
+                   const char *name,
+                   const char *physdev_path)
 {
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (self);
     SupportsInfo *info;
@@ -318,6 +322,7 @@ supports_info_new (MMManager *self, const char *subsys, const char *name)
     info->manager = self;
     info->subsys = g_strdup (subsys);
     info->name = g_strdup (name);
+    info->physdev_path = g_strdup (physdev_path);
     info->plugins = g_slist_copy (priv->plugins);
     info->cur_plugin = info->plugins;
     return info;
@@ -358,8 +363,6 @@ static void supports_callback (MMPlugin *plugin,
 
 static void try_supports_port (MMManager *manager,
                                MMPlugin *plugin,
-                               const char *subsys,
-                               const char *name,
                                SupportsInfo *info);
 
 static gboolean
@@ -370,8 +373,6 @@ supports_defer_timeout (gpointer user_data)
     g_debug ("(%s): re-checking support...", info->name);
     try_supports_port (info->manager,
                        MM_PLUGIN (info->cur_plugin->data),
-                       info->subsys,
-                       info->name,
                        info);
     return FALSE;
 }
@@ -379,23 +380,28 @@ supports_defer_timeout (gpointer user_data)
 static void
 try_supports_port (MMManager *manager,
                    MMPlugin *plugin,
-                   const char *subsys,
-                   const char *name,
                    SupportsInfo *info)
 {
     MMPluginSupportsResult result;
 
-    result = mm_plugin_supports_port (plugin, subsys, name, supports_callback, info);
+    result = mm_plugin_supports_port (plugin,
+                                      info->subsys,
+                                      info->name,
+                                      info->physdev_path,
+                                      supports_callback,
+                                      info);
 
     switch (result) {
     case MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED:
         /* If the plugin knows it doesn't support the modem, just call the
          * callback and indicate 0 support.
          */
-        supports_callback (plugin, subsys, name, 0, info);
+        supports_callback (plugin, info->subsys, info->name, 0, info);
         break;
     case MM_PLUGIN_SUPPORTS_PORT_DEFER:
-        g_debug ("(%s): (%s) deferring support check", mm_plugin_get_name (plugin), name);
+        g_debug ("(%s): (%s) deferring support check",
+                 mm_plugin_get_name (plugin),
+                 info->name);
         if (info->defer_id)
             g_source_remove (info->defer_id);
 
@@ -494,21 +500,59 @@ supports_callback (MMPlugin *plugin,
 
     if (next_plugin) {
         /* Try the next plugin */
-        try_supports_port (info->manager, next_plugin, info->subsys, info->name, info);
+        try_supports_port (info->manager, next_plugin, info);
     } else {
         /* All done; let the best modem grab the port */
         info->done_id = g_idle_add (do_grab_port, info);
     }
 }
 
+static GUdevDevice *
+find_physical_device (GUdevDevice *child)
+{
+    GUdevDevice *iter, *old = NULL;
+    GUdevDevice *physdev = NULL;
+    const char *subsys, *type;
+    guint32 i = 0;
+    gboolean is_usb = FALSE, is_pci = FALSE;
+
+    g_return_val_if_fail (child != NULL, NULL);
+
+    iter = g_object_ref (child);
+    while (iter && i++ < 8) {
+        subsys = g_udev_device_get_subsystem (iter);
+        if (subsys) {
+            if (is_usb || !strcmp (subsys, "usb")) {
+                is_usb = TRUE;
+                type = g_udev_device_get_devtype (iter);
+                if (type && !strcmp (type, "usb_device")) {
+                    physdev = iter;
+                    break;
+                }
+            } else if (is_pci || !strcmp (subsys, "pci")) {
+                is_pci = TRUE;
+                physdev = iter;
+                break;
+            }
+        }
+
+        old = iter;
+        iter = g_udev_device_get_parent (old);
+        g_object_unref (old);
+    }
+
+    return physdev;
+}
+
 static void
 device_added (MMManager *manager, GUdevDevice *device)
 {
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
-    const char *subsys, *name;
+    const char *subsys, *name, *physdev_path;
     SupportsInfo *info;
     char *key;
     gboolean found;
+    GUdevDevice *physdev = NULL;
 
     g_return_if_fail (device != NULL);
 
@@ -527,15 +571,44 @@ device_added (MMManager *manager, GUdevDevice *device)
 
     key = get_key (subsys, name);
     found = !!g_hash_table_lookup (priv->supports, key);
-    if (found) {
-        g_free (key);
-        return;
+    if (found)
+        goto out;
+
+    /* Find the port's physical device's sysfs path.  This is the kernel device
+     * that "owns" all the ports of the device, like the USB device or the PCI
+     * device the provides each tty or network port.
+     */
+    physdev = find_physical_device (device);
+    if (!physdev) {
+        /* Warn about it, but filter out some common ports that we know don't have
+         * anything to do with mobile broadband.
+         */
+        if (   strcmp (name, "console")
+            && strcmp (name, "ptmx")
+            && strcmp (name, "lo")
+            && strcmp (name, "tty")
+            && !strstr (name, "virbr"))
+            g_debug ("(%s/%s): could not get port's parent device", subsys, name);
+
+        goto out;
     }
 
-    info = supports_info_new (manager, subsys, name);
-    g_hash_table_insert (priv->supports, key, info);
+    physdev_path = g_udev_device_get_sysfs_path (physdev);
+    if (!physdev_path) {
+        g_debug ("(%s/%s): could not get port's parent device sysfs path", subsys, name);
+        goto out;
+    }
 
-    try_supports_port (manager, MM_PLUGIN (info->cur_plugin->data), subsys, name, info);
+    /* Success; now ask plugins if they can handle this port */    
+    info = supports_info_new (manager, subsys, name, physdev_path);
+    g_hash_table_insert (priv->supports, g_strdup (key), info);
+
+    try_supports_port (manager, MM_PLUGIN (info->cur_plugin->data), info);
+
+out:
+    if (physdev)
+        g_object_unref (physdev);
+    g_free (key);
 }
 
 static void

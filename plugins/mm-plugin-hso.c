@@ -100,7 +100,7 @@ grab_port (MMPluginBase *base,
            MMPluginBaseSupportsTask *task,
            GError **error)
 {
-    GUdevDevice *port = NULL, *physdev = NULL;
+    GUdevDevice *port = NULL;
     MMModem *modem = NULL;
     const char *name, *subsys, *sysfs_path;
     char *devfile;
@@ -131,18 +131,11 @@ grab_port (MMPluginBase *base,
         }
     }
 
-    physdev = mm_plugin_base_supports_task_get_physdev (task);
-    g_assert (physdev);
-    sysfs_path = g_udev_device_get_sysfs_path (physdev);
-    if (!sysfs_path) {
-        g_set_error (error, 0, 0, "Could not get port's physical device sysfs path.");
-        goto out;
-    }
-
     caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
     if (!(caps & MM_PLUGIN_BASE_PORT_CAP_GSM) && strcmp (subsys, "net"))
         goto out;
 
+    sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
     if (!existing) {
         modem = mm_modem_hso_new (sysfs_path,
                                   mm_plugin_base_supports_task_get_driver (task),
