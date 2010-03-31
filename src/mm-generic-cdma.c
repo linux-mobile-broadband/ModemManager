@@ -847,25 +847,98 @@ get_signal_quality_done (MMAtSerialPort *port,
 }
 
 static void
+qcdm_pilot_sets_cb (MMQcdmSerialPort *port,
+                    GByteArray *response,
+                    GError *error,
+                    gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMGenericCdmaPrivate *priv;
+    QCDMResult *result;
+    guint32 num = 0, quality = 0, i;
+    float best_db = -28;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        goto done;
+    }
+
+    priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
+
+    /* Parse the response */
+    result = qcdm_cmd_pilot_sets_result ((const char *) response->data, response->len, &info->error);
+    if (!result)
+        goto done;
+
+    qcdm_cmd_pilot_sets_result_get_num (result, QCDM_CMD_PILOT_SETS_TYPE_ACTIVE, &num);
+    for (i = 0; i < num; i++) {
+        guint32 pn_offset = 0, ecio = 0;
+        float db = 0;
+
+        qcdm_cmd_pilot_sets_result_get_pilot (result,
+                                              QCDM_CMD_PILOT_SETS_TYPE_ACTIVE,
+                                              i,
+                                              &pn_offset,
+                                              &ecio,
+                                              &db);
+        best_db = MAX (db, best_db);
+    }
+    qcdm_result_unref (result);
+
+    if (num > 0) {
+        #define BEST_ECIO 3
+        #define WORST_ECIO 25
+
+        /* EC/IO dB ranges from roughly 0 to -31 dB.  Lower == worse.  We
+         * really only care about -3 to -25 dB though, since that's about what
+         * you'll see in real-world usage.
+         */
+        best_db = CLAMP (ABS (best_db), BEST_ECIO, WORST_ECIO) - BEST_ECIO;
+        quality = (guint32) (100 - (best_db * 100 / (WORST_ECIO - BEST_ECIO)));
+    }
+
+    mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
+
+    if (priv->cdma1x_quality != quality) {
+        priv->cdma1x_quality = quality;
+        mm_modem_cdma_emit_signal_quality_changed (MM_MODEM_CDMA (info->modem), quality);
+    }
+
+done:
+    mm_callback_info_schedule (info);
+}
+
+static void
 get_signal_quality (MMModemCdma *modem,
                     MMModemUIntFn callback,
                     gpointer user_data)
 {
     MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (modem);
     MMCallbackInfo *info;
-    MMAtSerialPort *port;
+    MMAtSerialPort *at_port;
 
     info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
 
-    port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (modem), &info->error);
-    if (!port) {
+    at_port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (modem), &info->error);
+    if (!at_port && !priv->qcdm) {
         g_message ("Returning saved signal quality %d", priv->cdma1x_quality);
         mm_callback_info_set_result (info, GUINT_TO_POINTER (priv->cdma1x_quality), NULL);
         mm_callback_info_schedule (info);
         return;
     }
+    g_clear_error (&info->error);
 
-    mm_at_serial_port_queue_command (port, "+CSQ", 3, get_signal_quality_done, info);
+    if (at_port)
+        mm_at_serial_port_queue_command (at_port, "+CSQ", 3, get_signal_quality_done, info);
+    else if (priv->qcdm) {
+        GByteArray *pilot_sets;
+
+        /* Use CDMA1x pilot EC/IO if we can */
+        pilot_sets = g_byte_array_sized_new (25);
+        pilot_sets->len = qcdm_cmd_pilot_sets_new ((char *) pilot_sets->data, 25, NULL);
+        g_assert (pilot_sets->len);
+        mm_qcdm_serial_port_queue_command (priv->qcdm, pilot_sets, 3, qcdm_pilot_sets_cb, info);
+    }
 }
 
 static void
