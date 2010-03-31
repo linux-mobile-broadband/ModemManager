@@ -564,10 +564,6 @@ supports_callback (MMPlugin *plugin,
     MMPlugin *next_plugin = NULL;
     MMModem *existing;
 
-    info->cur_plugin = info->cur_plugin->next;
-    if (info->cur_plugin)
-        next_plugin = MM_PLUGIN (info->cur_plugin->data);
-
     /* Is this plugin's result better than any one we've tried before? */
     if (level > info->best_level) {
         info->best_level = level;
@@ -610,11 +606,20 @@ supports_callback (MMPlugin *plugin,
             next_plugin = existing_plugin;
         } else
             g_assert_not_reached ();
+    } else {
+        info->cur_plugin = info->cur_plugin->next;
+        if (info->cur_plugin->next)
+            next_plugin = MM_PLUGIN (info->cur_plugin->data);
     }
 
     if (next_plugin) {
-        /* Try the next plugin */
-        try_supports_port (info->manager, next_plugin, existing, info);
+        const char *next_name = mm_plugin_get_name (next_plugin);
+
+        /* Try the next plugin, but don't bother with the Generic plugin if
+         * something already supports this port.
+         */
+        if (!info->best_plugin || strcmp (next_name, MM_PLUGIN_GENERIC_NAME))
+            try_supports_port (info->manager, next_plugin, existing, info);
     } else {
         /* All done; let the best modem grab the port */
         info->done_id = g_idle_add (do_grab_port, info);
