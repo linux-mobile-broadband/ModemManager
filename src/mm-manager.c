@@ -240,6 +240,12 @@ check_export_modem (MMManager *self, MMModem *modem)
         }
     }
 
+    /* Already exported?  This can happen if the modem is exported and the kernel
+     * discovers another of the modem's ports.
+     */
+    if (g_object_get_data (G_OBJECT (modem), DBUS_PATH_TAG))
+        return;
+
     /* No outstanding port tasks, so if the modem is valid we can export it */
     if (mm_modem_get_valid (modem)) {
         static guint32 id = 0;
