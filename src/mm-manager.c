@@ -412,16 +412,21 @@ static void supports_callback (MMPlugin *plugin,
 
 static void try_supports_port (MMManager *manager,
                                MMPlugin *plugin,
+                               MMModem *existing,
                                SupportsInfo *info);
 
 static gboolean
 supports_defer_timeout (gpointer user_data)
 {
     SupportsInfo *info = user_data;
+    MMModem *existing;
+
+    existing = find_modem_for_device (info->manager, info->physdev_path);
 
     g_debug ("(%s): re-checking support...", info->name);
     try_supports_port (info->manager,
                        MM_PLUGIN (info->cur_plugin->data),
+                       existing,
                        info);
     return FALSE;
 }
@@ -429,12 +434,10 @@ supports_defer_timeout (gpointer user_data)
 static void
 try_supports_port (MMManager *manager,
                    MMPlugin *plugin,
+                   MMModem *existing,
                    SupportsInfo *info)
 {
     MMPluginSupportsResult result;
-    MMModem *existing;
-
-    existing = find_modem_for_device (manager, info->physdev_path);
 
     result = mm_plugin_supports_port (plugin,
                                       info->subsys,
@@ -611,7 +614,7 @@ supports_callback (MMPlugin *plugin,
 
     if (next_plugin) {
         /* Try the next plugin */
-        try_supports_port (info->manager, next_plugin, info);
+        try_supports_port (info->manager, next_plugin, existing, info);
     } else {
         /* All done; let the best modem grab the port */
         info->done_id = g_idle_add (do_grab_port, info);
@@ -725,7 +728,7 @@ device_added (MMManager *manager, GUdevDevice *device)
     if (existing)
         plugin = MM_PLUGIN (g_object_get_data (G_OBJECT (existing), MANAGER_PLUGIN_TAG));
 
-    try_supports_port (manager, plugin, info);
+    try_supports_port (manager, plugin, existing, info);
 
 out:
     if (physdev)
