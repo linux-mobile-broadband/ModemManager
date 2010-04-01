@@ -21,7 +21,7 @@
 #include "test-qcdm-utils.h"
 #include "utils.h"
 
-static const char inbuf[] = {
+static const char decap_inbuf[] = {
     0x40, 0x03, 0x00, 0x01, 0x00, 0x19, 0xf0, 0x00, 0x16, 0x00, 0x21, 0x00,
     0x1c, 0x00, 0xd8, 0x00, 0x3f, 0x00, 0x56, 0x01, 0x3f, 0x00, 0x15, 0x00,
     0x1a, 0x00, 0x11, 0x01, 0x3f, 0x00, 0x92, 0x01, 0x3f, 0x00, 0x39, 0x00,
@@ -52,12 +52,35 @@ test_utils_decapsulate_buffer (void *f, void *data)
     gsize used = 0;
     gboolean more = FALSE;
 
-    success = dm_decapsulate_buffer (inbuf, sizeof (inbuf),
+    success = dm_decapsulate_buffer (decap_inbuf, sizeof (decap_inbuf),
                                      outbuf, sizeof (outbuf),
                                      &decap_len, &used, &more);
     g_assert (success);
     g_assert (decap_len == 214);
     g_assert (used == 221);
     g_assert (more == FALSE);
+}
+
+
+static const char encap_outbuf[] = {
+    0x4b, 0x05, 0x08, 0x00, 0x01, 0xdd, 0x7e
+};
+
+void
+test_utils_encapsulate_buffer (void *f, void *data)
+{
+    char cmdbuf[10];
+    char outbuf[512];
+    gsize encap_len = 0;
+
+    cmdbuf[0] = 0x4B;   /* DIAG_CMD_SUBSYS */
+    cmdbuf[1] = 0x05;   /* DIAG_SUBSYS_HDR */
+    cmdbuf[2] = 0x08;   /* first byte of DIAG_SUBSYS_HDR_STATE_INFO in LE */
+    cmdbuf[3] = 0x00;   /* second byte of DIAG_SUBSYS_HDR_STATE_INFO in LE */
+
+    encap_len = dm_encapsulate_buffer (cmdbuf, 4, sizeof (cmdbuf),
+                                       &outbuf[0], sizeof (outbuf));
+    g_assert (encap_len == sizeof (encap_outbuf));
+    g_assert (memcmp (outbuf, encap_outbuf, encap_len) == 0);
 }
 

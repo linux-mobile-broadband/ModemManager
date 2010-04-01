@@ -194,7 +194,8 @@ dm_encapsulate_buffer (char *inbuf,
     g_return_val_if_fail (inbuf_len >= cmd_len + 2, 0); /* space for CRC */
     g_return_val_if_fail (outbuf != NULL, 0);
 
-    crc = GUINT16_TO_LE (crc16 (inbuf, cmd_len));
+    /* Add the CRC */
+    crc = crc16 (inbuf, cmd_len);
     inbuf[cmd_len++] = crc & 0xFF;
     inbuf[cmd_len++] = (crc >> 8) & 0xFF;
 
@@ -296,8 +297,9 @@ dm_decapsulate_buffer (const char *inbuf,
 
     /* Check the CRC of the packet's data */
     crc = crc16 (outbuf, unesc_len - 2);
-    pkt_crc = *((guint16 *) &outbuf[unesc_len - 2]);
-    if (crc != GUINT_FROM_LE (pkt_crc)) {
+    pkt_crc = outbuf[unesc_len - 2] & 0xFF;
+    pkt_crc |= (outbuf[unesc_len - 1] & 0xFF) << 8;
+    if (crc != pkt_crc) {
         *out_used = pkt_len + 1; /* packet + CRC + 0x7E */
         return FALSE;
     }
