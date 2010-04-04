@@ -50,6 +50,10 @@ auth_sources += \
 	mm-auth-provider-polkit.h
 endif
 
+loc_sources = \
+	mm-modem-location.c \
+	mm-modem-location.h
+
 modem_manager_SOURCES = \
 	main.c \
 	mm-callback-info.c \
@@ -88,8 +92,6 @@ modem_manager_SOURCES = \
 	mm-modem-gsm-sms.h \
 	mm-modem-simple.c \
 	mm-modem-simple.h \
-	mm-modem-location.c \
-	mm-modem-location.h \
 	mm-options.c \
 	mm-options.h \
 	mm-plugin.c \
@@ -120,9 +122,6 @@ mm-modem-gsm-network-glue.h: $(top_srcdir)/introspection/mm-modem-gsm-network.xm
 mm-modem-gsm-sms-glue.h: $(top_srcdir)/introspection/mm-modem-gsm-sms.xml
 	dbus-binding-tool --prefix=mm_modem_gsm_sms --mode=glib-server --output=$@ $<
 
-mm-modem-location-glue.h: $(top_srcdir)/introspection/mm-modem-location.xml
-	dbus-binding-tool --prefix=mm_modem_location --mode=glib-server --output=$@ $<
-
 BUILT_SOURCES = \
 	mm-manager-glue.h \
 	mm-modem-glue.h \
@@ -130,7 +129,17 @@ BUILT_SOURCES = \
 	mm-modem-cdma-glue.h \
 	mm-modem-gsm-card-glue.h \
 	mm-modem-gsm-network-glue.h \
-	mm-modem-gsm-sms-glue.h \
-	mm-modem-location-glue.h
+	mm-modem-gsm-sms-glue.h
+
+if WITH_LOCATION_API
+mm-modem-location-glue.h: $(top_srcdir)/introspection/mm-modem-location.xml
+	dbus-binding-tool --prefix=mm_modem_location --mode=glib-server --output=$@ $<
+
+modem_manager_SOURCES += $(loc_sources)
+
+BUILT_SOURCES += mm-modem-location-glue.h
+else
+EXTRA_DIST = $(loc_sources)
+endif
 
 CLEANFILES = $(BUILT_SOURCES)

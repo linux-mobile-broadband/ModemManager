@@ -113,6 +113,19 @@ esac
 
 NM_COMPILER_WARNINGS
 
+
+dnl
+dnl dbus-glib >= 0.86 is required for Location API support
+dnl
+with_location_api=no
+PKG_CHECK_MODULES(DBUS_GLIB, dbus-glib-1 >= 0.86, with_location_api="yes", with_location_api="no")
+if test x"$with_location_api" = xyes; then
+    AC_DEFINE(LOCATION_API, 1, [Define if you have dbus-glib 0.86 or higher])
+else
+    AC_MSG_WARN([dbus-glib >= 0.86 is required for Location API support])
+fi
+AM_CONDITIONAL(WITH_LOCATION_API, test "x$with_location_api" = "xyes")
+
 AC_CONFIG_FILES([
 Makefile
 marshallers/Makefile
@@ -139,5 +152,7 @@ echo
 echo Building PPP-enabled tests: ${have_pppd_headers}
 echo
 echo Building with PolicyKit support: ${with_polkit}
+echo
+echo Building with Location API support: ${with_location_api}
 echo
 

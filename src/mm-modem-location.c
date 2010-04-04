@@ -314,6 +314,16 @@ mm_modem_location_get_type (void)
 
         g_type_interface_add_prerequisite (loc_type, G_TYPE_OBJECT);
         dbus_g_object_type_install_info (loc_type, &dbus_glib_mm_modem_location_object_info);
+
+        /* Register some shadow properties to handle Enabled and Capabilities
+         * since these could be used by other interfaces.
+         */
+        dbus_g_object_type_register_shadow_property (loc_type,
+                                                     "Enabled",
+                                                     MM_MODEM_LOCATION_ENABLED);
+        dbus_g_object_type_register_shadow_property (loc_type,
+                                                     "Capabilities",
+                                                     MM_MODEM_LOCATION_CAPABILITIES);
     }
 
     return loc_type;
