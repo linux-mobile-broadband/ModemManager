@@ -152,6 +152,24 @@ mm_qcdm_serial_port_queue_command_cached (MMQcdmSerialPort *self,
                                          user_data);
 }
 
+static void
+debug_log (MMSerialPort *port, const char *prefix, const char *buf, gsize len)
+{
+    static GString *debug = NULL;
+    const char *s = buf;
+
+    if (!debug)
+        debug = g_string_sized_new (512);
+
+    g_string_append (debug, prefix);
+
+    while (len--)
+        g_string_append_printf (debug, " %02x", (guint8) (*s++ & 0xFF));
+
+    g_debug ("(%s): %s", mm_port_get_device (MM_PORT (port)), debug->str);
+    g_string_truncate (debug, 0);
+}
+
 /*****************************************************************************/
 
 static gboolean
@@ -197,4 +215,5 @@ mm_qcdm_serial_port_class_init (MMQcdmSerialPortClass *klass)
     port_class->parse_response = parse_response;
     port_class->handle_response = handle_response;
     port_class->config_fd = config_fd;
+    port_class->debug_log = debug_log;
 }

@@ -88,6 +88,11 @@ struct _MMSerialPortClass {
      */
     gboolean (*config_fd)         (MMSerialPort *self, int fd, GError **error);
 
+    void (*debug_log)             (MMSerialPort *self,
+                                   const char *prefix,
+                                   const char *buf,
+                                   gsize len);
+
     /* Signals */
     void (*buffer_full)           (MMSerialPort *port, const GByteArray *buffer);
 };

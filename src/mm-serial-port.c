@@ -343,40 +343,12 @@ real_config_fd (MMSerialPort *self, int fd, GError **error)
 }
 
 static void
-serial_debug (MMSerialPort *self, const char *prefix, const char *buf, int len)
+serial_debug (MMSerialPort *self, const char *prefix, const char *buf, gsize len)
 {
-    static GString *debug = NULL;
-    const char *s;
+    g_return_if_fail (len > 0);
 
-    if (!mm_options_debug ())
-        return;
-
-    if (len < 0)
-        len = strlen (buf);
-
-    if (!debug)
-        debug = g_string_sized_new (256);
-
-    g_string_append (debug, prefix);
-    g_string_append (debug, " '");
-    
-    s = buf;
-    while (len--) {
-        if (g_ascii_isprint (*s))
-            g_string_append_c (debug, *s);
-        else if (*s == '\r')
-            g_string_append (debug, "<CR>");
-        else if (*s == '\n')
-            g_string_append (debug, "<LF>");
-        else
-            g_string_append_printf (debug, "\\%d", *s);
-
-        s++;
-    }
-
-    g_string_append_c (debug, '\'');
-    g_debug ("(%s): %s", mm_port_get_device (MM_PORT (self)), debug->str);
-    g_string_truncate (debug, 0);
+    if (mm_options_debug () && MM_SERIAL_PORT_GET_CLASS (self)->debug_log)
+        MM_SERIAL_PORT_GET_CLASS (self)->debug_log (self, prefix, buf, len);
 }
 
 static gboolean

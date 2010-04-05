@@ -268,6 +268,37 @@ mm_at_serial_port_queue_command_cached (MMAtSerialPort *self,
                                          user_data);
 }
 
+static void
+debug_log (MMSerialPort *port, const char *prefix, const char *buf, gsize len)
+{
+    static GString *debug = NULL;
+    const char *s;
+
+    if (!debug)
+        debug = g_string_sized_new (256);
+
+    g_string_append (debug, prefix);
+    g_string_append (debug, " '");
+
+    s = buf;
+    while (len--) {
+        if (g_ascii_isprint (*s))
+            g_string_append_c (debug, *s);
+        else if (*s == '\r')
+            g_string_append (debug, "<CR>");
+        else if (*s == '\n')
+            g_string_append (debug, "<LF>");
+        else
+            g_string_append_printf (debug, "\\%d", *s);
+
+        s++;
+    }
+
+    g_string_append_c (debug, '\'');
+    g_debug ("(%s): %s", mm_port_get_device (MM_PORT (port)), debug->str);
+    g_string_truncate (debug, 0);
+}
+
 /*****************************************************************************/
 
 MMAtSerialPort *
@@ -323,4 +354,5 @@ mm_at_serial_port_class_init (MMAtSerialPortClass *klass)
     port_class->parse_unsolicited = parse_unsolicited;
     port_class->parse_response = parse_response;
     port_class->handle_response = handle_response;
+    port_class->debug_log = debug_log;
 }
