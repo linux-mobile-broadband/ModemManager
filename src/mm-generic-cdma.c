@@ -66,6 +66,8 @@ typedef struct {
     gboolean has_spservice;
     gboolean has_speri;
 
+    guint poll_id;
+
     MMModemCdmaRegistrationState cdma_1x_reg_state;
     MMModemCdmaRegistrationState evdo_reg_state;
 
@@ -332,6 +334,38 @@ mm_generic_cdma_evdo_get_registration_state_sync (MMGenericCdma *self)
     g_return_val_if_fail (MM_IS_GENERIC_CDMA (self), MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
 
     return MM_GENERIC_CDMA_GET_PRIVATE (self)->evdo_reg_state;
+}
+
+/*****************************************************************************/
+
+static void
+periodic_poll_reg_cb (MMModemCdma *modem,
+                      MMModemCdmaRegistrationState cdma_1x_reg_state,
+                      MMModemCdmaRegistrationState evdo_reg_state,
+                      GError *error,
+                      gpointer user_data)
+{
+    /* cached reg state already updated */
+}
+
+static void
+periodic_poll_signal_quality_cb (MMModem *modem,
+                                 guint32 result,
+                                 GError *error,
+                                 gpointer user_data)
+{
+    /* cached signal quality already updated */
+}
+
+static gboolean
+periodic_poll_cb (gpointer user_data)
+{
+    MMGenericCdma *self = MM_GENERIC_CDMA (user_data);
+
+    mm_modem_cdma_get_registration_state (MM_MODEM_CDMA (self), periodic_poll_reg_cb, NULL);
+    mm_modem_cdma_get_signal_quality (MM_MODEM_CDMA (self), periodic_poll_signal_quality_cb, NULL);
+
+    return TRUE;
 }
 
 /*****************************************************************************/
@@ -1939,6 +1973,25 @@ modem_valid_changed (MMGenericCdma *self, GParamSpec *pspec, gpointer user_data)
         registration_cleanup (self, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL);
 }
 
+static void
+modem_state_changed (MMGenericCdma *self, GParamSpec *pspec, gpointer user_data)
+{
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
+    MMModemState state;
+
+    /* Start polling registration status and signal quality when enabled */
+
+    state = mm_modem_get_state (MM_MODEM (self));
+    if (state > MM_MODEM_STATE_ENABLED) {
+        if (!priv->poll_id)
+            priv->poll_id = g_timeout_add_seconds (30, periodic_poll_cb, self);
+    } else {
+        if (priv->poll_id)
+            g_source_remove (priv->poll_id);
+        priv->poll_id = 0;
+    }
+}
+
 /*****************************************************************************/
 
 static void
@@ -1983,6 +2036,8 @@ constructor (GType type,
     if (object) {
         g_signal_connect (object, "notify::" MM_MODEM_VALID,
                           G_CALLBACK (modem_valid_changed), NULL);
+        g_signal_connect (object, "notify::" MM_MODEM_STATE,
+                          G_CALLBACK (modem_state_changed), NULL);
     }
 
     return object;
@@ -2051,15 +2106,15 @@ get_property (GObject *object, guint prop_id,
 static void
 dispose (GObject *object)
 {
-    registration_cleanup (MM_GENERIC_CDMA (object), MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL);
+    MMGenericCdma *self = MM_GENERIC_CDMA (object);
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
+
+    registration_cleanup (self, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL);
+
+    if (priv->poll_id)
+        g_source_remove (priv->poll_id);
 
     G_OBJECT_CLASS (mm_generic_cdma_parent_class)->dispose (object);
-}
-
-static void
-finalize (GObject *object)
-{
-    G_OBJECT_CLASS (mm_generic_cdma_parent_class)->finalize (object);
 }
 
 static void
@@ -2074,7 +2129,6 @@ mm_generic_cdma_class_init (MMGenericCdmaClass *klass)
     object_class->set_property = set_property;
     object_class->get_property = get_property;
     object_class->dispose = dispose;
-    object_class->finalize = finalize;
     object_class->constructor = constructor;
     klass->query_registration_state = real_query_registration_state;
 
