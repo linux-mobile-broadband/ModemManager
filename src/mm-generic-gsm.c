@@ -524,6 +524,15 @@ reg_poll_response (MMAtSerialPort *port,
         handle_reg_status_response (self, response, NULL);
 }
 
+static void
+periodic_signal_quality_cb (MMModem *modem,
+                            guint32 result,
+                            GError *error,
+                            gpointer user_data)
+{
+    /* Cached signal quality already updated */
+}
+
 static gboolean
 periodic_poll_cb (gpointer user_data)
 {
@@ -539,6 +548,10 @@ periodic_poll_cb (gpointer user_data)
         mm_at_serial_port_queue_command (port, "+CREG?", 10, reg_poll_response, self);
     if (priv->cgreg_poll)
         mm_at_serial_port_queue_command (port, "+CGREG?", 10, reg_poll_response, self);
+
+    mm_modem_gsm_network_get_signal_quality (MM_MODEM_GSM_NETWORK (self),
+                                                periodic_signal_quality_cb,
+                                                NULL);
 
     return TRUE;  /* continue running */
 }
@@ -560,8 +573,6 @@ cgreg1_done (MMAtSerialPort *port,
 
             /* The modem doesn't like unsolicited CGREG, so we'll need to poll */
             priv->cgreg_poll = TRUE;
-            if (!priv->poll_id)
-                priv->poll_id = g_timeout_add_seconds (10, periodic_poll_cb, info->modem);
         }
         /* Success; get initial state */
         mm_at_serial_port_queue_command (port, "+CGREG?", 10, reg_poll_response, info->modem);
@@ -614,8 +625,6 @@ creg1_done (MMAtSerialPort *port,
 
             /* The modem doesn't like unsolicited CREG, so we'll need to poll */
             priv->creg_poll = TRUE;
-            if (!priv->poll_id)
-                priv->poll_id = g_timeout_add_seconds (10, periodic_poll_cb, info->modem);
         }
         /* Success; get initial state */
         mm_at_serial_port_queue_command (port, "+CREG?", 10, reg_poll_response, info->modem);
@@ -3346,6 +3355,27 @@ simple_get_status (MMModemSimple *simple,
 /*****************************************************************************/
 
 static void
+modem_state_changed (MMGenericGsm *self, GParamSpec *pspec, gpointer user_data)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    MMModemState state;
+
+    /* Start polling registration status and signal quality when enabled */
+
+    state = mm_modem_get_state (MM_MODEM (self));
+    if (state >= MM_MODEM_STATE_ENABLED) {
+        if (!priv->poll_id)
+            priv->poll_id = g_timeout_add_seconds (30, periodic_poll_cb, self);
+    } else {
+        if (priv->poll_id)
+            g_source_remove (priv->poll_id);
+        priv->poll_id = 0;
+    }
+}
+
+/*****************************************************************************/
+
+static void
 modem_init (MMModem *modem_class)
 {
     modem_class->owns_port = owns_port;
@@ -3411,6 +3441,9 @@ mm_generic_gsm_init (MMGenericGsm *self)
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_GSM_NETWORK_ACCESS_TECHNOLOGY,
                                                     MM_MODEM_GSM_NETWORK_DBUS_INTERFACE);
+
+    g_signal_connect (self, "notify::" MM_MODEM_STATE,
+                      G_CALLBACK (modem_state_changed), NULL);
 }
 
 static void
