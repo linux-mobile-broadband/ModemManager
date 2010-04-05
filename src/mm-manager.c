@@ -607,8 +607,8 @@ supports_callback (MMPlugin *plugin,
         } else
             g_assert_not_reached ();
     } else {
-        info->cur_plugin = info->cur_plugin->next;
-        if (info->cur_plugin->next)
+        info->cur_plugin = g_slist_next (info->cur_plugin);
+        if (info->cur_plugin)
             next_plugin = MM_PLUGIN (info->cur_plugin->data);
     }
 
