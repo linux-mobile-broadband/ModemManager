@@ -1982,7 +1982,7 @@ modem_state_changed (MMGenericCdma *self, GParamSpec *pspec, gpointer user_data)
     /* Start polling registration status and signal quality when enabled */
 
     state = mm_modem_get_state (MM_MODEM (self));
-    if (state > MM_MODEM_STATE_ENABLED) {
+    if (state >= MM_MODEM_STATE_ENABLED) {
         if (!priv->poll_id)
             priv->poll_id = g_timeout_add_seconds (30, periodic_poll_cb, self);
     } else {
@@ -2023,29 +2023,13 @@ modem_simple_init (MMModemSimple *class)
     class->get_status = simple_get_status;
 }
 
-static GObject*
-constructor (GType type,
-             guint n_construct_params,
-             GObjectConstructParam *construct_params)
-{
-    GObject *object;
-
-    object = G_OBJECT_CLASS (mm_generic_cdma_parent_class)->constructor (type,
-                                                                         n_construct_params,
-                                                                         construct_params);
-    if (object) {
-        g_signal_connect (object, "notify::" MM_MODEM_VALID,
-                          G_CALLBACK (modem_valid_changed), NULL);
-        g_signal_connect (object, "notify::" MM_MODEM_STATE,
-                          G_CALLBACK (modem_state_changed), NULL);
-    }
-
-    return object;
-}
-
 static void
 mm_generic_cdma_init (MMGenericCdma *self)
 {
+    g_signal_connect (self, "notify::" MM_MODEM_VALID,
+                      G_CALLBACK (modem_valid_changed), NULL);
+    g_signal_connect (self, "notify::" MM_MODEM_STATE,
+                      G_CALLBACK (modem_state_changed), NULL);
 }
 
 static void
@@ -2129,7 +2113,6 @@ mm_generic_cdma_class_init (MMGenericCdmaClass *klass)
     object_class->set_property = set_property;
     object_class->get_property = get_property;
     object_class->dispose = dispose;
-    object_class->constructor = constructor;
     klass->query_registration_state = real_query_registration_state;
 
     /* Properties */
