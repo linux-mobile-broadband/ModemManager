@@ -612,14 +612,17 @@ supports_callback (MMPlugin *plugin,
             next_plugin = MM_PLUGIN (info->cur_plugin->data);
     }
 
+    /* Don't bother with Generic if some other plugin already supports this port */
     if (next_plugin) {
         const char *next_name = mm_plugin_get_name (next_plugin);
 
-        /* Try the next plugin, but don't bother with the Generic plugin if
-         * something already supports this port.
-         */
-        if (!info->best_plugin || strcmp (next_name, MM_PLUGIN_GENERIC_NAME))
-            try_supports_port (info->manager, next_plugin, existing, info);
+        if (info->best_plugin && strcmp (next_name, MM_PLUGIN_GENERIC_NAME))
+            next_plugin = NULL;
+    }
+
+    if (next_plugin) {
+        /* Try the next plugin */
+        try_supports_port (info->manager, next_plugin, existing, info);
     } else {
         /* All done; let the best modem grab the port */
         info->done_id = g_idle_add (do_grab_port, info);
