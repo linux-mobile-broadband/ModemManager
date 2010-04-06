@@ -1286,8 +1286,22 @@ get_serving_system (MMModemCdma *modem,
         legacy_get_serving_system (self, info);
 }
 
+/*****************************************************************************/
+
+/* Registration state stuff */
+
 #define CDMA_1X_STATE_TAG     "cdma-1x-reg-state"
 #define EVDO_STATE_TAG        "evdo-reg-state"
+
+MMModemCdmaRegistrationState
+mm_generic_cdma_query_reg_state_get_callback_1x_state (MMCallbackInfo *info)
+{
+    g_return_val_if_fail (info != NULL, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+    g_return_val_if_fail (info->modem != NULL, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+    g_return_val_if_fail (MM_IS_GENERIC_CDMA (info->modem), MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+
+    return GPOINTER_TO_UINT (mm_callback_info_get_data (info, CDMA_1X_STATE_TAG));
+}
 
 void
 mm_generic_cdma_query_reg_state_set_callback_1x_state (MMCallbackInfo *info,
@@ -1298,6 +1312,16 @@ mm_generic_cdma_query_reg_state_set_callback_1x_state (MMCallbackInfo *info,
     g_return_if_fail (MM_IS_GENERIC_CDMA (info->modem));
 
     mm_callback_info_set_data (info, CDMA_1X_STATE_TAG, GUINT_TO_POINTER (new_state), NULL);
+}
+
+MMModemCdmaRegistrationState
+mm_generic_cdma_query_reg_state_get_callback_evdo_state (MMCallbackInfo *info)
+{
+    g_return_val_if_fail (info != NULL, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+    g_return_val_if_fail (info->modem != NULL, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+    g_return_val_if_fail (MM_IS_GENERIC_CDMA (info->modem), MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+
+    return GPOINTER_TO_UINT (mm_callback_info_get_data (info, EVDO_STATE_TAG));
 }
 
 void
@@ -1318,18 +1342,19 @@ registration_state_invoke (MMCallbackInfo *info)
 
     /* note: This is the MMModemCdma interface callback */
     callback (MM_MODEM_CDMA (info->modem),
-              GPOINTER_TO_UINT (mm_callback_info_get_data (info, CDMA_1X_STATE_TAG)),
-              GPOINTER_TO_UINT (mm_callback_info_get_data (info, EVDO_STATE_TAG)),
+              mm_generic_cdma_query_reg_state_get_callback_1x_state (info),
+              mm_generic_cdma_query_reg_state_get_callback_evdo_state (info),
               info->error,
               info->user_data);
 }
 
 MMCallbackInfo *
 mm_generic_cdma_query_reg_state_callback_info_new (MMGenericCdma *self,
+                                                   MMModemCdmaRegistrationState cur_cdma_state,
+                                                   MMModemCdmaRegistrationState cur_evdo_state,
                                                    MMModemCdmaRegistrationStateFn callback,
                                                    gpointer user_data)
 {
-    MMGenericCdmaPrivate *priv;
     MMCallbackInfo *info;
 
     g_return_val_if_fail (self != NULL, NULL);
@@ -1342,15 +1367,8 @@ mm_generic_cdma_query_reg_state_callback_info_new (MMGenericCdma *self,
                                       user_data);
 
     /* Fill with current state */
-    priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
-    mm_callback_info_set_data (info,
-                               CDMA_1X_STATE_TAG,
-                               GUINT_TO_POINTER (priv->cdma_1x_reg_state),
-                               NULL);
-    mm_callback_info_set_data (info,
-                               EVDO_STATE_TAG,
-                               GUINT_TO_POINTER (priv->evdo_reg_state),
-                               NULL);
+    mm_generic_cdma_query_reg_state_set_callback_1x_state (info, cur_cdma_state);
+    mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, cur_evdo_state);
     return info;
 }
 
@@ -1381,18 +1399,18 @@ set_callback_evdo_state_helper (MMCallbackInfo *info,
 }
 
 static void
-reg_state_query_done (MMModemCdma *cdma,
-                      MMModemCdmaRegistrationState cdma_1x_reg_state,
-                      MMModemCdmaRegistrationState evdo_reg_state,
-                      GError *error,
-                      gpointer user_data)
+subclass_reg_query_done (MMModemCdma *cdma,
+                         MMModemCdmaRegistrationState cdma_reg_state,
+                         MMModemCdmaRegistrationState evdo_reg_state,
+                         GError *error,
+                         gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    if (error)
-        info->error = g_error_copy (error);
-    else {
-        set_callback_1x_state_helper (info, cdma_1x_reg_state);
+    info->error = mm_modem_check_removed (info->modem, error);
+    if (!info->error) {
+        /* Set final registration state */
+        set_callback_1x_state_helper (info, cdma_reg_state);
         set_callback_evdo_state_helper (info, evdo_reg_state);
     }
 
@@ -1406,25 +1424,26 @@ reg_query_speri_done (MMAtSerialPort *port,
                       gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
-    MMModemCdmaRegistrationState cdma_state;
-    MMModemCdmaRegistrationState evdo_state;
+    gboolean roam = FALSE;
 
-    cdma_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "tmp-cdma-state"));
-    evdo_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "tmp-evdo-state"));
+    if (error)
+        goto done;
 
-    if (!error) {
-        gboolean roam = FALSE;
+    if (!mm_cdma_parse_speri_response (response->str, &roam, NULL))
+        goto done;
 
-        if (mm_cdma_parse_speri_response (response->str, &roam, NULL)) {
-            cdma_state = roam ? MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING
-                              : MM_MODEM_CDMA_REGISTRATION_STATE_HOME;
-            evdo_state = roam ? MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING
-                              : MM_MODEM_CDMA_REGISTRATION_STATE_HOME;
-        }
+    /* Change the 1x and EVDO registration states to roaming if they were
+     * anything other than UNKNOWN.
+     */
+    if (roam) {
+        if (mm_generic_cdma_query_reg_state_get_callback_1x_state (info))
+            mm_generic_cdma_query_reg_state_set_callback_1x_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING);
+
+        if (mm_generic_cdma_query_reg_state_get_callback_evdo_state (info))
+            mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING);
     }
 
-    set_callback_1x_state_helper (info, cdma_state);
-    set_callback_evdo_state_helper (info, evdo_state);
+done:
     mm_callback_info_schedule (info);
 }
 
@@ -1440,32 +1459,36 @@ reg_query_spservice_done (MMAtSerialPort *port,
 
     if (error)
         info->error = g_error_copy (error);
-    else if (mm_cdma_parse_spservice_response (response->str,
-                                               &cdma_state,
-                                               &evdo_state)) {
+    else if (mm_cdma_parse_spservice_response (response->str, &cdma_state, &evdo_state)) {
+        mm_generic_cdma_query_reg_state_set_callback_1x_state (info, cdma_state);
+        mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, evdo_state);
+
         if (MM_GENERIC_CDMA_GET_PRIVATE (info->modem)->has_speri) {
             /* Get roaming status to override generic registration state */
-            mm_callback_info_set_data (info, "tmp-cdma-state", GUINT_TO_POINTER (cdma_state), NULL);
-            mm_callback_info_set_data (info, "tmp-evdo-state", GUINT_TO_POINTER (evdo_state), NULL);
             mm_at_serial_port_queue_command (port, "$SPERI?", 3, reg_query_speri_done, info);
             return;
         }
     }
 
-    set_callback_1x_state_helper (info, cdma_state);
-    set_callback_evdo_state_helper (info, evdo_state);
     mm_callback_info_schedule (info);
 }
 
 static void
 real_query_registration_state (MMGenericCdma *self,
+                               MMModemCdmaRegistrationState cur_cdma_state,
+                               MMModemCdmaRegistrationState cur_evdo_state,
                                MMModemCdmaRegistrationStateFn callback,
                                gpointer user_data)
 {
     MMCallbackInfo *info;
     MMAtSerialPort *port;
 
-    info = mm_generic_cdma_query_reg_state_callback_info_new (self, callback, user_data);
+    /* Seed this CallbackInfo with any previously determined registration state */
+    info = mm_generic_cdma_query_reg_state_callback_info_new (self,
+                                                              cur_cdma_state,
+                                                              cur_evdo_state,
+                                                              callback,
+                                                              user_data);
 
     port = mm_generic_cdma_get_best_at_port (self, &info->error);
     if (!port) {
@@ -1477,9 +1500,11 @@ real_query_registration_state (MMGenericCdma *self,
         /* Try Sprint-specific commands */
         mm_at_serial_port_queue_command (port, "+SPSERVICE?", 3, reg_query_spservice_done, info);
     } else {
-        /* Assume we're registered if we passed CAD and CSS checking */
-        set_callback_1x_state_helper (info, MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED);
-        set_callback_evdo_state_helper (info, MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED);
+        /* Assume we're registered on the 1x network if we passed +CAD, +CSS,
+         * and QCDM Call Manager checking.
+         */
+        mm_generic_cdma_query_reg_state_set_callback_1x_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED);
+        mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
         mm_callback_info_schedule (info);
     }
 }
@@ -1498,8 +1523,7 @@ reg_state_css_response (MMModemCdma *cdma,
      * report unknown registration state.
      */
     if (error) {
-        if (   (error->domain == MM_MOBILE_ERROR)
-            && (error->code == MM_MOBILE_ERROR_NO_NETWORK)) {
+        if (g_error_matches (error, MM_MOBILE_ERROR, MM_MOBILE_ERROR_NO_NETWORK)) {
             set_callback_1x_state_helper (info, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
             set_callback_evdo_state_helper (info, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
         } else {
@@ -1507,12 +1531,16 @@ reg_state_css_response (MMModemCdma *cdma,
             info->error = g_error_copy (error);
         }
         mm_callback_info_schedule (info);
-        return;
+    } else {
+        /* We're registered on the CDMA 1x network at least, but let subclasses
+         * do more specific registration checking.
+         */
+        MM_GENERIC_CDMA_GET_CLASS (cdma)->query_registration_state (MM_GENERIC_CDMA (info->modem),
+                                                                    MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED,
+                                                                    MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN,
+                                                                    subclass_reg_query_done,
+                                                                    info);
     }
-
-    MM_GENERIC_CDMA_GET_CLASS (cdma)->query_registration_state (MM_GENERIC_CDMA (info->modem),
-                                                                reg_state_query_done,
-                                                                info);
 }
 
 static void
@@ -1564,7 +1592,9 @@ get_analog_digital_done (MMAtSerialPort *port,
              * state, so skip AT+CSS? query.
              */
             MM_GENERIC_CDMA_GET_CLASS (info->modem)->query_registration_state (MM_GENERIC_CDMA (info->modem),
-                                                                               reg_state_query_done,
+                                                                               MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN,
+                                                                               MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN,
+                                                                               subclass_reg_query_done,
                                                                                info);
         }
         return;
@@ -1623,11 +1653,14 @@ reg_cmstate_cb (MMQcdmSerialPort *port,
              * better idea of whether we're roaming or not and what the
              * access technology is.
              */
-            if (MM_GENERIC_CDMA_GET_CLASS (info->modem)->query_registration_state)
+            if (MM_GENERIC_CDMA_GET_CLASS (info->modem)->query_registration_state) {
                 MM_GENERIC_CDMA_GET_CLASS (info->modem)->query_registration_state (MM_GENERIC_CDMA (info->modem),
-                                                                                   reg_state_query_done,
+                                                                                   cdma_state,
+                                                                                   evdo_state,
+                                                                                   subclass_reg_query_done,
                                                                                    info);
-            return;
+                return;
+            }
         }
     }
 
@@ -1654,20 +1687,18 @@ get_registration_state (MMModemCdma *modem,
     MMCallbackInfo *info;
     MMAtSerialPort *port;
 
-    info = mm_generic_cdma_query_reg_state_callback_info_new (MM_GENERIC_CDMA (modem), callback, user_data);
+    info = mm_generic_cdma_query_reg_state_callback_info_new (MM_GENERIC_CDMA (modem),
+                                                              MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN,
+                                                              MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN,
+                                                              callback,
+                                                              user_data);
 
     port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (modem), &info->error);
     if (!port && !priv->qcdm) {
         g_message ("Returning saved registration states: 1x: %d  EVDO: %d",
                    priv->cdma_1x_reg_state, priv->evdo_reg_state);
-        mm_callback_info_set_data (info,
-                                   CDMA_1X_STATE_TAG,
-                                   GUINT_TO_POINTER (priv->cdma_1x_reg_state),
-                                   NULL);
-        mm_callback_info_set_data (info,
-                                   EVDO_STATE_TAG,
-                                   GUINT_TO_POINTER (priv->evdo_reg_state),
-                                   NULL);
+        mm_generic_cdma_query_reg_state_set_callback_1x_state (info, priv->cdma_1x_reg_state);
+        mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, priv->evdo_reg_state);
         mm_callback_info_schedule (info);
         return;
     }
@@ -1983,8 +2014,11 @@ modem_state_changed (MMGenericCdma *self, GParamSpec *pspec, gpointer user_data)
 
     state = mm_modem_get_state (MM_MODEM (self));
     if (state >= MM_MODEM_STATE_ENABLED) {
-        if (!priv->poll_id)
+        if (!priv->poll_id) {
             priv->poll_id = g_timeout_add_seconds (30, periodic_poll_cb, self);
+            /* Kick one off immediately */
+            periodic_poll_cb (self);
+        }
     } else {
         if (priv->poll_id)
             g_source_remove (priv->poll_id);

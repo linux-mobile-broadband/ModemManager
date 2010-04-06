@@ -125,13 +125,13 @@ status_done (MMAtSerialPort *port,
     gboolean cdma_1x_set = FALSE, evdo_set = FALSE;
 
     if (error) {
-        info->error = g_error_copy (error);
+        /* Leave superclass' reg state alone if AT!STATUS isn't supported */
         goto done;
     }
 
     lines = g_strsplit_set (response->str, "\n\r", 0);
     if (!lines) {
-        /* Whatever, just use default registration state */
+        /* Whatever, just use superclass' registration state */
         goto done;
     }
 
@@ -289,13 +289,15 @@ done:
 
 static void
 query_registration_state (MMGenericCdma *cdma,
+                          MMModemCdmaRegistrationState cur_cdma_state,
+                          MMModemCdmaRegistrationState cur_evdo_state,
                           MMModemCdmaRegistrationStateFn callback,
                           gpointer user_data)
 {
     MMCallbackInfo *info;
     MMAtSerialPort *port;
 
-    info = mm_generic_cdma_query_reg_state_callback_info_new (cdma, callback, user_data);
+    info = mm_generic_cdma_query_reg_state_callback_info_new (cdma, cur_cdma_state, cur_evdo_state, callback, user_data);
 
     port = mm_generic_cdma_get_best_at_port (cdma, &info->error);
     if (!port) {

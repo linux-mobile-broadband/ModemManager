@@ -123,15 +123,8 @@ evdo_state_done (MMAtSerialPort *port,
     GRegex *r;
     GMatchInfo *match_info;
 
-    info->error = mm_modem_check_removed (info->modem, error);
-    if (info->error) {
-        if (info->modem) {
-            /* If HSTATE returned an error, assume the device is not EVDO capable
-             * or EVDO is not registered.
-             */
-            mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
-        }
-
+    if (error) {
+        /* Leave superclass' reg state alone if AT*HSTATE isn't supported */
         mm_callback_info_schedule (info);
         return;
     }
@@ -143,13 +136,8 @@ evdo_state_done (MMAtSerialPort *port,
                      G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     if (!r) {
         /* Parse error; warn about it and assume EVDO is not available */
-        g_warning ("AnyData(%s): failed to create EVDO state regex: (%d) %s",
-                   __func__,
-                   error ? error->code : -1,
-                   error && error->message ? error->message : "(unknown)");
-        mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
-        mm_callback_info_schedule (info);
-        return;
+        g_warning ("AnyDATA(%s): *HSTATE parse regex creation failed.", __func__);
+        goto done;
     }
 
     g_regex_match (r, reply, 0, &match_info);
@@ -185,8 +173,8 @@ evdo_state_done (MMAtSerialPort *port,
         }
     }
 
+done:
     mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, reg_state);
-
     mm_callback_info_schedule (info);
 }
 
@@ -202,17 +190,8 @@ state_done (MMAtSerialPort *port,
     GRegex *r;
     GMatchInfo *match_info;
 
-    info->error = mm_modem_check_removed (info->modem, error);
-    if (info->error) {
-        if (info->modem) {
-            /* Assume if we got this far, we're registered even if an error
-             * occurred.  We're not sure if all AnyData CDMA modems support
-             * the *STATE and *HSTATE commands.
-             */
-            mm_generic_cdma_query_reg_state_set_callback_1x_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED);
-            mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
-        }
-
+    if (error) {
+        /* Leave superclass' reg state alone if AT*STATE isn't supported */
         mm_callback_info_schedule (info);
         return;
     }
@@ -223,9 +202,7 @@ state_done (MMAtSerialPort *port,
     r = g_regex_new ("\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*([^,\\)]*)\\s*,.*",
                      G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     if (!r) {
-        info->error = g_error_new_literal (MM_MODEM_ERROR,
-                                           MM_MODEM_ERROR_GENERAL,
-                                           "Could not parse sysinfo results (regex creation failed).");
+        g_warning ("AnyDATA(%s): *STATE parse regex creation failed.", __func__);
         mm_callback_info_schedule (info);
         return;
     }
@@ -254,7 +231,7 @@ state_done (MMAtSerialPort *port,
                 reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
                 break;
             default:
-                g_message ("ANYDATA: unknown *STATE (%d); assuming no service.", val);
+                g_warning ("ANYDATA: unknown *STATE (%d); assuming no service.", val);
                 /* fall through */
             case 0:  /* NO SERVICE */
                 break;
@@ -270,13 +247,15 @@ state_done (MMAtSerialPort *port,
 
 static void
 query_registration_state (MMGenericCdma *cdma,
+                          MMModemCdmaRegistrationState cur_cdma_state,
+                          MMModemCdmaRegistrationState cur_evdo_state,
                           MMModemCdmaRegistrationStateFn callback,
                           gpointer user_data)
 {
     MMCallbackInfo *info;
     MMAtSerialPort *port;
 
-    info = mm_generic_cdma_query_reg_state_callback_info_new (cdma, callback, user_data);
+    info = mm_generic_cdma_query_reg_state_callback_info_new (cdma, cur_cdma_state, cur_evdo_state, callback, user_data);
 
     port = mm_generic_cdma_get_best_at_port (cdma, &info->error);
     if (!port) {

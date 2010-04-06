@@ -161,12 +161,10 @@ sysinfo_done (MMAtSerialPort *port,
     GRegex *r;
     GMatchInfo *match_info;
     const char *reply;
-    gboolean success = FALSE;
 
     if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-        return;
+        /* Leave superclass' reg state alone if AT^SYSINFO isn't supported */
+        goto done;
     }
 
     reply = strip_response (response->str, "^SYSINFO:");
@@ -175,9 +173,7 @@ sysinfo_done (MMAtSerialPort *port,
     r = g_regex_new ("\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)",
                      G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     if (!r) {
-        info->error = g_error_new_literal (MM_MODEM_ERROR,
-                                           MM_MODEM_ERROR_GENERAL,
-                                           "Could not parse sysinfo results (regex creation failed).");
+        g_warning ("Huawei(%s): ^SYSINFO parse regex creation failed.", __func__);
         goto done;
     }
 
@@ -217,31 +213,27 @@ sysinfo_done (MMAtSerialPort *port,
             /* Say we're registered to something even though sysmode parsing failed */
             mm_generic_cdma_query_reg_state_set_callback_1x_state (info, reg_state);
         }
-        success = TRUE;
-    }
+    } else
+        g_warning ("Huawei(%s): failed to parse ^SYSINFO response.", __func__);
 
-done:
     g_match_info_free (match_info);
     g_regex_unref (r);
-    
-    if (!success && !info->error) {
-        info->error = g_error_new_literal (MM_MODEM_ERROR,
-                                           MM_MODEM_ERROR_GENERAL,
-                                           "Could not parse sysinfo results.");
-    }
 
+done:
     mm_callback_info_schedule (info);
 }
 
 static void
 query_registration_state (MMGenericCdma *cdma,
+                          MMModemCdmaRegistrationState cur_cdma_state,
+                          MMModemCdmaRegistrationState cur_evdo_state,
                           MMModemCdmaRegistrationStateFn callback,
                           gpointer user_data)
 {
     MMCallbackInfo *info;
     MMAtSerialPort *port;
 
-    info = mm_generic_cdma_query_reg_state_callback_info_new (cdma, callback, user_data);
+    info = mm_generic_cdma_query_reg_state_callback_info_new (cdma, cur_cdma_state, cur_evdo_state, callback, user_data);
 
     port = mm_generic_cdma_get_best_at_port (cdma, &info->error);
     if (!port) {
