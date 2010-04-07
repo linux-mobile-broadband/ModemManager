@@ -290,7 +290,7 @@ get_allowed_mode (MMGenericGsm *gsm,
         return;
     }
 
-    mm_at_serial_port_queue_command (port, "CFUN?", 3, get_allowed_mode_done, info);
+    mm_at_serial_port_queue_command (port, "+CFUN?", 3, get_allowed_mode_done, info);
 }
 
 /*****************************************************************************/
