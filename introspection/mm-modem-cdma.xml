@@ -57,10 +57,10 @@
       <tp:docstring>Get device registration state.</tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_cdma_get_registration_state"/>
-      <arg name="cdma-1x-state" type="u" direction="out" tp:type="MM_MODEM_CDMA_REGISTRATION_STATE">
+      <arg name="cdma_1x_state" type="u" direction="out" tp:type="MM_MODEM_CDMA_REGISTRATION_STATE">
         <tp:docstring>CDMA 1x registration state.</tp:docstring>
       </arg>
-      <arg name="evdo-state" type="u" direction="out" tp:type="MM_MODEM_CDMA_REGISTRATION_STATE">
+      <arg name="evdo_state" type="u" direction="out" tp:type="MM_MODEM_CDMA_REGISTRATION_STATE">
         <tp:docstring>EVDO registration state.</tp:docstring>
       </arg>
     </method>

@@ -1,6 +1,6 @@
 XSLTPROC = xsltproc --xinclude --nonet
 
-XMLS = $(wildcard introspection/mm-*.xml)
+XMLS = $(wildcard introspection/*.xml)
 
 if WITH_DOCS
 
@@ -53,6 +53,9 @@ include/mm-modem.h: $(XMLS) introspection/all.xml header-generator.xsl
 
 %service: %service.in
 	$(edit) $< >$@
+
+xmldir = $(datadir)/dbus-1/interfaces
+xml_DATA = $(XMLS)
 
 edit = @sed \
 	-e 's|@sbindir[@]|$(sbindir)|g' \
