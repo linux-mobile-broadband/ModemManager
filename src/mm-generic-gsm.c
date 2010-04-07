@@ -868,9 +868,14 @@ init_done (MMAtSerialPort *port,
     }
 
     /* Ensure echo is off after the init command; some modems ignore the
-        * E0 when it's in the same like as ATZ (Option GIO322).
-        */
-    mm_at_serial_port_queue_command (port, "E0 +CMEE=1", 2, NULL, NULL);
+     * E0 when it's in the same line as ATZ (Option GIO322).
+     */
+    mm_at_serial_port_queue_command (port, "E0", 2, NULL, NULL);
+
+    /* Some phones (like Blackberries) don't support +CMEE=1, so make it
+     * optional.  It completely violates 3GPP TS 27.007 (9.1) but what can we do...
+     */
+    mm_at_serial_port_queue_command (port, "+CMEE=1", 2, NULL, NULL);
 
     g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_INIT_CMD_OPTIONAL, &cmd, NULL);
     mm_at_serial_port_queue_command (port, cmd, 2, NULL, NULL);
@@ -3497,7 +3502,7 @@ get_property (GObject *object, guint prop_id,
         g_value_set_string (value, "");
         break;
     case MM_GENERIC_GSM_PROP_INIT_CMD:
-        g_value_set_string (value, "Z E0 V1 +CMEE=1");
+        g_value_set_string (value, "Z E0 V1");
         break;
     case MM_GENERIC_GSM_PROP_INIT_CMD_OPTIONAL:
         g_value_set_string (value, "X4 &C1");
