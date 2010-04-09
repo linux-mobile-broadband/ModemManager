@@ -18,6 +18,7 @@
 #define MM_MODEM_HELPERS_H
 
 #include "mm-modem-cdma.h"
+#include "mm-charsets.h"
 
 #define MM_SCAN_TAG_STATUS "status"
 #define MM_SCAN_TAG_OPER_LONG "operator-long"
@@ -50,6 +51,9 @@ gboolean mm_cdma_parse_spservice_response (const char *reply,
 gboolean mm_cdma_parse_speri_response (const char *reply,
                                        gboolean *out_roaming,
                                        const char **out_desc);
+
+gboolean mm_gsm_parse_cscs_support_response (const char *reply,
+                                             MMModemCharset *out_charsets);
 
 #endif  /* MM_MODEM_HELPERS_H */
 

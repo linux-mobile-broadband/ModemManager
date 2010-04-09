@@ -23,6 +23,22 @@
 #include "mm-errors.h"
 #include "mm-modem-helpers.h"
 
+const char *
+mm_strip_tag (const char *str, const char *cmd)
+{
+    const char *p = str;
+
+    if (p) {
+        if (!strncmp (p, cmd, strlen (cmd)))
+            p += strlen (cmd);
+        while (isspace (*p))
+            p++;
+    }
+    return p;
+}
+
+/*************************************************************************/
+
 static void
 save_scan_value (GHashTable *hash, const char *key, GMatchInfo *info, guint32 num)
 {
@@ -702,17 +718,55 @@ mm_cdma_parse_speri_response (const char *reply,
 
 /*************************************************************************/
 
-const char *
-mm_strip_tag (const char *str, const char *cmd)
+gboolean
+mm_gsm_parse_cscs_support_response (const char *reply,
+                                    MMModemCharset *out_charsets)
 {
-    const char *p = str;
+    MMModemCharset charsets = MM_MODEM_CHARSET_UNKNOWN;
+    GRegex *r;
+    GMatchInfo *match_info;
+    char *p, *str;
+    gboolean success = FALSE;
 
-    if (p) {
-        if (!strncmp (p, cmd, strlen (cmd)))
-            p += strlen (cmd);
-        while (isspace (*p))
-            p++;
+    g_return_val_if_fail (reply != NULL, FALSE);
+    g_return_val_if_fail (out_charsets != NULL, FALSE);
+
+    /* Find the first '(' or '"'; the general format is:
+     *
+     * +CSCS: ("IRA","GSM","UCS2")
+     *
+     * but some devices (some Blackberries) don't include the ().
+     */
+    p = strchr (reply, '(');
+    if (p)
+        p++;
+    else {
+        p = strchr (reply, '"');
+        if (!p)
+            return FALSE;
     }
-    return p;
+
+    /* Now parse each charset */
+    r = g_regex_new ("\\s*([^,\\)]+)\\s*", 0, 0, NULL);
+    if (!r)
+        return FALSE;
+
+    if (g_regex_match_full (r, p, strlen (p), 0, 0, &match_info, NULL)) {
+        while (g_match_info_matches (match_info)) {
+            str = g_match_info_fetch (match_info, 1);
+            charsets |= mm_modem_charset_from_string (str);
+            g_free (str);
+
+            g_match_info_next (match_info, NULL);
+            success = TRUE;
+        }
+        g_match_info_free (match_info);
+    }
+    g_regex_unref (r);
+
+    if (success)
+        *out_charsets = charsets;
+
+    return success;
 }
 

@@ -23,21 +23,22 @@
 
 typedef struct {
     const char *gsm_name;
+    const char *other_name;
     const char *iconv_from_name;
     const char *iconv_to_name;
     MMModemCharset charset;
 } CharsetEntry;
 
 static CharsetEntry charset_map[] = {
-    { "UTF-8",   "UTF-8",     "UTF-8//TRANSLIT",     MM_MODEM_CHARSET_UTF8 },
-    { "UCS2",    "UCS-2BE",   "UCS-2BE//TRANSLIT",   MM_MODEM_CHARSET_UCS2 },
-    { "IRA",     "ASCII",     "ASCII//TRANSLIT",     MM_MODEM_CHARSET_IRA },
-    { "GSM",     NULL,        NULL,                  MM_MODEM_CHARSET_GSM },
-    { "8859-1",  "ISO8859-1", "ISO8859-1//TRANSLIT", MM_MODEM_CHARSET_8859_1 },
-    { "PCCP437", NULL,        NULL,                  MM_MODEM_CHARSET_PCCP437 },
-    { "PCDN",    NULL,        NULL,                  MM_MODEM_CHARSET_PCDN },
-    { "HEX",     NULL,        NULL,                  MM_MODEM_CHARSET_HEX },
-    { NULL,      NULL,        NULL,                  MM_MODEM_CHARSET_UNKNOWN }
+    { "UTF-8",   "UTF8",   "UTF-8",     "UTF-8//TRANSLIT",     MM_MODEM_CHARSET_UTF8 },
+    { "UCS2",    NULL,     "UCS-2BE",   "UCS-2BE//TRANSLIT",   MM_MODEM_CHARSET_UCS2 },
+    { "IRA",     "ASCII",  "ASCII",     "ASCII//TRANSLIT",     MM_MODEM_CHARSET_IRA },
+    { "GSM",     NULL,     NULL,        NULL,                  MM_MODEM_CHARSET_GSM },
+    { "8859-1",  NULL,     "ISO8859-1", "ISO8859-1//TRANSLIT", MM_MODEM_CHARSET_8859_1 },
+    { "PCCP437", NULL,     NULL,        NULL,                  MM_MODEM_CHARSET_PCCP437 },
+    { "PCDN",    NULL,     NULL,        NULL,                  MM_MODEM_CHARSET_PCDN },
+    { "HEX",     NULL,     NULL,        NULL,                  MM_MODEM_CHARSET_HEX },
+    { NULL,      NULL,     NULL,        NULL,                  MM_MODEM_CHARSET_UNKNOWN }
 };
 
 const char *
@@ -65,6 +66,8 @@ mm_modem_charset_from_string (const char *string)
 
     while (iter->gsm_name) {
         if (strcasestr (string, iter->gsm_name))
+            return iter->charset;
+        if (iter->other_name && strcasestr (string, iter->other_name))
             return iter->charset;
         iter++;
     }

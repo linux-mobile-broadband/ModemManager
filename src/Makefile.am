@@ -9,7 +9,9 @@ libmodem_helpers_la_SOURCES = \
 	mm-errors.c \
 	mm-errors.h \
 	mm-modem-helpers.c \
-	mm-modem-helpers.h
+	mm-modem-helpers.h \
+	mm-charsets.c \
+	mm-charsets.h
 
 sbin_PROGRAMS = modem-manager
 
@@ -58,8 +60,6 @@ modem_manager_SOURCES = \
 	main.c \
 	mm-callback-info.c \
 	mm-callback-info.h \
-	mm-charsets.c \
-	mm-charsets.h \
 	$(auth_sources) \
 	mm-manager.c \
 	mm-manager.h \

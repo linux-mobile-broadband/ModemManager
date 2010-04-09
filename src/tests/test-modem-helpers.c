@@ -690,6 +690,67 @@ test_creg_cgreg_multi2_unsolicited (void *f, gpointer d)
     test_creg_match ("Multi CREG/CGREG #2", FALSE, reply, data, &result);
 }
 
+static void
+test_cscs_icon225_support_response (void *f, gpointer d)
+{
+    const char *reply = "\r\n+CSCS: (\"IRA\",\"GSM\",\"UCS2\")\r\n";
+    MMModemCharset charsets = MM_MODEM_CHARSET_UNKNOWN;
+    gboolean success;
+
+    success = mm_gsm_parse_cscs_support_response (reply, &charsets);
+    g_assert (success);
+
+    g_assert (charsets == (MM_MODEM_CHARSET_IRA |
+                           MM_MODEM_CHARSET_GSM |
+                           MM_MODEM_CHARSET_UCS2));
+}
+
+static void
+test_cscs_sierra_mercury_support_response (void *f, gpointer d)
+{
+    const char *reply = "\r\n+CSCS: (\"IRA\",\"GSM\",\"UCS2\",\"PCCP437\")\r\n";
+    MMModemCharset charsets = MM_MODEM_CHARSET_UNKNOWN;
+    gboolean success;
+
+    success = mm_gsm_parse_cscs_support_response (reply, &charsets);
+    g_assert (success);
+
+    g_assert (charsets == (MM_MODEM_CHARSET_IRA |
+                           MM_MODEM_CHARSET_GSM |
+                           MM_MODEM_CHARSET_UCS2 |
+                           MM_MODEM_CHARSET_PCCP437));
+}
+
+static void
+test_cscs_buslink_support_response (void *f, gpointer d)
+{
+    const char *reply = "\r\n+CSCS: (\"8859-1\",\"ASCII\",\"GSM\",\"UCS2\",\"UTF8\")\r\n";
+    MMModemCharset charsets = MM_MODEM_CHARSET_UNKNOWN;
+    gboolean success;
+
+    success = mm_gsm_parse_cscs_support_response (reply, &charsets);
+    g_assert (success);
+
+    g_assert (charsets == (MM_MODEM_CHARSET_8859_1 |
+                           MM_MODEM_CHARSET_IRA |
+                           MM_MODEM_CHARSET_GSM |
+                           MM_MODEM_CHARSET_UCS2 |
+                           MM_MODEM_CHARSET_UTF8));
+}
+
+static void
+test_cscs_blackberry_support_response (void *f, gpointer d)
+{
+    const char *reply = "\r\n+CSCS: \"IRA\"\r\n";
+    MMModemCharset charsets = MM_MODEM_CHARSET_UNKNOWN;
+    gboolean success;
+
+    success = mm_gsm_parse_cscs_support_response (reply, &charsets);
+    g_assert (success);
+
+    g_assert (charsets == MM_MODEM_CHARSET_IRA);
+}
+
 static TestData *
 test_data_new (void)
 {
@@ -774,6 +835,11 @@ int main (int argc, char **argv)
 
     g_test_suite_add (suite, TESTCASE (test_creg_cgreg_multi_unsolicited, data));
     g_test_suite_add (suite, TESTCASE (test_creg_cgreg_multi2_unsolicited, data));
+
+    g_test_suite_add (suite, TESTCASE (test_cscs_icon225_support_response, data));
+    g_test_suite_add (suite, TESTCASE (test_cscs_sierra_mercury_support_response, data));
+    g_test_suite_add (suite, TESTCASE (test_cscs_buslink_support_response, data));
+    g_test_suite_add (suite, TESTCASE (test_cscs_blackberry_support_response, data));
 
     result = g_test_run ();
 

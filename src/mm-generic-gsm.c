@@ -2676,9 +2676,6 @@ get_charsets_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMGenericGsmPrivate *priv;
-    GRegex *r = NULL;
-    GMatchInfo *match_info;
-    const char *p;
 
     info->error = mm_modem_check_removed (info->modem, error);
     if (info->error) {
@@ -2688,41 +2685,13 @@ get_charsets_done (MMAtSerialPort *port,
 
     priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
 
-    /* Find the first '(' */
-    p = strchr (response->str, '(');
-    if (!p)
-        goto done;
-    p++;
-
-    /* Now parse each charset */
-    r = g_regex_new ("\\s*([^,\\)]+)\\s*", 0, 0, NULL);
-    if (!r)
-        goto done;
-
-    if (!g_regex_match_full (r, p, strlen (p), 0, 0, &match_info, NULL))
-        goto done;
-
     priv->charsets = MM_MODEM_CHARSET_UNKNOWN;
-
-    while (g_match_info_matches (match_info)) {
-        char *str;
-
-        str = g_match_info_fetch (match_info, 1);
-        priv->charsets |= mm_modem_charset_from_string (str);
-        g_free (str);
-
-        g_match_info_next (match_info, NULL);
-    }
-    g_match_info_free (match_info);
-
-    mm_callback_info_set_result (info, GUINT_TO_POINTER (priv->charsets), NULL);
-
-done:
-    if (!info->error && !priv->charsets) {
+    if (!mm_gsm_parse_cscs_support_response (response->str, &priv->charsets)) {
         info->error = g_error_new_literal (MM_MODEM_ERROR,
                                            MM_MODEM_ERROR_GENERAL,
                                            "Failed to parse the supported character sets response");
-    }
+    } else
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (priv->charsets), NULL);
 
     mm_callback_info_schedule (info);
 }
