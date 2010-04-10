@@ -636,7 +636,7 @@ find_physical_device (GUdevDevice *child)
     GUdevDevice *physdev = NULL;
     const char *subsys, *type;
     guint32 i = 0;
-    gboolean is_usb = FALSE, is_pci = FALSE;
+    gboolean is_usb = FALSE, is_pci = FALSE, is_pcmcia = FALSE;
 
     g_return_val_if_fail (child != NULL, NULL);
 
@@ -650,6 +650,26 @@ find_physical_device (GUdevDevice *child)
                 if (type && !strcmp (type, "usb_device")) {
                     physdev = iter;
                     break;
+                }
+            } else if (is_pcmcia || !strcmp (subsys, "pcmcia")) {
+                GUdevDevice *pcmcia_parent;
+                const char *tmp_subsys;
+
+                is_pcmcia = TRUE;
+
+                /* If the parent of this PCMCIA device is no longer part of
+                 * the PCMCIA subsystem, we want to stop since we're looking
+                 * for the base PCMCIA device, not the PCMCIA controller which
+                 * is usually PCI or some other bus type.
+                 */
+                pcmcia_parent = g_udev_device_get_parent (iter);
+                if (pcmcia_parent) {
+                    tmp_subsys = g_udev_device_get_subsystem (pcmcia_parent);
+                    if (tmp_subsys && strcmp (tmp_subsys, "pcmcia"))
+                        physdev = iter;
+                    g_object_unref (pcmcia_parent);
+                    if (physdev)
+                        break;
                 }
             } else if (is_pci || !strcmp (subsys, "pci")) {
                 is_pci = TRUE;
