@@ -55,21 +55,22 @@ static void
 println (guint indent, const char *fmt, ...)
 {
 	va_list args;
-	char real_fmt[1000];
+	GString *output;
 	int i;
 
 	g_return_if_fail (fmt != NULL);
-	g_return_if_fail (indent < sizeof (real_fmt) - 2 - strlen (fmt));
+
+	output = g_string_sized_new (250);
 
 	for (i = 0; i < indent; i++)
-		real_fmt[i] = ' ';
-	strcpy (&real_fmt[i], fmt);
-	real_fmt[i + strlen (fmt)] = '\n';
-	real_fmt[i + strlen (fmt) + 1] = '\0';
+		g_string_append_c (output, ' ');
 
 	va_start (args, fmt);
-	vprintf (real_fmt, args);
+	g_string_append_vprintf (output, fmt, args);
 	va_end (args);
+
+	g_print ("%s\n", output->str);
+	g_string_free (output, TRUE);
 }
 
 static void
@@ -88,7 +89,7 @@ dump_device_and_parent (GUdevDevice *device, guint indent)
 	println (indent, "Path:     %s", g_udev_device_get_sysfs_path (device));
 	println (indent, "Driver:   %s", g_udev_device_get_driver (device));
 	println (indent, "Action:   %s", g_udev_device_get_action (device));
-	println (indent, "Seq Num:  %s", g_udev_device_get_seqnum (device));
+	println (indent, "Seq Num:  %lu", g_udev_device_get_seqnum (device));
 	println (indent, "Dev File: %s", g_udev_device_get_device_file (device));
 
 	println (indent, "");
