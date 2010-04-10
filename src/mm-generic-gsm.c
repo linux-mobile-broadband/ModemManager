@@ -1043,6 +1043,11 @@ disable (MMModem *modem,
         priv->signal_quality_id = 0;
     }
 
+    if (priv->pin_check_timeout) {
+        g_source_remove (priv->pin_check_timeout);
+        priv->pin_check_timeout = 0;
+    }
+
     priv->lac[0] = 0;
     priv->lac[1] = 0;
     priv->cell_id[0] = 0;
@@ -1129,16 +1134,59 @@ get_card_info (MMModem *modem,
 #define PIN_PORT_TAG "pin-port"
 
 static void
+pin_puk_recheck_done (MMModem *modem, GError *error, gpointer user_data);
+
+static gboolean
+pin_puk_recheck_again (gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    MM_GENERIC_GSM_GET_PRIVATE (info->modem)->pin_check_timeout = 0;
+    check_pin (MM_GENERIC_GSM (info->modem), pin_puk_recheck_done, info);
+    return FALSE;
+}
+
+static void
 pin_puk_recheck_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     gboolean close_port = !!mm_callback_info_get_data (info, PIN_CLOSE_PORT_TAG);
+
+    /* Clear the pin check timeout to ensure that it won't ever get a
+     * stale MMCallbackInfo if the modem got removed.  We'll reschedule it here
+     * anyway if needed.
+     */
+    if (info->modem) {
+        MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+
+        if (priv->pin_check_timeout)
+            g_source_remove (priv->pin_check_timeout);
+        priv->pin_check_timeout = 0;
+    }
 
     /* modem could have been removed before we get here, in which case
      * 'modem' will be NULL.
      */
     info->error = mm_modem_check_removed (modem, error);
 
+    /* If the modem wasn't removed, and the modem isn't ready yet, ask it for
+     * the current PIN status a few times since some devices take a bit to fully
+     * enable themselves after a SIM PIN/PUK unlock.
+     */
+    if (   info->modem
+        && info->error
+        && !g_error_matches (info->error, MM_MODEM_ERROR, MM_MODEM_ERROR_REMOVED)) {
+        MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+
+        if (priv->pin_check_tries < 4) {
+            g_clear_error (&info->error);
+            priv->pin_check_tries++;
+            priv->pin_check_timeout = g_timeout_add_seconds (2, pin_puk_recheck_again, info);
+            return;
+        }
+    }
+
+    /* Otherwise, clean up and return the PIN check error */
     if (modem && close_port) {
         MMSerialPort *port = mm_callback_info_get_data (info, PIN_PORT_TAG);
 
@@ -1167,6 +1215,7 @@ send_puk_done (MMAtSerialPort *port,
     }
 
     /* Get latest PIN status */
+    MM_GENERIC_GSM_GET_PRIVATE (info->modem)->pin_check_tries = 0;
     check_pin (MM_GENERIC_GSM (info->modem), pin_puk_recheck_done, info);
 }
 
@@ -1227,6 +1276,7 @@ send_pin_done (MMAtSerialPort *port,
     }
 
     /* Get latest PIN status */
+    MM_GENERIC_GSM_GET_PRIVATE (info->modem)->pin_check_tries = 0;
     check_pin (MM_GENERIC_GSM (info->modem), pin_puk_recheck_done, info);
 }
 
@@ -3504,8 +3554,10 @@ finalize (GObject *object)
 
     mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (object));
 
-    if (priv->pin_check_timeout)
+    if (priv->pin_check_timeout) {
         g_source_remove (priv->pin_check_timeout);
+        priv->pin_check_timeout = 0;
+    }
 
     if (priv->poll_id) {
         g_source_remove (priv->poll_id);
