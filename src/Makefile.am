@@ -1,5 +1,12 @@
 SUBDIRS=. tests
 
+udevrulesdir = $(UDEV_BASE_DIR)/rules.d
+udevrules_DATA = \
+	77-mm-usb-device-blacklist.rules
+
+EXTRA_DIST = \
+	$(udevrules_DATA)
+
 noinst_LTLIBRARIES = libmodem-helpers.la
 
 libmodem_helpers_la_CPPFLAGS = \
@@ -139,7 +146,7 @@ modem_manager_SOURCES += $(loc_sources)
 
 BUILT_SOURCES += mm-modem-location-glue.h
 else
-EXTRA_DIST = $(loc_sources)
+EXTRA_DIST += $(loc_sources)
 endif
 
 CLEANFILES = $(BUILT_SOURCES)
