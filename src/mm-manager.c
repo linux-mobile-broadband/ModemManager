@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
 #include <string.h>
@@ -734,6 +734,12 @@ device_added (MMManager *manager, GUdevDevice *device)
             && !strstr (name, "virbr"))
             g_debug ("(%s/%s): could not get port's parent device", subsys, name);
 
+        goto out;
+    }
+
+    /* Is the device blacklisted? */
+    if (g_udev_device_get_property_as_boolean (physdev, "ID_MM_DEVICE_IGNORE")) {
+        g_debug ("(%s/%s): port's parent device is blacklisted", subsys, name);
         goto out;
     }
 
