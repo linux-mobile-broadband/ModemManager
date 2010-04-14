@@ -137,6 +137,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
   </xsl:template>
 
   <xsl:template match="signal">
+    <xsl:variable name="varname">
+      <xsl:value-of select="translate(@name,
+			    'abcdefghijklmnopqrstuvwxyz. ',
+			    'ABCDEFGHIJKLMNOPQRSTUVWXYZ_')"/>
+    </xsl:variable>
+#define <xsl:value-of select="concat('MM_SIGNAL_', $varname)"/> "<xsl:value-of select="@name"/>"
+
   </xsl:template>
 
   <xsl:template match="method">
