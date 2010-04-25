@@ -371,7 +371,7 @@ pre_init_done (MMAtSerialPort *port,
     if (error) {
         /* Retry the init string one more time; the modem sometimes throws it away */
         if (   !priv->init_retried
-            && g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_RESPONSE_TIMEOUT)) {
+            && g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
             priv->init_retried = TRUE;
             enable_flash_done (MM_SERIAL_PORT (port), NULL, user_data);
         } else

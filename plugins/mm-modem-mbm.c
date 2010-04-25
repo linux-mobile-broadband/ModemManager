@@ -405,11 +405,9 @@ mbm_emrdy_done (MMAtSerialPort *port,
     MMCallbackInfo *info = user_data;
     MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (info->modem);
 
-    if (   error
-        && error->domain == MM_SERIAL_ERROR
-        && error->code == MM_SERIAL_RESPONSE_TIMEOUT) {
+    if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT))
         g_warning ("%s: timed out waiting for EMRDY response.", __func__);
-    } else
+    else
         priv->have_emrdy = TRUE;
 
     do_init (port, info);

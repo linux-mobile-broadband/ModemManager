@@ -574,7 +574,7 @@ real_handle_probe_response (MMPluginBase *self,
         ignore_error = TRUE;
 
     if (error && !ignore_error) {
-        if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_RESPONSE_TIMEOUT)) {
+        if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
             /* Try GCAP again */
             if (task_priv->probe_state < PROBE_STATE_GCAP_TRY3) {
                 task_priv->probe_state++;
@@ -734,7 +734,7 @@ custom_init_response (MMAtSerialPort *port,
             return;
         } else if (task_priv->custom_init_fail_if_timeout) {
             /* Fail the probe if the plugin wanted it and the command timed out */
-            if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_RESPONSE_TIMEOUT)) {
+            if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
                 probe_complete (task);
                 return;
             }
@@ -784,7 +784,7 @@ try_open (gpointer user_data)
             probe_complete (task);
         } else if (g_error_matches (error,
                                     MM_SERIAL_ERROR,
-                                    MM_SERIAL_OPEN_FAILED_NO_DEVICE)) {
+                                    MM_SERIAL_ERROR_OPEN_FAILED_NO_DEVICE)) {
             /* this is nozomi being dumb; try again */
             task_priv->open_id = g_timeout_add_seconds (1, try_open, task);
         } else {

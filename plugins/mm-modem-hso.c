@@ -300,7 +300,7 @@ hso_connect_timed_out (gpointer data)
 
     if (info) {
         info->error = g_error_new_literal (MM_SERIAL_ERROR,
-                                           MM_SERIAL_RESPONSE_TIMEOUT,
+                                           MM_SERIAL_ERROR_RESPONSE_TIMEOUT,
                                            "Connection timed out");
     }
 

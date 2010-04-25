@@ -362,13 +362,13 @@ mm_serial_port_send_command (MMSerialPort *self,
     const guint8 *p;
 
     if (priv->fd < 0) {
-        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_SEND_FAILED,
+        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
                      "%s", "Sending command failed: device is not enabled");
         return FALSE;
     }
 
     if (mm_port_get_connected (MM_PORT (self))) {
-        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_SEND_FAILED,
+        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
                      "%s", "Sending command failed: device is connected");
         return FALSE;
     }
@@ -386,12 +386,12 @@ mm_serial_port_send_command (MMSerialPort *self,
             if (errno == EAGAIN) {
                 eagain_count--;
                 if (eagain_count <= 0) {
-                    g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_SEND_FAILED,
+                    g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
                                  "Sending command failed: '%s'", strerror (errno));
                     break;
                 }
             } else {
-                g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_SEND_FAILED,
+                g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
                              "Sending command failed: '%s'", strerror (errno));
                 break;
             }
@@ -526,7 +526,7 @@ mm_serial_port_timed_out (gpointer data)
     priv->timeout_id = 0;
 
     error = g_error_new_literal (MM_SERIAL_ERROR,
-                                 MM_SERIAL_RESPONSE_TIMEOUT,
+                                 MM_SERIAL_ERROR_RESPONSE_TIMEOUT,
                                  "Serial command timed out");
     /* FIXME: This is not completely correct - if the response finally arrives and there's
        some other command waiting for response right now, the other command will
@@ -708,13 +708,13 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
          */
         g_set_error (error,
                      MM_SERIAL_ERROR,
-                     (errno == ENODEV) ? MM_SERIAL_OPEN_FAILED_NO_DEVICE : MM_SERIAL_OPEN_FAILED,
+                     (errno == ENODEV) ? MM_SERIAL_ERROR_OPEN_FAILED_NO_DEVICE : MM_SERIAL_ERROR_OPEN_FAILED,
                      "Could not open serial device %s: %s", device, strerror (errno));
         return FALSE;
     }
 
     if (ioctl (priv->fd, TIOCEXCL) < 0) {
-        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_OPEN_FAILED,
+        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_OPEN_FAILED,
                      "Could not lock serial device %s: %s", device, strerror (errno));
         close (priv->fd);
         priv->fd = -1;
@@ -725,7 +725,7 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
     tcflush (priv->fd, TCIOFLUSH);
 
     if (tcgetattr (priv->fd, &priv->old_t) < 0) {
-        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_OPEN_FAILED,
+        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_OPEN_FAILED,
                      "Could not open serial device %s: %s", device, strerror (errno));
         close (priv->fd);
         priv->fd = -1;

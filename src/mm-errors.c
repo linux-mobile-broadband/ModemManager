@@ -39,11 +39,11 @@ mm_serial_error_get_type (void)
 
     if (etype == 0) {
         static const GEnumValue values[] = {
-            ENUM_ENTRY (MM_SERIAL_OPEN_FAILED,      "SerialOpenFailed"),
-            ENUM_ENTRY (MM_SERIAL_SEND_FAILED,      "SerialSendfailed"),
-            ENUM_ENTRY (MM_SERIAL_RESPONSE_TIMEOUT, "SerialResponseTimeout"),
-            ENUM_ENTRY (MM_SERIAL_OPEN_FAILED_NO_DEVICE, "SerialOpenFailedNoDevice"),
-            ENUM_ENTRY (MM_SERIAL_ERROR_FLASH_FAILED,    "SerialFlashFailed"),
+            ENUM_ENTRY (MM_SERIAL_ERROR_OPEN_FAILED,           "SerialOpenFailed"),
+            ENUM_ENTRY (MM_SERIAL_ERROR_SEND_FAILED,           "SerialSendfailed"),
+            ENUM_ENTRY (MM_SERIAL_ERROR_RESPONSE_TIMEOUT,      "SerialResponseTimeout"),
+            ENUM_ENTRY (MM_SERIAL_ERROR_OPEN_FAILED_NO_DEVICE, "SerialOpenFailedNoDevice"),
+            ENUM_ENTRY (MM_SERIAL_ERROR_FLASH_FAILED,          "SerialFlashFailed"),
             { 0, 0, 0 }
         };
 
