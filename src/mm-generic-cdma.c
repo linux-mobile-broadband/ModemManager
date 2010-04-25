@@ -1847,10 +1847,9 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
     const char *str;
     guint id;
 
-    if (error) {
-        info->error = g_error_copy (error);
+    info->error = mm_modem_check_removed (modem, error);
+    if (info->error)
         goto out;
-    }
 
     switch (state) {
     case SIMPLE_STATE_BEGIN:
@@ -1885,7 +1884,8 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
 
  out:
     if (info->error || state == SIMPLE_STATE_DONE) {
-        registration_cleanup (MM_GENERIC_CDMA (modem), 0, 0);
+        if (modem)
+            registration_cleanup (MM_GENERIC_CDMA (modem), 0, 0);
         mm_callback_info_schedule (info);
     }
 }
