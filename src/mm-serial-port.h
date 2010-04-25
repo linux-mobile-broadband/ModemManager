@@ -110,6 +110,7 @@ void     mm_serial_port_close             (MMSerialPort *self);
 
 gboolean mm_serial_port_flash             (MMSerialPort *self,
                                            guint32 flash_time,
+                                           gboolean ignore_errors,
                                            MMSerialFlashFn callback,
                                            gpointer user_data);
 void     mm_serial_port_flash_cancel      (MMSerialPort *self);

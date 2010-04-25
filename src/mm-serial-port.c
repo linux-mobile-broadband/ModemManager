@@ -958,8 +958,14 @@ flash_do (gpointer data)
 
     priv->flash_id = 0;
 
-    if (!set_speed (info->port, info->current_speed, &error))
-        g_assert (error);
+    if (info->current_speed) {
+        if (!set_speed (info->port, info->current_speed, &error))
+            g_assert (error);
+    } else {
+        error = g_error_new_literal (MM_SERIAL_ERROR,
+                                     MM_SERIAL_ERROR_FLASH_FAILED,
+                                     "Failed to retrieve current speed");
+    }
 
     info->callback (info->port, error, info->user_data);
     g_clear_error (&error);
@@ -970,6 +976,7 @@ flash_do (gpointer data)
 gboolean
 mm_serial_port_flash (MMSerialPort *self,
                       guint32 flash_time,
+                      gboolean ignore_errors,
                       MMSerialFlashFn callback,
                       gpointer user_data)
 {
@@ -977,6 +984,7 @@ mm_serial_port_flash (MMSerialPort *self,
     MMSerialPortPrivate *priv;
     speed_t cur_speed = 0;
     GError *error = NULL;
+    gboolean success;
 
     g_return_val_if_fail (MM_IS_SERIAL_PORT (self), FALSE);
     g_return_val_if_fail (callback != NULL, FALSE);
@@ -992,7 +1000,8 @@ mm_serial_port_flash (MMSerialPort *self,
         return FALSE;
     }
 
-    if (!get_speed (self, &cur_speed, &error)) {
+    success = get_speed (self, &cur_speed, &error);
+    if (!success && !ignore_errors) {
         callback (self, error, user_data);
         g_error_free (error);
         return FALSE;
@@ -1004,7 +1013,8 @@ mm_serial_port_flash (MMSerialPort *self,
     info->callback = callback;
     info->user_data = user_data;
 
-    if (!set_speed (self, B0, &error)) {
+    success = set_speed (self, B0, &error);
+    if (!success && !ignore_errors) {
         callback (self, error, user_data);
         g_error_free (error);
         return FALSE;

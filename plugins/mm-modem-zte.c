@@ -406,7 +406,7 @@ do_enable (MMGenericGsm *modem, MMModemFn callback, gpointer user_data)
     g_assert (primary);
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
-    mm_serial_port_flash (MM_SERIAL_PORT (primary), 100, enable_flash_done, info);
+    mm_serial_port_flash (MM_SERIAL_PORT (primary), 100, FALSE, enable_flash_done, info);
 }
 
 static void

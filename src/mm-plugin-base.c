@@ -805,7 +805,7 @@ try_open (gpointer user_data)
         g_debug ("(%s): probe requested by plugin '%s'",
                  g_udev_device_get_name (port),
                  mm_plugin_get_name (MM_PLUGIN (task_priv->plugin)));
-        mm_serial_port_flash (MM_SERIAL_PORT (task_priv->probe_port), 100, flash_done, task);
+        mm_serial_port_flash (MM_SERIAL_PORT (task_priv->probe_port), 100, TRUE, flash_done, task);
     }
 
     return FALSE;

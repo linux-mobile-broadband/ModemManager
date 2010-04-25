@@ -588,7 +588,7 @@ enable (MMModem *modem,
                         MM_MODEM_STATE_ENABLING,
                         MM_MODEM_STATE_REASON_NONE);
 
-    mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 100, flash_done, info);
+    mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 100, FALSE, flash_done, info);
 }
 
 static void
@@ -681,7 +681,7 @@ disable (MMModem *modem,
                         MM_MODEM_STATE_REASON_NONE);
 
     if (mm_port_get_connected (MM_PORT (priv->primary)))
-        mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 1000, disable_flash_done, info);
+        mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 1000, TRUE, disable_flash_done, info);
     else
         disable_flash_done (MM_SERIAL_PORT (priv->primary), NULL, info);
 }
@@ -776,7 +776,7 @@ disconnect (MMModem *modem,
                                NULL);
 
     mm_modem_set_state (modem, MM_MODEM_STATE_DISCONNECTING, MM_MODEM_STATE_REASON_NONE);
-    mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 1000, disconnect_flash_done, info);
+    mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 1000, TRUE, disconnect_flash_done, info);
 }
 
 static void

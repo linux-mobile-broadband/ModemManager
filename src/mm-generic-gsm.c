@@ -912,7 +912,7 @@ real_do_enable (MMGenericGsm *self, MMModemFn callback, gpointer user_data)
     MMCallbackInfo *info;
 
     info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
-    mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 100, enable_flash_done, info);
+    mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 100, FALSE, enable_flash_done, info);
 }
 
 static void
@@ -1072,7 +1072,7 @@ disable (MMModem *modem,
                         MM_MODEM_STATE_REASON_NONE);
 
     if (mm_port_get_connected (MM_PORT (priv->primary)))
-        mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 1000, disable_flash_done, info);
+        mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 1000, TRUE, disable_flash_done, info);
     else
         disable_flash_done (MM_SERIAL_PORT (priv->primary), NULL, info);
 }
@@ -2195,7 +2195,7 @@ real_do_disconnect (MMGenericGsm *self,
     MMCallbackInfo *info;
 
     info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
-    mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 1000, disconnect_flash_done, info);
+    mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 1000, TRUE, disconnect_flash_done, info);
 }
 
 static void
