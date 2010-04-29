@@ -3,7 +3,8 @@ SUBDIRS=. tests
 udevrulesdir = $(UDEV_BASE_DIR)/rules.d
 udevrules_DATA = \
 	77-mm-usb-device-blacklist.rules \
-	77-mm-pcmcia-device-blacklist.rules
+	77-mm-pcmcia-device-blacklist.rules \
+	77-mm-platform-serial-whitelist.rules
 
 EXTRA_DIST = \
 	$(udevrules_DATA)

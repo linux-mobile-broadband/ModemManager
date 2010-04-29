@@ -636,7 +636,7 @@ find_physical_device (GUdevDevice *child)
     GUdevDevice *physdev = NULL;
     const char *subsys, *type;
     guint32 i = 0;
-    gboolean is_usb = FALSE, is_pci = FALSE, is_pcmcia = FALSE;
+    gboolean is_usb = FALSE, is_pci = FALSE, is_pcmcia = FALSE, is_platform = FALSE;
 
     g_return_val_if_fail (child != NULL, NULL);
 
@@ -671,6 +671,11 @@ find_physical_device (GUdevDevice *child)
                     if (physdev)
                         break;
                 }
+            } else if (is_platform || !strcmp (subsys, "platform")) {
+                /* Take the first platform parent as the physical device */
+                is_platform = TRUE;
+                physdev = iter;
+                break;
             } else if (is_pci || !strcmp (subsys, "pci")) {
                 is_pci = TRUE;
                 physdev = iter;
@@ -690,7 +695,7 @@ static void
 device_added (MMManager *manager, GUdevDevice *device)
 {
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
-    const char *subsys, *name, *physdev_path;
+    const char *subsys, *name, *physdev_path, *physdev_subsys;
     SupportsInfo *info;
     char *key;
     gboolean found;
@@ -740,6 +745,15 @@ device_added (MMManager *manager, GUdevDevice *device)
     /* Is the device blacklisted? */
     if (g_udev_device_get_property_as_boolean (physdev, "ID_MM_DEVICE_IGNORE")) {
         g_debug ("(%s/%s): port's parent device is blacklisted", subsys, name);
+        goto out;
+    }
+
+    /* If the physdev is a 'platform' device that's not whitelisted, ignore it */
+    physdev_subsys = g_udev_device_get_subsystem (physdev);
+    if (   physdev_subsys
+        && !strcmp (physdev_subsys, "platform")
+        && !g_udev_device_get_property_as_boolean (physdev, "ID_MM_PLATFORM_DRIVER_PROBE")) {
+        g_debug ("(%s/%s): port's parent platform driver is not whitelisted", subsys, name);
         goto out;
     }
 
