@@ -143,14 +143,17 @@ get_signal_quality (MMModemCdma *modem,
 {
     MMCallbackInfo *info;
     MMAtSerialPort *port;
+    MMModemCdma *parent_iface;
 
-    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-
-    port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (modem), &info->error);
+    port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (modem), NULL);
     if (!port) {
-        mm_callback_info_schedule (info);
+        /* Let the superclass handle it */
+        parent_iface = g_type_interface_peek_parent (MM_MODEM_CDMA_GET_INTERFACE (modem));
+        parent_iface->get_signal_quality (MM_MODEM_CDMA (modem), callback, user_data);
         return;
     }
+
+    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
 
     /* Many Novatel CDMA cards don't report CSQ in standard 0 - 31 and the CSQ
      * reply doesn't appear to be in positive dBm either; instead try the custom
