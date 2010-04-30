@@ -322,7 +322,7 @@ pin_check_again (gpointer user_data)
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
 
     priv->pin_check_timeout = 0;
-    check_pin (self, initial_pin_check_done, GUINT_TO_POINTER (TRUE));
+    check_pin (self, initial_pin_check_done, NULL);
     return FALSE;
 }
 
@@ -330,7 +330,6 @@ static void
 initial_pin_check_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMGenericGsmPrivate *priv;
-    gboolean close_port = !!user_data;
 
     /* modem could have been removed before we get here, in which case
      * 'modem' will be NULL.
@@ -350,8 +349,7 @@ initial_pin_check_done (MMModem *modem, GError *error, gpointer user_data)
         priv->pin_check_timeout = g_timeout_add_seconds (2, pin_check_again, modem);
     } else {
         priv->pin_checked = TRUE;
-        if (close_port)
-            mm_serial_port_close (MM_SERIAL_PORT (priv->primary));
+        mm_serial_port_close (MM_SERIAL_PORT (priv->primary));
         check_valid (MM_GENERIC_GSM (modem));
     }
 }
@@ -368,7 +366,7 @@ initial_pin_check (MMGenericGsm *self)
     g_return_if_fail (priv->primary != NULL);
 
     if (mm_serial_port_open (MM_SERIAL_PORT (priv->primary), &error))
-        check_pin (self, initial_pin_check_done, GUINT_TO_POINTER (TRUE));
+        check_pin (self, initial_pin_check_done, NULL);
     else {
         g_warning ("%s: failed to open serial port: (%d) %s",
                    __func__,
@@ -379,7 +377,7 @@ initial_pin_check (MMGenericGsm *self)
         /* Ensure the modem is still somewhat usable if opening the serial
          * port fails for some reason.
          */
-        initial_pin_check_done (MM_MODEM (self), NULL, GUINT_TO_POINTER (FALSE));
+        initial_pin_check_done (MM_MODEM (self), NULL, NULL);
     }
 }
 
@@ -679,9 +677,9 @@ enable_failed (MMModem *modem, GError *error, MMCallbackInfo *info)
         priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
 
         if (priv->primary && mm_serial_port_is_open (MM_SERIAL_PORT (priv->primary)))
-            mm_serial_port_close (MM_SERIAL_PORT (priv->primary));
+            mm_serial_port_close_force (MM_SERIAL_PORT (priv->primary));
         if (priv->secondary && mm_serial_port_is_open (MM_SERIAL_PORT (priv->secondary)))
-            mm_serial_port_close (MM_SERIAL_PORT (priv->secondary));
+            mm_serial_port_close_force (MM_SERIAL_PORT (priv->secondary));
     }
 
     mm_callback_info_schedule (info);
@@ -968,7 +966,7 @@ disable_done (MMAtSerialPort *port,
     if (!info->error) {
         MMGenericGsm *self = MM_GENERIC_GSM (info->modem);
 
-        mm_serial_port_close (MM_SERIAL_PORT (port));
+        mm_serial_port_close_force (MM_SERIAL_PORT (port));
         mm_modem_set_state (MM_MODEM (info->modem),
                             MM_MODEM_STATE_DISABLED,
                             MM_MODEM_STATE_REASON_NONE);
@@ -1056,7 +1054,7 @@ disable (MMModem *modem,
 
     /* Close the secondary port if its open */
     if (priv->secondary && mm_serial_port_is_open (MM_SERIAL_PORT (priv->secondary)))
-        mm_serial_port_close (MM_SERIAL_PORT (priv->secondary));
+        mm_serial_port_close_force (MM_SERIAL_PORT (priv->secondary));
 
     info = mm_callback_info_new (modem, callback, user_data);
 
@@ -1130,7 +1128,6 @@ get_card_info (MMModem *modem,
     g_clear_error (&error);
 }
 
-#define PIN_CLOSE_PORT_TAG "pin-close-port"
 #define PIN_PORT_TAG "pin-port"
 
 static void
@@ -1150,7 +1147,7 @@ static void
 pin_puk_recheck_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    gboolean close_port = !!mm_callback_info_get_data (info, PIN_CLOSE_PORT_TAG);
+    MMSerialPort *port;
 
     /* Clear the pin check timeout to ensure that it won't ever get a
      * stale MMCallbackInfo if the modem got removed.  We'll reschedule it here
@@ -1186,13 +1183,10 @@ pin_puk_recheck_done (MMModem *modem, GError *error, gpointer user_data)
         }
     }
 
-    /* Otherwise, clean up and return the PIN check error */
-    if (modem && close_port) {
-        MMSerialPort *port = mm_callback_info_get_data (info, PIN_PORT_TAG);
-
-        if (port && MM_IS_SERIAL_PORT (port))
-            mm_serial_port_close (port);
-    }
+    /* Otherwise, clean up and return the PIN check result */
+    port = mm_callback_info_get_data (info, PIN_PORT_TAG);
+    if (modem && port)
+        mm_serial_port_close (port);
 
     mm_callback_info_schedule (info);
 }
@@ -1204,13 +1198,11 @@ send_puk_done (MMAtSerialPort *port,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    gboolean close_port = !!mm_callback_info_get_data (info, PIN_CLOSE_PORT_TAG);
 
     if (error) {
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
-        if (close_port)
-            mm_serial_port_close (MM_SERIAL_PORT (port));
+        mm_serial_port_close (MM_SERIAL_PORT (port));
         return;
     }
 
@@ -1239,19 +1231,15 @@ send_puk (MMModemGsmCard *modem,
         return;
     }
 
-    if (!mm_serial_port_is_open (MM_SERIAL_PORT (port))) {
-        /* Modem may not be enabled yet, which sometimes can't be done until
-         * the device has been unlocked.
-         */
-        if (!mm_serial_port_open (MM_SERIAL_PORT (port), &info->error)) {
-            mm_callback_info_schedule (info);
-            return;
-        }
-
-        /* Clean up after ourselves if we opened the port */
-        mm_callback_info_set_data (info, PIN_CLOSE_PORT_TAG, GUINT_TO_POINTER (TRUE), NULL);
-        mm_callback_info_set_data (info, PIN_PORT_TAG, port, NULL);
+    /* Modem may not be enabled yet, which sometimes can't be done until
+     * the device has been unlocked.  In this case we have to open the port
+     * ourselves.
+     */
+    if (!mm_serial_port_open (MM_SERIAL_PORT (port), &info->error)) {
+        mm_callback_info_schedule (info);
+        return;
     }
+    mm_callback_info_set_data (info, PIN_PORT_TAG, port, NULL);
 
     command = g_strdup_printf ("+CPIN=\"%s\",\"%s\"", puk, pin);
     mm_at_serial_port_queue_command (port, command, 3, send_puk_done, info);
@@ -1265,13 +1253,11 @@ send_pin_done (MMAtSerialPort *port,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    gboolean close_port = !!mm_callback_info_get_data (info, PIN_CLOSE_PORT_TAG);
 
     if (error) {
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
-        if (close_port)
-            mm_serial_port_close (MM_SERIAL_PORT (port));
+        mm_serial_port_close (MM_SERIAL_PORT (port));
         return;
     }
 
@@ -1299,19 +1285,15 @@ send_pin (MMModemGsmCard *modem,
         return;
     }
 
-    if (!mm_serial_port_is_open (MM_SERIAL_PORT (port))) {
-        /* Modem may not be enabled yet, which sometimes can't be done until
-         * the device has been unlocked.
-         */
-        if (!mm_serial_port_open (MM_SERIAL_PORT (port), &info->error)) {
-            mm_callback_info_schedule (info);
-            return;
-        }
-
-        /* Clean up after ourselves if we opened the port */
-        mm_callback_info_set_data (info, PIN_CLOSE_PORT_TAG, GUINT_TO_POINTER (TRUE), NULL);
-        mm_callback_info_set_data (info, PIN_PORT_TAG, port, NULL);
+    /* Modem may not be enabled yet, which sometimes can't be done until
+     * the device has been unlocked.  In this case we have to open the port
+     * ourselves.
+     */
+    if (!mm_serial_port_open (MM_SERIAL_PORT (port), &info->error)) {
+        mm_callback_info_schedule (info);
+        return;
     }
+    mm_callback_info_set_data (info, PIN_PORT_TAG, port, NULL);
 
     command = g_strdup_printf ("+CPIN=\"%s\"", pin);
     mm_at_serial_port_queue_command (port, command, 3, send_pin_done, info);

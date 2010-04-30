@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
 #ifndef MM_SERIAL_PORT_H
@@ -101,12 +101,18 @@ GType mm_serial_port_get_type (void);
 
 MMSerialPort *mm_serial_port_new (const char *name, MMPortType ptype);
 
+/* Keep in mind that port open/close is refcounted, so ensure that
+ * open/close calls are properly balanced.
+ */
+
 gboolean mm_serial_port_is_open           (MMSerialPort *self);
 
 gboolean mm_serial_port_open              (MMSerialPort *self,
                                            GError  **error);
 
 void     mm_serial_port_close             (MMSerialPort *self);
+
+void     mm_serial_port_close_force       (MMSerialPort *self);
 
 gboolean mm_serial_port_flash             (MMSerialPort *self,
                                            guint32 flash_time,

@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
 #define _GNU_SOURCE  /* for strcasestr() */
@@ -51,6 +51,7 @@ enum {
 #define MM_SERIAL_PORT_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_SERIAL_PORT, MMSerialPortPrivate))
 
 typedef struct {
+    guint32 open_count;
     int fd;
     GHashTable *reply_cache;
     GIOChannel *channel;
@@ -601,7 +602,7 @@ data_available (GIOChannel *source,
     if (condition & G_IO_HUP) {
         if (priv->response->len)
             g_byte_array_remove_range (priv->response, 0, priv->response->len);
-        mm_serial_port_close (self);
+        mm_serial_port_close_force (self);
         return FALSE;
     }
 
@@ -688,12 +689,12 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
 
     priv = MM_SERIAL_PORT_GET_PRIVATE (self);
 
-    if (priv->fd >= 0) {
-        /* Already open */
-        return TRUE;
-    }
-
     device = mm_port_get_device (MM_PORT (self));
+
+    if (priv->open_count) {
+        /* Already open */
+        goto success;
+    }
 
     g_message ("(%s) opening serial device...", device);
     devfile = g_strdup_printf ("/dev/%s", device);
@@ -716,9 +717,7 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
     if (ioctl (priv->fd, TIOCEXCL) < 0) {
         g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_OPEN_FAILED,
                      "Could not lock serial device %s: %s", device, strerror (errno));
-        close (priv->fd);
-        priv->fd = -1;
-        return FALSE;
+        goto error;
     }
 
     /* Flush any waiting IO */
@@ -727,17 +726,12 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
     if (tcgetattr (priv->fd, &priv->old_t) < 0) {
         g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_OPEN_FAILED,
                      "Could not open serial device %s: %s", device, strerror (errno));
-        close (priv->fd);
-        priv->fd = -1;
-        return FALSE;
+        goto error;
     }
 
     g_warn_if_fail (MM_SERIAL_PORT_GET_CLASS (self)->config_fd);
-    if (!MM_SERIAL_PORT_GET_CLASS (self)->config_fd (self, priv->fd, error)) {
-        close (priv->fd);
-        priv->fd = -1;
-        return FALSE;
-    }
+    if (!MM_SERIAL_PORT_GET_CLASS (self)->config_fd (self, priv->fd, error))
+        goto error;
 
     priv->channel = g_io_channel_unix_new (priv->fd);
     g_io_channel_set_encoding (priv->channel, NULL, NULL);
@@ -749,7 +743,21 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
     priv->connected_id = g_signal_connect (self, "notify::" MM_PORT_CONNECTED,
                                            G_CALLBACK (port_connected), NULL);
 
+success:
+    priv->open_count++;
+    if (mm_options_debug ()) {
+        GTimeVal tv;
+
+        g_get_current_time (&tv);
+        g_debug ("<%ld.%ld> (%s) device open count is %d (open)",
+                 tv.tv_sec, tv.tv_usec, device, priv->open_count);
+    }
     return TRUE;
+
+error:
+    close (priv->fd);
+    priv->fd = -1;
+    return FALSE;
 }
 
 gboolean
@@ -758,18 +766,35 @@ mm_serial_port_is_open (MMSerialPort *self)
     g_return_val_if_fail (self != NULL, FALSE);
     g_return_val_if_fail (MM_IS_SERIAL_PORT (self), FALSE);
 
-    return (MM_SERIAL_PORT_GET_PRIVATE (self)->fd >= 0);
+    return !!MM_SERIAL_PORT_GET_PRIVATE (self)->open_count;
 }
 
 void
 mm_serial_port_close (MMSerialPort *self)
 {
     MMSerialPortPrivate *priv;
+    const char *device;
     int i;
 
     g_return_if_fail (MM_IS_SERIAL_PORT (self));
 
     priv = MM_SERIAL_PORT_GET_PRIVATE (self);
+    g_return_if_fail (priv->open_count > 0);
+
+    device = mm_port_get_device (MM_PORT (self));
+
+    priv->open_count--;
+
+    if (mm_options_debug ()) {
+        GTimeVal tv;
+
+        g_get_current_time (&tv);
+        g_debug ("<%ld.%ld> (%s) device open count is %d (close)",
+                 tv.tv_sec, tv.tv_usec, device, priv->open_count);
+    }
+
+    if (priv->open_count > 0)
+        return;
 
     if (priv->connected_id) {
         g_signal_handler_disconnect (self, priv->connected_id);
@@ -777,7 +802,7 @@ mm_serial_port_close (MMSerialPort *self)
     }
 
     if (priv->fd >= 0) {
-        g_message ("(%s) closing serial device...", mm_port_get_device (MM_PORT (self)));
+        g_message ("(%s) closing serial device...", device);
 
         mm_port_set_connected (MM_PORT (self), FALSE);
 
@@ -807,6 +832,22 @@ mm_serial_port_close (MMSerialPort *self)
         g_slice_free (MMQueueData, item);
     }
     g_queue_clear (priv->queue);
+}
+
+void
+mm_serial_port_close_force (MMSerialPort *self)
+{
+    MMSerialPortPrivate *priv;
+
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_SERIAL_PORT (self));
+
+    priv = MM_SERIAL_PORT_GET_PRIVATE (self);
+    g_return_if_fail (priv->open_count > 0);
+
+    /* Force the port to close */
+    priv->open_count = 1;
+    mm_serial_port_close (self);
 }
 
 static void
@@ -1170,7 +1211,8 @@ get_property (GObject *object, guint prop_id,
 static void
 dispose (GObject *object)
 {
-    mm_serial_port_close (MM_SERIAL_PORT (object));
+    if (mm_serial_port_is_open (MM_SERIAL_PORT (object)))
+        mm_serial_port_close_force (MM_SERIAL_PORT (object));
 
     G_OBJECT_CLASS (mm_serial_port_parent_class)->dispose (object);
 }

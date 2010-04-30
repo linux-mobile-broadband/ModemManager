@@ -614,7 +614,7 @@ disable_all_done (MMModem *modem, GError *error, gpointer user_data)
         MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
         MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
 
-        mm_serial_port_close (MM_SERIAL_PORT (priv->primary));
+        mm_serial_port_close_force (MM_SERIAL_PORT (priv->primary));
         mm_modem_set_state (modem, MM_MODEM_STATE_DISABLED, MM_MODEM_STATE_REASON_NONE);
 
         priv->cdma_1x_reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
@@ -672,9 +672,9 @@ disable (MMModem *modem,
 
     /* Close auxiliary serial ports */
     if (priv->secondary)
-        mm_serial_port_close (MM_SERIAL_PORT (priv->secondary));
+        mm_serial_port_close_force (MM_SERIAL_PORT (priv->secondary));
     if (priv->qcdm)
-        mm_serial_port_close (MM_SERIAL_PORT (priv->qcdm));
+        mm_serial_port_close_force (MM_SERIAL_PORT (priv->qcdm));
 
     mm_modem_set_state (MM_MODEM (info->modem),
                         MM_MODEM_STATE_DISABLING,
