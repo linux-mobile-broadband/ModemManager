@@ -18,6 +18,7 @@
 #include <string.h>
 #include <dbus/dbus-glib.h>
 #include "mm-modem.h"
+#include "mm-options.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 #include "mm-marshal.h"
@@ -643,10 +644,22 @@ mm_modem_set_state (MMModem *self,
 
         dbus_path = (const char *) g_object_get_data (G_OBJECT (self), DBUS_PATH_TAG);
         if (dbus_path) {
-            g_message ("Modem %s: state changed (%s -> %s)",
-                       dbus_path,
-                       state_to_string (old_state),
-                       state_to_string (new_state));
+            if (mm_options_debug ()) {
+                GTimeVal tv;
+
+                g_get_current_time (&tv);
+                g_debug ("<%ld.%ld> Modem %s: state changed (%s -> %s)",
+                         tv.tv_sec,
+                         tv.tv_usec,
+                         dbus_path,
+                         state_to_string (old_state),
+                         state_to_string (new_state));
+            } else {
+                g_message ("Modem %s: state changed (%s -> %s)",
+                           dbus_path,
+                           state_to_string (old_state),
+                           state_to_string (new_state));
+            }
         }
     }
 }

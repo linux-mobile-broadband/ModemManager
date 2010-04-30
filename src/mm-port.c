@@ -19,6 +19,7 @@
 #include <string.h>
 
 #include "mm-port.h"
+#include "mm-options.h"
 
 G_DEFINE_TYPE (MMPort, mm_port, G_TYPE_OBJECT)
 
@@ -140,6 +141,16 @@ mm_port_set_connected (MMPort *self, gboolean connected)
     if (priv->connected != connected) {
         priv->connected = connected;
         g_object_notify (G_OBJECT (self), MM_PORT_CONNECTED);
+        if (mm_options_debug()) {
+            GTimeVal tv;
+
+            g_get_current_time (&tv);
+            g_debug ("<%ld.%ld> (%s): port now %s",
+                     tv.tv_sec,
+                     tv.tv_usec,
+                     priv->device,
+                     connected ? "connected" : "disconnected");
+        }
     }
 }
 

@@ -157,6 +157,7 @@ debug_log (MMSerialPort *port, const char *prefix, const char *buf, gsize len)
 {
     static GString *debug = NULL;
     const char *s = buf;
+    GTimeVal tv;
 
     if (!debug)
         debug = g_string_sized_new (512);
@@ -166,7 +167,12 @@ debug_log (MMSerialPort *port, const char *prefix, const char *buf, gsize len)
     while (len--)
         g_string_append_printf (debug, " %02x", (guint8) (*s++ & 0xFF));
 
-    g_debug ("(%s): %s", mm_port_get_device (MM_PORT (port)), debug->str);
+    g_get_current_time (&tv);
+    g_debug ("<%ld.%ld> (%s): %s",
+             tv.tv_sec,
+             tv.tv_usec,
+             mm_port_get_device (MM_PORT (port)),
+             debug->str);
     g_string_truncate (debug, 0);
 }
 
