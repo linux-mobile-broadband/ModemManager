@@ -531,6 +531,16 @@ periodic_signal_quality_cb (MMModem *modem,
     /* Cached signal quality already updated */
 }
 
+static void
+periodic_access_tech_cb (MMModem *modem,
+                         guint32 act,
+                         GError *error,
+                         gpointer user_data)
+{
+    if (modem && !error && act)
+        mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (modem), act);
+}
+
 static gboolean
 periodic_poll_cb (gpointer user_data)
 {
@@ -550,6 +560,9 @@ periodic_poll_cb (gpointer user_data)
     mm_modem_gsm_network_get_signal_quality (MM_MODEM_GSM_NETWORK (self),
                                                 periodic_signal_quality_cb,
                                                 NULL);
+
+    if (MM_GENERIC_GSM_GET_CLASS (self)->get_access_technology)
+        MM_GENERIC_GSM_GET_CLASS (self)->get_access_technology (self, periodic_access_tech_cb, NULL);
 
     return TRUE;  /* continue running */
 }
