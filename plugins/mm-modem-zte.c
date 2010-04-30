@@ -137,7 +137,7 @@ get_allowed_mode_done (MMAtSerialPort *port,
 
         g_match_info_free (match_info);
 
-        if (cm_mode >=0 && cm_mode <= 2 && pref_acq >= 0 && pref_acq <= 2) {
+        if (cm_mode < 0 || cm_mode > 2 || pref_acq < 0 || pref_acq > 2) {
             info->error = g_error_new (MM_MODEM_ERROR,
                                        MM_MODEM_ERROR_GENERAL,
                                        "Failed to parse the allowed mode response: '%s'",
