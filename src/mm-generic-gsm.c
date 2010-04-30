@@ -1802,6 +1802,8 @@ handle_reg_status_response (MMGenericGsm *self,
     return TRUE;
 }
 
+#define CGREG_TRIED_TAG "cgreg-tried"
+
 static void
 get_reg_status_done (MMAtSerialPort *port,
                      GString *response,
@@ -1820,8 +1822,21 @@ get_reg_status_done (MMAtSerialPort *port,
     g_return_if_fail (info == priv->pending_reg_info);
 
     if (error) {
-        info->error = g_error_copy (error);
-        goto reg_done;
+        gboolean cgreg_tried = !!mm_callback_info_get_data (info, CGREG_TRIED_TAG);
+
+        /* If this was a +CREG error, try +CGREG.  Some devices (blackberries)
+         * respond to +CREG with an error but return a valid +CGREG response.
+         * So try both.  If we get an error from both +CREG and +CGREG, that's
+         * obviously a hard fail.
+         */
+        if (cgreg_tried == FALSE) {
+            mm_callback_info_set_data (info, CGREG_TRIED_TAG, GUINT_TO_POINTER (TRUE), NULL);
+            mm_at_serial_port_queue_command (port, "+CGREG?", 10, get_reg_status_done, info);
+            return;
+        } else {
+            info->error = g_error_copy (error);
+            goto reg_done;
+        }
     }
 
     /* The unsolicited registration state handlers will intercept the CREG
