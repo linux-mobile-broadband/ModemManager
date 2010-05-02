@@ -18,6 +18,7 @@
 #define MM_MODEM_HELPERS_H
 
 #include "mm-modem-cdma.h"
+#include "mm-modem-gsm.h"
 #include "mm-charsets.h"
 
 #define MM_SCAN_TAG_STATUS "status"
@@ -54,6 +55,8 @@ gboolean mm_cdma_parse_speri_response (const char *reply,
 
 gboolean mm_gsm_parse_cscs_support_response (const char *reply,
                                              MMModemCharset *out_charsets);
+
+MMModemGsmAccessTech mm_gsm_string_to_access_tech (const char *string);
 
 #endif  /* MM_MODEM_HELPERS_H */
 

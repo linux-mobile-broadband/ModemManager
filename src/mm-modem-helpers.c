@@ -14,6 +14,7 @@
  * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
+#include <config.h>
 #include <glib.h>
 #include <string.h>
 #include <ctype.h>
@@ -768,5 +769,35 @@ mm_gsm_parse_cscs_support_response (const char *reply,
         *out_charsets = charsets;
 
     return success;
+}
+
+/*************************************************************************/
+
+MMModemGsmAccessTech
+mm_gsm_string_to_access_tech (const char *string)
+{
+    g_return_val_if_fail (string != NULL, MM_MODEM_GSM_ACCESS_TECH_UNKNOWN);
+
+    /* Better technologies are listed first since modems sometimes say
+     * stuff like "GPRS/EDGE" and that should be handled as EDGE.
+     */
+    if (strcasestr (string, "HSPA"))
+        return MM_MODEM_GSM_ACCESS_TECH_HSPA;
+    else if (strcasestr (string, "HSDPA/HSUPA"))
+        return MM_MODEM_GSM_ACCESS_TECH_HSPA;
+    else if (strcasestr (string, "HSUPA"))
+        return MM_MODEM_GSM_ACCESS_TECH_HSUPA;
+    else if (strcasestr (string, "HSDPA"))
+        return MM_MODEM_GSM_ACCESS_TECH_HSDPA;
+    else if (strcasestr (string, "UMTS"))
+        return MM_MODEM_GSM_ACCESS_TECH_UMTS;
+    else if (strcasestr (string, "EDGE"))
+        return MM_MODEM_GSM_ACCESS_TECH_EDGE;
+    else if (strcasestr (string, "GPRS"))
+        return MM_MODEM_GSM_ACCESS_TECH_GPRS;
+    else if (strcasestr (string, "GSM"))
+        return MM_MODEM_GSM_ACCESS_TECH_GSM;
+
+    return MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
 }
 
