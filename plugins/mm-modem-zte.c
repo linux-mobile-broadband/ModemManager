@@ -56,32 +56,6 @@ mm_modem_zte_new (const char *device,
 
 /*****************************************************************************/
 
-static MMModemGsmAccessTech
-zte_act_to_mm (const char *str)
-{
-    g_return_val_if_fail (str != NULL, MM_MODEM_GSM_ACCESS_TECH_UNKNOWN);
-
-    /* Better technologies are listed first since modem sometimes says
-     * stuff like "GPRS/EDGE" and that should be handled as EDGE.
-     */
-    if (strcasestr (str, "HSPA"))
-        return MM_MODEM_GSM_ACCESS_TECH_HSPA;
-    else if (strcasestr (str, "HSUPA"))
-        return MM_MODEM_GSM_ACCESS_TECH_HSUPA;
-    else if (strcasestr (str, "HSDPA"))
-        return MM_MODEM_GSM_ACCESS_TECH_HSDPA;
-    else if (strcasestr (str, "UMTS"))
-        return MM_MODEM_GSM_ACCESS_TECH_UMTS;
-    else if (strcasestr (str, "EDGE"))
-        return MM_MODEM_GSM_ACCESS_TECH_EDGE;
-    else if (strcasestr (str, "GPRS"))
-        return MM_MODEM_GSM_ACCESS_TECH_GPRS;
-    else if (strcasestr (str, "GSM"))
-        return MM_MODEM_GSM_ACCESS_TECH_GSM;
-
-    return MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
-}
-
 static void
 zte_access_tech_changed (MMAtSerialPort *port,
                          GMatchInfo *info,
@@ -92,7 +66,7 @@ zte_access_tech_changed (MMAtSerialPort *port,
 
     str = g_match_info_fetch (info, 1);
     if (str)
-        act = zte_act_to_mm (str);
+        act = mm_gsm_string_to_access_tech (str);
     g_free (str);
 
     mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (user_data), act);
@@ -262,7 +236,7 @@ get_act_request_done (MMAtSerialPort *port,
          *   +ZPAS: "GPRS/EDGE","CS_ONLY"
          */
         p = mm_strip_tag (response->str, "+ZPAS:");
-        act = zte_act_to_mm (p);
+        act = mm_gsm_string_to_access_tech (p);
     }
 
     mm_callback_info_set_result (info, GUINT_TO_POINTER (act), NULL);

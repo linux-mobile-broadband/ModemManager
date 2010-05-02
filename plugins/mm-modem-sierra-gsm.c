@@ -206,32 +206,15 @@ get_act_request_done (MMAtSerialPort *port,
     MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     const char *p;
 
-    if (error) {
+    if (error)
         info->error = g_error_copy (error);
-        goto done;
+    else {
+        p = mm_strip_tag (response->str, "*CNTI:");
+        p = strchr (p, ',');
+        if (p)
+            act = mm_gsm_string_to_access_tech (p + 1);
     }
 
-    p = mm_strip_tag (response->str, "*CNTI:");
-    p = strchr (p, ',');
-    if (p) {
-        p++;
-        if (strcasestr (p, "HSDPA/HSUPA"))
-            act = MM_MODEM_GSM_ACCESS_TECH_HSPA;
-        else if (strcasestr (p, "HSUPA"))
-            act = MM_MODEM_GSM_ACCESS_TECH_HSUPA;
-        else if (strcasestr (p, "HSDPA"))
-            act = MM_MODEM_GSM_ACCESS_TECH_HSDPA;
-        else if (strcasestr (p, "UMTS"))
-            act = MM_MODEM_GSM_ACCESS_TECH_UMTS;
-        else if (strcasestr (p, "EDGE"))
-            act = MM_MODEM_GSM_ACCESS_TECH_EDGE;
-        else if (strcasestr (p, "GPRS"))
-            act = MM_MODEM_GSM_ACCESS_TECH_GPRS;
-        else if (strcasestr (p, "GSM"))
-            act = MM_MODEM_GSM_ACCESS_TECH_GSM;
-    }
-
-done:
     mm_callback_info_set_result (info, GUINT_TO_POINTER (act), NULL);
     mm_callback_info_schedule (info);
 }
