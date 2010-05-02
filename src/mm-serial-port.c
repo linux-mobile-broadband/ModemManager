@@ -1047,6 +1047,7 @@ mm_serial_port_flash (MMSerialPort *self,
         g_error_free (error);
         return FALSE;
     }
+    g_clear_error (&error);
 
     info = g_slice_new0 (FlashInfo);
     info->port = self;
