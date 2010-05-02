@@ -223,7 +223,9 @@ libmm_plugin_zte_la_LDFLAGS = \
 
 libmm_plugin_longcheer_la_SOURCES = \
 	mm-plugin-longcheer.c \
-	mm-plugin-longcheer.h
+	mm-plugin-longcheer.h \
+	mm-modem-longcheer-gsm.c \
+	mm-modem-longcheer-gsm.h
 
 libmm_plugin_longcheer_la_CPPFLAGS = \
 	$(MM_CFLAGS) \

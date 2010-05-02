@@ -11,12 +11,13 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
 #include <string.h>
 #include <gmodule.h>
 #include "mm-plugin-longcheer.h"
+#include "mm-modem-longcheer-gsm.h"
 #include "mm-generic-gsm.h"
 #include "mm-generic-cdma.h"
 
@@ -140,9 +141,9 @@ grab_port (MMPluginBase *base,
     sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
     if (!existing) {
         if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
-            modem = mm_generic_gsm_new (sysfs_path,
-                                        mm_plugin_base_supports_task_get_driver (task),
-                                        mm_plugin_get_name (MM_PLUGIN (base)));
+            modem = mm_modem_longcheer_gsm_new (sysfs_path,
+                                                mm_plugin_base_supports_task_get_driver (task),
+                                                mm_plugin_get_name (MM_PLUGIN (base)));
         } else if (caps & CAP_CDMA) {
             modem = mm_generic_cdma_new (sysfs_path,
                                          mm_plugin_base_supports_task_get_driver (task),
