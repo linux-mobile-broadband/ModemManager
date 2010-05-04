@@ -137,6 +137,13 @@ mm_modem_base_add_port (MMModemBase *self,
     if (!port)
         return NULL;
 
+    if (mm_options_debug ()) {
+        g_message ("(%s/%s) port claimed by %s (%s)",
+                    subsys,
+                    name,
+                    mm_modem_get_device (MM_MODEM (self)),
+                    mm_port_type_to_name (ptype));
+    }
     key = get_hash_key (subsys, name);
     g_hash_table_insert (priv->ports, key, port);
     return port;
