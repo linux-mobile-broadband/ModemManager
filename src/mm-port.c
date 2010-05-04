@@ -46,6 +46,26 @@ typedef struct {
 
 /*****************************************************************************/
 
+const char *
+mm_port_type_to_name (MMPortType ptype)
+{
+    switch (ptype) {
+    case MM_PORT_TYPE_PRIMARY:
+        return "primary";
+    case MM_PORT_TYPE_SECONDARY:
+        return "secondary";
+    case MM_PORT_TYPE_IGNORED:
+        return "ignored";
+    case MM_PORT_TYPE_QCDM:
+        return "QCDM";
+    default:
+        break;
+    }
+    return "(unknown)";
+}
+
+/*****************************************************************************/
+
 static GObject*
 constructor (GType type,
              guint n_construct_params,
