@@ -187,8 +187,16 @@ grab_port (MMModem *modem,
     MMPort *port = NULL;
 
     port = mm_generic_gsm_grab_port (gsm, subsys, name, suggested_type, error);
-    if (port && MM_IS_AT_SERIAL_PORT (port))
+    if (port && MM_IS_AT_SERIAL_PORT (port)) {
+        if (mm_port_get_port_type (port) == MM_PORT_TYPE_PRIMARY) {
+            GRegex *regex;
+
+            regex = g_regex_new ("\\r\\n\\+PACSP0\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+            g_regex_unref (regex);
+        }
         option_register_unsolicted_handlers (gsm, MM_AT_SERIAL_PORT (port));
+    }
 
     return !!port;
 }
