@@ -249,7 +249,7 @@ check_export_modem (MMManager *self, MMModem *modem)
     /* No outstanding port tasks, so if the modem is valid we can export it */
     if (mm_modem_get_valid (modem)) {
         static guint32 id = 0;
-        char *path, *device;
+        char *path, *device, *data_device = NULL;
 
         path = g_strdup_printf (MM_DBUS_PATH"/Modems/%d", id++);
         dbus_g_connection_register_g_object (priv->connection, path, G_OBJECT (modem));
@@ -259,6 +259,10 @@ check_export_modem (MMManager *self, MMModem *modem)
         g_assert (device);
         g_debug ("Exported modem %s as %s", device, path);
         g_free (device);
+
+        g_object_get (G_OBJECT (modem), MM_MODEM_DATA_DEVICE, &data_device, NULL);
+        g_debug ("(%s): data port is %s", path, data_device);
+        g_free (data_device);
 
         g_signal_emit (self, signals[DEVICE_ADDED], 0, modem);
     }
