@@ -290,7 +290,7 @@ add_modem (MMManager *manager, MMModem *modem, MMPlugin *plugin)
         g_object_set_data (G_OBJECT (modem), MANAGER_PLUGIN_TAG, plugin);
 
         g_debug ("Added modem %s", device);
-        g_signal_connect (modem, "notify::valid", G_CALLBACK (modem_valid), manager);
+        g_signal_connect (modem, "notify::" MM_MODEM_VALID, G_CALLBACK (modem_valid), manager);
         check_export_modem (manager, modem);
     }
     g_free (device);
