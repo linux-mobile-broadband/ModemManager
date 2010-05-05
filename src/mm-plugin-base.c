@@ -378,7 +378,7 @@ static const char *dq_strings[] = {
 };
 
 static void
-port_buffer_full (MMSerialPort *port, GString *buffer, gpointer user_data)
+port_buffer_full (MMSerialPort *port, GByteArray *buffer, gpointer user_data)
 {
     MMPluginBaseSupportsTask *task = MM_PLUGIN_BASE_SUPPORTS_TASK (user_data);
     MMPluginBaseSupportsTaskPrivate *priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (user_data);
@@ -400,7 +400,7 @@ port_buffer_full (MMSerialPort *port, GString *buffer, gpointer user_data)
          */
         iter_len = strlen (*iter);
         for (i = 0; i < buffer->len - iter_len; i++) {
-            if (!memcmp (&buffer->str[i], *iter, iter_len)) {
+            if (!memcmp (&buffer->data[i], *iter, iter_len)) {
                 /* Immediately close the port and complete probing */
                 priv->probed_caps = 0;
                 mm_serial_port_close (MM_SERIAL_PORT (priv->probe_port));
