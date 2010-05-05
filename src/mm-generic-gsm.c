@@ -401,7 +401,12 @@ mm_generic_gsm_grab_port (MMGenericGsm *self,
     g_return_val_if_fail (!strcmp (subsys, "net") || !strcmp (subsys, "tty"), FALSE);
 
     port = mm_modem_base_add_port (MM_MODEM_BASE (self), subsys, name, ptype);
-    if (port && MM_IS_AT_SERIAL_PORT (port)) {
+    if (!port) {
+        g_warn_if_fail (port != NULL);
+        return NULL;
+    }
+
+    if (MM_IS_AT_SERIAL_PORT (port)) {
         GPtrArray *array;
         int i;
 
@@ -431,11 +436,12 @@ mm_generic_gsm_grab_port (MMGenericGsm *self,
 
         } else if (ptype == MM_PORT_TYPE_SECONDARY)
             priv->secondary = MM_AT_SERIAL_PORT (port);
-    } else if (MM_IS_QCDM_SERIAL_PORT (port) && !priv->qcdm) {
-        priv->qcdm = MM_QCDM_SERIAL_PORT (port);
-    } else {
+    } else if (MM_IS_QCDM_SERIAL_PORT (port)) {
+        if (!priv->qcdm)
+            priv->qcdm = MM_QCDM_SERIAL_PORT (port);
+    } else if (!strcmp (subsys, "net")) {
         /* Net device (if any) is the preferred data port */
-        if (!priv->data || MM_IS_SERIAL_PORT (priv->data)) {
+        if (!priv->data || MM_IS_AT_SERIAL_PORT (priv->data)) {
             priv->data = port;
             g_object_notify (G_OBJECT (self), MM_MODEM_DATA_DEVICE);
             check_valid (self);

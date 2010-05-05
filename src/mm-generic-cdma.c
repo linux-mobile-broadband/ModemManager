@@ -158,7 +158,12 @@ mm_generic_cdma_grab_port (MMGenericCdma *self,
     }
 
     port = mm_modem_base_add_port (MM_MODEM_BASE (self), subsys, name, ptype);
-    if (port && MM_IS_AT_SERIAL_PORT (port)) {
+    if (!port) {
+        g_warn_if_fail (port != NULL);
+        return NULL;
+    }
+
+    if (MM_IS_AT_SERIAL_PORT (port)) {
         g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
         mm_at_serial_port_set_response_parser (MM_AT_SERIAL_PORT (port),
                                                mm_serial_parser_v1_e1_parse,
@@ -174,9 +179,10 @@ mm_generic_cdma_grab_port (MMGenericCdma *self,
             check_valid (self);
         } else if (ptype == MM_PORT_TYPE_SECONDARY)
             priv->secondary = MM_AT_SERIAL_PORT (port);
-    } else if (MM_IS_QCDM_SERIAL_PORT (port) && !priv->qcdm) {
-        priv->qcdm = MM_QCDM_SERIAL_PORT (port);
-    } else {
+    } else if (MM_IS_QCDM_SERIAL_PORT (port)) {
+        if (!priv->qcdm)
+            priv->qcdm = MM_QCDM_SERIAL_PORT (port);
+    } else if (!strcmp (subsys, "net")) {
         /* Net device (if any) is the preferred data port */
         if (!priv->data || MM_IS_AT_SERIAL_PORT (priv->data)) {
             priv->data = port;
