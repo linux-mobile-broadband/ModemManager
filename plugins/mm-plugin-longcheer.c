@@ -83,7 +83,8 @@ supports_port (MMPluginBase *base,
     if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, NULL))
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
-    if (vendor != 0x1c9e)
+    /* Longcheer and TAMobile */
+    if (vendor != 0x1c9e && vendor != 0x1bbb)
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
     if (mm_plugin_base_get_cached_port_capabilities (base, port, &cached)) {
