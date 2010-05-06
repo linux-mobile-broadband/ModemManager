@@ -2388,7 +2388,7 @@ existing_apns_read (MMAtSerialPort *port,
     info->error = mm_modem_check_removed (info->modem, error);
     if (info->error)
         goto done;
-    else if (g_str_has_prefix (response->str, "+CGDCONT: ")) {
+    else if (g_str_has_prefix (response->str, "+CGDCONT:")) {
         GRegex *r;
         GMatchInfo *match_info;
 
