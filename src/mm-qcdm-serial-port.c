@@ -66,7 +66,7 @@ handle_response (MMSerialPort *port,
     gsize used = 0;
 
     /* Ignore empty frames */
-    if (!response->len > 0 && response->data[0] == 0x7E)
+    if (response->len > 0 && response->data[0] == 0x7E)
         return 1;
 
     if (!error) {
