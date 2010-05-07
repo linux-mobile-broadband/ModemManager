@@ -24,6 +24,71 @@
 #include "result-private.h"
 #include "utils.h"
 
+
+/**********************************************************************/
+
+static guint8
+cdma_prev_to_qcdm (guint8 cdma)
+{
+    switch (cdma) {
+    case CDMA_PREV_IS_95:
+        return QCDM_CDMA_PREV_IS_95;
+    case CDMA_PREV_IS_95A:
+        return QCDM_CDMA_PREV_IS_95A;
+    case CDMA_PREV_IS_95A_TSB74:
+        return QCDM_CDMA_PREV_IS_95A_TSB74;
+    case CDMA_PREV_IS_95B_PHASE1:
+        return QCDM_CDMA_PREV_IS_95B_PHASE1;
+    case CDMA_PREV_IS_95B_PHASE2:
+        return QCDM_CDMA_PREV_IS_95B_PHASE2;
+    case CDMA_PREV_IS2000_REL0:
+        return QCDM_CDMA_PREV_IS2000_REL0;
+    case CDMA_PREV_IS2000_RELA:
+        return QCDM_CDMA_PREV_IS2000_RELA;
+    default:
+        break;
+    }
+    return QCDM_CDMA_PREV_UNKNOWN;
+}
+
+static guint8
+cdma_band_class_to_qcdm (guint8 cdma)
+{
+    switch (cdma) {
+    case CDMA_BAND_CLASS_0_CELLULAR_800:
+        return QCDM_CDMA_BAND_CLASS_0_CELLULAR_800;
+    case CDMA_BAND_CLASS_1_PCS:
+        return QCDM_CDMA_BAND_CLASS_1_PCS;
+    case CDMA_BAND_CLASS_2_TACS:
+        return QCDM_CDMA_BAND_CLASS_2_TACS;
+    case CDMA_BAND_CLASS_3_JTACS:
+        return QCDM_CDMA_BAND_CLASS_3_JTACS;
+    case CDMA_BAND_CLASS_4_KOREAN_PCS:
+        return QCDM_CDMA_BAND_CLASS_4_KOREAN_PCS;
+    case CDMA_BAND_CLASS_5_NMT450:
+        return QCDM_CDMA_BAND_CLASS_5_NMT450;
+    case CDMA_BAND_CLASS_6_IMT2000:
+        return QCDM_CDMA_BAND_CLASS_6_IMT2000;
+    case CDMA_BAND_CLASS_7_CELLULAR_700:
+        return QCDM_CDMA_BAND_CLASS_7_CELLULAR_700;
+    case CDMA_BAND_CLASS_8_1800:
+        return QCDM_CDMA_BAND_CLASS_8_1800;
+    case CDMA_BAND_CLASS_9_900:
+        return QCDM_CDMA_BAND_CLASS_9_900;
+    case CDMA_BAND_CLASS_10_SECONDARY_800:
+        return QCDM_CDMA_BAND_CLASS_10_SECONDARY_800;
+    case CDMA_BAND_CLASS_11_PAMR_400:
+        return QCDM_CDMA_BAND_CLASS_11_PAMR_400;
+    case CDMA_BAND_CLASS_12_PAMR_800:
+        return QCDM_CDMA_BAND_CLASS_12_PAMR_800;
+    default:
+        break;
+    }
+    return QCDM_CDMA_BAND_CLASS_UNKNOWN;
+}
+
+/**********************************************************************/
+
 /*
  * utils_bin2hexstr
  *
@@ -971,78 +1036,10 @@ qcdm_cmd_nw_subsys_modem_snapshot_cdma_result (const char *buf, gsize len, GErro
     num = GUINT32_FROM_LE (cdma->rssi);
     qcdm_result_add_uint32 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_RSSI, num);
 
-    num8 = QCDM_CDMA_PREV_UNKNOWN;
-    switch (cdma->prev) {
-    case CDMA_PREV_IS_95:
-        num8 = QCDM_CDMA_PREV_IS_95;
-        break;
-    case CDMA_PREV_IS_95A:
-        num8 = QCDM_CDMA_PREV_IS_95A;
-        break;
-    case CDMA_PREV_IS_95A_TSB74:
-        num8 = QCDM_CDMA_PREV_IS_95A_TSB74;
-        break;
-    case CDMA_PREV_IS_95B_PHASE1:
-        num8 = QCDM_CDMA_PREV_IS_95B_PHASE1;
-        break;
-    case CDMA_PREV_IS_95B_PHASE2:
-        num8 = QCDM_CDMA_PREV_IS_95B_PHASE2;
-        break;
-    case CDMA_PREV_IS2000_REL0:
-        num8 = QCDM_CDMA_PREV_IS2000_REL0;
-        break;
-    case CDMA_PREV_IS2000_RELA:
-        num8 = QCDM_CDMA_PREV_IS2000_RELA;
-        break;
-    default:
-        break;
-    }
+    num8 = cdma_prev_to_qcdm (cdma->prev);
     qcdm_result_add_uint8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_PREV, num8);
 
-    num8 = QCDM_CDMA_BAND_CLASS_UNKNOWN;
-    switch (cdma->band_class) {
-    case CDMA_BAND_CLASS_0_CELLULAR_800:
-        num8 = QCDM_CDMA_BAND_CLASS_0_CELLULAR_800;
-        break;
-    case CDMA_BAND_CLASS_1_PCS:
-        num8 = QCDM_CDMA_BAND_CLASS_1_PCS;
-        break;
-    case CDMA_BAND_CLASS_2_TACS:
-        num8 = QCDM_CDMA_BAND_CLASS_2_TACS;
-        break;
-    case CDMA_BAND_CLASS_3_JTACS:
-        num8 = QCDM_CDMA_BAND_CLASS_3_JTACS;
-        break;
-    case CDMA_BAND_CLASS_4_KOREAN_PCS:
-        num8 = QCDM_CDMA_BAND_CLASS_4_KOREAN_PCS;
-        break;
-    case CDMA_BAND_CLASS_5_NMT450:
-        num8 = QCDM_CDMA_BAND_CLASS_5_NMT450;
-        break;
-    case CDMA_BAND_CLASS_6_IMT2000:
-        num8 = QCDM_CDMA_BAND_CLASS_6_IMT2000;
-        break;
-    case CDMA_BAND_CLASS_7_CELLULAR_700:
-        num8 = QCDM_CDMA_BAND_CLASS_7_CELLULAR_700;
-        break;
-    case CDMA_BAND_CLASS_8_1800:
-        num8 = QCDM_CDMA_BAND_CLASS_8_1800;
-        break;
-    case CDMA_BAND_CLASS_9_900:
-        num8 = QCDM_CDMA_BAND_CLASS_9_900;
-        break;
-    case CDMA_BAND_CLASS_10_SECONDARY_800:
-        num8 = QCDM_CDMA_BAND_CLASS_10_SECONDARY_800;
-        break;
-    case CDMA_BAND_CLASS_11_PAMR_400:
-        num8 = QCDM_CDMA_BAND_CLASS_11_PAMR_400;
-        break;
-    case CDMA_BAND_CLASS_12_PAMR_800:
-        num8 = QCDM_CDMA_BAND_CLASS_12_PAMR_800;
-        break;
-    default:
-        break;
-    }
+    num8 = cdma_band_class_to_qcdm (cdma->band_class);
     qcdm_result_add_uint8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_BAND_CLASS, num8);
 
     qcdm_result_add_uint8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_ERI, cdma->eri);
