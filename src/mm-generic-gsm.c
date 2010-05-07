@@ -2159,13 +2159,34 @@ disconnect_done (MMModem *modem,
 }
 
 static void
-disconnect_cgact_done (MMAtSerialPort *port,
-                       GString *response,
-                       GError *error,
-                       gpointer user_data)
+disconnect_all_done (MMAtSerialPort *port,
+                     GString *response,
+                     GError *error,
+                     gpointer user_data)
 {
     mm_callback_info_schedule ((MMCallbackInfo *) user_data);
 }
+
+static void
+disconnect_send_cgact (MMAtSerialPort *port,
+                       gint cid,
+                       MMAtSerialResponseFn callback,
+                       gpointer user_data)
+{
+    char *command;
+
+    if (cid >= 0)
+        command = g_strdup_printf ("+CGACT=0,%d", cid);
+    else {
+        /* Disable all PDP contexts */
+        command = g_strdup_printf ("+CGACT=0");
+    }
+
+    mm_at_serial_port_queue_command (port, command, 3, callback, user_data);
+    g_free (command);
+}
+
+#define DISCONNECT_CGACT_DONE_TAG "disconnect-cgact-done"
 
 static void
 disconnect_flash_done (MMSerialPort *port,
@@ -2174,31 +2195,60 @@ disconnect_flash_done (MMSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMGenericGsmPrivate *priv;
-    char *command;
 
     info->error = mm_modem_check_removed (info->modem, error);
-    /* Ignore NO_CARRIER errors and proceed with the PDP context deactivation */
-    if (   info->error
-        && !g_error_matches (info->error,
-                             MM_MODEM_CONNECT_ERROR,
-                             MM_MODEM_CONNECT_ERROR_NO_CARRIER)) {
-        mm_callback_info_schedule (info);
-        return;
+    if (info->error) {
+        /* Ignore "NO CARRIER" response when modem disconnects and any flash
+         * failures we might encounter.  Other errors are hard errors.
+         */
+        if (   !g_error_matches (info->error, MM_MODEM_CONNECT_ERROR, MM_MODEM_CONNECT_ERROR_NO_CARRIER)
+            && !g_error_matches (info->error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_FLASH_FAILED)) {
+            mm_callback_info_schedule (info);
+            return;
+        }
+        g_clear_error (&info->error);
     }
 
     priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
     mm_port_set_connected (priv->data, FALSE);
 
-    /* Disconnect the PDP context */
-    if (priv->cid >= 0)
-        command = g_strdup_printf ("+CGACT=0,%d", priv->cid);
+    /* Don't bother doing the CGACT again if it was done on a secondary port */
+    if (mm_callback_info_get_data (info, DISCONNECT_CGACT_DONE_TAG))
+        disconnect_all_done (MM_AT_SERIAL_PORT (priv->primary), NULL, NULL, info);
     else {
-        /* Disable all PDP contexts */
-        command = g_strdup_printf ("+CGACT=0");
+        disconnect_send_cgact (MM_AT_SERIAL_PORT (priv->primary),
+                               priv->cid,
+                               disconnect_all_done,
+                               info);
+    }
+}
+
+static void
+disconnect_secondary_cgact_done (MMAtSerialPort *port,
+                                 GString *response,
+                                 GError *error,
+                                 gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMGenericGsm *self;
+    MMGenericGsmPrivate *priv;
+
+    if (!info->modem) {
+        info->error = mm_modem_check_removed (info->modem, error);
+        mm_callback_info_schedule (info);
+        return;
     }
 
-    mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), command, 3, disconnect_cgact_done, info);
-    g_free (command);
+    self = MM_GENERIC_GSM (info->modem);
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    /* Now that we've tried deactivating the PDP context on the secondary
+     * port, continue with flashing the primary port.
+     */
+    if (!error)
+        mm_callback_info_set_data (info, DISCONNECT_CGACT_DONE_TAG, GUINT_TO_POINTER (TRUE), NULL);
+
+    mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 1000, TRUE, disconnect_flash_done, info);
 }
 
 static void
@@ -2211,7 +2261,23 @@ real_do_disconnect (MMGenericGsm *self,
     MMCallbackInfo *info;
 
     info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
-    mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 1000, TRUE, disconnect_flash_done, info);
+
+    /* If the primary port is connected (with PPP) then try sending the PDP
+     * context deactivation on the secondary port because not all modems will
+     * respond to flashing (since either the modem or the kernel's serial
+     * driver doesn't support it).
+     */
+    if (   mm_port_get_connected (MM_PORT (priv->primary))
+        && priv->secondary
+        && mm_serial_port_is_open (MM_SERIAL_PORT (priv->secondary))) {
+        disconnect_send_cgact (MM_AT_SERIAL_PORT (priv->secondary),
+                               priv->cid,
+                               disconnect_secondary_cgact_done,
+                               info);
+    } else {
+        /* Just flash the primary port */
+        mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 1000, TRUE, disconnect_flash_done, info);
+    }
 }
 
 static void
