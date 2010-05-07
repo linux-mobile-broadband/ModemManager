@@ -102,7 +102,7 @@ mm_modem_base_add_port (MMModemBase *self,
 {
     MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (self);
     MMPort *port = NULL;
-    char *key;
+    char *key, *device;
 
     g_return_val_if_fail (MM_IS_MODEM_BASE (self), NULL);
     g_return_val_if_fail (subsys != NULL, NULL);
@@ -138,10 +138,13 @@ mm_modem_base_add_port (MMModemBase *self,
         return NULL;
 
     if (mm_options_debug ()) {
+        device = mm_modem_get_device (MM_MODEM (self));
+
         g_message ("(%s) type %s claimed by %s",
                     name,
                     mm_port_type_to_name (ptype),
-                    mm_modem_get_device (MM_MODEM (self)));
+                    device);
+        g_free (device);
     }
     key = get_hash_key (subsys, name);
     g_hash_table_insert (priv->ports, key, port);

@@ -207,7 +207,7 @@ static void
 check_export_modem (MMManager *self, MMModem *modem)
 {
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (self);
-    const char *modem_physdev;
+    char *modem_physdev;
     GHashTableIter iter;
     gpointer value;
 
@@ -235,8 +235,8 @@ check_export_modem (MMManager *self, MMModem *modem)
 
         if (!strcmp (info->physdev_path, modem_physdev)) {
             g_debug ("(%s/%s): outstanding support task prevents export of %s",
-                     info->subsys, info->name, mm_modem_get_device (modem));
-            return;
+                     info->subsys, info->name, modem_physdev);
+            goto out;
         }
     }
 
@@ -244,21 +244,18 @@ check_export_modem (MMManager *self, MMModem *modem)
      * discovers another of the modem's ports.
      */
     if (g_object_get_data (G_OBJECT (modem), DBUS_PATH_TAG))
-        return;
+        goto out;
 
     /* No outstanding port tasks, so if the modem is valid we can export it */
     if (mm_modem_get_valid (modem)) {
         static guint32 id = 0;
-        char *path, *device, *data_device = NULL;
+        char *path, *data_device = NULL;
 
         path = g_strdup_printf (MM_DBUS_PATH"/Modems/%d", id++);
         dbus_g_connection_register_g_object (priv->connection, path, G_OBJECT (modem));
         g_object_set_data_full (G_OBJECT (modem), DBUS_PATH_TAG, path, (GDestroyNotify) g_free);
 
-        device = mm_modem_get_device (modem);
-        g_assert (device);
-        g_debug ("Exported modem %s as %s", device, path);
-        g_free (device);
+        g_debug ("Exported modem %s as %s", modem_physdev, path);
 
         g_object_get (G_OBJECT (modem), MM_MODEM_DATA_DEVICE, &data_device, NULL);
         g_debug ("(%s): data port is %s", path, data_device);
@@ -266,6 +263,9 @@ check_export_modem (MMManager *self, MMModem *modem)
 
         g_signal_emit (self, signals[DEVICE_ADDED], 0, modem);
     }
+
+out:
+    g_free (modem_physdev);
 }
 
 static void
@@ -333,15 +333,18 @@ find_modem_for_device (MMManager *manager, const char *device)
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
     GHashTableIter iter;
     gpointer key, value;
+    MMModem *found = NULL;
 
     g_hash_table_iter_init (&iter, priv->modems);
-    while (g_hash_table_iter_next (&iter, &key, &value)) {
-        MMModem *modem = MM_MODEM (value);
+    while (g_hash_table_iter_next (&iter, &key, &value) && !found) {
+        MMModem *candidate = MM_MODEM (value);
+        char *candidate_device = mm_modem_get_device (candidate);
 
-        if (!strcmp (device, mm_modem_get_device (modem)))
-            return modem;
+        if (!strcmp (device, candidate_device))
+            found = candidate;
+        g_free (candidate_device);
     }
-    return NULL;
+    return found;
 }
 
 
@@ -521,6 +524,7 @@ do_grab_port (gpointer user_data)
         if (modem) {
             guint32 modem_type = MM_MODEM_TYPE_UNKNOWN;
             const char *type_name = "UNKNOWN";
+            char *device;;
 
             g_object_get (G_OBJECT (modem), MM_MODEM_TYPE, &modem_type, NULL);
             if (modem_type == MM_MODEM_TYPE_GSM)
@@ -528,11 +532,13 @@ do_grab_port (gpointer user_data)
             else if (modem_type == MM_MODEM_TYPE_CDMA)
                 type_name = "CDMA";
 
+            device = mm_modem_get_device (modem);
             g_message ("(%s): %s modem %s claimed port %s",
                         mm_plugin_get_name (info->best_plugin),
                         type_name,
-                        mm_modem_get_device (modem),
+                        device,
                         info->name);
+            g_free (device);
 
             add_modem (info->manager, modem, info->best_plugin);
         } else {

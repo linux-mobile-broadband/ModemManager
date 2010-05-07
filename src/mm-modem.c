@@ -150,12 +150,15 @@ disable_disconnect_done (MMModem *self,
     }
 
     if (error) {
+        char *device = mm_modem_get_device (self);
+
         /* Don't really care what the error was; log it and proceed to disable */
         g_warning ("%s: (%s): error disconnecting the modem while disabling: (%d) %s",
                    __func__,
-                   mm_modem_get_device (self),
+                   device,
                    error ? error->code : -1,
                    error && error->message ? error->message : "(unknown)");
+        g_free (device);
     }
     finish_disable (self, cb_data->callback, cb_data->user_data);
     g_free (cb_data);
