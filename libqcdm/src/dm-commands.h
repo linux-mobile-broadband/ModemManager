@@ -279,6 +279,7 @@ struct DMCmdSubsysZteStatusRsp {
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysZteStatusRsp DMCmdSubsysZteStatusRsp;
 
+/* DIAG_CMD_PILOT_SETS command */
 struct DMCmdPilotSetsSet {
     guint16 pn_offset;
     guint16 ecio;
