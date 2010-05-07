@@ -137,20 +137,47 @@ enum {
 
 /* NW_CONTROL subsystem command codes (only for Novatel Wireless devices) */
 enum {
-    DIAG_SUBSYS_NW_CONTROL_AT_REQUEST   = 3, /* AT commands via diag */
-    DIAG_SUBSYS_NW_CONTROL_AT_RESPONSE  = 4,
-    DIAG_SUBSYS_NW_CONTROL_MODEM_STATUS = 7, /* Modem status */
-    DIAG_SUBSYS_NW_CONTROL_ERI          = 8, /* Extended Roaming Indicator */
-    DIAG_SUBSYS_NW_CONTROL_PRL          = 12,
+    DIAG_SUBSYS_NW_CONTROL_AT_REQUEST     = 3, /* AT commands via diag */
+    DIAG_SUBSYS_NW_CONTROL_AT_RESPONSE    = 4,
+    DIAG_SUBSYS_NW_CONTROL_MODEM_SNAPSHOT = 7,
+    DIAG_SUBSYS_NW_CONTROL_ERI            = 8, /* Extended Roaming Indicator */
+    DIAG_SUBSYS_NW_CONTROL_PRL            = 12,
 };
 
 enum {
-    DIAG_SUBSYS_NW_CONTROL_MODEM_STATUS_CDMA = 7,
-    DIAG_SUBSYS_NW_CONTROL_MODEM_STATUS_WCDMA = 20,
+    DIAG_SUBSYS_NW_CONTROL_MODEM_SNAPSHOT_TECH_CDMA_EVDO = 7,
+    DIAG_SUBSYS_NW_CONTROL_MODEM_SNAPSHOT_TECH_WCDMA = 20,
 };
 
 enum {
     DIAG_SUBSYS_ZTE_STATUS = 0,
+};
+
+enum {
+    CDMA_PREV_UNKNOWN       = 0,
+    CDMA_PREV_IS_95         = 1, /* and J_STD008 */
+    CDMA_PREV_IS_95A        = 2,
+    CDMA_PREV_IS_95A_TSB74  = 3,
+    CDMA_PREV_IS_95B_PHASE1 = 4,
+    CDMA_PREV_IS_95B_PHASE2 = 5,
+    CDMA_PREV_IS2000_REL0   = 6,
+    CDMA_PREV_IS2000_RELA   = 7
+};
+
+enum {
+    CDMA_BAND_CLASS_0_CELLULAR_800   = 0,  /* US cellular 850MHz */
+    CDMA_BAND_CLASS_1_PCS            = 1,  /* US PCS 1900MHz */
+    CDMA_BAND_CLASS_2_TACS           = 2,
+    CDMA_BAND_CLASS_3_JTACS          = 3,  /* Japanese TACS */
+    CDMA_BAND_CLASS_4_KOREAN_PCS     = 4,
+    CDMA_BAND_CLASS_5_NMT450         = 5,
+    CDMA_BAND_CLASS_6_IMT2000        = 6,  /* 2100HMz */
+    CDMA_BAND_CLASS_7_CELLULAR_700   = 7,
+    CDMA_BAND_CLASS_8_1800           = 8,
+    CDMA_BAND_CLASS_9_900            = 9,
+    CDMA_BAND_CLASS_10_SECONDARY_800 = 10,
+    CDMA_BAND_CLASS_11_PAMR_400      = 11,
+    CDMA_BAND_CLASS_12_PAMR_800      = 12
 };
 
 /* Generic DM command header */
@@ -295,6 +322,49 @@ struct DMCmdPilotSetsRsp {
     DMCmdPilotSetsSet sets[52];
 } __attribute__ ((packed));
 typedef struct DMCmdPilotSetsRsp DMCmdPilotSetsRsp;
+
+/* DIAG_SUBSYS_NW_CONTROL_* subsys command */
+struct DMCmdSubsysNwSnapshotReq {
+    DMCmdSubsysHeader hdr;
+    guint8 technology;        /* DIAG_SUBSYS_NW_CONTROL_MODEM_SNAPSHOT_TECH_* */
+    guint32 snapshot_mask;
+} __attribute__ ((packed));
+typedef struct DMCmdSubsysNwSnapshotReq DMCmdSubsysNwSnapshotReq;
+
+/* DIAG_SUBSYS_NW_CONTROL_MODEM_SNAPSHOT response */
+struct DMCmdSubsysNwSnapshotRsp {
+    DMCmdSubsysHeader hdr;
+    guint8 response_code;
+    guint32 bitfield1;
+    guint32 bitfield2;
+    guint8 data[100];
+} __attribute__ ((packed));
+typedef struct DMCmdSubsysNwSnapshotRsp DMCmdSubsysNwSnapshotRsp;
+
+struct DMCmdSubsysNwSnapshotCdma {
+    guint32 rssi;
+    guint32 battery_level;
+    guint8 call_info;
+    guint8 new_sms_ind;
+    guint8 missed_calls;
+    guint32 voicemail_ind;
+    guint8 pkt_call_ctrl_state;
+    guint8 mip_rrp_err_code;
+    guint8 cur_packet_zone_id;
+    guint8 prev;
+    guint8 band_class;
+    guint8 eri;
+    guint8 eri_alert_id;
+    guint32 cur_call_total_time;
+    guint32 cur_call_active_time;
+    guint32 cur_call_tx_ip_bytes;
+    guint32 cur_call_rx_ip_bytes;
+    guint8 connection_status;
+    guint16 dominant_pn;
+    guint8 wdisable_mask;
+    guint8 hdr_rev;
+} __attribute__ ((packed));
+typedef struct DMCmdSubsysNwSnapshotCdma DMCmdSubsysNwSnapshotCdma;
 
 #endif  /* LIBQCDM_DM_COMMANDS_H */
 

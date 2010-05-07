@@ -911,3 +911,157 @@ qcdm_cmd_zte_subsys_status_result (const char *buf, gsize len, GError **error)
 
 /**********************************************************************/
 
+gsize
+qcdm_cmd_nw_subsys_modem_snapshot_cdma_new (char *buf,
+                                            gsize len,
+                                            guint8 chipset,
+                                            GError **error)
+{
+    char cmdbuf[sizeof (DMCmdSubsysNwSnapshotReq) + 2];
+    DMCmdSubsysNwSnapshotReq *cmd = (DMCmdSubsysNwSnapshotReq *) &cmdbuf[0];
+
+    g_return_val_if_fail (buf != NULL, 0);
+    g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    /* Validate chipset */
+    if (chipset != QCDM_NW_CHIPSET_6500 && chipset != QCDM_NW_CHIPSET_6800) {
+        g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_BAD_PARAMETER,
+                     "Unknown Novatel chipset 0x%X",
+                     chipset);
+        return 0;
+    }
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->hdr.code = DIAG_CMD_SUBSYS;
+    switch (chipset) {
+    case QCDM_NW_CHIPSET_6500:
+        cmd->hdr.subsys_id = DIAG_SUBSYS_NW_CONTROL_6500;
+        break;
+    case QCDM_NW_CHIPSET_6800:
+        cmd->hdr.subsys_id = DIAG_SUBSYS_NW_CONTROL_6800;
+        break;
+    default:
+        g_assert_not_reached ();
+    }
+    cmd->hdr.subsys_cmd = GUINT16_TO_LE (DIAG_SUBSYS_NW_CONTROL_MODEM_SNAPSHOT);
+    cmd->technology = DIAG_SUBSYS_NW_CONTROL_MODEM_SNAPSHOT_TECH_CDMA_EVDO;
+    cmd->snapshot_mask = GUINT32_TO_LE (0xFFFF);
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QCDMResult *
+qcdm_cmd_nw_subsys_modem_snapshot_cdma_result (const char *buf, gsize len, GError **error)
+{
+    QCDMResult *result = NULL;
+    DMCmdSubsysNwSnapshotRsp *rsp = (DMCmdSubsysNwSnapshotRsp *) buf;
+    DMCmdSubsysNwSnapshotCdma *cdma = (DMCmdSubsysNwSnapshotCdma *) &rsp->data;
+    guint32 num;
+    guint8 num8;
+
+    g_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_SUBSYS, sizeof (DMCmdSubsysNwSnapshotRsp), error))
+        return NULL;
+
+    /* FIXME: check response_code when we know what it means */
+
+    result = qcdm_result_new ();
+
+    num = GUINT32_FROM_LE (cdma->rssi);
+    qcdm_result_add_uint32 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_RSSI, num);
+
+    num8 = QCDM_CDMA_PREV_UNKNOWN;
+    switch (cdma->prev) {
+    case CDMA_PREV_IS_95:
+        num8 = QCDM_CDMA_PREV_IS_95;
+        break;
+    case CDMA_PREV_IS_95A:
+        num8 = QCDM_CDMA_PREV_IS_95A;
+        break;
+    case CDMA_PREV_IS_95A_TSB74:
+        num8 = QCDM_CDMA_PREV_IS_95A_TSB74;
+        break;
+    case CDMA_PREV_IS_95B_PHASE1:
+        num8 = QCDM_CDMA_PREV_IS_95B_PHASE1;
+        break;
+    case CDMA_PREV_IS_95B_PHASE2:
+        num8 = QCDM_CDMA_PREV_IS_95B_PHASE2;
+        break;
+    case CDMA_PREV_IS2000_REL0:
+        num8 = QCDM_CDMA_PREV_IS2000_REL0;
+        break;
+    case CDMA_PREV_IS2000_RELA:
+        num8 = QCDM_CDMA_PREV_IS2000_RELA;
+        break;
+    default:
+        break;
+    }
+    qcdm_result_add_uint8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_PREV, num8);
+
+    num8 = QCDM_CDMA_BAND_CLASS_UNKNOWN;
+    switch (cdma->band_class) {
+    case CDMA_BAND_CLASS_0_CELLULAR_800:
+        num8 = QCDM_CDMA_BAND_CLASS_0_CELLULAR_800;
+        break;
+    case CDMA_BAND_CLASS_1_PCS:
+        num8 = QCDM_CDMA_BAND_CLASS_1_PCS;
+        break;
+    case CDMA_BAND_CLASS_2_TACS:
+        num8 = QCDM_CDMA_BAND_CLASS_2_TACS;
+        break;
+    case CDMA_BAND_CLASS_3_JTACS:
+        num8 = QCDM_CDMA_BAND_CLASS_3_JTACS;
+        break;
+    case CDMA_BAND_CLASS_4_KOREAN_PCS:
+        num8 = QCDM_CDMA_BAND_CLASS_4_KOREAN_PCS;
+        break;
+    case CDMA_BAND_CLASS_5_NMT450:
+        num8 = QCDM_CDMA_BAND_CLASS_5_NMT450;
+        break;
+    case CDMA_BAND_CLASS_6_IMT2000:
+        num8 = QCDM_CDMA_BAND_CLASS_6_IMT2000;
+        break;
+    case CDMA_BAND_CLASS_7_CELLULAR_700:
+        num8 = QCDM_CDMA_BAND_CLASS_7_CELLULAR_700;
+        break;
+    case CDMA_BAND_CLASS_8_1800:
+        num8 = QCDM_CDMA_BAND_CLASS_8_1800;
+        break;
+    case CDMA_BAND_CLASS_9_900:
+        num8 = QCDM_CDMA_BAND_CLASS_9_900;
+        break;
+    case CDMA_BAND_CLASS_10_SECONDARY_800:
+        num8 = QCDM_CDMA_BAND_CLASS_10_SECONDARY_800;
+        break;
+    case CDMA_BAND_CLASS_11_PAMR_400:
+        num8 = QCDM_CDMA_BAND_CLASS_11_PAMR_400;
+        break;
+    case CDMA_BAND_CLASS_12_PAMR_800:
+        num8 = QCDM_CDMA_BAND_CLASS_12_PAMR_800;
+        break;
+    default:
+        break;
+    }
+    qcdm_result_add_uint8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_BAND_CLASS, num8);
+
+    qcdm_result_add_uint8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_ERI, cdma->eri);
+
+    num8 = QCDM_HDR_REV_UNKNOWN;
+    switch (cdma->hdr_rev) {
+    case 0:
+        num8 = QCDM_HDR_REV_0;
+        break;
+    case 1:
+        num8 = QCDM_HDR_REV_A;
+        break;
+    default:
+        break;
+    }
+    qcdm_result_add_uint8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_HDR_REV, num8);
+
+    return result;
+}
+
+/**********************************************************************/
+

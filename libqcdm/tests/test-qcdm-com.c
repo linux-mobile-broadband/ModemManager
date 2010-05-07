@@ -31,6 +31,84 @@
 #include "commands.h"
 #include "error.h"
 
+/************************************************************/
+
+static const char *
+prev_to_string (guint8 prev)
+{
+    switch (prev) {
+    case QCDM_CDMA_PREV_IS_95:
+        return "IS-95";
+    case QCDM_CDMA_PREV_IS_95A:
+        return "IS-95A";
+    case QCDM_CDMA_PREV_IS_95A_TSB74:
+        return "IS-95A TSB-74";
+    case QCDM_CDMA_PREV_IS_95B_PHASE1:
+        return "IS-95B Phase I";
+    case QCDM_CDMA_PREV_IS_95B_PHASE2:
+        return "IS-95B Phase II";
+    case QCDM_CDMA_PREV_IS2000_REL0:
+        return "IS-2000 Release 0";
+    case QCDM_CDMA_PREV_IS2000_RELA:
+        return "IS-2000 Release A";
+    default:
+        break;
+    }
+    return "unknown";
+}
+
+static const char *
+band_class_to_string (guint8 band_class)
+{
+    switch (band_class) {
+    case QCDM_CDMA_BAND_CLASS_0_CELLULAR_800:
+        return "0 (Cellular 800)";
+    case QCDM_CDMA_BAND_CLASS_1_PCS:
+        return "1 (PCS 1900)";
+    case QCDM_CDMA_BAND_CLASS_2_TACS:
+        return "2 (TACS)";
+    case QCDM_CDMA_BAND_CLASS_3_JTACS:
+        return "3 (JTACS)";
+    case QCDM_CDMA_BAND_CLASS_4_KOREAN_PCS:
+        return "4 (Korean PCS)";
+    case QCDM_CDMA_BAND_CLASS_5_NMT450:
+        return "5 (NMT-450)";
+    case QCDM_CDMA_BAND_CLASS_6_IMT2000:
+        return "6 (IMT-2000)";
+    case QCDM_CDMA_BAND_CLASS_7_CELLULAR_700:
+        return "7 (Cellular 700)";
+    case QCDM_CDMA_BAND_CLASS_8_1800:
+        return "8 (1800 MHz)";
+    case QCDM_CDMA_BAND_CLASS_9_900:
+        return "9 (1900 MHz)";
+    case QCDM_CDMA_BAND_CLASS_10_SECONDARY_800:
+        return "10 (Secondary 800 MHz)";
+    case QCDM_CDMA_BAND_CLASS_11_PAMR_400:
+        return "11 (PAMR 400)";
+    case QCDM_CDMA_BAND_CLASS_12_PAMR_800:
+        return "11 (PAMR 800)";
+    default:
+        break;
+    }
+    return "unknown";
+}
+
+static const char *
+hdr_rev_to_string (guint8 hdr_rev)
+{
+    switch (hdr_rev) {
+    case QCDM_HDR_REV_0:
+        return "0";
+    case QCDM_HDR_REV_A:
+        return "A";
+    default:
+        break;
+    }
+    return "unknown";
+}
+
+/************************************************************/
+
 typedef struct {
     char *port;
     int fd;
@@ -814,6 +892,8 @@ test_com_hdr_subsys_state_info (void *f, void *data)
     /* Get a response */
     reply_len = wait_reply (d, buf, sizeof (buf));
 
+    g_print ("\n");
+
     /* Parse the response into a result structure */
     result = qcdm_cmd_hdr_subsys_state_info_result (buf, reply_len, &error);
     if (!result) {
@@ -823,8 +903,6 @@ test_com_hdr_subsys_state_info (void *f, void *data)
         return;
     }
     g_assert (result);
-
-    g_print ("\n");
 
     num = 0;
     detail = NULL;
@@ -1034,16 +1112,72 @@ test_com_zte_subsys_status (void *f, void *data)
     /* Get a response */
     reply_len = wait_reply (d, buf, sizeof (buf));
 
+    g_print ("\n");
+
     /* Parse the response into a result structure */
     result = qcdm_cmd_zte_subsys_status_result (buf, reply_len, &error);
     if (!result) {
         /* Obviously not all devices implement this command */
         g_assert_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_BAD_COMMAND);
+        g_message ("%s: device does not implement the ZTE subsystem", __func__);
         return;
     }
+    g_assert (result);
 
     qcdm_result_get_uint8 (result, QCDM_CMD_ZTE_SUBSYS_STATUS_ITEM_SIGNAL_INDICATOR, &ind);
     g_message ("%s: Signal Indicator: %d", __func__, ind);
+
+    qcdm_result_unref (result);
+}
+
+void
+test_com_nw_subsys_modem_snapshot_cdma (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    GError *error = NULL;
+    char buf[200];
+    gint len;
+    QCDMResult *result;
+    gsize reply_len;
+    guint8 num8 = 0;
+    guint32 num32 = 0;
+
+    len = qcdm_cmd_nw_subsys_modem_snapshot_cdma_new (buf, sizeof (buf), QCDM_NW_CHIPSET_6800, NULL);
+    g_assert (len == 12);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    g_print ("\n");
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_nw_subsys_modem_snapshot_cdma_result (buf, reply_len, &error);
+    if (!result) {
+        /* Obviously not all devices implement this command */
+        g_assert_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_BAD_COMMAND);
+        return;
+    }
+    g_assert (result);
+
+    qcdm_result_get_uint32 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_RSSI, &num32);
+    g_message ("%s: RSSI: %d", __func__, num32);
+
+    qcdm_result_get_uint8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_PREV, &num8);
+    g_message ("%s: P_REV: %s", __func__, prev_to_string (num8));
+
+    qcdm_result_get_uint8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_BAND_CLASS, &num8);
+    g_message ("%s: Band Class: %s", __func__, band_class_to_string (num8));
+
+    qcdm_result_get_uint8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_ERI, &num8);
+    g_message ("%s: ERI: %d", __func__, num8);
+
+    qcdm_result_get_uint8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_HDR_REV, &num8);
+    g_message ("%s: HDR Revision: %s", __func__, hdr_rev_to_string (num8));
 
     qcdm_result_unref (result);
 }

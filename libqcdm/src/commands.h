@@ -24,6 +24,44 @@
 
 /**********************************************************************/
 
+/* Generic enums */
+
+enum {
+    QCDM_CDMA_PREV_UNKNOWN       = 0,
+    QCDM_CDMA_PREV_IS_95         = 1, /* and J_STD008 */
+    QCDM_CDMA_PREV_IS_95A        = 2,
+    QCDM_CDMA_PREV_IS_95A_TSB74  = 3,
+    QCDM_CDMA_PREV_IS_95B_PHASE1 = 4,
+    QCDM_CDMA_PREV_IS_95B_PHASE2 = 5,
+    QCDM_CDMA_PREV_IS2000_REL0   = 6,
+    QCDM_CDMA_PREV_IS2000_RELA   = 7
+};
+
+enum {
+    QCDM_CDMA_BAND_CLASS_UNKNOWN          = 0,
+    QCDM_CDMA_BAND_CLASS_0_CELLULAR_800   = 1,  /* US cellular 850MHz */
+    QCDM_CDMA_BAND_CLASS_1_PCS            = 2,  /* US PCS 1900MHz */
+    QCDM_CDMA_BAND_CLASS_2_TACS           = 3,
+    QCDM_CDMA_BAND_CLASS_3_JTACS          = 4,  /* Japanese TACS */
+    QCDM_CDMA_BAND_CLASS_4_KOREAN_PCS     = 5,
+    QCDM_CDMA_BAND_CLASS_5_NMT450         = 6,
+    QCDM_CDMA_BAND_CLASS_6_IMT2000        = 7,  /* 2100HMz */
+    QCDM_CDMA_BAND_CLASS_7_CELLULAR_700   = 8,
+    QCDM_CDMA_BAND_CLASS_8_1800           = 9,
+    QCDM_CDMA_BAND_CLASS_9_900            = 10,
+    QCDM_CDMA_BAND_CLASS_10_SECONDARY_800 = 11,
+    QCDM_CDMA_BAND_CLASS_11_PAMR_400      = 12,
+    QCDM_CDMA_BAND_CLASS_12_PAMR_800      = 13
+};
+
+enum {
+    QCDM_HDR_REV_UNKNOWN = 0x00,
+    QCDM_HDR_REV_0 = 0x01,
+    QCDM_HDR_REV_A = 0x02
+};
+
+/**********************************************************************/
+
 #define QCDM_CMD_VERSION_INFO_ITEM_COMP_DATE "comp-date"
 #define QCDM_CMD_VERSION_INFO_ITEM_COMP_TIME "comp-time"
 #define QCDM_CMD_VERSION_INFO_ITEM_RELEASE_DATE "release-date"
@@ -363,6 +401,36 @@ gsize       qcdm_cmd_zte_subsys_status_new    (char *buf,
 QCDMResult *qcdm_cmd_zte_subsys_status_result (const char *buf,
                                                gsize len,
                                                GError **error);
+
+/**********************************************************************/
+
+#define QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_RSSI       "rssi"
+
+/* One of QCDM_CDMA_PREV_* */
+#define QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_PREV       "prev"
+
+/* One of QCDM_CDMA_BAND_CLASS_* */
+#define QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_BAND_CLASS "band-class"
+
+#define QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_ERI        "eri"
+
+/* One of QCDM_HDR_REV_* */
+#define QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_HDR_REV    "hdr-rev"
+
+enum {
+    QCDM_NW_CHIPSET_UNKNOWN = 0,
+    QCDM_NW_CHIPSET_6500 = 1,
+    QCDM_NW_CHIPSET_6800 = 2,
+};
+
+gsize       qcdm_cmd_nw_subsys_modem_snapshot_cdma_new    (char *buf,
+                                                           gsize len,
+                                                           guint8 chipset,
+                                                           GError **error);
+
+QCDMResult *qcdm_cmd_nw_subsys_modem_snapshot_cdma_result (const char *buf,
+                                                           gsize len,
+                                                           GError **error);
 
 /**********************************************************************/
 
