@@ -40,4 +40,4 @@ MMModem *mm_modem_longcheer_gsm_new (const char *device,
                                      const char *driver,
                                      const char *plugin);
 
-#endif /* MM_MODEM_ZTE_H */
+#endif /* MM_MODEM_LONGCHEER_H */
