@@ -2387,7 +2387,7 @@ cid_range_read (MMAtSerialPort *port,
 
     if (error)
         info->error = g_error_copy (error);
-    else if (g_str_has_prefix (response->str, "+CGDCONT: ")) {
+    else if (g_str_has_prefix (response->str, "+CGDCONT:")) {
         GRegex *r;
         GMatchInfo *match_info;
 
