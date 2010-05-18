@@ -28,6 +28,7 @@
 #include "mm-callback-info.h"
 #include "mm-serial-port.h"
 #include "mm-serial-parsers.h"
+#include "mm-modem-helpers.h"
 
 G_DEFINE_TYPE (MMModemSierraCdma, mm_modem_sierra_cdma, MM_TYPE_GENERIC_CDMA)
 
@@ -75,13 +76,19 @@ mm_modem_sierra_cdma_new (const char *device,
 #define SYS_MODE_NO_SERVICE_TAG "NO SRV"
 #define SYS_MODE_EVDO_TAG "HDR"
 #define SYS_MODE_1X_TAG "1x"
+#define SYS_MODE_CDMA_TAG "CDMA"
 #define EVDO_REV_TAG "HDR Revision:"
 #define SID_TAG "SID:"
 
 static gboolean
-get_roam_value (const char *reply, const char *tag, gboolean *roaming)
+get_roam_value (const char *reply,
+                const char *tag,
+                gboolean is_eri,
+                gboolean *out_roaming)
 {
     char *p;
+    gboolean success;
+    guint32 ind = 0;
 
     p = strstr (reply, tag);
     if (!p)
@@ -90,11 +97,26 @@ get_roam_value (const char *reply, const char *tag, gboolean *roaming)
     p += strlen (tag);
     while (*p && isspace (*p))
         p++;
+
+    /* Use generic ERI parsing if it's an ERI */
+    if (is_eri) {
+        success = mm_cdma_parse_eri (p, out_roaming, &ind, NULL);
+        if (success) {
+            /* Sierra redefines ERI 0, 1, and 2 */
+            if (ind == 0)
+                *out_roaming = FALSE;  /* home */
+            else if (ind == 1 || ind == 2)
+                *out_roaming = TRUE;   /* roaming */
+        }
+        return success;
+    }
+
+    /* If it's not an ERI, roaming is just true/false */
     if (*p == '1') {
-        *roaming = TRUE;
+        *out_roaming = TRUE;
         return TRUE;
     } else if (*p == '0') {
-        *roaming = FALSE;
+        *out_roaming = FALSE;
         return TRUE;
     }
 
@@ -107,6 +129,12 @@ sys_mode_has_service (SysMode mode)
     return (   mode == SYS_MODE_CDMA_1X
             || mode == SYS_MODE_EVDO_REV0
             || mode == SYS_MODE_EVDO_REVA);
+}
+
+static gboolean
+sys_mode_is_evdo (SysMode mode)
+{
+    return (mode == SYS_MODE_EVDO_REV0 || mode == SYS_MODE_EVDO_REVA);
 }
 
 static void
@@ -122,7 +150,7 @@ status_done (MMAtSerialPort *port,
     gboolean have_sid = FALSE;
     SysMode evdo_mode = SYS_MODE_UNKNOWN;
     SysMode sys_mode = SYS_MODE_UNKNOWN;
-    gboolean cdma_1x_set = FALSE, evdo_set = FALSE;
+    gboolean evdo_roam = FALSE, cdma1x_roam = FALSE;
 
     if (error) {
         /* Leave superclass' reg state alone if AT!STATUS isn't supported */
@@ -197,29 +225,10 @@ status_done (MMAtSerialPort *port,
         }
 
         /* Roaming */
-        if (get_roam_value (*iter, ROAM_1X_TAG, &bool_val)) {
-            mm_generic_cdma_query_reg_state_set_callback_1x_state (info,
-                        bool_val ? MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING :
-                                   MM_MODEM_CDMA_REGISTRATION_STATE_HOME);
-            cdma_1x_set = TRUE;
-        }
-        if (get_roam_value (*iter, ROAM_EVDO_TAG, &bool_val)) {
-            mm_generic_cdma_query_reg_state_set_callback_evdo_state (info,
-                        bool_val ? MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING :
-                                   MM_MODEM_CDMA_REGISTRATION_STATE_HOME);
-            evdo_set = TRUE;
-        }
-        if (get_roam_value (*iter, GENERIC_ROAM_TAG, &bool_val)) {
-            MMModemCdmaRegistrationState reg_state;
-
-            reg_state = bool_val ? MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING :
-                                   MM_MODEM_CDMA_REGISTRATION_STATE_HOME;
-
-            mm_generic_cdma_query_reg_state_set_callback_1x_state (info, reg_state);
-            mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, reg_state);
-            cdma_1x_set = TRUE;
-            evdo_set = TRUE;
-        }
+        get_roam_value (*iter, ROAM_1X_TAG, TRUE, &cdma1x_roam);
+        get_roam_value (*iter, ROAM_EVDO_TAG, TRUE, &evdo_roam);
+        if (get_roam_value (*iter, GENERIC_ROAM_TAG, FALSE, &bool_val))
+            cdma1x_roam = evdo_roam = bool_val;
 
         /* Current system mode */
         p = strstr (*iter, SYS_MODE_TAG);
@@ -231,7 +240,8 @@ status_done (MMAtSerialPort *port,
                 sys_mode = SYS_MODE_NO_SERVICE;
             else if (!strncmp (p, SYS_MODE_EVDO_TAG, strlen (SYS_MODE_EVDO_TAG)))
                 sys_mode = SYS_MODE_EVDO_REV0;
-            else if (!strncmp (p, SYS_MODE_1X_TAG, strlen (SYS_MODE_1X_TAG)))
+            else if (   !strncmp (p, SYS_MODE_1X_TAG, strlen (SYS_MODE_1X_TAG))
+                     || !strncmp (p, SYS_MODE_CDMA_TAG, strlen (SYS_MODE_CDMA_TAG)))
                 sys_mode = SYS_MODE_CDMA_1X;
         }
 
@@ -259,24 +269,36 @@ status_done (MMAtSerialPort *port,
     }
 
     /* Update current system mode */
-    if (sys_mode == SYS_MODE_EVDO_REV0 || sys_mode == SYS_MODE_EVDO_REVA) {
+    if (sys_mode_is_evdo (sys_mode)) {
         /* Prefer the explicit EVDO mode from EVDO_REV_TAG */
         if (evdo_mode != SYS_MODE_UNKNOWN)
             sys_mode = evdo_mode;
     }
     priv->sys_mode = sys_mode;
 
-    if (registered || have_sid || sys_mode_has_service (sys_mode)) {
-        /* As a backup, if for some reason the registration states didn't get
-         * figured out by parsing the status info, set some generic registration
-         * states here.
-         */
-        if (!cdma_1x_set)
-            mm_generic_cdma_query_reg_state_set_callback_1x_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED);
+    /* If the modem didn't report explicit registration with "Modem has
+     * registered" then get registration status by looking at either system
+     * mode or (for older devices that don't report that) just the SID.
+     */
+    if (!registered) {
+        if (sys_mode != SYS_MODE_UNKNOWN)
+            registered = sys_mode_has_service (sys_mode);
+        else
+            registered = have_sid;
+    }
 
-        /* Ensure EVDO registration mode is set if we're at least in EVDO mode */
-        if (!evdo_set && (sys_mode == SYS_MODE_EVDO_REV0 || sys_mode == SYS_MODE_EVDO_REVA))
-            mm_generic_cdma_query_reg_state_set_callback_1x_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED);
+    if (registered) {
+        mm_generic_cdma_query_reg_state_set_callback_1x_state (info,
+                    cdma1x_roam ? MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING :
+                                  MM_MODEM_CDMA_REGISTRATION_STATE_HOME);
+
+        if (sys_mode_is_evdo (sys_mode)) {
+            mm_generic_cdma_query_reg_state_set_callback_evdo_state (info,
+                        evdo_roam ? MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING :
+                                    MM_MODEM_CDMA_REGISTRATION_STATE_HOME);
+        } else {
+            mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+        }
     } else {
         /* Not registered */
         mm_generic_cdma_query_reg_state_set_callback_1x_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
