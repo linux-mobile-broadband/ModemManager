@@ -686,11 +686,10 @@ static const EriItem eris[] = {
 };
 
 gboolean
-mm_cdma_parse_speri_response (const char *reply,
-                              gboolean *out_roaming,
-                              const char **out_desc)
+mm_cdma_parse_eri (const char *reply,
+                   gboolean *out_roaming,
+                   const char **out_desc)
 {
-    const char *p;
     long int ind;
     const EriItem *iter = &eris[0];
     gboolean found = FALSE;
@@ -698,9 +697,8 @@ mm_cdma_parse_speri_response (const char *reply,
     g_return_val_if_fail (reply != NULL, FALSE);
     g_return_val_if_fail (out_roaming != NULL, FALSE);
 
-    p = mm_strip_tag (reply, "$SPERI:");
     errno = 0;
-    ind = strtol (p, NULL, 10);
+    ind = strtol (reply, NULL, 10);
     if (errno == 0) {
         while (iter->num != -1) {
             if (iter->num == ind) {

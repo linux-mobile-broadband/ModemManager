@@ -1431,11 +1431,13 @@ reg_query_speri_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = user_data;
     gboolean roam = FALSE;
+    const char *p;
 
     if (error)
         goto done;
 
-    if (!mm_cdma_parse_speri_response (response->str, &roam, NULL))
+    p = mm_strip_tag (response->str, "$SPERI:");
+    if (!p || !mm_cdma_parse_eri (p, &roam, NULL))
         goto done;
 
     /* Change the 1x and EVDO registration states to roaming if they were
