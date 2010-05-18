@@ -51,6 +51,7 @@ gboolean mm_cdma_parse_spservice_response (const char *reply,
 
 gboolean mm_cdma_parse_eri (const char *reply,
                             gboolean *out_roaming,
+                            guint32 *out_ind,
                             const char **out_desc);
 
 gboolean mm_gsm_parse_cscs_support_response (const char *reply,

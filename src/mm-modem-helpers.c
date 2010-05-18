@@ -688,6 +688,7 @@ static const EriItem eris[] = {
 gboolean
 mm_cdma_parse_eri (const char *reply,
                    gboolean *out_roaming,
+                   guint32 *out_ind,
                    const char **out_desc)
 {
     long int ind;
@@ -700,6 +701,9 @@ mm_cdma_parse_eri (const char *reply,
     errno = 0;
     ind = strtol (reply, NULL, 10);
     if (errno == 0) {
+        if (out_ind)
+            *out_ind = ind;
+
         while (iter->num != -1) {
             if (iter->num == ind) {
                 *out_roaming = iter->roam_ind;

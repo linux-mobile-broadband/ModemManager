@@ -1437,7 +1437,7 @@ reg_query_speri_done (MMAtSerialPort *port,
         goto done;
 
     p = mm_strip_tag (response->str, "$SPERI:");
-    if (!p || !mm_cdma_parse_eri (p, &roam, NULL))
+    if (!p || !mm_cdma_parse_eri (p, &roam, NULL, NULL))
         goto done;
 
     /* Change the 1x and EVDO registration states to roaming if they were
