@@ -766,6 +766,11 @@ grab_port (MMModem *modem,
             regex = g_regex_new ("\\r\\n\\*E2NAP: (\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
             mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, mbm_e2nap_received, modem, NULL);
             g_regex_unref (regex);
+
+            /* Catch the extended error status bit of the command too */
+            regex = g_regex_new ("\\r\\n\\*E2NAP: (\\d),.*\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, mbm_e2nap_received, modem, NULL);
+            g_regex_unref (regex);
         }
 
         regex = g_regex_new ("\\r\\n\\*EMRDY: \\d\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
