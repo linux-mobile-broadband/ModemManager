@@ -255,12 +255,31 @@ libmm_plugin_anydata_la_LDFLAGS = \
 	-module \
 	-avoid-version
 
+# SimTech
+
+libmm_plugin_anydata_la_SOURCES = \
+	mm-plugin-simtech.c \
+	mm-plugin-simtech.h \
+	mm-modem-simtech-gsm.c \
+	mm-modem-simtech-gsm.h
+
+libmm_plugin_simtech_la_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
+	-I$(top_srcdir)/src
+
+libmm_plugin_simtech_la_LDFLAGS = \
+	$(GUDEV_LDFLAGS) \
+	-module \
+	-avoid-version
+
 
 udevrulesdir = $(UDEV_BASE_DIR)/rules.d
 udevrules_DATA = \
 	77-mm-ericsson-mbm.rules \
 	77-mm-zte-port-types.rules \
-	77-mm-longcheer-port-types.rules
+	77-mm-longcheer-port-types.rules \
+	77-mm-simtech-port-types.rules
 
 BUILT_SOURCES = \
 	mm-modem-gsm-hso-glue.h
