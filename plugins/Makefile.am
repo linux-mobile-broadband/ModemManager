@@ -11,7 +11,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-zte.la \
 	libmm-plugin-mbm.la \
 	libmm-plugin-longcheer.la \
-	libmm-plugin-anydata.la
+	libmm-plugin-anydata.la \
+	libmm-plugin-simtech.la
 
 # Generic
 
@@ -257,7 +258,7 @@ libmm_plugin_anydata_la_LDFLAGS = \
 
 # SimTech
 
-libmm_plugin_anydata_la_SOURCES = \
+libmm_plugin_simtech_la_SOURCES = \
 	mm-plugin-simtech.c \
 	mm-plugin-simtech.h \
 	mm-modem-simtech-gsm.c \
