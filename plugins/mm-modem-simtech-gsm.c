@@ -332,7 +332,7 @@ handle_act_change (MMAtSerialPort *port,
     MMModemGsmAccessTech act;
     char *str;
 
-    str = g_match_info_fetch (match_info, 2);
+    str = g_match_info_fetch (match_info, 1);
     if (str && strlen (str)) {
         act = simtech_act_to_mm_act (atoi (str));
         mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (self), act);
@@ -434,7 +434,7 @@ grab_port (MMModem *modem,
     if (port && MM_IS_AT_SERIAL_PORT (port)) {
         GRegex *regex;
 
-        regex = g_regex_new ("\\r\\n\\+CNSMOD:\\s*(\\d),(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        regex = g_regex_new ("\\r\\n\\+CNSMOD:\\s*(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_act_change, modem, NULL);
         g_regex_unref (regex);
     }
