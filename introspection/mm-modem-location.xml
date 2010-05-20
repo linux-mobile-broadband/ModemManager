@@ -117,43 +117,37 @@
           providing GPS NMEA-format location information.</p>
 
           <p>For location reporting, devices supporting this capability return
-          an array mapping timestamps to specific NMEA sentences (D-Bus
-          signature 'a(ss)').  The manager will cache the most recent NMEA
-          sentence of each type for a period of time not less than 30 seconds
-          and must indicate the time that sentence was receieved from the device
-          using the timestamp.  Timestamps are provided as strings in the "Unix
-          epoch" format (i.e. number of seconds since 1970-01-01 00:00:00 UTC
-          with microsecond resolution if available).
+          a string containing one or more NMEA sentences (D-Bus signature 's').
+          The manager will cache the most recent NMEA sentence of each type for
+          a period of time not less than 30 seconds.  When reporting multiple
+          NMEA sentences, sentences shall be separated by an ASCII Carriage
+          Return and Line Feed (&lt;CR&gt;&lt;LF&gt;) sequence.
           </p>
           <p>
-          For example, if at time 1268336242.282202 the device sends a $GPRMC
-          sentence immediately followed by a $GPGGA sentence, the reported
-          location array would be:
+          For example, if the device sends a $GPRMC sentence immediately
+          followed by a $GPGGA sentence, the reported location string would be
+          (where of course the &lt;CR&gt;&lt;LF&gt; is replaced with the actual
+          ASCII CR (0x0D) and LF (0x0A) control characters):
           <pre>
-          [ '1268336242.282202': '$GPRMC,134523.92,V,,,,,,,030136,,,N*73',
-            '1268336242.282202': '$GPGGA,,,,,,0,00,0.5,,M,0.0001999,M,0.0000099,0000*45' ]
+          $GPRMC,134523.92,V,,,,,,,030136,,,N*73&lt;CR&gt;&lt;LF&gt;$GPGGA,,,,,,0,00,0.5,,M,0.0001999,M,0.0000099,0000*45
           </pre>
           If the device sends a new $GPRMC three seconds later, the new $GPRMC
-          replaces the previously received $GPRMC sentence, and the updated array
-          would be:
+          replaces the previously received $GPRMC sentence, and the updated 
+          string would be:
           <pre>
-          [ '1268336245.282202': '$GPRMC,134526.92,V,,,,,,,030136,,,N*76',
-            '1268336242.282202': '$GPGGA,,,,,,0,00,0.5,,M,0.0001999,M,0.0000099,0000*45' ]
+          $GPRMC,134526.92,V,,,,,,,030136,,,N*76&lt;CR&gt;&lt;LF&gt;$GPGGA,,,,,,0,00,0.5,,M,0.0001999,M,0.0000099,0000*45
           </pre>
           If the device then sends a $GPGSA sentence about 5 seconds later, the
-          $GPGSA sentence is added to the array (since no $GPGSA sentence was
-          previously received in this session), the updated array would be:
+          $GPGSA sentence is added to the string (since no $GPGSA sentence was
+          previously received in this session), the updated string would be:
           <pre>
-          [ '1268336245.282202': '$GPRMC,134526.92,V,,,,,,,030136,,,N*76',
-            '1268336242.282202': '$GPGGA,,,,,,0,00,0.5,,M,0.0001999,M,0.0000099,0000*45'
-            '1268336250.395423': '$GPGSA,A,1,,,,,,,,,,,,,1.1,0.5,1.0*34' ]
+          $GPRMC,134526.92,V,,,,,,,030136,,,N*76&lt;CR&gt;&lt;LF&gt;$GPGGA,,,,,,0,00,0.5,,M,0.0001999,M,0.0000099,0000*45&lt;CR&gt;&lt;LF&gt;$GPGSA,A,1,,,,,,,,,,,,,1.1,0.5,1.0*34
           </pre>
-          The manager may discard any entries older than 30 seconds.
+          The manager may discard any cached sentences older than 30 seconds.
           </p>
           <p>This allows clients to read the latest positioning data as soon as
           possible after they start, even if the device is not providing
-          frequent location data updates.  Using the timestamp the client can
-          determine which data is most relevant to its particular uses.
+          frequent location data updates.
           </p>
         </tp:docstring>
       </tp:flag>
@@ -203,6 +197,53 @@
           mobile is not registered with a network, then the GSM_LAC_CI location
           information item should not be provided as a returned value from the
           GetLocation() method or in the Location property.</p>
+        </tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="GSM_GPS_RAW" value="0x4">
+        <tp:docstring>
+          <p>For capability reporting, indicates the device is capable of
+          providing raw GPS information using a series of defined key/value
+          pairs.</p>
+
+          <p>For location reporting, devices supporting this
+          capability return a D-Bus dict (signature a{sv}) mapping well-known
+          keys to values with defined formats.  The allowed key/value pairs
+          and their formats are:</p>
+          <table>
+            <tr><th>Key</th><th>Value Type</th><th>Value contents</th><th>Example</th></tr>
+            <tr>
+              <td>latitude</td>
+              <td>d</td>
+              <td>Latitude in Decimal Degrees (positive numbers mean N quadrasphere, negative mean S quadrasphere)</td>
+              <td>38.889722 (ie, 38d 53' 22" N)</td>
+            </tr>
+            <tr>
+              <td>longitude</td>
+              <td>d</td>
+              <td>Longitude in Decimal Degrees (positive numbers mean E quadrasphere, negative mean W quadrasphere)</td>
+              <td>-77.008889 (ie, 77d 0' 32" W)</td>
+            </tr>
+            <tr>
+              <td>altitude</td>
+              <td>d</td>
+              <td>Altitude above sea level in meters</td>
+              <td>33.5</td>
+            </tr>
+            <tr>
+              <td>horiz-velocity</td>
+              <td>d</td>
+              <td>Horizontal velocity in meters-per-second</td>
+              <td>.5</td>
+            </tr>
+            <tr>
+              <td>vert-velocity</td>
+              <td>d</td>
+              <td>Vertical velocity in meters-per-second</td>
+              <td>.01</td>
+            </tr>
+          </table>
+          <p>The 'latitude' and 'longitude' keys are required; other keys are
+          optional.</p>
         </tp:docstring>
       </tp:flag>
     </tp:flags>
