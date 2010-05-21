@@ -11,9 +11,10 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2010 Red Hat, Inc.
  */
 
+#include <config.h>
 #include <signal.h>
 #include <syslog.h>
 #include <string.h>
@@ -23,7 +24,9 @@
 #include "mm-manager.h"
 #include "mm-options.h"
 
-#define HAL_DBUS_SERVICE "org.freedesktop.Hal"
+#if !defined(MM_DIST_VERSION)
+# define MM_DIST_VERSION VERSION
+#endif
 
 static GMainLoop *loop = NULL;
 
@@ -181,6 +184,8 @@ main (int argc, char *argv[])
 
     if (!mm_options_debug ())
         logging_setup ();
+
+    g_message ("ModemManager (version " MM_DIST_VERSION ") starting...");
 
     bus = dbus_g_bus_get (DBUS_BUS_SYSTEM, &err);
     if (!bus) {

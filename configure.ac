@@ -126,6 +126,14 @@ else
 fi
 AM_CONDITIONAL(WITH_LOCATION_API, test "x$with_location_api" = "xyes")
 
+dnl
+dnl Distribution version string
+dnl
+AC_ARG_WITH(dist-version, AS_HELP_STRING([--with-dist-version=<mm-dist-version>], [Define the custom version (like distribution package name and revision)]), ac_distver=$withval, ac_distver="")
+if ! test x"$ac_distver" = x""; then
+  AC_DEFINE_UNQUOTED(MM_DIST_VERSION, "$ac_distver", [Define the distribution version string])
+fi
+
 AC_CONFIG_FILES([
 Makefile
 marshallers/Makefile
