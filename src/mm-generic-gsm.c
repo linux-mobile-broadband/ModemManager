@@ -1776,7 +1776,7 @@ handle_reg_status_response (MMGenericGsm *self,
 
     if (!match_info) {
         g_set_error_literal (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                             "Could not parse the registration status response");
+                             "Unknown registration status response");
         return FALSE;
     }
 
@@ -3223,6 +3223,17 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
         goto out;
 
     priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+
+    if (mm_options_debug ()) {
+        GTimeVal tv;
+        char *data_device;
+
+        g_object_get (G_OBJECT (modem), MM_MODEM_DATA_DEVICE, &data_device, NULL);
+        g_get_current_time (&tv);
+        g_debug ("<%ld.%ld> (%s): simple connect state %d",
+                 tv.tv_sec, tv.tv_usec, data_device, state);
+        g_free (data_device);
+    }
 
     switch (state) {
     case SIMPLE_STATE_CHECK_PIN:
