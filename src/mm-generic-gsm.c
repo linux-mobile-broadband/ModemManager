@@ -3319,6 +3319,29 @@ simple_connect (MMModemSimple *simple,
 {
     MMCallbackInfo *info;
 
+    /* If debugging, list all the simple connect properties */
+    if (mm_options_debug ()) {
+        GHashTableIter iter;
+        gpointer key, value;
+        GTimeVal tv;
+        char *data_device;
+
+        g_object_get (G_OBJECT (simple), MM_MODEM_DATA_DEVICE, &data_device, NULL);
+        g_get_current_time (&tv);
+
+        g_hash_table_iter_init (&iter, properties);
+        while (g_hash_table_iter_next (&iter, &key, &value)) {
+            char *val_str;
+
+            val_str = g_strdup_value_contents ((GValue *) value);
+            g_debug ("<%ld.%ld> (%s): %s => %s",
+                     tv.tv_sec, tv.tv_usec,
+                     data_device, (const char *) key, val_str);
+            g_free (val_str);
+        }
+        g_free (data_device);
+    }
+
     info = mm_callback_info_new (MM_MODEM (simple), callback, user_data);
     mm_callback_info_set_data (info, "simple-connect-properties", 
                                g_hash_table_ref (properties),
