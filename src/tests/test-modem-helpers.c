@@ -671,6 +671,26 @@ test_cgreg2_f3607gw_unsolicited (void *f, gpointer d)
 }
 
 static void
+test_creg2_md400_unsolicited (void *f, gpointer d)
+{
+    TestData *data = (TestData *) d;
+    const char *reply = "\r\n+CREG: 2,5,\"0502\",\"0404736D\"\r\n";
+    const CregResult result = { 5, 0x0502, 0x0404736D, -1 , 4, FALSE};
+
+    test_creg_match ("Sony-Ericsson MD400 CREG=2", FALSE, reply, data, &result);
+}
+
+static void
+test_cgreg2_md400_unsolicited (void *f, gpointer d)
+{
+    TestData *data = (TestData *) d;
+    const char *reply = "\r\n+CGREG: 5,\"0502\",\"0404736D\",2\r\n";
+    const CregResult result = { 5, 0x0502, 0x0404736D, 2, 5, TRUE};
+
+    test_creg_match ("Sony-Ericsson MD400 CGREG=2", FALSE, reply, data, &result);
+}
+
+static void
 test_creg_cgreg_multi_unsolicited (void *f, gpointer d)
 {
     TestData *data = (TestData *) d;
@@ -827,11 +847,13 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_creg2_e160g_unsolicited, data));
     g_test_suite_add (suite, TESTCASE (test_creg2_tm506_solicited, data));
     g_test_suite_add (suite, TESTCASE (test_creg2_xu870_unsolicited_unregistered, data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_md400_unsolicited, data));
 
     g_test_suite_add (suite, TESTCASE (test_cgreg1_solicited, data));
     g_test_suite_add (suite, TESTCASE (test_cgreg1_unsolicited, data));
     g_test_suite_add (suite, TESTCASE (test_cgreg2_f3607gw_solicited, data));
     g_test_suite_add (suite, TESTCASE (test_cgreg2_f3607gw_unsolicited, data));
+    g_test_suite_add (suite, TESTCASE (test_cgreg2_md400_unsolicited, data));
 
     g_test_suite_add (suite, TESTCASE (test_creg_cgreg_multi_unsolicited, data));
     g_test_suite_add (suite, TESTCASE (test_creg_cgreg_multi2_unsolicited, data));
