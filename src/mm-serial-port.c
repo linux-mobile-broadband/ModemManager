@@ -814,10 +814,7 @@ mm_serial_port_close (MMSerialPort *self)
             priv->channel = NULL;
         }
 
-        if (priv->flash_id > 0) {
-            g_source_remove (priv->flash_id);
-            priv->flash_id = 0;
-        }
+        mm_serial_port_flash_cancel (self);
 
         tcsetattr (priv->fd, TCSANOW, &priv->old_t);
         close (priv->fd);
@@ -1032,6 +1029,15 @@ mm_serial_port_flash (MMSerialPort *self,
 
     priv = MM_SERIAL_PORT_GET_PRIVATE (self);
 
+    if (!mm_serial_port_is_open (self)) {
+        error = g_error_new_literal (MM_SERIAL_ERROR,
+                                     MM_SERIAL_ERROR_NOT_OPEN,
+                                     "The serial port is not open.");
+        callback (self, error, user_data);
+        g_error_free (error);
+        return FALSE;
+    }
+
     if (priv->flash_id > 0) {
         error = g_error_new_literal (MM_MODEM_ERROR,
                                      MM_MODEM_ERROR_OPERATION_IN_PROGRESS,
@@ -1214,6 +1220,8 @@ dispose (GObject *object)
 {
     if (mm_serial_port_is_open (MM_SERIAL_PORT (object)))
         mm_serial_port_close_force (MM_SERIAL_PORT (object));
+
+    mm_serial_port_flash_cancel (MM_SERIAL_PORT (object));
 
     G_OBJECT_CLASS (mm_serial_port_parent_class)->dispose (object);
 }
