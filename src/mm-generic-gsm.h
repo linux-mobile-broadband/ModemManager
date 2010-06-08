@@ -49,6 +49,11 @@ typedef enum {
     MM_GENERIC_GSM_PROP_ACCESS_TECHNOLOGY
 } MMGenericGsmProp;
 
+typedef enum {
+    MM_GENERIC_GSM_REG_TYPE_UNKNOWN = 0,
+    MM_GENERIC_GSM_REG_TYPE_CS = 1,
+    MM_GENERIC_GSM_REG_TYPE_PS = 2
+} MMGenericGsmRegType;
 
 typedef struct {
     MMModemBase parent;
@@ -122,6 +127,7 @@ void mm_generic_gsm_pending_registration_stop (MMGenericGsm *modem);
 gint mm_generic_gsm_get_cid (MMGenericGsm *modem);
 
 void mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
+                                    MMGenericGsmRegType reg_type,
                                     MMModemGsmNetworkRegStatus status);
 
 MMModemCharset mm_generic_gsm_get_charset (MMGenericGsm *modem);

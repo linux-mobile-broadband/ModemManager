@@ -79,7 +79,8 @@ typedef struct {
     gulong cell_id[2];
     MMModemGsmAccessTech act;
 
-    MMModemGsmNetworkRegStatus reg_status;
+    /* Index 0 for CREG, index 1 for CGREG */
+    MMModemGsmNetworkRegStatus reg_status[2];
     guint pending_reg_id;
     MMCallbackInfo *pending_reg_info;
     gboolean manual_reg;
@@ -129,6 +130,7 @@ static void _internal_update_access_technology (MMGenericGsm *modem,
 
 static void reg_info_updated (MMGenericGsm *self,
                               gboolean update_rs,
+                              MMGenericGsmRegType rs_type,
                               MMModemGsmNetworkRegStatus status,
                               gboolean update_code,
                               const char *oper_code,
@@ -270,20 +272,49 @@ check_pin (MMGenericGsm *modem,
 
 /*****************************************************************************/
 
+static MMModemGsmNetworkRegStatus
+gsm_reg_status (MMGenericGsm *self)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    /* Some devices (Blackberries for example) will respond to +CGREG, but
+     * return ERROR for +CREG, probably because their firmware is just stupid.
+     * So here we prefer the +CREG response, but if we never got a successful
+     * +CREG response, we'll take +CGREG instead.
+     */
+
+    if (   priv->reg_status[0] == MM_MODEM_GSM_NETWORK_REG_STATUS_HOME
+        || priv->reg_status[0] == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING)
+        return priv->reg_status[0];
+
+    if (   priv->reg_status[1] == MM_MODEM_GSM_NETWORK_REG_STATUS_HOME
+        || priv->reg_status[1] == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING)
+        return priv->reg_status[1];
+
+    if (priv->reg_status[0] == MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING)
+        return priv->reg_status[0];
+
+    if (priv->reg_status[1] == MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING)
+        return priv->reg_status[1];
+
+    if (priv->reg_status[0] != MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN)
+        return priv->reg_status[0];
+
+    return priv->reg_status[1];
+}
+
 void
 mm_generic_gsm_update_enabled_state (MMGenericGsm *self,
                                      gboolean stay_connected,
                                      MMModemStateReason reason)
 {
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
-
     /* While connected we don't want registration status changes to change
      * the modem's state away from CONNECTED.
      */
     if (stay_connected && (mm_modem_get_state (MM_MODEM (self)) >= MM_MODEM_STATE_DISCONNECTING))
         return;
 
-    switch (priv->reg_status) {
+    switch (gsm_reg_status (self)) {
     case MM_MODEM_GSM_NETWORK_REG_STATUS_HOME:
     case MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING:
         mm_modem_set_state (MM_MODEM (self), MM_MODEM_STATE_REGISTERED, reason);
@@ -990,8 +1021,15 @@ disable_done (MMAtSerialPort *port,
                             MM_MODEM_STATE_DISABLED,
                             MM_MODEM_STATE_REASON_NONE);
 
-        /* Clear out registration info */
+        /* Clear out circuit-switched registration info... */
         reg_info_updated (self,
+                          MM_GENERIC_GSM_REG_TYPE_CS,
+                          TRUE, MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN,
+                          TRUE, NULL,
+                          TRUE, NULL);
+        /* ...and packet-switched registration info */
+        reg_info_updated (self,
+                          MM_GENERIC_GSM_REG_TYPE_PS,
                           TRUE, MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN,
                           TRUE, NULL,
                           TRUE, NULL);
@@ -1382,6 +1420,7 @@ change_pin (MMModemGsmCard *modem,
 static void
 reg_info_updated (MMGenericGsm *self,
                   gboolean update_rs,
+                  MMGenericGsmRegType rs_type,
                   MMModemGsmNetworkRegStatus status,
                   gboolean update_code,
                   const char *oper_code,
@@ -1389,13 +1428,17 @@ reg_info_updated (MMGenericGsm *self,
                   const char *oper_name)
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    MMModemGsmNetworkRegStatus old_status;
     gboolean changed = FALSE;
 
     if (update_rs) {
-        if (status != priv->reg_status) {
-            priv->reg_status = status;
+        g_return_if_fail (   rs_type == MM_GENERIC_GSM_REG_TYPE_CS
+                          || rs_type == MM_GENERIC_GSM_REG_TYPE_PS);
+
+        old_status = gsm_reg_status (self);
+        priv->reg_status[rs_type - 1] = status;
+        if (gsm_reg_status (self) != old_status)
             changed = TRUE;
-        }
     }
 
     if (update_code) {
@@ -1416,7 +1459,7 @@ reg_info_updated (MMGenericGsm *self,
 
     if (changed) {
         mm_modem_gsm_network_registration_info (MM_MODEM_GSM_NETWORK (self),
-                                                priv->reg_status,
+                                                gsm_reg_status (self),
                                                 priv->oper_code,
                                                 priv->oper_name);
     }
@@ -1495,8 +1538,11 @@ read_operator_code_done (MMAtSerialPort *port,
 
     if (!error) {
         oper = parse_operator (response->str, MM_MODEM_CHARSET_UNKNOWN);
-        if (oper)
-            reg_info_updated (self, FALSE, 0, TRUE, oper, FALSE, NULL);
+        if (oper) {
+            reg_info_updated (self, FALSE, MM_GENERIC_GSM_REG_TYPE_UNKNOWN, 0,
+                              TRUE, oper,
+                              FALSE, NULL);
+        }
     }
 }
 
@@ -1512,8 +1558,11 @@ read_operator_name_done (MMAtSerialPort *port,
 
     if (!error) {
         oper = parse_operator (response->str, priv->cur_charset);
-        if (oper)
-            reg_info_updated (self, FALSE, 0, FALSE, NULL, TRUE, oper);
+        if (oper) {
+            reg_info_updated (self, FALSE, MM_GENERIC_GSM_REG_TYPE_UNKNOWN, 0,
+                              FALSE, NULL,
+                              TRUE, oper);
+        }
     }
 }
 
@@ -1570,6 +1619,7 @@ get_reg_act_done (MMModem *modem,
 
 void
 mm_generic_gsm_set_reg_status (MMGenericGsm *self,
+                               MMGenericGsmRegType rs_type,
                                MMModemGsmNetworkRegStatus status)
 {
     MMGenericGsmPrivate *priv;
@@ -1577,13 +1627,18 @@ mm_generic_gsm_set_reg_status (MMGenericGsm *self,
 
     g_return_if_fail (MM_IS_GENERIC_GSM (self));
 
+    g_return_if_fail (   rs_type == MM_GENERIC_GSM_REG_TYPE_CS
+                      || rs_type == MM_GENERIC_GSM_REG_TYPE_PS);
+
     priv = MM_GENERIC_GSM_GET_PRIVATE (self);
 
-    if (priv->reg_status == status)
+    if (priv->reg_status[rs_type - 1] == status)
         return;
 
-    g_debug ("Registration state changed: %d", status);
-    priv->reg_status = status;
+    g_debug ("%s registration state changed: %d",
+             (rs_type == MM_GENERIC_GSM_REG_TYPE_CS) ? "CS" : "PS",
+             status);
+    priv->reg_status[rs_type - 1] = status;
 
     port = mm_generic_gsm_get_best_at_port (self, NULL);
 
@@ -1611,14 +1666,17 @@ mm_generic_gsm_set_reg_status (MMGenericGsm *self,
                 MM_GENERIC_GSM_GET_CLASS (self)->get_access_technology (self, get_reg_act_done, NULL);
         }
     } else
-        reg_info_updated (self, FALSE, 0, TRUE, NULL, TRUE, NULL);
+        reg_info_updated (self, FALSE, rs_type, 0, TRUE, NULL, TRUE, NULL);
 
     mm_generic_gsm_update_enabled_state (self, TRUE, MM_MODEM_STATE_REASON_NONE);
 }
 
 /* Returns TRUE if the modem is "done", ie has registered or been denied */
 static gboolean
-reg_status_updated (MMGenericGsm *self, int new_value, GError **error)
+reg_status_updated (MMGenericGsm *self,
+                    MMGenericGsmRegType rs_type,
+                    int new_value,
+                    GError **error)
 {
     MMModemGsmNetworkRegStatus status;
     gboolean status_done = FALSE;
@@ -1647,7 +1705,7 @@ reg_status_updated (MMGenericGsm *self, int new_value, GError **error)
         break;
     }
 
-    mm_generic_gsm_set_reg_status (self, status);
+    mm_generic_gsm_set_reg_status (self, rs_type, status);
 
     /* Registration has either completed successfully or completely failed */
     switch (status) {
@@ -1678,6 +1736,12 @@ reg_status_updated (MMGenericGsm *self, int new_value, GError **error)
     return status_done;
 }
 
+static MMGenericGsmRegType
+cgreg_to_reg_type (gboolean cgreg)
+{
+    return (cgreg ? MM_GENERIC_GSM_REG_TYPE_PS : MM_GENERIC_GSM_REG_TYPE_CS);
+}
+
 static void
 reg_state_changed (MMAtSerialPort *port,
                    GMatchInfo *match_info,
@@ -1700,21 +1764,14 @@ reg_state_changed (MMAtSerialPort *port,
         return;
     }
 
-    /* Don't update reg state on CGREG responses since for many devices it's
-     * unclear what that registration state that actually reflects.  We'll
-     * take CGREG registration state into account later when we have a more
-     * consistent way of handling it.
-     */
-    if (cgreg == FALSE) {
-        if (reg_status_updated (self, state, NULL)) {
-            /* If registration is finished (either registered or failed) but the
-             * registration query hasn't completed yet, just remove the timeout and
-             * let the registration query complete.
-             */
-            if (priv->pending_reg_id) {
-                g_source_remove (priv->pending_reg_id);
-                priv->pending_reg_id = 0;
-            }
+    if (reg_status_updated (self, cgreg_to_reg_type (cgreg), state, NULL)) {
+        /* If registration is finished (either registered or failed) but the
+         * registration query hasn't completed yet, just remove the timeout and
+         * let the registration query complete.
+         */
+        if (priv->pending_reg_id) {
+            g_source_remove (priv->pending_reg_id);
+            priv->pending_reg_id = 0;
         }
     }
 
@@ -1795,9 +1852,9 @@ handle_reg_status_response (MMGenericGsm *self,
     if (act != -1)
         mm_generic_gsm_update_access_technology (self, etsi_act_to_mm_act (act));
 
-    if ((cgreg == FALSE) && status >= 0) {
+    if (status >= 0) {
         /* Update cached registration status */
-        reg_status_updated (self, status, NULL);
+        reg_status_updated (self, cgreg_to_reg_type (cgreg), status, NULL);
     }
 
     return TRUE;
@@ -1815,6 +1872,7 @@ get_reg_status_done (MMAtSerialPort *port,
     MMGenericGsm *self = MM_GENERIC_GSM (info->modem);
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     guint id;
+    MMModemGsmNetworkRegStatus status;
 
     /* This function should only get called during the connect sequence when
      * polling for registration state, since explicit registration requests
@@ -1851,9 +1909,10 @@ get_reg_status_done (MMAtSerialPort *port,
             goto reg_done;
     }
 
-    if (   priv->reg_status != MM_MODEM_GSM_NETWORK_REG_STATUS_HOME
-        && priv->reg_status != MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING
-        && priv->reg_status != MM_MODEM_GSM_NETWORK_REG_STATUS_DENIED) {
+    status = gsm_reg_status (self);
+    if (   status != MM_MODEM_GSM_NETWORK_REG_STATUS_HOME
+        && status != MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING
+        && status != MM_MODEM_GSM_NETWORK_REG_STATUS_DENIED) {
         /* If we're still waiting for automatic registration to complete or
          * fail, check again in a few seconds.
          */
@@ -1910,9 +1969,14 @@ registration_timed_out (gpointer data)
 
     g_warn_if_fail (info == priv->pending_reg_info);
 
-    /* Clear out registration info */
+    /* Clear out circuit-switched registration info... */
     reg_info_updated (MM_GENERIC_GSM (info->modem),
-                      TRUE, MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE,
+                      TRUE, MM_GENERIC_GSM_REG_TYPE_CS, MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE,
+                      TRUE, NULL,
+                      TRUE, NULL);
+    /* ... and packet-switched registration info */
+    reg_info_updated (MM_GENERIC_GSM (info->modem),
+                      TRUE, MM_GENERIC_GSM_REG_TYPE_PS, MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE,
                       TRUE, NULL,
                       TRUE, NULL);
 
@@ -1938,12 +2002,13 @@ do_register (MMModemGsmNetwork *modem,
              MMModemFn callback,
              gpointer user_data)
 {
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+    MMGenericGsm *self = MM_GENERIC_GSM (modem);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     MMCallbackInfo *info;
     char *command = NULL;
 
     /* Clear any previous registration */
-    mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
+    mm_generic_gsm_pending_registration_stop (self);
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
@@ -1958,7 +2023,7 @@ do_register (MMModemGsmNetwork *modem,
     if (network_id) {
         command = g_strdup_printf ("+COPS=1,2,\"%s\"", network_id);
         priv->manual_reg = TRUE;
-    } else if (reg_is_idle (priv->reg_status) || priv->manual_reg) {
+    } else if (reg_is_idle (gsm_reg_status (self)) || priv->manual_reg) {
         command = g_strdup ("+COPS=0,,");
         priv->manual_reg = FALSE;
     }
@@ -1996,7 +2061,7 @@ gsm_network_reg_info_invoke (MMCallbackInfo *info)
     MMModemGsmNetworkRegInfoFn callback = (MMModemGsmNetworkRegInfoFn) info->callback;
 
     callback (MM_MODEM_GSM_NETWORK (info->modem),
-              priv->reg_status,
+              gsm_reg_status (MM_GENERIC_GSM (info->modem)),
               priv->oper_code,
               priv->oper_name,
               info->error,
@@ -3295,10 +3360,13 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
         str = simple_get_string_property (info, "number", &info->error);
         if (!info->error) {
             if (simple_get_bool_property (info, "home_only", &home_only, &info->error)) {
+                MMModemGsmNetworkRegStatus status;
+
                 priv->roam_allowed = !home_only;
 
                 /* Don't connect if we're not supposed to be roaming */
-                if (home_only && (priv->reg_status == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING)) {
+                status = gsm_reg_status (MM_GENERIC_GSM (modem));
+                if (home_only && (status == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING)) {
                     info->error = g_error_new_literal (MM_MOBILE_ERROR,
                                                        MM_MOBILE_ERROR_GPRS_ROAMING_NOT_ALLOWED,
                                                        "Roaming is not allowed.");
