@@ -1,6 +1,6 @@
 AC_PREREQ(2.52)
 
-AC_INIT(ModemManager, 0.3.998, dcbw@redhat.com, ModemManager)
+AC_INIT(ModemManager, 0.4, dcbw@redhat.com, ModemManager)
 AM_INIT_AUTOMAKE([1.9 subdir-objects tar-ustar no-dist-gzip dist-bzip2])
 AM_MAINTAINER_MODE
 
