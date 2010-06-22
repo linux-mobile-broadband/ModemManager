@@ -194,6 +194,7 @@ sms_auth_info_new (guint num1,
 
             dst = g_slice_new0 (GValue);
             g_value_init (dst, G_VALUE_TYPE (src));
+            g_value_copy (src, dst);
             g_hash_table_insert (info->hash, g_strdup (str_key), dst);
         }
     }
