@@ -805,6 +805,14 @@ mm_modem_init (gpointer g_iface)
 
     g_object_interface_install_property
         (g_iface,
+         g_param_spec_string (MM_MODEM_EQUIPMENT_IDENTITY,
+                               "EquipmentIdentiy",
+                               "The equipment identity of the device",
+                               NULL,
+                               G_PARAM_READABLE));
+
+    g_object_interface_install_property
+        (g_iface,
          g_param_spec_string (MM_MODEM_UNLOCK_REQUIRED,
                                "UnlockRequired",
                                "Whether or not the modem requires an unlock "

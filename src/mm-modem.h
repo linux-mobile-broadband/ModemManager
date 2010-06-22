@@ -58,8 +58,9 @@ typedef enum {
 #define MM_MODEM_TYPE          "type"
 #define MM_MODEM_IP_METHOD     "ip-method"
 #define MM_MODEM_ENABLED       "enabled"
+#define MM_MODEM_EQUIPMENT_IDENTITY "equipment-identity"
 #define MM_MODEM_UNLOCK_REQUIRED  "unlock-required"
-#define MM_MODEM_UNLOCK_RETRIES  "unlock-retries"
+#define MM_MODEM_UNLOCK_RETRIES   "unlock-retries"
 #define MM_MODEM_VALID         "valid"      /* not exported */
 #define MM_MODEM_PLUGIN        "plugin"     /* not exported */
 #define MM_MODEM_STATE         "state"      /* not exported */
@@ -84,6 +85,7 @@ typedef enum {
     MM_MODEM_PROP_PLUGIN,      /* Not exported */
     MM_MODEM_PROP_STATE,       /* Not exported */
     MM_MODEM_PROP_ENABLED,
+    MM_MODEM_PROP_EQUIPMENT_IDENTITY,
     MM_MODEM_PROP_UNLOCK_REQUIRED,
     MM_MODEM_PROP_UNLOCK_RETRIES
 } MMModemProp;

@@ -290,6 +290,18 @@ check_pin (MMGenericGsm *modem,
     mm_at_serial_port_queue_command (priv->primary, "+CPIN?", 3, pin_check_done, info);
 }
 
+static void
+get_imei_cb (MMModem *modem,
+             const char *result,
+             GError *error,
+             gpointer user_data)
+{
+    if (modem) {
+        mm_modem_base_set_equipment_identity (MM_MODEM_BASE (modem), error ? "" : result);
+        mm_serial_port_close (MM_SERIAL_PORT (MM_GENERIC_GSM_GET_PRIVATE (modem)->primary));
+    }
+}
+
 /*****************************************************************************/
 
 void
@@ -403,6 +415,34 @@ initial_pin_check (MMGenericGsm *self)
     }
 }
 
+static void
+initial_imei_check (MMGenericGsm *self)
+{
+    GError *error = NULL;
+    MMGenericGsmPrivate *priv;
+
+    g_return_if_fail (MM_IS_GENERIC_GSM (self));
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    g_return_if_fail (priv->primary != NULL);
+
+    if (mm_serial_port_open (MM_SERIAL_PORT (priv->primary), &error)) {
+        /* Make sure echoing is off */
+        mm_at_serial_port_queue_command (priv->primary, "E0", 3, NULL, NULL);
+
+        /* Get modem's imei number */
+        mm_modem_gsm_card_get_imei (MM_MODEM_GSM_CARD (self),
+                                    get_imei_cb,
+                                    NULL);
+    } else {
+        g_warning ("%s: failed to open serial port: (%d) %s",
+                   __func__,
+                   error ? error->code : -1,
+                   error && error->message ? error->message : "(unknown)");
+        g_clear_error (&error);
+    }
+}
+
 static gboolean
 owns_port (MMModem *modem, const char *subsys, const char *name)
 {
@@ -455,6 +495,9 @@ mm_generic_gsm_grab_port (MMGenericGsm *self,
 
             /* Get modem's initial lock/unlock state */
             initial_pin_check (self);
+
+            /* Get modem's IMEI number */
+            initial_imei_check (self);
 
         } else if (ptype == MM_PORT_TYPE_SECONDARY)
             priv->secondary = MM_AT_SERIAL_PORT (port);

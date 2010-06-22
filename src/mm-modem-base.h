@@ -62,6 +62,11 @@ void mm_modem_base_set_valid (MMModemBase *self,
 
 gboolean mm_modem_base_get_valid (MMModemBase *self);
 
+const char *mm_modem_base_get_equipment_identity (MMModemBase *self);
+
+void mm_modem_base_set_equipment_identity (MMModemBase *self,
+                                           const char *equipment_identity);
+
 const char *mm_modem_base_get_unlock_required (MMModemBase *self);
 
 void mm_modem_base_set_unlock_required (MMModemBase *self,

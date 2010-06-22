@@ -113,6 +113,13 @@
       </tp:docstring>
     </property>
 
+    <property name="EquipmentIdentity" type="s" access="read">
+      <tp:docstring>
+        The EquipmentIdentity of the device. This will be the IMEI number for
+        GSM devices and the hex-format ESN/MEID for CDMA devices.
+      </tp:docstring>
+    </property>
+
     <property name="UnlockRequired" type="s" access="read">
       <tp:docstring>
         Empty if the device is usable without an unlock code or has already
