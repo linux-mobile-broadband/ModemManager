@@ -626,7 +626,7 @@ supports_callback (MMPlugin *plugin,
     if (next_plugin) {
         const char *next_name = mm_plugin_get_name (next_plugin);
 
-        if (info->best_plugin && strcmp (next_name, MM_PLUGIN_GENERIC_NAME))
+        if (info->best_plugin && !strcmp (next_name, MM_PLUGIN_GENERIC_NAME))
             next_plugin = NULL;
     }
 
