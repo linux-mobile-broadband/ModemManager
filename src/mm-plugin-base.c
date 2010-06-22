@@ -31,6 +31,7 @@
 #include "mm-serial-parsers.h"
 #include "mm-errors.h"
 #include "mm-marshal.h"
+#include "mm-utils.h"
 #include "libqcdm/src/commands.h"
 #include "libqcdm/src/utils.h"
 
@@ -881,33 +882,6 @@ modem_destroyed (gpointer data, GObject *modem)
     g_hash_table_remove_all (cached_caps);
 }
 
-/* From hostap, Copyright (c) 2002-2005, Jouni Malinen <jkmaline@cc.hut.fi> */
-
-static int hex2num (char c)
-{
-	if (c >= '0' && c <= '9')
-		return c - '0';
-	if (c >= 'a' && c <= 'f')
-		return c - 'a' + 10;
-	if (c >= 'A' && c <= 'F')
-		return c - 'A' + 10;
-	return -1;
-}
-
-static int hex2byte (const char *hex)
-{
-	int a, b;
-	a = hex2num(*hex++);
-	if (a < 0)
-		return -1;
-	b = hex2num(*hex++);
-	if (b < 0)
-		return -1;
-	return (a << 4) | b;
-}
-
-/* End from hostap */
-
 gboolean
 mm_plugin_base_get_device_ids (MMPluginBase *self,
                                const char *subsys,
@@ -940,8 +914,8 @@ mm_plugin_base_get_device_ids (MMPluginBase *self,
         goto out;
 
     if (vendor) {
-        *vendor = (guint16) (hex2byte (vid + 2) & 0xFF);
-        *vendor |= (guint16) ((hex2byte (vid) & 0xFF) << 8);
+        *vendor = (guint16) (utils_hex2byte (vid + 2) & 0xFF);
+        *vendor |= (guint16) ((utils_hex2byte (vid) & 0xFF) << 8);
     }
 
     pid = g_udev_device_get_property (device, "ID_MODEL_ID");
@@ -951,8 +925,8 @@ mm_plugin_base_get_device_ids (MMPluginBase *self,
     }
 
     if (product) {
-        *product = (guint16) (hex2byte (pid + 2) & 0xFF);
-        *product |= (guint16) ((hex2byte (pid) & 0xFF) << 8);
+        *product = (guint16) (utils_hex2byte (pid + 2) & 0xFF);
+        *product |= (guint16) ((utils_hex2byte (pid) & 0xFF) << 8);
     }
 
     success = TRUE;

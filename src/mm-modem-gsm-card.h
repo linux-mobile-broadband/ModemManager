@@ -53,6 +53,10 @@ struct _MMModemGsmCard {
                               MMModemUIntFn callback,
                               gpointer user_data);
 
+    void (*get_operator_id) (MMModemGsmCard *self,
+                             MMModemStringFn callback,
+                             gpointer user_data);
+
     void (*send_puk) (MMModemGsmCard *self,
                       const char *puk,
                       const char *pin,
@@ -91,6 +95,10 @@ void mm_modem_gsm_card_get_unlock_retries (MMModemGsmCard *self,
                                            const char *pin_type,
                                            MMModemUIntFn callback,
                                            gpointer user_data);
+
+void mm_modem_gsm_card_get_operator_id (MMModemGsmCard *self,
+                                        MMModemStringFn callback,
+                                        gpointer user_data);
 
 void mm_modem_gsm_card_send_puk (MMModemGsmCard *self,
                                  const char *puk,

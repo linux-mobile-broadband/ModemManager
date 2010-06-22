@@ -12,7 +12,7 @@
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
  * Copyright (C) 2009 - 2010 Red Hat, Inc.
- * Copyright (C) 2009 Ericsson
+ * Copyright (C) 2009 - 2010 Ericsson
  */
 
 #include <config.h>
@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+
 #include "mm-generic-gsm.h"
 #include "mm-modem-gsm-card.h"
 #include "mm-modem-gsm-network.h"
@@ -33,6 +34,7 @@
 #include "mm-modem-helpers.h"
 #include "mm-options.h"
 #include "mm-properties-changed-signal.h"
+#include "mm-utils.h"
 
 static void modem_init (MMModem *modem_class);
 static void modem_gsm_card_init (MMModemGsmCard *gsm_card_class);
@@ -1176,6 +1178,110 @@ get_string_done (MMAtSerialPort *port,
 }
 
 static void
+get_mnc_length_done (MMAtSerialPort *port,
+                     GString *response,
+                     GError *error,
+                     gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    int sw1, sw2;
+    const char *imsi;
+    gboolean success = FALSE;
+    char hex[51];
+    char *bin;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        goto done;
+    }
+
+    memset (hex, 0, sizeof (hex));
+    if (sscanf (response->str, "+CRSM:%d,%d,\"%50c\"", &sw1, &sw2, (char *) &hex) == 3)
+        success = TRUE;
+    else {
+        /* May not include quotes... */
+        if (sscanf (response->str, "+CRSM:%d,%d,%50c", &sw1, &sw2, (char *) &hex) == 3)
+            success = TRUE;
+    }
+
+    if (!success) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse the CRSM response");
+        goto done;
+    }
+
+    if ((sw1 == 0x90 && sw2 == 0x00) || (sw1 == 0x91) || (sw1 == 0x92) || (sw1 == 0x9f)) {
+        gsize buflen = 0;
+        guint32 mnc_len;
+
+        /* Make sure the buffer is only hex characters */
+        while (buflen < sizeof (hex) && hex[buflen]) {
+            if (!isxdigit (hex[buflen])) {
+                hex[buflen] = 0x0;
+                break;
+            }
+            buflen++;
+        }
+
+        /* Convert hex string to binary */
+        bin = utils_hexstr2bin (hex, &buflen);
+        if (!bin || buflen < 4) {
+            info->error = g_error_new (MM_MODEM_ERROR,
+                                       MM_MODEM_ERROR_GENERAL,
+                                       "SIM returned malformed response '%s'",
+                                       hex);
+            goto done;
+        }
+
+        /* MNC length is byte 4 of this SIM file */
+        mnc_len = bin[3] & 0xFF;
+        if (mnc_len == 2 || mnc_len == 3) {
+            imsi = mm_callback_info_get_data (info, "imsi");
+            mm_callback_info_set_result (info, g_strndup (imsi, 3 + mnc_len), g_free);
+        } else {
+            info->error = g_error_new (MM_MODEM_ERROR,
+                                       MM_MODEM_ERROR_GENERAL,
+                                       "SIM returned invalid MNC length %d (should be either 2 or 3)",
+                                       mnc_len);
+        }
+    } else {
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "SIM failed to handle CRSM request (sw1 %d sw2 %d)",
+                                   sw1, sw2);
+    }
+
+done:
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_operator_id_imsi_done (MMModem *modem,
+                           const char *result,
+                           GError *error,
+                           gpointer user_data)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_callback_info_set_data (info, "imsi", g_strdup (result), g_free);
+
+    /* READ BINARY of EFad (Administrative Data) ETSI 51.011 section 10.3.18 */
+    mm_at_serial_port_queue_command_cached (priv->primary,
+                                            "+CRSM=176,28589,0,0,4",
+                                            3,
+                                            get_mnc_length_done,
+                                            info);
+}
+
+static void
 get_imei (MMModemGsmCard *modem,
           MMModemStringFn callback,
           gpointer user_data)
@@ -1197,6 +1303,19 @@ get_imsi (MMModemGsmCard *modem,
 
     info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
     mm_at_serial_port_queue_command_cached (priv->primary, "+CIMI", 3, get_string_done, info);
+}
+
+static void
+get_operator_id (MMModemGsmCard *modem,
+                 MMModemStringFn callback,
+                 gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
+    mm_modem_gsm_card_get_imsi (MM_MODEM_GSM_CARD (modem),
+                                get_operator_id_imsi_done,
+                                info);
 }
 
 static void
@@ -3615,6 +3734,7 @@ modem_gsm_card_init (MMModemGsmCard *class)
 {
     class->get_imei = get_imei;
     class->get_imsi = get_imsi;
+    class->get_operator_id = get_operator_id;
     class->send_pin = send_pin;
     class->send_puk = send_puk;
     class->enable_pin = enable_pin;
