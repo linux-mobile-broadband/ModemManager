@@ -43,6 +43,7 @@ typedef struct {
     char *plugin;
     char *device;
     char *unlock_required;
+    guint32 unlock_retries;
     guint32 ip_method;
     gboolean valid;
     MMModemState state;
@@ -230,6 +231,41 @@ mm_modem_base_set_unlock_required (MMModemBase *self, const char *unlock_require
     }
 
     g_object_notify (G_OBJECT (self), MM_MODEM_UNLOCK_REQUIRED);
+}
+
+guint32
+mm_modem_base_get_unlock_retries (MMModemBase *self)
+{
+    g_return_val_if_fail (self != NULL, 0);
+    g_return_val_if_fail (MM_IS_MODEM_BASE (self), 0);
+
+    return MM_MODEM_BASE_GET_PRIVATE (self)->unlock_retries;
+}
+
+void
+mm_modem_base_set_unlock_retries (MMModemBase *self, guint unlock_retries)
+{
+    MMModemBasePrivate *priv;
+    const char *dbus_path;
+
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_MODEM_BASE (self));
+
+    priv = MM_MODEM_BASE_GET_PRIVATE (self);
+
+    /* Only do something if the value changes */
+    if (priv->unlock_retries == unlock_retries)
+        return;
+
+    priv->unlock_retries = unlock_retries;
+
+    dbus_path = (const char *) g_object_get_data (G_OBJECT (self), DBUS_PATH_TAG);
+    if (dbus_path) {
+        g_message ("Modem %s: # unlock retries for %s is %d",
+                   dbus_path, priv->unlock_required, priv->unlock_retries);
+    }
+
+    g_object_notify (G_OBJECT (self), MM_MODEM_UNLOCK_RETRIES);
 }
 
 const char *
@@ -490,6 +526,9 @@ mm_modem_base_init (MMModemBase *self)
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_UNLOCK_REQUIRED,
                                                     MM_MODEM_DBUS_INTERFACE);
+    mm_properties_changed_signal_register_property (G_OBJECT (self),
+                                                    MM_MODEM_UNLOCK_RETRIES,
+                                                    MM_MODEM_DBUS_INTERFACE);
 }
 
 static void
@@ -539,6 +578,7 @@ set_property (GObject *object, guint prop_id,
     case MM_MODEM_PROP_TYPE:
     case MM_MODEM_PROP_ENABLED:
     case MM_MODEM_PROP_UNLOCK_REQUIRED:
+    case MM_MODEM_PROP_UNLOCK_RETRIES:
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -582,6 +622,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case MM_MODEM_PROP_UNLOCK_REQUIRED:
         g_value_set_string (value, priv->unlock_required);
+        break;
+    case MM_MODEM_PROP_UNLOCK_RETRIES:
+        g_value_set_uint (value, priv->unlock_retries);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -657,6 +700,10 @@ mm_modem_base_class_init (MMModemBaseClass *klass)
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_UNLOCK_REQUIRED,
                                       MM_MODEM_UNLOCK_REQUIRED);
+
+    g_object_class_override_property (object_class,
+                                      MM_MODEM_PROP_UNLOCK_RETRIES,
+                                      MM_MODEM_UNLOCK_RETRIES);
 
     mm_properties_changed_signal_new (object_class);
 }

@@ -67,6 +67,12 @@ const char *mm_modem_base_get_unlock_required (MMModemBase *self);
 void mm_modem_base_set_unlock_required (MMModemBase *self,
                                         const char *unlock_required);
 
+guint mm_modem_base_get_unlock_retries (MMModemBase *self);
+
+void mm_modem_base_set_unlock_retries (MMModemBase *self,
+                                        guint unlock_retries);
+
+
 const char *mm_modem_base_get_manf (MMModemBase *self);
 void        mm_modem_base_set_manf (MMModemBase *self, const char *manf);
 

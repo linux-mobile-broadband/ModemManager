@@ -125,6 +125,13 @@
       </tp:docstring>
     </property>
 
+    <property name="UnlockRetries" type="u" access="read">
+      <tp:docstring>
+        The number of unlock retries remaining for the unlock code given by the property UnlockRequired, or 999 if
+        the device does not support reporting unlock retries.
+      </tp:docstring>
+    </property>
+
     <property name="IpMethod" type="u" access="read" tp:type="MM_MODEM_IP_METHOD">
       <tp:docstring>
         The IP configuration method.

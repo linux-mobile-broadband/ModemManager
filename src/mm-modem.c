@@ -812,6 +812,14 @@ mm_modem_init (gpointer g_iface)
                                NULL,
                                G_PARAM_READABLE));
 
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_uint (MM_MODEM_UNLOCK_RETRIES,
+                               "UnlockRetries",
+                               "The remaining number of unlock attempts",
+                               0, G_MAXUINT32, 0,
+                               G_PARAM_READABLE));
+
     /* Signals */
     g_signal_new ("state-changed",
                   iface_type,

@@ -28,17 +28,20 @@
 
 #include "mm-modem-mbm.h"
 #include "mm-modem-simple.h"
+#include "mm-modem-gsm-card.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 
 static void modem_init (MMModem *modem_class);
 static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
 static void modem_simple_init (MMModemSimple *class);
+static void modem_gsm_card_init (MMModemGsmCard *class);
 
 G_DEFINE_TYPE_EXTENDED (MMModemMbm, mm_modem_mbm, MM_TYPE_GENERIC_GSM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_SIMPLE, modem_simple_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_SIMPLE, modem_simple_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_CARD, modem_gsm_card_init))
 
 #define MM_MODEM_MBM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_MBM, MMModemMbmPrivate))
 
@@ -736,6 +739,91 @@ mbm_modem_authenticate (MMModemMbm *self,
 
 /*****************************************************************************/
 
+static void
+send_epin_done (MMAtSerialPort *port,
+                GString *response,
+                GError *error,
+                gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    const char *pin_type;
+    int attempts_left = 0;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        goto done;
+    }
+
+    pin_type = mm_callback_info_get_data (info, "pin_type");
+
+    if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PIN))
+        sscanf (response->str, "*EPIN: %d", &attempts_left);
+    else if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PUK))
+        sscanf (response->str, "*EPIN: %*d, %d", &attempts_left);
+    else if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PIN2))
+        sscanf (response->str, "*EPIN: %*d, %*d, %d", &attempts_left);
+    else if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PUK2))
+        sscanf (response->str, "*EPIN: %*d, %*d, %*d, %d", &attempts_left);
+    else {
+        g_debug ("%s: unhandled pin type '%s'", __func__, pin_type);
+
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Unhandled PIN type");
+    }
+
+    if (attempts_left < 0 || attempts_left > 998) {
+        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Invalid PIN attempts left %d", attempts_left);
+        attempts_left = 0;
+    }
+
+    mm_callback_info_set_result (info, GUINT_TO_POINTER (attempts_left), NULL);
+
+done:
+    mm_serial_port_close (MM_SERIAL_PORT (port));
+    mm_callback_info_schedule (info);
+}
+
+static void
+mbm_get_unlock_retries (MMModemGsmCard *modem,
+                        const char *pin_type,
+                        MMModemUIntFn callback,
+                        gpointer user_data)
+{
+    MMAtSerialPort *port;
+    char *command;
+    MMCallbackInfo *info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+
+    g_debug ("%s: pin type '%s'", __func__, pin_type);
+
+    /* Ensure we have a usable port to use for the command */
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* Modem may not be enabled yet, which sometimes can't be done until
+     * the device has been unlocked.  In this case we have to open the port
+     * ourselves.
+     */
+    if (!mm_serial_port_open (MM_SERIAL_PORT (port), &info->error)) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* if the modem have not yet been enabled we need to make sure echoing is turned off */
+    command = g_strdup_printf ("E0");
+    mm_at_serial_port_queue_command (port, command, 3, NULL, NULL);
+    g_free (command);
+
+    mm_callback_info_set_data (info, "pin_type", g_strdup (pin_type), g_free);
+
+    command = g_strdup_printf ("*EPIN?");
+    mm_at_serial_port_queue_command (port, command, 3, send_epin_done, info);
+    g_free (command);
+}
+
+/*****************************************************************************/
+
 static gboolean
 grab_port (MMModem *modem,
            const char *subsys,
@@ -803,6 +891,12 @@ grab_port (MMModem *modem,
 }
 
 /*****************************************************************************/
+
+static void
+modem_gsm_card_init (MMModemGsmCard *class)
+{
+    class->get_unlock_retries = mbm_get_unlock_retries;
+}
 
 static void
 modem_gsm_network_init (MMModemGsmNetwork *class)

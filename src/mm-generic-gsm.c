@@ -206,6 +206,18 @@ error_for_unlock_required (const char *unlock)
 }
 
 static void
+get_unlock_retries_cb (MMModem *modem,
+                       guint32 result,
+                       GError *error,
+                       gpointer user_data)
+{
+    if (!error)
+        mm_modem_base_set_unlock_retries (MM_MODEM_BASE (modem), result);
+    else
+        mm_modem_base_set_unlock_retries (MM_MODEM_BASE (modem), MM_MODEM_GSM_CARD_UNLOCK_RETRIES_NOT_SUPPORTED);
+}
+
+static void
 pin_check_done (MMAtSerialPort *port,
                 GString *response,
                 GError *error,
@@ -221,6 +233,11 @@ pin_check_done (MMAtSerialPort *port,
 
         if (g_str_has_prefix (str, "READY")) {
             mm_modem_base_set_unlock_required (MM_MODEM_BASE (info->modem), NULL);
+            if (MM_MODEM_GSM_CARD_GET_INTERFACE (info->modem)->get_unlock_retries)
+                mm_modem_base_set_unlock_retries (MM_MODEM_BASE (info->modem), 0);
+            else
+                mm_modem_base_set_unlock_retries (MM_MODEM_BASE (info->modem),
+                                                  MM_MODEM_GSM_CARD_UNLOCK_RETRIES_NOT_SUPPORTED);
             parsed = TRUE;
         } else {
             CPinResult *iter = &unlock_results[0];
@@ -230,6 +247,10 @@ pin_check_done (MMAtSerialPort *port,
                 if (g_str_has_prefix (str, iter->result)) {
                     info->error = mm_mobile_error_for_code (iter->code);
                     mm_modem_base_set_unlock_required (MM_MODEM_BASE (info->modem), iter->normalized);
+                    mm_modem_gsm_card_get_unlock_retries (MM_MODEM_GSM_CARD (info->modem),
+                                                          iter->normalized,
+                                                          get_unlock_retries_cb,
+                                                          NULL);
                     parsed = TRUE;
                     break;
                 }
@@ -241,6 +262,7 @@ pin_check_done (MMAtSerialPort *port,
     if (!parsed) {
         /* Assume unlocked if we don't recognize the pin request result */
         mm_modem_base_set_unlock_required (MM_MODEM_BASE (info->modem), NULL);
+        mm_modem_base_set_unlock_retries (MM_MODEM_BASE (info->modem), 0);
 
         if (!info->error) {
             info->error = g_error_new (MM_MODEM_ERROR,
@@ -1377,6 +1399,21 @@ change_pin (MMModemGsmCard *modem,
     command = g_strdup_printf ("+CPWD=\"SC\",\"%s\",\"%s\"", old_pin, new_pin);
     mm_at_serial_port_queue_command (priv->primary, command, 3, change_pin_done, info);
     g_free (command);
+}
+
+static void
+get_unlock_retries (MMModemGsmCard *modem,
+                    const char *pin_type,
+                    MMModemUIntFn callback,
+                    gpointer user_data)
+{
+    MMCallbackInfo *info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+
+    mm_callback_info_set_result (info,
+                                 GUINT_TO_POINTER (MM_MODEM_GSM_CARD_UNLOCK_RETRIES_NOT_SUPPORTED),
+                                 NULL);
+
+    mm_callback_info_schedule (info);
 }
 
 static void
@@ -3539,6 +3576,7 @@ modem_gsm_card_init (MMModemGsmCard *class)
     class->send_puk = send_puk;
     class->enable_pin = enable_pin;
     class->change_pin = change_pin;
+    class->get_unlock_retries = get_unlock_retries;
 }
 
 static void
