@@ -299,7 +299,7 @@ get_imei_cb (MMModem *modem,
              gpointer user_data)
 {
     if (modem) {
-        mm_modem_base_set_equipment_identity (MM_MODEM_BASE (modem), error ? "" : result);
+        mm_modem_base_set_equipment_identifier (MM_MODEM_BASE (modem), error ? "" : result);
         mm_serial_port_close (MM_SERIAL_PORT (MM_GENERIC_GSM_GET_PRIVATE (modem)->primary));
     }
 }
