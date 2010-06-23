@@ -508,6 +508,59 @@ do_disconnect (MMGenericGsm *gsm,
     MM_GENERIC_GSM_CLASS (mm_modem_mbm_parent_class)->do_disconnect (gsm, cid, callback, user_data);
 }
 
+static void
+factory_reset_done (MMAtSerialPort *port,
+                    GString *response,
+                    GError *error,
+                    gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    mm_serial_port_close (MM_SERIAL_PORT (port));
+    mm_callback_info_schedule (info);
+}
+
+static void
+factory_reset (MMModem *self,
+               const char *code,
+               MMModemFn callback,
+               gpointer user_data)
+{
+    MMAtSerialPort *port;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new (self, callback, user_data);
+
+    /* Ensure we have a usable port to use for the command */
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (self), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* Modem may not be enabled yet, which sometimes can't be done until
+     * the device has been unlocked.  In this case we have to open the port
+     * ourselves.
+     */
+    if (!mm_serial_port_open (MM_SERIAL_PORT (port), &info->error)) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_at_serial_port_queue_command (port, "&F +CMEE=0", 3, NULL, NULL);
+    mm_at_serial_port_queue_command (port, "+COPS=0", 3, NULL, NULL);
+    mm_at_serial_port_queue_command (port, "+CR=0", 3, NULL, NULL);
+    mm_at_serial_port_queue_command (port, "+CRC=0", 3, NULL, NULL);
+    mm_at_serial_port_queue_command (port, "+CREG=0", 3, NULL, NULL);
+    mm_at_serial_port_queue_command (port, "+CMER=0", 3, NULL, NULL);
+    mm_at_serial_port_queue_command (port, "*EPEE=0", 3, NULL, NULL);
+    mm_at_serial_port_queue_command (port, "+CNMI=2, 0, 0, 0, 0", 3, NULL, NULL);
+    mm_at_serial_port_queue_command (port, "+CGREG=0", 3, NULL, NULL);
+    mm_at_serial_port_queue_command (port, "*EIAD=0", 3, NULL, NULL);
+    mm_at_serial_port_queue_command (port, "+CGSMS=3", 3, NULL, NULL);
+    mm_at_serial_port_queue_command (port, "+CSCA=\"\",129", 3, factory_reset_done, info);
+}
+
 /*****************************************************************************/
 
 static void
@@ -916,6 +969,7 @@ modem_init (MMModem *modem_class)
     modem_class->grab_port = grab_port;
     modem_class->disable = disable;
     modem_class->connect = do_connect;
+    modem_class->factory_reset = factory_reset;
 }
 
 static void
