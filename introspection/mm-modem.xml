@@ -81,6 +81,17 @@
       </arg>
     </method>
 
+    <method name="FactoryReset">
+      <tp:docstring>
+        Reset the modem to as close to factory state as possible.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_factory_reset"/>
+      <arg name="code" type="s" direction="in">
+        Carrier-supplied code required to reset the modem.  Ignored if not required.
+      </arg>
+    </method>
+
     <property name="Device" type="s" access="read">
       <tp:docstring>
 	The modem port to use for IP configuration and traffic.
