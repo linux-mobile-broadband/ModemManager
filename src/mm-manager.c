@@ -614,8 +614,17 @@ supports_callback (MMPlugin *plugin,
              * supports it.
              */
             next_plugin = existing_plugin;
-        } else
+        } else {
+            g_debug ("(%s/%s): plugin %p (%s) existing %p (%s) info->best %p (%s)",
+                     info->subsys, info->name,
+                     plugin,
+                     plugin ? mm_plugin_get_name (plugin) : "none",
+                     existing_plugin,
+                     existing_plugin ? mm_plugin_get_name (existing_plugin) : "none",
+                     info->best_plugin,
+                     info->best_plugin ? mm_plugin_get_name (info->best_plugin) : "none");
             g_assert_not_reached ();
+        }
     } else {
         info->cur_plugin = g_slist_next (info->cur_plugin);
         if (info->cur_plugin)
