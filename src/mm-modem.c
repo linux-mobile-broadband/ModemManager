@@ -28,6 +28,7 @@ static void impl_modem_connect (MMModem *modem, const char *number, DBusGMethodI
 static void impl_modem_disconnect (MMModem *modem, DBusGMethodInvocation *context);
 static void impl_modem_get_ip4_config (MMModem *modem, DBusGMethodInvocation *context);
 static void impl_modem_get_info (MMModem *modem, DBusGMethodInvocation *context);
+static void impl_modem_factory_reset (MMModem *modem, const char *code, DBusGMethodInvocation *context);
 
 #include "mm-modem-glue.h"
 
@@ -476,6 +477,62 @@ impl_modem_get_info (MMModem *modem,
 
 /*****************************************************************************/
 
+static void
+factory_reset_auth_cb (MMAuthRequest *req,
+                       GObject *owner,
+                       DBusGMethodInvocation *context,
+                       gpointer user_data)
+{
+    MMModem *self = MM_MODEM (owner);
+    const char *code = user_data;
+    GError *error = NULL;
+
+    /* Return any authorization error, otherwise try to reset the modem */
+    if (!mm_modem_auth_finish (self, req, &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    } else
+        mm_modem_factory_reset (self, code, async_call_done, context);
+}
+
+static void
+impl_modem_factory_reset (MMModem *modem,
+                          const char *code,
+                          DBusGMethodInvocation *context)
+{
+    GError *error = NULL;
+
+    /* Make sure the caller is authorized to reset the device */
+    if (!mm_modem_auth_request (MM_MODEM (modem),
+                                MM_AUTHORIZATION_DEVICE_CONTROL,
+                                context,
+                                factory_reset_auth_cb,
+                                g_strdup (code),
+                                g_free,
+                                &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    }
+}
+
+void
+mm_modem_factory_reset (MMModem *self,
+                        const char *code,
+                        MMModemFn callback,
+                        gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM (self));
+    g_return_if_fail (callback != NULL);
+    g_return_if_fail (code != NULL);
+
+    if (MM_MODEM_GET_INTERFACE (self)->factory_reset)
+        MM_MODEM_GET_INTERFACE (self)->factory_reset (self, code, callback, user_data);
+    else
+        async_op_not_supported (self, callback, user_data);
+}
+
+/*****************************************************************************/
+
 void
 mm_modem_get_supported_charsets (MMModem *self,
                                  MMModemUIntFn callback,
@@ -805,11 +862,27 @@ mm_modem_init (gpointer g_iface)
 
     g_object_interface_install_property
         (g_iface,
+         g_param_spec_string (MM_MODEM_EQUIPMENT_IDENTIFIER,
+                               "EquipmentIdentifier",
+                               "The equipment identifier of the device",
+                               NULL,
+                               G_PARAM_READABLE));
+
+    g_object_interface_install_property
+        (g_iface,
          g_param_spec_string (MM_MODEM_UNLOCK_REQUIRED,
                                "UnlockRequired",
                                "Whether or not the modem requires an unlock "
                                "code to become usable, and if so, which unlock code is required",
                                NULL,
+                               G_PARAM_READABLE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_uint (MM_MODEM_UNLOCK_RETRIES,
+                               "UnlockRetries",
+                               "The remaining number of unlock attempts",
+                               0, G_MAXUINT32, 0,
                                G_PARAM_READABLE));
 
     /* Signals */

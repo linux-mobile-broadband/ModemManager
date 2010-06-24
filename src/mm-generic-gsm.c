@@ -12,7 +12,7 @@
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
  * Copyright (C) 2009 - 2010 Red Hat, Inc.
- * Copyright (C) 2009 Ericsson
+ * Copyright (C) 2009 - 2010 Ericsson
  */
 
 #include <config.h>
@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+
 #include "mm-generic-gsm.h"
 #include "mm-modem-gsm-card.h"
 #include "mm-modem-gsm-network.h"
@@ -33,6 +34,7 @@
 #include "mm-modem-helpers.h"
 #include "mm-options.h"
 #include "mm-properties-changed-signal.h"
+#include "mm-utils.h"
 
 static void modem_init (MMModem *modem_class);
 static void modem_gsm_card_init (MMModemGsmCard *gsm_card_class);
@@ -208,6 +210,18 @@ error_for_unlock_required (const char *unlock)
 }
 
 static void
+get_unlock_retries_cb (MMModem *modem,
+                       guint32 result,
+                       GError *error,
+                       gpointer user_data)
+{
+    if (!error)
+        mm_modem_base_set_unlock_retries (MM_MODEM_BASE (modem), result);
+    else
+        mm_modem_base_set_unlock_retries (MM_MODEM_BASE (modem), MM_MODEM_GSM_CARD_UNLOCK_RETRIES_NOT_SUPPORTED);
+}
+
+static void
 pin_check_done (MMAtSerialPort *port,
                 GString *response,
                 GError *error,
@@ -223,6 +237,11 @@ pin_check_done (MMAtSerialPort *port,
 
         if (g_str_has_prefix (str, "READY")) {
             mm_modem_base_set_unlock_required (MM_MODEM_BASE (info->modem), NULL);
+            if (MM_MODEM_GSM_CARD_GET_INTERFACE (info->modem)->get_unlock_retries)
+                mm_modem_base_set_unlock_retries (MM_MODEM_BASE (info->modem), 0);
+            else
+                mm_modem_base_set_unlock_retries (MM_MODEM_BASE (info->modem),
+                                                  MM_MODEM_GSM_CARD_UNLOCK_RETRIES_NOT_SUPPORTED);
             parsed = TRUE;
         } else {
             CPinResult *iter = &unlock_results[0];
@@ -232,6 +251,10 @@ pin_check_done (MMAtSerialPort *port,
                 if (g_str_has_prefix (str, iter->result)) {
                     info->error = mm_mobile_error_for_code (iter->code);
                     mm_modem_base_set_unlock_required (MM_MODEM_BASE (info->modem), iter->normalized);
+                    mm_modem_gsm_card_get_unlock_retries (MM_MODEM_GSM_CARD (info->modem),
+                                                          iter->normalized,
+                                                          get_unlock_retries_cb,
+                                                          NULL);
                     parsed = TRUE;
                     break;
                 }
@@ -243,6 +266,7 @@ pin_check_done (MMAtSerialPort *port,
     if (!parsed) {
         /* Assume unlocked if we don't recognize the pin request result */
         mm_modem_base_set_unlock_required (MM_MODEM_BASE (info->modem), NULL);
+        mm_modem_base_set_unlock_retries (MM_MODEM_BASE (info->modem), 0);
 
         if (!info->error) {
             info->error = g_error_new (MM_MODEM_ERROR,
@@ -268,6 +292,18 @@ check_pin (MMGenericGsm *modem,
     priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
     mm_at_serial_port_queue_command (priv->primary, "+CPIN?", 3, pin_check_done, info);
+}
+
+static void
+get_imei_cb (MMModem *modem,
+             const char *result,
+             GError *error,
+             gpointer user_data)
+{
+    if (modem) {
+        mm_modem_base_set_equipment_identifier (MM_MODEM_BASE (modem), error ? "" : result);
+        mm_serial_port_close (MM_SERIAL_PORT (MM_GENERIC_GSM_GET_PRIVATE (modem)->primary));
+    }
 }
 
 /*****************************************************************************/
@@ -412,6 +448,34 @@ initial_pin_check (MMGenericGsm *self)
     }
 }
 
+static void
+initial_imei_check (MMGenericGsm *self)
+{
+    GError *error = NULL;
+    MMGenericGsmPrivate *priv;
+
+    g_return_if_fail (MM_IS_GENERIC_GSM (self));
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    g_return_if_fail (priv->primary != NULL);
+
+    if (mm_serial_port_open (MM_SERIAL_PORT (priv->primary), &error)) {
+        /* Make sure echoing is off */
+        mm_at_serial_port_queue_command (priv->primary, "E0", 3, NULL, NULL);
+
+        /* Get modem's imei number */
+        mm_modem_gsm_card_get_imei (MM_MODEM_GSM_CARD (self),
+                                    get_imei_cb,
+                                    NULL);
+    } else {
+        g_warning ("%s: failed to open serial port: (%d) %s",
+                   __func__,
+                   error ? error->code : -1,
+                   error && error->message ? error->message : "(unknown)");
+        g_clear_error (&error);
+    }
+}
+
 static gboolean
 owns_port (MMModem *modem, const char *subsys, const char *name)
 {
@@ -464,6 +528,9 @@ mm_generic_gsm_grab_port (MMGenericGsm *self,
 
             /* Get modem's initial lock/unlock state */
             initial_pin_check (self);
+
+            /* Get modem's IMEI number */
+            initial_imei_check (self);
 
         } else if (ptype == MM_PORT_TYPE_SECONDARY)
             priv->secondary = MM_AT_SERIAL_PORT (port);
@@ -1149,6 +1216,110 @@ get_string_done (MMAtSerialPort *port,
 }
 
 static void
+get_mnc_length_done (MMAtSerialPort *port,
+                     GString *response,
+                     GError *error,
+                     gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    int sw1, sw2;
+    const char *imsi;
+    gboolean success = FALSE;
+    char hex[51];
+    char *bin;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        goto done;
+    }
+
+    memset (hex, 0, sizeof (hex));
+    if (sscanf (response->str, "+CRSM:%d,%d,\"%50c\"", &sw1, &sw2, (char *) &hex) == 3)
+        success = TRUE;
+    else {
+        /* May not include quotes... */
+        if (sscanf (response->str, "+CRSM:%d,%d,%50c", &sw1, &sw2, (char *) &hex) == 3)
+            success = TRUE;
+    }
+
+    if (!success) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse the CRSM response");
+        goto done;
+    }
+
+    if ((sw1 == 0x90 && sw2 == 0x00) || (sw1 == 0x91) || (sw1 == 0x92) || (sw1 == 0x9f)) {
+        gsize buflen = 0;
+        guint32 mnc_len;
+
+        /* Make sure the buffer is only hex characters */
+        while (buflen < sizeof (hex) && hex[buflen]) {
+            if (!isxdigit (hex[buflen])) {
+                hex[buflen] = 0x0;
+                break;
+            }
+            buflen++;
+        }
+
+        /* Convert hex string to binary */
+        bin = utils_hexstr2bin (hex, &buflen);
+        if (!bin || buflen < 4) {
+            info->error = g_error_new (MM_MODEM_ERROR,
+                                       MM_MODEM_ERROR_GENERAL,
+                                       "SIM returned malformed response '%s'",
+                                       hex);
+            goto done;
+        }
+
+        /* MNC length is byte 4 of this SIM file */
+        mnc_len = bin[3] & 0xFF;
+        if (mnc_len == 2 || mnc_len == 3) {
+            imsi = mm_callback_info_get_data (info, "imsi");
+            mm_callback_info_set_result (info, g_strndup (imsi, 3 + mnc_len), g_free);
+        } else {
+            info->error = g_error_new (MM_MODEM_ERROR,
+                                       MM_MODEM_ERROR_GENERAL,
+                                       "SIM returned invalid MNC length %d (should be either 2 or 3)",
+                                       mnc_len);
+        }
+    } else {
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "SIM failed to handle CRSM request (sw1 %d sw2 %d)",
+                                   sw1, sw2);
+    }
+
+done:
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_operator_id_imsi_done (MMModem *modem,
+                           const char *result,
+                           GError *error,
+                           gpointer user_data)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_callback_info_set_data (info, "imsi", g_strdup (result), g_free);
+
+    /* READ BINARY of EFad (Administrative Data) ETSI 51.011 section 10.3.18 */
+    mm_at_serial_port_queue_command_cached (priv->primary,
+                                            "+CRSM=176,28589,0,0,4",
+                                            3,
+                                            get_mnc_length_done,
+                                            info);
+}
+
+static void
 get_imei (MMModemGsmCard *modem,
           MMModemStringFn callback,
           gpointer user_data)
@@ -1170,6 +1341,19 @@ get_imsi (MMModemGsmCard *modem,
 
     info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
     mm_at_serial_port_queue_command_cached (priv->primary, "+CIMI", 3, get_string_done, info);
+}
+
+static void
+get_operator_id (MMModemGsmCard *modem,
+                 MMModemStringFn callback,
+                 gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
+    mm_modem_gsm_card_get_imsi (MM_MODEM_GSM_CARD (modem),
+                                get_operator_id_imsi_done,
+                                info);
 }
 
 static void
@@ -1415,6 +1599,21 @@ change_pin (MMModemGsmCard *modem,
     command = g_strdup_printf ("+CPWD=\"SC\",\"%s\",\"%s\"", old_pin, new_pin);
     mm_at_serial_port_queue_command (priv->primary, command, 3, change_pin_done, info);
     g_free (command);
+}
+
+static void
+get_unlock_retries (MMModemGsmCard *modem,
+                    const char *pin_type,
+                    MMModemUIntFn callback,
+                    gpointer user_data)
+{
+    MMCallbackInfo *info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+
+    mm_callback_info_set_result (info,
+                                 GUINT_TO_POINTER (MM_MODEM_GSM_CARD_UNLOCK_RETRIES_NOT_SUPPORTED),
+                                 NULL);
+
+    mm_callback_info_schedule (info);
 }
 
 static void
@@ -3603,10 +3802,12 @@ modem_gsm_card_init (MMModemGsmCard *class)
 {
     class->get_imei = get_imei;
     class->get_imsi = get_imsi;
+    class->get_operator_id = get_operator_id;
     class->send_pin = send_pin;
     class->send_puk = send_puk;
     class->enable_pin = enable_pin;
     class->change_pin = change_pin;
+    class->get_unlock_retries = get_unlock_retries;
 }
 
 static void

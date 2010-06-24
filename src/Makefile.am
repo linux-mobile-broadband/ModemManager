@@ -20,7 +20,9 @@ libmodem_helpers_la_SOURCES = \
 	mm-modem-helpers.c \
 	mm-modem-helpers.h \
 	mm-charsets.c \
-	mm-charsets.h
+	mm-charsets.h \
+	mm-utils.c \
+	mm-utils.h
 
 sbin_PROGRAMS = modem-manager
 

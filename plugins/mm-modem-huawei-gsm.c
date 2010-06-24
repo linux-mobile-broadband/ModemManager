@@ -17,12 +17,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
 #define G_UDEV_API_IS_SUBJECT_TO_CHANGE
 #include <gudev/gudev.h>
 
 #include "mm-modem-huawei-gsm.h"
 #include "mm-modem-gsm-network.h"
+#include "mm-modem-gsm-card.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 #include "mm-at-serial-port.h"
@@ -30,10 +32,12 @@
 
 static void modem_init (MMModem *modem_class);
 static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
+static void modem_gsm_card_init (MMModemGsmCard *gsm_card_class);
 
 G_DEFINE_TYPE_EXTENDED (MMModemHuaweiGsm, mm_modem_huawei_gsm, MM_TYPE_GENERIC_GSM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_CARD, modem_gsm_card_init))
 
 
 #define MM_MODEM_HUAWEI_GSM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_HUAWEI_GSM, MMModemHuaweiGsmPrivate))
@@ -448,6 +452,141 @@ get_access_technology (MMGenericGsm *modem,
 }
 
 /*****************************************************************************/
+
+static gboolean
+parse_num (const char *str, guint32 *out_num, guint32 min, guint32 max)
+{
+    unsigned long int tmp;
+
+    if (!str || !strlen (str))
+        return FALSE;
+
+    errno = 0;
+    tmp = strtoul (str, NULL, 10);
+    if (errno != 0 || tmp < min || tmp > max)
+        return FALSE;
+    *out_num = (guint32) tmp;
+    return TRUE;
+}
+
+static void
+send_huawei_cpin_done (MMAtSerialPort *port,
+                       GString *response,
+                       GError *error,
+                       gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    GRegex *r = NULL;
+    GMatchInfo *match_info = NULL;
+    const char *pin_type;
+    guint32 attempts_left = 0;
+    char *str = NULL;
+    guint32 num = 0;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        goto done;
+    }
+
+    pin_type = mm_callback_info_get_data (info, "pin_type");
+
+	r = g_regex_new ("\\^CPIN:\\s*([^,]+),[^,]*,(\\d+),(\\d+),(\\d+),(\\d+)", G_REGEX_UNGREEDY, 0, NULL);
+    if (!r) {
+        g_set_error_literal (&info->error,
+                             MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             "Could not parse ^CPIN results (error creating regex).");
+        goto done;
+    }
+
+    if (!g_regex_match_full (r, response->str, response->len, 0, 0, &match_info, &info->error)) {
+        g_set_error_literal (&info->error,
+                             MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             "Could not parse ^CPIN results (match failed).");
+        goto done;
+    }
+
+    if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PUK))
+        num = 2;
+    else if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PIN))
+        num = 3;
+    else if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PUK2))
+        num = 4;
+    else if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PIN2))
+        num = 5;
+    else {
+        g_debug ("%s: unhandled pin type '%s'", __func__, pin_type);
+
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Unhandled PIN type");
+    }
+
+    if (num > 0) {
+        gboolean success = FALSE;
+
+        str = g_match_info_fetch (match_info, num);
+        if (str) {
+            success = parse_num (str, &attempts_left, 0, 10);
+            g_free (str);
+        }
+
+        if (!success) {
+            info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                               MM_MODEM_ERROR_GENERAL,
+                                               "Could not parse ^CPIN results (missing or invalid match info).");
+        }
+    }
+
+    mm_callback_info_set_result (info, GUINT_TO_POINTER (attempts_left), NULL);
+
+    g_match_info_free (match_info);
+
+done:
+    if (r)
+        g_regex_unref (r);
+    mm_serial_port_close (MM_SERIAL_PORT (port));
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_unlock_retries (MMModemGsmCard *modem,
+                    const char *pin_type,
+                    MMModemUIntFn callback,
+                    gpointer user_data)
+{
+    MMAtSerialPort *port;
+    char *command;
+    MMCallbackInfo *info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+
+    g_debug ("%s: pin type '%s'", __func__, pin_type);
+
+    /* Ensure we have a usable port to use for the command */
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* Modem may not be enabled yet, which sometimes can't be done until
+     * the device has been unlocked.  In this case we have to open the port
+     * ourselves.
+     */
+    if (!mm_serial_port_open (MM_SERIAL_PORT (port), &info->error)) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* if the modem have not yet been enabled we need to make sure echoing is turned off */
+    command = g_strdup_printf ("E0");
+    mm_at_serial_port_queue_command (port, command, 3, NULL, NULL);
+    g_free (command);
+
+    mm_callback_info_set_data (info, "pin_type", g_strdup (pin_type), g_free);
+
+    command = g_strdup_printf ("^CPIN?");
+    mm_at_serial_port_queue_command (port, command, 3, send_huawei_cpin_done, info);
+    g_free (command);
+}
+
+/*****************************************************************************/
 /* Unsolicited message handlers */
 
 static void
@@ -624,6 +763,12 @@ modem_gsm_network_init (MMModemGsmNetwork *class)
 {
     class->set_band = set_band;
     class->get_band = get_band;
+}
+
+static void
+modem_gsm_card_init (MMModemGsmCard *class)
+{
+    class->get_unlock_retries = get_unlock_retries;
 }
 
 static void

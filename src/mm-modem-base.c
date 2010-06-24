@@ -42,7 +42,9 @@ typedef struct {
     char *driver;
     char *plugin;
     char *device;
+    char *equipment_ident;
     char *unlock_required;
+    guint32 unlock_retries;
     guint32 ip_method;
     gboolean valid;
     MMModemState state;
@@ -192,6 +194,45 @@ mm_modem_base_get_valid (MMModemBase *self)
 }
 
 const char *
+mm_modem_base_get_equipment_identifier (MMModemBase *self)
+{
+    g_return_val_if_fail (self != NULL, NULL);
+    g_return_val_if_fail (MM_IS_MODEM_BASE (self), NULL);
+
+    return MM_MODEM_BASE_GET_PRIVATE (self)->equipment_ident;
+}
+
+void
+mm_modem_base_set_equipment_identifier (MMModemBase *self, const char *ident)
+{
+    MMModemBasePrivate *priv;
+    const char *dbus_path;
+
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_MODEM_BASE (self));
+
+    priv = MM_MODEM_BASE_GET_PRIVATE (self);
+
+    /* Only do something if the value changes */
+    if (  (priv->equipment_ident == ident)
+       || (priv->equipment_ident && ident && !strcmp (priv->equipment_ident, ident)))
+       return;
+
+    g_free (priv->equipment_ident);
+    priv->equipment_ident = g_strdup (ident);
+
+    dbus_path = (const char *) g_object_get_data (G_OBJECT (self), DBUS_PATH_TAG);
+    if (dbus_path) {
+        if (priv->equipment_ident)
+            g_message ("Modem %s: Equipment identifier set (%s)", dbus_path, priv->equipment_ident);
+        else
+            g_message ("Modem %s: Equipment identifier not set", dbus_path);
+    }
+
+    g_object_notify (G_OBJECT (self), MM_MODEM_EQUIPMENT_IDENTIFIER);
+}
+
+const char *
 mm_modem_base_get_unlock_required (MMModemBase *self)
 {
     g_return_val_if_fail (self != NULL, NULL);
@@ -230,6 +271,41 @@ mm_modem_base_set_unlock_required (MMModemBase *self, const char *unlock_require
     }
 
     g_object_notify (G_OBJECT (self), MM_MODEM_UNLOCK_REQUIRED);
+}
+
+guint32
+mm_modem_base_get_unlock_retries (MMModemBase *self)
+{
+    g_return_val_if_fail (self != NULL, 0);
+    g_return_val_if_fail (MM_IS_MODEM_BASE (self), 0);
+
+    return MM_MODEM_BASE_GET_PRIVATE (self)->unlock_retries;
+}
+
+void
+mm_modem_base_set_unlock_retries (MMModemBase *self, guint unlock_retries)
+{
+    MMModemBasePrivate *priv;
+    const char *dbus_path;
+
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_MODEM_BASE (self));
+
+    priv = MM_MODEM_BASE_GET_PRIVATE (self);
+
+    /* Only do something if the value changes */
+    if (priv->unlock_retries == unlock_retries)
+        return;
+
+    priv->unlock_retries = unlock_retries;
+
+    dbus_path = (const char *) g_object_get_data (G_OBJECT (self), DBUS_PATH_TAG);
+    if (dbus_path) {
+        g_message ("Modem %s: # unlock retries for %s is %d",
+                   dbus_path, priv->unlock_required, priv->unlock_retries);
+    }
+
+    g_object_notify (G_OBJECT (self), MM_MODEM_UNLOCK_RETRIES);
 }
 
 const char *
@@ -488,7 +564,13 @@ mm_modem_base_init (MMModemBase *self)
                                                     MM_MODEM_ENABLED,
                                                     MM_MODEM_DBUS_INTERFACE);
     mm_properties_changed_signal_register_property (G_OBJECT (self),
+                                                    MM_MODEM_EQUIPMENT_IDENTIFIER,
+                                                    MM_MODEM_DBUS_INTERFACE);
+    mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_UNLOCK_REQUIRED,
+                                                    MM_MODEM_DBUS_INTERFACE);
+    mm_properties_changed_signal_register_property (G_OBJECT (self),
+                                                    MM_MODEM_UNLOCK_RETRIES,
                                                     MM_MODEM_DBUS_INTERFACE);
 }
 
@@ -538,7 +620,9 @@ set_property (GObject *object, guint prop_id,
     case MM_MODEM_PROP_VALID:
     case MM_MODEM_PROP_TYPE:
     case MM_MODEM_PROP_ENABLED:
+    case MM_MODEM_PROP_EQUIPMENT_IDENTIFIER:
     case MM_MODEM_PROP_UNLOCK_REQUIRED:
+    case MM_MODEM_PROP_UNLOCK_RETRIES:
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -580,8 +664,14 @@ get_property (GObject *object, guint prop_id,
     case MM_MODEM_PROP_ENABLED:
         g_value_set_boolean (value, is_enabled (priv->state));
         break;
+    case MM_MODEM_PROP_EQUIPMENT_IDENTIFIER:
+        g_value_set_string (value, priv->equipment_ident);
+        break;
     case MM_MODEM_PROP_UNLOCK_REQUIRED:
         g_value_set_string (value, priv->unlock_required);
+        break;
+    case MM_MODEM_PROP_UNLOCK_RETRIES:
+        g_value_set_uint (value, priv->unlock_retries);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -601,6 +691,7 @@ finalize (GObject *object)
     g_free (priv->driver);
     g_free (priv->plugin);
     g_free (priv->device);
+    g_free (priv->equipment_ident);
     g_free (priv->unlock_required);
 
     G_OBJECT_CLASS (mm_modem_base_parent_class)->finalize (object);
@@ -655,8 +746,16 @@ mm_modem_base_class_init (MMModemBaseClass *klass)
                                       MM_MODEM_ENABLED);
 
     g_object_class_override_property (object_class,
+                                      MM_MODEM_PROP_EQUIPMENT_IDENTIFIER,
+                                      MM_MODEM_EQUIPMENT_IDENTIFIER);
+
+    g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_UNLOCK_REQUIRED,
                                       MM_MODEM_UNLOCK_REQUIRED);
+
+    g_object_class_override_property (object_class,
+                                      MM_MODEM_PROP_UNLOCK_RETRIES,
+                                      MM_MODEM_UNLOCK_RETRIES);
 
     mm_properties_changed_signal_new (object_class);
 }

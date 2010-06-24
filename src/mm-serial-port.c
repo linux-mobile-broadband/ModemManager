@@ -825,6 +825,25 @@ mm_serial_port_close (MMSerialPort *self)
     for (i = 0; i < g_queue_get_length (priv->queue); i++) {
         MMQueueData *item = g_queue_peek_nth (priv->queue, i);
 
+        if (item->callback) {
+            GError *error;
+            GByteArray *response;
+
+            g_warn_if_fail (MM_SERIAL_PORT_GET_CLASS (self)->handle_response != NULL);
+            error = g_error_new_literal (MM_SERIAL_ERROR,
+                                         MM_SERIAL_ERROR_SEND_FAILED,
+                                         "Serial port is now closed");
+            response = g_byte_array_sized_new (1);
+            g_byte_array_append (response, (const guint8 *) "\0", 1);
+            MM_SERIAL_PORT_GET_CLASS (self)->handle_response (self,
+                                                              response,
+                                                              error,
+                                                              item->callback,
+                                                              item->user_data);
+            g_error_free (error);
+            g_byte_array_free (response, TRUE);
+        }
+
         g_byte_array_free (item->command, TRUE);
         g_slice_free (MMQueueData, item);
     }

@@ -20,6 +20,7 @@
 #include <string.h>
 
 #include "mm-charsets.h"
+#include "mm-utils.h"
 
 typedef struct {
     const char *gsm_name;
@@ -150,60 +151,6 @@ mm_modem_charset_byte_array_append (GByteArray *array,
     return TRUE;
 }
 
-/* From hostap, Copyright (c) 2002-2005, Jouni Malinen <jkmaline@cc.hut.fi> */
-
-static int hex2num (char c)
-{
-	if (c >= '0' && c <= '9')
-		return c - '0';
-	if (c >= 'a' && c <= 'f')
-		return c - 'a' + 10;
-	if (c >= 'A' && c <= 'F')
-		return c - 'A' + 10;
-	return -1;
-}
-
-static int hex2byte (const char *hex)
-{
-	int a, b;
-	a = hex2num(*hex++);
-	if (a < 0)
-		return -1;
-	b = hex2num(*hex++);
-	if (b < 0)
-		return -1;
-	return (a << 4) | b;
-}
-
-static char *
-hexstr2bin (const char *hex, gsize *out_len)
-{
-    size_t len = strlen (hex);
-	size_t       i;
-	int          a;
-	const char * ipos = hex;
-	char *       buf = NULL;
-	char *       opos;
-
-	/* Length must be a multiple of 2 */
-    g_return_val_if_fail ((len % 2) == 0, NULL);
-
-	opos = buf = g_malloc0 ((len / 2) + 1);
-	for (i = 0; i < len; i += 2) {
-		a = hex2byte (ipos);
-		if (a < 0) {
-			g_free (buf);
-			return NULL;
-		}
-		*opos++ = a;
-		ipos += 2;
-	}
-    *out_len = len / 2;
-	return buf;
-}
-
-/* End from hostap */
-
 char *
 mm_modem_charset_hex_to_utf8 (const char *src, MMModemCharset charset)
 {
@@ -217,7 +164,7 @@ mm_modem_charset_hex_to_utf8 (const char *src, MMModemCharset charset)
     iconv_from = charset_iconv_from (charset);
     g_return_val_if_fail (iconv_from != NULL, FALSE);
 
-    unconverted = hexstr2bin (src, &unconverted_len);
+    unconverted = utils_hexstr2bin (src, &unconverted_len);
     g_return_val_if_fail (unconverted != NULL, NULL);
 
     if (charset == MM_MODEM_CHARSET_UTF8 || charset == MM_MODEM_CHARSET_IRA)

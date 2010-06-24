@@ -237,7 +237,7 @@ supports_port (MMPluginBase *base,
         add_regex (info->serial, "\\r\\n\\^BOOT:.+\\r\\n", task);
         add_regex (info->serial, "\\r\\r\\^BOOT:.+\\r\\r", task);
 
-        info->id = g_timeout_add (5000, probe_secondary_timeout, task);
+        info->id = g_timeout_add_seconds (7, probe_secondary_timeout, task);
 
         g_object_set_data_full (G_OBJECT (task), TAG_SUPPORTS_INFO,
                                 info, huawei_supports_info_destroy);

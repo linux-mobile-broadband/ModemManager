@@ -28,6 +28,9 @@ static void impl_gsm_modem_get_imei (MMModemGsmCard *modem,
 static void impl_gsm_modem_get_imsi (MMModemGsmCard *modem,
                                      DBusGMethodInvocation *context);
 
+static void impl_gsm_modem_get_operator_id (MMModemGsmCard *modem,
+                                            DBusGMethodInvocation *context);
+
 static void impl_gsm_modem_send_pin (MMModemGsmCard *modem,
                                      const char *pin,
                                      DBusGMethodInvocation *context);
@@ -73,6 +76,19 @@ str_call_not_supported (MMModemGsmCard *self,
     info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
                                        "Operation not supported");
 
+    mm_callback_info_schedule (info);
+}
+
+static void
+uint_call_not_supported (MMModemGsmCard *self,
+                         MMModemUIntFn callback,
+                         gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_uint_new (MM_MODEM (self), callback, user_data);
+    info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                       "Operation not supported");
     mm_callback_info_schedule (info);
 }
 
@@ -126,6 +142,35 @@ mm_modem_gsm_card_get_imsi (MMModemGsmCard *self,
 
     if (MM_MODEM_GSM_CARD_GET_INTERFACE (self)->get_imsi)
         MM_MODEM_GSM_CARD_GET_INTERFACE (self)->get_imsi (self, callback, user_data);
+    else
+        str_call_not_supported (self, callback, user_data);
+}
+
+void mm_modem_gsm_card_get_unlock_retries (MMModemGsmCard *self,
+                                           const char *pin_type,
+                                           MMModemUIntFn callback,
+                                           gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_GSM_CARD (self));
+    g_return_if_fail (pin_type != NULL);
+    g_return_if_fail (callback != NULL);
+
+    if (MM_MODEM_GSM_CARD_GET_INTERFACE (self)->get_unlock_retries)
+        MM_MODEM_GSM_CARD_GET_INTERFACE (self)->get_unlock_retries (self, pin_type, callback, user_data);
+    else
+        uint_call_not_supported (self, callback, user_data);
+}
+
+void
+mm_modem_gsm_card_get_operator_id (MMModemGsmCard *self,
+                                   MMModemStringFn callback,
+                                   gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_GSM_CARD (self));
+    g_return_if_fail (callback != NULL);
+
+    if (MM_MODEM_GSM_CARD_GET_INTERFACE (self)->get_operator_id)
+        MM_MODEM_GSM_CARD_GET_INTERFACE (self)->get_operator_id (self, callback, user_data);
     else
         str_call_not_supported (self, callback, user_data);
 }
@@ -265,6 +310,43 @@ impl_gsm_modem_get_imsi (MMModemGsmCard *modem, DBusGMethodInvocation *context)
                                 MM_AUTHORIZATION_DEVICE_INFO,
                                 context,
                                 imsi_auth_cb,
+                                NULL,
+                                NULL,
+                                &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    }
+}
+
+/*****************************************************************************/
+
+static void
+operator_id_auth_cb (MMAuthRequest *req,
+                     GObject *owner,
+                     DBusGMethodInvocation *context,
+                     gpointer user_data)
+{
+    MMModemGsmCard *self = MM_MODEM_GSM_CARD (owner);
+    GError *error = NULL;
+
+    /* Return any authorization error, otherwise get the operator id */
+    if (!mm_modem_auth_finish (MM_MODEM (self), req, &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    } else
+        mm_modem_gsm_card_get_operator_id (self, str_call_done, context);
+}
+
+static void
+impl_gsm_modem_get_operator_id (MMModemGsmCard *modem, DBusGMethodInvocation *context)
+{
+    GError *error = NULL;
+
+    /* Make sure the caller is authorized to get the operator id */
+    if (!mm_modem_auth_request (MM_MODEM (modem),
+                                MM_AUTHORIZATION_DEVICE_INFO,
+                                context,
+                                operator_id_auth_cb,
                                 NULL,
                                 NULL,
                                 &error)) {
