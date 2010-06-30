@@ -35,18 +35,27 @@
 #include "mm-options.h"
 #include "mm-properties-changed-signal.h"
 #include "mm-utils.h"
+#if LOCATION_API
+#include "mm-modem-location.h"
+#endif
 
 static void modem_init (MMModem *modem_class);
 static void modem_gsm_card_init (MMModemGsmCard *gsm_card_class);
 static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
 static void modem_gsm_sms_init (MMModemGsmSms *gsm_sms_class);
 static void modem_simple_init (MMModemSimple *class);
+#if LOCATION_API
+static void modem_location_init (MMModemLocation *class);
+#endif
 
 G_DEFINE_TYPE_EXTENDED (MMGenericGsm, mm_generic_gsm, MM_TYPE_MODEM_BASE, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_CARD, modem_gsm_card_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_SMS, modem_gsm_sms_init)
+#if LOCATION_API
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_LOCATION, modem_location_init)
+#endif
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_SIMPLE, modem_simple_init))
 
 #define MM_GENERIC_GSM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_GENERIC_GSM, MMGenericGsmPrivate))
@@ -99,6 +108,11 @@ typedef struct {
     MMAtSerialPort *secondary;
     MMQcdmSerialPort *qcdm;
     MMPort *data;
+
+    /* Location API */
+    guint32 loc_caps;
+    gboolean loc_enabled;
+    gboolean loc_signal;
 } MMGenericGsmPrivate;
 
 static void get_registration_status (MMAtSerialPort *port, MMCallbackInfo *info);
@@ -138,6 +152,8 @@ static void reg_info_updated (MMGenericGsm *self,
                               const char *oper_code,
                               gboolean update_name,
                               const char *oper_name);
+
+static void update_lac_ci (MMGenericGsm *self, gulong lac, gulong ci, guint idx);
 
 MMModem *
 mm_generic_gsm_new (const char *device,
@@ -309,9 +325,10 @@ get_imei_cb (MMModem *modem,
 /*****************************************************************************/
 
 static MMModemGsmNetworkRegStatus
-gsm_reg_status (MMGenericGsm *self)
+gsm_reg_status (MMGenericGsm *self, guint32 *out_idx)
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    guint32 idx = 1;
 
     /* Some devices (Blackberries for example) will respond to +CGREG, but
      * return ERROR for +CREG, probably because their firmware is just stupid.
@@ -320,23 +337,36 @@ gsm_reg_status (MMGenericGsm *self)
      */
 
     if (   priv->reg_status[0] == MM_MODEM_GSM_NETWORK_REG_STATUS_HOME
-        || priv->reg_status[0] == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING)
-        return priv->reg_status[0];
+        || priv->reg_status[0] == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING) {
+        idx = 0;
+        goto out;
+    }
 
     if (   priv->reg_status[1] == MM_MODEM_GSM_NETWORK_REG_STATUS_HOME
-        || priv->reg_status[1] == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING)
-        return priv->reg_status[1];
+        || priv->reg_status[1] == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING) {
+        idx = 1;
+        goto out;
+    }
 
-    if (priv->reg_status[0] == MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING)
-        return priv->reg_status[0];
+    if (priv->reg_status[0] == MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING) {
+        idx = 0;
+        goto out;
+    }
 
-    if (priv->reg_status[1] == MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING)
-        return priv->reg_status[1];
+    if (priv->reg_status[1] == MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING) {
+        idx = 1;
+        goto out;
+    }
 
-    if (priv->reg_status[0] != MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN)
-        return priv->reg_status[0];
+    if (priv->reg_status[0] != MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN) {
+        idx = 0;
+        goto out;
+    }
 
-    return priv->reg_status[1];
+out:
+    if (out_idx)
+        *out_idx = idx;
+    return priv->reg_status[idx];
 }
 
 void
@@ -350,7 +380,7 @@ mm_generic_gsm_update_enabled_state (MMGenericGsm *self,
     if (stay_connected && (mm_modem_get_state (MM_MODEM (self)) >= MM_MODEM_STATE_DISCONNECTING))
         return;
 
-    switch (gsm_reg_status (self)) {
+    switch (gsm_reg_status (self, NULL)) {
     case MM_MODEM_GSM_NETWORK_REG_STATUS_HOME:
     case MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING:
         mm_modem_set_state (MM_MODEM (self), MM_MODEM_STATE_REGISTERED, reason);
@@ -614,6 +644,20 @@ release_port (MMModem *modem, const char *subsys, const char *name)
     check_valid (MM_GENERIC_GSM (modem));
 }
 
+#if LOCATION_API
+static void
+add_loc_capability (MMGenericGsm *self, guint32 cap)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    guint32 old_caps = priv->loc_caps;
+
+    priv->loc_caps |= cap;
+    if (priv->loc_caps != old_caps) {
+        g_object_notify (G_OBJECT (self), MM_MODEM_LOCATION_CAPABILITIES);
+    }
+}
+#endif
+
 static void
 reg_poll_response (MMAtSerialPort *port,
                    GString *response,
@@ -711,6 +755,10 @@ cgreg2_done (MMAtSerialPort *port,
             /* Try CGREG=1 instead */
             mm_at_serial_port_queue_command (port, "+CGREG=1", 3, cgreg1_done, info);
         } else {
+#if LOCATION_API
+            add_loc_capability (MM_GENERIC_GSM (info->modem), MM_MODEM_LOCATION_CAPABILITY_GSM_LAC_CI);
+#endif
+
             /* Success; get initial state */
             mm_at_serial_port_queue_command (port, "+CGREG?", 10, reg_poll_response, info->modem);
 
@@ -767,6 +815,10 @@ creg2_done (MMAtSerialPort *port,
             g_clear_error (&info->error);
             mm_at_serial_port_queue_command (port, "+CREG=1", 3, creg1_done, info);
         } else {
+#if LOCATION_API
+            add_loc_capability (MM_GENERIC_GSM (info->modem), MM_MODEM_LOCATION_CAPABILITY_GSM_LAC_CI);
+#endif
+
             /* Success; get initial state */
             mm_at_serial_port_queue_command (port, "+CREG?", 10, reg_poll_response, info->modem);
 
@@ -1170,10 +1222,8 @@ disable (MMModem *modem,
         priv->pin_check_timeout = 0;
     }
 
-    priv->lac[0] = 0;
-    priv->lac[1] = 0;
-    priv->cell_id[0] = 0;
-    priv->cell_id[1] = 0;
+    update_lac_ci (self, 0, 0, 0);
+    update_lac_ci (self, 0, 0, 1);
     _internal_update_access_technology (self, MM_MODEM_GSM_ACCESS_TECH_UNKNOWN);
 
     /* Close the secondary port if its open */
@@ -1634,9 +1684,9 @@ reg_info_updated (MMGenericGsm *self,
         g_return_if_fail (   rs_type == MM_GENERIC_GSM_REG_TYPE_CS
                           || rs_type == MM_GENERIC_GSM_REG_TYPE_PS);
 
-        old_status = gsm_reg_status (self);
+        old_status = gsm_reg_status (self, NULL);
         priv->reg_status[rs_type - 1] = status;
-        if (gsm_reg_status (self) != old_status)
+        if (gsm_reg_status (self, NULL) != old_status)
             changed = TRUE;
     }
 
@@ -1658,7 +1708,7 @@ reg_info_updated (MMGenericGsm *self,
 
     if (changed) {
         mm_modem_gsm_network_registration_info (MM_MODEM_GSM_NETWORK (self),
-                                                gsm_reg_status (self),
+                                                gsm_reg_status (self, NULL),
                                                 priv->oper_code,
                                                 priv->oper_name);
     }
@@ -1948,7 +1998,7 @@ reg_state_changed (MMAtSerialPort *port,
 {
     MMGenericGsm *self = MM_GENERIC_GSM (user_data);
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
-    guint32 state = 0, idx;
+    guint32 state = 0;
     gulong lac = 0, cell_id = 0;
     gint act = -1;
     gboolean cgreg = FALSE;
@@ -1974,9 +2024,7 @@ reg_state_changed (MMAtSerialPort *port,
         }
     }
 
-    idx = cgreg ? 1 : 0;
-    priv->lac[idx] = lac;
-    priv->cell_id[idx] = cell_id;
+    update_lac_ci (self, lac, cell_id, cgreg ? 1 : 0);
 
     /* Only update access technology if it appeared in the CREG/CGREG response */
     if (act != -1)
@@ -2014,7 +2062,7 @@ handle_reg_status_response (MMGenericGsm *self,
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     GMatchInfo *match_info;
-    guint32 status = 0, idx;
+    guint32 status = 0;
     gulong lac = 0, ci = 0;
     gint act = -1;
     gboolean cgreg = FALSE;
@@ -2043,9 +2091,7 @@ handle_reg_status_response (MMGenericGsm *self,
     }
 
     /* Success; update cached location information */
-    idx = cgreg ? 1 : 0;
-    priv->lac[idx] = lac;
-    priv->cell_id[idx] = ci;
+    update_lac_ci (self, lac, ci, cgreg ? 1 : 0);
 
     /* Only update access technology if it appeared in the CREG/CGREG response */
     if (act != -1)
@@ -2108,7 +2154,7 @@ get_reg_status_done (MMAtSerialPort *port,
             goto reg_done;
     }
 
-    status = gsm_reg_status (self);
+    status = gsm_reg_status (self, NULL);
     if (   status != MM_MODEM_GSM_NETWORK_REG_STATUS_HOME
         && status != MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING
         && status != MM_MODEM_GSM_NETWORK_REG_STATUS_DENIED) {
@@ -2222,7 +2268,7 @@ do_register (MMModemGsmNetwork *modem,
     if (network_id) {
         command = g_strdup_printf ("+COPS=1,2,\"%s\"", network_id);
         priv->manual_reg = TRUE;
-    } else if (reg_is_idle (gsm_reg_status (self)) || priv->manual_reg) {
+    } else if (reg_is_idle (gsm_reg_status (self, NULL)) || priv->manual_reg) {
         command = g_strdup ("+COPS=0,,");
         priv->manual_reg = FALSE;
     }
@@ -2260,7 +2306,7 @@ gsm_network_reg_info_invoke (MMCallbackInfo *info)
     MMModemGsmNetworkRegInfoFn callback = (MMModemGsmNetworkRegInfoFn) info->callback;
 
     callback (MM_MODEM_GSM_NETWORK (info->modem),
-              gsm_reg_status (MM_GENERIC_GSM (info->modem)),
+              gsm_reg_status (MM_GENERIC_GSM (info->modem), NULL),
               priv->oper_code,
               priv->oper_name,
               info->error,
@@ -3564,7 +3610,7 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
                 priv->roam_allowed = !home_only;
 
                 /* Don't connect if we're not supposed to be roaming */
-                status = gsm_reg_status (MM_GENERIC_GSM (modem));
+                status = gsm_reg_status (MM_GENERIC_GSM (modem), NULL);
                 if (home_only && (status == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING)) {
                     info->error = g_error_new_literal (MM_MOBILE_ERROR,
                                                        MM_MOBILE_ERROR_GPRS_ROAMING_NOT_ALLOWED,
@@ -3761,6 +3807,168 @@ simple_get_status (MMModemSimple *simple,
 
 /*****************************************************************************/
 
+#if LOCATION_API
+static gboolean
+gsm_lac_ci_available (MMGenericGsm *self, guint32 *out_idx)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    MMModemGsmNetworkRegStatus status;
+    guint idx;
+
+    /* Must be registered, and have operator code, LAC and CI before GSM_LAC_CI is valid */
+    status = gsm_reg_status (self, &idx);
+    if (out_idx)
+        *out_idx = idx;
+
+    if (   status != MM_MODEM_GSM_NETWORK_REG_STATUS_HOME
+        && status != MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING)
+        return FALSE;
+
+    if (!priv->oper_code || !strlen (priv->oper_code))
+        return FALSE;
+
+    if (!priv->lac[idx] || !priv->cell_id[idx])
+        return FALSE;
+
+    return TRUE;
+}
+#endif
+
+static void
+update_lac_ci (MMGenericGsm *self, gulong lac, gulong ci, guint idx)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    gboolean changed = FALSE;
+
+    if (lac != priv->lac[idx]) {
+        priv->lac[idx] = lac;
+        changed = TRUE;
+    }
+
+    if (ci != priv->cell_id[idx]) {
+        priv->cell_id[idx] = ci;
+        changed = TRUE;
+    }
+
+#if LOCATION_API
+    if (changed && gsm_lac_ci_available (self, NULL) && priv->loc_enabled && priv->loc_signal)
+        g_object_notify (G_OBJECT (self), MM_MODEM_LOCATION_LOCATION);
+#endif
+}
+
+
+#if LOCATION_API
+
+static void
+destroy_gvalue (gpointer data)
+{
+    GValue *value = (GValue *) data;
+
+    g_value_unset (value);
+    g_slice_free (GValue, value);
+}
+
+static GHashTable *
+make_location_hash (MMGenericGsm *self, GError **error)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    GHashTable *locations = NULL;
+    guint32 reg_idx = 0;
+    GValue *val;
+    char mcc[4] = { 0, 0, 0, 0 };
+    char mnc[4] = { 0, 0, 0, 0 };
+
+    if (priv->loc_caps == MM_MODEM_LOCATION_CAPABILITY_UNKNOWN) {
+        g_set_error_literal (error,
+                             MM_MODEM_ERROR,
+                             MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                             "Modem has no location capabilities");
+        return NULL;
+    }
+
+    locations = g_hash_table_new_full (g_direct_hash, g_direct_equal,
+                                       NULL, destroy_gvalue);
+
+    if (!gsm_lac_ci_available (self, &reg_idx))
+        return locations;
+
+    memcpy (mcc, priv->oper_code, 3);
+    /* Not all modems report 6-digit MNCs */
+    memcpy (mnc, priv->oper_code + 3, 2);
+    if (strlen (priv->oper_code) == 6)
+        mnc[2] = priv->oper_code[5];
+
+    val = g_slice_new0 (GValue);
+    g_value_init (val, G_TYPE_STRING);
+    g_value_take_string (val, g_strdup_printf ("%s,%s,%lX,%lX",
+                                               mcc,
+                                               mnc,
+                                               priv->lac[reg_idx],
+                                               priv->cell_id[reg_idx]));
+    g_hash_table_insert (locations,
+                         GUINT_TO_POINTER (MM_MODEM_LOCATION_CAPABILITY_GSM_LAC_CI),
+                         val);
+
+    return locations;
+}
+
+static void
+location_enable (MMModemLocation *modem,
+                 gboolean loc_enable,
+                 gboolean signal_location,
+                 MMModemFn callback,
+                 gpointer user_data)
+{
+    MMGenericGsm *self = MM_GENERIC_GSM (modem);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    MMCallbackInfo *info;
+
+    if (loc_enable != priv->loc_enabled) {
+        priv->loc_enabled = loc_enable;
+        g_object_notify (G_OBJECT (modem), MM_MODEM_LOCATION_ENABLED);
+    }
+
+    if (signal_location != priv->loc_signal) {
+        priv->loc_signal = signal_location;
+        g_object_notify (G_OBJECT (modem), MM_MODEM_LOCATION_SIGNALS_LOCATION);
+    }
+
+    if (loc_enable && signal_location && gsm_lac_ci_available (self, NULL))
+        g_object_notify (G_OBJECT (modem), MM_MODEM_LOCATION_LOCATION);
+
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+    mm_callback_info_schedule (info);
+}
+
+static void
+location_get (MMModemLocation *modem,
+              MMModemLocationGetFn callback,
+              gpointer user_data)
+{
+    MMGenericGsm *self = MM_GENERIC_GSM (modem);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    GHashTable *locations = NULL;
+    GError *error = NULL;
+
+    if (priv->loc_caps == MM_MODEM_LOCATION_CAPABILITY_UNKNOWN) {
+        error = g_error_new_literal (MM_MODEM_ERROR,
+                                     MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                     "Modem has no location capabilities");
+    } else if (priv->loc_enabled)
+        locations = make_location_hash (self, &error);
+    else
+        locations = g_hash_table_new (g_direct_hash, g_direct_equal);
+
+    callback (modem, locations, error, user_data);
+    if (locations)
+        g_hash_table_destroy (locations);
+    g_clear_error (&error);
+}
+
+#endif /* LOCATION_API */
+
+/*****************************************************************************/
+
 static void
 modem_state_changed (MMGenericGsm *self, GParamSpec *pspec, gpointer user_data)
 {
@@ -3796,6 +4004,15 @@ modem_init (MMModem *modem_class)
     modem_class->get_supported_charsets = get_supported_charsets;
     modem_class->set_charset = set_charset;
 }
+
+#if LOCATION_API
+static void
+modem_location_init (MMModemLocation *class)
+{
+    class->enable = location_enable;
+    class->get_location = location_get;
+}
+#endif
 
 static void
 modem_gsm_card_init (MMModemGsmCard *class)
@@ -3851,6 +4068,24 @@ mm_generic_gsm_init (MMGenericGsm *self)
                                                     MM_MODEM_GSM_NETWORK_ACCESS_TECHNOLOGY,
                                                     MM_MODEM_GSM_NETWORK_DBUS_INTERFACE);
 
+#if LOCATION_API
+    mm_properties_changed_signal_register_property (G_OBJECT (self),
+                                                    MM_MODEM_LOCATION_CAPABILITIES,
+                                                    MM_MODEM_LOCATION_DBUS_INTERFACE);
+
+    mm_properties_changed_signal_register_property (G_OBJECT (self),
+                                                    MM_MODEM_LOCATION_ENABLED,
+                                                    MM_MODEM_LOCATION_DBUS_INTERFACE);
+
+    mm_properties_changed_signal_register_property (G_OBJECT (self),
+                                                    MM_MODEM_LOCATION_SIGNALS_LOCATION,
+                                                    MM_MODEM_LOCATION_DBUS_INTERFACE);
+
+    mm_properties_changed_signal_register_property (G_OBJECT (self),
+                                                    MM_MODEM_LOCATION_LOCATION,
+                                                    MM_MODEM_LOCATION_DBUS_INTERFACE);
+#endif
+
     g_signal_connect (self, "notify::" MM_MODEM_STATE,
                       G_CALLBACK (modem_state_changed), NULL);
 }
@@ -3869,6 +4104,12 @@ set_property (GObject *object, guint prop_id,
     case MM_GENERIC_GSM_PROP_SUPPORTED_MODES:
     case MM_GENERIC_GSM_PROP_ALLOWED_MODE:
     case MM_GENERIC_GSM_PROP_ACCESS_TECHNOLOGY:
+#if LOCATION_API
+    case MM_GENERIC_GSM_PROP_LOC_CAPABILITIES:
+    case MM_GENERIC_GSM_PROP_LOC_ENABLED:
+    case MM_GENERIC_GSM_PROP_LOC_SIGNAL:
+    case MM_GENERIC_GSM_PROP_LOC_LOCATION:
+#endif
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -3881,6 +4122,9 @@ get_property (GObject *object, guint prop_id,
               GValue *value, GParamSpec *pspec)
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (object);
+#if LOCATION_API
+    GHashTable *locations = NULL;
+#endif
 
     switch (prop_id) {
     case MM_MODEM_PROP_DATA_DEVICE:
@@ -3926,6 +4170,27 @@ get_property (GObject *object, guint prop_id,
         else
             g_value_set_uint (value, MM_MODEM_GSM_ACCESS_TECH_UNKNOWN);
         break;
+#if LOCATION_API
+    case MM_GENERIC_GSM_PROP_LOC_CAPABILITIES:
+        g_value_set_uint (value, priv->loc_caps);
+        break;
+    case MM_GENERIC_GSM_PROP_LOC_ENABLED:
+        g_value_set_boolean (value, priv->loc_enabled);
+        break;
+    case MM_GENERIC_GSM_PROP_LOC_SIGNAL:
+        g_value_set_boolean (value, priv->loc_signal);
+        break;
+    case MM_GENERIC_GSM_PROP_LOC_LOCATION:
+        /* We don't allow property accesses unless location change signalling
+         * is enabled, for security reasons.
+         */
+        if (priv->loc_enabled && priv->loc_signal)
+            locations = make_location_hash (MM_GENERIC_GSM (object), NULL);
+        else
+            locations = g_hash_table_new (g_direct_hash, g_direct_equal);
+        g_value_take_boxed (value, locations);
+        break;
+#endif
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -4003,6 +4268,24 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_ACCESS_TECHNOLOGY,
                                       MM_MODEM_GSM_NETWORK_ACCESS_TECHNOLOGY);
+
+#if LOCATION_API
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_LOC_CAPABILITIES,
+                                      MM_MODEM_LOCATION_CAPABILITIES);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_LOC_ENABLED,
+                                      MM_MODEM_LOCATION_ENABLED);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_LOC_SIGNAL,
+                                      MM_MODEM_LOCATION_SIGNALS_LOCATION);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_LOC_LOCATION,
+                                      MM_MODEM_LOCATION_LOCATION);
+#endif
 
     g_object_class_install_property
         (object_class, MM_GENERIC_GSM_PROP_POWER_UP_CMD,

@@ -257,7 +257,7 @@ mm_modem_location_init (gpointer g_iface)
          g_param_spec_boxed (MM_MODEM_LOCATION_LOCATION,
                              "Location",
                              "Available location information",
-                             G_TYPE_HASH_TABLE,
+                             MM_MODEM_LOCATION_PROP_TYPE,
                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_interface_install_property
@@ -267,7 +267,8 @@ mm_modem_location_init (gpointer g_iface)
                             "Supported location information methods",
                             MM_MODEM_LOCATION_CAPABILITY_UNKNOWN,
                               MM_MODEM_LOCATION_CAPABILITY_GPS_NMEA
-                            | MM_MODEM_LOCATION_CAPABILITY_GSM_LAC_CI,
+                            | MM_MODEM_LOCATION_CAPABILITY_GSM_LAC_CI
+                            | MM_MODEM_LOCATION_CAPABILITY_GPS_RAW,
                             MM_MODEM_LOCATION_CAPABILITY_UNKNOWN,
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
