@@ -199,7 +199,7 @@
           GetLocation() method or in the Location property.</p>
         </tp:docstring>
       </tp:flag>
-      <tp:flag suffix="GSM_GPS_RAW" value="0x4">
+      <tp:flag suffix="GPS_RAW" value="0x4">
         <tp:docstring>
           <p>For capability reporting, indicates the device is capable of
           providing raw GPS information using a series of defined key/value
