@@ -21,6 +21,7 @@
 #include "mm-modem-base.h"
 #include "mm-modem-cdma.h"
 #include "mm-at-serial-port.h"
+#include "mm-qcdm-serial-port.h"
 #include "mm-callback-info.h"
 
 #define MM_TYPE_GENERIC_CDMA            (mm_generic_cdma_get_type ())
@@ -102,6 +103,9 @@ MMAtSerialPort *mm_generic_cdma_get_at_port (MMGenericCdma *modem, MMPortType pt
 
 MMAtSerialPort *mm_generic_cdma_get_best_at_port (MMGenericCdma *modem,
                                                   GError **error);
+
+MMQcdmSerialPort *mm_generic_cdma_get_best_qcdm_port (MMGenericCdma *modem,
+                                                      GError **error);
 
 void mm_generic_cdma_update_cdma1x_quality (MMGenericCdma *self, guint32 quality);
 void mm_generic_cdma_update_evdo_quality (MMGenericCdma *self, guint32 quality);

@@ -315,6 +315,15 @@ mm_generic_cdma_get_best_at_port (MMGenericCdma *self, GError **error)
     return priv->secondary;
 }
 
+MMQcdmSerialPort *
+mm_generic_cdma_get_best_qcdm_port (MMGenericCdma *self, GError **error)
+{
+    g_return_val_if_fail (self != NULL, NULL);
+    g_return_val_if_fail (MM_IS_GENERIC_CDMA (self), NULL);
+
+    return MM_GENERIC_CDMA_GET_PRIVATE (self)->qcdm;
+}
+
 /*****************************************************************************/
 
 void

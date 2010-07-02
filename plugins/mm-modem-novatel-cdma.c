@@ -21,6 +21,8 @@
 #include <ctype.h>
 
 #include "mm-modem-novatel-cdma.h"
+#include "mm-modem-helpers.h"
+#include "libqcdm/src/commands.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 
@@ -178,6 +180,115 @@ get_signal_quality (MMModemCdma *modem,
 /*****************************************************************************/
 
 static void
+parse_modem_snapshot (MMCallbackInfo *info, QCDMResult *result)
+{
+    MMModemCdmaRegistrationState evdo_state, cdma1x_state, new_state;
+    guint8 eri = 0;
+
+    g_return_if_fail (info != NULL);
+    g_return_if_fail (result != NULL);
+
+    evdo_state = mm_generic_cdma_query_reg_state_get_callback_evdo_state (info);
+    cdma1x_state = mm_generic_cdma_query_reg_state_get_callback_1x_state (info);
+
+    /* Roaming? */
+    if (qcdm_result_get_uint8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_ERI, &eri)) {
+        char *str;
+        gboolean roaming = FALSE;
+
+        str = g_strdup_printf ("%u", eri);
+        if (mm_cdma_parse_eri (str, &roaming, NULL, NULL)) {
+            new_state = roaming ? MM_MODEM_CDMA_REGISTRATION_STATE_HOME : MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING;
+            if (cdma1x_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
+                mm_generic_cdma_query_reg_state_set_callback_1x_state (info, new_state);
+            if (evdo_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
+                mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, new_state);
+        }
+        g_free (str);
+    }
+}
+
+static void
+reg_nwsnap_6500_cb (MMQcdmSerialPort *port,
+                    GByteArray *response,
+                    GError *error,
+                    gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    QCDMResult *result;
+
+    if (!error) {
+        result = qcdm_cmd_nw_subsys_modem_snapshot_cdma_result ((const char *) response->data, response->len, NULL);
+        if (result) {
+            parse_modem_snapshot (info, result);
+            qcdm_result_unref (result);
+        }
+    }
+    mm_callback_info_schedule (info);
+}
+
+static void
+reg_nwsnap_6800_cb (MMQcdmSerialPort *port,
+                    GByteArray *response,
+                    GError *error,
+                    gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    QCDMResult *result;
+    GByteArray *nwsnap;
+
+    if (error)
+        goto done;
+
+    /* Parse the response */
+    result = qcdm_cmd_nw_subsys_modem_snapshot_cdma_result ((const char *) response->data, response->len, &info->error);
+    if (!result) {
+        g_clear_error (&info->error);
+
+        /* Try for MSM6500 */
+        nwsnap = g_byte_array_sized_new (25);
+        nwsnap->len = qcdm_cmd_nw_subsys_modem_snapshot_cdma_new ((char *) nwsnap->data, 25, QCDM_NW_CHIPSET_6500, NULL);
+        g_assert (nwsnap->len);
+        mm_qcdm_serial_port_queue_command (port, nwsnap, 3, reg_nwsnap_6500_cb, info);
+        return;
+    }
+
+    parse_modem_snapshot (info, result);
+    qcdm_result_unref (result);
+
+done:
+    mm_callback_info_schedule (info);
+}
+
+static void
+query_registration_state (MMGenericCdma *cdma,
+                          MMModemCdmaRegistrationState cur_cdma_state,
+                          MMModemCdmaRegistrationState cur_evdo_state,
+                          MMModemCdmaRegistrationStateFn callback,
+                          gpointer user_data)
+{
+    MMCallbackInfo *info;
+    MMQcdmSerialPort *port;
+    GByteArray *nwsnap;
+
+    info = mm_generic_cdma_query_reg_state_callback_info_new (cdma, cur_cdma_state, cur_evdo_state, callback, user_data);
+
+    port = mm_generic_cdma_get_best_qcdm_port (cdma, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* Try MSM6800 first since newer cards use that */
+    nwsnap = g_byte_array_sized_new (25);
+    nwsnap->len = qcdm_cmd_nw_subsys_modem_snapshot_cdma_new ((char *) nwsnap->data, 25, QCDM_NW_CHIPSET_6800, NULL);
+    g_assert (nwsnap->len);
+    mm_qcdm_serial_port_queue_command (port, nwsnap, 3, reg_nwsnap_6800_cb, info);
+}
+
+/*****************************************************************************/
+
+static void
 modem_cdma_init (MMModemCdma *cdma_class)
 {
     cdma_class->get_signal_quality = get_signal_quality;
@@ -191,6 +302,10 @@ mm_modem_novatel_cdma_init (MMModemNovatelCdma *self)
 static void
 mm_modem_novatel_cdma_class_init (MMModemNovatelCdmaClass *klass)
 {
+    MMGenericCdmaClass *generic_class = MM_GENERIC_CDMA_CLASS (klass);
+
     mm_modem_novatel_cdma_parent_class = g_type_class_peek_parent (klass);
+
+    generic_class->query_registration_state = query_registration_state;
 }
 
