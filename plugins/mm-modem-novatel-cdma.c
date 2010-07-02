@@ -72,6 +72,8 @@ get_one_qual (const char *reply, const char *tag)
 {
     int qual = -1;
     const char *p;
+    long int dbm;
+    gboolean success = FALSE;
 
     p = strstr (reply, tag);
     if (!p)
@@ -83,15 +85,24 @@ get_one_qual (const char *reply, const char *tag)
     /* Skip spaces */
     while (isspace (*p))
         p++;
-    if (*p == '-') {
-        long int dbm;
 
-        errno = 0;
-        dbm = strtol (p, NULL, 10);
-        if (dbm < 0 && errno == 0) {
-            dbm = CLAMP (dbm, -113, -51);
-            qual = 100 - ((dbm + 51) * 100 / (-113 + 51));
+    errno = 0;
+    dbm = strtol (p, NULL, 10);
+    if (errno == 0) {
+        if (*p == '-') {
+            /* Some cards appear to use RX0/RX1 and output RSSI in negative dBm */
+            if (dbm < 0)
+                success = TRUE;
+        } else if (isdigit (*p) && (dbm > 0) && (dbm < 115)) {
+            /* S720 appears to use "1x RSSI" and print RSSI in dBm without '-' */
+            dbm *= -1;
+            success = TRUE;
         }
+    }
+
+    if (success) {
+        dbm = CLAMP (dbm, -113, -51);
+        qual = 100 - ((dbm + 51) * 100 / (-113 + 51));
     }
 
     return qual;
@@ -122,6 +133,8 @@ get_rssi_done (MMAtSerialPort *port,
 
     /* Parse the signal quality */
     qual = get_one_qual (response->str, "RX0=");
+    if (qual < 0)
+        qual = get_one_qual (response->str, "1x RSSI=");
     if (qual < 0)
         qual = get_one_qual (response->str, "RX1=");
 
