@@ -19,5 +19,11 @@ lsudev_LDADD = $(GUDEV_LIBS)
 
 
 EXTRA_DIST = \
-	mm-test.py
+	mm-test.py \
+	disable.py \
+	enable.py \
+	info.py \
+	list-modems.py \
+	location.py \
+	mm-send-sms.py
 
