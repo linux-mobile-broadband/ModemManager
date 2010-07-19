@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2007 - 2008 Novell, Inc.
- * Copyright (C) 2008 - 2009 Red Hat, Inc.
+ * Copyright (C) 2008 - 2010 Red Hat, Inc.
  */
 
 #ifndef _MM_PROPERTIES_CHANGED_SIGNAL_H_
@@ -22,7 +22,8 @@
 guint mm_properties_changed_signal_new (GObjectClass *object_class);
 
 void mm_properties_changed_signal_register_property (GObject *object,
-                                                     const char *property,
+                                                     const char *gobject_property,
+                                                     const char *real_property,
                                                      const char *interface);
 
 #endif /* _MM_PROPERTIES_CHANGED_SIGNAL_H_ */

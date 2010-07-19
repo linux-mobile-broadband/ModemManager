@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2007 - 2008 Novell, Inc.
- * Copyright (C) 2008 - 2009 Red Hat, Inc.
+ * Copyright (C) 2008 - 2010 Red Hat, Inc.
  */
 
 #include <string.h>
@@ -27,10 +27,15 @@
 #define MM_DBUS_PROPERTY_CHANGED "MM_DBUS_PROPERTY_CHANGED"
 
 typedef struct {
+    char *real_property;
+    char *interface;
+} ChangeInfo;
+
+typedef struct {
     /* Whitelist of GObject property names for which changes will be emitted
      * over the bus.
      *
-     * Mapping of {property-name -> dbus-interface}
+     * Mapping of {property-name -> ChangeInfo}
      */
     GHashTable *registered;
 
@@ -55,6 +60,17 @@ destroy_value (gpointer data)
     g_slice_free (GValue, val);
 }
 
+static void
+change_info_free (gpointer data)
+{
+    ChangeInfo *info = data;
+
+    g_free (info->real_property);
+    g_free (info->interface);
+    memset (info, 0, sizeof (ChangeInfo));
+    g_free (info);
+}
+
 static PropertiesChangedInfo *
 properties_changed_info_new (void)
 {
@@ -62,7 +78,7 @@ properties_changed_info_new (void)
 
     info = g_slice_new0 (PropertiesChangedInfo);
 
-    info->registered = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
+    info->registered = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, change_info_free);
     info->hash = g_hash_table_new_full (g_str_hash, g_str_equal, 
                                         (GDestroyNotify) g_free,
                                         (GDestroyNotify) g_hash_table_destroy);
@@ -204,23 +220,23 @@ notify (GObject *object, GParamSpec *pspec)
 {
     GHashTable *interfaces;
     PropertiesChangedInfo *info;
-    const char *interface;
+    ChangeInfo *ch_info;
     GValue *value;
 
     info = get_properties_changed_info (object);
 
-    interface = g_hash_table_lookup (info->registered, pspec->name);
-    if (!interface)
+    ch_info = g_hash_table_lookup (info->registered, pspec->name);
+    if (!ch_info)
         return;
 
     /* Check if there are other changed properties for this interface already,
      * otherwise create a new hash table for all changed properties for this
      * D-Bus interface.
      */
-    interfaces = g_hash_table_lookup (info->hash, interface);
+    interfaces = g_hash_table_lookup (info->hash, ch_info->interface);
     if (!interfaces) {
         interfaces = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, destroy_value);
-        g_hash_table_insert (info->hash, g_strdup (interface), interfaces);
+        g_hash_table_insert (info->hash, g_strdup (ch_info->interface), interfaces);
     }
 
     /* Now put the changed property value into the hash table of changed values
@@ -229,7 +245,9 @@ notify (GObject *object, GParamSpec *pspec)
     value = g_slice_new0 (GValue);
     g_value_init (value, pspec->value_type);
     g_object_get_property (object, pspec->name, value);
-    g_hash_table_insert (interfaces, uscore_to_wincaps (pspec->name), value);
+
+    /* Use real property name, which takes shadow properties into accound */
+    g_hash_table_insert (interfaces, uscore_to_wincaps (ch_info->real_property), value);
 
     if (!info->idle_id)
         info->idle_id = g_idle_add_full (G_PRIORITY_DEFAULT_IDLE, properties_changed, object, idle_id_reset);
@@ -237,11 +255,12 @@ notify (GObject *object, GParamSpec *pspec)
 
 void
 mm_properties_changed_signal_register_property (GObject *object,
-                                                const char *property,
+                                                const char *gobject_property,
+                                                const char *real_property,
                                                 const char *interface)
 {
     PropertiesChangedInfo *info;
-    const char *tmp;
+    ChangeInfo *ch_info;
 
     /* All exported properties need to be registered explicitly for now since
      * dbus-glib doesn't expose any method to find out the properties registered
@@ -249,12 +268,16 @@ mm_properties_changed_signal_register_property (GObject *object,
      */
 
     info = get_properties_changed_info (object);
-    tmp = g_hash_table_lookup (info->registered, property);
-    if (tmp) {
+    ch_info = g_hash_table_lookup (info->registered, gobject_property);
+    if (ch_info) {
         g_warning ("%s: property '%s' already registerd on interface '%s'",
-                   __func__, property, tmp);
-    } else
-        g_hash_table_insert (info->registered, g_strdup (property), g_strdup (interface));
+                   __func__, gobject_property, ch_info->interface);
+    } else {
+        ch_info = g_malloc0 (sizeof (ChangeInfo));
+        ch_info->real_property = g_strdup (real_property ? real_property : gobject_property);
+        ch_info->interface = g_strdup (interface);
+        g_hash_table_insert (info->registered, g_strdup (gobject_property), ch_info);
+    }
 }
 
 guint

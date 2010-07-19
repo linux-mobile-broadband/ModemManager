@@ -4062,27 +4062,33 @@ mm_generic_gsm_init (MMGenericGsm *self)
 
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_GSM_NETWORK_ALLOWED_MODE,
+                                                    NULL,
                                                     MM_MODEM_GSM_NETWORK_DBUS_INTERFACE);
 
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_GSM_NETWORK_ACCESS_TECHNOLOGY,
+                                                    NULL,
                                                     MM_MODEM_GSM_NETWORK_DBUS_INTERFACE);
 
 #if LOCATION_API
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_LOCATION_CAPABILITIES,
+                                                    "Capabilities",
                                                     MM_MODEM_LOCATION_DBUS_INTERFACE);
 
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_LOCATION_ENABLED,
+                                                    "Enabled",
                                                     MM_MODEM_LOCATION_DBUS_INTERFACE);
 
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_LOCATION_SIGNALS_LOCATION,
+                                                    NULL,
                                                     MM_MODEM_LOCATION_DBUS_INTERFACE);
 
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_LOCATION_LOCATION,
+                                                    NULL,
                                                     MM_MODEM_LOCATION_DBUS_INTERFACE);
 #endif
 
