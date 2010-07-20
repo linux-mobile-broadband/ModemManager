@@ -154,9 +154,10 @@ mm_modem_charset_byte_array_append (GByteArray *array,
 char *
 mm_modem_charset_hex_to_utf8 (const char *src, MMModemCharset charset)
 {
-    char *unconverted;
+    char *unconverted, *converted;
     const char *iconv_from;
     gsize unconverted_len = 0;
+    GError *error = NULL;
 
     g_return_val_if_fail (src != NULL, NULL);
     g_return_val_if_fail (charset != MM_MODEM_CHARSET_UNKNOWN, NULL);
@@ -170,6 +171,15 @@ mm_modem_charset_hex_to_utf8 (const char *src, MMModemCharset charset)
     if (charset == MM_MODEM_CHARSET_UTF8 || charset == MM_MODEM_CHARSET_IRA)
         return unconverted;
 
-    return g_convert (unconverted, unconverted_len, "UTF-8//TRANSLIT", iconv_from, NULL, NULL, NULL);
+    converted = g_convert (unconverted, unconverted_len,
+                           "UTF-8//TRANSLIT", iconv_from,
+                           NULL, NULL, &error);
+    if (!converted || error) {
+        g_clear_error (&error);
+        g_free (unconverted);
+        converted = NULL;
+    }
+
+    return converted;
 }
 

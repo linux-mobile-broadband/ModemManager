@@ -1766,12 +1766,22 @@ parse_operator (const char *reply, MMModemCharset cur_charset)
 		g_regex_unref (r);
     }
 
-    /* Some modems (Option & HSO) return the operator name as a hexadecimal
-     * string of the bytes of the operator name as encoded by the current
-     * character set.
-     */
-    if (operator && (cur_charset == MM_MODEM_CHARSET_UCS2))
-        convert_operator_from_ucs2 (&operator);
+    if (operator) {
+        /* Some modems (Option & HSO) return the operator name as a hexadecimal
+         * string of the bytes of the operator name as encoded by the current
+         * character set.
+         */
+        if (cur_charset == MM_MODEM_CHARSET_UCS2)
+            convert_operator_from_ucs2 (&operator);
+
+        /* Ensure the operator name is valid UTF-8 so that we can send it
+         * through D-Bus and such.
+         */
+        if (!g_utf8_validate (operator, -1, NULL)) {
+            g_free (operator);
+            operator = NULL;
+        }
+    }
 
     return operator;
 }
