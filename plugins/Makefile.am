@@ -177,7 +177,8 @@ libmm_plugin_novatel_la_SOURCES = \
 libmm_plugin_novatel_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
-	-I$(top_srcdir)/src
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)
 
 libmm_plugin_novatel_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
