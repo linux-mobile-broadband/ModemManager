@@ -442,6 +442,9 @@ test_com_read_roam_pref (void *f, void *data)
 
     /* Parse the response into a result structure */
     result = qcdm_cmd_nv_get_roam_pref_result (buf, reply_len, &error);
+    if (error && (error->code == QCDM_COMMAND_NVCMD_FAILED))
+        return;
+
     g_assert (result);
 
     g_print ("\n");
@@ -493,7 +496,9 @@ test_com_read_mode_pref (void *f, void *data)
     /* Parse the response into a result structure */
     result = qcdm_cmd_nv_get_mode_pref_result (buf, reply_len, &error);
     if (!result) {
-        g_assert_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_NVCMD_FAILED);
+        g_assert (error);
+        g_assert (error->domain == QCDM_COMMAND_ERROR);
+        g_assert (error->code == QCDM_COMMAND_NVCMD_FAILED || error->code == QCDM_COMMAND_BAD_PARAMETER);
         return;
     }
 
