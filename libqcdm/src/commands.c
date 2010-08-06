@@ -438,6 +438,44 @@ qcdm_cmd_sw_version_result (const char *buf, gsize len, GError **error)
 /**********************************************************************/
 
 gsize
+qcdm_cmd_status_snapshot_new (char *buf, gsize len, GError **error)
+{
+    char cmdbuf[3];
+    DMCmdHeader *cmd = (DMCmdHeader *) &cmdbuf[0];
+
+    g_return_val_if_fail (buf != NULL, 0);
+    g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->code = DIAG_CMD_STATUS_SNAPSHOT;
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QCDMResult *
+qcdm_cmd_status_snapshot_result (const char *buf, gsize len, GError **error)
+{
+    QCDMResult *result = NULL;
+    DMCmdStatusSnapshotRsp *rsp = (DMCmdStatusSnapshotRsp *) buf;
+
+    g_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_STATUS_SNAPSHOT, sizeof (*rsp), error))
+        return NULL;
+
+    result = qcdm_result_new ();
+
+    qcdm_result_add_uint8 (result, QCDM_CMD_STATUS_SNAPSHOT_ITEM_BAND_CLASS, cdma_band_class_to_qcdm (rsp->band_class));
+    qcdm_result_add_uint8 (result, QCDM_CMD_STATUS_SNAPSHOT_ITEM_BASE_STATION_PREV, cdma_prev_to_qcdm (rsp->prev));
+    qcdm_result_add_uint8 (result, QCDM_CMD_STATUS_SNAPSHOT_ITEM_MOBILE_PREV, cdma_prev_to_qcdm (rsp->mob_prev));
+    qcdm_result_add_uint8 (result, QCDM_CMD_STATUS_SNAPSHOT_ITEM_PREV_IN_USE, cdma_prev_to_qcdm (rsp->prev_in_use));
+
+    return result;
+}
+
+/**********************************************************************/
+
+gsize
 qcdm_cmd_pilot_sets_new (char *buf, gsize len, GError **error)
 {
     char cmdbuf[3];

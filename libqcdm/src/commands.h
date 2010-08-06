@@ -148,6 +148,28 @@ QCDMResult *qcdm_cmd_sw_version_result (const char *buf,
 
 /**********************************************************************/
 
+/* One of QCDM_CDMA_BAND_CLASS_* */
+#define QCDM_CMD_STATUS_SNAPSHOT_ITEM_BAND_CLASS         "band-class"
+
+/* The protocol revision of the base station.  One of QCDM_CDMA_PREV_* */
+#define QCDM_CMD_STATUS_SNAPSHOT_ITEM_BASE_STATION_PREV  "prev"
+
+/* The protocol revision of the mobile terminal.  One of QCDM_CDMA_PREV_* */
+#define QCDM_CMD_STATUS_SNAPSHOT_ITEM_MOBILE_PREV        "mob-prev"
+
+/* The protocol revision currently in-use.  One of QCDM_CDMA_PREV_* */
+#define QCDM_CMD_STATUS_SNAPSHOT_ITEM_PREV_IN_USE        "prev-in-use"
+
+gsize       qcdm_cmd_status_snapshot_new    (char *buf,
+                                             gsize len,
+                                             GError **error);
+
+QCDMResult *qcdm_cmd_status_snapshot_result (const char *buf,
+                                             gsize len,
+                                             GError **error);
+
+/**********************************************************************/
+
 enum {
     QCDM_CMD_PILOT_SETS_TYPE_UNKNOWN = 0,
     QCDM_CMD_PILOT_SETS_TYPE_ACTIVE = 1,

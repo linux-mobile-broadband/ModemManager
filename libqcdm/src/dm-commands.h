@@ -265,6 +265,29 @@ struct DMCmdSwVersionRsp {
 } __attribute__ ((packed));
 typedef struct DMCmdSwVersionRsp DMCmdSwVersionRsp;
 
+/* DIAG_CMD_STATUS_SNAPSHOT */
+struct DMCmdStatusSnapshotRsp {
+    guint8 code;
+    guint8 esn[4];
+    guint8 imsi_s1[4];
+    guint8 imsi_s2[2];
+    guint8 imsi_s[8];
+    guint8 imsi_11_12;
+    guint16 mcc;
+    guint8 imsi_addr_num;
+    guint16 sid;
+    guint16 nid;
+    guint8 prev;
+    guint8 prev_in_use;
+    guint8 mob_prev;
+    guint8 band_class;
+    guint16 frequency;
+    guint8 oper_mode;
+    guint8 state;
+    guint8 sub_state;
+} __attribute__ ((packed));
+typedef struct DMCmdStatusSnapshotRsp DMCmdStatusSnapshotRsp;
+
 /* DIAG_SUBSYS_CM_STATE_INFO subsys command */
 struct DMCmdSubsysCMStateInfoRsp {
     DMCmdSubsysHeader header;

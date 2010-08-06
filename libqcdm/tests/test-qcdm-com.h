@@ -37,6 +37,8 @@ void test_com_status (void *f, void *data);
 
 void test_com_sw_version (void *f, void *data);
 
+void test_com_status_snapshot (void *f, void *data);
+
 void test_com_pilot_sets (void *f, void *data);
 
 void test_com_cm_subsys_state_info (void *f, void *data);

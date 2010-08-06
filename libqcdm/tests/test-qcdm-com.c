@@ -38,19 +38,19 @@ prev_to_string (guint8 prev)
 {
     switch (prev) {
     case QCDM_CDMA_PREV_IS_95:
-        return "IS-95";
+        return "1 (IS-95)";
     case QCDM_CDMA_PREV_IS_95A:
-        return "IS-95A";
+        return "2 (IS-95A)";
     case QCDM_CDMA_PREV_IS_95A_TSB74:
-        return "IS-95A TSB-74";
+        return "3 (IS-95A TSB-74)";
     case QCDM_CDMA_PREV_IS_95B_PHASE1:
-        return "IS-95B Phase I";
+        return "4 (IS-95B Phase I)";
     case QCDM_CDMA_PREV_IS_95B_PHASE2:
-        return "IS-95B Phase II";
+        return "5 (IS-95B Phase II)";
     case QCDM_CDMA_PREV_IS2000_REL0:
-        return "IS-2000 Release 0";
+        return "6 (IS-2000 Release 0)";
     case QCDM_CDMA_PREV_IS2000_RELA:
-        return "IS-2000 Release A";
+        return "7 (IS-2000 Release A)";
     default:
         break;
     }
@@ -681,6 +681,53 @@ test_com_sw_version (void *f, void *data)
 
     qcdm_result_unref (result);
 */
+}
+
+void
+test_com_status_snapshot (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    GError *error = NULL;
+    char buf[100];
+    gint len;
+    QCDMResult *result;
+    gsize reply_len;
+    guint8 n8;
+
+    len = qcdm_cmd_status_snapshot_new (buf, sizeof (buf), NULL);
+    g_assert (len == 4);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_status_snapshot_result (buf, reply_len, &error);
+    g_assert (result);
+
+    g_print ("\n");
+
+    n8 = 0;
+    qcdm_result_get_uint8 (result, QCDM_CMD_STATUS_SNAPSHOT_ITEM_BAND_CLASS, &n8);
+    g_message ("%s: Band Class: %s", __func__, band_class_to_string (n8));
+
+    n8 = 0;
+    qcdm_result_get_uint8 (result, QCDM_CMD_STATUS_SNAPSHOT_ITEM_BASE_STATION_PREV, &n8);
+    g_message ("%s: Base station P_REV: %s", __func__, prev_to_string (n8));
+
+    n8 = 0;
+    qcdm_result_get_uint8 (result, QCDM_CMD_STATUS_SNAPSHOT_ITEM_MOBILE_PREV, &n8);
+    g_message ("%s: Mobile P_REV: %s", __func__, prev_to_string (n8));
+
+    n8 = 0;
+    qcdm_result_get_uint8 (result, QCDM_CMD_STATUS_SNAPSHOT_ITEM_PREV_IN_USE, &n8);
+    g_message ("%s: P_REV in-use: %s", __func__, prev_to_string (n8));
+
+    qcdm_result_unref (result);
 }
 
 void
