@@ -41,6 +41,7 @@ enum {
     QCDM_COMMAND_NOT_ACCEPTED = 5,
     QCDM_COMMAND_BAD_MODE = 6,
     QCDM_COMMAND_NVCMD_FAILED = 7,
+    QCDM_COMMAND_SPC_LOCKED = 8,
 };
 
 #define QCDM_COMMAND_ERROR (qcdm_command_error_quark ())

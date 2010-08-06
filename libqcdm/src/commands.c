@@ -119,6 +119,8 @@ bin2hexstr (const guint8 *bytes, int len)
     return result;
 }
 
+/**********************************************************************/
+
 static gboolean
 check_command (const char *buf, gsize len, guint8 cmd, gsize min_len, GError **error)
 {
@@ -152,6 +154,11 @@ check_command (const char *buf, gsize len, guint8 cmd, gsize min_len, GError **e
     case DIAG_CMD_BAD_MODE:
         g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_BAD_MODE,
                      "DM command %d not allowed in the current device mode",
+                     cmd);
+        return FALSE;
+    case DIAG_CMD_BAD_SPC_MODE:
+        g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_SPC_LOCKED,
+                     "DM command %d not allowed because the Service Programming Code is locked",
                      cmd);
         return FALSE;
     default:
