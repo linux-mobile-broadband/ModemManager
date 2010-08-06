@@ -96,7 +96,7 @@ libmm_plugin_hso_la_SOURCES = \
 	mm-modem-hso.h
 
 mm-modem-gsm-hso-glue.h: $(top_srcdir)/introspection/mm-modem-gsm-hso.xml
-	dbus-binding-tool --prefix=mm_modem_gsm_hso --mode=glib-server --output=$@ $<
+	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_gsm_hso --mode=glib-server --output=$@ $<
 
 libmm_plugin_hso_la_CPPFLAGS = \
 	$(MM_CFLAGS) \

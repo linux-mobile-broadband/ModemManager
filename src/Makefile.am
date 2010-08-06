@@ -113,25 +113,25 @@ modem_manager_SOURCES = \
 	mm-properties-changed-signal.h
 
 mm-manager-glue.h: $(top_srcdir)/introspection/mm-manager.xml
-	dbus-binding-tool --prefix=mm_manager --mode=glib-server --output=$@ $<
+	$(AM_V_GEN) dbus-binding-tool --prefix=mm_manager --mode=glib-server --output=$@ $<
 
 mm-modem-glue.h: $(top_srcdir)/introspection/mm-modem.xml
-	dbus-binding-tool --prefix=mm_modem --mode=glib-server --output=$@ $<
+	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem --mode=glib-server --output=$@ $<
 
 mm-modem-simple-glue.h: $(top_srcdir)/introspection/mm-modem-simple.xml
-	dbus-binding-tool --prefix=mm_modem_simple --mode=glib-server --output=$@ $<
+	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_simple --mode=glib-server --output=$@ $<
 
 mm-modem-cdma-glue.h: $(top_srcdir)/introspection/mm-modem-cdma.xml
-	dbus-binding-tool --prefix=mm_modem_cdma --mode=glib-server --output=$@ $<
+	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_cdma --mode=glib-server --output=$@ $<
 
 mm-modem-gsm-card-glue.h: $(top_srcdir)/introspection/mm-modem-gsm-card.xml
-	dbus-binding-tool --prefix=mm_modem_gsm_card --mode=glib-server --output=$@ $<
+	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_gsm_card --mode=glib-server --output=$@ $<
 
 mm-modem-gsm-network-glue.h: $(top_srcdir)/introspection/mm-modem-gsm-network.xml
-	dbus-binding-tool --prefix=mm_modem_gsm_network --mode=glib-server --output=$@ $<
+	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_gsm_network --mode=glib-server --output=$@ $<
 
 mm-modem-gsm-sms-glue.h: $(top_srcdir)/introspection/mm-modem-gsm-sms.xml
-	dbus-binding-tool --prefix=mm_modem_gsm_sms --mode=glib-server --output=$@ $<
+	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_gsm_sms --mode=glib-server --output=$@ $<
 
 BUILT_SOURCES = \
 	mm-manager-glue.h \
@@ -144,7 +144,7 @@ BUILT_SOURCES = \
 
 if WITH_LOCATION_API
 mm-modem-location-glue.h: $(top_srcdir)/introspection/mm-modem-location.xml
-	dbus-binding-tool --prefix=mm_modem_location --mode=glib-server --output=$@ $<
+	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_location --mode=glib-server --output=$@ $<
 
 modem_manager_SOURCES += $(loc_sources)
 
