@@ -791,7 +791,11 @@ test_data_free (TestData *data)
 }
 
 
+#if GLIB_CHECK_VERSION(2,25,12)
+typedef GTestFixtureFunc TCFunc;
+#else
 typedef void (*TCFunc)(void);
+#endif
 
 #define TESTCASE(t, d) g_test_create_case (#t, 0, d, NULL, (TCFunc) t, NULL)
 
