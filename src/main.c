@@ -196,6 +196,17 @@ main (int argc, char *argv[])
         return -1;
     }
 
+#ifndef HAVE_DBUS_GLIB_DISABLE_LEGACY_PROP_ACCESS
+#error HAVE_DBUS_GLIB_DISABLE_LEGACY_PROP_ACCESS not defined
+#endif
+
+#if HAVE_DBUS_GLIB_DISABLE_LEGACY_PROP_ACCESS
+    /* Ensure that non-exported properties don't leak out, and that the
+     * introspection 'access' permissions are respected.
+     */
+    dbus_glib_global_set_disable_legacy_property_access ();
+#endif
+
     proxy = create_dbus_proxy (bus);
     if (!proxy)
         return -1;
