@@ -107,6 +107,54 @@ hdr_rev_to_string (guint8 hdr_rev)
     return "unknown";
 }
 
+static const char *
+status_snapshot_state_to_string (guint8 state)
+{
+    switch (state) {
+    case QCDM_CMD_STATUS_SNAPSHOT_STATE_NO_SERVICE:
+        return "no service";
+    case QCDM_CMD_STATUS_SNAPSHOT_STATE_INITIALIZATION:
+        return "initialization";
+    case QCDM_CMD_STATUS_SNAPSHOT_STATE_IDLE:
+        return "idle";
+    case QCDM_CMD_STATUS_SNAPSHOT_STATE_VOICE_CHANNEL_INIT:
+        return "voice channel init";
+    case QCDM_CMD_STATUS_SNAPSHOT_STATE_WAITING_FOR_ORDER:
+        return "waiting for order";
+    case QCDM_CMD_STATUS_SNAPSHOT_STATE_WAITING_FOR_ANSWER:
+        return "waiting for answer";
+    case QCDM_CMD_STATUS_SNAPSHOT_STATE_CONVERSATION:
+        return "conversation";
+    case QCDM_CMD_STATUS_SNAPSHOT_STATE_RELEASE:
+        return "release";
+    case QCDM_CMD_STATUS_SNAPSHOT_STATE_SYSTEM_ACCESS:
+        return "system access";
+    case QCDM_CMD_STATUS_SNAPSHOT_STATE_OFFLINE_CDMA:
+        return "offline CDMA";
+    case QCDM_CMD_STATUS_SNAPSHOT_STATE_OFFLINE_HDR:
+        return "offline HDR";
+    case QCDM_CMD_STATUS_SNAPSHOT_STATE_OFFLINE_ANALOG:
+        return "offline analog";
+    case QCDM_CMD_STATUS_SNAPSHOT_STATE_RESET:
+        return "reset";
+    case QCDM_CMD_STATUS_SNAPSHOT_STATE_POWER_DOWN:
+        return "power down";
+    case QCDM_CMD_STATUS_SNAPSHOT_STATE_POWER_SAVE:
+        return "power save";
+    case QCDM_CMD_STATUS_SNAPSHOT_STATE_POWER_UP:
+        return "power up";
+    case QCDM_CMD_STATUS_SNAPSHOT_STATE_LOW_POWER_MODE:
+        return "low power mode";
+    case QCDM_CMD_STATUS_SNAPSHOT_STATE_SEARCHER_DSMM:
+        return "searcher DSMM";
+    case QCDM_CMD_STATUS_SNAPSHOT_STATE_HDR:
+        return "HDR";
+    default:
+        break;
+    }
+    return "unknown";
+}
+
 /************************************************************/
 
 typedef struct {
@@ -731,6 +779,10 @@ test_com_status_snapshot (void *f, void *data)
     n8 = 0;
     qcdm_result_get_uint8 (result, QCDM_CMD_STATUS_SNAPSHOT_ITEM_PREV_IN_USE, &n8);
     g_message ("%s: P_REV in-use: %s", __func__, prev_to_string (n8));
+
+    n8 = 0;
+    qcdm_result_get_uint8 (result, QCDM_CMD_STATUS_SNAPSHOT_ITEM_STATE, &n8);
+    g_message ("%s: State: %d (%s)", __func__, n8, status_snapshot_state_to_string (n8));
 
     qcdm_result_unref (result);
 }

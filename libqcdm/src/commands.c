@@ -452,6 +452,13 @@ qcdm_cmd_status_snapshot_new (char *buf, gsize len, GError **error)
     return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
 }
 
+static guint8
+snapshot_state_to_qcdm (guint8 cdma_state)
+{
+    /* CDMA_STATUS_SNAPSHOT_STATE_* -> QCDM_STATUS_SNAPSHOT_STATE_* */
+    return cdma_state + 1;
+}
+
 QCDMResult *
 qcdm_cmd_status_snapshot_result (const char *buf, gsize len, GError **error)
 {
@@ -469,6 +476,7 @@ qcdm_cmd_status_snapshot_result (const char *buf, gsize len, GError **error)
     qcdm_result_add_uint8 (result, QCDM_CMD_STATUS_SNAPSHOT_ITEM_BASE_STATION_PREV, cdma_prev_to_qcdm (rsp->prev));
     qcdm_result_add_uint8 (result, QCDM_CMD_STATUS_SNAPSHOT_ITEM_MOBILE_PREV, cdma_prev_to_qcdm (rsp->mob_prev));
     qcdm_result_add_uint8 (result, QCDM_CMD_STATUS_SNAPSHOT_ITEM_PREV_IN_USE, cdma_prev_to_qcdm (rsp->prev_in_use));
+    qcdm_result_add_uint8 (result, QCDM_CMD_STATUS_SNAPSHOT_ITEM_STATE, snapshot_state_to_qcdm (rsp->state & 0xF));
 
     return result;
 }

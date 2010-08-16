@@ -160,6 +160,32 @@ QCDMResult *qcdm_cmd_sw_version_result (const char *buf,
 /* The protocol revision currently in-use.  One of QCDM_CDMA_PREV_* */
 #define QCDM_CMD_STATUS_SNAPSHOT_ITEM_PREV_IN_USE        "prev-in-use"
 
+enum {
+    QCDM_CMD_STATUS_SNAPSHOT_STATE_UNKNOWN            = 0x00,
+    QCDM_CMD_STATUS_SNAPSHOT_STATE_NO_SERVICE         = 0x01,
+    QCDM_CMD_STATUS_SNAPSHOT_STATE_INITIALIZATION     = 0x02,
+    QCDM_CMD_STATUS_SNAPSHOT_STATE_IDLE               = 0x03,
+    QCDM_CMD_STATUS_SNAPSHOT_STATE_VOICE_CHANNEL_INIT = 0x04,
+    QCDM_CMD_STATUS_SNAPSHOT_STATE_WAITING_FOR_ORDER  = 0x05,
+    QCDM_CMD_STATUS_SNAPSHOT_STATE_WAITING_FOR_ANSWER = 0x06,
+    QCDM_CMD_STATUS_SNAPSHOT_STATE_CONVERSATION       = 0x07,
+    QCDM_CMD_STATUS_SNAPSHOT_STATE_RELEASE            = 0x08,
+    QCDM_CMD_STATUS_SNAPSHOT_STATE_SYSTEM_ACCESS      = 0x09,
+    QCDM_CMD_STATUS_SNAPSHOT_STATE_OFFLINE_CDMA       = 0x11,
+    QCDM_CMD_STATUS_SNAPSHOT_STATE_OFFLINE_HDR        = 0x12,
+    QCDM_CMD_STATUS_SNAPSHOT_STATE_OFFLINE_ANALOG     = 0x13,
+    QCDM_CMD_STATUS_SNAPSHOT_STATE_RESET              = 0x14,
+    QCDM_CMD_STATUS_SNAPSHOT_STATE_POWER_DOWN         = 0x15,
+    QCDM_CMD_STATUS_SNAPSHOT_STATE_POWER_SAVE         = 0x16,
+    QCDM_CMD_STATUS_SNAPSHOT_STATE_POWER_UP           = 0x17,
+    QCDM_CMD_STATUS_SNAPSHOT_STATE_LOW_POWER_MODE     = 0x18,
+    QCDM_CMD_STATUS_SNAPSHOT_STATE_SEARCHER_DSMM      = 0x19, /* Dedicated System Measurement Mode */
+    QCDM_CMD_STATUS_SNAPSHOT_STATE_HDR                = 0x41,
+};
+
+/* The protocol revision currently in-use.  One of QCDM_STATUS_SNAPSHOT_STATE_* */
+#define QCDM_CMD_STATUS_SNAPSHOT_ITEM_STATE              "state"
+
 gsize       qcdm_cmd_status_snapshot_new    (char *buf,
                                              gsize len,
                                              GError **error);
