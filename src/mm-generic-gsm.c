@@ -251,6 +251,10 @@ pin_check_done (MMAtSerialPort *port,
     else if (response && strstr (response->str, "+CPIN: ")) {
         const char *str = strstr (response->str, "+CPIN: ") + 7;
 
+        /* Some phones (Motorola EZX models) seem to quote the response */
+        if (str[0] == '"')
+            str++;
+
         if (g_str_has_prefix (str, "READY")) {
             mm_modem_base_set_unlock_required (MM_MODEM_BASE (info->modem), NULL);
             if (MM_MODEM_GSM_CARD_GET_INTERFACE (info->modem)->get_unlock_retries)
