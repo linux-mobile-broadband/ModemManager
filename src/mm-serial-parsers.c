@@ -192,6 +192,7 @@ typedef struct {
     GRegex *regex_connect;
     GRegex *regex_cme_error;
     GRegex *regex_cme_error_str;
+    GRegex *regex_ezx_error;
     GRegex *regex_unknown_error;
     GRegex *regex_connect_failed;
 } MMSerialParserV1;
@@ -208,6 +209,7 @@ mm_serial_parser_v1_new (void)
     parser->regex_connect = g_regex_new ("\\r\\nCONNECT.*\\r\\n", flags, 0, NULL);
     parser->regex_cme_error = g_regex_new ("\\r\\n\\+CME ERROR: (\\d+)\\r\\n$", flags, 0, NULL);
     parser->regex_cme_error_str = g_regex_new ("\\r\\n\\+CME ERROR: ([^\\n\\r]+)\\r\\n$", flags, 0, NULL);
+    parser->regex_ezx_error = g_regex_new ("\\r\\n\\MODEM ERROR: (\\d+)\\r\\n$", flags, 0, NULL);
     parser->regex_unknown_error = g_regex_new ("\\r\\n(ERROR)|(COMMAND NOT SUPPORT)\\r\\n$", flags, 0, NULL);
     parser->regex_connect_failed = g_regex_new ("\\r\\n(NO CARRIER)|(BUSY)|(NO ANSWER)|(NO DIALTONE)\\r\\n$", flags, 0, NULL);
 
@@ -273,6 +275,19 @@ mm_serial_parser_v1_parse (gpointer data,
         goto done;
     }
 
+    /* Motorola EZX errors */
+    found = g_regex_match_full (parser->regex_ezx_error,
+                                response->str, response->len,
+                                0, 0, &match_info, NULL);
+    if (found) {
+        str = g_match_info_fetch (match_info, 1);
+        g_assert (str);
+        local_error = mm_mobile_error_for_code (MM_MOBILE_ERROR_UNKNOWN);
+        g_free (str);
+        g_match_info_free (match_info);
+        goto done;
+    }
+
     /* Last resort; unknown error */
     found = g_regex_match_full (parser->regex_unknown_error,
                                 response->str, response->len,
@@ -332,6 +347,7 @@ mm_serial_parser_v1_destroy (gpointer data)
     g_regex_unref (parser->regex_connect);
     g_regex_unref (parser->regex_cme_error);
     g_regex_unref (parser->regex_cme_error_str);
+    g_regex_unref (parser->regex_ezx_error);
     g_regex_unref (parser->regex_unknown_error);
     g_regex_unref (parser->regex_connect_failed);
 
