@@ -65,6 +65,12 @@
       </arg>
     </method>
 
+    <property name="MEID" type="s" access="read">
+      <tp:docstring>
+        The modem's Mobile Equipment Identifier.
+      </tp:docstring>
+    </property>
+
     <signal name="RegistrationStateChanged">
       <tp:docstring>
 	The device registration state changed.
