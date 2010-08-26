@@ -1424,6 +1424,7 @@ get_card_info (MMModem *modem,
 }
 
 #define PIN_PORT_TAG "pin-port"
+#define SAVED_ERROR_TAG "error"
 
 static void
 pin_puk_recheck_done (MMModem *modem, GError *error, gpointer user_data);
@@ -1443,6 +1444,7 @@ pin_puk_recheck_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMSerialPort *port;
+    GError *saved_error;
 
     /* Clear the pin check timeout to ensure that it won't ever get a
      * stale MMCallbackInfo if the modem got removed.  We'll reschedule it here
@@ -1483,6 +1485,13 @@ pin_puk_recheck_done (MMModem *modem, GError *error, gpointer user_data)
     if (modem && port)
         mm_serial_port_close (port);
 
+    /* If we have a saved error from sending PIN/PUK, return that to callers */
+    saved_error = mm_callback_info_get_data (info, SAVED_ERROR_TAG);
+    if (saved_error) {
+        g_clear_error (&info->error);
+        info->error = saved_error;
+    }
+
     mm_callback_info_schedule (info);
 }
 
@@ -1495,10 +1504,18 @@ send_puk_done (MMAtSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
     if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-        mm_serial_port_close (MM_SERIAL_PORT (port));
-        return;
+        if (error->domain != MM_MOBILE_ERROR) {
+            info->error = g_error_copy (error);
+            mm_callback_info_schedule (info);
+            mm_serial_port_close (MM_SERIAL_PORT (port));
+            return;
+        } else {
+            /* Keep the real error around so we can send it back
+             * when we're done rechecking CPIN status.
+             */
+            mm_callback_info_set_data (info, SAVED_ERROR_TAG,
+                                       g_error_copy (error), NULL);
+        }
     }
 
     /* Get latest PIN status */
@@ -1550,10 +1567,18 @@ send_pin_done (MMAtSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
     if (error) {
-        info->error = g_error_copy (error);
-        mm_callback_info_schedule (info);
-        mm_serial_port_close (MM_SERIAL_PORT (port));
-        return;
+        if (error->domain != MM_MOBILE_ERROR) {
+            info->error = g_error_copy (error);
+            mm_callback_info_schedule (info);
+            mm_serial_port_close (MM_SERIAL_PORT (port));
+            return;
+        } else {
+            /* Keep the real error around so we can send it back
+             * when we're done rechecking CPIN status.
+             */
+            mm_callback_info_set_data (info, SAVED_ERROR_TAG,
+                                       g_error_copy (error), NULL);
+        }
     }
 
     /* Get latest PIN status */
