@@ -301,8 +301,13 @@ mm_modem_base_set_unlock_retries (MMModemBase *self, guint unlock_retries)
 
     dbus_path = (const char *) g_object_get_data (G_OBJECT (self), DBUS_PATH_TAG);
     if (dbus_path) {
-        g_message ("Modem %s: # unlock retries for %s is %d",
-                   dbus_path, priv->unlock_required, priv->unlock_retries);
+        if (priv->unlock_required) {
+            g_message ("Modem %s: # unlock retries for %s is %d",
+                       dbus_path, priv->unlock_required, priv->unlock_retries);
+        } else {
+            g_message ("Modem %s: # unlock retries is %d",
+                       dbus_path, priv->unlock_retries);
+        }
     }
 
     g_object_notify (G_OBJECT (self), MM_MODEM_UNLOCK_RETRIES);
