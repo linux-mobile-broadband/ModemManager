@@ -440,6 +440,25 @@ QCDMResult *qcdm_cmd_hdr_subsys_state_info_result (const char *buf,
 
 /**********************************************************************/
 
+/* Max # of log items this device supports */
+#define QCDM_CMD_EXT_LOGMASK_ITEM_MAX_ITEMS   "max-items"
+
+gsize       qcdm_cmd_ext_logmask_new    (char *buf,
+                                         gsize len,
+                                         GSList *items,
+                                         guint16 maxlog,
+                                         GError **error);
+
+QCDMResult *qcdm_cmd_ext_logmask_result (const char *buf,
+                                         gsize len,
+                                         GError **error);
+
+/* Returns TRUE if 'item' is set in the log mask */
+gboolean    qcmd_cmd_ext_logmask_result_get_item (QCDMResult *result,
+                                                  guint16 item);
+
+/**********************************************************************/
+
 #define QCDM_CMD_ZTE_SUBSYS_STATUS_ITEM_SIGNAL_INDICATOR    "signal-indicator"
 
 gsize       qcdm_cmd_zte_subsys_status_new    (char *buf,

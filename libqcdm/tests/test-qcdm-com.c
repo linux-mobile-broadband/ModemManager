@@ -1195,6 +1195,65 @@ test_com_hdr_subsys_state_info (void *f, void *data)
 }
 
 void
+test_com_ext_logmask (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    GError *error = NULL;
+    char buf[520];
+    gint len;
+    QCDMResult *result;
+    gsize reply_len;
+    GSList *items = NULL;
+    guint32 maxlog = 0;
+
+    /* First get # of items the device supports */
+    len = qcdm_cmd_ext_logmask_new (buf, sizeof (buf), NULL, 0, NULL);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    g_print ("\n");
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_ext_logmask_result (buf, reply_len, &error);
+    g_assert (result);
+
+    qcdm_result_get_uint32 (result, QCDM_CMD_EXT_LOGMASK_ITEM_MAX_ITEMS, &maxlog);
+    g_message ("%s: Max # Log Items: %u (0x%X)", __func__, maxlog, maxlog);
+
+    qcdm_result_unref (result);
+
+    /* Now enable some log items */
+    items = g_slist_append (items, GUINT_TO_POINTER (0x002C));
+    items = g_slist_append (items, GUINT_TO_POINTER (0x002E));
+    len = qcdm_cmd_ext_logmask_new (buf, sizeof (buf), items, (guint16) maxlog, NULL);
+    g_slist_free (items);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    g_print ("\n");
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_ext_logmask_result (buf, reply_len, &error);
+    g_assert (result);
+
+    qcdm_result_unref (result);
+
+    /* Wait for a log packet */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+}
+
+void
 test_com_zte_subsys_status (void *f, void *data)
 {
     TestComData *d = data;

@@ -368,6 +368,15 @@ struct DMCmdPilotSetsRsp {
 } __attribute__ ((packed));
 typedef struct DMCmdPilotSetsRsp DMCmdPilotSetsRsp;
 
+struct DMCmdExtLogMask {
+    guint8 code;
+    /* Bit number of highest '1' in 'mask'; set to 0 to get current mask. */
+    guint16 len;
+    /* Bitfield of log messages to receive */
+    guint8 mask[512];
+} __attribute__ ((packed));
+typedef struct DMCmdExtLogMask DMCmdExtLogMask;
+
 /* DIAG_SUBSYS_NW_CONTROL_* subsys command */
 struct DMCmdSubsysNwSnapshotReq {
     DMCmdSubsysHeader hdr;

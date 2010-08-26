@@ -993,6 +993,108 @@ qcdm_cmd_hdr_subsys_state_info_result (const char *buf, gsize len, GError **erro
 /**********************************************************************/
 
 gsize
+qcdm_cmd_ext_logmask_new (char *buf,
+                          gsize len,
+                          GSList *items,
+                          guint16 maxlog,
+                          GError **error)
+{
+    char cmdbuf[sizeof (DMCmdExtLogMask) + 2];
+    DMCmdExtLogMask *cmd = (DMCmdExtLogMask *) &cmdbuf[0];
+    GSList *iter;
+    guint16 highest = 0;
+    gsize total = 3;
+
+    g_return_val_if_fail (buf != NULL, 0);
+    g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->code = DIAG_CMD_EXT_LOGMASK;
+
+    for (iter = items; iter; iter = g_slist_next (iter)) {
+        guint32 item = GPOINTER_TO_UINT (iter->data);
+
+        g_warn_if_fail (item > 0);
+        g_warn_if_fail (item < 4095);
+        cmd->mask[item / 8] |= 1 << item % 8;
+
+        if (item > highest)
+            highest = item;
+    }
+
+    g_return_val_if_fail (highest <= maxlog, 0);
+    cmd->len = GUINT16_TO_LE (maxlog);
+    total += maxlog / 8;
+    if (maxlog && maxlog % 8)
+        total++;
+
+    return dm_encapsulate_buffer (cmdbuf, total, sizeof (cmdbuf), buf, len);
+}
+
+QCDMResult *
+qcdm_cmd_ext_logmask_result (const char *buf,
+                             gsize len,
+                             GError **error)
+{
+    QCDMResult *result = NULL;
+    DMCmdExtLogMask *rsp = (DMCmdExtLogMask *) buf;
+    guint32 masklen = 0, maxlog = 0;
+    gsize minlen = 0;
+
+    g_return_val_if_fail (buf != NULL, NULL);
+
+    /* Ensure size is at least enough for the command header */
+    if (len < 1) {
+        g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_BAD_LENGTH,
+                     "DM command %d response not long enough (got %zu, expected "
+                     "at least %d).", DIAG_CMD_EXT_LOGMASK, len, 3);
+        return FALSE;
+    }
+
+    /* Result of a 'set' operation will be only 1 byte in size; result of
+     * a 'get' operation (ie setting len to 0x0000 in the request) will be
+     * the size of the header (3) plus the max log length.
+     */
+
+    if (len == 1)
+        minlen = 1;
+    else {
+        /* Ensure size is equal to max # of log items + 3 */
+        maxlog = GUINT16_FROM_LE (rsp->len);
+        masklen = maxlog / 8;
+        if (maxlog % 8)
+            masklen++;
+
+        if (len < (masklen + 3)) {
+            g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_BAD_LENGTH,
+                         "DM command %d response not long enough (got %zu, expected "
+                         "at least %d).", DIAG_CMD_EXT_LOGMASK, len, masklen + 3);
+            return FALSE;
+        }
+        minlen = masklen + 3;
+    }
+
+    if (!check_command (buf, len, DIAG_CMD_EXT_LOGMASK, minlen, error))
+        return NULL;
+
+    result = qcdm_result_new ();
+
+    if (minlen != 4)
+        qcdm_result_add_uint32 (result, QCDM_CMD_EXT_LOGMASK_ITEM_MAX_ITEMS, maxlog);
+
+    return result;
+}
+
+gboolean
+qcmd_cmd_ext_logmask_result_get_item (QCDMResult *result,
+                                      guint16 item)
+{
+    return FALSE;
+}
+
+/**********************************************************************/
+
+gsize
 qcdm_cmd_zte_subsys_status_new (char *buf, gsize len, GError **error)
 {
     char cmdbuf[sizeof (DMCmdSubsysHeader) + 2];
