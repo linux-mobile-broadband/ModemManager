@@ -64,6 +64,10 @@ case $with_polkit in
 	AC_DEFINE(WITH_POLKIT, 1, [Define if you want to use PolicyKit])
 	AC_SUBST(POLKIT_CFLAGS)
 	AC_SUBST(POLKIT_LIBS)
+
+	# Check for polkit_authority_get_sync()
+	AC_CHECK_LIB([polkit-gobject-1], [polkit_authority_get_sync], ac_have_pk_auth_get_sync="1", ac_have_pk_auth_get_sync="0")
+	AC_DEFINE_UNQUOTED(HAVE_POLKIT_AUTHORITY_GET_SYNC, $ac_have_pk_auth_get_sync, [Define if you have a polkit with polkit_authority_get_sync()])
         ;;
     *)
         with_polkit=no

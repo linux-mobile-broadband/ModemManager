@@ -15,6 +15,7 @@
 
 #include <polkit/polkit.h>
 
+#include <config.h>
 #include "mm-auth-request-polkit.h"
 #include "mm-auth-provider-polkit.h"
 
@@ -72,19 +73,39 @@ real_create_request (MMAuthProvider *provider,
 
 /*****************************************************************************/
 
+/* Fix for polkit 0.97 and later */
+#if !HAVE_POLKIT_AUTHORITY_GET_SYNC
+static inline PolkitAuthority *
+polkit_authority_get_sync (GCancellable *cancellable, GError **error)
+{
+	PolkitAuthority *authority;
+
+	authority = polkit_authority_get ();
+	if (!authority)
+		g_set_error (error, 0, 0, "failed to get the PolicyKit authority");
+	return authority;
+}
+#endif
+
 static void
 mm_auth_provider_polkit_init (MMAuthProviderPolkit *self)
 {
     MMAuthProviderPolkitPrivate *priv = MM_AUTH_PROVIDER_POLKIT_GET_PRIVATE (self);
+    GError *error = NULL;
 
-    priv->authority = polkit_authority_get ();
+    priv->authority = polkit_authority_get_sync (NULL, &error);
     if (priv->authority) {
         priv->auth_changed_id = g_signal_connect (priv->authority,
                                                   "changed",
                                                   G_CALLBACK (pk_authority_changed_cb),
                                                   self);
-    } else
-        g_warning ("%s: failed to create PolicyKit authority.", __func__);
+    } else {
+		g_warning ("%s: failed to create PolicyKit authority: (%d) %s",
+                   __func__,
+		           error ? error->code : -1,
+		           error && error->message ? error->message : "(unknown)");
+		g_clear_error (&error);
+    }
 }
 
 static void
