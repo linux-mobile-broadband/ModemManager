@@ -377,6 +377,20 @@ struct DMCmdExtLogMask {
 } __attribute__ ((packed));
 typedef struct DMCmdExtLogMask DMCmdExtLogMask;
 
+struct DMCmdEventReport {
+    guint8 code;
+    guint8 on;
+} __attribute__ ((packed));
+typedef struct DMCmdEventReport DMCmdEventReport;
+
+struct DMCmdEventReportRsp {
+    guint8 code;
+    guint16 len;
+    guint16 event_id;
+    guint8 data[0];
+} __attribute__ ((packed));
+typedef struct DMCmdEventReportRsp DMCmdEventReportRsp;
+
 /* DIAG_SUBSYS_NW_CONTROL_* subsys command */
 struct DMCmdSubsysNwSnapshotReq {
     DMCmdSubsysHeader hdr;

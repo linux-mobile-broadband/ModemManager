@@ -1254,6 +1254,49 @@ test_com_ext_logmask (void *f, void *data)
 }
 
 void
+test_com_event_report (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    GError *error = NULL;
+    char buf[520];
+    gint len;
+    QCDMResult *result;
+    gsize reply_len;
+
+    /* Turn event reporting on */
+    len = qcdm_cmd_event_report_new (buf, sizeof (buf), TRUE, NULL);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    g_print ("\n");
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_event_report_result (buf, reply_len, &error);
+    g_assert (result);
+
+    qcdm_result_unref (result);
+
+    /* Wait for an event */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    /* Turn event reporting off */
+    len = qcdm_cmd_event_report_new (buf, sizeof (buf), FALSE, NULL);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+}
+
+void
 test_com_zte_subsys_status (void *f, void *data)
 {
     TestComData *d = data;

@@ -1095,6 +1095,35 @@ qcmd_cmd_ext_logmask_result_get_item (QCDMResult *result,
 /**********************************************************************/
 
 gsize
+qcdm_cmd_event_report_new (char *buf, gsize len, gboolean start, GError **error)
+{
+    char cmdbuf[4];
+    DMCmdEventReport *cmd = (DMCmdEventReport *) &cmdbuf[0];
+
+    g_return_val_if_fail (buf != NULL, 0);
+    g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->code = DIAG_CMD_EVENT_REPORT;
+    cmd->on = start ? 1 : 0;
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QCDMResult *
+qcdm_cmd_event_report_result (const char *buf, gsize len, GError **error)
+{
+    g_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_EVENT_REPORT, sizeof (DMCmdEventReport), error))
+        return NULL;
+
+    return qcdm_result_new ();
+}
+
+/**********************************************************************/
+
+gsize
 qcdm_cmd_zte_subsys_status_new (char *buf, gsize len, GError **error)
 {
     char cmdbuf[sizeof (DMCmdSubsysHeader) + 2];
