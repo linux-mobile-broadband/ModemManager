@@ -561,25 +561,6 @@ out:
 }
 
 static void
-enable_error_reporting_done (MMAtSerialPort *port,
-                             GString *response,
-                             GError *error,
-                             gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
-
-    /* Just ignore errors, see comment in init_done() */
-    if (error)
-        g_warning ("Your CDMA modem does not support +CMEE command");
-
-    if (MM_GENERIC_CDMA_GET_CLASS (self)->post_enable)
-        MM_GENERIC_CDMA_GET_CLASS (self)->post_enable (self, enable_all_done, info);
-    else
-        enable_all_done (MM_MODEM (self), NULL, info);
-}
-
-static void
 init_done (MMAtSerialPort *port,
            GString *response,
            GError *error,
@@ -595,12 +576,17 @@ init_done (MMAtSerialPort *port,
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
     } else {
-        /* Try to enable better error reporting. My experience so far indicates
-           there's some CDMA modems that does not support that.
-        FIXME: It's mandatory by spec, so it really shouldn't be optional. Figure
-        out which CDMA modems have problems with it and implement plugin for them.
-        */
-        mm_at_serial_port_queue_command (port, "+CMEE=1", 3, enable_error_reporting_done, user_data);
+        MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
+
+        /* Try enabling better error reporting on CDMA devices, but few
+         * actually support +CMEE as it's more of a GSM command.
+         */
+        mm_at_serial_port_queue_command (port, "+CMEE=1", 3, NULL, NULL);
+
+        if (MM_GENERIC_CDMA_GET_CLASS (self)->post_enable)
+            MM_GENERIC_CDMA_GET_CLASS (self)->post_enable (self, enable_all_done, info);
+        else
+            enable_all_done (MM_MODEM (self), NULL, info);
     }
 }
 
