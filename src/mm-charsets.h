@@ -39,7 +39,7 @@ MMModemCharset mm_modem_charset_from_string (const char *string);
  * UTF-8 encoded.
  */
 gboolean mm_modem_charset_byte_array_append (GByteArray *array,
-                                             const char *string,
+                                             const char *utf8,
                                              gboolean quoted,
                                              MMModemCharset charset);
 
@@ -47,6 +47,10 @@ gboolean mm_modem_charset_byte_array_append (GByteArray *array,
  * and convert it from the given character set to UTF-8.
  */
 char *mm_modem_charset_hex_to_utf8 (const char *src, MMModemCharset charset);
+
+guint8 *mm_charset_utf8_to_unpacked_gsm (const char *utf8, guint32 *out_len);
+
+guint8 *mm_charset_gsm_unpacked_to_utf8 (const guint8 *gsm, guint32 len);
 
 #endif /* MM_CHARSETS_H */
 
