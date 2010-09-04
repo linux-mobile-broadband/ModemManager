@@ -425,3 +425,80 @@ mm_charset_utf8_to_unpacked_gsm (const char *utf8, guint32 *out_len)
     return g_byte_array_free (gsm, FALSE);
 }
 
+guint8 *
+gsm_unpack (const guint8 *gsm,
+            guint32 gsm_len,
+            guint8 start_offset,  /* in _bits_ */
+            guint32 *out_unpacked_len)
+{
+    GByteArray *unpacked;
+    int i, nchars;
+
+    nchars = ((gsm_len * 8) - start_offset) / 7;
+    unpacked = g_byte_array_sized_new (nchars + 1);
+
+    for (i = 0; i < nchars; i++) {
+        guint8 bits_here, bits_in_next, octet, offset, c;
+        guint32 start_bit;
+
+        start_bit = start_offset + (i * 7); /* Overall bit offset of char in buffer */
+        offset = start_bit % 8;  /* Offset to start of char in this byte */
+        bits_here = offset ? (8 - offset) : 7;
+        bits_in_next = 7 - bits_here;
+
+        /* Grab bits in the current byte */
+        octet = gsm[start_bit / 8];
+        c = (octet >> offset) & (0xFF >> (8 - bits_here));
+
+        /* Grab any bits that spilled over to next byte */
+        if (bits_in_next) {
+            octet = gsm[(start_bit / 8) + 1];
+            c |= (octet & (0xFF >> (8 - bits_in_next))) << bits_here;
+        }
+        g_byte_array_append (unpacked, &c, 1);
+    }
+
+    *out_unpacked_len = unpacked->len;
+    return g_byte_array_free (unpacked, FALSE);
+}
+
+guint8 *
+gsm_pack (const guint8 *src,
+          guint32 src_len,
+          guint8 start_offset,
+          guint32 *out_packed_len)
+{
+    GByteArray *packed;
+    guint8 c, add_last = 0;
+    int i;
+
+    packed = g_byte_array_sized_new (src_len);
+
+    for (i = 0, c = 0; i < src_len; i++) {
+        guint8 bits_here, offset;
+        guint32 start_bit;
+
+        start_bit = start_offset + (i * 7); /* Overall bit offset of char in buffer */
+        offset = start_bit % 8; /* Offset to start of char in this byte */
+        bits_here = offset ? (8 - offset) : 7;
+
+        c |= (src[i] & 0x7F) << offset;
+        if (offset) {
+            /* Add this packed byte */
+            g_byte_array_append (packed, &c, 1);
+            c = add_last = 0;
+        }
+
+        /* Pack the rest of this char into the next byte */
+        if (bits_here != 7) {
+            c = (src[i] & 0x7F) >> bits_here;
+            add_last = 1;
+        }
+    }
+    if (add_last)
+        g_byte_array_append (packed, &c, 1);
+
+    *out_packed_len = packed->len;
+    return g_byte_array_free (packed, FALSE);
+}
+
