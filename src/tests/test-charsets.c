@@ -297,16 +297,16 @@ typedef void (*TCFunc)(void);
 
 int main (int argc, char **argv)
 {
-	GTestSuite *suite;
+    GTestSuite *suite;
     gint result;
 
-	g_test_init (&argc, &argv, NULL);
+    g_test_init (&argc, &argv, NULL);
 
-	suite = g_test_get_root ();
+    suite = g_test_get_root ();
 
-	g_test_suite_add (suite, TESTCASE (test_def_chars, NULL));
-	g_test_suite_add (suite, TESTCASE (test_esc_chars, NULL));
-	g_test_suite_add (suite, TESTCASE (test_mixed_chars, NULL));
+    g_test_suite_add (suite, TESTCASE (test_def_chars, NULL));
+    g_test_suite_add (suite, TESTCASE (test_esc_chars, NULL));
+    g_test_suite_add (suite, TESTCASE (test_mixed_chars, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_unpack_gsm7, NULL));
     g_test_suite_add (suite, TESTCASE (test_unpack_gsm7_7_chars, NULL));
