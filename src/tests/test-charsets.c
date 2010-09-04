@@ -209,17 +209,16 @@ test_pack_gsm7_7_chars (void *f, gpointer d)
 static void
 print_array (const guint8 *array, guint32 len)
 {
-    int col, foo;
+    int col;
     guint8 c;
 
     g_print ("\n");
-    for (c = 0, col = 0, foo = 0; c < len; c++) {
+    for (c = 0, col = 0; c < len; c++) {
         g_print ("0x%02X, ", array[c] & 0xFF);
         if (col++ == 11) {
             col = 0;
             g_print ("\n");
         }
-        foo = 1;
     }
     g_print ("\n");
 }
