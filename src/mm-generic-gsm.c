@@ -863,6 +863,7 @@ static guint32 best_charsets[] = {
     MM_MODEM_CHARSET_UCS2,
     MM_MODEM_CHARSET_8859_1,
     MM_MODEM_CHARSET_IRA,
+    MM_MODEM_CHARSET_GSM,
     MM_MODEM_CHARSET_UNKNOWN
 };
 
@@ -921,7 +922,7 @@ supported_charsets_done (MMModem *modem,
     }
 
     /* Switch the device's charset; we prefer UTF-8, but UCS2 will do too */
-    mm_modem_set_charset (modem, MM_MODEM_CHARSET_UTF8, enabled_set_charset_done, info);
+    mm_modem_set_charset (modem, best_charsets[0], enabled_set_charset_done, info);
 }
 
 static void
