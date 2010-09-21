@@ -10,7 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2008 - 2009 Dan Williams <dcbw@redhat.com>
+ * Copyright (C) 2008 - 2010 Dan Williams <dcbw@redhat.com>
  */
 
 #include <string.h>
@@ -136,16 +136,16 @@ grab_port (MMPluginBase *base,
     caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
     sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
     if (!existing) {
-        if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
-            modem = mm_generic_gsm_new (sysfs_path,
-                                        mm_plugin_base_supports_task_get_driver (task),
-                                        mm_plugin_get_name (MM_PLUGIN (base)));
-        } else if (caps & CAP_CDMA) {
+        if (caps & CAP_CDMA) {
             modem = mm_generic_cdma_new (sysfs_path,
                                          mm_plugin_base_supports_task_get_driver (task),
                                          mm_plugin_get_name (MM_PLUGIN (base)),
                                          !!(caps & MM_PLUGIN_BASE_PORT_CAP_IS856),
                                          !!(caps & MM_PLUGIN_BASE_PORT_CAP_IS856_A));
+        } else if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
+            modem = mm_generic_gsm_new (sysfs_path,
+                                        mm_plugin_base_supports_task_get_driver (task),
+                                        mm_plugin_get_name (MM_PLUGIN (base)));
         }
 
         if (modem) {
