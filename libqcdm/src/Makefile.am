@@ -22,9 +22,6 @@ libqcdm_la_SOURCES = \
 libqcdm_la_LIBADD = \
 	$(MM_LIBS)
 
-libqcdm_la_LDFLAGS = -Wl,--version-script=$(srcdir)/libqcdm.ver \
-	-version-info "0:0:0"
-
 
 ###########################################
 # Test library without symbol versioning
