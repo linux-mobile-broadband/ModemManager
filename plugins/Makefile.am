@@ -12,7 +12,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-mbm.la \
 	libmm-plugin-longcheer.la \
 	libmm-plugin-anydata.la \
-	libmm-plugin-simtech.la
+	libmm-plugin-simtech.la \
+	libmm-plugin-x22x.la
 
 # Generic
 
@@ -275,13 +276,32 @@ libmm_plugin_simtech_la_LDFLAGS = \
 	-module \
 	-avoid-version
 
+# Alcatel/TCT/JRD x220D and possibly others
+
+libmm_plugin_x22x_la_SOURCES = \
+	mm-plugin-x22x.c \
+	mm-plugin-x22x.h \
+	mm-modem-x22x-gsm.c \
+	mm-modem-x22x-gsm.h
+
+libmm_plugin_x22x_la_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
+	-I$(top_srcdir)/src
+
+libmm_plugin_x22x_la_LDFLAGS = \
+	$(GUDEV_LDFLAGS) \
+	-module \
+	-avoid-version
+
 
 udevrulesdir = $(UDEV_BASE_DIR)/rules.d
 udevrules_DATA = \
 	77-mm-ericsson-mbm.rules \
 	77-mm-zte-port-types.rules \
 	77-mm-longcheer-port-types.rules \
-	77-mm-simtech-port-types.rules
+	77-mm-simtech-port-types.rules \
+	77-mm-x22x-port-types.rules
 
 BUILT_SOURCES = \
 	mm-modem-gsm-hso-glue.h
