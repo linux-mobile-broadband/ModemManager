@@ -711,6 +711,17 @@ test_creg_cgreg_multi2_unsolicited (void *f, gpointer d)
 }
 
 static void
+test_cgreg2_x220_unsolicited (void *f, gpointer d)
+{
+    TestData *data = (TestData *) d;
+    const char *reply = "\r\n+CGREG: 2,1, 81ED, 1A9CEB\r\n";
+    const CregResult result = { 1, 0x81ED, 0x1A9CEB, -1, 4, TRUE};
+
+    /* Tests random spaces in response */
+    test_creg_match ("Alcatel One-Touch X220D CGREG=2", FALSE, reply, data, &result);
+}
+
+static void
 test_cscs_icon225_support_response (void *f, gpointer d)
 {
     const char *reply = "\r\n+CSCS: (\"IRA\",\"GSM\",\"UCS2\")\r\n";
@@ -858,6 +869,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cgreg2_f3607gw_solicited, data));
     g_test_suite_add (suite, TESTCASE (test_cgreg2_f3607gw_unsolicited, data));
     g_test_suite_add (suite, TESTCASE (test_cgreg2_md400_unsolicited, data));
+    g_test_suite_add (suite, TESTCASE (test_cgreg2_x220_unsolicited, data));
 
     g_test_suite_add (suite, TESTCASE (test_creg_cgreg_multi_unsolicited, data));
     g_test_suite_add (suite, TESTCASE (test_creg_cgreg_multi2_unsolicited, data));
