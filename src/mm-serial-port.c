@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <string.h>
+#include <linux/serial.h>
 
 #include "mm-serial-port.h"
 #include "mm-errors.h"
@@ -685,6 +686,7 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
     char *devfile;
     const char *device;
     GTimeVal tv;
+    struct serial_struct sinfo;
 
     g_return_val_if_fail (MM_IS_SERIAL_PORT (self), FALSE);
 
@@ -739,6 +741,15 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
     g_warn_if_fail (MM_SERIAL_PORT_GET_CLASS (self)->config_fd);
     if (!MM_SERIAL_PORT_GET_CLASS (self)->config_fd (self, priv->fd, error))
         goto error;
+
+    /* Don't wait for pending data when closing the port; this can cause some
+     * stupid devices that don't respond to URBs on a particular port to hang
+     * for 30 seconds when probin fails.
+     */
+    if (ioctl (priv->fd, TIOCGSERIAL, &sinfo) == 0) {
+        sinfo.closing_wait = ASYNC_CLOSING_WAIT_NONE;
+        ioctl (priv->fd, TIOCSSERIAL, &sinfo);
+    }
 
     priv->channel = g_io_channel_unix_new (priv->fd);
     g_io_channel_set_encoding (priv->channel, NULL, NULL);
