@@ -98,6 +98,20 @@
       </tp:enumvalue>
     </tp:enum>
 
+    <tp:enum name="MM_MODEM_CDMA_ACTIVATION_STATE" type="u">
+      <tp:enumvalue suffix="NOT_ACTIVATED" value="0">
+        <tp:docstring>Device is not activated</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="ACTIVATING" value="1">
+        <tp:docstring>Device is activating</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="PARTIALLY_ACTIVATED" value="2">
+        <tp:docstring>Device is partially activated; carrier-specific steps required to continue.</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="ACTIVATED" value="3">
+        <tp:docstring>Device is ready for use.</tp:docstring>
+      </tp:enumvalue>
+    </tp:enum>
   </interface>
 </node>
 
