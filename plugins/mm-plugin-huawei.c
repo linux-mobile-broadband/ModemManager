@@ -239,9 +239,6 @@ supports_port (MMPluginBase *base,
 
         info->id = g_timeout_add_seconds (7, probe_secondary_timeout, task);
 
-        g_object_set_data_full (G_OBJECT (task), TAG_SUPPORTS_INFO,
-                                info, huawei_supports_info_destroy);
-
         if (!mm_serial_port_open (MM_SERIAL_PORT (info->serial), &error)) {
             g_warning ("%s: (Huawei) %s: couldn't open serial port: (%d) %s",
                        __func__, name,
@@ -251,6 +248,9 @@ supports_port (MMPluginBase *base,
             huawei_supports_info_destroy (info);
             return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
         }
+
+        g_object_set_data_full (G_OBJECT (task), TAG_SUPPORTS_INFO,
+                                info, huawei_supports_info_destroy);
 
         return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
     }
