@@ -50,6 +50,8 @@ GType mm_qcdm_serial_port_get_type (void);
 
 MMQcdmSerialPort *mm_qcdm_serial_port_new (const char *name, MMPortType ptype);
 
+MMQcdmSerialPort *mm_qcdm_serial_port_new_fd (int fd, MMPortType ptype);
+
 void     mm_qcdm_serial_port_queue_command     (MMQcdmSerialPort *self,
                                                 GByteArray *command,
                                                 guint32 timeout_seconds,

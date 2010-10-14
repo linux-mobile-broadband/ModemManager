@@ -196,6 +196,23 @@ mm_qcdm_serial_port_new (const char *name, MMPortType ptype)
                                               NULL));
 }
 
+MMQcdmSerialPort *
+mm_qcdm_serial_port_new_fd (int fd, MMPortType ptype)
+{
+    MMQcdmSerialPort *port;
+    char *name;
+
+    name = g_strdup_printf ("port%d", fd);
+    port = MM_QCDM_SERIAL_PORT (g_object_new (MM_TYPE_QCDM_SERIAL_PORT,
+                                              MM_PORT_DEVICE, name,
+                                              MM_PORT_SUBSYS, MM_PORT_SUBSYS_TTY,
+                                              MM_PORT_TYPE, ptype,
+                                              MM_SERIAL_PORT_FD, fd,
+                                              NULL));
+    g_free (name);
+    return port;
+}
+
 static void
 mm_qcdm_serial_port_init (MMQcdmSerialPort *self)
 {
