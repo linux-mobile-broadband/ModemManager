@@ -9,7 +9,7 @@ udevrules_DATA = \
 EXTRA_DIST = \
 	$(udevrules_DATA)
 
-noinst_LTLIBRARIES = libmodem-helpers.la
+noinst_LTLIBRARIES = libmodem-helpers.la libserial.la
 
 libmodem_helpers_la_CPPFLAGS = \
 	$(MM_CFLAGS)
@@ -23,6 +23,20 @@ libmodem_helpers_la_SOURCES = \
 	mm-charsets.h \
 	mm-utils.c \
 	mm-utils.h
+
+libserial_la_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	-I$(top_srcdir)
+
+libserial_la_SOURCES = \
+	mm-port.c \
+	mm-port.h \
+	mm-serial-port.c \
+	mm-serial-port.h \
+	mm-at-serial-port.c \
+	mm-at-serial-port.h \
+	mm-qcdm-serial-port.c \
+	mm-qcdm-serial-port.h
 
 sbin_PROGRAMS = modem-manager
 
@@ -41,8 +55,9 @@ modem_manager_LDADD = \
 	$(MM_LIBS) \
 	$(GUDEV_LIBS) \
 	$(top_builddir)/marshallers/libmarshallers.la \
-	$(top_builddir)/libqcdm/src/libqcdm.la \
-	$(builddir)/libmodem-helpers.la
+	$(builddir)/libmodem-helpers.la \
+	$(builddir)/libserial.la \
+	$(top_builddir)/libqcdm/src/libqcdm.la
 
 if WITH_POLKIT
 modem_manager_LDADD += $(POLKIT_LIBS)
@@ -76,14 +91,6 @@ modem_manager_SOURCES = \
 	mm-manager.h \
 	mm-modem.c \
 	mm-modem.h \
-	mm-port.c \
-	mm-port.h \
-	mm-serial-port.c \
-	mm-serial-port.h \
-	mm-at-serial-port.c \
-	mm-at-serial-port.h \
-	mm-qcdm-serial-port.c \
-	mm-qcdm-serial-port.h \
 	mm-serial-parsers.c \
 	mm-serial-parsers.h \
 	mm-modem-base.c \
