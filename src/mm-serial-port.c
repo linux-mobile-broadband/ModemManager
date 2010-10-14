@@ -43,6 +43,7 @@ enum {
     PROP_PARITY,
     PROP_STOPBITS,
     PROP_SEND_DELAY,
+    PROP_FD,
 
     LAST_PROP
 };
@@ -706,10 +707,13 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
     } else
         g_message ("(%s) opening serial port...", device);
 
-    devfile = g_strdup_printf ("/dev/%s", device);
-    errno = 0;
-    priv->fd = open (devfile, O_RDWR | O_EXCL | O_NONBLOCK | O_NOCTTY);
-    g_free (devfile);
+    /* Only open a new file descriptor if we weren't given one already */
+    if (priv->fd < 0) {
+        devfile = g_strdup_printf ("/dev/%s", device);
+        errno = 0;
+        priv->fd = open (devfile, O_RDWR | O_EXCL | O_NONBLOCK | O_NOCTTY);
+        g_free (devfile);
+    }
 
     if (priv->fd < 0) {
         /* nozomi isn't ready yet when the port appears, and it'll return
@@ -1222,6 +1226,9 @@ set_property (GObject *object, guint prop_id,
     MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (object);
 
     switch (prop_id) {
+    case PROP_FD:
+        priv->fd = g_value_get_int (value);
+        break;
     case PROP_BAUD:
         priv->baud = g_value_get_uint (value);
         break;
@@ -1250,6 +1257,9 @@ get_property (GObject *object, guint prop_id,
     MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (object);
 
     switch (prop_id) {
+    case PROP_FD:
+        g_value_set_int (value, priv->fd);
+        break;
     case PROP_BAUD:
         g_value_set_uint (value, priv->baud);
         break;
@@ -1312,6 +1322,14 @@ mm_serial_port_class_init (MMSerialPortClass *klass)
     klass->handle_response = real_handle_response;
 
     /* Properties */
+    g_object_class_install_property
+        (object_class, PROP_FD,
+         g_param_spec_int (MM_SERIAL_PORT_FD,
+                           "File descriptor",
+                           "Fiel descriptor",
+                           -1, G_MAXINT, -1,
+                           G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
     g_object_class_install_property
         (object_class, PROP_BAUD,
          g_param_spec_uint (MM_SERIAL_PORT_BAUD,

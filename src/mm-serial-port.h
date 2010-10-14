@@ -35,6 +35,7 @@
 #define MM_SERIAL_PORT_PARITY     "parity"
 #define MM_SERIAL_PORT_STOPBITS   "stopbits"
 #define MM_SERIAL_PORT_SEND_DELAY "send-delay"
+#define MM_SERIAL_PORT_FD         "fd" /* Construct-only */
 
 typedef struct _MMSerialPort MMSerialPort;
 typedef struct _MMSerialPortClass MMSerialPortClass;
