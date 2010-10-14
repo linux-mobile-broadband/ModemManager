@@ -51,7 +51,7 @@ edit = @sed \
 	-e 's|@localstatedir[@]|$(localstatedir)|g' \
 	-e 's|@libexecdir[@]|$(libexecdir)|g'
 
-DISTCHECK_CONFIGURE_FLAGS = --with-udev-base-dir=$dc_install_base
+DISTCHECK_CONFIGURE_FLAGS = --with-udev-base-dir=$dc_install_base --with-tests=yes
 
 INTLTOOL_FILES = \
 	intltool-extract.in \
