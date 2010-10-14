@@ -40,6 +40,18 @@ ATTRS{idVendor}=="413c", ATTRS{idProduct}=="8184", ENV{ID_MM_ERICSSON_MBM}="1"
 ATTRS{idVendor}=="413c", ATTRS{idProduct}=="818b", ENV{ID_MM_ERICSSON_MBM}="1"
 ATTRS{idVendor}=="413c", ATTRS{idProduct}=="818c", ENV{ID_MM_ERICSSON_MBM}="1"
 
+# HP hs2330 Mobile Broadband Module
+ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="271d", ENV{ID_MM_ERICSSON_MBM}="1"
+
+# HP hs2320 Mobile Broadband Module
+ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="261d", ENV{ID_MM_ERICSSON_MBM}="1"
+
+# HP lc2000 Mobile Broadband Module
+ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="301d", ENV{ID_MM_ERICSSON_MBM}="1"
+
+# HP lc2010 Mobile Broadband Module
+ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="2f1d", ENV{ID_MM_ERICSSON_MBM}="1"
+
 # Toshiba
 ATTRS{idVendor}=="0930", ATTRS{idProduct}=="130b", ENV{ID_MM_ERICSSON_MBM}="1"
 
