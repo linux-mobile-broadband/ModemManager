@@ -32,6 +32,7 @@ callouts/mm-modem-probe
 test/lsudev
 src/tests/test-modem-helpers
 src/tests/test-charsets
+src/tests/test-qcdm-serial-port
 policy/org.freedesktop.modem-manager.policy
 
 libqcdm/tests/test-qcdm
