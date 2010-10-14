@@ -171,10 +171,10 @@ typedef void (*VerInfoCb) (MMQcdmSerialPort *port,
                            gpointer user_data);
 
 static void
-qcdm_verinfo_cb (MMQcdmSerialPort *port,
-                 GByteArray *response,
-                 GError *error,
-                 gpointer user_data)
+qcdm_verinfo_expect_success_cb (MMQcdmSerialPort *port,
+                                GByteArray *response,
+                                GError *error,
+                                gpointer user_data)
 {
     GMainLoop *loop = user_data;
 
@@ -184,7 +184,7 @@ qcdm_verinfo_cb (MMQcdmSerialPort *port,
 }
 
 static void
-qcdm_verinfo (MMQcdmSerialPort *port, VerInfoCb cb, GMainLoop *loop)
+qcdm_request_verinfo (MMQcdmSerialPort *port, VerInfoCb cb, GMainLoop *loop)
 {
     GError *error = NULL;
     GByteArray *verinfo;
@@ -200,6 +200,33 @@ qcdm_verinfo (MMQcdmSerialPort *port, VerInfoCb cb, GMainLoop *loop)
     verinfo->len = len;
 
     mm_qcdm_serial_port_queue_command (port, verinfo, 3, cb, loop);
+}
+
+static void
+qcdm_test_child (int fd, VerInfoCb cb)
+{
+    MMQcdmSerialPort *port;
+    GMainLoop *loop;
+    gboolean success;
+    GError *error = NULL;
+
+    /* In the child */
+    g_type_init ();
+
+    loop = g_main_loop_new (NULL, FALSE);
+
+    port = mm_qcdm_serial_port_new_fd (fd, MM_PORT_TYPE_PRIMARY);
+    g_assert (port);
+
+    success = mm_serial_port_open (MM_SERIAL_PORT (port), &error);
+    g_assert_no_error (error);
+    g_assert (success);
+
+    qcdm_request_verinfo (port, cb, loop);
+    g_main_loop_run (loop);
+
+    mm_serial_port_close (MM_SERIAL_PORT (port));
+    g_object_unref (port);
 }
 
 /* Test that a Version Info request/response is processed correctly to
@@ -225,28 +252,8 @@ test_verinfo (void *f)
     g_assert (cpid >= 0);
 
     if (cpid == 0) {
-        MMQcdmSerialPort *port;
-        GMainLoop *loop;
-        gboolean success;
-        GError *error = NULL;
-
         /* In the child */
-        g_type_init ();
-
-        loop = g_main_loop_new (NULL, FALSE);
-
-        port = mm_qcdm_serial_port_new_fd (d->slave, MM_PORT_TYPE_PRIMARY);
-        g_assert (port);
-
-        success = mm_serial_port_open (MM_SERIAL_PORT (port), &error);
-        g_assert_no_error (error);
-        g_assert (success);
-
-        qcdm_verinfo (port, qcdm_verinfo_cb, loop);
-        g_main_loop_run (loop);
-
-        mm_serial_port_close (MM_SERIAL_PORT (port));
-        g_object_unref (port);
+        qcdm_test_child (d->slave, qcdm_verinfo_expect_success_cb);
         exit (0);
     }
     /* Parent */
@@ -261,10 +268,10 @@ test_verinfo (void *f)
 }
 
 static void
-qcdm_cns_cb (MMQcdmSerialPort *port,
-             GByteArray *response,
-             GError *error,
-             gpointer user_data)
+qcdm_verinfo_expect_fail_cb (MMQcdmSerialPort *port,
+                             GByteArray *response,
+                             GError *error,
+                             gpointer user_data)
 {
     GMainLoop *loop = user_data;
 
@@ -292,28 +299,86 @@ test_sierra_cns_rejected (void *f)
     g_assert (cpid >= 0);
 
     if (cpid == 0) {
-        MMQcdmSerialPort *port;
-        GMainLoop *loop;
-        gboolean success;
-        GError *error = NULL;
-
         /* In the child */
-        g_type_init ();
+        qcdm_test_child (d->slave, qcdm_verinfo_expect_fail_cb);
+        exit (0);
+    }
+    /* Parent */
+    d->child = cpid;
 
-        loop = g_main_loop_new (NULL, FALSE);
+    req_len = server_wait_request (d->master, req, sizeof (req));
+    g_assert (req_len == 1);
+    g_assert_cmpint (req[0], ==, 0x00);
 
-        port = mm_qcdm_serial_port_new_fd (d->slave, MM_PORT_TYPE_PRIMARY);
-        g_assert (port);
+    server_send_response (d->master, rsp, sizeof (rsp));
 
-        success = mm_serial_port_open (MM_SERIAL_PORT (port), &error);
-        g_assert_no_error (error);
-        g_assert (success);
+    /* We expect the child to exit normally */
+    g_assert (wait_for_child (d, 3));
+}
 
-        qcdm_verinfo (port, qcdm_cns_cb, loop);
-        g_main_loop_run (loop);
+/* Test that a random response to a Version Info command correctly
+ * raises an error in the child's response handler.
+ */
+static void
+test_random_data_rejected (void *f)
+{
+    TestData *d = f;
+    char req[512];
+    gsize req_len;
+    pid_t cpid;
+    const char rsp[] = {
+        0x7e, 0x7e, 0x7e, 0x6b, 0x6d, 0x7e, 0x7e, 0x7e, 0x7e,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7e
+    };
 
-        mm_serial_port_close (MM_SERIAL_PORT (port));
-        g_object_unref (port);
+    signal (SIGCHLD, SIG_DFL);
+    cpid = fork ();
+    g_assert (cpid >= 0);
+
+    if (cpid == 0) {
+        /* In the child */
+        qcdm_test_child (d->slave, qcdm_verinfo_expect_fail_cb);
+        exit (0);
+    }
+    /* Parent */
+    d->child = cpid;
+
+    req_len = server_wait_request (d->master, req, sizeof (req));
+    g_assert (req_len == 1);
+    g_assert_cmpint (req[0], ==, 0x00);
+
+    server_send_response (d->master, rsp, sizeof (rsp));
+
+    /* We expect the child to exit normally */
+    g_assert (wait_for_child (d, 3));
+}
+
+/* Test that a bunch of frame markers at the beginning of a valid response
+ * to a Version Info command is parsed correctly.
+ */
+static void
+test_leading_frame_markers (void *f)
+{
+    TestData *d = f;
+    char req[512];
+    gsize req_len;
+    pid_t cpid;
+    const char rsp[] = {
+        0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e,
+        0x00, 0x41, 0x75, 0x67, 0x20, 0x31, 0x39, 0x20, 0x32, 0x30, 0x30, 0x38,
+        0x32, 0x30, 0x3a, 0x34, 0x38, 0x3a, 0x34, 0x37, 0x4f, 0x63, 0x74, 0x20,
+        0x32, 0x39, 0x20, 0x32, 0x30, 0x30, 0x37, 0x31, 0x39, 0x3a, 0x30, 0x30,
+        0x3a, 0x30, 0x30, 0x53, 0x43, 0x4e, 0x52, 0x5a, 0x2e, 0x2e, 0x2e, 0x2a,
+        0x06, 0x04, 0xb9, 0x0b, 0x02, 0x00, 0xb2, 0x19, 0xc4, 0x7e
+    };
+
+    signal (SIGCHLD, SIG_DFL);
+    cpid = fork ();
+    g_assert (cpid >= 0);
+
+    if (cpid == 0) {
+        /* In the child */
+        qcdm_test_child (d->slave, qcdm_verinfo_expect_success_cb);
         exit (0);
     }
     /* Parent */
@@ -402,6 +467,8 @@ int main (int argc, char **argv)
 
     g_test_suite_add (suite, TESTCASE_PTY (test_verinfo, data));
     g_test_suite_add (suite, TESTCASE_PTY (test_sierra_cns_rejected, data));
+    g_test_suite_add (suite, TESTCASE_PTY (test_random_data_rejected, data));
+    g_test_suite_add (suite, TESTCASE_PTY (test_leading_frame_markers, data));
 
     result = g_test_run ();
 
