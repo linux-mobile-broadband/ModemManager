@@ -84,3 +84,23 @@ test_utils_encapsulate_buffer (void *f, void *data)
     g_assert (memcmp (outbuf, encap_outbuf, encap_len) == 0);
 }
 
+static const char cns_inbuf[] = {
+    0x00, 0x0a, 0x6b, 0x74, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x7e
+};
+
+void
+test_utils_decapsulate_sierra_cns (void *f, void *data)
+{
+    gboolean success;
+    char outbuf[512];
+    gsize decap_len = 0;
+    gsize used = 0;
+    gboolean more = FALSE;
+
+    success = dm_decapsulate_buffer (cns_inbuf, sizeof (cns_inbuf),
+                                     outbuf, sizeof (outbuf),
+                                     &decap_len, &used, &more);
+    g_assert (success == FALSE);
+}
+

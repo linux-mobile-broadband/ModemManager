@@ -22,5 +22,7 @@ void test_utils_decapsulate_buffer (void *f, void *data);
 
 void test_utils_encapsulate_buffer (void *f, void *data);
 
+void test_utils_decapsulate_sierra_cns (void *f, void *data);
+
 #endif  /* TEST_QCDM_UTILS_H */
 
