@@ -1815,6 +1815,7 @@ get_registration_state (MMModemCdma *modem,
         mm_callback_info_schedule (info);
         return;
     }
+    g_clear_error (&info->error);
 
     /* Use QCDM for Call Manager state or HDR state before trying CAD, since
      * CAD doesn't always reflect the state of the HDR radio's registration
