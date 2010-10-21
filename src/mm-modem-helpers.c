@@ -15,6 +15,7 @@
  */
 
 #include <config.h>
+#include <ctype.h>
 #include <glib.h>
 #include <string.h>
 #include <ctype.h>
@@ -801,5 +802,69 @@ mm_gsm_string_to_access_tech (const char *string)
         return MM_MODEM_GSM_ACCESS_TECH_GSM;
 
     return MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
+}
+
+/*************************************************************************/
+
+char *
+mm_create_device_identifier (const char *vid,
+                             const char *pid,
+                             const char *ati,
+                             const char *ati1,
+                             const char *gsn,
+                             const char *revision,
+                             const char *model,
+                             const char *manf,
+                             gboolean debug)
+{
+    GString *devid;
+    GChecksum *sum;
+    char *p, *ret = NULL, *j = NULL, *dbg = NULL;
+
+    /* Build up the device identifier */
+    devid = g_string_sized_new (50);
+    if (ati)
+        g_string_append (devid, ati);
+    if (ati1) {
+        /* Only append "ATI1" if it's differnet than "ATI" */
+        if (!ati || (strcmp (ati, ati1) != 0))
+            g_string_append (devid, ati1);
+    }
+    if (gsn)
+        g_string_append (devid, gsn);
+    if (revision)
+        g_string_append (devid, revision);
+    if (model)
+        g_string_append (devid, model);
+    if (manf)
+        g_string_append (devid, manf);
+
+    if (!strlen (devid->str))
+        return NULL;
+
+    p = devid->str;
+    if (debug)
+        j = dbg = g_malloc0 (strlen (devid->str) + 1);
+
+    sum = g_checksum_new (G_CHECKSUM_SHA1);
+    while (*p) {
+        /* Strip spaces and linebreaks */
+        if (!isblank (*p) && !isspace (*p) && isascii (*p)) {
+            g_checksum_update (sum, (const guchar *) p, 1);
+            if (dbg)
+                *j++ = *p;
+        }
+        p++;
+    }
+    ret = g_strdup (g_checksum_get_string (sum));
+    g_checksum_free (sum);
+
+    if (dbg) {
+        g_debug ("Device ID source '%s'", dbg);
+        g_debug ("Device ID '%s'", ret);
+        g_free (dbg);
+    }
+
+    return ret;
 }
 

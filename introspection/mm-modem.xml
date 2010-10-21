@@ -98,6 +98,18 @@
       </tp:docstring>
     </property>
 
+    <property name="DeviceIdentifier" type="s" access="read">
+      <tp:docstring>
+	A best-effort device identifier based on various device information like
+	model name, firmware revision, USB/PCI/PCMCIA IDs, and other properties.
+	This ID is not guaranteed to be unique and may be shared between
+	identical devices with the same firmware, but is intended to be
+	"unique enough" for use as a casual device identifier for various
+	user experience operations.  This is not the device's IMEI or ESN since
+	those may not be available before unlocking the device via a PIN.
+      </tp:docstring>
+    </property>
+
     <property name="MasterDevice" type="s" access="read">
       <tp:docstring>
 	The physical modem device reference (ie, USB, PCI, PCMCIA device), which

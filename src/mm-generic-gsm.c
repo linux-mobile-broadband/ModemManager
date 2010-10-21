@@ -326,6 +326,19 @@ get_imei_cb (MMModem *modem,
     }
 }
 
+static void
+get_info_cb (MMModem *modem,
+             const char *manufacturer,
+             const char *model,
+             const char *version,
+             GError *error,
+             gpointer user_data)
+{
+    /* Base class handles saving the info for us */
+    if (modem)
+        mm_serial_port_close (MM_SERIAL_PORT (MM_GENERIC_GSM_GET_PRIVATE (modem)->primary));
+}
+
 /*****************************************************************************/
 
 static MMModemGsmNetworkRegStatus
@@ -510,6 +523,34 @@ initial_imei_check (MMGenericGsm *self)
     }
 }
 
+static void
+initial_info_check (MMGenericGsm *self)
+{
+    GError *error = NULL;
+    MMGenericGsmPrivate *priv;
+
+    g_return_if_fail (MM_IS_GENERIC_GSM (self));
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    g_return_if_fail (priv->primary != NULL);
+
+    if (mm_serial_port_open (MM_SERIAL_PORT (priv->primary), &error)) {
+        /* Make sure echoing is off */
+        mm_at_serial_port_queue_command (priv->primary, "E0", 3, NULL, NULL);
+        mm_modem_base_get_card_info (MM_MODEM_BASE (self),
+                                     priv->primary,
+                                     NULL,
+                                     get_info_cb,
+                                     NULL);
+    } else {
+        g_warning ("%s: failed to open serial port: (%d) %s",
+                   __func__,
+                   error ? error->code : -1,
+                   error && error->message ? error->message : "(unknown)");
+        g_clear_error (&error);
+    }
+}
+
 static gboolean
 owns_port (MMModem *modem, const char *subsys, const char *name)
 {
@@ -560,11 +601,14 @@ mm_generic_gsm_grab_port (MMGenericGsm *self,
                 g_object_notify (G_OBJECT (self), MM_MODEM_DATA_DEVICE);
             }
 
-            /* Get modem's initial lock/unlock state */
-            initial_pin_check (self);
+            /* Get the modem's general info */
+            initial_info_check (self);
 
             /* Get modem's IMEI number */
             initial_imei_check (self);
+
+            /* Get modem's initial lock/unlock state */
+            initial_pin_check (self);
 
         } else if (ptype == MM_PORT_TYPE_SECONDARY)
             priv->secondary = MM_AT_SERIAL_PORT (port);
@@ -937,17 +981,6 @@ get_allowed_mode_done (MMModem *modem,
     }
 }
 
-static void
-get_enable_info_done (MMModem *modem,
-                      const char *manufacturer,
-                      const char *model,
-                      const char *version,
-                      GError *error,
-                      gpointer user_data)
-{
-    /* Modem base class handles the response for us */
-}
-
 void
 mm_generic_gsm_enable_complete (MMGenericGsm *self,
                                 GError *error,
@@ -984,9 +1017,6 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
 
     /* Try to enable XON/XOFF flow control */
     mm_at_serial_port_queue_command (priv->primary, "+IFC=1,1", 3, NULL, NULL);
-
-    /* Grab device info right away */
-    mm_modem_get_info (MM_MODEM (self), get_enable_info_done, NULL);
 
     /* Get allowed mode */
     if (MM_GENERIC_GSM_GET_CLASS (self)->get_allowed_mode)

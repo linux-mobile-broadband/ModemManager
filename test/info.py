@@ -232,6 +232,7 @@ elif mtype == 2:
 print "Driver: '%s'" % (props.Get(MM_DBUS_INTERFACE_MODEM, 'Driver'))
 print "Modem device: '%s'" % (props.Get(MM_DBUS_INTERFACE_MODEM, 'MasterDevice'))
 print "Data device: '%s'" % (props.Get(MM_DBUS_INTERFACE_MODEM, 'Device'))
+print "Device ID: '%s'" % (props.Get(MM_DBUS_INTERFACE_MODEM, 'DeviceIdentifier'))
 print ""
 
 modem = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM)

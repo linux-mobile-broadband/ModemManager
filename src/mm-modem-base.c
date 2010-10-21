@@ -14,6 +14,7 @@
  * Copyright (C) 2009 Red Hat, Inc.
  */
 
+#include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -43,6 +44,7 @@ typedef struct {
     char *plugin;
     char *device;
     char *equipment_ident;
+    char *device_ident;
     char *unlock_required;
     guint32 unlock_retries;
     guint32 ip_method;
@@ -52,6 +54,9 @@ typedef struct {
     char *manf;
     char *model;
     char *revision;
+    char *ati;
+    char *ati1;
+    char *gsn;
 
     MMAuthProvider *authp;
 
@@ -396,7 +401,7 @@ card_info_cache_invoke (MMCallbackInfo *info)
     MMModemBase *self = MM_MODEM_BASE (info->modem);
     MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (self);
     MMModemInfoFn callback = (MMModemInfoFn) info->callback;
-    const char *manf, *cmanf, *model, *cmodel, *rev, *crev;
+    const char *manf, *cmanf, *model, *cmodel, *rev, *crev, *ati, *ati1, *gsn, *cgsn;
 
     manf = mm_callback_info_get_data (info, "card-info-manf");
     cmanf = mm_callback_info_get_data (info, "card-info-c-manf");
@@ -415,6 +420,32 @@ card_info_cache_invoke (MMCallbackInfo *info)
     g_free (priv->revision);
     priv->revision = g_strdup (crev ? crev : rev);
 
+    ati = mm_callback_info_get_data (info, "card-info-ati");
+    g_free (priv->ati);
+    priv->ati = g_strdup (ati);
+
+    ati1 = mm_callback_info_get_data (info, "card-info-ati1");
+    g_free (priv->ati1);
+    priv->ati1 = g_strdup (ati1);
+
+    gsn = mm_callback_info_get_data (info, "card-info-gsn");
+    cgsn = mm_callback_info_get_data (info, "card-info-c-gsn");
+    g_free (priv->gsn);
+    priv->gsn = g_strdup (cgsn ? cgsn : gsn);
+
+    /* Build up the device identifier */
+    g_free (priv->device_ident);
+    priv->device_ident = mm_create_device_identifier (NULL,
+                                                      NULL,
+                                                      priv->ati,
+                                                      priv->ati1,
+                                                      priv->gsn,
+                                                      priv->revision,
+                                                      priv->model,
+                                                      priv->manf,
+                                                      mm_options_debug ());
+    g_object_notify (G_OBJECT (self), MM_MODEM_DEVICE_IDENTIFIER);
+
     callback (info->modem, priv->manf, priv->model, priv->revision, info->error, info->user_data);
 }
 
@@ -425,10 +456,11 @@ info_item_done (MMCallbackInfo *info,
                 const char *tag,
                 const char *desc)
 {
-    const char *p;
+    const char *p = response->str;
 
     if (!error) {
-        p = mm_strip_tag (response->str, tag);
+        if (tag)
+            p = mm_strip_tag (response->str, tag);
         mm_callback_info_set_data (info, desc, strlen (p) ? g_strdup (p) : NULL, g_free);
     }
 
@@ -453,6 +485,11 @@ GET_INFO_RESP_FN(get_c_revision_done, "+CGMR:", "card-info-c-revision")
 GET_INFO_RESP_FN(get_c_model_done, "+CGMM:", "card-info-c-model")
 GET_INFO_RESP_FN(get_c_manf_done, "+CGMI:", "card-info-c-manf")
 
+GET_INFO_RESP_FN(get_ati_done, NULL, "card-info-ati")
+GET_INFO_RESP_FN(get_ati1_done, NULL, "card-info-ati1")
+GET_INFO_RESP_FN(get_gsn_done, "+GSN:", "card-info-gsn")
+GET_INFO_RESP_FN(get_cgsn_done, "+CGSN:", "card-info-c-gsn")
+
 void
 mm_modem_base_get_card_info (MMModemBase *self,
                              MMAtSerialPort *port,
@@ -462,7 +499,6 @@ mm_modem_base_get_card_info (MMModemBase *self,
 {
     MMModemBasePrivate *priv;
     MMCallbackInfo *info;
-    MMModemState state;
     gboolean cached = FALSE;
     GError *error = port_error;
 
@@ -479,16 +515,8 @@ mm_modem_base_get_card_info (MMModemBase *self,
      */
     if (priv->manf || priv->model || priv->revision)
         cached = TRUE;
-    else {
-        state = mm_modem_get_state (MM_MODEM (self));
-
-        if (port_error)
-            error = g_error_copy (port_error);
-        else if (state < MM_MODEM_STATE_ENABLING) {
-            error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                                         "The modem is not enabled.");
-        }
-    }
+    else if (port_error)
+        error = g_error_copy (port_error);
 
     /* If we have cached info or an error, don't hit up the card */
     if (cached || error) {
@@ -507,13 +535,19 @@ mm_modem_base_get_card_info (MMModemBase *self,
                                       G_CALLBACK (callback),
                                       user_data);
 
-    mm_callback_info_chain_start (info, 6);
+    mm_callback_info_chain_start (info, 10);
+
     mm_at_serial_port_queue_command_cached (port, "+GMI", 3, get_manf_done, info);
     mm_at_serial_port_queue_command_cached (port, "+GMM", 3, get_model_done, info);
     mm_at_serial_port_queue_command_cached (port, "+GMR", 3, get_revision_done, info);
     mm_at_serial_port_queue_command_cached (port, "+CGMI", 3, get_c_manf_done, info);
     mm_at_serial_port_queue_command_cached (port, "+CGMM", 3, get_c_model_done, info);
     mm_at_serial_port_queue_command_cached (port, "+CGMR", 3, get_c_revision_done, info);
+
+    mm_at_serial_port_queue_command_cached (port, "I", 3, get_ati_done, info);
+    mm_at_serial_port_queue_command_cached (port, "I1", 3, get_ati1_done, info);
+    mm_at_serial_port_queue_command_cached (port, "+GSN", 3, get_gsn_done, info);
+    mm_at_serial_port_queue_command_cached (port, "+CGSN", 3, get_cgsn_done, info);
 }
 
 /*****************************************************************************/
@@ -574,6 +608,10 @@ mm_modem_base_init (MMModemBase *self)
                                                     NULL,
                                                     MM_MODEM_DBUS_INTERFACE);
     mm_properties_changed_signal_register_property (G_OBJECT (self),
+                                                    MM_MODEM_DEVICE_IDENTIFIER,
+                                                    NULL,
+                                                    MM_MODEM_DBUS_INTERFACE);
+    mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_UNLOCK_REQUIRED,
                                                     NULL,
                                                     MM_MODEM_DBUS_INTERFACE);
@@ -630,6 +668,7 @@ set_property (GObject *object, guint prop_id,
     case MM_MODEM_PROP_TYPE:
     case MM_MODEM_PROP_ENABLED:
     case MM_MODEM_PROP_EQUIPMENT_IDENTIFIER:
+    case MM_MODEM_PROP_DEVICE_IDENTIFIER:
     case MM_MODEM_PROP_UNLOCK_REQUIRED:
     case MM_MODEM_PROP_UNLOCK_RETRIES:
         break;
@@ -676,6 +715,9 @@ get_property (GObject *object, guint prop_id,
     case MM_MODEM_PROP_EQUIPMENT_IDENTIFIER:
         g_value_set_string (value, priv->equipment_ident);
         break;
+    case MM_MODEM_PROP_DEVICE_IDENTIFIER:
+        g_value_set_string (value, priv->device_ident);
+        break;
     case MM_MODEM_PROP_UNLOCK_REQUIRED:
         g_value_set_string (value, priv->unlock_required);
         break;
@@ -701,7 +743,14 @@ finalize (GObject *object)
     g_free (priv->plugin);
     g_free (priv->device);
     g_free (priv->equipment_ident);
+    g_free (priv->device_ident);
     g_free (priv->unlock_required);
+    g_free (priv->manf);
+    g_free (priv->model);
+    g_free (priv->revision);
+    g_free (priv->ati);
+    g_free (priv->ati1);
+    g_free (priv->gsn);
 
     G_OBJECT_CLASS (mm_modem_base_parent_class)->finalize (object);
 }
@@ -757,6 +806,10 @@ mm_modem_base_class_init (MMModemBaseClass *klass)
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_EQUIPMENT_IDENTIFIER,
                                       MM_MODEM_EQUIPMENT_IDENTIFIER);
+
+    g_object_class_override_property (object_class,
+                                      MM_MODEM_PROP_DEVICE_IDENTIFIER,
+                                      MM_MODEM_DEVICE_IDENTIFIER);
 
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_UNLOCK_REQUIRED,

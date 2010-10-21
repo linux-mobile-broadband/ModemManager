@@ -162,6 +162,47 @@ initial_esn_check (MMGenericCdma *self)
     }
 }
 
+static void
+get_info_cb (MMModem *modem,
+             const char *manufacturer,
+             const char *model,
+             const char *version,
+             GError *error,
+             gpointer user_data)
+{
+    /* Base class handles saving the info for us */
+    if (modem)
+        mm_serial_port_close (MM_SERIAL_PORT (MM_GENERIC_CDMA_GET_PRIVATE (modem)->primary));
+}
+
+static void
+initial_info_check (MMGenericCdma *self)
+{
+    GError *error = NULL;
+    MMGenericCdmaPrivate *priv;
+
+    g_return_if_fail (MM_IS_GENERIC_CDMA (self));
+    priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
+
+    g_return_if_fail (priv->primary != NULL);
+
+    if (mm_serial_port_open (MM_SERIAL_PORT (priv->primary), &error)) {
+        /* Make sure echoing is off */
+        mm_at_serial_port_queue_command (priv->primary, "E0", 3, NULL, NULL);
+        mm_modem_base_get_card_info (MM_MODEM_BASE (self),
+                                     priv->primary,
+                                     NULL,
+                                     get_info_cb,
+                                     NULL);
+    } else {
+        g_warning ("%s: failed to open serial port: (%d) %s",
+                   __func__,
+                   error ? error->code : -1,
+                   error && error->message ? error->message : "(unknown)");
+        g_clear_error (&error);
+    }
+}
+
 static gboolean
 owns_port (MMModem *modem, const char *subsys, const char *name)
 {
@@ -214,6 +255,9 @@ mm_generic_cdma_grab_port (MMGenericCdma *self,
                 priv->data = port;
                 g_object_notify (G_OBJECT (self), MM_MODEM_DATA_DEVICE);
             }
+
+            /* Get the modem's general info */
+            initial_info_check (self);
 
             /* Get modem's ESN number */
             initial_esn_check (self);
