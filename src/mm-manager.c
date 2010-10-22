@@ -248,8 +248,10 @@ check_export_modem (MMManager *self, MMModem *modem)
 
     /* No outstanding port tasks, so if the modem is valid we can export it */
     if (mm_modem_get_valid (modem)) {
-        static guint32 id = 0;
+        static guint32 id = 0, vid = 0, pid = 0;
         char *path, *data_device = NULL;
+        GUdevDevice *physdev;
+        const char *subsys = NULL;
 
         path = g_strdup_printf (MM_DBUS_PATH"/Modems/%d", id++);
         dbus_g_connection_register_g_object (priv->connection, path, G_OBJECT (modem));
@@ -257,9 +259,23 @@ check_export_modem (MMManager *self, MMModem *modem)
 
         g_debug ("Exported modem %s as %s", modem_physdev, path);
 
-        g_object_get (G_OBJECT (modem), MM_MODEM_DATA_DEVICE, &data_device, NULL);
+        physdev = g_udev_client_query_by_sysfs_path (priv->udev, modem_physdev);
+        if (physdev)
+            subsys = g_udev_device_get_subsystem (physdev);
+
+        g_object_get (G_OBJECT (modem),
+                      MM_MODEM_DATA_DEVICE, &data_device,
+                      MM_MODEM_HW_VID, &vid,
+                      MM_MODEM_HW_PID, &pid,
+                      NULL);
+        g_debug ("(%s): VID 0x%04X PID 0x%04X (%s)",
+                 path, (vid & 0xFFFF), (pid & 0xFFFF),
+                 subsys ? subsys : "unknown");
         g_debug ("(%s): data port is %s", path, data_device);
         g_free (data_device);
+
+        if (physdev)
+            g_object_unref (physdev);
 
         g_signal_emit (self, signals[DEVICE_ADDED], 0, modem);
     }
