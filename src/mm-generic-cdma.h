@@ -88,7 +88,9 @@ MMModem *mm_generic_cdma_new (const char *device,
                               const char *driver,
                               const char *plugin,
                               gboolean evdo_rev0,
-                              gboolean evdo_revA);
+                              gboolean evdo_revA,
+                              guint vendor,
+                              guint product);
 
 /* Private, for subclasses */
 

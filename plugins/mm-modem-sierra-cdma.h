@@ -40,6 +40,8 @@ MMModem *mm_modem_sierra_cdma_new (const char *device,
                                    const char *driver,
                                    const char *plugin,
                                    gboolean evdo_rev0,
-                                   gboolean evdo_revA);
+                                   gboolean evdo_revA,
+                                   guint32 vendor,
+                                   guint32 product);
 
 #endif /* MM_MODEM_SIERRA_CDMA_H */

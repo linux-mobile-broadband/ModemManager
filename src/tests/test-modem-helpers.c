@@ -782,6 +782,301 @@ test_cscs_blackberry_support_response (void *f, gpointer d)
     g_assert (charsets == MM_MODEM_CHARSET_IRA);
 }
 
+typedef struct {
+    char *devid;
+    char *desc;
+    guint vid;
+    guint pid;
+    const char *ati;
+    const char *ati1;
+    const char *gsn;
+    const char *revision;
+    const char *model;
+    const char *manf;
+} DevidItem;
+
+static DevidItem devids[] = {
+    { "36e7a8e78637fd380b2664507ea5de8fc317d05b",
+      "Huawei E1550",
+      0x12d1, 0x1001,
+      "\nManufacturer: huawei\n"
+        "Model: E1550\n"
+        "Revision: 11.608.09.01.21\n"
+        "IMEI: 235012412595195\n"
+        "+GCAP: +CGSM,+FCLASS,+DS\n",
+      NULL,
+      "\n235012412595195\n",
+      "\n11.608.09.01.21\n",
+      "\nE1550\n",
+      "\nhuawei\n"
+    },
+    { "33b0fc4a06af5448df656ce12925979acf1cb600",
+      "Huawei EC121",
+      0x12d1, 0x1411,
+      "\nManufacturer: HUAWEI INCORPORATED\n"
+        "Model: EC121\n"
+        "Revision: 11.100.17.00.114\n"
+        "ESN: +GSN:12de4fa6\n"
+        "+CIS707-A, +MS, +ES, +DS, +FCLASS\n",
+      NULL,
+      "\n12de4fa6\n",
+      "\n11.100.17.00.114\n",
+      "\nEC121\n",
+      "\nHUAWEI INCORPORATED\n"
+    },
+    { "d17f016a402354eaa1e24855f4308fafca9cadb1",
+      "Sierra USBConnect Mercury",
+      0x1199, 0x6880,
+      "\nManufacturer: Sierra Wireless, Inc.\n"
+        "Model: C885\n"
+        "Revision: J1_0_1_26AP C:/WS/FW/J1_0_1_26AP/MSM7200A/SRC/AMSS 2009/01/30 07:58:06\n"
+        "IMEI: 987866969112306\n"
+        "IMEI SV: 6\n"
+        "FSN: D603478104511\n"
+        "3GPP Release 6\n"
+        "+GCAP: +CGSM,+DS,+ES\n",
+      NULL,
+      "\n987866969112306\n",
+      "\nJ1_0_1_26AP C:/WS/FW/J1_0_1_26AP/MSM7200A/SRC/AMSS 2009/01/30 07:58:06\n",
+      "\nC885\n",
+      "\nSierra Wireless, Inc.\n"
+    },
+    { "345e9eaad7624393aca85cde9bd859edf462414c",
+      "ZTE MF627",
+      0x19d2, 0x0031,
+      "\nManufacturer: ZTE INCORPORATED\n"
+        "Model: MF627\n"
+        "Revision: BD_3GHAP673A4V1.0.0B02\n"
+        "IMEI: 023589923858188\n"
+        "+GCAP: +CGSM,+FCLASS,+DS\n",
+      NULL,
+      "\n023589923858188\n",
+      "\nBD_3GHAP673A4V1.0.0B02\n",
+      "\nMF627\n",
+      "\nZTE INCORPORATED\n"
+    },
+    { "69fa133a668b6f4dbf39b73500fd153ec240c73f",
+      "Sony-Ericsson MD300",
+      0x0fce, 0xd0cf,
+      "\nMD300\n",
+      "\nR3A018\n",
+      "\n349583712939483\n",
+      "\nR3A018\n",
+      "\nMD300\n",
+      "\nSony Ericsson\n"
+    },
+    { "3dad89ed7d774938c38188cf29cf1c211e9d360b",
+      "Option iCON 7.2",
+      0x0af0, 0x6901,
+      "\nManufacturer: Option N.V.\n"
+        "Model: GTM378\n"
+        "Revision: 2.5.21Hd (Date: Jun 17 2008, Time: 12:30:47)\n",
+      NULL,
+      "\n129512359199159,SE393939TS\n",
+      "\n2.5.21Hd (Date: Jun 17 2008, Time: 12:30:47)\n",
+      "\nGTM378\n",
+      "\nOption N.V.\n"
+    },
+    { "b0acccb956c9eaf2076e03697e74bf998dc44179",
+      "ZTE MF622",
+      0x19d2, 0x0001,
+      NULL,
+      NULL,
+      "\n235251122555115\n",
+      "\n3UKP671M3V1.0.0B08 3UKP671M3V1.0.0B08 1  [Jan 07 2008 16:00:00]\n",
+      "\nMF622\n",
+      "\nZTE INCORPORATED\n"
+    },
+    { "29a5b258f1dc6f50c66a1a9a1ecdde97560799ab",
+      "Option 452",
+      0x0af0, 0x7901,
+      "\nManufacturer: Option N.V.\n"
+        "Model: GlobeTrotter HSUPA Modem\n"
+        "Revision: 2.12.0.0Hd (Date: Oct 29 2009, Time: 09:56:48)\n",
+      "\nManufacturer: Option N.V.\n"
+        "Model: GlobeTrotter HSUPA Modem\n"
+        "Revision: 2.12.0.0Hd (Date: Oct 29 2009, Time: 09:56:48)\n",
+      "\n000125491259519,PH2155R3TR\n",
+      "\n2.12.0.0Hd (Date: Oct 29 2009, Time: 09:56:48)\n",
+      "\nGlobeTrotter HSUPA Modem\n",
+      "\nOption N.V.\n"
+    },
+    { "c756c67e960e693d5d221e381ea170b60bb9288f",
+      "Novatel XU870",
+      0x413c, 0x8118,
+      "\nManufacturer: Novatel Wireless Incorporated\n"
+        "Model: DELL XU870 ExpressCard\n"
+        "Revision: 9.5.05.01-02  [2006-10-20 17:19:09]\n"
+        "IMEI: 012051505051501\n"
+        "+GCAP: +CGSM,+DS\n",
+      "\nManufacturer: Novatel Wireless Incorporated\n"
+        "Model: DELL XU870 ExpressCard\n"
+        "Revision: 9.5.05.01-02  [2006-10-20 17:19:09]\n"
+        "IMEI: 012051505051501\n"
+        "+GCAP: +CGSM,+DS\n",
+      "\n012051505051501\n",
+      "\n9.5.05.01-02  [2006-10-20 17:19:09]\n",
+      "\nDELL XU870 ExpressCard\n",
+      "\nNovatel Wireless Incorporated\n"
+    },
+    { "4162ba918ab54b7776bccc3830e6c6b7a6738244",
+      "Zoom 4596",
+      0x1c9e, 0x9603,
+      "\nManufacturer: Manufacturer\n"
+        "Model: HSPA USB MODEM\n"
+        "Revision: LQA0021.1.1_M573A\n"
+        "IMEI: 239664699635121\n"
+        "+GCAP: +CGSM,+FCLASS,+DS\n",
+      "\nManufacturer: Manufacturer\n"
+        "Model: HSPA USB MODEM\n"
+        "Revision: LQA0021.1.1_M573A\n"
+        "IMEI: 239664699635121\n"
+        "+GCAP: +CGSM,+FCLASS,+DS\n",
+      "\n239664699635121\n",
+      "\nLQA0021.1.1_M573A\n",
+      "\nHSPA USB MODEM\n",
+      "\nManufacturer\n"
+    },
+    { "6d3a2fccd3588943a8962fd1e0d3ba752c706660",
+      "C-MOTECH CDX-650",
+      0x16d8, 0x6512,
+      "\nManufacturer: C-MOTECH Co., Ltd.\r\r\n"
+        "Model: CDX-650 \r\r\n"
+        "Revision: CDX65UAC03\r\r\n"
+        "Esn: 3B0C4B98\r\r\n"
+        "+GCAP: +CIS707A, +MS, +ES, +DS, +FCLASS\r\n",
+      "\nManufacturer: C-MOTECH Co., Ltd.\r\r\n"
+        "Model: CDX-650 \r\r\n"
+        "Revision: CDX65UAC03\r\r\n"
+        "Esn: 3B0C4B98\r\r\n"
+        "+GCAP: +CIS707A, +MS, +ES, +DS, +FCLASS\r\n",
+      "\n0x3B0C4B98\n",
+      "\nCDX65UAC03  1  [Oct 17 2007 13:30:00]\n",
+      "\nModel CDX-650 \n",
+      "\nC-MOTECH Co., Ltd.\n"
+    },
+    { "cf50da63e6d48beb1d1c3b41d70ef6fa534c3e13",
+      "BUSlink SCWi275u",
+      0x22b8, 0x3802,
+      "\n144\n",
+      "\n000\n",
+      NULL,
+      "\n\"ADE_05_00_06032300I\"\n",
+      "\n\"GSM900\",\"GSM1800\",\"GSM1900\",\"GSM850\",\"MODEL=I250-000\"\n",
+      "\n\"Motorola CE, Copyright 2000\"\n"
+    },
+    { "2aff568f2b60f3d6f3f6cac708ed5dce77b12b96",
+      "Motorola ROKR E2",
+      0x22b8, 0x3802,
+      NULL,
+      NULL,
+      "\n\"626936926396996\"\n",
+      "\n\"R564_G_12.00.47P\"\n",
+      "\n\"E2\"\n",
+      "\n\"Motorola\"\n"
+    },
+    { "a7136c6067a43f055ca093cee75cb98ce6c9658e",
+      "Sony-Ericsson W580i",
+      0x0fce, 0xd089,
+      "\nSony Ericsson W580\n",
+      "\nCXC1123481\n",
+      "\n012505051512505\n",
+      "\nR8BE001 080115 1451 CXC1123481_NAM_1_LA\n",
+      "\nAAC-1052042-BV\n",
+      "\nSony Ericsson\n"
+    },
+    { "b80ee70214bdf9672f2a268ce165ecfd9def5721",
+      "Huawei E226",
+      0x12d1, 0x1003,
+      "\nManufacturer: huawei\n"
+        "Model: E226\n"
+        "Revision: 11.310.15.00.150\n"
+        "IMEI: 232363662362362\n"
+        "+GCAP: +CGSM,+FCLASS,+DS\n",
+      "\nManufacturer: huawei\n"
+        "Model: E226\n"
+        "Revision: 11.310.15.00.150\n"
+        "IMEI: 232363662362362\n"
+        "+GCAP: +CGSM,+FCLASS,+DS\n",
+      "\n232363662362362\n",
+      "\n11.310.15.00.150\n",
+      "\nE226\n",
+      "\nhuawei\n"
+    },
+    { "d902e1f234863aa107bfc2d0faefbee5ed6901f1",
+      "LG LX265",
+      0x1004, 0x6000,
+      "\nManufacturer: +GMI: LG Electronics Inc.\n"
+        "Model: +GMI: LG Electronics Inc.+GMM: Model:LG-LX265\n"
+        "Revision: +GMR: LX265V05, 50571\n"
+        "ESN: +GSN: 0x9235EB52\n"
+        "+GCAP: +CIS707-A, +MS, +ES, +DS, +FCLASS\n",
+      "\nManufacturer: +GMI: LG Electronics Inc.\n"
+        "Model: +GMI: LG Electronics Inc.+GMM: Model:LG-LX265\n"
+        "Revision: +GMR: LX265V05, 50571\n"
+        "ESN: +GSN: 0x9235EB52\n"
+        "+GCAP: +CIS707-A, +MS, +ES, +DS, +FCLASS\n",
+      "\n0x9235EB52\n",
+      "\nLX265V05, 50571\n",
+      "\nModel:LG-LX265\n",
+      "\nLG Electronics Inc.\n"
+    },
+    { "543c2920e450e20a46368861fdec3a3b97ba8663",
+      "Nokia 2720a BT",
+      0x0000, 0x0000,
+      "\nNokia\n",
+      "\n012350150101501\n",
+      "\n012350150101501\n",
+      "\nV 08.62\n"
+        "24-07-09\n"
+        "RM-520\n"
+        "(c) Nokia            \n",
+      "\nNokia 2720a-2b\n",
+      "\nNokia\n"
+    },
+    { "6386ffa7a39ced3c9bfd1d693b90975661e54a86",
+      "Gobi 1000",
+      0x03f0, 0x1f1d,
+      "\nManufacturer: QUALCOMM INCORPORATED\n"
+        "Model: 88\n"
+        "Revision: D1020-SUUAASFA-4352  1  [Apr 14 2008 18:00:00]\n"
+        "IMEI: 239639269236269\n"
+        "+GCAP: +CGSM,+DS\n",
+      "\nManufacturer: QUALCOMM INCORPORATED\n"
+        "Model: 88\n"
+        "Revision: D1020-SUUAASFA-4352  1  [Apr 14 2008 18:00:00]\n"
+        "IMEI: 239639269236269\n"
+        "+GCAP: +CGSM,+DS\n",
+      "\n239639269236269\n",
+      "\nD1020-SUUAASFA-4352  1  [Apr 14 2008 18:00:00]\n",
+      "\n88\n",
+      "\nQUALCOMM INCORPORATED\n"
+    },
+    { NULL }
+};
+
+static void
+test_devid_item (void *f, gpointer d)
+{
+    DevidItem *item = (DevidItem *) d;
+    char *devid;
+
+    g_print ("%s... ", item->desc);
+    devid = mm_create_device_identifier (item->vid,
+                                         item->pid,
+                                         item->ati,
+                                         item->ati1,
+                                         item->gsn,
+                                         item->revision,
+                                         item->model,
+                                         item->manf,
+                                         FALSE);
+    g_assert (devid);
+if (strcmp (devid, item->devid))
+g_message (devid);
+    g_assert (!strcmp (devid, item->devid));
+}
+
 static TestData *
 test_data_new (void)
 {
@@ -815,6 +1110,7 @@ int main (int argc, char **argv)
 	GTestSuite *suite;
     TestData *data;
     gint result;
+    DevidItem *item = &devids[0];
 
 	g_test_init (&argc, &argv, NULL);
 
@@ -878,6 +1174,11 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cscs_sierra_mercury_support_response, data));
     g_test_suite_add (suite, TESTCASE (test_cscs_buslink_support_response, data));
     g_test_suite_add (suite, TESTCASE (test_cscs_blackberry_support_response, data));
+
+    while (item->devid) {
+        g_test_suite_add (suite, TESTCASE (test_devid_item, (gconstpointer) item));
+        item++;
+    }
 
     result = g_test_run ();
 

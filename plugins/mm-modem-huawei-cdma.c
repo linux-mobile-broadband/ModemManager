@@ -39,7 +39,9 @@ mm_modem_huawei_cdma_new (const char *device,
                          const char *driver,
                          const char *plugin,
                          gboolean evdo_rev0,
-                         gboolean evdo_revA)
+                         gboolean evdo_revA,
+                         guint32 vendor,
+                         guint32 product)
 {
     gboolean try_css = TRUE;
 
@@ -61,6 +63,8 @@ mm_modem_huawei_cdma_new (const char *device,
                                    MM_GENERIC_CDMA_EVDO_REV0, evdo_rev0,
                                    MM_GENERIC_CDMA_EVDO_REVA, evdo_revA,
                                    MM_GENERIC_CDMA_REGISTRATION_TRY_CSS, try_css,
+                                   MM_MODEM_HW_VID, vendor,
+                                   MM_MODEM_HW_PID, product,
                                    NULL));
 }
 

@@ -890,8 +890,8 @@ mm_plugin_base_get_device_ids (MMPluginBase *self,
                                guint16 *product)
 {
     MMPluginBasePrivate *priv;
-    GUdevDevice *device = NULL;
-    const char *vid, *pid;
+    GUdevDevice *device = NULL, *parent = NULL;
+    const char *vid, *pid, *parent_subsys;
     gboolean success = FALSE;
 
     g_return_val_if_fail (self != NULL, FALSE);
@@ -908,6 +908,18 @@ mm_plugin_base_get_device_ids (MMPluginBase *self,
     device = g_udev_client_query_by_subsystem_and_name (priv->client, subsys, name);
     if (!device)
         goto out;
+
+    /* Bluetooth devices report the VID/PID of the BT adapter here, which
+     * isn't really what we want.  Just return null IDs instead.
+     */
+    parent = g_udev_device_get_parent (device);
+    if (parent) {
+        parent_subsys = g_udev_device_get_subsystem (parent);
+        if (parent_subsys && !strcmp (parent_subsys, "bluetooth")) {
+            success = TRUE;
+            goto out;
+        }
+    }
 
     vid = g_udev_device_get_property (device, "ID_VENDOR_ID");
     if (!vid || (strlen (vid) != 4))
@@ -934,6 +946,8 @@ mm_plugin_base_get_device_ids (MMPluginBase *self,
 out:
     if (device)
         g_object_unref (device);
+    if (parent)
+        g_object_unref (parent);
     return success;
 }
 

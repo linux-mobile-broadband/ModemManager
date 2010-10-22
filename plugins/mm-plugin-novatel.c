@@ -115,6 +115,7 @@ grab_port (MMPluginBase *base,
     MMModem *modem = NULL;
     const char *name, *subsys, *devfile, *sysfs_path;
     guint32 caps;
+    guint16 vendor = 0, product = 0;
 
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
@@ -128,19 +129,28 @@ grab_port (MMPluginBase *base,
     subsys = g_udev_device_get_subsystem (port);
     name = g_udev_device_get_name (port);
 
+    if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product)) {
+        g_set_error (error, 0, 0, "Could not get modem product ID.");
+        return NULL;
+    }
+
     caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
     sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
     if (!existing) {
         if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
             modem = mm_modem_novatel_gsm_new (sysfs_path,
                                               mm_plugin_base_supports_task_get_driver (task),
-                                              mm_plugin_get_name (MM_PLUGIN (base)));
+                                              mm_plugin_get_name (MM_PLUGIN (base)),
+                                              vendor,
+                                              product);
         } else if (caps & CAP_CDMA) {
             modem = mm_modem_novatel_cdma_new (sysfs_path,
                                                mm_plugin_base_supports_task_get_driver (task),
                                                mm_plugin_get_name (MM_PLUGIN (base)),
                                                !!(caps & MM_PLUGIN_BASE_PORT_CAP_IS856),
-                                               !!(caps & MM_PLUGIN_BASE_PORT_CAP_IS856_A));
+                                               !!(caps & MM_PLUGIN_BASE_PORT_CAP_IS856_A),
+                                               vendor,
+                                               product);
         }
 
         if (modem) {

@@ -51,6 +51,8 @@ typedef struct {
     gboolean valid;
     MMModemState state;
 
+    guint vid;
+    guint pid;
     char *manf;
     char *model;
     char *revision;
@@ -435,8 +437,8 @@ card_info_cache_invoke (MMCallbackInfo *info)
 
     /* Build up the device identifier */
     g_free (priv->device_ident);
-    priv->device_ident = mm_create_device_identifier (NULL,
-                                                      NULL,
+    priv->device_ident = mm_create_device_identifier (priv->vid,
+                                                      priv->pid,
                                                       priv->ati,
                                                       priv->ati1,
                                                       priv->gsn,
@@ -454,41 +456,44 @@ info_item_done (MMCallbackInfo *info,
                 GString *response,
                 GError *error,
                 const char *tag,
+                const char *tag2,
                 const char *desc)
 {
     const char *p = response->str;
 
     if (!error) {
         if (tag)
-            p = mm_strip_tag (response->str, tag);
+            p = mm_strip_tag (p, tag);
+        if (tag2)
+            p = mm_strip_tag (p, tag2);
         mm_callback_info_set_data (info, desc, strlen (p) ? g_strdup (p) : NULL, g_free);
     }
 
     mm_callback_info_chain_complete_one (info);
 }
 
-#define GET_INFO_RESP_FN(func_name, tag, desc) \
+#define GET_INFO_RESP_FN(func_name, tag, tag2, desc) \
 static void \
 func_name (MMAtSerialPort *port, \
            GString *response, \
            GError *error, \
            gpointer user_data) \
 { \
-    info_item_done ((MMCallbackInfo *) user_data, response, error, tag , desc ); \
+    info_item_done ((MMCallbackInfo *) user_data, response, error, tag, tag2, desc ); \
 }
 
-GET_INFO_RESP_FN(get_revision_done, "+GMR:", "card-info-revision")
-GET_INFO_RESP_FN(get_model_done, "+GMM:", "card-info-model")
-GET_INFO_RESP_FN(get_manf_done, "+GMI:", "card-info-manf")
+GET_INFO_RESP_FN(get_revision_done, "+GMR:", "AT+GMR", "card-info-revision")
+GET_INFO_RESP_FN(get_model_done, "+GMM:", "AT+GMM", "card-info-model")
+GET_INFO_RESP_FN(get_manf_done, "+GMI:", "AT+GMI", "card-info-manf")
 
-GET_INFO_RESP_FN(get_c_revision_done, "+CGMR:", "card-info-c-revision")
-GET_INFO_RESP_FN(get_c_model_done, "+CGMM:", "card-info-c-model")
-GET_INFO_RESP_FN(get_c_manf_done, "+CGMI:", "card-info-c-manf")
+GET_INFO_RESP_FN(get_c_revision_done, "+CGMR:", "AT+CGMR", "card-info-c-revision")
+GET_INFO_RESP_FN(get_c_model_done, "+CGMM:", "AT+CGMM", "card-info-c-model")
+GET_INFO_RESP_FN(get_c_manf_done, "+CGMI:", "AT+CGMI", "card-info-c-manf")
 
-GET_INFO_RESP_FN(get_ati_done, NULL, "card-info-ati")
-GET_INFO_RESP_FN(get_ati1_done, NULL, "card-info-ati1")
-GET_INFO_RESP_FN(get_gsn_done, "+GSN:", "card-info-gsn")
-GET_INFO_RESP_FN(get_cgsn_done, "+CGSN:", "card-info-c-gsn")
+GET_INFO_RESP_FN(get_ati_done, NULL, "ATI", "card-info-ati")
+GET_INFO_RESP_FN(get_ati1_done, NULL, "ATI1", "card-info-ati1")
+GET_INFO_RESP_FN(get_gsn_done, "+GSN:", "AT+GSN", "card-info-gsn")
+GET_INFO_RESP_FN(get_cgsn_done, "+CGSN:", "AT+CGSN", "card-info-c-gsn")
 
 void
 mm_modem_base_get_card_info (MMModemBase *self,
@@ -672,6 +677,14 @@ set_property (GObject *object, guint prop_id,
     case MM_MODEM_PROP_UNLOCK_REQUIRED:
     case MM_MODEM_PROP_UNLOCK_RETRIES:
         break;
+    case MM_MODEM_PROP_HW_VID:
+        /* Construct only */
+        priv->vid = g_value_get_uint (value);
+        break;
+    case MM_MODEM_PROP_HW_PID:
+        /* Construct only */
+        priv->pid = g_value_get_uint (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -723,6 +736,12 @@ get_property (GObject *object, guint prop_id,
         break;
     case MM_MODEM_PROP_UNLOCK_RETRIES:
         g_value_set_uint (value, priv->unlock_retries);
+        break;
+    case MM_MODEM_PROP_HW_VID:
+        g_value_set_uint (value, priv->vid);
+        break;
+    case MM_MODEM_PROP_HW_PID:
+        g_value_set_uint (value, priv->pid);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -818,6 +837,14 @@ mm_modem_base_class_init (MMModemBaseClass *klass)
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_UNLOCK_RETRIES,
                                       MM_MODEM_UNLOCK_RETRIES);
+
+    g_object_class_override_property (object_class,
+                                      MM_MODEM_PROP_HW_VID,
+                                      MM_MODEM_HW_VID);
+
+    g_object_class_override_property (object_class,
+                                      MM_MODEM_PROP_HW_PID,
+                                      MM_MODEM_HW_PID);
 
     mm_properties_changed_signal_new (object_class);
 }

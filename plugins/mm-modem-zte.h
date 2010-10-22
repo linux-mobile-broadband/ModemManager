@@ -38,6 +38,8 @@ GType mm_modem_zte_get_type (void);
 
 MMModem *mm_modem_zte_new (const char *device,
                            const char *driver,
-                           const char *plugin);
+                           const char *plugin,
+                           guint32 vendor,
+                           guint32 product);
 
 #endif /* MM_MODEM_ZTE_H */

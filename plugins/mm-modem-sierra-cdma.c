@@ -51,7 +51,9 @@ mm_modem_sierra_cdma_new (const char *device,
                           const char *driver,
                           const char *plugin,
                           gboolean evdo_rev0,
-                          gboolean evdo_revA)
+                          gboolean evdo_revA,
+                          guint32 vendor,
+                          guint32 product)
 {
     g_return_val_if_fail (device != NULL, NULL);
     g_return_val_if_fail (driver != NULL, NULL);
@@ -63,6 +65,8 @@ mm_modem_sierra_cdma_new (const char *device,
                                    MM_MODEM_PLUGIN, plugin,
                                    MM_GENERIC_CDMA_EVDO_REV0, evdo_rev0,
                                    MM_GENERIC_CDMA_EVDO_REVA, evdo_revA,
+                                   MM_MODEM_HW_VID, vendor,
+                                   MM_MODEM_HW_PID, product,
                                    NULL));
 }
 

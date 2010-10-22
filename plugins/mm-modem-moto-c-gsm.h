@@ -38,6 +38,8 @@ GType mm_modem_moto_c_gsm_get_type (void);
 
 MMModem *mm_modem_moto_c_gsm_new (const char *device,
                                   const char *driver,
-                                  const char *plugin_name);
+                                  const char *plugin_name,
+                                  guint32 vendor,
+                                  guint32 product);
 
 #endif /* MM_MODEM_MOTO_C_GSM_H */

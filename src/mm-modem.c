@@ -893,6 +893,22 @@ mm_modem_init (gpointer g_iface)
                                0, G_MAXUINT32, 0,
                                G_PARAM_READABLE));
 
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_uint (MM_MODEM_HW_VID,
+                            "Hardware vendor ID",
+                            "Hardware vendor ID",
+                            0, G_MAXUINT, 0,
+                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_uint (MM_MODEM_HW_PID,
+                            "Hardware product ID",
+                            "Hardware product ID",
+                            0, G_MAXUINT, 0,
+                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
     /* Signals */
     g_signal_new ("state-changed",
                   iface_type,

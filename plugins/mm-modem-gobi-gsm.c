@@ -36,7 +36,9 @@ G_DEFINE_TYPE_EXTENDED (MMModemGobiGsm, mm_modem_gobi_gsm, MM_TYPE_GENERIC_GSM, 
 MMModem *
 mm_modem_gobi_gsm_new (const char *device,
                        const char *driver,
-                       const char *plugin)
+                       const char *plugin,
+                       guint32 vendor,
+                       guint32 product)
 {
     g_return_val_if_fail (device != NULL, NULL);
     g_return_val_if_fail (driver != NULL, NULL);
@@ -46,6 +48,8 @@ mm_modem_gobi_gsm_new (const char *device,
                                    MM_MODEM_MASTER_DEVICE, device,
                                    MM_MODEM_DRIVER, driver,
                                    MM_MODEM_PLUGIN, plugin,
+                                   MM_MODEM_HW_VID, vendor,
+                                   MM_MODEM_HW_PID, product,
                                    NULL));
 }
 

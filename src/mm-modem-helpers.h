@@ -59,8 +59,8 @@ gboolean mm_gsm_parse_cscs_support_response (const char *reply,
 
 MMModemGsmAccessTech mm_gsm_string_to_access_tech (const char *string);
 
-char *mm_create_device_identifier (const char *vid,
-                                   const char *pid,
+char *mm_create_device_identifier (guint vid,
+                                   guint pid,
                                    const char *ati,
                                    const char *ati1,
                                    const char *gsn,

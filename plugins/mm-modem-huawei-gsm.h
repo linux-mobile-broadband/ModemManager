@@ -38,6 +38,8 @@ GType mm_modem_huawei_gsm_get_type (void);
 
 MMModem *mm_modem_huawei_gsm_new (const char *device,
                                   const char *driver,
-                                  const char *plugin);
+                                  const char *plugin,
+                                  guint32 vendor,
+                                  guint32 product);
 
 #endif /* MM_MODEM_HUAWEI_GSM_H */

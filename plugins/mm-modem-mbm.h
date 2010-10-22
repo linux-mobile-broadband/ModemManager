@@ -43,6 +43,8 @@ GType mm_modem_mbm_get_type (void);
 
 MMModem *mm_modem_mbm_new (const char *device,
                            const char *driver,
-                           const char *plugin_name);
+                           const char *plugin_name,
+                           guint32 vendor,
+                           guint32 product);
 
 #endif /* MM_MODEM_MBM_H */

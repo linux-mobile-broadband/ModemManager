@@ -38,7 +38,9 @@ GType mm_modem_hso_get_type (void);
 
 MMModem *mm_modem_hso_new (const char *device,
                            const char *driver,
-                           const char *plugin);
+                           const char *plugin,
+                           guint32 vendor,
+                           guint32 product);
 
 void mm_hso_modem_authenticate (MMModemHso *self,
                                 const char *username,

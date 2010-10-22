@@ -105,12 +105,18 @@ grab_port (MMPluginBase *base,
     const char *name, *subsys, *sysfs_path;
     char *devfile;
     guint32 caps;
+    guint16 vendor = 0, product = 0;
 
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
 
     subsys = g_udev_device_get_subsystem (port);
     name = g_udev_device_get_name (port);
+
+    if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product)) {
+        g_set_error (error, 0, 0, "Could not get modem product ID.");
+        return NULL;
+    }
 
     devfile = g_strdup (g_udev_device_get_device_file (port));
     if (!devfile) {
@@ -139,7 +145,9 @@ grab_port (MMPluginBase *base,
     if (!existing) {
         modem = mm_modem_hso_new (sysfs_path,
                                   mm_plugin_base_supports_task_get_driver (task),
-                                  mm_plugin_get_name (MM_PLUGIN (base)));
+                                  mm_plugin_get_name (MM_PLUGIN (base)),
+                                  vendor,
+                                  product);
         if (modem) {
             if (!mm_modem_grab_port (modem, subsys, name, MM_PORT_TYPE_UNKNOWN, NULL, error)) {
                 g_object_unref (modem);

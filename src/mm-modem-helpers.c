@@ -15,6 +15,7 @@
  */
 
 #include <config.h>
+#include <stdio.h>
 #include <ctype.h>
 #include <glib.h>
 #include <string.h>
@@ -807,8 +808,8 @@ mm_gsm_string_to_access_tech (const char *string)
 /*************************************************************************/
 
 char *
-mm_create_device_identifier (const char *vid,
-                             const char *pid,
+mm_create_device_identifier (guint vid,
+                             guint pid,
                              const char *ati,
                              const char *ati1,
                              const char *gsn,
@@ -817,9 +818,10 @@ mm_create_device_identifier (const char *vid,
                              const char *manf,
                              gboolean debug)
 {
-    GString *devid;
+    GString *devid, *dbg = NULL;
     GChecksum *sum;
-    char *p, *ret = NULL, *j = NULL, *dbg = NULL;
+    char *p, *ret = NULL;
+    char str_vid[10], str_pid[10];
 
     /* Build up the device identifier */
     devid = g_string_sized_new (50);
@@ -844,15 +846,29 @@ mm_create_device_identifier (const char *vid,
 
     p = devid->str;
     if (debug)
-        j = dbg = g_malloc0 (strlen (devid->str) + 1);
+        dbg = g_string_sized_new (strlen (devid->str) + 17);
 
     sum = g_checksum_new (G_CHECKSUM_SHA1);
+
+    if (vid) {
+        snprintf (str_vid, sizeof (str_vid) - 1, "%08x", vid);
+        g_checksum_update (sum, (const guchar *) &str_vid[0], strlen (str_vid));
+        if (dbg)
+            g_string_append_printf (dbg, "%08x", vid);
+    }
+    if (vid) {
+        snprintf (str_pid, sizeof (str_pid) - 1, "%08x", pid);
+        g_checksum_update (sum, (const guchar *) &str_pid[0], strlen (str_pid));
+        if (dbg)
+            g_string_append_printf (dbg, "%08x", pid);
+    }
+
     while (*p) {
         /* Strip spaces and linebreaks */
         if (!isblank (*p) && !isspace (*p) && isascii (*p)) {
             g_checksum_update (sum, (const guchar *) p, 1);
             if (dbg)
-                *j++ = *p;
+                g_string_append_c (dbg, *p);
         }
         p++;
     }
@@ -860,9 +876,9 @@ mm_create_device_identifier (const char *vid,
     g_checksum_free (sum);
 
     if (dbg) {
-        g_debug ("Device ID source '%s'", dbg);
+        g_debug ("Device ID source '%s'", dbg->str);
         g_debug ("Device ID '%s'", ret);
-        g_free (dbg);
+        g_string_free (dbg, TRUE);
     }
 
     return ret;

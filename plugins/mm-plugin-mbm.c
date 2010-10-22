@@ -132,6 +132,7 @@ grab_port (MMPluginBase *base,
     MMModem *modem = NULL;
     const char *name, *subsys, *sysfs_path;
     guint32 caps;
+    guint16 vendor = 0, product = 0;
 
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
@@ -143,11 +144,18 @@ grab_port (MMPluginBase *base,
     if (!(caps & MM_PLUGIN_BASE_PORT_CAP_GSM) && strcmp (subsys, "net"))
         return NULL;
 
+    if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product)) {
+        g_set_error (error, 0, 0, "Could not get modem product ID.");
+        return NULL;
+    }
+
     sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
     if (!existing) {
         modem = mm_modem_mbm_new (sysfs_path,
                                   mm_plugin_base_supports_task_get_driver (task),
-                                  mm_plugin_get_name (MM_PLUGIN (base)));
+                                  mm_plugin_get_name (MM_PLUGIN (base)),
+                                  vendor,
+                                  product);
         if (modem) {
             if (!mm_modem_grab_port (modem, subsys, name, MM_PORT_TYPE_UNKNOWN, NULL, error)) {
                 g_object_unref (modem);

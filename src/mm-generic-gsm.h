@@ -134,7 +134,9 @@ GType mm_generic_gsm_get_type (void);
 
 MMModem *mm_generic_gsm_new (const char *device,
                              const char *driver,
-                             const char *plugin);
+                             const char *plugin,
+                             guint vendor,
+                             guint product);
 
 /* Private, for subclasses */
 

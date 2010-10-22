@@ -107,6 +107,7 @@ grab_port (MMPluginBase *base,
     guint32 caps;
     int usbif;
     MMPortType ptype = MM_PORT_TYPE_SECONDARY;
+    guint16 vendor = 0, product = 0;
 
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
@@ -129,13 +130,20 @@ grab_port (MMPluginBase *base,
     if (usbif == 0)
         ptype = MM_PORT_TYPE_PRIMARY;
 
+    if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product)) {
+        g_set_error (error, 0, 0, "Could not get modem product ID.");
+        return NULL;
+    }
+
     caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
     sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
     if (!existing) {
         if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
             modem = mm_modem_option_new (sysfs_path,
                                          mm_plugin_base_supports_task_get_driver (task),
-                                         mm_plugin_get_name (MM_PLUGIN (base)));
+                                         mm_plugin_get_name (MM_PLUGIN (base)),
+                                         vendor,
+                                         product);
         }
 
         if (modem) {

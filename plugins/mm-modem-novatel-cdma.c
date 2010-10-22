@@ -37,7 +37,9 @@ mm_modem_novatel_cdma_new (const char *device,
                            const char *driver,
                            const char *plugin,
                            gboolean evdo_rev0,
-                           gboolean evdo_revA)
+                           gboolean evdo_revA,
+                           guint32 vendor,
+                           guint32 product)
 {
     g_return_val_if_fail (device != NULL, NULL);
     g_return_val_if_fail (driver != NULL, NULL);
