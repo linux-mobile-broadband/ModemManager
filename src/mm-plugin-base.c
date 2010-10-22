@@ -922,7 +922,11 @@ mm_plugin_base_get_device_ids (MMPluginBase *self,
     }
 
     vid = g_udev_device_get_property (device, "ID_VENDOR_ID");
-    if (!vid || (strlen (vid) != 4))
+    if (!vid)
+        goto out;
+    if (strncmp (vid, "0x", 2) == 0)
+        vid += 2;
+    if (strlen (vid) != 4)
         goto out;
 
     if (vendor) {
@@ -931,7 +935,13 @@ mm_plugin_base_get_device_ids (MMPluginBase *self,
     }
 
     pid = g_udev_device_get_property (device, "ID_MODEL_ID");
-    if (!pid || (strlen (pid) != 4)) {
+    if (!pid) {
+        *vendor = 0;
+        goto out;
+    }
+    if (strncmp (pid, "0x", 2) == 0)
+        pid += 2;
+    if (strlen (pid) != 4) {
         *vendor = 0;
         goto out;
     }
