@@ -1072,8 +1072,8 @@ test_devid_item (void *f, gpointer d)
                                          item->manf,
                                          FALSE);
     g_assert (devid);
-if (strcmp (devid, item->devid))
-g_message (devid);
+    if (strcmp (devid, item->devid))
+        g_message (devid);
     g_assert (!strcmp (devid, item->devid));
 }
 
