@@ -891,7 +891,7 @@ mm_plugin_base_get_device_ids (MMPluginBase *self,
 {
     MMPluginBasePrivate *priv;
     GUdevDevice *device = NULL, *parent = NULL;
-    const char *vid, *pid, *parent_subsys;
+    const char *vid = NULL, *pid = NULL, *parent_subsys;
     gboolean success = FALSE;
 
     g_return_val_if_fail (self != NULL, FALSE);
@@ -909,21 +909,34 @@ mm_plugin_base_get_device_ids (MMPluginBase *self,
     if (!device)
         goto out;
 
-    /* Bluetooth devices report the VID/PID of the BT adapter here, which
-     * isn't really what we want.  Just return null IDs instead.
-     */
     parent = g_udev_device_get_parent (device);
     if (parent) {
         parent_subsys = g_udev_device_get_subsystem (parent);
-        if (parent_subsys && !strcmp (parent_subsys, "bluetooth")) {
-            success = TRUE;
-            goto out;
+        if (parent_subsys) {
+            if (!strcmp (parent_subsys, "bluetooth")) {
+                /* Bluetooth devices report the VID/PID of the BT adapter here,
+                 * which isn't really what we want.  Just return null IDs instead.
+                 */
+                success = TRUE;
+                goto out;
+            } else if (!strcmp (parent_subsys, "pcmcia")) {
+                /* For PCMCIA devices we need to grab the PCMCIA subsystem's
+                 * manfid and cardid, since any IDs on the tty device itself
+                 * may be from PCMCIA controller or something else.
+                 */
+                vid = g_udev_device_get_sysfs_attr (parent, "manf_id");
+                pid = g_udev_device_get_sysfs_attr (parent, "card_id");
+                if (!vid || !pid)
+                    goto out;
+            }
         }
     }
 
-    vid = g_udev_device_get_property (device, "ID_VENDOR_ID");
+    if (!vid)
+        vid = g_udev_device_get_property (device, "ID_VENDOR_ID");
     if (!vid)
         goto out;
+
     if (strncmp (vid, "0x", 2) == 0)
         vid += 2;
     if (strlen (vid) != 4)
@@ -934,11 +947,13 @@ mm_plugin_base_get_device_ids (MMPluginBase *self,
         *vendor |= (guint16) ((utils_hex2byte (vid) & 0xFF) << 8);
     }
 
-    pid = g_udev_device_get_property (device, "ID_MODEL_ID");
+    if (!pid)
+        pid = g_udev_device_get_property (device, "ID_MODEL_ID");
     if (!pid) {
         *vendor = 0;
         goto out;
     }
+
     if (strncmp (pid, "0x", 2) == 0)
         pid += 2;
     if (strlen (pid) != 4) {
