@@ -33,6 +33,13 @@ response_clean (GString *response)
         s -= 2;
     }
 
+    /* Contains duplicate '<CR><CR>' */
+    s = response->str;
+    while ((response->len >= 2) && (*s == '\r') && (*(s + 1) == '\r')) {
+        g_string_erase (response, 0, 1);
+        s = response->str;
+    }
+
     /* Starts with one or more '<CR><LF>' */
     s = response->str;
     while ((response->len >= 2) && (*s == '\r') && (*(s + 1) == '\n')) {

@@ -15,6 +15,7 @@
  */
 
 #include <config.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -242,6 +243,78 @@ get_access_technology (MMGenericGsm *modem,
     mm_at_serial_port_queue_command (port, "*CNTI=0", 3, get_act_request_done, info);
 }
 
+static void
+get_sim_iccid_done (MMAtSerialPort *port,
+                    GString *response,
+                    GError *error,
+                    gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    const char *p;
+    char buf[21];
+    int i;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        goto done;
+    }
+
+    p = mm_strip_tag (response->str, "!ICCID:");
+    if (!p) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_GENERAL,
+                                           "Failed to parse !ICCID response");
+        goto done;
+    }
+
+    memset (buf, 0, sizeof (buf));
+    for (i = 0; i < 20; i++) {
+        if (!isdigit (p[i]) && (p[i] != 'F') && (p[i] == 'f')) {
+            info->error = g_error_new (MM_MODEM_ERROR,
+                                       MM_MODEM_ERROR_GENERAL,
+                                       "CRSM ICCID response contained invalid character '%c'",
+                                       p[i]);
+            goto done;
+        }
+        if (p[i] == 'F' || p[i] == 'f') {
+            buf[i] = 0;
+            break;
+        }
+        buf[i] = p[i];
+    }
+
+    if (i == 19 || i == 20)
+        mm_callback_info_set_result (info, g_strdup (buf), g_free);
+    else {
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "Invalid +CRSM ICCID response size (was %d, expected 19 or 20)",
+                                   i);
+    }
+
+done:
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_sim_iccid (MMGenericGsm *modem,
+               MMModemStringFn callback,
+               gpointer user_data)
+{
+    MMAtSerialPort *port;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
+
+    port = mm_generic_gsm_get_best_at_port (modem, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_at_serial_port_queue_command (port, "!ICCID?", 3, get_sim_iccid_done, info);
+}
+
 /*****************************************************************************/
 /*    Modem class override functions                                         */
 /*****************************************************************************/
@@ -355,5 +428,6 @@ mm_modem_sierra_gsm_class_init (MMModemSierraGsmClass *klass)
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->get_access_technology = get_access_technology;
+    gsm_class->get_sim_iccid = get_sim_iccid;
 }
 

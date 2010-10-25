@@ -69,6 +69,7 @@ typedef struct {
     gboolean pin_checked;
     guint32 pin_check_tries;
     guint pin_check_timeout;
+    char *simid;
 
     MMModemGsmAllowedMode allowed_mode;
 
@@ -555,6 +556,188 @@ initial_info_check (MMGenericGsm *self)
     }
 }
 
+static void
+get_iccid_done (MMModem *modem,
+                const char *response,
+                GError *error,
+                gpointer user_data)
+{
+    MMGenericGsmPrivate *priv;
+    const char *p = response;
+    GChecksum *sum;
+
+    if (error || !response || !strlen (response))
+        return;
+
+    sum = g_checksum_new (G_CHECKSUM_SHA1);
+
+    /* Make sure it looks like an ICCID */
+    while (*p) {
+        if (!isdigit (*p)) {
+            g_warning ("%s: invalid ICCID format (not a digit)", __func__);
+            goto out;
+        }
+        g_checksum_update (sum, (const guchar *) p++, 1);
+    }
+
+    priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+    g_free (priv->simid);
+    priv->simid = g_strdup (g_checksum_get_string (sum));
+
+    if (mm_options_debug ()) {
+        g_debug ("SIM ID source '%s'", response);
+        g_debug ("SIM ID '%s'", priv->simid);
+    }
+
+    g_object_notify (G_OBJECT (modem), MM_MODEM_GSM_CARD_SIM_IDENTIFIER);
+
+out:
+    g_checksum_free (sum);
+}
+
+static void
+real_get_iccid_done (MMAtSerialPort *port,
+                     GString *response,
+                     GError *error,
+                     gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    const char *str;
+    int sw1, sw2;
+    gboolean success = FALSE;
+    char buf[21], swapped[21];
+
+    if (error) {
+        info->error = g_error_copy (error);
+        goto done;
+    }
+
+    memset (buf, 0, sizeof (buf));
+    str = mm_strip_tag (response->str, "+CRSM:");
+    if (sscanf (str, "%d,%d,\"%20c\"", &sw1, &sw2, (char *) &buf) == 3)
+        success = TRUE;
+    else {
+        /* May not include quotes... */
+        if (sscanf (str, "%d,%d,%20c", &sw1, &sw2, (char *) &buf) == 3)
+            success = TRUE;
+    }
+
+    if (!success) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse the CRSM response");
+        goto done;
+    }
+
+    if ((sw1 == 0x90 && sw2 == 0x00) || (sw1 == 0x91) || (sw1 == 0x92) || (sw1 == 0x9f)) {
+        gsize len = 0;
+        int f_pos = -1, i;
+
+        /* Make sure the buffer is only digits or 'F' */
+        for (len = 0; len < sizeof (buf) && buf[len]; len++) {
+            if (isdigit (buf[len]))
+                continue;
+            if (buf[len] == 'F' || buf[len] == 'f') {
+                buf[len] = 'F';  /* canonicalize the F */
+                f_pos = len;
+                continue;
+            }
+            if (buf[len] == '\"') {
+                buf[len] = 0;
+                break;
+            }
+
+            /* Invalid character */
+            info->error = g_error_new (MM_MODEM_ERROR,
+                                       MM_MODEM_ERROR_GENERAL,
+                                       "CRSM ICCID response contained invalid character '%c'",
+                                       buf[len]);
+            goto done;
+        }
+
+        /* BCD encoded ICCIDs are 20 digits long */
+        if (len != 20) {
+            info->error = g_error_new (MM_MODEM_ERROR,
+                                       MM_MODEM_ERROR_GENERAL,
+                                       "Invalid +CRSM ICCID response size (was %zd, expected 20)",
+                                       len);
+            goto done;
+        }
+
+        /* Ensure if there's an 'F' that it's second-to-last */
+        if ((f_pos >= 0) && (f_pos != len - 2)) {
+            info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                               MM_MODEM_ERROR_GENERAL,
+                                               "Invalid +CRSM ICCID length (unexpected F)");
+            goto done;
+        }
+
+        /* Swap digits in the EFiccid response to get the actual ICCID, each
+         * group of 2 digits is reversed in the +CRSM response.  i.e.:
+         *
+         *    21436587 -> 12345678
+         */
+        memset (swapped, 0, sizeof (swapped));
+        for (i = 0; i < 10; i++) {
+            swapped[i * 2] = buf[(i * 2) + 1];
+            swapped[(i * 2) + 1] = buf[i * 2];
+        }
+
+        /* Zero out the F for 19 digit ICCIDs */
+        if (swapped[len - 1] == 'F')
+            swapped[len - 1] = 0;
+
+        mm_callback_info_set_result (info, g_strdup (swapped), g_free);
+    } else {
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "SIM failed to handle CRSM request (sw1 %d sw2 %d)",
+                                   sw1, sw2);
+    }
+
+done:
+    mm_callback_info_schedule (info);
+}
+
+static void
+real_get_sim_iccid (MMGenericGsm *self,
+                    MMModemStringFn callback,
+                    gpointer callback_data)
+{
+    MMCallbackInfo *info;
+    MMAtSerialPort *port;
+    GError *error = NULL;
+
+    port = mm_generic_gsm_get_best_at_port (self, &error);
+    if (!port) {
+        callback (MM_MODEM (self), NULL, error, callback_data);
+        g_clear_error (&error);
+        return;
+    }
+
+    if (!mm_serial_port_open (MM_SERIAL_PORT (port), &error)) {
+        callback (MM_MODEM (self), NULL, error, callback_data);
+        g_clear_error (&error);
+        return;
+    }
+
+    info = mm_callback_info_string_new (MM_MODEM (self), callback, callback_data);
+
+    /* READ BINARY of EFiccid (ICC Identification) ETSI TS 102.221 section 13.2 */
+    mm_at_serial_port_queue_command (port,
+                                     "+CRSM=176,12258,0,0,10",
+                                     3,
+                                     real_get_iccid_done,
+                                     info);
+}
+
+static void
+initial_iccid_check (MMGenericGsm *self)
+{
+    g_assert (MM_GENERIC_GSM_GET_CLASS (self)->get_sim_iccid);
+    MM_GENERIC_GSM_GET_CLASS (self)->get_sim_iccid (self, get_iccid_done, NULL);
+}
+
 static gboolean
 owns_port (MMModem *modem, const char *subsys, const char *name)
 {
@@ -608,8 +791,11 @@ mm_generic_gsm_grab_port (MMGenericGsm *self,
             /* Get the modem's general info */
             initial_info_check (self);
 
-            /* Get modem's IMEI number */
+            /* Get modem's IMEI */
             initial_imei_check (self);
+
+            /* Try to get the SIM's ICCID */
+            initial_iccid_check (self);
 
             /* Get modem's initial lock/unlock state */
             initial_pin_check (self);
@@ -4184,6 +4370,7 @@ set_property (GObject *object, guint prop_id,
     case MM_GENERIC_GSM_PROP_SUPPORTED_MODES:
     case MM_GENERIC_GSM_PROP_ALLOWED_MODE:
     case MM_GENERIC_GSM_PROP_ACCESS_TECHNOLOGY:
+    case MM_GENERIC_GSM_PROP_SIM_IDENTIFIER:
 #if LOCATION_API
     case MM_GENERIC_GSM_PROP_LOC_CAPABILITIES:
     case MM_GENERIC_GSM_PROP_LOC_ENABLED:
@@ -4250,6 +4437,9 @@ get_property (GObject *object, guint prop_id,
         else
             g_value_set_uint (value, MM_MODEM_GSM_ACCESS_TECH_UNKNOWN);
         break;
+    case MM_GENERIC_GSM_PROP_SIM_IDENTIFIER:
+        g_value_set_string (value, priv->simid);
+        break;
 #if LOCATION_API
     case MM_GENERIC_GSM_PROP_LOC_CAPABILITIES:
         g_value_set_uint (value, priv->loc_caps);
@@ -4303,6 +4493,7 @@ finalize (GObject *object)
 
     g_free (priv->oper_code);
     g_free (priv->oper_name);
+    g_free (priv->simid);
 
     G_OBJECT_CLASS (mm_generic_gsm_parent_class)->finalize (object);
 }
@@ -4323,6 +4514,7 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
     klass->do_enable = real_do_enable;
     klass->do_enable_power_up_done = real_do_enable_power_up_done;
     klass->do_disconnect = real_do_disconnect;
+    klass->get_sim_iccid = real_get_sim_iccid;
 
     /* Properties */
     g_object_class_override_property (object_class,
@@ -4348,6 +4540,10 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_ACCESS_TECHNOLOGY,
                                       MM_MODEM_GSM_NETWORK_ACCESS_TECHNOLOGY);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_SIM_IDENTIFIER,
+                                      MM_MODEM_GSM_CARD_SIM_IDENTIFIER);
 
 #if LOCATION_API
     g_object_class_override_property (object_class,

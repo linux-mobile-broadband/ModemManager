@@ -55,6 +55,7 @@ typedef enum {
     MM_GENERIC_GSM_PROP_LOC_SIGNAL,
     MM_GENERIC_GSM_PROP_LOC_LOCATION,
 #endif
+    MM_GENERIC_GSM_PROP_SIM_IDENTIFIER,
 } MMGenericGsmProp;
 
 typedef enum {
@@ -128,6 +129,11 @@ typedef struct {
     void (*loc_get_capabilities) (MMGenericGsm *self,
                                   MMModemUIntFn callback,
                                   gpointer user_data);
+
+    /* Called by the generic class to retrieve the SIM's ICCID */
+    void (*get_sim_iccid) (MMGenericGsm *self,
+                           MMModemStringFn callback,
+                           gpointer user_data);
 } MMGenericGsmClass;
 
 GType mm_generic_gsm_get_type (void);

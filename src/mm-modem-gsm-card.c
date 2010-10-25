@@ -581,6 +581,14 @@ mm_modem_gsm_card_init (gpointer g_iface)
 
     g_object_interface_install_property
         (g_iface,
+         g_param_spec_string (MM_MODEM_GSM_CARD_SIM_IDENTIFIER,
+                               "SimIdentifier",
+                               "An obfuscated identifier of the SIM",
+                               NULL,
+                               G_PARAM_READABLE));
+
+    g_object_interface_install_property
+        (g_iface,
          g_param_spec_uint (MM_MODEM_GSM_CARD_SUPPORTED_BANDS,
                             "Supported Modes",
                             "Supported frequency bands of the card",

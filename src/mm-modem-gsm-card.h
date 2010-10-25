@@ -26,6 +26,7 @@
 
 #define MM_MODEM_GSM_CARD_SUPPORTED_BANDS "supported-bands"
 #define MM_MODEM_GSM_CARD_SUPPORTED_MODES "supported-modes"
+#define MM_MODEM_GSM_CARD_SIM_IDENTIFIER  "sim-identifier"
 
 #define MM_MODEM_GSM_CARD_SIM_PIN "sim-pin"
 #define MM_MODEM_GSM_CARD_SIM_PIN2 "sim-pin2"

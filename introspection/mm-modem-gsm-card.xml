@@ -109,6 +109,14 @@
       </arg>
     </method>
 
+    <property name="SimIdentifier" type="s" access="read">
+      <tp:docstring>
+	An obfuscated SIM identifier based on the IMSI or the ICCID.  This may
+	be available before the PIN has been entered depending on the device
+	itself.
+      </tp:docstring>
+    </property>
+
     <property name="SupportedBands" type="u" access="read" tp:type="MM_MODEM_GSM_BAND">
       <tp:docstring>
         Bands supported by the card.  (Note for plugin writers:

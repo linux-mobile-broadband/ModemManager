@@ -167,6 +167,13 @@ def gsm_inspect(proxy, props):
     # Gsm.Card interface
     card = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_GSM_CARD)
 
+    simid = "<unavailable>"
+    try:
+        simid = props.Get(MM_DBUS_INTERFACE_MODEM_GSM_CARD, "SimIdentifier")
+    except dbus.exceptions.DBusException:
+        pass
+    print "SIM ID: %s" % simid
+
     imei = "<unavailable>"
     try:
         imei = card.GetImei()
@@ -229,10 +236,10 @@ if mtype == 1:
 elif mtype == 2:
     print "Type: CDMA"
 
-print "Driver: '%s'" % (props.Get(MM_DBUS_INTERFACE_MODEM, 'Driver'))
-print "Modem device: '%s'" % (props.Get(MM_DBUS_INTERFACE_MODEM, 'MasterDevice'))
-print "Data device: '%s'" % (props.Get(MM_DBUS_INTERFACE_MODEM, 'Device'))
-print "Device ID: '%s'" % (props.Get(MM_DBUS_INTERFACE_MODEM, 'DeviceIdentifier'))
+print "Driver: %s" % (props.Get(MM_DBUS_INTERFACE_MODEM, 'Driver'))
+print "Modem device: %s" % (props.Get(MM_DBUS_INTERFACE_MODEM, 'MasterDevice'))
+print "Data device: %s" % (props.Get(MM_DBUS_INTERFACE_MODEM, 'Device'))
+print "Device ID: %s" % (props.Get(MM_DBUS_INTERFACE_MODEM, 'DeviceIdentifier'))
 print ""
 
 modem = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM)
