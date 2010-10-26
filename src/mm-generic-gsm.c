@@ -1231,6 +1231,10 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
     /* Try to enable XON/XOFF flow control */
     mm_at_serial_port_queue_command (priv->primary, "+IFC=1,1", 3, NULL, NULL);
 
+    /* Try one more time to get the SIM ID */
+    if (!priv->simid)
+        MM_GENERIC_GSM_GET_CLASS (self)->get_sim_iccid (self, get_iccid_done, NULL);
+
     /* Get allowed mode */
     if (MM_GENERIC_GSM_GET_CLASS (self)->get_allowed_mode)
         MM_GENERIC_GSM_GET_CLASS (self)->get_allowed_mode (self, get_allowed_mode_done, NULL);
