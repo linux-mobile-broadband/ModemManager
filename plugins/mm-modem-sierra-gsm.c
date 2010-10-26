@@ -293,26 +293,33 @@ get_sim_iccid_done (MMAtSerialPort *port,
     }
 
 done:
+    mm_serial_port_close (MM_SERIAL_PORT (port));
     mm_callback_info_schedule (info);
 }
 
 static void
 get_sim_iccid (MMGenericGsm *modem,
                MMModemStringFn callback,
-               gpointer user_data)
+               gpointer callback_data)
 {
     MMAtSerialPort *port;
     MMCallbackInfo *info;
+    GError *error = NULL;
 
-    info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
+    port = mm_generic_gsm_get_best_at_port (modem, &error);
+    if (!port)
+        goto error;
 
-    port = mm_generic_gsm_get_best_at_port (modem, &info->error);
-    if (!port) {
-        mm_callback_info_schedule (info);
-        return;
-    }
+    if (!mm_serial_port_open (MM_SERIAL_PORT (port), &error))
+        goto error;
 
+    info = mm_callback_info_string_new (MM_MODEM (modem), callback, callback_data);
     mm_at_serial_port_queue_command (port, "!ICCID?", 3, get_sim_iccid_done, info);
+    return;
+
+error:
+    callback (MM_MODEM (modem), NULL, error, callback_data);
+    g_clear_error (&error);
 }
 
 /*****************************************************************************/
