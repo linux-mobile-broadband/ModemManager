@@ -70,6 +70,8 @@ typedef struct {
     guint32 pin_check_tries;
     guint pin_check_timeout;
     char *simid;
+    gboolean simid_checked;
+    guint32 simid_tries;
 
     MMModemGsmAllowedMode allowed_mode;
 
@@ -425,136 +427,12 @@ check_valid (MMGenericGsm *self)
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     gboolean new_valid = FALSE;
 
-    if (priv->primary && priv->data && priv->pin_checked)
+    if (priv->primary && priv->data && priv->pin_checked && priv->simid_checked)
         new_valid = TRUE;
 
     mm_modem_base_set_valid (MM_MODEM_BASE (self), new_valid);
 }
 
-
-static void initial_pin_check_done (MMModem *modem, GError *error, gpointer user_data);
-
-static gboolean
-pin_check_again (gpointer user_data)
-{
-    MMGenericGsm *self = MM_GENERIC_GSM (user_data);
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
-
-    priv->pin_check_timeout = 0;
-    check_pin (self, initial_pin_check_done, NULL);
-    return FALSE;
-}
-
-static void
-initial_pin_check_done (MMModem *modem, GError *error, gpointer user_data)
-{
-    MMGenericGsmPrivate *priv;
-
-    /* modem could have been removed before we get here, in which case
-     * 'modem' will be NULL.
-     */
-    if (!modem)
-        return;
-
-    g_return_if_fail (MM_IS_GENERIC_GSM (modem));
-    priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
-
-    if (   error
-        && priv->pin_check_tries++ < 3
-        && !mm_modem_base_get_unlock_required (MM_MODEM_BASE (modem))) {
-        /* Try it again a few times */
-        if (priv->pin_check_timeout)
-            g_source_remove (priv->pin_check_timeout);
-        priv->pin_check_timeout = g_timeout_add_seconds (2, pin_check_again, modem);
-    } else {
-        priv->pin_checked = TRUE;
-        mm_serial_port_close (MM_SERIAL_PORT (priv->primary));
-        check_valid (MM_GENERIC_GSM (modem));
-    }
-}
-
-static void
-initial_pin_check (MMGenericGsm *self)
-{
-    GError *error = NULL;
-    MMGenericGsmPrivate *priv;
-
-    g_return_if_fail (MM_IS_GENERIC_GSM (self));
-    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
-
-    g_return_if_fail (priv->primary != NULL);
-
-    if (mm_serial_port_open (MM_SERIAL_PORT (priv->primary), &error))
-        check_pin (self, initial_pin_check_done, NULL);
-    else {
-        g_warning ("%s: failed to open serial port: (%d) %s",
-                   __func__,
-                   error ? error->code : -1,
-                   error && error->message ? error->message : "(unknown)");
-        g_clear_error (&error);
-
-        /* Ensure the modem is still somewhat usable if opening the serial
-         * port fails for some reason.
-         */
-        initial_pin_check_done (MM_MODEM (self), NULL, NULL);
-    }
-}
-
-static void
-initial_imei_check (MMGenericGsm *self)
-{
-    GError *error = NULL;
-    MMGenericGsmPrivate *priv;
-
-    g_return_if_fail (MM_IS_GENERIC_GSM (self));
-    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
-
-    g_return_if_fail (priv->primary != NULL);
-
-    if (mm_serial_port_open (MM_SERIAL_PORT (priv->primary), &error)) {
-        /* Make sure echoing is off */
-        mm_at_serial_port_queue_command (priv->primary, "E0", 3, NULL, NULL);
-
-        /* Get modem's imei number */
-        mm_modem_gsm_card_get_imei (MM_MODEM_GSM_CARD (self),
-                                    get_imei_cb,
-                                    NULL);
-    } else {
-        g_warning ("%s: failed to open serial port: (%d) %s",
-                   __func__,
-                   error ? error->code : -1,
-                   error && error->message ? error->message : "(unknown)");
-        g_clear_error (&error);
-    }
-}
-
-static void
-initial_info_check (MMGenericGsm *self)
-{
-    GError *error = NULL;
-    MMGenericGsmPrivate *priv;
-
-    g_return_if_fail (MM_IS_GENERIC_GSM (self));
-    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
-
-    g_return_if_fail (priv->primary != NULL);
-
-    if (mm_serial_port_open (MM_SERIAL_PORT (priv->primary), &error)) {
-        /* Make sure echoing is off */
-        mm_at_serial_port_queue_command (priv->primary, "E0", 3, NULL, NULL);
-        mm_modem_base_get_card_info (MM_MODEM_BASE (self),
-                                     priv->primary,
-                                     NULL,
-                                     get_info_cb,
-                                     NULL);
-    } else {
-        g_warning ("%s: failed to open serial port: (%d) %s",
-                   __func__,
-                   error ? error->code : -1,
-                   error && error->message ? error->message : "(unknown)");
-        g_clear_error (&error);
-    }
-}
 
 static void
 get_iccid_done (MMModem *modem,
@@ -564,10 +442,10 @@ get_iccid_done (MMModem *modem,
 {
     MMGenericGsmPrivate *priv;
     const char *p = response;
-    GChecksum *sum;
+    GChecksum *sum = NULL;
 
     if (error || !response || !strlen (response))
-        return;
+        goto done;
 
     sum = g_checksum_new (G_CHECKSUM_SHA1);
 
@@ -575,7 +453,7 @@ get_iccid_done (MMModem *modem,
     while (*p) {
         if (!isdigit (*p)) {
             g_warning ("%s: invalid ICCID format (not a digit)", __func__);
-            goto out;
+            goto done;
         }
         g_checksum_update (sum, (const guchar *) p++, 1);
     }
@@ -591,9 +469,17 @@ get_iccid_done (MMModem *modem,
 
     g_object_notify (G_OBJECT (modem), MM_MODEM_GSM_CARD_SIM_IDENTIFIER);
 
-out:
-    g_checksum_free (sum);
+done:
+    if (sum)
+        g_checksum_free (sum);
+
+    if (modem) {
+        MM_GENERIC_GSM_GET_PRIVATE (modem)->simid_checked = TRUE;
+        check_valid (MM_GENERIC_GSM (modem));
+    }
 }
+
+#define ICCID_CMD "+CRSM=176,12258,0,0,10"
 
 static void
 real_get_iccid_done (MMAtSerialPort *port,
@@ -689,13 +575,27 @@ real_get_iccid_done (MMAtSerialPort *port,
 
         mm_callback_info_set_result (info, g_strdup (swapped), g_free);
     } else {
-        info->error = g_error_new (MM_MODEM_ERROR,
-                                   MM_MODEM_ERROR_GENERAL,
-                                   "SIM failed to handle CRSM request (sw1 %d sw2 %d)",
-                                   sw1, sw2);
+        MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+
+        if (priv->simid_tries++ < 2) {
+            /* Try one more time... Gobi 1K cards may reply to the first
+             * request with '+CRSM: 106,134,""' which is bogus because
+             * subsequent requests work fine.
+             */
+            mm_at_serial_port_queue_command (port, ICCID_CMD, 20, real_get_iccid_done, info);
+            return;
+        } else {
+            info->error = g_error_new (MM_MODEM_ERROR,
+                                       MM_MODEM_ERROR_GENERAL,
+                                       "SIM failed to handle CRSM request (sw1 %d sw2 %d)",
+                                       sw1, sw2);
+        }
     }
 
 done:
+    /* Balance open from real_get_sim_iccid() */
+    mm_serial_port_close (MM_SERIAL_PORT (port));
+
     mm_callback_info_schedule (info);
 }
 
@@ -724,11 +624,7 @@ real_get_sim_iccid (MMGenericGsm *self,
     info = mm_callback_info_string_new (MM_MODEM (self), callback, callback_data);
 
     /* READ BINARY of EFiccid (ICC Identification) ETSI TS 102.221 section 13.2 */
-    mm_at_serial_port_queue_command (port,
-                                     "+CRSM=176,12258,0,0,10",
-                                     3,
-                                     real_get_iccid_done,
-                                     info);
+    mm_at_serial_port_queue_command (port, ICCID_CMD, 20, real_get_iccid_done, info);
 }
 
 static void
@@ -736,6 +632,134 @@ initial_iccid_check (MMGenericGsm *self)
 {
     g_assert (MM_GENERIC_GSM_GET_CLASS (self)->get_sim_iccid);
     MM_GENERIC_GSM_GET_CLASS (self)->get_sim_iccid (self, get_iccid_done, NULL);
+}
+
+static void initial_pin_check_done (MMModem *modem, GError *error, gpointer user_data);
+
+static gboolean
+pin_check_again (gpointer user_data)
+{
+    MMGenericGsm *self = MM_GENERIC_GSM (user_data);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    priv->pin_check_timeout = 0;
+    check_pin (self, initial_pin_check_done, NULL);
+    return FALSE;
+}
+
+static void
+initial_pin_check_done (MMModem *modem, GError *error, gpointer user_data)
+{
+    MMGenericGsmPrivate *priv;
+
+    /* modem could have been removed before we get here, in which case
+     * 'modem' will be NULL.
+     */
+    if (!modem)
+        return;
+
+    g_return_if_fail (MM_IS_GENERIC_GSM (modem));
+    priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+
+    if (   error
+        && priv->pin_check_tries++ < 3
+        && !mm_modem_base_get_unlock_required (MM_MODEM_BASE (modem))) {
+        /* Try it again a few times */
+        if (priv->pin_check_timeout)
+            g_source_remove (priv->pin_check_timeout);
+        priv->pin_check_timeout = g_timeout_add_seconds (2, pin_check_again, modem);
+    } else {
+        /* Try to get the SIM ICCID after we've checked PIN status and the SIM
+         * is ready.
+         */
+        initial_iccid_check (MM_GENERIC_GSM (modem));
+
+        priv->pin_checked = TRUE;
+        mm_serial_port_close (MM_SERIAL_PORT (priv->primary));
+    }
+}
+
+static void
+initial_pin_check (MMGenericGsm *self)
+{
+    GError *error = NULL;
+    MMGenericGsmPrivate *priv;
+
+    g_return_if_fail (MM_IS_GENERIC_GSM (self));
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    g_return_if_fail (priv->primary != NULL);
+
+    if (mm_serial_port_open (MM_SERIAL_PORT (priv->primary), &error))
+        check_pin (self, initial_pin_check_done, NULL);
+    else {
+        g_warning ("%s: failed to open serial port: (%d) %s",
+                   __func__,
+                   error ? error->code : -1,
+                   error && error->message ? error->message : "(unknown)");
+        g_clear_error (&error);
+
+        /* Ensure the modem is still somewhat usable if opening the serial
+         * port fails for some reason.
+         */
+        initial_pin_check_done (MM_MODEM (self), NULL, NULL);
+    }
+}
+
+static void
+initial_imei_check (MMGenericGsm *self)
+{
+    GError *error = NULL;
+    MMGenericGsmPrivate *priv;
+
+    g_return_if_fail (MM_IS_GENERIC_GSM (self));
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    g_return_if_fail (priv->primary != NULL);
+
+    if (mm_serial_port_open (MM_SERIAL_PORT (priv->primary), &error)) {
+        /* Make sure echoing is off */
+        mm_at_serial_port_queue_command (priv->primary, "E0", 3, NULL, NULL);
+
+        /* Get modem's imei number */
+        mm_modem_gsm_card_get_imei (MM_MODEM_GSM_CARD (self),
+                                    get_imei_cb,
+                                    NULL);
+    } else {
+        g_warning ("%s: failed to open serial port: (%d) %s",
+                   __func__,
+                   error ? error->code : -1,
+                   error && error->message ? error->message : "(unknown)");
+        g_clear_error (&error);
+    }
+}
+
+static void
+initial_info_check (MMGenericGsm *self)
+{
+    GError *error = NULL;
+    MMGenericGsmPrivate *priv;
+
+    g_return_if_fail (MM_IS_GENERIC_GSM (self));
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    g_return_if_fail (priv->primary != NULL);
+
+    if (mm_serial_port_open (MM_SERIAL_PORT (priv->primary), &error)) {
+        /* Make sure echoing is off */
+        mm_at_serial_port_queue_command (priv->primary, "E0", 3, NULL, NULL);
+        mm_modem_base_get_card_info (MM_MODEM_BASE (self),
+                                     priv->primary,
+                                     NULL,
+                                     get_info_cb,
+                                     NULL);
+    } else {
+        g_warning ("%s: failed to open serial port: (%d) %s",
+                   __func__,
+                   error ? error->code : -1,
+                   error && error->message ? error->message : "(unknown)");
+        g_clear_error (&error);
+    }
 }
 
 static gboolean
@@ -794,10 +818,9 @@ mm_generic_gsm_grab_port (MMGenericGsm *self,
             /* Get modem's IMEI */
             initial_imei_check (self);
 
-            /* Try to get the SIM's ICCID */
-            initial_iccid_check (self);
-
-            /* Get modem's initial lock/unlock state */
+            /* Get modem's initial lock/unlock state; this also ensures the
+             * SIM is ready by waiting if necessary for the SIM to initalize.
+             */
             initial_pin_check (self);
 
         } else if (ptype == MM_PORT_TYPE_SECONDARY)
