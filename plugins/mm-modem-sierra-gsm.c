@@ -399,12 +399,71 @@ grab_port (MMModem *modem,
     return !!port;
 }
 
+static void
+connect_done (MMModem *modem, GError *error, gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+
+    info->error = mm_modem_check_removed (modem, error);
+    mm_callback_info_schedule (info);
+}
+
+static void
+ps_attach_done (MMAtSerialPort *port,
+                GString *response,
+                GError *error,
+                gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMModem *parent_modem_iface;
+    const char *number;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* We've got a PS attach, chain up to parent for the connect */
+    number = mm_callback_info_get_data (info, "number");
+    parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (info->modem));
+    parent_modem_iface->connect (info->modem, number, connect_done, info);
+}
+
+static void
+do_connect (MMModem *modem,
+            const char *number,
+            MMModemFn callback,
+            gpointer user_data)
+{
+    MMCallbackInfo *info;
+    MMAtSerialPort *port;
+
+    mm_modem_set_state (modem, MM_MODEM_STATE_CONNECTING, MM_MODEM_STATE_REASON_NONE);
+
+    info = mm_callback_info_new (modem, callback, user_data);
+    mm_callback_info_set_data (info, "number", g_strdup (number), g_free);
+
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* Try to initiate a PS attach.  Some Sierra modems can get into a
+     * state where if there is no PS attach when dialing, the next time
+     * the modem tries to connect it won't ever register with the network.
+     */
+    mm_at_serial_port_queue_command (port, "+CGATT=1", 10, ps_attach_done, info);
+}
+
 /*****************************************************************************/
 
 static void
 modem_init (MMModem *modem_class)
 {
     modem_class->grab_port = grab_port;
+    modem_class->connect = do_connect;
 }
 
 static void
