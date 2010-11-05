@@ -27,7 +27,7 @@ AC_DEFINE_UNQUOTED(GETTEXT_PACKAGE,"$GETTEXT_PACKAGE", [Gettext package])
 IT_PROG_INTLTOOL([0.35.0])
 AM_GLIB_GNU_GETTEXT
 
-PKG_CHECK_MODULES(MM, dbus-glib-1 >= 0.75 glib-2.0 >= 2.18 gmodule-2.0 gobject-2.0)
+PKG_CHECK_MODULES(MM, dbus-glib-1 >= 0.86 glib-2.0 >= 2.18 gmodule-2.0 gobject-2.0)
 
 PKG_CHECK_MODULES(GUDEV, gudev-1.0)
 AC_SUBST(GUDEV_CFLAGS)
@@ -124,18 +124,6 @@ esac
 
 NM_COMPILER_WARNINGS
 
-
-dnl
-dnl dbus-glib >= 0.86 is required for Location API support
-dnl
-with_location_api=no
-PKG_CHECK_MODULES(DBUS_GLIB, dbus-glib-1 >= 0.86, with_location_api="yes", with_location_api="no")
-if test x"$with_location_api" = xyes; then
-    AC_DEFINE(LOCATION_API, 1, [Define if you have dbus-glib 0.86 or higher])
-else
-    AC_MSG_WARN([dbus-glib >= 0.86 is required for Location API support])
-fi
-AM_CONDITIONAL(WITH_LOCATION_API, test "x$with_location_api" = "xyes")
 
 dnl
 dnl Distribution version string

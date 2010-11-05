@@ -35,27 +35,21 @@
 #include "mm-options.h"
 #include "mm-properties-changed-signal.h"
 #include "mm-utils.h"
-#if LOCATION_API
 #include "mm-modem-location.h"
-#endif
 
 static void modem_init (MMModem *modem_class);
 static void modem_gsm_card_init (MMModemGsmCard *gsm_card_class);
 static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
 static void modem_gsm_sms_init (MMModemGsmSms *gsm_sms_class);
 static void modem_simple_init (MMModemSimple *class);
-#if LOCATION_API
 static void modem_location_init (MMModemLocation *class);
-#endif
 
 G_DEFINE_TYPE_EXTENDED (MMGenericGsm, mm_generic_gsm, MM_TYPE_MODEM_BASE, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_CARD, modem_gsm_card_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_SMS, modem_gsm_sms_init)
-#if LOCATION_API
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_LOCATION, modem_location_init)
-#endif
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_SIMPLE, modem_simple_init))
 
 #define MM_GENERIC_GSM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_GENERIC_GSM, MMGenericGsmPrivate))
@@ -905,7 +899,6 @@ release_port (MMModem *modem, const char *subsys, const char *name)
     check_valid (MM_GENERIC_GSM (modem));
 }
 
-#if LOCATION_API
 static void
 add_loc_capability (MMGenericGsm *self, guint32 cap)
 {
@@ -917,7 +910,6 @@ add_loc_capability (MMGenericGsm *self, guint32 cap)
         g_object_notify (G_OBJECT (self), MM_MODEM_LOCATION_CAPABILITIES);
     }
 }
-#endif
 
 static void
 reg_poll_response (MMAtSerialPort *port,
@@ -1016,9 +1008,7 @@ cgreg2_done (MMAtSerialPort *port,
             /* Try CGREG=1 instead */
             mm_at_serial_port_queue_command (port, "+CGREG=1", 3, cgreg1_done, info);
         } else {
-#if LOCATION_API
             add_loc_capability (MM_GENERIC_GSM (info->modem), MM_MODEM_LOCATION_CAPABILITY_GSM_LAC_CI);
-#endif
 
             /* Success; get initial state */
             mm_at_serial_port_queue_command (port, "+CGREG?", 10, reg_poll_response, info->modem);
@@ -1076,9 +1066,7 @@ creg2_done (MMAtSerialPort *port,
             g_clear_error (&info->error);
             mm_at_serial_port_queue_command (port, "+CREG=1", 3, creg1_done, info);
         } else {
-#if LOCATION_API
             add_loc_capability (MM_GENERIC_GSM (info->modem), MM_MODEM_LOCATION_CAPABILITY_GSM_LAC_CI);
-#endif
 
             /* Success; get initial state */
             mm_at_serial_port_queue_command (port, "+CREG?", 10, reg_poll_response, info->modem);
@@ -4094,7 +4082,6 @@ simple_get_status (MMModemSimple *simple,
 
 /*****************************************************************************/
 
-#if LOCATION_API
 static gboolean
 gsm_lac_ci_available (MMGenericGsm *self, guint32 *out_idx)
 {
@@ -4119,7 +4106,6 @@ gsm_lac_ci_available (MMGenericGsm *self, guint32 *out_idx)
 
     return TRUE;
 }
-#endif
 
 static void
 update_lac_ci (MMGenericGsm *self, gulong lac, gulong ci, guint idx)
@@ -4137,14 +4123,9 @@ update_lac_ci (MMGenericGsm *self, gulong lac, gulong ci, guint idx)
         changed = TRUE;
     }
 
-#if LOCATION_API
     if (changed && gsm_lac_ci_available (self, NULL) && priv->loc_enabled && priv->loc_signal)
         g_object_notify (G_OBJECT (self), MM_MODEM_LOCATION_LOCATION);
-#endif
 }
-
-
-#if LOCATION_API
 
 static void
 destroy_gvalue (gpointer data)
@@ -4252,8 +4233,6 @@ location_get (MMModemLocation *modem,
     g_clear_error (&error);
 }
 
-#endif /* LOCATION_API */
-
 /*****************************************************************************/
 
 static void
@@ -4292,14 +4271,12 @@ modem_init (MMModem *modem_class)
     modem_class->set_charset = set_charset;
 }
 
-#if LOCATION_API
 static void
 modem_location_init (MMModemLocation *class)
 {
     class->enable = location_enable;
     class->get_location = location_get;
 }
-#endif
 
 static void
 modem_gsm_card_init (MMModemGsmCard *class)
@@ -4357,7 +4334,6 @@ mm_generic_gsm_init (MMGenericGsm *self)
                                                     NULL,
                                                     MM_MODEM_GSM_NETWORK_DBUS_INTERFACE);
 
-#if LOCATION_API
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_LOCATION_CAPABILITIES,
                                                     "Capabilities",
@@ -4377,7 +4353,6 @@ mm_generic_gsm_init (MMGenericGsm *self)
                                                     MM_MODEM_LOCATION_LOCATION,
                                                     NULL,
                                                     MM_MODEM_LOCATION_DBUS_INTERFACE);
-#endif
 
     g_signal_connect (self, "notify::" MM_MODEM_STATE,
                       G_CALLBACK (modem_state_changed), NULL);
@@ -4398,12 +4373,10 @@ set_property (GObject *object, guint prop_id,
     case MM_GENERIC_GSM_PROP_ALLOWED_MODE:
     case MM_GENERIC_GSM_PROP_ACCESS_TECHNOLOGY:
     case MM_GENERIC_GSM_PROP_SIM_IDENTIFIER:
-#if LOCATION_API
     case MM_GENERIC_GSM_PROP_LOC_CAPABILITIES:
     case MM_GENERIC_GSM_PROP_LOC_ENABLED:
     case MM_GENERIC_GSM_PROP_LOC_SIGNAL:
     case MM_GENERIC_GSM_PROP_LOC_LOCATION:
-#endif
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -4416,9 +4389,7 @@ get_property (GObject *object, guint prop_id,
               GValue *value, GParamSpec *pspec)
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (object);
-#if LOCATION_API
     GHashTable *locations = NULL;
-#endif
 
     switch (prop_id) {
     case MM_MODEM_PROP_DATA_DEVICE:
@@ -4467,7 +4438,6 @@ get_property (GObject *object, guint prop_id,
     case MM_GENERIC_GSM_PROP_SIM_IDENTIFIER:
         g_value_set_string (value, priv->simid);
         break;
-#if LOCATION_API
     case MM_GENERIC_GSM_PROP_LOC_CAPABILITIES:
         g_value_set_uint (value, priv->loc_caps);
         break;
@@ -4487,7 +4457,6 @@ get_property (GObject *object, guint prop_id,
             locations = g_hash_table_new (g_direct_hash, g_direct_equal);
         g_value_take_boxed (value, locations);
         break;
-#endif
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -4572,7 +4541,6 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
                                       MM_GENERIC_GSM_PROP_SIM_IDENTIFIER,
                                       MM_MODEM_GSM_CARD_SIM_IDENTIFIER);
 
-#if LOCATION_API
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_LOC_CAPABILITIES,
                                       MM_MODEM_LOCATION_CAPABILITIES);
@@ -4588,7 +4556,6 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_LOC_LOCATION,
                                       MM_MODEM_LOCATION_LOCATION);
-#endif
 
     g_object_class_install_property
         (object_class, MM_GENERIC_GSM_PROP_POWER_UP_CMD,
