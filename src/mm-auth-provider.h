@@ -26,6 +26,7 @@
 #define MM_AUTHORIZATION_DEVICE_CONTROL "org.freedesktop.ModemManager.Device.Control"
 #define MM_AUTHORIZATION_CONTACTS       "org.freedesktop.ModemManager.Contacts"
 #define MM_AUTHORIZATION_SMS            "org.freedesktop.ModemManager.SMS"
+#define MM_AUTHORIZATION_USSD           "org.freedesktop.ModemManager.USSD"
 #define MM_AUTHORIZATION_LOCATION       "org.freedesktop.ModemManager.Location"
 /******************/
 

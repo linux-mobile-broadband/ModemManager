@@ -54,4 +54,13 @@
     </defaults>
   </action>
 
+  <action id="org.freedesktop.ModemManager.USSD">
+    <_description>Query and utilize network information and services</_description>
+    <_message>System policy prevents querying or utilizing network information and services.</_message>
+    <defaults>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+  </action>
+
 </policyconfig>

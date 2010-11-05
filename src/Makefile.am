@@ -104,6 +104,8 @@ modem_manager_SOURCES = \
 	mm-modem-gsm-network.h \
 	mm-modem-gsm-sms.c \
 	mm-modem-gsm-sms.h \
+	mm-modem-gsm-ussd.c \
+	mm-modem-gsm-ussd.h \
 	mm-modem-simple.c \
 	mm-modem-simple.h \
 	mm-options.c \
@@ -138,6 +140,9 @@ mm-modem-gsm-network-glue.h: $(top_srcdir)/introspection/mm-modem-gsm-network.xm
 mm-modem-gsm-sms-glue.h: $(top_srcdir)/introspection/mm-modem-gsm-sms.xml
 	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_gsm_sms --mode=glib-server --output=$@ $<
 
+mm-modem-gsm-ussd-glue.h: $(top_srcdir)/introspection/mm-modem-gsm-ussd.xml
+	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_gsm_ussd --mode=glib-server --output=$@ $<
+
 BUILT_SOURCES = \
 	mm-manager-glue.h \
 	mm-modem-glue.h \
@@ -145,7 +150,8 @@ BUILT_SOURCES = \
 	mm-modem-cdma-glue.h \
 	mm-modem-gsm-card-glue.h \
 	mm-modem-gsm-network-glue.h \
-	mm-modem-gsm-sms-glue.h
+	mm-modem-gsm-sms-glue.h \
+	mm-modem-gsm-ussd-glue.h
 
 mm-modem-location-glue.h: $(top_srcdir)/introspection/mm-modem-location.xml
 	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_location --mode=glib-server --output=$@ $<
