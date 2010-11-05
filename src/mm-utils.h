@@ -20,5 +20,7 @@ int utils_hex2byte (const char *hex);
 
 char *utils_hexstr2bin (const char *hex, gsize *out_len);
 
+char *utils_bin2hexstr (const guint8 *bin, gsize len);
+
 #endif  /* MM_UTILS_H */
 

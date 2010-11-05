@@ -76,3 +76,17 @@ utils_hexstr2bin (const char *hex, gsize *out_len)
 
 /* End from hostap */
 
+char *
+utils_bin2hexstr (const guint8 *bin, gsize len)
+{
+    GString *ret;
+    gsize i;
+
+    g_return_val_if_fail (bin != NULL, NULL);
+
+    ret = g_string_sized_new (len * 2 + 1);
+    for (i = 0; i < len; i++)
+        g_string_append_printf (ret, "%.2X", bin[i]);
+    return g_string_free (ret, FALSE);
+}
+
