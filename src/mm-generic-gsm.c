@@ -4788,6 +4788,18 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
                                       MM_GENERIC_GSM_PROP_LOC_LOCATION,
                                       MM_MODEM_LOCATION_LOCATION);
 
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_USSD_STATE,
+                                      MM_MODEM_GSM_USSD_STATE);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_USSD_NETWORK_NOTIFICATION,
+                                      MM_MODEM_GSM_USSD_NETWORK_NOTIFICATION);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_USSD_NETWORK_REQUEST,
+                                      MM_MODEM_GSM_USSD_NETWORK_REQUEST);
+
     g_object_class_install_property
         (object_class, MM_GENERIC_GSM_PROP_POWER_UP_CMD,
          g_param_spec_string (MM_GENERIC_GSM_POWER_UP_CMD,
