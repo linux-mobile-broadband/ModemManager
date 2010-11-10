@@ -431,7 +431,7 @@ unsolicited_disable_done (MMModem *modem,
     }
 
     /* Otherwise, kill any existing connection */
-    if (mm_generic_gsm_get_cid (MM_GENERIC_GSM (modem)) >= 0)
+    if (hso_get_cid (MM_MODEM_HSO (modem)) >= 0)
         hso_call_control (MM_MODEM_HSO (modem), FALSE, TRUE, disable_done, info);
     else
         disable_done (modem, NULL, info);

@@ -2695,7 +2695,7 @@ connect (MMModem *modem,
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
     char *command;
-    guint32 cid = mm_generic_gsm_get_cid (MM_GENERIC_GSM (modem));
+    gint cid = mm_generic_gsm_get_cid (MM_GENERIC_GSM (modem));
 
     info = mm_callback_info_new (modem, callback, user_data);
 

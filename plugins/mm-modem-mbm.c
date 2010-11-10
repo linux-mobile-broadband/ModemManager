@@ -728,18 +728,15 @@ mbm_auth_done (MMSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMGenericGsm *modem = MM_GENERIC_GSM (info->modem);
     char *command;
-    guint32 cid;
 
     if (error) {
         mm_generic_gsm_connect_complete (modem, error, info);
         return;
     }
 
-    cid = mm_generic_gsm_get_cid (modem);
-
     mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "AT*E2NAP=1", 3, NULL, NULL);
 
-    command = g_strdup_printf ("AT*ENAP=1,%d", cid);
+    command = g_strdup_printf ("AT*ENAP=1,%d", mm_generic_gsm_get_cid (modem));
     mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), command, 3, enap_done, user_data);
     g_free (command);
 }
