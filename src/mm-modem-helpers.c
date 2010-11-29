@@ -968,7 +968,7 @@ mm_parse_cind_response (const char *reply, GError **error)
     GHashTable *hash;
     GRegex *r;
     GMatchInfo *match_info;
-    gint idx = 0;
+    gint idx = 1;
 
     g_return_val_if_fail (reply != NULL, NULL);
 
