@@ -888,13 +888,13 @@ mm_create_device_identifier (guint vid,
 
 struct CindResponse {
     char *desc;
-    gint idx;
+    guint idx;
     gint min;
     gint max;
 };
 
 static CindResponse *
-cind_response_new (const char *desc, gint idx, gint min, gint max)
+cind_response_new (const char *desc, guint idx, gint min, gint max)
 {
     CindResponse *r;
     char *p;
@@ -936,10 +936,10 @@ cind_response_get_desc (CindResponse *r)
     return r->desc;
 }
 
-gint
+guint
 cind_response_get_index (CindResponse *r)
 {
-    g_return_val_if_fail (r != NULL, -1);
+    g_return_val_if_fail (r != NULL, 0);
 
     return r->idx;
 }
@@ -963,12 +963,12 @@ cind_response_get_max (CindResponse *r)
 #define CIND_TAG "+CIND:"
 
 GHashTable *
-mm_parse_cind_response (const char *reply, GError **error)
+mm_parse_cind_test_response (const char *reply, GError **error)
 {
     GHashTable *hash;
     GRegex *r;
     GMatchInfo *match_info;
-    gint idx = 1;
+    guint idx = 1;
 
     g_return_val_if_fail (reply != NULL, NULL);
 
@@ -1017,5 +1017,73 @@ mm_parse_cind_response (const char *reply, GError **error)
     g_regex_unref (r);
 
     return hash;
+}
+
+GByteArray *
+mm_parse_cind_query_response(const char *reply, GError **error)
+{
+    GByteArray *array = NULL;
+    const char *p = reply;
+    GRegex *r = NULL;
+    GMatchInfo *match_info;
+    guint8 t = 0;
+
+    g_return_val_if_fail (reply != NULL, NULL);
+
+    if (!g_str_has_prefix (p, CIND_TAG)) {
+        g_set_error_literal (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             "Could not parse the +CIND response");
+        return NULL;
+    }
+
+    p += strlen (CIND_TAG);
+    while (isspace (*p))
+        p++;
+
+    r = g_regex_new ("(\\d+)[^0-9]+", G_REGEX_UNGREEDY, 0, NULL);
+    if (!r) {
+        g_set_error_literal (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             "Internal failure attempting to parse +CIND response");
+        return NULL;
+    }
+
+    if (!g_regex_match_full (r, p, strlen (p), 0, 0, &match_info, NULL)) {
+        g_set_error_literal (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             "Failure parsing the +CIND response");
+        goto done;
+    }
+
+    array = g_byte_array_sized_new (g_match_info_get_match_count (match_info));
+
+    /* Add a zero element so callers can use 1-based indexes returned by
+     * cind_response_get_index().
+     */
+    g_byte_array_append (array, &t, 1);
+
+    while (g_match_info_matches (match_info)) {
+        char *str;
+        gulong val;
+
+        str = g_match_info_fetch (match_info, 1);
+
+        errno = 0;
+        val = strtoul (str, NULL, 10);
+
+        t = 0;
+        if ((errno == 0) && (val < 255))
+            t = (guint8) val;
+        /* FIXME: indicate errors somehow? */
+        g_byte_array_append (array, &t, 1);
+
+        g_free (str);
+        g_match_info_next (match_info, NULL);
+    }
+    g_match_info_free (match_info);
+
+done:
+    if (r)
+        g_regex_unref (r);
+
+    return array;
 }
 

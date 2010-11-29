@@ -1095,7 +1095,7 @@ test_cind_results (const char *desc,
 
     g_print ("\nTesting %s +CIND response...\n", desc);
 
-    results = mm_parse_cind_response (reply, &error);
+    results = mm_parse_cind_test_response (reply, &error);
     g_assert (results);
     g_assert (error == NULL);
 

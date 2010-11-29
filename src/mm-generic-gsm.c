@@ -97,9 +97,9 @@ typedef struct {
     gboolean manual_reg;
 
     gboolean cmer_enabled;
-    gint roam_ind;
-    gint signal_ind;
-    gint service_ind;
+    guint roam_ind;
+    guint signal_ind;
+    guint service_ind;
 
     guint signal_quality_id;
     time_t signal_emit_timestamp;
@@ -1260,7 +1260,7 @@ cind_cb (MMAtSerialPort *port,
     self = MM_GENERIC_GSM (user_data);
     priv = MM_GENERIC_GSM_GET_PRIVATE (self);
 
-    indicators = mm_parse_cind_response (response->str, NULL);
+    indicators = mm_parse_cind_test_response (response->str, NULL);
     if (indicators) {
         CindResponse *r;
 
@@ -3296,95 +3296,48 @@ mm_generic_gsm_update_signal_quality (MMGenericGsm *self, guint32 quality)
 #define CIND_TAG "+CIND:"
 
 static void
-cind_signal_cb (MMAtSerialPort *port,
-                GString *response,
-                GError *error,
-                gpointer user_data)
+get_cind_signal_done (MMAtSerialPort *port,
+                      GString *response,
+                      GError *error,
+                      gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    const char *p = response->str;
-    GRegex *r = NULL;
-    GMatchInfo *match_info;
-    int i = 1, quality = -1;
+    MMGenericGsmPrivate *priv;
+    GByteArray *indicators;
+    guint quality;
 
     info->error = mm_modem_check_removed (info->modem, error);
-    if (info->error)
-        goto done;
+    if (!info->error) {
+        priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
 
-    if (!g_str_has_prefix (p, CIND_TAG)) {
-        info->error = g_error_new_literal (MM_MODEM_ERROR,
-                                           MM_MODEM_ERROR_GENERAL,
-                                           "Could not parse the +CIND response");
-        goto done;
-    }
-
-    p += strlen (CIND_TAG);
-    while (isspace (*p))
-        p++;
-
-    r = g_regex_new ("(\\d+)[^0-9]+", G_REGEX_UNGREEDY, 0, NULL);
-    if (!r) {
-        info->error = g_error_new_literal (MM_MODEM_ERROR,
-                                           MM_MODEM_ERROR_GENERAL,
-                                           "Internal failure attempting to parse +CIND response");
-        goto done;
-    }
-
-    if (!g_regex_match_full (r, p, strlen (p), 0, 0, &match_info, NULL)) {
-        info->error = g_error_new_literal (MM_MODEM_ERROR,
-                                           MM_MODEM_ERROR_GENERAL,
-                                           "Failure parsing the +CIND response");
-        goto done;
-    }
-
-    while (g_match_info_matches (match_info)) {
-        if (MM_GENERIC_GSM_GET_PRIVATE (info->modem)->signal_ind == i++) {
-            char *str = g_match_info_fetch (match_info, 1);
-
-            if (str) {
-                quality = atoi (str);
-                mm_generic_gsm_update_signal_quality (MM_GENERIC_GSM (info->modem), quality * 20);
-                g_free (str);
-                break;
+        indicators = mm_parse_cind_query_response (response->str, &info->error);
+        if (indicators) {
+            if (indicators->len >= priv->signal_ind) {
+                quality = g_array_index (indicators, guint8, priv->signal_ind);
+                quality = CLAMP (quality, 0, 5) * 20;
+                mm_generic_gsm_update_signal_quality (MM_GENERIC_GSM (info->modem), quality);
+                mm_callback_info_set_result (info, GUINT_TO_POINTER (quality), NULL);
             }
+            g_byte_array_free (indicators, TRUE);
         }
-        g_match_info_next (match_info, NULL);
     }
-    g_match_info_free (match_info);
-
-done:
-    if (r)
-        g_regex_unref (r);
 
     mm_callback_info_schedule (info);
 }
 
 static void
-get_signal_quality_done (MMAtSerialPort *port,
-                         GString *response,
-                         GError *error,
-                         gpointer user_data)
+get_csq_done (MMAtSerialPort *port,
+              GString *response,
+              GError *error,
+              gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     char *reply = response->str;
     gboolean parsed = FALSE;
 
     info->error = mm_modem_check_removed (info->modem, error);
-    if (info->error) {
-        if (info->modem) {
-            MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
-
-            /* Modem won't do unsolicited reporting via +CMER/+CIEV, but still
-             * supports +CIND.
-             */
-            if (!priv->cmer_enabled && (priv->signal_ind >= 0)) {
-                g_clear_error (&info->error);
-                mm_at_serial_port_queue_command (port, "+CIND?", 3, cind_signal_cb, info);
-                return;
-            }
-        }
+    if (info->error)
         goto done;
-    }
 
     if (!strncmp (reply, "+CSQ: ", 6)) {
         /* Got valid reply */
@@ -3429,9 +3382,13 @@ get_signal_quality (MMModemGsmNetwork *modem,
     info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
 
     port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), NULL);
-    if (port)
-        mm_at_serial_port_queue_command (port, "+CSQ", 3, get_signal_quality_done, info);
-    else {
+    if (port) {
+        /* Prefer +CIND if the modem supports it, fall back to +CSQ otherwise */
+        if (priv->signal_ind)
+            mm_at_serial_port_queue_command (port, "+CIND?", 3, get_cind_signal_done, info);
+        else
+            mm_at_serial_port_queue_command (port, "+CSQ", 3, get_csq_done, info);
+    } else {
         /* Use cached signal quality */
         mm_callback_info_set_result (info, GUINT_TO_POINTER (priv->signal_quality), NULL);
         mm_callback_info_schedule (info);
@@ -4694,9 +4651,6 @@ mm_generic_gsm_init (MMGenericGsm *self)
     priv->act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     priv->reg_regex = mm_gsm_creg_regex_get (TRUE);
     priv->roam_allowed = TRUE;
-    priv->signal_ind = -1;
-    priv->roam_ind = -1;
-    priv->service_ind = -1;
 
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_GSM_NETWORK_ALLOWED_MODE,
