@@ -90,16 +90,27 @@ supports_port (MMPluginBase *base,
 {
     GUdevDevice *port;
     guint32 cached = 0, level;
-    const char *driver;
+    const char *driver, *subsys;
 
     /* Can't do anything with non-serial ports */
     port = mm_plugin_base_supports_task_get_port (task);
-    if (strcmp (g_udev_device_get_subsystem (port), "tty"))
+    if (!port)
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
     driver = mm_plugin_base_supports_task_get_driver (task);
-    if (!driver || strcmp (driver, "sierra"))
+    if (!driver || (strcmp (driver, "sierra") && strcmp (driver, "sierra_net")))
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
+
+    subsys = g_udev_device_get_subsystem (port);
+    g_assert (subsys);
+    if (!strcmp (subsys, "net")) {
+        /* Can't grab the net port until we know whether this is a CDMA or GSM device */
+        if (!existing)
+            return MM_PLUGIN_SUPPORTS_PORT_DEFER;
+
+        mm_plugin_base_supports_task_complete (task, 10);
+        return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
+    }
 
     if (mm_plugin_base_get_cached_port_capabilities (base, port, &cached)) {
         level = get_level_for_capabilities (cached);
@@ -125,19 +136,13 @@ grab_port (MMPluginBase *base,
 {
     GUdevDevice *port = NULL;
     MMModem *modem = NULL;
-    const char *name, *subsys, *devfile, *sysfs_path;
+    const char *name, *subsys, *sysfs_path;
     guint32 caps;
     MMPortType ptype = MM_PORT_TYPE_UNKNOWN;
     guint16 vendor = 0, product = 0;
 
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
-
-    devfile = g_udev_device_get_device_file (port);
-    if (!devfile) {
-        g_set_error (error, 0, 0, "Could not get port's sysfs file.");
-        return NULL;
-    }
 
     subsys = g_udev_device_get_subsystem (port);
     name = g_udev_device_get_name (port);
@@ -176,7 +181,16 @@ grab_port (MMPluginBase *base,
                 return NULL;
             }
         }
-    } else if (get_level_for_capabilities (caps) || (ptype != MM_PORT_TYPE_UNKNOWN)) {
+    } else if (   get_level_for_capabilities (caps)
+               || (ptype != MM_PORT_TYPE_UNKNOWN)
+               || (strcmp (subsys, "net") == 0)) {
+
+        /* FIXME: we don't yet know how to activate IP on CDMA devices using
+         * pseudo-ethernet ports.
+         */
+        if (strcmp (subsys, "net") == 0 && MM_IS_MODEM_SIERRA_CDMA (modem))
+            return modem;
+
         modem = existing;
         if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error))
             return NULL;

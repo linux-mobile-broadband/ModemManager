@@ -17,6 +17,7 @@ Overview of changes in ModemManager 0.5
 - Handle signal quality reporting for GSM modems that don't support AT+CSQ
 - Add preliminary USSD support
 - Fix reconnection attempts with some Sierra devices
+- Add support for pseduo-ethernet interface on newer Sierra devices
 
 Fixed bugs:
 rh#597296 rh#583691 rh#597088 bgo#626421 rh#585394 bgo#628105 bgo#627935

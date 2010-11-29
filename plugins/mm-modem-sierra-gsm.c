@@ -22,18 +22,24 @@
 #include <unistd.h>
 #include "mm-modem-sierra-gsm.h"
 #include "mm-errors.h"
+#include "mm-modem-simple.h"
 #include "mm-callback-info.h"
 #include "mm-modem-helpers.h"
 
 static void modem_init (MMModem *modem_class);
+static void modem_simple_init (MMModemSimple *class);
 
 G_DEFINE_TYPE_EXTENDED (MMModemSierraGsm, mm_modem_sierra_gsm, MM_TYPE_GENERIC_GSM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_SIMPLE, modem_simple_init))
 
 #define MM_MODEM_SIERRA_GSM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_SIERRA_GSM, MMModemSierraGsmPrivate))
 
 typedef struct {
     guint enable_wait_id;
+    gboolean has_net;
+    char *username;
+    char *password;
 } MMModemSierraGsmPrivate;
 
 MMModem *
@@ -386,26 +392,68 @@ grab_port (MMModem *modem,
 
     port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
 
-    if (port && MM_IS_AT_SERIAL_PORT (port)) {
-        GRegex *regex;
+    if (port) {
+        if (MM_IS_AT_SERIAL_PORT (port)) {
+            GRegex *regex;
 
-        g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
+            g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
 
-        regex = g_regex_new ("\\r\\n\\+PACSP0\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
-        g_regex_unref (regex);
+            regex = g_regex_new ("\\r\\n\\+PACSP0\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+            g_regex_unref (regex);
+        } else if (mm_port_get_subsys (port) == MM_PORT_SUBSYS_NET) {
+            MM_MODEM_SIERRA_GSM_GET_PRIVATE (gsm)->has_net = TRUE;
+            g_object_set (G_OBJECT (gsm), MM_MODEM_IP_METHOD, MM_MODEM_IP_METHOD_DHCP, NULL);
+        }
     }
 
     return !!port;
 }
 
 static void
-connect_done (MMModem *modem, GError *error, gpointer user_data)
+ppp_connect_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
 
     info->error = mm_modem_check_removed (modem, error);
     mm_callback_info_schedule (info);
+}
+
+static void
+net_activate_done (MMAtSerialPort *port,
+                   GString *response,
+                   GError *error,
+                   gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    mm_generic_gsm_connect_complete (MM_GENERIC_GSM (info->modem), error, info);
+}
+
+
+static void
+auth_done (MMAtSerialPort *port,
+           GString *response,
+           GError *error,
+           gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    gint cid;
+    char *command;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    cid = mm_generic_gsm_get_cid (MM_GENERIC_GSM (info->modem));
+    g_warn_if_fail (cid >= 0);
+
+    /* Activate data on the net port */
+    command = g_strdup_printf ("!SCACT=1,%d", cid);
+    mm_at_serial_port_queue_command (port, command, 3, net_activate_done, info);
+    g_free (command);
 }
 
 static void
@@ -415,6 +463,7 @@ ps_attach_done (MMAtSerialPort *port,
                 gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
+    MMModemSierraGsmPrivate *priv;
     MMModem *parent_modem_iface;
     const char *number;
 
@@ -424,10 +473,34 @@ ps_attach_done (MMAtSerialPort *port,
         return;
     }
 
-    /* We've got a PS attach, chain up to parent for the connect */
-    number = mm_callback_info_get_data (info, "number");
-    parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (info->modem));
-    parent_modem_iface->connect (info->modem, number, connect_done, info);
+    priv = MM_MODEM_SIERRA_GSM_GET_PRIVATE (info->modem);
+    if (priv->has_net) {
+        gint cid;
+        char *command;
+
+        /* If we have a net interface, we don't do PPP */
+
+        cid = mm_generic_gsm_get_cid (MM_GENERIC_GSM (info->modem));
+        g_warn_if_fail (cid >= 0);
+
+        if (!priv->username || !priv->password)
+            command = g_strdup_printf ("$QCPDPP=%d,0", cid);
+        else {
+            command = g_strdup_printf ("$QCPDPP=%d,1,\"%s\",\"%s\"",
+                                       cid,
+                                       priv->password ? priv->password : "",
+                                       priv->username ? priv->username : "");
+
+        }
+
+        mm_at_serial_port_queue_command (port, command, 3, auth_done, info);
+        g_free (command);
+    } else {
+        /* We've got a PS attach, chain up to parent for the connect */
+        number = mm_callback_info_get_data (info, "number");
+        parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (info->modem));
+        parent_modem_iface->connect (info->modem, number, ppp_connect_done, info);
+    }
 }
 
 static void
@@ -457,6 +530,82 @@ do_connect (MMModem *modem,
     mm_at_serial_port_queue_command (port, "+CGATT=1", 10, ps_attach_done, info);
 }
 
+static void
+clear_user_pass (MMModemSierraGsm *self)
+{
+    MMModemSierraGsmPrivate *priv = MM_MODEM_SIERRA_GSM_GET_PRIVATE (self);
+
+    g_free (priv->username);
+    priv->username = NULL;
+    g_free (priv->password);
+    priv->username = NULL;
+}
+
+static void
+do_disconnect (MMGenericGsm *gsm,
+               gint cid,
+               MMModemFn callback,
+               gpointer user_data)
+{
+    clear_user_pass (MM_MODEM_SIERRA_GSM (gsm));
+
+    if (MM_MODEM_SIERRA_GSM_GET_PRIVATE (gsm)->has_net) {
+        MMAtSerialPort *primary;
+        char *command;
+
+        primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
+        g_assert (primary);
+
+        /* If we have a net interface, deactivate it */
+        command = g_strdup_printf ("!SCACT=0,%d", cid);
+        mm_at_serial_port_queue_command (primary, command, 3, NULL, NULL);
+        g_free (command);
+    }
+
+    MM_GENERIC_GSM_CLASS (mm_modem_sierra_gsm_parent_class)->do_disconnect (gsm, cid, callback, user_data);
+}
+
+/*****************************************************************************/
+/*    Simple Modem class override functions                                  */
+/*****************************************************************************/
+
+static char *
+simple_dup_string_property (GHashTable *properties, const char *name, GError **error)
+{
+    GValue *value;
+
+    value = (GValue *) g_hash_table_lookup (properties, name);
+    if (!value)
+        return NULL;
+
+    if (G_VALUE_HOLDS_STRING (value))
+        return g_value_dup_string (value);
+
+    g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                 "Invalid property type for '%s': %s (string expected)",
+                 name, G_VALUE_TYPE_NAME (value));
+
+    return NULL;
+}
+
+static void
+simple_connect (MMModemSimple *simple,
+                GHashTable *properties,
+                MMModemFn callback,
+                gpointer user_data)
+{
+    MMModemSierraGsmPrivate *priv = MM_MODEM_SIERRA_GSM_GET_PRIVATE (simple);
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemSimple *parent_iface;
+
+    clear_user_pass (MM_MODEM_SIERRA_GSM (simple));
+    priv->username = simple_dup_string_property (properties, "username", &info->error);
+    priv->password = simple_dup_string_property (properties, "password", &info->error);
+
+    parent_iface = g_type_interface_peek_parent (MM_MODEM_SIMPLE_GET_INTERFACE (simple));
+    parent_iface->connect (MM_MODEM_SIMPLE (simple), properties, callback, info);
+}
+
 /*****************************************************************************/
 
 static void
@@ -464,6 +613,12 @@ modem_init (MMModem *modem_class)
 {
     modem_class->grab_port = grab_port;
     modem_class->connect = do_connect;
+}
+
+static void
+modem_simple_init (MMModemSimple *class)
+{
+    class->connect = simple_connect;
 }
 
 static void
@@ -478,6 +633,8 @@ dispose (GObject *object)
 
     if (priv->enable_wait_id)
         g_source_remove (priv->enable_wait_id);
+
+    clear_user_pass (MM_MODEM_SIERRA_GSM (object));
 }
 
 static void
@@ -495,5 +652,6 @@ mm_modem_sierra_gsm_class_init (MMModemSierraGsmClass *klass)
     gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->get_access_technology = get_access_technology;
     gsm_class->get_sim_iccid = get_sim_iccid;
+    gsm_class->do_disconnect = do_disconnect;
 }
 
