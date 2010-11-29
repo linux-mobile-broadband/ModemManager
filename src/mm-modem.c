@@ -832,7 +832,7 @@ mm_modem_init (gpointer g_iface)
                             MM_MODEM_IP_METHOD_PPP,
                             MM_MODEM_IP_METHOD_DHCP,
                             MM_MODEM_IP_METHOD_PPP,
-                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+                            G_PARAM_READWRITE));
 
     g_object_interface_install_property
         (g_iface,
