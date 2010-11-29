@@ -102,7 +102,8 @@ typedef struct {
     gint service_ind;
 
     guint signal_quality_id;
-    time_t signal_quality_timestamp;
+    time_t signal_emit_timestamp;
+    time_t signal_update_timestamp;
     guint32 signal_quality;
     gint cid;
 
@@ -976,9 +977,12 @@ periodic_poll_cb (gpointer user_data)
     if (priv->cgreg_poll)
         mm_at_serial_port_queue_command (port, "+CGREG?", 10, reg_poll_response, self);
 
-    mm_modem_gsm_network_get_signal_quality (MM_MODEM_GSM_NETWORK (self),
-                                             periodic_signal_quality_cb,
-                                             NULL);
+    /* Don't poll signal quality if we got a notification in the past 10 seconds */
+    if (time (NULL) - priv->signal_update_timestamp > 10) {
+        mm_modem_gsm_network_get_signal_quality (MM_MODEM_GSM_NETWORK (self),
+                                                 periodic_signal_quality_cb,
+                                                 NULL);
+    }
 
     if (MM_GENERIC_GSM_GET_CLASS (self)->get_access_technology)
         MM_GENERIC_GSM_GET_CLASS (self)->get_access_technology (self, periodic_access_tech_cb, NULL);
@@ -3229,7 +3233,7 @@ emit_signal_quality_change (gpointer user_data)
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
 
     priv->signal_quality_id = 0;
-    priv->signal_quality_timestamp = time (NULL);
+    priv->signal_emit_timestamp = time (NULL);
     mm_modem_gsm_network_signal_quality (MM_MODEM_GSM_NETWORK (self), priv->signal_quality);
     return FALSE;
 }
@@ -3246,6 +3250,8 @@ mm_generic_gsm_update_signal_quality (MMGenericGsm *self, guint32 quality)
 
     priv = MM_GENERIC_GSM_GET_PRIVATE (self);
 
+    priv->signal_update_timestamp = time (NULL);
+
     if (priv->signal_quality == quality)
         return;
 
@@ -3257,12 +3263,12 @@ mm_generic_gsm_update_signal_quality (MMGenericGsm *self, guint32 quality)
      * haven't been any updates in a while.
      */
     if (!priv->signal_quality_id) {
-        if (priv->signal_quality_timestamp > 0) {
+        if (priv->signal_emit_timestamp > 0) {
             time_t curtime;
             long int diff;
 
             curtime = time (NULL);
-            diff = curtime - priv->signal_quality_timestamp;
+            diff = curtime - priv->signal_emit_timestamp;
             if (diff == 0) {
                 /* If the device is sending more than one update per second,
                  * make sure we don't spam clients with signals.
