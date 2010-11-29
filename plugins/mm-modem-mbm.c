@@ -49,8 +49,6 @@ G_DEFINE_TYPE_EXTENDED (MMModemMbm, mm_modem_mbm, MM_TYPE_GENERIC_GSM, 0,
 #define MBM_E2NAP_CONNECTED    1
 #define MBM_E2NAP_CONNECTING   2
 
-#define MBM_SIGNAL_INDICATOR 2
-
 #define MBM_NETWORK_MODE_ANY  1
 #define MBM_NETWORK_MODE_2G   5
 #define MBM_NETWORK_MODE_3G   6
@@ -353,7 +351,6 @@ mbm_enable_done (MMAtSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
     /* Start unsolicited signal strength and access technology responses */
-    mm_at_serial_port_queue_command (port, "+CMER=3,0,0,1", 3, NULL, NULL);
     mm_at_serial_port_queue_command (port, "*ERINFO=1", 3, NULL, NULL);
 
     mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
@@ -477,7 +474,7 @@ disable (MMModem *modem,
     g_assert (primary);
 
     /* Turn off unsolicited responses */
-    mm_at_serial_port_queue_command (primary, "+CMER=0;*ERINFO=0", 5, disable_unsolicited_done, info);
+    mm_at_serial_port_queue_command (primary, "*ERINFO=0", 5, disable_unsolicited_done, info);
 }
 
 static void
@@ -581,29 +578,6 @@ mbm_pacsp_received (MMAtSerialPort *port,
                      gpointer user_data)
 {
     return;
-}
-
-static void
-mbm_ciev_received (MMAtSerialPort *port,
-                   GMatchInfo *info,
-                   gpointer user_data)
-{
-    int quality = 0, ind = 0;
-    char *str;
-
-    str = g_match_info_fetch (info, 1);
-    if (str)
-        ind = atoi (str);
-    g_free (str);
-
-    if (ind == MBM_SIGNAL_INDICATOR) {
-        str = g_match_info_fetch (info, 2);
-        if (str) {
-            quality = atoi (str);
-            mm_generic_gsm_update_signal_quality (MM_GENERIC_GSM (user_data), quality * 20);
-        }
-        g_free (str);
-    }
 }
 
 static void
@@ -921,10 +895,6 @@ grab_port (MMModem *modem,
 
         regex = g_regex_new ("\\r\\n\\+PACSP(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, mbm_pacsp_received, modem, NULL);
-        g_regex_unref (regex);
-
-        regex = g_regex_new ("\\r\\n\\+CIEV: (\\d+),(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, mbm_ciev_received, modem, NULL);
         g_regex_unref (regex);
 
         /* also consume unsolicited mbm messages we are not interested in them - see LP: #416418 */

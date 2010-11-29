@@ -96,6 +96,11 @@ typedef struct {
     MMCallbackInfo *pending_reg_info;
     gboolean manual_reg;
 
+    gboolean cmer_enabled;
+    gint roam_ind;
+    gint signal_ind;
+    gint service_ind;
+
     guint signal_quality_id;
     time_t signal_quality_timestamp;
     guint32 signal_quality;
@@ -156,6 +161,10 @@ static void reg_info_updated (MMGenericGsm *self,
                               const char *oper_name);
 
 static void update_lac_ci (MMGenericGsm *self, gulong lac, gulong ci, guint idx);
+
+static void ciev_received (MMAtSerialPort *port,
+                           GMatchInfo *info,
+                           gpointer user_data);
 
 MMModem *
 mm_generic_gsm_new (const char *device,
@@ -804,6 +813,10 @@ mm_generic_gsm_grab_port (MMGenericGsm *self,
         }
         mm_gsm_creg_regex_destroy (array);
 
+        regex = g_regex_new ("\\r\\n\\+CIEV: (\\d+),(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, ciev_received, self, NULL);
+        g_regex_unref (regex);
+
         if (ptype == MM_PORT_TYPE_PRIMARY) {
             priv->primary = MM_AT_SERIAL_PORT (port);
             if (!priv->data) {
@@ -964,8 +977,8 @@ periodic_poll_cb (gpointer user_data)
         mm_at_serial_port_queue_command (port, "+CGREG?", 10, reg_poll_response, self);
 
     mm_modem_gsm_network_get_signal_quality (MM_MODEM_GSM_NETWORK (self),
-                                                periodic_signal_quality_cb,
-                                                NULL);
+                                             periodic_signal_quality_cb,
+                                             NULL);
 
     if (MM_GENERIC_GSM_GET_CLASS (self)->get_access_technology)
         MM_GENERIC_GSM_GET_CLASS (self)->get_access_technology (self, periodic_access_tech_cb, NULL);
@@ -1187,6 +1200,83 @@ get_allowed_mode_done (MMModem *modem,
     }
 }
 
+static void
+ciev_received (MMAtSerialPort *port,
+               GMatchInfo *info,
+               gpointer user_data)
+{
+    MMGenericGsm *self = MM_GENERIC_GSM (user_data);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    int quality = 0, ind = 0;
+    char *str;
+
+    if (!priv->cmer_enabled)
+        return;
+
+    str = g_match_info_fetch (info, 1);
+    if (str)
+        ind = atoi (str);
+    g_free (str);
+
+    if (ind == priv->signal_ind) {
+        str = g_match_info_fetch (info, 2);
+        if (str) {
+            quality = atoi (str);
+            mm_generic_gsm_update_signal_quality (self, quality * 20);
+        }
+        g_free (str);
+    }
+
+    /* FIXME: handle roaming and service indicators */
+}
+
+static void
+cmer_cb (MMAtSerialPort *port,
+         GString *response,
+         GError *error,
+         gpointer user_data)
+{
+    if (!error)
+        MM_GENERIC_GSM_GET_PRIVATE (user_data)->cmer_enabled = TRUE;
+}
+
+static void
+cind_cb (MMAtSerialPort *port,
+         GString *response,
+         GError *error,
+         gpointer user_data)
+{
+    MMGenericGsm *self;
+    MMGenericGsmPrivate *priv;
+    GHashTable *indicators;
+
+    if (error)
+        return;
+
+    self = MM_GENERIC_GSM (user_data);
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    indicators = mm_parse_cind_response (response->str, NULL);
+    if (indicators) {
+        CindResponse *r;
+
+        r = g_hash_table_lookup (indicators, "signal");
+        if (r)
+            priv->signal_ind = cind_response_get_index (r);
+
+        r = g_hash_table_lookup (indicators, "roam");
+        if (r)
+            priv->roam_ind = cind_response_get_index (r);
+
+        r = g_hash_table_lookup (indicators, "service");
+        if (r)
+            priv->service_ind = cind_response_get_index (r);
+
+        mm_at_serial_port_queue_command (port, "+CMER=3,0,0,1", 3, cmer_cb, self);
+        g_hash_table_destroy (indicators);
+    }
+}
+
 void
 mm_generic_gsm_enable_complete (MMGenericGsm *self,
                                 GError *error,
@@ -1223,6 +1313,8 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
 
     /* Try to enable XON/XOFF flow control */
     mm_at_serial_port_queue_command (priv->primary, "+IFC=1,1", 3, NULL, NULL);
+
+    mm_at_serial_port_queue_command (priv->primary, "+CIND=?", 3, cind_cb, self);
 
     /* Try one more time to get the SIM ID */
     if (!priv->simid)
@@ -1406,6 +1498,7 @@ disable_flash_done (MMSerialPort *port,
                     GError *error,
                     gpointer user_data)
 {
+    MMGenericGsmPrivate *priv;
     MMCallbackInfo *info = user_data;
     MMModemState prev_state;
     char *cmd = NULL;
@@ -1424,9 +1517,16 @@ disable_flash_done (MMSerialPort *port,
         return;
     }
 
+    priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+
     /* Disable unsolicited messages */
     mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "AT+CREG=0", 3, NULL, NULL);
     mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "AT+CGREG=0", 3, NULL, NULL);
+
+    if (priv->cmer_enabled) {
+        mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "+CMER=0", 3, NULL, NULL);
+        priv->cmer_enabled = FALSE;
+    }
 
     g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_POWER_DOWN_CMD, &cmd, NULL);
     if (cmd && strlen (cmd))
@@ -3187,6 +3287,72 @@ mm_generic_gsm_update_signal_quality (MMGenericGsm *self, guint32 quality)
     }
 }
 
+#define CIND_TAG "+CIND:"
+
+static void
+cind_signal_cb (MMAtSerialPort *port,
+                GString *response,
+                GError *error,
+                gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    const char *p = response->str;
+    GRegex *r = NULL;
+    GMatchInfo *match_info;
+    int i = 1, quality = -1;
+
+    info->error = mm_modem_check_removed (info->modem, error);
+    if (info->error)
+        goto done;
+
+    if (!g_str_has_prefix (p, CIND_TAG)) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse the +CIND response");
+        goto done;
+    }
+
+    p += strlen (CIND_TAG);
+    while (isspace (*p))
+        p++;
+
+    r = g_regex_new ("(\\d+)[^0-9]+", G_REGEX_UNGREEDY, 0, NULL);
+    if (!r) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_GENERAL,
+                                           "Internal failure attempting to parse +CIND response");
+        goto done;
+    }
+
+    if (!g_regex_match_full (r, p, strlen (p), 0, 0, &match_info, NULL)) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_GENERAL,
+                                           "Failure parsing the +CIND response");
+        goto done;
+    }
+
+    while (g_match_info_matches (match_info)) {
+        if (MM_GENERIC_GSM_GET_PRIVATE (info->modem)->signal_ind == i++) {
+            char *str = g_match_info_fetch (match_info, 1);
+
+            if (str) {
+                quality = atoi (str);
+                mm_generic_gsm_update_signal_quality (MM_GENERIC_GSM (info->modem), quality * 20);
+                g_free (str);
+                break;
+            }
+        }
+        g_match_info_next (match_info, NULL);
+    }
+    g_match_info_free (match_info);
+
+done:
+    if (r)
+        g_regex_unref (r);
+
+    mm_callback_info_schedule (info);
+}
+
 static void
 get_signal_quality_done (MMAtSerialPort *port,
                          GString *response,
@@ -3198,8 +3364,21 @@ get_signal_quality_done (MMAtSerialPort *port,
     gboolean parsed = FALSE;
 
     info->error = mm_modem_check_removed (info->modem, error);
-    if (info->error)
+    if (info->error) {
+        if (info->modem) {
+            MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+
+            /* Modem won't do unsolicited reporting via +CMER/+CIEV, but still
+             * supports +CIND.
+             */
+            if (!priv->cmer_enabled && (priv->signal_ind >= 0)) {
+                g_clear_error (&info->error);
+                mm_at_serial_port_queue_command (port, "+CIND?", 3, cind_signal_cb, info);
+                return;
+            }
+        }
         goto done;
+    }
 
     if (!strncmp (reply, "+CSQ: ", 6)) {
         /* Got valid reply */
@@ -4509,6 +4688,9 @@ mm_generic_gsm_init (MMGenericGsm *self)
     priv->act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     priv->reg_regex = mm_gsm_creg_regex_get (TRUE);
     priv->roam_allowed = TRUE;
+    priv->signal_ind = -1;
+    priv->roam_ind = -1;
+    priv->service_ind = -1;
 
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_GSM_NETWORK_ALLOWED_MODE,
