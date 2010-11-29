@@ -884,3 +884,126 @@ mm_create_device_identifier (guint vid,
     return ret;
 }
 
+/*************************************************************************/
+
+struct CindResponse {
+    char *desc;
+    gint min;
+    gint max;
+};
+
+static CindResponse *
+cind_response_new (const char *desc, gint min, gint max)
+{
+    CindResponse *r;
+    char *p;
+
+    g_return_val_if_fail (desc != NULL, NULL);
+
+    r = g_malloc0 (sizeof (CindResponse));
+
+    /* Strip quotes */
+    r->desc = p = g_malloc0 (strlen (desc) + 1);
+    while (*desc) {
+        if (*desc != '"' && !isspace (*desc))
+            *p++ = tolower (*desc);
+        desc++;
+    }
+
+    r->max = max;
+    r->min = min;
+    return r;
+}
+
+static void
+cind_response_free (CindResponse *r)
+{
+    g_return_if_fail (r != NULL);
+
+    g_free (r->desc);
+    memset (r, 0, sizeof (CindResponse));
+    g_free (r);
+}
+
+const char *
+cind_response_get_desc (CindResponse *r)
+{
+    g_return_val_if_fail (r != NULL, NULL);
+
+    return r->desc;
+}
+
+gint
+cind_response_get_min (CindResponse *r)
+{
+    g_return_val_if_fail (r != NULL, 0);
+
+    return r->min;
+}
+
+gint
+cind_response_get_max (CindResponse *r)
+{
+    g_return_val_if_fail (r != NULL, 0);
+
+    return r->max;
+}
+
+#define CIND_TAG "+CIND:"
+
+GHashTable *
+mm_parse_cind_response (const char *reply, GError **error)
+{
+    GHashTable *hash;
+    GRegex *r;
+    GMatchInfo *match_info;
+
+    g_return_val_if_fail (reply != NULL, NULL);
+
+    /* Strip whitespace and response tag */
+    if (g_str_has_prefix (reply, CIND_TAG))
+        reply += strlen (CIND_TAG);
+    while (isspace (*reply))
+        reply++;
+
+    r = g_regex_new ("\\(([^,]*),\\((\\d+)[-,](\\d+)\\)", G_REGEX_UNGREEDY, 0, NULL);
+    if (!r) {
+        g_set_error_literal (error,
+                             MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             "Could not parse scan results.");
+        return NULL;
+    }
+
+    hash = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) cind_response_free);
+
+    if (g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, NULL)) {
+        while (g_match_info_matches (match_info)) {
+            CindResponse *resp;
+            char *desc, *tmp;
+            gint min = 0, max = 0;
+
+            desc = g_match_info_fetch (match_info, 1);
+
+            tmp = g_match_info_fetch (match_info, 2);
+            min = atoi (tmp);
+            g_free (tmp);
+
+            tmp = g_match_info_fetch (match_info, 3);
+            max = atoi (tmp);
+            g_free (tmp);
+
+            resp = cind_response_new (desc, min, max);
+            if (resp)
+                g_hash_table_insert (hash, g_strdup (resp->desc), resp);
+
+            g_free (desc);
+
+            g_match_info_next (match_info, NULL);
+        }
+        g_match_info_free (match_info);
+    }
+    g_regex_unref (r);
+
+    return hash;
+}
+

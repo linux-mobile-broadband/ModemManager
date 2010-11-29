@@ -1077,6 +1077,78 @@ test_devid_item (void *f, gpointer d)
     g_assert (!strcmp (devid, item->devid));
 }
 
+typedef struct {
+    const char *desc;
+    const gint min;
+    const gint max;
+} CindEntry;
+
+static void
+test_cind_results (const char *desc,
+                   const char *reply,
+                   CindEntry *expected_results,
+                   guint32 expected_results_len)
+{
+    guint i;
+    GError *error = NULL;
+    GHashTable *results;
+
+    g_print ("\nTesting %s +CIND response...\n", desc);
+
+    results = mm_parse_cind_response (reply, &error);
+    g_assert (results);
+    g_assert (error == NULL);
+
+    g_assert (g_hash_table_size (results) == expected_results_len);
+
+    for (i = 0; i < expected_results_len; i++) {
+        CindEntry *expected = &expected_results[i];
+        CindEntry *compare;
+
+        compare = g_hash_table_lookup (results, expected->desc);
+        g_assert (compare);
+
+        g_assert_cmpint (expected->min, ==, compare->min);
+        g_assert_cmpint (expected->max, ==, compare->max);
+    }
+
+    g_hash_table_destroy (results);
+}
+
+static void
+test_cind_response_linktop_lw273 (void *f, gpointer d)
+{
+    const char *reply = "+CIND: (\"battchg\",(0-5)),(\"signal\",(0-5)),(\"batterywarning\",(0-1)),(\"chargerconnected\",(0-1)),(\"service\",(0-1)),(\"sounder\",(0-1)),(\"message\",(0-1)),()";
+    static CindEntry expected[] = {
+        { "battchg", 0, 5 },
+        { "signal", 0, 5 },
+        { "batterywarning", 0, 1 },
+        { "chargerconnected", 0, 1 },
+        { "service", 0, 1 },
+        { "sounder", 0, 1 },
+        { "message", 0, 1 }
+    };
+
+    test_cind_results ("LW273", reply, &expected[0], ARRAY_LEN (expected));
+}
+
+static void
+test_cind_response_moto_v3m (void *f, gpointer d)
+{
+    const char *reply = "+CIND: (\"Voice Mail\",(0,1)),(\"service\",(0,1)),(\"call\",(0,1)),(\"Roam\",(0-2)),(\"signal\",(0-5)),(\"callsetup\",(0-3)),(\"smsfull\",(0,1))";
+    static CindEntry expected[] = {
+        { "voicemail", 0, 1 },
+        { "service", 0, 1 },
+        { "call", 0, 1 },
+        { "roam", 0, 2 },
+        { "signal", 0, 5 },
+        { "callsetup", 0, 3 },
+        { "smsfull", 0, 1 }
+    };
+
+    test_cind_results ("Motorola V3m", reply, &expected[0], ARRAY_LEN (expected));
+}
+
 static TestData *
 test_data_new (void)
 {
@@ -1174,6 +1246,9 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cscs_sierra_mercury_support_response, data));
     g_test_suite_add (suite, TESTCASE (test_cscs_buslink_support_response, data));
     g_test_suite_add (suite, TESTCASE (test_cscs_blackberry_support_response, data));
+
+    g_test_suite_add (suite, TESTCASE (test_cind_response_linktop_lw273, data));
+    g_test_suite_add (suite, TESTCASE (test_cind_response_moto_v3m, data));
 
     while (item->devid) {
         g_test_suite_add (suite, TESTCASE (test_devid_item, (gconstpointer) item));
