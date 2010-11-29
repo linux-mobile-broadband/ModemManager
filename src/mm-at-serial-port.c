@@ -290,7 +290,7 @@ debug_log (MMSerialPort *port, const char *prefix, const char *buf, gsize len)
         else if (*s == '\n')
             g_string_append (debug, "<LF>");
         else
-            g_string_append_printf (debug, "\\%d", *s);
+            g_string_append_printf (debug, "\\%u", (guint8) (*s & 0xFF));
 
         s++;
     }
