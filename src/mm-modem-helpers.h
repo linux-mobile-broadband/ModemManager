@@ -70,10 +70,11 @@ char *mm_create_device_identifier (guint vid,
                                    gboolean debug);
 
 typedef struct CindResponse CindResponse;
-GHashTable *mm_parse_cind_response (const char *reply, GError **error);
-const char *cind_response_get_desc (CindResponse *r);
-gint        cind_response_get_min (CindResponse *r);
-gint        cind_response_get_max (CindResponse *r);
+GHashTable *mm_parse_cind_response  (const char *reply, GError **error);
+const char *cind_response_get_desc  (CindResponse *r);
+gint        cind_response_get_index (CindResponse *r);
+gint        cind_response_get_min   (CindResponse *r);
+gint        cind_response_get_max   (CindResponse *r);
 
 #endif  /* MM_MODEM_HELPERS_H */
 

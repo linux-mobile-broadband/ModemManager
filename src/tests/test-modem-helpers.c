@@ -1103,13 +1103,13 @@ test_cind_results (const char *desc,
 
     for (i = 0; i < expected_results_len; i++) {
         CindEntry *expected = &expected_results[i];
-        CindEntry *compare;
+        CindResponse *compare;
 
         compare = g_hash_table_lookup (results, expected->desc);
         g_assert (compare);
-
-        g_assert_cmpint (expected->min, ==, compare->min);
-        g_assert_cmpint (expected->max, ==, compare->max);
+        g_assert_cmpint (i, ==, cind_response_get_index (compare));
+        g_assert_cmpint (expected->min, ==, cind_response_get_min (compare));
+        g_assert_cmpint (expected->max, ==, cind_response_get_max (compare));
     }
 
     g_hash_table_destroy (results);

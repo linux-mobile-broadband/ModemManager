@@ -888,17 +888,19 @@ mm_create_device_identifier (guint vid,
 
 struct CindResponse {
     char *desc;
+    gint idx;
     gint min;
     gint max;
 };
 
 static CindResponse *
-cind_response_new (const char *desc, gint min, gint max)
+cind_response_new (const char *desc, gint idx, gint min, gint max)
 {
     CindResponse *r;
     char *p;
 
     g_return_val_if_fail (desc != NULL, NULL);
+    g_return_val_if_fail (idx >= 0, NULL);
 
     r = g_malloc0 (sizeof (CindResponse));
 
@@ -910,6 +912,7 @@ cind_response_new (const char *desc, gint min, gint max)
         desc++;
     }
 
+    r->idx = idx;
     r->max = max;
     r->min = min;
     return r;
@@ -934,9 +937,17 @@ cind_response_get_desc (CindResponse *r)
 }
 
 gint
+cind_response_get_index (CindResponse *r)
+{
+    g_return_val_if_fail (r != NULL, -1);
+
+    return r->idx;
+}
+
+gint
 cind_response_get_min (CindResponse *r)
 {
-    g_return_val_if_fail (r != NULL, 0);
+    g_return_val_if_fail (r != NULL, -1);
 
     return r->min;
 }
@@ -944,7 +955,7 @@ cind_response_get_min (CindResponse *r)
 gint
 cind_response_get_max (CindResponse *r)
 {
-    g_return_val_if_fail (r != NULL, 0);
+    g_return_val_if_fail (r != NULL, -1);
 
     return r->max;
 }
@@ -957,6 +968,7 @@ mm_parse_cind_response (const char *reply, GError **error)
     GHashTable *hash;
     GRegex *r;
     GMatchInfo *match_info;
+    gint idx = 0;
 
     g_return_val_if_fail (reply != NULL, NULL);
 
@@ -992,7 +1004,7 @@ mm_parse_cind_response (const char *reply, GError **error)
             max = atoi (tmp);
             g_free (tmp);
 
-            resp = cind_response_new (desc, min, max);
+            resp = cind_response_new (desc, idx++, min, max);
             if (resp)
                 g_hash_table_insert (hash, g_strdup (resp->desc), resp);
 
