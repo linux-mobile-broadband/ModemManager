@@ -14,8 +14,11 @@ Overview of changes in ModemManager 0.5
 - Add support for newer Ericsson devices
 - Add an SIM identifier for use when auto-unlocking modems
 - Add an device identifier for use when MEID/IMEI is not yet available
+- Handle signal quality reporting for GSM modems that don't support AT+CSQ
+- Add preliminary USSD support
+- Fix reconnection attempts with some Sierra devices
 
 Fixed bugs:
 rh#597296 rh#583691 rh#597088 bgo#626421 rh#585394 bgo#628105 bgo#627935
-bgo#621815 rh#632516
+bgo#621815 rh#632516 lp:682282 bgo#590798
 
