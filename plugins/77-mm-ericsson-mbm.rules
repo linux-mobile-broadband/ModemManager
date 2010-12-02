@@ -32,6 +32,9 @@ ATTRS{idVendor}=="0fce", ATTRS{idProduct}=="d0cf", ENV{ID_MM_ERICSSON_MBM}="1"
 # Sony-Ericsson MD400
 ATTRS{idVendor}=="0fce", ATTRS{idProduct}=="d0e1", ENV{ID_MM_ERICSSON_MBM}="1"
 
+# Sony-Ericsson MD400G
+ATTRS{idVendor}=="0fce", ATTRS{idProduct}=="d103", ENV{ID_MM_ERICSSON_MBM}="1"
+
 # Dell 5530 HSDPA
 ATTRS{idVendor}=="413c", ATTRS{idProduct}=="8147", ENV{ID_MM_ERICSSON_MBM}="1"
 
