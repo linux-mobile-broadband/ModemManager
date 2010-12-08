@@ -733,7 +733,7 @@ device_added (MMManager *manager, GUdevDevice *device)
     const char *subsys, *name, *physdev_path, *physdev_subsys;
     SupportsInfo *info;
     char *key;
-    gboolean found;
+    gboolean found, is_candidate;
     GUdevDevice *physdev = NULL;
     MMPlugin *plugin;
     MMModem *existing;
@@ -748,6 +748,17 @@ device_added (MMManager *manager, GUdevDevice *device)
 
     /* ignore VTs */
     if (strncmp (name, "tty", 3) == 0 && isdigit (name[3]))
+        return;
+
+    /* Ignore devices that aren't completely configured by udev yet.  If
+     * ModemManager is started in parallel with udev, explicitly requesting
+     * devices may return devices for which not all udev rules have yet been
+     * applied (a bug in udev/gudev).  Since we often need those rules to match
+     * the device to a specific ModemManager driver, we need to ensure that all
+     * rules have been processed before handling a device.
+     */
+    is_candidate = g_udev_device_get_property_as_boolean (device, "ID_MM_CANDIDATE");
+    if (!is_candidate)
         return;
 
     if (find_modem_for_port (manager, subsys, name))
