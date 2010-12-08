@@ -13,7 +13,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-longcheer.la \
 	libmm-plugin-anydata.la \
 	libmm-plugin-simtech.la \
-	libmm-plugin-x22x.la
+	libmm-plugin-x22x.la \
+	libmm-plugin-linktop.la
 
 # Generic
 
@@ -294,6 +295,23 @@ libmm_plugin_x22x_la_LDFLAGS = \
 	-module \
 	-avoid-version
 
+# Linktop
+
+libmm_plugin_linktop_la_SOURCES = \
+	mm-plugin-linktop.c \
+	mm-plugin-linktop.h \
+	mm-modem-linktop.c \
+	mm-modem-linktop.h
+
+libmm_plugin_linktop_la_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
+	-I$(top_srcdir)/src
+
+libmm_plugin_linktop_la_LDFLAGS = \
+	$(GUDEV_LDFLAGS) \
+	-module \
+	-avoid-version
 
 udevrulesdir = $(UDEV_BASE_DIR)/rules.d
 udevrules_DATA = \
