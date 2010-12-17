@@ -31,11 +31,13 @@
 #include "mm-modem-helpers.h"
 
 static void modem_init (MMModem *modem_class);
+static void pc_init (MMPropertiesChanged *pc_class);
 
 G_DEFINE_TYPE_EXTENDED (MMModemBase, mm_modem_base,
                         G_TYPE_OBJECT,
                         G_TYPE_FLAG_VALUE_ABSTRACT,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_PROPERTIES_CHANGED, pc_init))
 
 #define MM_MODEM_BASE_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_BASE, MMModemBasePrivate))
 
@@ -633,6 +635,11 @@ modem_init (MMModem *modem_class)
     modem_class->auth_finish = modem_auth_finish;
 }
 
+static void
+pc_init (MMPropertiesChanged *pc_class)
+{
+}
+
 static gboolean
 is_enabled (MMModemState state)
 {
@@ -846,6 +853,6 @@ mm_modem_base_class_init (MMModemBaseClass *klass)
                                       MM_MODEM_PROP_HW_PID,
                                       MM_MODEM_HW_PID);
 
-    mm_properties_changed_signal_new (object_class);
+    mm_properties_changed_signal_enable (object_class);
 }
 

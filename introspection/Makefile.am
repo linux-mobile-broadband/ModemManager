@@ -15,4 +15,5 @@ EXTRA_DIST = \
 	mm-modem-simple.xml \
 	mm-serial-error.xml \
 	mm-modem-location.xml \
-	mm-modem-gsm-ussd.xml
+	mm-modem-gsm-ussd.xml \
+	mm-properties-changed.xml

@@ -144,6 +144,9 @@ mm-modem-gsm-sms-glue.h: $(top_srcdir)/introspection/mm-modem-gsm-sms.xml
 mm-modem-gsm-ussd-glue.h: $(top_srcdir)/introspection/mm-modem-gsm-ussd.xml
 	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_gsm_ussd --mode=glib-server --output=$@ $<
 
+mm-properties-changed-glue.h: $(top_srcdir)/introspection/mm-properties-changed.xml
+	$(AM_V_GEN) dbus-binding-tool --prefix=mm_properties_changed --mode=glib-server --output=$@ $<
+
 BUILT_SOURCES = \
 	mm-manager-glue.h \
 	mm-modem-glue.h \
@@ -152,7 +155,8 @@ BUILT_SOURCES = \
 	mm-modem-gsm-card-glue.h \
 	mm-modem-gsm-network-glue.h \
 	mm-modem-gsm-sms-glue.h \
-	mm-modem-gsm-ussd-glue.h
+	mm-modem-gsm-ussd-glue.h \
+	mm-properties-changed-glue.h
 
 mm-modem-location-glue.h: $(top_srcdir)/introspection/mm-modem-location.xml
 	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_location --mode=glib-server --output=$@ $<

@@ -35,6 +35,7 @@
   <xi:include href="mm-modem-gsm-sms.xml"/>
   <xi:include href="mm-modem-gsm-hso.xml"/>
   <xi:include href="mm-modem-gsm-ussd.xml"/>
+  <xi:include href="mm-properties-changed.xml"/>
 
   <xi:include href="mm-serial-error.xml"/>
   <xi:include href="mm-modem-error.xml"/>

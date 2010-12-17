@@ -20,11 +20,16 @@
 #include <dbus/dbus-glib.h>
 #include "mm-marshal.h"
 #include "mm-properties-changed-signal.h"
+#include "mm-properties-changed-glue.h"
 
-#define DBUS_TYPE_G_MAP_OF_VARIANT (dbus_g_type_get_map ("GHashTable", G_TYPE_STRING, G_TYPE_VALUE))
+#define DBUS_TYPE_G_MAP_OF_VARIANT  (dbus_g_type_get_map ("GHashTable", G_TYPE_STRING, G_TYPE_VALUE))
+#define DBUS_TYPE_G_ARRAY_OF_STRING (dbus_g_type_get_collection ("GPtrArray", G_TYPE_STRING))
 
-#define PC_SIGNAL_NAME "mm-properties-changed"
+#define MM_PC_SIGNAL_NAME "mm-properties-changed"
+#define DBUS_PC_SIGNAL_NAME "properties-changed"
 #define MM_DBUS_PROPERTY_CHANGED "MM_DBUS_PROPERTY_CHANGED"
+
+/*****************************************************************************/
 
 typedef struct {
     char *real_property;
@@ -47,7 +52,6 @@ typedef struct {
      */
     GHashTable *hash;
 
-    gulong signal_id;
     guint idle_id;
 } PropertiesChangedInfo;
 
@@ -140,6 +144,7 @@ properties_changed (gpointer data)
     while (g_hash_table_iter_next (&iter, &key, &value)) {
         const char *interface = (const char *) key;
         GHashTable *props = (GHashTable *) value;
+        GPtrArray *ignore = g_ptr_array_new ();
 
 #ifdef DEBUG
         {
@@ -153,7 +158,9 @@ properties_changed (gpointer data)
 #endif
 
         /* Send the PropertiesChanged signal */
-        g_signal_emit (object, info->signal_id, 0, interface, props);
+        g_signal_emit_by_name (object, MM_PC_SIGNAL_NAME, interface, props);
+        g_signal_emit_by_name (object, DBUS_PC_SIGNAL_NAME, interface, props, ignore);
+        g_ptr_array_free (ignore, TRUE);
     }
     g_hash_table_remove_all (info->hash);
 
@@ -207,8 +214,6 @@ get_properties_changed_info (GObject *object)
     if (!info) {
         info = properties_changed_info_new ();
         g_object_set_data_full (object, MM_DBUS_PROPERTY_CHANGED, info, properties_changed_info_destroy);
-        info->signal_id = g_signal_lookup (PC_SIGNAL_NAME, G_OBJECT_TYPE (object));
-        g_assert (info->signal_id);
     }
 
     g_assert (info);
@@ -280,20 +285,67 @@ mm_properties_changed_signal_register_property (GObject *object,
     }
 }
 
-guint
-mm_properties_changed_signal_new (GObjectClass *object_class)
+void
+mm_properties_changed_signal_enable (GObjectClass *object_class)
 {
-    guint id;
-
     object_class->notify = notify;
-
-    id = g_signal_new (PC_SIGNAL_NAME,
-                       G_OBJECT_CLASS_TYPE (object_class),
-                       G_SIGNAL_RUN_FIRST,
-                       0, NULL, NULL,
-                       mm_marshal_VOID__STRING_BOXED,
-                       G_TYPE_NONE, 2, G_TYPE_STRING, DBUS_TYPE_G_MAP_OF_VARIANT);
-
-    return id;
 }
 
+/*****************************************************************************/
+
+static void
+mm_properties_changed_init (gpointer g_iface)
+{
+    static gboolean initialized = FALSE;
+
+    if (initialized)
+        return;
+
+    g_signal_new (MM_PC_SIGNAL_NAME,
+                  G_TYPE_FROM_INTERFACE (g_iface),
+                  G_SIGNAL_RUN_FIRST,
+                  0, NULL, NULL,
+                  mm_marshal_VOID__STRING_BOXED,
+                  G_TYPE_NONE, 2, G_TYPE_STRING, DBUS_TYPE_G_MAP_OF_VARIANT);
+
+    g_signal_new (DBUS_PC_SIGNAL_NAME,
+                  G_TYPE_FROM_INTERFACE (g_iface),
+                  G_SIGNAL_RUN_FIRST,
+                  0, NULL, NULL,
+                  mm_marshal_VOID__STRING_BOXED_BOXED,
+                  G_TYPE_NONE, 3,
+                  G_TYPE_STRING,
+                  DBUS_TYPE_G_MAP_OF_VARIANT,
+                  DBUS_TYPE_G_ARRAY_OF_STRING);
+
+    initialized = TRUE;
+}
+
+GType
+mm_properties_changed_get_type (void)
+{
+    static GType pc_type = 0;
+
+    if (!G_UNLIKELY (pc_type)) {
+        const GTypeInfo pc_info = {
+            sizeof (MMPropertiesChanged), /* class_size */
+            mm_properties_changed_init,   /* base_init */
+            NULL,       /* base_finalize */
+            NULL,
+            NULL,       /* class_finalize */
+            NULL,       /* class_data */
+            0,
+            0,              /* n_preallocs */
+            NULL
+        };
+
+        pc_type = g_type_register_static (G_TYPE_INTERFACE,
+                                          "MMPropertiesChanged",
+                                          &pc_info, 0);
+
+        g_type_interface_add_prerequisite (pc_type, G_TYPE_OBJECT);
+        dbus_g_object_type_install_info (pc_type, &dbus_glib_mm_properties_changed_object_info);
+    }
+
+    return pc_type;
+}

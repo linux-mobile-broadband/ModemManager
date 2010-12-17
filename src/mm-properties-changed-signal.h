@@ -19,7 +19,18 @@
 
 #include <glib-object.h>
 
-guint mm_properties_changed_signal_new (GObjectClass *object_class);
+#define MM_TYPE_PROPERTIES_CHANGED      (mm_properties_changed_get_type ())
+#define MM_PROPERTIES_CHANGED(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PROPERTIES_CHANGED, MMPropertiesChanged))
+#define MM_IS_PROPERTIES_CHANGED(obj)   (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_PROPERTIES_CHANGED))
+#define MM_PROPERTIES_CHANGED_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_PROPERTIES_CHANGED, MMPropertiesChanged))
+
+typedef struct {
+    GTypeInterface g_iface;
+} MMPropertiesChanged;
+
+GType mm_properties_changed_get_type (void);
+
+void mm_properties_changed_signal_enable (GObjectClass *object_class);
 
 void mm_properties_changed_signal_register_property (GObject *object,
                                                      const char *gobject_property,
