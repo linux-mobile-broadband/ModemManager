@@ -7,11 +7,10 @@
 # that don't have this tag.  MM will still get the udev 'add' event for the
 # device a short while later and then process it as normal.
 
-ACTION!="add|change", GOTO="mm_candidate_end"
+ACTION!="add|change|move", GOTO="mm_candidate_end"
 
 SUBSYSTEM=="tty", ENV{ID_MM_CANDIDATE}="1"
 SUBSYSTEM=="net", ENV{ID_MM_CANDIDATE}="1"
-SUBSYSTEM=="bluetooth", ENV{ID_MM_CANDIDATE}="1"
 
 LABEL="mm_candidate_end"
 
