@@ -11,6 +11,7 @@ ACTION!="add|change", GOTO="mm_candidate_end"
 
 SUBSYSTEM=="tty", ENV{ID_MM_CANDIDATE}="1"
 SUBSYSTEM=="net", ENV{ID_MM_CANDIDATE}="1"
+SUBSYSTEM=="bluetooth", ENV{ID_MM_CANDIDATE}="1"
 
 LABEL="mm_candidate_end"
 
