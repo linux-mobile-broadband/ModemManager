@@ -27,14 +27,14 @@
   <xi:include href="org.freedesktop.ModemManager.Modem.xml"/>
   <xi:include href="org.freedesktop.ModemManager.Modem.Simple.xml"/>
   <xi:include href="org.freedesktop.ModemManager.Modem.Location.xml"/>
-  <xi:include href="org.freedesktop.ModemManager.Modem.Cdma"/>
-  <xi:include href="org.freedesktop.ModemManager.Modem.Gsm"/>
-  <xi:include href="org.freedesktop.ModemManager.Gsm.Card.xml"/>
-  <xi:include href="org.freedesktop.ModemManager.Gsm.Contacts.xml"/>
-  <xi:include href="org.freedesktop.ModemManager.Gsm.Network.xml"/>
-  <xi:include href="org.freedesktop.ModemManager.Gsm.SMS.xml"/>
-  <xi:include href="org.freedesktop.ModemManager.Gsm.Hso.xml"/>
-  <xi:include href="org.freedesktop.ModemManager.Gsm.Ussd.xml"/>
+  <xi:include href="org.freedesktop.ModemManager.Modem.Cdma.xml"/>
+  <xi:include href="org.freedesktop.ModemManager.Modem.Gsm.xml"/>
+  <xi:include href="org.freedesktop.ModemManager.Modem.Gsm.Card.xml"/>
+  <xi:include href="org.freedesktop.ModemManager.Modem.Gsm.Contacts.xml"/>
+  <xi:include href="org.freedesktop.ModemManager.Modem.Gsm.Network.xml"/>
+  <xi:include href="org.freedesktop.ModemManager.Modem.Gsm.SMS.xml"/>
+  <xi:include href="org.freedesktop.ModemManager.Modem.Gsm.Hso.xml"/>
+  <xi:include href="org.freedesktop.ModemManager.Modem.Gsm.Ussd.xml"/>
   <xi:include href="org.freedesktop.DBus.Properties.xml"/>
 
   <xi:include href="mm-serial-error.xml"/>
