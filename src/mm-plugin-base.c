@@ -48,6 +48,8 @@ G_DEFINE_TYPE_EXTENDED (MMPluginBase, mm_plugin_base, G_TYPE_OBJECT,
  */
 static GHashTable *cached_caps = NULL;
 
+/* Virtual port corresponding to the embeded modem */
+static gchar *virtual_port[] = {"smd0", NULL};
 
 typedef struct {
     char *name;
@@ -1034,6 +1036,7 @@ supports_port (MMPlugin *plugin,
     char *driver = NULL, *key = NULL;
     MMPluginBaseSupportsTask *task;
     MMPluginSupportsResult result = MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
+    int idx;
 
     key = get_key (subsys, name);
     task = g_hash_table_lookup (priv->tasks, key);
@@ -1046,6 +1049,16 @@ supports_port (MMPlugin *plugin,
     if (!port)
         goto out;
 
+    // Detect any modems accessible through the list of virtual ports
+    for (idx = 0; virtual_port[idx]; idx++)  {
+        if (strcmp(name, virtual_port[idx]))
+            continue;
+        task = supports_task_new (self, port, physdev_path, "virtual", callback, callback_data);
+        g_assert (task);
+        g_hash_table_insert (priv->tasks, g_strdup (key), g_object_ref (task));
+        goto find_plugin;
+    }
+
     driver = get_driver_name (port);
     if (!driver)
         goto out;
@@ -1054,6 +1067,7 @@ supports_port (MMPlugin *plugin,
     g_assert (task);
     g_hash_table_insert (priv->tasks, g_strdup (key), g_object_ref (task));
 
+find_plugin:
     result = MM_PLUGIN_BASE_GET_CLASS (self)->supports_port (self, existing, task);
     if (result != MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS) {
         /* If the plugin doesn't support the port at all, the supports task is
