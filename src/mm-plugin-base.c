@@ -18,6 +18,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <string.h>
@@ -1021,6 +1023,20 @@ get_driver_name (GUdevDevice *device)
     return ret;
 }
 
+static gboolean
+device_file_exists(const char *name)
+{
+    char *devfile;
+    struct stat s;
+    int result;
+
+    devfile = g_strdup_printf ("/dev/%s", name);
+    result = stat (devfile, &s);
+    g_free (devfile);
+
+    return (0 == result) ? TRUE : FALSE;
+}
+
 static MMPluginSupportsResult
 supports_port (MMPlugin *plugin,
                const char *subsys,
@@ -1053,6 +1069,9 @@ supports_port (MMPlugin *plugin,
     for (idx = 0; virtual_port[idx]; idx++)  {
         if (strcmp(name, virtual_port[idx]))
             continue;
+        if (!device_file_exists(virtual_port[idx]))
+            continue;
+
         task = supports_task_new (self, port, physdev_path, "virtual", callback, callback_data);
         g_assert (task);
         g_hash_table_insert (priv->tasks, g_strdup (key), g_object_ref (task));
