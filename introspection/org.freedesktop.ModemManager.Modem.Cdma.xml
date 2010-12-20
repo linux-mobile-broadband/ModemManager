@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
+  <interface name="org.freedesktop.ModemManager.Modem.Cdma">
+
+    <method name="GetSignalQuality">
+      <tp:docstring>
+	Get the current signal quality.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_cdma_get_signal_quality"/>
+      <arg name="quality" type="u" direction="out">
+	<tp:docstring>
+	  Signal quality (percent).
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <method name="GetEsn">
+      <tp:docstring>
+        Get the Electronic Serial Number of the card.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_cdma_get_esn"/>
+      <arg name="esn" type="s" direction="out">
+        <tp:docstring>
+          The ESN.
+        </tp:docstring>
+      </arg>
+    </method>
+
+    <method name="GetServingSystem">
+      <tp:docstring>
+        Get the Service System details of the current network, if registered.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_cdma_get_serving_system"/>
+      <arg name="info" type="(usu)" direction="out">
+        <tp:docstring>
+          A structure containing the Band Class (0 = unknown, 1 = 800 MHz, 2 = 1900 MHz), the Band ("A" - "F" as defined by IS707-A), and the System ID of the serving network.
+        </tp:docstring>
+      </arg>
+    </method>
+
+    <signal name="SignalQuality">
+      <tp:docstring>
+	The signal quality changed.
+      </tp:docstring>
+      <arg name="quality" type="u">
+	<tp:docstring>
+	  The new quality in percent, 0..100.
+	</tp:docstring>
+      </arg>
+    </signal>
+
+    <method name="GetRegistrationState">
+      <tp:docstring>Get device registration state.</tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_cdma_get_registration_state"/>
+      <arg name="cdma_1x_state" type="u" direction="out" tp:type="MM_MODEM_CDMA_REGISTRATION_STATE">
+        <tp:docstring>CDMA 1x registration state.</tp:docstring>
+      </arg>
+      <arg name="evdo_state" type="u" direction="out" tp:type="MM_MODEM_CDMA_REGISTRATION_STATE">
+        <tp:docstring>EVDO registration state.</tp:docstring>
+      </arg>
+    </method>
+
+    <signal name="RegistrationStateChanged">
+      <tp:docstring>
+	The device registration state changed.
+      </tp:docstring>
+      <arg name="cdma-1x-state" type="u" tp:type="MM_MODEM_CDMA_REGISTRATION_STATE">
+        <tp:docstring>CDMA 1x registration state.</tp:docstring>
+      </arg>
+      <arg name="evdo-state" type="u" tp:type="MM_MODEM_CDMA_REGISTRATION_STATE">
+        <tp:docstring>EVDO registration state.</tp:docstring>
+      </arg>
+    </signal>
+
+    <tp:enum name="MM_MODEM_CDMA_REGISTRATION_STATE" type="u">
+      <tp:enumvalue suffix="UNKNOWN" value="0">
+        <tp:docstring>Registration status is unknown or the device is not registered.</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="REGISTERED" value="1">
+        <tp:docstring>Registered, but roaming status is unknown or cannot be provided by the device.  The device may or may not be roaming.</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="HOME" value="2">
+        <tp:docstring>Currently registered on the home network.</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="ROAMING" value="3">
+        <tp:docstring>Currently registered on a roaming network.</tp:docstring>
+      </tp:enumvalue>
+    </tp:enum>
+
+  </interface>
+</node>
+
