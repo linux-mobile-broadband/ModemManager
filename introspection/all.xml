@@ -23,19 +23,19 @@
       Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.</p>
   </tp:license>
 
-  <xi:include href="mm-manager.xml"/>
-  <xi:include href="mm-modem.xml"/>
-  <xi:include href="mm-modem-simple.xml"/>
-  <xi:include href="mm-modem-location.xml"/>
-  <xi:include href="mm-modem-cdma.xml"/>
-  <xi:include href="mm-modem-gsm.xml"/>
-  <xi:include href="mm-modem-gsm-card.xml"/>
-  <xi:include href="mm-modem-gsm-contacts.xml"/>
-  <xi:include href="mm-modem-gsm-network.xml"/>
-  <xi:include href="mm-modem-gsm-sms.xml"/>
-  <xi:include href="mm-modem-gsm-hso.xml"/>
-  <xi:include href="mm-modem-gsm-ussd.xml"/>
-  <xi:include href="mm-properties-changed.xml"/>
+  <xi:include href="org.freedesktop.ModemManager.xml"/>
+  <xi:include href="org.freedesktop.ModemManager.Modem.xml"/>
+  <xi:include href="org.freedesktop.ModemManager.Modem.Simple.xml"/>
+  <xi:include href="org.freedesktop.ModemManager.Modem.Location.xml"/>
+  <xi:include href="org.freedesktop.ModemManager.Modem.Cdma"/>
+  <xi:include href="org.freedesktop.ModemManager.Modem.Gsm"/>
+  <xi:include href="org.freedesktop.ModemManager.Gsm.Card.xml"/>
+  <xi:include href="org.freedesktop.ModemManager.Gsm.Contacts.xml"/>
+  <xi:include href="org.freedesktop.ModemManager.Gsm.Network.xml"/>
+  <xi:include href="org.freedesktop.ModemManager.Gsm.SMS.xml"/>
+  <xi:include href="org.freedesktop.ModemManager.Gsm.Hso.xml"/>
+  <xi:include href="org.freedesktop.ModemManager.Gsm.Ussd.xml"/>
+  <xi:include href="org.freedesktop.DBus.Properties.xml"/>
 
   <xi:include href="mm-serial-error.xml"/>
   <xi:include href="mm-modem-error.xml"/>
