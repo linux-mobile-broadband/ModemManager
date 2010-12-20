@@ -74,6 +74,27 @@
       </arg>
     </method>
 
+    <signal name="StateChanged">
+      <tp:docstring>
+        The modem's state (see the State property) changed.
+      </tp:docstring>
+      <arg name="old" type="u">
+        <tp:docstring>
+          Old state.
+        </tp:docstring>
+      </arg>
+      <arg name="new" type="u">
+        <tp:docstring>
+          New state.
+        </tp:docstring>
+      </arg>
+      <arg name="reason" type="u">
+        <tp:docstring>
+          Reason for state transition.
+        </tp:docstring>
+      </arg>
+    </signal>
+
     <property name="Device" type="s" access="read">
       <tp:docstring>
 	The modem port to use for IP configuration and traffic.
@@ -147,6 +168,15 @@
     <property name="IpMethod" type="u" access="read" tp:type="MM_MODEM_IP_METHOD">
       <tp:docstring>
         The IP configuration method.
+      </tp:docstring>
+    </property>
+
+    <!-- This ought to be of tp:type="MM_MODEM_STATE" but there are a couple
+         more wrinkles to be sorted out before we can export that here.
+         Also, Enabled should be folded into this. -->
+    <property name="State" type="u" access="read">
+      <tp:docstring>
+        State of the modem.
       </tp:docstring>
     </property>
 
