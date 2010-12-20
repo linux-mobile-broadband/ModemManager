@@ -3,6 +3,34 @@
 <node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
   <interface name="org.freedesktop.ModemManager.Modem.Cdma">
 
+    <method name="Activate">
+      <tp:docstring>
+        Activates the modem for use with a given carrier.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_cdma_activate"/>
+      <arg name="carrier" type="s" direction="in">
+        <tp:docstring>
+          Name of carrier.
+        </tp:docstring>
+      </arg>
+    </method>
+
+    <method name="ActivateManual">
+      <tp:docstring>
+        Sets modem configuration data.  Unlike regular Activate(),
+        this does not contact the carrier.  Some modems will reboot
+        after this call is made.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_cdma_activate_manual"/>
+      <arg name="properties" type="a{sv}" direction="in">
+        <tp:docstring>
+          A dictionary of properties to set on the modem.  Keys include 'mdn', 'min'
+        </tp:docstring>
+      </arg>
+    </method>
+
     <method name="GetSignalQuality">
       <tp:docstring>
 	Get the current signal quality.

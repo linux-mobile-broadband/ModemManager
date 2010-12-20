@@ -70,6 +70,18 @@ struct _MMModemCdma {
                                     MMModemCdmaRegistrationStateFn callback,
                                     gpointer user_data);
 
+    void (*activate) (MMModemCdma *self,
+                      MMModemUIntFn callback,
+                      gpointer user_data);
+
+    void (*activate_manual) (MMModemCdma *self,
+                             MMModemUIntFn callback,
+                             gpointer user_data);
+
+    void (*activate_manual_debug) (MMModemCdma *self,
+                                   MMModemUIntFn callback,
+                                   gpointer user_data);
+
     /* Signals */
     void (*signal_quality) (MMModemCdma *self,
                             guint32 quality);
@@ -96,6 +108,12 @@ void mm_modem_cdma_get_serving_system (MMModemCdma *self,
 void mm_modem_cdma_get_registration_state (MMModemCdma *self,
                                            MMModemCdmaRegistrationStateFn callback,
                                            gpointer user_data);
+
+void mm_modem_cdma_activate (MMModemCdma *self, MMModemUIntFn callback,
+                             gpointer user_data);
+
+void mm_modem_cdma_activate_manual (MMModemCdma *self, MMModemUIntFn callback,
+                                    gpointer user_data);
 
 /* Protected */
 

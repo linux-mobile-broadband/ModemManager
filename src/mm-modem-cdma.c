@@ -26,6 +26,8 @@ static void impl_modem_cdma_get_signal_quality (MMModemCdma *modem, DBusGMethodI
 static void impl_modem_cdma_get_esn (MMModemCdma *modem, DBusGMethodInvocation *context);
 static void impl_modem_cdma_get_serving_system (MMModemCdma *modem, DBusGMethodInvocation *context);
 static void impl_modem_cdma_get_registration_state (MMModemCdma *modem, DBusGMethodInvocation *context);
+static void impl_modem_cdma_activate (MMModemCdma *modem, DBusGMethodInvocation *context);
+static void impl_modem_cdma_activate_manual (MMModemCdma *modem, DBusGMethodInvocation *context);
 
 #include "mm-modem-cdma-glue.h"
 
@@ -249,6 +251,39 @@ mm_modem_cdma_emit_signal_quality_changed (MMModemCdma *self, guint32 quality)
     g_return_if_fail (MM_IS_MODEM_CDMA (self));
 
     g_signal_emit (self, signals[SIGNAL_QUALITY], 0, quality);
+}
+
+void mm_modem_cdma_activate(MMModemCdma *self, MMModemUIntFn callback,
+                            gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_CDMA (self));
+    g_return_if_fail (callback != NULL);
+
+    if (MM_MODEM_CDMA_GET_INTERFACE (self)->activate)
+        MM_MODEM_CDMA_GET_INTERFACE (self)->activate(self, callback, user_data);
+    else
+        uint_op_not_supported (MM_MODEM (self), callback, user_data);
+}
+
+static void impl_modem_cdma_activate(MMModemCdma *modem,
+                                     DBusGMethodInvocation *context)
+{
+    mm_modem_cdma_activate (modem, uint_call_done, context);
+}
+
+
+void mm_modem_cdma_activate_manual(MMModemCdma *self, MMModemUIntFn callback,
+                                   gpointer user_data) {
+    g_return_if_fail (MM_IS_MODEM_CDMA (self));
+    g_return_if_fail (callback != NULL);
+    if (MM_MODEM_CDMA_GET_INTERFACE (self)->activate_manual)
+        MM_MODEM_CDMA_GET_INTERFACE (self)->activate_manual(self, callback, user_data);
+    else
+        uint_op_not_supported (MM_MODEM (self), callback, user_data);
+}
+static void impl_modem_cdma_activate_manual (MMModemCdma *modem,
+                                             DBusGMethodInvocation *context) {
+    mm_modem_cdma_activate_manual(modem, uint_call_done, context);
 }
 
 /*****************************************************************************/
