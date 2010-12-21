@@ -1,19 +1,19 @@
 EXTRA_DIST = \
 	all.xml \
-	mm-manager.xml \
+	org.freedesktop.ModemManager.xml \
 	mm-mobile-error.xml \
-	mm-modem.xml \
-	mm-modem-cdma.xml \
+	org.freedesktop.ModemManager.Modem.xml \
+	org.freedesktop.ModemManager.Modem.Cdma.xml \
 	mm-modem-connect-error.xml \
 	mm-modem-error.xml \
-	mm-modem-gsm.xml \
-	mm-modem-gsm-card.xml \
-	mm-modem-gsm-contacts.xml \
-	mm-modem-gsm-hso.xml \
-	mm-modem-gsm-network.xml \
-	mm-modem-gsm-sms.xml \
-	mm-modem-simple.xml \
+	org.freedesktop.ModemManager.Modem.Gsm.xml \
+	org.freedesktop.ModemManager.Modem.Gsm.Card.xml \
+	org.freedesktop.ModemManager.Modem.Gsm.Contacts.xml \
+	org.freedesktop.ModemManager.Modem.Gsm.Hso.xml \
+	org.freedesktop.ModemManager.Modem.Gsm.Network.xml \
+	org.freedesktop.ModemManager.Modem.Gsm.SMS.xml \
+	org.freedesktop.ModemManager.Modem.Simple.xml \
 	mm-serial-error.xml \
-	mm-modem-location.xml \
-	mm-modem-gsm-ussd.xml \
-	mm-properties-changed.xml
+	org.freedesktop.ModemManager.Modem.Location.xml \
+	org.freedesktop.ModemManager.Modem.Gsm.Ussd.xml \
+	org.freedesktop.DBus.Properties.xml

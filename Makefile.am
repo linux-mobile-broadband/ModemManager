@@ -80,6 +80,7 @@ DISTCLEANFILES = \
 
 EXTRA_DIST = \
 	doc-generator.xsl \
+	header-generator.xsl \
 	$(dbusactivation_in_files) \
 	$(INTLTOOL_FILES) \
 	$(dbusservice_file_polkit) \
