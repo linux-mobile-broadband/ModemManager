@@ -1107,7 +1107,7 @@ test_cind_results (const char *desc,
 
         compare = g_hash_table_lookup (results, expected->desc);
         g_assert (compare);
-        g_assert_cmpint (i, ==, cind_response_get_index (compare));
+        g_assert_cmpint (i + 1, ==, cind_response_get_index (compare));
         g_assert_cmpint (expected->min, ==, cind_response_get_min (compare));
         g_assert_cmpint (expected->max, ==, cind_response_get_max (compare));
     }
