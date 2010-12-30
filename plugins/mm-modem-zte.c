@@ -325,6 +325,8 @@ init_modem_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
+    mm_at_serial_port_queue_command (port, "E0", 5, NULL, NULL);
+
     /* Attempt to disable floods of "+ZUSIMR:2" unsolicited responses that
      * eventually fill up the device's buffers and make it crash.  Normally
      * done during probing, but if the device has a PIN enabled it won't
