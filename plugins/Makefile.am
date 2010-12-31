@@ -328,5 +328,6 @@ CLEANFILES = $(BUILT_SOURCES)
 
 EXTRA_DIST = \
 	$(udevrules_DATA) \
-	mm-modem-option-utils.c
+	mm-modem-option-utils.c \
+	mm-modem-icera-utils.c
 
