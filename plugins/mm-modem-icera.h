@@ -17,33 +17,53 @@
  * Generic utilities for Icera-based modems
  ******************************************/
 
-#ifndef MM_ICERA_UTILS_H
-#define MM_ICERA_UTILS_H
+#ifndef MM_MODEM_ICERA_H
+#define MM_MODEM_ICERA_H
 
+#include <glib-object.h>
+
+#include "mm-modem-gsm.h"
 #include "mm-generic-gsm.h"
 
-void mm_icera_utils_get_allowed_mode (MMGenericGsm *gsm,
+#define MM_TYPE_MODEM_ICERA               (mm_modem_icera_get_type ())
+#define MM_MODEM_ICERA(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_MODEM_ICERA, MMModemIcera))
+#define MM_IS_MODEM_ICERA(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_MODEM_ICERA))
+#define MM_MODEM_ICERA_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_MODEM_ICERA, MMModemIcera))
+
+typedef struct _MMModemIcera MMModemIcera;
+
+struct _MMModemIcera {
+    GTypeInterface g_iface;
+
+    MMModemGsmAccessTech last_act;
+};
+
+GType mm_modem_icera_get_type (void);
+
+void mm_modem_icera_dispose (MMModemIcera *self);
+
+void mm_modem_icera_get_allowed_mode (MMModemIcera *self,
                                       MMModemUIntFn callback,
                                       gpointer user_data);
 
-void mm_icera_utils_set_allowed_mode (MMGenericGsm *gsm,
+void mm_modem_icera_set_allowed_mode (MMModemIcera *self,
                                       MMModemGsmAllowedMode mode,
                                       MMModemFn callback,
                                       gpointer user_data);
 
-void mm_icera_utils_register_unsolicted_handlers (MMGenericGsm *modem,
+void mm_modem_icera_register_unsolicted_handlers (MMModemIcera *self,
                                                   MMAtSerialPort *port);
 
-void mm_icera_utils_change_unsolicited_messages (MMGenericGsm *modem,
+void mm_modem_icera_change_unsolicited_messages (MMModemIcera *self,
                                                  gboolean enabled);
 
-void mm_icera_utils_get_access_technology (MMGenericGsm *modem,
+void mm_modem_icera_get_access_technology (MMModemIcera *self,
                                            MMModemUIntFn callback,
                                            gpointer user_data);
 
-void mm_icera_utils_is_icera (MMGenericGsm *modem,
+void mm_modem_icera_is_icera (MMGenericGsm *modem,
                               MMModemUIntFn callback,
                               gpointer user_data);
 
-#endif  /* MM_ICERA_UTILS_H */
+#endif  /* MM_MODEM_ICERA_H */
 

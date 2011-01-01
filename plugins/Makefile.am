@@ -6,8 +6,8 @@
 noinst_LTLIBRARIES = libicera-utils.la
 
 libicera_utils_la_SOURCES = \
-	mm-icera-utils.c \
-	mm-icera-utils.h
+	mm-modem-icera.c \
+	mm-modem-icera.h
 
 libicera_utils_la_CPPFLAGS = \
 	$(MM_CFLAGS) \

@@ -24,12 +24,14 @@
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 #include "mm-modem-helpers.h"
-#include "mm-icera-utils.h"
+#include "mm-modem-icera.h"
 
 static void modem_init (MMModem *modem_class);
+static void modem_icera_init (MMModemIcera *icera_class);
 
 G_DEFINE_TYPE_EXTENDED (MMModemZte, mm_modem_zte, MM_TYPE_GENERIC_GSM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_ICERA, modem_icera_init))
 
 #define MM_MODEM_ZTE_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_ZTE, MMModemZtePrivate))
 
@@ -156,7 +158,7 @@ get_allowed_mode (MMGenericGsm *gsm,
     MMAtSerialPort *port;
 
     if (MM_MODEM_ZTE_GET_PRIVATE (self)->is_icera) {
-        mm_icera_utils_get_allowed_mode (gsm, callback, user_data);
+        mm_modem_icera_get_allowed_mode (MM_MODEM_ICERA (self), callback, user_data);
         return;
     }
 
@@ -198,7 +200,7 @@ set_allowed_mode (MMGenericGsm *gsm,
     int cm_mode = 0, pref_acq = 0;
 
     if (MM_MODEM_ZTE_GET_PRIVATE (self)->is_icera) {
-        mm_icera_utils_set_allowed_mode (gsm, mode, callback, user_data);
+        mm_modem_icera_set_allowed_mode (MM_MODEM_ICERA (self), mode, callback, user_data);
         return;
     }
 
@@ -271,7 +273,7 @@ get_access_technology (MMGenericGsm *gsm,
     MMCallbackInfo *info;
 
     if (MM_MODEM_ZTE_GET_PRIVATE (self)->is_icera) {
-        mm_icera_utils_get_access_technology (gsm, callback, user_data);
+        mm_modem_icera_get_access_technology (MM_MODEM_ICERA (self), callback, user_data);
         return;
     }
 
@@ -336,7 +338,7 @@ cpms_try_done (MMAtSerialPort *port,
 
     /* Turn on unsolicited network state messages */
     if (priv->is_icera)
-        mm_icera_utils_change_unsolicited_messages (MM_GENERIC_GSM (info->modem), TRUE);
+        mm_modem_icera_change_unsolicited_messages (MM_MODEM_ICERA (info->modem), TRUE);
 
     mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
 }
@@ -402,7 +404,7 @@ pre_init_done (MMAtSerialPort *port,
             mm_generic_gsm_enable_complete (MM_GENERIC_GSM (self), error, info);
     } else {
         /* Finish the initialization */
-        mm_icera_utils_is_icera (MM_GENERIC_GSM (self), icera_check_cb, self);
+        mm_modem_icera_is_icera (MM_GENERIC_GSM (self), icera_check_cb, self);
         mm_at_serial_port_queue_command (port, "Z E0 V1 X4 &C1 +CMEE=1;+CFUN=1;", 10, init_modem_done, info);
     }
 }
@@ -476,7 +478,7 @@ disable (MMModem *modem,
 
     /* Turn off unsolicited responses */
     if (priv->is_icera)
-        mm_icera_utils_change_unsolicited_messages (MM_GENERIC_GSM (modem), FALSE);
+        mm_modem_icera_change_unsolicited_messages (MM_MODEM_ICERA (modem), FALSE);
 
     /* Random command to ensure unsolicited message disable completes */
     mm_at_serial_port_queue_command (primary, "E0", 5, disable_unsolicited_done, info);
@@ -533,7 +535,7 @@ grab_port (MMModem *modem,
         g_regex_unref (regex);
 
         /* Add Icera-specific handlers */
-        mm_icera_utils_register_unsolicted_handlers (gsm, MM_AT_SERIAL_PORT (port));
+        mm_modem_icera_register_unsolicted_handlers (MM_MODEM_ICERA (gsm), MM_AT_SERIAL_PORT (port));
     }
 
     return !!port;
@@ -549,6 +551,11 @@ modem_init (MMModem *modem_class)
 }
 
 static void
+modem_icera_init (MMModemIcera *icera_class)
+{
+}
+
+static void
 mm_modem_zte_init (MMModemZte *self)
 {
 }
@@ -561,6 +568,10 @@ dispose (GObject *object)
 
     if (priv->cpms_timeout)
         g_source_remove (priv->cpms_timeout);
+
+    mm_modem_icera_dispose (MM_MODEM_ICERA (self));
+
+    G_OBJECT_CLASS (mm_modem_zte_parent_class)->dispose (object);
 }
 
 static void
