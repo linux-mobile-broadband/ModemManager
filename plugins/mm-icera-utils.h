@@ -41,5 +41,9 @@ void mm_icera_utils_get_access_technology (MMGenericGsm *modem,
                                            MMModemUIntFn callback,
                                            gpointer user_data);
 
+void mm_icera_utils_is_icera (MMGenericGsm *modem,
+                              MMModemUIntFn callback,
+                              gpointer user_data);
+
 #endif  /* MM_ICERA_UTILS_H */
 

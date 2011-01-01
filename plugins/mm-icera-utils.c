@@ -263,3 +263,36 @@ mm_icera_utils_get_access_technology (MMGenericGsm *modem,
     mm_at_serial_port_queue_command (port, "%NWSTATE=1", 3, get_nwstate_done, info);
 }
 
+static void
+icera_check_done (MMAtSerialPort *port,
+                  GString *response,
+                  GError *error,
+                  gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+
+    info->error = mm_modem_check_removed (info->modem, error);
+    if (!info->error)
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (TRUE), NULL);
+    mm_callback_info_schedule (info);
+}
+
+void
+mm_icera_utils_is_icera (MMGenericGsm *modem,
+                         MMModemUIntFn callback,
+                         gpointer user_data)
+{
+    MMAtSerialPort *port;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+
+    port = mm_generic_gsm_get_best_at_port (modem, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_at_serial_port_queue_command (port, "%IPSYS?", 5, icera_check_done, info);
+}
+

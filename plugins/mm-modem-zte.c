@@ -364,15 +364,15 @@ static void enable_flash_done (MMSerialPort *port,
                                gpointer user_data);
 
 static void
-icera_check_cb (MMAtSerialPort *port,
-                GString *response,
+icera_check_cb (MMModem *modem,
+                guint32 result,
                 GError *error,
                 gpointer user_data)
 {
     if (!error) {
         MMModemZte *self = MM_MODEM_ZTE (user_data);
 
-        MM_MODEM_ZTE_GET_PRIVATE (self)->is_icera = TRUE;
+        MM_MODEM_ZTE_GET_PRIVATE (self)->is_icera = !!result;
     }
 }
 
@@ -383,7 +383,8 @@ pre_init_done (MMAtSerialPort *port,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemZtePrivate *priv = MM_MODEM_ZTE_GET_PRIVATE (info->modem);
+    MMModemZte *self = MM_MODEM_ZTE (info->modem);
+    MMModemZtePrivate *priv = MM_MODEM_ZTE_GET_PRIVATE (self);
 
     if (error) {
         /* Retry the init string one more time; the modem sometimes throws it away */
@@ -392,10 +393,10 @@ pre_init_done (MMAtSerialPort *port,
             priv->init_retried = TRUE;
             enable_flash_done (MM_SERIAL_PORT (port), NULL, user_data);
         } else
-            mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
+            mm_generic_gsm_enable_complete (MM_GENERIC_GSM (self), error, info);
     } else {
         /* Finish the initialization */
-        mm_at_serial_port_queue_command (port, "%IPSYS?", 10, icera_check_cb, info->modem);
+        mm_icera_utils_is_icera (MM_GENERIC_GSM (self), icera_check_cb, self);
         mm_at_serial_port_queue_command (port, "Z E0 V1 X4 &C1 +CMEE=1;+CFUN=1;", 10, init_modem_done, info);
     }
 }
