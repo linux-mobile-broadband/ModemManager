@@ -626,6 +626,10 @@ mm_modem_base_init (MMModemBase *self)
                                                     MM_MODEM_UNLOCK_RETRIES,
                                                     NULL,
                                                     MM_MODEM_DBUS_INTERFACE);
+    mm_properties_changed_signal_register_property (G_OBJECT (self),
+                                                    MM_MODEM_IP_METHOD,
+                                                    NULL,
+                                                    MM_MODEM_DBUS_INTERFACE);
 }
 
 static void
