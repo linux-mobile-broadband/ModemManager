@@ -785,7 +785,9 @@ mm_gsm_string_to_access_tech (const char *string)
     /* Better technologies are listed first since modems sometimes say
      * stuff like "GPRS/EDGE" and that should be handled as EDGE.
      */
-    if (strcasestr (string, "HSPA"))
+    if (strcasestr (string, "HSPA+"))
+        return MM_MODEM_GSM_ACCESS_TECH_HSPA_PLUS;
+    else if (strcasestr (string, "HSPA"))
         return MM_MODEM_GSM_ACCESS_TECH_HSPA;
     else if (strcasestr (string, "HSDPA/HSUPA"))
         return MM_MODEM_GSM_ACCESS_TECH_HSPA;

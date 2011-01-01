@@ -108,6 +108,8 @@ mm_modem_gsm_network_act_to_old_mode (MMModemGsmAccessTech act)
         return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_HSUPA;
     else if (act & MM_MODEM_GSM_ACCESS_TECH_HSPA)
         return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_HSPA;
+    else if (act & MM_MODEM_GSM_ACCESS_TECH_HSPA_PLUS)
+        return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_HSPA;
 
     return MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_ANY;
 }

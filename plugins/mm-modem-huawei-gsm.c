@@ -367,6 +367,35 @@ get_band (MMModemGsmNetwork *modem,
     mm_at_serial_port_queue_command (port, "AT^SYSCFG?", 3, get_band_done, info);
 }
 
+static MMModemGsmAccessTech
+huawei_sysinfo_to_act (int huawei)
+{
+    switch (huawei) {
+    case 1:
+        return MM_MODEM_GSM_ACCESS_TECH_GSM;
+    case 2:
+        return MM_MODEM_GSM_ACCESS_TECH_GPRS;
+    case 3:
+        return MM_MODEM_GSM_ACCESS_TECH_EDGE;
+    case 4:
+        return MM_MODEM_GSM_ACCESS_TECH_UMTS;
+    case 5:
+        return MM_MODEM_GSM_ACCESS_TECH_HSDPA;
+    case 6:
+        return MM_MODEM_GSM_ACCESS_TECH_HSUPA;
+    case 7:
+        return MM_MODEM_GSM_ACCESS_TECH_HSPA;
+    case 9:
+        return MM_MODEM_GSM_ACCESS_TECH_HSPA_PLUS;
+    case 8:
+        /* TD-SCDMA */
+    default:
+        break;
+    }
+
+    return MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
+}
+
 static void
 get_act_request_done (MMAtSerialPort *port,
                       GString *response,
@@ -409,22 +438,8 @@ get_act_request_done (MMAtSerialPort *port,
     if (srv_stat != 0) {
         /* Valid service */
         str = g_match_info_fetch (match_info, 7);
-        if (str && strlen (str)) {
-            if (str[0] == '1')
-                act = MM_MODEM_GSM_ACCESS_TECH_GSM;
-            else if (str[0] == '2')
-                act = MM_MODEM_GSM_ACCESS_TECH_GPRS;
-            else if (str[0] == '3')
-                act = MM_MODEM_GSM_ACCESS_TECH_EDGE;
-            else if (str[0] == '4')
-                act = MM_MODEM_GSM_ACCESS_TECH_UMTS;
-            else if (str[0] == '5')
-                act = MM_MODEM_GSM_ACCESS_TECH_HSDPA;
-            else if (str[0] == '6')
-                act = MM_MODEM_GSM_ACCESS_TECH_HSUPA;
-            else if (str[0] == '7')
-                act = MM_MODEM_GSM_ACCESS_TECH_HSPA;
-        }
+        if (str && strlen (str))
+            act = huawei_sysinfo_to_act (atoi (str));
         g_free (str);
     }
 
@@ -627,32 +642,21 @@ handle_mode_change (MMAtSerialPort *port,
     MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     char *str;
     int a;
-    int b;
 
     str = g_match_info_fetch (match_info, 1);
     a = atoi (str);
     g_free (str);
 
     str = g_match_info_fetch (match_info, 2);
-    b = atoi (str);
+    act = huawei_sysinfo_to_act (atoi (str));
     g_free (str);
 
     if (a == 3) {   /* GSM/GPRS mode */
-        if (b == 1)
-            act = MM_MODEM_GSM_ACCESS_TECH_GSM;
-        else if (b == 2)
-            act = MM_MODEM_GSM_ACCESS_TECH_GPRS;
-        else if (b == 3)
-            act = MM_MODEM_GSM_ACCESS_TECH_EDGE;
+        if (act > MM_MODEM_GSM_ACCESS_TECH_EDGE)
+            act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     } else if (a == 5) {  /* WCDMA mode */
-        if (b == 4)
-            act = MM_MODEM_GSM_ACCESS_TECH_UMTS;
-        else if (b == 5)
-            act = MM_MODEM_GSM_ACCESS_TECH_HSDPA;
-        else if (b == 6)
-            act = MM_MODEM_GSM_ACCESS_TECH_HSUPA;
-        else if (b == 7)
-            act = MM_MODEM_GSM_ACCESS_TECH_HSPA;
+        if (act < MM_MODEM_GSM_ACCESS_TECH_UMTS)
+            act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     } else if (a == 0)
         act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     else {

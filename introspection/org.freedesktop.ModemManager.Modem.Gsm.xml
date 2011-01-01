@@ -157,6 +157,9 @@
       <tp:enumvalue suffix="HSPA" value="8">
 	<tp:docstring>HSPA (ETSI 27.007: "UTRAN w/HSDPA and HSUPA")</tp:docstring>
       </tp:enumvalue>
+      <tp:enumvalue suffix="HSPA_PLUS" value="9">
+	<tp:docstring>HSPA+ (ETSI 27.007: "UTRAN w/HSPA+")</tp:docstring>
+      </tp:enumvalue>
     </tp:enum>
 
   </interface>
