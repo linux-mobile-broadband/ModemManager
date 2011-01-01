@@ -1,3 +1,24 @@
+
+##########################
+# Icera-specific support #
+##########################
+
+noinst_LTLIBRARIES = libicera-utils.la
+
+libicera_utils_la_SOURCES = \
+	mm-icera-utils.c \
+	mm-icera-utils.h
+
+libicera_utils_la_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
+	-I$(top_srcdir)/src
+
+libicera_utils_la_LIBADD = \
+	$(GUDEV_LDFLAGS)
+
+########################################
+
 pkglib_LTLIBRARIES = \
 	libmm-plugin-generic.la \
 	libmm-plugin-moto-c.la \
@@ -220,6 +241,7 @@ libmm_plugin_zte_la_CPPFLAGS = \
 
 libmm_plugin_zte_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
+	$(builddir)/libicera-utils.la \
 	-module \
 	-avoid-version
 

@@ -17,6 +17,14 @@
  * Generic utilities for Icera-based modems
  ******************************************/
 
+#include <config.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+#include "mm-icera-utils.h"
+
+#include "mm-errors.h"
 #include "mm-callback-info.h"
 #include "mm-at-serial-port.h"
 #include "mm-generic-gsm.h"
@@ -68,10 +76,10 @@ icera_get_allowed_mode_done (MMAtSerialPort *port,
     mm_callback_info_schedule (info);
 }
 
-static void
-icera_get_allowed_mode (MMGenericGsm *gsm,
-                        MMModemUIntFn callback,
-                        gpointer user_data)
+void
+mm_icera_utils_get_allowed_mode (MMGenericGsm *gsm,
+                                 MMModemUIntFn callback,
+                                 gpointer user_data)
 {
     MMCallbackInfo *info;
     MMAtSerialPort *port;
@@ -100,11 +108,11 @@ icera_set_allowed_mode_done (MMAtSerialPort *port,
    mm_callback_info_schedule (info);
 }
 
-static void
-icera_set_allowed_mode (MMGenericGsm *gsm,
-                        MMModemGsmAllowedMode mode,
-                        MMModemFn callback,
-                        gpointer user_data)
+void
+mm_icera_utils_set_allowed_mode (MMGenericGsm *gsm,
+                                 MMModemGsmAllowedMode mode,
+                                 MMModemFn callback,
+                                 gpointer user_data)
 {
     MMCallbackInfo *info;
     MMAtSerialPort *port;
@@ -191,8 +199,9 @@ icera_nwstate_changed (MMAtSerialPort *port,
     mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (user_data), act);
 }
 
-static void
-icera_register_unsolicted_handlers (MMGenericGsm *modem, MMAtSerialPort *port)
+void
+mm_icera_utils_register_unsolicted_handlers (MMGenericGsm *modem,
+                                             MMAtSerialPort *port)
 {
     GRegex *regex;
 
@@ -202,8 +211,8 @@ icera_register_unsolicted_handlers (MMGenericGsm *modem, MMAtSerialPort *port)
     g_regex_unref (regex);
 }
 
-static void
-icera_change_unsolicited_messages (MMGenericGsm *modem, gboolean enabled)
+void
+mm_icera_utils_change_unsolicited_messages (MMGenericGsm *modem, gboolean enabled)
 {
     MMAtSerialPort *primary;
 
@@ -235,10 +244,10 @@ get_nwstate_done (MMAtSerialPort *port,
     mm_callback_info_schedule (info);
 }
 
-static void
-icera_get_access_technology (MMGenericGsm *modem,
-                             MMModemUIntFn callback,
-                             gpointer user_data)
+void
+mm_icera_utils_get_access_technology (MMGenericGsm *modem,
+                                      MMModemUIntFn callback,
+                                      gpointer user_data)
 {
     MMAtSerialPort *port;
     MMCallbackInfo *info;

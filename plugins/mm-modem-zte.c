@@ -24,6 +24,7 @@
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 #include "mm-modem-helpers.h"
+#include "mm-icera-utils.h"
 
 static void modem_init (MMModem *modem_class);
 
@@ -58,8 +59,6 @@ mm_modem_zte_new (const char *device,
                                    MM_MODEM_HW_PID, product,
                                    NULL));
 }
-
-#include "mm-modem-icera-utils.c"
 
 /*****************************************************************************/
 
@@ -157,7 +156,7 @@ get_allowed_mode (MMGenericGsm *gsm,
     MMAtSerialPort *port;
 
     if (MM_MODEM_ZTE_GET_PRIVATE (self)->is_icera) {
-        icera_get_allowed_mode (gsm, callback, user_data);
+        mm_icera_utils_get_allowed_mode (gsm, callback, user_data);
         return;
     }
 
@@ -199,7 +198,7 @@ set_allowed_mode (MMGenericGsm *gsm,
     int cm_mode = 0, pref_acq = 0;
 
     if (MM_MODEM_ZTE_GET_PRIVATE (self)->is_icera) {
-        icera_set_allowed_mode (gsm, mode, callback, user_data);
+        mm_icera_utils_set_allowed_mode (gsm, mode, callback, user_data);
         return;
     }
 
@@ -272,7 +271,7 @@ get_access_technology (MMGenericGsm *gsm,
     MMCallbackInfo *info;
 
     if (MM_MODEM_ZTE_GET_PRIVATE (self)->is_icera) {
-        icera_get_access_technology (gsm, callback, user_data);
+        mm_icera_utils_get_access_technology (gsm, callback, user_data);
         return;
     }
 
@@ -337,7 +336,7 @@ cpms_try_done (MMAtSerialPort *port,
 
     /* Turn on unsolicited network state messages */
     if (priv->is_icera)
-        icera_change_unsolicited_messages (MM_GENERIC_GSM (info->modem), TRUE);
+        mm_icera_utils_change_unsolicited_messages (MM_GENERIC_GSM (info->modem), TRUE);
 
     mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
 }
@@ -470,7 +469,7 @@ disable (MMModem *modem,
 
     /* Turn off unsolicited responses */
     if (priv->is_icera)
-        icera_change_unsolicited_messages (MM_GENERIC_GSM (modem), FALSE);
+        mm_icera_utils_change_unsolicited_messages (MM_GENERIC_GSM (modem), FALSE);
 
     /* Random command to ensure unsolicited message disable completes */
     mm_at_serial_port_queue_command (primary, "E0", 5, disable_unsolicited_done, info);
@@ -527,7 +526,7 @@ grab_port (MMModem *modem,
         g_regex_unref (regex);
 
         /* Add Icera-specific handlers */
-        icera_register_unsolicted_handlers (gsm, MM_AT_SERIAL_PORT (port));
+        mm_icera_utils_register_unsolicted_handlers (gsm, MM_AT_SERIAL_PORT (port));
     }
 
     return !!port;
