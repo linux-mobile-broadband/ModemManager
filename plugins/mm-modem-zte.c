@@ -371,8 +371,14 @@ icera_check_cb (MMModem *modem,
 {
     if (!error) {
         MMModemZte *self = MM_MODEM_ZTE (user_data);
+        MMModemZtePrivate *priv = MM_MODEM_ZTE_GET_PRIVATE (self);
 
-        MM_MODEM_ZTE_GET_PRIVATE (self)->is_icera = !!result;
+        if (result) {
+            priv->is_icera = TRUE;
+            g_object_set (G_OBJECT (modem),
+                          MM_MODEM_IP_METHOD, MM_MODEM_IP_METHOD_STATIC,
+                          NULL);
+        }
     }
 }
 
