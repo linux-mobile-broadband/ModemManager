@@ -30,17 +30,21 @@
 #define MM_IS_MODEM_ICERA(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_MODEM_ICERA))
 #define MM_MODEM_ICERA_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_MODEM_ICERA, MMModemIcera))
 
+typedef struct _MMModemIceraPrivate MMModemIceraPrivate;
+
 typedef struct _MMModemIcera MMModemIcera;
 
 struct _MMModemIcera {
     GTypeInterface g_iface;
 
-    MMModemGsmAccessTech last_act;
+    MMModemIceraPrivate *priv;
 };
 
 GType mm_modem_icera_get_type (void);
 
-void mm_modem_icera_dispose (MMModemIcera *self);
+void mm_modem_icera_prepare (MMModemIcera *self);
+
+void mm_modem_icera_cleanup (MMModemIcera *self);
 
 void mm_modem_icera_get_allowed_mode (MMModemIcera *self,
                                       MMModemUIntFn callback,
@@ -61,9 +65,25 @@ void mm_modem_icera_get_access_technology (MMModemIcera *self,
                                            MMModemUIntFn callback,
                                            gpointer user_data);
 
-void mm_modem_icera_is_icera (MMGenericGsm *modem,
+void mm_modem_icera_is_icera (MMModemIcera *self,
                               MMModemUIntFn callback,
                               gpointer user_data);
+
+void mm_modem_icera_do_disconnect (MMGenericGsm *gsm,
+                                   gint cid,
+                                   MMModemFn callback,
+                                   gpointer user_data);
+
+void mm_modem_icera_simple_connect (MMModemIcera *self, GHashTable *properties);
+
+void mm_modem_icera_do_connect (MMModemIcera *self,
+                                const char *number,
+                                MMModemFn callback,
+                                gpointer user_data);
+
+void mm_modem_icera_get_ip4_config (MMModemIcera *self,
+                                    MMModemIp4Fn callback,
+                                    gpointer user_data);
 
 #endif  /* MM_MODEM_ICERA_H */
 
