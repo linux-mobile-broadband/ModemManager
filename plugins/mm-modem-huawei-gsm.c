@@ -664,7 +664,9 @@ handle_mode_change (MMAtSerialPort *port,
         return;
     }
 
-    g_debug ("Access Technology: %d", act);
+    if (mm_options_debug ())
+        g_debug ("Access Technology: %d", act);
+
     mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (self), act);
 }
 
