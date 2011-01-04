@@ -35,6 +35,14 @@ typedef enum {
 
 #define MM_MODEM_CDMA_REGISTRATION_STATE_CHANGED "registration-state-changed"
 
+#define MM_MODEM_CDMA_MEID "meid"
+
+typedef enum {
+    MM_MODEM_CDMA_PROP_FIRST = 0x1200,
+
+    MM_MODEM_CDMA_PROP_MEID = MM_MODEM_CDMA_PROP_FIRST,
+} MMModemCdmaProp;
+
 typedef struct _MMModemCdma MMModemCdma;
 
 typedef void (*MMModemCdmaServingSystemFn) (MMModemCdma *modem,

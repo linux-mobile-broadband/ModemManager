@@ -68,6 +68,8 @@ typedef struct {
 
     guint poll_id;
 
+    char *meid;
+
     MMModemCdmaRegistrationState cdma_1x_reg_state;
     MMModemCdmaRegistrationState evdo_reg_state;
 
@@ -2279,6 +2281,9 @@ get_property (GObject *object, guint prop_id,
     case MM_MODEM_PROP_TYPE:
         g_value_set_uint (value, MM_MODEM_TYPE_CDMA);
         break;
+    case MM_MODEM_CDMA_PROP_MEID:
+        g_value_set_string (value, priv->meid);
+        break;
     case PROP_EVDO_REV0:
         g_value_set_boolean (value, priv->evdo_rev0);
         break;
@@ -2330,6 +2335,10 @@ mm_generic_cdma_class_init (MMGenericCdmaClass *klass)
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_TYPE,
                                       MM_MODEM_TYPE);
+
+    g_object_class_override_property (object_class,
+                                      MM_MODEM_CDMA_PROP_MEID,
+                                      MM_MODEM_CDMA_MEID);
 
     g_object_class_install_property (object_class, PROP_EVDO_REV0,
             g_param_spec_boolean (MM_GENERIC_CDMA_EVDO_REV0,

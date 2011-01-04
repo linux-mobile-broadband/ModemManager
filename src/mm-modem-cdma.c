@@ -357,6 +357,15 @@ mm_modem_cdma_init (gpointer g_iface)
     if (initialized)
         return;
 
+    /* Properties */
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_string (MM_MODEM_CDMA_MEID,
+                              "MEID",
+                              "MEID",
+                              NULL,
+                              G_PARAM_READABLE));
+
     /* Signals */
     signals[SIGNAL_QUALITY] =
         g_signal_new ("signal-quality",
