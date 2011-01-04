@@ -1584,6 +1584,12 @@ real_query_registration_state (MMGenericCdma *self,
 
     port = mm_generic_cdma_get_best_at_port (self, &info->error);
     if (!port) {
+        /* If we can't get an AT port, but less specific registration checks
+         * were successful, just use that and don't return an error.
+         */
+        if (   cur_cdma_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN
+            || cur_evdo_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
+            g_clear_error (&info->error);
         mm_callback_info_schedule (info);
         return;
     }
@@ -1722,7 +1728,7 @@ reg_hdrstate_cb (MMQcdmSerialPort *port,
     /* Get HDR subsystem state to determine EVDO registration when in 1X mode */
     result = qcdm_cmd_hdr_subsys_state_info_result ((const char *) response->data,
                                                     response->len,
-                                                    &info->error);
+                                                    NULL);
     if (result) {
         guint8 session_state = QCDM_CMD_HDR_SUBSYS_STATE_INFO_SESSION_STATE_CLOSED;
         guint8 almp_state = QCDM_CMD_HDR_SUBSYS_STATE_INFO_ALMP_STATE_INACTIVE;
@@ -1801,19 +1807,24 @@ reg_cmstate_cb (MMQcdmSerialPort *port,
     MMAtSerialPort *at_port = NULL;
     QCDMResult *result = NULL;
     guint32 opmode = 0, sysmode = 0;
+    GError *qcdm_error = NULL;
 
     /* Parse the response */
     if (!error)
-        result = qcdm_cmd_cm_subsys_state_info_result ((const char *) response->data, response->len, &info->error);
+        result = qcdm_cmd_cm_subsys_state_info_result ((const char *) response->data, response->len, &qcdm_error);
 
     if (!result) {
         /* If there was some error, fall back to use +CAD like we did before QCDM */
         if (info->modem)
             at_port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (info->modem), &info->error);
+        else
+            info->error = g_error_copy (qcdm_error);
+
         if (at_port)
             mm_at_serial_port_queue_command (at_port, "+CAD?", 3, get_analog_digital_done, info);
         else
             mm_callback_info_schedule (info);
+        g_clear_error (&qcdm_error);
         return;
     }
 
