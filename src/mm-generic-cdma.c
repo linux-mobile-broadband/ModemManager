@@ -1526,15 +1526,22 @@ reg_query_speri_done (MMAtSerialPort *port,
     if (!p || !mm_cdma_parse_eri (p, &roam, NULL, NULL))
         goto done;
 
-    /* Change the 1x and EVDO registration states to roaming if they were
-     * anything other than UNKNOWN.
-     */
     if (roam) {
+        /* Change the 1x and EVDO registration states to roaming if they were
+         * anything other than UNKNOWN.
+         */
         if (mm_generic_cdma_query_reg_state_get_callback_1x_state (info))
             mm_generic_cdma_query_reg_state_set_callback_1x_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING);
 
         if (mm_generic_cdma_query_reg_state_get_callback_evdo_state (info))
             mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING);
+    } else {
+        /* Change 1x and/or EVDO registration state to home if home/roaming wasn't previously known */
+        if (mm_generic_cdma_query_reg_state_get_callback_1x_state (info) == MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED)
+            mm_generic_cdma_query_reg_state_set_callback_1x_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_HOME);
+
+        if (mm_generic_cdma_query_reg_state_get_callback_evdo_state (info) == MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED)
+            mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_HOME);
     }
 
 done:
