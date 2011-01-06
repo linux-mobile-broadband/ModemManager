@@ -27,9 +27,12 @@ enum {
 
 /* Mode preference values */
 enum {
-    DIAG_NV_MODE_PREF_AUTO     = 0x04,
-    DIAG_NV_MODE_PREF_1X_ONLY  = 0x09,
-    DIAG_NV_MODE_PREF_HDR_ONLY = 0x0A,
+    DIAG_NV_MODE_PREF_AUTO            = 0x04,
+    DIAG_NV_MODE_PREF_1X_ONLY         = 0x09,
+    DIAG_NV_MODE_PREF_HDR_ONLY        = 0x0A,
+    DIAG_NV_MODE_PREF_1X_HDR_ONLY     = 0x0D,
+    DIAG_NV_MODE_PREF_LTE_ONLY        = 0x1E,
+    DIAG_NV_MODE_PREF_1X_HDR_LTE_ONLY = 0x24,
 };
 
 /* DIAG_NV_MODE_PREF */
