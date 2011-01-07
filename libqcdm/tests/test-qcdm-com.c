@@ -575,6 +575,62 @@ test_com_read_mode_pref (void *f, void *data)
 }
 
 void
+test_com_read_hdr_rev_pref (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    GError *error = NULL;
+    char buf[512];
+    guint8 pref;
+    const char *msg;
+    gint len;
+    QCDMResult *result;
+    gsize reply_len;
+
+    len = qcdm_cmd_nv_get_hdr_rev_pref_new (buf, sizeof (buf), NULL);
+    g_assert (len > 0);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_nv_get_hdr_rev_pref_result (buf, reply_len, &error);
+    if (!result) {
+        g_assert (error);
+        g_assert (error->domain == QCDM_COMMAND_ERROR);
+        g_assert (error->code == QCDM_COMMAND_NVCMD_FAILED || error->code == QCDM_COMMAND_BAD_PARAMETER);
+        return;
+    }
+
+    g_print ("\n");
+
+    success = qcdm_result_get_uint8 (result, QCDM_CMD_NV_GET_HDR_REV_PREF_ITEM_REV_PREF, &pref);
+    g_assert (success);
+
+    switch (pref) {
+    case QCDM_CMD_NV_HDR_REV_PREF_ITEM_REV_PREF_0:
+        msg = "rev0";
+        break;
+    case QCDM_CMD_NV_HDR_REV_PREF_ITEM_REV_PREF_A:
+        msg = "revA";
+        break;
+    case QCDM_CMD_NV_HDR_REV_PREF_ITEM_REV_PREF_EHRPD:
+        msg = "eHRPD";
+        break;
+    default:
+        msg = "unknown";
+        break;
+    }
+    g_message ("%s: HDR rev preference: 0x%02X (%s)", __func__, pref, msg);
+
+    qcdm_result_unref (result);
+}
+
+void
 test_com_status (void *f, void *data)
 {
     TestComData *d = data;

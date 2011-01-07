@@ -19,9 +19,10 @@
 #define LIBQCDM_NV_ITEMS_H
 
 enum {
-    DIAG_NV_MODE_PREF  = 10,   /* Mode preference: 1x, HDR, auto */
-    DIAG_NV_DIR_NUMBER = 178,  /* Mobile Directory Number (MDN) */
-    DIAG_NV_ROAM_PREF  = 442,  /* Roaming preference */
+    DIAG_NV_MODE_PREF    = 10,   /* Mode preference: 1x, HDR, auto */
+    DIAG_NV_DIR_NUMBER   = 178,  /* Mobile Directory Number (MDN) */
+    DIAG_NV_ROAM_PREF    = 442,  /* Roaming preference */
+    DIAG_NV_HDR_REV_PREF = 4964, /* HDR mode preference(?): rev0, revA, eHRPD */
 };
 
 
@@ -62,6 +63,19 @@ struct DMNVItemRoamPref {
     guint8 roam_pref;
 } __attribute__ ((packed));
 typedef struct DMNVItemRoamPref DMNVItemRoamPref;
+
+/* HDR Revision preference values (?) */
+enum {
+    DIAG_NV_HDR_REV_PREF_0     = 0x00,
+    DIAG_NV_HDR_REV_PREF_A     = 0x01,
+    DIAG_NV_HDR_REV_PREF_EHRPD = 0x04,
+};
+
+/* DIAG_NV_HDR_REV_PREF */
+struct DMNVItemHdrRevPref {
+    guint8 rev_pref;
+} __attribute__ ((packed));
+typedef struct DMNVItemHdrRevPref DMNVItemHdrRevPref;
 
 #endif  /* LIBQCDM_NV_ITEMS_H */
 

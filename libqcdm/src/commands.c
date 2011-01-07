@@ -873,6 +873,107 @@ qcdm_cmd_nv_set_mode_pref_result (const char *buf, gsize len, GError **error)
 
 /**********************************************************************/
 
+static gboolean
+hdr_rev_pref_validate (guint8 dm)
+{
+    if (   dm == DIAG_NV_HDR_REV_PREF_0
+        || dm == DIAG_NV_HDR_REV_PREF_A
+        || dm == DIAG_NV_HDR_REV_PREF_EHRPD)
+        return TRUE;
+    return FALSE;
+}
+
+gsize
+qcdm_cmd_nv_get_hdr_rev_pref_new (char *buf, gsize len, GError **error)
+{
+    char cmdbuf[sizeof (DMCmdNVReadWrite) + 2];
+    DMCmdNVReadWrite *cmd = (DMCmdNVReadWrite *) &cmdbuf[0];
+
+    g_return_val_if_fail (buf != NULL, 0);
+    g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->code = DIAG_CMD_NV_READ;
+    cmd->nv_item = GUINT16_TO_LE (DIAG_NV_HDR_REV_PREF);
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QCDMResult *
+qcdm_cmd_nv_get_hdr_rev_pref_result (const char *buf, gsize len, GError **error)
+{
+    QCDMResult *result = NULL;
+    DMCmdNVReadWrite *rsp = (DMCmdNVReadWrite *) buf;
+    DMNVItemHdrRevPref *rev;
+
+    g_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_NV_READ, sizeof (DMCmdNVReadWrite), error))
+        return NULL;
+
+    if (!check_nv_cmd (rsp, DIAG_NV_HDR_REV_PREF, error))
+        return NULL;
+
+    rev = (DMNVItemHdrRevPref *) &rsp->data[0];
+
+    if (!hdr_rev_pref_validate (rev->rev_pref)) {
+        g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_BAD_PARAMETER,
+                     "Unknown HDR revision preference 0x%X",
+                     rev->rev_pref);
+        return NULL;
+    }
+
+    result = qcdm_result_new ();
+    qcdm_result_add_uint8 (result, QCDM_CMD_NV_GET_HDR_REV_PREF_ITEM_REV_PREF, rev->rev_pref);
+
+    return result;
+}
+
+gsize
+qcdm_cmd_nv_set_hdr_rev_pref_new (char *buf,
+                                  gsize len,
+                                  guint8 rev_pref,
+                                  GError **error)
+{
+    char cmdbuf[sizeof (DMCmdNVReadWrite) + 2];
+    DMCmdNVReadWrite *cmd = (DMCmdNVReadWrite *) &cmdbuf[0];
+    DMNVItemHdrRevPref *req;
+
+    g_return_val_if_fail (buf != NULL, 0);
+    g_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    if (!hdr_rev_pref_validate (rev_pref)) {
+        g_set_error (error, QCDM_COMMAND_ERROR, QCDM_COMMAND_BAD_PARAMETER,
+                     "Invalid HDR revision preference %d", rev_pref);
+        return 0;
+    }
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->code = DIAG_CMD_NV_WRITE;
+    cmd->nv_item = GUINT16_TO_LE (DIAG_NV_HDR_REV_PREF);
+
+    req = (DMNVItemHdrRevPref *) &cmd->data[0];
+    req->rev_pref = rev_pref;
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QCDMResult *
+qcdm_cmd_nv_set_hdr_rev_pref_result (const char *buf, gsize len, GError **error)
+{
+    g_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_NV_WRITE, sizeof (DMCmdNVReadWrite), error))
+        return NULL;
+
+    if (!check_nv_cmd ((DMCmdNVReadWrite *) buf, DIAG_NV_HDR_REV_PREF, error))
+        return NULL;
+
+    return qcdm_result_new ();
+}
+
+/**********************************************************************/
+
 gsize
 qcdm_cmd_cm_subsys_state_info_new (char *buf, gsize len, GError **error)
 {

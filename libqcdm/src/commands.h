@@ -300,6 +300,34 @@ QCDMResult *qcdm_cmd_nv_set_mode_pref_result (const char *buf,
 
 /**********************************************************************/
 
+/* Values for QCDM_CMD_NV_GET_HDR_REV_PREF_ITEM_REV_PREF */
+enum {
+    QCDM_CMD_NV_HDR_REV_PREF_ITEM_REV_PREF_0 = 0x00,
+    QCDM_CMD_NV_HDR_REV_PREF_ITEM_REV_PREF_A = 0x01,
+    QCDM_CMD_NV_HDR_REV_PREF_ITEM_REV_PREF_EHRPD = 0x04,
+};
+
+#define QCDM_CMD_NV_GET_HDR_REV_PREF_ITEM_REV_PREF "rev-pref"
+
+gsize       qcdm_cmd_nv_get_hdr_rev_pref_new    (char *buf,
+                                                 gsize len,
+                                                 GError **error);
+
+QCDMResult *qcdm_cmd_nv_get_hdr_rev_pref_result (const char *buf,
+                                                 gsize len,
+                                                 GError **error);
+
+gsize       qcdm_cmd_nv_set_hdr_rev_pref_new    (char *buf,
+                                                 gsize len,
+                                                 guint8 rev_pref,
+                                                 GError **error);
+
+QCDMResult *qcdm_cmd_nv_set_hdr_rev_pref_result (const char *buf,
+                                                 gsize len,
+                                                 GError **error);
+
+/**********************************************************************/
+
 /* Values for QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_OPERATING_MODE */
 enum {
     QCDM_CMD_CM_SUBSYS_STATE_INFO_OPERATING_MODE_ONLINE = 5
