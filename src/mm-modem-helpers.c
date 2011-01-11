@@ -242,10 +242,14 @@ mm_gsm_destroy_scan_data (gpointer data)
 /* +CREG: <n>,<stat>,<lac>,<ci>,<AcT> (ETSI 27.007 solicited and some CREG=2 unsolicited) */
 #define CREG6 "\\+(CREG|CGREG):\\s*(\\d{1}),\\s*(\\d{1})\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*(\\d{1,2})"
 
+/* +CREG: <n>,<stat>,<lac>,<ci>,<AcT?>,<something> (Samsung Wave S8500) */
+/* '<CR><LF>+CREG: 2,1,000B,2816, B, C2816<CR><LF><CR><LF>OK<CR><LF>' */
+#define CREG7 "\\+(CREG|CGREG):\\s*(\\d{1}),\\s*(\\d{1})\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*[^,\\s]*"
+
 GPtrArray *
 mm_gsm_creg_regex_get (gboolean solicited)
 {
-    GPtrArray *array = g_ptr_array_sized_new (6);
+    GPtrArray *array = g_ptr_array_sized_new (7);
     GRegex *regex;
 
     /* #1 */
@@ -293,6 +297,14 @@ mm_gsm_creg_regex_get (gboolean solicited)
         regex = g_regex_new (CREG6 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     else
         regex = g_regex_new ("\\r\\n" CREG6 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    /* #7 */
+    if (solicited)
+        regex = g_regex_new (CREG7 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" CREG7 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     g_assert (regex);
     g_ptr_array_add (array, regex);
 
