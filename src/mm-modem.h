@@ -194,6 +194,10 @@ struct _MMModem {
                               MMAuthRequest *req,
                               GError **error);
 
+    void (*reset)            (MMModem *self,
+                              MMModemFn callback,
+                              gpointer user_data);
+
     void (*factory_reset) (MMModem *self,
                            const char *code,
                            MMModemFn callback,
@@ -256,6 +260,10 @@ void mm_modem_set_charset (MMModem *self,
                            MMModemCharset charset,
                            MMModemFn callback,
                            gpointer user_data);
+
+void mm_modem_reset         (MMModem *self,
+                             MMModemFn callback,
+                             gpointer user_data);
 
 void mm_modem_factory_reset (MMModem *self,
                              const char *code,

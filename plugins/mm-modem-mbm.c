@@ -510,6 +510,24 @@ do_disconnect (MMGenericGsm *gsm,
 }
 
 static void
+reset (MMModem *modem,
+       MMModemFn callback,
+       gpointer user_data)
+{
+    MMCallbackInfo *info;
+    MMAtSerialPort *port;
+
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+
+    /* Ensure we have a usable port to use for the command */
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    if (port)
+        mm_at_serial_port_queue_command (port, "*E2RESET", 3, NULL, NULL);
+
+    mm_callback_info_schedule (info);
+}
+
+static void
 factory_reset_done (MMAtSerialPort *port,
                     GString *response,
                     GError *error,
@@ -940,6 +958,7 @@ modem_init (MMModem *modem_class)
     modem_class->grab_port = grab_port;
     modem_class->disable = disable;
     modem_class->connect = do_connect;
+    modem_class->reset = reset;
     modem_class->factory_reset = factory_reset;
 }
 

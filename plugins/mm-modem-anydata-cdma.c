@@ -272,6 +272,24 @@ query_registration_state (MMGenericCdma *cdma,
 
 /*****************************************************************************/
 
+static void
+reset (MMModem *modem,
+       MMModemFn callback,
+       gpointer user_data)
+{
+    MMCallbackInfo *info;
+    MMAtSerialPort *port;
+
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+
+    /* Ensure we have a usable port to use for the command */
+    port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (modem), &info->error);
+    if (port)
+        mm_at_serial_port_queue_command (port, "*RESET", 3, NULL, NULL);
+
+    mm_callback_info_schedule (info);
+}
+
 static gboolean
 grab_port (MMModem *modem,
            const char *subsys,
@@ -333,6 +351,7 @@ static void
 modem_init (MMModem *modem_class)
 {
     modem_class->grab_port = grab_port;
+    modem_class->reset = reset;
 }
 
 static void

@@ -28,6 +28,7 @@ static void impl_modem_connect (MMModem *modem, const char *number, DBusGMethodI
 static void impl_modem_disconnect (MMModem *modem, DBusGMethodInvocation *context);
 static void impl_modem_get_ip4_config (MMModem *modem, DBusGMethodInvocation *context);
 static void impl_modem_get_info (MMModem *modem, DBusGMethodInvocation *context);
+static void impl_modem_reset (MMModem *modem, DBusGMethodInvocation *context);
 static void impl_modem_factory_reset (MMModem *modem, const char *code, DBusGMethodInvocation *context);
 
 #include "mm-modem-glue.h"
@@ -473,6 +474,56 @@ impl_modem_get_info (MMModem *modem,
                      DBusGMethodInvocation *context)
 {
     mm_modem_get_info (modem, info_call_done, context);
+}
+
+/*****************************************************************************/
+
+static void
+reset_auth_cb (MMAuthRequest *req,
+               GObject *owner,
+               DBusGMethodInvocation *context,
+               gpointer user_data)
+{
+    MMModem *self = MM_MODEM (owner);
+    GError *error = NULL;
+
+    /* Return any authorization error, otherwise try to reset the modem */
+    if (!mm_modem_auth_finish (self, req, &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    } else
+        mm_modem_reset (self, async_call_done, context);
+}
+
+static void
+impl_modem_reset (MMModem *modem, DBusGMethodInvocation *context)
+{
+    GError *error = NULL;
+
+    /* Make sure the caller is authorized to reset the device */
+    if (!mm_modem_auth_request (MM_MODEM (modem),
+                                MM_AUTHORIZATION_DEVICE_CONTROL,
+                                context,
+                                reset_auth_cb,
+                                NULL, NULL,
+                                &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    }
+}
+
+void
+mm_modem_reset (MMModem *self,
+                MMModemFn callback,
+                gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM (self));
+    g_return_if_fail (callback != NULL);
+
+    if (MM_MODEM_GET_INTERFACE (self)->reset)
+        MM_MODEM_GET_INTERFACE (self)->reset (self, callback, user_data);
+    else
+        async_op_not_supported (self, callback, user_data);
 }
 
 /*****************************************************************************/
