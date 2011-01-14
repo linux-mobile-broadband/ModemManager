@@ -15,7 +15,7 @@
 #
 # Usage: ./test/ussd.py /org/freedesktop/ModemManager/Modems/0 '*130#'
 
-import sys, dbus
+import sys, dbus, re
 
 MM_DBUS_SERVICE='org.freedesktop.ModemManager'
 MM_DBUS_INTERFACE_USSD='org.freedesktop.ModemManager.Modem.Gsm.Ussd'
@@ -23,5 +23,22 @@ MM_DBUS_INTERFACE_USSD='org.freedesktop.ModemManager.Modem.Gsm.Ussd'
 bus = dbus.SystemBus()
 proxy = bus.get_object(MM_DBUS_SERVICE, sys.argv[1])
 modem = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_USSD)
-ret = modem.Initiate (sys.argv[2])
+
+if len(sys.argv) != 3:
+    print "Usage: %s dbus_object ussd"
+    sys.exit(1)
+else:
+    arg = sys.argv[2]
+
+# For testing purposes treat all "common" USSD sequences as initiate and the
+# rest (except for cancel) as response. See GSM 02.90.
+initiate_re = re.compile('[*#]{1,3}1[0-9][0-9].*#')
+
+if initiate_re.match(arg):
+    ret = modem.Initiate(arg)
+elif arg == "cancel":
+    ret = modem.Cancel()
+else:
+    ret = modem.Respond(arg)
 print ret
+
