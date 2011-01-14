@@ -38,6 +38,12 @@
           request for further input.
       </tp:docstring>
       </arg>
+      <arg name="reply" type="s" direction="out">
+        <tp:docstring>
+          The network reply to this response to the network-initiated USSD
+          command.  The reply may require further responses.
+        </tp:docstring>
+      </arg>
     </method>
 
     <method name="Cancel">
