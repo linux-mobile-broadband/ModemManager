@@ -106,6 +106,23 @@ mm_modem_gsm_ussd_initiate (MMModemGsmUssd *self,
 }
 
 void
+mm_modem_gsm_ussd_respond (MMModemGsmUssd *self,
+                           const char *command,
+                           MMModemStringFn callback,
+                           gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_GSM_USSD (self));
+    g_return_if_fail (command != NULL);
+    g_return_if_fail (callback != NULL);
+
+    if (MM_MODEM_GSM_USSD_GET_INTERFACE (self)->respond)
+        MM_MODEM_GSM_USSD_GET_INTERFACE (self)->respond(self, command, callback, user_data);
+    else
+        str_call_not_supported (self, callback, user_data);
+
+}
+
+void
 mm_modem_gsm_ussd_cancel (MMModemGsmUssd *self,
                           MMModemFn callback,
                           gpointer user_data)
@@ -144,16 +161,6 @@ ussd_auth_info_new (const char* command)
     info->command = g_strdup (command);
 
     return info;
-}
-
-/*****************************************************************************/
-
-static void
-impl_modem_gsm_ussd_respond (MMModemGsmUssd *modem,
-                             const char *responste,
-                             DBusGMethodInvocation *context)
-{
-    async_call_not_supported (modem, async_call_done, context);
 }
 
 /*****************************************************************************/
@@ -200,6 +207,56 @@ impl_modem_gsm_ussd_initiate (MMModemGsmUssd *modem,
                                 MM_AUTHORIZATION_USSD,
                                 context,
                                 ussd_initiate_auth_cb,
+                                info,
+                                ussd_auth_info_destroy,
+                                &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    }
+}
+
+static void
+ussd_respond_auth_cb (MMAuthRequest *req,
+                       GObject *owner,
+                       DBusGMethodInvocation *context,
+                       gpointer user_data)
+{
+    MMModemGsmUssd *self = MM_MODEM_GSM_USSD (owner);
+    UssdAuthInfo *info = user_data;
+    GError *error = NULL;
+
+    /* Return any authorization error, otherwise respond to the USSD */
+    if (!mm_modem_auth_finish (MM_MODEM (self), req, &error))
+        goto done;
+
+    if (!info->command) {
+        error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                     "Missing USSD command");
+    }
+
+done:
+    if (error) {
+        str_call_done (MM_MODEM (self), NULL, error, context);
+        g_error_free (error);
+    } else
+        mm_modem_gsm_ussd_respond (self, info->command, str_call_done, context);
+}
+
+static void
+impl_modem_gsm_ussd_respond (MMModemGsmUssd *modem,
+                              const char *command,
+                              DBusGMethodInvocation *context)
+{
+    GError *error = NULL;
+    UssdAuthInfo *info;
+
+    info = ussd_auth_info_new (command);
+
+    /* Make sure the caller is authorized to respond to the USSD */
+    if (!mm_modem_auth_request (MM_MODEM (modem),
+                                MM_AUTHORIZATION_USSD,
+                                context,
+                                ussd_respond_auth_cb,
                                 info,
                                 ussd_auth_info_destroy,
                                 &error)) {

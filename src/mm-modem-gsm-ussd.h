@@ -46,6 +46,11 @@ struct _MMModemGsmUssd {
                       MMModemStringFn callback,
                       gpointer user_data);
 
+    void (*respond) (MMModemGsmUssd *modem,
+                     const char *command,
+                     MMModemStringFn callback,
+                     gpointer user_data);
+
     void (*cancel) (MMModemGsmUssd *modem,
                     MMModemFn callback,
                     gpointer user_data);
@@ -57,6 +62,11 @@ void mm_modem_gsm_ussd_initiate (MMModemGsmUssd *self,
                                  const char *command,
                                  MMModemStringFn callback,
                                  gpointer user_data);
+
+void mm_modem_gsm_ussd_respond (MMModemGsmUssd *self,
+                                const char *command,
+                                MMModemStringFn callback,
+                                gpointer user_data);
 
 void mm_modem_gsm_ussd_cancel (MMModemGsmUssd *self,
                                MMModemFn callback,

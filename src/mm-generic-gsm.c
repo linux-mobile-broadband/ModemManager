@@ -3830,10 +3830,10 @@ ussd_update_state (MMGenericGsm *self, MMModemGsmUssdState new_state)
 }
 
 static void
-ussd_initiate_done (MMAtSerialPort *port,
-                    GString *response,
-                    GError *error,
-                    gpointer user_data)
+ussd_send_done (MMAtSerialPort *port,
+                GString *response,
+                GError *error,
+                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMGenericGsmPrivate *priv;
@@ -3860,10 +3860,7 @@ ussd_initiate_done (MMAtSerialPort *port,
     case 0: /* no further action required */
         ussd_state = MM_MODEM_GSM_USSD_STATE_IDLE;
         break;
-    case 1: /* Not an error but not yet implemented */
-        info->error = g_error_new (MM_MODEM_ERROR,
-                                   MM_MODEM_ERROR_GENERAL,
-                                   "Further action required.");
+    case 1: /* further action required */
         ussd_state = MM_MODEM_GSM_USSD_STATE_USER_RESPONSE;
         break;
     case 2:
@@ -3919,10 +3916,10 @@ done:
 }
 
 static void
-ussd_initiate (MMModemGsmUssd *modem,
-               const char *command,
-               MMModemStringFn callback,
-               gpointer user_data)
+ussd_send (MMModemGsmUssd *modem,
+           const char *command,
+           MMModemStringFn callback,
+           gpointer user_data)
 {
     MMCallbackInfo *info;
     char *atc_command;
@@ -3947,10 +3944,54 @@ ussd_initiate (MMModemGsmUssd *modem,
     atc_command = g_strdup_printf ("+CUSD=1,\"%s\",15", hex);
     g_free (hex);
 
-    mm_at_serial_port_queue_command (port, atc_command, 10, ussd_initiate_done, info);
+    mm_at_serial_port_queue_command (port, atc_command, 10, ussd_send_done, info);
     g_free (atc_command);
 
     ussd_update_state (MM_GENERIC_GSM (modem), MM_MODEM_GSM_USSD_STATE_ACTIVE);
+}
+
+static void
+ussd_initiate (MMModemGsmUssd *modem,
+               const char *command,
+               MMModemStringFn callback,
+               gpointer user_data)
+{
+    MMCallbackInfo *info;
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+    info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
+
+    if (priv->ussd_state != MM_MODEM_GSM_USSD_STATE_IDLE) {
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "USSD session already active.");
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    ussd_send (modem, command, callback, user_data);
+    return;
+}
+
+static void
+ussd_respond (MMModemGsmUssd *modem,
+              const char *command,
+              MMModemStringFn callback,
+              gpointer user_data)
+{
+    MMCallbackInfo *info;
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+    info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
+
+    if (priv->ussd_state != MM_MODEM_GSM_USSD_STATE_USER_RESPONSE) {
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "No active USSD session, cannot respond.");
+        mm_callback_info_schedule (info);
+        return;
+    }
+	
+    ussd_send (modem, command, callback, user_data);
+    return;
 }
 
 static void
@@ -4633,6 +4674,7 @@ static void
 modem_gsm_ussd_init (MMModemGsmUssd *class)
 {
     class->initiate = ussd_initiate;
+    class->respond = ussd_respond;
     class->cancel = ussd_cancel;
 }
 
