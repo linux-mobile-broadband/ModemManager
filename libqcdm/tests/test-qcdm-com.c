@@ -962,6 +962,9 @@ test_com_cm_subsys_state_info (void *f, void *data)
     case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_WCDMA:
         detail = "WCDMA";
         break;
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_LTE:
+        detail = "LTE";
+        break;
     default:
         detail = "unknown";
         break;
