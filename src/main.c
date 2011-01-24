@@ -150,8 +150,11 @@ main (int argc, char *argv[])
 
 	g_option_context_free (opt_ctx);
 
-    if (debug)
+    if (debug) {
         log_level = "DEBUG";
+        if (!show_ts && !rel_ts)
+            show_ts = TRUE;
+    }
 
     if (!mm_log_setup (log_level, log_file, show_ts, rel_ts, &err)) {
         g_warning ("Failed to set up logging: %s", err->message);
