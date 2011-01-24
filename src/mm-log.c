@@ -112,7 +112,7 @@ _mm_log (const char *loc,
         if (logfd < 0)
             syslog (syslog_priority, "%s", msgbuf);
         else {
-            write (logfd, msgbuf, strlen (msgbuf));
+            (void) write (logfd, msgbuf, strlen (msgbuf));
             fsync (logfd);  /* Make sure output is dumped to disk immediately */
         }
     }
@@ -153,7 +153,7 @@ log_handler (const gchar *log_domain,
     if (logfd < 0)
         syslog (syslog_priority, "%s", message);
     else
-        write (logfd, message, strlen (message));
+        (void) write (logfd, message, strlen (message));
 }
 
 gboolean
