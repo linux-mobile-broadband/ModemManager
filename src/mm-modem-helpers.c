@@ -25,6 +25,7 @@
 
 #include "mm-errors.h"
 #include "mm-modem-helpers.h"
+#include "mm-log.h"
 
 const char *
 mm_strip_tag (const char *str, const char *cmd)
@@ -829,10 +830,9 @@ mm_create_device_identifier (guint vid,
                              const char *gsn,
                              const char *revision,
                              const char *model,
-                             const char *manf,
-                             gboolean debug)
+                             const char *manf)
 {
-    GString *devid, *dbg = NULL;
+    GString *devid, *msg = NULL;
     GChecksum *sum;
     char *p, *ret = NULL;
     char str_vid[10], str_pid[10];
@@ -859,41 +859,35 @@ mm_create_device_identifier (guint vid,
         return NULL;
 
     p = devid->str;
-    if (debug)
-        dbg = g_string_sized_new (strlen (devid->str) + 17);
+    msg = g_string_sized_new (strlen (devid->str) + 17);
 
     sum = g_checksum_new (G_CHECKSUM_SHA1);
 
     if (vid) {
         snprintf (str_vid, sizeof (str_vid) - 1, "%08x", vid);
         g_checksum_update (sum, (const guchar *) &str_vid[0], strlen (str_vid));
-        if (dbg)
-            g_string_append_printf (dbg, "%08x", vid);
+        g_string_append_printf (msg, "%08x", vid);
     }
     if (vid) {
         snprintf (str_pid, sizeof (str_pid) - 1, "%08x", pid);
         g_checksum_update (sum, (const guchar *) &str_pid[0], strlen (str_pid));
-        if (dbg)
-            g_string_append_printf (dbg, "%08x", pid);
+        g_string_append_printf (msg, "%08x", pid);
     }
 
     while (*p) {
         /* Strip spaces and linebreaks */
         if (!isblank (*p) && !isspace (*p) && isascii (*p)) {
             g_checksum_update (sum, (const guchar *) p, 1);
-            if (dbg)
-                g_string_append_c (dbg, *p);
+            g_string_append_c (msg, *p);
         }
         p++;
     }
     ret = g_strdup (g_checksum_get_string (sum));
     g_checksum_free (sum);
 
-    if (dbg) {
-        g_debug ("Device ID source '%s'", dbg->str);
-        g_debug ("Device ID '%s'", ret);
-        g_string_free (dbg, TRUE);
-    }
+    mm_dbg ("Device ID source '%s'", msg->str);
+    mm_dbg ("Device ID '%s'", ret);
+    g_string_free (msg, TRUE);
 
     return ret;
 }

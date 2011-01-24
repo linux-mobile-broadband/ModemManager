@@ -25,7 +25,7 @@
 #include "mm-at-serial-port.h"
 #include "mm-qcdm-serial-port.h"
 #include "mm-errors.h"
-#include "mm-options.h"
+#include "mm-log.h"
 #include "mm-properties-changed-signal.h"
 #include "mm-callback-info.h"
 #include "mm-modem-helpers.h"
@@ -148,15 +148,13 @@ mm_modem_base_add_port (MMModemBase *self,
     if (!port)
         return NULL;
 
-    if (mm_options_debug ()) {
-        device = mm_modem_get_device (MM_MODEM (self));
+    device = mm_modem_get_device (MM_MODEM (self));
+    mm_dbg ("(%s) type %s claimed by %s",
+            name,
+            mm_port_type_to_name (ptype),
+            device);
+    g_free (device);
 
-        g_message ("(%s) type %s claimed by %s",
-                    name,
-                    mm_port_type_to_name (ptype),
-                    device);
-        g_free (device);
-    }
     key = get_hash_key (subsys, name);
     g_hash_table_insert (priv->ports, key, port);
     return port;
@@ -233,9 +231,9 @@ mm_modem_base_set_equipment_identifier (MMModemBase *self, const char *ident)
     dbus_path = (const char *) g_object_get_data (G_OBJECT (self), DBUS_PATH_TAG);
     if (dbus_path) {
         if (priv->equipment_ident)
-            g_message ("Modem %s: Equipment identifier set (%s)", dbus_path, priv->equipment_ident);
+            mm_info ("Modem %s: Equipment identifier set (%s)", dbus_path, priv->equipment_ident);
         else
-            g_message ("Modem %s: Equipment identifier not set", dbus_path);
+            mm_warn ("Modem %s: Equipment identifier not set", dbus_path);
     }
 
     g_object_notify (G_OBJECT (self), MM_MODEM_EQUIPMENT_IDENTIFIER);
@@ -274,9 +272,9 @@ mm_modem_base_set_unlock_required (MMModemBase *self, const char *unlock_require
     dbus_path = (const char *) g_object_get_data (G_OBJECT (self), DBUS_PATH_TAG);
     if (dbus_path) {
         if (priv->unlock_required)
-            g_message ("Modem %s: unlock required (%s)", dbus_path, priv->unlock_required);
+            mm_info ("Modem %s: unlock required (%s)", dbus_path, priv->unlock_required);
         else
-            g_message ("Modem %s: unlock no longer required", dbus_path);
+            mm_info ("Modem %s: unlock no longer required", dbus_path);
     }
 
     g_object_notify (G_OBJECT (self), MM_MODEM_UNLOCK_REQUIRED);
@@ -311,11 +309,11 @@ mm_modem_base_set_unlock_retries (MMModemBase *self, guint unlock_retries)
     dbus_path = (const char *) g_object_get_data (G_OBJECT (self), DBUS_PATH_TAG);
     if (dbus_path) {
         if (priv->unlock_required) {
-            g_message ("Modem %s: # unlock retries for %s is %d",
-                       dbus_path, priv->unlock_required, priv->unlock_retries);
+            mm_info ("Modem %s: # unlock retries for %s is %d",
+                     dbus_path, priv->unlock_required, priv->unlock_retries);
         } else {
-            g_message ("Modem %s: # unlock retries is %d",
-                       dbus_path, priv->unlock_retries);
+            mm_info ("Modem %s: # unlock retries is %d",
+                     dbus_path, priv->unlock_retries);
         }
     }
 
@@ -446,8 +444,7 @@ card_info_cache_invoke (MMCallbackInfo *info)
                                                       priv->gsn,
                                                       priv->revision,
                                                       priv->model,
-                                                      priv->manf,
-                                                      mm_options_debug ());
+                                                      priv->manf);
     g_object_notify (G_OBJECT (self), MM_MODEM_DEVICE_IDENTIFIER);
 
     callback (info->modem, priv->manf, priv->model, priv->revision, info->error, info->user_data);

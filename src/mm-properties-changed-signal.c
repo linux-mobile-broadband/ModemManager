@@ -21,6 +21,7 @@
 #include "mm-marshal.h"
 #include "mm-properties-changed-signal.h"
 #include "mm-properties-changed-glue.h"
+#include "mm-log.h"
 
 #define DBUS_TYPE_G_MAP_OF_VARIANT  (dbus_g_type_get_map ("GHashTable", G_TYPE_STRING, G_TYPE_VALUE))
 #define DBUS_TYPE_G_ARRAY_OF_STRING (dbus_g_type_get_collection ("GPtrArray", G_TYPE_STRING))
@@ -150,10 +151,10 @@ properties_changed (gpointer data)
         {
             char buf[2048] = { 0, };
             g_hash_table_foreach (props, add_to_string, &buf);
-            g_message ("%s: %s -> (%s) %s", __func__,
-                       G_OBJECT_TYPE_NAME (object),
-                       interface,
-                       buf);
+            mm_dbg ("%s: %s -> (%s) %s", __func__,
+                    G_OBJECT_TYPE_NAME (object),
+                    interface,
+                    buf);
         }
 #endif
 

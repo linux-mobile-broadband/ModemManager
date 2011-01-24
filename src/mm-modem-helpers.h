@@ -66,8 +66,7 @@ char *mm_create_device_identifier (guint vid,
                                    const char *gsn,
                                    const char *revision,
                                    const char *model,
-                                   const char *manf,
-                                   gboolean debug);
+                                   const char *manf);
 
 typedef struct CindResponse CindResponse;
 GHashTable *mm_parse_cind_test_response (const char *reply, GError **error);

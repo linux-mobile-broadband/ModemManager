@@ -31,6 +31,7 @@
 #include "mm-generic-cdma.h"
 #include "mm-errors.h"
 #include "mm-serial-parsers.h"
+#include "mm-log.h"
 
 G_DEFINE_TYPE (MMPluginGeneric, mm_plugin_generic, MM_TYPE_PLUGIN_BASE)
 
@@ -127,10 +128,10 @@ grab_port (MMPluginBase *base,
             g_set_error (error, 0, 0, "Could not get port's sysfs file.");
             return NULL;
         } else {
-            g_message ("%s: (%s/%s) WARNING: missing udev 'device' file",
-                       mm_plugin_get_name (MM_PLUGIN (base)),
-                       subsys,
-                       name);
+            mm_warn ("%s: (%s/%s) WARNING: missing udev 'device' file",
+                     mm_plugin_get_name (MM_PLUGIN (base)),
+                     subsys,
+                     name);
         }
     }
 

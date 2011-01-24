@@ -32,6 +32,7 @@
 #include "mm-at-serial-port.h"
 #include "mm-generic-gsm.h"
 #include "mm-modem-helpers.h"
+#include "mm-log.h"
 
 struct _MMModemIceraPrivate {
     /* Pending connection attempt */
@@ -325,7 +326,7 @@ icera_disconnect_done (MMModem *modem,
                        GError *error,
                        gpointer user_data)
 {
-    g_message ("Modem signaled disconnection from the network");
+    mm_info ("Modem signaled disconnection from the network");
 }
 
 static void
@@ -380,7 +381,7 @@ connection_enabled (MMAtSerialPort *port,
         connect_pending_done (self);
         break;
     default:
-        g_warning ("Unknown Icera connect status %d", status);
+        mm_warn ("Unknown Icera connect status %d", status);
         break;
     }
 }

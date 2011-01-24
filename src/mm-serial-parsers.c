@@ -19,6 +19,7 @@
 
 #include "mm-serial-parsers.h"
 #include "mm-errors.h"
+#include "mm-log.h"
 
 /* Clean up the response by removing control characters like <CR><LF> etc */
 static void
@@ -174,7 +175,7 @@ mm_serial_parser_v0_parse (gpointer data,
         response_clean (response);
 
     if (local_error) {
-        g_debug ("Got failure code %d: %s", local_error->code, local_error->message);
+        mm_dbg ("Got failure code %d: %s", local_error->code, local_error->message);
         g_propagate_error (error, local_error);
     }
 
@@ -336,7 +337,7 @@ done:
         response_clean (response);
 
     if (local_error) {
-        g_debug ("Got failure code %d: %s", local_error->code, local_error->message);
+        mm_dbg ("Got failure code %d: %s", local_error->code, local_error->message);
         g_propagate_error (error, local_error);
     }
 

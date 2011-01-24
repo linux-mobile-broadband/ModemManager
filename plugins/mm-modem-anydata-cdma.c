@@ -28,6 +28,7 @@
 #include "mm-callback-info.h"
 #include "mm-serial-port.h"
 #include "mm-serial-parsers.h"
+#include "mm-log.h"
 
 static void modem_init (MMModem *modem_class);
 
@@ -140,7 +141,7 @@ evdo_state_done (MMAtSerialPort *port,
                      G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     if (!r) {
         /* Parse error; warn about it and assume EVDO is not available */
-        g_warning ("AnyDATA(%s): *HSTATE parse regex creation failed.", __func__);
+        mm_warn ("ANYDATA: *HSTATE parse regex creation failed.");
         goto done;
     }
 
@@ -167,7 +168,7 @@ evdo_state_done (MMAtSerialPort *port,
                 reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
                 break;
             default:
-                g_message ("ANYDATA: unknown *STATE (%d); assuming no service.", val);
+                mm_warn ("ANYDATA: unknown *STATE (%d); assuming no service.", val);
                 /* fall through */
             case 0:  /* NO SERVICE */
             case 1:  /* ACQUISITION */
@@ -206,7 +207,7 @@ state_done (MMAtSerialPort *port,
     r = g_regex_new ("\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*([^,\\)]*)\\s*,.*",
                      G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     if (!r) {
-        g_warning ("AnyDATA(%s): *STATE parse regex creation failed.", __func__);
+        mm_warn ("ANYDATA: *STATE parse regex creation failed.");
         mm_callback_info_schedule (info);
         return;
     }
@@ -235,7 +236,7 @@ state_done (MMAtSerialPort *port,
                 reg_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
                 break;
             default:
-                g_warning ("ANYDATA: unknown *STATE (%d); assuming no service.", val);
+                mm_warn ("ANYDATA: unknown *STATE (%d); assuming no service.", val);
                 /* fall through */
             case 0:  /* NO SERVICE */
                 break;

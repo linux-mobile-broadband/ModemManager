@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 - 2010 Red Hat, Inc.
+ * Copyright (C) 2009 - 2011 Red Hat, Inc.
  */
 
 #include <config.h>
@@ -21,8 +21,10 @@
 #include <unistd.h>
 #include <dbus/dbus-glib.h>
 #include <dbus/dbus-glib-lowlevel.h>
+#include <stdlib.h>
+
 #include "mm-manager.h"
-#include "mm-options.h"
+#include "mm-log.h"
 
 #if !defined(MM_DIST_VERSION)
 # define MM_DIST_VERSION VERSION
@@ -34,9 +36,9 @@ static void
 mm_signal_handler (int signo)
 {
     if (signo == SIGUSR1)
-        mm_options_set_debug (!mm_options_debug ());
+        mm_log_usr1 ();
 	else if (signo == SIGINT || signo == SIGTERM) {
-		g_message ("Caught signal %d, shutting down...", signo);
+		mm_info ("Caught signal %d, shutting down...", signo);
         if (loop)
             g_main_loop_quit (loop);
         else
@@ -60,64 +62,9 @@ setup_signals (void)
 }
 
 static void
-log_handler (const gchar *log_domain,
-             GLogLevelFlags log_level,
-             const gchar *message,
-             gpointer ignored)
-{
-    int syslog_priority;    
-
-    switch (log_level) {
-    case G_LOG_LEVEL_ERROR:
-        syslog_priority = LOG_CRIT;
-        break;
-
-    case G_LOG_LEVEL_CRITICAL:
-        syslog_priority = LOG_ERR;
-        break;
-
-    case G_LOG_LEVEL_WARNING:
-        syslog_priority = LOG_WARNING;
-        break;
-
-    case G_LOG_LEVEL_MESSAGE:
-        syslog_priority = LOG_NOTICE;
-        break;
-
-    case G_LOG_LEVEL_DEBUG:
-        syslog_priority = LOG_DEBUG;
-        break;
-
-    case G_LOG_LEVEL_INFO:
-    default:
-        syslog_priority = LOG_INFO;
-        break;
-    }
-
-    syslog (syslog_priority, "%s", message);
-}
-
-
-static void
-logging_setup (void)
-{
-    openlog (G_LOG_DOMAIN, LOG_CONS, LOG_DAEMON);
-    g_log_set_handler (G_LOG_DOMAIN, 
-                       G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION,
-                       log_handler,
-                       NULL);
-}
-
-static void
-logging_shutdown (void)
-{
-    closelog ();
-}
-
-static void
 destroy_cb (DBusGProxy *proxy, gpointer user_data)
 {
-    g_message ("disconnected from the system bus, exiting.");
+    mm_warn ("disconnected from the system bus, exiting.");
     g_main_loop_quit (loop);
 }
 
@@ -139,16 +86,16 @@ create_dbus_proxy (DBusGConnection *bus)
                             G_TYPE_INVALID,
                             G_TYPE_UINT, &request_name_result,
                             G_TYPE_INVALID)) {
-        g_warning ("Could not acquire the %s service.\n"
-                   "  Message: '%s'", MM_DBUS_SERVICE, err->message);
+        mm_warn ("Could not acquire the %s service.\n"
+                 "  Message: '%s'", MM_DBUS_SERVICE, err->message);
 
         g_error_free (err);
         g_object_unref (proxy);
         proxy = NULL;
     } else if (request_name_result != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
-        g_warning ("Could not acquire the " MM_DBUS_SERVICE
-                   " service as it is already taken. Return: %d",
-                   request_name_result);
+        mm_warn ("Could not acquire the " MM_DBUS_SERVICE
+                 " service as it is already taken. Return: %d",
+                 request_name_result);
 
         g_object_unref (proxy);
         proxy = NULL;
@@ -175,17 +122,46 @@ main (int argc, char *argv[])
     DBusGProxy *proxy;
     MMManager *manager;
     GError *err = NULL;
+    GOptionContext *opt_ctx;
     guint id;
+    const char *log_level = NULL, *log_file = NULL;
+    gboolean debug = FALSE, show_ts = FALSE, rel_ts = FALSE;
 
-    mm_options_parse (argc, argv);
+    GOptionEntry entries[] = {
+		{ "debug", 0, 0, G_OPTION_ARG_NONE, &debug, "Output to console rather than syslog", NULL },
+		{ "log-level", 0, 0, G_OPTION_ARG_STRING, &log_level, "Log level: one of [ERR, WARN, INFO, DEBUG]", "INFO" },
+		{ "log-file", 0, 0, G_OPTION_ARG_STRING, &log_file, "Path to log file", NULL },
+		{ "timestamps", 0, 0, G_OPTION_ARG_NONE, &show_ts, "Show timestamps in log output", NULL },
+		{ "relative-timestamps", 0, 0, G_OPTION_ARG_NONE, &rel_ts, "Use relative timestamps (from MM start)", NULL },
+		{ NULL }
+	};
+
     g_type_init ();
+
+	opt_ctx = g_option_context_new (NULL);
+	g_option_context_set_summary (opt_ctx, "DBus system service to communicate with modems.");
+	g_option_context_add_main_entries (opt_ctx, entries, NULL);
+
+	if (!g_option_context_parse (opt_ctx, &argc, &argv, &err)) {
+		g_warning ("%s\n", err->message);
+		g_error_free (err);
+		exit (1);
+	}
+
+	g_option_context_free (opt_ctx);
+
+    if (debug)
+        log_level = "DEBUG";
+
+    if (!mm_log_setup (log_level, log_file, show_ts, rel_ts, &err)) {
+        g_warning ("Failed to set up logging: %s", err->message);
+        g_error_free (err);
+        exit (1);
+    }
 
     setup_signals ();
 
-    if (!mm_options_debug ())
-        logging_setup ();
-
-    g_message ("ModemManager (version " MM_DIST_VERSION ") starting...");
+    mm_info ("ModemManager (version " MM_DIST_VERSION ") starting...");
 
     bus = dbus_g_bus_get (DBUS_BUS_SYSTEM, &err);
     if (!bus) {
@@ -235,7 +211,7 @@ main (int argc, char *argv[])
     g_object_unref (proxy);
     dbus_g_connection_unref (bus);    
 
-    logging_shutdown ();
+    mm_log_shutdown ();
 
     return 0;
 }

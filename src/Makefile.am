@@ -81,6 +81,8 @@ endif
 
 modem_manager_SOURCES = \
 	main.c \
+	mm-log.c \
+	mm-log.h \
 	mm-callback-info.c \
 	mm-callback-info.h \
 	$(auth_sources) \
@@ -109,8 +111,6 @@ modem_manager_SOURCES = \
 	mm-modem-gsm-ussd.h \
 	mm-modem-simple.c \
 	mm-modem-simple.h \
-	mm-options.c \
-	mm-options.h \
 	mm-plugin.c \
 	mm-plugin.h \
 	mm-plugin-base.c \

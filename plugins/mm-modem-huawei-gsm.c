@@ -29,7 +29,7 @@
 #include "mm-callback-info.h"
 #include "mm-at-serial-port.h"
 #include "mm-serial-parsers.h"
-#include "mm-options.h"
+#include "mm-log.h"
 
 static void modem_init (MMModem *modem_class);
 static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
@@ -534,7 +534,7 @@ send_huawei_cpin_done (MMAtSerialPort *port,
     else if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PIN2))
         num = 5;
     else {
-        g_debug ("%s: unhandled pin type '%s'", __func__, pin_type);
+        mm_dbg ("unhandled pin type '%s'", pin_type);
 
         info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Unhandled PIN type");
     }
@@ -576,7 +576,7 @@ get_unlock_retries (MMModemGsmCard *modem,
     char *command;
     MMCallbackInfo *info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
 
-    g_debug ("%s: pin type '%s'", __func__, pin_type);
+    mm_dbg ("pin type '%s'", pin_type);
 
     /* Ensure we have a usable port to use for the command */
     port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
@@ -660,12 +660,11 @@ handle_mode_change (MMAtSerialPort *port,
     } else if (a == 0)
         act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     else {
-        g_warning ("Couldn't parse mode change value: '%s'", str);
+        mm_warn ("Couldn't parse mode change value: '%s'", str);
         return;
     }
 
-    if (mm_options_debug ())
-        g_debug ("Access Technology: %d", act);
+    mm_dbg ("Access Technology: %d", act);
 
     mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (self), act);
 }
@@ -680,10 +679,8 @@ handle_status_change (MMAtSerialPort *port,
 
     str = g_match_info_fetch (match_info, 1);
     if (sscanf (str, "%x,%x,%x,%x,%x,%x,%x", &n1, &n2, &n3, &n4, &n5, &n6, &n7)) {
-        if (mm_options_debug ()) {
-            g_debug ("Duration: %d Up: %d Kbps Down: %d Kbps Total: %d Total: %d\n",
-                     n1, n2 * 8 / 1000, n3  * 8 / 1000, n4 / 1024, n5 / 1024);
-        }
+        mm_dbg ("Duration: %d Up: %d Kbps Down: %d Kbps Total: %d Total: %d\n",
+                n1, n2 * 8 / 1000, n3  * 8 / 1000, n4 / 1024, n5 / 1024);
     }
     g_free (str);
 }

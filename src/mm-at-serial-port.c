@@ -23,7 +23,7 @@
 
 #include "mm-at-serial-port.h"
 #include "mm-errors.h"
-#include "mm-options.h"
+#include "mm-log.h"
 
 G_DEFINE_TYPE (MMAtSerialPort, mm_at_serial_port, MM_TYPE_SERIAL_PORT)
 
@@ -273,7 +273,6 @@ debug_log (MMSerialPort *port, const char *prefix, const char *buf, gsize len)
 {
     static GString *debug = NULL;
     const char *s;
-    GTimeVal tv;
 
     if (!debug)
         debug = g_string_sized_new (256);
@@ -296,12 +295,7 @@ debug_log (MMSerialPort *port, const char *prefix, const char *buf, gsize len)
     }
 
     g_string_append_c (debug, '\'');
-    g_get_current_time (&tv);
-    g_debug ("<%ld.%ld> (%s): %s",
-             tv.tv_sec,
-             tv.tv_usec,
-             mm_port_get_device (MM_PORT (port)),
-             debug->str);
+    mm_dbg ("(%s): %s", mm_port_get_device (MM_PORT (port)), debug->str);
     g_string_truncate (debug, 0);
 }
 

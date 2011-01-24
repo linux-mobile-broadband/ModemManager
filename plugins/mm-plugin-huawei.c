@@ -27,6 +27,7 @@
 #include "mm-modem-huawei-cdma.h"
 #include "mm-serial-parsers.h"
 #include "mm-at-serial-port.h"
+#include "mm-log.h"
 
 G_DEFINE_TYPE (MMPluginHuawei, mm_plugin_huawei, MM_TYPE_PLUGIN_BASE)
 
@@ -240,10 +241,10 @@ supports_port (MMPluginBase *base,
         info->id = g_timeout_add_seconds (7, probe_secondary_timeout, task);
 
         if (!mm_serial_port_open (MM_SERIAL_PORT (info->serial), &error)) {
-            g_warning ("%s: (Huawei) %s: couldn't open serial port: (%d) %s",
-                       __func__, name,
-                       error ? error->code : -1,
-                       error && error->message ? error->message : "(unknown)");
+            mm_warn ("(Huawei) %s: couldn't open serial port: (%d) %s",
+                     name,
+                     error ? error->code : -1,
+                     error && error->message ? error->message : "(unknown)");
             g_clear_error (&error);
             huawei_supports_info_destroy (info);
             return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;

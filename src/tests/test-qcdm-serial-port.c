@@ -31,6 +31,7 @@
 #include "libqcdm/src/commands.h"
 #include "libqcdm/src/utils.h"
 #include "libqcdm/src/com.h"
+#include "mm-log.h"
 
 typedef struct {
     int master;
@@ -449,10 +450,14 @@ typedef void (*TCFunc)(void);
 #define TESTCASE(t, d) g_test_create_case (#t, 0, d, NULL, (TCFunc) t, NULL)
 #define TESTCASE_PTY(t, d) g_test_create_case (#t, sizeof (*d), d, (TCFunc) test_pty_create, (TCFunc) t, (TCFunc) test_pty_cleanup)
 
-gboolean mm_options_debug (void);
-gboolean mm_options_debug (void)
+void
+_mm_log (const char *loc,
+         const char *func,
+         guint32 level,
+         const char *fmt,
+         ...)
 {
-    return g_test_verbose ();
+    /* Dummy log function */
 }
 
 int main (int argc, char **argv)

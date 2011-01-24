@@ -17,6 +17,7 @@
 #include <string.h>
 
 #include "mm-modem-helpers.h"
+#include "mm-log.h"
 
 typedef struct {
     GPtrArray *solicited_creg;
@@ -1079,8 +1080,7 @@ test_devid_item (void *f, gpointer d)
                                          item->gsn,
                                          item->revision,
                                          item->model,
-                                         item->manf,
-                                         FALSE);
+                                         item->manf);
     g_assert (devid);
     if (strcmp (devid, item->devid))
         g_message ("%s", devid);
@@ -1178,6 +1178,15 @@ test_data_free (TestData *data)
     g_free (data);
 }
 
+void
+_mm_log (const char *loc,
+         const char *func,
+         guint32 level,
+         const char *fmt,
+         ...)
+{
+    /* Dummy log function */
+}
 
 #if GLIB_CHECK_VERSION(2,25,12)
 typedef GTestFixtureFunc TCFunc;

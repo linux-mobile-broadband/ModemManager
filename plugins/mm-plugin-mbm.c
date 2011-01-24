@@ -84,7 +84,7 @@ supports_port (MMPluginBase *base,
 
     client = g_udev_client_new (sys);
     if (!client) {
-        g_warning ("mbm: could not get udev client.");
+        g_warn_if_fail (client != NULL);
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
     }
 

@@ -36,6 +36,7 @@
 #include "mm-utils.h"
 #include "libqcdm/src/commands.h"
 #include "libqcdm/src/utils.h"
+#include "mm-log.h"
 
 static void plugin_init (MMPlugin *plugin_class);
 
@@ -807,9 +808,9 @@ try_open (gpointer user_data)
         task_priv->full_id = g_signal_connect (task_priv->probe_port, "buffer-full",
                                                G_CALLBACK (port_buffer_full), task);
 
-        g_debug ("(%s): probe requested by plugin '%s'",
-                 g_udev_device_get_name (port),
-                 mm_plugin_get_name (MM_PLUGIN (task_priv->plugin)));
+        mm_dbg ("(%s): probe requested by plugin '%s'",
+                g_udev_device_get_name (port),
+                mm_plugin_get_name (MM_PLUGIN (task_priv->plugin)));
         mm_serial_port_flash (MM_SERIAL_PORT (task_priv->probe_port), 100, TRUE, flash_done, task);
     }
 

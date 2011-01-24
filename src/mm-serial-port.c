@@ -30,7 +30,7 @@
 
 #include "mm-serial-port.h"
 #include "mm-errors.h"
-#include "mm-options.h"
+#include "mm-log.h"
 
 static gboolean mm_serial_port_queue_process (gpointer data);
 
@@ -152,10 +152,10 @@ mm_serial_port_print_config (MMSerialPort *port, const char *detail)
         return;
     }
 
-    g_message ("*** %s (%s): (%s) baud rate: %d (%s)",
-               __func__, detail, mm_port_get_device (MM_PORT (port)),
-               stbuf.c_cflag & CBAUD,
-               baud_to_string (stbuf.c_cflag & CBAUD));
+    mm_info ("(%s): (%s) baud rate: %d (%s)",
+             detail, mm_port_get_device (MM_PORT (port)),
+             stbuf.c_cflag & CBAUD,
+             baud_to_string (stbuf.c_cflag & CBAUD));
 }
 #endif
 
@@ -350,7 +350,7 @@ serial_debug (MMSerialPort *self, const char *prefix, const char *buf, gsize len
 {
     g_return_if_fail (len > 0);
 
-    if (mm_options_debug () && MM_SERIAL_PORT_GET_CLASS (self)->debug_log)
+    if (MM_SERIAL_PORT_GET_CLASS (self)->debug_log)
         MM_SERIAL_PORT_GET_CLASS (self)->debug_log (self, prefix, buf, len);
 }
 
@@ -686,7 +686,6 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
     MMSerialPortPrivate *priv;
     char *devfile;
     const char *device;
-    GTimeVal tv;
     struct serial_struct sinfo;
 
     g_return_val_if_fail (MM_IS_SERIAL_PORT (self), FALSE);
@@ -700,12 +699,7 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
         goto success;
     }
 
-    if (mm_options_debug ()) {
-        g_get_current_time (&tv);
-        g_debug ("<%ld.%ld> (%s) opening serial port...",
-                 tv.tv_sec, tv.tv_usec, device);
-    } else
-        g_message ("(%s) opening serial port...", device);
+    mm_info ("(%s) opening serial port...", device);
 
     /* Only open a new file descriptor if we weren't given one already */
     if (priv->fd < 0) {
@@ -767,11 +761,7 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
 
 success:
     priv->open_count++;
-    if (mm_options_debug ()) {
-        g_get_current_time (&tv);
-        g_debug ("<%ld.%ld> (%s) device open count is %d (open)",
-                 tv.tv_sec, tv.tv_usec, device, priv->open_count);
-    }
+    mm_dbg ("(%s) device open count is %d (open)", device, priv->open_count);
     return TRUE;
 
 error:
@@ -794,7 +784,6 @@ mm_serial_port_close (MMSerialPort *self)
 {
     MMSerialPortPrivate *priv;
     const char *device;
-    GTimeVal tv;
     int i;
 
     g_return_if_fail (MM_IS_SERIAL_PORT (self));
@@ -806,11 +795,7 @@ mm_serial_port_close (MMSerialPort *self)
 
     priv->open_count--;
 
-    if (mm_options_debug ()) {
-        g_get_current_time (&tv);
-        g_debug ("<%ld.%ld> (%s) device open count is %d (close)",
-                 tv.tv_sec, tv.tv_usec, device, priv->open_count);
-    }
+    mm_dbg ("(%s) device open count is %d (close)", device, priv->open_count);
 
     if (priv->open_count > 0)
         return;
@@ -823,12 +808,7 @@ mm_serial_port_close (MMSerialPort *self)
     if (priv->fd >= 0) {
         GTimeVal tv_start, tv_end;
 
-        g_get_current_time (&tv_start);
-        if (mm_options_debug ()) {
-            g_debug ("<%ld.%ld> (%s) closing serial port...",
-                     tv_start.tv_sec, tv_start.tv_usec, device);
-        } else
-            g_message ("(%s) closing serial port...", device);
+        mm_info ("(%s) closing serial port...", device);
 
         mm_port_set_connected (MM_PORT (self), FALSE);
 
@@ -842,16 +822,16 @@ mm_serial_port_close (MMSerialPort *self)
 
         mm_serial_port_flash_cancel (self);
 
+        g_get_current_time (&tv_start);
+
         tcsetattr (priv->fd, TCSANOW, &priv->old_t);
         tcflush (priv->fd, TCIOFLUSH);
         close (priv->fd);
         priv->fd = -1;
 
         g_get_current_time (&tv_end);
-        if (mm_options_debug ()) {
-            g_debug ("<%ld.%ld> (%s) serial port closed",
-                     tv_end.tv_sec, tv_end.tv_usec, device);
-        }
+
+        mm_info ("(%s) serial port closed", device);
 
         /* Some ports don't respond to data and when close is called
          * the serial layer waits up to 30 second (closing_wait) for
@@ -859,7 +839,7 @@ mm_serial_port_close (MMSerialPort *self)
          * Log that.  See GNOME bug #630670 for more details.
          */
         if (tv_end.tv_sec - tv_start.tv_sec > 20)
-            g_warning ("(%s): close blocked by driver for more than 20 seconds!", device);
+            mm_warn ("(%s): close blocked by driver for more than 20 seconds!", device);
     }
 
     /* Clear the command queue */

@@ -1,7 +1,7 @@
 /* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 /*
  * Copyright (C) 2008 - 2010 Ericsson AB
- * Copyright (C) 2009 - 2010 Red Hat, Inc.
+ * Copyright (C) 2009 - 2011 Red Hat, Inc.
  *
  * Author: Per Hallsmark <per.hallsmark@ericsson.com>
  *         Bjorn Runaker <bjorn.runaker@ericsson.com>
@@ -31,6 +31,7 @@
 #include "mm-modem-gsm-card.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
+#include "mm-log.h"
 
 static void modem_init (MMModem *modem_class);
 static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
@@ -410,7 +411,7 @@ mbm_emrdy_done (MMAtSerialPort *port,
     MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (info->modem);
 
     if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT))
-        g_warning ("%s: timed out waiting for EMRDY response.", __func__);
+        mm_warn ("timed out waiting for EMRDY response.");
     else
         priv->have_emrdy = TRUE;
 
@@ -632,16 +633,16 @@ mbm_e2nap_received (MMAtSerialPort *port,
     g_free (str);
 
     if (MBM_E2NAP_DISCONNECTED == state) {
-        g_debug ("%s: disconnected", __func__);
+        mm_dbg ("disconnected");
         mbm_do_connect_done (MM_MODEM_MBM (user_data), FALSE);
     } else if (MBM_E2NAP_CONNECTED == state) {
-        g_debug ("%s: connected", __func__);
+        mm_dbg ("connected");
         mbm_do_connect_done (MM_MODEM_MBM (user_data), TRUE);
     } else if (MBM_E2NAP_CONNECTING == state)
-        g_debug("%s: connecting", __func__);
+        mm_dbg ("connecting");
     else {
         /* Should not happen */
-        g_debug("%s: unhandled E2NAP state %d", __func__, state);
+        mm_dbg ("unhandled E2NAP state %d", state);
         mbm_do_connect_done (MM_MODEM_MBM (user_data), FALSE);
     }
 }
@@ -811,7 +812,7 @@ send_epin_done (MMAtSerialPort *port,
     else if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PUK2))
         sscanf (response->str, "*EPIN: %*d, %*d, %*d, %d", &attempts_left);
     else {
-        g_debug ("%s: unhandled pin type '%s'", __func__, pin_type);
+        mm_dbg ("unhandled pin type '%s'", pin_type);
 
         info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Unhandled PIN type");
     }
@@ -838,7 +839,7 @@ mbm_get_unlock_retries (MMModemGsmCard *modem,
     char *command;
     MMCallbackInfo *info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
 
-    g_debug ("%s: pin type '%s'", __func__, pin_type);
+    mm_dbg ("pin type '%s'", pin_type);
 
     /* Ensure we have a usable port to use for the command */
     port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);

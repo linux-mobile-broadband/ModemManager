@@ -30,6 +30,7 @@
 #include "mm-serial-parsers.h"
 #include "mm-modem-helpers.h"
 #include "libqcdm/src/commands.h"
+#include "mm-log.h"
 
 #define MM_GENERIC_CDMA_PREV_STATE_TAG "prev-state"
 
@@ -1047,7 +1048,7 @@ get_signal_quality (MMModemCdma *modem,
 
     at_port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (modem), &info->error);
     if (!at_port && !priv->qcdm) {
-        g_message ("Returning saved signal quality %d", priv->cdma1x_quality);
+        mm_dbg ("Returning saved signal quality %d", priv->cdma1x_quality);
         mm_callback_info_set_result (info, GUINT_TO_POINTER (priv->cdma1x_quality), NULL);
         mm_callback_info_schedule (info);
         return;
@@ -1876,8 +1877,8 @@ get_registration_state (MMModemCdma *modem,
 
     port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (modem), &info->error);
     if (!port && !priv->qcdm) {
-        g_message ("Returning saved registration states: 1x: %d  EVDO: %d",
-                   priv->cdma_1x_reg_state, priv->evdo_reg_state);
+        mm_dbg ("Returning saved registration states: 1x: %d  EVDO: %d",
+                priv->cdma_1x_reg_state, priv->evdo_reg_state);
         mm_generic_cdma_query_reg_state_set_callback_1x_state (info, priv->cdma_1x_reg_state);
         mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, priv->evdo_reg_state);
         mm_callback_info_schedule (info);

@@ -33,7 +33,7 @@
 #include "mm-qcdm-serial-port.h"
 #include "mm-serial-parsers.h"
 #include "mm-modem-helpers.h"
-#include "mm-options.h"
+#include "mm-log.h"
 #include "mm-properties-changed-signal.h"
 #include "mm-utils.h"
 #include "mm-modem-location.h"
@@ -471,10 +471,8 @@ get_iccid_done (MMModem *modem,
     g_free (priv->simid);
     priv->simid = g_strdup (g_checksum_get_string (sum));
 
-    if (mm_options_debug ()) {
-        g_debug ("SIM ID source '%s'", response);
-        g_debug ("SIM ID '%s'", priv->simid);
-    }
+    mm_dbg ("SIM ID source '%s'", response);
+    mm_dbg ("SIM ID '%s'", priv->simid);
 
     g_object_notify (G_OBJECT (modem), MM_MODEM_GSM_CARD_SIM_IDENTIFIER);
 
@@ -1306,12 +1304,9 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
      */
     if (priv->secondary) {
         if (!mm_serial_port_open (MM_SERIAL_PORT (priv->secondary), &error)) {
-            if (mm_options_debug ()) {
-                g_warning ("%s: error opening secondary port: (%d) %s",
-                           __func__,
-                           error ? error->code : -1,
-                           error && error->message ? error->message : "(unknown)");
-            }
+            mm_dbg ("error opening secondary port: (%d) %s",
+                    error ? error->code : -1,
+                    error && error->message ? error->message : "(unknown)");
         }
     }
 
@@ -2237,7 +2232,7 @@ roam_disconnect_done (MMModem *modem,
                       GError *error,
                       gpointer user_data)
 {
-    g_message ("Disconnected because roaming is not allowed");
+    mm_info ("Disconnected because roaming is not allowed");
 }
 
 static void
@@ -2268,9 +2263,9 @@ mm_generic_gsm_set_reg_status (MMGenericGsm *self,
     if (priv->reg_status[rs_type - 1] == status)
         return;
 
-    g_debug ("%s registration state changed: %d",
-             (rs_type == MM_GENERIC_GSM_REG_TYPE_CS) ? "CS" : "PS",
-             status);
+    mm_dbg ("%s registration state changed: %d",
+            (rs_type == MM_GENERIC_GSM_REG_TYPE_CS) ? "CS" : "PS",
+            status);
     priv->reg_status[rs_type - 1] = status;
 
     port = mm_generic_gsm_get_best_at_port (self, NULL);
@@ -2389,11 +2384,8 @@ reg_state_changed (MMAtSerialPort *port,
     GError *error = NULL;
 
     if (!mm_gsm_parse_creg_response (match_info, &state, &lac, &cell_id, &act, &cgreg, &error)) {
-        if (mm_options_debug ()) {
-            g_warning ("%s: error parsing unsolicited registration: %s",
-                       __func__,
-                       error && error->message ? error->message : "(unknown)");
-        }
+        mm_warn ("error parsing unsolicited registration: %s",
+                 error && error->message ? error->message : "(unknown)");
         return;
     }
 
@@ -3891,10 +3883,8 @@ ussd_send_done (MMAtSerialPort *port,
 
     if (reply) {
         /* look for the reply data coding scheme */
-        if (mm_options_debug ()) {
-            if ((start = strrchr (end, ',')) != NULL)
-                g_debug ("USSD data coding scheme %d", atoi (start + 1));
-        }
+        if ((start = strrchr (end, ',')) != NULL)
+            mm_dbg ("USSD data coding scheme %d", atoi (start + 1));
 
         converted = mm_modem_charset_hex_to_utf8 (reply, priv->cur_charset);
         mm_callback_info_set_result (info, converted, g_free);
@@ -4164,6 +4154,7 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
     gboolean done = FALSE;
     MMModemGsmAllowedMode allowed_mode;
     gboolean home_only = FALSE;
+    char *data_device;
 
     info->error = mm_modem_check_removed (modem, error);
     if (info->error)
@@ -4171,16 +4162,9 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
 
     priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
 
-    if (mm_options_debug ()) {
-        GTimeVal tv;
-        char *data_device;
-
-        g_object_get (G_OBJECT (modem), MM_MODEM_DATA_DEVICE, &data_device, NULL);
-        g_get_current_time (&tv);
-        g_debug ("<%ld.%ld> (%s): simple connect state %d",
-                 tv.tv_sec, tv.tv_usec, data_device, state);
-        g_free (data_device);
-    }
+    g_object_get (G_OBJECT (modem), MM_MODEM_DATA_DEVICE, &data_device, NULL);
+    mm_dbg ("(%s): simple connect state %d", data_device, state);
+    g_free (data_device);
 
     switch (state) {
     case SIMPLE_STATE_CHECK_PIN:
@@ -4279,29 +4263,21 @@ simple_connect (MMModemSimple *simple,
                 gpointer user_data)
 {
     MMCallbackInfo *info;
+    GHashTableIter iter;
+    gpointer key, value;
+    char *data_device;
 
-    /* If debugging, list all the simple connect properties */
-    if (mm_options_debug ()) {
-        GHashTableIter iter;
-        gpointer key, value;
-        GTimeVal tv;
-        char *data_device;
+    /* List simple connect properties when debugging */
+    g_object_get (G_OBJECT (simple), MM_MODEM_DATA_DEVICE, &data_device, NULL);
+    g_hash_table_iter_init (&iter, properties);
+    while (g_hash_table_iter_next (&iter, &key, &value)) {
+        char *val_str;
 
-        g_object_get (G_OBJECT (simple), MM_MODEM_DATA_DEVICE, &data_device, NULL);
-        g_get_current_time (&tv);
-
-        g_hash_table_iter_init (&iter, properties);
-        while (g_hash_table_iter_next (&iter, &key, &value)) {
-            char *val_str;
-
-            val_str = g_strdup_value_contents ((GValue *) value);
-            g_debug ("<%ld.%ld> (%s): %s => %s",
-                     tv.tv_sec, tv.tv_usec,
-                     data_device, (const char *) key, val_str);
-            g_free (val_str);
-        }
-        g_free (data_device);
+        val_str = g_strdup_value_contents ((GValue *) value);
+        mm_dbg ("(%s): %s => %s", data_device, (const char *) key, val_str);
+        g_free (val_str);
     }
+    g_free (data_device);
 
     info = mm_callback_info_new (MM_MODEM (simple), callback, user_data);
     mm_callback_info_set_data (info, "simple-connect-properties", 
