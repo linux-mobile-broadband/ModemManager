@@ -836,7 +836,7 @@ device_removed (MMManager *manager, GUdevDevice *device)
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
     MMModem *modem;
     const char *subsys, *name;
-    char *key;
+    char *key, *modem_device;
     SupportsInfo *info;
 
     g_return_if_fail (device != NULL);
@@ -851,6 +851,9 @@ device_removed (MMManager *manager, GUdevDevice *device)
         /* find_modem_for_port handles tty and net removal */
         modem = find_modem_for_port (manager, subsys, name);
         if (modem) {
+            modem_device = mm_modem_get_device (modem);
+            mm_info ("(%s/%s): released by modem %s", subsys, name, modem_device);
+            g_free (modem_device);
             mm_modem_release_port (modem, subsys, name);
             return;
         }
@@ -865,7 +868,6 @@ device_removed (MMManager *manager, GUdevDevice *device)
          */
         const char *sysfs_path = g_udev_device_get_sysfs_path (device);
 
-        // mm_dbg ("Looking for a modem for removed device %s", sysfs_path);
         modem = find_modem_for_device (manager, sysfs_path);
         if (modem) {
             mm_dbg ("Removing modem claimed by removed device %s", sysfs_path);
