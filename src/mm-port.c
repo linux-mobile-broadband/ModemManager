@@ -47,6 +47,20 @@ typedef struct {
 /*****************************************************************************/
 
 const char *
+mm_port_subsys_to_name (MMPortSubsys psubsys)
+{
+    switch (psubsys) {
+    case MM_PORT_SUBSYS_TTY:
+        return "tty";
+    case MM_PORT_SUBSYS_NET:
+        return "net";
+    default:
+        break;
+    }
+    return "(unknown)";
+}
+
+const char *
 mm_port_type_to_name (MMPortType ptype)
 {
     switch (ptype) {
