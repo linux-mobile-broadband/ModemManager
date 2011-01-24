@@ -164,9 +164,8 @@ gboolean
 mm_modem_base_remove_port (MMModemBase *self, MMPort *port)
 {
     MMModemBasePrivate *priv;
-    char *device, *key, *dupname;
-    const char *type_name, *name;
-    MMPortSubsys subsys;
+    char *device, *key, *name;
+    const char *type_name, *subsys;
     gboolean removed;
 
     g_return_val_if_fail (MM_IS_MODEM_BASE (self), FALSE);
@@ -174,21 +173,20 @@ mm_modem_base_remove_port (MMModemBase *self, MMPort *port)
 
     priv = MM_MODEM_BASE_GET_PRIVATE (self);
 
-    name = mm_port_get_device (port);
-    dupname = g_strdup (name);
-    subsys = mm_port_get_subsys (port);
+    name = g_strdup (mm_port_get_device (port));
+    subsys = mm_port_subsys_to_name (mm_port_get_subsys (port));
     type_name = mm_port_type_to_name (mm_port_get_port_type (port));
 
-    key = get_hash_key (mm_port_subsys_to_name (subsys), name);
+    key = get_hash_key (subsys, name);
     removed = g_hash_table_remove (priv->ports, key);
     if (removed) {
         /* Port may have already been destroyed by removal from the hash */
         device = mm_modem_get_device (MM_MODEM (self));
-        mm_dbg ("(%s) type %s removed from %s", dupname, type_name, device);
+        mm_dbg ("(%s) type %s removed from %s", name, type_name, device);
         g_free (device);
     }
     g_free (key);
-    g_free (dupname);
+    g_free (name);
 
     return removed;
 }
