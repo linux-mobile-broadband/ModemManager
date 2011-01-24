@@ -988,6 +988,57 @@ periodic_poll_cb (gpointer user_data)
     return TRUE;  /* continue running */
 }
 
+#define CREG_NUM_TAG "creg-num"
+#define CGREG_NUM_TAG "cgreg-num"
+
+static void
+initial_unsolicited_reg_check_done (MMCallbackInfo *info)
+{
+    MMGenericGsmPrivate *priv;
+    guint creg_num, cgreg_num;
+
+    if (!info->modem || info->error)
+        goto done;
+
+    priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+    if (!priv->secondary)
+        goto done;
+
+    /* Enable unsolicited registration responses on secondary ports too,
+     * to ensure that we get the response even if the modem is connected
+     * on the primary port.  We enable responses on both ports because we
+     * cannot trust modems to reliably send the responses on the port we
+     * enable them on.
+     */
+
+    creg_num = GPOINTER_TO_UINT (mm_callback_info_get_data (info, CREG_NUM_TAG));
+    switch (creg_num) {
+    case 1:
+        mm_at_serial_port_queue_command (priv->secondary, "+CREG=1", 3, NULL, NULL);
+        break;
+    case 2:
+        mm_at_serial_port_queue_command (priv->secondary, "+CREG=2", 3, NULL, NULL);
+        break;
+    default:
+        break;
+    }
+
+    cgreg_num = GPOINTER_TO_UINT (mm_callback_info_get_data (info, CGREG_NUM_TAG));
+    switch (cgreg_num) {
+    case 1:
+        mm_at_serial_port_queue_command (priv->secondary, "+CGREG=1", 3, NULL, NULL);
+        break;
+    case 2:
+        mm_at_serial_port_queue_command (priv->secondary, "+CGREG=2", 3, NULL, NULL);
+        break;
+    default:
+        break;
+    }
+
+done:
+    mm_callback_info_schedule (info);
+}
+
 static void
 cgreg1_done (MMAtSerialPort *port,
              GString *response,
@@ -1005,11 +1056,14 @@ cgreg1_done (MMAtSerialPort *port,
 
             /* The modem doesn't like unsolicited CGREG, so we'll need to poll */
             priv->cgreg_poll = TRUE;
-        }
+        } else
+            mm_callback_info_set_data (info, CGREG_NUM_TAG, GUINT_TO_POINTER (1), NULL);
+
         /* Success; get initial state */
         mm_at_serial_port_queue_command (port, "+CGREG?", 10, reg_poll_response, info->modem);
     }
-    mm_callback_info_schedule (info);
+
+    initial_unsolicited_reg_check_done (info);
 }
 
 static void
@@ -1030,11 +1084,13 @@ cgreg2_done (MMAtSerialPort *port,
         } else {
             add_loc_capability (MM_GENERIC_GSM (info->modem), MM_MODEM_LOCATION_CAPABILITY_GSM_LAC_CI);
 
+            mm_callback_info_set_data (info, CGREG_NUM_TAG, GUINT_TO_POINTER (2), NULL);
+
             /* Success; get initial state */
             mm_at_serial_port_queue_command (port, "+CGREG?", 10, reg_poll_response, info->modem);
 
             /* All done */
-            mm_callback_info_schedule (info);
+            initial_unsolicited_reg_check_done (info);
         }
     } else {
         /* Modem got removed */
@@ -1059,7 +1115,9 @@ creg1_done (MMAtSerialPort *port,
 
             /* The modem doesn't like unsolicited CREG, so we'll need to poll */
             priv->creg_poll = TRUE;
-        }
+        } else
+            mm_callback_info_set_data (info, CREG_NUM_TAG, GUINT_TO_POINTER (1), NULL);
+
         /* Success; get initial state */
         mm_at_serial_port_queue_command (port, "+CREG?", 10, reg_poll_response, info->modem);
 
@@ -1087,6 +1145,8 @@ creg2_done (MMAtSerialPort *port,
             mm_at_serial_port_queue_command (port, "+CREG=1", 3, creg1_done, info);
         } else {
             add_loc_capability (MM_GENERIC_GSM (info->modem), MM_MODEM_LOCATION_CAPABILITY_GSM_LAC_CI);
+
+            mm_callback_info_set_data (info, CREG_NUM_TAG, GUINT_TO_POINTER (2), NULL);
 
             /* Success; get initial state */
             mm_at_serial_port_queue_command (port, "+CREG?", 10, reg_poll_response, info->modem);
@@ -1238,8 +1298,15 @@ cmer_cb (MMAtSerialPort *port,
          GError *error,
          gpointer user_data)
 {
-    if (!error)
-        MM_GENERIC_GSM_GET_PRIVATE (user_data)->cmer_enabled = TRUE;
+    if (!error) {
+        MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (user_data);
+
+        priv->cmer_enabled = TRUE;
+
+        /* Enable CMER on the secondary port if we can too */
+        if (priv->secondary && mm_serial_port_is_open (MM_SERIAL_PORT (priv->secondary)))
+            mm_at_serial_port_queue_command (priv->secondary, "+CMER=3,0,0,1", 3, NULL, NULL);
+    }
 }
 
 static void
@@ -1519,11 +1586,16 @@ disable_flash_done (MMSerialPort *port,
     priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
 
     /* Disable unsolicited messages */
-    mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "AT+CREG=0", 3, NULL, NULL);
-    mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "AT+CGREG=0", 3, NULL, NULL);
+    mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "+CREG=0", 3, NULL, NULL);
+    mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "+CGREG=0", 3, NULL, NULL);
 
     if (priv->cmer_enabled) {
         mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "+CMER=0", 3, NULL, NULL);
+
+        /* And on the secondary port */
+        if (priv->secondary && mm_serial_port_is_open (MM_SERIAL_PORT (priv->secondary)))
+            mm_at_serial_port_queue_command (priv->secondary, "+CMER=0", 3, NULL, NULL);
+
         priv->cmer_enabled = FALSE;
     }
 
@@ -1533,6 +1605,15 @@ disable_flash_done (MMSerialPort *port,
     else
         disable_done (MM_AT_SERIAL_PORT (port), NULL, NULL, user_data);
     g_free (cmd);
+}
+
+static void
+secondary_unsolicited_done (MMAtSerialPort *port,
+                            GString *response,
+                            GError *error,
+                            gpointer user_data)
+{
+    mm_serial_port_close_force (MM_SERIAL_PORT (port));
 }
 
 static void
@@ -1570,9 +1651,12 @@ disable (MMModem *modem,
     update_lac_ci (self, 0, 0, 1);
     _internal_update_access_technology (self, MM_MODEM_GSM_ACCESS_TECH_UNKNOWN);
 
-    /* Close the secondary port if its open */
-    if (priv->secondary && mm_serial_port_is_open (MM_SERIAL_PORT (priv->secondary)))
-        mm_serial_port_close_force (MM_SERIAL_PORT (priv->secondary));
+    /* Clean up the secondary port if it's open */
+    if (priv->secondary && mm_serial_port_is_open (MM_SERIAL_PORT (priv->secondary))) {
+        mm_at_serial_port_queue_command (priv->secondary, "+CREG=0", 3, NULL, NULL);
+        mm_at_serial_port_queue_command (priv->secondary, "+CGREG=0", 3, NULL, NULL);
+        mm_at_serial_port_queue_command (priv->secondary, "+CMER=0", 3, secondary_unsolicited_done, NULL);
+    }
 
     info = mm_callback_info_new (modem, callback, user_data);
 
