@@ -40,7 +40,9 @@ typedef enum {
 } MMModemState;
 
 typedef enum {
-    MM_MODEM_STATE_REASON_NONE = 0
+    MM_MODEM_STATE_REASON_NONE = 0,
+    MM_MODEM_STATE_REASON_USER_REQUESTED,
+    MM_MODEM_STATE_REASON_SUSPEND
 } MMModemStateReason;
 
 #define DBUS_PATH_TAG "dbus-path"

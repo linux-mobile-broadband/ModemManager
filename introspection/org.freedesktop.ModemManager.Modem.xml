@@ -99,11 +99,6 @@
           New state.
         </tp:docstring>
       </arg>
-      <arg name="reason" type="u">
-        <tp:docstring>
-          Reason for state transition.
-        </tp:docstring>
-      </arg>
       <arg name="reason" type="u" tp:type="MM_MODEM_STATE_CHANGED_REASON">
         <tp:docstring>
           Reason for this state change.
@@ -227,20 +222,20 @@
       </tp:enumvalue>
     </tp:enum>
 
-    <tp:enum name="MM_MODEM_STATE_CHANGE_REASON" type="u">
+    <tp:enum name="MM_MODEM_STATE_CHANGED_REASON" type="u">
       <tp:enumvalue suffix="UNKNOWN" value="0">
         <tp:docstring>
           Reason unknown or not reportable.
         </tp:docstring>
       </tp:enumvalue>
-      <tp:enumvalue suffix="REQUESTED" value="1">
+      <tp:enumvalue suffix="USER_REQUESTED" value="1">
         <tp:docstring>
-          Connection state change was requested by an interface user.
+          State change was requested by an interface user.
         </tp:docstring>
       </tp:enumvalue>
       <tp:enumvalue suffix="SUSPEND" value="2">
         <tp:docstring>
-          Connection state change was caused by a system suspend.
+          State change was caused by a system suspend.
         </tp:docstring>
       </tp:enumvalue>
     </tp:enum>
