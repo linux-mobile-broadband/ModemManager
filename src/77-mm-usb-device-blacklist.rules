@@ -62,5 +62,11 @@ ATTRS{idVendor}=="0592", ATTRS{idProduct}=="0002", ENV{ID_MM_DEVICE_IGNORE}="1"
 # that isn't blacklisted.
 ATTRS{idVendor}=="0830", ATTRS{idProduct}=="0061", ENV{ID_MM_DEVICE_IGNORE}="1"
 
+# Belkin F5U183 Serial Adapter (unlikely to have a modem behind it)
+ATTRS{idVendor}=="050d", ATTRS{idProduct}=="0103", ENV{ID_MM_DEVICE_IGNORE}="1"
+
+# ATEN Intl UC-232A (Prolific)
+ATTRS{idVendor}=="0557", ATTRS{idProduct}=="2008", ENV{ID_MM_DEVICE_IGNORE}="1"
+
 LABEL="mm_usb_device_blacklist_end"
 
