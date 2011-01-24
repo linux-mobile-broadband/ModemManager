@@ -64,6 +64,7 @@ _mm_log (const char *loc,
     char msgbuf[512] = { 0 };
     int syslog_priority = LOG_INFO;
     const char *prefix = NULL;
+    ssize_t ign;
 
     if (!(log_level & level))
         return;
@@ -112,7 +113,9 @@ _mm_log (const char *loc,
         if (logfd < 0)
             syslog (syslog_priority, "%s", msgbuf);
         else {
-            (void) write (logfd, msgbuf, strlen (msgbuf));
+            ign = write (logfd, msgbuf, strlen (msgbuf));
+            if (ign) {} /* whatever; really shut up about unused result */
+
             fsync (logfd);  /* Make sure output is dumped to disk immediately */
         }
     }
@@ -127,6 +130,7 @@ log_handler (const gchar *log_domain,
              gpointer ignored)
 {
     int syslog_priority;
+    ssize_t ign;
 
     switch (level) {
     case G_LOG_LEVEL_ERROR:
@@ -152,8 +156,10 @@ log_handler (const gchar *log_domain,
 
     if (logfd < 0)
         syslog (syslog_priority, "%s", message);
-    else
-        (void) write (logfd, message, strlen (message));
+    else {
+        ign = write (logfd, message, strlen (message));
+        if (ign) {} /* whatever; really shut up about unused result */
+    }
 }
 
 gboolean
