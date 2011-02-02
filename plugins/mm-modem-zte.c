@@ -547,12 +547,13 @@ simple_connect (MMModemSimple *simple,
                 MMModemFn callback,
                 gpointer user_data)
 {
-    MMModemZtePrivate *priv = MM_MODEM_ZTE_GET_PRIVATE (simple);
+    MMModemZte *self = MM_MODEM_ZTE (simple);
+    MMModemZtePrivate *priv = MM_MODEM_ZTE_GET_PRIVATE (self);
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMModemSimple *parent_iface;
 
     if (priv->is_icera)
-        mm_modem_icera_simple_connect (MM_MODEM_ICERA (simple), properties);
+        mm_modem_icera_simple_connect (MM_MODEM_ICERA (self), properties);
 
     parent_iface = g_type_interface_peek_parent (MM_MODEM_SIMPLE_GET_INTERFACE (simple));
     parent_iface->connect (MM_MODEM_SIMPLE (simple), properties, callback, info);
