@@ -55,7 +55,7 @@ include/mm-modem.h: $(XMLS) introspection/all.xml header-generator.xsl
 	$(edit) $< >$@
 
 xmldir = $(datadir)/dbus-1/interfaces
-xml_DATA = $(XMLS)
+xml_DATA = $(filter-out introspection/all.xml, $(XMLS))
 
 edit = @sed \
 	-e 's|@sbindir[@]|$(sbindir)|g' \
