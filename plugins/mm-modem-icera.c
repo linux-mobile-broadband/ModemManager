@@ -526,8 +526,8 @@ mm_modem_icera_do_connect (MMModemIcera *self,
     else {
         command = g_strdup_printf ("%%IPDPCFG=%d,0,1,\"%s\",\"%s\"",
                                    cid,
-                                   priv->password ? priv->password : "",
-                                   priv->username ? priv->username : "");
+                                   priv->username ? priv->username : "",
+                                   priv->password ? priv->password : "");
 
     }
 
