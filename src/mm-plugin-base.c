@@ -933,6 +933,10 @@ mm_plugin_base_get_device_ids (MMPluginBase *self,
                 pid = g_udev_device_get_sysfs_attr (parent, "card_id");
                 if (!vid || !pid)
                     goto out;
+            } else if (!strcmp (parent_subsys, "platform")) {
+                /* Platform devices don't usually have a VID/PID */
+                success = TRUE;
+                goto out;
             }
         }
     }
