@@ -92,23 +92,23 @@ _mm_log (const char *loc,
     }
 
     if ((log_level & LOGL_DEBUG) && (level == LOGL_DEBUG))
-        prefix = "debug";
+        prefix = "<debug>";
     else if ((log_level & LOGL_INFO) && (level == LOGL_INFO))
-        prefix = "info";
+        prefix = "<info> ";
     else if ((log_level & LOGL_WARN) && (level == LOGL_WARN)) {
-        prefix = "warn";
+        prefix = "<warn> ";
         syslog_priority = LOG_WARNING;
     } else if ((log_level & LOGL_ERR) && (level == LOGL_ERR)) {
-        prefix = "err";
+        prefix = "<error>";
         syslog_priority = LOG_ERR;
     } else
         g_warn_if_reached ();
 
     if (prefix) {
         if (log_level & LOGL_DEBUG)
-            snprintf (msgbuf, sizeof (msgbuf), "<%s>%s [%s] %s(): %s\n", prefix, tsbuf, loc, func, msg);
+            snprintf (msgbuf, sizeof (msgbuf), "%s%s [%s] %s(): %s\n", prefix, tsbuf, loc, func, msg);
         else
-            snprintf (msgbuf, sizeof (msgbuf), "<%s>%s %s\n", prefix, tsbuf, msg);
+            snprintf (msgbuf, sizeof (msgbuf), "%s%s %s\n", prefix, tsbuf, msg);
 
         if (logfd < 0)
             syslog (syslog_priority, "%s", msgbuf);
