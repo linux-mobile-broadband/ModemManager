@@ -34,6 +34,7 @@ static void impl_modem_cdma_activate_manual (MMModemCdma *modem, DBusGMethodInvo
 enum {
     SIGNAL_QUALITY,
     REGISTRATION_STATE_CHANGED,
+    ACTIVATION_STATE_CHANGED,
 
     LAST_SIGNAL
 };
@@ -348,6 +349,8 @@ mm_modem_cdma_emit_registration_state_changed (MMModemCdma *self,
 
 /*****************************************************************************/
 
+#define DBUS_TYPE_G_MAP_OF_VARIANT (dbus_g_type_get_map ("GHashTable", G_TYPE_STRING, G_TYPE_VALUE))
+
 static void
 mm_modem_cdma_init (gpointer g_iface)
 {
@@ -384,6 +387,15 @@ mm_modem_cdma_init (gpointer g_iface)
                       NULL, NULL,
                       mm_marshal_VOID__UINT_UINT,
                       G_TYPE_NONE, 2, G_TYPE_UINT, G_TYPE_UINT);
+
+    signals[ACTIVATION_STATE_CHANGED] =
+        g_signal_new ("activation-state-changed",
+                      iface_type,
+                      G_SIGNAL_RUN_FIRST,
+                      G_STRUCT_OFFSET (MMModemCdma, registration_state_changed),
+                      NULL, NULL,
+                      mm_marshal_VOID__UINT_UINT_BOXED,
+                      G_TYPE_NONE, 3, G_TYPE_UINT, G_TYPE_UINT, DBUS_TYPE_G_MAP_OF_VARIANT);
 
     initialized = TRUE;
 }
