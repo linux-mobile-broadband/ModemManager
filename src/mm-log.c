@@ -77,8 +77,8 @@ _mm_log (const char *loc,
         g_get_current_time (&tv);
         snprintf (&tsbuf[0], sizeof (tsbuf), " [%09ld.%06ld]", tv.tv_sec, tv.tv_usec);
     } else if (ts_flags == TS_FLAG_REL) {
-        time_t secs;
-        suseconds_t usecs;
+        glong secs;
+        glong usecs;
 
         g_get_current_time (&tv);
         secs = tv.tv_sec - rel_start.tv_sec;
