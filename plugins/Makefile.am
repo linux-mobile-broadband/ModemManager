@@ -35,7 +35,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-anydata.la \
 	libmm-plugin-simtech.la \
 	libmm-plugin-x22x.la \
-	libmm-plugin-linktop.la
+	libmm-plugin-linktop.la \
+	libmm-plugin-samsung.la
 
 # Generic
 
@@ -331,6 +332,24 @@ libmm_plugin_linktop_la_CPPFLAGS = \
 	-I$(top_srcdir)/src
 
 libmm_plugin_linktop_la_LDFLAGS = \
+	$(GUDEV_LDFLAGS) \
+	-module \
+	-avoid-version
+
+# Samsung modem
+
+libmm_plugin_samsung_la_SOURCES = \
+	mm-plugin-samsung.c \
+	mm-plugin-samsung.h \
+	mm-modem-samsung-gsm.c \
+	mm-modem-samsung-gsm.h
+
+libmm_plugin_samsung_la_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
+	-I$(top_srcdir)/src
+
+libmm_plugin_samsung_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
 	-module \
 	-avoid-version
