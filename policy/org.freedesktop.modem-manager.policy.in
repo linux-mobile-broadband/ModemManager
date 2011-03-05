@@ -23,7 +23,7 @@
     <_message>System policy prevents requesting identifying information from the mobile broadband device.</_message>
     <defaults>
       <allow_inactive>no</allow_inactive>
-      <allow_active>auth_self_keep</allow_active>
+      <allow_active>yes</allow_active>
     </defaults>
   </action>
 
