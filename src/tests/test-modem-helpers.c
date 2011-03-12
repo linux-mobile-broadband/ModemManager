@@ -733,6 +733,16 @@ test_creg2_s8500_wave_unsolicited (void *f, gpointer d)
 }
 
 static void
+test_creg2_gobi_weird_solicited (void *f, gpointer d)
+{
+    TestData *data = (TestData *) d;
+    const char *reply = "\r\n+CREG: 2,1,  0 5, 2715\r\n";
+    const CregResult result = { 1, 0x0000, 0x2715, -1, 4, FALSE};
+
+    test_creg_match ("Qualcomm Gobi 1000 CREG=2", TRUE, reply, data, &result);
+}
+
+static void
 test_cscs_icon225_support_response (void *f, gpointer d)
 {
     const char *reply = "\r\n+CSCS: (\"IRA\",\"GSM\",\"UCS2\")\r\n";
@@ -1251,6 +1261,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_creg2_xu870_unsolicited_unregistered, data));
     g_test_suite_add (suite, TESTCASE (test_creg2_md400_unsolicited, data));
     g_test_suite_add (suite, TESTCASE (test_creg2_s8500_wave_unsolicited, data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_gobi_weird_solicited, data));
 
     g_test_suite_add (suite, TESTCASE (test_cgreg1_solicited, data));
     g_test_suite_add (suite, TESTCASE (test_cgreg1_unsolicited, data));

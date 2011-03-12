@@ -235,7 +235,7 @@ mm_gsm_destroy_scan_data (gpointer data)
 #define CREG3 "\\+(CREG|CGREG):\\s*(\\d{1}),\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)"
 
 /* +CREG: <n>,<stat>,<lac>,<ci>       (GSM 07.07 solicited and some CREG=2 unsolicited) */
-#define CREG4 "\\+(CREG|CGREG):\\s*(\\d{1}),\\s*(\\d{1})\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)"
+#define CREG4 "\\+(CREG|CGREG):\\s*(\\d{1}),\\s*(\\d{1})\\s*,\\s*([^,]*)\\s*,\\s*([^,\\s]*)"
 
 /* +CREG: <stat>,<lac>,<ci>,<AcT>     (ETSI 27.007 CREG=2 unsolicited) */
 #define CREG5 "\\+(CREG|CGREG):\\s*(\\d{1})\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*(\\d{1,2})"
