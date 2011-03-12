@@ -56,6 +56,9 @@ typedef struct {
 
 GType mm_plugin_base_supports_task_get_type (void);
 
+typedef guint32 (*MMBaseSupportsTaskCustomInitResultFunc) (GString* response,
+                                                           gpointer user_data);
+
 MMPlugin *mm_plugin_base_supports_task_get_plugin (MMPluginBaseSupportsTask *task);
 
 GUdevDevice *mm_plugin_base_supports_task_get_port (MMPluginBaseSupportsTask *task);
@@ -73,7 +76,9 @@ void mm_plugin_base_supports_task_set_custom_init_command (MMPluginBaseSupportsT
                                                            const char *cmd,
                                                            guint32 delay_seconds,
                                                            guint32 max_tries,
-                                                           gboolean fail_if_timeout);
+                                                           gboolean fail_if_timeout,
+                                                           MMBaseSupportsTaskCustomInitResultFunc callback,
+                                                           gpointer callback_data);
 
 #define MM_TYPE_PLUGIN_BASE            (mm_plugin_base_get_type ())
 #define MM_PLUGIN_BASE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_BASE, MMPluginBase))
@@ -113,6 +118,9 @@ struct _MMPluginBaseClass {
                                    const char *command,
                                    const char *response,
                                    const GError *error);
+
+    void (*handle_custom_init_response) (MMPluginBaseSupportsTask *task,
+                                         GString *response);
 
     /* Signals */
     void (*probe_result) (MMPluginBase *self,

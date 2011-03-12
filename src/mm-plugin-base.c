@@ -115,6 +115,8 @@ typedef struct {
     guint32 custom_init_tries;
     guint32 custom_init_delay_seconds;
     gboolean custom_init_fail_if_timeout;
+    MMBaseSupportsTaskCustomInitResultFunc custom_init_callback;
+    gpointer custom_init_callback_data;
 
     MMSupportsPortResultFunc callback;
     gpointer callback_data;
@@ -229,7 +231,9 @@ mm_plugin_base_supports_task_set_custom_init_command (MMPluginBaseSupportsTask *
                                                       const char *cmd,
                                                       guint32 delay_seconds,
                                                       guint32 max_tries,
-                                                      gboolean fail_if_timeout)
+                                                      gboolean fail_if_timeout,
+                                                      MMBaseSupportsTaskCustomInitResultFunc callback,
+                                                      gpointer callback_data)
 {
     MMPluginBaseSupportsTaskPrivate *priv;
 
@@ -243,6 +247,8 @@ mm_plugin_base_supports_task_set_custom_init_command (MMPluginBaseSupportsTask *
     priv->custom_init_max_tries = max_tries;
     priv->custom_init_delay_seconds = delay_seconds;
     priv->custom_init_fail_if_timeout = fail_if_timeout;
+    priv->custom_init_callback = callback;
+    priv->custom_init_callback_data = callback_data;
 }
 
 static void
@@ -731,6 +737,7 @@ custom_init_response (MMAtSerialPort *port,
 {
     MMPluginBaseSupportsTask *task = MM_PLUGIN_BASE_SUPPORTS_TASK (user_data);
     MMPluginBaseSupportsTaskPrivate *task_priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
+    MMPluginBaseClass* klass = MM_PLUGIN_BASE_GET_CLASS (task_priv->plugin);
 
     if (error) {
         task_priv->custom_init_tries++;
@@ -744,6 +751,24 @@ custom_init_response (MMAtSerialPort *port,
                 probe_complete (task);
                 return;
             }
+        }
+    } else {
+        /* custom handle init response */
+        if (klass->handle_custom_init_response != NULL)
+            klass->handle_custom_init_response (task, response);
+    }
+
+    /* check for custom init callback */
+    if (task_priv->custom_init_callback != NULL) {
+        MMBaseSupportsTaskCustomInitResultFunc callback = task_priv->custom_init_callback;
+        guint32 level;
+
+        level = callback (response, task_priv->custom_init_callback_data);
+        if (level > 0) {
+            /* Plugin supports the modem */
+            task_priv->probed_caps = level;
+            probe_complete (task);
+            return;
         }
     }
 
@@ -1243,6 +1268,7 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
     g_type_class_add_private (object_class, sizeof (MMPluginBasePrivate));
 
     klass->handle_probe_response = real_handle_probe_response;
+    klass->handle_custom_init_response = NULL;
 
     /* Virtual methods */
     object_class->get_property = get_property;
