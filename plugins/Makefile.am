@@ -242,9 +242,11 @@ libmm_plugin_zte_la_CPPFLAGS = \
 
 libmm_plugin_zte_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
-	$(builddir)/libicera-utils.la \
 	-module \
 	-avoid-version
+
+libmm_plugin_zte_la_LIBADD = \
+	$(builddir)/libicera-utils.la
 
 # Longcheer (and rebranded dongles)
 
