@@ -62,7 +62,7 @@
     
     <method name="SendPin">
       <tp:docstring>
-	Send the PIN (or PUK) to unlock the SIM card.
+	Send the PIN to unlock the SIM card.
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_send_pin"/>
