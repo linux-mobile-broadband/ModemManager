@@ -673,23 +673,32 @@ do_connect (MMModem *modem,
 }
 
 static void
+disconnect_ipdpact_done (MMAtSerialPort *port,
+                         GString *response,
+                         GError *error,
+                         gpointer user_data)
+{
+    mm_callback_info_schedule ((MMCallbackInfo *) user_data);
+}
+
+static void
 do_disconnect (MMGenericGsm *gsm,
                gint cid,
                MMModemFn callback,
                gpointer user_data)
 {
+    MMCallbackInfo *info;
     MMAtSerialPort *primary;
     char *command;
+
+    info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
 
     primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
 
     command = g_strdup_printf ("AT%%IPDPACT=%d,0", cid);
-
-    mm_at_serial_port_queue_command (primary, command, 3, NULL, NULL);
+    mm_at_serial_port_queue_command (primary, command, 3, disconnect_ipdpact_done, info);
     g_free (command);
-
-    MM_GENERIC_GSM_CLASS (mm_modem_samsung_gsm_parent_class)->do_disconnect (gsm, cid, callback, user_data);
 }
 
 static void
