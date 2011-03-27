@@ -149,25 +149,25 @@ static gint samsung_get_cid (MMModemSamsungGsm *self)
 
 static gboolean
 parse_ipsys (MMModemSamsungGsm *self,
-              const char *reply,
-              int *mode,
-              int *domain,
-              MMModemGsmAllowedMode *out_mode)
+             const char *reply,
+             MMModemGsmAllowedMode *out_mode)
 {
-    if(reply == NULL || !g_str_has_prefix(reply, "%IPSYS:"))
+    int mode, domain;
+
+    if (reply == NULL || !g_str_has_prefix (reply, "%IPSYS:"))
         return FALSE;
 
-    if (sscanf (reply + 7, "%d,%d", mode, domain) == 2) {
+    if (sscanf (reply + 7, "%d,%d", &mode, &domain) == 2) {
         MMModemGsmAllowedMode new_mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
 
         /* Network mode */
-        if (*mode == 2)
+        if (mode == 2)
             new_mode = MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED;
-        else if (*mode == 3)
+        else if (mode == 3)
             new_mode = MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED;
-        else if (*mode == 0)
+        else if (mode == 0)
             new_mode = MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY;
-        else if (*mode == 1)
+        else if (mode == 1)
             new_mode = MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY;
 
         if (out_mode)
@@ -188,13 +188,12 @@ get_allowed_mode_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMModemSamsungGsm *self = MM_MODEM_SAMSUNG_GSM (info->modem);
-    int mode, domain;
-    MMModemGsmAllowedMode mode_out = MM_MODEM_GSM_ALLOWED_MODE_ANY;
+    MMModemGsmAllowedMode allowed = MM_MODEM_GSM_ALLOWED_MODE_ANY;
 
     if (error)
         info->error = g_error_copy (error);
-    else if (parse_ipsys (self, response->str, &mode, &domain, &mode_out))
-        mm_callback_info_set_result (info, GUINT_TO_POINTER (mode), NULL);
+    else if (parse_ipsys (self, response->str, &allowed))
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (allowed), NULL);
 
     mm_callback_info_schedule (info);
 }
