@@ -11,8 +11,8 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
- * Copyright 2011 by Samsung Electronics, Inc.,
+ * Copyright (C) 2009 - 2011 Red Hat, Inc.
+ * Copyright (C) 2011 Samsung Electronics, Inc.,
  */
 
 #include <stdlib.h>
@@ -50,7 +50,6 @@ G_DEFINE_TYPE_EXTENDED (MMModemSamsungGsm, mm_modem_samsung_gsm, MM_TYPE_GENERIC
 typedef struct {
     char * band;
     MMCallbackInfo *connect_pending_data;
-    gboolean init_retried;
 
     char *username;
     char *password;
@@ -490,11 +489,8 @@ disable (MMModem *modem,
          MMModemFn callback,
          gpointer user_data)
 {
-    MMModemSamsungGsmPrivate *priv = MM_MODEM_SAMSUNG_GSM_GET_PRIVATE (modem);
     MMAtSerialPort *primary;
     DisableInfo *info;
-
-    priv->init_retried = FALSE;
 
     info = g_malloc0 (sizeof (DisableInfo));
     info->callback = callback;
@@ -513,73 +509,66 @@ disable (MMModem *modem,
 }
 
 static void
-init_modem_done (MMAtSerialPort *port,
-                 GString *response,
-                 GError *error,
-                 gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-
-    mm_at_serial_port_queue_command (port, "ATE0;+CFUN=1", 5, NULL, NULL);
-
-    _samsung_change_unsolicited_messages (MM_MODEM_SAMSUNG_GSM (info->modem), TRUE);
-
-    mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
-}
-
-static void enable_flash_done (MMSerialPort *port,
-                               GError *error,
-                               gpointer user_data);
-
-static void
-pre_init_done (MMAtSerialPort *port,
+init_all_done (MMAtSerialPort *port,
                GString *response,
                GError *error,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMModemSamsungGsm *self = MM_MODEM_SAMSUNG_GSM (info->modem);
-    MMModemSamsungGsmPrivate *priv = MM_MODEM_SAMSUNG_GSM_GET_PRIVATE (self);
 
-    if (error) {
-        /* Retry the init string one more time; the modem sometimes throws it away */
-        if (   !priv->init_retried
-            && g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
-            priv->init_retried = TRUE;
-            enable_flash_done (MM_SERIAL_PORT (port), NULL, user_data);
-        } else
-            mm_generic_gsm_enable_complete (MM_GENERIC_GSM (self), error, info);
-    } else {
+    if (!error)
+        _samsung_change_unsolicited_messages (self, TRUE);
+
+    mm_generic_gsm_enable_complete (MM_GENERIC_GSM (self), error, info);
+}
+
+static void
+init2_done (MMAtSerialPort *port,
+            GString *response,
+            GError *error,
+            gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemSamsungGsm *self = MM_MODEM_SAMSUNG_GSM (info->modem);
+
+    if (error)
+        mm_generic_gsm_enable_complete (MM_GENERIC_GSM (self), error, info);
+    else {
         /* Finish the initialization */
-        mm_at_serial_port_queue_command (port, "Z E0 V1 X4 &C1 +CMEE=1;+CFUN=1;", 10, init_modem_done, info);
+        mm_at_serial_port_queue_command (port, "E0 V1 X4 &C1", 3, init_all_done, info);
     }
 }
 
 static void
-enable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
+init_done (MMAtSerialPort *port,
+           GString *response,
+           GError *error,
+           gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemSamsungGsm *self = MM_MODEM_SAMSUNG_GSM (info->modem);
 
     if (error)
-        mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
-    else
-        mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "E0 V1", 3, pre_init_done, user_data);
+        mm_generic_gsm_enable_complete (MM_GENERIC_GSM (self), error, info);
+    else {
+        /* Power up the modem */
+        mm_at_serial_port_queue_command (port, "+CMEE=1", 2, NULL, NULL);
+        mm_at_serial_port_queue_command (port, "+CFUN=1", 10, init2_done, info);
+    }
 }
 
 static void
 do_enable (MMGenericGsm *modem, MMModemFn callback, gpointer user_data)
 {
-    MMModemSamsungGsmPrivate *priv = MM_MODEM_SAMSUNG_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
     MMAtSerialPort *primary;
 
-    priv->init_retried = FALSE;
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
     primary = mm_generic_gsm_get_at_port (modem, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-
-    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
-    mm_serial_port_flash (MM_SERIAL_PORT (primary), 100, FALSE, enable_flash_done, info);
+    mm_at_serial_port_queue_command (primary, "Z E0 V1", 3, init_done, info);
 }
 
 static void
