@@ -572,10 +572,10 @@ do_enable (MMGenericGsm *modem, MMModemFn callback, gpointer user_data)
 }
 
 static void
-Samsung_call_control (MMModemSamsungGsm *self,
-                    gboolean activate,
-                    MMAtSerialResponseFn callback,
-                    gpointer user_data)
+samsung_call_control (MMModemSamsungGsm *self,
+                      gboolean activate,
+                      MMAtSerialResponseFn callback,
+                      gpointer user_data)
 {
     char *command;
     MMAtSerialPort *primary;
@@ -618,7 +618,7 @@ auth_done (MMAtSerialPort *port,
         mm_generic_gsm_connect_complete (MM_GENERIC_GSM (info->modem), error, info);
     else {
         /* Activate the PDP context and start the data session */
-    Samsung_call_control (MM_MODEM_SAMSUNG_GSM (info->modem), TRUE, Samsung_enabled, info);
+        samsung_call_control (MM_MODEM_SAMSUNG_GSM (info->modem), TRUE, Samsung_enabled, info);
     }
 }
 
@@ -669,7 +669,7 @@ do_connect (MMModem *modem,
     info = mm_callback_info_new (modem, callback, user_data);
 
     /* Ensure the PDP context is deactivated */
-    Samsung_call_control (MM_MODEM_SAMSUNG_GSM (info->modem), FALSE, old_context_clear_done, info);
+    samsung_call_control (MM_MODEM_SAMSUNG_GSM (info->modem), FALSE, old_context_clear_done, info);
 }
 
 static void
