@@ -56,7 +56,6 @@ typedef struct {
     char *password;
 
     MMModemGsmAccessTech last_act;
-
 } MMModemSamsungGsmPrivate;
 
 #define IPDPADDR_TAG "%IPDPADDR: "
@@ -343,61 +342,45 @@ set_band (MMModemGsmNetwork *modem,
         command = g_strdup_printf ("AT%%IPBM=\"%s\",1", priv->band);
         mm_at_serial_port_queue_command (port, command, 3, set_band_done, info);
         g_free (command);
-     priv->band = NULL;
+        priv->band = NULL;
     }
 }
 
-static gboolean parse_ipbm(MMModemSamsungGsm *self,
-              const char *reply,
-              MMModemGsmBand *band)
+static gboolean
+parse_ipbm (const char *reply, MMModemGsmBand *band)
 {
     int enable[12];
 
-    g_assert(band != NULL);
+    g_return_val_if_fail (band != NULL, FALSE);
+    g_return_val_if_fail (reply != NULL, FALSE);
 
-    if (reply == NULL)
+    if (sscanf (reply, "\"ANY\": %d\r\n\"EGSM\": %d\r\n\"DCS\": %d\r\n\"PCS\": %d\r\n\"G850\": %d\r\n\"FDD_BAND_I\": %d\r\n\"FDD_BAND_II\": %d\r\n\"FDD_BAND_III\": %d\r\n\"FDD_BAND_IV\": %d\r\n\"FDD_BAND_V\": %d\r\n\"FDD_BAND_VI\": %d\r\n\"FDD_BAND_VIII\": %d", &enable[0], &enable[1], &enable[2], &enable[3], &enable[4], &enable[5], &enable[6], &enable[7], &enable[8], &enable[9], &enable[10], &enable[11]) != 12)
         return FALSE;
 
-    if (sscanf (reply, "\"ANY\": %d\r\n\"EGSM\": %d\r\n\"DCS\": %d\r\n\"PCS\": %d\r\n\"G850\": %d\r\n\"FDD_BAND_I\": %d\r\n\"FDD_BAND_II\": %d\r\n\"FDD_BAND_III\": %d\r\n\"FDD_BAND_IV\": %d\r\n\"FDD_BAND_V\": %d\r\n\"FDD_BAND_VI\": %d\r\n\"FDD_BAND_VIII\": %d", &enable[0], &enable[1], &enable[2], &enable[3], &enable[4], &enable[5], &enable[6], &enable[7], &enable[8], &enable[9], &enable[10], &enable[11])== 12) {
-
-    if(enable[5] == 1) {
+    if (enable[5] == 1)
         *band = MM_MODEM_GSM_BAND_U2100;
-        return TRUE;}
-    else if(enable[6] == 1) {
+    else if (enable[6] == 1)
         *band = MM_MODEM_GSM_BAND_U1900;
-        return TRUE;}
-    else if(enable[7] == 1) {
+    else if (enable[7] == 1)
         *band = MM_MODEM_GSM_BAND_U1800;
-        return TRUE;}
-    else if(enable[8] == 1) {
+    else if (enable[8] == 1)
         *band = MM_MODEM_GSM_BAND_U17IV;
-        return TRUE;}
-    else if(enable[9] == 1) {
+    else if (enable[9] == 1)
         *band = MM_MODEM_GSM_BAND_U850;
-        return TRUE;}
-    else if(enable[10] == 1) {
+    else if (enable[10] == 1)
         *band = MM_MODEM_GSM_BAND_U800;
-        return TRUE;}
-    else if(enable[11] == 1) {
+    else if (enable[11] == 1)
         *band = MM_MODEM_GSM_BAND_U900;
-        return TRUE;}
-    else if(enable[1] == 1) {
+    else if (enable[1] == 1)
         *band = MM_MODEM_GSM_BAND_EGSM;
-        return TRUE;}
-    else if(enable[2] == 1) {
+    else if (enable[2] == 1)
         *band = MM_MODEM_GSM_BAND_DCS;
-        return TRUE;}
-    else if(enable[3] == 1) {
+    else if (enable[3] == 1)
         *band = MM_MODEM_GSM_BAND_PCS;
-        return TRUE;}
-    else if(enable[4] == 1) {
+    else if (enable[4] == 1)
         *band = MM_MODEM_GSM_BAND_G850;
-        return TRUE;}
-    else{
-        *band = MM_MODEM_GSM_BAND_ANY;}
-
-        return TRUE;
-    }
+    else
+        *band = MM_MODEM_GSM_BAND_ANY;
 
     return FALSE;
 }
@@ -409,15 +392,12 @@ get_band_done (MMAtSerialPort *port,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemSamsungGsm *self = MM_MODEM_SAMSUNG_GSM (info->modem);
-    MMModemGsmBand mm_band = MM_MODEM_GSM_BAND_ANY;
+    MMModemGsmBand mm_band = MM_MODEM_GSM_BAND_UNKNOWN;
 
     if (error)
         info->error = g_error_copy (error);
-    else if (parse_ipbm (self, response->str, &mm_band)) {
-
+    else if (parse_ipbm (response->str, &mm_band))
         mm_callback_info_set_result (info, GUINT_TO_POINTER (mm_band), NULL);
-    }
 
     mm_callback_info_schedule (info);
 }
@@ -724,11 +704,8 @@ do_disconnect (MMGenericGsm *gsm,
                MMModemFn callback,
                gpointer user_data)
 {
-    MMCallbackInfo *info;
     MMAtSerialPort *primary;
     char *command;
-
-    info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
 
     primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
@@ -739,7 +716,6 @@ do_disconnect (MMGenericGsm *gsm,
     g_free (command);
 
     MM_GENERIC_GSM_CLASS (mm_modem_samsung_gsm_parent_class)->do_disconnect (gsm, cid, callback, user_data);
-
 }
 
 static void
@@ -1012,7 +988,6 @@ grab_port (MMModem *modem,
 
         g_object_set (port, MM_PORT_CARRIER_DETECT, FALSE, NULL);
 
-
         /* %NWSTATE: <rssi>,<mccmnc>,<tech>,<connected>,<regulation> */
         regex = g_regex_new ("\\r\\n\\%NWSTATE: (\\d),(\\d+),\\s*([^,\\s]*)\\s*,(.+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_mode_change, modem, NULL);
@@ -1033,7 +1008,6 @@ modem_init (MMModem *modem_class)
     modem_class->disable = disable;
     modem_class->connect = do_connect;
     modem_class->get_ip4_config = get_ip4_config;
-
     modem_class->grab_port = grab_port;
 }
 
