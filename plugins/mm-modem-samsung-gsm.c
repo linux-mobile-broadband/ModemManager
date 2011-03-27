@@ -790,7 +790,6 @@ handle_mode_change (MMAtSerialPort *port,
      /* Better technologies are listed first since modems sometimes say
      * stuff like "GPRS/EDGE" and that should be handled as EDGE.
      */
-    g_debug ("Access Technology: %s", str);
     if (strcmp (str, "3G-HSDPA-HSUPA")==0)
         act = MM_MODEM_GSM_ACCESS_TECH_HSPA;
     else if (strcmp (str, "3G-HSUPA")==0)
@@ -811,7 +810,6 @@ handle_mode_change (MMAtSerialPort *port,
         act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     g_free (str);
 
-    g_debug ("Access Technology: %d", act);
     MM_MODEM_SAMSUNG_GSM_GET_PRIVATE (self)->last_act = act;
     mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (self), act);
 }
