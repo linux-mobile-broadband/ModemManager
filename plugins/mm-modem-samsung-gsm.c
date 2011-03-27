@@ -96,29 +96,6 @@ connect_pending_done (MMModemSamsungGsm *self)
     }
 }
 
-void
-mm_modem_samsung_cleanup (MMModemSamsungGsm *self)
-{
-    MMModemSamsungGsmPrivate *priv = MM_MODEM_SAMSUNG_GSM_GET_PRIVATE (self);
-
-    /* Clear the pending connection if necessary */
-    connect_pending_done (self);
-    g_free (priv->username);
-    g_free (priv->password);
-    memset (priv, 0, sizeof (MMModemSamsungGsmPrivate));
-}
-
-void
-mm_modem_samsung_change_unsolicited_messages (MMModemSamsungGsm *self, gboolean enabled)
-{
-    MMAtSerialPort *primary;
-
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
-    g_assert (primary);
-
-    mm_at_serial_port_queue_command (primary, enabled ? "%NWSTATE=1" : "%NWSTATE=0", 3, NULL, NULL);
-}
-
 typedef struct {
     MMModemGsmBand mm;
     char band[50];
@@ -465,6 +442,29 @@ get_access_technology (MMGenericGsm *gsm,
     mm_at_serial_port_queue_command (port, "%NWSTATE=1", 3, get_nwstate_done, info);
 }
 
+static void
+_samsung_cleanup (MMModemSamsungGsm *self)
+{
+    MMModemSamsungGsmPrivate *priv = MM_MODEM_SAMSUNG_GSM_GET_PRIVATE (self);
+
+    /* Clear the pending connection if necessary */
+    connect_pending_done (self);
+    g_free (priv->username);
+    g_free (priv->password);
+    memset (priv, 0, sizeof (MMModemSamsungGsmPrivate));
+}
+
+static void
+_samsung_change_unsolicited_messages (MMModemSamsungGsm *self, gboolean enabled)
+{
+    MMAtSerialPort *primary;
+
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+
+    mm_at_serial_port_queue_command (primary, enabled ? "%NWSTATE=1" : "%NWSTATE=0", 3, NULL, NULL);
+}
+
 typedef struct {
     MMModem *modem;
     MMModemFn callback;
@@ -506,8 +506,8 @@ disable (MMModem *modem,
     g_assert (primary);
 
     /* Turn off unsolicited responses */
-    mm_modem_samsung_cleanup (MM_MODEM_SAMSUNG_GSM (modem));
-    mm_modem_samsung_change_unsolicited_messages (MM_MODEM_SAMSUNG_GSM (modem), FALSE);
+    _samsung_cleanup (MM_MODEM_SAMSUNG_GSM (modem));
+    _samsung_change_unsolicited_messages (MM_MODEM_SAMSUNG_GSM (modem), FALSE);
 
     /* Random command to ensure unsolicited message disable completes */
     mm_at_serial_port_queue_command (primary, "AT+CFUN=0", 5, disable_unsolicited_done, info);
@@ -523,7 +523,7 @@ init_modem_done (MMAtSerialPort *port,
 
     mm_at_serial_port_queue_command (port, "ATE0;+CFUN=1", 5, NULL, NULL);
 
-    mm_modem_samsung_change_unsolicited_messages (MM_MODEM_SAMSUNG_GSM (info->modem), TRUE);
+    _samsung_change_unsolicited_messages (MM_MODEM_SAMSUNG_GSM (info->modem), TRUE);
 
     mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
 }
@@ -668,34 +668,20 @@ old_context_clear_done (MMAtSerialPort *port,
     g_free (command);
 }
 
-void
-mm_modem_samsung_do_connect (MMModemSamsungGsm *self,
-                           const char *number,
-                           MMModemFn callback,
-                           gpointer user_data)
-{
-    MMModem *modem = MM_MODEM (self);
-    MMCallbackInfo *info;
-
-    mm_modem_set_state (modem, MM_MODEM_STATE_CONNECTING, MM_MODEM_STATE_REASON_NONE);
-
-    info = mm_callback_info_new (modem, callback, user_data);
-
-
-    /* Ensure the PDP context is deactivated */
-    Samsung_call_control (MM_MODEM_SAMSUNG_GSM (info->modem), FALSE, old_context_clear_done, info);
-
-}
-
 static void
 do_connect (MMModem *modem,
             const char *number,
             MMModemFn callback,
             gpointer user_data)
 {
+    MMCallbackInfo *info;
 
-    mm_modem_samsung_do_connect (MM_MODEM_SAMSUNG_GSM (modem), number, callback, user_data);
+    mm_modem_set_state (modem, MM_MODEM_STATE_CONNECTING, MM_MODEM_STATE_REASON_NONE);
 
+    info = mm_callback_info_new (modem, callback, user_data);
+
+    /* Ensure the PDP context is deactivated */
+    Samsung_call_control (MM_MODEM_SAMSUNG_GSM (info->modem), FALSE, old_context_clear_done, info);
 }
 
 static void

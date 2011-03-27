@@ -12,14 +12,14 @@
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
  * Copyright (C) 2009 Red Hat, Inc.
- * Copyright 2011 by Samsung Electronics, Inc.,
+ * Copyright (C) 2011 Samsung Electronics, Inc.,
  */
 
 #ifndef MM_MODEM_SAMSUNG_GSM_H
 #define MM_MODEM_SAMSUNG_GSM_H
+
 #include <glib-object.h>
 
-#include "mm-generic-gsm.h"
 #include "mm-generic-gsm.h"
 
 #define MM_TYPE_MODEM_SAMSUNG_GSM            (mm_modem_samsung_gsm_get_type ())
@@ -39,19 +39,9 @@ typedef struct {
 
 GType mm_modem_samsung_gsm_get_type (void);
 
-void mm_modem_samsung_cleanup (MMModemSamsungGsm *self);
-
-void mm_modem_samsung_change_unsolicited_messages (MMModemSamsungGsm *self,
-                                                 gboolean enabled);
-
-void mm_modem_samsung_do_connect (MMModemSamsungGsm *self,
-                                const char *number,
-                                MMModemFn callback,
-                                gpointer user_data);
-
 MMModem *mm_modem_samsung_gsm_new (const char *device,
-                                  const char *driver,
-                                  const char *plugin_name);
+                                   const char *driver,
+                                   const char *plugin_name);
 
 #endif /* MM_MODEM_SAMSUNG_GSM_H */
 
