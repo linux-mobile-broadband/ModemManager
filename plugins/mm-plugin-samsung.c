@@ -102,7 +102,7 @@ done:
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
     }
 
-    mm_plugin_base_supports_task_set_custom_init_command (task, "+CFUN=1", 10, 4, FALSE);
+    mm_plugin_base_supports_task_set_custom_init_command (task, "+CFUN=1", 10, 4, FALSE, NULL, NULL);
 
     /* Otherwise kick off a probe */
     if (mm_plugin_base_probe_port (base, task, NULL))
