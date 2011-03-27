@@ -11,8 +11,8 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
- * Copyright 2011 by Samsung Electronics, Inc.,
+ * Copyright (C) 2009 - 2011 Red Hat, Inc.
+ * Copyright (c) 2011 Samsung Electronics, Inc.,
  */
 
 #include <string.h>
@@ -35,6 +35,13 @@ mm_plugin_create (void)
                                     MM_PLUGIN_BASE_NAME, "Samsung",
                                     NULL));
 }
+
+/*****************************************************************************/
+
+#define CAP_CDMA (MM_PLUGIN_BASE_PORT_CAP_IS707_A | \
+                  MM_PLUGIN_BASE_PORT_CAP_IS707_P | \
+                  MM_PLUGIN_BASE_PORT_CAP_IS856 | \
+                  MM_PLUGIN_BASE_PORT_CAP_IS856_A)
 
 static guint32
 get_level_for_capabilities (guint32 capabilities)
@@ -59,56 +66,33 @@ supports_port (MMPluginBase *base,
                MMPluginBaseSupportsTask *task)
 {
     GUdevDevice *port;
-    const char *tmp;
-    guint32 level;
+    const char *subsys, *name;
+    guint16 vendor = 0, product = 0;
 
-    /* Can't do anything with non-serial ports */
     port = mm_plugin_base_supports_task_get_port (task);
 
-    if(!g_str_has_prefix(g_udev_device_get_subsystem(port), "tty"))
-    {
-        if(g_str_has_prefix(g_udev_device_get_name(port), "usb"))
-    {
-            goto done;
-        }
-        else
-        {
-            return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
-        }
-    }
-    else
-    {
-        tmp = g_udev_device_get_property (port, "ID_BUS");
+    subsys = g_udev_device_get_subsystem (port);
+    g_assert (subsys);
+    name = g_udev_device_get_name (port);
+    g_assert (name);
 
-        if(g_strcmp0(tmp, "usb"))
-            return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
-
-        tmp = g_udev_device_get_property (port, "ID_VENDOR_ID");
-
-        if (g_strcmp0(tmp, "04e8") && g_strcmp0(tmp, "1983"))
-        {
-            return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
-        }
-    }
-
-done:
-
-    if (g_str_has_prefix(g_udev_device_get_name (port), "usb")) {
-        level = get_level_for_capabilities (1);
-        if (level) {
-            mm_plugin_base_supports_task_complete (task, 10);
-            return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
-        }
+    if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product))
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
-    }
 
-    mm_plugin_base_supports_task_set_custom_init_command (task, "+CFUN=1", 10, 4, FALSE, NULL, NULL);
+    /* Vendor ID check */
+    if (vendor != 0x04e8 && vendor != 0x1983)
+        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
+
+    /* The ethernet ports are obviously supported and don't need probing */
+    if (!strcmp (subsys, "net")) {
+        mm_plugin_base_supports_task_complete (task, 10);
+        return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
+    }
 
     /* Otherwise kick off a probe */
     if (mm_plugin_base_probe_port (base, task, NULL))
-    {
         return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
-    }
+
     return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 }
 
@@ -120,6 +104,7 @@ grab_port (MMPluginBase *base,
 {
     GUdevDevice *port = NULL;
     MMModem *modem = NULL;
+    guint32 caps;
     const char *name, *subsys, *sysfs_path;
 
     port = mm_plugin_base_supports_task_get_port (task);
@@ -128,11 +113,17 @@ grab_port (MMPluginBase *base,
     subsys = g_udev_device_get_subsystem (port);
     name = g_udev_device_get_name (port);
 
+    caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
+    if (caps & CAP_CDMA) {
+        g_set_error (error, 0, 0, "Only GSM modems are currently supported by this plugin.");
+        return NULL;
+    }
+
     sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
     if (!existing) {
         modem = mm_modem_samsung_gsm_new (sysfs_path,
-                                         mm_plugin_base_supports_task_get_driver (task),
-                                         mm_plugin_get_name (MM_PLUGIN (base)));
+                                          mm_plugin_base_supports_task_get_driver (task),
+                                          mm_plugin_get_name (MM_PLUGIN (base)));
 
         if (modem) {
             if (!mm_modem_grab_port (modem, subsys, name, MM_PORT_TYPE_UNKNOWN, NULL, error)) {
