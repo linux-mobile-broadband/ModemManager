@@ -973,12 +973,12 @@ grab_port (MMModem *modem,
     MMPort *port = NULL;
 
     if (suggested_type == MM_PORT_TYPE_UNKNOWN) {
-    if(g_str_has_prefix(name, "usb"))
-        ptype = MM_PORT_TYPE_ECM;
-        else if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY))
+        if (!strcmp (subsys, "tty")) {
+            if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY))
                 ptype = MM_PORT_TYPE_PRIMARY;
-        else if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY))
+            else if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY))
                 ptype = MM_PORT_TYPE_SECONDARY;
+        }
     } else
         ptype = suggested_type;
 

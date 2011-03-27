@@ -68,8 +68,6 @@ mm_port_type_to_name (MMPortType ptype)
         return "primary";
     case MM_PORT_TYPE_SECONDARY:
         return "secondary";
-    case MM_PORT_TYPE_ECM:
-    	return "ECM";
     case MM_PORT_TYPE_IGNORED:
         return "ignored";
     case MM_PORT_TYPE_QCDM:
