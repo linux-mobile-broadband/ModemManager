@@ -1,4 +1,4 @@
-AC_PREREQ(2.52)
+AC_PREREQ(2.60)
 
 AC_INIT(ModemManager, 0.4, dcbw@redhat.com, ModemManager)
 AM_INIT_AUTOMAKE([1.9 subdir-objects tar-ustar no-dist-gzip dist-bzip2 -Wno-portability])
@@ -9,14 +9,14 @@ AC_CONFIG_MACRO_DIR([m4])
 
 AC_CONFIG_HEADERS(config.h)
 
+dnl Define system extensions for various things like strcasestr()
+AC_USE_SYSTEM_EXTENSIONS
+
 dnl Required programs
 AC_PROG_CC
 AM_PROG_CC_C_O
 AC_PROG_INSTALL
 AC_PROG_LIBTOOL
-
-dnl Define _GNU_SOURCE for various things like strcasestr()
-AC_GNU_SOURCE
 
 dnl
 dnl translation support
