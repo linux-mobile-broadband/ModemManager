@@ -21,11 +21,7 @@
 #include <unistd.h>
 
 #include "mm-modem-wavecom-gsm.h"
-#include "mm-errors.h"
-#include "mm-modem-simple.h"
-#include "mm-callback-info.h"
-#include "mm-modem-helpers.h"
-#include "mm-at-serial-port.h"
+#include "mm-serial-parsers.h"
 
 static void modem_init (MMModem *modem_class);
 
@@ -55,11 +51,56 @@ mm_modem_wavecom_gsm_new (const char *device,
                                    NULL));
 }
 
+
+static gboolean
+grab_port (MMModem *modem,
+           const char *subsys,
+           const char *name,
+           MMPortType suggested_type,
+           gpointer user_data,
+           GError **error)
+{
+    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
+    MMPortType ptype = MM_PORT_TYPE_IGNORED;
+    MMPort *port = NULL;
+
+    if (suggested_type == MM_PORT_TYPE_UNKNOWN) {
+        if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY))
+            ptype = MM_PORT_TYPE_PRIMARY;
+        else if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY))
+            ptype = MM_PORT_TYPE_SECONDARY;
+    } else
+        ptype = suggested_type;
+
+    port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
+    if (port && MM_IS_AT_SERIAL_PORT (port)) {
+        gpointer parser;
+        GRegex *regex;
+
+        parser = mm_serial_parser_v1_new ();
+
+        /* AT+CPIN? replies will never have an OK appended */
+        regex = g_regex_new ("\\r\\n\\+CPIN: .*\\r\\n",
+                             G_REGEX_RAW | G_REGEX_OPTIMIZE,
+                             0, NULL);
+        mm_serial_parser_v1_set_custom_regex (parser, regex, NULL);
+        g_regex_unref (regex);
+
+        mm_at_serial_port_set_response_parser (MM_AT_SERIAL_PORT (port),
+                                               mm_serial_parser_v1_parse,
+                                               parser,
+                                               mm_serial_parser_v1_destroy);
+    }
+
+    return !!port;
+}
+
 /*****************************************************************************/
 
 static void
 modem_init (MMModem *modem_class)
 {
+    modem_class->grab_port = grab_port;
 }
 
 static void
