@@ -196,13 +196,17 @@ mm_serial_parser_v0_destroy (gpointer data)
 }
 
 typedef struct {
+    /* Regular expressions for successful replies */
     GRegex *regex_ok;
     GRegex *regex_connect;
+    GRegex *regex_custom_successful;
+    /* Regular expressions for error replies */
     GRegex *regex_cme_error;
     GRegex *regex_cme_error_str;
     GRegex *regex_ezx_error;
     GRegex *regex_unknown_error;
     GRegex *regex_connect_failed;
+    GRegex *regex_custom_error;
 } MMSerialParserV1;
 
 gpointer
@@ -221,7 +225,28 @@ mm_serial_parser_v1_new (void)
     parser->regex_unknown_error = g_regex_new ("\\r\\n(ERROR)|(COMMAND NOT SUPPORT)\\r\\n$", flags, 0, NULL);
     parser->regex_connect_failed = g_regex_new ("\\r\\n(NO CARRIER)|(BUSY)|(NO ANSWER)|(NO DIALTONE)\\r\\n$", flags, 0, NULL);
 
+    parser->regex_custom_successful = NULL;
+    parser->regex_custom_error = NULL;
+
     return parser;
+}
+
+void
+mm_serial_parser_v1_set_custom_regex (gpointer data,
+                                      GRegex *successful,
+                                      GRegex *error)
+{
+    MMSerialParserV1 *parser = (MMSerialParserV1 *) data;
+
+    g_return_if_fail (parser != NULL);
+
+    if (parser->regex_custom_successful)
+        g_regex_unref (parser->regex_custom_successful);
+    if (parser->regex_custom_error)
+        g_regex_unref (parser->regex_custom_error);
+
+    parser->regex_custom_successful = successful ? g_regex_ref (successful) : NULL;
+    parser->regex_custom_error = error ? g_regex_ref (error) : NULL;
 }
 
 gboolean
@@ -244,11 +269,23 @@ mm_serial_parser_v1_parse (gpointer data,
 
     /* First, check for successful responses */
 
-    found = g_regex_match_full (parser->regex_ok, response->str, response->len, 0, 0, NULL, NULL);
-    if (found)
-        remove_matches (parser->regex_ok, response);
-    else
-        found = g_regex_match_full (parser->regex_connect, response->str, response->len, 0, 0, NULL, NULL);
+    /* Custom successful replies first, if any */
+    if (parser->regex_custom_successful)
+        found = g_regex_match_full (parser->regex_custom_successful,
+                                    response->str, response->len,
+                                    0, 0, NULL, NULL);
+
+    if (!found) {
+        found = g_regex_match_full (parser->regex_ok,
+                                    response->str, response->len,
+                                    0, 0, NULL, NULL);
+        if (found)
+            remove_matches (parser->regex_ok, response);
+        else
+            found = g_regex_match_full (parser->regex_connect,
+                                        response->str, response->len,
+                                        0, 0, NULL, NULL);
+    }
 
     if (found) {
         response_clean (response);
@@ -256,6 +293,21 @@ mm_serial_parser_v1_parse (gpointer data,
     }
 
     /* Now failures */
+
+    /* Custom error matches first, if any */
+    if (parser->regex_custom_error) {
+        found = g_regex_match_full (parser->regex_custom_error,
+                                    response->str, response->len,
+                                    0, 0, &match_info, NULL);
+        if (found) {
+            str = g_match_info_fetch (match_info, 1);
+            g_assert (str);
+            local_error = mm_mobile_error_for_code (atoi (str));
+            g_free (str);
+            g_match_info_free (match_info);
+            goto done;
+        }
+    }
 
     /* Numeric CME errors */
     found = g_regex_match_full (parser->regex_cme_error,
@@ -358,6 +410,11 @@ mm_serial_parser_v1_destroy (gpointer data)
     g_regex_unref (parser->regex_ezx_error);
     g_regex_unref (parser->regex_unknown_error);
     g_regex_unref (parser->regex_connect_failed);
+
+    if (parser->regex_custom_successful)
+        g_regex_unref (parser->regex_custom_successful);
+    if (parser->regex_custom_error)
+        g_regex_unref (parser->regex_custom_error);
 
     g_slice_free (MMSerialParserV1, data);
 }
