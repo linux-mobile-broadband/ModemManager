@@ -36,7 +36,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-simtech.la \
 	libmm-plugin-x22x.la \
 	libmm-plugin-linktop.la \
-	libmm-plugin-samsung.la
+	libmm-plugin-samsung.la \
+	libmm-plugin-wavecom.la
 
 # Generic
 
@@ -184,6 +185,24 @@ libmm_plugin_sierra_la_CPPFLAGS = \
 	-I$(top_srcdir)/src
 
 libmm_plugin_sierra_la_LDFLAGS = \
+	$(GUDEV_LDFLAGS) \
+	-module \
+	-avoid-version
+
+# Wavecom (Sierra Airlink)
+
+libmm_plugin_wavecom_la_SOURCES = \
+	mm-plugin-wavecom.c \
+	mm-plugin-wavecom.h \
+	mm-modem-wavecom-gsm.c \
+	mm-modem-wavecom-gsm.h
+
+libmm_plugin_wavecom_la_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
+	-I$(top_srcdir)/src
+
+libmm_plugin_wavecom_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
 	-module \
 	-avoid-version
