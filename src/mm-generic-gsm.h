@@ -37,6 +37,7 @@
 #define MM_GENERIC_GSM_POWER_DOWN_CMD     "power-down-cmd"
 #define MM_GENERIC_GSM_INIT_CMD           "init-cmd"
 #define MM_GENERIC_GSM_INIT_CMD_OPTIONAL  "init-cmd-optional"
+#define MM_GENERIC_GSM_FLOW_CONTROL_CMD   "flow-control-cmd"
 
 typedef enum {
     MM_GENERIC_GSM_PROP_FIRST = 0x2000,
@@ -57,6 +58,7 @@ typedef enum {
     MM_GENERIC_GSM_PROP_USSD_STATE,
     MM_GENERIC_GSM_PROP_USSD_NETWORK_REQUEST,
     MM_GENERIC_GSM_PROP_USSD_NETWORK_NOTIFICATION,
+    MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD
 } MMGenericGsmProp;
 
 typedef enum {

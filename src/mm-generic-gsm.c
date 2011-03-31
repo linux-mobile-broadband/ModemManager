@@ -1352,6 +1352,7 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
                                 MMCallbackInfo *info)
 {
     MMGenericGsmPrivate *priv;
+    gchar *cmd = NULL;
 
     g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_GENERIC_GSM (self));
@@ -1377,8 +1378,11 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
         }
     }
 
-    /* Try to enable XON/XOFF flow control */
-    mm_at_serial_port_queue_command (priv->primary, "+IFC=1,1", 3, NULL, NULL);
+    /* Try to enable flow control */
+    g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_FLOW_CONTROL_CMD, &cmd, NULL);
+    if (cmd && strlen (cmd))
+        mm_at_serial_port_queue_command (priv->primary, cmd, 3, NULL, NULL);
+    g_free (cmd);
 
     mm_at_serial_port_queue_command (priv->primary, "+CIND=?", 3, cind_cb, self);
 
@@ -4825,6 +4829,7 @@ set_property (GObject *object, guint prop_id,
     case MM_GENERIC_GSM_PROP_USSD_STATE:
     case MM_GENERIC_GSM_PROP_USSD_NETWORK_REQUEST:
     case MM_GENERIC_GSM_PROP_USSD_NETWORK_NOTIFICATION:
+    case MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD:
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -4931,6 +4936,10 @@ get_property (GObject *object, guint prop_id,
         break;
     case MM_GENERIC_GSM_PROP_USSD_NETWORK_NOTIFICATION:
         g_value_set_string (value, "");
+        break;
+    case MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD:
+        /* By default, try to set XOFF/XON flow control */
+        g_value_set_string (value, "+IFC=1,1");
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -5074,6 +5083,14 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
                               "InitCommandOptional",
                               "Optional initialization command (errors ignored)",
                               NULL,
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD,
+         g_param_spec_string (MM_GENERIC_GSM_FLOW_CONTROL_CMD,
+                              "FlowControlCommand",
+                              "Flow control configuration command (errors ignored)",
+                              "+IFC=1,1",
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
 
