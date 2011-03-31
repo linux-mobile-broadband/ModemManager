@@ -207,8 +207,8 @@ struct _MMModem {
 
     /* Signals */
     void (*state_changed) (MMModem *self,
-                           MMModemState new_state,
                            MMModemState old_state,
+                           MMModemState new_state,
                            MMModemStateReason reason);
 };
 

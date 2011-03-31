@@ -751,7 +751,7 @@ mm_modem_set_state (MMModem *self,
 
     if (new_state != old_state) {
         g_object_set (G_OBJECT (self), MM_MODEM_STATE, new_state, NULL);
-        g_signal_emit_by_name (G_OBJECT (self), "state-changed", new_state, old_state, reason);
+        g_signal_emit_by_name (G_OBJECT (self), "state-changed", old_state, new_state, reason);
 
         dbus_path = (const char *) g_object_get_data (G_OBJECT (self), DBUS_PATH_TAG);
         if (dbus_path) {
