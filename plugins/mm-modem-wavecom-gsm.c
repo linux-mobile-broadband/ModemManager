@@ -95,6 +95,33 @@ grab_port (MMModem *modem,
     return !!port;
 }
 
+static void
+set_property (GObject *object,
+              guint prop_id,
+              const GValue *value,
+              GParamSpec *pspec)
+{
+    /* Do nothing... see set_property() in parent, which also does nothing */
+}
+
+static void
+get_property (GObject *object,
+              guint prop_id,
+              GValue *value,
+              GParamSpec *pspec)
+{
+    switch (prop_id) {
+    case MM_GENERIC_GSM_PROP_POWER_UP_CMD:
+        /* Wavecom doesn't like CFUN=1, it will reset the whole software stack,
+         * including the USB connection and therefore connection would get
+         * closed */
+        g_value_set_string (value, "");
+        break;
+    default:
+        break;
+    }
+}
+
 /*****************************************************************************/
 
 static void
@@ -111,5 +138,14 @@ mm_modem_wavecom_gsm_init (MMModemWavecomGsm *self)
 static void
 mm_modem_wavecom_gsm_class_init (MMModemWavecomGsmClass *klass)
 {
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+    object_class->get_property = get_property;
+    object_class->set_property = set_property;
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_POWER_UP_CMD,
+                                      MM_GENERIC_GSM_POWER_UP_CMD);
+
 }
 
