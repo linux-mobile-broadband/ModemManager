@@ -117,6 +117,10 @@ get_property (GObject *object,
          * closed */
         g_value_set_string (value, "");
         break;
+    case MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD:
+        /* Wavecom doesn't have XOFF/XON flow control, so we enable RTS/CTS */
+        g_value_set_string (value, "+IFC=2,2");
+        break;
     default:
         break;
     }
@@ -147,5 +151,8 @@ mm_modem_wavecom_gsm_class_init (MMModemWavecomGsmClass *klass)
                                       MM_GENERIC_GSM_PROP_POWER_UP_CMD,
                                       MM_GENERIC_GSM_POWER_UP_CMD);
 
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD,
+                                      MM_GENERIC_GSM_FLOW_CONTROL_CMD);
 }
 
