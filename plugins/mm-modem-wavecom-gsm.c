@@ -20,6 +20,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "mm-errors.h"
+#include "mm-modem-helpers.h"
 #include "mm-modem-wavecom-gsm.h"
 #include "mm-serial-parsers.h"
 
@@ -126,6 +128,76 @@ get_property (GObject *object,
     }
 }
 
+static void
+get_access_technology_cb (MMAtSerialPort *port,
+                          GString *response,
+                          GError *error,
+                          gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
+    const gchar *p;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else {
+        p = mm_strip_tag (response->str, "+WGPRSIND:");
+        if (!p) {
+            g_set_error (&info->error,
+                         MM_MODEM_ERROR,
+                         MM_MODEM_ERROR_GENERAL,
+                         "Couldn't get network capabilities");
+        } else {
+            switch (*p) {
+            case '1':
+                /* GPRS only */
+                act = MM_MODEM_GSM_ACCESS_TECH_GPRS;
+                break;
+            case '2':
+                /* EGPRS/EDGE supported */
+                act = MM_MODEM_GSM_ACCESS_TECH_EDGE;
+                break;
+            case '3':
+                /* 3G R99 supported */
+                act = MM_MODEM_GSM_ACCESS_TECH_UMTS;
+                break;
+            case '4':
+                /* HSDPA supported */
+                act = MM_MODEM_GSM_ACCESS_TECH_HSDPA;
+                break;
+            case '5':
+                /* HSUPA supported */
+                act = MM_MODEM_GSM_ACCESS_TECH_HSUPA;
+                break;
+            default:
+                break;
+            }
+        }
+    }
+
+    mm_callback_info_set_result (info, GUINT_TO_POINTER (act), NULL);
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_access_technology (MMGenericGsm *gsm,
+                       MMModemUIntFn callback,
+                       gpointer user_data)
+{
+    MMAtSerialPort *port;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_uint_new (MM_MODEM (gsm), callback, user_data);
+
+    port = mm_generic_gsm_get_best_at_port (gsm, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_at_serial_port_queue_command (port, "+WGPRS=9,2", 3, get_access_technology_cb, info);
+}
+
 /*****************************************************************************/
 
 static void
@@ -143,6 +215,7 @@ static void
 mm_modem_wavecom_gsm_class_init (MMModemWavecomGsmClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    MMGenericGsmClass *gsm_class = MM_GENERIC_GSM_CLASS (klass);
 
     object_class->get_property = get_property;
     object_class->set_property = set_property;
@@ -154,5 +227,7 @@ mm_modem_wavecom_gsm_class_init (MMModemWavecomGsmClass *klass)
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD,
                                       MM_GENERIC_GSM_FLOW_CONTROL_CMD);
+
+    gsm_class->get_access_technology = get_access_technology;
 }
 
