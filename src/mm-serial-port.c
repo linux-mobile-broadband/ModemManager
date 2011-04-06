@@ -68,13 +68,25 @@ typedef struct {
     guint stopbits;
     guint64 send_delay;
 
-    guint queue_schedule;
+    guint queue_id;
     guint watch_id;
     guint timeout_id;
 
     guint flash_id;
     guint connected_id;
 } MMSerialPortPrivate;
+
+typedef struct {
+    GByteArray *command;
+    guint32 idx;
+    guint32 eagain_count;
+    gboolean started;
+    gboolean done;
+    GCallback callback;
+    gpointer user_data;
+    guint32 timeout;
+    gboolean cached;
+} MMQueueData;
 
 #if 0
 static const char *
@@ -355,57 +367,57 @@ serial_debug (MMSerialPort *self, const char *prefix, const char *buf, gsize len
 }
 
 static gboolean
-mm_serial_port_send_command (MMSerialPort *self,
-                             GByteArray *command,
-                             GError **error)
+mm_serial_port_process_command (MMSerialPort *self,
+                                MMQueueData *info,
+                                GError **error)
 {
     MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (self);
-    int status, i = 0;
-    int eagain_count = 1000;
     const guint8 *p;
+    int status;
 
     if (priv->fd < 0) {
-        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
-                     "%s", "Sending command failed: device is not enabled");
+        g_set_error_literal (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
+                             "Sending command failed: device is not enabled");
         return FALSE;
     }
 
     if (mm_port_get_connected (MM_PORT (self))) {
-        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
-                     "%s", "Sending command failed: device is connected");
+        g_set_error_literal (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
+                             "Sending command failed: device is connected");
         return FALSE;
     }
 
-    serial_debug (self, "-->", (const char *) command->data, command->len);
-
-    /* Only accept about 3 seconds of EAGAIN */
-    if (priv->send_delay > 0)
-        eagain_count = 3000000 / priv->send_delay;
-
-    while (i < command->len) {
-        p = &command->data[i];
-        status = write (priv->fd, p, 1);
-        if (status < 0) {
-            if (errno == EAGAIN) {
-                eagain_count--;
-                if (eagain_count <= 0) {
-                    g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
-                                 "Sending command failed: '%s'", strerror (errno));
-                    break;
-                }
-            } else {
-                g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
-                             "Sending command failed: '%s'", strerror (errno));
-                break;
-            }
-        } else
-            i++;
-
-        if (priv->send_delay)
-            usleep (priv->send_delay);
+    /* Only print command the first time */
+    if (info->started == FALSE) {
+        info->started = TRUE;
+        serial_debug (self, "-->", (const char *) info->command->data, info->command->len);
     }
 
-    return i == command->len;
+    /* Send a single byte of the command */
+    p = &info->command->data[info->idx];
+    errno = 0;
+    status = write (priv->fd, p, 1);
+    if (status == 1)
+        info->idx++;
+    else if (status < 0) {
+        if (errno == EAGAIN) {
+            info->eagain_count--;
+            if (info->eagain_count <= 0) {
+                g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
+                             "Sending command failed: '%s'", strerror (errno));
+                return FALSE;
+            }
+        } else {
+            g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
+                         "Sending command failed: '%s'", strerror (errno));
+            return FALSE;
+        }
+    }
+
+    if (info->idx >= info->command->len)
+        info->done = TRUE;
+
+    return TRUE;
 }
 
 static void
@@ -436,35 +448,25 @@ mm_serial_port_get_cached_reply (MMSerialPort *self, GByteArray *command)
     return (const GByteArray *) g_hash_table_lookup (MM_SERIAL_PORT_GET_PRIVATE (self)->reply_cache, command);
 }
 
-typedef struct {
-    GByteArray *command;
-    GCallback callback;
-    gpointer user_data;
-    guint32 timeout;
-    gboolean cached;
-} MMQueueData;
-
 static void
-mm_serial_port_schedule_queue_process (MMSerialPort *self)
+mm_serial_port_schedule_queue_process (MMSerialPort *self, guint timeout_ms)
 {
     MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (self);
-    GSource *source;
 
     if (priv->timeout_id) {
         /* A command is already in progress */
         return;
     }
 
-    if (priv->queue_schedule) {
+    if (priv->queue_id) {
         /* Already scheduled */
         return;
     }
 
-    source = g_idle_source_new ();
-    g_source_set_closure (source, g_cclosure_new_object (G_CALLBACK (mm_serial_port_queue_process), G_OBJECT (self)));
-    g_source_attach (source, NULL);
-    priv->queue_schedule = g_source_get_id (source);
-    g_source_unref (source);
+    if (timeout_ms)
+        priv->queue_id = g_timeout_add (timeout_ms, mm_serial_port_queue_process, self);
+    else
+        priv->queue_id = g_idle_add (mm_serial_port_queue_process, self);
 }
 
 static gsize
@@ -516,7 +518,7 @@ mm_serial_port_got_response (MMSerialPort *self, GError *error)
     if (consumed)
         g_byte_array_remove_range (priv->response, 0, consumed);
     if (!g_queue_is_empty (priv->queue))
-        mm_serial_port_schedule_queue_process (self);
+        mm_serial_port_schedule_queue_process (self, 0);
 }
 
 static gboolean
@@ -547,7 +549,7 @@ mm_serial_port_queue_process (gpointer data)
     MMQueueData *info;
     GError *error = NULL;
 
-    priv->queue_schedule = 0;
+    priv->queue_id = 0;
 
     info = (MMQueueData *) g_queue_peek_head (priv->queue);
     if (!info)
@@ -563,17 +565,18 @@ mm_serial_port_queue_process (gpointer data)
         }
     }
 
-    if (mm_serial_port_send_command (self, info->command, &error)) {
-        GSource *source;
-
-        source = g_timeout_source_new_seconds (info->timeout);
-        g_source_set_closure (source, g_cclosure_new_object (G_CALLBACK (mm_serial_port_timed_out), G_OBJECT (self)));
-        g_source_attach (source, NULL);
-        priv->timeout_id = g_source_get_id (source);
-        g_source_unref (source);
-    } else {
+    if (mm_serial_port_process_command (self, info, &error)) {
+        if (info->done) {
+            /* If the command is finished being sent, schedule the timeout */
+            priv->timeout_id = g_timeout_add_seconds (info->timeout,
+                                                      mm_serial_port_timed_out,
+                                                      self);
+        } else {
+            /* Schedule the next byte of the command to be sent */
+            mm_serial_port_schedule_queue_process (self, priv->send_delay / 1000);
+        }
+    } else
         mm_serial_port_got_response (self, error);
-    }
 
     return FALSE;
 }
@@ -600,6 +603,7 @@ data_available (GIOChannel *source,
     char buf[SERIAL_BUF_SIZE + 1];
     gsize bytes_read;
     GIOStatus status;
+    MMQueueData *info;
 
     if (condition & G_IO_HUP) {
         if (priv->response->len)
@@ -613,6 +617,11 @@ data_available (GIOChannel *source,
             g_byte_array_remove_range (priv->response, 0, priv->response->len);
         return TRUE;
     }
+
+    /* Don't read any input if the current command isn't done being sent yet */
+    info = g_queue_peek_nth (priv->queue, 0);
+    if (info && (info->started == TRUE) && (info->done == FALSE))
+        return TRUE;
 
     do {
         GError *err = NULL;
@@ -909,6 +918,13 @@ internal_queue_command (MMSerialPort *self,
         info->command = g_byte_array_sized_new (command->len);
         g_byte_array_append (info->command, command->data, command->len);
     }
+
+    /* Only accept about 3 seconds of EAGAIN for this command */
+    if (priv->send_delay)
+        info->eagain_count = 3000000 / priv->send_delay;
+    else
+        info->eagain_count = 1000;
+
     info->cached = cached;
     info->timeout = timeout_seconds;
     info->callback = (GCallback) callback;
@@ -921,7 +937,7 @@ internal_queue_command (MMSerialPort *self,
     g_queue_push_tail (priv->queue, info);
 
     if (g_queue_get_length (priv->queue) == 1)
-        mm_serial_port_schedule_queue_process (self);
+        mm_serial_port_schedule_queue_process (self, 0);
 }
 
 void
@@ -1264,6 +1280,13 @@ get_property (GObject *object, guint prop_id,
 static void
 dispose (GObject *object)
 {
+    MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (object);
+
+    if (priv->timeout_id) {
+        g_source_remove (priv->timeout_id);
+        priv->timeout_id = 0;
+    }
+
     if (mm_serial_port_is_open (MM_SERIAL_PORT (object)))
         mm_serial_port_close_force (MM_SERIAL_PORT (object));
 
@@ -1346,7 +1369,7 @@ mm_serial_port_class_init (MMSerialPortClass *klass)
         (object_class, PROP_SEND_DELAY,
          g_param_spec_uint64 (MM_SERIAL_PORT_SEND_DELAY,
                               "SendDelay",
-                              "Send delay",
+                              "Send delay for each byte in microseconds",
                               0, G_MAXUINT64, 0,
                               G_PARAM_READWRITE));
 
