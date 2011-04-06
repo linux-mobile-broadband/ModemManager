@@ -27,12 +27,11 @@
 #include "mm-log.h"
 
 static void modem_init (MMModem *modem_class);
+static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
 
-G_DEFINE_TYPE_EXTENDED (MMModemWavecomGsm,
-                        mm_modem_wavecom_gsm,
-                        MM_TYPE_GENERIC_GSM,
-                        0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init))
+G_DEFINE_TYPE_EXTENDED (MMModemWavecomGsm, mm_modem_wavecom_gsm, MM_TYPE_GENERIC_GSM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init))
 
 /* Bit flags for mobile station classes supported by the modem */
 typedef enum {
@@ -53,6 +52,25 @@ typedef enum {
 #define WAVECOM_MS_CLASS_B_IDSTR  "\"B\""
 #define WAVECOM_MS_CLASS_A_IDSTR  "\"A\""
 
+/* Mask of all supported 2G bands */
+#define ALL_2G_BANDS          \
+    (MM_MODEM_GSM_BAND_EGSM | \
+     MM_MODEM_GSM_BAND_DCS |  \
+     MM_MODEM_GSM_BAND_PCS |  \
+     MM_MODEM_GSM_BAND_G850)
+
+/* Mask of all supported 3G bands */
+#define ALL_3G_BANDS            \
+    (MM_MODEM_GSM_BAND_U2100 |  \
+     MM_MODEM_GSM_BAND_U1800 |  \
+     MM_MODEM_GSM_BAND_U17IV |  \
+     MM_MODEM_GSM_BAND_U800 |   \
+     MM_MODEM_GSM_BAND_U850 |   \
+     MM_MODEM_GSM_BAND_U900 |   \
+     MM_MODEM_GSM_BAND_U17IX |  \
+     MM_MODEM_GSM_BAND_U1900 |  \
+     MM_MODEM_GSM_BAND_U2600)
+
 #define MM_MODEM_WAVECOM_GSM_GET_PRIVATE(o)                             \
     (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_WAVECOM_GSM, MMModemWavecomGsmPrivate))
 
@@ -63,7 +81,44 @@ typedef struct {
     WavecomMSClass current_ms_class;
     /* Current allowed mode, only for 3G devices */
     MMModemGsmAllowedMode allowed_mode;
+    /* Bitmask for currently active bands */
+    guint32 current_bands;
 } MMModemWavecomGsmPrivate;
+
+/* Setup relationship between 2G bands in the modem (identified by a
+ * single digit in ASCII) and the bitmask in ModemManager. */
+typedef struct {
+    gchar   wavecom_band;
+    guint32 mm_band_mask;
+} WavecomBand2G;
+static const WavecomBand2G bands_2g[] = {
+    { '0', MM_MODEM_GSM_BAND_G850 },
+    { '1', MM_MODEM_GSM_BAND_EGSM },
+    { '2', MM_MODEM_GSM_BAND_DCS  },
+    { '3', MM_MODEM_GSM_BAND_PCS  },
+    { '4', (MM_MODEM_GSM_BAND_G850 | MM_MODEM_GSM_BAND_PCS) },
+    { '5', (MM_MODEM_GSM_BAND_EGSM | MM_MODEM_GSM_BAND_DCS) },
+    { '6', (MM_MODEM_GSM_BAND_EGSM | MM_MODEM_GSM_BAND_PCS) },
+    { '7', ALL_2G_BANDS }
+};
+
+/* Setup relationship between the 3G band bitmask in the modem and the bitmask
+ * in ModemManager. */
+typedef struct {
+    guint32 wavecom_band_flag;
+    guint32 mm_band_flag;
+} WavecomBand3G;
+static const WavecomBand3G bands_3g[] = {
+    { (1 << 0), MM_MODEM_GSM_BAND_U2100 },
+    { (1 << 1), MM_MODEM_GSM_BAND_U1900 },
+    { (1 << 2), MM_MODEM_GSM_BAND_U1800 },
+    { (1 << 3), MM_MODEM_GSM_BAND_U17IV },
+    { (1 << 4), MM_MODEM_GSM_BAND_U850  },
+    { (1 << 5), MM_MODEM_GSM_BAND_U800  },
+    { (1 << 6), MM_MODEM_GSM_BAND_U2600 },
+    { (1 << 7), MM_MODEM_GSM_BAND_U900  },
+    { (1 << 8), MM_MODEM_GSM_BAND_U17IX }
+};
 
 MMModem *
 mm_modem_wavecom_gsm_new (const char *device,
@@ -175,6 +230,272 @@ get_property (GObject *object,
     default:
         break;
     }
+}
+
+static void
+set_band_done (MMAtSerialPort *port,
+               GString *response,
+               GError *error,
+               gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
+
+    if (error)
+        info->error = g_error_copy (error);
+    else
+        priv->current_bands = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "new-band"));
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+set_2g_band (MMModemGsmNetwork *self,
+             MMModemGsmBand band,
+             MMAtSerialPort *port,
+             MMCallbackInfo *info)
+{
+    gchar wavecom_band;
+    gchar *cmd;
+    guint i;
+
+    /* Ensure we don't get 3G bands when trying to configure 2G bands */
+    if (band & ALL_3G_BANDS) {
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "Not allowed to set 3G bands in 2G mode");
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* Loop looking for allowed masks */
+    wavecom_band = '\0';
+    for (i = 0; i < G_N_ELEMENTS (bands_2g); i++) {
+        if (bands_2g[i].mm_band_mask == band) {
+            wavecom_band = bands_2g[i].wavecom_band;
+            break;
+        }
+    }
+
+    /* If we didn't find a match, set an error */
+    if (wavecom_band == '\0') {
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "Wrong 2G band mask: '%u'", band);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_callback_info_set_data (info,
+                               "new-band",
+                               GUINT_TO_POINTER ((guint)band),
+                               NULL);
+
+    cmd = g_strdup_printf ("+WMBS=%c,1", wavecom_band);
+    mm_at_serial_port_queue_command (port, cmd, 3, set_band_done, info);
+    g_free (cmd);
+}
+
+static void
+set_3g_band (MMModemGsmNetwork *self,
+             MMModemGsmBand band,
+             MMAtSerialPort *port,
+             MMCallbackInfo *info)
+{
+    guint wavecom_band;
+    gchar *cmd;
+    guint i;
+
+    /* Ensure we don't get 2G bands when trying to configure 2G bands */
+    if (band & ALL_2G_BANDS) {
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "Not allowed to set 2G bands in 3G mode");
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* Loop looking for allowed masks */
+    wavecom_band = 0;
+    for (i = 0; i < G_N_ELEMENTS (bands_3g); i++) {
+        if (bands_3g[i].mm_band_flag & band) {
+            wavecom_band |= bands_3g[i].wavecom_band_flag;
+        }
+    }
+
+    /* If we didn't find a match, set an error */
+    if (wavecom_band == 0) {
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "Wrong 3G band mask: '%u'", band);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_callback_info_set_data (info,
+                               "new-band",
+                               GUINT_TO_POINTER ((guint)band),
+                               NULL);
+
+    cmd = g_strdup_printf ("+WMBS=\"%u\",1", wavecom_band);
+    mm_at_serial_port_queue_command (port, cmd, 3, set_band_done, info);
+    g_free (cmd);
+}
+
+static void
+set_band (MMModemGsmNetwork *self,
+          MMModemGsmBand band,
+          MMModemFn callback,
+          gpointer user_data)
+{
+    MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (self);
+    MMAtSerialPort *port;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
+
+    /* Are we trying to change the band to the same bands currently
+     * being used? if so, we're done */
+    if (priv->current_bands == band) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* Otherwise ask the modem */
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (self), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    if (priv->current_ms_class != WAVECOM_MS_CLASS_A)
+        set_2g_band (self, band, port, info);
+    else
+        set_3g_band (self, band, port, info);
+}
+
+static void
+get_2g_band_done (MMAtSerialPort *port,
+                  GString *response,
+                  GError *error,
+                  gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
+
+    if (error)
+        info->error = g_error_copy (error);
+    else {
+        const gchar *p;
+        guint32 mm_band = MM_MODEM_GSM_BAND_UNKNOWN;
+
+        p = mm_strip_tag (response->str, "+WMBS:");
+        if (p) {
+            guint i;
+
+            for (i = 0; i < G_N_ELEMENTS (bands_2g); i++) {
+                if (bands_2g[i].wavecom_band == *p) {
+                    mm_band = bands_2g[i].mm_band_mask;
+                    break;
+                }
+            }
+        }
+
+        if (mm_band == MM_MODEM_GSM_BAND_UNKNOWN) {
+            g_set_error (&info->error,
+                         MM_MODEM_ERROR,
+                         MM_MODEM_ERROR_GENERAL,
+                         "Couldn't get 2G bands");
+        } else {
+            priv->current_bands = mm_band;
+            mm_callback_info_set_result (info, GUINT_TO_POINTER (mm_band), NULL);
+        }
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_3g_band_done (MMAtSerialPort *port,
+                  GString *response,
+                  GError *error,
+                  gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
+
+    if (error)
+        info->error = g_error_copy (error);
+    else {
+        const gchar *p;
+        guint mm_band = MM_MODEM_GSM_BAND_UNKNOWN;
+        guint32 wavecom_band;
+
+        /* Example reply:
+         *   AT+WUBS? -->
+         *            <-- +WUBS: "3",1
+         *            <-- OK
+         * The "3" meaning here Band I and II are selected.
+         */
+
+        p = mm_strip_tag (response->str, "+WUBS:");
+        if (*p == '"')
+            p++;
+        wavecom_band = atoi (p);
+
+        if (wavecom_band > 0) {
+            guint i;
+
+            for (i = 0; i < G_N_ELEMENTS (bands_3g); i++) {
+                if (bands_3g[i].wavecom_band_flag & wavecom_band) {
+                    mm_band |= bands_3g[i].mm_band_flag;
+                }
+            }
+        }
+
+        if (mm_band == MM_MODEM_GSM_BAND_UNKNOWN) {
+            g_set_error (&info->error,
+                         MM_MODEM_ERROR,
+                         MM_MODEM_ERROR_GENERAL,
+                         "Couldn't get 3G bands");
+        } else {
+            priv->current_bands = mm_band;
+            mm_callback_info_set_result (info, GUINT_TO_POINTER (mm_band), NULL);
+        }
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_band (MMModemGsmNetwork *self,
+          MMModemUIntFn callback,
+          gpointer user_data)
+{
+    MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (self);
+    MMAtSerialPort *port;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_uint_new (MM_MODEM (self), callback, user_data);
+
+    /* If results are already cached, return them */
+    if (priv->current_bands > 0) {
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (priv->current_bands), NULL);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* Otherwise ask the modem */
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (self), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    if (priv->current_ms_class != WAVECOM_MS_CLASS_A)
+        mm_at_serial_port_queue_command (port, "AT+WMBS?", 3, get_2g_band_done, info);
+    else
+        mm_at_serial_port_queue_command (port, "AT+WUBS?", 3, get_3g_band_done, info);
 }
 
 static void
@@ -725,6 +1046,13 @@ modem_init (MMModem *modem_class)
 }
 
 static void
+modem_gsm_network_init (MMModemGsmNetwork *network_class)
+{
+    network_class->set_band = set_band;
+    network_class->get_band = get_band;
+}
+
+static void
 mm_modem_wavecom_gsm_init (MMModemWavecomGsm *self)
 {
     MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (self);
@@ -733,6 +1061,7 @@ mm_modem_wavecom_gsm_init (MMModemWavecomGsm *self)
     priv->supported_ms_classes = 0; /* This is a bitmask, so empty */
     priv->current_ms_class = WAVECOM_MS_CLASS_UNKNOWN;
     priv->allowed_mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
+    priv->current_bands = 0; /* This is a bitmask, so empty */
 }
 
 static void
