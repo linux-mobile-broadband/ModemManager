@@ -496,8 +496,8 @@ set_highest_ms_class_cb (MMAtSerialPort *port,
     if (new_class)
         priv->current_ms_class = new_class;
 
-    /* All done! */
-    mm_dbg ("[4/4] All done...");
+    /* All done without errors! */
+    mm_dbg ("[5/5] All done");
     enable_complete (MM_GENERIC_GSM (info->modem), NULL, info);
 }
 
@@ -530,7 +530,7 @@ set_highest_ms_class (MMAtSerialPort *port,
         gchar *cmd;
 
         new_class_str = wavecom_ms_class_to_str (new_class);
-        mm_dbg ("  Changing mobile station class to: %s", new_class_str);
+        mm_dbg ("Changing mobile station class to: %s", new_class_str);
         mm_callback_info_set_data (info,
                                    "new-class",
                                    GUINT_TO_POINTER (new_class),
@@ -542,7 +542,7 @@ set_highest_ms_class (MMAtSerialPort *port,
     }
 
     /* if no need to change station class, then just go on */
-    mm_dbg ("  No need to change mobile station class");
+    mm_dbg ("No need to change mobile station class");
     set_highest_ms_class_cb (port, NULL, NULL, info);
 }
 
@@ -595,8 +595,8 @@ get_current_ms_class_cb (MMAtSerialPort *port,
         return;
     }
 
-    /* 3rd, set highest mobile station class possible */
-    mm_dbg ("[3/4] Ensuring highest MS class...");
+    /* Next, set highest mobile station class possible */
+    mm_dbg ("[4/5] Ensuring highest MS class...");
     set_highest_ms_class (port, info);
 }
 
@@ -652,9 +652,41 @@ get_supported_ms_classes_cb (MMAtSerialPort *port,
         return;
     }
 
-    /* 2nd, query for current MS class */
-    mm_dbg ("[2/4] Getting current MS class...");
+    /* Next, query for current MS class */
+    mm_dbg ("[3/5] Getting current MS class...");
     mm_at_serial_port_queue_command (port, "+CGCLASS?",  3, get_current_ms_class_cb, info);
+}
+
+static void
+get_current_functionality_status_cb (MMAtSerialPort *port,
+                                     GString *response,
+                                     GError *error,
+                                     gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    const gchar *p;
+    GError *inner_error;
+
+    if (error) {
+        enable_complete (MM_GENERIC_GSM (info->modem), error, info);
+        return;
+    }
+
+    p = mm_strip_tag (response->str, "+CFUN:");
+    if (!p || *p != '1') {
+        /* Reported functionality status MUST be '1'. Otherwise, RF is probably
+         * switched off. */
+        inner_error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "Unexpected functionality status: '%c'. ",
+                                   p ? *p :' ');
+        enable_complete (MM_GENERIC_GSM (info->modem), inner_error, info);
+        g_error_free (inner_error);
+    }
+
+    /* Nex, query for supported MS classes */
+    mm_dbg ("[2/5] Getting supported MS classes...");
+    mm_at_serial_port_queue_command (port, "+CGCLASS=?", 3, get_supported_ms_classes_cb, info);
 }
 
 static void
@@ -679,9 +711,9 @@ do_enable_power_up_done (MMGenericGsm *gsm,
         return;
     }
 
-    /* 1st, query for supported MS classes */
-    mm_dbg ("[1/4] Getting supported MS classes...");
-    mm_at_serial_port_queue_command (port, "+CGCLASS=?", 3, get_supported_ms_classes_cb, info);
+    /* Next, get current functionality status */
+    mm_dbg ("[1/5] Getting current functionality status...");
+    mm_at_serial_port_queue_command (port, "+CFUN?", 3, get_current_functionality_status_cb, info);
 }
 
 /*****************************************************************************/
