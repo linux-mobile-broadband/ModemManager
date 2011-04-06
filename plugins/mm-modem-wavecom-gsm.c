@@ -61,6 +61,8 @@ typedef struct {
     guint8 supported_ms_classes;
     /* Current MS class */
     WavecomMSClass current_ms_class;
+    /* Current allowed mode, only for 3G devices */
+    MMModemGsmAllowedMode allowed_mode;
 } MMModemWavecomGsmPrivate;
 
 MMModem *
@@ -243,6 +245,225 @@ get_access_technology (MMGenericGsm *gsm,
     }
 
     mm_at_serial_port_queue_command (port, "+WGPRS=9,2", 3, get_access_technology_cb, info);
+}
+
+static void
+get_allowed_mode_cb (MMAtSerialPort *port,
+                     GString *response,
+                     GError *error,
+                     gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
+    gint read_mode = -1;
+    gchar *mode_str = NULL;
+    gchar *prefer_str = NULL;
+    GRegex *r = NULL;
+    GMatchInfo *match_info = NULL;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* Possible responses:
+     *   +WWSM: 0    (2G only)
+     *   +WWSM: 1    (3G only)
+     *   +WWSM: 2,0  (Any)
+     *   +WWSM: 2,1  (2G preferred)
+     *   +WWSM: 2,2  (3G preferred)
+     */
+    r = g_regex_new ("\\r\\n\\+WWSM: ([0-2])(,([0-2]))?.*$", 0, 0, NULL);
+    if (r && g_regex_match_full (r, response->str, response->len, 0, 0, &match_info, NULL)) {
+        mode_str = g_match_info_fetch (match_info, 1);
+        prefer_str = g_match_info_fetch (match_info, 3); /* 3, to avoid the comma */
+
+        if (mode_str) {
+            switch (atoi (mode_str)) {
+            case 0:
+                if (!prefer_str)
+                    read_mode = MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY;
+                break;
+            case 1:
+                if (!prefer_str)
+                    read_mode = MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY;
+                break;
+            case 2:
+                if (prefer_str) {
+                    switch (atoi (prefer_str)) {
+                    case 0:
+                        read_mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
+                        break;
+                    case 1:
+                        read_mode = MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED;
+                        break;
+                    case 2:
+                        read_mode = MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED;
+                        break;
+                    default:
+                        g_warn_if_reached ();
+                        break;
+                    }
+                }
+                break;
+            default:
+                g_warn_if_reached ();
+                break;
+            }
+        }
+    }
+
+    if (read_mode < 0) {
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "Unexpected wireless data service reply: '%s' "
+                                   "(mode: '%s', prefer: '%s')",
+                                   response->str,
+                                   mode_str ? mode_str : "none",
+                                   prefer_str ? prefer_str : "none");
+    } else {
+        priv->allowed_mode = (guint)read_mode;
+        mm_callback_info_set_result (info,
+                                     GUINT_TO_POINTER (priv->allowed_mode),
+                                     NULL);
+    }
+
+    if (r)
+        g_regex_unref (r);
+    if (match_info)
+        g_match_info_free (match_info);
+    g_free (mode_str);
+    g_free (prefer_str);
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_allowed_mode (MMGenericGsm *gsm,
+                  MMModemUIntFn callback,
+                  gpointer user_data)
+{
+    MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (gsm);
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_uint_new (MM_MODEM (gsm), callback, user_data);
+
+    /* For 3G devices, query WWSM status */
+    if (priv->supported_ms_classes & WAVECOM_MS_CLASS_A) {
+        MMAtSerialPort *port;
+
+        port = mm_generic_gsm_get_best_at_port (gsm, &info->error);
+        if (!port) {
+            mm_callback_info_schedule (info);
+            return;
+        }
+
+        mm_at_serial_port_queue_command (port, "+WWSM?", 3, get_allowed_mode_cb, info);
+        return;
+    }
+
+    /* For 2G devices, just return cached value */
+    mm_callback_info_set_result (info,
+                                 GUINT_TO_POINTER (priv->allowed_mode),
+                                 NULL);
+    mm_callback_info_schedule (info);
+}
+
+static void
+set_allowed_mode_cb (MMAtSerialPort *port,
+                     GString *response,
+                     GError *error,
+                     gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
+
+    if (error)
+        info->error = g_error_copy (error);
+    else
+        priv->allowed_mode = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "new-mode"));
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+set_allowed_mode (MMGenericGsm *gsm,
+                  MMModemGsmAllowedMode mode,
+                  MMModemFn callback,
+                  gpointer user_data)
+{
+    MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (gsm);
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
+
+    /* For 3G devices, go on with WWSM */
+    if (priv->supported_ms_classes & WAVECOM_MS_CLASS_A) {
+        MMAtSerialPort *port;
+        GString *cmd;
+        gint net = -1;
+        gint prefer = -1;
+
+        /* Get port */
+        port = mm_generic_gsm_get_best_at_port (gsm, &info->error);
+        if (!port) {
+            mm_callback_info_schedule (info);
+            return;
+        }
+
+        mm_callback_info_set_data (info,
+                                   "new-mode",
+                                   GUINT_TO_POINTER (mode),
+                                   NULL);
+
+        switch (mode) {
+        case MM_MODEM_GSM_ALLOWED_MODE_ANY:
+            net = 2;
+            prefer = 0;
+            break;
+        case MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED:
+            net = 2;
+            prefer = 1;
+            break;
+        case MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED:
+            net = 2;
+            prefer = 2;
+            break;
+        case MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY:
+            net = 0;
+            break;
+        case MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY:
+            net = 1;
+            break;
+        }
+
+        cmd = g_string_new ("+WWSM=");
+        g_string_append_printf (cmd, "%d", net);
+        if (net == 2)
+            g_string_append_printf (cmd, ",%d", prefer);
+        mm_at_serial_port_queue_command (port, cmd->str, 3, set_allowed_mode_cb, info);
+        g_string_free (cmd, TRUE);
+
+        return;
+    }
+
+    /* For non-3G devices, allow only 2G-related allowed modes */
+    switch (mode) {
+    case MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED:
+    case MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY:
+    case MM_MODEM_GSM_ALLOWED_MODE_ANY:
+        priv->allowed_mode = mode;
+        break;
+    default:
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "Cannot set desired allowed mode, "
+                                   "not a 3G device");
+        break;
+    }
+
+    mm_callback_info_schedule (info);
 }
 
 static void
@@ -479,6 +700,7 @@ mm_modem_wavecom_gsm_init (MMModemWavecomGsm *self)
     /* Set defaults */
     priv->supported_ms_classes = 0; /* This is a bitmask, so empty */
     priv->current_ms_class = WAVECOM_MS_CLASS_UNKNOWN;
+    priv->allowed_mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
 }
 
 static void
@@ -501,6 +723,8 @@ mm_modem_wavecom_gsm_class_init (MMModemWavecomGsmClass *klass)
                                       MM_GENERIC_GSM_FLOW_CONTROL_CMD);
 
     gsm_class->do_enable_power_up_done = do_enable_power_up_done;
+    gsm_class->set_allowed_mode = set_allowed_mode;
+    gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->get_access_technology = get_access_technology;
 }
 
