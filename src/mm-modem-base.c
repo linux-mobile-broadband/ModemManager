@@ -526,12 +526,12 @@ mm_modem_base_get_card_info (MMModemBase *self,
     MMModemBasePrivate *priv;
     MMCallbackInfo *info;
     gboolean cached = FALSE;
-    GError *error = port_error;
+    GError *error = NULL;
 
     g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_MODEM_BASE (self));
-    g_return_if_fail (port != NULL);
-    g_return_if_fail (MM_IS_AT_SERIAL_PORT (port));
+    /* Either we get a proper AT port, or we get a port_error */
+    g_return_if_fail ((port != NULL && MM_IS_AT_SERIAL_PORT (port)) || port_error != NULL);
     g_return_if_fail (callback != NULL);
 
     priv = MM_MODEM_BASE_GET_PRIVATE (self);
