@@ -144,7 +144,8 @@ sms_auth_info_destroy (gpointer data)
 {
     SmsAuthInfo *info = data;
 
-    g_hash_table_destroy (info->hash);
+    if (info->hash)
+        g_hash_table_destroy (info->hash);
     g_free (info->str);
     memset (info, 0, sizeof (SmsAuthInfo));
     g_free (info);
