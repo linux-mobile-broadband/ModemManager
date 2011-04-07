@@ -29,16 +29,19 @@
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 #include "mm-modem-gsm-card.h"
+#include "mm-log.h"
 
 static void modem_init (MMModem *modem_class);
 static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
 static void modem_simple_init (MMModemSimple *class);
+static void modem_gsm_card_init (MMModemGsmCard *class);
 
 
 G_DEFINE_TYPE_EXTENDED (MMModemSamsungGsm, mm_modem_samsung_gsm, MM_TYPE_GENERIC_GSM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_SIMPLE, modem_simple_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_CARD, modem_gsm_card_init))
 
 #define MM_MODEM_SAMSUNG_GSM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_SAMSUNG_GSM, MMModemSamsungGsmPrivate))
 
@@ -395,6 +398,148 @@ get_band (MMModemGsmNetwork *modem,
     }
 
     mm_at_serial_port_queue_command (port, "AT%IPBM?", 3, get_band_done, info);
+}
+
+static gboolean
+parse_samsung_num (const char *str, guint32 *out_num, guint32 min, guint32 max)
+{
+    unsigned long int tmp;
+
+    if (!str || !strlen (str))
+        return FALSE;
+
+    errno = 0;
+    tmp = strtoul (str, NULL, 10);
+    if (errno != 0 || tmp < min || tmp > max)
+        return FALSE;
+    *out_num = (guint32) tmp;
+    return TRUE;
+}
+
+static void
+send_samsung_pinnum_done (MMAtSerialPort *port,
+                          GString *response,
+                          GError *error,
+                          gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    GRegex *r = NULL;
+    GMatchInfo *match_info = NULL;
+    const char *pin_type;
+    guint32 attempts_left = 0;
+    char *str = NULL;
+    guint32 num = 0;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        goto done;
+    }
+
+    pin_type = mm_callback_info_get_data (info, "pin_type");
+
+    r = g_regex_new ("\\%PINNUM:\\s*(\\d+),\\s*(\\d+),\\s*(\\d+),\\s*(\\d+)", G_REGEX_UNGREEDY, 0, NULL);
+    if (!r) {
+        g_set_error_literal (&info->error,
+                             MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             "Could not parse %PINNUM results (error creating regex).");
+        goto done;
+    }
+
+    if (!g_regex_match_full (r, response->str, response->len, 0, 0, &match_info, &info->error)) {
+        g_set_error_literal (&info->error,
+                             MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             "Could not parse %PINNUM results (match failed).");
+        goto done;
+    }
+
+    if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PIN))
+        num = 1;
+    else if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PUK))
+        num = 2;
+    else if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PIN2))
+        num = 3;
+    else if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PUK2))
+        num = 4;
+    else {
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Unhandled PIN type");
+    }
+
+    if (num > 0) {
+        gboolean success = FALSE;
+
+        str = g_match_info_fetch (match_info, num);
+        if (str) {
+            success = parse_samsung_num (str, &attempts_left, 0, 10);
+            g_free (str);
+        }
+
+        if (!success) {
+            info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                               MM_MODEM_ERROR_GENERAL,
+                                               "Could not parse %PINNUM results (missing or invalid match info).");
+        }
+    }
+
+    mm_callback_info_set_result (info, GUINT_TO_POINTER (attempts_left), NULL);
+
+    g_match_info_free (match_info);
+
+done:
+    if (r)
+        g_regex_unref (r);
+    mm_serial_port_close (MM_SERIAL_PORT (port));
+    mm_callback_info_schedule (info);
+}
+
+static void
+reset (MMModem *modem,
+       MMModemFn callback,
+       gpointer user_data)
+{
+    MMCallbackInfo *info;
+    MMAtSerialPort *port;
+
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    if (port)
+        mm_at_serial_port_queue_command (port, "%IRESET", 3, NULL, NULL);
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_unlock_retries (MMModemGsmCard *modem,
+                    const char *pin_type,
+                    MMModemUIntFn callback,
+                    gpointer user_data)
+{
+    MMAtSerialPort *port;
+    MMCallbackInfo *info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+
+    mm_dbg ("pin type '%s'", pin_type);
+
+    /* Ensure we have a usable port to use for the command */
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* Modem may not be enabled yet, which sometimes can't be done until
+     * the device has been unlocked.  In this case we have to open the port
+     * ourselves.
+     */
+    if (!mm_serial_port_open (MM_SERIAL_PORT (port), &info->error)) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* if the modem have not yet been enabled we need to make sure echoing is turned off */
+    mm_at_serial_port_queue_command (port, "E0", 3, NULL, NULL);
+    mm_callback_info_set_data (info, "pin_type", g_strdup (pin_type), g_free);
+    mm_at_serial_port_queue_command (port, "%PINNUM?", 3, send_samsung_pinnum_done, info);
+
 }
 
 static void
@@ -986,6 +1131,7 @@ grab_port (MMModem *modem,
 static void
 modem_init (MMModem *modem_class)
 {
+    modem_class->reset = reset;
     modem_class->disable = disable;
     modem_class->connect = do_connect;
     modem_class->get_ip4_config = get_ip4_config;
@@ -1003,6 +1149,12 @@ modem_gsm_network_init (MMModemGsmNetwork *class)
 {
     class->set_band = set_band;
     class->get_band = get_band;
+}
+
+static void
+modem_gsm_card_init (MMModemGsmCard *class)
+{
+    class->get_unlock_retries = get_unlock_retries;
 }
 
 static void
