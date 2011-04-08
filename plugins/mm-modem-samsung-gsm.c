@@ -1112,7 +1112,10 @@ grab_port (MMModem *modem,
     if (port && MM_IS_AT_SERIAL_PORT (port)) {
         GRegex *regex;
 
-        g_object_set (port, MM_PORT_CARRIER_DETECT, FALSE, NULL);
+        g_object_set (port,
+                      MM_PORT_CARRIER_DETECT, FALSE,
+                      MM_SERIAL_PORT_SEND_DELAY, (guint64) 0,
+                      NULL);
 
         /* %NWSTATE: <rssi>,<mccmnc>,<tech>,<connected>,<regulation> */
         regex = g_regex_new ("\\r\\n\\%NWSTATE: (\\d),(\\d+),\\s*([^,\\s]*)\\s*,(.+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);

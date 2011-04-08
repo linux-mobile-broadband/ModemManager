@@ -373,7 +373,7 @@ mm_serial_port_process_command (MMSerialPort *self,
 {
     MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (self);
     const guint8 *p;
-    int status;
+    int status, expected_status, send_len;
 
     if (priv->fd < 0) {
         g_set_error_literal (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
@@ -393,14 +393,24 @@ mm_serial_port_process_command (MMSerialPort *self,
         serial_debug (self, "-->", (const char *) info->command->data, info->command->len);
     }
 
+    if (priv->send_delay == 0) {
+        /* Send the whole command in one write */
+        send_len = expected_status = info->command->len;
+        p = info->command->data;
+    } else {
+        /* Send just one byte of the command */
+        send_len = expected_status = 1;
+        p = &info->command->data[info->idx];
+    }
+
     /* Send a single byte of the command */
-    p = &info->command->data[info->idx];
     errno = 0;
-    status = write (priv->fd, p, 1);
-    if (status == 1)
-        info->idx++;
-    else if (status < 0) {
-        if (errno == EAGAIN) {
+    status = write (priv->fd, p, send_len);
+    if (status > 0)
+        info->idx += status;
+    else {
+        /* Error or no bytes written */
+        if (errno == EAGAIN || status == 0) {
             info->eagain_count--;
             if (info->eagain_count <= 0) {
                 g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
