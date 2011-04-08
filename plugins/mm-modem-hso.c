@@ -750,7 +750,7 @@ grab_port (MMModem *modem,
         goto out;
 
     if (MM_IS_AT_SERIAL_PORT (port)) {
-        g_object_set (G_OBJECT (port), MM_SERIAL_PORT_SEND_DELAY, (guint64) 10000, NULL);
+        g_object_set (G_OBJECT (port), MM_SERIAL_PORT_SEND_DELAY, (guint64) 0, NULL);
         if (ptype == MM_PORT_TYPE_PRIMARY) {
             GRegex *regex;
 
