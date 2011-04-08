@@ -115,7 +115,7 @@ supports_port (MMPluginBase *base,
      */
     mm_plugin_base_supports_task_set_custom_init_command (task, "ATE0+CPMS?", 3, 4, FALSE, NULL, NULL);
 
-    if (mm_plugin_base_probe_port (base, task, NULL))
+    if (mm_plugin_base_probe_port (base, task, 100000, NULL))
         return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
 
     return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;

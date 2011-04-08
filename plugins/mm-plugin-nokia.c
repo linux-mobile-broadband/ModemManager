@@ -93,7 +93,7 @@ supports_port (MMPluginBase *base,
     }
 
     /* Otherwise kick off a probe */
-    if (mm_plugin_base_probe_port (base, task, NULL))
+    if (mm_plugin_base_probe_port (base, task, 100000, NULL))
         return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
 
     return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;

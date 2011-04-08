@@ -845,6 +845,7 @@ try_open (gpointer user_data)
 gboolean
 mm_plugin_base_probe_port (MMPluginBase *self,
                            MMPluginBaseSupportsTask *task,
+                           guint64 send_delay_us,
                            GError **error)
 {
     MMPluginBaseSupportsTaskPrivate *task_priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
@@ -869,7 +870,7 @@ mm_plugin_base_probe_port (MMPluginBase *self,
     }
 
     g_object_set (serial,
-                  MM_SERIAL_PORT_SEND_DELAY, (guint64) 100000,
+                  MM_SERIAL_PORT_SEND_DELAY, send_delay_us,
                   MM_PORT_CARRIER_DETECT, FALSE,
                   NULL);
 

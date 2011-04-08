@@ -138,6 +138,7 @@ gboolean mm_plugin_base_get_device_ids (MMPluginBase *self,
 
 gboolean mm_plugin_base_probe_port (MMPluginBase *self,
                                     MMPluginBaseSupportsTask *task,
+                                    guint64 send_delay_us,
                                     GError **error);
 
 /* Returns TRUE if the port was previously probed, FALSE if not */
