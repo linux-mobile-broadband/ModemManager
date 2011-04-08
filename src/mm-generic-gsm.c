@@ -697,9 +697,10 @@ initial_pin_check (MMGenericGsm *self)
 
     g_return_if_fail (priv->primary != NULL);
 
-    if (mm_serial_port_open (MM_SERIAL_PORT (priv->primary), &error))
+    if (mm_serial_port_open (MM_SERIAL_PORT (priv->primary), &error)) {
+        mm_at_serial_port_queue_command (priv->primary, "+CMEE=1", 2, NULL, NULL);
         check_pin (self, initial_pin_check_done, NULL);
-    else {
+    } else {
         g_warning ("%s: failed to open serial port: (%d) %s",
                    __func__,
                    error ? error->code : -1,
