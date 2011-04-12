@@ -571,6 +571,17 @@ mm_serial_port_queue_process (gpointer data)
         const GByteArray *cached = mm_serial_port_get_cached_reply (self, info->command);
 
         if (cached) {
+            /* Ensure the response array is fully empty before setting the
+             * cached response.  */
+            if (priv->response->len > 0) {
+                g_warning ("%s: (%s) response array is not empty when using "
+                           "cached reply, cleaning up %u bytes",
+                           __func__,
+                           mm_port_get_device (MM_PORT (self)),
+                           priv->response->len);
+                g_byte_array_set_size (priv->response, 0);
+            }
+
             g_byte_array_append (priv->response, cached->data, cached->len);
             mm_serial_port_got_response (self, NULL);
             return FALSE;
