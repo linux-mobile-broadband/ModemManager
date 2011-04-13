@@ -37,7 +37,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-x22x.la \
 	libmm-plugin-linktop.la \
 	libmm-plugin-samsung.la \
-	libmm-plugin-wavecom.la
+	libmm-plugin-wavecom.la \
+	libmm-plugin-cinterion.la
 
 # Generic
 
@@ -371,6 +372,24 @@ libmm_plugin_samsung_la_CPPFLAGS = \
 	-I$(top_srcdir)/src
 
 libmm_plugin_samsung_la_LDFLAGS = \
+	$(GUDEV_LDFLAGS) \
+	-module \
+	-avoid-version
+
+# Cinterion (previously Siemens) modem
+
+libmm_plugin_cinterion_la_SOURCES = \
+	mm-plugin-cinterion.c \
+	mm-plugin-cinterion.h \
+	mm-modem-cinterion-gsm.c \
+	mm-modem-cinterion-gsm.h
+
+libmm_plugin_cinterion_la_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
+	-I$(top_srcdir)/src
+
+libmm_plugin_cinterion_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
 	-module \
 	-avoid-version
