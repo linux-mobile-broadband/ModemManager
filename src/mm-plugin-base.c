@@ -872,6 +872,7 @@ mm_plugin_base_probe_port (MMPluginBase *self,
     g_object_set (serial,
                   MM_SERIAL_PORT_SEND_DELAY, send_delay_us,
                   MM_PORT_CARRIER_DETECT, FALSE,
+                  MM_SERIAL_PORT_SPEW_CONTROL, TRUE,
                   NULL);
 
     mm_at_serial_port_set_response_parser (serial,

@@ -44,6 +44,7 @@ enum {
     PROP_STOPBITS,
     PROP_SEND_DELAY,
     PROP_FD,
+    PROP_SPEW_CONTROL,
 
     LAST_PROP
 };
@@ -67,6 +68,7 @@ typedef struct {
     char parity;
     guint stopbits;
     guint64 send_delay;
+    gboolean spew_control;
 
     guint queue_id;
     guint watch_id;
@@ -657,7 +659,7 @@ data_available (GIOChannel *source,
         }
 
         /* Make sure the response doesn't grow too long */
-        if (priv->response->len > SERIAL_BUF_SIZE) {
+        if ((priv->response->len > SERIAL_BUF_SIZE) && priv->spew_control) {
             /* Notify listeners and then trim the buffer */
             g_signal_emit_by_name (self, "buffer-full", priv->response);
             g_byte_array_remove_range (priv->response, 0, (SERIAL_BUF_SIZE / 2));
@@ -1250,6 +1252,9 @@ set_property (GObject *object, guint prop_id,
     case PROP_SEND_DELAY:
         priv->send_delay = g_value_get_uint64 (value);
         break;
+    case PROP_SPEW_CONTROL:
+        priv->spew_control = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -1280,6 +1285,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case PROP_SEND_DELAY:
         g_value_set_uint64 (value, priv->send_delay);
+        break;
+    case PROP_SPEW_CONTROL:
+        g_value_set_boolean (value, priv->spew_control);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1382,6 +1390,14 @@ mm_serial_port_class_init (MMSerialPortClass *klass)
                               "Send delay for each byte in microseconds",
                               0, G_MAXUINT64, 0,
                               G_PARAM_READWRITE));
+
+    g_object_class_install_property
+        (object_class, PROP_SPEW_CONTROL,
+         g_param_spec_boolean (MM_SERIAL_PORT_SPEW_CONTROL,
+                               "SpewControl",
+                               "Spew control",
+                               FALSE,
+                               G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE));
 
     /* Signals */
     g_signal_new ("buffer-full",
