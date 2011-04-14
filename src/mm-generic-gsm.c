@@ -167,6 +167,16 @@ static void ciev_received (MMAtSerialPort *port,
                            GMatchInfo *info,
                            gpointer user_data);
 
+static void cmti_received (MMAtSerialPort *port,
+                           GMatchInfo *info,
+                           gpointer user_data);
+
+#define GS_HASH_TAG "get-sms"
+static GValue *simple_string_value (const char *str);
+static GValue *simple_uint_value (guint32 i);
+static GValue *simple_boolean_value (gboolean b);
+static void simple_free_gvalue (gpointer data);
+
 MMModem *
 mm_generic_gsm_new (const char *device,
                     const char *driver,
@@ -815,6 +825,9 @@ mm_generic_gsm_grab_port (MMGenericGsm *self,
 
         regex = g_regex_new ("\\r\\n\\+CIEV: (\\d+),(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, ciev_received, self, NULL);
+
+        regex = g_regex_new ("\\r\\n\\+CMTI: \"(\\S+)\",(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, cmti_received, self, NULL);
         g_regex_unref (regex);
 
         if (ptype == MM_PORT_TYPE_PRIMARY) {
@@ -1294,6 +1307,29 @@ ciev_received (MMAtSerialPort *port,
 }
 
 static void
+cmti_received (MMAtSerialPort *port,
+               GMatchInfo *info,
+               gpointer user_data)
+{
+    MMGenericGsm *self = MM_GENERIC_GSM (user_data);
+
+    guint idx=0;
+    char *str;
+
+    str = g_match_info_fetch (info, 2);
+    if (str)
+        idx = atoi (str);
+    g_free (str);
+
+    /* todo: parse pdu to know if the sms is complete */
+    mm_modem_gsm_sms_received (MM_MODEM_GSM_SMS (self),
+                               idx,
+                               TRUE);
+
+    /* todo: send mm_modem_gsm_sms_completed if complete */
+}
+
+static void
 cmer_cb (MMAtSerialPort *port,
          GString *response,
          GError *error,
@@ -1384,6 +1420,11 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
     if (cmd && strlen (cmd))
         mm_at_serial_port_queue_command (priv->primary, cmd, 3, NULL, NULL);
     g_free (cmd);
+
+    /* Enable SMS notifications */
+    mm_at_serial_port_queue_command (priv->primary, "+CNMI=2,1,2,1,0", 3, NULL, NULL);
+    /* Set SMS storage location to ME */
+    mm_at_serial_port_queue_command (priv->primary, "+CPMS=\"ME\",\"ME\",\"ME\"", 3, NULL, NULL);
 
     mm_at_serial_port_queue_command (priv->primary, "+CIND=?", 3, cind_cb, self);
 
@@ -3816,6 +3857,29 @@ mm_generic_gsm_get_charset (MMGenericGsm *self)
 /*****************************************************************************/
 /* MMModemGsmSms interface */
 
+
+#define SMS_TP_MTI_MASK	              0x03
+#define  SMS_TP_MTI_SMS_DELIVER       0x00
+#define  SMS_TP_MTI_SMS_SUBMIT_REPORT 0x01
+#define  SMS_TP_MTI_SMS_STATUS_REPORT 0x02
+
+#define SMS_TP_MMS                    0x04
+#define SMS_TP_SRI                    0x20
+#define SMS_TP_UDHI                   0x40
+#define SMS_TP_RP                     0x80
+
+#define SMS_DCS_CODING_MASK           0xec
+#define  SMS_DCS_CODING_DEFAULT       0x00
+#define  SMS_DCS_CODING_8BIT          0x04
+#define  SMS_DCS_CODING_UCS2          0x08
+
+#define SMS_DCS_CLASS_VALID           0x10
+#define SMS_DCS_CLASS_MASK            0x03
+
+#define SMS_TIMESTAMP_LEN 7
+#define SMS_MIN_PDU_LEN (7 + SMS_TIMESTAMP_LEN)
+#define SMS_MAX_PDU_LEN 344
+
 static void
 sms_send_done (MMAtSerialPort *port,
                GString *response,
@@ -3858,6 +3922,414 @@ sms_send (MMModemGsmSms *modem,
     command = g_strdup_printf ("+CMGS=\"%s\"\r%s\x1a", number, text);
     mm_at_serial_port_queue_command (port, command, 10, sms_send_done, info);
     g_free (command);
+}
+
+static char sms_bcd_chars[] = "0123456789*#abc\0\0";
+
+static void
+sms_semi_octets_to_bcd_string (char *dest, const guint8 *octets, int num_octets)
+{
+    int i;
+
+    for (i = 0 ; i < num_octets; i++) {
+        *dest++ = sms_bcd_chars[octets[i] & 0xf];
+        *dest++ = sms_bcd_chars[(octets[i] >> 4) & 0xf];
+    }
+    *dest++ = '\0';
+}
+
+/* len is in septets for gsm7 and in digits (semi-octets) for others */
+static char *
+sms_decode_address (const guint8 *address, int len)
+{
+    guint8 addrtype;
+    char *utf8;
+
+    addrtype = address[0];
+    address++;
+
+    if (addrtype == 0xd0) {
+        guint8 *unpacked;
+        guint32 unpacked_len;
+        unpacked = gsm_unpack (address + 1, len, 0, &unpacked_len);
+        utf8 = (char *)mm_charset_gsm_unpacked_to_utf8 (unpacked,
+                                                        unpacked_len);
+        g_free(unpacked);
+    } else {
+        utf8 = g_malloc (len + 2); /* may need one extra for trailing 0xf */
+        sms_semi_octets_to_bcd_string (utf8, address, (len + 1) / 2);
+    }
+
+    return utf8;
+}
+
+
+static char *
+sms_decode_timestamp (const guint8 *timestamp)
+{
+    /* YYMMDDHHMMSS+ZZ */
+    char *timestr;
+    int quarters, hours;
+
+    timestr = g_malloc0 (16);
+    sms_semi_octets_to_bcd_string (timestr, timestamp, 6);
+    quarters = ((timestamp[6] & 0x7) * 10) + ((timestamp[6] >> 4) & 0xf);
+    hours = quarters / 4;
+    if (timestamp[6] & 0x08)
+        timestr[12] = '-';
+    else
+        timestr[12] = '+';
+    timestr[13] = (hours / 10) + '0';
+    timestr[14] = (hours % 10) + '0';
+    /* TODO(njw): Change timestamp rep to something that includes quarter-hours */
+    return timestr;
+}
+
+static char *
+sms_decode_text (const guint8 *text, int len, int dcs, int bit_offset)
+{
+    char *utf8;
+    guint8 coding = dcs & SMS_DCS_CODING_MASK;
+    guint8 *unpacked;
+    guint32 unpacked_len;
+
+    if (coding == SMS_DCS_CODING_DEFAULT) {
+        unpacked = gsm_unpack ((const guint8 *) text, len, bit_offset, &unpacked_len);
+        utf8 = (char *) mm_charset_gsm_unpacked_to_utf8 (unpacked, unpacked_len);
+        g_free (unpacked);
+    } else if (coding == SMS_DCS_CODING_UCS2)
+        utf8 = g_convert ((char *) text, len, "UTF8", "UCS-2BE", NULL, NULL, NULL);
+    else if (coding == SMS_DCS_CODING_8BIT)
+        utf8 = g_strndup ((const char *)text, len);
+    else
+        utf8 = g_strdup ("");
+
+    return utf8;
+}
+
+
+static GHashTable *
+sms_parse_pdu (const char *hexpdu)
+{
+    GHashTable *properties;
+    gsize pdu_len;
+    guint8 *pdu;
+    int smsc_addr_num_octets, variable_length_items, msg_start_offset,
+            sender_addr_num_digits, sender_addr_num_octets,
+            tp_pid_offset, tp_dcs_offset, user_data_offset, user_data_len,
+            user_data_len_offset, user_data_dcs, bit_offset;
+    char *smsc_addr, *sender_addr, *sc_timestamp, *msg_text;
+
+    /* Convert PDU from hex to binary */
+    pdu = (guint8 *) utils_hexstr2bin (hexpdu, &pdu_len);
+    if (!pdu) {
+        mm_err("Couldn't parse PDU of SMS GET response from hex");
+        return NULL;
+    }
+
+    /* SMSC, in address format, precedes the TPDU */
+    smsc_addr_num_octets = pdu[0];
+    variable_length_items = smsc_addr_num_octets;
+    if (pdu_len < variable_length_items + SMS_MIN_PDU_LEN) {
+        mm_err ("PDU too short (1): %zd vs %d", pdu_len,
+                variable_length_items + SMS_MIN_PDU_LEN);
+        g_free (pdu);
+        return NULL;
+    }
+
+    /* where in the PDU the actual SMS protocol message begins */
+    msg_start_offset = 1 + smsc_addr_num_octets;
+    sender_addr_num_digits = pdu[msg_start_offset + 1];
+    /*
+     * round the sender address length up to an even number of
+     * semi-octets, and thus an integral number of octets
+     */
+    sender_addr_num_octets = (sender_addr_num_digits + 1) >> 1;
+    variable_length_items += sender_addr_num_octets;
+    if (pdu_len < variable_length_items + SMS_MIN_PDU_LEN) {
+        mm_err ("PDU too short (2): %zd vs %d", pdu_len,
+                variable_length_items + SMS_MIN_PDU_LEN);
+        g_free (pdu);
+        return NULL;
+    }
+
+    tp_pid_offset = msg_start_offset + 3 + sender_addr_num_octets;
+    tp_dcs_offset = tp_pid_offset + 1;
+
+    user_data_len_offset = tp_dcs_offset + 1 + SMS_TIMESTAMP_LEN;
+    user_data_offset = user_data_len_offset + 1;
+    user_data_len = pdu[user_data_len_offset];
+    user_data_dcs = pdu[tp_dcs_offset];
+    if ((user_data_dcs & SMS_DCS_CODING_MASK) == SMS_DCS_CODING_DEFAULT)
+        variable_length_items += (7 * (user_data_len + 1 )) / 8;
+    else
+        variable_length_items += user_data_len;
+    if (pdu_len < variable_length_items + SMS_MIN_PDU_LEN) {
+        mm_err ("PDU too short (3): %zd vs %d", pdu_len,
+                variable_length_items + SMS_MIN_PDU_LEN);
+        g_free (pdu);
+        return NULL;
+    }
+
+    /* Only handle SMS-DELIVER */
+    if ((pdu[msg_start_offset] & SMS_TP_MTI_MASK) != SMS_TP_MTI_SMS_DELIVER) {
+        mm_err ("Unhandled message type: 0x%02x", pdu[msg_start_offset]);
+        g_free (pdu);
+        return NULL;
+    }
+
+    /* Only handle the basic protocol identifier */
+    if (pdu[tp_pid_offset] != 0) {
+        mm_err ("Unhandled protocol identifier: 0x%02x vs 0x00",
+                pdu[tp_pid_offset]);
+        g_free (pdu);
+        return NULL;
+    }
+
+    smsc_addr = sms_decode_address (&pdu[1], 2 * (pdu[0] - 1));
+    sender_addr = sms_decode_address (&pdu[msg_start_offset + 2],
+                                      pdu[msg_start_offset + 1]);
+    sc_timestamp = sms_decode_timestamp (&pdu[tp_dcs_offset + 1]);
+    bit_offset = 0;
+    if (pdu[msg_start_offset] & SMS_TP_UDHI) {
+        /*
+         * Skip over the user data headers to prevent it from being
+         * decoded into garbage text.
+         */
+        int udhl;
+        udhl = pdu[user_data_offset] + 1;
+        user_data_offset += udhl;
+        if ((user_data_dcs & SMS_DCS_CODING_MASK) == SMS_DCS_CODING_DEFAULT) {
+            bit_offset = 7 - (udhl * 8) % 7;
+            user_data_len -= (udhl * 8 + bit_offset) / 7;
+        } else
+            user_data_len -= udhl;
+    }
+
+    msg_text = sms_decode_text (&pdu[user_data_offset], user_data_len,
+                                user_data_dcs, bit_offset);
+
+    properties = g_hash_table_new_full (g_str_hash, g_str_equal, NULL,
+                                        simple_free_gvalue);
+    g_hash_table_insert (properties, "number",
+                         simple_string_value (sender_addr));
+    g_hash_table_insert (properties, "text",
+                         simple_string_value (msg_text));
+    g_hash_table_insert (properties, "smsc",
+                         simple_string_value (smsc_addr));
+    g_hash_table_insert (properties, "timestamp",
+                         simple_string_value (sc_timestamp));
+    if (user_data_dcs & SMS_DCS_CLASS_VALID)
+        g_hash_table_insert (properties, "class",
+                             simple_uint_value (user_data_dcs &
+                                                SMS_DCS_CLASS_MASK));
+    g_hash_table_insert (properties, "completed", simple_boolean_value (TRUE));
+
+    g_free (smsc_addr);
+    g_free (sender_addr);
+    g_free (sc_timestamp);
+    g_free (msg_text);
+    g_free (pdu);
+
+    return properties;
+}
+
+static void
+sms_get_done (MMAtSerialPort *port,
+              GString *response,
+              GError *error,
+              gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    GHashTable *properties;
+    int rv, status, tpdu_len, offset;
+    char pdu[SMS_MAX_PDU_LEN + 1];
+
+    if (error) {
+        info->error = g_error_copy (error);
+        goto out;
+    }
+
+    /* 344 == SMS_MAX_PDU_LEN */
+    rv = sscanf (response->str, "+CMGR: %d,,%d %344s %n",
+                 &status, &tpdu_len, pdu, &offset);
+    if (rv != 4) {
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "Failed to parse CMGR response (parsed %d items)",
+                                   rv);
+        goto out;
+    }
+
+    properties = sms_parse_pdu (pdu);
+    if (!properties) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_GENERAL,
+                                           "Failed to parse SMS PDU");
+        goto out;
+    }
+
+    mm_callback_info_set_data (info, GS_HASH_TAG, properties,
+                               (GDestroyNotify) g_hash_table_unref);
+
+out:
+    mm_callback_info_schedule (info);
+}
+
+static void
+sms_get_invoke (MMCallbackInfo *info)
+{
+    MMModemGsmSmsGetFn callback = (MMModemGsmSmsGetFn) info->callback;
+
+    callback (MM_MODEM_GSM_SMS (info->modem),
+              (GHashTable *) mm_callback_info_get_data (info, GS_HASH_TAG),
+              info->error, info->user_data);
+}
+
+static void
+sms_get (MMModemGsmSms *modem,
+         guint idx,
+         MMModemGsmSmsGetFn callback,
+         gpointer user_data)
+{
+    MMCallbackInfo *info;
+    char *command;
+    MMAtSerialPort *port;
+
+    info = mm_callback_info_new_full (MM_MODEM (modem),
+                                      sms_get_invoke,
+                                      G_CALLBACK (callback),
+                                      user_data);
+
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    command = g_strdup_printf ("+CMGR=%d\r\n", idx);
+    mm_at_serial_port_queue_command (port, command, 10, sms_get_done, info);
+}
+
+static void
+sms_delete_done (MMAtSerialPort *port,
+                 GString *response,
+                 GError *error,
+                 gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error)
+        info->error = g_error_copy (error);
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+sms_delete (MMModemGsmSms *modem,
+            guint idx,
+            MMModemFn callback,
+            gpointer user_data)
+{
+    MMCallbackInfo *info;
+    char *command;
+    MMAtSerialPort *port;
+
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    command = g_strdup_printf ("+CMGD=%d\r\n", idx);
+    mm_at_serial_port_queue_command (port, command, 10, sms_delete_done, info);
+}
+
+static void
+sms_list_done (MMAtSerialPort *port,
+               GString *response,
+               GError *error,
+               gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    GPtrArray *results = NULL;
+    int rv, status, tpdu_len, offset;
+    char *rstr;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else {
+        results = g_ptr_array_new ();
+        rstr = response->str;
+
+        while (*rstr) {
+            GHashTable *properties;
+            int idx;
+            char pdu[SMS_MAX_PDU_LEN + 1];
+
+            rv = sscanf (rstr, "+CMGL: %d,%d,,%d %344s %n",
+                         &idx, &status, &tpdu_len, pdu, &offset);
+            if (4 != rv) {
+                mm_err("Couldn't parse response to SMS LIST (%d)", rv);
+                break;
+            }
+            rstr += offset;
+
+            properties = sms_parse_pdu (pdu);
+            if (properties) {
+                g_hash_table_insert (properties, "index",
+                                     simple_uint_value (idx));
+                g_ptr_array_add (results, properties);
+            }
+        }
+        /*
+         * todo(njw): mm_gsm_destroy_scan_data does what we want
+         * (destroys a GPtrArray of g_hash_tables), but it should be
+         * renamed to describe that or there should be a function
+         * named for what we're doing here.
+         */
+        if (results)
+            mm_callback_info_set_data (info, "list-sms", results,
+                                       mm_gsm_destroy_scan_data);
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+sms_list_invoke (MMCallbackInfo *info)
+{
+    MMModemGsmSmsListFn callback = (MMModemGsmSmsListFn) info->callback;
+
+    callback (MM_MODEM_GSM_SMS (info->modem),
+              (GPtrArray *) mm_callback_info_get_data (info, "list-sms"),
+              info->error, info->user_data);
+}
+
+static void
+sms_list (MMModemGsmSms *modem,
+          MMModemGsmSmsListFn callback,
+          gpointer user_data)
+{
+    MMCallbackInfo *info;
+    char *command;
+    MMAtSerialPort *port;
+
+    info = mm_callback_info_new_full (MM_MODEM (modem),
+                                      sms_list_invoke,
+                                      G_CALLBACK (callback),
+                                      user_data);
+
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    command = g_strdup_printf ("+CMGL=4\r\n");
+    mm_at_serial_port_queue_command (port, command, 10, sms_list_done, info);
 }
 
 MMAtSerialPort *
@@ -4396,6 +4868,18 @@ simple_uint_value (guint32 i)
 }
 
 static GValue *
+simple_boolean_value (gboolean b)
+{
+    GValue *val;
+
+    val = g_slice_new0 (GValue);
+    g_value_init (val, G_TYPE_BOOLEAN);
+    g_value_set_boolean (val, b);
+
+    return val;
+}
+
+static GValue *
 simple_string_value (const char *str)
 {
     GValue *val;
@@ -4733,6 +5217,9 @@ static void
 modem_gsm_sms_init (MMModemGsmSms *class)
 {
     class->send = sms_send;
+    class->get = sms_get;
+    class->delete = sms_delete;
+    class->list = sms_list;
 }
 
 static void

@@ -36,6 +36,7 @@
           validity : uint (0..255) - Specifies when the SMS expires in SMSC (optional)
           class    : uint (0..3) - Message importance and location (optional)
           completed: boolean - Whether all message parts have been received or not (optional)
+          index    : uint - Index of message (for Get and Delete) (optional)
         </tp:docstring>
       </arg>
     </method>

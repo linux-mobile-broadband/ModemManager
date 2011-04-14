@@ -25,6 +25,16 @@
 
 typedef struct _MMModemGsmSms MMModemGsmSms;
 
+typedef void (*MMModemGsmSmsGetFn) (MMModemGsmSms *modem,
+                                    GHashTable *properties,
+                                    GError *error,
+                                    gpointer user_data);
+
+typedef void (*MMModemGsmSmsListFn) (MMModemGsmSms *modem,
+                                     GPtrArray *resultlist,
+                                     GError *error,
+                                     gpointer user_data);
+
 struct _MMModemGsmSms {
     GTypeInterface g_iface;
 
@@ -36,6 +46,20 @@ struct _MMModemGsmSms {
                   guint validity,
                   guint class,
                   MMModemFn callback,
+                  gpointer user_data);
+
+    void (*get) (MMModemGsmSms *modem,
+                 guint32 index,
+                 MMModemGsmSmsGetFn callback,
+                 gpointer user_data);
+
+    void (*delete) (MMModemGsmSms *modem,
+                    guint32 index,
+                    MMModemFn callback,
+                    gpointer user_data);
+
+    void (*list) (MMModemGsmSms *modem,
+                  MMModemGsmSmsListFn callback,
                   gpointer user_data);
 
     /* Signals */
@@ -58,5 +82,28 @@ void mm_modem_gsm_sms_send (MMModemGsmSms *self,
                             guint class,
                             MMModemFn callback,
                             gpointer user_data);
+
+void mm_modem_gsm_sms_get (MMModemGsmSms *self,
+                           guint idx,
+                           MMModemGsmSmsGetFn callback,
+                           gpointer user_data);
+
+void mm_modem_gsm_sms_delete (MMModemGsmSms *self,
+                              guint idx,
+                              MMModemFn callback,
+                              gpointer user_data);
+
+void mm_modem_gsm_sms_list (MMModemGsmSms *self,
+                            MMModemGsmSmsListFn callback,
+                            gpointer user_data);
+
+void mm_modem_gsm_sms_received (MMModemGsmSms *self,
+                                guint idx,
+                                gboolean complete);
+
+void mm_modem_gsm_sms_completed (MMModemGsmSms *self,
+                                guint idx,
+                                gboolean complete);
+
 
 #endif /* MM_MODEM_GSM_SMS_H */

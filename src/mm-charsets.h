@@ -53,7 +53,7 @@ guint8 *mm_charset_utf8_to_unpacked_gsm (const char *utf8, guint32 *out_len);
 guint8 *mm_charset_gsm_unpacked_to_utf8 (const guint8 *gsm, guint32 len);
 
 guint8 *gsm_unpack (const guint8 *gsm,
-                    guint32 nchars, /* number of gsm characters, not octets */
+                    guint32 num_septets,
                     guint8 start_offset,  /* in bits */
                     guint32 *out_unpacked_len);
 

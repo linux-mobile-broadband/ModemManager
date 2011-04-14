@@ -103,6 +103,34 @@ async_call_not_supported (MMModemGsmSms *self,
     mm_callback_info_schedule (info);
 }
 
+static void
+sms_get_done (MMModemGsmSms *self,
+              GHashTable *properties,
+              GError *error,
+              gpointer user_data)
+{
+    DBusGMethodInvocation *context = (DBusGMethodInvocation *) user_data;
+
+    if (error)
+        dbus_g_method_return_error (context, error);
+    else
+        dbus_g_method_return (context, properties);
+}
+
+static void
+sms_list_done (MMModemGsmSms *self,
+              GPtrArray *results,
+              GError *error,
+              gpointer user_data)
+{
+    DBusGMethodInvocation *context = (DBusGMethodInvocation *) user_data;
+
+    if (error)
+        dbus_g_method_return_error (context, error);
+    else
+        dbus_g_method_return (context, results);
+}
+
 /*****************************************************************************/
 
 void
@@ -125,6 +153,110 @@ mm_modem_gsm_sms_send (MMModemGsmSms *self,
     else
         async_call_not_supported (self, callback, user_data);
 
+}
+
+static void
+sms_get_invoke (MMCallbackInfo *info)
+{
+    MMModemGsmSmsGetFn callback = (MMModemGsmSmsGetFn) info->callback;
+
+    callback (MM_MODEM_GSM_SMS (info->modem), NULL, info->error, info->user_data);
+}
+
+void
+mm_modem_gsm_sms_get (MMModemGsmSms *self,
+                      guint idx,
+                      MMModemGsmSmsGetFn callback,
+                      gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_GSM_SMS (self));
+    g_return_if_fail (callback != NULL);
+
+    if (MM_MODEM_GSM_SMS_GET_INTERFACE (self)->get)
+        MM_MODEM_GSM_SMS_GET_INTERFACE (self)->get (self, idx, callback, user_data);
+    else {
+        MMCallbackInfo *info;
+
+        info = mm_callback_info_new_full (MM_MODEM (self),
+                                          sms_get_invoke,
+                                          G_CALLBACK (callback),
+                                          user_data);
+
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                           "Operation not supported");
+        mm_callback_info_schedule (info);
+    }
+}
+
+void
+mm_modem_gsm_sms_delete (MMModemGsmSms *self,
+                         guint idx,
+                         MMModemFn callback,
+                         gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_GSM_SMS (self));
+    g_return_if_fail (callback != NULL);
+
+    if (MM_MODEM_GSM_SMS_GET_INTERFACE (self)->delete)
+        MM_MODEM_GSM_SMS_GET_INTERFACE (self)->delete (self, idx, callback, user_data);
+    else
+        async_call_not_supported (self, callback, user_data);
+}
+
+static void
+sms_list_invoke (MMCallbackInfo *info)
+{
+    MMModemGsmSmsListFn callback = (MMModemGsmSmsListFn) info->callback;
+
+    callback (MM_MODEM_GSM_SMS (info->modem), NULL, info->error, info->user_data);
+}
+
+void
+mm_modem_gsm_sms_list (MMModemGsmSms *self,
+                       MMModemGsmSmsListFn callback,
+                       gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_GSM_SMS (self));
+    g_return_if_fail (callback != NULL);
+
+    if (MM_MODEM_GSM_SMS_GET_INTERFACE (self)->list)
+        MM_MODEM_GSM_SMS_GET_INTERFACE (self)->list (self, callback, user_data);
+    else {
+        MMCallbackInfo *info;
+
+        info = mm_callback_info_new_full (MM_MODEM (self),
+                                          sms_list_invoke,
+                                          G_CALLBACK (callback),
+                                          user_data);
+
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                           "Operation not supported");
+        mm_callback_info_schedule (info);
+    }
+}
+
+void
+mm_modem_gsm_sms_received (MMModemGsmSms *self,
+                           guint idx,
+                           gboolean complete)
+{
+    g_return_if_fail (MM_IS_MODEM_GSM_SMS (self));
+
+    g_signal_emit (self, signals[SMS_RECEIVED], 0,
+                   idx,
+                   complete);
+}
+
+void
+mm_modem_gsm_sms_completed (MMModemGsmSms *self,
+                            guint idx,
+                            gboolean complete)
+{
+    g_return_if_fail (MM_IS_MODEM_GSM_SMS (self));
+
+    g_signal_emit (self, signals[COMPLETED], 0,
+                   idx,
+                   complete);
 }
 
 /*****************************************************************************/
@@ -212,14 +344,18 @@ sms_delete_auth_cb (MMAuthRequest *req,
                     gpointer user_data)
 {
     MMModemGsmSms *self = MM_MODEM_GSM_SMS (owner);
+    SmsAuthInfo *info = user_data;
     GError *error = NULL;
+    guint idx;
 
     /* Return any authorization error, otherwise delete the SMS */
     if (!mm_modem_auth_finish (MM_MODEM (self), req, &error)) {
         dbus_g_method_return_error (context, error);
         g_error_free (error);
-    } else
-        async_call_not_supported (self, async_call_done, context);
+    } else {
+        idx = info->num1;
+        mm_modem_gsm_sms_delete (self, idx, async_call_done, context);
+    }
 }
 
 static void
@@ -254,14 +390,18 @@ sms_get_auth_cb (MMAuthRequest *req,
                  gpointer user_data)
 {
     MMModemGsmSms *self = MM_MODEM_GSM_SMS (owner);
+    SmsAuthInfo *info = user_data;
+    guint idx;
     GError *error = NULL;
 
     /* Return any authorization error, otherwise get the SMS */
     if (!mm_modem_auth_finish (MM_MODEM (self), req, &error)) {
         dbus_g_method_return_error (context, error);
         g_error_free (error);
-    } else
-        async_call_not_supported (self, async_call_done, context);
+    } else {
+        idx = info->num1;
+        mm_modem_gsm_sms_get (self, idx, sms_get_done, context);
+    }
 }
 
 static void
@@ -369,7 +509,7 @@ sms_list_auth_cb (MMAuthRequest *req,
         dbus_g_method_return_error (context, error);
         g_error_free (error);
     } else
-        async_call_not_supported (self, async_call_done, context);
+        mm_modem_gsm_sms_list (self, sms_list_done, context);
 }
 
 static void

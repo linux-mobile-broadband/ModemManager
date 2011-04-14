@@ -202,6 +202,7 @@ typedef struct {
     GRegex *regex_custom_successful;
     /* Regular expressions for error replies */
     GRegex *regex_cme_error;
+    GRegex *regex_cms_error;
     GRegex *regex_cme_error_str;
     GRegex *regex_ezx_error;
     GRegex *regex_unknown_error;
@@ -220,6 +221,7 @@ mm_serial_parser_v1_new (void)
     parser->regex_ok = g_regex_new ("\\r\\nOK(\\r\\n)+$", flags, 0, NULL);
     parser->regex_connect = g_regex_new ("\\r\\nCONNECT.*\\r\\n", flags, 0, NULL);
     parser->regex_cme_error = g_regex_new ("\\r\\n\\+CME ERROR: (\\d+)\\r\\n$", flags, 0, NULL);
+    parser->regex_cms_error = g_regex_new ("\\r\\n\\+CMS ERROR: (\\d+)\\r\\n$", flags, 0, NULL);
     parser->regex_cme_error_str = g_regex_new ("\\r\\n\\+CME ERROR: ([^\\n\\r]+)\\r\\n$", flags, 0, NULL);
     parser->regex_ezx_error = g_regex_new ("\\r\\n\\MODEM ERROR: (\\d+)\\r\\n$", flags, 0, NULL);
     parser->regex_unknown_error = g_regex_new ("\\r\\n(ERROR)|(COMMAND NOT SUPPORT)\\r\\n$", flags, 0, NULL);
@@ -311,6 +313,23 @@ mm_serial_parser_v1_parse (gpointer data,
 
     /* Numeric CME errors */
     found = g_regex_match_full (parser->regex_cme_error,
+                                response->str, response->len,
+                                0, 0, &match_info, NULL);
+    if (found) {
+        str = g_match_info_fetch (match_info, 1);
+        g_assert (str);
+        local_error = mm_mobile_error_for_code (atoi (str));
+        g_free (str);
+        g_match_info_free (match_info);
+        goto done;
+    }
+
+    /* Numeric CMS errors */
+    /* Todo
+     * One should probably add message service
+     * errors explicitly in mm-errors.h/c
+     */
+    found = g_regex_match_full (parser->regex_cms_error,
                                 response->str, response->len,
                                 0, 0, &match_info, NULL);
     if (found) {
