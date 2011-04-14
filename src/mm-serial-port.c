@@ -1397,7 +1397,7 @@ mm_serial_port_class_init (MMSerialPortClass *klass)
                                "SpewControl",
                                "Spew control",
                                FALSE,
-                               G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE));
+                               G_PARAM_READWRITE));
 
     /* Signals */
     g_signal_new ("buffer-full",
