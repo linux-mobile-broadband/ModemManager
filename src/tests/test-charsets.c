@@ -98,7 +98,7 @@ test_unpack_gsm7 (void *f, gpointer d)
     guint8 *unpacked;
     guint32 unpacked_len = 0;
 
-    unpacked = gsm_unpack (gsm, sizeof (gsm), 0, &unpacked_len);
+    unpacked = gsm_unpack (gsm, (sizeof (gsm) * 8) / 7, 0, &unpacked_len);
     g_assert (unpacked);
     g_assert_cmpint (unpacked_len, ==, sizeof (expected));
     g_assert_cmpint (memcmp (unpacked, expected, unpacked_len), ==, 0);
@@ -110,17 +110,16 @@ static void
 test_unpack_gsm7_7_chars (void *f, gpointer d)
 {
     static const guint8 gsm[] = { 0xF1, 0x7B, 0x59, 0x4E, 0xCF, 0xD7, 0x01 };
-    static const guint8 expected[] = { 0x71, 0x77, 0x65, 0x72, 0x74, 0x79, 0x75, 0x00 };
+    static const guint8 expected[] = { 0x71, 0x77, 0x65, 0x72, 0x74, 0x79, 0x75};
     guint8 *unpacked;
     guint32 unpacked_len = 0;
 
     /* Tests the edge case where there are 7 bits left in the packed
      * buffer but those 7 bits do not contain a character.  In this case
-     * we expect a trailing NULL byte and the caller must know enough about
-     * the intended message to remove it when required.
+     * we expect to get the number of characters that were specified.
      */
 
-    unpacked = gsm_unpack (gsm, sizeof (gsm), 0, &unpacked_len);
+    unpacked = gsm_unpack (gsm, 7 , 0, &unpacked_len);
     g_assert (unpacked);
     g_assert_cmpint (unpacked_len, ==, sizeof (expected));
     g_assert_cmpint (memcmp (unpacked, expected, unpacked_len), ==, 0);
@@ -153,7 +152,7 @@ test_unpack_gsm7_all_chars (void *f, gpointer d)
     guint32 unpacked_len = 0;
     int i;
 
-    unpacked = gsm_unpack (gsm, sizeof (gsm), 0, &unpacked_len);
+    unpacked = gsm_unpack (gsm, (sizeof (gsm) * 8) / 7, 0, &unpacked_len);
     g_assert (unpacked);
     g_assert_cmpint (unpacked_len, ==, 148);
 

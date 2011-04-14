@@ -427,14 +427,13 @@ mm_charset_utf8_to_unpacked_gsm (const char *utf8, guint32 *out_len)
 
 guint8 *
 gsm_unpack (const guint8 *gsm,
-            guint32 gsm_len,
+            guint32 nchars,
             guint8 start_offset,  /* in _bits_ */
             guint32 *out_unpacked_len)
 {
     GByteArray *unpacked;
-    int i, nchars;
+    int i;
 
-    nchars = ((gsm_len * 8) - start_offset) / 7;
     unpacked = g_byte_array_sized_new (nchars + 1);
 
     for (i = 0; i < nchars; i++) {
