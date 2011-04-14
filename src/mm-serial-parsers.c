@@ -272,10 +272,11 @@ mm_serial_parser_v1_parse (gpointer data,
     /* First, check for successful responses */
 
     /* Custom successful replies first, if any */
-    if (parser->regex_custom_successful)
+    if (parser->regex_custom_successful) {
         found = g_regex_match_full (parser->regex_custom_successful,
                                     response->str, response->len,
                                     0, 0, NULL, NULL);
+    }
 
     if (!found) {
         found = g_regex_match_full (parser->regex_ok,
