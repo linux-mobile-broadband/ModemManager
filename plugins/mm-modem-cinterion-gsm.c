@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <ctype.h>
 
 #include "mm-errors.h"
 #include "mm-modem-helpers.h"
@@ -26,7 +27,27 @@
 #include "mm-serial-parsers.h"
 #include "mm-log.h"
 
-G_DEFINE_TYPE (MMModemCinterionGsm, mm_modem_cinterion_gsm, MM_TYPE_GENERIC_GSM);
+static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
+
+G_DEFINE_TYPE_EXTENDED (MMModemCinterionGsm, mm_modem_cinterion_gsm, MM_TYPE_GENERIC_GSM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init))
+
+/* Mask of all bands supported in 2G devices */
+#define ALL_2G_BANDS          \
+    (MM_MODEM_GSM_BAND_EGSM | \
+     MM_MODEM_GSM_BAND_DCS |  \
+     MM_MODEM_GSM_BAND_PCS |  \
+     MM_MODEM_GSM_BAND_G850)
+
+/* Mask of all bands supported in 3G devices (including some 2G bands) */
+#define ALL_3G_BANDS           \
+    (MM_MODEM_GSM_BAND_EGSM |  \
+     MM_MODEM_GSM_BAND_DCS |   \
+     MM_MODEM_GSM_BAND_PCS |   \
+     MM_MODEM_GSM_BAND_G850 |  \
+     MM_MODEM_GSM_BAND_U2100 | \
+     MM_MODEM_GSM_BAND_U1900 | \
+     MM_MODEM_GSM_BAND_U850)
 
 #define MM_MODEM_CINTERION_GSM_GET_PRIVATE(o)                           \
     (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_CINTERION_GSM, MMModemCinterionGsmPrivate))
@@ -42,7 +63,53 @@ typedef struct {
 
     /* Current allowed mode */
     MMModemGsmAllowedMode allowed_mode;
+
+    /* Bitmask for currently active bands */
+    guint32 current_bands;
 } MMModemCinterionGsmPrivate;
+
+/* Setup relationship between the band bitmask in the modem and the bitmask
+ * in ModemManager. */
+typedef struct {
+    gchar *cinterion_band;
+    guint32 mm_band_mask;
+} CinterionBand2G;
+/* Table checked in both MC75i (GPRS/EDGE) and EGS5 (GPRS) references.
+ * Note that the modem's configuration is also based on a bitmask, but as we
+ * will just support some of the combinations, we just use strings for them.
+ */
+static const CinterionBand2G bands_2g[] = {
+    { "1",  MM_MODEM_GSM_BAND_EGSM  },
+    { "2",  MM_MODEM_GSM_BAND_DCS   },
+    { "4",  MM_MODEM_GSM_BAND_PCS   },
+    { "8",  MM_MODEM_GSM_BAND_G850  },
+    { "3",  (MM_MODEM_GSM_BAND_EGSM | MM_MODEM_GSM_BAND_DCS) },
+    { "5",  (MM_MODEM_GSM_BAND_EGSM | MM_MODEM_GSM_BAND_PCS) },
+    { "10", (MM_MODEM_GSM_BAND_G850 | MM_MODEM_GSM_BAND_DCS) },
+    { "12", (MM_MODEM_GSM_BAND_G850 | MM_MODEM_GSM_BAND_PCS) },
+    { "15", ALL_2G_BANDS }
+};
+
+/* Setup relationship between the 3G band bitmask in the modem and the bitmask
+ * in ModemManager. */
+typedef struct {
+    guint32 cinterion_band_flag;
+    guint32 mm_band_flag;
+} CinterionBand3G;
+/* Table checked in HC25 (3G) reference. This table includes both 2G and 3G
+ * frequencies. Depending on which one is configured, one access technology or
+ * the other will be used. This may conflict with the allowed mode configuration
+ * set, so you shouldn't for example set 3G frequency bands, and then use a
+ * 2G-only allowed mode. */
+static const CinterionBand3G bands_3g[] = {
+    { (1 << 0), MM_MODEM_GSM_BAND_EGSM  },
+    { (1 << 1), MM_MODEM_GSM_BAND_DCS   },
+    { (1 << 2), MM_MODEM_GSM_BAND_PCS   },
+    { (1 << 3), MM_MODEM_GSM_BAND_G850  },
+    { (1 << 4), MM_MODEM_GSM_BAND_U2100 },
+    { (1 << 5), MM_MODEM_GSM_BAND_U1900 },
+    { (1 << 6), MM_MODEM_GSM_BAND_U850  }
+};
 
 MMModem *
 mm_modem_cinterion_gsm_new (const char *device,
@@ -62,6 +129,351 @@ mm_modem_cinterion_gsm_new (const char *device,
                                    MM_MODEM_HW_VID, vendor,
                                    MM_MODEM_HW_PID, product,
                                    NULL));
+}
+
+static void
+convert_str_from_ucs2 (gchar **str)
+{
+    const char *p;
+    char *converted;
+    size_t len;
+
+    p = *str;
+    len = strlen (p);
+
+    /* Len needs to be a multiple of 4 for UCS2 */
+    if ((len < 4) || ((len % 4) != 0))
+        return;
+
+    while (*p) {
+        if (!isxdigit (*p++))
+            return;
+    }
+
+    converted = mm_modem_charset_hex_to_utf8 (*str, MM_MODEM_CHARSET_UCS2);
+    if (converted) {
+        g_free (*str);
+        *str = converted;
+    }
+}
+
+static void
+get_2g_band_done (MMAtSerialPort *port,
+                  GString *response,
+                  GError *error,
+                  gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (info->modem);
+
+    if (error)
+        info->error = g_error_copy (error);
+    else {
+        guint32 mm_band = MM_MODEM_GSM_BAND_UNKNOWN;
+        GRegex *regex;
+        GMatchInfo *match_info = NULL;
+
+        /* The AT^SCFG? command replies a list of several different config
+         * values. We will only look for 'Radio/Band".
+         *
+         * AT+SCFG="Radio/Band"
+         * ^SCFG: "Radio/Band","0031","0031"
+         *
+         * Note that "0031" is a UCS2-encoded string, as we configured UCS2 as
+         * character set to use.
+         */
+        regex = g_regex_new ("\\^SCFG:\\s*\"Radio/Band\",\\s*\"(.*)\",\\s*\"(.*)\"", 0, 0, NULL);
+        if (regex &&
+            g_regex_match_full (regex, response->str, response->len, 0, 0, &match_info, NULL)) {
+            gchar *current;
+
+            /* The first number given is the current band configuration, the
+             * second number given is the allowed band configuration, which we
+             * don't really need to get here. */
+            current = g_match_info_fetch (match_info, 1);
+            if (current) {
+                guint i;
+
+                /* If in UCS2, convert to UTF-8 */
+                if (mm_generic_gsm_get_charset (MM_GENERIC_GSM (info->modem)) == MM_MODEM_CHARSET_UCS2)
+                    convert_str_from_ucs2 (&current);
+
+                for (i = 0; i < G_N_ELEMENTS (bands_2g); i++) {
+                    if (strcmp (bands_2g[i].cinterion_band, current) == 0) {
+                        mm_band = bands_2g[i].mm_band_mask;
+                        break;
+                    }
+                }
+
+                g_free (current);
+            }
+        }
+
+        if (mm_band == MM_MODEM_GSM_BAND_UNKNOWN) {
+            g_set_error (&info->error,
+                         MM_MODEM_ERROR,
+                         MM_MODEM_ERROR_GENERAL,
+                         "Couldn't get bands configuration");
+        } else {
+            priv->current_bands = mm_band;
+            mm_callback_info_set_result (info, GUINT_TO_POINTER (mm_band), NULL);
+        }
+
+        if (regex)
+            g_regex_unref (regex);
+        if (match_info)
+            g_match_info_free (match_info);
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_3g_band_done (MMAtSerialPort *port,
+                  GString *response,
+                  GError *error,
+                  gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (info->modem);
+
+    if (error)
+        info->error = g_error_copy (error);
+    else {
+        guint32 mm_band = 0;
+        GRegex *regex;
+        GMatchInfo *match_info = NULL;
+
+        /* The AT^SCFG? command replies a list of several different config
+         * values. We will only look for 'Radio/Band".
+         *
+         * AT+SCFG="Radio/Band"
+         * ^SCFG: "Radio/Band",127
+         *
+         * Note that in this case, the <rba> replied is a number, not a string.
+         */
+        regex = g_regex_new ("\\^SCFG:\\s*\"Radio/Band\",\\s*(\\d*)", 0, 0, NULL);
+        if (regex &&
+            g_regex_match_full (regex, response->str, response->len, 0, 0, &match_info, NULL)) {
+            gchar *current;
+
+            current = g_match_info_fetch (match_info, 1);
+            if (current) {
+                guint32 current_int;
+                guint i;
+
+                current_int = (guint32) atoi (current);
+
+                for (i = 0; i < G_N_ELEMENTS (bands_3g); i++) {
+                    if (current_int & bands_3g[i].cinterion_band_flag)
+                        mm_band |= bands_3g[i].mm_band_flag;
+                }
+
+                g_free (current);
+            }
+        }
+
+        if (mm_band == 0) {
+            g_set_error (&info->error,
+                         MM_MODEM_ERROR,
+                         MM_MODEM_ERROR_GENERAL,
+                         "Couldn't get bands configuration");
+        } else {
+            priv->current_bands = mm_band;
+            mm_callback_info_set_result (info, GUINT_TO_POINTER (mm_band), NULL);
+        }
+
+        if (regex)
+            g_regex_unref (regex);
+        if (match_info)
+            g_match_info_free (match_info);
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_band (MMModemGsmNetwork *self,
+          MMModemUIntFn callback,
+          gpointer user_data)
+{
+    MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (self);
+    MMAtSerialPort *port;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_uint_new (MM_MODEM (self), callback, user_data);
+
+    /* If results are already cached, return them */
+    if (priv->current_bands > 0) {
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (priv->current_bands), NULL);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* Otherwise ask the modem */
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (self), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* Query the currently used Radio/Band. The query command is the same for
+     * both 2G and 3G devices, but the reply reader is different. */
+    mm_at_serial_port_queue_command (port,
+                                     "AT^SCFG=\"Radio/Band\"",
+                                     3,
+                                     ((!priv->only_utran && !priv->both_geran_utran) ?
+                                      get_2g_band_done :
+                                      get_3g_band_done),
+                                     info);
+}
+
+static void
+set_band_done (MMAtSerialPort *port,
+               GString *response,
+               GError *error,
+               gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (info->modem);
+
+    if (error)
+        info->error = g_error_copy (error);
+    else
+        priv->current_bands = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "new-band"));
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+set_2g_band (MMModemGsmNetwork *self,
+             MMModemGsmBand band,
+             MMAtSerialPort *port,
+             MMCallbackInfo *info)
+{
+    const gchar *cinterion_band = NULL;
+    gchar *cinterion_band_ucs2 = NULL;
+    gchar *cmd;
+    guint i;
+
+    /* If we get ANY, reset to all-2G bands to get the proper value */
+    if (band == MM_MODEM_GSM_BAND_ANY)
+        band = ALL_2G_BANDS;
+
+    /* Loop looking for correct allowed masks */
+    for (i = 0; i < G_N_ELEMENTS (bands_2g); i++) {
+        if (bands_2g[i].mm_band_mask == band) {
+            cinterion_band = bands_2g[i].cinterion_band;
+            break;
+        }
+    }
+
+    /* If we didn't find a match, set an error */
+    if (!cinterion_band) {
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "Wrong band mask: '%u'", band);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    if (mm_generic_gsm_get_charset (MM_GENERIC_GSM (info->modem)) == MM_MODEM_CHARSET_UCS2)
+        cinterion_band_ucs2 = mm_modem_charset_utf8_to_hex (cinterion_band, MM_MODEM_CHARSET_UCS2);
+
+    mm_callback_info_set_data (info,
+                               "new-band",
+                               GUINT_TO_POINTER ((guint)band),
+                               NULL);
+    /* Following the setup:
+     *  AT^SCFG="Radion/Band",<rbp>,<rba>
+     * We will set the preferred band equal to the allowed band, so that we force
+     * the modem to connect at that specific frequency only. Note that we will be
+     * passing double-quote enclosed strings here!
+     */
+    cmd = g_strdup_printf ("^SCFG=\"Radio/Band\",\"%s\",\"%s\"",
+                           cinterion_band_ucs2 ? cinterion_band_ucs2 : cinterion_band,
+                           cinterion_band_ucs2 ? cinterion_band_ucs2 : cinterion_band);
+    mm_at_serial_port_queue_command (port, cmd, 3, set_band_done, info);
+    g_free (cmd);
+    g_free (cinterion_band_ucs2);
+}
+
+static void
+set_3g_band (MMModemGsmNetwork *self,
+             MMModemGsmBand band,
+             MMAtSerialPort *port,
+             MMCallbackInfo *info)
+{
+    guint32 cinterion_band = 0;
+    gchar *cmd;
+    guint i;
+
+    /* If we get ANY, reset to all-3G bands to get the proper value */
+    if (band == MM_MODEM_GSM_BAND_ANY)
+        band = ALL_3G_BANDS;
+
+    /* Loop looking for correct allowed masks */
+    for (i = 0; i < G_N_ELEMENTS (bands_3g); i++) {
+        if (band & bands_3g[i].mm_band_flag) {
+            cinterion_band |= bands_3g[i].cinterion_band_flag;
+        }
+    }
+
+    /* If we didn't find a match, set an error */
+    if (!cinterion_band) {
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "Wrong band mask: '%u'", band);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_callback_info_set_data (info,
+                               "new-band",
+                               GUINT_TO_POINTER ((guint)band),
+                               NULL);
+    /* Following the setup:
+     *  AT^SCFG="Radion/Band",<rba>
+     * We will set the preferred band equal to the allowed band, so that we force
+     * the modem to connect at that specific frequency only. Note that we will be
+     * passing a number here!
+     */
+    cmd = g_strdup_printf ("^SCFG=\"Radio/Band\",%u", cinterion_band);
+    mm_at_serial_port_queue_command (port, cmd, 3, set_band_done, info);
+    g_free (cmd);
+}
+
+static void
+set_band (MMModemGsmNetwork *self,
+          MMModemGsmBand band,
+          MMModemFn callback,
+          gpointer user_data)
+{
+    MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (self);
+    MMAtSerialPort *port;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
+
+    /* Are we trying to change the band to the same bands currently
+     * being used? if so, we're done */
+    if (priv->current_bands == band) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* Otherwise ask the modem */
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (self), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    if (!priv->only_utran &&
+        !priv->both_geran_utran)
+        set_2g_band (self, band, port, info);
+    else
+        set_3g_band (self, band, port, info);
 }
 
 static MMModemGsmAccessTech
@@ -466,6 +878,13 @@ do_enable_power_up_done (MMGenericGsm *gsm,
 /*****************************************************************************/
 
 static void
+modem_gsm_network_init (MMModemGsmNetwork *network_class)
+{
+    network_class->set_band = set_band;
+    network_class->get_band = get_band;
+}
+
+static void
 mm_modem_cinterion_gsm_init (MMModemCinterionGsm *self)
 {
     MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (self);
@@ -476,6 +895,7 @@ mm_modem_cinterion_gsm_init (MMModemCinterionGsm *self)
     priv->only_geran = FALSE;
     priv->only_utran = FALSE;
     priv->both_geran_utran = FALSE;
+    priv->current_bands = 0; /* This is a bitmask, so empty */
 }
 
 static void
