@@ -1958,8 +1958,17 @@ pin_puk_recheck_done (MMModem *modem, GError *error, gpointer user_data)
     /* If we have a saved error from sending PIN/PUK, return that to callers */
     saved_error = mm_callback_info_get_data (info, SAVED_ERROR_TAG);
     if (saved_error) {
-        g_clear_error (&info->error);
-        info->error = saved_error;
+        if (info->modem && !mm_modem_base_get_unlock_required (MM_MODEM_BASE (info->modem))) {
+            /* Original unlock failed but the modem is actually unlocked, so
+             * return success.  Sometimes happens if the modem doesn't allow
+             * CPIN="xxxx" when it's already unlocked and returns an error.
+             * Do nothing.
+             */
+        } else {
+            /* Unlock failed after recheck, return original error */
+            g_clear_error (&info->error);
+            info->error = g_error_copy (saved_error);
+        }
     }
 
     mm_callback_info_schedule (info);
@@ -1984,7 +1993,8 @@ send_puk_done (MMAtSerialPort *port,
              * when we're done rechecking CPIN status.
              */
             mm_callback_info_set_data (info, SAVED_ERROR_TAG,
-                                       g_error_copy (error), NULL);
+                                       g_error_copy (error),
+                                       (GDestroyNotify) g_error_free);
         }
     }
 
@@ -2047,7 +2057,8 @@ send_pin_done (MMAtSerialPort *port,
              * when we're done rechecking CPIN status.
              */
             mm_callback_info_set_data (info, SAVED_ERROR_TAG,
-                                       g_error_copy (error), NULL);
+                                       g_error_copy (error),
+                                       (GDestroyNotify) g_error_free);
         }
     }
 
