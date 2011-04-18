@@ -837,6 +837,8 @@ mm_serial_port_close (MMSerialPort *self)
         priv->connected_id = 0;
     }
 
+    mm_serial_port_flash_cancel (self);
+
     if (priv->fd >= 0) {
         GTimeVal tv_start, tv_end;
 
@@ -851,8 +853,6 @@ mm_serial_port_close (MMSerialPort *self)
             g_io_channel_unref (priv->channel);
             priv->channel = NULL;
         }
-
-        mm_serial_port_flash_cancel (self);
 
         g_get_current_time (&tv_start);
 
@@ -901,6 +901,16 @@ mm_serial_port_close (MMSerialPort *self)
         g_slice_free (MMQueueData, item);
     }
     g_queue_clear (priv->queue);
+
+    if (priv->timeout_id) {
+        g_source_remove (priv->timeout_id);
+        priv->timeout_id = 0;
+    }
+
+    if (priv->queue_id) {
+        g_source_remove (priv->queue_id);
+        priv->queue_id = 0;
+    }
 }
 
 void
