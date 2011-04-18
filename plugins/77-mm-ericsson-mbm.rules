@@ -28,6 +28,7 @@ ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="190b", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # Ericsson F5521gw
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="190d", ENV{ID_MM_ERICSSON_MBM}="1"
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1911", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # Sony-Ericsson MD300
 ATTRS{idVendor}=="0fce", ATTRS{idProduct}=="d0cf", ENV{ID_MM_ERICSSON_MBM}="1"
