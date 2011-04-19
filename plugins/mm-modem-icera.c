@@ -172,11 +172,15 @@ static MMModemGsmAccessTech
 nwstate_to_act (const char *str)
 {
     /* small 'g' means CS, big 'G' means PS */
-    if (!strcmp (str, "2G-GPRS"))
+    if (!strcmp (str, "2g"))
+        return MM_MODEM_GSM_ACCESS_TECH_GSM;
+    else if (!strcmp (str, "2G-GPRS"))
         return MM_MODEM_GSM_ACCESS_TECH_GPRS;
     else if (!strcmp (str, "2G-EDGE"))
         return MM_MODEM_GSM_ACCESS_TECH_EDGE;
     else if (!strcmp (str, "3G"))
+        return MM_MODEM_GSM_ACCESS_TECH_UMTS;
+    else if (!strcmp (str, "3g"))
         return MM_MODEM_GSM_ACCESS_TECH_UMTS;
     else if (!strcmp (str, "3G-HSDPA"))
         return MM_MODEM_GSM_ACCESS_TECH_HSDPA;
@@ -671,7 +675,7 @@ mm_modem_icera_register_unsolicted_handlers (MMModemIcera *self,
     GRegex *regex;
 
     /* %NWSTATE: <rssi>,<mccmnc>,<tech>,<connected>,<regulation> */
-    regex = g_regex_new ("\\r\\n%NWSTATE:\\s*(\\d+),(\\d+),([^,]*),([^,]*),(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    regex = g_regex_new ("\\r\\n%NWSTATE:\\s*(-?\\d+),(\\d+),([^,]*),([^,]*),(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     mm_at_serial_port_add_unsolicited_msg_handler (port, regex, nwstate_changed, self, NULL);
     g_regex_unref (regex);
 
