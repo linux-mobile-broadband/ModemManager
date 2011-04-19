@@ -45,7 +45,7 @@ struct _MMModemIceraPrivate {
     MMModemGsmAccessTech last_act;
 };
 
-#define MM_MODEM_ICERA_GET_PRIVATE(m) (MM_MODEM_ICERA_GET_INTERFACE(m)->priv)
+#define MM_MODEM_ICERA_GET_PRIVATE(m) (MM_MODEM_ICERA_GET_INTERFACE (m)->get_private(m))
 
 static void
 get_allowed_mode_done (MMAtSerialPort *port,
@@ -447,10 +447,10 @@ icera_connect_timed_out (gpointer data)
 }
 
 static void
-icera_enabled (MMAtSerialPort *port,
-               GString *response,
-               GError *error,
-               gpointer user_data)
+icera_connected (MMAtSerialPort *port,
+                 GString *response,
+                 GError *error,
+                 gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
@@ -478,7 +478,7 @@ old_context_clear_done (MMAtSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
     /* Activate the PDP context and start the data session */
-    icera_call_control (MM_MODEM_ICERA (info->modem), TRUE, icera_enabled, info);
+    icera_call_control (MM_MODEM_ICERA (info->modem), TRUE, icera_connected, info);
 }
 
 static void
@@ -731,14 +731,6 @@ mm_modem_icera_is_icera (MMModemIcera *self,
     mm_at_serial_port_queue_command (port, "%IPSYS?", 5, is_icera_done, info);
 }
 
-/****************************************************************/
-
-void
-mm_modem_icera_prepare (MMModemIcera *self)
-{
-    self->priv = g_malloc0 (sizeof (MMModemIceraPrivate));
-}
-
 void
 mm_modem_icera_cleanup (MMModemIcera *self)
 {
@@ -748,20 +740,32 @@ mm_modem_icera_cleanup (MMModemIcera *self)
     connect_pending_done (self);
 
     g_free (priv->username);
+    priv->username = NULL;
     g_free (priv->password);
+    priv->password = NULL;
+}
 
-    memset (priv, 0, sizeof (MMModemIceraPrivate));
+/****************************************************************/
+
+MMModemIceraPrivate *
+mm_modem_icera_init_private (void)
+{
+    return g_malloc0 (sizeof (MMModemIceraPrivate));
+}
+
+void
+mm_modem_icera_dispose_private (MMModemIcera *self)
+{
+    MMModemIceraPrivate *priv = MM_MODEM_ICERA_GET_PRIVATE (self);
+
+    mm_modem_icera_cleanup (self);
+    memset (priv, 0, sizeof (*priv));
     g_free (priv);
 }
 
 static void
 mm_modem_icera_init (gpointer g_iface)
 {
-    static gboolean initialized = FALSE;
-
-    if (!initialized) {
-        initialized = TRUE;
-    }
 }
 
 GType

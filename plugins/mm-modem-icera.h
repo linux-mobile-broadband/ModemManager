@@ -37,12 +37,16 @@ typedef struct _MMModemIcera MMModemIcera;
 struct _MMModemIcera {
     GTypeInterface g_iface;
 
-    MMModemIceraPrivate *priv;
+    /* Returns the implementing object's pointer to an internal
+     * MMModemIceraPrivate pointer.
+     */
+    MMModemIceraPrivate * (*get_private) (MMModemIcera *icera);
 };
 
 GType mm_modem_icera_get_type (void);
 
-void mm_modem_icera_prepare (MMModemIcera *self);
+MMModemIceraPrivate *mm_modem_icera_init_private (void);
+void mm_modem_icera_dispose_private (MMModemIcera *self);
 
 void mm_modem_icera_cleanup (MMModemIcera *self);
 
