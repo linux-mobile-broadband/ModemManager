@@ -39,6 +39,7 @@ G_DEFINE_TYPE_EXTENDED (MMModemZte, mm_modem_zte, MM_TYPE_GENERIC_GSM, 0,
 #define MM_MODEM_ZTE_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_ZTE, MMModemZtePrivate))
 
 typedef struct {
+    gboolean disposed;
     gboolean init_retried;
     guint32 cpms_tries;
     guint cpms_timeout;
@@ -667,10 +668,14 @@ dispose (GObject *object)
     MMModemZte *self = MM_MODEM_ZTE (object);
     MMModemZtePrivate *priv = MM_MODEM_ZTE_GET_PRIVATE (self);
 
-    if (priv->cpms_timeout)
-        g_source_remove (priv->cpms_timeout);
+    if (priv->disposed == FALSE) {
+        priv->disposed = TRUE;
 
-    mm_modem_icera_dispose_private (MM_MODEM_ICERA (self));
+        if (priv->cpms_timeout)
+            g_source_remove (priv->cpms_timeout);
+
+        mm_modem_icera_dispose_private (MM_MODEM_ICERA (self));
+    }
 
     G_OBJECT_CLASS (mm_modem_zte_parent_class)->dispose (object);
 }
