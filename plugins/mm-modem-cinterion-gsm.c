@@ -34,6 +34,11 @@ G_DEFINE_TYPE (MMModemCinterionGsm, mm_modem_cinterion_gsm, MM_TYPE_GENERIC_GSM)
 typedef struct {
     /* Flag to know if we should try AT^SIND or not to get psinfo */
     gboolean sind_psinfo;
+
+    /* Supported networks */
+    gboolean only_geran;
+    gboolean only_utran;
+    gboolean both_geran_utran;
 } MMModemCinterionGsmPrivate;
 
 MMModem *
@@ -243,6 +248,97 @@ get_access_technology (MMGenericGsm *gsm,
     }
 }
 
+static void
+enable_complete (MMGenericGsm *gsm,
+                 GError *error,
+                 MMCallbackInfo *info)
+{
+    /* Do NOT chain up parent do_enable_power_up_done(), as it actually ignores
+     * all errors. */
+
+    mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
+}
+
+
+static void
+get_supported_networks_cb (MMAtSerialPort *port,
+                           GString *response,
+                           GError *error,
+                           gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (info->modem);
+    GError *inner_error = NULL;
+
+    if (error) {
+        enable_complete (MM_GENERIC_GSM (info->modem), error, info);
+        return;
+    }
+
+    /* Note: Documentation says that AT+WS46=? is replied with '+WS46:' followed
+     * by a list of supported network modes between parenthesis, but the EGS5
+     * used to test this didn't use the 'WS46:' prefix. Also, more than one
+     * numeric ID may appear in the list, that's why they are checked
+     * separately. * */
+
+    if (strstr (response->str, "12") != NULL) {
+        mm_dbg ("Device allows 2G-only network mode");
+        priv->only_geran = TRUE;
+    }
+
+    if (strstr (response->str, "22") != NULL) {
+        mm_dbg ("Device allows 3G-only network mode");
+        priv->only_utran = TRUE;
+    }
+
+    if (strstr (response->str, "25") != NULL) {
+        mm_dbg ("Device allows 2G/3G network mode");
+        priv->both_geran_utran = TRUE;
+    }
+
+    /* If no expected ID found, error */
+    if (!priv->only_geran &&
+        !priv->only_utran &&
+        !priv->both_geran_utran) {
+        mm_warn ("Invalid list of supported networks: '%s'",
+                 response->str);
+        inner_error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "Invalid list of supported networks: '%s'",
+                                   response->str);
+    }
+
+    enable_complete (MM_GENERIC_GSM (info->modem), inner_error, info);
+    if (inner_error)
+        g_error_free (inner_error);
+}
+
+static void
+do_enable_power_up_done (MMGenericGsm *gsm,
+                         GString *response,
+                         GError *error,
+                         MMCallbackInfo *info)
+{
+    MMAtSerialPort *port;
+    GError *inner_error = NULL;
+
+    if (error) {
+        enable_complete (gsm, error, info);
+        return;
+    }
+
+    /* Get port */
+    port = mm_generic_gsm_get_best_at_port (gsm, &inner_error);
+    if (!port) {
+        enable_complete (gsm, inner_error, info);
+        g_error_free (inner_error);
+        return;
+    }
+
+    /* List supported networks */
+    mm_at_serial_port_queue_command (port, "+WS46=?", 3, get_supported_networks_cb, info);
+}
+
 /*****************************************************************************/
 
 static void
@@ -262,6 +358,7 @@ mm_modem_cinterion_gsm_class_init (MMModemCinterionGsmClass *klass)
 
     g_type_class_add_private (object_class, sizeof (MMModemCinterionGsmPrivate));
 
+    gsm_class->do_enable_power_up_done = do_enable_power_up_done;
     gsm_class->get_access_technology = get_access_technology;
 }
 
