@@ -39,6 +39,9 @@ typedef struct {
     gboolean only_geran;
     gboolean only_utran;
     gboolean both_geran_utran;
+
+    /* Current allowed mode */
+    MMModemGsmAllowedMode allowed_mode;
 } MMModemCinterionGsmPrivate;
 
 MMModem *
@@ -249,6 +252,128 @@ get_access_technology (MMGenericGsm *gsm,
 }
 
 static void
+get_allowed_mode (MMGenericGsm *gsm,
+                  MMModemUIntFn callback,
+                  gpointer user_data)
+{
+    MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (gsm);
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_uint_new (MM_MODEM (gsm), callback, user_data);
+
+    /* We just return cached value. For 3G devices we could try to ask the
+     * modem for the Access technology being used, and base 3G-only or 2G-only
+     * replies on that, but we wouldn't be covering all possible allowed modes
+     * anyway. */
+    mm_callback_info_set_result (info,
+                                 GUINT_TO_POINTER (priv->allowed_mode),
+                                 NULL);
+    mm_callback_info_schedule (info);
+}
+
+static void
+set_allowed_mode_cb (MMAtSerialPort *port,
+                     GString *response,
+                     GError *error,
+                     gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (info->modem);
+
+    if (error)
+        info->error = g_error_copy (error);
+    else
+        priv->allowed_mode = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "new-mode"));
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+set_allowed_mode (MMGenericGsm *gsm,
+                  MMModemGsmAllowedMode mode,
+                  MMModemFn callback,
+                  gpointer user_data)
+{
+    MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (gsm);
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
+
+    /* For dual 2G/3G devices... */
+    if (priv->both_geran_utran) {
+        GString *cmd;
+        MMAtSerialPort *port;
+
+        port = mm_generic_gsm_get_best_at_port (gsm, &info->error);
+        if (!port) {
+            mm_callback_info_schedule (info);
+            return;
+        }
+
+        /* We will try to simulate the possible allowed modes here. The
+         * Cinterion devices do not seem to allow setting preferred access
+         * technology in 3G devices, but they allow restricting to a given
+         * one:
+         * - 2G-only is forced by forcing GERAN RAT (AcT=0)
+         * - 3G-only is forced by forcing UTRAN RAT (AcT=2)
+         * - for the remaining ones, we default to automatic selection of RAT,
+         *   which is based on the quality of the connection.
+         */
+        cmd = g_string_new ("+COPS=,,,");
+        if (mode == MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY) {
+            g_string_append (cmd, "2");
+        } else if (mode == MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY) {
+            g_string_append (cmd, "0");
+        } /* else, no AcT given, defaults to Auto */
+
+        mm_callback_info_set_data (info,
+                                   "new-mode",
+                                   GUINT_TO_POINTER (mode),
+                                   NULL);
+
+        mm_at_serial_port_queue_command (port, cmd->str, 3, set_allowed_mode_cb, info);
+        g_string_free (cmd, TRUE);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* For 3G-only devices, allow only 3G-related allowed modes */
+    if (priv->only_utran) {
+        switch (mode) {
+        case MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED:
+        case MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY:
+        case MM_MODEM_GSM_ALLOWED_MODE_ANY:
+            priv->allowed_mode = mode;
+            break;
+        default:
+            info->error = g_error_new (MM_MODEM_ERROR,
+                                       MM_MODEM_ERROR_GENERAL,
+                                       "Cannot set desired allowed mode, "
+                                       "not a 2G device");
+            break;
+        }
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    /* For 2G devices, allow only 2G-related allowed modes */
+    switch (mode) {
+    case MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED:
+    case MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY:
+    case MM_MODEM_GSM_ALLOWED_MODE_ANY:
+        priv->allowed_mode = mode;
+        break;
+    default:
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "Cannot set desired allowed mode, "
+                                   "not a 3G device");
+        break;
+    }
+    mm_callback_info_schedule (info);
+}
+
+static void
 enable_complete (MMGenericGsm *gsm,
                  GError *error,
                  MMCallbackInfo *info)
@@ -258,7 +383,6 @@ enable_complete (MMGenericGsm *gsm,
 
     mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
 }
-
 
 static void
 get_supported_networks_cb (MMAtSerialPort *port,
@@ -348,6 +472,10 @@ mm_modem_cinterion_gsm_init (MMModemCinterionGsm *self)
 
     /* Set defaults */
     priv->sind_psinfo = TRUE; /* Initially, always try to get psinfo */
+    priv->allowed_mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
+    priv->only_geran = FALSE;
+    priv->only_utran = FALSE;
+    priv->both_geran_utran = FALSE;
 }
 
 static void
@@ -359,6 +487,8 @@ mm_modem_cinterion_gsm_class_init (MMModemCinterionGsmClass *klass)
     g_type_class_add_private (object_class, sizeof (MMModemCinterionGsmPrivate));
 
     gsm_class->do_enable_power_up_done = do_enable_power_up_done;
+    gsm_class->set_allowed_mode = set_allowed_mode;
+    gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->get_access_technology = get_access_technology;
 }
 
