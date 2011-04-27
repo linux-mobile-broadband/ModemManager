@@ -20,10 +20,10 @@ all: $(GENERATED_FILES)
 CLEANFILES = $(GENERATED_FILES)
 endif
 
-SUBDIRS = marshallers libqcdm src plugins introspection policy test
+SUBDIRS = marshallers libqcdm src plugins introspection po policy test
 
 if WITH_POLKIT
-SUBDIRS += policy po
+SUBDIRS += policy
 endif
 
 dbusservicedir = $(DBUS_SYS_DIR)
