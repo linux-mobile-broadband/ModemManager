@@ -90,7 +90,7 @@ guint32 mm_plugin_base_supports_task_get_probed_capabilities (MMPluginBaseSuppor
 void mm_plugin_base_supports_task_complete (MMPluginBaseSupportsTask *task,
                                             guint32 level);
 
-void mm_plugin_base_supports_task_set_custom_init_command (MMPluginBaseSupportsTask *task,
+void mm_plugin_base_supports_task_add_custom_init_command (MMPluginBaseSupportsTask *task,
                                                            const char *cmd,
                                                            guint32 delay_seconds,
                                                            MMBaseSupportsTaskCustomInitResultFunc callback,

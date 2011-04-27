@@ -129,7 +129,7 @@ supports_port (MMPluginBase *base,
      * 	1235f71b20c92cded4abd976ccc5010649aae1a0 and
      * 	f38ad328acfdc6ce29dd1380602c546b064161ae for more details.
      */
-    mm_plugin_base_supports_task_set_custom_init_command (task,
+    mm_plugin_base_supports_task_add_custom_init_command (task,
                                                           "ATE0+CPMS?",
                                                           3,
                                                           custom_init_response_cb,
