@@ -21,14 +21,9 @@ dnl Initialize libtool
 LT_PREREQ([2.2])
 LT_INIT
 
-dnl
-dnl translation support
-dnl
 GETTEXT_PACKAGE=ModemManager
 AC_SUBST(GETTEXT_PACKAGE)
 AC_DEFINE_UNQUOTED(GETTEXT_PACKAGE,"$GETTEXT_PACKAGE", [Gettext package])
-IT_PROG_INTLTOOL([0.35.0])
-AM_GLIB_GNU_GETTEXT
 
 PKG_CHECK_MODULES(MM, dbus-glib-1 >= 0.86 glib-2.0 >= 2.18 gmodule-2.0 gobject-2.0)
 
@@ -71,6 +66,10 @@ case $with_polkit in
 	# Check for polkit_authority_get_sync()
 	AC_CHECK_LIB([polkit-gobject-1], [polkit_authority_get_sync], ac_have_pk_auth_get_sync="1", ac_have_pk_auth_get_sync="0")
 	AC_DEFINE_UNQUOTED(HAVE_POLKIT_AUTHORITY_GET_SYNC, $ac_have_pk_auth_get_sync, [Define if you have a polkit with polkit_authority_get_sync()])
+
+	# translation support for policy files
+	IT_PROG_INTLTOOL([0.35.0])
+	AM_GLIB_GNU_GETTEXT
         ;;
     *)
         with_polkit=no
@@ -162,7 +161,5 @@ echo
 echo Building PPP-enabled tests: ${have_pppd_headers}
 echo
 echo Building with PolicyKit support: ${with_polkit}
-echo
-echo Building with Location API support: ${with_location_api}
 echo
 

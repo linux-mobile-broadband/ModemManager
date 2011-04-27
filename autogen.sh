@@ -13,9 +13,19 @@ PKG_NAME=ModemManager
     exit 1
 }
 
+polkit="false"
+args=""
+while (( "$#" )); do
+    if [ "$1" == "--with-polkit=yes" ]; then
+        polkit="true"
+    fi
+    args="$args $1"
+    shift
+done
+
 (cd $srcdir;
     autoreconf --install --symlink &&
-    intltoolize --force &&
+    ((eval "$polkit" && intltoolize --force) || true) &&
     autoreconf &&
-    ./configure --enable-maintainer-mode $@
+    ./configure --enable-maintainer-mode $args
 )
