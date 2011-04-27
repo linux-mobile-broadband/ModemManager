@@ -111,10 +111,8 @@ typedef struct {
     GError *probe_error;
 
     char *custom_init;
-    guint32 custom_init_max_tries;
     guint32 custom_init_tries;
     guint32 custom_init_delay_seconds;
-    gboolean custom_init_fail_if_timeout;
     MMBaseSupportsTaskCustomInitResultFunc custom_init_callback;
     gpointer custom_init_callback_data;
 
@@ -230,8 +228,6 @@ void
 mm_plugin_base_supports_task_set_custom_init_command (MMPluginBaseSupportsTask *task,
                                                       const char *cmd,
                                                       guint32 delay_seconds,
-                                                      guint32 max_tries,
-                                                      gboolean fail_if_timeout,
                                                       MMBaseSupportsTaskCustomInitResultFunc callback,
                                                       gpointer callback_data)
 {
@@ -239,14 +235,13 @@ mm_plugin_base_supports_task_set_custom_init_command (MMPluginBaseSupportsTask *
 
     g_return_if_fail (task != NULL);
     g_return_if_fail (MM_IS_PLUGIN_BASE_SUPPORTS_TASK (task));
+    g_return_if_fail (callback != NULL);
 
     priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
 
     g_free (priv->custom_init);
     priv->custom_init = g_strdup (cmd);
-    priv->custom_init_max_tries = max_tries;
     priv->custom_init_delay_seconds = delay_seconds;
-    priv->custom_init_fail_if_timeout = fail_if_timeout;
     priv->custom_init_callback = callback;
     priv->custom_init_callback_data = callback_data;
 }
@@ -727,6 +722,12 @@ parse_response (MMAtSerialPort *port,
     task_priv->probe_id = g_idle_add (handle_probe_response, task);
 }
 
+static void
+start_generic_probing (MMPluginBaseSupportsTask *task, MMAtSerialPort *port)
+{
+    mm_at_serial_port_queue_command (port, "+GCAP", 3, parse_response, task);
+}
+
 static void flash_done (MMSerialPort *port, GError *error, gpointer user_data);
 
 static void
@@ -737,43 +738,35 @@ custom_init_response (MMAtSerialPort *port,
 {
     MMPluginBaseSupportsTask *task = MM_PLUGIN_BASE_SUPPORTS_TASK (user_data);
     MMPluginBaseSupportsTaskPrivate *task_priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
-    MMPluginBaseClass* klass = MM_PLUGIN_BASE_GET_CLASS (task_priv->plugin);
+    MMBaseSupportsTaskCustomInitResultFunc callback = task_priv->custom_init_callback;
+    gboolean retry = FALSE;
+    gboolean fail = FALSE;
+    guint32 level = 0;
 
-    if (error) {
-        task_priv->custom_init_tries++;
-        if (task_priv->custom_init_tries < task_priv->custom_init_max_tries) {
-            /* Try the custom command again */
-            flash_done (MM_SERIAL_PORT (port), NULL, user_data);
-            return;
-        } else if (task_priv->custom_init_fail_if_timeout) {
-            /* Fail the probe if the plugin wanted it and the command timed out */
-            if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
-                probe_complete (task);
-                return;
-            }
-        }
-    } else {
-        /* custom handle init response */
-        if (klass->handle_custom_init_response != NULL)
-            klass->handle_custom_init_response (task, response);
+    task_priv->custom_init_tries++;
+    retry = callback (task, response, error, task_priv->custom_init_tries, &fail, &level, task_priv->custom_init_callback_data);
+
+    if (fail) {
+        /* Plugin said to fail the probe */
+        probe_complete (task);
+        return;
     }
 
-    /* check for custom init callback */
-    if (task_priv->custom_init_callback != NULL) {
-        MMBaseSupportsTaskCustomInitResultFunc callback = task_priv->custom_init_callback;
-        guint32 level;
-
-        level = callback (response, task_priv->custom_init_callback_data);
-        if (level > 0) {
-            /* Plugin supports the modem */
-            task_priv->probed_caps = level;
-            probe_complete (task);
-            return;
-        }
+    if (level > 0) {
+        /* Plugin supports the modem */
+        task_priv->probed_caps = level;
+        probe_complete (task);
+        return;
     }
 
-    /* Otherwise proceed to probing */
-    mm_at_serial_port_queue_command (port, "+GCAP", 3, parse_response, user_data);
+    if (retry) {
+        /* Try the custom command again */
+        flash_done (MM_SERIAL_PORT (port), NULL, user_data);
+        return;
+    }
+
+    /* Otherwise continue with generic probing */
+    start_generic_probing (task, port);
 }
 
 static void
@@ -794,7 +787,7 @@ flash_done (MMSerialPort *port, GError *error, gpointer user_data)
                                          user_data);
     } else {
         /* Otherwise start normal probing */
-        custom_init_response (MM_AT_SERIAL_PORT (port), NULL, NULL, user_data);
+        start_generic_probing (task, MM_AT_SERIAL_PORT (port));
     }
 }
 
@@ -1270,7 +1263,6 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
     g_type_class_add_private (object_class, sizeof (MMPluginBasePrivate));
 
     klass->handle_probe_response = real_handle_probe_response;
-    klass->handle_custom_init_response = NULL;
 
     /* Virtual methods */
     object_class->get_property = get_property;

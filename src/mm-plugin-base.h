@@ -56,8 +56,26 @@ typedef struct {
 
 GType mm_plugin_base_supports_task_get_type (void);
 
-typedef guint32 (*MMBaseSupportsTaskCustomInitResultFunc) (GString* response,
-                                                           gpointer user_data);
+/* 
+ * response: the response string from the modem, if no error occurred
+ * error: the error returned by the modem or serial stack, if any
+ * tries: number of times the custom init command has been sent to the modem
+ * out_fail: on return, TRUE means fail the probe and close the port
+ * out_level: if the custom init command has determined that the modem is
+ *            supported, return the support level here, and probing will cease
+ *
+ * Function should return TRUE if the custom init command should be retried,
+ * FALSE if it should not.  If FALSE is returned, generic probing will continue
+ * if out_fail == FALSE and out_level == 0, otherwise if out_fail == FALSE
+ * probing will stop, or if out_level > 0 the port will be claimed.
+ */
+typedef gboolean (*MMBaseSupportsTaskCustomInitResultFunc) (MMPluginBaseSupportsTask *task,
+                                                            GString *response,
+                                                            GError *error,
+                                                            guint32 tries,
+                                                            gboolean *out_fail,
+                                                            guint32 *out_level,
+                                                            gpointer user_data);
 
 MMPlugin *mm_plugin_base_supports_task_get_plugin (MMPluginBaseSupportsTask *task);
 
@@ -75,8 +93,6 @@ void mm_plugin_base_supports_task_complete (MMPluginBaseSupportsTask *task,
 void mm_plugin_base_supports_task_set_custom_init_command (MMPluginBaseSupportsTask *task,
                                                            const char *cmd,
                                                            guint32 delay_seconds,
-                                                           guint32 max_tries,
-                                                           gboolean fail_if_timeout,
                                                            MMBaseSupportsTaskCustomInitResultFunc callback,
                                                            gpointer callback_data);
 
@@ -113,14 +129,12 @@ struct _MMPluginBaseClass {
     void (*cancel_task)       (MMPluginBase *plugin,
                                MMPluginBaseSupportsTask *task);
 
+    /* Lets plugins read the probe response before the generic plugin processes it */
     void (*handle_probe_response) (MMPluginBase *plugin,
                                    MMPluginBaseSupportsTask *task,
                                    const char *command,
                                    const char *response,
                                    const GError *error);
-
-    void (*handle_custom_init_response) (MMPluginBaseSupportsTask *task,
-                                         GString *response);
 
     /* Signals */
     void (*probe_result) (MMPluginBase *self,
