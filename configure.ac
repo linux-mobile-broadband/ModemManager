@@ -164,6 +164,4 @@ echo Building PPP-enabled tests: ${have_pppd_headers}
 echo
 echo Building with PolicyKit support: ${with_polkit}
 echo
-echo Building with Location API support: ${with_location_api}
-echo
 
