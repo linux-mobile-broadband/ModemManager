@@ -31,6 +31,7 @@
 #include "mm-modem-gsm-card.h"
 #include "mm-log.h"
 #include "mm-modem-icera.h"
+#include "mm-utils.h"
 
 static void modem_init (MMModem *modem_class);
 static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
@@ -168,7 +169,11 @@ set_band (MMModemGsmNetwork *modem,
         return;
     }
 
-    if (!band_mm_to_samsung (band, modem)) {
+    /* TODO: Check how to pass more than one band in the same AT%%IPBM command */
+    if (!utils_check_for_single_value (band)) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Cannot set more than one band.");
+        mm_callback_info_schedule (info);
+    } else if (!band_mm_to_samsung (band, modem)) {
         info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Invalid band.");
         mm_callback_info_schedule (info);
     } else {
