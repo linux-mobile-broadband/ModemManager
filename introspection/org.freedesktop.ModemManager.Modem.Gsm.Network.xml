@@ -87,26 +87,26 @@
 
     <method name="SetBand">
       <tp:docstring>
-        Sets the band the device is allowed to use when connecting to a mobile network.
+        Sets the bands the device is allowed to use when connecting to a mobile network.
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_set_band"/>
       <arg name="band" type="u" direction="in" tp:type="MM_MODEM_GSM_BAND">
         <tp:docstring>
-          The desired band.  Only one band may be specified, and may not be UNKNOWN.
+          The desired bands, as a set of flags.
         </tp:docstring>
       </arg>
     </method>
 
     <method name="GetBand">
       <tp:docstring>
-        Returns the current band the device is using.  (Note for plugin writers: returned value must not be ANY)
+        Returns the current bands the device is using.  (Note for plugin writers: returned value must not be ANY)
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_band"/>
       <arg name="band" type="u" direction="out" tp:type="MM_MODEM_GSM_BAND">
         <tp:docstring>
-          The current band.
+          The current bands, as a set of flags.
         </tp:docstring>
       </arg>
     </method>
@@ -160,7 +160,7 @@
             <li>
               Current operator code of the operator to which the mobile is
               currently registered.  Returned in the format "MCCMNC", where MCC
-              is the three-digit ITU E.212 Mobile Country Code and MNC is the 
+              is the three-digit ITU E.212 Mobile Country Code and MNC is the
               two- or three-digit GSM Mobile Network Code.  If the MCC and MNC
               are not known or the mobile is not registered to a mobile network,
               this value should be a zero-length (blank) string. e.g. "31026"
@@ -233,7 +233,7 @@
 	<tp:docstring>
           Current operator code of the operator to which the mobile is
           currently registered.  Returned in the format "MCCMNC", where MCC
-          is the three-digit ITU E.212 Mobile Country Code and MNC is the 
+          is the three-digit ITU E.212 Mobile Country Code and MNC is the
           two- or three-digit GSM Mobile Network Code.  If the MCC and MNC
           are not known or the mobile is not registered to a mobile network,
           this value should be a zero-length (blank) string.  e.g. "31026" or

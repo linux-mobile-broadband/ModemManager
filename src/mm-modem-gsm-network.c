@@ -496,16 +496,6 @@ impl_gsm_modem_set_band (MMModemGsmNetwork *modem,
                          MMModemGsmBand band,
                          DBusGMethodInvocation *context)
 {
-    if (!check_for_single_value (band)) {
-        GError *error;
-
-        error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
-                                     "Invalid arguments (more than one value given)");
-        dbus_g_method_return_error (context, error);
-        g_error_free (error);
-        return;
-    }
-
     mm_modem_gsm_network_set_band (modem, band, async_call_done, context);
 }
 
