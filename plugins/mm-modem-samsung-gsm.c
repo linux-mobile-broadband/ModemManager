@@ -196,32 +196,31 @@ parse_ipbm (const char *reply, MMModemGsmBand *band)
     if (sscanf (reply, "\"ANY\": %d\r\n\"EGSM\": %d\r\n\"DCS\": %d\r\n\"PCS\": %d\r\n\"G850\": %d\r\n\"FDD_BAND_I\": %d\r\n\"FDD_BAND_II\": %d\r\n\"FDD_BAND_III\": %d\r\n\"FDD_BAND_IV\": %d\r\n\"FDD_BAND_V\": %d\r\n\"FDD_BAND_VI\": %d\r\n\"FDD_BAND_VIII\": %d", &enable[0], &enable[1], &enable[2], &enable[3], &enable[4], &enable[5], &enable[6], &enable[7], &enable[8], &enable[9], &enable[10], &enable[11]) != 12)
         return FALSE;
 
+    *band = 0;
     if (enable[5] == 1)
-        *band = MM_MODEM_GSM_BAND_U2100;
-    else if (enable[6] == 1)
-        *band = MM_MODEM_GSM_BAND_U1900;
-    else if (enable[7] == 1)
-        *band = MM_MODEM_GSM_BAND_U1800;
-    else if (enable[8] == 1)
-        *band = MM_MODEM_GSM_BAND_U17IV;
-    else if (enable[9] == 1)
-        *band = MM_MODEM_GSM_BAND_U850;
-    else if (enable[10] == 1)
-        *band = MM_MODEM_GSM_BAND_U800;
-    else if (enable[11] == 1)
-        *band = MM_MODEM_GSM_BAND_U900;
-    else if (enable[1] == 1)
-        *band = MM_MODEM_GSM_BAND_EGSM;
-    else if (enable[2] == 1)
-        *band = MM_MODEM_GSM_BAND_DCS;
-    else if (enable[3] == 1)
-        *band = MM_MODEM_GSM_BAND_PCS;
-    else if (enable[4] == 1)
-        *band = MM_MODEM_GSM_BAND_G850;
-    else
-        *band = MM_MODEM_GSM_BAND_ANY;
+        *band |= MM_MODEM_GSM_BAND_U2100;
+    if (enable[6] == 1)
+        *band |= MM_MODEM_GSM_BAND_U1900;
+    if (enable[7] == 1)
+        *band |= MM_MODEM_GSM_BAND_U1800;
+    if (enable[8] == 1)
+        *band |= MM_MODEM_GSM_BAND_U17IV;
+    if (enable[9] == 1)
+        *band |= MM_MODEM_GSM_BAND_U850;
+    if (enable[10] == 1)
+        *band |= MM_MODEM_GSM_BAND_U800;
+    if (enable[11] == 1)
+        *band |= MM_MODEM_GSM_BAND_U900;
+    if (enable[1] == 1)
+        *band |= MM_MODEM_GSM_BAND_EGSM;
+    if (enable[2] == 1)
+        *band |= MM_MODEM_GSM_BAND_DCS;
+    if (enable[3] == 1)
+        *band |= MM_MODEM_GSM_BAND_PCS;
+    if (enable[4] == 1)
+        *band |= MM_MODEM_GSM_BAND_G850;
 
-    return FALSE;
+    return (*band > 0 ? TRUE : FALSE);
 }
 
 static void
