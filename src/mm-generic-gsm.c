@@ -3792,24 +3792,6 @@ set_charset_done (MMAtSerialPort *port,
         mm_at_serial_port_queue_command (port, "+CSCS?", 3, set_get_charset_done, info);
 }
 
-static gboolean
-check_for_single_value (guint32 value)
-{
-    gboolean found = FALSE;
-    guint32 i;
-
-    for (i = 1; i <= 32; i++) {
-        if (value & 0x1) {
-            if (found)
-                return FALSE;  /* More than one bit set */
-            found = TRUE;
-        }
-        value >>= 1;
-    }
-
-    return TRUE;
-}
-
 static void
 set_charset (MMModem *modem,
              MMModemCharset charset,
@@ -3824,7 +3806,7 @@ set_charset (MMModem *modem,
 
     info = mm_callback_info_new (modem, callback, user_data);
 
-    if (!(priv->charsets & charset) || !check_for_single_value (charset)) {
+    if (!(priv->charsets & charset) || !utils_check_for_single_value (charset)) {
         info->error = g_error_new (MM_MODEM_ERROR,
                                    MM_MODEM_ERROR_UNSUPPORTED_CHARSET,
                                    "Character set 0x%X not supported",
@@ -4551,7 +4533,7 @@ ussd_respond (MMModemGsmUssd *modem,
         mm_callback_info_schedule (info);
         return;
     }
-	
+
     ussd_send (modem, command, callback, user_data);
     return;
 }
@@ -4852,7 +4834,7 @@ simple_connect (MMModemSimple *simple,
     g_free (data_device);
 
     info = mm_callback_info_new (MM_MODEM (simple), callback, user_data);
-    mm_callback_info_set_data (info, "simple-connect-properties", 
+    mm_callback_info_set_data (info, "simple-connect-properties",
                                g_hash_table_ref (properties),
                                (GDestroyNotify) g_hash_table_unref);
 

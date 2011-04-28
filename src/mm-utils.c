@@ -90,3 +90,20 @@ utils_bin2hexstr (const guint8 *bin, gsize len)
     return g_string_free (ret, FALSE);
 }
 
+gboolean
+utils_check_for_single_value (guint32 value)
+{
+    gboolean found = FALSE;
+    guint32 i;
+
+    for (i = 1; i <= 32; i++) {
+        if (value & 0x1) {
+            if (found)
+                return FALSE;  /* More than one bit set */
+            found = TRUE;
+        }
+        value >>= 1;
+    }
+
+    return TRUE;
+}

@@ -21,6 +21,7 @@
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 #include "mm-marshal.h"
+#include "mm-utils.h"
 
 static void impl_gsm_modem_register (MMModemGsmNetwork *modem,
                                      const char *network_id,
@@ -473,24 +474,6 @@ impl_gsm_modem_get_signal_quality (MMModemGsmNetwork *modem,
     mm_modem_gsm_network_get_signal_quality (modem, uint_call_done, context);
 }
 
-static gboolean
-check_for_single_value (guint32 value)
-{
-    gboolean found = FALSE;
-    guint32 i;
-
-    for (i = 1; i <= 32; i++) {
-        if (value & 0x1) {
-            if (found)
-                return FALSE;  /* More than one bit set */
-            found = TRUE;
-        }
-        value >>= 1;
-    }
-
-    return TRUE;
-}
-
 static void
 impl_gsm_modem_set_band (MMModemGsmNetwork *modem,
                          MMModemGsmBand band,
@@ -511,7 +494,7 @@ impl_gsm_modem_set_network_mode (MMModemGsmNetwork *modem,
                                  MMModemDeprecatedMode old_mode,
                                  DBusGMethodInvocation *context)
 {
-    if (!check_for_single_value (old_mode)) {
+    if (!utils_check_for_single_value (old_mode)) {
         GError *error;
 
         error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,

@@ -22,5 +22,7 @@ char *utils_hexstr2bin (const char *hex, gsize *out_len);
 
 char *utils_bin2hexstr (const guint8 *bin, gsize len);
 
+gboolean utils_check_for_single_value (guint32 value);
+
 #endif  /* MM_UTILS_H */
 
