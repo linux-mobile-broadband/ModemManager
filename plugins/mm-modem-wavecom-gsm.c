@@ -268,6 +268,10 @@ set_2g_band (MMModemGsmNetwork *self,
         return;
     }
 
+    /* If we get ANY, reset to all-2G bands to get the proper value */
+    if (band == MM_MODEM_GSM_BAND_ANY)
+        band = ALL_2G_BANDS;
+
     /* Loop looking for allowed masks */
     wavecom_band = '\0';
     for (i = 0; i < G_N_ELEMENTS (bands_2g); i++) {
@@ -314,6 +318,10 @@ set_3g_band (MMModemGsmNetwork *self,
         mm_callback_info_schedule (info);
         return;
     }
+
+    /* If we get ANY, reset to all-3G bands to get the proper value */
+    if (band == MM_MODEM_GSM_BAND_ANY)
+        band = ALL_3G_BANDS;
 
     /* Loop looking for allowed masks */
     wavecom_band = 0;
