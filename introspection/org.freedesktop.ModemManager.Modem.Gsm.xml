@@ -100,6 +100,9 @@
       <tp:flag suffix="U1900" value="0x1000">
         <tp:docstring>WCDMA 3GPP UMTS 1900 MHz (Class II)</tp:docstring>
       </tp:flag>
+      <tp:flag suffix="U2600" value="0x2000">
+        <tp:docstring>WCDMA 3GPP UMTS 2600 MHz (Class VII, internal)</tp:docstring>
+      </tp:flag>
     </tp:flags>
 
     <tp:enum name="MM_MODEM_GSM_ALLOWED_MODE" type="u">
