@@ -85,9 +85,7 @@ static BandTable bands[] = {
     /* 2G second */
     { MM_MODEM_GSM_BAND_DCS,   0x00000080 },
     { MM_MODEM_GSM_BAND_EGSM,  0x00000300 }, /* 0x100 = Extended GSM, 0x200 = Primary GSM */
-    { MM_MODEM_GSM_BAND_PCS,   0x00200000 },
-    /* And ANY last since it's most inclusive */
-    { MM_MODEM_GSM_BAND_ANY,   0x3FFFFFFF },
+    { MM_MODEM_GSM_BAND_PCS,   0x00200000 }
 };
 
 static gboolean
@@ -95,13 +93,19 @@ band_mm_to_huawei (MMModemGsmBand band, guint32 *out_huawei)
 {
     int i;
 
-    for (i = 0; i < sizeof (bands) / sizeof (BandTable); i++) {
-        if (bands[i].mm == band) {
-            *out_huawei = bands[i].huawei;
-            return TRUE;
+    /* Treat ANY as a special case: All huawei flags enabled */
+    if (band == MM_MODEM_GSM_BAND_ANY) {
+        *out_huawei = 0x3FFFFFFF;
+        return TRUE;
+    }
+
+    *out_huawei = 0;
+    for (i = 0; i < G_N_ELEMENTS (bands); i++) {
+        if (bands[i].mm & band) {
+            *out_huawei |= bands[i].huawei;
         }
     }
-    return FALSE;
+    return (*out_huawei > 0 ? TRUE : FALSE);
 }
 
 static gboolean
@@ -109,16 +113,13 @@ band_huawei_to_mm (guint32 huawei, MMModemGsmBand *out_mm)
 {
     int i;
 
-    for (i = 0; i < sizeof (bands) / sizeof (BandTable); i++) {
-        /* The dongle returns a bitfield, but since we don't support that
-         * yet in MM, take the "best" band and return it.
-         */
+    *out_mm = 0;
+    for (i = 0; i < G_N_ELEMENTS (bands); i++) {
         if (bands[i].huawei & huawei) {
-            *out_mm = bands[i].mm;
-            return TRUE;
+            *out_mm |= bands[i].mm;
         }
     }
-    return FALSE;
+    return (*out_mm > 0 ? TRUE : FALSE);
 }
 
 /*****************************************************************************/
