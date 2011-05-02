@@ -83,6 +83,10 @@ supports_port (MMPluginBase *base,
     if (vendor != 0x04e8 && vendor != 0x1983)
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
+    /* Product ID check */
+    if (product != 0x6872)
+        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
+
     /* The ethernet ports are obviously supported and don't need probing */
     if (!strcmp (subsys, "net")) {
         mm_plugin_base_supports_task_complete (task, 10);
