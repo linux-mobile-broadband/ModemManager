@@ -13,7 +13,7 @@ GENERATED_FILES = \
 
 docs/spec.html: $(XMLS) introspection/all.xml doc-generator.xsl
 	@install -d docs
-	$(XSLTPROC) doc-generator.xsl introspection/all.xml > $@
+	$(XSLTPROC) $(top_srcdir)/doc-generator.xsl $(top_srcdir)/introspection/all.xml > $@
 
 all: $(GENERATED_FILES)
 
@@ -49,7 +49,7 @@ include_HEADERS = include/mm-modem.h
 
 include/mm-modem.h: $(XMLS) introspection/all.xml header-generator.xsl
 	@install -d include
-	$(XSLTPROC) header-generator.xsl introspection/all.xml > $@
+	$(XSLTPROC) $(top_srcdir)/header-generator.xsl $(top_srcdir)/introspection/all.xml > $@
 
 %service: %service.in
 	$(edit) $< >$@
@@ -63,7 +63,10 @@ edit = @sed \
 	-e 's|@localstatedir[@]|$(localstatedir)|g' \
 	-e 's|@libexecdir[@]|$(libexecdir)|g'
 
-DISTCHECK_CONFIGURE_FLAGS = --with-udev-base-dir=$dc_install_base --with-tests=yes
+DISTCHECK_CONFIGURE_FLAGS = \
+	--with-udev-base-dir="$$dc_install_base" \
+	--with-tests=yes \
+	--with-docs=yes
 
 INTLTOOL_FILES = \
 	intltool-extract.in \
