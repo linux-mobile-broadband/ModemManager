@@ -87,6 +87,12 @@ supports_port (MMPluginBase *base,
     if (vendor != 0x1c9e && vendor != 0x1bbb)
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
+    /* Some TAMobile devices are different chipsets and should be handled
+     * by other plugins, so only handle LONGCHEER tagged devices here.
+     */
+    if (g_udev_device_get_property_as_boolean (port, "ID_MM_LONGCHEER_TAGGED") == FALSE)
+        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
+
     if (mm_plugin_base_get_cached_port_capabilities (base, port, &cached)) {
         level = get_level_for_capabilities (cached);
         if (level) {
