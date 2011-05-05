@@ -56,7 +56,7 @@ typedef struct {
 
 GType mm_plugin_base_supports_task_get_type (void);
 
-/* 
+/*
  * response: the response string from the modem, if no error occurred
  * error: the error returned by the modem or serial stack, if any
  * tries: number of times the custom init command has been sent to the modem
@@ -85,6 +85,10 @@ const char *mm_plugin_base_supports_task_get_physdev_path (MMPluginBaseSupportsT
 const char *mm_plugin_base_supports_task_get_driver (MMPluginBaseSupportsTask *task);
 
 guint32 mm_plugin_base_supports_task_get_probed_capabilities (MMPluginBaseSupportsTask *task);
+
+const gchar *mm_plugin_base_supports_task_get_probed_vendor (MMPluginBaseSupportsTask *task);
+
+const gchar *mm_plugin_base_supports_task_get_probed_product (MMPluginBaseSupportsTask *task);
 
 void mm_plugin_base_supports_task_complete (MMPluginBaseSupportsTask *task,
                                             guint32 level);
@@ -158,6 +162,12 @@ gboolean mm_plugin_base_probe_port (MMPluginBase *self,
 gboolean mm_plugin_base_get_cached_port_capabilities (MMPluginBase *self,
                                                       GUdevDevice *port,
                                                       guint32 *capabilities);
+
+/* Returns TRUE if the port was previously probed, FALSE if not */
+gboolean mm_plugin_base_get_cached_product_info (MMPluginBase *self,
+                                                 GUdevDevice *port,
+                                                 gchar **vendor,
+                                                 gchar **product);
 
 #endif /* MM_PLUGIN_BASE_H */
 

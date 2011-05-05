@@ -45,11 +45,18 @@ G_DEFINE_TYPE_EXTENDED (MMPluginBase, mm_plugin_base, G_TYPE_OBJECT,
 
 #define MM_PLUGIN_BASE_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_PLUGIN_BASE, MMPluginBasePrivate))
 
+/* Struct to be stored in the cached hash table */
+typedef struct {
+    guint32 capabilities;
+    gchar *vendor;
+    gchar *product;
+} MMPluginBaseProbedInfo;
+
 /* A hash table shared between all instances of the plugin base that
- * caches the probed capabilities so that only one plugin has to actually
- * probe a port.
+ * caches the probed capabilities and reported vendor/model (when available)
+ * so that only one plugin has to actually probe a port.
  */
-static GHashTable *cached_caps = NULL;
+static GHashTable *probed_info = NULL;
 
 /* Virtual port corresponding to the embeded modem */
 static gchar *virtual_port[] = {"smd0", NULL};
@@ -73,18 +80,65 @@ enum {
 
 static guint signals[LAST_SIGNAL] = { 0 };
 
-
 typedef enum {
-    PROBE_STATE_GCAP_TRY1 = 0,
-    PROBE_STATE_GCAP_TRY2,
-    PROBE_STATE_GCAP_TRY3,
-    PROBE_STATE_ATI,
-    PROBE_STATE_CPIN,
-    PROBE_STATE_CGMM,
+    /* Probing capabilities... */
+    PROBE_STATE_CAPS_GCAP_TRY1 = 0,
+    PROBE_STATE_CAPS_GCAP_TRY2,
+    PROBE_STATE_CAPS_GCAP_TRY3,
+    PROBE_STATE_CAPS_ATI,
+    PROBE_STATE_CAPS_CPIN,
+    PROBE_STATE_CAPS_CGMM,
+    /* Probing vendor... */
+    PROBE_STATE_VENDOR_CGMI,
+    PROBE_STATE_VENDOR_GMI,
+    PROBE_STATE_VENDOR_ATI,
+    /* Probing product... */
+    PROBE_STATE_PRODUCT_CGMM,
+    PROBE_STATE_PRODUCT_GMM,
+    PROBE_STATE_PRODUCT_ATI,
     PROBE_STATE_LAST
 } ProbeState;
 
+/* Additional helper IDs for the states, to be updated whenever new intermediate
+ * states are added in each probing group */
+#define PROBE_STATE_CAPS_FIRST    PROBE_STATE_CAPS_GCAP_TRY1
+#define PROBE_STATE_CAPS_LAST     PROBE_STATE_CAPS_CGMM
+#define PROBE_STATE_VENDOR_FIRST  PROBE_STATE_VENDOR_CGMI
+#define PROBE_STATE_VENDOR_LAST   PROBE_STATE_VENDOR_ATI
+#define PROBE_STATE_PRODUCT_FIRST PROBE_STATE_PRODUCT_CGMM
+#define PROBE_STATE_PRODUCT_LAST  PROBE_STATE_PRODUCT_ATI
+
+typedef struct {
+    /* The command to send in this probing state */
+    gchar *cmd;
+    /* Whether the command reply should be cached */
+    gboolean cached;
+} ProbeStateCmd;
+
+/* List of commands sent in each state */
+static const ProbeStateCmd state_commands[PROBE_STATE_LAST] = {
+    /* Probing capabilities... */
+    { "+GCAP",  FALSE }, /* PROBE_STATE_CAPS_GCAP_TRY1 */
+    { "+GCAP",  FALSE }, /* PROBE_STATE_CAPS_GCAP_TRY2 */
+    { "+GCAP",  FALSE }, /* PROBE_STATE_CAPS_GCAP_TRY3 */
+    { "I",      TRUE  }, /* PROBE_STATE_CAPS_ATI */
+    { "+CPIN?", FALSE }, /* PROBE_STATE_CAPS_CPIN */
+    { "+CGMM",  TRUE  }, /* PROBE_STATE_CAPS_CGMM */
+    /* Probing vendor... */
+    { "+CGMI",  TRUE  }, /* PROBE_STATE_VENDOR_CGMI */
+    { "+GMI",   TRUE  }, /* PROBE_STATE_VENDOR_GMI */
+    { "I",      TRUE  }, /* PROBE_STATE_VENDOR_ATI */
+    /* Probing product... */
+    { "+CGMM",  TRUE  }, /* PROBE_STATE_PRODUCT_CGMM */
+    { "+GMM",   TRUE  }, /* PROBE_STATE_PRODUCT_GMM */
+    { "I",      TRUE  }  /* PROBE_STATE_PRODUCT_ATI */
+};
+
 static void probe_complete (MMPluginBaseSupportsTask *task);
+static void parse_response (MMAtSerialPort *port,
+                            GString *response,
+                            GError *error,
+                            gpointer user_data);
 
 /*****************************************************************************/
 
@@ -113,6 +167,8 @@ typedef struct {
     MMAtSerialPort *probe_port;
     MMQcdmSerialPort *qcdm_port;
     guint32 probed_caps;
+    gchar *probed_vendor;
+    gchar *probed_product;
     ProbeState probe_state;
     guint probe_id;
     char *probe_resp;
@@ -200,6 +256,24 @@ mm_plugin_base_supports_task_get_probed_capabilities (MMPluginBaseSupportsTask *
     g_return_val_if_fail (MM_IS_PLUGIN_BASE_SUPPORTS_TASK (task), 0);
 
     return MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task)->probed_caps;
+}
+
+const gchar *
+mm_plugin_base_supports_task_get_probed_vendor (MMPluginBaseSupportsTask *task)
+{
+    g_return_val_if_fail (task != NULL, NULL);
+    g_return_val_if_fail (MM_IS_PLUGIN_BASE_SUPPORTS_TASK (task), NULL);
+
+    return MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task)->probed_vendor;
+}
+
+const gchar *
+mm_plugin_base_supports_task_get_probed_product (MMPluginBaseSupportsTask *task)
+{
+    g_return_val_if_fail (task != NULL, NULL);
+    g_return_val_if_fail (MM_IS_PLUGIN_BASE_SUPPORTS_TASK (task), NULL);
+
+    return MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task)->probed_product;
 }
 
 void
@@ -299,6 +373,9 @@ supports_task_dispose (GObject *object)
         g_object_unref (priv->qcdm_port);
     }
 
+    g_free (priv->probed_vendor);
+    g_free (priv->probed_product);
+
     G_OBJECT_CLASS (mm_plugin_base_supports_task_parent_class)->dispose (object);
 }
 
@@ -346,7 +423,7 @@ static struct modem_caps modem_caps[] = {
 };
 
 static guint32
-parse_gcap (const char *buf)
+parse_caps_gcap (const char *buf)
 {
     struct modem_caps *cap = modem_caps;
     guint32 ret = 0;
@@ -360,7 +437,7 @@ parse_gcap (const char *buf)
 }
 
 static guint32
-parse_cpin (const char *buf)
+parse_caps_cpin (const char *buf)
 {
     if (   strcasestr (buf, "SIM PIN")
         || strcasestr (buf, "SIM PUK")
@@ -384,12 +461,24 @@ parse_cpin (const char *buf)
 }
 
 static guint32
-parse_cgmm (const char *buf)
+parse_caps_cgmm (const char *buf)
 {
     if (strstr (buf, "GSM900") || strstr (buf, "GSM1800") ||
         strstr (buf, "GSM1900") || strstr (buf, "GSM850"))
         return MM_PLUGIN_BASE_PORT_CAP_GSM;
     return 0;
+}
+
+static gchar *
+parse_vendor_cgmi (const gchar *buf)
+{
+    return g_strstrip (g_strdelimit (g_strdup (buf), "\r\n", ' '));
+}
+
+static gchar *
+parse_product_cgmm (const gchar *buf)
+{
+    return g_strstrip (g_strdelimit (g_strdup (buf), "\r\n", ' '));
 }
 
 static const char *dq_strings[] = {
@@ -400,6 +489,17 @@ static const char *dq_strings[] = {
     "NETWORK SERVICE CHANGE",
     NULL
 };
+
+static void
+probed_info_free (MMPluginBaseProbedInfo *info)
+{
+    if (!info)
+        return;
+
+    g_free (info->vendor);
+    g_free (info->product);
+    g_free (info);
+}
 
 static void
 port_buffer_full (MMSerialPort *port, GByteArray *buffer, gpointer user_data)
@@ -427,6 +527,8 @@ port_buffer_full (MMSerialPort *port, GByteArray *buffer, gpointer user_data)
             if (!memcmp (&buffer->data[i], *iter, iter_len)) {
                 /* Immediately close the port and complete probing */
                 priv->probed_caps = 0;
+                priv->probed_vendor = NULL;
+                priv->probed_product = NULL;
                 mm_serial_port_close (MM_SERIAL_PORT (priv->probe_port));
                 probe_complete (task);
                 return;
@@ -461,13 +563,20 @@ static void
 probe_complete (MMPluginBaseSupportsTask *task)
 {
     MMPluginBaseSupportsTaskPrivate *priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
+    MMPluginBaseProbedInfo *info;
     MMPort *port;
 
     port = priv->probe_port ? MM_PORT (priv->probe_port) : MM_PORT (priv->qcdm_port);
     g_assert (port);
-    g_hash_table_insert (cached_caps,
+
+    /* Allocate new cached info struct and store it in the hash table */
+    info = g_malloc0 (sizeof (*info));
+    info->capabilities = priv->probed_caps;
+    info->vendor = g_strdup (priv->probed_vendor);
+    info->product = g_strdup (priv->probed_product);
+    g_hash_table_insert (probed_info,
                          g_strdup (mm_port_get_device (port)),
-                         GUINT_TO_POINTER (priv->probed_caps));
+                         info);
 
     priv->probe_id = g_idle_add (emit_probe_result, task);
 }
@@ -509,7 +618,6 @@ qcdm_verinfo_cb (MMQcdmSerialPort *port,
     /* yay, probably a QCDM port */
     qcdm_result_unref (result);
     priv->probed_caps |= MM_PLUGIN_BASE_PORT_CAP_QCDM;
-
 done:
     probe_complete (task);
 }
@@ -575,12 +683,6 @@ try_qcdm_probe (MMPluginBaseSupportsTask *task)
 }
 
 static void
-parse_response (MMAtSerialPort *port,
-                GString *response,
-                GError *error,
-                gpointer user_data);
-
-static void
 real_handle_probe_response (MMPluginBase *self,
                             MMPluginBaseSupportsTask *task,
                             const char *cmd,
@@ -598,83 +700,149 @@ real_handle_probe_response (MMPluginBase *self,
         ignore_error = TRUE;
 
     if (error && !ignore_error) {
+        /* Only allow timeout errors in the initial AT+GCAP queries. If all AT+GCAP
+         * get timed out, assume it's not an AT port. */
         if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
             /* Try GCAP again */
-            if (task_priv->probe_state < PROBE_STATE_GCAP_TRY3) {
+            if (task_priv->probe_state < PROBE_STATE_CAPS_GCAP_TRY3) {
                 task_priv->probe_state++;
-                mm_at_serial_port_queue_command (port, "+GCAP", 3, parse_response, task);
-            } else {
-               /* Otherwise, if all the GCAP tries timed out, ignore the port
-                * as it's probably not an AT-capable port.  Try QCDM.
-                */
-               try_qcdm_probe (task);
+                mm_at_serial_port_queue_command (port,
+                                                 state_commands[task_priv->probe_state].cmd,
+                                                 3,
+                                                 parse_response,
+                                                 task);
+                return;
             }
-            return;
+
+            /* If all the GCAP tries timed out, ignore the port as it's
+             * probably not an AT-capable port.  Try QCDM.
+             */
+            if (task_priv->probe_state == PROBE_STATE_CAPS_GCAP_TRY3) {
+                try_qcdm_probe (task);
+                return;
+            }
+
+            /* Otherwise, it's a timeout in some other command being probed, so try the
+             * next one if any */
         }
 
-        /* Otherwise proceed to the next command */
+        /* Non-timeout error, so proceed to the next command if any */
     } else if (response) {
         /* Parse the response */
 
         switch (task_priv->probe_state) {
-        case PROBE_STATE_GCAP_TRY1:
-        case PROBE_STATE_GCAP_TRY2:
-        case PROBE_STATE_GCAP_TRY3:
-        case PROBE_STATE_ATI:
+        case PROBE_STATE_CAPS_GCAP_TRY1:
+        case PROBE_STATE_CAPS_GCAP_TRY2:
+        case PROBE_STATE_CAPS_GCAP_TRY3:
+        case PROBE_STATE_CAPS_ATI:
             /* Some modems don't respond to AT+GCAP, but often they put a
              * GCAP-style response as a line in the ATI response.
              */
-            task_priv->probed_caps = parse_gcap (response);
+            task_priv->probed_caps = parse_caps_gcap (response);
             break;
-        case PROBE_STATE_CPIN:
+        case PROBE_STATE_CAPS_CPIN:
             /* Some devices (ZTE MF628/ONDA MT503HS for example) reply to
              * anything but AT+CPIN? with ERROR if the device has a PIN set.
              * Since no known CDMA modems support AT+CPIN? we can consider the
              * device a GSM device if it returns a non-error response to AT+CPIN?.
              */
-            task_priv->probed_caps = parse_cpin (response);
+            task_priv->probed_caps = parse_caps_cpin (response);
             break;
-        case PROBE_STATE_CGMM:
+        case PROBE_STATE_CAPS_CGMM:
             /* Some models (BUSlink SCWi275u) stick stupid stuff in the CGMM
              * response but at least it allows us to identify them.
              */
-            task_priv->probed_caps = parse_cgmm (response);
+            task_priv->probed_caps = parse_caps_cgmm (response);
+            break;
+        case PROBE_STATE_VENDOR_CGMI:
+        case PROBE_STATE_VENDOR_GMI:
+        case PROBE_STATE_VENDOR_ATI:
+            /* These replies parsed the same way, just removing EOLs */
+            task_priv->probed_vendor = parse_vendor_cgmi (response);
+            break;
+        case PROBE_STATE_PRODUCT_CGMM:
+        case PROBE_STATE_PRODUCT_GMM:
+        case PROBE_STATE_PRODUCT_ATI:
+            /* These replies parsed the same way, just removing EOLs */
+            task_priv->probed_product = parse_product_cgmm (response);
             break;
         default:
             break;
         }
+    }
 
+    /* Now, choose the proper next state */
+
+    if (task_priv->probe_state <= PROBE_STATE_CAPS_LAST) {
+        /* Probing capabilities */
         if (task_priv->probed_caps & CAP_GSM_OR_CDMA) {
+            /* Got capabilities probed, go on with vendor probing */
+            task_priv->probe_state = PROBE_STATE_VENDOR_FIRST;
+        } else if (task_priv->probe_state < PROBE_STATE_CAPS_LAST) {
+            /* Didn't get capabilities probed yet, go on to next caps
+             * probing command */
+            task_priv->probe_state++;
+        } else {
+            /* Tried probing all commands for capabilities and didn't get
+             * any: just end probing here, it probably isn't a GSM or CDMA
+             * modem */
+            mm_warn ("Couldn't probe for capabilities, probably not a GSM or CDMA modem");
             probe_complete (task);
             return;
         }
+    } else if (task_priv->probe_state <= PROBE_STATE_VENDOR_LAST) {
+        /* Probing vendors */
+        if (task_priv->probed_vendor) {
+            /* Got vendor probed, go on with product probing. */
+            task_priv->probe_state = PROBE_STATE_PRODUCT_FIRST;
+        } else if (task_priv->probe_state < PROBE_STATE_VENDOR_LAST) {
+            /* Didn't get vendor probed yet, go on to next vendor
+             * probing command */
+            task_priv->probe_state++;
+        } else {
+            /* Tried probing all commands for vendor and didn't get
+             * any: just end probing here, product ID  is useless without
+             * vendor ID */
+            probe_complete (task);
+            return;
+        }
+    } else if (task_priv->probe_state <= PROBE_STATE_PRODUCT_LAST) {
+        /* Probing products */
+        if (!task_priv->probed_product &&
+            task_priv->probe_state < PROBE_STATE_PRODUCT_LAST) {
+            /* Didn't get probed product yet but more commands available,
+             * go on with the next one */
+            task_priv->probe_state++;
+        } else {
+            /* Got product probed or no more commands to probe, so end. */
+            probe_complete (task);
+            return;
+        }
+    } else {
+        g_warn_if_reached ();
     }
 
-    task_priv->probe_state++;
-
-    /* Try a different command */
-    switch (task_priv->probe_state) {
-    case PROBE_STATE_GCAP_TRY2:
-    case PROBE_STATE_GCAP_TRY3:
-        mm_at_serial_port_queue_command (port, "+GCAP", 3, parse_response, task);
-        break;
-    case PROBE_STATE_ATI:
-        /* After the last GCAP attempt, try ATI */
-        mm_at_serial_port_queue_command (port, "I", 3, parse_response, task);
-        break;
-    case PROBE_STATE_CPIN:
-        /* After the ATI attempt, try CPIN */
-        mm_at_serial_port_queue_command (port, "+CPIN?", 3, parse_response, task);
-        break;
-    case PROBE_STATE_CGMM:
-        /* After the CPIN attempt, try CGMM */
-        mm_at_serial_port_queue_command (port, "+CGMM", 3, parse_response, task);
-        break;
-    default:
-        /* Probably not GSM or CDMA */
+    /* Out of last state? */
+    if (task_priv->probe_state >= PROBE_STATE_LAST) {
+        /* Probing ended */
         probe_complete (task);
-        break;
+        return;
     }
+
+    /* Go on with the command in next state */
+
+    if (state_commands[task_priv->probe_state].cached)
+        mm_at_serial_port_queue_command_cached (port,
+                                                state_commands[task_priv->probe_state].cmd,
+                                                3,
+                                                parse_response,
+                                                task);
+    else
+        mm_at_serial_port_queue_command (port,
+                                         state_commands[task_priv->probe_state].cmd,
+                                         3,
+                                         parse_response,
+                                         task);
 }
 
 static gboolean
@@ -683,29 +851,10 @@ handle_probe_response (gpointer user_data)
     MMPluginBaseSupportsTask *task = MM_PLUGIN_BASE_SUPPORTS_TASK (user_data);
     MMPluginBaseSupportsTaskPrivate *task_priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
     MMPluginBase *self = MM_PLUGIN_BASE (mm_plugin_base_supports_task_get_plugin (task));
-    const char *cmd = NULL;
-
-    switch (task_priv->probe_state) {
-    case PROBE_STATE_GCAP_TRY1:
-    case PROBE_STATE_GCAP_TRY2:
-    case PROBE_STATE_GCAP_TRY3:
-        cmd = "+GCAP";
-        break;
-    case PROBE_STATE_ATI:
-        cmd = "I";
-        break;
-    case PROBE_STATE_CPIN:
-        cmd = "+CPIN?";
-        break;
-    case PROBE_STATE_CGMM:
-    default:
-        cmd = "+CGMM";
-        break;
-    }
 
     MM_PLUGIN_BASE_GET_CLASS (self)->handle_probe_response (self,
                                                             task,
-                                                            cmd,
+                                                            state_commands[task_priv->probe_state].cmd,
                                                             task_priv->probe_resp,
                                                             task_priv->probe_error);
     return FALSE;
@@ -902,12 +1051,44 @@ mm_plugin_base_get_cached_port_capabilities (MMPluginBase *self,
                                              GUdevDevice *port,
                                              guint32 *capabilities)
 {
-    gpointer tmp = NULL;
-    gboolean found;
+    MMPluginBaseProbedInfo *info;
 
-    found = g_hash_table_lookup_extended (cached_caps, g_udev_device_get_name (port), NULL, tmp);
-    *capabilities = GPOINTER_TO_UINT (tmp);
-    return found;
+    if (g_hash_table_lookup_extended (probed_info,
+                                      g_udev_device_get_name (port),
+                                      NULL,
+                                      (gpointer *)&info)) {
+        *capabilities = info->capabilities;
+        return TRUE;
+    }
+
+    *capabilities = 0;
+    return FALSE;
+}
+
+gboolean
+mm_plugin_base_get_cached_product_info (MMPluginBase *self,
+                                        GUdevDevice *port,
+                                        gchar **vendor,
+                                        gchar **product)
+{
+    MMPluginBaseProbedInfo *info;
+
+    if (g_hash_table_lookup_extended (probed_info,
+                                      g_udev_device_get_name (port),
+                                      NULL,
+                                      (gpointer *)&info)) {
+        if (vendor)
+            *vendor = (info->vendor ? g_strdup (info->vendor) : NULL);
+        if (product)
+            *product = (info->product ? g_strdup (info->product) : NULL);
+        return TRUE;
+    }
+
+    if (vendor)
+        *vendor = NULL;
+    if (product)
+        *product = NULL;
+    return FALSE;
 }
 
 /*****************************************************************************/
@@ -922,7 +1103,7 @@ modem_destroyed (gpointer data, GObject *modem)
      * or something and then only removing cached capabilities for ports
      * that the modem that was just removed owned, but whatever.
      */
-    g_hash_table_remove_all (cached_caps);
+    g_hash_table_remove_all (probed_info);
 }
 
 gboolean
@@ -1217,12 +1398,18 @@ mm_plugin_base_init (MMPluginBase *self)
     MMPluginBasePrivate *priv = MM_PLUGIN_BASE_GET_PRIVATE (self);
     const char *subsys[] = { "tty", "net", NULL };
 
-    if (!cached_caps)
-        cached_caps = g_hash_table_new (g_str_hash, g_str_equal);
+    if (!probed_info) {
+        probed_info = g_hash_table_new_full (g_str_hash,
+                                             g_str_equal,
+                                             g_free,
+                                             (GDestroyNotify) probed_info_free);
+    }
 
     priv->client = g_udev_client_new (subsys);
 
-    priv->tasks = g_hash_table_new_full (g_str_hash, g_str_equal, g_free,
+    priv->tasks = g_hash_table_new_full (g_str_hash,
+                                         g_str_equal,
+                                         g_free,
                                          (GDestroyNotify) g_object_unref);
 }
 
