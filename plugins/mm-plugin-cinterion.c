@@ -35,6 +35,7 @@ mm_plugin_create (void)
 {
     return MM_PLUGIN (g_object_new (MM_TYPE_PLUGIN_CINTERION,
                                     MM_PLUGIN_BASE_NAME, "Cinterion",
+                                    MM_PLUGIN_BASE_SORT_LAST, TRUE,
                                     NULL));
 }
 
