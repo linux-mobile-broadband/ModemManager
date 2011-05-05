@@ -113,7 +113,6 @@ load_plugin (const char *path)
     plugin = (*plugin_create_func) ();
     if (plugin) {
         g_object_weak_ref (G_OBJECT (plugin), (GWeakNotify) g_module_close, module);
-        mm_info ("Loaded plugin %s", mm_plugin_get_name (plugin));
     } else
         mm_warn ("Could not load plugin %s: initialization failed", path);
 
@@ -122,6 +121,31 @@ load_plugin (const char *path)
         g_module_close (module);
 
     return plugin;
+}
+
+static gint
+compare_plugins (const MMPlugin *plugin_a,
+                 const MMPlugin *plugin_b)
+{
+    /* The order of the plugins in the list is the same order used to check
+     * whether the plugin can manage a given modem:
+     *  - First, modems that will check vendor ID from udev.
+     *  - Then, modems that report to be sorted last (those which will check
+     *    vendor ID also from the probed ones..
+     */
+    if (mm_plugin_get_sort_last (plugin_a) &&
+        !mm_plugin_get_sort_last (plugin_b))
+        return 1;
+    if (!mm_plugin_get_sort_last (plugin_a) &&
+        mm_plugin_get_sort_last (plugin_b))
+        return -1;
+    return 0;
+}
+
+static void
+found_plugin (MMPlugin *plugin)
+{
+    mm_info ("Loaded plugin '%s'", mm_plugin_get_name (plugin));
 }
 
 static void
@@ -162,9 +186,18 @@ load_plugins (MMManager *manager)
         }
     }
 
+    /* Sort last plugins that request it */
+    priv->plugins = g_slist_sort (priv->plugins, (GCompareFunc)compare_plugins);
+
     /* Make sure the generic plugin is last */
     if (generic_plugin)
         priv->plugins = g_slist_append (priv->plugins, generic_plugin);
+
+    /* Now report about all the found plugins, in the same order they will be
+     * used while checking support */
+    g_slist_foreach (priv->plugins, (GFunc)found_plugin, NULL);
+
+    mm_info ("Successfully loaded %u plugins", g_slist_length (priv->plugins));
 
     g_dir_close (dir);
 }
@@ -812,7 +845,7 @@ device_added (MMManager *manager, GUdevDevice *device)
         goto out;
     }
 
-    /* Success; now ask plugins if they can handle this port */    
+    /* Success; now ask plugins if they can handle this port */
     info = supports_info_new (manager, subsys, name, physdev_path);
     g_hash_table_insert (priv->supports, g_strdup (key), info);
 

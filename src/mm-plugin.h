@@ -54,8 +54,13 @@ typedef enum {
 struct _MMPlugin {
     GTypeInterface g_iface;
 
-    /* Methods */
+    /* Get plugin name */
     const char *(*get_name)   (MMPlugin *self);
+
+    /* Returns TRUE if the plugin should be sorted last in the list of plugins
+     * loaded. This is useful to indicate plugins that need an additional check
+     * on the probed vendor ID to see if they can support it. */
+    gboolean (*get_sort_last) (const MMPlugin *self);
 
     /* Check whether a plugin supports a particular modem port, and what level
      * of support the plugin has for the device.  If the plugin can immediately
@@ -103,6 +108,8 @@ struct _MMPlugin {
 GType mm_plugin_get_type (void);
 
 const char *mm_plugin_get_name   (MMPlugin *plugin);
+
+gboolean mm_plugin_get_sort_last (const MMPlugin *plugin);
 
 MMPluginSupportsResult mm_plugin_supports_port  (MMPlugin *plugin,
                                                  const char *subsys,

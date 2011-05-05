@@ -65,11 +65,13 @@ typedef struct {
     char *name;
     GUdevClient *client;
     GHashTable *tasks;
+    gboolean sort_last;
 } MMPluginBasePrivate;
 
 enum {
     PROP_0,
     PROP_NAME,
+    PROP_SORT_LAST,
     LAST_PROP
 };
 
@@ -1216,6 +1218,12 @@ get_name (MMPlugin *plugin)
     return MM_PLUGIN_BASE_GET_PRIVATE (plugin)->name;
 }
 
+static gboolean
+get_sort_last (const MMPlugin *plugin)
+{
+    return MM_PLUGIN_BASE_GET_PRIVATE (plugin)->sort_last;
+}
+
 static char *
 get_driver_name (GUdevDevice *device)
 {
@@ -1387,6 +1395,7 @@ plugin_init (MMPlugin *plugin_class)
 {
     /* interface implementation */
     plugin_class->get_name = get_name;
+    plugin_class->get_sort_last = get_sort_last;
     plugin_class->supports_port = supports_port;
     plugin_class->cancel_supports_port = cancel_supports_port;
     plugin_class->grab_port = grab_port;
@@ -1424,6 +1433,10 @@ set_property (GObject *object, guint prop_id,
         /* Construct only */
         priv->name = g_value_dup_string (value);
         break;
+    case PROP_SORT_LAST:
+        /* Construct only */
+        priv->sort_last = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -1439,6 +1452,9 @@ get_property (GObject *object, guint prop_id,
     switch (prop_id) {
     case PROP_NAME:
         g_value_set_string (value, priv->name);
+        break;
+    case PROP_SORT_LAST:
+        g_value_set_boolean (value, priv->sort_last);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1481,6 +1497,15 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
                               "Name",
                               NULL,
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_SORT_LAST,
+         g_param_spec_boolean (MM_PLUGIN_BASE_SORT_LAST,
+                               "Sort Last",
+                               "Whether the plugin should be sorted last in the"
+                               "list of plugins loaded",
+                               FALSE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     signals[PROBE_RESULT] =
         g_signal_new ("probe-result",

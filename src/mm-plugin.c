@@ -24,6 +24,14 @@ mm_plugin_get_name (MMPlugin *plugin)
     return MM_PLUGIN_GET_INTERFACE (plugin)->get_name (plugin);
 }
 
+gboolean
+mm_plugin_get_sort_last (const MMPlugin *plugin)
+{
+    g_return_val_if_fail (MM_IS_PLUGIN (plugin), FALSE);
+
+    return MM_PLUGIN_GET_INTERFACE (plugin)->get_sort_last (plugin);
+}
+
 MMPluginSupportsResult
 mm_plugin_supports_port (MMPlugin *plugin,
                          const char *subsys,
@@ -100,8 +108,8 @@ mm_plugin_get_type (void)
         };
 
         plugin_type = g_type_register_static (G_TYPE_INTERFACE,
-                                             "MMPlugin",
-                                             &plugin_info, 0);
+                                              "MMPlugin",
+                                              &plugin_info, 0);
 
         g_type_interface_add_prerequisite (plugin_type, G_TYPE_OBJECT);
     }
