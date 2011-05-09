@@ -1312,8 +1312,7 @@ cmti_received (MMAtSerialPort *port,
                gpointer user_data)
 {
     MMGenericGsm *self = MM_GENERIC_GSM (user_data);
-
-    guint idx=0;
+    guint idx = 0;
     char *str;
 
     str = g_match_info_fetch (info, 2);
