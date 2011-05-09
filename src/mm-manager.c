@@ -322,12 +322,15 @@ enumerate_devices_cb (gpointer key, gpointer val, gpointer user_data)
 {
     MMModem *modem = MM_MODEM (val);
     GPtrArray **devices = (GPtrArray **) user_data;
-    const char *path;
 
     if (mm_modem_get_valid (modem)) {
+        const char *path;
+
         path = g_object_get_data (G_OBJECT (modem), DBUS_PATH_TAG);
-        g_return_if_fail (path != NULL);
-        g_ptr_array_add (*devices, g_strdup (path));
+        /* A valid modem without dbus path may happen when enumerating devices
+         * while there is an ongoing modem probing. */
+        if (path)
+            g_ptr_array_add (*devices, g_strdup (path));
     }
 }
 
