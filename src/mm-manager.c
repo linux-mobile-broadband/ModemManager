@@ -22,6 +22,7 @@
 #include <dbus/dbus-glib.h>
 #include <dbus/dbus-glib-lowlevel.h>
 #include "mm-manager.h"
+#include "mm-auth-provider.h"
 #include "mm-errors.h"
 #include "mm-plugin.h"
 #include "mm-log.h"
@@ -30,7 +31,8 @@ static gboolean impl_manager_enumerate_devices (MMManager *manager,
                                                 GPtrArray **devices,
                                                 GError **err);
 
-static gboolean impl_manager_scan_devices (MMManager *manager);
+static void impl_manager_scan_devices (MMManager *manager,
+                                       DBusGMethodInvocation *context);
 
 #include "mm-manager-glue.h"
 
@@ -52,6 +54,8 @@ typedef struct {
     GUdevClient *udev;
     GSList *plugins;
     GHashTable *modems;
+
+    MMAuthProvider *authp;
 
     GHashTable *supports;
 } MMManagerPrivate;
@@ -953,12 +957,47 @@ handle_uevent (GUdevClient *client,
 		device_removed (self, device);
 }
 
-static gboolean
-impl_manager_scan_devices (MMManager *manager)
+static void
+scan_devices_auth_cb (MMAuthRequest *req,
+                      GObject *owner,
+                      DBusGMethodInvocation *context,
+                      gpointer user_data)
 {
-    /* Relaunch manager start, which does device scanning */
-    mm_manager_start (manager);
-    return TRUE;
+    if (mm_auth_request_get_result (req) != MM_AUTH_RESULT_AUTHORIZED) {
+        GError *error;
+
+        error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_AUTHORIZATION_REQUIRED,
+                             "This request requires the '%s' authorization",
+                             mm_auth_request_get_authorization (req));
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+        return;
+    }
+
+    /* Otherwise relaunch device scan */
+    mm_manager_start (MM_MANAGER (owner));
+    dbus_g_method_return (context);
+}
+
+static void
+impl_manager_scan_devices (MMManager *manager,
+                           DBusGMethodInvocation *context)
+{
+    GError *error = NULL;
+    MMManagerPrivate *priv;
+
+    priv = MM_MANAGER_GET_PRIVATE (manager);
+    if (!mm_auth_provider_request_auth (priv->authp,
+                                        MM_AUTHORIZATION_MANAGER_CONTROL,
+                                        G_OBJECT (manager),
+                                        context,
+                                        scan_devices_auth_cb,
+                                        NULL,
+                                        NULL,
+                                        &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    }
 }
 
 void
@@ -1062,6 +1101,8 @@ mm_manager_init (MMManager *manager)
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
     const char *subsys[4] = { "tty", "net", "usb", NULL };
 
+    priv->authp = mm_auth_provider_get ();
+
     priv->modems = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
     load_plugins (manager);
 
@@ -1076,6 +1117,8 @@ static void
 finalize (GObject *object)
 {
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (object);
+
+    mm_auth_provider_cancel_for_owner (priv->authp, object);
 
     g_hash_table_destroy (priv->supports);
     g_hash_table_destroy (priv->modems);
