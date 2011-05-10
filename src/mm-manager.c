@@ -30,6 +30,8 @@ static gboolean impl_manager_enumerate_devices (MMManager *manager,
                                                 GPtrArray **devices,
                                                 GError **err);
 
+static gboolean impl_manager_scan_devices (MMManager *manager);
+
 #include "mm-manager-glue.h"
 
 G_DEFINE_TYPE (MMManager, mm_manager, G_TYPE_OBJECT)
@@ -951,6 +953,14 @@ handle_uevent (GUdevClient *client,
 		device_removed (self, device);
 }
 
+static gboolean
+impl_manager_scan_devices (MMManager *manager)
+{
+    /* Relaunch manager start, which does device scanning */
+    mm_manager_start (manager);
+    return TRUE;
+}
+
 void
 mm_manager_start (MMManager *manager)
 {
@@ -959,6 +969,8 @@ mm_manager_start (MMManager *manager)
 
     g_return_if_fail (manager != NULL);
     g_return_if_fail (MM_IS_MANAGER (manager));
+
+    mm_dbg ("Starting device scan...");
 
     priv = MM_MANAGER_GET_PRIVATE (manager);
 
@@ -975,6 +987,8 @@ mm_manager_start (MMManager *manager)
         g_object_unref (G_OBJECT (iter->data));
     }
     g_list_free (devices);
+
+    mm_dbg ("Finished device scan...");
 }
 
 typedef struct {
