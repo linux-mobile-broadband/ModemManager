@@ -9,6 +9,15 @@
   <vendor_url>http://www.freedesktop.org/wiki/ModemManager</vendor_url>
   <icon_name>modem-manager</icon_name>
 
+  <action id="org.freedesktop.ModemManager.Control">
+    <_description>Control the Modem Manager daemon</_description>
+    <_message>System policy prevents controlling the Modem Manager.</_message>
+    <defaults>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+  </action>
+
   <action id="org.freedesktop.ModemManager.Device.Control">
     <_description>Unlock and control a mobile broadband device</_description>
     <_message>System policy prevents unlocking or controlling the mobile broadband device.</_message>
