@@ -34,9 +34,9 @@
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_gsm_ussd_respond"/>
       <arg name="response" type="s" direction="in">
         <tp:docstring>
-          The response to network-initiated USSD command, or a response to a 
+          The response to network-initiated USSD command, or a response to a
           request for further input.
-      </tp:docstring>
+        </tp:docstring>
       </arg>
       <arg name="reply" type="s" direction="out">
         <tp:docstring>

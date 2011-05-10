@@ -4,29 +4,29 @@
   <interface name="org.freedesktop.ModemManager.Modem.Gsm.Network">
     <method name="Register">
       <tp:docstring>
-	Register the device to network.
+        Register the device to network.
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_register"/>
       <arg name="network_id" type="s" direction="in">
-	<tp:docstring>
-	  The network ID to register. An empty string can be used to register to the home network.
-	</tp:docstring>
+        <tp:docstring>
+          The network ID to register. An empty string can be used to register to the home network.
+        </tp:docstring>
       </arg>
     </method>
 
     <method name="Scan">
       <tp:docstring>
-	Scan for available networks.
+        Scan for available networks.
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_scan"/>
       <arg name="results" type="aa{ss}" direction="out">
-	<tp:docstring>
+        <tp:docstring>
           <p>Found networks. It's an array of dictionaries (strings for both
-          keys and values) with each array element describing a mobile network
-          found in the scan.  Each dict may include one or more of the following
-          keys:</p>
+            keys and values) with each array element describing a mobile network
+            found in the scan.  Each dict may include one or more of the following
+            keys:</p>
           <ul>
             <li>
               "status": a number representing network availability status as
@@ -55,33 +55,33 @@
               etc.
             </li>
           </ul>
-	</tp:docstring>
+        </tp:docstring>
       </arg>
     </method>
 
     <method name="SetApn">
       <tp:docstring>
-	Set the APN.
+        Set the APN.
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_set_apn"/>
       <arg name="apn" type="s" direction="in">
-	<tp:docstring>
-	  The APN.
-	</tp:docstring>
+        <tp:docstring>
+          The APN.
+        </tp:docstring>
       </arg>
     </method>
 
     <method name="GetSignalQuality">
       <tp:docstring>
-	Get the current signal quality.
+        Get the current signal quality.
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_signal_quality"/>
       <arg name="quality" type="u" direction="out">
-	<tp:docstring>
-	  Signal quality (percent).
-	</tp:docstring>
+        <tp:docstring>
+          Signal quality (percent).
+        </tp:docstring>
       </arg>
     </method>
 
@@ -143,12 +143,12 @@
 
     <method name="GetRegistrationInfo">
       <tp:docstring>
-	Get the registration status and the current operator (if registered).
+        Get the registration status and the current operator (if registered).
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_reg_info"/>
       <arg name="info" type="(uss)" direction="out">
-	<tp:docstring>
+        <tp:docstring>
           The returned information is composed of the following items in the
           following order:
           <ul>
@@ -173,7 +173,7 @@
               be a zero-length (blank) string.
             </li>
           </ul>
-	</tp:docstring>
+        </tp:docstring>
       </arg>
     </method>
 
@@ -210,27 +210,27 @@
 
     <signal name="SignalQuality">
       <tp:docstring>
-	The signal quality changed.
+        The signal quality changed.
       </tp:docstring>
       <arg name="quality" type="u">
-	<tp:docstring>
-	  The new quality in percent, 0..100.
-	</tp:docstring>
+        <tp:docstring>
+          The new quality in percent, 0..100.
+        </tp:docstring>
       </arg>
     </signal>
 
     <signal name="RegistrationInfo">
       <tp:docstring>
-	The registration status changed.
+        The registration status changed.
       </tp:docstring>
       <arg name="status" type="u" tp:type="MM_MODEM_GSM_NETWORK_REG_STATUS">
-	<tp:docstring>
+        <tp:docstring>
           Mobile registration status as defined in 3GPP TS 27.007 section
           10.1.19.
-	</tp:docstring>
+        </tp:docstring>
       </arg>
       <arg name="operator_code" type="s">
-	<tp:docstring>
+        <tp:docstring>
           Current operator code of the operator to which the mobile is
           currently registered.  Returned in the format "MCCMNC", where MCC
           is the three-digit ITU E.212 Mobile Country Code and MNC is the
@@ -238,25 +238,25 @@
           are not known or the mobile is not registered to a mobile network,
           this value should be a zero-length (blank) string.  e.g. "31026" or
           "310260".
-	</tp:docstring>
+        </tp:docstring>
       </arg>
       <arg name="operator_name" type="s">
-	<tp:docstring>
+        <tp:docstring>
           Current operator name of the operator to which the mobile is
           currently registered.  If the operator name is not knowon or the
           mobile is not registered to a mobile network, this value should
           be a zero-length (blank) string.
-	</tp:docstring>
+        </tp:docstring>
       </arg>
     </signal>
 
     <signal name="NetworkMode">
       <tp:docstring>
-	The network mode preference changed. (DEPRECATED; see documentation
-	for GetNetworkMode/SetNetworkMode)
+        The network mode preference changed. (DEPRECATED; see documentation
+        for GetNetworkMode/SetNetworkMode)
       </tp:docstring>
       <arg name="mode" type="u" tp:type="MM_MODEM_GSM_NETWORK_DEPRECATED_MODE">
-	<tp:docstring>The new network mode.</tp:docstring>
+        <tp:docstring>The new network mode.</tp:docstring>
       </arg>
     </signal>
 
@@ -265,34 +265,34 @@
         GSM registration code as defined in 3GPP TS 27.007 section 10.1.19.
       </tp:docstring>
       <tp:enumvalue suffix="IDLE" value="0">
-	<tp:docstring>
-	  Not registered, not searching for new operator to register.
-	</tp:docstring>
+        <tp:docstring>
+          Not registered, not searching for new operator to register.
+        </tp:docstring>
       </tp:enumvalue>
       <tp:enumvalue suffix="HOME" value="1">
-	<tp:docstring>
-	  Registered on home network.
-	</tp:docstring>
+        <tp:docstring>
+          Registered on home network.
+        </tp:docstring>
       </tp:enumvalue>
       <tp:enumvalue suffix="SEARCHING" value="2">
-	<tp:docstring>
-	  Not registered, searching for new operator to register with.
-	</tp:docstring>
+        <tp:docstring>
+          Not registered, searching for new operator to register with.
+        </tp:docstring>
       </tp:enumvalue>
       <tp:enumvalue suffix="DENIED" value="3">
-	<tp:docstring>
-	  Registration denied.
-	</tp:docstring>
+        <tp:docstring>
+          Registration denied.
+        </tp:docstring>
       </tp:enumvalue>
       <tp:enumvalue suffix="UNKNOWN" value="4">
-	<tp:docstring>
-	  Unknown registration status.
-	</tp:docstring>
+        <tp:docstring>
+          Unknown registration status.
+        </tp:docstring>
       </tp:enumvalue>
       <tp:enumvalue suffix="ROAMING" value="5">
-	<tp:docstring>
-	  Registered on a roaming network.
-	</tp:docstring>
+        <tp:docstring>
+          Registered on a roaming network.
+        </tp:docstring>
       </tp:enumvalue>
     </tp:enum>
 
@@ -302,37 +302,37 @@
         AccessTechnology, AllowedMode, and SetAllowedMode() instead.
       </tp:docstring>
       <tp:enumvalue suffix="ANY" value="0">
-	<tp:docstring>Any network mode can be used</tp:docstring>
+        <tp:docstring>Any network mode can be used</tp:docstring>
       </tp:enumvalue>
       <tp:enumvalue suffix="GPRS" value="1">
-	<tp:docstring>GPRS</tp:docstring>
+        <tp:docstring>GPRS</tp:docstring>
       </tp:enumvalue>
       <tp:enumvalue suffix="EDGE" value="2">
-	<tp:docstring>EDGE</tp:docstring>
+        <tp:docstring>EDGE</tp:docstring>
       </tp:enumvalue>
       <tp:enumvalue suffix="UMTS" value="3">
-	<tp:docstring>UMTS (3G)</tp:docstring>
+        <tp:docstring>UMTS (3G)</tp:docstring>
       </tp:enumvalue>
       <tp:enumvalue suffix="HSDPA" value="4">
-	<tp:docstring>HSDPA</tp:docstring>
+        <tp:docstring>HSDPA</tp:docstring>
       </tp:enumvalue>
       <tp:enumvalue suffix="2G_PREFERRED" value="5">
-	<tp:docstring>Prefer 2G (GPRS or EDGE)</tp:docstring>
+        <tp:docstring>Prefer 2G (GPRS or EDGE)</tp:docstring>
       </tp:enumvalue>
       <tp:enumvalue suffix="3G_PREFERRED" value="6">
-	<tp:docstring>Prefer 3G (UMTS/HSDPA/HSUPA/HSPA)</tp:docstring>
+        <tp:docstring>Prefer 3G (UMTS/HSDPA/HSUPA/HSPA)</tp:docstring>
       </tp:enumvalue>
       <tp:enumvalue suffix="2G_ONLY" value="7">
-	<tp:docstring>Use only 2G (GPRS or EDGE)</tp:docstring>
+        <tp:docstring>Use only 2G (GPRS or EDGE)</tp:docstring>
       </tp:enumvalue>
       <tp:enumvalue suffix="3G_ONLY" value="8">
-	<tp:docstring>Use only 3G (UMTS/HSDPA/HSUPA/HSPA)</tp:docstring>
+        <tp:docstring>Use only 3G (UMTS/HSDPA/HSUPA/HSPA)</tp:docstring>
       </tp:enumvalue>
       <tp:enumvalue suffix="HSUPA" value="9">
-	<tp:docstring>HSUPA</tp:docstring>
+        <tp:docstring>HSUPA</tp:docstring>
       </tp:enumvalue>
       <tp:enumvalue suffix="HSPA" value="10">
-	<tp:docstring>HSPA (HSDPA + HSUPA)</tp:docstring>
+        <tp:docstring>HSPA (HSDPA + HSUPA)</tp:docstring>
       </tp:enumvalue>
     </tp:enum>
 

@@ -42,7 +42,7 @@
 
     <signal name="ActivationStateChanged">
       <tp:docstring>
-	    The device activation state changed.
+        The device activation state changed.
       </tp:docstring>
       <arg name="activation_state" type="u" tp:type="MM_MODEM_CDMA_ACTIVATION_STATE">
         <tp:docstring>Current activation state</tp:docstring>
@@ -60,14 +60,14 @@
 
     <method name="GetSignalQuality">
       <tp:docstring>
-	Get the current signal quality.
+        Get the current signal quality.
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_cdma_get_signal_quality"/>
       <arg name="quality" type="u" direction="out">
-	<tp:docstring>
-	  Signal quality (percent).
-	</tp:docstring>
+        <tp:docstring>
+          Signal quality (percent).
+        </tp:docstring>
       </arg>
     </method>
 
@@ -99,12 +99,12 @@
 
     <signal name="SignalQuality">
       <tp:docstring>
-	The signal quality changed.
+        The signal quality changed.
       </tp:docstring>
       <arg name="quality" type="u">
-	<tp:docstring>
-	  The new quality in percent, 0..100.
-	</tp:docstring>
+        <tp:docstring>
+          The new quality in percent, 0..100.
+        </tp:docstring>
       </arg>
     </signal>
 
@@ -128,7 +128,7 @@
 
     <signal name="RegistrationStateChanged">
       <tp:docstring>
-	The device registration state changed.
+        The device registration state changed.
       </tp:docstring>
       <arg name="cdma-1x-state" type="u" tp:type="MM_MODEM_CDMA_REGISTRATION_STATE">
         <tp:docstring>CDMA 1x registration state.</tp:docstring>
