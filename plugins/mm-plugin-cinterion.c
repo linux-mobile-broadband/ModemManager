@@ -126,8 +126,12 @@ supports_port (MMPluginBase *base,
 
     /* First thing to check in this plugin is if we got capabilities already.
      * This is because we have a later check of the probed vendor, which is
-     * taken also during port probing. */
-    if (!mm_plugin_base_get_cached_port_capabilities (base, port, &cached)) {
+     * taken also during port probing.
+     * Note that we also relaunch a port probe if we got a cached value but no
+     * capabilities set (used when trying to detect RS232 modems during
+     * re-scans). */
+    if (!mm_plugin_base_get_cached_port_capabilities (base, port, &cached) ||
+        !cached) {
         /* Kick off a probe */
         if (mm_plugin_base_probe_port (base, task, 100000, NULL))
             return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
