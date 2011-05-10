@@ -12,6 +12,7 @@ ltmain.sh
 intltool-*
 missing
 stamp-h1
+include
 *~
 *.o
 *.lo
