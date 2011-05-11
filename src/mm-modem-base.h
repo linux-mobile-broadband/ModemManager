@@ -35,6 +35,8 @@
 typedef struct _MMModemBase MMModemBase;
 typedef struct _MMModemBaseClass MMModemBaseClass;
 
+#define MM_MODEM_BASE_MAX_TIMEOUTS   "max-timeouts"
+
 struct _MMModemBase {
     GObject parent;
 };

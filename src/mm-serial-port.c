@@ -49,6 +49,15 @@ enum {
     LAST_PROP
 };
 
+enum {
+    BUFFER_FULL,
+    TIMED_OUT,
+
+    LAST_SIGNAL
+};
+
+static guint signals[LAST_SIGNAL] = { 0 };
+
 #define SERIAL_BUF_SIZE 2048
 
 #define MM_SERIAL_PORT_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_SERIAL_PORT, MMSerialPortPrivate))
@@ -73,6 +82,8 @@ typedef struct {
     guint queue_id;
     guint watch_id;
     guint timeout_id;
+
+    guint n_consecutive_timeouts;
 
     guint flash_id;
     guint connected_id;
@@ -415,6 +426,10 @@ mm_serial_port_process_command (MMSerialPort *self,
         if (errno == EAGAIN || status == 0) {
             info->eagain_count--;
             if (info->eagain_count <= 0) {
+                /* If we reach the limit of EAGAIN errors, treat as a timeout error. */
+                priv->n_consecutive_timeouts++;
+                g_signal_emit (self, signals[TIMED_OUT], 0, priv->n_consecutive_timeouts);
+
                 g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_SEND_FAILED,
                              "Sending command failed: '%s'", strerror (errno));
                 return FALSE;
@@ -542,13 +557,21 @@ mm_serial_port_timed_out (gpointer data)
 
     priv->timeout_id = 0;
 
+    /* Update number of consecutive timeouts found */
+    priv->n_consecutive_timeouts++;
+
     error = g_error_new_literal (MM_SERIAL_ERROR,
                                  MM_SERIAL_ERROR_RESPONSE_TIMEOUT,
                                  "Serial command timed out");
+
     /* FIXME: This is not completely correct - if the response finally arrives and there's
        some other command waiting for response right now, the other command will
        get the output of the timed out command. Not sure what to do here. */
     mm_serial_port_got_response (self, error);
+
+    /* Emit a timed out signal, used by upper layers to identify a disconnected
+     * serial port */
+    g_signal_emit (self, signals[TIMED_OUT], 0, priv->n_consecutive_timeouts);
 
     return FALSE;
 }
@@ -672,12 +695,15 @@ data_available (GIOChannel *source,
         /* Make sure the response doesn't grow too long */
         if ((priv->response->len > SERIAL_BUF_SIZE) && priv->spew_control) {
             /* Notify listeners and then trim the buffer */
-            g_signal_emit_by_name (self, "buffer-full", priv->response);
+            g_signal_emit (self, signals[BUFFER_FULL], 0, priv->response);
             g_byte_array_remove_range (priv->response, 0, (SERIAL_BUF_SIZE / 2));
         }
 
-        if (parse_response (self, priv->response, &err))
+        if (parse_response (self, priv->response, &err)) {
+            /* Reset number of consecutive timeouts only here */
+            priv->n_consecutive_timeouts = 0;
             mm_serial_port_got_response (self, err);
+        }
     } while (bytes_read == SERIAL_BUF_SIZE || status == G_IO_STATUS_AGAIN);
 
     return TRUE;
@@ -888,6 +914,7 @@ mm_serial_port_close (MMSerialPort *self)
                                          "Serial port is now closed");
             response = g_byte_array_sized_new (1);
             g_byte_array_append (response, (const guint8 *) "\0", 1);
+
             MM_SERIAL_PORT_GET_CLASS (self)->handle_response (self,
                                                               response,
                                                               error,
@@ -1421,12 +1448,22 @@ mm_serial_port_class_init (MMSerialPortClass *klass)
                                G_PARAM_READWRITE));
 
     /* Signals */
-    g_signal_new ("buffer-full",
+    signals[BUFFER_FULL] =
+        g_signal_new ("buffer-full",
                   G_OBJECT_CLASS_TYPE (object_class),
                   G_SIGNAL_RUN_FIRST,
                   G_STRUCT_OFFSET (MMSerialPortClass, buffer_full),
                   NULL, NULL,
                   g_cclosure_marshal_VOID__POINTER,
                   G_TYPE_NONE, 1, G_TYPE_POINTER);
+
+    signals[TIMED_OUT] =
+        g_signal_new ("timed-out",
+                      G_OBJECT_CLASS_TYPE (object_class),
+                      G_SIGNAL_RUN_FIRST,
+                      G_STRUCT_OFFSET (MMSerialPortClass, timed_out),
+                      NULL, NULL,
+                      g_cclosure_marshal_VOID__UINT,
+					  G_TYPE_NONE, 1, G_TYPE_UINT);
 }
 

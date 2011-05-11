@@ -41,6 +41,12 @@ G_DEFINE_TYPE_EXTENDED (MMModemBase, mm_modem_base,
 
 #define MM_MODEM_BASE_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_BASE, MMModemBasePrivate))
 
+enum {
+    PROP_0,
+    PROP_MAX_TIMEOUTS,
+    LAST_PROP
+};
+
 typedef struct {
     char *driver;
     char *plugin;
@@ -61,6 +67,9 @@ typedef struct {
     char *ati;
     char *ati1;
     char *gsn;
+
+    guint max_timeouts;
+    guint set_invalid_unresponsive_modem_id;
 
     MMAuthProvider *authp;
 
@@ -105,6 +114,42 @@ find_primary (gpointer key, gpointer data, gpointer user_data)
         *found = port;
 }
 
+static gboolean
+set_invalid_unresponsive_modem_cb (MMModemBase *self)
+{
+    MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (self);
+
+    mm_modem_base_set_valid (self, FALSE);
+    priv->set_invalid_unresponsive_modem_id = 0;
+    return FALSE;
+}
+
+static void
+serial_port_timed_out_cb (MMSerialPort *port,
+                          guint n_consecutive_timeouts,
+                          gpointer user_data)
+{
+    MMModemBase *self = (MM_MODEM_BASE (user_data));
+    MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (self);
+
+    if (priv->max_timeouts > 0 &&
+        n_consecutive_timeouts >= priv->max_timeouts) {
+        const gchar *dbus_path;
+
+        dbus_path = (const gchar *) g_object_get_data (G_OBJECT (self), DBUS_PATH_TAG);
+        mm_warn ("Modem %s: Port (%s/%s) timed out %u times, marking modem as disabled",
+                 dbus_path,
+                 mm_port_type_to_name (mm_port_get_port_type (MM_PORT (port))),
+                 mm_port_get_device (MM_PORT (port)),
+                 n_consecutive_timeouts);
+
+        /* Only set action to invalidate modem if not already done */
+        if (!priv->set_invalid_unresponsive_modem_id)
+            priv->set_invalid_unresponsive_modem_id =
+                g_idle_add ((GSourceFunc)set_invalid_unresponsive_modem_cb, self);
+    }
+}
+
 MMPort *
 mm_modem_base_add_port (MMModemBase *self,
                         const char *subsys,
@@ -137,6 +182,13 @@ mm_modem_base_add_port (MMModemBase *self,
             port = MM_PORT (mm_qcdm_serial_port_new (name, ptype));
         else
             port = MM_PORT (mm_at_serial_port_new (name, ptype));
+
+        /* For serial ports, enable port timeout checks */
+        if (port)
+            g_signal_connect (port,
+                              "timed-out",
+                              G_CALLBACK (serial_port_timed_out_cb),
+                              self);
     } else if (!strcmp (subsys, "net")) {
         port = MM_PORT (g_object_new (MM_TYPE_PORT,
                                       MM_PORT_DEVICE, name,
@@ -538,7 +590,7 @@ mm_modem_base_get_card_info (MMModemBase *self,
 
     priv = MM_MODEM_BASE_GET_PRIVATE (self);
 
-    /* Cached info and errors schedule the callback immediately and do 
+    /* Cached info and errors schedule the callback immediately and do
      * not hit up the card for it's model information.
      */
     if (priv->manf || priv->model || priv->revision)
@@ -717,6 +769,9 @@ set_property (GObject *object, guint prop_id,
         /* Construct only */
         priv->pid = g_value_get_uint (value);
         break;
+    case PROP_MAX_TIMEOUTS:
+        priv->max_timeouts = g_value_get_uint (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -774,6 +829,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case MM_MODEM_PROP_HW_PID:
         g_value_set_uint (value, priv->pid);
+        break;
+    case PROP_MAX_TIMEOUTS:
+        g_value_set_uint (value, priv->max_timeouts);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -877,6 +935,15 @@ mm_modem_base_class_init (MMModemBaseClass *klass)
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_HW_PID,
                                       MM_MODEM_HW_PID);
+
+    g_object_class_install_property
+        (object_class, PROP_MAX_TIMEOUTS,
+         g_param_spec_uint (MM_MODEM_BASE_MAX_TIMEOUTS,
+                            "Max timeouts",
+                            "Maximum number of consecutive timed out commands sent to "
+                            "the modem before disabling it. If 0, this feature is disabled.",
+                            0, G_MAXUINT, 0,
+                            G_PARAM_READWRITE));
 
     mm_properties_changed_signal_enable (object_class);
 }
