@@ -164,11 +164,16 @@ get_2g_band_done (MMAtSerialPort *port,
                   gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (info->modem);
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error)
         info->error = g_error_copy (error);
     else {
+        MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (info->modem);
         guint32 mm_band = MM_MODEM_GSM_BAND_UNKNOWN;
         GRegex *regex;
         GMatchInfo *match_info = NULL;
@@ -235,11 +240,16 @@ get_3g_band_done (MMAtSerialPort *port,
                   gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (info->modem);
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error)
         info->error = g_error_copy (error);
     else {
+        MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (info->modem);
         guint32 mm_band = 0;
         GRegex *regex;
         GMatchInfo *match_info = NULL;
@@ -335,12 +345,19 @@ set_band_done (MMAtSerialPort *port,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (info->modem);
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error)
         info->error = g_error_copy (error);
-    else
+    else {
+        MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (info->modem);
+
         priv->current_bands = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "new-band"));
+    }
 
     mm_callback_info_schedule (info);
 }
@@ -545,10 +562,15 @@ get_smong_cb (MMAtSerialPort *port,
               gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
-    MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (info->modem);
+    MMModemCinterionGsmPrivate *priv;
     MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     GMatchInfo *match_info = NULL;
     GRegex *regex;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error) {
         info->error = g_error_copy (error);
@@ -556,6 +578,8 @@ get_smong_cb (MMAtSerialPort *port,
         mm_callback_info_schedule (info);
         return;
     }
+
+    priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (info->modem);
 
     /* The AT^SMONG command returns a cell info table, where the second
      * column identifies the "GPRS status", which is exactly what we want.
@@ -604,6 +628,11 @@ get_sind_cb (MMAtSerialPort *port,
     MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     GMatchInfo *match_info = NULL;
     GRegex *regex;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error) {
         info->error = g_error_copy (error);
@@ -690,12 +719,19 @@ set_allowed_mode_cb (MMAtSerialPort *port,
                      gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (info->modem);
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error)
         info->error = g_error_copy (error);
-    else
+    else {
+        MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (info->modem);
+
         priv->allowed_mode = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "new-mode"));
+    }
 
     mm_callback_info_schedule (info);
 }
@@ -803,13 +839,20 @@ get_supported_networks_cb (MMAtSerialPort *port,
                            gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
-    MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (info->modem);
+    MMModemCinterionGsmPrivate *priv;
     GError *inner_error = NULL;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error) {
         enable_complete (MM_GENERIC_GSM (info->modem), error, info);
         return;
     }
+
+    priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (info->modem);
 
     /* Note: Documentation says that AT+WS46=? is replied with '+WS46:' followed
      * by a list of supported network modes between parenthesis, but the EGS5
