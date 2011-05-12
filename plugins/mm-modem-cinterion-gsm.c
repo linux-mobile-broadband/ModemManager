@@ -128,6 +128,7 @@ mm_modem_cinterion_gsm_new (const char *device,
                                    MM_MODEM_PLUGIN, plugin,
                                    MM_MODEM_HW_VID, vendor,
                                    MM_MODEM_HW_PID, product,
+                                   MM_MODEM_BASE_MAX_TIMEOUTS, 3,
                                    NULL));
 }
 
