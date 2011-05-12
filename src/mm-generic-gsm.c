@@ -121,6 +121,9 @@ typedef struct {
     gboolean loc_signal;
 
     MMModemGsmUssdState ussd_state;
+
+    /* SMS */
+    GHashTable *sms_present;
 } MMGenericGsmPrivate;
 
 static void get_registration_status (MMAtSerialPort *port, MMCallbackInfo *info);
@@ -1312,6 +1315,7 @@ cmti_received (MMAtSerialPort *port,
                gpointer user_data)
 {
     MMGenericGsm *self = MM_GENERIC_GSM (user_data);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     guint idx = 0;
     char *str;
 
@@ -1319,6 +1323,13 @@ cmti_received (MMAtSerialPort *port,
     if (str)
         idx = atoi (str);
     g_free (str);
+
+    /* Don't signal multiple times if there are multiple CMTI notifications for a message */
+    if (g_hash_table_lookup_extended (priv->sms_present, GINT_TO_POINTER (idx), NULL, NULL))
+        return;
+
+    /* Nothing is currently stored in the hash table - presence is all that matters. */
+    g_hash_table_insert (priv->sms_present, GINT_TO_POINTER (idx), NULL);
 
     /* todo: parse pdu to know if the sms is complete */
     mm_modem_gsm_sms_received (MM_MODEM_GSM_SMS (self),
@@ -4226,8 +4237,10 @@ sms_delete (MMModemGsmSms *modem,
     MMCallbackInfo *info;
     char *command;
     MMAtSerialPort *port;
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (MM_GENERIC_GSM (modem));
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+    g_hash_table_remove (priv->sms_present, GINT_TO_POINTER (idx));
 
     port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
     if (!port) {
@@ -5237,6 +5250,7 @@ mm_generic_gsm_init (MMGenericGsm *self)
     priv->act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     priv->reg_regex = mm_gsm_creg_regex_get (TRUE);
     priv->roam_allowed = TRUE;
+    priv->sms_present = g_hash_table_new (g_direct_hash, g_direct_equal);
 
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_GSM_NETWORK_ALLOWED_MODE,
@@ -5454,6 +5468,7 @@ finalize (GObject *object)
     g_free (priv->oper_code);
     g_free (priv->oper_name);
     g_free (priv->simid);
+    g_hash_table_destroy (priv->sms_present);
 
     G_OBJECT_CLASS (mm_generic_gsm_parent_class)->finalize (object);
 }
