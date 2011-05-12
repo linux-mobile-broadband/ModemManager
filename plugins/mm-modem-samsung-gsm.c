@@ -505,6 +505,21 @@ init_done (MMAtSerialPort *port,
 }
 
 static void
+init_reset_done (MMAtSerialPort *port,
+           GString *response,
+           GError *error,
+           gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemSamsungGsm *self = MM_MODEM_SAMSUNG_GSM (info->modem);
+
+    if (error)
+        mm_generic_gsm_enable_complete (MM_GENERIC_GSM (self), error, info);
+    else
+        mm_at_serial_port_queue_command (port, "E0 V1", 3, init_done, info);
+}
+
+static void
 do_enable (MMGenericGsm *modem, MMModemFn callback, gpointer user_data)
 {
     MMCallbackInfo *info;
@@ -514,7 +529,7 @@ do_enable (MMGenericGsm *modem, MMModemFn callback, gpointer user_data)
 
     primary = mm_generic_gsm_get_at_port (modem, MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
-    mm_at_serial_port_queue_command (primary, "Z E0 V1", 3, init_done, info);
+    mm_at_serial_port_queue_command (primary, "Z", 3, init_reset_done, info);
 }
 
 static void
