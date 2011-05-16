@@ -47,19 +47,24 @@ invoke_mm_modem_string_fn (MMCallbackInfo *info)
               info->error, info->user_data);
 }
 
-
 static void
 modem_destroyed_cb (gpointer data, GObject *destroyed)
 {
     MMCallbackInfo *info = data;
 
+    /* Reset modem pointer, so that callback know that they shouldn't do
+     * anything else */
     info->modem = NULL;
-    if (!info->pending_id) {
-        info->error = g_error_new_literal (MM_MODEM_ERROR,
-                                           MM_MODEM_ERROR_REMOVED,
-                                           "The modem was removed.");
+
+    /* Overwrite any possible previous error set */
+    g_clear_error (&(info->error));
+    info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                       MM_MODEM_ERROR_REMOVED,
+                                       "The modem was removed.");
+
+    /* Only schedule the info if not already done before */
+    if (!info->pending_id)
         mm_callback_info_schedule (info);
-    }
 }
 
 static void
