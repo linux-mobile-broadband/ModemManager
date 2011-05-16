@@ -165,19 +165,26 @@ enum {
 };
 
 enum {
-    CDMA_BAND_CLASS_0_CELLULAR_800   = 0,  /* US cellular 850MHz */
-    CDMA_BAND_CLASS_1_PCS            = 1,  /* US PCS 1900MHz */
-    CDMA_BAND_CLASS_2_TACS           = 2,
-    CDMA_BAND_CLASS_3_JTACS          = 3,  /* Japanese TACS */
-    CDMA_BAND_CLASS_4_KOREAN_PCS     = 4,
-    CDMA_BAND_CLASS_5_NMT450         = 5,
-    CDMA_BAND_CLASS_6_IMT2000        = 6,  /* 2100HMz */
-    CDMA_BAND_CLASS_7_CELLULAR_700   = 7,
-    CDMA_BAND_CLASS_8_1800           = 8,
-    CDMA_BAND_CLASS_9_900            = 9,
-    CDMA_BAND_CLASS_10_SECONDARY_800 = 10,
-    CDMA_BAND_CLASS_11_PAMR_400      = 11,
-    CDMA_BAND_CLASS_12_PAMR_800      = 12
+    CDMA_BAND_CLASS_0_CELLULAR_800   = 0,  /* 800 MHz cellular band */
+    CDMA_BAND_CLASS_1_PCS            = 1,  /* 1800 to 2000 MHz PCS band */
+    CDMA_BAND_CLASS_2_TACS           = 2,  /* 872 to 960 MHz TACS band */
+    CDMA_BAND_CLASS_3_JTACS          = 3,  /* 832 to 925 MHz JTACS band */
+    CDMA_BAND_CLASS_4_KOREAN_PCS     = 4,  /* 1750 to 1870 MHz Korean PCS band */
+    CDMA_BAND_CLASS_5_NMT450         = 5,  /* 450 MHz NMT band */
+    CDMA_BAND_CLASS_6_IMT2000        = 6,  /* 2100 MHz IMT-2000 band */
+    CDMA_BAND_CLASS_7_CELLULAR_700   = 7,  /* Upper 700 MHz band */
+    CDMA_BAND_CLASS_8_1800           = 8,  /* 1800 MHz band */
+    CDMA_BAND_CLASS_9_900            = 9,  /* 900 MHz band */
+    CDMA_BAND_CLASS_10_SECONDARY_800 = 10, /* Secondary 800 MHz band */
+    CDMA_BAND_CLASS_11_PAMR_400      = 11, /* 400 MHz European PAMR band */
+    CDMA_BAND_CLASS_12_PAMR_800      = 12, /* 800 MHz PAMR band */
+    CDMA_BAND_CLASS_13_IMT2000_2500  = 13, /* 2500 MHz IMT-2000 Extension Band */
+    CDMA_BAND_CLASS_14_US_PCS_1900   = 14, /* US PCS 1900 MHz Band */
+    CDMA_BAND_CLASS_15_AWS           = 15, /* AWS 1700 MHz band */
+    CDMA_BAND_CLASS_16_US_2500       = 16, /* US 2500 MHz Band */
+    CDMA_BAND_CLASS_17_US_FLO_2500   = 17, /* US 2500 MHz Forward Link Only Band */
+    CDMA_BAND_CLASS_18_US_PS_700     = 18, /* 700 MHz Public Safety Band */
+    CDMA_BAND_CLASS_19_US_LOWER_700  = 19  /* Lower 700 MHz Band */
 };
 
 enum {
