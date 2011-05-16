@@ -918,6 +918,41 @@ do_enable_power_up_done (MMGenericGsm *gsm,
     mm_at_serial_port_queue_command (port, "+WS46=?", 3, get_supported_networks_cb, info);
 }
 
+static void
+set_property (GObject *object,
+              guint prop_id,
+              const GValue *value,
+              GParamSpec *pspec)
+{
+    /* Do nothing... see set_property() in parent, which also does nothing */
+}
+
+static void
+get_property (GObject *object,
+              guint prop_id,
+              GValue *value,
+              GParamSpec *pspec)
+{
+    switch (prop_id) {
+    case MM_GENERIC_GSM_PROP_SMS_INDICATION_ENABLE_CMD:
+        /* AT+CNMO=<mode>,[<mt>[,<bm>[,<ds>[,<bfr>]]]]
+         *  but <bfr> should be either not set, or equal to 1;
+         *  and <ds> can be only either 0 or 2 (EGS5)
+         */
+        g_value_set_string (value, "+CNMI=2,1,2,2,1");
+        break;
+    case MM_GENERIC_GSM_PROP_SMS_STORAGE_LOCATION_CMD:
+        /* AT=CPMS=<mem1>[,<mem2>[,<mem3>]]
+         *  but <mem3> should be either not set, or equal to "SM" or "MT".
+         * This <mem3> parameter is only meaningful if <mt>=2 in AT+CNMI
+         * */
+        g_value_set_string (value, "+CPMS=\"ME\",\"ME\"");
+        break;
+    default:
+        break;
+    }
+}
+
 /*****************************************************************************/
 
 static void
@@ -948,6 +983,17 @@ mm_modem_cinterion_gsm_class_init (MMModemCinterionGsmClass *klass)
     MMGenericGsmClass *gsm_class = MM_GENERIC_GSM_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMModemCinterionGsmPrivate));
+
+    object_class->get_property = get_property;
+    object_class->set_property = set_property;
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_SMS_INDICATION_ENABLE_CMD,
+                                      MM_GENERIC_GSM_SMS_INDICATION_ENABLE_CMD);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_SMS_STORAGE_LOCATION_CMD,
+                                      MM_GENERIC_GSM_SMS_STORAGE_LOCATION_CMD);
 
     gsm_class->do_enable_power_up_done = do_enable_power_up_done;
     gsm_class->set_allowed_mode = set_allowed_mode;
