@@ -948,6 +948,13 @@ get_property (GObject *object,
          * */
         g_value_set_string (value, "+CPMS=\"ME\",\"ME\"");
         break;
+    case MM_GENERIC_GSM_PROP_CMER_ENABLE_CMD:
+        /* AT=CMER=[<mode>[,<keyp>[,<disp>[,<ind>[,<bfr>]]]]]
+         *  but <ind> should be either not set, or equal to 0 or 2.
+         * Enabled with 2.
+         * */
+        g_value_set_string (value, "+CMER=3,0,0,2");
+        break;
     default:
         break;
     }
@@ -994,6 +1001,10 @@ mm_modem_cinterion_gsm_class_init (MMModemCinterionGsmClass *klass)
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_SMS_STORAGE_LOCATION_CMD,
                                       MM_GENERIC_GSM_SMS_STORAGE_LOCATION_CMD);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_CMER_ENABLE_CMD,
+                                      MM_GENERIC_GSM_CMER_ENABLE_CMD);
 
     gsm_class->do_enable_power_up_done = do_enable_power_up_done;
     gsm_class->set_allowed_mode = set_allowed_mode;
