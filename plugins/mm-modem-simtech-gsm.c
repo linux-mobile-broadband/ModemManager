@@ -67,9 +67,15 @@ get_mode_pref_done (MMAtSerialPort *port,
     guint32 acqord;
     MMModemGsmAllowedMode allowed = MM_MODEM_GSM_ALLOWED_MODE_ANY;
 
-    info->error = mm_modem_check_removed (info->modem, error);
-    if (info->error)
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error) {
+        info->error = g_error_copy (error);
         goto done;
+    }
 
     p = mm_strip_tag (response->str, "+CNMP:");
     if (!p) {
@@ -125,9 +131,15 @@ get_acq_order_done (MMAtSerialPort *port,
     const char *p;
     gint acqord = -1;
 
-    info->error = mm_modem_check_removed (info->modem, error);
-    if (info->error)
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error) {
+        info->error = g_error_copy (error);
         goto done;
+    }
 
     p = mm_strip_tag (response->str, "+CNAOP:");
     if (!p) {
@@ -182,6 +194,11 @@ set_acq_order_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error)
         info->error = g_error_copy (error);
 
@@ -198,8 +215,13 @@ set_mode_pref_done (MMAtSerialPort *port,
     guint32 naop;
     char *command;
 
-    info->error = mm_modem_check_removed (info->modem, error);
-    if (info->error) {
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error) {
+        info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
         return;
     }
@@ -286,8 +308,13 @@ get_act_tech_done (MMAtSerialPort *port,
     MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     const char *p;
 
-    info->error = mm_modem_check_removed (info->modem, error);
-    if (info->error) {
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error) {
+        info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
         return;
     }

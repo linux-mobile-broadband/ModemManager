@@ -144,6 +144,11 @@ set_band_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error)
         info->error = g_error_copy (error);
 
@@ -232,6 +237,11 @@ get_band_done (MMAtSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMModemGsmBand mm_band = MM_MODEM_GSM_BAND_UNKNOWN;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error)
         info->error = g_error_copy (error);
     else if (parse_ipbm (response->str, &mm_band))
@@ -289,6 +299,11 @@ send_samsung_pinnum_done (MMAtSerialPort *port,
     guint32 attempts_left = 0;
     char *str = NULL;
     guint32 num = 0;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error) {
         info->error = g_error_copy (error);
@@ -461,7 +476,14 @@ init_all_done (MMAtSerialPort *port,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemSamsungGsm *self = MM_MODEM_SAMSUNG_GSM (info->modem);
+    MMModemSamsungGsm *self;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    self = MM_MODEM_SAMSUNG_GSM (info->modem);
 
     if (!error)
         mm_modem_icera_change_unsolicited_messages (MM_MODEM_ICERA (self), TRUE);
@@ -476,7 +498,14 @@ init2_done (MMAtSerialPort *port,
             gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemSamsungGsm *self = MM_MODEM_SAMSUNG_GSM (info->modem);
+    MMModemSamsungGsm *self;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    self = MM_MODEM_SAMSUNG_GSM (info->modem);
 
     if (error)
         mm_generic_gsm_enable_complete (MM_GENERIC_GSM (self), error, info);
@@ -493,7 +522,14 @@ init_done (MMAtSerialPort *port,
            gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemSamsungGsm *self = MM_MODEM_SAMSUNG_GSM (info->modem);
+    MMModemSamsungGsm *self;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    self = MM_MODEM_SAMSUNG_GSM (info->modem);
 
     if (error)
         mm_generic_gsm_enable_complete (MM_GENERIC_GSM (self), error, info);

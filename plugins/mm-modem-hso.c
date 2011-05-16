@@ -117,8 +117,16 @@ auth_done (MMAtSerialPort *port,
            gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemHso *self = MM_MODEM_HSO (info->modem);
-    MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (self);
+    MMModemHso *self;
+    MMModemHsoPrivate *priv;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    self = MM_MODEM_HSO (info->modem);
+    priv = MM_MODEM_HSO_GET_PRIVATE (self);
 
     if (error) {
         priv->auth_idx++;
@@ -257,6 +265,11 @@ hso_call_control_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error && !mm_callback_info_get_data (info, IGNORE_ERRORS_TAG))
         info->error = g_error_copy (error);
 
@@ -318,12 +331,13 @@ hso_enabled (MMModem *modem,
              gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    GError *tmp_error;
 
-    tmp_error = mm_modem_check_removed (modem, error);
-    if (tmp_error) {
-        mm_generic_gsm_connect_complete (MM_GENERIC_GSM (modem), tmp_error, info);
-        g_clear_error (&tmp_error);
+    /* Do nothing if modem removed */
+    if (!modem || mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error) {
+        mm_generic_gsm_connect_complete (MM_GENERIC_GSM (modem), error, info);
     } else {
         MMModemHsoPrivate *priv = MM_MODEM_HSO_GET_PRIVATE (modem);
 
@@ -338,13 +352,14 @@ old_context_clear_done (MMModem *modem,
                         gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    GError *tmp_error;
 
-    tmp_error = mm_modem_check_removed (modem, error);
-    if (tmp_error) {
-        mm_generic_gsm_connect_complete (MM_GENERIC_GSM (modem), tmp_error, info);
-        g_clear_error (&tmp_error);
-    } else {
+    /* Do nothing if modem removed */
+    if (!modem || mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error)
+        mm_generic_gsm_connect_complete (MM_GENERIC_GSM (modem), error, info);
+    else {
         /* Success, activate the PDP context and start the data session */
         hso_call_control (MM_MODEM_HSO (modem), TRUE, FALSE, hso_enabled, info);
     }
@@ -356,12 +371,13 @@ connect_auth_done (MMModem *modem,
                    gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    GError *tmp_error;
 
-    tmp_error = mm_modem_check_removed (modem, error);
-    if (tmp_error) {
-        mm_generic_gsm_connect_complete (MM_GENERIC_GSM (modem), tmp_error, info);
-        g_clear_error (&tmp_error);
+    /* Do nothing if modem removed */
+    if (!modem || mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error) {
+        mm_generic_gsm_connect_complete (MM_GENERIC_GSM (modem), error, info);
     } else {
         /* Now connect; kill any existing connections first */
         hso_call_control (MM_MODEM_HSO (modem), FALSE, TRUE, old_context_clear_done, info);
@@ -491,6 +507,11 @@ get_ip4_config_done (MMAtSerialPort *port,
     guint32 tmp;
     gint cid;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error) {
         info->error = g_error_copy (error);
         goto out;
@@ -560,7 +581,14 @@ disconnect_owancall_done (MMAtSerialPort *port,
                           GError *error,
                           gpointer user_data)
 {
-    mm_callback_info_schedule ((MMCallbackInfo *) user_data);
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    mm_callback_info_schedule (info);
 }
 
 static void

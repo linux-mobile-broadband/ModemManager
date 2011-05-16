@@ -70,6 +70,8 @@ void            mm_callback_info_set_data (MMCallbackInfo *info,
 gpointer        mm_callback_info_get_data (MMCallbackInfo *info,
                                            const char *key);
 
+gboolean        mm_callback_info_check_modem_removed (MMCallbackInfo *info);
+
 MMCallbackInfo *mm_callback_info_ref (MMCallbackInfo *info);
 void            mm_callback_info_unref (MMCallbackInfo *info);
 

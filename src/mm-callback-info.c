@@ -182,6 +182,14 @@ mm_callback_info_get_data (MMCallbackInfo *info, const char *key)
     return quark ? g_datalist_id_get_data (&info->qdata, quark) : NULL;
 }
 
+gboolean
+mm_callback_info_check_modem_removed (MMCallbackInfo *info)
+{
+    g_return_val_if_fail (info != NULL, TRUE);
+
+    return (info->modem ? FALSE : TRUE);
+}
+
 MMCallbackInfo *
 mm_callback_info_ref (MMCallbackInfo *info)
 {

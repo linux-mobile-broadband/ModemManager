@@ -104,6 +104,11 @@ linktop_set_allowed_mode_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error)
         info->error = g_error_copy (error);
 
@@ -127,7 +132,7 @@ set_allowed_mode (MMGenericGsm *gsm,
         mm_callback_info_schedule (info);
         return;
     }
-    
+
     command = g_strdup_printf ("+CFUN=%d", linktop_parse_allowed_mode (mode));
     mm_at_serial_port_queue_command (port, command, 3, linktop_set_allowed_mode_done, info);
     g_free (command);
@@ -141,6 +146,11 @@ get_allowed_mode_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     gboolean parsed = FALSE;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error)
         info->error = g_error_copy (error);

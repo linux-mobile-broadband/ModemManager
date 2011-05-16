@@ -74,9 +74,15 @@ get_allowed_mode_done (MMAtSerialPort *port,
     GRegex *r = NULL;
     GMatchInfo *match_info;
 
-    info->error = mm_modem_check_removed (info->modem, error);
-    if (info->error)
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error) {
+        info->error = g_error_copy (error);
         goto done;
+    }
 
     /* Example response: !SELRAT: 03, UMTS 3G Preferred */
     r = g_regex_new ("!SELRAT:\\s*(\\d+).*$", 0, 0, NULL);
@@ -156,6 +162,11 @@ set_allowed_mode_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error)
         info->error = g_error_copy (error);
 
@@ -217,6 +228,11 @@ get_act_request_done (MMAtSerialPort *port,
     MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     const char *p;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error)
         info->error = g_error_copy (error);
     else {
@@ -259,6 +275,11 @@ get_sim_iccid_done (MMAtSerialPort *port,
     const char *p;
     char buf[21];
     int i;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error) {
         info->error = g_error_copy (error);
@@ -415,7 +436,13 @@ ppp_connect_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
 
-    info->error = mm_modem_check_removed (modem, error);
+    /* Do nothing if modem removed */
+    if (!modem || mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error)
+        info->error = g_error_copy (error);
+
     mm_callback_info_schedule (info);
 }
 
@@ -426,6 +453,11 @@ net_activate_done (MMAtSerialPort *port,
                    gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     mm_generic_gsm_connect_complete (MM_GENERIC_GSM (info->modem), error, info);
 }
@@ -440,6 +472,11 @@ auth_done (MMAtSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     gint cid;
     char *command;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error) {
         info->error = g_error_copy (error);
@@ -466,6 +503,11 @@ ps_attach_done (MMAtSerialPort *port,
     MMModemSierraGsmPrivate *priv;
     MMModem *parent_modem_iface;
     const char *number;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error) {
         info->error = g_error_copy (error);

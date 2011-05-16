@@ -122,16 +122,15 @@ get_rssi_done (MMAtSerialPort *port,
     MMModemCdma *parent_iface;
     int qual;
 
-    info->error = mm_modem_check_removed (info->modem, error);
-    if (info->error) {
-        if (info->modem) {
-            /* Fallback to parent's method */
-            g_clear_error (&info->error);
-            parent_iface = g_type_interface_peek_parent (MM_MODEM_CDMA_GET_INTERFACE (info->modem));
-            parent_iface->get_signal_quality (MM_MODEM_CDMA (info->modem), parent_csq_done, info);
-        } else
-            mm_callback_info_schedule (info);
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
+    if (error) {
+        /* Fallback to parent's method */
+        parent_iface = g_type_interface_peek_parent (MM_MODEM_CDMA_GET_INTERFACE (info->modem));
+        parent_iface->get_signal_quality (MM_MODEM_CDMA (info->modem), parent_csq_done, info);
         return;
     }
 
@@ -149,7 +148,7 @@ get_rssi_done (MMAtSerialPort *port,
         info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
                                     "%s", "Could not parse signal quality results");
     }
-        
+
     mm_callback_info_schedule (info);
 }
 

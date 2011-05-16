@@ -128,6 +128,11 @@ evdo_state_done (MMAtSerialPort *port,
     GRegex *r;
     GMatchInfo *match_info;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error) {
         /* Leave superclass' reg state alone if AT*HSTATE isn't supported */
         mm_callback_info_schedule (info);
@@ -194,6 +199,11 @@ state_done (MMAtSerialPort *port,
     const char *reply;
     GRegex *r;
     GMatchInfo *match_info;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error) {
         /* Leave superclass' reg state alone if AT*STATE isn't supported */

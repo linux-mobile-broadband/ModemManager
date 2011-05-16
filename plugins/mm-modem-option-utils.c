@@ -32,6 +32,11 @@ option_get_allowed_mode_done (MMAtSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     gboolean parsed = FALSE;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error)
         info->error = g_error_copy (error);
     else if (!g_str_has_prefix (response->str, "_OPSYS: ")) {
@@ -94,6 +99,11 @@ option_set_allowed_mode_done (MMAtSerialPort *port,
                               gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error)
         info->error = g_error_copy (error);
@@ -357,8 +367,14 @@ unsolicited_msg_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = user_data;
 
-    if (info)
+    if (info) {
+        /* If the modem has already been removed, return without
+         * scheduling callback */
+        if (mm_callback_info_check_modem_removed (info))
+            return;
+
         mm_callback_info_chain_complete_one (info);
+    }
 }
 
 static void
@@ -394,6 +410,11 @@ get_act_octi_request_done (MMAtSerialPort *port,
     MMModemGsmAccessTech octi = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     MMModemGsmAccessTech owcti;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (!error) {
         if (parse_octi_response (response, &octi)) {
             /* If no 3G tech yet or current tech isn't 3G, then 2G tech is the best */
@@ -415,6 +436,11 @@ get_act_owcti_request_done (MMAtSerialPort *port,
     MMCallbackInfo *info = user_data;
     MMModemGsmAccessTech owcti = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     const char *p;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (!error) {
         p = mm_strip_tag (response->str, "_OWCTI:");

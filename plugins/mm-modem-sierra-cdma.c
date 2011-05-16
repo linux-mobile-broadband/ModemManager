@@ -148,13 +148,20 @@ status_done (MMAtSerialPort *port,
              gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemSierraCdmaPrivate *priv = MM_MODEM_SIERRA_CDMA_GET_PRIVATE (info->modem);
+    MMModemSierraCdmaPrivate *priv;
     char **lines, **iter;
     gboolean registered = FALSE;
     gboolean have_sid = FALSE;
     SysMode evdo_mode = SYS_MODE_UNKNOWN;
     SysMode sys_mode = SYS_MODE_UNKNOWN;
     gboolean evdo_roam = FALSE, cdma1x_roam = FALSE;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    priv = MM_MODEM_SIERRA_CDMA_GET_PRIVATE (info->modem);
 
     if (error) {
         /* Leave superclass' reg state alone if AT!STATUS isn't supported */
@@ -167,11 +174,11 @@ status_done (MMAtSerialPort *port,
         goto done;
     }
 
-    /* Sierra CDMA parts have two general formats depending on whether they 
+    /* Sierra CDMA parts have two general formats depending on whether they
      * support EVDO or not.  EVDO parts report both 1x and EVDO roaming status
      * while of course 1x parts only report 1x status.  Some modems also do not
      * report the Roaming information (MP 555 GPS).
-     * 
+     *
      * AT!STATUS responses:
      *
      * Unregistered MC5725:
@@ -182,7 +189,7 @@ status_done (MMAtSerialPort *port,
      * Temp: 33  State: 100  Sys Mode: NO SRV
      * Pilot NOT acquired
      * Modem has NOT registered
-     * 
+     *
      * Registered MC5725:
      * -----------------------
      * Current band: Cellular Sleep
@@ -340,10 +347,17 @@ pcstate_done (MMAtSerialPort *port,
               GError *error,
               gpointer user_data)
 {
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     /* Ignore errors for now; we're not sure if all Sierra CDMA devices support
      * at!pcstate.
      */
-    mm_callback_info_schedule ((MMCallbackInfo *) user_data);
+    mm_callback_info_schedule (info);
 }
 
 static void

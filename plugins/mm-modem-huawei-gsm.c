@@ -171,6 +171,11 @@ set_allowed_mode_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error)
         info->error = g_error_copy (error);
 
@@ -232,10 +237,17 @@ get_allowed_mode_done (MMAtSerialPort *port,
                        gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemHuaweiGsm *self = MM_MODEM_HUAWEI_GSM (info->modem);
+    MMModemHuaweiGsm *self;
     int mode_a, mode_b, u1, u2;
     guint32 band;
     MMModemGsmAllowedMode mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    self = MM_MODEM_HUAWEI_GSM (info->modem);
 
     if (error)
         info->error = g_error_copy (error);
@@ -271,8 +283,16 @@ set_band_done (MMAtSerialPort *port,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemHuaweiGsm *self = MM_MODEM_HUAWEI_GSM (info->modem);
-    MMModemHuaweiGsmPrivate *priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (self);
+    MMModemHuaweiGsm *self;
+    MMModemHuaweiGsmPrivate *priv;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    self = MM_MODEM_HUAWEI_GSM (info->modem);
+    priv = MM_MODEM_HUAWEI_GSM_GET_PRIVATE (self);
 
     if (error)
         info->error = g_error_copy (error);
@@ -321,9 +341,16 @@ get_band_done (MMAtSerialPort *port,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemHuaweiGsm *self = MM_MODEM_HUAWEI_GSM (info->modem);
+    MMModemHuaweiGsm *self;
     int mode_a, mode_b, u1, u2;
     guint32 band;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    self = MM_MODEM_HUAWEI_GSM (info->modem);
 
     if (error)
         info->error = g_error_copy (error);
@@ -409,6 +436,11 @@ get_act_request_done (MMAtSerialPort *port,
     GMatchInfo *match_info = NULL;
     char *str;
     int srv_stat = 0;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error) {
         info->error = g_error_copy (error);
@@ -503,6 +535,11 @@ send_huawei_cpin_done (MMAtSerialPort *port,
     guint32 attempts_left = 0;
     char *str = NULL;
     guint32 num = 0;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error) {
         info->error = g_error_copy (error);

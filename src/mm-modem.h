@@ -282,8 +282,6 @@ void mm_modem_set_state (MMModem *self,
                          MMModemState new_state,
                          MMModemStateReason reason);
 
-GError *mm_modem_check_removed (MMModem *self, const GError *error);
-
 /* Request authorization to perform an action.  Used by D-Bus method
  * handlers to ensure that the incoming request is authorized to perform
  * the action it's requesting.

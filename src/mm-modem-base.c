@@ -493,15 +493,17 @@ info_item_done (MMCallbackInfo *info,
     mm_callback_info_chain_complete_one (info);
 }
 
-#define GET_INFO_RESP_FN(func_name, tag, tag2, desc) \
-static void \
-func_name (MMAtSerialPort *port, \
-           GString *response, \
-           GError *error, \
-           gpointer user_data) \
-{ \
-    info_item_done ((MMCallbackInfo *) user_data, response, error, tag, tag2, desc ); \
-}
+#define GET_INFO_RESP_FN(func_name, tag, tag2, desc)                    \
+    static void                                                         \
+    func_name (MMAtSerialPort *port,                                    \
+               GString *response,                                       \
+               GError *error,                                           \
+               gpointer user_data)                                      \
+    {                                                                   \
+        if (mm_callback_info_check_modem_removed ((MMCallbackInfo *) user_data)) \
+            return;                                                     \
+        info_item_done ((MMCallbackInfo *) user_data, response, error, tag, tag2, desc ); \
+    }
 
 GET_INFO_RESP_FN(get_revision_done, "+GMR:", "AT+GMR", "card-info-revision")
 GET_INFO_RESP_FN(get_model_done, "+GMM:", "AT+GMM", "card-info-model")
