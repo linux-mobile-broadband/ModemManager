@@ -39,19 +39,26 @@ enum {
 
 enum {
     QCDM_CDMA_BAND_CLASS_UNKNOWN          = 0,
-    QCDM_CDMA_BAND_CLASS_0_CELLULAR_800   = 1,  /* US cellular 850MHz */
-    QCDM_CDMA_BAND_CLASS_1_PCS            = 2,  /* US PCS 1900MHz */
-    QCDM_CDMA_BAND_CLASS_2_TACS           = 3,
-    QCDM_CDMA_BAND_CLASS_3_JTACS          = 4,  /* Japanese TACS */
-    QCDM_CDMA_BAND_CLASS_4_KOREAN_PCS     = 5,
-    QCDM_CDMA_BAND_CLASS_5_NMT450         = 6,
-    QCDM_CDMA_BAND_CLASS_6_IMT2000        = 7,  /* 2100HMz */
-    QCDM_CDMA_BAND_CLASS_7_CELLULAR_700   = 8,
-    QCDM_CDMA_BAND_CLASS_8_1800           = 9,
-    QCDM_CDMA_BAND_CLASS_9_900            = 10,
-    QCDM_CDMA_BAND_CLASS_10_SECONDARY_800 = 11,
-    QCDM_CDMA_BAND_CLASS_11_PAMR_400      = 12,
-    QCDM_CDMA_BAND_CLASS_12_PAMR_800      = 13
+    QCDM_CDMA_BAND_CLASS_0_CELLULAR_800   = 1,  /* 800 MHz cellular band */
+    QCDM_CDMA_BAND_CLASS_1_PCS            = 2,  /* 1800 to 2000 MHz PCS band */
+    QCDM_CDMA_BAND_CLASS_2_TACS           = 3,  /* 872 to 960 MHz TACS band */
+    QCDM_CDMA_BAND_CLASS_3_JTACS          = 4,  /* 832 to 925 MHz JTACS band */
+    QCDM_CDMA_BAND_CLASS_4_KOREAN_PCS     = 5,  /* 1750 to 1870 MHz Korean PCS band */
+    QCDM_CDMA_BAND_CLASS_5_NMT450         = 6,  /* 450 MHz NMT band */
+    QCDM_CDMA_BAND_CLASS_6_IMT2000        = 7,  /* 2100 MHz IMT-2000 band */
+    QCDM_CDMA_BAND_CLASS_7_CELLULAR_700   = 8,  /* Upper 700 MHz band */
+    QCDM_CDMA_BAND_CLASS_8_1800           = 9,  /* 1800 MHz band */
+    QCDM_CDMA_BAND_CLASS_9_900            = 10, /* 900 MHz band */
+    QCDM_CDMA_BAND_CLASS_10_SECONDARY_800 = 11, /* Secondary 800 MHz band */
+    QCDM_CDMA_BAND_CLASS_11_PAMR_400      = 12, /* 400 MHz European PAMR band */
+    QCDM_CDMA_BAND_CLASS_12_PAMR_800      = 13, /* 800 MHz PAMR band */
+    QCDM_CDMA_BAND_CLASS_13_IMT2000_2500  = 14, /* 2500 MHz IMT-2000 Extension Band */
+    QCDM_CDMA_BAND_CLASS_14_US_PCS_1900   = 15, /* US PCS 1900 MHz Band */
+    QCDM_CDMA_BAND_CLASS_15_AWS           = 16, /* AWS 1700 MHz band */
+    QCDM_CDMA_BAND_CLASS_16_US_2500       = 17, /* US 2500 MHz Band */
+    QCDM_CDMA_BAND_CLASS_17_US_FLO_2500   = 18, /* US 2500 MHz Forward Link Only Band */
+    QCDM_CDMA_BAND_CLASS_18_US_PS_700     = 19, /* 700 MHz Public Safety Band */
+    QCDM_CDMA_BAND_CLASS_19_US_LOWER_700  = 20  /* Lower 700 MHz Band */
 };
 
 enum {

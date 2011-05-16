@@ -81,6 +81,20 @@ cdma_band_class_to_qcdm (guint8 cdma)
         return QCDM_CDMA_BAND_CLASS_11_PAMR_400;
     case CDMA_BAND_CLASS_12_PAMR_800:
         return QCDM_CDMA_BAND_CLASS_12_PAMR_800;
+    case CDMA_BAND_CLASS_13_IMT2000_2500:
+        return QCDM_CDMA_BAND_CLASS_13_IMT2000_2500;
+    case CDMA_BAND_CLASS_14_US_PCS_1900:
+        return QCDM_CDMA_BAND_CLASS_14_US_PCS_1900;
+    case CDMA_BAND_CLASS_15_AWS:
+        return QCDM_CDMA_BAND_CLASS_15_AWS;
+    case CDMA_BAND_CLASS_16_US_2500:
+        return QCDM_CDMA_BAND_CLASS_16_US_2500;
+    case CDMA_BAND_CLASS_17_US_FLO_2500:
+        return QCDM_CDMA_BAND_CLASS_17_US_FLO_2500;
+    case CDMA_BAND_CLASS_18_US_PS_700:
+        return QCDM_CDMA_BAND_CLASS_18_US_PS_700;
+    case CDMA_BAND_CLASS_19_US_LOWER_700:
+        return QCDM_CDMA_BAND_CLASS_19_US_LOWER_700;
     default:
         break;
     }
