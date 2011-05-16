@@ -33,11 +33,13 @@
 #define MM_IS_GENERIC_GSM_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_GENERIC_GSM))
 #define MM_GENERIC_GSM_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_GENERIC_GSM, MMGenericGsmClass))
 
-#define MM_GENERIC_GSM_POWER_UP_CMD       "power-up-cmd"
-#define MM_GENERIC_GSM_POWER_DOWN_CMD     "power-down-cmd"
-#define MM_GENERIC_GSM_INIT_CMD           "init-cmd"
-#define MM_GENERIC_GSM_INIT_CMD_OPTIONAL  "init-cmd-optional"
-#define MM_GENERIC_GSM_FLOW_CONTROL_CMD   "flow-control-cmd"
+#define MM_GENERIC_GSM_POWER_UP_CMD              "power-up-cmd"
+#define MM_GENERIC_GSM_POWER_DOWN_CMD            "power-down-cmd"
+#define MM_GENERIC_GSM_INIT_CMD                  "init-cmd"
+#define MM_GENERIC_GSM_INIT_CMD_OPTIONAL         "init-cmd-optional"
+#define MM_GENERIC_GSM_FLOW_CONTROL_CMD          "flow-control-cmd"
+#define MM_GENERIC_GSM_SMS_INDICATION_ENABLE_CMD "sms-enable-cmd"
+#define MM_GENERIC_GSM_SMS_STORAGE_LOCATION_CMD  "sms-storage-cmd"
 
 typedef enum {
     MM_GENERIC_GSM_PROP_FIRST = 0x2000,
@@ -58,7 +60,9 @@ typedef enum {
     MM_GENERIC_GSM_PROP_USSD_STATE,
     MM_GENERIC_GSM_PROP_USSD_NETWORK_REQUEST,
     MM_GENERIC_GSM_PROP_USSD_NETWORK_NOTIFICATION,
-    MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD
+    MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD,
+    MM_GENERIC_GSM_PROP_SMS_INDICATION_ENABLE_CMD,
+    MM_GENERIC_GSM_PROP_SMS_STORAGE_LOCATION_CMD,
 } MMGenericGsmProp;
 
 typedef enum {
@@ -163,7 +167,7 @@ MMModemCharset mm_generic_gsm_get_charset (MMGenericGsm *modem);
 
 /* Called to asynchronously update the current allowed operating mode that the
  * device is allowed to use when connecting to a network.  This isn't the
- * specific access technology the device is currently using (see 
+ * specific access technology the device is currently using (see
  * mm_generic_gsm_set_access_technology() for that) but the mode the device is
  * allowed to choose from when connecting.
  */

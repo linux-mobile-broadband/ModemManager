@@ -1439,9 +1439,16 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
     g_free (cmd);
 
     /* Enable SMS notifications */
-    mm_at_serial_port_queue_command (priv->primary, "+CNMI=2,1,2,1,0", 3, NULL, NULL);
-    /* Set SMS storage location to ME */
-    mm_at_serial_port_queue_command (priv->primary, "+CPMS=\"ME\",\"ME\",\"ME\"", 3, NULL, NULL);
+    g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_SMS_INDICATION_ENABLE_CMD, &cmd, NULL);
+    if (cmd && strlen (cmd))
+        mm_at_serial_port_queue_command (priv->primary, cmd, 3, NULL, NULL);
+    g_free (cmd);
+
+    /* Set SMS storage locations */
+    g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_SMS_STORAGE_LOCATION_CMD, &cmd, NULL);
+    if (cmd && strlen (cmd))
+        mm_at_serial_port_queue_command (priv->primary, cmd, 3, NULL, NULL);
+    g_free (cmd);
 
     mm_at_serial_port_queue_command (priv->primary, "+CIND=?", 3, cind_cb, self);
 
@@ -5615,6 +5622,8 @@ set_property (GObject *object, guint prop_id,
     case MM_GENERIC_GSM_PROP_USSD_NETWORK_REQUEST:
     case MM_GENERIC_GSM_PROP_USSD_NETWORK_NOTIFICATION:
     case MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD:
+    case MM_GENERIC_GSM_PROP_SMS_INDICATION_ENABLE_CMD:
+    case MM_GENERIC_GSM_PROP_SMS_STORAGE_LOCATION_CMD:
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -5725,6 +5734,14 @@ get_property (GObject *object, guint prop_id,
     case MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD:
         /* By default, try to set XOFF/XON flow control */
         g_value_set_string (value, "+IFC=1,1");
+        break;
+    case MM_GENERIC_GSM_PROP_SMS_INDICATION_ENABLE_CMD:
+        /* Enable SMS notifications */
+        g_value_set_string (value, "+CNMI=2,1,2,1,0");
+        break;
+    case MM_GENERIC_GSM_PROP_SMS_STORAGE_LOCATION_CMD:
+        /* Use always ME to store SMS */
+        g_value_set_string (value, "+CPMS=\"ME\",\"ME\",\"ME\"");
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -5877,6 +5894,22 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
                               "FlowControlCommand",
                               "Flow control configuration command (errors ignored)",
                               "+IFC=1,1",
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, MM_GENERIC_GSM_PROP_SMS_INDICATION_ENABLE_CMD,
+         g_param_spec_string (MM_GENERIC_GSM_SMS_INDICATION_ENABLE_CMD,
+                              "SmsIndicationEnableCommand",
+                              "SMS indication enable command (errors ignored)",
+                              "+CNMI=2,1,2,1,0",
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, MM_GENERIC_GSM_PROP_SMS_STORAGE_LOCATION_CMD,
+         g_param_spec_string (MM_GENERIC_GSM_SMS_STORAGE_LOCATION_CMD,
+                              "SmsStorageLocationCommand",
+                              "SMS storage location command (errors ignored)",
+                              "+CPMS=\"ME\",\"ME\",\"ME\"",
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
 
