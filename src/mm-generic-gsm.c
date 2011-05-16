@@ -1358,8 +1358,14 @@ cmer_cb (MMAtSerialPort *port,
         priv->cmer_enabled = TRUE;
 
         /* Enable CMER on the secondary port if we can too */
-        if (priv->secondary && mm_serial_port_is_open (MM_SERIAL_PORT (priv->secondary)))
-            mm_at_serial_port_queue_command (priv->secondary, "+CMER=3,0,0,1", 3, NULL, NULL);
+        if (priv->secondary && mm_serial_port_is_open (MM_SERIAL_PORT (priv->secondary))) {
+            gchar *cmd = NULL;
+
+            g_object_get (G_OBJECT (user_data), MM_GENERIC_GSM_CMER_ENABLE_CMD, &cmd, NULL);
+            if (cmd && strlen (cmd))
+                mm_at_serial_port_queue_command (priv->secondary, cmd, 3, NULL, NULL);
+            g_free (cmd);
+        }
     }
 }
 
@@ -1382,6 +1388,7 @@ cind_cb (MMAtSerialPort *port,
     indicators = mm_parse_cind_test_response (response->str, NULL);
     if (indicators) {
         CindResponse *r;
+        gchar *cmd = NULL;
 
         r = g_hash_table_lookup (indicators, "signal");
         if (r)
@@ -1395,7 +1402,11 @@ cind_cb (MMAtSerialPort *port,
         if (r)
             priv->service_ind = cind_response_get_index (r);
 
-        mm_at_serial_port_queue_command (port, "+CMER=3,0,0,1", 3, cmer_cb, self);
+        /* Enable CMER in the primary port */
+        g_object_get (G_OBJECT (user_data), MM_GENERIC_GSM_CMER_ENABLE_CMD, &cmd, NULL);
+        if (cmd && strlen (cmd))
+            mm_at_serial_port_queue_command (port, cmd, 3, cmer_cb, self);
+        g_free (cmd);
         g_hash_table_destroy (indicators);
     }
 }
@@ -5624,6 +5635,7 @@ set_property (GObject *object, guint prop_id,
     case MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD:
     case MM_GENERIC_GSM_PROP_SMS_INDICATION_ENABLE_CMD:
     case MM_GENERIC_GSM_PROP_SMS_STORAGE_LOCATION_CMD:
+    case MM_GENERIC_GSM_PROP_CMER_ENABLE_CMD:
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -5742,6 +5754,9 @@ get_property (GObject *object, guint prop_id,
     case MM_GENERIC_GSM_PROP_SMS_STORAGE_LOCATION_CMD:
         /* Use always ME to store SMS */
         g_value_set_string (value, "+CPMS=\"ME\",\"ME\",\"ME\"");
+        break;
+    case MM_GENERIC_GSM_PROP_CMER_ENABLE_CMD:
+        g_value_set_string (value, "+CMER=3,0,0,1");
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -5910,6 +5925,14 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
                               "SmsStorageLocationCommand",
                               "SMS storage location command (errors ignored)",
                               "+CPMS=\"ME\",\"ME\",\"ME\"",
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, MM_GENERIC_GSM_PROP_CMER_ENABLE_CMD,
+         g_param_spec_string (MM_GENERIC_GSM_CMER_ENABLE_CMD,
+                              "CmerEnableCommand",
+                              "CMER enable command",
+                              "+CMER=3,0,0,1",
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
 

@@ -40,6 +40,7 @@
 #define MM_GENERIC_GSM_FLOW_CONTROL_CMD          "flow-control-cmd"
 #define MM_GENERIC_GSM_SMS_INDICATION_ENABLE_CMD "sms-enable-cmd"
 #define MM_GENERIC_GSM_SMS_STORAGE_LOCATION_CMD  "sms-storage-cmd"
+#define MM_GENERIC_GSM_CMER_ENABLE_CMD           "cmer-enable-cmd"
 
 typedef enum {
     MM_GENERIC_GSM_PROP_FIRST = 0x2000,
@@ -63,6 +64,7 @@ typedef enum {
     MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD,
     MM_GENERIC_GSM_PROP_SMS_INDICATION_ENABLE_CMD,
     MM_GENERIC_GSM_PROP_SMS_STORAGE_LOCATION_CMD,
+    MM_GENERIC_GSM_PROP_CMER_ENABLE_CMD
 } MMGenericGsmProp;
 
 typedef enum {
