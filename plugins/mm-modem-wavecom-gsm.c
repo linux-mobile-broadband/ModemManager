@@ -239,12 +239,19 @@ set_band_done (MMAtSerialPort *port,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error)
         info->error = g_error_copy (error);
-    else
+    else {
+        MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
+
         priv->current_bands = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "new-band"));
+    }
 
     mm_callback_info_schedule (info);
 }
@@ -389,11 +396,16 @@ get_2g_band_done (MMAtSerialPort *port,
                   gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error)
         info->error = g_error_copy (error);
     else {
+        MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
         const gchar *p;
         guint32 mm_band = MM_MODEM_GSM_BAND_UNKNOWN;
 
@@ -430,11 +442,16 @@ get_3g_band_done (MMAtSerialPort *port,
                   gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error)
         info->error = g_error_copy (error);
     else {
+        MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
         const gchar *p;
         guint mm_band = MM_MODEM_GSM_BAND_UNKNOWN;
         guint32 wavecom_band;
@@ -516,6 +533,11 @@ get_access_technology_cb (MMAtSerialPort *port,
     MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     const gchar *p;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error)
         info->error = g_error_copy (error);
     else {
@@ -583,18 +605,25 @@ get_allowed_mode_cb (MMAtSerialPort *port,
                      gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
-    MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
+    MMModemWavecomGsmPrivate *priv;
     gint read_mode = -1;
     gchar *mode_str = NULL;
     gchar *prefer_str = NULL;
     GRegex *r = NULL;
     GMatchInfo *match_info = NULL;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error) {
         info->error = g_error_copy (error);
         mm_callback_info_schedule (info);
         return;
     }
+
+    priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
 
     /* Possible responses:
      *   +WWSM: 0    (2G only)
@@ -706,12 +735,19 @@ set_allowed_mode_cb (MMAtSerialPort *port,
                      gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error)
         info->error = g_error_copy (error);
-    else
+    else {
+        MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
+
         priv->allowed_mode = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "new-mode"));
+    }
 
     mm_callback_info_schedule (info);
 }
@@ -813,8 +849,12 @@ set_highest_ms_class_cb (MMAtSerialPort *port,
                          gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
     guint new_class;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error) {
         enable_complete (MM_GENERIC_GSM (info->modem), error, info);
@@ -822,8 +862,11 @@ set_highest_ms_class_cb (MMAtSerialPort *port,
     }
 
     new_class = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "new-class"));
-    if (new_class)
+    if (new_class) {
+        MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
+
         priv->current_ms_class = new_class;
+    }
 
     /* All done without errors! */
     mm_dbg ("[5/5] All done");
@@ -882,13 +925,20 @@ get_current_ms_class_cb (MMAtSerialPort *port,
                          gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
-    MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
+    MMModemWavecomGsmPrivate *priv;
     const gchar *p;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error) {
         enable_complete (MM_GENERIC_GSM (info->modem), error, info);
         return;
     }
+
+    priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
 
     p = mm_strip_tag (response->str, "+CGCLASS:");
 
@@ -936,13 +986,20 @@ get_supported_ms_classes_cb (MMAtSerialPort *port,
                              gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
-    MMModemWavecomGsmPrivate *priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
+    MMModemWavecomGsmPrivate *priv;
     const gchar *p;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error) {
         enable_complete (MM_GENERIC_GSM (info->modem), error, info);
         return;
     }
+
+    priv = MM_MODEM_WAVECOM_GSM_GET_PRIVATE (info->modem);
 
     /* Reset currently supported MS classes */
     priv->supported_ms_classes = 0;
@@ -996,6 +1053,11 @@ get_current_functionality_status_cb (MMAtSerialPort *port,
     const gchar *p;
     GError *inner_error;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error) {
         enable_complete (MM_GENERIC_GSM (info->modem), error, info);
         return;
@@ -1026,6 +1088,11 @@ do_enable_power_up_done (MMGenericGsm *gsm,
 {
     MMAtSerialPort *port;
     GError *inner_error = NULL;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error) {
         enable_complete (gsm, error, info);

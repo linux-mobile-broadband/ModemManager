@@ -33,25 +33,6 @@ static void impl_modem_factory_reset (MMModem *modem, const char *code, DBusGMet
 
 #include "mm-modem-glue.h"
 
-/* Should be used from callbacks to check whether the modem was removed after
- * the callback's operation was started, but before the callback itself was
- * called, in which case the MMModem passed to the callback is NULL.
- */
-GError *
-mm_modem_check_removed (MMModem *self, const GError *error)
-{
-    if (!self) {
-        /* If the modem was NULL, the error *should* have been
-         * MM_MODEM_ERROR_REMOVED.  If it wasn't, make it that.
-         */
-        return g_error_new_literal (MM_MODEM_ERROR,
-                                    MM_MODEM_ERROR_REMOVED,
-                                    "The modem was removed.");
-    }
-
-    return error ? g_error_copy (error) : NULL;
-}
-
 static void
 async_op_not_supported (MMModem *self,
                         MMModemFn callback,

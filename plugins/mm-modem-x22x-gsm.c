@@ -115,8 +115,14 @@ get_allowed_mode_done (MMAtSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMModemGsmAllowedMode mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
 
-    info->error = mm_modem_check_removed (info->modem, error);
-    if (!info->error) {
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else {
         parse_syssel_response (response, &mode, &info->error);
         mm_callback_info_set_result (info, GUINT_TO_POINTER (mode), NULL);
     }
@@ -151,7 +157,14 @@ set_allowed_mode_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    info->error = mm_modem_check_removed (info->modem, error);
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error)
+        info->error = g_error_copy (error);
+
     mm_callback_info_schedule (info);
 }
 
@@ -199,9 +212,14 @@ get_act_request_done (MMAtSerialPort *port,
     MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
     const char *p;
 
-    info->error = mm_modem_check_removed (info->modem, error);
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
-    if (info->error == NULL) {
+    if (error)
+        info->error = g_error_copy (error);
+    else {
         p = mm_strip_tag (response->str, "+SSND:");
         act = mm_gsm_string_to_access_tech (p);
     }

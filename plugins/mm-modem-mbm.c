@@ -177,6 +177,11 @@ mbm_set_allowed_mode_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error)
         info->error = g_error_copy (error);
 
@@ -256,6 +261,11 @@ get_allowed_mode_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     gboolean parsed = FALSE;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error)
         info->error = g_error_copy (error);
@@ -351,6 +361,11 @@ mbm_enable_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     /* Start unsolicited signal strength and access technology responses */
     mm_at_serial_port_queue_command (port, "*ERINFO=1", 3, NULL, NULL);
 
@@ -359,13 +374,20 @@ mbm_enable_done (MMAtSerialPort *port,
 
 static void
 mbm_enap0_done (MMAtSerialPort *port,
-               GString *response,
-               GError *error,
-               gpointer user_data)
+                GString *response,
+                GError *error,
+                gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
-    MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (info->modem);
+    MMModemMbmPrivate *priv;
     char *command;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    priv = MM_MODEM_MBM_GET_PRIVATE (info->modem);
 
     if (!priv->network_mode)
         priv->network_mode = MBM_NETWORK_MODE_ANY;
@@ -382,7 +404,14 @@ mbm_init_done (MMAtSerialPort *port,
                gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
-    MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (info->modem);
+    MMModemMbmPrivate *priv;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    priv = MM_MODEM_MBM_GET_PRIVATE (info->modem);
 
     if (error) {
         mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
@@ -408,12 +437,19 @@ mbm_emrdy_done (MMAtSerialPort *port,
                 gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
-    MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (info->modem);
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT))
         mm_warn ("timed out waiting for EMRDY response.");
-    else
+    else {
+        MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (info->modem);
+
         priv->have_emrdy = TRUE;
+    }
 
     do_init (port, info);
 }
@@ -535,6 +571,11 @@ factory_reset_done (MMAtSerialPort *port,
                     gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     mm_serial_port_close (MM_SERIAL_PORT (port));
     mm_callback_info_schedule (info);
@@ -659,6 +700,11 @@ enap_poll_response (MMAtSerialPort *port,
 
     g_assert (info);
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     count = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "mbm-enap-poll-count"));
 
     if (sscanf (response->str, "*ENAP: %d", &state) == 1 && state == 1) {
@@ -701,6 +747,11 @@ enap_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     guint tid;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error) {
         mm_generic_gsm_connect_complete (MM_GENERIC_GSM (info->modem), error, info);
@@ -795,6 +846,11 @@ send_epin_done (MMAtSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     const char *pin_type;
     int attempts_left = 0;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error) {
         info->error = g_error_copy (error);

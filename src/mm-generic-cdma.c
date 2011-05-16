@@ -619,6 +619,11 @@ init_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error) {
         mm_modem_set_state (MM_MODEM (info->modem),
                             MM_MODEM_STATE_DISABLED,
@@ -699,10 +704,14 @@ disable_all_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
 
-    info->error = mm_modem_check_removed (modem, error);
-    if (info->error) {
-        if (modem)
-            disable_set_previous_state (modem, info);
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (!modem || mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        disable_set_previous_state (modem, info);
     } else {
         MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
         MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
@@ -725,10 +734,15 @@ disable_flash_done (MMSerialPort *port,
     MMCallbackInfo *info = user_data;
     MMGenericCdma *self;
 
-    info->error = mm_modem_check_removed (info->modem, error);
-    if (info->error) {
-        if (info->modem)
-            disable_set_previous_state (info->modem, info);
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error) {
+        info->error = g_error_copy (error);
+
+        disable_set_previous_state (info->modem, info);
         mm_callback_info_schedule (info);
         return;
     }
@@ -787,10 +801,14 @@ dial_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    info->error = mm_modem_check_removed (info->modem, error);
-    if (info->error) {
-        if (info->modem)
-            update_enabled_state (MM_GENERIC_CDMA (info->modem), FALSE, MM_MODEM_STATE_REASON_NONE);
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        update_enabled_state (MM_GENERIC_CDMA (info->modem), FALSE, MM_MODEM_STATE_REASON_NONE);
     } else {
         MMGenericCdma *self = MM_GENERIC_CDMA (info->modem);
         MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
@@ -831,15 +849,19 @@ disconnect_flash_done (MMSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMModemState prev_state;
 
-    info->error = mm_modem_check_removed (info->modem, error);
-    if (info->error) {
-        if (info->modem) {
-            /* Reset old state since the operation failed */
-            prev_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, MM_GENERIC_CDMA_PREV_STATE_TAG));
-            mm_modem_set_state (MM_MODEM (info->modem),
-                                prev_state,
-                                MM_MODEM_STATE_REASON_NONE);
-        }
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error) {
+        info->error = g_error_copy (error);
+
+        /* Reset old state since the operation failed */
+        prev_state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, MM_GENERIC_CDMA_PREV_STATE_TAG));
+        mm_modem_set_state (MM_MODEM (info->modem),
+                            prev_state,
+                            MM_MODEM_STATE_REASON_NONE);
     } else {
         mm_port_set_connected (MM_GENERIC_CDMA_GET_PRIVATE (info->modem)->data, FALSE);
         update_enabled_state (MM_GENERIC_CDMA (info->modem), FALSE, MM_MODEM_STATE_REASON_NONE);
@@ -928,6 +950,11 @@ get_signal_quality_done (MMAtSerialPort *port,
     MMGenericCdmaPrivate *priv;
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     char *reply = response->str;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error) {
         if (mm_callback_info_get_data (info, CSQ2_TRIED))
@@ -1077,6 +1104,11 @@ get_string_done (MMAtSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     const char *p;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error)
         info->error = g_error_copy (error);
     else {
@@ -1206,6 +1238,11 @@ serving_system_done (MMAtSerialPort *port,
     int class = 0, sid = 99999, num;
     unsigned char band = 'Z';
     gboolean success = FALSE;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error) {
         info->error = g_error_copy (error);
@@ -1500,8 +1537,14 @@ subclass_reg_query_done (MMModemCdma *cdma,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
-    info->error = mm_modem_check_removed (info->modem, error);
-    if (!info->error) {
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else {
         /* Set final registration state */
         set_callback_1x_state_helper (info, cdma_reg_state);
         set_callback_evdo_state_helper (info, evdo_reg_state);
@@ -1519,6 +1562,11 @@ reg_query_speri_done (MMAtSerialPort *port,
     MMCallbackInfo *info = user_data;
     gboolean roam = FALSE;
     const char *p;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error)
         goto done;
@@ -1558,6 +1606,11 @@ reg_query_spservice_done (MMAtSerialPort *port,
     MMCallbackInfo *info = user_data;
     MMModemCdmaRegistrationState cdma_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     MMModemCdmaRegistrationState evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error)
         info->error = g_error_copy (error);
@@ -1660,6 +1713,11 @@ get_analog_digital_done (MMAtSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     const char *reply;
     long int int_cad;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error) {
         info->error = g_error_copy (error);
@@ -1994,7 +2052,7 @@ reg_state_changed (MMModemCdma *self,
                    MMModemCdmaRegistrationState evdo_new_state,
                    gpointer user_data)
 {
-/* Disabled for now...  changing the registration state from the 
+/* Disabled for now...  changing the registration state from the
  * subclass' query_registration_state handler also emits the registration
  * state changed signal, which will call this function, and execute
  * simple_state_machine() to advance to the next state.  Then however
@@ -2030,9 +2088,14 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
     const char *str;
     guint id;
 
-    info->error = mm_modem_check_removed (modem, error);
-    if (info->error)
+    /* Do nothing if modem removed */
+    if (!modem || mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error) {
+        info->error = g_error_copy (error);
         goto out;
+    }
 
     switch (state) {
     case SIMPLE_STATE_BEGIN:
@@ -2095,7 +2158,7 @@ simple_connect (MMModemSimple *simple,
 
     info = mm_callback_info_new (MM_MODEM (simple), callback, user_data);
     priv->simple_connect_info = info;
-    mm_callback_info_set_data (info, "simple-connect-properties", 
+    mm_callback_info_set_data (info, "simple-connect-properties",
                                g_hash_table_ref (properties),
                                (GDestroyNotify) g_hash_table_unref);
 

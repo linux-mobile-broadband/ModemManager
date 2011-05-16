@@ -167,6 +167,11 @@ sysinfo_done (MMAtSerialPort *port,
     GMatchInfo *match_info;
     const char *reply;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error) {
         /* Leave superclass' reg state alone if AT^SYSINFO isn't supported */
         goto done;

@@ -63,6 +63,11 @@ get_string_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error && response && !strcmp (response->str, "ERROR")) {
         info->error = g_error_new_literal (MM_MOBILE_ERROR,
                                            MM_MOBILE_ERROR_SIM_NOT_INSERTED,

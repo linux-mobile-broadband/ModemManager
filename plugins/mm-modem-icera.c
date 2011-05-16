@@ -56,6 +56,11 @@ get_allowed_mode_done (MMAtSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     gboolean parsed = FALSE;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error)
         info->error = g_error_copy (error);
     else if (!g_str_has_prefix (response->str, "%IPSYS: ")) {
@@ -118,6 +123,11 @@ set_allowed_mode_done (MMAtSerialPort *port,
                        gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error)
         info->error = g_error_copy (error);
@@ -235,8 +245,14 @@ get_nwstate_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = user_data;
 
-    info->error = mm_modem_check_removed (info->modem, error);
-    if (!info->error) {
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else {
         MMModemIcera *self = MM_MODEM_ICERA (info->modem);
         MMModemIceraPrivate *priv = MM_MODEM_ICERA_GET_PRIVATE (self);
 
@@ -277,7 +293,14 @@ disconnect_ipdpact_done (MMAtSerialPort *port,
                          GError *error,
                          gpointer user_data)
 {
-    mm_callback_info_schedule ((MMCallbackInfo *) user_data);
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    mm_callback_info_schedule (info);
 }
 
 void
@@ -458,6 +481,11 @@ icera_connected (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     if (error) {
         mm_generic_gsm_connect_complete (MM_GENERIC_GSM (info->modem), error, info);
     } else {
@@ -481,6 +509,11 @@ old_context_clear_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
     /* Activate the PDP context and start the data session */
     icera_call_control (MM_MODEM_ICERA (info->modem), TRUE, icera_connected, info);
 }
@@ -492,6 +525,11 @@ auth_done (MMAtSerialPort *port,
            gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error)
         mm_generic_gsm_connect_complete (MM_GENERIC_GSM (info->modem), error, info);
@@ -573,6 +611,11 @@ get_ip4_config_done (MMAtSerialPort *port,
     int i;
     guint32 tmp;
     gint cid;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
 
     if (error) {
         info->error = g_error_copy (error);
@@ -710,8 +753,14 @@ is_icera_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = user_data;
 
-    info->error = mm_modem_check_removed (info->modem, error);
-    if (!info->error)
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else
         mm_callback_info_set_result (info, GUINT_TO_POINTER (TRUE), NULL);
     mm_callback_info_schedule (info);
 }
