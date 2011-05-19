@@ -1601,14 +1601,12 @@ disable_done (MMAtSerialPort *port,
 
         /* Clear out circuit-switched registration info... */
         reg_info_updated (self,
-                          MM_GENERIC_GSM_REG_TYPE_CS,
-                          TRUE, MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN,
+                          TRUE, MM_GENERIC_GSM_REG_TYPE_CS, MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN,
                           TRUE, NULL,
                           TRUE, NULL);
         /* ...and packet-switched registration info */
         reg_info_updated (self,
-                          MM_GENERIC_GSM_REG_TYPE_PS,
-                          TRUE, MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN,
+                          TRUE, MM_GENERIC_GSM_REG_TYPE_PS, MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN,
                           TRUE, NULL,
                           TRUE, NULL);
     }
