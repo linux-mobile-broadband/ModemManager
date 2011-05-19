@@ -4483,6 +4483,7 @@ ussd_send (MMModemGsmUssd *modem,
     GByteArray *ussd_command = g_byte_array_new();
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMAtSerialPort *port;
+    gboolean success;
 
     info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
 
@@ -4493,7 +4494,9 @@ ussd_send (MMModemGsmUssd *modem,
     }
 
     /* encode to cur_charset */
-    g_warn_if_fail (mm_modem_charset_byte_array_append (ussd_command, command, FALSE, priv->cur_charset));
+    success = mm_modem_charset_byte_array_append (ussd_command, command, FALSE, priv->cur_charset);
+    g_warn_if_fail (success == TRUE);
+
     /* convert to hex representation */
     hex = utils_bin2hexstr (ussd_command->data, ussd_command->len);
     g_byte_array_free (ussd_command, TRUE);
@@ -4514,6 +4517,7 @@ ussd_initiate (MMModemGsmUssd *modem,
 {
     MMCallbackInfo *info;
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+
     info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
 
     if (priv->ussd_state != MM_MODEM_GSM_USSD_STATE_IDLE) {
@@ -4521,11 +4525,9 @@ ussd_initiate (MMModemGsmUssd *modem,
                                    MM_MODEM_ERROR_GENERAL,
                                    "USSD session already active.");
         mm_callback_info_schedule (info);
-        return;
+    } else {
+        ussd_send (modem, command, callback, user_data);
     }
-
-    ussd_send (modem, command, callback, user_data);
-    return;
 }
 
 static void
@@ -4536,6 +4538,7 @@ ussd_respond (MMModemGsmUssd *modem,
 {
     MMCallbackInfo *info;
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+
     info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
 
     if (priv->ussd_state != MM_MODEM_GSM_USSD_STATE_USER_RESPONSE) {
@@ -4543,11 +4546,9 @@ ussd_respond (MMModemGsmUssd *modem,
                                    MM_MODEM_ERROR_GENERAL,
                                    "No active USSD session, cannot respond.");
         mm_callback_info_schedule (info);
-        return;
+    } else {
+        ussd_send (modem, command, callback, user_data);
     }
-
-    ussd_send (modem, command, callback, user_data);
-    return;
 }
 
 static void
