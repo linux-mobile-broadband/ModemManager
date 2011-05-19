@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
+  <interface name="org.freedesktop.ModemManager1.Modem.Bearer">
+
+    <!-- METHODS -->
+
+    <method name="Connect">
+      <tp:docstring>
+	Requests activation of a packet data connection with the network using
+	this bearer's properties.  Upon successful activation, the modem can
+	send and receive packet data and, depending on the addressing
+	capability of the modem, a connection manager may need to start PPP,
+	perform DHCP, or assign the IP address returned by the modem to the
+	data interface.  Upon successful return, the Ip4Config and/or Ip6Config
+	properties become valid and may contain IP configuration information for
+	the data interface associated with this bearer.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_bearer_connect"/>
+      <arg name="number" type="s" direction="in">
+	<tp:docstring>
+	  The number to use for dialing.
+      </tp:docstring>
+      </arg>
+    </method>
+
+    <method name="Disconnect">
+      <tp:docstring>
+	Disconnect and deactivate this packet data connection.  Any ongoing data
+	session will be terminated and IP addresses become invalid when this
+	method is called.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_bearer_disconnect"/>
+    </method>
+
+    <!-- For 3GPP (GSM/UMTS/LTE) technologies, Bearer objects represent only
+         Primary PDP contexts; Secondary contexts are not exposed as a concept
+         because they share everything with their parent primary PDP context
+         except QoS and traffic flows.  Instead, methods for setting QoS and
+         Traffic Flow Templates (TFTs) should be provided here which could as a
+         result of being called create secondary PDP contexts with those QoS and
+         TFT parameters.
+         
+         FIXME: add methods to set QoS/TFT on the Bearer object, which should
+         create Secondary contexts if needed, and figure out some method of
+         disposing of those secondary contexts when no longer required.
+      -->
+
+    <!-- PROPERTIES -->
+
+    <property name="Interface" type="s" access="read">
+      <tp:docstring>
+        The operating system name for the network data interface that provides
+        packet data using this bearer.  Connection managers must configure this
+        interface depending on the IP "method" given by the "Ip4Config" or
+        "Ip6Config" properties set by bearer activation.  If STATIC or DHCP
+        methods are given, the interface will be an ethernet-style inteface
+        suitable for DHCP or setting static IP configuration on, while if the
+        PPP method is given, the interface will be a serial TTY which must then
+        have PPP run over it.
+      </tp:docstring>
+    </property>
+
+    <property name="Connected" type="b" access="read">
+      <tp:docstring>
+        Indicates whether or not the bearer is connected and thus whether
+        packet data communication using this bearer is possible.
+      </tp:docstring>
+    </property>
+
+    <property name="Suspended" type="b" access="read">
+      <tp:docstring>
+        In some devices, packet data service will be suspended while the device
+        is handling other communication, like a voice call.  If packet data
+        service is suspended (but not deactivated) this property will be TRUE.
+      </tp:docstring>
+    </property>
+
+    <property name="Ip4Config" type="a{sv}" access="read">
+      <tp:docstring>
+        If the bearer was configured for IPv4 addressing, upon activation this
+        property contains the addressing details for assignment to the data
+        interface.  If the bearer specifies configuration via PPP or DHCP,
+        only the 'method' item will be present.  Available items include:
+        
+          method:  (uint) One of MM_MODEM_BEARER_IP_METHOD
+          address: (string, STATIC method only) IP address
+          prefix:  (uint, STATIC method only) Numeric CIDR network prefix (ie, 24, 32, etc)
+          dns1:    (string, STATIC method only) First DNS server
+          dns2:    (string, STATIC method only) Second DNS server
+          dns3:    (string, STATIC method only) Third DNS server
+          gateway: (string, STATIC method only) First DNS server
+      </tp:docstring>
+    </property>
+
+    <property name="Ip6Config" type="a{sv}" access="read">
+      <tp:docstring>
+        If the bearer was configured for IPv6 addressing, upon activation this
+        property contains the addressing details for assignment to the data
+        interface.  If the bearer specifies configuration via PPP or DHCP,
+        only the 'method' item will be present.  Available items include:
+        
+          method:  (uint) One of MM_MODEM_BEARER_IP_METHOD
+          address: (string, STATIC method only) IP address
+          prefix:  (string, STATIC method only) Network prefix
+          dns1:    (string, STATIC method only) First DNS server
+          dns2:    (string, STATIC method only) Second DNS server
+          dns3:    (string, STATIC method only) Third DNS server
+          gateway: (string, STATIC method only) First DNS server
+      </tp:docstring>
+    </property>
+
+    <!-- ENUMS -->
+    <tp:enum name="MM_MODEM_BEARER_IP_METHOD" type="u">
+      <tp:enumvalue suffix="PPP" value="0">
+	<tp:docstring>
+	  Connection managers should use PPP to get the address.
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="STATIC" value="1">
+	<tp:docstring>
+	  Connection managers should use the provided static IP configuration
+	  given by the modem to configure the IP data interface.
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="DHCP" value="2">
+	<tp:docstring>
+	  Connection managers should begin DHCP on the data interface to obtain
+	  necessary IP configuration details.
+	</tp:docstring>
+      </tp:enumvalue>
+    </tp:enum>
+
+  </interface>
+</node>

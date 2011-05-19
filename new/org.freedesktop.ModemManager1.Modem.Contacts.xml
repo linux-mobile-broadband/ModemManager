@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
+  <interface name="org.freedesktop.ModemManager1.Modem.Contacts">
+
+    <method name="Add">
+      <tp:docstring>
+	Add a new contact.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_contacts_add"/>
+      <arg name="properties" type="a{sv}" direction="in">
+	<tp:docstring>
+	  Dictionary of properties describing the contact.  If any property
+	  exceeds the modem's size limit, that property will be truncated to fit.
+	  Known properties are:
+	  
+	    name    : (string) Full name of the contact
+	    number  : (string) Telephone number
+	    email   : (string) Email address
+	    group   : (string) Group this contact belongs to
+	    name2   : (string) Additional contact name
+	    number2 : (string) Additional contact telephone number
+	    hidden  : (bool)   Whether this entry is hidden or not
+	    storage : (uint)   Phonebook in which contact is stored, one of
+	                        MM_MODEM_CONTACTS_STORAGE
+	</tp:docstring>
+      </arg>
+      <arg name="index" type="u" direction="out">
+	<tp:docstring>
+	  The index number of the new contact; this number is an internal
+	  private number to ModemManager and does not correspond to the index
+	  of the contact in the modem or SIM itself.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <method name="Delete">
+      <tp:docstring>
+	Delete a contact.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_contacts_delete"/>
+      <arg name="index" type="u" direction="in">
+	<tp:docstring>
+	  The index of the contact to delete.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <method name="Get">
+      <tp:docstring>
+	Retrieve a contact from the SIM card.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_contacts_get"/>
+      <arg name="index" type="u" direction="in">
+	<tp:docstring>
+	  The index of the contact.
+	</tp:docstring>
+      </arg>
+      <arg name="properties" type="a{sv}" direction="out">
+	<tp:docstring>
+	  The properties of the contact including those properties defined by
+	  the Add method.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <method name="List">
+      <tp:docstring>
+	List all contacts.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_contacts_list"/>
+      <arg name="results" type="aa{sv}" direction="out">
+	<tp:docstring>
+	  An array of dictionaries, each dictionary representing a contact.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <method name="Find">
+      <tp:docstring>
+	Find a contact from the SIM card.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_contacts_find"/>
+      <arg name="pattern" type="s" direction="in">
+	<tp:docstring>
+	  The pattern to search for.
+	</tp:docstring>
+      </arg>
+      <arg name="results" type="aa{sv}" direction="out">
+	<tp:docstring>
+	  An array of dictionaries, each dictionary representing a contact which
+	  matches the query pattern.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <method name="GetCount">
+      <tp:docstring>
+	Get the number of contacts stored on the SIM card.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_contacts_count"/>
+      <arg name="count" type="u" direction="out">
+	<tp:docstring>
+	  The number of contacts.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <!-- ENUMS -->
+
+    <tp:enum name="MM_MODEM_CONTACTS_STORAGE" type="u">
+      <tp:docstring>
+        Specifies different storage locations for contact information.
+      </tp:docstring>
+      <tp:enumvalue suffix="ME" value="0">
+	<tp:docstring>
+	  Store information in device's local memory.
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="SM" value="1">
+	<tp:docstring>
+	  Store information in a card inserted in the device (like a SIM/RUIM).
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="MT" value="2">
+	<tp:docstring>
+	  Store information in the combined device/ME and SIM/SM phonebook.
+	</tp:docstring>
+      </tp:enumvalue>
+    </tp:enum>
+
+  </interface>
+</node>

@@ -1,0 +1,601 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
+  <interface name="org.freedesktop.ModemManager1.Modem">
+
+    <!-- METHODS -->
+
+    <method name="Enable">
+      <tp:docstring>
+	Enable or disables the modem.  When enabled, the modem's radio is powered
+	on and data sessions, voice calls, location services, and Short Message
+	Service may be available.  When disabled, the modem enters low-power
+	state and no network-related operations are available. 
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_enable"/>
+      <arg name="enable" type="b" direction="in">
+	<tp:docstring>
+	  Pass True to enable the modem, or False to disable it.
+	</tp:docstring>
+      </arg>
+    </method>
+
+    <method name="ListBearers">
+      <tp:docstring>
+	List configured packet data bearers (EPS Bearers, PDP Contexts, or
+	CDMA2000 Packet Data Sessions).
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_list_bearers"/>
+      <arg name="bearers" type="ao" direction="out">
+	<tp:docstring>
+	  The list of bearer object paths.
+        </tp:docstring>
+      </arg>
+    </method>
+
+    <method name="CreateBearer">
+      <tp:docstring>
+	Create a new packet data bearer using the given characteristics.  This
+	request may fail if the modem does not support additional bearers, if
+	too many bearers are already defined, or if properties are invalid.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_create_bearer"/>
+      <arg name="properties" type="a{sv}" direction="in">
+	<tp:docstring>
+	  List of properties to assign to the bearer after creating it.  Some
+	  properties are only applicable to a bearer of certain access
+	  technologies, for example the "apn" property is not applicable to
+	  CDMA2000 Packet Data Session bearers.  Allowed properties are:
+	  
+	     apn      : (3GPP, required) Access Point Name
+	     ip-type  : (3GPP and CMDA, optional) Addressing type, one of
+	                "IPV4", "IPV4V6", or "IPV6"
+	     user     : (3GPP, optional) user name (if any) required by the network
+	     password : (3GPP, optional) password (if any) required by the network
+	     number   : (POTS, required) telphone number to dial
+
+          ** FIXME: how about QoS?
+        </tp:docstring>
+      </arg>
+    </method>
+
+    <method name="DeleteBearer">
+      <tp:docstring>
+	Delete an existing packet data bearer.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_delete_bearer"/>
+      <arg name="bearer" type="o" direction="in">
+	<tp:docstring>
+	  Object path of the bearer to delete.  If the bearer is currently
+	  active and providing packet data server, it will be disconnected
+	  and that packet data service will terminate.
+        </tp:docstring>
+      </arg>
+    </method>
+
+    <method name="GetInfo">
+      <tp:docstring>
+        Retrieve modem information, like the manufacturer, hardware version,
+        firmware version, etc.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_get_info"/>
+      <arg name="info" type="a{sv}" direction="out">
+        <tp:docstring>
+          Dictionary containing various information about the modem, including
+          zero or more of the following items:
+          
+             manufacturer     : (string)
+             model            : (string)
+             version/revision : (string)
+        </tp:docstring>
+      </arg>
+    </method>
+
+    <method name="Reset">
+      <tp:docstring>
+        Clear non-persistent configuration and state, and return the device to
+        a newly-powered-on state.  This command may power-cycle the device.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_reset"/>
+    </method>
+
+    <method name="FactoryReset">
+      <tp:docstring>
+        Clear the modem's configuration (including persistent configuration and
+        state), and return the device to a factory-default state. This command
+        may or may not power-cycle the device.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_factory_reset"/>
+      <arg name="code" type="s" direction="in">
+        Carrier-supplied code required to reset the modem.  Ignored if not required.
+      </arg>
+    </method>
+
+    <!-- SIGNALS -->
+
+    <signal name="StateChanged">
+      <tp:docstring>
+        The modem's state (see the State property) changed.
+      </tp:docstring>
+      <arg name="old" type="u">
+        <tp:docstring>Old state</tp:docstring>
+      </arg>
+      <arg name="new" type="u">
+        <tp:docstring>New state</tp:docstring>
+      </arg>
+      <arg name="reason" type="u" tp:type="MM_MODEM_STATE_CHANGED_REASON">
+        <tp:docstring>Reason for this state change</tp:docstring>
+      </arg>
+    </signal>
+
+    <!-- PROPERTIES -->
+
+    <property name="ModemCapabilities" type="u" access="read" tp:type="MM_MODEM_CAPABILITIES">
+      <tp:docstring>
+        The generic family of access technologies the modem supports.  Not all
+        capabilities are available at the same time however; some modems require
+        a firmware reload or other reinitialization to switch between eg CDMA/EVDO
+        and GSM/UMTS.
+      </tp:docstring>
+    </property>
+
+    <property name="CurrentCapabilities" type="u" access="read" tp:type="MM_MODEM_CAPABILITIES">
+      <tp:docstring>
+        The generic family of access technologies the modem currently supports
+        without a firmware reload or reinitialization.
+      </tp:docstring>
+    </property>
+
+    <property name="MaxBearers" type="u" access="read">
+      <tp:docstring>
+        The maximum number of defined packet data bearers the modem supports.
+        This is not the number of active/connected bearers the modem supports,
+        but simply the number of bearers that may be defined at any given time.
+        For example, POTS and CDMA2000-only devices support only one bearer,
+        while GSM/UMTS devices typically support three or more, and any
+        LTE-capable device (whether LTE-only, GSM/UMTS-capable, and/or
+        CDMA2000-capable) also typically support three or more.
+      </tp:docstring>
+    </property>
+
+    <property name="MaxActiveBearers" type="u" access="read">
+      <tp:docstring>
+        The maximum number of active packet data bearers the modem supports.
+        POTS and CDMA2000-only devices support one active bearer, while 
+        GSM/UMTS and LTE-capable devices (including LTE/CDMA devices) typically
+        support at least two active bearers.
+      </tp:docstring>
+    </property>
+
+    <property name="DeviceIdentifier" type="s" access="read">
+      <tp:docstring>
+	A best-effort device identifier based on various device information like
+	model name, firmware revision, USB/PCI/PCMCIA IDs, and other properties.
+	This ID is not guaranteed to be unique and may be shared between
+	identical devices with the same firmware, but is intended to be
+	"unique enough" for use as a casual device identifier for various
+	user experience operations.  This is not the device's IMEI or ESN since
+	those may not be available before unlocking the device via a PIN.
+      </tp:docstring>
+    </property>
+
+    <property name="Device" type="s" access="read">
+      <tp:docstring>
+	The physical modem device reference (ie, USB, PCI, PCMCIA device), which
+	may be dependent upon the operating system.  In Linux for example, this
+	points to a sysfs path of the usb_device object.
+      </tp:docstring>
+    </property>
+
+    <property name="Driver" type="s" access="read">
+      <tp:docstring>
+        The Operating System device driver handling communication with the
+        modem hardware.
+      </tp:docstring>
+    </property>
+
+    <property name="EquipmentIdentifier" type="s" access="read">
+      <tp:docstring>
+        The identity of the device. This will be the IMEI number for
+        GSM devices and the hex-format ESN/MEID for CDMA devices.
+      </tp:docstring>
+    </property>
+
+    <property name="UnlockRequired" type="s" access="read">
+      <tp:docstring>
+        Empty if the device is usable without an unlock code or has already
+        been unlocked. If the device needs to be unlocked before becoming usable this
+        property contains the specific unlock code required.  Valid unlock code values
+        are "" (blank), "sim-pin", "sim-puk", "ph-sim-pin", "ph-fsim-pin",
+        "ph-fsim-puk", "sim-pin2", "sim-puk2", "ph-net-pin", "ph-net-puk",
+        "ph-netsub-pin", "ph-netsub-puk", "ph-sp-pin", "ph-sp-puk", "ph-corp-pin", and
+        "ph-corp-puk".
+      </tp:docstring>
+    </property>
+
+    <property name="UnlockRetries" type="u" access="read">
+      <tp:docstring>
+        The number of unlock retries remaining for the unlock code given by the property UnlockRequired, or 999 if
+        the device does not support reporting unlock retries.
+      </tp:docstring>
+    </property>
+
+    <property name="State" type="u" access="read" tp:type="MM_MODEM_STATE">
+      <tp:docstring>
+        Overall state of the modem.
+      </tp:docstring>
+    </property>
+
+    <property name="AccessTechnology" type="u" access="read" tp:type="MM_MODEM_ACCESS_TECH">
+      <tp:docstring>
+        The current network access technology used by the device to communicate
+        with the network.  (Note to plugin writers: if the device's access
+        technology cannot be determined, use UNKNOWN)
+      </tp:docstring>
+    </property>
+
+    <property name="SignalQuality" type="u" access="read">
+      <tp:docstring>
+        Signal quality in percent (0 - 100) of the dominant access technology
+        the device is using to communicate with the network.  Always 0 for POTS
+        devices.
+      </tp:docstring>
+    </property>
+
+    <property name="AllowedMode" type="u" access="readwrite" tp:type="MM_MODEM_ALLOWED_MODE">
+      <tp:docstring>
+        The allowed access technologies (eg 2G/3G/4G preference) the device is
+        allowed to use when connecting to a network.  For POTS devices, only
+        the "any" mode is supported.
+      </tp:docstring>
+    </property>
+
+    <property name="SupportedModes" type="u" access="read" tp:type="MM_MODEM_ALLOWED_MODE">
+      <tp:docstring>
+        Access technology selection modes supported by the device.
+      </tp:docstring>
+    </property>
+
+    <property name="AllowedBands" type="t" access="readwrite" tp:type="MM_MODEM_BAND">
+      <tp:docstring>
+        The allowed radio frequency and technology bands the device may use when
+        allowed to use when connecting to a network.  For POTS devices, only
+        the "any" mode is supported.
+      </tp:docstring>
+    </property>
+
+    <property name="SupportedBands" type="t" access="read" tp:type="MM_MODEM_BAND">
+      <tp:docstring>
+        Radio frequency and technology bands supported by the device.
+      </tp:docstring>
+    </property>
+
+    <!-- ENUMS -->
+
+    <tp:flags name="MM_MODEM_CAPABILITIES" value-prefix="MM_MODEM_CAPABILITY" type="u">
+      <tp:docstring>
+        Flags describing one or more of the general access technology families
+        that a modem supports.
+      </tp:docstring>
+      <tp:flag suffix="NONE" value="0x0">
+        <tp:docstring>Modem has no capabilties.</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="POTS" value="0x1">
+        <tp:docstring>
+          Modem supports the analog wired telephone network (ie 56k dialup) and
+          does not have wireless/cellular capabilities.
+        </tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CDMA_EVDO" value="0x2">
+        <tp:docstring>
+          Modem supports at least one of CDMA 1xRTT, EVDO revision 0, EVDO
+          revision A, or EVDO revision B.
+        </tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="GSM_UMTS" value="0x4">
+        <tp:docstring>
+          Modem supports at least one of GSM, GPRS, EDGE, UMTS, HSDPA, HSUPA, or
+          HSPA+ packet switched data capability.
+        </tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="LTE" value="0x8">
+        <tp:docstring>
+          Modem has at LTE data capability.
+        </tp:docstring>
+      </tp:flag>
+    </tp:flags>
+
+    <tp:enum name="MM_MODEM_STATE" type="u">
+      <tp:enumvalue suffix="UNKNOWN" value="0">
+        <tp:docstring>
+          State unknown or not reportable.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="DISABLED" value="10">
+        <tp:docstring>
+          The modem is not enabled and is powered down.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="DISABLING" value="20">
+        <tp:docstring>
+          The modem is current transitioning to the DISABLED state.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="ENABLING" value="30">
+        <tp:docstring>
+          The modem is currently transitioning to the ENABLED state.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="ENABLED" value="40">
+        <tp:docstring>
+          The modem is enabled and powered on but not registered with a network
+          provider and not available for data connections.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="SEARCHING" value="50">
+        <tp:docstring>
+          The modem is searching for a network provider to register with.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="REGISTERED" value="60">
+        <tp:docstring>
+          The modem is registered with a network provider, and data connections
+          and messaging may be available for use.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="DISCONNECTING" value="70">
+        <tp:docstring>
+          The modem is disconnecting and deactivating the last active packet
+          data bearer.  This state will not be entered if more than one packet
+          data bearer is active and one of the active bearers is deactivated.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="CONNECTING" value="80">
+        <tp:docstring>
+          The modem is activating and connecting the first packet data bearer.
+          Subsequent bearer activations when another bearer is already active
+          do not cause this state to be entered.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="CONNECTED" value="90">
+        <tp:docstring>
+          One or more packet data bearers is active and connected.
+        </tp:docstring>
+      </tp:enumvalue>
+    </tp:enum>
+
+    <tp:enum name="MM_MODEM_STATE_CHANGED_REASON" type="u">
+      <tp:enumvalue suffix="UNKNOWN" value="0">
+        <tp:docstring>
+          Reason unknown or not reportable.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="USER_REQUESTED" value="1">
+        <tp:docstring>
+          State change was requested by an interface user.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="SUSPEND" value="2">
+        <tp:docstring>
+          State change was caused by a system suspend.
+        </tp:docstring>
+      </tp:enumvalue>
+    </tp:enum>
+
+    <tp:enum name="MM_MODEM_ACCESS_TECH" type="u">
+      <tp:docstring>
+        Describes various access technologies that a device uses when registered
+        with or connected to a network.
+      </tp:docstring>
+      <tp:enumvalue suffix="UNKNOWN" value="0">
+	<tp:docstring>The access technology used is unknown</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="POTS" value="1">
+	<tp:docstring>Analog wireline telephone</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="GSM" value="2">
+	<tp:docstring>GSM</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="GSM_COMPACT" value="3">
+	<tp:docstring>Compact GSM</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="GPRS" value="4">
+	<tp:docstring>GPRS</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="EDGE" value="5">
+	<tp:docstring>EDGE (ETSI 27.007: "GSM w/EGPRS")</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="UMTS" value="6">
+	<tp:docstring>UMTS (ETSI 27.007: "UTRAN")</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="HSDPA" value="7">
+	<tp:docstring>HSDPA (ETSI 27.007: "UTRAN w/HSDPA")</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="HSUPA" value="8">
+	<tp:docstring>HSUPA (ETSI 27.007: "UTRAN w/HSUPA")</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="HSPA" value="9">
+	<tp:docstring>HSPA (ETSI 27.007: "UTRAN w/HSDPA and HSUPA")</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="HSPA_PLUS" value="10">
+	<tp:docstring>HSPA+ (ETSI 27.007: "UTRAN w/HSPA+")</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="1XRTT" value="11">
+	<tp:docstring>CDMA2000 1xRTT</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="EVDO0" value="12">
+	<tp:docstring>CDMA2000 EVDO revision 0</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="EVDOA" value="13">
+	<tp:docstring>CDMA2000 EVDO revision A</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="EVDOB" value="14">
+	<tp:docstring>CDMA2000 EVDO revision B</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="LTE" value="15">
+	<tp:docstring>LTE (ETSI 27.007: "E-UTRAN")</tp:docstring>
+      </tp:enumvalue>
+    </tp:enum>
+
+    <tp:enum name="MM_MODEM_ALLOWED_MODE" type="u">
+      <tp:docstring>
+        Describes the device's current access mode preference; ie the specific
+        technology preferences the device is allowed to use when connecting to
+        a network.  Also used as a bitfield to indicate which allowed modes
+        the modem supports when setting the mode preference.
+      </tp:docstring>
+      <tp:enumvalue suffix="ANY" value="0x0000">
+	<tp:docstring>
+	  Any mode can be used (only this value allowed for POTS modems)
+	</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="2G_PREFERRED" value="0x0001">
+	<tp:docstring>Prefer 2G (GPRS or EDGE)</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="3G_PREFERRED" value="0x0002">
+	<tp:docstring>Prefer 3G (UMTS or HSxPA)</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="4G_PREFERRED" value="0x0004">
+	<tp:docstring>Prefer 4G (LTE)</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="2G_ONLY" value="0x0100">
+	<tp:docstring>Use only 2G (GPRS or EDGE)</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="3G_ONLY" value="0x0200">
+	<tp:docstring>Use only 3G (UMTS or HSxPA)</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="4G_ONLY" value="0x0400">
+	<tp:docstring>Use only 4G (LTE)</tp:docstring>
+      </tp:enumvalue>
+      <!-- FIXME: what about 3G/4G only? or 2G/3G only?  Should this be a
+           bitfield?  If so, do we need to indicate what combinations the
+           modem supports?
+        -->
+    </tp:enum>
+
+    <tp:flags name="MM_MODEM_BAND" value-prefix="MM_MODEM_BAND" type="u">
+      <tp:docstring>
+        A 64-bit wide bitfield describing the specific radio bands supported by
+        the device and the radio bands the device is allowed to use when
+        connecting to a mobile network.
+      </tp:docstring>
+      <tp:flag suffix="UNKNOWN" value="0x0">
+        <tp:docstring>Unknown or invalid band</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="ANY" value="0x1">
+        <tp:docstring>For certain operations, allow the modem to select a band automatically.</tp:docstring>
+      </tp:flag>
+
+      <!-- GSM/UMTS/3GPP bands -->
+      <tp:flag suffix="EGSM" value="0x2">
+        <tp:docstring>GSM/GPRS/EDGE 900 MHz</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="DCS" value="0x4">
+        <tp:docstring>GSM/GPRS/EDGE 1800 MHz</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="PCS" value="0x8">
+        <tp:docstring>GSM/GPRS/EDGE 1900 MHz</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="G850" value="0x10">
+        <tp:docstring>GSM/GPRS/EDGE 850 MHz</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="U2100" value="0x20">
+        <tp:docstring>WCDMA 2100 MHz (Class I)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="U1800" value="0x40">
+        <tp:docstring>WCDMA 3GPP 1800 MHz (Class III)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="U17IV" value="0x80">
+        <tp:docstring>WCDMA 3GPP AWS 1700/2100 MHz (Class IV)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="U800" value="0x100">
+        <tp:docstring>WCDMA 3GPP UMTS 800 MHz (Class VI)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="U850" value="0x200">
+        <tp:docstring>WCDMA 3GPP UMTS 850 MHz (Class V)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="U900" value="0x400">
+        <tp:docstring>WCDMA 3GPP UMTS 900 MHz (Class VIII)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="U17IX" value="0x800">
+        <tp:docstring>WCDMA 3GPP UMTS 1700 MHz (Class IX)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="U1900" value="0x1000">
+        <tp:docstring>WCDMA 3GPP UMTS 1900 MHz (Class II)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="U2600" value="0x2000">
+        <tp:docstring>WCDMA 3GPP UMTS 2600 MHz (Class VII, internal)</tp:docstring>
+      </tp:flag>
+
+      <!-- CDMA Band Classes (see 3GPP2 C.S0057-C) -->
+      <tp:flag suffix="CDMA_BC0_CELLULAR_800" value="0x0000000100000000">
+        <tp:docstring>CDMA Band Class 0 (US Cellular 850MHz)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CDMA_BC1_PCS_1900" value="0x0000000200000000">
+        <tp:docstring>CDMA Band Class 1 (US PCS 1900MHz)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CDMA_BC2_TACS" value="0x0000000400000000">
+        <tp:docstring>CDMA Band Class 2 (UK TACS 900MHz)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CDMA_BC3_JTACS" value="0x0000000800000000">
+        <tp:docstring>CDMA Band Class 3 (Japanese TACS)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CDMA_BC4_KOREAN_PCS" value="0x0000001000000000">
+        <tp:docstring>CDMA Band Class 4 (Korean PCS)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CDMA_BC5_NMT450" value="0x0000002000000000">
+        <tp:docstring>CDMA Band Class 5 (NMT 450MHz)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CDMA_BC6_IMT2000" value="0x0000004000000000">
+        <tp:docstring>CDMA Band Class 6 (IMT2000 2100MHz)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CDMA_BC7_CELLULAR_700" value="0x0000008000000000">
+        <tp:docstring>CDMA Band Class 7 (Cellular 700MHz)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CDMA_BC8_1800" value="0x0000010000000000">
+        <tp:docstring>CDMA Band Class 8 (1800MHz)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CDMA_BC9_900" value="0x0000020000000000">
+        <tp:docstring>CDMA Band Class 9 (900MHz)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CDMA_BC10_SECONDARY_800" value="0x0000040000000000">
+        <tp:docstring>CDMA Band Class 10 (US Secondary 800)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CDMA_BC11_PAMR_400" value="0x0000080000000000">
+        <tp:docstring>CDMA Band Class 11 (European PAMR 400MHz)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CDMA_BC12_PAMR_800" value="0x0000100000000000">
+        <tp:docstring>CDMA Band Class 12 (PAMR 800MHz)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CDMA_BC13_IMT2000_2500" value="0x0000200000000000">
+        <tp:docstring>CDMA Band Class 13 (IMT2000 2500MHz Expansion)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CDMA_BC14_PCS2_1900" value="0x0000400000000000">
+        <tp:docstring>CDMA Band Class 14 (More US PCS 1900MHz)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CDMA_BC15_AWS" value="0x0000800000000000">
+        <tp:docstring>CDMA Band Class 15 (AWS 1700MHz)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CDMA_BC16_US_2500" value="0x0001000000000000">
+        <tp:docstring>CDMA Band Class 16 (US 2500MHz)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CDMA_BC17_US_FLO_2500" value="0x0002000000000000">
+        <tp:docstring>CDMA Band Class 17 (US 2500MHz Forward Link Only)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CDMA_BC18_US_PS_700" value="0x0004000000000000">
+        <tp:docstring>CDMA Band Class 18 (US 700MHz Public Safety)</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CDMA_BC19_US_LOWER_700" value="0x0008000000000000">
+        <tp:docstring>CDMA Band Class 19 (US Lower 700MHz)</tp:docstring>
+      </tp:flag>
+    </tp:flags>
+
+  </interface>
+</node>
