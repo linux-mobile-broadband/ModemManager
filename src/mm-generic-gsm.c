@@ -1803,6 +1803,7 @@ get_mnc_length_done (MMAtSerialPort *port,
                                        MM_MODEM_ERROR_GENERAL,
                                        "SIM returned malformed response '%s'",
                                        hex);
+            g_free (bin);
             goto done;
         }
 
@@ -1817,6 +1818,7 @@ get_mnc_length_done (MMAtSerialPort *port,
                                        "SIM returned invalid MNC length %d (should be either 2 or 3)",
                                        mnc_len);
         }
+        g_free (bin);
     } else {
         info->error = g_error_new (MM_MODEM_ERROR,
                                    MM_MODEM_ERROR_GENERAL,
