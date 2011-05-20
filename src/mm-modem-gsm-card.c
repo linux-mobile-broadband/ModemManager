@@ -31,6 +31,9 @@ static void impl_gsm_modem_get_imsi (MMModemGsmCard *modem,
 static void impl_gsm_modem_get_operator_id (MMModemGsmCard *modem,
                                             DBusGMethodInvocation *context);
 
+static void impl_gsm_modem_get_spn (MMModemGsmCard *modem,
+                                    DBusGMethodInvocation *context);
+
 static void impl_gsm_modem_send_pin (MMModemGsmCard *modem,
                                      const char *pin,
                                      DBusGMethodInvocation *context);
@@ -176,6 +179,20 @@ mm_modem_gsm_card_get_operator_id (MMModemGsmCard *self,
 }
 
 void
+mm_modem_gsm_card_get_spn (MMModemGsmCard *self,
+                           MMModemStringFn callback,
+                           gpointer user_data)
+{
+    g_return_if_fail (MM_IS_MODEM_GSM_CARD (self));
+    g_return_if_fail (callback != NULL);
+
+    if (MM_MODEM_GSM_CARD_GET_INTERFACE (self)->get_spn)
+        MM_MODEM_GSM_CARD_GET_INTERFACE (self)->get_spn (self, callback, user_data);
+    else
+        str_call_not_supported (self, callback, user_data);
+}
+
+void
 mm_modem_gsm_card_send_puk (MMModemGsmCard *self,
                             const char *puk,
                             const char *pin,
@@ -310,6 +327,43 @@ impl_gsm_modem_get_imsi (MMModemGsmCard *modem, DBusGMethodInvocation *context)
                                 MM_AUTHORIZATION_DEVICE_INFO,
                                 context,
                                 imsi_auth_cb,
+                                NULL,
+                                NULL,
+                                &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    }
+}
+
+/*****************************************************************************/
+
+static void
+spn_auth_cb (MMAuthRequest *req,
+             GObject *owner,
+             DBusGMethodInvocation *context,
+             gpointer user_data)
+{
+    MMModemGsmCard *self = MM_MODEM_GSM_CARD (owner);
+    GError *error = NULL;
+
+    /* Return any authorization error, otherwise get the SPN */
+    if (!mm_modem_auth_finish (MM_MODEM (self), req, &error)) {
+        dbus_g_method_return_error (context, error);
+        g_error_free (error);
+    } else
+        mm_modem_gsm_card_get_spn (self, str_call_done, context);
+}
+
+static void
+impl_gsm_modem_get_spn (MMModemGsmCard *modem, DBusGMethodInvocation *context)
+{
+    GError *error = NULL;
+
+    /* Make sure the caller is authorized to get the SPN */
+    if (!mm_modem_auth_request (MM_MODEM (modem),
+                                MM_AUTHORIZATION_DEVICE_INFO,
+                                context,
+                                spn_auth_cb,
                                 NULL,
                                 NULL,
                                 &error)) {

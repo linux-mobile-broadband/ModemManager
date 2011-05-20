@@ -1854,6 +1854,81 @@ get_operator_id_imsi_done (MMModem *modem,
 }
 
 static void
+get_spn_done (MMAtSerialPort *port,
+              GString *response,
+              GError *error,
+              gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    int sw1, sw2;
+    gboolean success = FALSE;
+    char hex[51];
+    char *bin, *utf8;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        goto done;
+    }
+
+    memset (hex, 0, sizeof (hex));
+    if (sscanf (response->str, "+CRSM:%d,%d,\"%50c\"", &sw1, &sw2, (char *) &hex) == 3)
+        success = TRUE;
+    else {
+        /* May not include quotes... */
+        if (sscanf (response->str, "+CRSM:%d,%d,%50c", &sw1, &sw2, (char *) &hex) == 3)
+            success = TRUE;
+    }
+
+    if (!success) {
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse the CRSM response");
+        goto done;
+    }
+
+    if ((sw1 == 0x90 && sw2 == 0x00) || (sw1 == 0x91) || (sw1 == 0x92) || (sw1 == 0x9f)) {
+        gsize buflen = 0;
+
+        /* Make sure the buffer is only hex characters */
+        while (buflen < sizeof (hex) && hex[buflen]) {
+            if (!isxdigit (hex[buflen])) {
+                hex[buflen] = 0x0;
+                break;
+            }
+            buflen++;
+        }
+
+        /* Convert hex string to binary */
+        bin = utils_hexstr2bin (hex, &buflen);
+        if (!bin) {
+            info->error = g_error_new (MM_MODEM_ERROR,
+                                       MM_MODEM_ERROR_GENERAL,
+                                       "SIM returned malformed response '%s'",
+                                       hex);
+            goto done;
+        }
+
+        /* Remove the FF filler at the end */
+        while (bin[buflen - 1] == (char)0xff)
+            buflen--;
+
+        /* First byte is metadata; remainder is GSM-7 unpacked into octets; convert to UTF8 */
+        utf8 = (char *)mm_charset_gsm_unpacked_to_utf8 ((guint8 *)bin + 1, buflen - 1);
+        g_free(bin);
+        mm_callback_info_set_result(info, utf8, g_free);
+    } else {
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "SIM failed to handle CRSM request (sw1 %d sw2 %d)",
+                                   sw1, sw2);
+    }
+
+done:
+    mm_callback_info_schedule (info);
+}
+
+
+static void
 get_imei (MMModemGsmCard *modem,
           MMModemStringFn callback,
           gpointer user_data)
@@ -1888,6 +1963,24 @@ get_operator_id (MMModemGsmCard *modem,
     mm_modem_gsm_card_get_imsi (MM_MODEM_GSM_CARD (modem),
                                 get_operator_id_imsi_done,
                                 info);
+}
+
+static void
+get_spn (MMModemGsmCard *modem,
+         MMModemStringFn callback,
+         gpointer user_data)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
+
+    /* READ BINARY of EFspn (Service Provider Name) ETSI 51.011 section 10.3.11 */
+    mm_at_serial_port_queue_command_cached (priv->primary,
+                                            "+CRSM=176,28486,0,0,17",
+                                            3,
+                                            get_spn_done,
+                                            info);
 }
 
 static void
@@ -5213,6 +5306,7 @@ modem_gsm_card_init (MMModemGsmCard *class)
     class->get_imei = get_imei;
     class->get_imsi = get_imsi;
     class->get_operator_id = get_operator_id;
+    class->get_spn = get_spn;
     class->send_pin = send_pin;
     class->send_puk = send_puk;
     class->enable_pin = enable_pin;

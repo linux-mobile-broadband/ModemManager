@@ -42,6 +42,19 @@
       </arg>
     </method>
 
+    <method name="GetSpn">
+      <tp:docstring>
+	Returns the SPN (Service Provider Name) from the SIM card,
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_gsm_modem_get_spn"/>
+      <arg name="spn" type="s" direction="out">
+	<tp:docstring>
+	  The Service Provider Name.
+	</tp:docstring>
+      </arg>
+    </method>
+
     <method name="SendPuk">
       <tp:docstring>
 	Send the PUK and a new PIN to unlock the SIM card.
