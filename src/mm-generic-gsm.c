@@ -3941,7 +3941,7 @@ sms_semi_octets_to_bcd_string (char *dest, const guint8 *octets, int num_octets)
     *dest++ = '\0';
 }
 
-/* len is in septets for gsm7 and in digits (semi-octets) for others */
+/* len is in semi-octets */
 static char *
 sms_decode_address (const guint8 *address, int len)
 {
@@ -3954,7 +3954,7 @@ sms_decode_address (const guint8 *address, int len)
     if (addrtype == 0xd0) {
         guint8 *unpacked;
         guint32 unpacked_len;
-        unpacked = gsm_unpack (address + 1, len, 0, &unpacked_len);
+        unpacked = gsm_unpack (address, (len * 4) / 7, 0, &unpacked_len);
         utf8 = (char *)mm_charset_gsm_unpacked_to_utf8 (unpacked,
                                                         unpacked_len);
         g_free(unpacked);
@@ -4077,14 +4077,6 @@ sms_parse_pdu (const char *hexpdu)
     /* Only handle SMS-DELIVER */
     if ((pdu[msg_start_offset] & SMS_TP_MTI_MASK) != SMS_TP_MTI_SMS_DELIVER) {
         mm_err ("Unhandled message type: 0x%02x", pdu[msg_start_offset]);
-        g_free (pdu);
-        return NULL;
-    }
-
-    /* Only handle the basic protocol identifier */
-    if (pdu[tp_pid_offset] != 0) {
-        mm_err ("Unhandled protocol identifier: 0x%02x vs 0x00",
-                pdu[tp_pid_offset]);
         g_free (pdu);
         return NULL;
     }
