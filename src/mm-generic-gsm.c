@@ -3866,6 +3866,14 @@ mm_generic_gsm_get_charset (MMGenericGsm *self)
 #define  SMS_TP_MTI_SMS_SUBMIT_REPORT 0x01
 #define  SMS_TP_MTI_SMS_STATUS_REPORT 0x02
 
+#define SMS_NUMBER_TYPE_MASK          0x70
+#define SMS_NUMBER_TYPE_UNKNOWN       0x00
+#define SMS_NUMBER_TYPE_INTL          0x10
+#define SMS_NUMBER_TYPE_ALPHA         0x50
+
+#define SMS_NUMBER_PLAN_MASK          0x0f
+#define SMS_NUMBER_PLAN_TELEPHONE     0x01
+
 #define SMS_TP_MMS                    0x04
 #define SMS_TP_SRI                    0x20
 #define SMS_TP_UDHI                   0x40
@@ -3945,21 +3953,33 @@ sms_semi_octets_to_bcd_string (char *dest, const guint8 *octets, int num_octets)
 static char *
 sms_decode_address (const guint8 *address, int len)
 {
-    guint8 addrtype;
+    guint8 addrtype, addrplan;
     char *utf8;
 
-    addrtype = address[0];
+    addrtype = address[0] & SMS_NUMBER_TYPE_MASK;
+    addrplan = address[0] & SMS_NUMBER_PLAN_MASK;
     address++;
 
-    if (addrtype == 0xd0) {
+    if (addrtype == SMS_NUMBER_TYPE_ALPHA) {
         guint8 *unpacked;
         guint32 unpacked_len;
         unpacked = gsm_unpack (address, (len * 4) / 7, 0, &unpacked_len);
         utf8 = (char *)mm_charset_gsm_unpacked_to_utf8 (unpacked,
                                                         unpacked_len);
         g_free(unpacked);
+    } else if (addrtype == SMS_NUMBER_TYPE_INTL &&
+               addrplan == SMS_NUMBER_PLAN_TELEPHONE) {
+        /* International telphone number, format as "+1234567890" */
+        utf8 = g_malloc (len + 3); /* '+' + digits + possible trailing 0xf + NUL */
+        utf8[0] = '+';
+        sms_semi_octets_to_bcd_string (utf8 + 1, address, (len + 1) / 2);
     } else {
-        utf8 = g_malloc (len + 2); /* may need one extra for trailing 0xf */
+        /*
+         * All non-alphanumeric types and plans are just digits, but
+         * don't apply any special formatting if we don't know the
+         * format.
+         */
+        utf8 = g_malloc (len + 2); /* digits + possible trailing 0xf + NUL */
         sms_semi_octets_to_bcd_string (utf8, address, (len + 1) / 2);
     }
 
