@@ -40,7 +40,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-linktop.la \
 	libmm-plugin-samsung.la \
 	libmm-plugin-wavecom.la \
-	libmm-plugin-cinterion.la
+	libmm-plugin-cinterion.la \
+	libmm-plugin-iridium.la
 
 # Generic
 
@@ -435,6 +436,25 @@ libmm_plugin_cinterion_la_CPPFLAGS = \
 	-I$(top_srcdir)/include
 
 libmm_plugin_cinterion_la_LDFLAGS = \
+	$(GUDEV_LDFLAGS) \
+	-module \
+	-avoid-version
+
+# Iridium satellite modem
+
+libmm_plugin_iridium_la_SOURCES = \
+	mm-plugin-iridium.c \
+	mm-plugin-iridium.h \
+	mm-modem-iridium-gsm.c \
+	mm-modem-iridium-gsm.h
+
+libmm_plugin_iridium_la_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	$(GUDEV_CFLAGS) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
+
+libmm_plugin_iridium_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
 	-module \
 	-avoid-version

@@ -444,6 +444,7 @@ static struct modem_caps modem_caps[] = {
 	{"+ES",       MM_PLUGIN_BASE_PORT_CAP_ES},
 	{"+MS",       MM_PLUGIN_BASE_PORT_CAP_MS},
 	{"+FCLASS",   MM_PLUGIN_BASE_PORT_CAP_FCLASS},
+    {"+WIRIDIUM", MM_PLUGIN_BASE_PORT_CAP_IRIDIUM},
 	{NULL}
 };
 
