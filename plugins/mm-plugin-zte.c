@@ -83,7 +83,6 @@ supports_port (MMPluginBase *base,
                MMPluginBaseSupportsTask *task)
 {
     GUdevDevice *port;
-    guint32 cached = 0, level;
     guint16 vendor = 0;
     const char *subsys, *name;
 
@@ -112,8 +111,12 @@ supports_port (MMPluginBase *base,
     if (strcmp (subsys, "tty"))
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
-    if (mm_plugin_base_get_cached_port_capabilities (base, port, &cached)) {
-        level = get_level_for_capabilities (cached);
+    /* Check if a previous probing was already launched in this port */
+    if (mm_plugin_base_supports_task_propagate_cached (task)) {
+        guint32 level;
+
+        /* A previous probing was already done, use its results */
+        level = get_level_for_capabilities (mm_plugin_base_supports_task_get_probed_capabilities (task));
         if (level) {
             mm_plugin_base_supports_task_complete (task, level);
             return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;

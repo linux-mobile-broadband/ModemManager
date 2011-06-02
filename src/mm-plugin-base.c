@@ -278,6 +278,28 @@ mm_plugin_base_supports_task_get_probed_product (MMPluginBaseSupportsTask *task)
     return MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task)->probed_product;
 }
 
+gboolean
+mm_plugin_base_supports_task_propagate_cached (MMPluginBaseSupportsTask *task)
+{
+    MMPluginBaseSupportsTaskPrivate *priv;
+
+    g_return_val_if_fail (task != NULL, FALSE);
+    g_return_val_if_fail (MM_IS_PLUGIN_BASE_SUPPORTS_TASK (task), FALSE);
+
+    priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
+
+    g_free (priv->probed_vendor);
+    g_free (priv->probed_product);
+
+    /* Returns TRUE if a previous supports task already cached probing results.
+     * It will also store a copy of the cached result. */
+    return mm_plugin_base_get_cached_probe_result (priv->plugin,
+                                                   priv->port,
+                                                   &priv->probed_caps,
+                                                   &priv->probed_vendor,
+                                                   &priv->probed_product);
+}
+
 void
 mm_plugin_base_supports_task_complete (MMPluginBaseSupportsTask *task,
                                        guint32 level)
@@ -1049,27 +1071,9 @@ mm_plugin_base_probe_port (MMPluginBase *self,
 }
 
 gboolean
-mm_plugin_base_get_cached_port_capabilities (MMPluginBase *self,
-                                             GUdevDevice *port,
-                                             guint32 *capabilities)
-{
-    MMPluginBaseProbedInfo *info;
-
-    if (g_hash_table_lookup_extended (probed_info,
-                                      g_udev_device_get_name (port),
-                                      NULL,
-                                      (gpointer *)&info)) {
-        *capabilities = info->capabilities;
-        return TRUE;
-    }
-
-    *capabilities = 0;
-    return FALSE;
-}
-
-gboolean
-mm_plugin_base_get_cached_product_info (MMPluginBase *self,
+mm_plugin_base_get_cached_probe_result (MMPluginBase *self,
                                         GUdevDevice *port,
+                                        guint32 *capabilities,
                                         gchar **vendor,
                                         gchar **product)
 {
@@ -1079,6 +1083,8 @@ mm_plugin_base_get_cached_product_info (MMPluginBase *self,
                                       g_udev_device_get_name (port),
                                       NULL,
                                       (gpointer *)&info)) {
+        if (capabilities)
+            *capabilities = info->capabilities;
         if (vendor)
             *vendor = (info->vendor ? g_strdup (info->vendor) : NULL);
         if (product)
@@ -1086,6 +1092,8 @@ mm_plugin_base_get_cached_product_info (MMPluginBase *self,
         return TRUE;
     }
 
+    if (capabilities)
+        *capabilities = 0;
     if (vendor)
         *vendor = NULL;
     if (product)

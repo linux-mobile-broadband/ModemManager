@@ -48,14 +48,15 @@ get_level_for_capabilities (guint32 capabilities)
 }
 
 static gboolean
-check_vendor_cinterion (MMPluginBase *base,
-                        GUdevDevice *port)
+check_vendor_cinterion (MMPluginBaseSupportsTask *task)
 {
+    MMPluginBase *base;
+    GUdevDevice *port;
     const char *subsys, *name;
     guint16 vendor = 0;
-    gchar *probed_vendor;
-    gchar *probed_vendor_strdown;
-    gboolean probed_vendor_correct;
+
+    base = MM_PLUGIN_BASE (mm_plugin_base_supports_task_get_plugin (task));
+    port = mm_plugin_base_supports_task_get_port (task);
 
     /* Try to get device IDs from udev. Note that it is not an error
      * if we can't get them in our case, as we also support serial
@@ -74,23 +75,29 @@ check_vendor_cinterion (MMPluginBase *base,
 
     /* We may get Cinterion modems connected in RS232 port, try to get
      * probed Vendor ID string to check */
-    if (!mm_plugin_base_get_cached_product_info (base, port, &probed_vendor, NULL) ||
-        !probed_vendor)
-        return FALSE;
+    if (mm_plugin_base_supports_task_propagate_cached (task)) {
+        const gchar *probed_vendor;
+        gchar *probed_vendor_strdown;
+        gboolean probed_vendor_correct = FALSE;
 
-    /* Lowercase the vendor string and compare */
-    probed_vendor_strdown = g_utf8_strdown (probed_vendor, -1);
-    probed_vendor_correct = ((strstr (probed_vendor_strdown, "cinterion") ||
-                              strstr (probed_vendor_strdown, "siemens")) ?
-                             TRUE : FALSE);
-    g_free (probed_vendor_strdown);
-    g_free (probed_vendor);
+        probed_vendor = mm_plugin_base_supports_task_get_probed_vendor (task);
+        if (!probed_vendor)
+            return FALSE;
 
-    if (!probed_vendor_correct)
-        return FALSE;
+        /* Lowercase the vendor string and compare */
+        probed_vendor_strdown = g_utf8_strdown (probed_vendor, -1);
+        if (strstr (probed_vendor_strdown, "cinterion") ||
+            strstr (probed_vendor_strdown, "siemens")) {
+            mm_dbg ("Cinterion/Siemens RS232 modem detected");
+            probed_vendor_correct = TRUE;
+        }
 
-    mm_dbg ("Cinterion/Siemens RS232 modem detected");
-    return TRUE;
+        g_free (probed_vendor_strdown);
+
+        return probed_vendor_correct;
+    }
+
+    return FALSE;
 }
 
 static void
@@ -99,15 +106,12 @@ probe_result (MMPluginBase *base,
               guint32 capabilities,
               gpointer user_data)
 {
-    GUdevDevice *port;
-
     /* Note: the signal contains only capabilities, but we can also query the
      * probed vendor and product strings here. */
 
     /* Check vendor */
-    port = mm_plugin_base_supports_task_get_port (task);
     mm_plugin_base_supports_task_complete (task,
-                                           (check_vendor_cinterion (base, port) ?
+                                           (check_vendor_cinterion (task) ?
                                             get_level_for_capabilities (capabilities) : 0));
 }
 
@@ -130,8 +134,8 @@ supports_port (MMPluginBase *base,
      * Note that we also relaunch a port probe if we got a cached value but no
      * capabilities set (used when trying to detect RS232 modems during
      * re-scans). */
-    if (!mm_plugin_base_get_cached_port_capabilities (base, port, &cached) ||
-        !cached) {
+    if (!mm_plugin_base_supports_task_propagate_cached (task) ||
+        !mm_plugin_base_supports_task_get_probed_capabilities (task)) {
         /* Kick off a probe */
         if (mm_plugin_base_probe_port (base, task, 100000, NULL))
             return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
@@ -140,7 +144,7 @@ supports_port (MMPluginBase *base,
     }
 
     /* Check vendor */
-    if (!check_vendor_cinterion (base, port))
+    if (!check_vendor_cinterion (task))
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
     /* Completed! */

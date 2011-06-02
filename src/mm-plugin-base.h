@@ -90,6 +90,9 @@ const gchar *mm_plugin_base_supports_task_get_probed_vendor (MMPluginBaseSupport
 
 const gchar *mm_plugin_base_supports_task_get_probed_product (MMPluginBaseSupportsTask *task);
 
+gboolean mm_plugin_base_supports_task_propagate_cached (MMPluginBaseSupportsTask *task);
+
+
 void mm_plugin_base_supports_task_complete (MMPluginBaseSupportsTask *task,
                                             guint32 level);
 
@@ -160,13 +163,9 @@ gboolean mm_plugin_base_probe_port (MMPluginBase *self,
                                     GError **error);
 
 /* Returns TRUE if the port was previously probed, FALSE if not */
-gboolean mm_plugin_base_get_cached_port_capabilities (MMPluginBase *self,
-                                                      GUdevDevice *port,
-                                                      guint32 *capabilities);
-
-/* Returns TRUE if the port was previously probed, FALSE if not */
-gboolean mm_plugin_base_get_cached_product_info (MMPluginBase *self,
+gboolean mm_plugin_base_get_cached_probe_result (MMPluginBase *self,
                                                  GUdevDevice *port,
+                                                 guint32 *capabilities,
                                                  gchar **vendor,
                                                  gchar **product);
 
