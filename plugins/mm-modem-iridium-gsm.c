@@ -50,6 +50,41 @@ mm_modem_iridium_gsm_new (const char *device,
                                    NULL));
 }
 
+static void
+set_property (GObject *object,
+              guint prop_id,
+              const GValue *value,
+              GParamSpec *pspec)
+{
+    /* Do nothing... see set_property() in parent, which also does nothing */
+}
+
+static void
+get_property (GObject *object,
+              guint prop_id,
+              GValue *value,
+              GParamSpec *pspec)
+{
+    switch (prop_id) {
+    case MM_GENERIC_GSM_PROP_POWER_UP_CMD:
+        /* No need for any special power up command */
+        g_value_set_string (value, "");
+        break;
+    case MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD:
+        /* Enable RTS/CTS flow control.
+         * Other available values:
+         *   AT&K0: Disable flow control
+         *   AT&K3: RTS/CTS
+         *   AT&K4: XOFF/XON
+         *   AT&K6: Both RTS/CTS and XOFF/XON
+         */
+        g_value_set_string (value, "&K3");
+        break;
+    default:
+        break;
+    }
+}
+
 /*****************************************************************************/
 
 static void
@@ -60,5 +95,17 @@ mm_modem_iridium_gsm_init (MMModemIridiumGsm *self)
 static void
 mm_modem_iridium_gsm_class_init (MMModemIridiumGsmClass *klass)
 {
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+    object_class->get_property = get_property;
+    object_class->set_property = set_property;
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_POWER_UP_CMD,
+                                      MM_GENERIC_GSM_POWER_UP_CMD);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD,
+                                      MM_GENERIC_GSM_FLOW_CONTROL_CMD);
 }
 
