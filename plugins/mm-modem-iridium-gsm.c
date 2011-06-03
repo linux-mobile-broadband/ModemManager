@@ -51,6 +51,16 @@ mm_modem_iridium_gsm_new (const char *device,
 }
 
 static void
+get_sim_iccid (MMGenericGsm *modem,
+               MMModemStringFn callback,
+               gpointer callback_data)
+{
+    /* There seems to be no way of getting an ICCID/IMSI subscriber ID within
+     * the Iridium AT command set, so we just skip this. */
+    callback (MM_MODEM (modem), "", NULL, callback_data);
+}
+
+static void
 set_property (GObject *object,
               guint prop_id,
               const GValue *value,
@@ -96,6 +106,7 @@ static void
 mm_modem_iridium_gsm_class_init (MMModemIridiumGsmClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    MMGenericGsmClass *gsm_class = MM_GENERIC_GSM_CLASS (klass);
 
     object_class->get_property = get_property;
     object_class->set_property = set_property;
@@ -107,5 +118,7 @@ mm_modem_iridium_gsm_class_init (MMModemIridiumGsmClass *klass)
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD,
                                       MM_GENERIC_GSM_FLOW_CONTROL_CMD);
+
+    gsm_class->get_sim_iccid = get_sim_iccid;
 }
 
