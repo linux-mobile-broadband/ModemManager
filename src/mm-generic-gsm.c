@@ -725,12 +725,17 @@ initial_pin_check_done (MMModem *modem, GError *error, gpointer user_data)
             g_source_remove (priv->pin_check_timeout);
         priv->pin_check_timeout = g_timeout_add_seconds (2, pin_check_again, modem);
     } else {
+        /* Set pin checked flag before launching ICCID check. Some plugins may
+         * use their own ICCID check, which is completed right away without
+         * scheduling it in a callback info, so modem enable request may be done
+         * just here. */
+        priv->pin_checked = TRUE;
+
         /* Try to get the SIM ICCID after we've checked PIN status and the SIM
          * is ready.
          */
         initial_iccid_check (MM_GENERIC_GSM (modem));
 
-        priv->pin_checked = TRUE;
         mm_serial_port_close (MM_SERIAL_PORT (priv->primary));
     }
 }
