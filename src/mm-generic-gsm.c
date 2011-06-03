@@ -307,8 +307,12 @@ pin_check_done (MMAtSerialPort *port,
 
     if (error)
         info->error = g_error_copy (error);
-    else if (response && strstr (response->str, "+CPIN: ")) {
-        const char *str = strstr (response->str, "+CPIN: ") + 7;
+    else if (response && strstr (response->str, "+CPIN:")) {
+        const char *str = strstr (response->str, "+CPIN:") + 6;
+
+        /* Skip possible whitespaces after '+CPIN:' and before the response */
+        while (*str == ' ')
+            str++;
 
         /* Some phones (Motorola EZX models) seem to quote the response */
         if (str[0] == '"')
