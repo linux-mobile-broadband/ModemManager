@@ -90,6 +90,25 @@ get_property (GObject *object,
          */
         g_value_set_string (value, "&K3");
         break;
+    case MM_GENERIC_GSM_PROP_SMS_INDICATION_ENABLE_CMD:
+        /* AT+CNMO=<mode>,[<mt>[,<bm>[,<ds>[,<bfr>]]]]
+         *  but <bm> can only be 0,
+         *  and <ds> can only be either 0 or 1
+         *
+         * Note: Modem may return +CMS ERROR:322, which indicates Memory Full,
+         * not a big deal
+         */
+        g_value_set_string (value, "+CNMI=2,1,0,0,1");
+        break;
+    case MM_GENERIC_GSM_PROP_SMS_STORAGE_LOCATION_CMD:
+        /* AT=CPMS=<mem1>[,<mem2>[,<mem3>]]
+         *  Only "SM" is allowed in all 3 message storages
+         *
+         * Note: Modem may return +CMS ERROR:322, which indicates Memory Full,
+         * not a big deal
+         */
+        g_value_set_string (value, "+CPMS=\"SM\",\"SM\",\"SM\"");
+        break;
     default:
         break;
     }
@@ -118,6 +137,14 @@ mm_modem_iridium_gsm_class_init (MMModemIridiumGsmClass *klass)
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD,
                                       MM_GENERIC_GSM_FLOW_CONTROL_CMD);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_SMS_INDICATION_ENABLE_CMD,
+                                      MM_GENERIC_GSM_SMS_INDICATION_ENABLE_CMD);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_SMS_STORAGE_LOCATION_CMD,
+                                      MM_GENERIC_GSM_SMS_STORAGE_LOCATION_CMD);
 
     gsm_class->get_sim_iccid = get_sim_iccid;
 }
