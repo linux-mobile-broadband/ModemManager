@@ -189,6 +189,46 @@ set_allowed_mode (MMGenericGsm *gsm,
     mm_at_serial_port_queue_command (port, command, 3, set_allowed_mode_done, info);
 }
 
+static void
+get_act_request_done (MMAtSerialPort *port,
+                      GString *response,
+                      GError *error,
+                      gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
+    const char *p;
+
+    info->error = mm_modem_check_removed (info->modem, error);
+
+    if (info->error == NULL) {
+        p = mm_strip_tag (response->str, "+SSND:");
+        act = mm_gsm_string_to_access_tech (p);
+    }
+
+    mm_callback_info_set_result (info, GUINT_TO_POINTER (act), NULL);
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_access_technology (MMGenericGsm *modem,
+                       MMModemUIntFn callback,
+                       gpointer user_data)
+{
+    MMAtSerialPort *port;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+
+    port = mm_generic_gsm_get_best_at_port (modem, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_at_serial_port_queue_command (port, "+SSND?", 3, get_act_request_done, info);
+}
+
 /*****************************************************************************/
 
 static void
@@ -205,5 +245,6 @@ mm_modem_x22x_gsm_class_init (MMModemX22xGsmClass *klass)
 
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;
+    gsm_class->get_access_technology = get_access_technology;
 }
 
