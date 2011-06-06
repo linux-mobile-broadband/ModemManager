@@ -32,6 +32,15 @@ static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
 G_DEFINE_TYPE_EXTENDED (MMModemIridiumGsm, mm_modem_iridium_gsm, MM_TYPE_GENERIC_GSM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init))
 
+
+#define MM_MODEM_IRIDIUM_GSM_GET_PRIVATE(o)                             \
+    (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_IRIDIUM_GSM, MMModemIridiumGsmPrivate))
+
+typedef struct {
+    /* Current allowed mode */
+    MMModemGsmAllowedMode allowed_mode;
+} MMModemIridiumGsmPrivate;
+
 MMModem *
 mm_modem_iridium_gsm_new (const char *device,
                           const char *driver,
@@ -51,6 +60,51 @@ mm_modem_iridium_gsm_new (const char *device,
                                    MM_MODEM_HW_PID, product,
                                    MM_MODEM_BASE_MAX_TIMEOUTS, 3,
                                    NULL));
+}
+
+static void
+set_allowed_mode (MMGenericGsm *gsm,
+                  MMModemGsmAllowedMode mode,
+                  MMModemFn callback,
+                  gpointer user_data)
+{
+    MMModemIridiumGsmPrivate *priv = MM_MODEM_IRIDIUM_GSM_GET_PRIVATE (gsm);
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
+
+    /* Allow only 2G-related allowed modes */
+    switch (mode) {
+    case MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED:
+    case MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY:
+    case MM_MODEM_GSM_ALLOWED_MODE_ANY:
+        priv->allowed_mode = mode;
+        break;
+    default:
+        info->error = g_error_new (MM_MODEM_ERROR,
+                                   MM_MODEM_ERROR_GENERAL,
+                                   "Cannot set desired allowed mode, "
+                                   "not supported");
+        break;
+    }
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_allowed_mode (MMGenericGsm *gsm,
+                  MMModemUIntFn callback,
+                  gpointer user_data)
+{
+    MMModemIridiumGsmPrivate *priv = MM_MODEM_IRIDIUM_GSM_GET_PRIVATE (gsm);
+    MMCallbackInfo *info;
+
+    /* Just return cached value */
+    info = mm_callback_info_uint_new (MM_MODEM (gsm), callback, user_data);
+    mm_callback_info_set_result (info,
+                                 GUINT_TO_POINTER (priv->allowed_mode),
+                                 NULL);
+    mm_callback_info_schedule (info);
 }
 
 static void
@@ -203,6 +257,10 @@ modem_gsm_network_init (MMModemGsmNetwork *network_class)
 static void
 mm_modem_iridium_gsm_init (MMModemIridiumGsm *self)
 {
+    MMModemIridiumGsmPrivate *priv = MM_MODEM_IRIDIUM_GSM_GET_PRIVATE (self);
+
+    /* Set defaults */
+    priv->allowed_mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
 }
 
 static void
@@ -210,6 +268,8 @@ mm_modem_iridium_gsm_class_init (MMModemIridiumGsmClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
     MMGenericGsmClass *gsm_class = MM_GENERIC_GSM_CLASS (klass);
+
+    g_type_class_add_private (object_class, sizeof (MMModemIridiumGsmPrivate));
 
     object_class->get_property = get_property;
     object_class->set_property = set_property;
@@ -230,6 +290,8 @@ mm_modem_iridium_gsm_class_init (MMModemIridiumGsmClass *klass)
                                       MM_GENERIC_GSM_PROP_SMS_STORAGE_LOCATION_CMD,
                                       MM_GENERIC_GSM_SMS_STORAGE_LOCATION_CMD);
 
+    gsm_class->set_allowed_mode = set_allowed_mode;
+    gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->get_sim_iccid = get_sim_iccid;
 }
 
