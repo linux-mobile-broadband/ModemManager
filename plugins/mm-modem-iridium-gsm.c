@@ -27,6 +27,16 @@
 #include "mm-modem-iridium-gsm.h"
 #include "mm-log.h"
 
+/* NOTE:
+ *  We are simulating here the Iridium modem as if it were a pure GSM device
+ *  (even if it of course isn't). This is because the Iridium modems implement
+ *  GSM-like AT commands and therefore we can base the Iridium plugin on the
+ *  generic GSM implementation. So:
+ *  - We report Access Technology as pure GSM.
+ *  - We allow only 2G-related allowed modes.
+ *
+ */
+
 static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
 
 G_DEFINE_TYPE_EXTENDED (MMModemIridiumGsm, mm_modem_iridium_gsm, MM_TYPE_GENERIC_GSM, 0,
@@ -103,6 +113,20 @@ get_allowed_mode (MMGenericGsm *gsm,
     info = mm_callback_info_uint_new (MM_MODEM (gsm), callback, user_data);
     mm_callback_info_set_result (info,
                                  GUINT_TO_POINTER (priv->allowed_mode),
+                                 NULL);
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_access_technology (MMGenericGsm *gsm,
+                       MMModemUIntFn callback,
+                       gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_uint_new (MM_MODEM (gsm), callback, user_data);
+    mm_callback_info_set_result (info,
+                                 GUINT_TO_POINTER (MM_MODEM_GSM_ACCESS_TECH_GSM),
                                  NULL);
     mm_callback_info_schedule (info);
 }
@@ -290,6 +314,7 @@ mm_modem_iridium_gsm_class_init (MMModemIridiumGsmClass *klass)
                                       MM_GENERIC_GSM_PROP_SMS_STORAGE_LOCATION_CMD,
                                       MM_GENERIC_GSM_SMS_STORAGE_LOCATION_CMD);
 
+    gsm_class->get_access_technology = get_access_technology;
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->get_sim_iccid = get_sim_iccid;
