@@ -19,6 +19,7 @@
 #include "mm-plugin-x22x.h"
 #include "mm-modem-x22x-gsm.h"
 #include "mm-generic-gsm.h"
+#include "mm-modem-helpers.h"
 
 G_DEFINE_TYPE (MMPluginX22x, mm_plugin_x22x, MM_TYPE_PLUGIN_BASE)
 
@@ -59,6 +60,38 @@ probe_result (MMPluginBase *base,
     mm_plugin_base_supports_task_complete (task, get_level_for_capabilities (capabilities));
 }
 
+
+static gboolean
+custom_init_response_cb (MMPluginBaseSupportsTask *task,
+                         GString *response,
+                         GError *error,
+                         guint32 tries,
+                         gboolean *out_stop,
+                         guint32 *out_level,
+                         gpointer user_data)
+{
+    const char *p = response->str;
+
+    if (error)
+        return tries <= 4 ? TRUE : FALSE;
+
+    /* Note the lack of a ':' on the GMR; the X200 doesn't send one */
+    p = mm_strip_tag (response->str, "AT+GMR");
+    if (*p != 'L') {
+        /* X200 modems have a GMR firmware revision that starts with 'L', and
+         * as far as I can tell X060s devices have a revision starting with 'C'.
+         * So use that to determine if the device is an X200, which this plugin
+         * does supports.
+         */
+        *out_level = 0;
+        *out_stop = TRUE;
+        return FALSE;
+    }
+
+    /* Continue with generic probing */
+    return FALSE;
+}
+
 static MMPluginSupportsResult
 supports_port (MMPluginBase *base,
                MMModem *existing,
@@ -66,7 +99,7 @@ supports_port (MMPluginBase *base,
 {
     GUdevDevice *port;
     guint32 cached = 0, level;
-    guint16 vendor = 0;
+    guint16 vendor = 0, product = 0;
     const char *subsys, *name;
 
     /* Can't do anything with non-serial ports */
@@ -77,7 +110,7 @@ supports_port (MMPluginBase *base,
     subsys = g_udev_device_get_subsystem (port);
     name = g_udev_device_get_name (port);
 
-    if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, NULL))
+    if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product))
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
     /* Only TCT/T&A for now */
@@ -95,6 +128,23 @@ supports_port (MMPluginBase *base,
             return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
         }
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
+    }
+
+    /* TCT/Alcatel in their infinite wisdom assigned the same USB VID/PID to
+     * the x060s (Longcheer firmware) and the x200 (X22X, this plugin) and thus
+     * we can't tell them apart via udev rules.  Worse, they both report the
+     * same +GMM and +GMI, so we're left with just +GMR which is a sketchy way
+     * to tell modems apart.  We can't really use X22X-specific commands
+     * like AT+SSND because we're not sure if they work when the SIM PIN has not
+     * been entered yet; many modems have a limited command parser before the
+     * SIM is unlocked.
+     */
+    if (vendor == 0x1bbb && product == 0x0000) {
+        mm_plugin_base_supports_task_add_custom_init_command (task,
+                                                              "AT+GMR",
+                                                              3,
+                                                              custom_init_response_cb,
+                                                              NULL);
     }
 
     /* Otherwise kick off a probe */
