@@ -60,20 +60,19 @@ GType mm_plugin_base_supports_task_get_type (void);
  * response: the response string from the modem, if no error occurred
  * error: the error returned by the modem or serial stack, if any
  * tries: number of times the custom init command has been sent to the modem
- * out_fail: on return, TRUE means fail the probe and close the port
- * out_level: if the custom init command has determined that the modem is
- *            supported, return the support level here, and probing will cease
+ * out_stop: on return, TRUE means stop the probe and close the port
+ * out_level: on return, if out_stop is TRUE this should indicate the plugin's
+ *            support level for this modem
  *
  * Function should return TRUE if the custom init command should be retried,
  * FALSE if it should not.  If FALSE is returned, generic probing will continue
- * if out_fail == FALSE and out_level == 0, otherwise if out_fail == FALSE
- * probing will stop, or if out_level > 0 the port will be claimed.
+ * if out_stop == FALSE.
  */
 typedef gboolean (*MMBaseSupportsTaskCustomInitResultFunc) (MMPluginBaseSupportsTask *task,
                                                             GString *response,
                                                             GError *error,
                                                             guint32 tries,
-                                                            gboolean *out_fail,
+                                                            gboolean *out_stop,
                                                             guint32 *out_level,
                                                             gpointer user_data);
 

@@ -66,7 +66,7 @@ custom_init_response_cb (MMPluginBaseSupportsTask *task,
                          GString *response,
                          GError *error,
                          guint32 tries,
-                         gboolean *out_fail,
+                         gboolean *out_stop,
                          guint32 *out_level,
                          gpointer user_data)
 {
