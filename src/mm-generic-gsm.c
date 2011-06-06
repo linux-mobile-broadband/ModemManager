@@ -1048,6 +1048,17 @@ periodic_access_tech_cb (MMModem *modem,
 }
 
 static gboolean
+ps_network_supported (MMGenericGsm *gsm)
+{
+    gboolean supported;
+
+    g_object_get (G_OBJECT (gsm),
+                  MM_GENERIC_GSM_PS_NETWORK_SUPPORTED,
+                  &supported, NULL);
+    return supported;
+}
+
+static gboolean
 periodic_poll_cb (gpointer user_data)
 {
     MMGenericGsm *self = MM_GENERIC_GSM (user_data);
@@ -1210,7 +1221,12 @@ creg1_done (MMAtSerialPort *port,
     mm_at_serial_port_queue_command (port, "+CREG?", 10, reg_poll_response, info->modem);
 
     /* Now try to set up CGREG messages */
-    mm_at_serial_port_queue_command (port, "+CGREG=2", 3, cgreg2_done, info);
+    if (ps_network_supported (MM_GENERIC_GSM (info->modem)))
+        mm_at_serial_port_queue_command (port, "+CGREG=2", 3, cgreg2_done, info);
+    else {
+        /* All done */
+        initial_unsolicited_reg_check_done (info);
+    }
 }
 
 static void
@@ -1238,7 +1254,12 @@ creg2_done (MMAtSerialPort *port,
         mm_at_serial_port_queue_command (port, "+CREG?", 10, reg_poll_response, info->modem);
 
         /* Now try to set up CGREG messages */
-        mm_at_serial_port_queue_command (port, "+CGREG=2", 3, cgreg2_done, info);
+        if (ps_network_supported (MM_GENERIC_GSM (info->modem)))
+            mm_at_serial_port_queue_command (port, "+CGREG=2", 3, cgreg2_done, info);
+        else {
+            /* All done */
+            initial_unsolicited_reg_check_done (info);
+        }
     }
 }
 
@@ -2198,7 +2219,8 @@ disable_flash_done (MMSerialPort *port,
 
     /* Disable unsolicited messages */
     mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "+CREG=0", 3, NULL, NULL);
-    mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "+CGREG=0", 3, NULL, NULL);
+    if (ps_network_supported (MM_GENERIC_GSM (info->modem)))
+        mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "+CGREG=0", 3, NULL, NULL);
 
     if (priv->ussd_enabled) {
         mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "+CUSD=0", 3, NULL, NULL);
@@ -3239,6 +3261,9 @@ reg_state_changed (MMAtSerialPort *port,
         return;
     }
 
+    if (cgreg && !ps_network_supported (self))
+        mm_warn ("shouldn't get PS registration status if PS not supported");
+
     if (reg_status_updated (self, cgreg_to_reg_type (cgreg), state, NULL)) {
         /* If registration is finished (either registered or failed) but the
          * registration query hasn't completed yet, just remove the timeout and
@@ -3314,6 +3339,9 @@ handle_reg_status_response (MMGenericGsm *self,
     parsed = mm_gsm_parse_creg_response (match_info, &status, &lac, &ci, &act, &cgreg, error);
     g_match_info_free (match_info);
     if (parsed) {
+        if (cgreg && !ps_network_supported (self))
+            mm_warn ("shouldn't get PS registration status if PS not supported");
+
         /* Success; update cached location information */
         update_lac_ci (self, lac, ci, cgreg ? 1 : 0);
 
@@ -3350,8 +3378,14 @@ check_reg_status_done (MMCallbackInfo *info)
 
     /* Only process when both CS and PS checks are both done */
     if (   !mm_callback_info_get_data (info, CS_DONE_TAG)
-        || !mm_callback_info_get_data (info, PS_DONE_TAG))
+        || (   ps_network_supported (self)
+            && !mm_callback_info_get_data (info, PS_DONE_TAG)))
         return;
+
+    /* The unsolicited registration state handlers will intercept the CREG
+     * response and update the cached registration state for us, so we usually
+     * just need to check the cached state here.
+     */
 
     /* If both CS and PS registration checks returned errors we fail */
     cs_error = mm_callback_info_get_data (info, CS_ERROR_TAG);
@@ -6528,6 +6562,7 @@ set_property (GObject *object, guint prop_id,
     case MM_GENERIC_GSM_PROP_SMS_INDICATION_ENABLE_CMD:
     case MM_GENERIC_GSM_PROP_SMS_STORAGE_LOCATION_CMD:
     case MM_GENERIC_GSM_PROP_CMER_ENABLE_CMD:
+    case MM_GENERIC_GSM_PROP_PS_NETWORK_SUPPORTED:
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -6652,6 +6687,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case MM_GENERIC_GSM_PROP_CMER_ENABLE_CMD:
         g_value_set_string (value, "+CMER=3,0,0,1");
+        break;
+    case MM_GENERIC_GSM_PROP_PS_NETWORK_SUPPORTED:
+        g_value_set_boolean (value, TRUE);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -6836,4 +6874,12 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
                               "CMER enable command",
                               "+CMER=3,0,0,1",
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, MM_GENERIC_GSM_PROP_PS_NETWORK_SUPPORTED,
+         g_param_spec_boolean (MM_GENERIC_GSM_PS_NETWORK_SUPPORTED,
+                               "PSNetworkSupported",
+                               "Flag identifying if PS network is supported",
+                               TRUE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
