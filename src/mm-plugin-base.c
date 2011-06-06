@@ -757,20 +757,13 @@ custom_init_response (MMAtSerialPort *port,
     MMPluginBaseSupportsTaskPrivate *task_priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
     CustomInit *custom = task_priv->cur_custom->data;
     gboolean retry = FALSE;
-    gboolean fail = FALSE;
+    gboolean stop = FALSE;
     guint32 level = 0;
 
     custom->tries++;
-    retry = custom->callback (task, response, error, custom->tries, &fail, &level, custom->callback_data);
+    retry = custom->callback (task, response, error, custom->tries, &stop, &level, custom->callback_data);
 
-    if (fail) {
-        /* Plugin said to fail the probe */
-        probe_complete (task);
-        return;
-    }
-
-    if (level > 0) {
-        /* Plugin supports the modem */
+    if (stop) {
         task_priv->probed_caps = level;
         probe_complete (task);
         return;
