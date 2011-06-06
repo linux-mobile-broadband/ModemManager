@@ -265,6 +265,10 @@ get_property (GObject *object,
          */
         g_value_set_string (value, "+CPMS=\"SM\",\"SM\",\"SM\"");
         break;
+    case MM_GENERIC_GSM_PROP_PS_NETWORK_SUPPORTED:
+        /* We do not support PS network in Iridium, only CS */
+        g_value_set_boolean (value, FALSE);
+        break;
     default:
         break;
     }
@@ -313,6 +317,10 @@ mm_modem_iridium_gsm_class_init (MMModemIridiumGsmClass *klass)
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_SMS_STORAGE_LOCATION_CMD,
                                       MM_GENERIC_GSM_SMS_STORAGE_LOCATION_CMD);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_PS_NETWORK_SUPPORTED,
+                                      MM_GENERIC_GSM_PS_NETWORK_SUPPORTED);
 
     gsm_class->get_access_technology = get_access_technology;
     gsm_class->set_allowed_mode = set_allowed_mode;
