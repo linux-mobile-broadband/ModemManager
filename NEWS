@@ -9,7 +9,7 @@ Overview of changes in ModemManager 0.5
 - Fixes for Novatel CDMA devices (home/roaming status, better signal quality reporting)
 - Better detection of EVDO registration when device is in 1X mode
 - Add support for newer Alcatel devices like X220D
-- Support for more ZTE devices
+- Support for more ZTE devices (Rocket 2, LW272, others)
 - Fix modem detection failures with some Sierra devices
 - Add support for newer Ericsson devices
 - Add an SIM identifier for use when auto-unlocking modems
@@ -18,8 +18,28 @@ Overview of changes in ModemManager 0.5
 - Add preliminary USSD support
 - Fix reconnection attempts with some Sierra devices
 - Add support for pseduo-ethernet interface on newer Sierra devices
+- Add support for various Linktop devices (LW273, etc)
+- Implement standard D-Bus Properties interface PropertiesChanged signal
+- Add support for Qualcomm SMD-connected modems
+- Export modem state over D-Bus
+- Add D-Bus API for CDMA modem activation
+- Correctly report HSPA+ access technology
+- Correctly report home vs. roaming state with basic Sprint CDMA modems
+- Add D-Bus API for power-cycling/resetting modems
+- Add support for USSD responses
+- Finer grained and more consistent logging
+- Blacklist more usb-serial dongles unlikely to be modems
+- Add support for platform serial ports
+- Loosen permissions for reading device information
+- Add support for Samsung Y3300 Icera-based modem
+- Speed up probing process when ports support AT commands
+- Better SMS reception and reporting
+- Add support for some Wavecom modems
+- Add support for Simtech-based Prolink PH-300
+- Add support for Alcatel X200
+- Fix various crashes when modem is removed
 
 Fixed bugs:
 rh#597296 rh#583691 rh#597088 bgo#626421 rh#585394 bgo#628105 bgo#627935
-bgo#621815 rh#632516 lp:682282 bgo#590798
-
+bgo#621815 rh#632516 lp:682282 bgo#590798 lp:673457 bgo#636040 bgo #636438
+bgo#638038 bgo#637140 rh#544121 kde#266807 novell#674022 
