@@ -501,12 +501,17 @@ test_creg_match (const char *test,
         GRegex *r = g_ptr_array_index (array, i);
 
         if (g_regex_match (r, reply, 0, &info)) {
+            g_print ("  matched with %d\n", i);
             regex_num = i + 1;
             break;
         }
         g_match_info_free (info);
         info = NULL;
     }
+
+    g_print ("  regex_num (%u) == result->regex_num (%u)\n",
+             regex_num,
+             result->regex_num);
 
     g_assert (info != NULL);
     g_assert (regex_num == result->regex_num);
@@ -517,6 +522,9 @@ test_creg_match (const char *test,
     g_assert (state == result->state);
     g_assert (lac == result->lac);
     g_assert (ci == result->ci);
+
+    g_print ("  access_tech (%d) == result->act (%d)\n",
+             access_tech, result->act);
     g_assert (access_tech == result->act);
     g_assert (cgreg == result->cgreg);
 }
@@ -630,6 +638,16 @@ test_creg2_xu870_unsolicited_unregistered (void *f, gpointer d)
     const CregResult result = { 2, 0, 0, -1 , 3, FALSE};
 
     test_creg_match ("Novatel XU870 unregistered CREG=2", FALSE, reply, data, &result);
+}
+
+static void
+test_creg2_iridium_solicited (void *f, gpointer d)
+{
+    TestData *data = (TestData *) d;
+    const char *reply = "+CREG:002,001,\"18d8\",\"ffff\"";
+    const CregResult result = { 1, 0x18D8, 0xFFFF, -1 , 4, FALSE};
+
+    test_creg_match ("Iridium, CREG=2", TRUE, reply, data, &result);
 }
 
 static void
@@ -1256,7 +1274,7 @@ int main (int argc, char **argv)
 	g_test_suite_add (suite, TESTCASE (test_cops_response_gobi, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_sek600i, NULL));
 
-	g_test_suite_add (suite, TESTCASE (test_cops_response_gsm_invalid, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cops_response_gsm_invalid, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_umts_invalid, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_creg1_solicited, data));
@@ -1273,6 +1291,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_creg2_md400_unsolicited, data));
     g_test_suite_add (suite, TESTCASE (test_creg2_s8500_wave_unsolicited, data));
     g_test_suite_add (suite, TESTCASE (test_creg2_gobi_weird_solicited, data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_iridium_solicited, data));
 
     g_test_suite_add (suite, TESTCASE (test_cgreg1_solicited, data));
     g_test_suite_add (suite, TESTCASE (test_cgreg1_unsolicited, data));

@@ -223,27 +223,27 @@ mm_gsm_destroy_scan_data (gpointer data)
 
 /*************************************************************************/
 
-/* +CREG: <stat>                       (GSM 07.07 CREG=1 unsolicited) */
-#define CREG1 "\\+(CREG|CGREG):\\s*(\\d{1})"
+/* +CREG: <stat>                      (GSM 07.07 CREG=1 unsolicited) */
+#define CREG1 "\\+(CREG|CGREG):\\s*0*([0-9])"
 
-/* +CREG: <n>,<stat>                   (GSM 07.07 CREG=1 solicited) */
-#define CREG2 "\\+(CREG|CGREG):\\s*(\\d{1}),\\s*(\\d{1})"
+/* +CREG: <n>,<stat>                  (GSM 07.07 CREG=1 solicited) */
+#define CREG2 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*0*([0-9])"
 
 /* +CREG: <stat>,<lac>,<ci>           (GSM 07.07 CREG=2 unsolicited) */
-#define CREG3 "\\+(CREG|CGREG):\\s*(\\d{1}),\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)"
+#define CREG3 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)"
 
 /* +CREG: <n>,<stat>,<lac>,<ci>       (GSM 07.07 solicited and some CREG=2 unsolicited) */
-#define CREG4 "\\+(CREG|CGREG):\\s*(\\d{1}),\\s*(\\d{1})\\s*,\\s*([^,]*)\\s*,\\s*([^,\\s]*)"
+#define CREG4 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,]*)\\s*,\\s*([^,\\s]*)"
 
 /* +CREG: <stat>,<lac>,<ci>,<AcT>     (ETSI 27.007 CREG=2 unsolicited) */
-#define CREG5 "\\+(CREG|CGREG):\\s*(\\d{1})\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*(\\d{1,2})"
+#define CREG5 "\\+(CREG|CGREG):\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])"
 
 /* +CREG: <n>,<stat>,<lac>,<ci>,<AcT> (ETSI 27.007 solicited and some CREG=2 unsolicited) */
-#define CREG6 "\\+(CREG|CGREG):\\s*(\\d{1}),\\s*(\\d{1})\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*(\\d{1,2})"
+#define CREG6 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])"
 
 /* +CREG: <n>,<stat>,<lac>,<ci>,<AcT?>,<something> (Samsung Wave S8500) */
 /* '<CR><LF>+CREG: 2,1,000B,2816, B, C2816<CR><LF><CR><LF>OK<CR><LF>' */
-#define CREG7 "\\+(CREG|CGREG):\\s*(\\d{1}),\\s*(\\d{1})\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*[^,\\s]*"
+#define CREG7 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*[^,\\s]*"
 
 /* +CREG: <stat>,<lac>,<ci>,<AcT>,<RAC> (ETSI 27.007 v9.20 CREG=2 unsolicited with RAC) */
 #define CREG8 "\\+(CREG|CGREG):\\s*(\\d{1})\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*(\\d{1,2})\\s*,\\s*([^,\\s]*)"
