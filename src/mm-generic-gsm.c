@@ -3861,8 +3861,10 @@ disconnect_flash_done (MMSerialPort *port,
     priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
     mm_port_set_connected (priv->data, FALSE);
 
-    /* Don't bother doing the CGACT again if it was done on a secondary port */
-    if (mm_callback_info_get_data (info, DISCONNECT_CGACT_DONE_TAG))
+    /* Don't bother doing the CGACT again if it was done on a secondary port,
+     * or if no GPRS activation was done before. */
+    if (   mm_callback_info_get_data (info, DISCONNECT_CGACT_DONE_TAG)
+        || !ps_network_supported (MM_GENERIC_GSM (info->modem)))
         disconnect_all_done (MM_AT_SERIAL_PORT (priv->primary), NULL, NULL, info);
     else {
         disconnect_send_cgact (MM_AT_SERIAL_PORT (priv->primary),
