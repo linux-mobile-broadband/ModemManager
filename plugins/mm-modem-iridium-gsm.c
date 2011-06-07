@@ -217,6 +217,24 @@ get_sim_iccid (MMGenericGsm *modem,
 }
 
 static void
+get_operator_name (MMGenericGsm *modem,
+                   MMModemStringFn callback,
+                   gpointer callback_data)
+{
+    /* Only "IRIDIUM" operator name is assumed */
+    callback (MM_MODEM (modem), "IRIDIUM", NULL, callback_data);
+}
+
+static void
+get_operator_code (MMGenericGsm *modem,
+                   MMModemStringFn callback,
+                   gpointer callback_data)
+{
+    /* Only "90103" operator code is assumed */
+    callback (MM_MODEM (modem), "90103", NULL, callback_data);
+}
+
+static void
 set_property (GObject *object,
               guint prop_id,
               const GValue *value,
@@ -326,5 +344,7 @@ mm_modem_iridium_gsm_class_init (MMModemIridiumGsmClass *klass)
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->get_sim_iccid = get_sim_iccid;
+    gsm_class->get_operator_name = get_operator_name;
+    gsm_class->get_operator_code = get_operator_code;
 }
 

@@ -3236,7 +3236,7 @@ mm_generic_gsm_set_reg_status (MMGenericGsm *self,
                 g_assert (MM_GENERIC_GSM_GET_CLASS (self)->get_operator_name);
                 MM_GENERIC_GSM_GET_CLASS (self)->get_operator_name (self, get_operator_name_done, NULL);
                 g_assert (MM_GENERIC_GSM_GET_CLASS (self)->get_operator_code);
-                MM_GENERIC_GSM_GET_CLASS (self)->get_operator_name (self, get_operator_code_done, NULL);
+                MM_GENERIC_GSM_GET_CLASS (self)->get_operator_code (self, get_operator_code_done, NULL);
             }
 
             /* And update signal quality and access technology */
