@@ -155,6 +155,15 @@ typedef struct {
                            MMModemStringFn callback,
                            gpointer user_data);
 
+    /* Called by the generic class to retrieve the Operator's name */
+    void (*get_operator_name) (MMGenericGsm *self,
+                               MMModemStringFn callback,
+                               gpointer user_data);
+
+    /* Called by the generic class to retrieve the Operator's code */
+    void (*get_operator_code) (MMGenericGsm *self,
+                               MMModemStringFn callback,
+                               gpointer user_data);
 } MMGenericGsmClass;
 
 GType mm_generic_gsm_get_type (void);

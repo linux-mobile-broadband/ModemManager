@@ -146,15 +146,6 @@ typedef struct {
 } MMGenericGsmPrivate;
 
 static void get_registration_status (MMAtSerialPort *port, MMCallbackInfo *info);
-static void read_operator_code_done (MMAtSerialPort *port,
-                                     GString *response,
-                                     GError *error,
-                                     gpointer user_data);
-
-static void read_operator_name_done (MMAtSerialPort *port,
-                                     GString *response,
-                                     GError *error,
-                                     gpointer user_data);
 
 static void reg_state_changed (MMAtSerialPort *port,
                                GMatchInfo *match_info,
@@ -2984,6 +2975,30 @@ reg_info_updated (MMGenericGsm *self,
     }
 }
 
+static void
+get_operator_name_done (MMModem *self,
+                        const char *operator_name,
+                        GError *error,
+                        gpointer user_data)
+{
+    if (!error && operator_name)
+        reg_info_updated (MM_GENERIC_GSM (self), FALSE, MM_GENERIC_GSM_REG_TYPE_UNKNOWN, 0,
+                          FALSE, NULL,
+                          TRUE, operator_name);
+}
+
+static void
+get_operator_code_done (MMModem *self,
+                        const char *operator_code,
+                        GError *error,
+                        gpointer user_data)
+{
+    if (!error && operator_code)
+        reg_info_updated (MM_GENERIC_GSM (self), FALSE, MM_GENERIC_GSM_REG_TYPE_UNKNOWN, 0,
+                          TRUE, operator_code,
+                          FALSE, NULL);
+}
+
 static char *
 parse_operator (const char *reply, MMModemCharset cur_charset)
 {
@@ -3028,42 +3043,104 @@ parse_operator (const char *reply, MMModemCharset cur_charset)
 }
 
 static void
-read_operator_code_done (MMAtSerialPort *port,
-                         GString *response,
-                         GError *error,
-                         gpointer user_data)
+real_get_operator_code_done (MMAtSerialPort *port,
+                             GString *response,
+                             GError *error,
+                             gpointer user_data)
 {
-    MMGenericGsm *self = MM_GENERIC_GSM (user_data);
-    char *oper;
+    MMCallbackInfo *info = user_data;
 
-    if (!error) {
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else {
+        char *oper;
+
+        /* Note that parse_operator() returns a newly allocated string */
         oper = parse_operator (response->str, MM_MODEM_CHARSET_UNKNOWN);
-        if (oper) {
-            reg_info_updated (self, FALSE, MM_GENERIC_GSM_REG_TYPE_UNKNOWN, 0,
-                              TRUE, oper,
-                              FALSE, NULL);
-        }
+        if (oper)
+            mm_callback_info_set_result (info, oper, g_free);
+        else
+            info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                               MM_MODEM_ERROR_GENERAL,
+                                               "Could not parse the +COPS response");
     }
+
+    mm_callback_info_schedule (info);
 }
 
 static void
-read_operator_name_done (MMAtSerialPort *port,
-                         GString *response,
-                         GError *error,
-                         gpointer user_data)
+real_get_operator_name_done (MMAtSerialPort *port,
+                             GString *response,
+                             GError *error,
+                             gpointer user_data)
 {
-    MMGenericGsm *self = MM_GENERIC_GSM (user_data);
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
-    char *oper;
+    MMCallbackInfo *info = user_data;
 
-    if (!error) {
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else {
+        MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+        char *oper;
+
+        /* Note that parse_operator() returns a newly allocated string */
         oper = parse_operator (response->str, priv->cur_charset);
-        if (oper) {
-            reg_info_updated (self, FALSE, MM_GENERIC_GSM_REG_TYPE_UNKNOWN, 0,
-                              FALSE, NULL,
-                              TRUE, oper);
-        }
+        if (oper)
+            mm_callback_info_set_result (info, oper, g_free);
+        else
+            info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                               MM_MODEM_ERROR_GENERAL,
+                                               "Could not parse the +COPS response");
     }
+
+    mm_callback_info_schedule (info);
+}
+
+static void
+real_get_operator_name (MMGenericGsm *self,
+                        MMModemStringFn callback,
+                        gpointer callback_data)
+{
+    MMAtSerialPort *port;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_string_new (MM_MODEM (self), callback, callback_data);
+
+    port = mm_generic_gsm_get_best_at_port (self, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_at_serial_port_queue_command (port, "+COPS=3,0;+COPS?", 3, real_get_operator_name_done, info);
+}
+
+static void
+real_get_operator_code (MMGenericGsm *self,
+                        MMModemStringFn callback,
+                        gpointer callback_data)
+{
+    MMAtSerialPort *port;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_string_new (MM_MODEM (self), callback, callback_data);
+
+    port = mm_generic_gsm_get_best_at_port (self, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_at_serial_port_queue_command (port, "+COPS=3,2;+COPS?", 3, real_get_operator_code_done, info);
 }
 
 /* Registration */
@@ -3156,8 +3233,10 @@ mm_generic_gsm_set_reg_status (MMGenericGsm *self,
         } else {
             /* Grab the new operator name and MCC/MNC */
             if (port) {
-                mm_at_serial_port_queue_command (port, "+COPS=3,2;+COPS?", 3, read_operator_code_done, self);
-                mm_at_serial_port_queue_command (port, "+COPS=3,0;+COPS?", 3, read_operator_name_done, self);
+                g_assert (MM_GENERIC_GSM_GET_CLASS (self)->get_operator_name);
+                MM_GENERIC_GSM_GET_CLASS (self)->get_operator_name (self, get_operator_name_done, NULL);
+                g_assert (MM_GENERIC_GSM_GET_CLASS (self)->get_operator_code);
+                MM_GENERIC_GSM_GET_CLASS (self)->get_operator_name (self, get_operator_code_done, NULL);
             }
 
             /* And update signal quality and access technology */
@@ -6751,6 +6830,8 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
     klass->do_enable_power_up_done = real_do_enable_power_up_done;
     klass->do_disconnect = real_do_disconnect;
     klass->get_sim_iccid = real_get_sim_iccid;
+    klass->get_operator_name = real_get_operator_name;
+    klass->get_operator_code = real_get_operator_code;
 
     /* Properties */
     g_object_class_override_property (object_class,
