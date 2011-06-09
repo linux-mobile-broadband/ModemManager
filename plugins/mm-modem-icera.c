@@ -359,13 +359,48 @@ icera_disconnect_done (MMModem *modem,
 }
 
 static void
+query_network_error_code_done (MMAtSerialPort *port,
+                               GString *response,
+                               GError *error,
+                               gpointer user_data)
+{
+    MMModemIcera *self = MM_MODEM_ICERA (user_data);
+    MMModemIceraPrivate *priv = MM_MODEM_ICERA_GET_PRIVATE (self);
+    MMCallbackInfo *info = priv->connect_pending_data;
+    int nw_activation_err;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if ((error == NULL) && g_str_has_prefix (response->str, "%IER: ")) {
+        if (sscanf (response->str + 6, "%*d,%*d,%d", &nw_activation_err)) {
+            /* 3GPP TS 24.008 Annex G error codes:
+             * 27 - Unknown or missing access point name
+             * 33 - Requested service option not subscribed
+             */
+            if (nw_activation_err == 27 || nw_activation_err == 33)
+                info->error = mm_mobile_error_for_code (MM_MOBILE_ERROR_GPRS_NOT_SUBSCRIBED);
+        }
+    }
+
+    if (info->error == NULL) {
+        /* Generic error since parsing the specific one didn't work */
+        info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                           MM_MODEM_ERROR_GENERAL,
+                                           "Call setup failed");
+    }
+    connect_pending_done (self);
+}
+
+static void
 connection_enabled (MMAtSerialPort *port,
                     GMatchInfo *match_info,
                     gpointer user_data)
 {
     MMModemIcera *self = MM_MODEM_ICERA (user_data);
-    MMModemIceraPrivate *priv = MM_MODEM_ICERA_GET_PRIVATE (self);
-    MMCallbackInfo *info = priv->connect_pending_data;
+    MMAtSerialPort *primary;
     char *str;
     int status, cid, tmp;
 
@@ -402,12 +437,11 @@ connection_enabled (MMAtSerialPort *port,
         break;
     case 3:
         /* Call setup failure? */
-        if (info) {
-            info->error = g_error_new_literal (MM_MODEM_ERROR,
-                                               MM_MODEM_ERROR_GENERAL,
-                                               "Call setup failed");
-        }
-        connect_pending_done (self);
+        primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM(self), MM_PORT_TYPE_PRIMARY);
+        g_assert (primary);
+        /* Get additional error details */
+        mm_at_serial_port_queue_command (primary, "AT%IER?", 3,
+                                         query_network_error_code_done, self);
         break;
     default:
         mm_warn ("Unknown Icera connect status %d", status);
@@ -850,4 +884,3 @@ mm_modem_icera_get_type (void)
 
     return icera_type;
 }
-
