@@ -192,11 +192,13 @@ nwstate_to_act (const char *str)
         return MM_MODEM_GSM_ACCESS_TECH_UMTS;
     else if (!strcmp (str, "3g"))
         return MM_MODEM_GSM_ACCESS_TECH_UMTS;
-    else if (!strcmp (str, "3G-HSDPA"))
+    else if (!strcmp (str, "R99"))
+        return MM_MODEM_GSM_ACCESS_TECH_UMTS;
+    else if (!strcmp (str, "3G-HSDPA") || !strcmp (str, "HSDPA"))
         return MM_MODEM_GSM_ACCESS_TECH_HSDPA;
-    else if (!strcmp (str, "3G-HSUPA"))
+    else if (!strcmp (str, "3G-HSUPA") || !strcmp (str, "HSUPA"))
         return MM_MODEM_GSM_ACCESS_TECH_HSUPA;
-    else if (!strcmp (str, "3G-HSDPA-HSUPA"))
+    else if (!strcmp (str, "3G-HSDPA-HSUPA") || !strcmp (str, "HSDPA-HSUPA"))
         return MM_MODEM_GSM_ACCESS_TECH_HSPA;
 
     return MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
