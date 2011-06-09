@@ -938,24 +938,24 @@ handle_uevent (GUdevClient *client,
                gpointer user_data)
 {
     MMManager *self = MM_MANAGER (user_data);
-	const char *subsys;
+    const char *subsys;
 
-	g_return_if_fail (action != NULL);
+    g_return_if_fail (action != NULL);
 
-	/* A bit paranoid */
-	subsys = g_udev_device_get_subsystem (device);
-	g_return_if_fail (subsys != NULL);
+    /* A bit paranoid */
+    subsys = g_udev_device_get_subsystem (device);
+    g_return_if_fail (subsys != NULL);
 
-	g_return_if_fail (!strcmp (subsys, "tty") || !strcmp (subsys, "net") || !strcmp (subsys, "usb"));
+    g_return_if_fail (!strcmp (subsys, "tty") || !strcmp (subsys, "net") || !strcmp (subsys, "usb"));
 
-	/* We only care about tty/net devices when adding modem ports,
-	 * but for remove, also handle usb parent device remove events
-	 */
-	if (   (!strcmp (action, "add") || !strcmp (action, "move") || !strcmp (action, "change"))
+    /* We only care about tty/net devices when adding modem ports,
+     * but for remove, also handle usb parent device remove events
+     */
+    if (   (!strcmp (action, "add") || !strcmp (action, "move") || !strcmp (action, "change"))
         && (strcmp (subsys, "usb") != 0))
-		device_added (self, device);
-	else if (!strcmp (action, "remove"))
-		device_removed (self, device);
+        device_added (self, device);
+    else if (!strcmp (action, "remove"))
+        device_removed (self, device);
 }
 
 static void
