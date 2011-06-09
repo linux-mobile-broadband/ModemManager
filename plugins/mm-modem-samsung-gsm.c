@@ -478,8 +478,12 @@ disable (MMModem *modem,
     primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
     g_assert (primary);
 
-    /* Random command to ensure unsolicited message disable completes */
-    mm_at_serial_port_queue_command (primary, "AT+CFUN=0", 5, disable_unsolicited_done, info);
+    /*
+     * Command to ensure unsolicited message disable completes.
+     * Turns the radios off, which seems like a reasonable
+     * think to do when disabling.
+     */
+    mm_at_serial_port_queue_command (primary, "AT+CFUN=4", 5, disable_unsolicited_done, info);
 }
 
 static void
