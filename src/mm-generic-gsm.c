@@ -120,7 +120,11 @@ typedef struct {
     gboolean loc_enabled;
     gboolean loc_signal;
 
+    gboolean ussd_enabled;
+    MMCallbackInfo *pending_ussd_info;
     MMModemGsmUssdState ussd_state;
+    char *ussd_network_request;
+    char *ussd_network_notification;
 
     /* SMS */
     GHashTable *sms_present;
@@ -171,6 +175,10 @@ static void ciev_received (MMAtSerialPort *port,
                            gpointer user_data);
 
 static void cmti_received (MMAtSerialPort *port,
+                           GMatchInfo *info,
+                           gpointer user_data);
+
+static void cusd_received (MMAtSerialPort *port,
                            GMatchInfo *info,
                            gpointer user_data);
 
@@ -844,6 +852,10 @@ mm_generic_gsm_grab_port (MMGenericGsm *self,
         mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, cmti_received, self, NULL);
         g_regex_unref (regex);
 
+        regex = g_regex_new ("\\r\\n\\+CUSD:\\s*(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, cusd_received, self, NULL);
+        g_regex_unref (regex);
+
         if (ptype == MM_PORT_TYPE_PRIMARY) {
             priv->primary = MM_AT_SERIAL_PORT (port);
             if (!priv->data) {
@@ -1412,6 +1424,21 @@ cind_cb (MMAtSerialPort *port,
     }
 }
 
+static void
+cusd_enable_cb (MMAtSerialPort *port,
+                GString *response,
+                GError *error,
+                gpointer user_data)
+{
+    if (error) {
+        mm_warn ("(%s): failed to enable USSD notifications.",
+                 mm_port_get_device (MM_PORT (port)));
+        return;
+    }
+
+    MM_GENERIC_GSM_GET_PRIVATE (user_data)->ussd_enabled = TRUE;
+}
+
 void
 mm_generic_gsm_enable_complete (MMGenericGsm *self,
                                 GError *error,
@@ -1461,6 +1488,9 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
     if (cmd && strlen (cmd))
         mm_at_serial_port_queue_command (priv->primary, cmd, 3, NULL, NULL);
     g_free (cmd);
+
+    /* Enable USSD notifications */
+    mm_at_serial_port_queue_command (priv->primary, "+CUSD=1", 3, cusd_enable_cb, self);
 
     mm_at_serial_port_queue_command (priv->primary, "+CIND=?", 3, cind_cb, self);
 
@@ -1689,6 +1719,11 @@ disable_flash_done (MMSerialPort *port,
     mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "+CREG=0", 3, NULL, NULL);
     mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "+CGREG=0", 3, NULL, NULL);
 
+    if (priv->ussd_enabled) {
+        mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "+CUSD=0", 3, NULL, NULL);
+        priv->ussd_enabled = FALSE;
+    }
+
     if (priv->cmer_enabled) {
         mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "+CMER=0", 3, NULL, NULL);
 
@@ -1731,6 +1766,8 @@ disable (MMModem *modem,
     priv->cid = -1;
 
     mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (modem));
+
+    mm_generic_gsm_ussd_cleanup (MM_GENERIC_GSM (modem));
 
     if (priv->poll_id) {
         g_source_remove (priv->poll_id);
@@ -4676,6 +4713,143 @@ ussd_update_state (MMGenericGsm *self, MMModemGsmUssdState new_state)
     }
 }
 
+void
+mm_generic_gsm_ussd_cleanup (MMGenericGsm *self)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    if (priv->pending_ussd_info) {
+        /* And schedule the callback */
+        g_clear_error (&priv->pending_ussd_info->error);
+        priv->pending_ussd_info->error = g_error_new_literal (MM_MODEM_ERROR,
+                                                              MM_MODEM_ERROR_GENERAL,
+                                                              "USSD session terminated without reply.");
+        mm_callback_info_schedule (priv->pending_ussd_info);
+        priv->pending_ussd_info = NULL;
+    }
+
+    ussd_update_state (self, MM_MODEM_GSM_USSD_STATE_IDLE);
+
+    g_free (priv->ussd_network_request);
+    priv->ussd_network_request = NULL;
+    g_object_notify (G_OBJECT (self), MM_MODEM_GSM_USSD_NETWORK_REQUEST);
+
+    g_free (priv->ussd_network_notification);
+    priv->ussd_network_notification = NULL;
+    g_object_notify (G_OBJECT (self), MM_MODEM_GSM_USSD_NETWORK_NOTIFICATION);
+}
+
+static char *
+decode_ussd_response (const char *reply, MMModemCharset cur_charset)
+{
+    char **items, **iter, *p;
+    char *str = NULL;
+    gint encoding = -1;
+
+    /* Look for the first ',' */
+    p = strchr (reply, ',');
+    if (p == NULL)
+        return NULL;
+
+    items = g_strsplit_set (p + 1, " ,", -1);
+    for (iter = items; iter && *iter; iter++) {
+        if (*iter[0] == '\0')
+            continue;
+        if (str == NULL)
+            str = *iter;
+        else if (encoding == -1) {
+            encoding = atoi (*iter);
+            mm_dbg ("USSD data coding scheme %d", encoding);
+            break;  /* All done */
+        }
+    }
+
+    /* Strip quotes */
+    if (str[0] == '"')
+        str++;
+    p = strchr (str, '"');
+    if (p)
+        *p = '\0';
+
+    /* FIXME: actually use the given encoding scheme */
+    return mm_modem_charset_hex_to_utf8 (str, cur_charset);
+}
+
+static void
+cusd_received (MMAtSerialPort *port,
+               GMatchInfo *info,
+               gpointer user_data)
+{
+    MMGenericGsm *self = MM_GENERIC_GSM (user_data);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    GError *error = NULL;
+    gint status;
+    MMModemGsmUssdState ussd_state = MM_MODEM_GSM_USSD_STATE_IDLE;
+    char *reply = NULL, *converted;
+
+    reply = g_match_info_fetch (info, 1);
+    if (!reply || !isdigit (*reply)) {
+        mm_warn ("Recieved invalid USSD response: '%s'", reply ? reply : "(none)");
+        g_free (reply);
+        return;
+    }
+
+    status = g_ascii_digit_value (*reply);
+    switch (status) {
+    case 0: /* no further action required */
+        converted = decode_ussd_response (reply, priv->cur_charset);
+        if (priv->pending_ussd_info) {
+            /* Response to the user's request */
+            mm_callback_info_set_result (priv->pending_ussd_info, converted, g_free);
+        } else {
+            /* Network-initiated USSD-Notify */
+            g_free (priv->ussd_network_notification);
+            priv->ussd_network_notification = converted;
+            g_object_notify (G_OBJECT (self), MM_MODEM_GSM_USSD_NETWORK_NOTIFICATION);
+        }
+        break;
+    case 1: /* further action required */
+        ussd_state = MM_MODEM_GSM_USSD_STATE_USER_RESPONSE;
+        converted = decode_ussd_response (reply, priv->cur_charset);
+        if (priv->pending_ussd_info) {
+            mm_callback_info_set_result (priv->pending_ussd_info, converted, g_free);
+        } else {
+            /* Network-initiated USSD-Request */
+            g_free (priv->ussd_network_request);
+            priv->ussd_network_request = converted;
+            g_object_notify (G_OBJECT (self), MM_MODEM_GSM_USSD_NETWORK_REQUEST);
+        }
+        break;
+    case 2:
+        error = g_error_new_literal (MM_MODEM_ERROR,
+                                     MM_MODEM_ERROR_GENERAL,
+                                     "USSD terminated by network.");
+        break;
+    case 4:
+        error = g_error_new_literal (MM_MODEM_ERROR,
+                                     MM_MODEM_ERROR_GENERAL,
+                                     "Operation not supported.");
+        break;
+    default:
+        error = g_error_new (MM_MODEM_ERROR,
+                             MM_MODEM_ERROR_GENERAL,
+                             "Unhandled USSD reply %d", status);
+        break;
+    }
+
+    ussd_update_state (self, ussd_state);
+
+    if (priv->pending_ussd_info) {
+        if (error)
+            priv->pending_ussd_info->error = g_error_copy (error);
+        mm_callback_info_schedule (priv->pending_ussd_info);
+        priv->pending_ussd_info = NULL;
+    }
+
+    g_clear_error (&error);
+    g_free (reply);
+}
+
 static void
 ussd_send_done (MMAtSerialPort *port,
                 GString *response,
@@ -4684,85 +4858,26 @@ ussd_send_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMGenericGsmPrivate *priv;
-    gint status;
-    gboolean parsed = FALSE;
-    MMModemGsmUssdState ussd_state = MM_MODEM_GSM_USSD_STATE_IDLE;
-    const char *str, *start = NULL, *end = NULL;
-    char *reply = NULL, *converted;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
     if (mm_callback_info_check_modem_removed (info))
         return;
 
-    if (error) {
-        info->error = g_error_copy (error);
-        goto done;
-    }
-
     priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
-    ussd_state = priv->ussd_state;
 
-    str = mm_strip_tag (response->str, "+CUSD:");
-    if (!str || !isdigit (*str))
-        goto done;
+    if (error) {
+        /* Some immediate error happened when sending the USSD request */
+        info->error = g_error_copy (error);
+        priv->pending_ussd_info = NULL;
+        mm_callback_info_schedule (info);
 
-    status = g_ascii_digit_value (*str);
-    switch (status) {
-    case 0: /* no further action required */
-        ussd_state = MM_MODEM_GSM_USSD_STATE_IDLE;
-        break;
-    case 1: /* further action required */
-        ussd_state = MM_MODEM_GSM_USSD_STATE_USER_RESPONSE;
-        break;
-    case 2:
-        info->error = g_error_new (MM_MODEM_ERROR,
-                                   MM_MODEM_ERROR_GENERAL,
-                                   "USSD terminated by network.");
-        ussd_state = MM_MODEM_GSM_USSD_STATE_IDLE;
-        break;
-    case 4:
-        info->error = g_error_new (MM_MODEM_ERROR,
-                                   MM_MODEM_ERROR_GENERAL,
-                                   "Operiation not supported.");
-        ussd_state = MM_MODEM_GSM_USSD_STATE_IDLE;
-        break;
-    default:
-        info->error = g_error_new (MM_MODEM_ERROR,
-                                   MM_MODEM_ERROR_GENERAL,
-                                   "Unknown USSD reply %d", status);
-        ussd_state = MM_MODEM_GSM_USSD_STATE_IDLE;
-        break;
-    }
-    if (info->error)
-        goto done;
-
-    /* look for the reply */
-    if ((start = strchr (str, '"')) && (end = strrchr (str, '"')) && (start != end))
-        reply = g_strndup (start + 1, end - start -1);
-
-    if (reply) {
-        /* look for the reply data coding scheme */
-        if ((start = strrchr (end, ',')) != NULL)
-            mm_dbg ("USSD data coding scheme %d", atoi (start + 1));
-
-        converted = mm_modem_charset_hex_to_utf8 (reply, priv->cur_charset);
-        mm_callback_info_set_result (info, converted, g_free);
-        parsed = TRUE;
-        g_free (reply);
+        ussd_update_state (MM_GENERIC_GSM (info->modem), MM_MODEM_GSM_USSD_STATE_IDLE);
     }
 
-done:
-    if (!parsed && !info->error) {
-        info->error = g_error_new (MM_MODEM_ERROR,
-                                   MM_MODEM_ERROR_GENERAL,
-                                   "Could not parse USSD reply '%s'",
-                                   response->str);
-    }
-    mm_callback_info_schedule (info);
-
-    if (info->modem)
-        ussd_update_state (MM_GENERIC_GSM (info->modem), ussd_state);
+    /* Otherwise if no error wait for the response to show up via the 
+     * unsolicited response code.
+     */
 }
 
 static void
@@ -4779,6 +4894,8 @@ ussd_send (MMModemGsmUssd *modem,
     MMAtSerialPort *port;
     gboolean success;
 
+    g_warn_if_fail (priv->pending_ussd_info == NULL);
+
     info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
 
     port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
@@ -4786,6 +4903,9 @@ ussd_send (MMModemGsmUssd *modem,
         mm_callback_info_schedule (info);
         return;
     }
+
+    /* Cache the callback info since the response is an unsolicited one */
+    priv->pending_ussd_info = info;
 
     /* encode to cur_charset */
     success = mm_modem_charset_byte_array_append (ussd_command, command, FALSE, priv->cur_charset);
@@ -5737,10 +5857,10 @@ get_property (GObject *object, guint prop_id,
         g_value_set_string (value, ussd_state_to_string (priv->ussd_state));
         break;
     case MM_GENERIC_GSM_PROP_USSD_NETWORK_REQUEST:
-        g_value_set_string (value, "");
+        g_value_set_string (value, priv->ussd_network_request);
         break;
     case MM_GENERIC_GSM_PROP_USSD_NETWORK_NOTIFICATION:
-        g_value_set_string (value, "");
+        g_value_set_string (value, priv->ussd_network_notification);
         break;
     case MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD:
         /* By default, try to set XOFF/XON flow control */
@@ -5769,6 +5889,7 @@ finalize (GObject *object)
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (object);
 
     mm_generic_gsm_pending_registration_stop (MM_GENERIC_GSM (object));
+    mm_generic_gsm_ussd_cleanup (MM_GENERIC_GSM (object));
 
     if (priv->pin_check_timeout) {
         g_source_remove (priv->pin_check_timeout);
