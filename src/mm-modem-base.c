@@ -60,6 +60,7 @@ typedef struct {
     guint32 unlock_retries;
     GArray *pin_retry_counts;
     guint32 ip_method;
+    guint32 ip_timeout;
     gboolean valid;
     MMModemState state;
 
@@ -925,6 +926,9 @@ set_property (GObject *object, guint prop_id,
     case MM_MODEM_PROP_IP_METHOD:
         priv->ip_method = g_value_get_uint (value);
         break;
+    case MM_MODEM_PROP_IP_TIMEOUT:
+        priv->ip_timeout = g_value_get_uint (value);
+        break;
     case MM_MODEM_PROP_VALID:
     case MM_MODEM_PROP_TYPE:
     case MM_MODEM_PROP_ENABLED:
@@ -996,6 +1000,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case MM_MODEM_PROP_IP_METHOD:
         g_value_set_uint (value, priv->ip_method);
+        break;
+    case MM_MODEM_PROP_IP_TIMEOUT:
+        g_value_set_uint (value, priv->ip_timeout);
         break;
     case MM_MODEM_PROP_VALID:
         g_value_set_boolean (value, priv->valid);
@@ -1104,6 +1111,10 @@ mm_modem_base_class_init (MMModemBaseClass *klass)
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_IP_METHOD,
                                       MM_MODEM_IP_METHOD);
+
+    g_object_class_override_property (object_class,
+                                      MM_MODEM_PROP_IP_TIMEOUT,
+                                      MM_MODEM_IP_TIMEOUT);
 
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_VALID,

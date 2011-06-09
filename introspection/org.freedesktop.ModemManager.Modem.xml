@@ -195,6 +195,12 @@
       </tp:docstring>
     </property>
 
+    <property name="IpTimeout" type="u" access="read">
+      <tp:docstring>
+        Maximum time to wait for a successful IP establishment, when PPP is used.
+      </tp:docstring>
+    </property>
+
     <!-- Enabled should be folded into this. -->
     <property name="State" type="u" access="read" tp:type="MM_MODEM_STATE">
       <tp:docstring>

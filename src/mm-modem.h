@@ -38,6 +38,7 @@
 #define MM_MODEM_DRIVER        "driver"
 #define MM_MODEM_TYPE          "type"
 #define MM_MODEM_IP_METHOD     "ip-method"
+#define MM_MODEM_IP_TIMEOUT    "ip-timeout"
 #define MM_MODEM_ENABLED       "enabled"
 #define MM_MODEM_EQUIPMENT_IDENTIFIER "equipment-identifier"
 #define MM_MODEM_DEVICE_IDENTIFIER "device-identifier"
@@ -71,7 +72,8 @@ typedef enum {
     MM_MODEM_PROP_DEVICE_IDENTIFIER,
     MM_MODEM_PROP_HW_VID,       /* Not exported */
     MM_MODEM_PROP_HW_PID,       /* Not exported */
-    MM_MODEM_PROP_NETWORK_TIMEZONE
+    MM_MODEM_PROP_NETWORK_TIMEZONE,
+    MM_MODEM_PROP_IP_TIMEOUT
 } MMModemProp;
 
 typedef struct _MMModem MMModem;

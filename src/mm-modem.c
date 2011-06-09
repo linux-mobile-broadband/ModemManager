@@ -862,6 +862,16 @@ mm_modem_init (gpointer g_iface)
 
     g_object_interface_install_property
         (g_iface,
+         g_param_spec_uint (MM_MODEM_IP_TIMEOUT,
+                            "IP timeout",
+                            "Maximum time to wait for a successful IP establishment, "
+                            "when PPP is used. Modems with special needs will set this "
+                            "property to a value greater than 0",
+                            0, G_MAXUINT32, 0,
+                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_interface_install_property
+        (g_iface,
          g_param_spec_boolean (MM_MODEM_VALID,
                                "Valid",
                                "Modem is valid",
