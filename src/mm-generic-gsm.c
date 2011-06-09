@@ -4811,9 +4811,8 @@ ussd_initiate (MMModemGsmUssd *modem,
     MMCallbackInfo *info;
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
 
-    info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
-
     if (priv->ussd_state != MM_MODEM_GSM_USSD_STATE_IDLE) {
+        info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
         info->error = g_error_new (MM_MODEM_ERROR,
                                    MM_MODEM_ERROR_GENERAL,
                                    "USSD session already active.");
@@ -4832,9 +4831,8 @@ ussd_respond (MMModemGsmUssd *modem,
     MMCallbackInfo *info;
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
 
-    info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
-
     if (priv->ussd_state != MM_MODEM_GSM_USSD_STATE_USER_RESPONSE) {
+        info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
         info->error = g_error_new (MM_MODEM_ERROR,
                                    MM_MODEM_ERROR_GENERAL,
                                    "No active USSD session, cannot respond.");
