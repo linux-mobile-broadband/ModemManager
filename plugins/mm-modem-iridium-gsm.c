@@ -70,7 +70,12 @@ mm_modem_iridium_gsm_new (const char *device,
                                    MM_MODEM_PLUGIN, plugin,
                                    MM_MODEM_HW_VID, vendor,
                                    MM_MODEM_HW_PID, product,
+                                   /* If up to 3 commands get timed out, mark
+                                    * the modem as removed */
                                    MM_MODEM_BASE_MAX_TIMEOUTS, 3,
+                                   /* Allow up to 200s to setup the IP configuration
+                                    * (used by NM when launching pppd) */
+                                   MM_MODEM_IP_TIMEOUT, 200,
                                    NULL));
 }
 
