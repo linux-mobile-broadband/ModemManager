@@ -375,6 +375,9 @@ libmm_plugin_samsung_la_LDFLAGS = \
 	-module \
 	-avoid-version
 
+libmm_plugin_samsung_la_LIBADD = \
+	$(builddir)/libicera-utils.la
+
 udevrulesdir = $(UDEV_BASE_DIR)/rules.d
 udevrules_DATA = \
 	77-mm-ericsson-mbm.rules \
