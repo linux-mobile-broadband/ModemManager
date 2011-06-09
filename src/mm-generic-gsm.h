@@ -153,6 +153,8 @@ MMModem *mm_generic_gsm_new (const char *device,
 
 void mm_generic_gsm_pending_registration_stop (MMGenericGsm *modem);
 
+void mm_generic_gsm_ussd_cleanup (MMGenericGsm *modem);
+
 gint mm_generic_gsm_get_cid (MMGenericGsm *modem);
 
 void mm_generic_gsm_set_reg_status (MMGenericGsm *modem,
