@@ -125,6 +125,10 @@ after_atz_sleep_cb (gpointer user_data)
     mm_at_serial_port_queue_command (port, "E0 V1", 10, NULL, NULL);
     mm_at_serial_port_queue_command (port, "+CMEE=1", 10, NULL, NULL);
 
+    /* Bearer service type set to 9600bps (V.110), which behaves better than the
+     * default 9600bps (V.32). */
+    mm_at_serial_port_queue_command (port, "+CBST=71,0,1", 3, NULL, NULL);
+
     mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), NULL, info);
 
     return FALSE;
