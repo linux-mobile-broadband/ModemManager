@@ -110,6 +110,75 @@ grab_port (MMModem *modem,
     return !!port;
 }
 
+static gboolean
+after_atz_sleep_cb (gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMAtSerialPort *port;
+
+    port = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (info->modem), MM_PORT_TYPE_PRIMARY);
+    g_assert (port);
+
+    /* And send remaining initialization commands here, we do not care about the
+     * responses. Note we also don't need a power-up command!
+     */
+    mm_at_serial_port_queue_command (port, "E0 V1", 10, NULL, NULL);
+    mm_at_serial_port_queue_command (port, "+CMEE=1", 10, NULL, NULL);
+
+    mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), NULL, info);
+
+    return FALSE;
+}
+
+static void
+atz_done (MMAtSerialPort *port,
+          GString *response,
+          GError *error,
+          gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error) {
+        mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
+    } else {
+        /* Once ATZ reply is received, we need to wait a bit before going on,
+         * otherwise, the next commands given will receive garbage as reply
+         * (500ms should be enough) */
+        g_timeout_add (500, after_atz_sleep_cb, info);
+    }
+}
+
+static void
+enable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (error)
+        mm_generic_gsm_enable_complete (MM_GENERIC_GSM (info->modem), error, info);
+    else {
+        /* Just ATZ alone first */
+        mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "Z", 3, atz_done, user_data);
+    }
+}
+
+static void
+do_enable (MMGenericGsm *modem, MMModemFn callback, gpointer user_data)
+{
+    MMCallbackInfo *info;
+    MMAtSerialPort *primary;
+
+    primary = mm_generic_gsm_get_at_port (modem, MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+
+    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+    mm_serial_port_flash (MM_SERIAL_PORT (primary), 100, FALSE, enable_flash_done, info);
+}
+
 static void
 set_allowed_mode (MMGenericGsm *gsm,
                   MMModemGsmAllowedMode mode,
@@ -288,10 +357,6 @@ get_property (GObject *object,
               GParamSpec *pspec)
 {
     switch (prop_id) {
-    case MM_GENERIC_GSM_PROP_POWER_UP_CMD:
-        /* No need for any special power up command */
-        g_value_set_string (value, "");
-        break;
     case MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD:
         /* Enable RTS/CTS flow control.
          * Other available values:
@@ -365,10 +430,6 @@ mm_modem_iridium_gsm_class_init (MMModemIridiumGsmClass *klass)
     object_class->set_property = set_property;
 
     g_object_class_override_property (object_class,
-                                      MM_GENERIC_GSM_PROP_POWER_UP_CMD,
-                                      MM_GENERIC_GSM_POWER_UP_CMD);
-
-    g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD,
                                       MM_GENERIC_GSM_FLOW_CONTROL_CMD);
 
@@ -384,6 +445,7 @@ mm_modem_iridium_gsm_class_init (MMModemIridiumGsmClass *klass)
                                       MM_GENERIC_GSM_PROP_PS_NETWORK_SUPPORTED,
                                       MM_GENERIC_GSM_PS_NETWORK_SUPPORTED);
 
+    gsm_class->do_enable = do_enable;
     gsm_class->get_access_technology = get_access_technology;
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;
