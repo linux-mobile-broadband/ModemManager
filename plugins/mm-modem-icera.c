@@ -221,7 +221,15 @@ nwstate_changed (MMAtSerialPort *port,
         g_free (str);
     }
 
-    str = g_match_info_fetch (info, 3);
+    /* Check the <connection state> field first for the connected access
+     * technology, otherwise if not connected (ie, "-") use the available
+     * access technology from the <tech> field.
+     */
+    str = g_match_info_fetch (info, 4);
+    if (!str || (strcmp (str, "-") == 0)) {
+        g_free (str);
+        str = g_match_info_fetch (info, 3);
+    }
     if (str) {
         act = nwstate_to_act (str);
         g_free (str);
@@ -753,7 +761,11 @@ mm_modem_icera_register_unsolicted_handlers (MMModemIcera *self,
 {
     GRegex *regex;
 
-    /* %NWSTATE: <rssi>,<mccmnc>,<tech>,<connected>,<regulation> */
+    /* %NWSTATE: <rssi>,<mccmnc>,<tech>,<connection state>,<regulation>
+     *
+     * <connection state> shows the actual access technology in-use when a
+     * PS connection is active.
+     */
     regex = g_regex_new ("\\r\\n%NWSTATE:\\s*(-?\\d+),(\\d+),([^,]*),([^,]*),(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     mm_at_serial_port_add_unsolicited_msg_handler (port, regex, nwstate_changed, self, NULL);
     g_regex_unref (regex);
