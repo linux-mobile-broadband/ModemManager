@@ -376,6 +376,9 @@ libmm_plugin_samsung_la_LDFLAGS = \
 	-module \
 	-avoid-version
 
+libmm_plugin_samsung_la_LIBADD = \
+	$(builddir)/libicera-utils.la
+
 # Cinterion (previously Siemens) modem
 
 libmm_plugin_cinterion_la_SOURCES = \
@@ -393,9 +396,6 @@ libmm_plugin_cinterion_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
 	-module \
 	-avoid-version
-
-libmm_plugin_samsung_la_LIBADD = \
-	$(builddir)/libicera-utils.la
 
 udevrulesdir = $(UDEV_BASE_DIR)/rules.d
 udevrules_DATA = \
