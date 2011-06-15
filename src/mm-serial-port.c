@@ -745,6 +745,7 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
     char *devfile;
     const char *device;
     struct serial_struct sinfo;
+    GTimeVal tv_start, tv_end;
 
     g_return_val_if_fail (MM_IS_SERIAL_PORT (self), FALSE);
 
@@ -758,6 +759,8 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
     }
 
     mm_info ("(%s) opening serial port...", device);
+
+    g_get_current_time (&tv_start);
 
     /* Only open a new file descriptor if we weren't given one already */
     if (priv->fd < 0) {
@@ -806,6 +809,11 @@ mm_serial_port_open (MMSerialPort *self, GError **error)
         sinfo.closing_wait = ASYNC_CLOSING_WAIT_NONE;
         ioctl (priv->fd, TIOCSSERIAL, &sinfo);
     }
+
+    g_get_current_time (&tv_end);
+
+    if (tv_end.tv_sec - tv_start.tv_sec > 7)
+        mm_warn ("(%s): open blocked by driver for more than 7 seconds!", device);
 
     priv->channel = g_io_channel_unix_new (priv->fd);
     g_io_channel_set_encoding (priv->channel, NULL, NULL);
@@ -896,8 +904,8 @@ mm_serial_port_close (MMSerialPort *self)
          * that data to send before giving up and returning from close().
          * Log that.  See GNOME bug #630670 for more details.
          */
-        if (tv_end.tv_sec - tv_start.tv_sec > 20)
-            mm_warn ("(%s): close blocked by driver for more than 20 seconds!", device);
+        if (tv_end.tv_sec - tv_start.tv_sec > 7)
+            mm_warn ("(%s): close blocked by driver for more than 7 seconds!", device);
     }
 
     /* Clear the command queue */
