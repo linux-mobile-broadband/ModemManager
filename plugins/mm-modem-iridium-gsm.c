@@ -184,6 +184,78 @@ do_enable (MMGenericGsm *modem, MMModemFn callback, gpointer user_data)
 }
 
 static void
+disconnect_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error) {
+        /* Ignore "NO CARRIER" response when modem disconnects and any flash
+         * failures we might encounter.  Other errors are hard errors.
+         */
+        if (   !g_error_matches (error, MM_MODEM_CONNECT_ERROR, MM_MODEM_CONNECT_ERROR_NO_CARRIER)
+            && !g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_FLASH_FAILED)) {
+            info->error = g_error_copy (error);
+            mm_callback_info_schedule (info);
+            return;
+        }
+    }
+
+    /* Send ATE0 after reopening, and continue */
+    mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "E0", 3, NULL, NULL);
+    mm_callback_info_schedule (info);
+}
+
+static gboolean
+after_disconnect_sleep_cb (gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *)user_data;
+    MMAtSerialPort *primary;
+    GError *error = NULL;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return FALSE;
+
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (info->modem), MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+
+    /* Propagate errors when reopening the port */
+    if (!mm_serial_port_open (MM_SERIAL_PORT (primary), &error)) {
+        info->error = g_error_copy (error);
+        mm_callback_info_schedule (info);
+    }
+
+    mm_serial_port_flash (MM_SERIAL_PORT (primary), 1000, TRUE, disconnect_flash_done, info);
+    return FALSE;
+}
+
+static void
+do_disconnect (MMGenericGsm *gsm,
+               gint cid,
+               MMModemFn callback,
+               gpointer user_data)
+{
+    MMCallbackInfo *info;
+    MMAtSerialPort *primary;
+
+    info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
+
+    primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+
+    /* Close the serial port and wait some seconds before reopening it */
+    mm_serial_port_close (MM_SERIAL_PORT (primary));
+    mm_dbg ("Waiting some seconds before reopening the port...");
+    g_timeout_add_seconds (5, after_disconnect_sleep_cb, info);
+}
+
+static void
 set_allowed_mode (MMGenericGsm *gsm,
                   MMModemGsmAllowedMode mode,
                   MMModemFn callback,
@@ -450,6 +522,7 @@ mm_modem_iridium_gsm_class_init (MMModemIridiumGsmClass *klass)
                                       MM_GENERIC_GSM_PS_NETWORK_SUPPORTED);
 
     gsm_class->do_enable = do_enable;
+    gsm_class->do_disconnect = do_disconnect;
     gsm_class->get_access_technology = get_access_technology;
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;
