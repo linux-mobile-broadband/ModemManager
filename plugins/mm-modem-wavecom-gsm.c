@@ -227,6 +227,11 @@ get_property (GObject *object,
         /* Wavecom doesn't have XOFF/XON flow control, so we enable RTS/CTS */
         g_value_set_string (value, "+IFC=2,2");
         break;
+    case MM_GENERIC_GSM_PROP_POWER_DOWN_CMD:
+        /* Use AT+CFUN=4 for power down. It will stop the RF (IMSI detach), and
+         * keeps access to the SIM */
+        g_value_set_string (value, "+CFUN=4");
+        break;
     default:
         break;
     }
@@ -1178,6 +1183,10 @@ mm_modem_wavecom_gsm_class_init (MMModemWavecomGsmClass *klass)
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD,
                                       MM_GENERIC_GSM_FLOW_CONTROL_CMD);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_POWER_DOWN_CMD,
+                                      MM_GENERIC_GSM_POWER_DOWN_CMD);
 
     gsm_class->do_enable_power_up_check_needed = do_enable_power_up_check_needed;
     gsm_class->do_enable_power_up_done = do_enable_power_up_done;
