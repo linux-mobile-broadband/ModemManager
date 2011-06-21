@@ -218,10 +218,10 @@ get_property (GObject *object,
 {
     switch (prop_id) {
     case MM_GENERIC_GSM_PROP_POWER_UP_CMD:
-        /* Wavecom doesn't like CFUN=1, it will reset the whole software stack,
-         * including the USB connection and therefore connection would get
-         * closed */
-        g_value_set_string (value, "");
+        /* Try to go to full functionality mode without rebooting the system.
+         * Works well if we previously switched off the power with CFUN=4
+         */
+        g_value_set_string (value, "+CFUN=1,0");
         break;
     case MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD:
         /* Wavecom doesn't have XOFF/XON flow control, so we enable RTS/CTS */
