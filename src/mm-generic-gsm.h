@@ -84,7 +84,15 @@ typedef struct {
      * encountered during the process and the MMCallbackInfo created from the
      * callback and user_data passed in here.
      */
-    void (*do_enable) (MMGenericGsm *self, MMModemFn callback, gpointer user_data);
+    void (*do_enable) (MMGenericGsm *self,
+                       MMModemFn callback,
+                       gpointer user_data);
+
+    /* Called before issuing the power-up command, to check whether it should
+     * really be issued or not. */
+    void (*do_enable_power_up_check_needed) (MMGenericGsm *self,
+                                             MMModemUIntFn callback,
+                                             gpointer user_data);
 
     /* Called after the generic class has attempted to power up the modem.
      * Subclasses can handle errors here if they know the device supports their
@@ -137,6 +145,7 @@ typedef struct {
     void (*get_sim_iccid) (MMGenericGsm *self,
                            MMModemStringFn callback,
                            gpointer user_data);
+
 } MMGenericGsmClass;
 
 GType mm_generic_gsm_get_type (void);

@@ -1780,6 +1780,27 @@ enable_done (MMAtSerialPort *port,
 }
 
 static void
+enable_power_up_check_needed_done (MMModem *self,
+                                   guint32 needed,
+                                   GError *error,
+                                   gpointer user_data)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    char *cmd = NULL;
+
+    if (needed)
+        g_object_get (G_OBJECT (self), MM_GENERIC_GSM_POWER_UP_CMD, &cmd, NULL);
+    else
+        mm_dbg ("Power-up not needed, skipping...");
+
+    if (cmd && strlen (cmd))
+        mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (priv->primary), cmd, 5, enable_done, user_data);
+    else
+        enable_done (MM_AT_SERIAL_PORT (priv->primary), NULL, NULL, user_data);
+    g_free (cmd);
+}
+
+static void
 init_done (MMAtSerialPort *port,
            GString *response,
            GError *error,
@@ -1812,12 +1833,13 @@ init_done (MMAtSerialPort *port,
     mm_at_serial_port_queue_command (port, cmd, 2, NULL, NULL);
     g_free (cmd);
 
-    g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_POWER_UP_CMD, &cmd, NULL);
-    if (cmd && strlen (cmd))
-        mm_at_serial_port_queue_command (port, cmd, 5, enable_done, user_data);
+    /* Plugins can now check if they need the power up command or not */
+    if (MM_GENERIC_GSM_GET_CLASS (info->modem)->do_enable_power_up_check_needed)
+        MM_GENERIC_GSM_GET_CLASS (info->modem)->do_enable_power_up_check_needed (MM_GENERIC_GSM (info->modem),
+                                                                                 enable_power_up_check_needed_done,
+                                                                                 info);
     else
-        enable_done (port, NULL, NULL, user_data);
-    g_free (cmd);
+        enable_power_up_check_needed_done (info->modem, TRUE, NULL, info);
 }
 
 static void
@@ -5199,7 +5221,7 @@ ussd_send_done (MMAtSerialPort *port,
         ussd_update_state (MM_GENERIC_GSM (info->modem), MM_MODEM_GSM_USSD_STATE_IDLE);
     }
 
-    /* Otherwise if no error wait for the response to show up via the 
+    /* Otherwise if no error wait for the response to show up via the
      * unsolicited response code.
      */
 }
