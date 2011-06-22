@@ -45,6 +45,7 @@ enum {
     PROP_SEND_DELAY,
     PROP_FD,
     PROP_SPEW_CONTROL,
+    PROP_RTS_CTS,
 
     LAST_PROP
 };
@@ -78,6 +79,7 @@ typedef struct {
     guint stopbits;
     guint64 send_delay;
     gboolean spew_control;
+    gboolean rts_cts;
 
     guint queue_id;
     guint watch_id;
@@ -1059,6 +1061,7 @@ get_speed (MMSerialPort *self, speed_t *speed, GError **error)
 static gboolean
 set_speed (MMSerialPort *self, speed_t speed, GError **error)
 {
+    MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (self);
     struct termios options;
     int fd, count = 4;
     gboolean success = FALSE;
@@ -1078,6 +1081,10 @@ set_speed (MMSerialPort *self, speed_t speed, GError **error)
     cfsetispeed (&options, speed);
     cfsetospeed (&options, speed);
     options.c_cflag |= (CLOCAL | CREAD);
+
+    /* Configure flow control as well here */
+    if (priv->rts_cts)
+        options.c_cflag |= (CRTSCTS);
 
     while (count-- > 0) {
         if (tcsetattr (fd, TCSANOW, &options) == 0) {
@@ -1311,6 +1318,9 @@ set_property (GObject *object, guint prop_id,
     case PROP_SPEW_CONTROL:
         priv->spew_control = g_value_get_boolean (value);
         break;
+    case PROP_RTS_CTS:
+        priv->rts_cts = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -1344,6 +1354,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case PROP_SPEW_CONTROL:
         g_value_set_boolean (value, priv->spew_control);
+        break;
+    case PROP_RTS_CTS:
+        g_value_set_boolean (value, priv->rts_cts);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1452,6 +1465,14 @@ mm_serial_port_class_init (MMSerialPortClass *klass)
          g_param_spec_boolean (MM_SERIAL_PORT_SPEW_CONTROL,
                                "SpewControl",
                                "Spew control",
+                               FALSE,
+                               G_PARAM_READWRITE));
+
+    g_object_class_install_property
+        (object_class, PROP_RTS_CTS,
+         g_param_spec_boolean (MM_SERIAL_PORT_RTS_CTS,
+                               "RTSCTS",
+                               "Enable RTS/CTS flow control",
                                FALSE,
                                G_PARAM_READWRITE));
 

@@ -35,6 +35,7 @@
 #define MM_SERIAL_PORT_PARITY       "parity"
 #define MM_SERIAL_PORT_STOPBITS     "stopbits"
 #define MM_SERIAL_PORT_SEND_DELAY   "send-delay"
+#define MM_SERIAL_PORT_RTS_CTS      "rts-cts"
 #define MM_SERIAL_PORT_FD           "fd" /* Construct-only */
 #define MM_SERIAL_PORT_SPEW_CONTROL "spew-control" /* Construct-only */
 
