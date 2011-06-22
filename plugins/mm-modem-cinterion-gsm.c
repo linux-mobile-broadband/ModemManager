@@ -27,9 +27,11 @@
 #include "mm-serial-parsers.h"
 #include "mm-log.h"
 
+static void modem_init (MMModem *modem_class);
 static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
 
 G_DEFINE_TYPE_EXTENDED (MMModemCinterionGsm, mm_modem_cinterion_gsm, MM_TYPE_GENERIC_GSM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init))
 
 /* Mask of all bands supported in 2G devices */
@@ -133,6 +135,37 @@ mm_modem_cinterion_gsm_new (const char *device,
                                    MM_MODEM_HW_PID, product,
                                    MM_MODEM_BASE_MAX_TIMEOUTS, 3,
                                    NULL));
+}
+
+static gboolean
+grab_port (MMModem *modem,
+           const char *subsys,
+           const char *name,
+           MMPortType suggested_type,
+           gpointer user_data,
+           GError **error)
+{
+    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
+    MMPortType ptype = MM_PORT_TYPE_IGNORED;
+    MMPort *port = NULL;
+
+    if (suggested_type == MM_PORT_TYPE_UNKNOWN) {
+        if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY))
+            ptype = MM_PORT_TYPE_PRIMARY;
+        else if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY))
+            ptype = MM_PORT_TYPE_SECONDARY;
+    } else
+        ptype = suggested_type;
+
+    port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
+    if (port && MM_IS_AT_SERIAL_PORT (port)) {
+        /* Set RTS/CTS flow control by default */
+        g_object_set (G_OBJECT (port),
+                      MM_SERIAL_PORT_RTS_CTS, TRUE,
+                      NULL);
+    }
+
+    return !!port;
 }
 
 static void
@@ -1039,6 +1072,12 @@ finalize (GObject *object)
 }
 
 /*****************************************************************************/
+
+static void
+modem_init (MMModem *modem_class)
+{
+    modem_class->grab_port = grab_port;
+}
 
 static void
 modem_gsm_network_init (MMModemGsmNetwork *network_class)
