@@ -163,6 +163,24 @@ log_handler (const gchar *log_domain,
 }
 
 gboolean
+mm_log_set_level (const char *level, GError **error)
+{
+    gboolean found = FALSE;
+    const LogDesc *diter;
+
+    for (diter = &level_descs[0]; diter->name; diter++) {
+        if (!strcasecmp (diter->name, level)) {
+            log_level = diter->num;
+            found = TRUE;
+            break;
+        }
+    }
+    if (!found)
+       g_set_error (error, 0, 0, "Unknown log level '%s'", level);
+    return found;
+}
+
+gboolean
 mm_log_setup (const char *level,
               const char *log_file,
               gboolean show_timestamps,
@@ -170,23 +188,8 @@ mm_log_setup (const char *level,
               GError **error)
 {
     /* levels */
-    if (level && strlen (level)) {
-        gboolean found = FALSE;
-        const LogDesc *diter;
-
-        for (diter = &level_descs[0]; diter->name; diter++) {
-            if (!strcasecmp (diter->name, level)) {
-                log_level = diter->num;
-                found = TRUE;
-                break;
-            }
-        }
-
-        if (!found) {
-            g_set_error (error, 0, 0, "Unknown log level '%s'", level);
-            return FALSE;
-        }
-    }
+    if (level && strlen (level) && !mm_log_set_level (level, error))
+        return FALSE;
 
     if (show_timestamps)
         ts_flags = TS_FLAG_WALL;

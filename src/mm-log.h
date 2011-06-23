@@ -47,6 +47,8 @@ void _mm_log (const char *loc,
               const char *fmt,
               ...)  __attribute__((__format__ (__printf__, 4, 5)));
 
+gboolean mm_log_set_level (const char *level, GError **error);
+
 gboolean mm_log_setup (const char *level,
                        const char *log_file,
                        gboolean show_ts,

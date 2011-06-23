@@ -30,6 +30,10 @@ static gboolean impl_manager_enumerate_devices (MMManager *manager,
                                                 GPtrArray **devices,
                                                 GError **err);
 
+static gboolean impl_manager_set_logging (MMManager *manager,
+                                          const char *level,
+                                          GError **error);
+
 #include "mm-manager-glue.h"
 
 G_DEFINE_TYPE (MMManager, mm_manager, G_TYPE_OBJECT)
@@ -918,6 +922,19 @@ handle_uevent (GUdevClient *client,
 	else if (!strcmp (action, "remove"))
 		device_removed (self, device);
 }
+
+static gboolean
+impl_manager_set_logging (MMManager *manager,
+                          const char *level,
+                          GError **error)
+{
+	if (mm_log_set_level (level, error)) {
+		mm_info ("logging: level '%s'", level);
+		return TRUE;
+	}
+	return FALSE;
+}
+
 
 void
 mm_manager_start (MMManager *manager)

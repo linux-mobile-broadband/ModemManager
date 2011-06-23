@@ -14,6 +14,18 @@
       </arg>
     </method>
 
+    <method name="SetLogging">
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_manager_set_logging"/>
+      <tp:docstring>
+        Set logging verbosity.
+      </tp:docstring>
+      <arg name="level" type="s" direction="in">
+        <tp:docstring>
+          One of [ERR, WARN, INFO, DEBUG].
+        </tp:docstring>
+      </arg>
+    </method>
+
     <signal name="DeviceAdded">
       <tp:docstring>
 	A device was added to the system.
