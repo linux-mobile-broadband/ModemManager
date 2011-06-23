@@ -2002,7 +2002,7 @@ get_spn_done (MMAtSerialPort *port,
         }
 
         /* Remove the FF filler at the end */
-        while (bin[buflen - 1] == (char)0xff)
+        while (buflen > 1 && bin[buflen - 1] == (char)0xff)
             buflen--;
 
         /* First byte is metadata; remainder is GSM-7 unpacked into octets; convert to UTF8 */
