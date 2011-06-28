@@ -84,7 +84,7 @@ supports_port (MMPluginBase *base,
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
     /* Product ID check */
-    if (product != 0x6872)
+    if (product != 0x6872 && product != 0x6906)
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
     /* The ethernet ports are obviously supported and don't need probing */
