@@ -1477,14 +1477,14 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
         mm_at_serial_port_queue_command (priv->primary, cmd, 3, NULL, NULL);
     g_free (cmd);
 
-    /* Enable SMS notifications */
-    g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_SMS_INDICATION_ENABLE_CMD, &cmd, NULL);
+    /* Set SMS storage locations */
+    g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_SMS_STORAGE_LOCATION_CMD, &cmd, NULL);
     if (cmd && strlen (cmd))
         mm_at_serial_port_queue_command (priv->primary, cmd, 3, NULL, NULL);
     g_free (cmd);
 
-    /* Set SMS storage locations */
-    g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_SMS_STORAGE_LOCATION_CMD, &cmd, NULL);
+    /* Enable SMS notifications */
+    g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_SMS_INDICATION_ENABLE_CMD, &cmd, NULL);
     if (cmd && strlen (cmd))
         mm_at_serial_port_queue_command (priv->primary, cmd, 3, NULL, NULL);
     g_free (cmd);
