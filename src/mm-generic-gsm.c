@@ -1466,10 +1466,11 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
         mm_at_serial_port_queue_command (priv->primary, cmd, 3, NULL, NULL);
     g_free (cmd);
 
-    /* Enable SMS notifications */
-    mm_at_serial_port_queue_command (priv->primary, "+CNMI=2,1,2,1,0", 3, NULL, NULL);
     /* Set SMS storage location to ME */
     mm_at_serial_port_queue_command (priv->primary, "+CPMS=\"ME\",\"ME\",\"ME\"", 3, NULL, NULL);
+
+    /* Enable SMS notifications */
+    mm_at_serial_port_queue_command (priv->primary, "+CNMI=2,1,2,1,0", 3, NULL, NULL);
 
     /* Enable USSD notifications */
     mm_at_serial_port_queue_command (priv->primary, "+CUSD=1", 3, cusd_enable_cb, self);
