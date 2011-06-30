@@ -27,9 +27,11 @@
 #include "mm-serial-parsers.h"
 #include "mm-log.h"
 
+static void modem_init (MMModem *modem_class);
 static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
 
 G_DEFINE_TYPE_EXTENDED (MMModemCinterionGsm, mm_modem_cinterion_gsm, MM_TYPE_GENERIC_GSM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init))
 
 /* Mask of all bands supported in 2G devices */
@@ -66,6 +68,9 @@ typedef struct {
 
     /* Bitmask for currently active bands */
     guint32 current_bands;
+
+    /* Command to go into sleep mode */
+    gchar *sleep_mode_cmd;
 } MMModemCinterionGsmPrivate;
 
 /* Setup relationship between the band bitmask in the modem and the bitmask
@@ -130,6 +135,37 @@ mm_modem_cinterion_gsm_new (const char *device,
                                    MM_MODEM_HW_PID, product,
                                    MM_MODEM_BASE_MAX_TIMEOUTS, 3,
                                    NULL));
+}
+
+static gboolean
+grab_port (MMModem *modem,
+           const char *subsys,
+           const char *name,
+           MMPortType suggested_type,
+           gpointer user_data,
+           GError **error)
+{
+    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
+    MMPortType ptype = MM_PORT_TYPE_IGNORED;
+    MMPort *port = NULL;
+
+    if (suggested_type == MM_PORT_TYPE_UNKNOWN) {
+        if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY))
+            ptype = MM_PORT_TYPE_PRIMARY;
+        else if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY))
+            ptype = MM_PORT_TYPE_SECONDARY;
+    } else
+        ptype = suggested_type;
+
+    port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
+    if (port && MM_IS_AT_SERIAL_PORT (port)) {
+        /* Set RTS/CTS flow control by default */
+        g_object_set (G_OBJECT (port),
+                      MM_SERIAL_PORT_RTS_CTS, TRUE,
+                      NULL);
+    }
+
+    return !!port;
 }
 
 static void
@@ -834,6 +870,55 @@ enable_complete (MMGenericGsm *gsm,
 }
 
 static void
+get_supported_functionality_status_cb (MMAtSerialPort *port,
+                                       GString *response,
+                                       GError *error,
+                                       gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMModemCinterionGsmPrivate *priv;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error) {
+        enable_complete (MM_GENERIC_GSM (info->modem), error, info);
+        return;
+    }
+
+    priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (info->modem);
+
+    /* We need to get which power-off command to use to put the modem in low
+     * power mode (with serial port open for AT commands, but with RF switched
+     * off). According to the documentation of various Cinterion modems, some
+     * support AT+CFUN=4 (HC25) and those which don't support it can use
+     * AT+CFUN=7 (CYCLIC SLEEP mode with 2s timeout after last character
+     * received in the serial port).
+     *
+     * So, just look for '4' in the reply; if not found, look for '7', and if
+     * not found, report warning and don't use any.
+     */
+
+    g_free (priv->sleep_mode_cmd);
+    if (strstr (response->str, "4") != NULL) {
+        mm_dbg ("Device supports CFUN=4 sleep mode");
+        priv->sleep_mode_cmd = g_strdup ("+CFUN=4");
+    } else if (strstr (response->str, "7") != NULL) {
+        mm_dbg ("Device supports CFUN=7 sleep mode");
+        priv->sleep_mode_cmd = g_strdup ("+CFUN=7");
+    } else {
+        mm_warn ("Unknown functionality mode to go into sleep mode");
+        priv->sleep_mode_cmd = NULL;
+    }
+
+    /* All done without errors! */
+    mm_dbg ("[3/3] All done");
+    enable_complete (MM_GENERIC_GSM (info->modem), NULL, info);
+}
+
+static void
 get_supported_networks_cb (MMAtSerialPort *port,
                            GString *response,
                            GError *error,
@@ -841,7 +926,6 @@ get_supported_networks_cb (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = user_data;
     MMModemCinterionGsmPrivate *priv;
-    GError *inner_error = NULL;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
@@ -880,17 +964,22 @@ get_supported_networks_cb (MMAtSerialPort *port,
     if (!priv->only_geran &&
         !priv->only_utran &&
         !priv->both_geran_utran) {
+        GError *inner_error = NULL;
+
         mm_warn ("Invalid list of supported networks: '%s'",
                  response->str);
         inner_error = g_error_new (MM_MODEM_ERROR,
                                    MM_MODEM_ERROR_GENERAL,
                                    "Invalid list of supported networks: '%s'",
                                    response->str);
+        enable_complete (MM_GENERIC_GSM (info->modem), inner_error, info);
+        g_error_free (inner_error);
+        return;
     }
 
-    enable_complete (MM_GENERIC_GSM (info->modem), inner_error, info);
-    if (inner_error)
-        g_error_free (inner_error);
+    /* Next, check which supported functionality modes are available */
+    mm_dbg ("[2/3] Getting list of supported functionality status...");
+    mm_at_serial_port_queue_command (port, "+CFUN=?", 3, get_supported_functionality_status_cb, info);
 }
 
 static void
@@ -915,7 +1004,8 @@ do_enable_power_up_done (MMGenericGsm *gsm,
         return;
     }
 
-    /* List supported networks */
+    /* First, list supported networks */
+    mm_dbg ("[1/3] Getting list of supported networks...");
     mm_at_serial_port_queue_command (port, "+WS46=?", 3, get_supported_networks_cb, info);
 }
 
@@ -934,7 +1024,13 @@ get_property (GObject *object,
               GValue *value,
               GParamSpec *pspec)
 {
+    MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (object);
+
     switch (prop_id) {
+    case MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD:
+        /* We need to enable RTS/CTS so that CYCLIC SLEEP mode works */
+        g_value_set_string (value, "\\Q3");
+        break;
     case MM_GENERIC_GSM_PROP_SMS_INDICATION_ENABLE_CMD:
         /* AT+CNMO=<mode>,[<mt>[,<bm>[,<ds>[,<bfr>]]]]
          *  but <bfr> should be either not set, or equal to 1;
@@ -956,12 +1052,32 @@ get_property (GObject *object,
          * */
         g_value_set_string (value, "+CMER=3,0,0,2");
         break;
+    case MM_GENERIC_GSM_PROP_POWER_DOWN_CMD:
+        /* Use the value computed before, if any. */
+        g_value_set_string (value, priv->sleep_mode_cmd ? priv->sleep_mode_cmd : "");
+        break;
     default:
         break;
     }
 }
 
+static void
+finalize (GObject *object)
+{
+    MMModemCinterionGsmPrivate *priv = MM_MODEM_CINTERION_GSM_GET_PRIVATE (object);
+
+    g_free (priv->sleep_mode_cmd);
+
+    G_OBJECT_CLASS (mm_modem_cinterion_gsm_parent_class)->finalize (object);
+}
+
 /*****************************************************************************/
+
+static void
+modem_init (MMModem *modem_class)
+{
+    modem_class->grab_port = grab_port;
+}
 
 static void
 modem_gsm_network_init (MMModemGsmNetwork *network_class)
@@ -990,10 +1106,16 @@ mm_modem_cinterion_gsm_class_init (MMModemCinterionGsmClass *klass)
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
     MMGenericGsmClass *gsm_class = MM_GENERIC_GSM_CLASS (klass);
 
+    mm_modem_cinterion_gsm_parent_class = g_type_class_peek_parent (klass);
     g_type_class_add_private (object_class, sizeof (MMModemCinterionGsmPrivate));
 
+    object_class->finalize = finalize;
     object_class->get_property = get_property;
     object_class->set_property = set_property;
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD,
+                                      MM_GENERIC_GSM_FLOW_CONTROL_CMD);
 
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_SMS_INDICATION_ENABLE_CMD,
@@ -1006,6 +1128,10 @@ mm_modem_cinterion_gsm_class_init (MMModemCinterionGsmClass *klass)
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_CMER_ENABLE_CMD,
                                       MM_GENERIC_GSM_CMER_ENABLE_CMD);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_POWER_DOWN_CMD,
+                                      MM_GENERIC_GSM_POWER_DOWN_CMD);
 
     gsm_class->do_enable_power_up_done = do_enable_power_up_done;
     gsm_class->set_allowed_mode = set_allowed_mode;

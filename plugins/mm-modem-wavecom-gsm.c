@@ -218,14 +218,19 @@ get_property (GObject *object,
 {
     switch (prop_id) {
     case MM_GENERIC_GSM_PROP_POWER_UP_CMD:
-        /* Wavecom doesn't like CFUN=1, it will reset the whole software stack,
-         * including the USB connection and therefore connection would get
-         * closed */
-        g_value_set_string (value, "");
+        /* Try to go to full functionality mode without rebooting the system.
+         * Works well if we previously switched off the power with CFUN=4
+         */
+        g_value_set_string (value, "+CFUN=1,0");
         break;
     case MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD:
         /* Wavecom doesn't have XOFF/XON flow control, so we enable RTS/CTS */
         g_value_set_string (value, "+IFC=2,2");
+        break;
+    case MM_GENERIC_GSM_PROP_POWER_DOWN_CMD:
+        /* Use AT+CFUN=4 for power down. It will stop the RF (IMSI detach), and
+         * keeps access to the SIM */
+        g_value_set_string (value, "+CFUN=4");
         break;
     default:
         break;
@@ -869,7 +874,7 @@ set_highest_ms_class_cb (MMAtSerialPort *port,
     }
 
     /* All done without errors! */
-    mm_dbg ("[5/5] All done");
+    mm_dbg ("[4/4] All done");
     enable_complete (MM_GENERIC_GSM (info->modem), NULL, info);
 }
 
@@ -975,7 +980,7 @@ get_current_ms_class_cb (MMAtSerialPort *port,
     }
 
     /* Next, set highest mobile station class possible */
-    mm_dbg ("[4/5] Ensuring highest MS class...");
+    mm_dbg ("[3/4] Ensuring highest MS class...");
     set_highest_ms_class (port, info);
 }
 
@@ -1039,45 +1044,8 @@ get_supported_ms_classes_cb (MMAtSerialPort *port,
     }
 
     /* Next, query for current MS class */
-    mm_dbg ("[3/5] Getting current MS class...");
+    mm_dbg ("[2/4] Getting current MS class...");
     mm_at_serial_port_queue_command (port, "+CGCLASS?",  3, get_current_ms_class_cb, info);
-}
-
-static void
-get_current_functionality_status_cb (MMAtSerialPort *port,
-                                     GString *response,
-                                     GError *error,
-                                     gpointer user_data)
-{
-    MMCallbackInfo *info = user_data;
-    const gchar *p;
-    GError *inner_error;
-
-    /* If the modem has already been removed, return without
-     * scheduling callback */
-    if (mm_callback_info_check_modem_removed (info))
-        return;
-
-    if (error) {
-        enable_complete (MM_GENERIC_GSM (info->modem), error, info);
-        return;
-    }
-
-    p = mm_strip_tag (response->str, "+CFUN:");
-    if (!p || *p != '1') {
-        /* Reported functionality status MUST be '1'. Otherwise, RF is probably
-         * switched off. */
-        inner_error = g_error_new (MM_MODEM_ERROR,
-                                   MM_MODEM_ERROR_GENERAL,
-                                   "Unexpected functionality status: '%c'. ",
-                                   p ? *p :' ');
-        enable_complete (MM_GENERIC_GSM (info->modem), inner_error, info);
-        g_error_free (inner_error);
-    }
-
-    /* Nex, query for supported MS classes */
-    mm_dbg ("[2/5] Getting supported MS classes...");
-    mm_at_serial_port_queue_command (port, "+CGCLASS=?", 3, get_supported_ms_classes_cb, info);
 }
 
 static void
@@ -1107,9 +1075,67 @@ do_enable_power_up_done (MMGenericGsm *gsm,
         return;
     }
 
-    /* Next, get current functionality status */
-    mm_dbg ("[1/5] Getting current functionality status...");
-    mm_at_serial_port_queue_command (port, "+CFUN?", 3, get_current_functionality_status_cb, info);
+    mm_dbg ("[1/4] Getting supported MS classes...");
+    mm_at_serial_port_queue_command (port, "+CGCLASS=?", 3, get_supported_ms_classes_cb, info);
+}
+
+static void
+get_current_functionality_status_cb (MMAtSerialPort *port,
+                                     GString *response,
+                                     GError *error,
+                                     gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    guint needed = FALSE;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    /* On error, just assume we don't need the power-up command */
+    if (!error) {
+        const gchar *p;
+
+        p = mm_strip_tag (response->str, "+CFUN:");
+        if (p && *p == '1') {
+            /* If reported functionality status is '1', then we do not need to
+             * issue the power-up command. Otherwise, do it. */
+            mm_dbg ("Already in full functionality status, skipping power-up command");
+        } else {
+            needed = TRUE;
+            mm_warn ("Not in full functionality status, power-up command is needed. "
+                     "Note that it may reboot the modem.");
+        }
+    } else
+        mm_warn ("Failed checking if power-up command is needed: '%s'. "
+                 "Will assume it isn't.",
+                 error->message);
+
+    /* Set result and schedule */
+    mm_callback_info_set_result (info,
+                                 GUINT_TO_POINTER (needed),
+                                 NULL);
+    mm_callback_info_schedule (info);
+}
+
+static void
+do_enable_power_up_check_needed (MMGenericGsm *self,
+                                 MMModemUIntFn callback,
+                                 gpointer user_data)
+{
+    MMAtSerialPort *primary;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_uint_new (MM_MODEM (self), callback, user_data);
+
+    /* Get port */
+    primary = mm_generic_gsm_get_at_port (self, MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+
+    /* Get current functionality status */
+    mm_dbg ("Getting current functionality status...");
+    mm_at_serial_port_queue_command (primary, "+CFUN?", 3, get_current_functionality_status_cb, info);
 }
 
 /*****************************************************************************/
@@ -1158,6 +1184,11 @@ mm_modem_wavecom_gsm_class_init (MMModemWavecomGsmClass *klass)
                                       MM_GENERIC_GSM_PROP_FLOW_CONTROL_CMD,
                                       MM_GENERIC_GSM_FLOW_CONTROL_CMD);
 
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_POWER_DOWN_CMD,
+                                      MM_GENERIC_GSM_POWER_DOWN_CMD);
+
+    gsm_class->do_enable_power_up_check_needed = do_enable_power_up_check_needed;
     gsm_class->do_enable_power_up_done = do_enable_power_up_done;
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;

@@ -25,6 +25,7 @@
 #include "mm-modem-simple.h"
 #include "mm-callback-info.h"
 #include "mm-modem-helpers.h"
+#include "mm-log.h"
 
 static void modem_init (MMModem *modem_class);
 static void modem_simple_init (MMModemSimple *class);
@@ -391,6 +392,64 @@ real_do_enable_power_up_done (MMGenericGsm *gsm,
     priv->enable_wait_id = g_timeout_add_seconds (10, sierra_enabled, info);
 }
 
+static void
+get_current_functionality_status_cb (MMAtSerialPort *port,
+                                     GString *response,
+                                     GError *error,
+                                     gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    guint needed = FALSE;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    /* On error, just assume we don't need the power-up command */
+    if (!error) {
+        const gchar *p;
+
+        p = mm_strip_tag (response->str, "+CFUN:");
+        if (p && *p == '1') {
+            /* If reported functionality status is '1', then we do not need to
+             * issue the power-up command. Otherwise, do it. */
+            mm_dbg ("Already in full functionality status, skipping power-up command");
+        } else {
+            needed = TRUE;
+            mm_warn ("Not in full functionality status, power-up command is needed.");
+        }
+    } else
+        mm_warn ("Failed checking if power-up command is needed: '%s'. "
+                 "Will assume it isn't.",
+                 error->message);
+
+    /* Set result and schedule */
+    mm_callback_info_set_result (info,
+                                 GUINT_TO_POINTER (needed),
+                                 NULL);
+    mm_callback_info_schedule (info);
+}
+
+static void
+do_enable_power_up_check_needed (MMGenericGsm *self,
+                                 MMModemUIntFn callback,
+                                 gpointer user_data)
+{
+    MMAtSerialPort *primary;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_uint_new (MM_MODEM (self), callback, user_data);
+
+    /* Get port */
+    primary = mm_generic_gsm_get_at_port (self, MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+
+    /* Get current functionality status */
+    mm_dbg ("Getting current functionality status...");
+    mm_at_serial_port_queue_command (primary, "+CFUN?", 3, get_current_functionality_status_cb, info);
+}
+
 static gboolean
 grab_port (MMModem *modem,
            const char *subsys,
@@ -689,6 +748,7 @@ mm_modem_sierra_gsm_class_init (MMModemSierraGsmClass *klass)
     g_type_class_add_private (object_class, sizeof (MMModemSierraGsmPrivate));
 
     object_class->dispose = dispose;
+    gsm_class->do_enable_power_up_check_needed = do_enable_power_up_check_needed;
     gsm_class->do_enable_power_up_done = real_do_enable_power_up_done;
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;
