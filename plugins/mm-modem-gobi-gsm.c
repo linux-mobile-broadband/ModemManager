@@ -24,6 +24,7 @@
 #include "mm-callback-info.h"
 #include "mm-modem-gsm-card.h"
 #include "mm-at-serial-port.h"
+#include "mm-modem-helpers.h"
 
 static void modem_init (MMModem *modem_class);
 static void modem_gsm_card_init (MMModemGsmCard *gsm_card_class);
@@ -51,6 +52,55 @@ mm_modem_gobi_gsm_new (const char *device,
                                    MM_MODEM_HW_VID, vendor,
                                    MM_MODEM_HW_PID, product,
                                    NULL));
+}
+
+/*****************************************************************************/
+
+static void
+get_act_request_done (MMAtSerialPort *port,
+                      GString *response,
+                      GError *error,
+                      gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMModemGsmAccessTech act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
+    const char *p;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error)
+        info->error = g_error_copy (error);
+    else {
+        p = mm_strip_tag (response->str, "*CNTI:");
+        p = strchr (p, ',');
+        if (p)
+            act = mm_gsm_string_to_access_tech (p + 1);
+    }
+
+    mm_callback_info_set_result (info, GUINT_TO_POINTER (act), NULL);
+    mm_callback_info_schedule (info);
+}
+
+static void
+get_access_technology (MMGenericGsm *modem,
+                       MMModemUIntFn callback,
+                       gpointer user_data)
+{
+    MMAtSerialPort *port;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+
+    port = mm_generic_gsm_get_best_at_port (modem, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_at_serial_port_queue_command (port, "*CNTI=0", 3, get_act_request_done, info);
 }
 
 /*****************************************************************************/
@@ -118,5 +168,8 @@ mm_modem_gobi_gsm_init (MMModemGobiGsm *self)
 static void
 mm_modem_gobi_gsm_class_init (MMModemGobiGsmClass *klass)
 {
+    MMGenericGsmClass *gsm_class = MM_GENERIC_GSM_CLASS (klass);
+
+    gsm_class->get_access_technology = get_access_technology;
 }
 
