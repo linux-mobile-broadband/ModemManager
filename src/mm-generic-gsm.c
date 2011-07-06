@@ -1575,7 +1575,13 @@ enable_flash_done (MMSerialPort *port, GError *error, gpointer user_data)
         return;
     }
 
+    /* Send the init command twice; some devices (Nokia N900) appear to take a
+     * few commands before responding correctly.  Instead of penalizing them for
+     * being stupid the first time by failing to enable the device, just
+     * try again.
+     */
     g_object_get (G_OBJECT (info->modem), MM_GENERIC_GSM_INIT_CMD, &cmd, NULL);
+    mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), cmd, 3, NULL, NULL);
     mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), cmd, 3, init_done, user_data);
     g_free (cmd);
 }
