@@ -16,7 +16,8 @@
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  *
- * Copyright (C) 2011 Ammonit Gesellschaft für Messtechnik mbH
+ * Copyright (C) 2011 Ammonit Measurement GmbH
+ * Author: Aleksander Morgado <aleksander@lanedo.com>
  */
 
 #include <string.h>

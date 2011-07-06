@@ -10,7 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2011 Aleksander Morgado <aleksander@lanedo.com>
+ * Copyright (C) 2011 Ammonit Measurement GmbH
+ * Author: Aleksander Morgado <aleksander@lanedo.com>
  */
 
 #ifndef MM_MODEM_CINTERION_GSM_H
