@@ -324,7 +324,7 @@ static gboolean
 real_config_fd (MMSerialPort *self, int fd, GError **error)
 {
     MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (self);
-    struct termios stbuf;
+    struct termios stbuf, other;
     int speed;
     int bits;
     int parity;
@@ -343,7 +343,7 @@ real_config_fd (MMSerialPort *self, int fd, GError **error)
                    errno);
     }
 
-    stbuf.c_iflag &= ~(IGNCR | ICRNL | IUCLC | INPCK | IXON | IXANY | IGNPAR );
+    stbuf.c_iflag &= ~(IGNCR | ICRNL | IUCLC | INPCK | IXON | IXANY );
     stbuf.c_oflag &= ~(OPOST | OLCUC | OCRNL | ONLCR | ONLRET);
     stbuf.c_lflag &= ~(ICANON | XCASE | ECHO | ECHOE | ECHONL);
     stbuf.c_lflag &= ~(ECHO | ECHOE);
@@ -351,14 +351,34 @@ real_config_fd (MMSerialPort *self, int fd, GError **error)
     stbuf.c_cc[VTIME] = 0;
     stbuf.c_cc[VEOF] = 1;
 
-    /* Use software handshaking */
-    stbuf.c_iflag |= (IXON | IXOFF | IXANY);
+    /* Use software handshaking and ignore parity/framing errors */
+    stbuf.c_iflag |= (IXON | IXOFF | IXANY | IGNPAR);
 
     /* Set up port speed and serial attributes; also ignore modem control
      * lines since most drivers don't implement RTS/CTS anyway.
      */
     stbuf.c_cflag &= ~(CBAUD | CSIZE | CSTOPB | PARENB | CRTSCTS);
-    stbuf.c_cflag |= (speed | bits | CREAD | 0 | parity | stopbits | CLOCAL);
+    stbuf.c_cflag |= (bits | CREAD | 0 | parity | stopbits | CLOCAL);
+
+    errno = 0;
+    if (cfsetispeed (&stbuf, speed) != 0) {
+        g_set_error (error,
+                     MM_MODEM_ERROR,
+                     MM_MODEM_ERROR_GENERAL,
+                     "%s: failed to set serial port input speed; errno %d",
+                     __func__, errno);
+        return FALSE;
+    }
+
+    errno = 0;
+    if (cfsetospeed (&stbuf, speed) != 0) {
+        g_set_error (error,
+                     MM_MODEM_ERROR,
+                     MM_MODEM_ERROR_GENERAL,
+                     "%s: failed to set serial port output speed; errno %d",
+                     __func__, errno);
+        return FALSE;
+    }
 
     if (tcsetattr (fd, TCSANOW, &stbuf) < 0) {
         g_set_error (error,
@@ -367,6 +387,22 @@ real_config_fd (MMSerialPort *self, int fd, GError **error)
                      "%s: failed to set serial port attributes; errno %d",
                      __func__, errno);
         return FALSE;
+    }
+
+    /* tcsetattr() returns 0 if any of the requested attributes could be set,
+     * so we should double-check that all were set and log a warning if not.
+     */
+    memset (&other, 0, sizeof (struct termios));
+    errno = 0;
+    if (tcgetattr (fd, &other) != 0) {
+        mm_warn ("(%s): tcgetattr() error: %d",
+                 mm_port_get_device (MM_PORT (self)),
+                 errno);
+    }
+
+    if (memcmp (&stbuf, &other, sizeof (other)) != 0) {
+        mm_warn ("(%s): port attributes not fully set",
+                   mm_port_get_device (MM_PORT (self)));
     }
 
     return TRUE;
