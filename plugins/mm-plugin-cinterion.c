@@ -123,28 +123,11 @@ supports_port (MMPluginBase *base,
 {
     GUdevDevice *port;
     guint32 cached = 0;
-    const char *subsys, *name;
-    guint16 vendor = 0;
 
     /* Can't do anything with non-serial ports */
     port = mm_plugin_base_supports_task_get_port (task);
     if (strcmp (g_udev_device_get_subsystem (port), "tty"))
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
-
-    /* If we can get the vendor ID from udev then we can short-circuit
-     * the vendor name checks.
-     */
-    subsys = g_udev_device_get_subsystem (port);
-    name = g_udev_device_get_name (port);
-    if (mm_plugin_base_get_device_ids (base, subsys, name, &vendor, NULL)) {
-        /* Vendors: Cinterion (0x1e2d)
-         *          Siemens   (0x0681)
-         * Also including 0 just in case the ports are platform serial ports 
-         * which this plugin does need to check support for.
-         */
-        if (vendor != 0x1e2d && vendor != 0x0681 && vendor != 0)
-            return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
-    }
 
     /* First thing to check in this plugin is if we got capabilities already.
      * This is because we have a later check of the probed vendor, which is
