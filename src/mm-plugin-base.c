@@ -511,6 +511,7 @@ static const char *dq_strings[] = {
     "os_logids.h",
     /* Sierra CnS port */
     "NETWORK SERVICE CHANGE",
+    "/SRC/AMSS",
     NULL
 };
 
