@@ -34,6 +34,15 @@
 
 #define MM_GENERIC_CDMA_PREV_STATE_TAG "prev-state"
 
+typedef enum {
+    RM_PROTO_ASYNC = 0,
+    RM_PROTO_RELAY = 1,
+    RM_PROTO_NETWORK_PPP = 2,
+    RM_PROTO_NETWORK_SLIP = 3,
+    RM_PROTO_STU_III = 4
+} RmProtocol;
+
+
 static void simple_reg_callback (MMModemCdma *modem,
                                  MMModemCdmaRegistrationState cdma_1x_reg_state,
                                  MMModemCdmaRegistrationState evdo_reg_state,
@@ -66,6 +75,10 @@ typedef struct {
     gboolean reg_try_css;
     gboolean has_spservice;
     gboolean has_speri;
+
+    /* Original and current Rm interface protocol */
+    RmProtocol orig_crm;
+    RmProtocol cur_crm;
 
     guint poll_id;
 
@@ -563,6 +576,29 @@ speri_done (MMAtSerialPort *port,
 }
 
 static void
+crm_done (MMAtSerialPort *port,
+          GString *response,
+          GError *error,
+          gpointer user_data)
+{
+    const char *p;
+    unsigned long num;
+
+    if (error)
+        return;
+
+    p = mm_strip_tag (response->str, "+CRM:");
+    if (p) {
+        errno = 0;
+        num = strtoul (p, NULL, 10);
+        if (num >= 0 && num <= 4 && (errno == 0)) {
+            MM_GENERIC_CDMA_GET_PRIVATE (user_data)->orig_crm = (guint32) num;
+            MM_GENERIC_CDMA_GET_PRIVATE (user_data)->cur_crm = (guint32) num;
+        }
+    }
+}
+
+static void
 enable_all_done (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
@@ -599,6 +635,9 @@ enable_all_done (MMModem *modem, GError *error, gpointer user_data)
         /* Check for support of Sprint-specific phone commands */
         mm_at_serial_port_queue_command (priv->primary, "+SPSERVICE?", 3, spservice_done, self);
         mm_at_serial_port_queue_command (priv->primary, "$SPERI?", 3, speri_done, self);
+
+        /* Grab default CRM */
+        mm_at_serial_port_queue_command (priv->primary, "+CRM?", 3, crm_done, self);
     }
 
 out:
@@ -1960,12 +1999,63 @@ get_registration_state (MMModemCdma *modem,
 }
 
 /*****************************************************************************/
+
+static void
+set_rm_proto_done (MMAtSerialPort *port,
+                   GString *response,
+                   GError *error,
+                   gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (mm_callback_info_check_modem_removed (info) == FALSE) {
+        if (error)
+            info->error = g_error_copy (error);
+
+        mm_callback_info_schedule (info);
+    }
+}
+
+static void
+mm_generic_cdma_set_rm_protocol (MMGenericCdma *self,
+                                 RmProtocol proto,
+                                 MMModemFn callback,
+                                 gpointer user_data)
+{
+    MMCallbackInfo *info;
+    MMAtSerialPort *port;
+    char *cmd;
+
+    info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
+
+    port = mm_generic_cdma_get_best_at_port (self, &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+    g_clear_error (&info->error);
+
+    if (proto < RM_PROTO_ASYNC || proto > RM_PROTO_STU_III) {
+        g_set_error (&info->error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                     "Invalid Rm interface protocol %d",
+                     proto);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    cmd = g_strdup_printf ("+CRM=%d", proto);
+    mm_at_serial_port_queue_command (port, cmd, 3, set_rm_proto_done, info);
+    g_free (cmd);
+}
+
+/*****************************************************************************/
 /* MMModemSimple interface */
 
 typedef enum {
     SIMPLE_STATE_BEGIN = 0,
     SIMPLE_STATE_ENABLE,
     SIMPLE_STATE_REGISTER,
+    SIMPLE_STATE_PRE_CONNECT,
     SIMPLE_STATE_CONNECT,
     SIMPLE_STATE_DONE
 } SimpleState;
@@ -1988,6 +2078,32 @@ simple_get_string_property (MMCallbackInfo *info, const char *name, GError **err
                  name, G_VALUE_TYPE_NAME (value));
 
     return NULL;
+}
+
+static gboolean
+simple_get_uint_property (MMCallbackInfo *info,
+                          const char *name,
+                          guint32 *out_val,
+                          GError **error)
+{
+    GHashTable *properties = (GHashTable *) mm_callback_info_get_data (info, "simple-connect-properties");
+    GValue *value;
+
+    g_return_val_if_fail (out_val != NULL, FALSE);
+
+    value = (GValue *) g_hash_table_lookup (properties, name);
+    if (value) {
+        if (G_VALUE_HOLDS_UINT (value)) {
+            *out_val = g_value_get_uint (value);
+            return TRUE;
+        }
+
+        g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                     "Invalid property type for '%s': %s (uint expected)",
+                     name, G_VALUE_TYPE_NAME (value));
+    }
+
+    return FALSE;
 }
 
 static gboolean
@@ -2083,10 +2199,11 @@ static void
 simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
+    MMGenericCdma *self;
+    MMGenericCdmaPrivate *priv;
     SimpleState state = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "simple-connect-state"));
     const char *str;
-    guint id;
+    guint id, rm_protocol = 0;
 
     /* Do nothing if modem removed */
     if (!modem || mm_callback_info_check_modem_removed (info))
@@ -2097,12 +2214,17 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
         goto out;
     }
 
+    self = MM_GENERIC_CDMA (info->modem);
+    priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
+
     switch (state) {
     case SIMPLE_STATE_BEGIN:
+        /* Enable state */
         state = set_simple_state (info, SIMPLE_STATE_ENABLE);
         mm_modem_enable (modem, simple_state_machine, info);
         break;
     case SIMPLE_STATE_ENABLE:
+        /* Register state */
         state = set_simple_state (info, SIMPLE_STATE_REGISTER);
         mm_modem_cdma_get_registration_state (MM_MODEM_CDMA (modem),
                                               simple_reg_callback,
@@ -2114,14 +2236,34 @@ simple_state_machine (MMModem *modem, GError *error, gpointer user_data)
         priv->reg_state_changed_id = id;
         break;
     case SIMPLE_STATE_REGISTER:
+        /* Pre Connect state */
         registration_cleanup (MM_GENERIC_CDMA (modem), 0, 0);
-        state = set_simple_state (info, SIMPLE_STATE_CONNECT);
+        state = set_simple_state (info, SIMPLE_STATE_PRE_CONNECT);
         mm_modem_set_state (modem, MM_MODEM_STATE_REGISTERED, MM_MODEM_STATE_REASON_NONE);
 
+        /* Change the Rm interface protocol due to manager request if needed */
+        if (simple_get_uint_property (info, "rm-protocol", &rm_protocol, &info->error)) {
+            mm_generic_cdma_set_rm_protocol (self, rm_protocol, simple_state_machine, info);
+            break;
+        }
+
+        /* Or if the Rm protocol isn't the default, and there was no request
+         * to change it, do that now.
+         */
+        if (priv->cur_crm != priv->orig_crm) {
+            mm_generic_cdma_set_rm_protocol (self, priv->orig_crm, simple_state_machine, info);
+            break;
+        }
+
+        /* Fall through */
+    case SIMPLE_STATE_PRE_CONNECT:
+        /* Connect state */
+        state = set_simple_state (info, SIMPLE_STATE_CONNECT);
         str = simple_get_string_property (info, "number", &info->error);
         mm_modem_connect (modem, str, simple_state_machine, info);
         break;
     case SIMPLE_STATE_CONNECT:
+        /* All done! */
         state = set_simple_state (info, SIMPLE_STATE_DONE);
         break;
     case SIMPLE_STATE_DONE:
@@ -2306,10 +2448,15 @@ modem_simple_init (MMModemSimple *class)
 static void
 mm_generic_cdma_init (MMGenericCdma *self)
 {
+    MMGenericCdmaPrivate *priv = MM_GENERIC_CDMA_GET_PRIVATE (self);
+
     g_signal_connect (self, "notify::" MM_MODEM_VALID,
                       G_CALLBACK (modem_valid_changed), NULL);
     g_signal_connect (self, "notify::" MM_MODEM_STATE,
                       G_CALLBACK (modem_state_changed), NULL);
+
+    /* Default to Network Layer Rm interface/PPP */
+    priv->orig_crm = priv->cur_crm = RM_PROTO_NETWORK_PPP;
 }
 
 static void

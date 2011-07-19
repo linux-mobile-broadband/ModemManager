@@ -16,11 +16,12 @@
 	  common ones are:
 
 	  'pin'          : string
-	  'network_id'   : string
+	  'network_id'   : string (GSM/HSPA only)
 	  'band'         : uint
 	  'network_mode' : uint
-	  'apn'          : string
+	  'apn'          : string (GSM/HSPA only)
 	  'number'       : string
+	  'rm-protocol'  : uint (CDMA/EVDO only) (1 - Relay, 2 - Network PPP)
 	</tp:docstring>
       </arg>
     </method>
