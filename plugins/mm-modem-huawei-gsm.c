@@ -25,21 +25,25 @@
 #include "mm-modem-huawei-gsm.h"
 #include "mm-modem-gsm-network.h"
 #include "mm-modem-gsm-card.h"
+#include "mm-modem-gsm-ussd.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
 #include "mm-at-serial-port.h"
 #include "mm-serial-parsers.h"
 #include "mm-log.h"
+#include "mm-utils.h"
 
 static void modem_init (MMModem *modem_class);
 static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
 static void modem_gsm_card_init (MMModemGsmCard *gsm_card_class);
+static void modem_gsm_ussd_init (MMModemGsmUssd *ussd_class);
 
 G_DEFINE_TYPE_EXTENDED (MMModemHuaweiGsm, mm_modem_huawei_gsm, MM_TYPE_GENERIC_GSM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_CARD, modem_gsm_card_init))
-
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_CARD, modem_gsm_card_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_USSD, modem_gsm_ussd_init)
+)
 
 #define MM_MODEM_HUAWEI_GSM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_HUAWEI_GSM, MMModemHuaweiGsmPrivate))
 
@@ -874,6 +878,42 @@ out:
     return !!port;
 }
 
+/* Encode to packed GSM - this is what Huawei supports on all known models */
+static char*
+ussd_encode (MMModemGsmUssd *self, const char* command, guint *scheme)
+{
+    char *hex;
+    guint8 *gsm, *packed;
+    guint32 len = 0, packed_len = 0;
+
+    *scheme = MM_MODEM_GSM_USSD_SCHEME_7BIT;
+    gsm = mm_charset_utf8_to_unpacked_gsm (command, &len);
+    packed = gsm_pack (gsm, len, 0, &packed_len);
+    hex = utils_bin2hexstr (packed, packed_len);
+    g_free (packed);
+    g_free (gsm);
+
+    return hex;
+}
+
+/* Unparse packed gsm to utf8 */
+static char*
+ussd_decode (MMModemGsmUssd *self, const char* reply, guint scheme)
+{
+    char *bin, *utf8;
+    guint8 *unpacked;
+    gsize bin_len;
+    guint32 unpacked_len;
+
+    bin = utils_hexstr2bin (reply, &bin_len);
+    unpacked = gsm_unpack ((guint8*)bin, bin_len, 0, &unpacked_len);
+    utf8 = (char*)mm_charset_gsm_unpacked_to_utf8 (unpacked, unpacked_len);
+
+    g_free (bin);
+    g_free (unpacked);
+    return utf8;
+}
+
 /*****************************************************************************/
 
 static void
@@ -899,6 +939,13 @@ modem_gsm_card_init (MMModemGsmCard *class)
 static void
 mm_modem_huawei_gsm_init (MMModemHuaweiGsm *self)
 {
+}
+
+static void
+modem_gsm_ussd_init (MMModemGsmUssd *ussd_class)
+{
+    ussd_class->encode = ussd_encode;
+    ussd_class->decode = ussd_decode;
 }
 
 static void

@@ -4820,9 +4820,9 @@ ussd_encode (MMModemGsmUssd *modem, const char* command, guint *scheme)
     if (!success)
         goto out;
 
+    *scheme = MM_MODEM_GSM_USSD_SCHEME_7BIT;
     /* convert to hex representation */
     hex = utils_bin2hexstr (ussd_command->data, ussd_command->len);
-    *scheme = 15;
 
  out:
     g_byte_array_free (ussd_command, TRUE);

@@ -80,6 +80,10 @@ void mm_modem_gsm_ussd_cancel (MMModemGsmUssd *self,
                                MMModemFn callback,
                                gpointer user_data);
 
+/* CBS data coding scheme - 3GPP TS 23.038 */
+#define MM_MODEM_GSM_USSD_SCHEME_7BIT 0b00001111;
+#define MM_MODEM_GSM_USSD_SCHEME_UCS2 0b01001000;
+
 char *mm_modem_gsm_ussd_encode (MMModemGsmUssd *self,
                                 const char* command,
                                 guint *scheme);
