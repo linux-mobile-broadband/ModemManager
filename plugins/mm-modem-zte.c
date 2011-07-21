@@ -26,15 +26,19 @@
 #include "mm-modem-helpers.h"
 #include "mm-modem-simple.h"
 #include "mm-modem-icera.h"
+#include "mm-modem-gsm-ussd.h"
 
 static void modem_init (MMModem *modem_class);
 static void modem_icera_init (MMModemIcera *icera_class);
 static void modem_simple_init (MMModemSimple *simple_class);
+static void modem_gsm_ussd_init (MMModemGsmUssd *ussd_class);
 
 G_DEFINE_TYPE_EXTENDED (MMModemZte, mm_modem_zte, MM_TYPE_GENERIC_GSM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_ICERA, modem_icera_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_SIMPLE, modem_simple_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_SIMPLE, modem_simple_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_USSD, modem_gsm_ussd_init)
+)
 
 #define MM_MODEM_ZTE_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_ZTE, MMModemZtePrivate))
 
@@ -683,6 +687,19 @@ get_icera_private (MMModemIcera *icera)
 
 /*****************************************************************************/
 
+static char*
+ussd_encode (MMModemGsmUssd *self, const char* command, guint *scheme)
+{
+    char *cmd;
+
+    *scheme = MM_MODEM_GSM_USSD_SCHEME_7BIT;
+    cmd = g_strdup (command);
+
+    return cmd;
+}
+
+/*****************************************************************************/
+
 static void
 modem_init (MMModem *modem_class)
 {
@@ -707,6 +724,12 @@ modem_simple_init (MMModemSimple *class)
 static void
 mm_modem_zte_init (MMModemZte *self)
 {
+}
+
+static void
+modem_gsm_ussd_init (MMModemGsmUssd *ussd_class)
+{
+    ussd_class->encode = ussd_encode;
 }
 
 static void
