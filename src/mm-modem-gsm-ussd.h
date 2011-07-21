@@ -54,6 +54,14 @@ struct _MMModemGsmUssd {
     void (*cancel) (MMModemGsmUssd *modem,
                     MMModemFn callback,
                     gpointer user_data);
+
+    gchar* (*encode) (MMModemGsmUssd *modem,
+                      const char* command,
+                      guint *scheme);
+
+    gchar* (*decode) (MMModemGsmUssd *modem,
+                      const char* command,
+                      guint scheme);
 };
 
 GType mm_modem_gsm_ussd_get_type (void);
@@ -71,5 +79,13 @@ void mm_modem_gsm_ussd_respond (MMModemGsmUssd *self,
 void mm_modem_gsm_ussd_cancel (MMModemGsmUssd *self,
                                MMModemFn callback,
                                gpointer user_data);
+
+char *mm_modem_gsm_ussd_encode (MMModemGsmUssd *self,
+                                const char* command,
+                                guint *scheme);
+
+char *mm_modem_gsm_ussd_decode (MMModemGsmUssd *self,
+                                const char* reply,
+                                guint scheme);
 
 #endif /* MM_MODEM_GSM_USSD_H */
