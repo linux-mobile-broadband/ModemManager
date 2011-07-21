@@ -20,15 +20,15 @@ import sys, dbus, re
 MM_DBUS_SERVICE='org.freedesktop.ModemManager'
 MM_DBUS_INTERFACE_USSD='org.freedesktop.ModemManager.Modem.Gsm.Ussd'
 
-bus = dbus.SystemBus()
-proxy = bus.get_object(MM_DBUS_SERVICE, sys.argv[1])
-modem = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_USSD)
-
 if len(sys.argv) != 3:
-    print "Usage: %s dbus_object ussd"
+    print "Usage: %s dbus_object [<ussd>|cancel]" % sys.argv[0]
     sys.exit(1)
 else:
     arg = sys.argv[2]
+
+bus = dbus.SystemBus()
+proxy = bus.get_object(MM_DBUS_SERVICE, sys.argv[1])
+modem = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_USSD)
 
 # For testing purposes treat all "common" USSD sequences as initiate and the
 # rest (except for cancel) as response. See GSM 02.90.
