@@ -137,6 +137,32 @@ mm_modem_gsm_ussd_cancel (MMModemGsmUssd *self,
 
 }
 
+char*
+mm_modem_gsm_ussd_encode (MMModemGsmUssd *self,
+                          const char* command,
+                          guint *schema)
+{
+    if (MM_MODEM_GSM_USSD_GET_INTERFACE (self)->encode)
+        return MM_MODEM_GSM_USSD_GET_INTERFACE (self)->encode(self,
+                                                              command,
+                                                              schema);
+    else
+        return NULL;
+}
+
+char*
+mm_modem_gsm_ussd_decode (MMModemGsmUssd *self,
+                          const char* reply,
+                          guint schema)
+{
+    if (MM_MODEM_GSM_USSD_GET_INTERFACE (self)->decode)
+        return MM_MODEM_GSM_USSD_GET_INTERFACE (self)->decode(self,
+                                                              reply,
+                                                              schema);
+    else
+        return NULL;
+}
+
 /*****************************************************************************/
 
 typedef struct {

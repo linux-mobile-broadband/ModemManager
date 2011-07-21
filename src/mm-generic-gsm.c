@@ -4768,7 +4768,9 @@ mm_generic_gsm_ussd_cleanup (MMGenericGsm *self)
 }
 
 static char *
-decode_ussd_response (const char *reply, MMModemCharset cur_charset)
+decode_ussd_response (MMGenericGsm *self,
+                      const char *reply,
+                      MMModemCharset cur_charset)
 {
     char **items, **iter, *p;
     char *str = NULL;
@@ -4799,8 +4801,42 @@ decode_ussd_response (const char *reply, MMModemCharset cur_charset)
     if (p)
         *p = '\0';
 
-    /* FIXME: actually use the given encoding scheme */
-    return mm_modem_charset_hex_to_utf8 (str, cur_charset);
+    return mm_modem_gsm_ussd_decode (MM_MODEM_GSM_USSD (self), str,
+                                     cur_charset);
+}
+
+static char*
+ussd_encode (MMModemGsmUssd *modem, const char* command, guint *scheme)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+    GByteArray *ussd_command = g_byte_array_new();
+    gboolean success;
+    char *hex = NULL;
+
+    /* encode to cur_charset */
+    success = mm_modem_charset_byte_array_append (ussd_command, command, FALSE,
+                                                  priv->cur_charset);
+    g_warn_if_fail (success == TRUE);
+    if (!success)
+        goto out;
+
+    /* convert to hex representation */
+    hex = utils_bin2hexstr (ussd_command->data, ussd_command->len);
+    *scheme = 15;
+
+ out:
+    g_byte_array_free (ussd_command, TRUE);
+    return hex;
+}
+
+static char*
+ussd_decode (MMModemGsmUssd *modem, const char* reply, guint scheme)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+    char *converted;
+
+    converted = mm_modem_charset_hex_to_utf8 (reply, priv->cur_charset);
+    return converted;
 }
 
 static void
@@ -4825,7 +4861,7 @@ cusd_received (MMAtSerialPort *port,
     status = g_ascii_digit_value (*reply);
     switch (status) {
     case 0: /* no further action required */
-        converted = decode_ussd_response (reply, priv->cur_charset);
+        converted = decode_ussd_response (self, reply, priv->cur_charset);
         if (priv->pending_ussd_info) {
             /* Response to the user's request */
             mm_callback_info_set_result (priv->pending_ussd_info, converted, g_free);
@@ -4838,7 +4874,7 @@ cusd_received (MMAtSerialPort *port,
         break;
     case 1: /* further action required */
         ussd_state = MM_MODEM_GSM_USSD_STATE_USER_RESPONSE;
-        converted = decode_ussd_response (reply, priv->cur_charset);
+        converted = decode_ussd_response (self, reply, priv->cur_charset);
         if (priv->pending_ussd_info) {
             mm_callback_info_set_result (priv->pending_ussd_info, converted, g_free);
         } else {
@@ -4917,10 +4953,9 @@ ussd_send (MMModemGsmUssd *modem,
     MMCallbackInfo *info;
     char *atc_command;
     char *hex;
-    GByteArray *ussd_command = g_byte_array_new();
+    guint scheme = 0;
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMAtSerialPort *port;
-    gboolean success;
 
     g_warn_if_fail (priv->pending_ussd_info == NULL);
 
@@ -4935,14 +4970,16 @@ ussd_send (MMModemGsmUssd *modem,
     /* Cache the callback info since the response is an unsolicited one */
     priv->pending_ussd_info = info;
 
-    /* encode to cur_charset */
-    success = mm_modem_charset_byte_array_append (ussd_command, command, FALSE, priv->cur_charset);
-    g_warn_if_fail (success == TRUE);
-
-    /* convert to hex representation */
-    hex = utils_bin2hexstr (ussd_command->data, ussd_command->len);
-    g_byte_array_free (ussd_command, TRUE);
-    atc_command = g_strdup_printf ("+CUSD=1,\"%s\",15", hex);
+    hex = mm_modem_gsm_ussd_encode (MM_MODEM_GSM_USSD (modem), command, &scheme);
+    if (!hex) {
+        info->error =  g_error_new (MM_MODEM_ERROR,
+                                    MM_MODEM_ERROR_GENERAL,
+                                    "Failed to encode USSD command '%s'",
+                                    command);
+        mm_callback_info_schedule (info);
+        return;
+    }
+    atc_command = g_strdup_printf ("+CUSD=1,\"%s\",%d", hex, scheme);
     g_free (hex);
 
     mm_at_serial_port_queue_command (port, atc_command, 10, ussd_send_done, info);
@@ -5689,6 +5726,8 @@ modem_gsm_ussd_init (MMModemGsmUssd *class)
     class->initiate = ussd_initiate;
     class->respond = ussd_respond;
     class->cancel = ussd_cancel;
+    class->encode = ussd_encode;
+    class->decode = ussd_decode;
 }
 
 static void
