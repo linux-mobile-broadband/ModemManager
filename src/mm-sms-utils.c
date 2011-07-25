@@ -349,7 +349,11 @@ sms_parse_pdu (const char *hexpdu, GError **error)
         udhl = pdu[user_data_offset] + 1;
         user_data_offset += udhl;
         if (user_data_encoding == MM_SMS_ENCODING_GSM7) {
-            bit_offset = 7 - (udhl * 8) % 7;
+            /*
+             * Find the number of bits we need to add to the length of the
+             * user data to get a multiple of 7 (the padding).
+             */
+            bit_offset = (7 - udhl % 7) % 7;
             user_data_len -= (udhl * 8 + bit_offset) / 7;
         } else
             user_data_len -= udhl;

@@ -339,6 +339,34 @@ test_pdu_insufficient_data (void *f, gpointer d)
   g_free (hexpdu);
 }
 
+
+static void
+test_pdu_udhi (void *f, gpointer d)
+{
+  /* Welcome message from KPN NL */
+  static const char *hexpdu =
+"07911356131313F64004850120390011609232239180A006080400100201D7327BFD6EB340E232"
+"1BF46E83EA7790F59D1E97DBE1341B442F83C465763D3DA797E56537C81D0ECB41AB59CC1693C1"
+"6031D96C064241E5656838AF03A96230982A269BCD462917C8FA4E8FCBED709A0D7ABBE9F6B0FB"
+"5C7683D27350984D4FABC9A0B33C4C4FCF5D20EBFB2D079DCB62793DBD06D9C36E50FB2D4E97D9"
+"A0B49B5E96BBCB";
+  GHashTable *sms;
+  GError *error;
+
+  sms = sms_parse_pdu (hexpdu, &error);
+  g_assert (sms);
+
+  TEST_ENTRY_EQ (sms, "smsc", "+31653131316");
+  TEST_ENTRY_EQ (sms, "number", "1002");
+  TEST_ENTRY_EQ (sms, "timestamp", "110629233219+02");
+  TEST_ENTRY_EQ (sms, "text",
+                 "Welkom, bel om uw Voicemail te beluisteren naar +31612001233"
+                 " (PrePay: *100*1233#). Voicemail ontvangen is altijd gratis."
+                 " Voor gebruik van mobiel interne");
+
+  g_hash_table_unref (sms);
+}
+
 #if 0
 static void
 test_pduX (void *f, gpointer d)
@@ -393,6 +421,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_pdu_dcsf1, NULL));
     g_test_suite_add (suite, TESTCASE (test_pdu_dcsf_8bit, NULL));
     g_test_suite_add (suite, TESTCASE (test_pdu_insufficient_data, NULL));
+    g_test_suite_add (suite, TESTCASE (test_pdu_udhi, NULL));
 
     result = g_test_run ();
 
