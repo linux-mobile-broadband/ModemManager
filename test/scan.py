@@ -21,16 +21,14 @@ MM_DBUS_SERVICE='org.freedesktop.ModemManager'
 MM_DBUS_INTERFACE_MODEM='org.freedesktop.ModemManager.Modem'
 MM_DBUS_INTERFACE_MODEM_GSM_NETWORK='org.freedesktop.ModemManager.Modem.Gsm.Network'
 
-mm_act =     { 0: "unknown",
-               1: "GSM",
-               2: "GSM Compact",
-               3: "GPRS",
-               4: "EDGE",
-               5: "UMTS",
-               6: "HSDPA",
-               7: "HSUPA",
-               8: "HSPA"
-             }
+gsm_act =     { 0: "(GSM)",
+                1: "(GSM Compact)",
+                2: "(UMTS)",
+                3: "(EDGE)",
+                4: "(HSDPA)",
+                5: "(HSUPA)",
+                6: "(HSPA)"
+              }
 
 bus = dbus.SystemBus()
 proxy = bus.get_object(MM_DBUS_SERVICE, sys.argv[1])
@@ -70,20 +68,7 @@ for r in results:
     access_tech = ""
     try:
         access_tech_num = int(r['access-tech'])
-        if access_tech_num == "0":
-            access_tech = "(GSM)"
-        elif access_tech_num == "1":
-            access_tech = "(Compact GSM)"
-        elif access_tech_num == "2":
-            access_tech = "(UMTS)"
-        elif access_tech_num == "3":
-            access_tech = "(EDGE)"
-        elif access_tech_num == "4":
-            access_tech = "(HSDPA)"
-        elif access_tech_num == "5":
-            access_tech = "(HSUPA)"
-        elif access_tech_num == "6":
-            access_tech = "(HSPA)"
+        access_tech = gsm_act[access_tech_num]
     except KeyError:
         pass
 
