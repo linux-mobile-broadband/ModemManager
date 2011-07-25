@@ -2442,6 +2442,19 @@ reg_info_updated (MMGenericGsm *self,
             changed = TRUE;
     }
 
+    /* Don't clear oper code or oper num if at least one of CS or PS state
+     * is home or roaming.
+     */
+    if (   priv->reg_status[0] == MM_MODEM_GSM_NETWORK_REG_STATUS_HOME
+        || priv->reg_status[0] == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING
+        || priv->reg_status[1] == MM_MODEM_GSM_NETWORK_REG_STATUS_HOME
+        || priv->reg_status[1] == MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING) {
+        if (update_code && oper_code == NULL)
+            update_code = FALSE;
+        if (update_name && oper_name == NULL)
+            update_name = FALSE;
+    }
+
     if (update_code) {
         if (g_strcmp0 (oper_code, priv->oper_code) != 0) {
             g_free (priv->oper_code);
