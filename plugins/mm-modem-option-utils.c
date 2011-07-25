@@ -190,6 +190,22 @@ owcti_to_mm (char owcti, MMModemGsmAccessTech *out_act)
 }
 
 static gboolean
+ossys_to_mm (char ossys, MMModemGsmAccessTech *out_act)
+{
+    if (ossys == '0') {
+        *out_act = MM_MODEM_GSM_ACCESS_TECH_GPRS;
+        return TRUE;
+    } else if (ossys == '2') {
+        *out_act = MM_MODEM_GSM_ACCESS_TECH_UMTS;
+        return TRUE;
+    } else if (ossys == '3') {
+        *out_act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static gboolean
 parse_octi_response (GString *response, MMModemGsmAccessTech *act)
 {
     MMModemGsmAccessTech cur_act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
@@ -211,6 +227,39 @@ parse_octi_response (GString *response, MMModemGsmAccessTech *act)
     if (g_match_info_matches (match_info)) {
         str = g_match_info_fetch (match_info, 2);
         if (str && octi_to_mm (str[0], &cur_act)) {
+            *act = cur_act;
+            success = TRUE;
+        }
+        g_free (str);
+    }
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    return success;
+}
+
+static gboolean
+parse_ossys_response (GString *response, MMModemGsmAccessTech *act)
+{
+    MMModemGsmAccessTech cur_act = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
+    const char *p;
+    GRegex *r;
+    GMatchInfo *match_info;
+    char *str;
+    gboolean success = FALSE;
+
+    g_return_val_if_fail (act != NULL, FALSE);
+    g_return_val_if_fail (response != NULL, FALSE);
+
+    p = mm_strip_tag (response->str, "_OSSYS:");
+
+    r = g_regex_new ("(\\d),(\\d)", G_REGEX_UNGREEDY, 0, NULL);
+    g_return_val_if_fail (r != NULL, FALSE);
+
+    g_regex_match (r, p, 0, &match_info);
+    if (g_match_info_matches (match_info)) {
+        str = g_match_info_fetch (match_info, 2);
+        if (str && ossys_to_mm (str[0], &cur_act)) {
             *act = cur_act;
             success = TRUE;
         }
@@ -261,18 +310,8 @@ option_ossys_tech_changed (MMAtSerialPort *port,
     char *str;
 
     str = g_match_info_fetch (info, 1);
-    if (str) {
-        switch (atoi (str)) {
-        case 0:
-            act = MM_MODEM_GSM_ACCESS_TECH_GPRS;
-            break;
-        case 2:
-            act = MM_MODEM_GSM_ACCESS_TECH_UMTS;
-            break;
-        default:
-            break;
-        }
-    }
+    if (str)
+        ossys_to_mm (str[0], &act);
     g_free (str);
 
     mm_generic_gsm_update_access_technology (MM_GENERIC_GSM (user_data), act);
@@ -408,7 +447,7 @@ get_act_octi_request_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = user_data;
     MMModemGsmAccessTech octi = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
-    MMModemGsmAccessTech owcti;
+    MMModemGsmAccessTech act;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
@@ -417,9 +456,11 @@ get_act_octi_request_done (MMAtSerialPort *port,
 
     if (!error) {
         if (parse_octi_response (response, &octi)) {
-            /* If no 3G tech yet or current tech isn't 3G, then 2G tech is the best */
-            owcti = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "owcti"));
-            if (octi && !owcti)
+            /* If current tech is 2G or unknown then use the more specific
+             * OCTI response.
+             */
+            act = GPOINTER_TO_UINT (mm_callback_info_get_result (info));
+            if (act < MM_MODEM_GSM_ACCESS_TECH_UMTS)
                 mm_callback_info_set_result (info, GUINT_TO_POINTER (octi), NULL);
         }
     }
@@ -444,12 +485,56 @@ get_act_owcti_request_done (MMAtSerialPort *port,
 
     if (!error) {
         p = mm_strip_tag (response->str, "_OWCTI:");
-        if (owcti_to_mm (*p, &owcti)) {
-            /* 3G tech always takes precedence over 2G tech */
-            if (owcti)
-                mm_callback_info_set_result (info, GUINT_TO_POINTER (owcti), NULL);
+        if (owcti_to_mm (*p, &owcti) && owcti)
+            mm_callback_info_set_result (info, GUINT_TO_POINTER (owcti), NULL);
+    }
+
+    mm_callback_info_chain_complete_one (info);
+}
+
+static void
+get_act_ossys_request_done (MMAtSerialPort *port,
+                            GString *response,
+                            GError *error,
+                            gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMModemGsmAccessTech ossys = MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
+    gboolean check_2g = TRUE, check_3g = TRUE;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    /* If for some reason the OSSYS request failed, still try to check
+     * explicit 2G/3G mode with OCTI and OWCTI; maybe we'll get something.
+     */
+
+    if (!error) {
+        /* Response is _OSSYS: <n>,<act> so we must skip the <n> */
+        if (parse_ossys_response (response, &ossys)) {
+            mm_callback_info_set_result (info, GUINT_TO_POINTER (ossys), NULL);
+
+            /* If the OSSYS response indicated a generic access tech type
+             * then only check for more specific access tech of that type.
+             */
+            if (ossys == MM_MODEM_GSM_ACCESS_TECH_GPRS)
+                check_3g = FALSE;
+            if (ossys == MM_MODEM_GSM_ACCESS_TECH_UMTS)
+                check_2g = FALSE;
         }
     }
+
+    if (check_2g)
+        mm_at_serial_port_queue_command (port, "_OCTI?", 3, get_act_octi_request_done, info);
+    else
+        mm_callback_info_chain_complete_one (info);  /* complete it if it wasn't used */
+
+    if (check_3g)
+        mm_at_serial_port_queue_command (port, "_OWCTI?", 3, get_act_owcti_request_done, info);
+    else
+        mm_callback_info_chain_complete_one (info);  /* complete it if it wasn't used */
 
     mm_callback_info_chain_complete_one (info);
 }
@@ -463,7 +548,7 @@ option_get_access_technology (MMGenericGsm *modem,
     MMCallbackInfo *info;
 
     info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-    mm_callback_info_chain_start (info, 2);
+    mm_callback_info_chain_start (info, 3);
 
     port = mm_generic_gsm_get_best_at_port (modem, &info->error);
     if (!port) {
@@ -471,7 +556,6 @@ option_get_access_technology (MMGenericGsm *modem,
         return;
     }
 
-    mm_at_serial_port_queue_command (port, "_OCTI?", 3, get_act_octi_request_done, info);
-    mm_at_serial_port_queue_command (port, "_OWCTI?", 3, get_act_owcti_request_done, info);
+    mm_at_serial_port_queue_command (port, "_OSSYS?", 3, get_act_ossys_request_done, info);
 }
 
