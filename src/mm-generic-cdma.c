@@ -1700,11 +1700,17 @@ real_query_registration_state (MMGenericCdma *self,
         /* Try Sprint-specific commands */
         mm_at_serial_port_queue_command (port, "+SPSERVICE?", 3, reg_query_spservice_done, info);
     } else {
-        /* Assume we're registered on the 1x network if we passed +CAD, +CSS,
-         * and QCDM Call Manager checking.
+        /* Assume we're at least registered on the 1x network if we passed
+         * +CAD, +CSS, and QCDM Call Manager checking.  But don't override a
+         * more specific registration state passed from a caller.
          */
-        mm_generic_cdma_query_reg_state_set_callback_1x_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED);
-        mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+        if (cur_cdma_state == MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
+            mm_generic_cdma_query_reg_state_set_callback_1x_state (info, MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED);
+
+        /* Don't touch EVDO state; it's already either UNKNOWN, or been set
+         * by generic checking earlier.
+         */
+
         mm_callback_info_schedule (info);
     }
 }
