@@ -151,6 +151,14 @@ mm_callback_info_string_new (MMModem *modem,
     return mm_callback_info_new_full (modem, invoke_mm_modem_string_fn, (GCallback) callback, user_data);
 }
 
+gpointer
+mm_callback_info_get_result (MMCallbackInfo *info)
+{
+    g_return_val_if_fail (info != NULL, NULL);
+
+    return mm_callback_info_get_data (info, CALLBACK_INFO_RESULT);
+}
+
 void
 mm_callback_info_set_result (MMCallbackInfo *info,
                              gpointer data,
