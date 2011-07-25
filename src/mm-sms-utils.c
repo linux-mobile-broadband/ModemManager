@@ -49,6 +49,13 @@
 #define SMS_TIMESTAMP_LEN 7
 #define SMS_MIN_PDU_LEN (7 + SMS_TIMESTAMP_LEN)
 
+typedef enum {
+    MM_SMS_ENCODING_UNKNOWN = 0x0,
+    MM_SMS_ENCODING_GSM7,
+    MM_SMS_ENCODING_8BIT,
+    MM_SMS_ENCODING_UCS2
+} SmsEncoding;
+
 static char sms_bcd_chars[] = "0123456789*#abc\0\0";
 
 static void
@@ -122,21 +129,78 @@ sms_decode_timestamp (const guint8 *timestamp)
     return timestr;
 }
 
+static SmsEncoding
+sms_encoding_type (int dcs)
+{
+    SmsEncoding scheme = MM_SMS_ENCODING_UNKNOWN;
+
+    switch ((dcs >> 4) & 0xf) {
+        /* General data coding group */
+        case 0: case 1:
+        case 2: case 3:
+            switch (dcs & 0x0c) {
+                case 0x08:
+                    scheme = MM_SMS_ENCODING_UCS2;
+                    break;
+                case 0x00:
+                    /* fallthrough */
+                    /* reserved - spec says to treat it as default alphabet */
+                case 0x0c:
+                    scheme = MM_SMS_ENCODING_GSM7;
+                    break;
+                case 0x04:
+                    scheme = MM_SMS_ENCODING_8BIT;
+                    break;
+            }
+            break;
+
+            /* Message waiting group (default alphabet) */
+        case 0xc:
+        case 0xd:
+            scheme = MM_SMS_ENCODING_GSM7;
+            break;
+
+            /* Message waiting group (UCS2 alphabet) */
+        case 0xe:
+            scheme = MM_SMS_ENCODING_UCS2;
+            break;
+
+            /* Data coding/message class group */
+        case 0xf:
+            switch (dcs & 0x04) {
+                case 0x00:
+                    scheme = MM_SMS_ENCODING_GSM7;
+                    break;
+                case 0x04:
+                    scheme = MM_SMS_ENCODING_8BIT;
+                    break;
+            }
+            break;
+
+            /* Reserved coding group values - spec says to treat it as default alphabet */
+        default:
+            scheme = MM_SMS_ENCODING_GSM7;
+            break;
+    }
+
+    return scheme;
+
+}
+
 static char *
-sms_decode_text (const guint8 *text, int len, int dcs, int bit_offset)
+sms_decode_text (const guint8 *text, int len, SmsEncoding encoding, int bit_offset)
 {
     char *utf8;
-    guint8 coding = dcs & SMS_DCS_CODING_MASK;
     guint8 *unpacked;
     guint32 unpacked_len;
 
-    if (coding == SMS_DCS_CODING_DEFAULT) {
+    if (encoding == MM_SMS_ENCODING_GSM7) {
         unpacked = gsm_unpack ((const guint8 *) text, len, bit_offset, &unpacked_len);
         utf8 = (char *) mm_charset_gsm_unpacked_to_utf8 (unpacked, unpacked_len);
         g_free (unpacked);
-    } else if (coding == SMS_DCS_CODING_UCS2)
+    } else if (encoding == MM_SMS_ENCODING_UCS2)
         utf8 = g_convert ((char *) text, len, "UTF8", "UCS-2BE", NULL, NULL, NULL);
-    else if (coding == SMS_DCS_CODING_8BIT)
+    else if (encoding == MM_SMS_ENCODING_8BIT)
         utf8 = g_strndup ((const char *)text, len);
     else
         utf8 = g_strdup ("");
@@ -198,8 +262,9 @@ sms_parse_pdu (const char *hexpdu, GError **error)
     int smsc_addr_num_octets, variable_length_items, msg_start_offset,
             sender_addr_num_digits, sender_addr_num_octets,
             tp_pid_offset, tp_dcs_offset, user_data_offset, user_data_len,
-            user_data_len_offset, user_data_dcs, bit_offset;
+            user_data_len_offset, bit_offset;
     char *smsc_addr, *sender_addr, *sc_timestamp, *msg_text;
+    SmsEncoding user_data_encoding;
 
     /* Convert PDU from hex to binary */
     pdu = (guint8 *) utils_hexstr2bin (hexpdu, &pdu_len);
@@ -246,8 +311,8 @@ sms_parse_pdu (const char *hexpdu, GError **error)
     user_data_len_offset = tp_dcs_offset + 1 + SMS_TIMESTAMP_LEN;
     user_data_offset = user_data_len_offset + 1;
     user_data_len = pdu[user_data_len_offset];
-    user_data_dcs = pdu[tp_dcs_offset];
-    if ((user_data_dcs & SMS_DCS_CODING_MASK) == SMS_DCS_CODING_DEFAULT)
+    user_data_encoding = sms_encoding_type(pdu[tp_dcs_offset]);
+    if (user_data_encoding == MM_SMS_ENCODING_GSM7)
         variable_length_items += (7 * (user_data_len + 1 )) / 8;
     else
         variable_length_items += user_data_len;
@@ -283,7 +348,7 @@ sms_parse_pdu (const char *hexpdu, GError **error)
         int udhl;
         udhl = pdu[user_data_offset] + 1;
         user_data_offset += udhl;
-        if ((user_data_dcs & SMS_DCS_CODING_MASK) == SMS_DCS_CODING_DEFAULT) {
+        if (user_data_encoding == MM_SMS_ENCODING_GSM7) {
             bit_offset = 7 - (udhl * 8) % 7;
             user_data_len -= (udhl * 8 + bit_offset) / 7;
         } else
@@ -291,7 +356,7 @@ sms_parse_pdu (const char *hexpdu, GError **error)
     }
 
     msg_text = sms_decode_text (&pdu[user_data_offset], user_data_len,
-                                user_data_dcs, bit_offset);
+                                user_data_encoding, bit_offset);
 
     properties = g_hash_table_new_full (g_str_hash, g_str_equal, NULL,
                                         simple_free_gvalue);
@@ -303,9 +368,9 @@ sms_parse_pdu (const char *hexpdu, GError **error)
                          simple_string_value (smsc_addr));
     g_hash_table_insert (properties, "timestamp",
                          simple_string_value (sc_timestamp));
-    if (user_data_dcs & SMS_DCS_CLASS_VALID)
+    if (pdu[tp_dcs_offset] & SMS_DCS_CLASS_VALID)
         g_hash_table_insert (properties, "class",
-                             simple_uint_value (user_data_dcs &
+                             simple_uint_value (pdu[tp_dcs_offset] &
                                                 SMS_DCS_CLASS_MASK));
     g_hash_table_insert (properties, "completed", simple_boolean_value (TRUE));
 
