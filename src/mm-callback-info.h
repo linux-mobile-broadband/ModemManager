@@ -58,6 +58,7 @@ MMCallbackInfo *mm_callback_info_string_new (MMModem *modem,
                                              gpointer user_data);
 
 void            mm_callback_info_schedule (MMCallbackInfo *info);
+gpointer        mm_callback_info_get_result (MMCallbackInfo *info);
 void            mm_callback_info_set_result (MMCallbackInfo *info,
                                              gpointer data,
                                              GDestroyNotify destroy);
