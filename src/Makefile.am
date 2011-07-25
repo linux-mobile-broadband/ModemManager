@@ -23,7 +23,9 @@ libmodem_helpers_la_SOURCES = \
 	mm-charsets.c \
 	mm-charsets.h \
 	mm-utils.c \
-	mm-utils.h
+	mm-utils.h \
+	mm-sms-utils.c \
+	mm-sms-utils.h
 
 libserial_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
