@@ -58,7 +58,7 @@ supports_port (MMPluginBase *base,
 {
     GUdevDevice *port;
     const char *driver, *subsys, *name;
-    guint16 vendor = 0;
+    guint16 vendor = 0, product = 0;
 
     /* Can't do anything with non-serial ports */
     port = mm_plugin_base_supports_task_get_port (task);
@@ -69,13 +69,14 @@ supports_port (MMPluginBase *base,
     name = g_udev_device_get_name (port);
 
     driver = mm_plugin_base_supports_task_get_driver (task);
-    if (!driver || (strcmp (driver, "option1") && strcmp (driver, "option")))
+    if (!driver || (strcmp (driver, "option1") && strcmp (driver, "option") && strcmp (driver, "nozomi")))
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
-    if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, NULL))
+    if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product))
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
-    if (vendor != 0x0af0)
+    if (   (vendor != 0x0af0)                        /* Option USB devices */
+        && (vendor != 0x1931 || product != 0x000c))  /* Nozomi CardBus devices */
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
     /* Check if a previous probing was already launched in this port */
