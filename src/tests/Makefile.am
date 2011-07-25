@@ -4,7 +4,8 @@ INCLUDES = \
 noinst_PROGRAMS = \
 	test-modem-helpers \
 	test-charsets \
-	test-qcdm-serial-port
+	test-qcdm-serial-port \
+	test-sms
 
 test_modem_helpers_SOURCES = \
 	test-modem-helpers.c
@@ -40,12 +41,23 @@ test_qcdm_serial_port_LDADD = \
 	$(top_builddir)/libqcdm/src/libqcdm.la \
 	-lutil
 
+test_sms_SOURCES = \
+	test-sms.c
+
+test_sms_CFLAGS = \
+	$(MM_CFLAGS)
+
+test_sms_LDADD = \
+	$(top_builddir)/src/libmodem-helpers.la \
+	$(MM_LIBS)
+
 if WITH_TESTS
 
 check-local: test-modem-helpers
 	$(abs_builddir)/test-modem-helpers
 	$(abs_builddir)/test-charsets
 	$(abs_builddir)/test-qcdm-serial-port
+	$(abs_builddir)/test-sms
 
 endif
 
