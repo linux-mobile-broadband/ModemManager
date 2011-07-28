@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
+  <interface name="org.freedesktop.ModemManager1.Modem.SMS">
+
+    <tp:docstring>
+      Defines operations and properties of a single SMS message.
+    </tp:docstring>
+
+    <!-- METHODS -->
+
+    <method name="Delete">
+      <tp:docstring>
+        Deletes the message.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_sms_delete"/>
+    </method>
+
+    <method name="Send">
+      <tp:docstring>
+        If the message has not yet been sent, queue it for delivery.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_sms_send"/>
+    </method>
+
+    <!-- PROPERTIES -->
+
+    <property name="State" type="u" access="read" tp:type="MM_MODEM_SMS_STATE">
+      <tp:docstring>
+        Describes the state of the message.
+      </tp:docstring>
+    </property>
+
+    <property name="To" type="s" access="readwrite">
+      <tp:docstring>
+        Indicates the number to which the message is addressed.
+      </tp:docstring>
+    </property>
+
+    <property name="Text" type="s" access="readwrite">
+      <tp:docstring>
+        Message text.  When sending, if the text is larger than the limit of
+        the technology or modem, the message will be broken into multiple
+        parts or messages.
+      </tp:docstring>
+    </property>
+
+    <property name="Smsc" type="s" access="readwrite">
+      <tp:docstring>
+        Indicates the SMS service center number.  Always empty for 3GPP2/CDMA.
+      </tp:docstring>
+    </property>
+
+    <property name="Validity" type="u" access="readwrite">
+      <tp:docstring>
+        Specifies when the SMS expires in the SMSC.  Always 0 for 3GPP2/CDMA.
+      </tp:docstring>
+    </property>
+
+    <property name="Class" type="u" access="readwrite">
+      <tp:docstring>
+        3GPP message class (0..3).  Always 0 for 3GPP2/CDMA.
+      </tp:docstring>
+    </property>
+
+    <property name="Timestamp" type="s" access="read">
+      <tp:docstring>
+        Time message was received or was sent in ISO8601 format.
+      </tp:docstring>
+    </property>
+
+    <!-- ENUMS -->
+
+    <tp:enum name="MM_MODEM_SMS_STATE" type="u">
+      <tp:enumvalue suffix="UNKNOWN" value="0">
+        <tp:docstring>
+          State unknown or not reportable.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="STORED" value="0">
+        <tp:docstring>
+          The message has been neither received nor yet sent.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="RECEIVING" value="1">
+        <tp:docstring>
+          The message is being received but is not yet complete.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="RECEIVED" value="2">
+        <tp:docstring>
+          The message received and is complete.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="SENDING" value="3">
+        <tp:docstring>
+          The message is queued for delivery.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="SENT" value="4">
+        <tp:docstring>
+          The message was successfully sent.
+        </tp:docstring>
+      </tp:enumvalue>
+    </tp:enum>
+
+  </interface>
+</node>
