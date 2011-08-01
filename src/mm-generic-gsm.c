@@ -1918,8 +1918,8 @@ get_operator_id_imsi_done (MMModem *modem,
                            GError *error,
                            gpointer user_data)
 {
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMAtSerialPort *port;
 
     if (error) {
         info->error = g_error_copy (error);
@@ -1927,10 +1927,17 @@ get_operator_id_imsi_done (MMModem *modem,
         return;
     }
 
+    g_clear_error (&info->error);
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    if (!port) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
     mm_callback_info_set_data (info, "imsi", g_strdup (result), g_free);
 
     /* READ BINARY of EFad (Administrative Data) ETSI 51.011 section 10.3.18 */
-    mm_at_serial_port_queue_command_cached (priv->primary,
+    mm_at_serial_port_queue_command_cached (port,
                                             "+CRSM=176,28589,0,0,4",
                                             3,
                                             get_mnc_length_done,
@@ -2017,11 +2024,18 @@ get_imei (MMModemGsmCard *modem,
           MMModemStringFn callback,
           gpointer user_data)
 {
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
+    MMAtSerialPort *port;
 
     info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
-    mm_at_serial_port_queue_command_cached (priv->primary, "+CGSN", 3, get_string_done, info);
+
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    if (!port)
+        mm_callback_info_schedule (info);
+    else {
+        g_clear_error (&info->error);
+        mm_at_serial_port_queue_command_cached (port, "+CGSN", 3, get_string_done, info);
+    }
 }
 
 static void
@@ -2029,11 +2043,18 @@ get_imsi (MMModemGsmCard *modem,
           MMModemStringFn callback,
           gpointer user_data)
 {
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
+    MMAtSerialPort *port;
 
     info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
-    mm_at_serial_port_queue_command_cached (priv->primary, "+CIMI", 3, get_string_done, info);
+
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    if (!port)
+        mm_callback_info_schedule (info);
+    else {
+        g_clear_error (&info->error);
+        mm_at_serial_port_queue_command_cached (port, "+CIMI", 3, get_string_done, info);
+    }
 }
 
 static void
@@ -2054,17 +2075,24 @@ get_spn (MMModemGsmCard *modem,
          MMModemStringFn callback,
          gpointer user_data)
 {
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     MMCallbackInfo *info;
+    MMAtSerialPort *port;
 
     info = mm_callback_info_string_new (MM_MODEM (modem), callback, user_data);
 
-    /* READ BINARY of EFspn (Service Provider Name) ETSI 51.011 section 10.3.11 */
-    mm_at_serial_port_queue_command_cached (priv->primary,
-                                            "+CRSM=176,28486,0,0,17",
-                                            3,
-                                            get_spn_done,
-                                            info);
+    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    if (!port)
+        mm_callback_info_schedule (info);
+    else {
+        g_clear_error (&info->error);
+
+        /* READ BINARY of EFspn (Service Provider Name) ETSI 51.011 section 10.3.11 */
+        mm_at_serial_port_queue_command_cached (port,
+                                                "+CRSM=176,28486,0,0,17",
+                                                3,
+                                                get_spn_done,
+                                                info);
+    }
 }
 
 static void
