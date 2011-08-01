@@ -60,6 +60,11 @@
           ** FIXME: how about QoS?
         </tp:docstring>
       </arg>
+      <arg name="path" type="o" direction="out">
+	<tp:docstring>
+	  On success, the object path of the newly created bearer.
+        </tp:docstring>
+      </arg>
     </method>
 
     <method name="DeleteBearer">
@@ -252,28 +257,30 @@
     <property name="AllowedMode" type="u" access="readwrite" tp:type="MM_MODEM_ALLOWED_MODE">
       <tp:docstring>
         The allowed access technologies (eg 2G/3G/4G preference) the device is
-        allowed to use when connecting to a network.  For POTS devices, only
-        the "any" mode is supported.
+        currently allowed to use when connecting to a network.  For POTS
+        devices, only the "any" mode is supported.
       </tp:docstring>
     </property>
 
     <property name="SupportedModes" type="u" access="read" tp:type="MM_MODEM_ALLOWED_MODE">
       <tp:docstring>
-        Access technology selection modes supported by the device.
+        Access technology selection modes supported by the device.  For POTS
+        devices, only the "any" mode will be returned.
       </tp:docstring>
     </property>
 
     <property name="AllowedBands" type="t" access="readwrite" tp:type="MM_MODEM_BAND">
       <tp:docstring>
-        The allowed radio frequency and technology bands the device may use when
+        The allowed radio frequency and technology bands the device is currently
         allowed to use when connecting to a network.  For POTS devices, only
-        the "any" mode is supported.
+        the "any" value is supported.
       </tp:docstring>
     </property>
 
     <property name="SupportedBands" type="t" access="read" tp:type="MM_MODEM_BAND">
       <tp:docstring>
-        Radio frequency and technology bands supported by the device.
+        Radio frequency and technology bands supported by the device.  For POTS
+        devices, only the "any" value will be returned.
       </tp:docstring>
     </property>
 
@@ -307,7 +314,12 @@
       </tp:flag>
       <tp:flag suffix="LTE" value="0x8">
         <tp:docstring>
-          Modem has at LTE data capability.
+          Modem has LTE data capability.
+        </tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="LTE_ADVANCED" value="0x10">
+        <tp:docstring>
+          Modem has LTE Advanced data capability.
         </tp:docstring>
       </tp:flag>
     </tp:flags>

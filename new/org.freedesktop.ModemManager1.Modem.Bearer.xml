@@ -20,7 +20,11 @@
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_bearer_connect"/>
       <arg name="number" type="s" direction="in">
 	<tp:docstring>
-	  The number to use for dialing.
+	  The number to use for dialing (optional).  Usually not required, in
+	  which case it should be an empty (zero-length) string.  Only required
+	  for POTS connections or in certain special circumstances.  If a number
+	  is given for 3GPP (GSM/UMTS/LTE) based devices, it is always ignored,
+	  as the number is generated internally if one is required at all.
       </tp:docstring>
       </arg>
     </method>
