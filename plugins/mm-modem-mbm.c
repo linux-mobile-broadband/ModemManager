@@ -437,18 +437,28 @@ mbm_emrdy_done (MMAtSerialPort *port,
                 gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
+    MMModemMbmPrivate *priv;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
     if (mm_callback_info_check_modem_removed (info))
         return;
 
-    if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT))
-        mm_warn ("timed out waiting for EMRDY response.");
-    else {
-        MMModemMbmPrivate *priv = MM_MODEM_MBM_GET_PRIVATE (info->modem);
-
-        priv->have_emrdy = TRUE;
+    /* EMRDY unsolicited response might have happened between the command
+     * submission and the response.  This was seen once:
+     *
+     * (ttyACM0): --> 'AT*EMRDY?<CR>'
+     * (ttyACM0): <-- 'T*EMRD<CR><LF>*EMRDY: 1<CR><LF>Y?'
+     *
+     * So suppress the warning if the unsolicited handler handled the response
+     * before we get here.
+     */
+    priv = MM_MODEM_MBM_GET_PRIVATE (info->modem);
+    if (!priv->have_emrdy) {
+        if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT))
+            mm_warn ("timed out waiting for EMRDY response.");
+        else
+            priv->have_emrdy = TRUE;
     }
 
     do_init (port, info);
@@ -965,6 +975,13 @@ grab_port (MMModem *modem,
     port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
     if (port && MM_IS_AT_SERIAL_PORT (port)) {
         GRegex *regex;
+
+        /* The Ericsson modems always have a free AT command port, so we
+         * don't need to flash the ports when disconnecting to get back to
+         * command mode.  F5521gw R2A07 resets port properties like echo when
+         * flashed, leading to confusion.  bgo #650740
+         */
+        g_object_set (G_OBJECT (port), MM_SERIAL_PORT_FLASH_OK, FALSE, NULL);
 
         if (ptype == MM_PORT_TYPE_PRIMARY) {
             regex = g_regex_new ("\\r\\n\\*E2NAP: (\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
