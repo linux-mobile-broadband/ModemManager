@@ -272,8 +272,6 @@ supports_task_dispose (GObject *object)
     g_object_unref (priv->port);
     g_free (priv->physdev_path);
     g_free (priv->driver);
-    g_free (priv->probe_resp);
-    g_clear_error (&(priv->probe_error));
 
     for (iter = priv->custom; iter; iter = g_slist_next (iter)) {
         CustomInit *custom = iter->data;
@@ -298,6 +296,9 @@ supports_task_dispose (GObject *object)
         mm_serial_port_close (MM_SERIAL_PORT (priv->qcdm_port));
         g_object_unref (priv->qcdm_port);
     }
+
+    g_free (priv->probe_resp);
+    g_clear_error (&(priv->probe_error));
 
     G_OBJECT_CLASS (mm_plugin_base_supports_task_parent_class)->dispose (object);
 }
