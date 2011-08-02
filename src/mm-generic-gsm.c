@@ -3585,7 +3585,12 @@ existing_apns_read (MMAtSerialPort *port,
         return;
 
     if (error) {
-        info->error = g_error_copy (error);
+        /* Some Android phones don't support querying existing PDP contexts,
+         * but will accept setting the APN.  So if CGDCONT? isn't supported,
+         * just ignore that error and hope for the best. (bgo #637327)
+         */
+        if (g_error_matches (error, MM_MOBILE_ERROR, MM_MOBILE_ERROR_NOT_SUPPORTED) == FALSE)
+            info->error = g_error_copy (error);
     } else if (g_str_has_prefix (response->str, "+CGDCONT:")) {
         GRegex *r;
         GMatchInfo *match_info;
