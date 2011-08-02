@@ -13,7 +13,7 @@ program (tests/mm-test.py) that demonstrates the basic API usage.
 Implementation.
 ModemManager is a DBus system bus activated service (meaning it's started 
 automatically when a request arrives). It is written in C. The devices are
-queried from HAL and automatically updated based on hardware events. There's
+queried from udev and automatically updated based on hardware events. There's
 a GInterface (MMModem) that defines the modem interface and any device specific
 implementation must implement it. There are two generic MMModem implementations
 to support the basic operations (one for GSM, one for CDMA,) which are common
@@ -22,7 +22,7 @@ for all cards.
 Plugins.
 Plugins are loaded on startup, and must implement the MMPlugin interface. It
 consists of a couple of methods which tell the daemon whether the plugin
-supports a HAL UDI and to create custom MMModem implementations. It most likely
+supports a port and to create custom MMModem implementations. It most likely
 makes sense to derive custom modem implementations from one of the generic
 classes and just add (or override) operations which are not standard. There's a
 fully working plugin in the plugins/ directory for Huawei cards that can be
