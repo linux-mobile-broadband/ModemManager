@@ -45,6 +45,7 @@ enum {
     PROP_SEND_DELAY,
     PROP_FD,
     PROP_SPEW_CONTROL,
+    PROP_FLASH_OK,
 
     LAST_PROP
 };
@@ -69,6 +70,7 @@ typedef struct {
     guint stopbits;
     guint64 send_delay;
     gboolean spew_control;
+    gboolean flash_ok;
 
     guint queue_id;
     guint watch_id;
@@ -1003,13 +1005,6 @@ mm_serial_port_queue_command_cached (MMSerialPort *self,
     internal_queue_command (self, command, take_command, TRUE, timeout_seconds, callback, user_data);
 }
 
-typedef struct {
-    MMSerialPort *port;
-    speed_t current_speed;
-    MMSerialFlashFn callback;
-    gpointer user_data;
-} FlashInfo;
-
 static gboolean
 get_speed (MMSerialPort *self, speed_t *speed, GError **error)
 {
@@ -1084,6 +1079,13 @@ set_speed (MMSerialPort *self, speed_t speed, GError **error)
     return TRUE;
 }
 
+typedef struct {
+    MMSerialPort *port;
+    speed_t current_speed;
+    MMSerialFlashFn callback;
+    gpointer user_data;
+} FlashInfo;
+
 static gboolean
 flash_do (gpointer data)
 {
@@ -1093,13 +1095,15 @@ flash_do (gpointer data)
 
     priv->flash_id = 0;
 
-    if (info->current_speed) {
-        if (!set_speed (info->port, info->current_speed, &error))
-            g_assert (error);
-    } else {
-        error = g_error_new_literal (MM_SERIAL_ERROR,
-                                     MM_SERIAL_ERROR_FLASH_FAILED,
-                                     "Failed to retrieve current speed");
+    if (priv->flash_ok) {
+        if (info->current_speed) {
+            if (!set_speed (info->port, info->current_speed, &error))
+                g_assert (error);
+        } else {
+            error = g_error_new_literal (MM_SERIAL_ERROR,
+                                         MM_SERIAL_ERROR_FLASH_FAILED,
+                                         "Failed to retrieve current speed");
+        }
     }
 
     info->callback (info->port, error, info->user_data);
@@ -1115,9 +1119,8 @@ mm_serial_port_flash (MMSerialPort *self,
                       MMSerialFlashFn callback,
                       gpointer user_data)
 {
-    FlashInfo *info;
+    FlashInfo *info = NULL;
     MMSerialPortPrivate *priv;
-    speed_t cur_speed = 0;
     GError *error = NULL;
     gboolean success;
 
@@ -1130,43 +1133,43 @@ mm_serial_port_flash (MMSerialPort *self,
         error = g_error_new_literal (MM_SERIAL_ERROR,
                                      MM_SERIAL_ERROR_NOT_OPEN,
                                      "The serial port is not open.");
-        callback (self, error, user_data);
-        g_error_free (error);
-        return FALSE;
+        goto error;
     }
 
     if (priv->flash_id > 0) {
         error = g_error_new_literal (MM_MODEM_ERROR,
                                      MM_MODEM_ERROR_OPERATION_IN_PROGRESS,
                                      "Modem is already being flashed.");
-        callback (self, error, user_data);
-        g_error_free (error);
-        return FALSE;
+        goto error;
     }
-
-    success = get_speed (self, &cur_speed, &error);
-    if (!success && !ignore_errors) {
-        callback (self, error, user_data);
-        g_error_free (error);
-        return FALSE;
-    }
-    g_clear_error (&error);
 
     info = g_slice_new0 (FlashInfo);
     info->port = self;
-    info->current_speed = cur_speed;
     info->callback = callback;
     info->user_data = user_data;
 
-    success = set_speed (self, B0, &error);
-    if (!success && !ignore_errors) {
-        callback (self, error, user_data);
-        g_error_free (error);
-        return FALSE;
-    }
+    if (priv->flash_ok) {
+        /* Grab current speed so we can reset it after flashing */
+        success = get_speed (self, &info->current_speed, &error);
+        if (!success && !ignore_errors)
+            goto error;
+        g_clear_error (&error);
 
-    priv->flash_id = g_timeout_add (flash_time, flash_do, info);
+        success = set_speed (self, B0, &error);
+        if (!success && !ignore_errors)
+            goto error;
+        priv->flash_id = g_timeout_add (flash_time, flash_do, info);
+    } else
+        priv->flash_id = g_idle_add (flash_do, info);
+
     return TRUE;
+
+error:
+    callback (self, error, user_data);
+    g_clear_error (&error);
+    if (info)
+        g_slice_free (FlashInfo, info);
+    return FALSE;
 }
 
 void
@@ -1182,6 +1185,14 @@ mm_serial_port_flash_cancel (MMSerialPort *self)
         g_source_remove (priv->flash_id);
         priv->flash_id = 0;
     }
+}
+
+gboolean
+mm_serial_port_get_flash_ok (MMSerialPort *self)
+{
+    g_return_val_if_fail (MM_IS_SERIAL_PORT (self), TRUE);
+
+    return MM_SERIAL_PORT_GET_PRIVATE (self)->flash_ok;
 }
 
 /*****************************************************************************/
@@ -1284,6 +1295,9 @@ set_property (GObject *object, guint prop_id,
     case PROP_SPEW_CONTROL:
         priv->spew_control = g_value_get_boolean (value);
         break;
+    case PROP_FLASH_OK:
+        priv->flash_ok = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -1317,6 +1331,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case PROP_SPEW_CONTROL:
         g_value_set_boolean (value, priv->spew_control);
+        break;
+    case PROP_FLASH_OK:
+        g_value_set_boolean (value, priv->flash_ok);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1426,6 +1443,15 @@ mm_serial_port_class_init (MMSerialPortClass *klass)
                                "SpewControl",
                                "Spew control",
                                FALSE,
+                               G_PARAM_READWRITE));
+
+    g_object_class_install_property
+        (object_class, PROP_FLASH_OK,
+         g_param_spec_boolean (MM_SERIAL_PORT_FLASH_OK,
+                               "FlaskOk",
+                               "Flashing the port (0 baud for a short period) "
+                               "is allowed.",
+                               TRUE,
                                G_PARAM_READWRITE));
 
     /* Signals */

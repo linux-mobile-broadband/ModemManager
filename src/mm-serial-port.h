@@ -37,6 +37,7 @@
 #define MM_SERIAL_PORT_SEND_DELAY   "send-delay"
 #define MM_SERIAL_PORT_FD           "fd" /* Construct-only */
 #define MM_SERIAL_PORT_SPEW_CONTROL "spew-control" /* Construct-only */
+#define MM_SERIAL_PORT_FLASH_OK     "flash-ok" /* Construct-only */
 
 typedef struct _MMSerialPort MMSerialPort;
 typedef struct _MMSerialPortClass MMSerialPortClass;
@@ -121,7 +122,10 @@ gboolean mm_serial_port_flash             (MMSerialPort *self,
                                            gboolean ignore_errors,
                                            MMSerialFlashFn callback,
                                            gpointer user_data);
+
 void     mm_serial_port_flash_cancel      (MMSerialPort *self);
+
+gboolean mm_serial_port_get_flash_ok      (MMSerialPort *self);
 
 void     mm_serial_port_queue_command     (MMSerialPort *self,
                                            GByteArray *command,
