@@ -580,7 +580,7 @@ clear_user_pass (MMModemSierraGsm *self)
     g_free (priv->username);
     priv->username = NULL;
     g_free (priv->password);
-    priv->username = NULL;
+    priv->password = NULL;
 }
 
 static void
