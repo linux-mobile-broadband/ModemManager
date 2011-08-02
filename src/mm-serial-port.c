@@ -690,8 +690,12 @@ data_available (GIOChannel *source,
     gsize bytes_read;
     GIOStatus status;
     MMQueueData *info;
+    const char *device;
 
     if (condition & G_IO_HUP) {
+        device = mm_port_get_device (MM_PORT (self));
+        mm_dbg ("(%s) unexpected port hangup!", device);
+
         if (priv->response->len)
             g_byte_array_remove_range (priv->response, 0, priv->response->len);
         mm_serial_port_close_force (self);
