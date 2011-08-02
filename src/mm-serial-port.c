@@ -1228,6 +1228,8 @@ mm_serial_port_flash (MMSerialPort *self,
         success = set_speed (self, B0, &error);
         if (!success && !ignore_errors)
             goto error;
+        g_clear_error (&error);
+
         priv->flash_id = g_timeout_add (flash_time, flash_do, info);
     } else
         priv->flash_id = g_idle_add (flash_do, info);
@@ -1536,7 +1538,7 @@ mm_serial_port_class_init (MMSerialPortClass *klass)
                                "Flashing the port (0 baud for a short period) "
                                "is allowed.",
                                TRUE,
-                               G_PARAM_READWRITE));
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
 
     /* Signals */
     signals[BUFFER_FULL] =
