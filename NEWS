@@ -38,8 +38,17 @@ Overview of changes in ModemManager 0.5
 - Add support for Simtech-based Prolink PH-300
 - Add support for Alcatel X200
 - Fix various crashes when modem is removed
+- Improvements for Samsung modems
+- Support access technology reporting for Qualcomm Gobi modems
+- Fix communication with Nokia N900 devices
+- Support multiple CDMA Rm protocols
+- Fix handling of Option access technology reporting
+- Fix handling of CDMA EVDO registration states
+- Fix problems reconnecting Ericsson F5521gw modems
+- Better handling of some Android handset modem
 
 Fixed bugs:
 rh#597296 rh#583691 rh#597088 bgo#626421 rh#585394 bgo#628105 bgo#627935
 bgo#621815 rh#632516 lp:682282 bgo#590798 lp:673457 bgo#636040 bgo #636438
-bgo#638038 bgo#637140 rh#544121 kde#266807 novell#674022 
+bgo#638038 bgo#637140 rh#544121 kde#266807 novell#674022 rh#583691
+lp:765516 bgo#641661 bgo#652682 bgo#650740 bgo#652910 bgo#637327
