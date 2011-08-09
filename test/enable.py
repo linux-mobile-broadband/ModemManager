@@ -21,7 +21,10 @@ MM_DBUS_PATH='/org/freedesktop/ModemManager'
 MM_DBUS_INTERFACE_MODEM='org.freedesktop.ModemManager.Modem'
 
 bus = dbus.SystemBus()
-proxy = bus.get_object(MM_DBUS_SERVICE, sys.argv[1])
+objpath = sys.argv[1]
+if objpath[:1] != '/':
+    objpath = "/org/freedesktop/ModemManager/Modems/" + str(objpath)
+proxy = bus.get_object(MM_DBUS_SERVICE, objpath)
 modem = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM)
 modem.Enable (True)
 

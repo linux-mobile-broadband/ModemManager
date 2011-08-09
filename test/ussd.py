@@ -27,7 +27,11 @@ else:
     arg = sys.argv[2]
 
 bus = dbus.SystemBus()
-proxy = bus.get_object(MM_DBUS_SERVICE, sys.argv[1])
+objpath = sys.argv[1]
+if objpath[:1] != '/':
+    objpath = "/org/freedesktop/ModemManager/Modems/" + str(objpath)
+proxy = bus.get_object(MM_DBUS_SERVICE, objpath)
+
 modem = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_USSD)
 
 # For testing purposes treat all "common" USSD sequences as initiate and the

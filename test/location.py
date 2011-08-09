@@ -29,7 +29,10 @@ MM_MODEM_LOCATION_CAPABILITY_GSM_LAC_CI = 0x00000002
 MM_MODEM_LOCATION_CAPABILITY_GPS_RAW    = 0x00000004
 
 bus = dbus.SystemBus()
-proxy = bus.get_object(MM_DBUS_SERVICE, sys.argv[1])
+objpath = sys.argv[1]
+if objpath[:1] != '/':
+    objpath = "/org/freedesktop/ModemManager/Modems/" + str(objpath)
+proxy = bus.get_object(MM_DBUS_SERVICE, objpath)
 modem = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM)
 
 props = dbus.Interface(proxy, dbus_interface=DBUS_INTERFACE_PROPERTIES)

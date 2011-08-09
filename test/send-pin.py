@@ -33,7 +33,11 @@ if not sys.argv[2].isdigit():
     os._exit(1)
 
 bus = dbus.SystemBus()
-proxy = bus.get_object(MM_DBUS_SERVICE, sys.argv[1])
+objpath = sys.argv[1]
+if objpath[:1] != '/':
+    objpath = "/org/freedesktop/ModemManager/Modems/" + str(objpath)
+proxy = bus.get_object(MM_DBUS_SERVICE, objpath)
+
 props = dbus.Interface(proxy, dbus_interface=DBUS_INTERFACE_PROPS)
 req = props.Get(MM_DBUS_INTERFACE_MODEM, "UnlockRequired")
 if req == "":

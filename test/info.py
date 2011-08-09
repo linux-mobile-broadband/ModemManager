@@ -224,8 +224,10 @@ def gsm_inspect(proxy, props):
 
 
 bus = dbus.SystemBus()
-bus = dbus.SystemBus()
-proxy = bus.get_object(MM_DBUS_SERVICE, sys.argv[1])
+objpath = sys.argv[1]
+if objpath[:1] != '/':
+    objpath = "/org/freedesktop/ModemManager/Modems/%s" % str(objpath)
+proxy = bus.get_object(MM_DBUS_SERVICE, objpath)
 
 # Properties
 props = dbus.Interface(proxy, dbus_interface='org.freedesktop.DBus.Properties')
