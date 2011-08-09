@@ -31,7 +31,10 @@ gsm_act =     { 0: "(GSM)",
               }
 
 bus = dbus.SystemBus()
-proxy = bus.get_object(MM_DBUS_SERVICE, sys.argv[1])
+objpath = sys.argv[1]
+if objpath[:1] != '/':
+    objpath = "/org/freedesktop/ModemManager/Modems/" + str(objpath)
+proxy = bus.get_object(MM_DBUS_SERVICE, objpath)
 
 # Properties
 props = dbus.Interface(proxy, dbus_interface='org.freedesktop.DBus.Properties')
