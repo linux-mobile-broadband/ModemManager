@@ -39,6 +39,8 @@ struct _MMModemIceraPrivate {
     /* Pending connection attempt */
     MMCallbackInfo *connect_pending_data;
     guint connect_pending_id;
+    guint configure_context_id;
+    guint configure_context_tries;
 
     char *username;
     char *password;
@@ -563,6 +565,24 @@ old_context_clear_done (MMAtSerialPort *port,
     icera_call_control (MM_MODEM_ICERA (info->modem), TRUE, icera_connected, info);
 }
 
+static void configure_context(MMAtSerialPort *port, MMCallbackInfo *info,
+                              char *username, char *password, gint cid);
+
+static gboolean
+retry_config_context (gpointer data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) data;
+    MMModemIcera *self = MM_MODEM_ICERA (info->modem);
+    MMModemIceraPrivate *priv = MM_MODEM_ICERA_GET_PRIVATE (self);
+    MMAtSerialPort *primary;
+
+    priv->configure_context_id = 0;
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_AT_PORT_FLAG_PRIMARY);
+    g_assert (primary);
+    configure_context (primary, info, priv->username, priv->password, _get_cid(self));
+    return FALSE;
+}
+
 static void
 auth_done (MMAtSerialPort *port,
            GString *response,
@@ -570,18 +590,49 @@ auth_done (MMAtSerialPort *port,
            gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemIcera *self = MM_MODEM_ICERA (info->modem);
+    MMModemIceraPrivate *priv = MM_MODEM_ICERA_GET_PRIVATE (self);
 
     /* If the modem has already been removed, return without
      * scheduling callback */
     if (mm_callback_info_check_modem_removed (info))
         return;
 
-    if (error)
+    if (error) {
+        /* Retry configuring the context. It sometimes fails with a 583
+         * error ["a profile (CID) is currently active"] if a connect
+         * is attempted too soon after a disconnect. */
+        if (++priv->configure_context_tries < 3) {
+            priv->configure_context_id =
+                    g_timeout_add_seconds (1, retry_config_context, info);
+            return;
+        }
         mm_generic_gsm_connect_complete (MM_GENERIC_GSM (info->modem), error, info);
-    else {
+    } else {
         /* Ensure the PDP context is deactivated */
         icera_call_control (MM_MODEM_ICERA (info->modem), FALSE, old_context_clear_done, info);
     }
+}
+
+static void
+configure_context(MMAtSerialPort *port, MMCallbackInfo *info,
+                  char *username, char *password, gint cid)
+{
+    char *command;
+
+    /* Both user and password are required; otherwise firmware returns an error */
+    if (!username || !password)
+		command = g_strdup_printf ("%%IPDPCFG=%d,0,0,\"\",\"\"", cid);
+    else {
+        command = g_strdup_printf ("%%IPDPCFG=%d,0,1,\"%s\",\"%s\"",
+                                   cid,
+                                   username ? username : "",
+                                   password ? password : "");
+
+    }
+
+    mm_at_serial_port_queue_command (port, command, 3, auth_done, info);
+    g_free (command);
 }
 
 void
@@ -594,8 +645,6 @@ mm_modem_icera_do_connect (MMModemIcera *self,
     MMModemIceraPrivate *priv = MM_MODEM_ICERA_GET_PRIVATE (self);
     MMCallbackInfo *info;
     MMAtSerialPort *primary;
-    gint cid;
-    char *command;
 
     mm_modem_set_state (modem, MM_MODEM_STATE_CONNECTING, MM_MODEM_STATE_REASON_NONE);
 
@@ -604,22 +653,8 @@ mm_modem_icera_do_connect (MMModemIcera *self,
     primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
-    cid = _get_cid (self);
-
-
-    /* Both user and password are required; otherwise firmware returns an error */
-    if (!priv->username || !priv->password)
-		command = g_strdup_printf ("%%IPDPCFG=%d,0,0,\"\",\"\"", cid);
-    else {
-        command = g_strdup_printf ("%%IPDPCFG=%d,0,1,\"%s\",\"%s\"",
-                                   cid,
-                                   priv->username ? priv->username : "",
-                                   priv->password ? priv->password : "");
-
-    }
-
-    mm_at_serial_port_queue_command (primary, command, 3, auth_done, info);
-    g_free (command);
+    priv->configure_context_tries = 0;
+    configure_context(primary, info, priv->username, priv->password, _get_cid(self));
 }
 
 /****************************************************************/
@@ -1338,6 +1373,10 @@ mm_modem_icera_cleanup (MMModemIcera *self)
 
     /* Clear the pending connection if necessary */
     connect_pending_done (self);
+    if (priv->configure_context_id != 0) {
+        g_source_remove (priv->configure_context_id);
+        priv->configure_context_id = 0;
+    }
 
     g_free (priv->username);
     priv->username = NULL;
