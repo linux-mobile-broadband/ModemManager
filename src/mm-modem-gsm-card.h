@@ -19,6 +19,8 @@
 
 #include <mm-modem.h>
 
+#define MM_MODEM_GSM_CARD_DBUS_INTERFACE "org.freedesktop.ModemManager.Modem.Gsm.Card"
+
 #define MM_TYPE_MODEM_GSM_CARD      (mm_modem_gsm_card_get_type ())
 #define MM_MODEM_GSM_CARD(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_MODEM_GSM_CARD, MMModemGsmCard))
 #define MM_IS_MODEM_GSM_CARD(obj)   (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_MODEM_GSM_CARD))
@@ -27,6 +29,7 @@
 #define MM_MODEM_GSM_CARD_SUPPORTED_BANDS "supported-bands"
 #define MM_MODEM_GSM_CARD_SUPPORTED_MODES "supported-modes"
 #define MM_MODEM_GSM_CARD_SIM_IDENTIFIER  "sim-identifier"
+#define MM_MODEM_GSM_CARD_ENABLED_FACILITY_LOCKS  "enabled-facility-locks"
 
 #define MM_MODEM_GSM_CARD_SIM_PIN "sim-pin"
 #define MM_MODEM_GSM_CARD_SIM_PIN2 "sim-pin2"

@@ -659,6 +659,16 @@ mm_modem_gsm_card_init (gpointer g_iface)
                             G_MAXUINT32,
                             MM_MODEM_GSM_MODE_UNKNOWN,
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_uint (MM_MODEM_GSM_CARD_ENABLED_FACILITY_LOCKS,
+                            "Enabled Facility Locks",
+                            "Facility locks (i.e. PINs) that are enabled",
+                            MM_MODEM_GSM_FACILITY_NONE,
+                            G_MAXUINT32,
+                            MM_MODEM_GSM_FACILITY_NONE,
+                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
 
 GType

@@ -4,7 +4,7 @@
   <interface name="org.freedesktop.ModemManager.Modem.Gsm">
     <tp:flags name="MM_MODEM_GSM_MODE" value-prefix="MM_MODEM_GSM_MODE" type="u">
       <tp:docstring>
-        A bitfield describing the specifc access modes and technologies
+        A bitfield describing the specific access modes and technologies
         supported by a device and the access technology in-use when connected to
         a mobile network.
       </tp:docstring>
@@ -168,6 +168,41 @@
       </tp:enumvalue>
     </tp:enum>
 
+    <tp:flags name="MM_MODEM_GSM_FACILITY" value-prefix="MM_MODEM_GSM_FACILITY" type="u">
+      <tp:docstring>
+        A bitfield describing which facilities have a lock enabled, i.e.,
+        requires a pin or unlock code. The facilities include the
+        personalizations (device locks) described in 3GPP spec TS 22.022,
+        and the PIN and PIN2 locks, which are SIM locks.
+      </tp:docstring>
+      <tp:flag suffix="NONE" value="0x0">
+        <tp:docstring>No facility</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="SIM" value="0x1">
+        <tp:docstring>SIM lock</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="FIXED_DIALING" value="0x2">
+        <tp:docstring>Fixed dialing (PIN2) SIM lock</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="PH_SIM" value="0x4">
+        <tp:docstring>Device is locked to a specific SIM</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="PH_FSIM" value="0x8">
+        <tp:docstring>Device is locked to first SIM inserted</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="NET_PERS" value="0x10">
+        <tp:docstring>Network personalization</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="NET_SUB_PERS" value="0x20">
+        <tp:docstring>Network subset personalization</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="PROVIDER_PERS" value="0x40">
+        <tp:docstring>Service provider personalization</tp:docstring>
+      </tp:flag>
+      <tp:flag suffix="CORP_PERS" value="0x80">
+        <tp:docstring>Corporate personalization</tp:docstring>
+      </tp:flag>
+    </tp:flags>
   </interface>
 </node>
 

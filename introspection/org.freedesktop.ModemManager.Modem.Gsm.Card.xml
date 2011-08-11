@@ -144,5 +144,11 @@
       </tp:docstring>
     </property>
 
+    <property name="EnabledFacilityLocks" type="u" access="read" tp:type="MM_MODEM_GSM_FACILITY">
+      <tp:docstring>
+        Facilities for which PIN locking is enabled.
+      </tp:docstring>
+    </property>
+
   </interface>
 </node>

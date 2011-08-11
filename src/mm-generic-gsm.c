@@ -138,6 +138,9 @@ typedef struct {
     GHashTable *sms_parts;
 
     guint sms_fetch_pending;
+
+    /* Facility locks */
+    MMModemGsmFacility enabled_facilities;
 } MMGenericGsmPrivate;
 
 static void get_registration_status (MMAtSerialPort *port, MMCallbackInfo *info);
@@ -809,6 +812,30 @@ initial_info_check (MMGenericGsm *self)
     }
 }
 
+static void clck_cb (MMAtSerialPort *port, GString *response, GError *error, gpointer user_data);
+
+static void
+initial_facility_lock_check (MMGenericGsm *self)
+{
+    GError *error = NULL;
+    MMGenericGsmPrivate *priv;
+
+    g_return_if_fail (MM_IS_GENERIC_GSM (self));
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    g_return_if_fail (priv->primary != NULL);
+
+    if (mm_serial_port_open (MM_SERIAL_PORT (priv->primary), &error)) {
+        mm_at_serial_port_queue_command (priv->primary, "+CLCK=?", 3, clck_cb, self);
+    } else {
+        g_warning ("%s: failed to open serial port: (%d) %s",
+                   __func__,
+                   error ? error->code : -1,
+                   error && error->message ? error->message : "(unknown)");
+        g_clear_error (&error);
+    }
+}
+
 static gboolean
 owns_port (MMModem *modem, const char *subsys, const char *name)
 {
@@ -881,6 +908,9 @@ mm_generic_gsm_grab_port (MMGenericGsm *self,
              * SIM is ready by waiting if necessary for the SIM to initalize.
              */
             initial_pin_check (self);
+
+            /* Determine what facility locks are supported */
+            initial_facility_lock_check (self);
 
         } else if (ptype == MM_PORT_TYPE_SECONDARY)
             priv->secondary = MM_AT_SERIAL_PORT (port);
@@ -1697,6 +1727,73 @@ cusd_enable_cb (MMAtSerialPort *port,
     }
 
     MM_GENERIC_GSM_GET_PRIVATE (user_data)->ussd_enabled = TRUE;
+}
+
+typedef struct {
+    MMGenericGsmPrivate *priv;
+    MMModemGsmFacility facility;
+} FacilityLockInfo;
+
+static void
+get_facility_lock_state_done (MMAtSerialPort *port,
+                              GString *response,
+                              GError *error,
+                              gpointer user_data)
+{
+    gboolean enabled = FALSE;
+    FacilityLockInfo *finfo = (FacilityLockInfo *)user_data;
+
+    if (!error && mm_gsm_parse_clck_response (response->str, &enabled)) {
+        if (enabled)
+            finfo->priv->enabled_facilities |= finfo->facility;
+        else
+            finfo->priv->enabled_facilities &= ~finfo->facility;
+    }
+    mm_serial_port_close (MM_SERIAL_PORT (port));
+    g_free (finfo);
+}
+
+static void
+get_facility_lock_states (MMGenericGsm *self,
+                          MMModemGsmFacility facilities,
+                          MMAtSerialPort *port,
+                          GError *error)
+{
+    gchar *cmd;
+    MMGenericGsmPrivate *priv;
+    gchar *facility_name;
+    FacilityLockInfo *finfo;
+    int i;
+
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    for (i = 0; i < sizeof (MMModemGsmFacility) * 8; i++) {
+        guint32 facility = 1 << i;
+        if (facilities & facility) {
+            facility_name = mm_gsm_get_facility_name (facility);
+            if (facility_name != NULL && mm_serial_port_open (MM_SERIAL_PORT (port), &error)) {
+                cmd = g_strdup_printf ("+CLCK=\"%s\",2", facility_name);
+                finfo = g_malloc0 (sizeof (FacilityLockInfo));
+                finfo->facility = facility;
+                finfo->priv = priv;
+                mm_at_serial_port_queue_command (port, cmd, 3, get_facility_lock_state_done, finfo);
+                g_free (cmd);
+            }
+        }
+    }
+}
+
+static void
+clck_cb (MMAtSerialPort *port,
+         GString *response,
+         GError *error,
+         gpointer user_data)
+{
+    MMModemGsmFacility facilities;
+
+    if (!error && mm_gsm_parse_clck_test_response (response->str, &facilities))
+        get_facility_lock_states (MM_GENERIC_GSM (user_data), facilities, port, error);
+    mm_serial_port_close (MM_SERIAL_PORT (port));
 }
 
 void
@@ -2517,10 +2614,10 @@ update_pin_puk_status (MMModem *modem, GError *error)
 }
 
 static void
-send_puk_done (MMAtSerialPort *port,
-               GString *response,
-               GError *error,
-               gpointer user_data)
+send_pin_puk_done (MMAtSerialPort *port,
+                   GString *response,
+                   GError *error,
+                   gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
 
@@ -2581,42 +2678,8 @@ send_puk (MMModemGsmCard *modem,
     mm_callback_info_set_data (info, PIN_PORT_TAG, port, NULL);
 
     command = g_strdup_printf ("+CPIN=\"%s\",\"%s\"", puk, pin);
-    mm_at_serial_port_queue_command (port, command, 3, send_puk_done, info);
+    mm_at_serial_port_queue_command (port, command, 3, send_pin_puk_done, info);
     g_free (command);
-}
-
-static void
-send_pin_done (MMAtSerialPort *port,
-               GString *response,
-               GError *error,
-               gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-
-    /* If the modem has already been removed, return without
-     * scheduling callback */
-    if (mm_callback_info_check_modem_removed (info))
-        return;
-
-    if (error) {
-        if (error->domain != MM_MOBILE_ERROR) {
-            info->error = g_error_copy (error);
-            mm_callback_info_schedule (info);
-            mm_serial_port_close (MM_SERIAL_PORT (port));
-            return;
-        } else {
-            /* Keep the real error around so we can send it back
-             * when we're done rechecking CPIN status.
-             */
-            mm_callback_info_set_data (info, SAVED_ERROR_TAG,
-                                       g_error_copy (error),
-                                       (GDestroyNotify) g_error_free);
-        }
-    }
-
-    /* Get latest PIN status */
-    MM_GENERIC_GSM_GET_PRIVATE (info->modem)->pin_check_tries = 0;
-    check_pin (MM_GENERIC_GSM (info->modem), pin_puk_recheck_done, info);
 }
 
 static void
@@ -2649,24 +2712,47 @@ send_pin (MMModemGsmCard *modem,
     mm_callback_info_set_data (info, PIN_PORT_TAG, port, NULL);
 
     command = g_strdup_printf ("+CPIN=\"%s\"", pin);
-    mm_at_serial_port_queue_command (port, command, 3, send_pin_done, info);
+    mm_at_serial_port_queue_command (port, command, 3, send_pin_puk_done, info);
     g_free (command);
 }
 
+#define ENABLED_FACILITY_TAG "enabled-facility"
+#define ENABLED_TAG "enabled"
+
 static void
-enable_pin_done (MMAtSerialPort *port,
-                 GString *response,
-                 GError *error,
-                 gpointer user_data)
+pin_operation_done (MMAtSerialPort *port,
+                    GString *response,
+                    GError *error,
+                    gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMGenericGsmPrivate *priv;
+    MMModem *modem;
+    MMModemGsmFacility facility;
+    gboolean enabled;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
     if (mm_callback_info_check_modem_removed (info))
         return;
 
-    update_pin_puk_status (info->modem, error);
+    modem = info->modem;
+    priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+    if (!error) {
+        facility = GPOINTER_TO_UINT (mm_callback_info_get_data (info, ENABLED_FACILITY_TAG));
+        enabled = GPOINTER_TO_UINT (mm_callback_info_get_data (info, ENABLED_TAG));
+        if (facility != MM_MODEM_GSM_FACILITY_NONE) {
+            MMModemGsmFacility old = priv->enabled_facilities;
+            if (enabled)
+                priv->enabled_facilities |= facility;
+            else
+                priv->enabled_facilities &= ~facility;
+            if (priv->enabled_facilities != old)
+                g_object_notify (G_OBJECT (modem),
+                                 MM_MODEM_GSM_CARD_ENABLED_FACILITY_LOCKS);
+        }
+    }
+    update_pin_puk_status (modem, error);
     if (error)
         info->error = g_error_copy (error);
     mm_callback_info_schedule (info);
@@ -2685,27 +2771,10 @@ enable_pin (MMModemGsmCard *modem,
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
     command = g_strdup_printf ("+CLCK=\"SC\",%d,\"%s\"", enabled ? 1 : 0, pin);
-    mm_at_serial_port_queue_command (priv->primary, command, 3, enable_pin_done, info);
+    mm_callback_info_set_data (info, ENABLED_FACILITY_TAG, GUINT_TO_POINTER (MM_MODEM_GSM_FACILITY_SIM), NULL);
+    mm_callback_info_set_data (info, ENABLED_TAG, GUINT_TO_POINTER (enabled), NULL);
+    mm_at_serial_port_queue_command (priv->primary, command, 3, pin_operation_done, info);
     g_free (command);
-}
-
-static void
-change_pin_done (MMAtSerialPort *port,
-                 GString *response,
-                 GError *error,
-                 gpointer user_data)
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-
-    /* If the modem has already been removed, return without
-     * scheduling callback */
-    if (mm_callback_info_check_modem_removed (info))
-        return;
-
-    update_pin_puk_status (info->modem, error);
-    if (error)
-        info->error = g_error_copy (error);
-    mm_callback_info_schedule (info);
 }
 
 static void
@@ -2721,7 +2790,7 @@ change_pin (MMModemGsmCard *modem,
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
     command = g_strdup_printf ("+CPWD=\"SC\",\"%s\",\"%s\"", old_pin, new_pin);
-    mm_at_serial_port_queue_command (priv->primary, command, 3, change_pin_done, info);
+    mm_at_serial_port_queue_command (priv->primary, command, 3, pin_operation_done, info);
     g_free (command);
 }
 
@@ -6043,6 +6112,11 @@ mm_generic_gsm_init (MMGenericGsm *self)
                                                     MM_MODEM_GSM_NETWORK_DBUS_INTERFACE);
 
     mm_properties_changed_signal_register_property (G_OBJECT (self),
+                                                    MM_MODEM_GSM_CARD_ENABLED_FACILITY_LOCKS,
+                                                    NULL,
+                                                    MM_MODEM_GSM_CARD_DBUS_INTERFACE);
+
+    mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_LOCATION_CAPABILITIES,
                                                     "Capabilities",
                                                     MM_MODEM_LOCATION_DBUS_INTERFACE);
@@ -6096,6 +6170,7 @@ set_property (GObject *object, guint prop_id,
     case MM_GENERIC_GSM_PROP_ALLOWED_MODE:
     case MM_GENERIC_GSM_PROP_ACCESS_TECHNOLOGY:
     case MM_GENERIC_GSM_PROP_SIM_IDENTIFIER:
+    case MM_GENERIC_GSM_PROP_ENABLED_FACILITY_LOCKS:
     case MM_GENERIC_GSM_PROP_LOC_CAPABILITIES:
     case MM_GENERIC_GSM_PROP_LOC_ENABLED:
     case MM_GENERIC_GSM_PROP_LOC_SIGNAL:
@@ -6185,6 +6260,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case MM_GENERIC_GSM_PROP_SIM_IDENTIFIER:
         g_value_set_string (value, priv->simid);
+        break;
+    case MM_GENERIC_GSM_PROP_ENABLED_FACILITY_LOCKS:
+        g_value_set_uint (value, priv->enabled_facilities);
         break;
     case MM_GENERIC_GSM_PROP_LOC_CAPABILITIES:
         g_value_set_uint (value, priv->loc_caps);
@@ -6304,6 +6382,10 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_SUPPORTED_MODES,
                                       MM_MODEM_GSM_CARD_SUPPORTED_MODES);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_ENABLED_FACILITY_LOCKS,
+                                      MM_MODEM_GSM_CARD_ENABLED_FACILITY_LOCKS);
 
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_ALLOWED_MODE,
