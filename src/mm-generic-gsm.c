@@ -146,11 +146,6 @@ static void reg_state_changed (MMAtSerialPort *port,
                                GMatchInfo *match_info,
                                gpointer user_data);
 
-static void get_reg_status_done (MMAtSerialPort *port,
-                                 GString *response,
-                                 GError *error,
-                                 gpointer user_data);
-
 static gboolean handle_reg_status_response (MMGenericGsm *self,
                                             GString *response,
                                             GError **error);
@@ -2905,27 +2900,19 @@ handle_reg_status_response (MMGenericGsm *self,
     return TRUE;
 }
 
-#define CGREG_TRIED_TAG "cgreg-tried"
+#define CS_ERROR_TAG "cs-error"
+#define CS_DONE_TAG "cs-complete"
+#define PS_ERROR_TAG "ps-error"
+#define PS_DONE_TAG "ps-complete"
 
 static void
-get_reg_status_done (MMAtSerialPort *port,
-                     GString *response,
-                     GError *error,
-                     gpointer user_data)
+check_reg_status_done (MMCallbackInfo *info)
 {
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    MMGenericGsm *self;
-    MMGenericGsmPrivate *priv;
-    guint id;
+    MMGenericGsm *self = MM_GENERIC_GSM (info->modem);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    GError *cs_error, *ps_error;
     MMModemGsmNetworkRegStatus status;
-
-    /* If the modem has already been removed, return without
-     * scheduling callback */
-    if (mm_callback_info_check_modem_removed (info))
-        return;
-
-    self = MM_GENERIC_GSM (info->modem);
-    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    guint id;
 
     /* This function should only get called during the connect sequence when
      * polling for registration state, since explicit registration requests
@@ -2933,46 +2920,38 @@ get_reg_status_done (MMAtSerialPort *port,
      */
     g_return_if_fail (info == priv->pending_reg_info);
 
-    if (error) {
-        gboolean cgreg_tried = !!mm_callback_info_get_data (info, CGREG_TRIED_TAG);
+    /* Only process when both CS and PS checks are both done */
+    if (   !mm_callback_info_get_data (info, CS_DONE_TAG)
+        || !mm_callback_info_get_data (info, PS_DONE_TAG))
+        return;
 
-        /* If this was a +CREG error, try +CGREG.  Some devices (blackberries)
-         * respond to +CREG with an error but return a valid +CGREG response.
-         * So try both.  If we get an error from both +CREG and +CGREG, that's
-         * obviously a hard fail.
-         */
-        if (cgreg_tried == FALSE) {
-            mm_callback_info_set_data (info, CGREG_TRIED_TAG, GUINT_TO_POINTER (TRUE), NULL);
-            mm_at_serial_port_queue_command (port, "+CGREG?", 10, get_reg_status_done, info);
-            return;
-        } else {
-            info->error = g_error_copy (error);
-            goto reg_done;
-        }
-    }
-
-    /* The unsolicited registration state handlers will intercept the CREG
-     * response and update the cached registration state for us, so we usually
-     * just need to check the cached state here.
-     */
-
-    if (strlen (response->str)) {
-        /* But just in case the unsolicited handlers doesn't do it... */
-        if (!handle_reg_status_response (self, response, &info->error))
-            goto reg_done;
+    /* If both CS and PS registration checks returned errors we fail */
+    cs_error = mm_callback_info_get_data (info, CS_ERROR_TAG);
+    ps_error = mm_callback_info_get_data (info, PS_ERROR_TAG);
+    if (cs_error && ps_error) {
+        /* Prefer the PS error */
+        info->error = g_error_copy (ps_error);
+        goto reg_done;
     }
 
     status = gsm_reg_status (self, NULL);
     if (   status != MM_MODEM_GSM_NETWORK_REG_STATUS_HOME
         && status != MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING
         && status != MM_MODEM_GSM_NETWORK_REG_STATUS_DENIED) {
+
+        /* Clear state that should be reset every poll */
+        mm_callback_info_set_data (info, CS_DONE_TAG, NULL, NULL);
+        mm_callback_info_set_data (info, CS_ERROR_TAG, NULL, NULL);
+        mm_callback_info_set_data (info, PS_DONE_TAG, NULL, NULL);
+        mm_callback_info_set_data (info, PS_ERROR_TAG, NULL, NULL);
+
         /* If we're still waiting for automatic registration to complete or
          * fail, check again in a few seconds.
          */
         id = g_timeout_add_seconds (1, reg_status_again, info);
         mm_callback_info_set_data (info, REG_STATUS_AGAIN_TAG,
-                                    GUINT_TO_POINTER (id),
-                                    reg_status_again_remove);
+                                   GUINT_TO_POINTER (id),
+                                   reg_status_again_remove);
         return;
     }
 
@@ -2982,9 +2961,63 @@ reg_done:
 }
 
 static void
+generic_reg_status_done (MMCallbackInfo *info,
+                         GString *response,
+                         GError *error,
+                         const char *error_tag,
+                         const char *done_tag)
+{
+    MMGenericGsm *self = MM_GENERIC_GSM (info->modem);
+    GError *local = NULL;
+
+    if (error)
+        local = g_error_copy (error);
+    else if (strlen (response->str)) {
+        /* Unsolicited registration status handlers will usually process the
+         * response for us, but just in case they don't, do that here.
+         */
+        if (handle_reg_status_response (self, response, &local) == TRUE)
+            g_assert_no_error (local);
+    }
+
+    if (local)
+        mm_callback_info_set_data (info, error_tag, local, (GDestroyNotify) g_error_free);
+    mm_callback_info_set_data (info, done_tag, GUINT_TO_POINTER (1), NULL);
+}
+
+static void
+get_ps_reg_status_done (MMAtSerialPort *port,
+                        GString *response,
+                        GError *error,
+                        gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (mm_callback_info_check_modem_removed (info) == FALSE) {
+        generic_reg_status_done (info, response, error, PS_ERROR_TAG, PS_DONE_TAG);
+        check_reg_status_done (info);
+    }
+}
+
+static void
+get_cs_reg_status_done (MMAtSerialPort *port,
+                        GString *response,
+                        GError *error,
+                        gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    if (mm_callback_info_check_modem_removed (info) == FALSE) {
+        generic_reg_status_done (info, response, error, CS_ERROR_TAG, CS_DONE_TAG);
+        check_reg_status_done (info);
+    }
+}
+
+static void
 get_registration_status (MMAtSerialPort *port, MMCallbackInfo *info)
 {
-    mm_at_serial_port_queue_command (port, "+CREG?", 10, get_reg_status_done, info);
+    mm_at_serial_port_queue_command (port, "+CREG?", 10, get_cs_reg_status_done, info);
+    mm_at_serial_port_queue_command (port, "+CGREG?", 10, get_ps_reg_status_done, info);
 }
 
 static void
@@ -3101,9 +3134,9 @@ do_register (MMModemGsmNetwork *modem,
      * complete.  For those devices that delay the +COPS response (hso) the
      * callback will be called from register_done().  For those devices that
      * return the +COPS response immediately, we'll poll the registration state
-     * and call the callback from get_reg_status_done() in response to the
-     * polled response.  The registration timeout will only be triggered when
-     * the +COPS response is never received.
+     * and call the callback from get_[cs|ps]_reg_status_done() in response to
+     * the polled response.  The registration timeout will only be triggered
+     * when the +COPS response is never received.
      */
     mm_callback_info_ref (info);
 
