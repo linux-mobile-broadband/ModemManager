@@ -49,6 +49,8 @@ get_level_for_capabilities (guint32 capabilities)
         return 10;
     if (capabilities & MM_PLUGIN_BASE_PORT_CAP_QCDM)
         return 10;
+    if (capabilities & MM_PLUGIN_BASE_PORT_CAP_AT)
+        return 10;
     return 0;
 }
 

@@ -716,15 +716,20 @@ real_handle_probe_response (MMPluginBase *self,
 {
     MMPluginBaseSupportsTaskPrivate *task_priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
     MMAtSerialPort *port = task_priv->probe_port;
-    gboolean ignore_error = FALSE;
 
     /* Some modems (Huawei E160g) won't respond to +GCAP with no SIM, but
-     * will respond to ATI.
+     * will respond to ATI.  Ignore the error and continue.
      */
-    if (response && strstr (response, "+CME ERROR:"))
-        ignore_error = TRUE;
+    if (response && strstr (response, "+CME ERROR:")) {
+        task_priv->probed_caps |= MM_PLUGIN_BASE_PORT_CAP_AT;
+        error = NULL;
+    }
 
-    if (error && !ignore_error) {
+    if (error) {
+        /* If the modem returned a recognizable error, it can do AT commands */
+        if (error->domain == MM_MOBILE_ERROR)
+            task_priv->probed_caps |= MM_PLUGIN_BASE_PORT_CAP_AT;
+
         /* Only allow timeout errors in the initial AT+GCAP queries. If all AT+GCAP
          * get timed out, assume it's not an AT port. */
         if (g_error_matches (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_RESPONSE_TIMEOUT)) {
@@ -763,7 +768,8 @@ real_handle_probe_response (MMPluginBase *self,
             /* Some modems don't respond to AT+GCAP, but often they put a
              * GCAP-style response as a line in the ATI response.
              */
-            task_priv->probed_caps = parse_caps_gcap (response);
+            task_priv->probed_caps |= parse_caps_gcap (response);
+            task_priv->probed_caps |= MM_PLUGIN_BASE_PORT_CAP_AT;
             break;
         case PROBE_STATE_CAPS_CPIN:
             /* Some devices (ZTE MF628/ONDA MT503HS for example) reply to
@@ -771,13 +777,15 @@ real_handle_probe_response (MMPluginBase *self,
              * Since no known CDMA modems support AT+CPIN? we can consider the
              * device a GSM device if it returns a non-error response to AT+CPIN?.
              */
-            task_priv->probed_caps = parse_caps_cpin (response);
+            task_priv->probed_caps |= parse_caps_cpin (response);
+            task_priv->probed_caps |= MM_PLUGIN_BASE_PORT_CAP_AT;
             break;
         case PROBE_STATE_CAPS_CGMM:
             /* Some models (BUSlink SCWi275u) stick stupid stuff in the CGMM
              * response but at least it allows us to identify them.
              */
-            task_priv->probed_caps = parse_caps_cgmm (response);
+            task_priv->probed_caps |= parse_caps_cgmm (response);
+            task_priv->probed_caps |= MM_PLUGIN_BASE_PORT_CAP_AT;
             break;
         case PROBE_STATE_VENDOR_CGMI:
         case PROBE_STATE_VENDOR_GMI:
