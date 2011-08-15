@@ -182,10 +182,8 @@
       </tp:docstring>
     </property>
 
-    <!-- This ought to be of tp:type="MM_MODEM_STATE" but there are a couple
-         more wrinkles to be sorted out before we can export that here.
-         Also, Enabled should be folded into this. -->
-    <property name="State" type="u" access="read">
+    <!-- Enabled should be folded into this. -->
+    <property name="State" type="u" access="read" tp:type="MM_MODEM_STATE">
       <tp:docstring>
         State of the modem.
       </tp:docstring>
@@ -222,6 +220,59 @@
       </tp:enumvalue>
     </tp:enum>
 
+    <tp:enum name="MM_MODEM_STATE" type="u">
+      <tp:enumvalue suffix="UNKNOWN" value="0">
+        <tp:docstring>
+          State unknown or not reportable.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="DISABLED" value="10">
+        <tp:docstring>
+          Modem is disabled.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="DISABLING" value="20">
+        <tp:docstring>
+          Modem is being disabled.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="ENABLING" value="30">
+        <tp:docstring>
+          Modem is being enabled.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="ENABLED" value="40">
+        <tp:docstring>
+          Modem is enabled.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="SEARCHING" value="50">
+        <tp:docstring>
+          Modem is searching networks.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="REGISTERED" value="60">
+        <tp:docstring>
+          Modem is registered in a network.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="DISCONNECTING" value="70">
+        <tp:docstring>
+          Modem is being disconnected.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="CONNECTING" value="80">
+        <tp:docstring>
+          Modem is being connected.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="CONNECTED" value="90">
+        <tp:docstring>
+          Modem is connected
+        </tp:docstring>
+      </tp:enumvalue>
+    </tp:enum>
+
     <tp:enum name="MM_MODEM_STATE_CHANGED_REASON" type="u">
       <tp:enumvalue suffix="UNKNOWN" value="0">
         <tp:docstring>
@@ -239,7 +290,6 @@
         </tp:docstring>
       </tp:enumvalue>
     </tp:enum>
-
 
   </interface>
 </node>
