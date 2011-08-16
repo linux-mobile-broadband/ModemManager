@@ -868,7 +868,7 @@ mm_modem_init (gpointer g_iface)
                             "State",
                             "State",
                             MM_MODEM_STATE_UNKNOWN,
-                            MM_MODEM_STATE_LAST,
+                            MM_MODEM_STATE_CONNECTED,
                             MM_MODEM_STATE_UNKNOWN,
                             G_PARAM_READWRITE));
 

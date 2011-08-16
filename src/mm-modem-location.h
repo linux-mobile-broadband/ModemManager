@@ -32,15 +32,6 @@
 #define MM_MODEM_LOCATION_SIGNALS_LOCATION "signals-location"
 #define MM_MODEM_LOCATION_LOCATION         "location"
 
-typedef enum {
-    MM_MODEM_LOCATION_CAPABILITY_UNKNOWN    = 0x00000000,
-    MM_MODEM_LOCATION_CAPABILITY_GPS_NMEA   = 0x00000001,
-    MM_MODEM_LOCATION_CAPABILITY_GSM_LAC_CI = 0x00000002,
-    MM_MODEM_LOCATION_CAPABILITY_GPS_RAW    = 0x00000004,
-
-    MM_MODEM_LOCATION_CAPABILITY_LAST = MM_MODEM_LOCATION_CAPABILITY_GPS_RAW
-} MMModemLocationCapabilities;
-
 typedef struct _MMModemLocation MMModemLocation;
 
 typedef void (*MMModemLocationGetFn) (MMModemLocation *modem,

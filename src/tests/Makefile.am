@@ -1,5 +1,3 @@
-INCLUDES = \
-	-I$(top_srcdir)/src
 
 noinst_PROGRAMS = \
 	test-modem-helpers \
@@ -11,7 +9,10 @@ test_modem_helpers_SOURCES = \
 	test-modem-helpers.c
 
 test_modem_helpers_CPPFLAGS = \
-	$(MM_CFLAGS)
+	$(MM_CFLAGS) \
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 test_modem_helpers_LDADD = \
 	$(top_builddir)/src/libmodem-helpers.la \
@@ -21,7 +22,10 @@ test_charsets_SOURCES = \
 	test-charsets.c
 
 test_charsets_CPPFLAGS = \
-	$(MM_CFLAGS)
+	$(MM_CFLAGS) \
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 test_charsets_LDADD = \
 	$(top_builddir)/src/libmodem-helpers.la \
@@ -32,7 +36,9 @@ test_qcdm_serial_port_SOURCES = \
 
 test_qcdm_serial_port_CPPFLAGS = \
 	$(MM_CFLAGS) \
-	-I$(top_srcdir)
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 test_qcdm_serial_port_LDADD = \
 	$(MM_LIBS) \
@@ -44,8 +50,11 @@ test_qcdm_serial_port_LDADD = \
 test_sms_SOURCES = \
 	test-sms.c
 
-test_sms_CFLAGS = \
-	$(MM_CFLAGS)
+test_sms_CPPFLAGS = \
+	$(MM_CFLAGS) \
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 test_sms_LDADD = \
 	$(top_builddir)/src/libmodem-helpers.la \

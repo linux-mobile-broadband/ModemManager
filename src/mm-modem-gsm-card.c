@@ -17,10 +17,11 @@
 #include <dbus/dbus-glib.h>
 #include <string.h>
 
+#include <ModemManager.h>
+
 #include "mm-modem-gsm-card.h"
 #include "mm-errors.h"
 #include "mm-callback-info.h"
-#include "mm-modem-gsm.h"
 
 static void impl_gsm_modem_get_imei (MMModemGsmCard *modem,
                                      DBusGMethodInvocation *context);

@@ -17,16 +17,8 @@
 #ifndef MM_MODEM_CDMA_H
 #define MM_MODEM_CDMA_H
 
+#include <ModemManager.h>
 #include <mm-modem.h>
-
-typedef enum {
-    MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN =    0,
-    MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED = 1,
-    MM_MODEM_CDMA_REGISTRATION_STATE_HOME =       2,
-    MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING =    3,
-
-    MM_MODEM_CDMA_REGISTRATION_STATE_LAST = MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING
-} MMModemCdmaRegistrationState;
 
 #define MM_TYPE_MODEM_CDMA               (mm_modem_cdma_get_type ())
 #define MM_MODEM_CDMA(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_MODEM_CDMA, MMModemCdma))

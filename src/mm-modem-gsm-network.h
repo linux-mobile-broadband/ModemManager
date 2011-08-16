@@ -17,8 +17,8 @@
 #ifndef MM_MODEM_GSM_NETWORK_H
 #define MM_MODEM_GSM_NETWORK_H
 
+#include <ModemManager.h>
 #include <mm-modem.h>
-#include <mm-modem-gsm.h>
 
 #define MM_MODEM_GSM_NETWORK_DBUS_INTERFACE "org.freedesktop.ModemManager.Modem.Gsm.Network"
 
@@ -36,15 +36,6 @@ typedef enum {
     MM_MODEM_GSM_NETWORK_PROP_ALLOWED_MODE = MM_MODEM_GSM_NETWORK_PROP_FIRST,
     MM_MODEM_GSM_NETWORK_PROP_ACCESS_TECHNOLOGY,
 } MMModemGsmNetworkProp;
-
-typedef enum {
-    MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE = 0,
-    MM_MODEM_GSM_NETWORK_REG_STATUS_HOME = 1,
-    MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING = 2,
-    MM_MODEM_GSM_NETWORK_REG_STATUS_DENIED = 3,
-    MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN = 4,
-    MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING = 5
-} MMModemGsmNetworkRegStatus;
 
 typedef struct _MMModemGsmNetwork MMModemGsmNetwork;
 
@@ -160,8 +151,8 @@ void mm_modem_gsm_network_registration_info (MMModemGsmNetwork *self,
                                              const char *oper_name);
 
 /* Private */
-MMModemDeprecatedMode mm_modem_gsm_network_act_to_old_mode (MMModemGsmAccessTech act);
+MMModemGsmNetworkDeprecatedMode mm_modem_gsm_network_act_to_old_mode (MMModemGsmAccessTech act);
 
-MMModemGsmAllowedMode mm_modem_gsm_network_old_mode_to_allowed (MMModemDeprecatedMode old_mode);
+MMModemGsmAllowedMode mm_modem_gsm_network_old_mode_to_allowed (MMModemGsmNetworkDeprecatedMode old_mode);
 
 #endif /* MM_MODEM_GSM_NETWORK_H */

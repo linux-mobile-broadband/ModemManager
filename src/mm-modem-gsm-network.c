@@ -49,7 +49,7 @@ static void impl_gsm_modem_set_allowed_mode (MMModemGsmNetwork *modem,
                                              DBusGMethodInvocation *context);
 
 static void impl_gsm_modem_set_network_mode (MMModemGsmNetwork *modem,
-                                             MMModemDeprecatedMode old_mode,
+                                             MMModemGsmNetworkDeprecatedMode old_mode,
                                              DBusGMethodInvocation *context);
 
 static void impl_gsm_modem_get_network_mode (MMModemGsmNetwork *modem,
@@ -75,7 +75,7 @@ static guint signals[LAST_SIGNAL] = { 0 };
 /*****************************************************************************/
 
 MMModemGsmAllowedMode
-mm_modem_gsm_network_old_mode_to_allowed (MMModemDeprecatedMode old_mode)
+mm_modem_gsm_network_old_mode_to_allowed (MMModemGsmNetworkDeprecatedMode old_mode)
 {
     /* Translate deprecated mode into new mode */
     switch (old_mode) {
@@ -93,7 +93,7 @@ mm_modem_gsm_network_old_mode_to_allowed (MMModemDeprecatedMode old_mode)
     }
 }
 
-MMModemDeprecatedMode
+MMModemGsmNetworkDeprecatedMode
 mm_modem_gsm_network_act_to_old_mode (MMModemGsmAccessTech act)
 {
     /* Translate new mode into old deprecated mode */
@@ -491,7 +491,7 @@ impl_gsm_modem_get_band (MMModemGsmNetwork *modem,
 
 static void
 impl_gsm_modem_set_network_mode (MMModemGsmNetwork *modem,
-                                 MMModemDeprecatedMode old_mode,
+                                 MMModemGsmNetworkDeprecatedMode old_mode,
                                  DBusGMethodInvocation *context)
 {
     if (!utils_check_for_single_value (old_mode)) {
@@ -515,7 +515,7 @@ impl_gsm_modem_set_allowed_mode (MMModemGsmNetwork *modem,
                                  MMModemGsmAllowedMode mode,
                                  DBusGMethodInvocation *context)
 {
-    if (mode > MM_MODEM_GSM_ALLOWED_MODE_LAST) {
+    if (mode > MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY) {
         GError *error;
 
         error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
@@ -566,7 +566,7 @@ mm_modem_gsm_network_init (gpointer g_iface)
                             "Allowed Mode",
                             "Allowed network access mode",
                             MM_MODEM_GSM_ALLOWED_MODE_ANY,
-                            MM_MODEM_GSM_ALLOWED_MODE_LAST,
+                            MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY,
                             MM_MODEM_GSM_ALLOWED_MODE_ANY,
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
@@ -577,7 +577,7 @@ mm_modem_gsm_network_init (gpointer g_iface)
                             "Current access technology in use when connected to "
                             "a mobile network.",
                             MM_MODEM_GSM_ACCESS_TECH_UNKNOWN,
-                            MM_MODEM_GSM_ACCESS_TECH_LAST,
+                            MM_MODEM_GSM_ACCESS_TECH_LTE,
                             MM_MODEM_GSM_ACCESS_TECH_UNKNOWN,
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 

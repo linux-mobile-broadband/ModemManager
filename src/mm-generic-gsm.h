@@ -19,7 +19,7 @@
 
 #include <config.h>
 
-#include "mm-modem-gsm.h"
+#include <ModemManager.h>
 #include "mm-modem-gsm-network.h"
 #include "mm-modem-base.h"
 #include "mm-at-serial-port.h"

@@ -22,7 +22,7 @@
 
 #include <glib-object.h>
 
-#include "mm-modem-gsm.h"
+#include <ModemManager.h>
 #include "mm-generic-gsm.h"
 
 #define MM_TYPE_MODEM_ICERA               (mm_modem_icera_get_type ())

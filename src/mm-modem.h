@@ -20,30 +20,11 @@
 #include <glib-object.h>
 #include <dbus/dbus-glib-lowlevel.h>
 
+#include <ModemManager.h>
+
 #include "mm-port.h"
 #include "mm-auth-provider.h"
 #include "mm-charsets.h"
-
-typedef enum {
-    MM_MODEM_STATE_UNKNOWN = 0,
-    MM_MODEM_STATE_DISABLED = 10,
-    MM_MODEM_STATE_DISABLING = 20,
-    MM_MODEM_STATE_ENABLING = 30,
-    MM_MODEM_STATE_ENABLED = 40,
-    MM_MODEM_STATE_SEARCHING = 50,
-    MM_MODEM_STATE_REGISTERED = 60,
-    MM_MODEM_STATE_DISCONNECTING = 70,
-    MM_MODEM_STATE_CONNECTING = 80,
-    MM_MODEM_STATE_CONNECTED = 90,
-
-    MM_MODEM_STATE_LAST = MM_MODEM_STATE_CONNECTED
-} MMModemState;
-
-typedef enum {
-    MM_MODEM_STATE_REASON_NONE = 0,
-    MM_MODEM_STATE_REASON_USER_REQUESTED,
-    MM_MODEM_STATE_REASON_SUSPEND
-} MMModemStateReason;
 
 #define DBUS_PATH_TAG "dbus-path"
 
@@ -51,8 +32,6 @@ typedef enum {
 #define MM_MODEM(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_MODEM, MMModem))
 #define MM_IS_MODEM(obj)   (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_MODEM))
 #define MM_MODEM_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_MODEM, MMModem))
-
-#define MM_MODEM_DBUS_INTERFACE "org.freedesktop.ModemManager.Modem"
 
 #define MM_MODEM_DATA_DEVICE   "device"
 #define MM_MODEM_MASTER_DEVICE "master-device"
@@ -69,14 +48,6 @@ typedef enum {
 #define MM_MODEM_STATE         "state"      /* not exported */
 #define MM_MODEM_HW_VID        "hw-vid"     /* not exported */
 #define MM_MODEM_HW_PID        "hw-pid"     /* not exported */
-
-#define MM_MODEM_TYPE_UNKNOWN  0
-#define MM_MODEM_TYPE_GSM      1
-#define MM_MODEM_TYPE_CDMA     2
-
-#define MM_MODEM_IP_METHOD_PPP    0
-#define MM_MODEM_IP_METHOD_STATIC 1
-#define MM_MODEM_IP_METHOD_DHCP   2
 
 typedef enum {
     MM_MODEM_PROP_FIRST = 0x1000,

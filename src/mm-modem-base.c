@@ -682,27 +682,27 @@ mm_modem_base_init (MMModemBase *self)
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_ENABLED,
                                                     NULL,
-                                                    MM_MODEM_DBUS_INTERFACE);
+                                                    MM_DBUS_INTERFACE_MODEM);
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_EQUIPMENT_IDENTIFIER,
                                                     NULL,
-                                                    MM_MODEM_DBUS_INTERFACE);
+                                                    MM_DBUS_INTERFACE_MODEM);
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_DEVICE_IDENTIFIER,
                                                     NULL,
-                                                    MM_MODEM_DBUS_INTERFACE);
+                                                    MM_DBUS_INTERFACE_MODEM);
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_UNLOCK_REQUIRED,
                                                     NULL,
-                                                    MM_MODEM_DBUS_INTERFACE);
+                                                    MM_DBUS_INTERFACE_MODEM);
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_UNLOCK_RETRIES,
                                                     NULL,
-                                                    MM_MODEM_DBUS_INTERFACE);
+                                                    MM_DBUS_INTERFACE_MODEM);
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_IP_METHOD,
                                                     NULL,
-                                                    MM_MODEM_DBUS_INTERFACE);
+                                                    MM_DBUS_INTERFACE_MODEM);
 }
 
 static void

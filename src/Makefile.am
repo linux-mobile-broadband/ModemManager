@@ -13,7 +13,8 @@ EXTRA_DIST = \
 noinst_LTLIBRARIES = libmodem-helpers.la libserial.la
 
 libmodem_helpers_la_CPPFLAGS = \
-	$(MM_CFLAGS)
+	$(MM_CFLAGS) \
+	-I$(top_srcdir)/include
 
 libmodem_helpers_la_SOURCES = \
 	mm-errors.c \
@@ -47,6 +48,7 @@ modem_manager_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
 	-I$(top_srcdir) \
+	-I$(top_srcdir)/include \
 	-I${top_builddir}/marshallers \
 	-DPLUGINDIR=\"$(pkglibdir)\"
 

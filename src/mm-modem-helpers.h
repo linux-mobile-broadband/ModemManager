@@ -17,8 +17,9 @@
 #ifndef MM_MODEM_HELPERS_H
 #define MM_MODEM_HELPERS_H
 
+#include <ModemManager.h>
+
 #include "mm-modem-cdma.h"
-#include "mm-modem-gsm.h"
 #include "mm-charsets.h"
 
 #define MM_SCAN_TAG_STATUS "status"

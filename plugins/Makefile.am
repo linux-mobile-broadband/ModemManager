@@ -12,7 +12,9 @@ libicera_utils_la_SOURCES = \
 libicera_utils_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
-	-I$(top_srcdir)/src
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 libicera_utils_la_LIBADD = \
 	$(GUDEV_LDFLAGS)
@@ -48,8 +50,10 @@ libmm_plugin_generic_la_SOURCES = \
 
 libmm_plugin_generic_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
-	$(GUDEV_CFLAGS) \
-	-I$(top_srcdir)/src
+	$(GUDEV_CFLAGS)	\
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 libmm_plugin_generic_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
@@ -66,8 +70,10 @@ libmm_plugin_moto_c_la_SOURCES = \
 
 libmm_plugin_moto_c_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
-	$(GUDEV_CFLAGS) \
-	-I$(top_srcdir)/src
+	$(GUDEV_CFLAGS)	\
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 libmm_plugin_moto_c_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
@@ -85,7 +91,9 @@ libmm_plugin_gobi_la_SOURCES = \
 libmm_plugin_gobi_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
-	-I$(top_srcdir)/src
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 libmm_plugin_gobi_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
@@ -105,7 +113,9 @@ libmm_plugin_huawei_la_SOURCES = \
 libmm_plugin_huawei_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
-	-I$(top_srcdir)/src
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 libmm_plugin_huawei_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
@@ -127,7 +137,9 @@ mm-modem-gsm-hso-glue.h: $(top_srcdir)/introspection/org.freedesktop.ModemManage
 libmm_plugin_hso_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
-	-I$(top_srcdir)/src
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 libmm_plugin_hso_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
@@ -145,7 +157,9 @@ libmm_plugin_mbm_la_SOURCES = \
 libmm_plugin_mbm_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
-	-I$(top_srcdir)/src
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 libmm_plugin_mbm_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
@@ -163,7 +177,9 @@ libmm_plugin_option_la_SOURCES = \
 libmm_plugin_option_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
-	-I$(top_srcdir)/src
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 libmm_plugin_option_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
@@ -183,7 +199,9 @@ libmm_plugin_sierra_la_SOURCES = \
 libmm_plugin_sierra_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
-	-I$(top_srcdir)/src
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 libmm_plugin_sierra_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
@@ -201,7 +219,9 @@ libmm_plugin_wavecom_la_SOURCES = \
 libmm_plugin_wavecom_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
-	-I$(top_srcdir)/src
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 libmm_plugin_wavecom_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
@@ -221,8 +241,9 @@ libmm_plugin_novatel_la_SOURCES = \
 libmm_plugin_novatel_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
+	-I$(top_srcdir) \
 	-I$(top_srcdir)/src \
-	-I$(top_srcdir)
+	-I$(top_srcdir)/include
 
 libmm_plugin_novatel_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
@@ -240,7 +261,9 @@ libmm_plugin_nokia_la_SOURCES = \
 libmm_plugin_nokia_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
-	-I$(top_srcdir)/src
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 libmm_plugin_nokia_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
@@ -258,7 +281,9 @@ libmm_plugin_zte_la_SOURCES = \
 libmm_plugin_zte_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
-	-I$(top_srcdir)/src
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 libmm_plugin_zte_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
@@ -279,7 +304,9 @@ libmm_plugin_longcheer_la_SOURCES = \
 libmm_plugin_longcheer_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
-	-I$(top_srcdir)/src
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 libmm_plugin_longcheer_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
@@ -297,7 +324,9 @@ libmm_plugin_anydata_la_SOURCES = \
 libmm_plugin_anydata_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
-	-I$(top_srcdir)/src
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 libmm_plugin_anydata_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
@@ -315,7 +344,9 @@ libmm_plugin_simtech_la_SOURCES = \
 libmm_plugin_simtech_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
-	-I$(top_srcdir)/src
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 libmm_plugin_simtech_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
@@ -333,7 +364,9 @@ libmm_plugin_x22x_la_SOURCES = \
 libmm_plugin_x22x_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
-	-I$(top_srcdir)/src
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 libmm_plugin_x22x_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
@@ -351,7 +384,9 @@ libmm_plugin_linktop_la_SOURCES = \
 libmm_plugin_linktop_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
-	-I$(top_srcdir)/src
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 libmm_plugin_linktop_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
@@ -369,7 +404,9 @@ libmm_plugin_samsung_la_SOURCES = \
 libmm_plugin_samsung_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
-	-I$(top_srcdir)/src
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 libmm_plugin_samsung_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \
@@ -390,7 +427,9 @@ libmm_plugin_cinterion_la_SOURCES = \
 libmm_plugin_cinterion_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
-	-I$(top_srcdir)/src
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/include
 
 libmm_plugin_cinterion_la_LDFLAGS = \
 	$(GUDEV_LDFLAGS) \

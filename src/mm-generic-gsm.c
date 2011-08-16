@@ -3959,12 +3959,13 @@ _internal_update_access_technology (MMGenericGsm *modem,
 
     g_return_if_fail (modem != NULL);
     g_return_if_fail (MM_IS_GENERIC_GSM (modem));
-    g_return_if_fail (act >= MM_MODEM_GSM_ACCESS_TECH_UNKNOWN && act <= MM_MODEM_GSM_ACCESS_TECH_LAST);
+    g_return_if_fail (act >= MM_MODEM_GSM_ACCESS_TECH_UNKNOWN &&
+                      act <= MM_MODEM_GSM_ACCESS_TECH_LTE);
 
     priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
 
     if (act != priv->act) {
-        MMModemDeprecatedMode old_mode;
+        MMModemGsmNetworkDeprecatedMode old_mode;
 
         priv->act = act;
         g_object_notify (G_OBJECT (modem), MM_MODEM_GSM_NETWORK_ACCESS_TECHNOLOGY);
@@ -4999,13 +5000,13 @@ simple_get_allowed_mode (MMCallbackInfo *info,
                          MMModemGsmAllowedMode *out_mode,
                          GError **error)
 {
-    MMModemDeprecatedMode old_mode = MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_ANY;
+    MMModemGsmNetworkDeprecatedMode old_mode = MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_ANY;
     MMModemGsmAllowedMode allowed_mode = MM_MODEM_GSM_ALLOWED_MODE_ANY;
     GError *tmp_error = NULL;
 
     /* check for new allowed mode first */
     if (simple_get_uint_property (info, "allowed_mode", &allowed_mode, &tmp_error)) {
-        if (allowed_mode > MM_MODEM_GSM_ALLOWED_MODE_LAST) {
+        if (allowed_mode > MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY) {
             g_set_error (&tmp_error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
                          "Invalid allowed mode %d", old_mode);
         } else {
@@ -5015,7 +5016,7 @@ simple_get_allowed_mode (MMCallbackInfo *info,
     } else if (!tmp_error) {
         /* and if not, the old allowed mode */
         if (simple_get_uint_property (info, "network_mode", &old_mode, &tmp_error)) {
-            if (old_mode > MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_LAST) {
+            if (old_mode > MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_HSPA) {
                 g_set_error (&tmp_error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
                              "Invalid allowed mode %d", old_mode);
             } else {
@@ -5290,7 +5291,7 @@ simple_get_status (MMModemSimple *simple,
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (simple);
     GHashTable *properties;
     MMCallbackInfo *info;
-    MMModemDeprecatedMode old_mode;
+    MMModemGsmNetworkDeprecatedMode old_mode;
 
     info = mm_callback_info_new_full (MM_MODEM (simple),
                                       simple_get_status_invoke,
