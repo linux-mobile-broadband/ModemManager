@@ -1,5 +1,5 @@
 
-SUBDIRS = . marshallers build-aux data include libmm-common libqcdm libwmc src plugins introspection libmm-glib po test docs
+SUBDIRS = . marshallers build-aux data include libmm-common libqcdm libwmc src plugins introspection libmm-glib cli po test docs
 
 DISTCHECK_CONFIGURE_FLAGS = \
 	--with-udev-base-dir="$$dc_install_base" \
