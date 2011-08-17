@@ -99,7 +99,7 @@
           New state.
         </tp:docstring>
       </arg>
-      <arg name="reason" type="u" tp:type="MM_MODEM_STATE_CHANGED_REASON">
+      <arg name="reason" type="u" tp:type="MM_MODEM_STATE_REASON">
         <tp:docstring>
           Reason for this state change.
         </tp:docstring>
@@ -278,7 +278,7 @@
       </tp:enumvalue>
     </tp:enum>
 
-    <tp:enum name="MM_MODEM_STATE_CHANGED_REASON" type="u">
+    <tp:enum name="MM_MODEM_STATE_REASON" type="u">
       <tp:enumvalue suffix="NONE" value="0">
         <tp:docstring>
           Reason unknown or not reportable.
