@@ -2,7 +2,7 @@
    xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0"
    xmlns:xi="http://www.w3.org/2001/XInclude">
 
-  <tp:title>ModemManager D-Bus Interface Specification</tp:title>
+  <tp:title>ModemManager Interface Specification</tp:title>
   <tp:version>0.5</tp:version>
   <tp:copyright>Copyright (C) 2008 Novell, Inc.</tp:copyright>
   <tp:copyright>Copyright (C) 2008 - 2010 Red Hat, Inc.</tp:copyright>
