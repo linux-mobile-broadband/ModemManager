@@ -279,7 +279,7 @@
     </tp:enum>
 
     <tp:enum name="MM_MODEM_STATE_CHANGED_REASON" type="u">
-      <tp:enumvalue suffix="UNKNOWN" value="0">
+      <tp:enumvalue suffix="NONE" value="0">
         <tp:docstring>
           Reason unknown or not reportable.
         </tp:docstring>
