@@ -44,11 +44,16 @@ static gboolean async_flag;
 static gboolean list_modems_flag;
 static gboolean monitor_modems_flag;
 static gboolean scan_modems_flag;
+static gchar *set_logging_str;
 
 static GOptionEntry entries[] = {
     { "version", 'V', 0, G_OPTION_ARG_NONE, &version_flag,
       "Print version",
       NULL
+    },
+    { "set-logging", 'L', 0, G_OPTION_ARG_STRING, &set_logging_str,
+      "Set logging level in the ModemManager daemon",
+      "[ERR,WARN,INFO,DEBUG]",
     },
     { "async", 'a', 0, G_OPTION_ARG_NONE, &async_flag,
       "Use asynchronous methods",
@@ -248,6 +253,33 @@ synchronous (MMManager *manager)
 
     g_debug ("Running synchronous operations...");
 
+    /* Request to set log level? */
+    if (set_logging_str) {
+        MMLogLevel level;
+
+        if (g_strcmp0 (set_logging_str, "ERR") == 0)
+            level = MM_LOG_LEVEL_ERROR;
+        else if (g_strcmp0 (set_logging_str, "WARN") == 0)
+            level = MM_LOG_LEVEL_WARNING;
+        else if (g_strcmp0 (set_logging_str, "INFO") == 0)
+            level = MM_LOG_LEVEL_INFO;
+        else if (g_strcmp0 (set_logging_str, "DEBUG") == 0)
+            level = MM_LOG_LEVEL_DEBUG;
+        else {
+            g_printerr ("couldn't set unknown logging level: '%s'\n",
+                        set_logging_str);
+            exit (EXIT_FAILURE);
+        }
+
+        if (mm_manager_set_logging (manager, level, &error)) {
+            g_printerr ("couldn't set logging level: '%s'\n",
+                        error ? error->message : "unknown error");
+            exit (EXIT_FAILURE);
+        }
+        g_print ("successfully set log level '%s'\n", set_logging_str);
+        return;
+    }
+
     /* Request to scan modems? */
     if (scan_modems_flag) {
         gboolean result;
@@ -275,7 +307,8 @@ ensure_single_action (void)
 
     n_actions = (scan_modems_flag +
                  list_modems_flag +
-                 monitor_modems_flag);
+                 monitor_modems_flag +
+                 (set_logging_str ? 1 : 0));
 
     if (n_actions == 0)
         print_version_and_exit ();
@@ -293,6 +326,14 @@ ensure_single_action (void)
         list_modems_flag = TRUE;
         /* Monitoring always asynchronously */
         async_flag = TRUE;
+    }
+
+    /* Additional fixes for the log level setting request */
+    if (set_logging_str) {
+        /* Log level setting always synchronously */
+        async_flag = FALSE;
+        /* Always stop loop after setting log level */
+        keep_loop = FALSE;
     }
 }
 
