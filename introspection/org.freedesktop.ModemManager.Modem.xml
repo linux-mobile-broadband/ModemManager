@@ -89,12 +89,12 @@
       <tp:docstring>
         The modem's state (see the State property) changed.
       </tp:docstring>
-      <arg name="old" type="u">
+      <arg name="old" type="u" tp:type="MM_MODEM_STATE">
         <tp:docstring>
           Old state.
         </tp:docstring>
       </arg>
-      <arg name="new" type="u">
+      <arg name="new" type="u" tp:type="MM_MODEM_STATE">
         <tp:docstring>
           New state.
         </tp:docstring>
