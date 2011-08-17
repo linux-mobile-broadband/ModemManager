@@ -43,6 +43,7 @@ static gboolean version_flag;
 static gboolean async_flag;
 static gboolean list_modems_flag;
 static gboolean monitor_modems_flag;
+static gboolean scan_modems_flag;
 
 static GOptionEntry entries[] = {
     { "version", 'V', 0, G_OPTION_ARG_NONE, &version_flag,
@@ -59,6 +60,10 @@ static GOptionEntry entries[] = {
     },
     { "monitor-modems", 'm', 0, G_OPTION_ARG_NONE, &monitor_modems_flag,
       "List available modems and monitor additions and removals",
+      NULL
+    },
+    { "scan-modems", 's', 0, G_OPTION_ARG_NONE, &scan_modems_flag,
+      "Request to re-scan looking for modems",
       NULL
     },
     { NULL }
@@ -96,6 +101,40 @@ print_version_and_exit (void)
              "There is NO WARRANTY, to the extent permitted by law.\n"
              "\n");
     exit (EXIT_SUCCESS);
+}
+
+static void
+scan_devices_process_reply (gboolean      result,
+                            const GError *error)
+{
+    if (!result) {
+        g_printerr ("couldn't request to scan devices: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully requested to scan devices\n");
+}
+
+static void
+scan_devices_ready (MMManager    *manager,
+                    GAsyncResult *result,
+                    gpointer      nothing)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_manager_scan_devices_finish (manager,
+                                                       result,
+                                                       &error);
+    scan_devices_process_reply (operation_result, error);
+
+    if (cancellable) {
+        g_object_unref (cancellable);
+        cancellable = NULL;
+    }
+    if (!keep_loop)
+        g_main_loop_quit (loop);
 }
 
 static void
@@ -171,6 +210,15 @@ asynchronous (MMManager *manager)
     /* Setup global cancellable */
     cancellable = g_cancellable_new ();
 
+    /* Request to scan modems? */
+    if (scan_modems_flag) {
+        mm_manager_scan_devices_async (manager,
+                                       cancellable,
+                                       (GAsyncReadyCallback)scan_devices_ready,
+                                       NULL);
+        return;
+    }
+
     /* Request to monitor modems? */
     if (monitor_modems_flag) {
         g_signal_connect (manager,
@@ -200,6 +248,15 @@ synchronous (MMManager *manager)
 
     g_debug ("Running synchronous operations...");
 
+    /* Request to scan modems? */
+    if (scan_modems_flag) {
+        gboolean result;
+
+        result = mm_manager_scan_devices (manager, &error);
+        scan_devices_process_reply (result, error);
+        return;
+    }
+
     /* Request to list modems? */
     if (list_modems_flag) {
         GStrv paths;
@@ -216,7 +273,8 @@ ensure_single_action (void)
 {
     guint n_actions;
 
-    n_actions = (list_modems_flag +
+    n_actions = (scan_modems_flag +
+                 list_modems_flag +
                  monitor_modems_flag);
 
     if (n_actions == 0)
