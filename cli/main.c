@@ -33,16 +33,52 @@
 #define PROGRAM_NAME    "mmcli"
 #define PROGRAM_VERSION PACKAGE_VERSION
 
+/* Globals */
+static GMainLoop *loop;
+static gboolean keep_loop;
+static GCancellable *cancellable;
+
 /* Context */
 static gboolean version_flag;
+static gboolean async_flag;
+static gboolean list_modems_flag;
 
 static GOptionEntry entries[] = {
     { "version", 'V', 0, G_OPTION_ARG_NONE, &version_flag,
       "Print version",
       NULL
     },
+    { "async", 'a', 0, G_OPTION_ARG_NONE, &async_flag,
+      "Use asynchronous methods",
+      NULL
+    },
+    { "list-modems", 'l', 0, G_OPTION_ARG_NONE, &list_modems_flag,
+      "List available modems",
+      NULL
+    },
     { NULL }
 };
+
+static void
+signals_handler (int signum)
+{
+    if (cancellable) {
+        /* Ignore consecutive requests of cancellation */
+        if (!g_cancellable_is_cancelled (cancellable)) {
+            g_printerr ("%s\n",
+                        "cancelling the operation...");
+            g_cancellable_cancel (cancellable);
+        }
+        return;
+    }
+
+    if (loop &&
+        g_main_loop_is_running (loop)) {
+        g_printerr ("%s\n",
+                    "cancelling the main loop...");
+        g_main_loop_quit (loop);
+    }
+}
 
 static void
 print_version_and_exit (void)
@@ -57,10 +93,95 @@ print_version_and_exit (void)
     exit (EXIT_SUCCESS);
 }
 
+static void
+enumerate_devices_process_reply (const GStrv   paths,
+                                 const GError *error)
+{
+    if (error) {
+        g_printerr ("couldn't enumerate devices: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("\n");
+    if (!paths) {
+        g_print ("No modems were found");
+    } else {
+        guint i;
+
+        for (i = 0; paths[i]; i++) {
+            g_print ("%s: '%s'\n",
+                     "Found modem",
+                     paths[i]);
+        }
+    }
+    g_print ("\n");
+}
+
+static void
+enumerate_devices_ready (MMManager    *manager,
+                         GAsyncResult *result,
+                         gpointer      nothing)
+{
+    GStrv paths;
+    GError *error = NULL;
+
+    paths = mm_manager_enumerate_devices_finish (manager, result, &error);
+    enumerate_devices_process_reply (paths, error);
+    g_strfreev (paths);
+
+    if (cancellable) {
+        g_object_unref (cancellable);
+        cancellable = NULL;
+    }
+    if (!keep_loop)
+        g_main_loop_quit (loop);
+}
+
+static void
+asynchronous (MMManager *manager)
+{
+    g_debug ("Running asynchronous operations...");
+
+    /* Setup global cancellable */
+    cancellable = g_cancellable_new ();
+
+    /* Request to list modems? */
+    if (list_modems_flag) {
+        mm_manager_enumerate_devices_async (manager,
+                                            cancellable,
+                                            (GAsyncReadyCallback)enumerate_devices_ready,
+                                            NULL);
+        return;
+    }
+}
+
+static void
+synchronous (MMManager *manager)
+{
+    GError *error = NULL;
+
+    g_debug ("Running synchronous operations...");
+
+    /* Request to list modems? */
+    if (list_modems_flag) {
+        GStrv paths;
+
+        paths = mm_manager_enumerate_devices (manager, &error);
+        enumerate_devices_process_reply (paths, error);
+        g_strfreev (paths);
+        return;
+    }
+}
+
+
 gint
 main (gint argc, gchar **argv)
 {
+    GDBusConnection *connection;
+    MMManager *manager;
     GOptionContext *context;
+    GError *error = NULL;
 
     setlocale (LC_ALL, "");
 
@@ -70,6 +191,44 @@ main (gint argc, gchar **argv)
 
     if (version_flag)
         print_version_and_exit ();
+
+    g_type_init ();
+
+    /* Setup signals */
+    signal (SIGINT, signals_handler);
+    signal (SIGHUP, signals_handler);
+    signal (SIGTERM, signals_handler);
+
+    /* Setup dbus connection to use */
+    connection = g_bus_get_sync (G_BUS_TYPE_SYSTEM, NULL, &error);
+    if (!connection) {
+        g_printerr ("couldn't get bus: %s\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    /* Create new manager */
+    manager = mm_manager_new (connection, NULL, &error);
+    if (!manager) {
+        g_printerr ("couldn't create manager: %s\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    if (async_flag) {
+        loop = g_main_loop_new (NULL, FALSE);
+        asynchronous (manager);
+        g_main_loop_run (loop);
+        g_main_loop_unref (loop);
+    }
+    else
+        synchronous (manager);
+
+    g_object_unref (manager);
+    g_object_unref (connection);
+    if (cancellable)
+        g_object_unref (cancellable);
+    g_option_context_free (context);
 
     return EXIT_SUCCESS;
 }
