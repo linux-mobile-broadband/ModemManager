@@ -45,9 +45,9 @@ dbusactivation_DATA = $(dbusactivation_in_files:.service.in=.service)
 
 includedir = @includedir@/mm
 
-include_HEADERS = include/mm-modem.h
+include_HEADERS = include/ModemManager.h
 
-include/mm-modem.h: $(XMLS) introspection/all.xml header-generator.xsl
+include/ModemManager.h: $(XMLS) introspection/all.xml header-generator.xsl
 	@install -d include
 	$(XSLTPROC) $(top_srcdir)/header-generator.xsl $(top_srcdir)/introspection/all.xml > $@
 
