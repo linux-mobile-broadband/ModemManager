@@ -42,6 +42,7 @@ static GCancellable *cancellable;
 static gboolean version_flag;
 static gboolean async_flag;
 static gboolean list_modems_flag;
+static gboolean monitor_modems_flag;
 
 static GOptionEntry entries[] = {
     { "version", 'V', 0, G_OPTION_ARG_NONE, &version_flag,
@@ -54,6 +55,10 @@ static GOptionEntry entries[] = {
     },
     { "list-modems", 'l', 0, G_OPTION_ARG_NONE, &list_modems_flag,
       "List available modems",
+      NULL
+    },
+    { "monitor-modems", 'm', 0, G_OPTION_ARG_NONE, &monitor_modems_flag,
+      "List available modems and monitor additions and removals",
       NULL
     },
     { NULL }
@@ -139,12 +144,44 @@ enumerate_devices_ready (MMManager    *manager,
 }
 
 static void
+device_added (MMManager   *manager,
+              const gchar *path)
+{
+    g_print ("%s: '%s'\n",
+             "Added modem",
+             path);
+    fflush (stdout);
+}
+
+static void
+device_removed (MMManager   *manager,
+                const gchar *path)
+{
+    g_print ("%s: '%s'\n",
+             "Removed modem",
+             path);
+    fflush (stdout);
+}
+
+static void
 asynchronous (MMManager *manager)
 {
     g_debug ("Running asynchronous operations...");
 
     /* Setup global cancellable */
     cancellable = g_cancellable_new ();
+
+    /* Request to monitor modems? */
+    if (monitor_modems_flag) {
+        g_signal_connect (manager,
+                          "device-added",
+                          G_CALLBACK (device_added),
+                          NULL);
+        g_signal_connect (manager,
+                          "device-removed",
+                          G_CALLBACK (device_removed),
+                          NULL);
+    }
 
     /* Request to list modems? */
     if (list_modems_flag) {
@@ -174,6 +211,32 @@ synchronous (MMManager *manager)
     }
 }
 
+static void
+ensure_single_action (void)
+{
+    guint n_actions;
+
+    n_actions = (list_modems_flag +
+                 monitor_modems_flag);
+
+    if (n_actions == 0)
+        print_version_and_exit ();
+
+    if (n_actions > 1) {
+        g_printerr ("error, too many actions requested\n");
+        exit (EXIT_FAILURE);
+    }
+
+    /* Additional fixes to the modem monitoring request */
+    if (monitor_modems_flag) {
+        /* Do not stop loop after listing initial modems */
+        keep_loop = TRUE;
+        /* Assume an implicit list modems request */
+        list_modems_flag = TRUE;
+        /* Monitoring always asynchronously */
+        async_flag = TRUE;
+    }
+}
 
 gint
 main (gint argc, gchar **argv)
@@ -191,6 +254,9 @@ main (gint argc, gchar **argv)
 
     if (version_flag)
         print_version_and_exit ();
+
+    /* We must have exactly 1 action requested */
+    ensure_single_action ();
 
     g_type_init ();
 
