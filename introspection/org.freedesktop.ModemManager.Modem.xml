@@ -190,6 +190,11 @@
     </property>
 
     <tp:enum name="MM_MODEM_TYPE" type="u">
+      <tp:enumvalue suffix="UNKNOWN" value="0">
+        <tp:docstring>
+          Unknown device.
+        </tp:docstring>
+      </tp:enumvalue>
       <tp:enumvalue suffix="GSM" value="1">
         <tp:docstring>
           A GSM device.
