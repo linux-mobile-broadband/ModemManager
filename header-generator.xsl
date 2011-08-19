@@ -55,23 +55,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
       </xsl:call-template>
     </xsl:if>
   </xsl:template>
-<!--
-      <xsl:variable name="thisletter" select="substring($text,1,1)"/>
-      <xsl:choose>
-	<xsl:when test="$lastletter=' ' or  $lastletter='_'">
-	  <xsl:value-of select="translate($thisletter,'abcdefghijklmnopqrstuvwxyz',
-				'ABCDEFGHIJKLMNOPQRSTUVWXYZ')"/>
-	</xsl:when>
-	<xsl:otherwise>
-	  <xsl:value-of select="translate($thisletter,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')"/>
-	</xsl:otherwise>
-      </xsl:choose>
-      <xsl:call-template name="TitleCase">
-	<xsl:with-param name="text" select="substring($text,2)"/>
-	<xsl:with-param name="lastletter" select="$thisletter"/>
-      </xsl:call-template>
-    </xsl:if>
-  </xsl:template>-->
   <xsl:template match="tp:docstring">
   </xsl:template>
   <xsl:template match="tp:realdocstring">
