@@ -10,7 +10,9 @@ mmcli_CPPFLAGS = \
 	-I$(top_srcdir)/libmm-glib
 
 mmcli_SOURCES = \
-	main.c
+	mmcli.h \
+	mmcli.c \
+	mmcli-manager.c
 
 mmcli_LDADD = \
 	$(MMCLI_LIBS) \
