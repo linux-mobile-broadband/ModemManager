@@ -120,6 +120,11 @@ get_property (GObject *object, guint prop_id,
     case MM_GENERIC_GSM_PROP_POWER_DOWN_CMD:
         g_value_set_string (value, "");
         break;
+    case MM_GENERIC_GSM_PROP_INIT_CMD:
+        /* When initializing a Nokia phone, first enable the echo,
+         * and then disable it, so that we get it properly disabled */
+        g_value_set_string (value, "Z E1 E0 V1");
+        break;
     default:
         break;
     }
@@ -134,6 +139,10 @@ mm_modem_nokia_class_init (MMModemNokiaClass *klass)
 
     object_class->get_property = get_property;
     object_class->set_property = set_property;
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_INIT_CMD,
+                                      MM_GENERIC_GSM_INIT_CMD);
 
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_POWER_UP_CMD,
