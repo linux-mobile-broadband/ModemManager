@@ -166,6 +166,68 @@ prefix_newlines (const gchar *prefix,
             NULL);
 }
 
+static const gchar *
+get_ip_method_string (MMModemIpMethod ip_method)
+{
+    switch (ip_method) {
+    case MM_MODEM_IP_METHOD_PPP:
+        return "PPP";
+    case MM_MODEM_IP_METHOD_STATIC:
+        return "Static";
+    case MM_MODEM_IP_METHOD_DHCP:
+        return "DHCP";
+    }
+
+    g_warn_if_reached ();
+    return NULL;
+}
+
+static const gchar *
+get_modem_type_string (MMModemType type)
+{
+    switch (type) {
+    case MM_MODEM_TYPE_UNKNOWN:
+        return "Unknown";
+    case MM_MODEM_TYPE_GSM:
+        return "GSM";
+    case MM_MODEM_TYPE_CDMA:
+        return "CDMA";
+    }
+
+    g_warn_if_reached ();
+    return NULL;
+}
+
+static const gchar *
+get_state_string (MMModemState state)
+{
+    switch (state) {
+    case MM_MODEM_STATE_UNKNOWN:
+        return "Unknown";
+    case MM_MODEM_STATE_DISABLED:
+        return "Disabled";
+    case MM_MODEM_STATE_DISABLING:
+        return "Disabling";
+    case MM_MODEM_STATE_ENABLING:
+        return "Enabling";
+    case MM_MODEM_STATE_ENABLED:
+        return "Enabled";
+    case MM_MODEM_STATE_SEARCHING:
+        return "Searching";
+    case MM_MODEM_STATE_REGISTERED:
+        return "Registered";
+    case MM_MODEM_STATE_DISCONNECTING:
+        return "Disconnecting";
+    case MM_MODEM_STATE_CONNECTING:
+        return "Connecting";
+    case MM_MODEM_STATE_CONNECTED:
+        return "Connected";
+    }
+
+    g_warn_if_reached ();
+    return NULL;
+}
+
 static void
 get_info_process_reply (gboolean      result,
                         const GError *error,
@@ -177,8 +239,16 @@ get_info_process_reply (gboolean      result,
     gchar *master_device;
     gchar *device;
     gchar *device_id;
+    gchar *equipment_id;
     gchar *driver;
     gchar *plugin;
+    MMModemType type;
+    gboolean enabled;
+    gchar *unlock_required;
+    guint32 unlock_retries;
+    gchar *unlock;
+    MMModemIpMethod ip_method;
+    MMModemState state;
 
     if (!result) {
         g_printerr ("couldn't get info from modem: '%s'\n",
@@ -190,8 +260,22 @@ get_info_process_reply (gboolean      result,
     master_device = mm_modem_get_master_device (ctxt.modem);
     device = mm_modem_get_device (ctxt.modem);
     device_id = mm_modem_get_device_identifier (ctxt.modem);
+    equipment_id = mm_modem_get_equipment_identifier (ctxt.modem);
     driver = mm_modem_get_driver (ctxt.modem);
     plugin = mm_modem_get_plugin (ctxt.modem);
+    type = mm_modem_get_modem_type (ctxt.modem);
+    enabled = mm_modem_get_enabled (ctxt.modem);
+    unlock_required = mm_modem_get_unlock_required (ctxt.modem);
+    unlock_retries = mm_modem_get_unlock_retries (ctxt.modem);
+    ip_method = mm_modem_get_ip_method (ctxt.modem);
+    state = mm_modem_get_state (ctxt.modem);
+
+    /* Strings with mixed properties */
+    unlock = (unlock_required ?
+              g_strdup_printf ("%s (%u retries)",
+                               unlock_required,
+                               unlock_retries) :
+              g_strdup ("not required"));
 
     /* Rework possible multiline strings */
     prefixed_revision = prefix_newlines ("           |                 ",
@@ -203,29 +287,45 @@ get_info_process_reply (gboolean      result,
              "  Hardware |  manufacturer: '%s'\n"
              "           |         model: '%s'\n"
              "           |      revision: '%s'\n"
+             "           |          type: '%s'\n"
              "  -------------------------\n"
              "  System   | master device: '%s'\n"
              "           |        device: '%s'\n"
              "           |     device id: '%s'\n"
+             "           |  equipment id: '%s'\n"
              "           |        driver: '%s'\n"
              "           |        plugin: '%s'\n"
+             "  -------------------------\n"
+             "  Status   |       enabled: '%s'\n"
+             "           |        unlock: '%s'\n"
+             "           |     IP method: '%s'\n"
+             "           |         state: '%s'\n"
              "\n",
              ctxt.modem_str,
              manufacturer,
              model,
              prefixed_revision ? prefixed_revision : revision,
+             get_modem_type_string (type),
              master_device,
              device,
              device_id,
+             equipment_id,
              driver,
-             plugin);
+             plugin,
+             enabled ? "yes" : "no",
+             unlock,
+             get_ip_method_string (ip_method),
+             get_state_string (state));
 
     g_free (prefixed_revision);
     g_free (master_device);
     g_free (device);
     g_free (device_id);
+    g_free (equipment_id);
     g_free (driver);
     g_free (plugin);
+    g_free (unlock_required);
+    g_free (unlock);
 }
 
 static void
