@@ -160,6 +160,10 @@ main (gint argc, gchar **argv)
         g_main_loop_unref (loop);
     }
 
+    if (mmcli_manager_options_enabled ()) {
+        mmcli_manager_shutdown ();
+    }
+
     g_object_unref (connection);
 
     return EXIT_SUCCESS;
