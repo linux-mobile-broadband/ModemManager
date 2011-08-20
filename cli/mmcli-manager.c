@@ -45,19 +45,19 @@ static gboolean scan_modems_flag;
 static gchar *set_logging_str;
 
 static GOptionEntry entries[] = {
-    { "set-logging", 'L', 0, G_OPTION_ARG_STRING, &set_logging_str,
+    { "set-logging", 'G', 0, G_OPTION_ARG_STRING, &set_logging_str,
       "Set logging level in the ModemManager daemon",
       "[ERR,WARN,INFO,DEBUG]",
     },
-    { "list-modems", 'l', 0, G_OPTION_ARG_NONE, &list_modems_flag,
+    { "list-modems", 'L', 0, G_OPTION_ARG_NONE, &list_modems_flag,
       "List available modems",
       NULL
     },
-    { "monitor-modems", 'm', 0, G_OPTION_ARG_NONE, &monitor_modems_flag,
+    { "monitor-modems", 'M', 0, G_OPTION_ARG_NONE, &monitor_modems_flag,
       "List available modems and monitor additions and removals",
       NULL
     },
-    { "scan-modems", 's', 0, G_OPTION_ARG_NONE, &scan_modems_flag,
+    { "scan-modems", 'S', 0, G_OPTION_ARG_NONE, &scan_modems_flag,
       "Request to re-scan looking for modems",
       NULL
     },
