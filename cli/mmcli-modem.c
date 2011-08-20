@@ -41,6 +41,7 @@ typedef struct {
     gboolean enable_flag;
     gboolean disable_flag;
     gboolean reset_flag;
+    gchar *factory_reset_str;
     /* The modem proxy */
     MMModem *modem;
 } Context;
@@ -55,7 +56,7 @@ static GOptionEntry entries[] = {
       "Get information of a given modem",
       NULL
     },
-    { "monitor-state", 'f', 0, G_OPTION_ARG_NONE, &ctxt.monitor_state_flag,
+    { "monitor-state", 'w', 0, G_OPTION_ARG_NONE, &ctxt.monitor_state_flag,
       "Monitor state of a given modem",
       NULL
     },
@@ -70,6 +71,10 @@ static GOptionEntry entries[] = {
     { "reset", 'r', 0, G_OPTION_ARG_NONE, &ctxt.reset_flag,
       "Reset a given modem",
       NULL
+    },
+    { "factory-reset", 0, 0, G_OPTION_ARG_STRING, &ctxt.factory_reset_str,
+      "Reset a given modem to its factory state",
+      "[CODE]"
     },
     { NULL }
 };
@@ -99,7 +104,8 @@ mmcli_modem_options_enabled (void)
                  ctxt.monitor_state_flag +
                  ctxt.enable_flag +
                  ctxt.disable_flag +
-                 ctxt.reset_flag);
+                 ctxt.reset_flag +
+                 !!ctxt.factory_reset_str);
 
     if (n_actions > 1) {
         g_printerr ("error: too many modem actions requested\n");
@@ -486,6 +492,35 @@ reset_ready (MMModem      *modem,
 }
 
 static void
+factory_reset_process_reply (gboolean      result,
+                             const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't reset the modem to factory state: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully reseted the modem to factory state\n");
+}
+
+static void
+factory_reset_ready (MMModem      *modem,
+                     GAsyncResult *result,
+                     gpointer      nothing)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_factory_reset_finish (modem,
+                                                      result,
+                                                      &error);
+    factory_reset_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
 state_changed (MMModem            *modem,
                MMModemState        old_state,
                MMModemState        new_state,
@@ -557,6 +592,16 @@ mmcli_modem_run_asynchronous (GDBusConnection *connection,
         return FALSE;
     }
 
+    /* Request to reset the modem to factory state? */
+    if (ctxt.factory_reset_str) {
+        mm_modem_factory_reset_async (ctxt.modem,
+                                      ctxt.factory_reset_str,
+                                      cancellable,
+                                      (GAsyncReadyCallback)factory_reset_ready,
+                                      NULL);
+        return FALSE;
+    }
+
     g_warn_if_reached ();
     return FALSE;
 }
@@ -625,6 +670,14 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
         return;
     }
 
+    /* Request to reset the modem to factory state? */
+    if (ctxt.factory_reset_str) {
+        gboolean result;
+
+        result = mm_modem_factory_reset (ctxt.modem, ctxt.factory_reset_str, &error);
+        factory_reset_process_reply (result, error);
+        return;
+    }
+
     g_warn_if_reached ();
 }
-
