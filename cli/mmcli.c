@@ -132,7 +132,7 @@ main (gint argc, gchar **argv)
     /* Setup dbus connection to use */
     connection = g_bus_get_sync (G_BUS_TYPE_SYSTEM, NULL, &error);
     if (!connection) {
-        g_printerr ("couldn't get bus: %s\n",
+        g_printerr ("error: couldn't get bus: %s\n",
                     error ? error->message : "unknown error");
         exit (EXIT_FAILURE);
     }

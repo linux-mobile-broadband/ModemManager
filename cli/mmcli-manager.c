@@ -91,7 +91,7 @@ mmcli_manager_options_enabled (void)
                  (set_logging_str ? 1 : 0));
 
     if (n_actions > 1) {
-        g_printerr ("error, too many manager actions requested\n");
+        g_printerr ("error: too many manager actions requested\n");
         exit (EXIT_FAILURE);
     }
 
@@ -106,7 +106,7 @@ init (GDBusConnection *connection)
     /* Create new manager */
     ctxt.manager = mm_manager_new (connection, NULL, &error);
     if (!ctxt.manager) {
-        g_printerr ("couldn't create manager: %s\n",
+        g_printerr ("error: couldn't create manager: %s\n",
                     error ? error->message : "unknown error");
         exit (EXIT_FAILURE);
     }
@@ -123,7 +123,7 @@ scan_devices_process_reply (gboolean      result,
                             const GError *error)
 {
     if (!result) {
-        g_printerr ("couldn't request to scan devices: '%s'\n",
+        g_printerr ("error: couldn't request to scan devices: '%s'\n",
                     error ? error->message : "unknown error");
         exit (EXIT_FAILURE);
     }
@@ -284,13 +284,13 @@ mmcli_manager_run_synchronous (GDBusConnection *connection)
         else if (g_strcmp0 (set_logging_str, "DEBUG") == 0)
             level = MM_LOG_LEVEL_DEBUG;
         else {
-            g_printerr ("couldn't set unknown logging level: '%s'\n",
+            g_printerr ("error: couldn't set unknown logging level: '%s'\n",
                         set_logging_str);
             exit (EXIT_FAILURE);
         }
 
         if (mm_manager_set_logging (ctxt.manager, level, &error)) {
-            g_printerr ("couldn't set logging level: '%s'\n",
+            g_printerr ("error: couldn't set logging level: '%s'\n",
                         error ? error->message : "unknown error");
             exit (EXIT_FAILURE);
         }
