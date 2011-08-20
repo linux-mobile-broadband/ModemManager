@@ -442,9 +442,9 @@ disable_ready (MMModem      *modem,
     gboolean operation_result;
     GError *error = NULL;
 
-    operation_result = mm_modem_enable_finish (modem,
-                                               result,
-                                               &error);
+    operation_result = mm_modem_disable_finish (modem,
+                                                result,
+                                                &error);
     disable_process_reply (operation_result, error);
 
     mmcli_async_operation_done ();
@@ -498,7 +498,6 @@ mmcli_modem_run_asynchronous (GDBusConnection *connection,
     /* Request to enable the modem? */
     if (ctxt.enable_flag) {
         mm_modem_enable_async (ctxt.modem,
-                               TRUE,
                                cancellable,
                                (GAsyncReadyCallback)enable_ready,
                                NULL);
@@ -507,11 +506,10 @@ mmcli_modem_run_asynchronous (GDBusConnection *connection,
 
     /* Request to disable the modem? */
     if (ctxt.disable_flag) {
-        mm_modem_enable_async (ctxt.modem,
-                               FALSE,
-                               cancellable,
-                               (GAsyncReadyCallback)disable_ready,
-                               NULL);
+        mm_modem_disable_async (ctxt.modem,
+                                cancellable,
+                                (GAsyncReadyCallback)disable_ready,
+                                NULL);
         return FALSE;
     }
 
@@ -560,9 +558,7 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
     if (ctxt.enable_flag) {
         gboolean result;
 
-        result = mm_modem_enable (ctxt.modem,
-                                  TRUE,
-                                  &error);
+        result = mm_modem_enable (ctxt.modem, &error);
         enable_process_reply (result, error);
         return;
     }
@@ -571,9 +567,7 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
     if (ctxt.disable_flag) {
         gboolean result;
 
-        result = mm_modem_enable (ctxt.modem,
-                                  FALSE,
-                                  &error);
+        result = mm_modem_disable (ctxt.modem, &error);
         disable_process_reply (result, error);
         return;
     }
