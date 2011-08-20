@@ -59,6 +59,22 @@ probe_result (MMPluginBase *base,
     mm_plugin_base_supports_task_complete (task, get_level_for_capabilities (capabilities));
 }
 
+static gboolean
+custom_init_response_cb (MMPluginBaseSupportsTask *task,
+                         GString *response,
+                         GError *error,
+                         guint32 tries,
+                         gboolean *out_stop,
+                         guint32 *out_level,
+                         gpointer user_data)
+{
+    if (error)
+        return tries <= 4 ? TRUE : FALSE;
+
+    /* No error, assume success */
+    return FALSE;
+}
+
 static MMPluginSupportsResult
 supports_port (MMPluginBase *base,
                MMModem *existing,
@@ -94,6 +110,12 @@ supports_port (MMPluginBase *base,
         }
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
     }
+
+    mm_plugin_base_supports_task_add_custom_init_command (task,
+                                                          "ATE1 E0",
+                                                          3,
+                                                          custom_init_response_cb,
+                                                          NULL);
 
     /* Otherwise kick off a probe */
     if (mm_plugin_base_probe_port (base, task, 100000, NULL))
