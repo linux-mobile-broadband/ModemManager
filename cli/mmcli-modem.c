@@ -37,6 +37,7 @@ typedef struct {
     /* Input options */
     gchar *modem_str;
     gboolean info_flag;
+    gboolean monitor_state_flag;
     /* The modem proxy */
     MMModem *modem;
 } Context;
@@ -49,6 +50,10 @@ static GOptionEntry entries[] = {
     },
     { "info", 'i', 0, G_OPTION_ARG_NONE, &ctxt.info_flag,
       "Get information of a given modem",
+      NULL
+    },
+    { "monitor-state", 'f', 0, G_OPTION_ARG_NONE, &ctxt.monitor_state_flag,
+      "Monitor state of a given modem",
       NULL
     },
     { NULL }
@@ -75,7 +80,8 @@ mmcli_modem_options_enabled (void)
 {
     guint n_actions;
 
-    n_actions = (ctxt.info_flag);
+    n_actions = (ctxt.info_flag +
+                 ctxt.monitor_state_flag);
 
     if (n_actions > 1) {
         g_printerr ("error: too many modem actions requested\n");
@@ -228,6 +234,22 @@ get_state_string (MMModemState state)
     return NULL;
 }
 
+static const gchar *
+get_state_reason_string (MMModemStateReason reason)
+{
+    switch (reason) {
+    case MM_MODEM_STATE_REASON_NONE:
+        return "None or unknown";
+    case MM_MODEM_STATE_REASON_USER_REQUESTED:
+        return "User request";
+    case MM_MODEM_STATE_REASON_SUSPEND:
+        return "Suspend";
+    }
+
+    g_warn_if_reached ();
+    return NULL;
+}
+
 static void
 get_info_process_reply (gboolean      result,
                         const GError *error,
@@ -358,12 +380,23 @@ get_info_ready (MMModem      *modem,
     mmcli_async_operation_done ();
 }
 
+static void
+state_changed (MMModem            *modem,
+               MMModemState        old_state,
+               MMModemState        new_state,
+               MMModemStateReason  reason)
+{
+    g_print ("State changed: '%s' --> '%s' (Reason: %s)\n",
+             get_state_string (old_state),
+             get_state_string (new_state),
+             get_state_reason_string (reason));
+    fflush (stdout);
+}
+
 gboolean
 mmcli_modem_run_asynchronous (GDBusConnection *connection,
                               GCancellable    *cancellable)
 {
-    gboolean keep_loop = FALSE;
-
     /* Initialize context */
     init (connection);
 
@@ -373,7 +406,23 @@ mmcli_modem_run_asynchronous (GDBusConnection *connection,
                                  cancellable,
                                  (GAsyncReadyCallback)get_info_ready,
                                  NULL);
-        return keep_loop;
+        return FALSE;
+    }
+
+    /* Request to monitor modems? */
+    if (ctxt.monitor_state_flag) {
+        MMModemState current;
+
+        g_signal_connect (ctxt.modem,
+                          "state-changed",
+                          G_CALLBACK (state_changed),
+                          NULL);
+
+        current = mm_modem_get_state (ctxt.modem);
+        g_print ("Initial state: '%s'\n", get_state_string (current));
+
+        /* We need to keep the loop */
+        return TRUE;
     }
 
     g_warn_if_reached ();
@@ -384,6 +433,11 @@ void
 mmcli_modem_run_synchronous (GDBusConnection *connection)
 {
     GError *error = NULL;
+
+    if (ctxt.monitor_state_flag) {
+        g_printerr ("error: monitoring state cannot be done synchronously\n");
+        exit (EXIT_FAILURE);
+    }
 
     /* Initialize context */
     init (connection);
