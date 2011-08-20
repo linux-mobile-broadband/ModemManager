@@ -40,6 +40,7 @@ typedef struct {
     gboolean monitor_state_flag;
     gboolean enable_flag;
     gboolean disable_flag;
+    gboolean reset_flag;
     /* The modem proxy */
     MMModem *modem;
 } Context;
@@ -64,6 +65,10 @@ static GOptionEntry entries[] = {
     },
     { "disable", 'd', 0, G_OPTION_ARG_NONE, &ctxt.disable_flag,
       "Disable a given modem",
+      NULL
+    },
+    { "reset", 'r', 0, G_OPTION_ARG_NONE, &ctxt.reset_flag,
+      "Reset a given modem",
       NULL
     },
     { NULL }
@@ -93,7 +98,8 @@ mmcli_modem_options_enabled (void)
     n_actions = (ctxt.info_flag +
                  ctxt.monitor_state_flag +
                  ctxt.enable_flag +
-                 ctxt.disable_flag);
+                 ctxt.disable_flag +
+                 ctxt.reset_flag);
 
     if (n_actions > 1) {
         g_printerr ("error: too many modem actions requested\n");
@@ -451,6 +457,35 @@ disable_ready (MMModem      *modem,
 }
 
 static void
+reset_process_reply (gboolean      result,
+                     const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't reset the modem: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully reseted the modem\n");
+}
+
+static void
+reset_ready (MMModem      *modem,
+             GAsyncResult *result,
+             gpointer      nothing)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_reset_finish (modem,
+                                              result,
+                                              &error);
+    reset_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
 state_changed (MMModem            *modem,
                MMModemState        old_state,
                MMModemState        new_state,
@@ -513,6 +548,15 @@ mmcli_modem_run_asynchronous (GDBusConnection *connection,
         return FALSE;
     }
 
+    /* Request to reset the modem? */
+    if (ctxt.reset_flag) {
+        mm_modem_reset_async (ctxt.modem,
+                              cancellable,
+                              (GAsyncReadyCallback)reset_ready,
+                              NULL);
+        return FALSE;
+    }
+
     g_warn_if_reached ();
     return FALSE;
 }
@@ -572,5 +616,15 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
         return;
     }
 
+    /* Request to reset the modem? */
+    if (ctxt.reset_flag) {
+        gboolean result;
+
+        result = mm_modem_reset (ctxt.modem, &error);
+        reset_process_reply (result, error);
+        return;
+    }
+
     g_warn_if_reached ();
 }
+
