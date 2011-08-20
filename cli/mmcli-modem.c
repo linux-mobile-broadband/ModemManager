@@ -38,6 +38,8 @@ typedef struct {
     gchar *modem_str;
     gboolean info_flag;
     gboolean monitor_state_flag;
+    gboolean enable_flag;
+    gboolean disable_flag;
     /* The modem proxy */
     MMModem *modem;
 } Context;
@@ -54,6 +56,14 @@ static GOptionEntry entries[] = {
     },
     { "monitor-state", 'f', 0, G_OPTION_ARG_NONE, &ctxt.monitor_state_flag,
       "Monitor state of a given modem",
+      NULL
+    },
+    { "enable", 'e', 0, G_OPTION_ARG_NONE, &ctxt.enable_flag,
+      "Enable a given modem",
+      NULL
+    },
+    { "disable", 'd', 0, G_OPTION_ARG_NONE, &ctxt.disable_flag,
+      "Disable a given modem",
       NULL
     },
     { NULL }
@@ -81,7 +91,9 @@ mmcli_modem_options_enabled (void)
     guint n_actions;
 
     n_actions = (ctxt.info_flag +
-                 ctxt.monitor_state_flag);
+                 ctxt.monitor_state_flag +
+                 ctxt.enable_flag +
+                 ctxt.disable_flag);
 
     if (n_actions > 1) {
         g_printerr ("error: too many modem actions requested\n");
@@ -381,6 +393,64 @@ get_info_ready (MMModem      *modem,
 }
 
 static void
+enable_process_reply (gboolean      result,
+                      const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't enable the modem: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully enabled the modem\n");
+}
+
+static void
+enable_ready (MMModem      *modem,
+              GAsyncResult *result,
+              gpointer      nothing)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_enable_finish (modem,
+                                               result,
+                                               &error);
+    enable_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
+disable_process_reply (gboolean      result,
+                       const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't disable the modem: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully disabled the modem\n");
+}
+
+static void
+disable_ready (MMModem      *modem,
+               GAsyncResult *result,
+               gpointer      nothing)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_enable_finish (modem,
+                                               result,
+                                               &error);
+    disable_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
 state_changed (MMModem            *modem,
                MMModemState        old_state,
                MMModemState        new_state,
@@ -425,6 +495,26 @@ mmcli_modem_run_asynchronous (GDBusConnection *connection,
         return TRUE;
     }
 
+    /* Request to enable the modem? */
+    if (ctxt.enable_flag) {
+        mm_modem_enable_async (ctxt.modem,
+                               TRUE,
+                               cancellable,
+                               (GAsyncReadyCallback)enable_ready,
+                               NULL);
+        return FALSE;
+    }
+
+    /* Request to disable the modem? */
+    if (ctxt.disable_flag) {
+        mm_modem_enable_async (ctxt.modem,
+                               FALSE,
+                               cancellable,
+                               (GAsyncReadyCallback)disable_ready,
+                               NULL);
+        return FALSE;
+    }
+
     g_warn_if_reached ();
     return FALSE;
 }
@@ -463,6 +553,28 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
         g_free (manufacturer);
         g_free (model);
         g_free (revision);
+        return;
+    }
+
+    /* Request to enable the modem? */
+    if (ctxt.enable_flag) {
+        gboolean result;
+
+        result = mm_modem_enable (ctxt.modem,
+                                  TRUE,
+                                  &error);
+        enable_process_reply (result, error);
+        return;
+    }
+
+    /* Request to disable the modem? */
+    if (ctxt.disable_flag) {
+        gboolean result;
+
+        result = mm_modem_enable (ctxt.modem,
+                                  FALSE,
+                                  &error);
+        disable_process_reply (result, error);
         return;
     }
 
