@@ -174,6 +174,11 @@ get_info_process_reply (gboolean      result,
                         const gchar  *revision)
 {
     gchar *prefixed_revision;
+    gchar *master_device;
+    gchar *device;
+    gchar *device_id;
+    gchar *driver;
+    gchar *plugin;
 
     if (!result) {
         g_printerr ("couldn't get info from modem: '%s'\n",
@@ -181,6 +186,14 @@ get_info_process_reply (gboolean      result,
         exit (EXIT_FAILURE);
     }
 
+    /* Get additional info from properties */
+    master_device = mm_modem_get_master_device (ctxt.modem);
+    device = mm_modem_get_device (ctxt.modem);
+    device_id = mm_modem_get_device_identifier (ctxt.modem);
+    driver = mm_modem_get_driver (ctxt.modem);
+    plugin = mm_modem_get_plugin (ctxt.modem);
+
+    /* Rework possible multiline strings */
     prefixed_revision = prefix_newlines ("           |                 ",
                                          revision);
 
@@ -190,13 +203,29 @@ get_info_process_reply (gboolean      result,
              "  Hardware |  manufacturer: '%s'\n"
              "           |         model: '%s'\n"
              "           |      revision: '%s'\n"
+             "  -------------------------\n"
+             "  System   | master device: '%s'\n"
+             "           |        device: '%s'\n"
+             "           |     device id: '%s'\n"
+             "           |        driver: '%s'\n"
+             "           |        plugin: '%s'\n"
              "\n",
              ctxt.modem_str,
              manufacturer,
              model,
-             prefixed_revision ? prefixed_revision : revision);
+             prefixed_revision ? prefixed_revision : revision,
+             master_device,
+             device,
+             device_id,
+             driver,
+             plugin);
 
     g_free (prefixed_revision);
+    g_free (master_device);
+    g_free (device);
+    g_free (device_id);
+    g_free (driver);
+    g_free (plugin);
 }
 
 static void
