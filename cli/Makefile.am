@@ -12,7 +12,8 @@ mmcli_CPPFLAGS = \
 mmcli_SOURCES = \
 	mmcli.h \
 	mmcli.c \
-	mmcli-manager.c
+	mmcli-manager.c \
+	mmcli-modem.c
 
 mmcli_LDADD = \
 	$(MMCLI_LIBS) \

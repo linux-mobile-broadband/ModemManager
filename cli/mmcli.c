@@ -116,6 +116,8 @@ main (gint argc, gchar **argv)
     context = g_option_context_new ("- Control and monitor the ModemManager");
 	g_option_context_add_group (context,
 	                            mmcli_manager_get_option_group ());
+	g_option_context_add_group (context,
+	                            mmcli_modem_get_option_group ());
     g_option_context_add_main_entries (context, main_entries, NULL);
     g_option_context_parse (context, &argc, &argv, NULL);
 	g_option_context_free (context);
@@ -145,11 +147,30 @@ main (gint argc, gchar **argv)
 
     /* Manager options? */
     if (mmcli_manager_options_enabled ()) {
+        /* Ensure options from different groups are not enabled */
+        if (mmcli_modem_options_enabled ()) {
+            g_printerr ("error: cannot use manager and modem options "
+                        "at the same time\n");
+            exit (EXIT_FAILURE);
+        }
+
         if (async_flag)
             mmcli_manager_run_asynchronous (connection, cancellable);
         else
             mmcli_manager_run_synchronous (connection);
     } else {
+        g_printerr ("error: no actions specified\n");
+        exit (EXIT_FAILURE);
+    }
+    /* Modem options? */
+    else if (mmcli_modem_options_enabled ()) {
+        if (async_flag)
+            keep_loop = mmcli_modem_run_asynchronous (connection, cancellable);
+        else
+            mmcli_modem_run_synchronous (connection);
+    }
+    /* No options? */
+    else {
         g_printerr ("error: no actions specified\n");
         exit (EXIT_FAILURE);
     }
@@ -164,6 +185,8 @@ main (gint argc, gchar **argv)
 
     if (mmcli_manager_options_enabled ()) {
         mmcli_manager_shutdown ();
+    } else if (mmcli_modem_options_enabled ()) {
+        mmcli_modem_shutdown ();
     }
 
     g_object_unref (connection);
