@@ -4323,7 +4323,7 @@ sms_get_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     GHashTable *properties;
-    int rv, status, tpdu_len, offset;
+    int rv, status, tpdu_len;
     char pdu[SMS_MAX_PDU_LEN + 1];
 
     /* If the modem has already been removed, return without
@@ -4337,9 +4337,9 @@ sms_get_done (MMAtSerialPort *port,
     }
 
     /* 344 == SMS_MAX_PDU_LEN */
-    rv = sscanf (response->str, "+CMGR: %d,,%d %344s %n",
-                 &status, &tpdu_len, pdu, &offset);
-    if (rv != 4) {
+    rv = sscanf (response->str, "+CMGR: %d,,%d %344s",
+                 &status, &tpdu_len, pdu);
+    if (rv != 3) {
         info->error = g_error_new (MM_MODEM_ERROR,
                                    MM_MODEM_ERROR_GENERAL,
                                    "Failed to parse CMGR response (parsed %d items)",
