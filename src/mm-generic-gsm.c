@@ -3046,6 +3046,10 @@ register_done (MMAtSerialPort *port,
 
     if (priv->pending_reg_info) {
         g_warn_if_fail (info == priv->pending_reg_info);
+        if (error) {
+            g_clear_error (&info->error);
+            info->error = g_error_copy (error);
+        }
 
         /* Don't use cached registration state here since it could be up to
          * 30 seconds old.  Get fresh registration state.
