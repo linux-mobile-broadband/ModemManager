@@ -30,6 +30,27 @@ ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="190b", ENV{ID_MM_ERICSSON_MBM}="1"
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="190d", ENV{ID_MM_ERICSSON_MBM}="1"
 ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1911", ENV{ID_MM_ERICSSON_MBM}="1"
 
+# Ericsson H5321gw
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1919", ENV{ID_MM_ERICSSON_MBM}="1"
+
+# Ericsson H5321w
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="191d", ENV{ID_MM_ERICSSON_MBM}="1"
+
+# Ericsson F5321gw
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1917", ENV{ID_MM_ERICSSON_MBM}="1"
+
+# Ericsson F5321w
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="191b", ENV{ID_MM_ERICSSON_MBM}="1"
+
+# Ericsson C5621gw
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="191f", ENV{ID_MM_ERICSSON_MBM}="1"
+
+# Ericsson C5621w
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1921", ENV{ID_MM_ERICSSON_MBM}="1"
+
+# Ericsson C3304w
+ATTRS{idVendor}=="0bdb", ATTRS{idProduct}=="1928", ENV{ID_MM_ERICSSON_MBM}="1"
+
 # Sony-Ericsson MD300
 ATTRS{idVendor}=="0fce", ATTRS{idProduct}=="d0cf", ENV{ID_MM_ERICSSON_MBM}="1"
 
@@ -38,6 +59,9 @@ ATTRS{idVendor}=="0fce", ATTRS{idProduct}=="d0e1", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # Sony-Ericsson MD400G
 ATTRS{idVendor}=="0fce", ATTRS{idProduct}=="d103", ENV{ID_MM_ERICSSON_MBM}="1"
+
+# Dell 5560
+ATTRS{idVendor}=="413c", ATTRS{idProduct}=="818e", ENV{ID_MM_ERICSSON_MBM}="1"
 
 # Dell 5550
 ATTRS{idVendor}=="413c", ATTRS{idProduct}=="818d", ENV{ID_MM_ERICSSON_MBM}="1"
