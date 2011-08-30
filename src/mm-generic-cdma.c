@@ -591,7 +591,7 @@ crm_done (MMAtSerialPort *port,
     if (p) {
         errno = 0;
         num = strtoul (p, NULL, 10);
-        if (num >= 0 && num <= 4 && (errno == 0)) {
+        if (num <= 4 && (errno == 0)) {
             MM_GENERIC_CDMA_GET_PRIVATE (user_data)->orig_crm = (guint32) num;
             MM_GENERIC_CDMA_GET_PRIVATE (user_data)->cur_crm = (guint32) num;
         }

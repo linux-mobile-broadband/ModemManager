@@ -2892,10 +2892,8 @@ handle_reg_status_response (MMGenericGsm *self,
     if (act != -1)
         mm_generic_gsm_update_access_technology (self, etsi_act_to_mm_act (act));
 
-    if (status >= 0) {
-        /* Update cached registration status */
-        reg_status_updated (self, cgreg_to_reg_type (cgreg), status, NULL);
-    }
+    /* Update cached registration status */
+    reg_status_updated (self, cgreg_to_reg_type (cgreg), status, NULL);
 
     return TRUE;
 }
