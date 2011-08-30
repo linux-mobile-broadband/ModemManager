@@ -22,6 +22,7 @@
 #include "mm-errors.h"
 #include "mm-utils.h"
 #include "mm-sms-utils.h"
+#include "mm-log.h"
 
 #define SMS_TP_MTI_MASK               0x03
 #define  SMS_TP_MTI_SMS_DELIVER       0x00
@@ -247,18 +248,6 @@ simple_uint_value (guint32 i)
 }
 
 static GValue *
-simple_boolean_value (gboolean b)
-{
-    GValue *val;
-
-    val = g_slice_new0 (GValue);
-    g_value_init (val, G_TYPE_BOOLEAN);
-    g_value_set_boolean (val, b);
-
-    return val;
-}
-
-static GValue *
 simple_string_value (const char *str)
 {
     GValue *val;
@@ -352,18 +341,79 @@ sms_parse_pdu (const char *hexpdu, GError **error)
         return NULL;
     }
 
+    properties = g_hash_table_new_full (g_str_hash, g_str_equal, NULL,
+                                        simple_free_gvalue);
+
     smsc_addr = sms_decode_address (&pdu[1], 2 * (pdu[0] - 1));
+    g_hash_table_insert (properties, "smsc",
+                         simple_string_value (smsc_addr));
+    g_free (smsc_addr);
+
     sender_addr = sms_decode_address (&pdu[msg_start_offset + 2],
                                       pdu[msg_start_offset + 1]);
+    g_hash_table_insert (properties, "number",
+                         simple_string_value (sender_addr));
+    g_free (sender_addr);
+
     sc_timestamp = sms_decode_timestamp (&pdu[tp_dcs_offset + 1]);
+    g_hash_table_insert (properties, "timestamp",
+                         simple_string_value (sc_timestamp));
+    g_free (sc_timestamp);
+
     bit_offset = 0;
     if (pdu[msg_start_offset] & SMS_TP_UDHI) {
+        int udhl, end, offset;
+        udhl = pdu[user_data_offset] + 1;
+        end = user_data_offset + udhl;
+
+        for (offset = user_data_offset + 1; offset < end;) {
+            guint8 ie_id, ie_len;
+
+            ie_id = pdu[offset++];
+            ie_len = pdu[offset++];
+
+            switch (ie_id) {
+                case 0x00:
+                    /*
+                     * Ignore the IE if one of the following is true:
+                     *  - it claims to be part 0 of M
+                     *  - it claims to be part N of M, N > M
+                     */
+                    if (pdu[offset + 2] == 0 ||
+                        pdu[offset + 2] > pdu[offset + 1])
+                        break;
+
+                    g_hash_table_insert (properties, "concat-reference",
+                                         simple_uint_value (pdu[offset]));
+                    g_hash_table_insert (properties, "concat-max",
+                                         simple_uint_value (pdu[offset + 1]));
+                    g_hash_table_insert (properties, "concat-sequence",
+                                         simple_uint_value (pdu[offset + 2]));
+                    break;
+                case 0x08:
+                    /* Concatenated short message, 16-bit reference */
+                    if (pdu[offset + 3] == 0 ||
+                        pdu[offset + 3] > pdu[offset + 2])
+                        break;
+
+                    g_hash_table_insert (properties, "concat-reference",
+                                         simple_uint_value (
+                                             (pdu[offset] << 8)
+                                             | pdu[offset + 1]));
+                    g_hash_table_insert (properties, "concat-max",
+                                         simple_uint_value (pdu[offset + 2]));
+                    g_hash_table_insert (properties, "concat-sequence",
+                                         simple_uint_value (pdu[offset + 3]));
+                    break;
+            }
+
+            offset += ie_len;
+        }
+
         /*
-         * Skip over the user data headers to prevent it from being
+         * Move past the user data headers to prevent it from being
          * decoded into garbage text.
          */
-        int udhl;
-        udhl = pdu[user_data_offset] + 1;
         user_data_offset += udhl;
         if (user_data_encoding == MM_SMS_ENCODING_GSM7) {
             /*
@@ -378,29 +428,15 @@ sms_parse_pdu (const char *hexpdu, GError **error)
 
     msg_text = sms_decode_text (&pdu[user_data_offset], user_data_len,
                                 user_data_encoding, bit_offset);
-
-    properties = g_hash_table_new_full (g_str_hash, g_str_equal, NULL,
-                                        simple_free_gvalue);
-    g_hash_table_insert (properties, "number",
-                         simple_string_value (sender_addr));
     g_hash_table_insert (properties, "text",
                          simple_string_value (msg_text));
-    g_hash_table_insert (properties, "smsc",
-                         simple_string_value (smsc_addr));
-    g_hash_table_insert (properties, "timestamp",
-                         simple_string_value (sc_timestamp));
+    g_free (msg_text);
+
     if (pdu[tp_dcs_offset] & SMS_DCS_CLASS_VALID)
         g_hash_table_insert (properties, "class",
                              simple_uint_value (pdu[tp_dcs_offset] &
                                                 SMS_DCS_CLASS_MASK));
-    g_hash_table_insert (properties, "completed", simple_boolean_value (TRUE));
-
-    g_free (smsc_addr);
-    g_free (sender_addr);
-    g_free (sc_timestamp);
-    g_free (msg_text);
     g_free (pdu);
-
 
     return properties;
 }
