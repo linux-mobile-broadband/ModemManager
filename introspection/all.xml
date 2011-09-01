@@ -6,6 +6,7 @@
   <tp:version>0.5</tp:version>
   <tp:copyright>Copyright (C) 2008 Novell, Inc.</tp:copyright>
   <tp:copyright>Copyright (C) 2008 - 2010 Red Hat, Inc.</tp:copyright>
+  <tp:copyright>Copyright (C) 2011 The Chromium OS Authors</tp:copyright>
 
   <tp:license xmlns="http://www.w3.org/1999/xhtml">
     <p>This program is free software; you can redistribute it and/or modify
@@ -26,6 +27,7 @@
   <xi:include href="org.freedesktop.ModemManager.xml"/>
   <xi:include href="org.freedesktop.ModemManager.Modem.xml"/>
   <xi:include href="org.freedesktop.ModemManager.Modem.Simple.xml"/>
+  <xi:include href="org.freedesktop.ModemManager.Modem.Firmware.xml"/>
   <xi:include href="org.freedesktop.ModemManager.Modem.Location.xml"/>
   <xi:include href="org.freedesktop.ModemManager.Modem.Cdma.xml"/>
   <xi:include href="org.freedesktop.ModemManager.Modem.Gsm.xml"/>

@@ -72,4 +72,13 @@
     </defaults>
   </action>
 
+  <action id="org.freedesktop.ModemManager.Firmware">
+    <_description>Query and manage firmware on a mobile broadband device</_description>
+    <_message>System policy prevents querying or managing this device's firmware.</_message>
+    <defaults>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+  </action>
+
 </policyconfig>

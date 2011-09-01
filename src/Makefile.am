@@ -122,7 +122,9 @@ modem_manager_SOURCES = \
 	mm-properties-changed-signal.c \
 	mm-properties-changed-signal.h \
 	mm-modem-location.c \
-	mm-modem-location.h
+	mm-modem-location.h \
+	mm-modem-firmware.c \
+	mm-modem-firmware.h
 
 mm-manager-glue.h: $(top_srcdir)/introspection/org.freedesktop.ModemManager.xml
 	$(AM_V_GEN) dbus-binding-tool --prefix=mm_manager --mode=glib-server --output=$@ $<
@@ -165,8 +167,11 @@ BUILT_SOURCES = \
 mm-modem-location-glue.h: $(top_srcdir)/introspection/org.freedesktop.ModemManager.Modem.Location.xml
 	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_location --mode=glib-server --output=$@ $<
 
+mm-modem-firmware-glue.h: $(top_srcdir)/introspection/org.freedesktop.ModemManager.Modem.Firmware.xml
+	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_firmware --mode=glib-server --output=$@ $<
+
 modem_manager_SOURCES += $(loc_sources)
 
-BUILT_SOURCES += mm-modem-location-glue.h
+BUILT_SOURCES += mm-modem-location-glue.h mm-modem-firmware-glue.h
 
 CLEANFILES = $(BUILT_SOURCES)
