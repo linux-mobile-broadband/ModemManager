@@ -1023,7 +1023,7 @@ impl_manager_scan_devices (MMManager *manager,
                                         MM_AUTHORIZATION_MANAGER_CONTROL,
                                         G_OBJECT (manager),
                                         context,
-                                        scan_devices_auth_cb,
+                                        (MMAuthRequestCb)scan_devices_auth_cb,
                                         NULL,
                                         NULL,
                                         &error)) {

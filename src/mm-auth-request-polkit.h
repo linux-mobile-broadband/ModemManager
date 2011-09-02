@@ -42,7 +42,8 @@ GType mm_auth_request_polkit_get_type (void);
 GObject *mm_auth_request_polkit_new (PolkitAuthority *authority,
                                      const char *authorization,
                                      GObject *owner,
-                                     DBusGMethodInvocation *context,
+                                     gpointer context,
+                                     const gchar *sender,
                                      MMAuthRequestCb callback,
                                      gpointer callback_data,
                                      GDestroyNotify notify);

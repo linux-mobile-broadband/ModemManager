@@ -452,7 +452,7 @@ impl_gsm_modem_scan (MMModemGsmNetwork *modem,
     if (!mm_modem_auth_request (MM_MODEM (modem),
                                 MM_AUTHORIZATION_DEVICE_CONTROL,
                                 context,
-                                scan_auth_cb,
+                                (MMAuthRequestCb)scan_auth_cb,
                                 NULL,
                                 NULL,
                                 &error)) {

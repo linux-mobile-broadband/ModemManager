@@ -491,7 +491,7 @@ impl_modem_reset (MMModem *modem, DBusGMethodInvocation *context)
     if (!mm_modem_auth_request (MM_MODEM (modem),
                                 MM_AUTHORIZATION_DEVICE_CONTROL,
                                 context,
-                                reset_auth_cb,
+                                (MMAuthRequestCb)reset_auth_cb,
                                 NULL, NULL,
                                 &error)) {
         dbus_g_method_return_error (context, error);
@@ -544,7 +544,7 @@ impl_modem_factory_reset (MMModem *modem,
     if (!mm_modem_auth_request (MM_MODEM (modem),
                                 MM_AUTHORIZATION_DEVICE_CONTROL,
                                 context,
-                                factory_reset_auth_cb,
+                                (MMAuthRequestCb)factory_reset_auth_cb,
                                 g_strdup (code),
                                 g_free,
                                 &error)) {
