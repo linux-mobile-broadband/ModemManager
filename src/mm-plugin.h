@@ -91,7 +91,7 @@ struct _MMPlugin {
      * be called on the second plugin to allow that plugin to clean up resources
      * used while determining it's level of support for the port.
      */
-    void (*cancel_supports_port) (MMPlugin *self,
+    void (*supports_port_cancel) (MMPlugin *self,
                                   const char *subsys,
                                   const char *name);
 
@@ -129,7 +129,7 @@ MMPluginSupportsResult mm_plugin_supports_port_finish (MMPlugin *plugin,
                                                        guint *level,
                                                        GError **error);
 
-void mm_plugin_cancel_supports_port (MMPlugin *plugin,
+void mm_plugin_supports_port_cancel (MMPlugin *plugin,
                                      const char *subsys,
                                      const char *name);
 

@@ -74,7 +74,7 @@ mm_plugin_supports_port_finish (MMPlugin *self,
 }
 
 void
-mm_plugin_cancel_supports_port (MMPlugin *plugin,
+mm_plugin_supports_port_cancel (MMPlugin *plugin,
                                 const char *subsys,
                                 const char *name)
 {
@@ -82,7 +82,7 @@ mm_plugin_cancel_supports_port (MMPlugin *plugin,
     g_return_if_fail (subsys != NULL);
     g_return_if_fail (name != NULL);
 
-    MM_PLUGIN_GET_INTERFACE (plugin)->cancel_supports_port (plugin, subsys, name);
+    MM_PLUGIN_GET_INTERFACE (plugin)->supports_port_cancel (plugin, subsys, name);
 }
 
 MMModem *

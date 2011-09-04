@@ -458,7 +458,9 @@ supports_info_free (SupportsInfo *info)
 {
     /* Cancel any in-process operation on the first plugin */
     if (info->cur_plugin)
-        mm_plugin_cancel_supports_port (MM_PLUGIN (info->cur_plugin->data), info->subsys, info->name);
+        mm_plugin_supports_port_cancel (MM_PLUGIN (info->cur_plugin->data),
+                                        info->subsys,
+                                        info->name);
 
     if (info->defer_id)
         g_source_remove (info->defer_id);
@@ -657,7 +659,9 @@ do_grab_port (gpointer user_data)
 
     /* Tell each plugin to clean up any outstanding supports task */
     for (iter = info->plugins; iter; iter = g_slist_next (iter))
-        mm_plugin_cancel_supports_port (MM_PLUGIN (iter->data), info->subsys, info->name);
+        mm_plugin_supports_port_cancel (MM_PLUGIN (iter->data),
+                                        info->subsys,
+                                        info->name);
     g_slist_free (info->plugins);
     info->cur_plugin = info->plugins = NULL;
 
@@ -980,7 +984,9 @@ device_removed (MMManager *manager, GUdevDevice *device)
 
     if (info) {
         if (info->plugins)
-            mm_plugin_cancel_supports_port (MM_PLUGIN (info->plugins->data), subsys, name);
+            mm_plugin_supports_port_cancel (MM_PLUGIN (info->plugins->data),
+                                            subsys,
+                                            name);
         g_hash_table_remove (priv->supports, key);
     }
 

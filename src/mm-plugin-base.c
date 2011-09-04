@@ -1447,7 +1447,7 @@ out:
 }
 
 static void
-cancel_supports_port (MMPlugin *plugin,
+supports_port_cancel (MMPlugin *plugin,
                       const char *subsys,
                       const char *name)
 {
@@ -1508,7 +1508,7 @@ plugin_init (MMPlugin *plugin_class)
     plugin_class->get_sort_last = get_sort_last;
     plugin_class->supports_port = supports_port;
     plugin_class->supports_port_finish = supports_port_finish;
-    plugin_class->cancel_supports_port = cancel_supports_port;
+    plugin_class->supports_port_cancel = supports_port_cancel;
     plugin_class->grab_port = grab_port;
 }
 
