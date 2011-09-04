@@ -18,6 +18,8 @@
 #define MM_PLUGIN_H
 
 #include <glib-object.h>
+#include <gio/gio.h>
+
 #include <mm-modem.h>
 
 #define MM_PLUGIN_GENERIC_NAME "Generic"
@@ -48,7 +50,8 @@ typedef void (*MMSupportsPortResultFunc) (MMPlugin *plugin,
 typedef enum {
     MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED = 0x0,
     MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS,
-    MM_PLUGIN_SUPPORTS_PORT_DEFER
+    MM_PLUGIN_SUPPORTS_PORT_DEFER,
+    MM_PLUGIN_SUPPORTS_PORT_SUPPORTED
 } MMPluginSupportsResult;
 
 struct _MMPlugin {
@@ -63,22 +66,24 @@ struct _MMPlugin {
     gboolean (*get_sort_last) (const MMPlugin *self);
 
     /* Check whether a plugin supports a particular modem port, and what level
-     * of support the plugin has for the device.  If the plugin can immediately
-     * determine whether a port is unsupported, it should return
-     * FALSE.  Otherwise, if the plugin needs to perform additional operations
-     * (ie, probing) to determine the level of support or additional details
-     * about a port, it should queue that operation (but *not* block on the
-     * result) and return TRUE to indicate the operation is ongoing.  When the
-     * operation is finished or the level of support is known, the plugin should
-     * call the provided callback and pass that callback the provided user_data.
+     * of support the plugin has for the device.
+     * The check is done always asynchronously. When the result of the check is
+     * ready, the passed callback will be called, and the result will be ready
+     * to get retrieved with supports_port_finish().
      */
-    MMPluginSupportsResult (*supports_port)  (MMPlugin *self,
-                                              const char *subsys,
-                                              const char *name,
-                                              const char *physdev_path,
-                                              MMModem *existing,
-                                              MMSupportsPortResultFunc callback,
-                                              gpointer user_data);
+    void (* supports_port) (MMPlugin *self,
+                            const gchar *subsys,
+                            const gchar *name,
+                            const gchar *physdev_path,
+                            MMModem *existing,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data);
+
+    /* Allows to get the result of an asynchronous port support check. */
+    MMPluginSupportsResult (* supports_port_finish) (MMPlugin *self,
+                                                     GAsyncResult *result,
+                                                     guint *level,
+                                                     GError **error);
 
     /* Called to cancel an ongoing supports_port() operation or to notify the
      * plugin to clean up that operation.  For example, if two plugins support
@@ -111,13 +116,18 @@ const char *mm_plugin_get_name   (MMPlugin *plugin);
 
 gboolean mm_plugin_get_sort_last (const MMPlugin *plugin);
 
-MMPluginSupportsResult mm_plugin_supports_port  (MMPlugin *plugin,
-                                                 const char *subsys,
-                                                 const char *name,
-                                                 const char *physdev_path,
-                                                 MMModem *existing,
-                                                 MMSupportsPortResultFunc callback,
-                                                 gpointer user_data);
+void mm_plugin_supports_port (MMPlugin *plugin,
+                              const gchar *subsys,
+                              const gchar *name,
+                              const gchar *physdev_path,
+                              MMModem *existing,
+                              GAsyncReadyCallback callback,
+                              gpointer user_data);
+
+MMPluginSupportsResult mm_plugin_supports_port_finish (MMPlugin *plugin,
+                                                       GAsyncResult *result,
+                                                       guint *level,
+                                                       GError **error);
 
 void mm_plugin_cancel_supports_port (MMPlugin *plugin,
                                      const char *subsys,

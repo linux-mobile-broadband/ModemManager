@@ -486,10 +486,9 @@ static void supports_callback (MMPlugin *plugin,
                                guint32 level,
                                gpointer user_data);
 
-static void try_supports_port (MMManager *manager,
-                               MMPlugin *plugin,
-                               MMModem *existing,
-                               SupportsInfo *info);
+static void supports_port_ready_cb (MMPlugin *plugin,
+                                    GAsyncResult *result,
+                                    SupportsInfo *info);
 
 static gboolean
 supports_defer_timeout (gpointer user_data)
@@ -500,30 +499,43 @@ supports_defer_timeout (gpointer user_data)
     existing = find_modem_for_device (info->manager, info->physdev_path);
 
     mm_dbg ("(%s): re-checking support...", info->name);
-    try_supports_port (info->manager,
-                       MM_PLUGIN (info->cur_plugin->data),
-                       existing,
-                       info);
+    mm_plugin_supports_port (MM_PLUGIN (info->cur_plugin->data),
+                             info->subsys,
+                             info->name,
+                             info->physdev_path,
+                             existing,
+                             (GAsyncReadyCallback)supports_port_ready_cb,
+                             info);
     return FALSE;
 }
 
 static void
-try_supports_port (MMManager *manager,
-                   MMPlugin *plugin,
-                   MMModem *existing,
-                   SupportsInfo *info)
+supports_port_ready_cb (MMPlugin *plugin,
+                        GAsyncResult *result,
+                        SupportsInfo *info)
 {
-    MMPluginSupportsResult result;
+    MMPluginSupportsResult supports_result;
+    GError *error = NULL;
+    guint level = 0;
 
-    result = mm_plugin_supports_port (plugin,
-                                      info->subsys,
-                                      info->name,
-                                      info->physdev_path,
-                                      existing,
-                                      supports_callback,
-                                      info);
+    /* Get supports check results */
+    supports_result = mm_plugin_supports_port_finish (plugin,
+                                                      result,
+                                                      &level,
+                                                      &error);
+    if (error) {
+        mm_warn ("(%s): (%s) error when checking support: '%s'",
+                 mm_plugin_get_name (plugin),
+                 info->name,
+                 error->message);
+        g_error_free (error);
+    }
 
-    switch (result) {
+    switch (supports_result) {
+    case MM_PLUGIN_SUPPORTS_PORT_SUPPORTED:
+        /* Report support level to the callback */
+        supports_callback (plugin, info->subsys, info->name, level, info);
+        break;
     case MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED:
         /* If the plugin knows it doesn't support the modem, just call the
          * callback and indicate 0 support.
@@ -541,7 +553,8 @@ try_supports_port (MMManager *manager,
         info->defer_id = g_timeout_add (3000, supports_defer_timeout, info);
         break;
     case MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS:
-    default:
+        /* This should never happen at this level */
+        g_warn_if_reached ();
         break;
     }
 }
@@ -730,7 +743,13 @@ supports_callback (MMPlugin *plugin,
 
     if (next_plugin) {
         /* Try the next plugin */
-        try_supports_port (info->manager, next_plugin, existing, info);
+        mm_plugin_supports_port (next_plugin,
+                                 info->subsys,
+                                 info->name,
+                                 info->physdev_path,
+                                 existing,
+                                 (GAsyncReadyCallback)supports_port_ready_cb,
+                                 info);
     } else {
         /* All done; let the best modem grab the port */
         info->done_id = g_idle_add (do_grab_port, info);
@@ -895,7 +914,13 @@ device_added (MMManager *manager, GUdevDevice *device)
     if (existing)
         plugin = MM_PLUGIN (g_object_get_data (G_OBJECT (existing), MANAGER_PLUGIN_TAG));
 
-    try_supports_port (manager, plugin, existing, info);
+    mm_plugin_supports_port (plugin,
+                             info->subsys,
+                             info->name,
+                             info->physdev_path,
+                             existing,
+                             (GAsyncReadyCallback)supports_port_ready_cb,
+                             info);
 
 out:
     if (physdev)

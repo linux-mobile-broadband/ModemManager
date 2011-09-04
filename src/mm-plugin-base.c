@@ -150,6 +150,11 @@ G_DEFINE_TYPE (MMPluginBaseSupportsTask, mm_plugin_base_supports_task, G_TYPE_OB
 #define MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_PLUGIN_BASE_SUPPORTS_TASK, MMPluginBaseSupportsTaskPrivate))
 
 typedef struct {
+	MMPluginSupportsResult result;
+	guint support_level;
+} SupportsPortResult;
+
+typedef struct {
     char *command;
     guint32 tries;
     guint32 delay_seconds;
@@ -181,27 +186,22 @@ typedef struct {
     GSList *custom;
     GSList *cur_custom; /* Pointer to current custom init command */
 
-    MMSupportsPortResultFunc callback;
-    gpointer callback_data;
+    GSimpleAsyncResult *async_result;
 }  MMPluginBaseSupportsTaskPrivate;
+
+static SupportsPortResult *supports_port_result_new (MMPluginSupportsResult result,
+                                                     guint support_level);
+static void supports_port_result_free (SupportsPortResult *spr);
 
 static MMPluginBaseSupportsTask *
 supports_task_new (MMPluginBase *self,
                    GUdevDevice *port,
                    const char *physdev_path,
                    const char *driver,
-                   MMSupportsPortResultFunc callback,
-                   gpointer callback_data)
+                   GSimpleAsyncResult *result)
 {
     MMPluginBaseSupportsTask *task;
     MMPluginBaseSupportsTaskPrivate *priv;
-
-    g_return_val_if_fail (self != NULL, NULL);
-    g_return_val_if_fail (MM_IS_PLUGIN_BASE (self), NULL);
-    g_return_val_if_fail (port != NULL, NULL);
-    g_return_val_if_fail (physdev_path != NULL, NULL);
-    g_return_val_if_fail (driver != NULL, NULL);
-    g_return_val_if_fail (callback != NULL, NULL);
 
     task = (MMPluginBaseSupportsTask *) g_object_new (MM_TYPE_PLUGIN_BASE_SUPPORTS_TASK, NULL);
 
@@ -210,8 +210,7 @@ supports_task_new (MMPluginBase *self,
     priv->port = g_object_ref (port);
     priv->physdev_path = g_strdup (physdev_path);
     priv->driver = g_strdup (driver);
-    priv->callback = callback;
-    priv->callback_data = callback_data;
+    priv->async_result = g_object_ref (result);
 
     return task;
 }
@@ -316,27 +315,24 @@ mm_plugin_base_supports_task_complete (MMPluginBaseSupportsTask *task,
                                        guint32 level)
 {
     MMPluginBaseSupportsTaskPrivate *priv;
-    const char *subsys, *name;
 
-    g_return_if_fail (task != NULL);
     g_return_if_fail (MM_IS_PLUGIN_BASE_SUPPORTS_TASK (task));
 
     priv = MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task);
-    g_return_if_fail (priv->callback != NULL);
 
     if (priv->full_id) {
         g_source_remove (priv->full_id);
         priv->full_id = 0;
     }
 
-    subsys = g_udev_device_get_subsystem (priv->port);
-    name = g_udev_device_get_name (priv->port);
-
-    priv->callback (MM_PLUGIN (priv->plugin), subsys, name, level, priv->callback_data);
-
-    /* Clear out the callback, it shouldn't be called more than once */
-    priv->callback = NULL;
-    priv->callback_data = NULL;
+    g_simple_async_result_set_op_res_gpointer (
+        priv->async_result,
+        supports_port_result_new ((level > 0 ?
+                                   MM_PLUGIN_SUPPORTS_PORT_SUPPORTED :
+                                   MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED),
+                                  level),
+        (GDestroyNotify)supports_port_result_free);
+    g_simple_async_result_complete (priv->async_result);
 }
 
 void
@@ -1306,71 +1302,148 @@ device_file_exists(const char *name)
     return (0 == result) ? TRUE : FALSE;
 }
 
-static MMPluginSupportsResult
-supports_port (MMPlugin *plugin,
-               const char *subsys,
-               const char *name,
-               const char *physdev_path,
-               MMModem *existing,
-               MMSupportsPortResultFunc callback,
-               gpointer callback_data)
+static SupportsPortResult *
+supports_port_result_new (MMPluginSupportsResult result,
+                          guint support_level)
 {
+    SupportsPortResult *spr;
+
+    spr = g_malloc (sizeof (SupportsPortResult));
+	spr->result = result;
+	spr->support_level = support_level;
+    return spr;
+}
+
+static void
+supports_port_result_free (SupportsPortResult *spr)
+{
+    g_free (spr);
+}
+
+static MMPluginSupportsResult
+supports_port_finish (MMPlugin *self,
+                      GAsyncResult *result,
+                      guint *level,
+                      GError **error)
+{
+    SupportsPortResult *spr;
+
+    g_return_val_if_fail (MM_IS_PLUGIN (self),
+                          MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED);
+    g_return_val_if_fail (G_IS_ASYNC_RESULT (result),
+                          MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED);
+
+    /* Propagate error, if any */
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result),
+                                               error)) {
+		return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
+    }
+
+    spr = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (result));
+    *level = spr->support_level;
+    return spr->result;
+}
+
+static void
+supports_port (MMPlugin *plugin,
+               const gchar *subsys,
+               const gchar *name,
+               const gchar *physdev_path,
+               MMModem *existing,
+               GAsyncReadyCallback callback,
+               gpointer user_data)
+{
+    MMPluginSupportsResult result = MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
     MMPluginBase *self = MM_PLUGIN_BASE (plugin);
     MMPluginBasePrivate *priv = MM_PLUGIN_BASE_GET_PRIVATE (self);
     GUdevDevice *port = NULL;
-    char *driver = NULL, *key = NULL;
+    gchar *driver = NULL;
+    gchar *key = NULL;
     MMPluginBaseSupportsTask *task;
-    MMPluginSupportsResult result = MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
-    int idx;
+    gint idx;
+    GSimpleAsyncResult *async_result;
 
+    async_result = g_simple_async_result_new (G_OBJECT (self),
+                                              callback,
+                                              user_data,
+                                              supports_port);
+
+    /* Lookup task, there shouldn't be any */
     key = get_key (subsys, name);
     task = g_hash_table_lookup (priv->tasks, key);
     if (task) {
-        g_free (key);
-        g_return_val_if_fail (task == NULL, MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED);
+        g_warn_if_reached ();
+        goto unsupported;
     }
 
-    port = g_udev_client_query_by_subsystem_and_name (priv->client, subsys, name);
+    /* Get port device */
+    port = g_udev_client_query_by_subsystem_and_name (priv->client,
+                                                      subsys,
+                                                      name);
     if (!port)
-        goto out;
+        goto unsupported;
 
-    // Detect any modems accessible through the list of virtual ports
+    /* Detect any modems accessible through the list of virtual ports */
     for (idx = 0; virtual_port[idx]; idx++)  {
         if (strcmp(name, virtual_port[idx]))
             continue;
         if (!device_file_exists(virtual_port[idx]))
             continue;
 
-        task = supports_task_new (self, port, physdev_path, "virtual", callback, callback_data);
-        g_assert (task);
-        g_hash_table_insert (priv->tasks, g_strdup (key), g_object_ref (task));
+        task = supports_task_new (self,
+                                  port,
+                                  physdev_path,
+                                  "virtual",
+                                  async_result);
         goto find_plugin;
     }
 
     driver = get_driver_name (port);
     if (!driver)
-        goto out;
+        goto unsupported;
 
-    task = supports_task_new (self, port, physdev_path, driver, callback, callback_data);
-    g_assert (task);
-    g_hash_table_insert (priv->tasks, g_strdup (key), g_object_ref (task));
+    /* Create new supports task for this port */
+    task = supports_task_new (self,
+                              port,
+                              physdev_path,
+                              driver,
+                              async_result);
 
 find_plugin:
-    result = MM_PLUGIN_BASE_GET_CLASS (self)->supports_port (self, existing, task);
-    if (result != MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS) {
-        /* If the plugin doesn't support the port at all, the supports task is
-         * not needed.
-         */
-        g_hash_table_remove (priv->tasks, key);
+    /* Keep track of the task */
+    g_hash_table_insert (priv->tasks,
+                         g_strdup (key),
+                         g_object_ref (task));
+
+    /* Let the specific plugin check port support */
+    result = MM_PLUGIN_BASE_GET_CLASS (self)->supports_port (self,
+                                                             existing,
+                                                             task);
+    if (result == MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS) {
+        /* It will really be asynchronous */
+        goto out;
     }
+
+    /* If the plugin doesn't support the port at all, the supports task is
+     * not needed.
+     */
+    g_hash_table_remove (priv->tasks, key);
     g_object_unref (task);
+
+unsupported:
+    /* Set the result of the asynchronous method just here */
+    g_simple_async_result_set_op_res_gpointer (
+        async_result,
+        supports_port_result_new (result, 0),
+        (GDestroyNotify)supports_port_result_free);
+    g_simple_async_result_complete_in_idle (async_result);
 
 out:
     if (port)
         g_object_unref (port);
     g_free (key);
     g_free (driver);
-    return result;
+    g_object_unref (async_result);
 }
 
 static void
@@ -1434,6 +1507,7 @@ plugin_init (MMPlugin *plugin_class)
     plugin_class->get_name = get_name;
     plugin_class->get_sort_last = get_sort_last;
     plugin_class->supports_port = supports_port;
+    plugin_class->supports_port_finish = supports_port_finish;
     plugin_class->cancel_supports_port = cancel_supports_port;
     plugin_class->grab_port = grab_port;
 }

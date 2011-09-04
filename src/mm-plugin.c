@@ -32,28 +32,45 @@ mm_plugin_get_sort_last (const MMPlugin *plugin)
     return MM_PLUGIN_GET_INTERFACE (plugin)->get_sort_last (plugin);
 }
 
-MMPluginSupportsResult
-mm_plugin_supports_port (MMPlugin *plugin,
-                         const char *subsys,
-                         const char *name,
-                         const char *physdev_path,
+void
+mm_plugin_supports_port (MMPlugin *self,
+                         const gchar *subsys,
+                         const gchar *name,
+                         const gchar *physdev_path,
                          MMModem *existing,
-                         MMSupportsPortResultFunc callback,
+                         GAsyncReadyCallback callback,
                          gpointer user_data)
 {
-    g_return_val_if_fail (MM_IS_PLUGIN (plugin), FALSE);
-    g_return_val_if_fail (subsys != NULL, FALSE);
-    g_return_val_if_fail (name != NULL, FALSE);
-    g_return_val_if_fail (physdev_path != NULL, FALSE);
-    g_return_val_if_fail (callback != NULL, FALSE);
+    g_return_if_fail (MM_IS_PLUGIN (self));
+    g_return_if_fail (subsys != NULL);
+    g_return_if_fail (name != NULL);
+    g_return_if_fail (physdev_path != NULL);
+    g_return_if_fail (callback != NULL);
 
-    return MM_PLUGIN_GET_INTERFACE (plugin)->supports_port (plugin,
-                                                            subsys,
-                                                            name,
-                                                            physdev_path,
-                                                            existing,
-                                                            callback,
-                                                            user_data);
+    MM_PLUGIN_GET_INTERFACE (self)->supports_port (self,
+                                                   subsys,
+                                                   name,
+                                                   physdev_path,
+                                                   existing,
+                                                   callback,
+                                                   user_data);
+}
+
+MMPluginSupportsResult
+mm_plugin_supports_port_finish (MMPlugin *self,
+                                GAsyncResult *result,
+                                guint *level,
+                                GError **error)
+{
+    g_return_val_if_fail (MM_IS_PLUGIN (self),
+                          MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED);
+    g_return_val_if_fail (G_IS_ASYNC_RESULT (result),
+                          MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED);
+
+    return MM_PLUGIN_GET_INTERFACE (self)->supports_port_finish (self,
+                                                                 result,
+                                                                 level,
+                                                                 error);
 }
 
 void
