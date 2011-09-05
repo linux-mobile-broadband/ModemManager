@@ -106,6 +106,8 @@ modem_manager_SOURCES = \
 	$(auth_sources) \
 	mm-manager.c \
 	mm-manager.h \
+	mm-plugin-manager.c \
+	mm-plugin-manager.h \
 	mm-modem.c \
 	mm-modem.h \
 	mm-serial-parsers.c \
