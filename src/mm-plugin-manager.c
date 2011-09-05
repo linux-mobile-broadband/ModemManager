@@ -10,15 +10,21 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
+ * Copyright (C) 2008 - 2009 Novell, Inc.
+ * Copyright (C) 2009 - 2011 Red Hat, Inc.
  * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
  */
 
 #include <string.h>
 #include <ctype.h>
 
+#include <gmodule.h>
 #include <gio/gio.h>
 
 #include "mm-plugin-manager.h"
+#include "mm-plugin.h"
+#include "mm-errors.h"
+#include "mm-log.h"
 
 static void initable_iface_init (GInitableIface *iface);
 
@@ -27,8 +33,170 @@ G_DEFINE_TYPE_EXTENDED (MMPluginManager, mm_plugin_manager, G_TYPE_OBJECT, 0,
                                                initable_iface_init));
 
 struct _MMPluginManagerPrivate {
-    gpointer dummy;
+    /* The list of plugins. It is loaded once when the program starts, and the
+     * list is NOT expected to change after that. */
+    GSList *plugins;
 };
+
+static MMPlugin *
+load_plugin (const gchar *path)
+{
+    MMPlugin *plugin = NULL;
+    GModule *module;
+    MMPluginCreateFunc plugin_create_func;
+    gint *major_plugin_version;
+    gint *minor_plugin_version;
+
+    module = g_module_open (path, G_MODULE_BIND_LAZY);
+    if (!module) {
+        g_warning ("Could not load plugin %s: %s", path, g_module_error ());
+        return NULL;
+    }
+
+    if (!g_module_symbol (module, "mm_plugin_major_version", (gpointer *) &major_plugin_version)) {
+        g_warning ("Could not load plugin %s: Missing major version info", path);
+        goto out;
+    }
+
+    if (*major_plugin_version != MM_PLUGIN_MAJOR_VERSION) {
+        g_warning ("Could not load plugin %s: Plugin major version %d, %d is required",
+                   path, *major_plugin_version, MM_PLUGIN_MAJOR_VERSION);
+        goto out;
+    }
+
+    if (!g_module_symbol (module, "mm_plugin_minor_version", (gpointer *) &minor_plugin_version)) {
+        g_warning ("Could not load plugin %s: Missing minor version info", path);
+        goto out;
+    }
+
+    if (*minor_plugin_version != MM_PLUGIN_MINOR_VERSION) {
+        g_warning ("Could not load plugin %s: Plugin minor version %d, %d is required",
+                   path, *minor_plugin_version, MM_PLUGIN_MINOR_VERSION);
+        goto out;
+    }
+
+    if (!g_module_symbol (module, "mm_plugin_create", (gpointer *) &plugin_create_func)) {
+        g_warning ("Could not load plugin %s: %s", path, g_module_error ());
+        goto out;
+    }
+
+    plugin = (*plugin_create_func) ();
+    if (plugin) {
+        g_object_weak_ref (G_OBJECT (plugin), (GWeakNotify) g_module_close, module);
+    } else
+        mm_warn ("Could not load plugin %s: initialization failed", path);
+
+ out:
+    if (!plugin)
+        g_module_close (module);
+
+    return plugin;
+}
+
+static gint
+compare_plugins (const MMPlugin *plugin_a,
+                 const MMPlugin *plugin_b)
+{
+    /* The order of the plugins in the list is the same order used to check
+     * whether the plugin can manage a given modem:
+     *  - First, modems that will check vendor ID from udev.
+     *  - Then, modems that report to be sorted last (those which will check
+     *    vendor ID also from the probed ones..
+     */
+    if (mm_plugin_get_sort_last (plugin_a) &&
+        !mm_plugin_get_sort_last (plugin_b))
+        return 1;
+    if (!mm_plugin_get_sort_last (plugin_a) &&
+        mm_plugin_get_sort_last (plugin_b))
+        return -1;
+    return 0;
+}
+
+static void
+found_plugin (MMPlugin *plugin)
+{
+    mm_info ("Loaded plugin '%s'", mm_plugin_get_name (plugin));
+}
+
+static gboolean
+load_plugins (MMPluginManager *self,
+              GError **error)
+{
+    GDir *dir;
+    const gchar *fname;
+    MMPlugin *generic_plugin = NULL;
+
+	if (!g_module_supported ()) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_UNSUPPORTED,
+                     "GModules are not supported on your platform!");
+		return FALSE;
+	}
+
+    mm_dbg ("Looking for plugins in '%s'", PLUGINDIR);
+    dir = g_dir_open (PLUGINDIR, 0, NULL);
+    if (!dir) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_NO_PLUGINS,
+                     "Plugin directory '%s' not found",
+                     PLUGINDIR);
+        return FALSE;
+    }
+
+    while ((fname = g_dir_read_name (dir)) != NULL) {
+        gchar *path;
+        MMPlugin *plugin;
+
+        if (!g_str_has_suffix (fname, G_MODULE_SUFFIX))
+            continue;
+
+        path = g_module_build_path (PLUGINDIR, fname);
+        plugin = load_plugin (path);
+        g_free (path);
+
+        if (plugin) {
+            if (g_str_equal (mm_plugin_get_name (plugin),
+                             MM_PLUGIN_GENERIC_NAME))
+                generic_plugin = plugin;
+            else
+                self->priv->plugins = g_slist_append (self->priv->plugins,
+                                                      plugin);
+        }
+    }
+
+    /* Sort last plugins that request it */
+    self->priv->plugins = g_slist_sort (self->priv->plugins,
+                                        (GCompareFunc)compare_plugins);
+
+    /* Make sure the generic plugin is last */
+    if (generic_plugin)
+        self->priv->plugins = g_slist_append (self->priv->plugins,
+                                              generic_plugin);
+
+    /* Treat as error if we don't find any plugin */
+    if (!self->priv->plugins) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_NO_PLUGINS,
+                     "No plugins found in plugin directory '%s'",
+                     PLUGINDIR);
+        g_dir_close (dir);
+        return FALSE;
+    }
+
+    /* Now report about all the found plugins, in the same order they will be
+     * used while checking support */
+    g_slist_foreach (self->priv->plugins, (GFunc)found_plugin, NULL);
+
+    mm_info ("Successfully loaded %u plugins",
+             g_slist_length (self->priv->plugins));
+
+    g_dir_close (dir);
+
+    return TRUE;
+}
 
 MMPluginManager *
 mm_plugin_manager_new (GError **error)
@@ -53,12 +221,19 @@ initable_init (GInitable *initable,
                GCancellable *cancellable,
                GError **error)
 {
-    return TRUE;
+    /* Load the list of plugins */
+    return load_plugins (MM_PLUGIN_MANAGER (initable), error);
 }
 
 static void
 finalize (GObject *object)
 {
+    MMPluginManager *self = MM_PLUGIN_MANAGER (object);
+
+    /* Cleanup list of plugins */
+    g_slist_foreach (self->priv->plugins, (GFunc)g_object_unref, NULL);
+    g_slist_free (self->priv->plugins);
+
     G_OBJECT_CLASS (mm_plugin_manager_parent_class)->finalize (object);
 }
 
