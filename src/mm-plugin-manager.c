@@ -39,7 +39,20 @@ struct _MMPluginManagerPrivate {
     /* The list of plugins. It is loaded once when the program starts, and the
      * list is NOT expected to change after that. */
     GSList *plugins;
+
+    /* Hash table to keep track of support tasks, using physical path of the
+     * device as key (which means that more than one tasks may be associated
+     * to the same key if the modem happens to show more than one port).
+     * The data in each HT item will be SupportsInfoList (not a GSList directly,
+     * as we want to be able to modify the list without replacing items with
+     * the HT API, which also replaces keys). */
+    GHashTable *supports;
 };
+
+/* List of support infos associated to the same physical device */
+typedef struct {
+    GSList *info_list;
+} SupportsInfoList;
 
 /* Context of the task looking for best port support */
 typedef struct {
@@ -80,6 +93,56 @@ supports_info_free (SupportsInfo *info)
     g_free (info->name);
     g_free (info->physdev_path);
     g_free (info);
+}
+
+static void
+supports_info_list_free (SupportsInfoList *list)
+{
+    g_slist_foreach (list->info_list,
+                     (GFunc)supports_info_free,
+                     NULL);
+    g_slist_free (list->info_list);
+    g_free (list);
+}
+
+static void
+add_supports_info (MMPluginManager *self,
+                   SupportsInfo *info)
+{
+    SupportsInfoList *list;
+
+    list = g_hash_table_lookup (self->priv->supports,
+                                info->physdev_path);
+    if (!list) {
+        list = g_malloc0 (sizeof (SupportsInfoList));
+        g_hash_table_insert (self->priv->supports,
+                             g_strdup (info->physdev_path),
+                             list);
+    }
+
+    list->info_list = g_slist_append (list->info_list, info);
+}
+
+static void
+remove_supports_info (MMPluginManager *self,
+                      SupportsInfo *info)
+{
+    SupportsInfoList *list;
+
+    list = g_hash_table_lookup (self->priv->supports,
+                                info->physdev_path);
+    g_assert (list != NULL);
+    g_assert (list->info_list != NULL);
+
+    list->info_list = g_slist_remove (list->info_list, info);
+
+    /* If it was the last info for the given physical path,
+     * also remove it */
+    if (!list->info_list)
+        g_hash_table_remove (self->priv->supports,
+                             info->physdev_path);
+
+    /* Note that we just remove it from the list, we don't free it */
 }
 
 static void
@@ -174,8 +237,14 @@ find_port_support_idle (SupportsInfo *info)
             info->best_plugin,
             NULL);
 
+        /* We are only giving the plugin as result, so we can now safely remove
+         * the supports info from the manager. Always untrack the supports info
+         * before completing the operation. */
+        remove_supports_info (info->self, info);
+
         /* The asynchronous operation is always completed here */
         g_simple_async_result_complete (info->result);
+
         supports_info_free (info);
         return FALSE;
     }
@@ -235,6 +304,10 @@ mm_plugin_manager_find_port_support (MMPluginManager *self,
 
     /* Set first plugin to check */
     info->current = self->priv->plugins;
+
+    /* We will keep track of the supports info internally.
+     * Ownership of the supports info will belong to the manager now. */
+    add_supports_info (self, info);
 
     /* Schedule the processing of the supports task in an idle */
     info->source_id = g_idle_add ((GSourceFunc)find_port_support_idle,
@@ -429,6 +502,12 @@ mm_plugin_manager_init (MMPluginManager *manager)
     manager->priv = G_TYPE_INSTANCE_GET_PRIVATE (manager,
                                                  MM_TYPE_PLUGIN_MANAGER,
                                                  MMPluginManagerPrivate);
+
+    manager->priv->supports = g_hash_table_new_full (
+        g_str_hash,
+        g_str_equal,
+        g_free,
+        (GDestroyNotify)supports_info_list_free);
 }
 
 static gboolean
@@ -444,6 +523,13 @@ static void
 finalize (GObject *object)
 {
     MMPluginManager *self = MM_PLUGIN_MANAGER (object);
+
+	/* The Plugin Manager will only be finalized when all support tasks have
+     * been finished (as the GSimpleAsyncResult takes a reference to the object.
+     * Therefore, the hash table of support tasks should always be empty.
+     */
+    g_assert (g_hash_table_size (self->priv->supports) == 0);
+    g_hash_table_destroy (self->priv->supports);
 
     /* Cleanup list of plugins */
     g_slist_foreach (self->priv->plugins, (GFunc)g_object_unref, NULL);
