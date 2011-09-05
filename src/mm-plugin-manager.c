@@ -16,18 +16,27 @@
 #include <string.h>
 #include <ctype.h>
 
+#include <gio/gio.h>
+
 #include "mm-plugin-manager.h"
 
-G_DEFINE_TYPE (MMPluginManager, mm_plugin_manager, G_TYPE_OBJECT);
+static void initable_iface_init (GInitableIface *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMPluginManager, mm_plugin_manager, G_TYPE_OBJECT, 0,
+                        G_IMPLEMENT_INTERFACE (G_TYPE_INITABLE,
+                                               initable_iface_init));
 
 struct _MMPluginManagerPrivate {
     gpointer dummy;
 };
 
 MMPluginManager *
-mm_plugin_manager_new (void)
+mm_plugin_manager_new (GError **error)
 {
-    return g_object_new (MM_TYPE_PLUGIN_MANAGER, NULL);
+    return g_initable_new (MM_TYPE_PLUGIN_MANAGER,
+                           NULL,
+                           error,
+                           NULL);
 }
 
 static void
@@ -39,10 +48,24 @@ mm_plugin_manager_init (MMPluginManager *manager)
                                                  MMPluginManagerPrivate);
 }
 
+static gboolean
+initable_init (GInitable *initable,
+               GCancellable *cancellable,
+               GError **error)
+{
+    return TRUE;
+}
+
 static void
 finalize (GObject *object)
 {
     G_OBJECT_CLASS (mm_plugin_manager_parent_class)->finalize (object);
+}
+
+static void
+initable_iface_init (GInitableIface *iface)
+{
+	iface->init = initable_init;
 }
 
 static void

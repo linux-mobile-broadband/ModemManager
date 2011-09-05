@@ -38,6 +38,6 @@ typedef struct {
 
 GType mm_plugin_manager_get_type (void);
 
-MMPluginManager *mm_plugin_manager_new (void);
+MMPluginManager *mm_plugin_manager_new (GError **error);
 
 #endif /* MM_PLUGIN_MANAGER_H */
