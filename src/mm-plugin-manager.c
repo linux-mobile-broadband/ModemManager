@@ -46,37 +46,41 @@ load_plugin (const gchar *path)
     MMPluginCreateFunc plugin_create_func;
     gint *major_plugin_version;
     gint *minor_plugin_version;
+    gchar *path_display;
+
+    /* Get printable UTF-8 string of the path */
+    path_display = g_filename_display_name (path);
 
     module = g_module_open (path, G_MODULE_BIND_LAZY);
     if (!module) {
-        g_warning ("Could not load plugin %s: %s", path, g_module_error ());
-        return NULL;
+        g_warning ("Could not load plugin '%s': %s", path_display, g_module_error ());
+        goto out;
     }
 
     if (!g_module_symbol (module, "mm_plugin_major_version", (gpointer *) &major_plugin_version)) {
-        g_warning ("Could not load plugin %s: Missing major version info", path);
+        g_warning ("Could not load plugin '%s': Missing major version info", path_display);
         goto out;
     }
 
     if (*major_plugin_version != MM_PLUGIN_MAJOR_VERSION) {
-        g_warning ("Could not load plugin %s: Plugin major version %d, %d is required",
-                   path, *major_plugin_version, MM_PLUGIN_MAJOR_VERSION);
+        g_warning ("Could not load plugin '%s': Plugin major version %d, %d is required",
+                   path_display, *major_plugin_version, MM_PLUGIN_MAJOR_VERSION);
         goto out;
     }
 
     if (!g_module_symbol (module, "mm_plugin_minor_version", (gpointer *) &minor_plugin_version)) {
-        g_warning ("Could not load plugin %s: Missing minor version info", path);
+        g_warning ("Could not load plugin '%s': Missing minor version info", path_display);
         goto out;
     }
 
     if (*minor_plugin_version != MM_PLUGIN_MINOR_VERSION) {
-        g_warning ("Could not load plugin %s: Plugin minor version %d, %d is required",
-                   path, *minor_plugin_version, MM_PLUGIN_MINOR_VERSION);
+        g_warning ("Could not load plugin '%s': Plugin minor version %d, %d is required",
+                   path_display, *minor_plugin_version, MM_PLUGIN_MINOR_VERSION);
         goto out;
     }
 
     if (!g_module_symbol (module, "mm_plugin_create", (gpointer *) &plugin_create_func)) {
-        g_warning ("Could not load plugin %s: %s", path, g_module_error ());
+        g_warning ("Could not load plugin '%s': %s", path_display, g_module_error ());
         goto out;
     }
 
@@ -84,11 +88,13 @@ load_plugin (const gchar *path)
     if (plugin) {
         g_object_weak_ref (G_OBJECT (plugin), (GWeakNotify) g_module_close, module);
     } else
-        mm_warn ("Could not load plugin %s: initialization failed", path);
+        mm_warn ("Could not load plugin '%s': initialization failed", path_display);
 
- out:
-    if (!plugin)
+out:
+    if (module && !plugin)
         g_module_close (module);
+
+    g_free (path_display);
 
     return plugin;
 }
@@ -122,27 +128,31 @@ static gboolean
 load_plugins (MMPluginManager *self,
               GError **error)
 {
-    GDir *dir;
+    GDir *dir = NULL;
     const gchar *fname;
     MMPlugin *generic_plugin = NULL;
+    gchar *plugindir_display = NULL;
 
 	if (!g_module_supported ()) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_UNSUPPORTED,
                      "GModules are not supported on your platform!");
-		return FALSE;
+        goto out;
 	}
 
-    mm_dbg ("Looking for plugins in '%s'", PLUGINDIR);
+    /* Get printable UTF-8 string of the path */
+    plugindir_display = g_filename_display_name (PLUGINDIR);
+
+    mm_dbg ("Looking for plugins in '%s'", plugindir_display);
     dir = g_dir_open (PLUGINDIR, 0, NULL);
     if (!dir) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_NO_PLUGINS,
                      "Plugin directory '%s' not found",
-                     PLUGINDIR);
-        return FALSE;
+                     plugindir_display);
+        goto out;
     }
 
     while ((fname = g_dir_read_name (dir)) != NULL) {
@@ -181,9 +191,8 @@ load_plugins (MMPluginManager *self,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_NO_PLUGINS,
                      "No plugins found in plugin directory '%s'",
-                     PLUGINDIR);
-        g_dir_close (dir);
-        return FALSE;
+                     plugindir_display);
+        goto out;
     }
 
     /* Now report about all the found plugins, in the same order they will be
@@ -193,9 +202,12 @@ load_plugins (MMPluginManager *self,
     mm_info ("Successfully loaded %u plugins",
              g_slist_length (self->priv->plugins));
 
-    g_dir_close (dir);
+out:
+    if (dir)
+        g_dir_close (dir);
+    g_free (plugindir_display);
 
-    return TRUE;
+    return !!self->priv->plugins;
 }
 
 MMPluginManager *
