@@ -20,6 +20,9 @@
 
 #include <glib-object.h>
 
+#include "mm-plugin.h"
+#include "mm-modem.h"
+
 #define MM_TYPE_PLUGIN_MANAGER            (mm_plugin_manager_get_type ())
 #define MM_PLUGIN_MANAGER(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_MANAGER, MMPluginManager))
 #define MM_PLUGIN_MANAGER_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), MM_TYPE_PLUGIN_MANAGER, MMPluginManagerClass))
@@ -41,5 +44,18 @@ typedef struct {
 GType mm_plugin_manager_get_type (void);
 
 MMPluginManager *mm_plugin_manager_new (GError **error);
+
+/* Asynchronous operation to find the best plugin giving support to a
+ * given port. */
+void      mm_plugin_manager_find_port_support        (MMPluginManager *self,
+                                                      const gchar *subsys,
+                                                      const gchar *name,
+                                                      const gchar *physdev_path,
+                                                      MMModem *existing,
+                                                      GAsyncReadyCallback callback,
+                                                      gpointer user_data);
+MMPlugin *mm_plugin_manager_find_port_support_finish (MMPluginManager *self,
+                                                      GAsyncResult *result,
+                                                      GError **error);
 
 #endif /* MM_PLUGIN_MANAGER_H */

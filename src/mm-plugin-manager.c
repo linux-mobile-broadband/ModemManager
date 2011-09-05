@@ -26,6 +26,9 @@
 #include "mm-errors.h"
 #include "mm-log.h"
 
+/* Default time to defer probing checks */
+#define SUPPORTS_DEFER_TIMEOUT_SECS 3
+
 static void initable_iface_init (GInitableIface *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMPluginManager, mm_plugin_manager, G_TYPE_OBJECT, 0,
@@ -37,6 +40,206 @@ struct _MMPluginManagerPrivate {
      * list is NOT expected to change after that. */
     GSList *plugins;
 };
+
+/* Context of the task looking for best port support */
+typedef struct {
+    MMPluginManager *self;
+    GSimpleAsyncResult *result;
+    /* Input context */
+    gchar *subsys;
+    gchar *name;
+    gchar *physdev_path;
+    MMModem *existing;
+    /* Current context */
+    GSList *current;
+    guint source_id;
+    /* Output context */
+    guint best_level;
+    MMPlugin *best_plugin;
+} SupportsInfo;
+
+static gboolean find_port_support_idle (SupportsInfo *info);
+
+static void
+supports_info_free (SupportsInfo *info)
+{
+    if (!info)
+        return;
+
+    /* There shouldn't be any ongoing supports operation */
+    g_assert (info->current == NULL);
+
+    /* There shouldn't be any scheduled source */
+    g_assert (info->source_id == 0);
+
+    if (info->existing)
+        g_object_unref (info->existing);
+
+    g_object_unref (info->result);
+    g_free (info->subsys);
+    g_free (info->name);
+    g_free (info->physdev_path);
+    g_free (info);
+}
+
+static void
+supports_port_ready_cb (MMPlugin *plugin,
+                        GAsyncResult *result,
+                        SupportsInfo *info)
+{
+    MMPluginSupportsResult support_result;
+    GError *error = NULL;
+    guint level = 0;
+
+    /* Get supports check results */
+    support_result = mm_plugin_supports_port_finish (plugin,
+                                                     result,
+                                                     &level,
+                                                     &error);
+    if (error) {
+        mm_warn ("(%s): (%s) error when checking support: '%s'",
+                 mm_plugin_get_name (plugin),
+                 info->name,
+                 error->message);
+        g_error_free (error);
+    }
+
+    switch (support_result) {
+    case MM_PLUGIN_SUPPORTS_PORT_SUPPORTED:
+        /* Is this plugin's result better than any one we've tried before? */
+        if (level > info->best_level) {
+            info->best_level = level;
+            info->best_plugin = plugin;
+        }
+
+        /* Go on to the next plugin */
+        info->current = g_slist_next (info->current);
+
+        /* Don't bother with Generic if some other plugin already supports
+         * this port */
+        if (info->best_plugin &&
+            info->current &&
+            !strcmp (mm_plugin_get_name (MM_PLUGIN (info->current->data)),
+                     MM_PLUGIN_GENERIC_NAME)) {
+            mm_dbg ("(%s): (%s) found best plugin for port",
+                    mm_plugin_get_name (info->best_plugin),
+                    info->name);
+            info->current = NULL;
+        }
+
+        /* Schedule checking support with next plugin */
+        info->source_id = g_idle_add ((GSourceFunc)find_port_support_idle,
+                                      info);
+        break;
+
+    case MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED:
+        /* If the plugin knows it doesn't support the modem, just keep on
+         * checking the next plugin.
+         */
+        info->current = g_slist_next (info->current);
+        info->source_id = g_idle_add ((GSourceFunc)find_port_support_idle,
+                                      info);
+        break;
+
+    case MM_PLUGIN_SUPPORTS_PORT_DEFER:
+        mm_dbg ("(%s): (%s) deferring support check",
+                mm_plugin_get_name (MM_PLUGIN (info->current->data)),
+                info->name);
+        /* Schedule checking support with the same plugin */
+        info->source_id = g_timeout_add_seconds (SUPPORTS_DEFER_TIMEOUT_SECS,
+                                                 (GSourceFunc)find_port_support_idle,
+                                                 info);
+        break;
+
+    case MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS:
+        /* We have full asynchronous support, now, so we shouldn't get an
+         * intermediate state here. */
+        g_assert_not_reached ();
+    }
+}
+
+static gboolean
+find_port_support_idle (SupportsInfo *info)
+{
+    info->source_id = 0;
+
+    /* Already checked all plugins? */
+    if (!info->current) {
+        /* Report best plugin in asynchronous result (could be none)
+         * Note: plugins are not expected to be removed while these
+         * operations are ongoing, so no issue if we don't ref/unref
+         * them. */
+        g_simple_async_result_set_op_res_gpointer (
+            info->result,
+            info->best_plugin,
+            NULL);
+
+        /* The asynchronous operation is always completed here */
+        g_simple_async_result_complete (info->result);
+        supports_info_free (info);
+        return FALSE;
+    }
+
+    /* Ask the current plugin to check support of this port */
+    mm_plugin_supports_port (MM_PLUGIN (info->current->data),
+                             info->subsys,
+                             info->name,
+                             info->physdev_path,
+                             info->existing,
+                             (GAsyncReadyCallback)supports_port_ready_cb,
+                             info);
+    return FALSE;
+}
+
+MMPlugin *
+mm_plugin_manager_find_port_support_finish (MMPluginManager *self,
+                                            GAsyncResult *result,
+                                            GError **error)
+{
+    g_return_val_if_fail (MM_IS_PLUGIN_MANAGER (self), NULL);
+    g_return_val_if_fail (G_IS_ASYNC_RESULT (result), NULL);
+
+    /* Propagate error, if any */
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result), error))
+		return NULL;
+
+    /* Return the plugin found, if any */
+    return g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (result));
+}
+
+void
+mm_plugin_manager_find_port_support (MMPluginManager *self,
+                                     const gchar *subsys,
+                                     const gchar *name,
+                                     const gchar *physdev_path,
+                                     MMModem *existing,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
+{
+    SupportsInfo *info;
+
+    g_return_if_fail (MM_IS_PLUGIN_MANAGER (self));
+
+    /* Setup supports info */
+    info = g_malloc0 (sizeof (SupportsInfo));
+    info->self = self; /* SupportsInfo lives as long as self lives */
+    info->subsys = g_strdup (subsys);
+    info->name = g_strdup (name);
+    info->physdev_path = g_strdup (physdev_path);
+    if (existing)
+        info->existing = g_object_ref (existing);
+    info->result = g_simple_async_result_new (G_OBJECT (self),
+                                              callback,
+                                              user_data,
+                                              NULL);
+
+    /* Set first plugin to check */
+    info->current = self->priv->plugins;
+
+    /* Schedule the processing of the supports task in an idle */
+    info->source_id = g_idle_add ((GSourceFunc)find_port_support_idle,
+                                  info);
+}
 
 static MMPlugin *
 load_plugin (const gchar *path)
