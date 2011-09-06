@@ -368,6 +368,7 @@ mm_plugin_manager_find_port_support (MMPluginManager *self,
                                      const gchar *subsys,
                                      const gchar *name,
                                      const gchar *physdev_path,
+                                     MMPlugin *suggested_plugin,
                                      MMModem *existing,
                                      GAsyncReadyCallback callback,
                                      gpointer user_data)
@@ -382,6 +383,7 @@ mm_plugin_manager_find_port_support (MMPluginManager *self,
     info->subsys = g_strdup (subsys);
     info->name = g_strdup (name);
     info->physdev_path = g_strdup (physdev_path);
+    info->suggested_plugin = suggested_plugin;
     if (existing)
         info->existing = g_object_ref (existing);
     info->result = g_simple_async_result_new (G_OBJECT (self),
@@ -391,6 +393,12 @@ mm_plugin_manager_find_port_support (MMPluginManager *self,
 
     /* Set first plugin to check */
     info->current = self->priv->plugins;
+
+    /* If we got one suggested, it will be the first one */
+    if (info->suggested_plugin) {
+        info->current = g_slist_find (info->current,
+                                      info->suggested_plugin);
+    }
 
     /* We will keep track of the supports info internally.
      * Ownership of the supports info will belong to the manager now. */
