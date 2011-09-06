@@ -64,6 +64,7 @@ typedef struct {
     gchar *physdev_path;
     MMModem *existing;
     /* Current context */
+    MMPlugin *suggested_plugin;
     GSList *current;
     guint source_id;
     /* Output context */
@@ -146,6 +147,39 @@ remove_supports_info (MMPluginManager *self,
 }
 
 static void
+suggest_supports_info_result (MMPluginManager *self,
+                              const gchar *physdev_path,
+                              MMPlugin *suggested_plugin)
+{
+    SupportsInfoList *list;
+    GSList *l;
+
+    list = g_hash_table_lookup (self->priv->supports,
+                                physdev_path);
+
+    if (!list)
+        return;
+
+    /* Look for support infos on the same physical path */
+    for (l = list->info_list;
+         l;
+         l = g_slist_next (l)) {
+        SupportsInfo *info = l->data;
+
+        if (!info->best_plugin &&
+            !info->suggested_plugin) {
+            /* TODO: Cancel probing in the port if the plugin being
+             * checked right now is not the one being suggested.
+             */
+            mm_dbg ("(%s): (%s) suggested plugin for port",
+                    mm_plugin_get_name (suggested_plugin),
+                    info->name);
+            info->suggested_plugin = suggested_plugin;
+        }
+    }
+}
+
+static void
 supports_port_ready_cb (MMPlugin *plugin,
                         GAsyncResult *result,
                         SupportsInfo *info)
@@ -175,19 +209,32 @@ supports_port_ready_cb (MMPlugin *plugin,
             info->best_plugin = plugin;
         }
 
-        /* Go on to the next plugin */
-        info->current = g_slist_next (info->current);
-
-        /* Don't bother with Generic if some other plugin already supports
-         * this port */
-        if (info->best_plugin &&
-            info->current &&
-            !strcmp (mm_plugin_get_name (MM_PLUGIN (info->current->data)),
-                     MM_PLUGIN_GENERIC_NAME)) {
-            mm_dbg ("(%s): (%s) found best plugin for port",
-                    mm_plugin_get_name (info->best_plugin),
-                    info->name);
-            info->current = NULL;
+        if (info->suggested_plugin) {
+            if (info->suggested_plugin == plugin) {
+                /* If the plugin that just completed the support check is actually
+                 * the one suggested, stop the checks */
+                info->current = NULL;
+            } else {
+                /* The last plugin we tried is NOT the one we got suggested, so
+                 * directly check support with the suggested plugin. If we
+                 * already checked its support, it won't be checked again. */
+                info->current = g_slist_find (info->current,
+                                              info->suggested_plugin);
+            }
+        } else {
+            /* Go on to the next plugin */
+            info->current = g_slist_next (info->current);
+            /* Don't bother with Generic if some other plugin already supports
+             * this port */
+            if (info->best_plugin &&
+                info->current &&
+                g_str_equal (mm_plugin_get_name (MM_PLUGIN (info->current->data)),
+                             MM_PLUGIN_GENERIC_NAME)) {
+                mm_dbg ("(%s): (%s) found best plugin for port",
+                        mm_plugin_get_name (info->best_plugin),
+                        info->name);
+                info->current = NULL;
+            }
         }
 
         /* Schedule checking support with next plugin */
@@ -196,19 +243,51 @@ supports_port_ready_cb (MMPlugin *plugin,
         break;
 
     case MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED:
-        /* If the plugin knows it doesn't support the modem, just keep on
-         * checking the next plugin.
-         */
-        info->current = g_slist_next (info->current);
+        if (info->suggested_plugin) {
+            if (info->suggested_plugin == plugin) {
+                /* If the plugin that just completed the support check claims
+                 * not to support this port, but this plugin is clearly the
+                 * right plugin since it claimed this port's physical modem,
+                 * just drop the port.
+                 */
+                mm_dbg ("(%s/%s): ignoring port unsupported by physical modem's plugin",
+                        info->subsys,
+                        info->name);
+                info->best_plugin = NULL;
+                info->best_level = 0;
+                info->current = NULL;
+            } else {
+                /* The last plugin we tried is NOT the one we got suggested, so
+                 * directly check support with the suggested plugin. If we
+                 * already checked its support, it won't be checked again. */
+                info->current = g_slist_find (info->current,
+                                              info->suggested_plugin);
+            }
+        } else {
+            /* If the plugin knows it doesn't support the modem, just keep on
+             * checking the next plugin.
+             */
+            info->current = g_slist_next (info->current);
+        }
         info->source_id = g_idle_add ((GSourceFunc)find_port_support_idle,
                                       info);
         break;
 
     case MM_PLUGIN_SUPPORTS_PORT_DEFER:
-        mm_dbg ("(%s): (%s) deferring support check",
-                mm_plugin_get_name (MM_PLUGIN (info->current->data)),
-                info->name);
-        /* Schedule checking support with the same plugin */
+        /* Try with the suggested one after being deferred */
+        if (info->suggested_plugin) {
+            mm_dbg ("(%s): (%s) deferring support check, suggested: %s",
+                    mm_plugin_get_name (MM_PLUGIN (info->current->data)),
+                    info->name,
+                    mm_plugin_get_name (MM_PLUGIN (info->suggested_plugin)));
+            info->current = g_slist_find (info->current,
+                                          info->suggested_plugin);
+        } else {
+            mm_dbg ("(%s): (%s) deferring support check",
+                    mm_plugin_get_name (MM_PLUGIN (info->current->data)),
+                    info->name);
+        }
+        /* Schedule checking support */
         info->source_id = g_timeout_add_seconds (SUPPORTS_DEFER_TIMEOUT_SECS,
                                                  (GSourceFunc)find_port_support_idle,
                                                  info);
@@ -241,6 +320,14 @@ find_port_support_idle (SupportsInfo *info)
          * the supports info from the manager. Always untrack the supports info
          * before completing the operation. */
         remove_supports_info (info->self, info);
+
+        /* We are reporting a best plugin found to a port. We can now
+         * 'suggest' this same plugin to other ports of the same device. */
+        if (info->best_plugin) {
+            suggest_supports_info_result (info->self,
+                                          info->physdev_path,
+                                          info->best_plugin);
+        }
 
         /* The asynchronous operation is always completed here */
         g_simple_async_result_complete (info->result);
