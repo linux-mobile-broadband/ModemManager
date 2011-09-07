@@ -67,11 +67,15 @@ typedef struct {
     GUdevClient *client;
     GHashTable *tasks;
     gboolean sort_last;
+
+    /* Plugin-specific setups */
+    const gchar **subsystems;
 } MMPluginBasePrivate;
 
 enum {
     PROP_0,
     PROP_NAME,
+    PROP_ALLOWED_SUBSYSTEMS,
     PROP_SORT_LAST,
     LAST_PROP
 };
@@ -1544,6 +1548,10 @@ set_property (GObject *object, guint prop_id,
         /* Construct only */
         priv->name = g_value_dup_string (value);
         break;
+    case PROP_ALLOWED_SUBSYSTEMS:
+        /* Construct only */
+        priv->subsystems = (const gchar **)g_value_get_pointer (value);
+        break;
     case PROP_SORT_LAST:
         /* Construct only */
         priv->sort_last = g_value_get_boolean (value);
@@ -1563,6 +1571,9 @@ get_property (GObject *object, guint prop_id,
     switch (prop_id) {
     case PROP_NAME:
         g_value_set_string (value, priv->name);
+        break;
+    case PROP_ALLOWED_SUBSYSTEMS:
+        g_value_set_pointer (value, (gpointer)priv->subsystems);
         break;
     case PROP_SORT_LAST:
         g_value_set_boolean (value, priv->sort_last);
@@ -1608,6 +1619,14 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
                               "Name",
                               NULL,
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_ALLOWED_SUBSYSTEMS,
+         g_param_spec_pointer (MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS,
+                               "Allowed subsystems",
+                               "List of subsystems this plugin can support, "
+                               "should be an array of strings finished with 'NULL'",
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property
         (object_class, PROP_SORT_LAST,
