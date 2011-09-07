@@ -112,9 +112,11 @@ void mm_plugin_base_supports_task_add_custom_init_command (MMPluginBaseSupportsT
 #define MM_IS_PLUBIN_BASE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_PLUGIN_BASE))
 #define MM_PLUGIN_BASE_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PLUGIN_BASE, MMPluginBaseClass))
 
-#define MM_PLUGIN_BASE_NAME               "name"
-#define MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS "allowed-subsystems"
-#define MM_PLUGIN_BASE_SORT_LAST          "sort-last"
+#define MM_PLUGIN_BASE_NAME                "name"
+#define MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS  "allowed-subsystems"
+#define MM_PLUGIN_BASE_ALLOWED_VENDOR_IDS  "allowed-vendor-ids"
+#define MM_PLUGIN_BASE_ALLOWED_PRODUCT_IDS "allowed-product-ids"
+#define MM_PLUGIN_BASE_SORT_LAST           "sort-last"
 
 typedef struct _MMPluginBase MMPluginBase;
 typedef struct _MMPluginBaseClass MMPluginBaseClass;

@@ -70,12 +70,16 @@ typedef struct {
 
     /* Plugin-specific setups */
     const gchar **subsystems;
+    const guint16 *vendor_ids;
+    const guint16 *product_ids;
 } MMPluginBasePrivate;
 
 enum {
     PROP_0,
     PROP_NAME,
     PROP_ALLOWED_SUBSYSTEMS,
+    PROP_ALLOWED_VENDOR_IDS,
+    PROP_ALLOWED_PRODUCT_IDS,
     PROP_SORT_LAST,
     LAST_PROP
 };
@@ -1552,6 +1556,14 @@ set_property (GObject *object, guint prop_id,
         /* Construct only */
         priv->subsystems = (const gchar **)g_value_get_pointer (value);
         break;
+    case PROP_ALLOWED_VENDOR_IDS:
+        /* Construct only */
+        priv->vendor_ids = (const guint16 *)g_value_get_pointer (value);
+        break;
+    case PROP_ALLOWED_PRODUCT_IDS:
+        /* Construct only */
+        priv->product_ids = (const guint16 *)g_value_get_pointer (value);
+        break;
     case PROP_SORT_LAST:
         /* Construct only */
         priv->sort_last = g_value_get_boolean (value);
@@ -1574,6 +1586,12 @@ get_property (GObject *object, guint prop_id,
         break;
     case PROP_ALLOWED_SUBSYSTEMS:
         g_value_set_pointer (value, (gpointer)priv->subsystems);
+        break;
+    case PROP_ALLOWED_VENDOR_IDS:
+        g_value_set_pointer (value, (gpointer)priv->vendor_ids);
+        break;
+    case PROP_ALLOWED_PRODUCT_IDS:
+        g_value_set_pointer (value, (gpointer)priv->product_ids);
         break;
     case PROP_SORT_LAST:
         g_value_set_boolean (value, priv->sort_last);
@@ -1626,6 +1644,22 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
                                "Allowed subsystems",
                                "List of subsystems this plugin can support, "
                                "should be an array of strings finished with 'NULL'",
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_ALLOWED_VENDOR_IDS,
+         g_param_spec_pointer (MM_PLUGIN_BASE_ALLOWED_VENDOR_IDS,
+                               "Allowed vendor IDs",
+                               "List of vendor IDs this plugin can support, "
+                               "should be an array of guint16 finished with '0'",
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_ALLOWED_PRODUCT_IDS,
+         g_param_spec_pointer (MM_PLUGIN_BASE_ALLOWED_PRODUCT_IDS,
+                               "Allowed product IDs",
+                               "List of product IDs this plugin can support, "
+                               "should be an array of guint16 finished with '0'",
                                G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property
