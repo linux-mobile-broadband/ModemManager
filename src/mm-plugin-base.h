@@ -112,10 +112,22 @@ void mm_plugin_base_supports_task_add_custom_init_command (MMPluginBaseSupportsT
 #define MM_IS_PLUBIN_BASE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_PLUGIN_BASE))
 #define MM_PLUGIN_BASE_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PLUGIN_BASE, MMPluginBaseClass))
 
+/* Structure defining custom commands that the plugins may need to initialize
+ * the devices */
+typedef struct {
+    /* AT command to send to the modem */
+    gchar *command;
+    /* Number of allowed retries (>= 0) */
+    guint retries;
+    /* Callback to call when reply received */
+    MMBaseSupportsTaskCustomInitResultFunc callback;
+} MMPluginCustomInit;
+
 #define MM_PLUGIN_BASE_NAME                "name"
 #define MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS  "allowed-subsystems"
 #define MM_PLUGIN_BASE_ALLOWED_VENDOR_IDS  "allowed-vendor-ids"
 #define MM_PLUGIN_BASE_ALLOWED_PRODUCT_IDS "allowed-product-ids"
+#define MM_PLUGIN_BASE_CUSTOM_INIT         "custom-init"
 #define MM_PLUGIN_BASE_SORT_LAST           "sort-last"
 
 typedef struct _MMPluginBase MMPluginBase;
