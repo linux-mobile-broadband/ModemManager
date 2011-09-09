@@ -23,15 +23,67 @@
 G_DEFINE_TYPE (MMPortProbe, mm_port_probe, G_TYPE_OBJECT)
 
 struct _MMPortProbePrivate {
-    gpointer dummy;
+    /* Port and properties */
+    GUdevDevice *port;
+    gchar *subsys;
+    gchar *name;
+    gchar *physdev_path;
+    gchar *driver;
 };
 
+GUdevDevice *
+mm_port_probe_get_port (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), NULL);
+
+    return self->priv->port;
+}
+
+const gchar *
+mm_port_probe_get_port_name (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), NULL);
+
+    return self->priv->name;
+}
+
+const gchar *
+mm_port_probe_get_port_subsys (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), NULL);
+
+    return self->priv->subsys;
+}
+
+const gchar *
+mm_port_probe_get_port_physdev (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), NULL);
+
+    return self->priv->physdev_path;
+}
+
+const gchar *
+mm_port_probe_get_port_driver (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), NULL);
+
+    return self->priv->driver;
+}
+
 MMPortProbe *
-mm_port_probe_new (void)
+mm_port_probe_new (GUdevDevice *port,
+                   const gchar *physdev_path,
+                   const gchar *driver)
 {
     MMPortProbe *self;
 
     self = MM_PORT_PROBE (g_object_new (MM_TYPE_PORT_PROBE, NULL));
+    self->priv->port = g_object_ref (port);
+    self->priv->subsys = g_strdup (g_udev_device_get_subsystem (port));
+    self->priv->name = g_strdup (g_udev_device_get_name (port));
+    self->priv->physdev_path = g_strdup (physdev_path);
+    self->priv->driver = g_strdup (driver);
 
     return self;
 }
@@ -47,6 +99,14 @@ mm_port_probe_init (MMPortProbe *self)
 static void
 finalize (GObject *object)
 {
+    MMPortProbe *self = MM_PORT_PROBE (object);
+
+    g_free (self->priv->subsys);
+    g_free (self->priv->name);
+    g_free (self->priv->physdev_path);
+    g_free (self->priv->driver);
+    g_object_unref (self->priv->port);
+
     G_OBJECT_CLASS (mm_port_probe_parent_class)->finalize (object);
 }
 

@@ -19,6 +19,9 @@
 #include <glib.h>
 #include <glib-object.h>
 
+#define G_UDEV_API_IS_SUBJECT_TO_CHANGE
+#include <gudev/gudev.h>
+
 #define MM_TYPE_PORT_PROBE            (mm_port_probe_get_type ())
 #define MM_PORT_PROBE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PORT_PROBE, MMPortProbe))
 #define MM_PORT_PROBE_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_PORT_PROBE, MMPortProbeClass))
@@ -41,7 +44,15 @@ struct _MMPortProbeClass {
 
 GType mm_port_probe_get_type (void);
 
-MMPortProbe *mm_port_probe_new (void);
+MMPortProbe *mm_port_probe_new (GUdevDevice *port,
+                                const gchar *physdev_path,
+                                const gchar *driver);
+
+GUdevDevice *mm_port_probe_get_port         (MMPortProbe *self);
+const gchar *mm_port_probe_get_port_name    (MMPortProbe *self);
+const gchar *mm_port_probe_get_port_subsys  (MMPortProbe *self);
+const gchar *mm_port_probe_get_port_physdev (MMPortProbe *self);
+const gchar *mm_port_probe_get_port_driver  (MMPortProbe *self);
 
 #endif /* MM_PORT_PROBE_H */
 
