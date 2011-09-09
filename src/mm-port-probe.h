@@ -30,6 +30,9 @@
 #define MM_IS_PLUBIN_PROBE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_PORT_PROBE))
 #define MM_PORT_PROBE_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PORT_PROBE, MMPortProbeClass))
 
+/* Flags to request port probing */
+#define MM_PORT_PROBE_AT 0x0001
+
 typedef struct _MMPortProbe MMPortProbe;
 typedef struct _MMPortProbeClass MMPortProbeClass;
 typedef struct _MMPortProbePrivate MMPortProbePrivate;
@@ -57,12 +60,17 @@ const gchar *mm_port_probe_get_port_driver  (MMPortProbe *self);
 
 /* Run probing */
 void     mm_port_probe_run        (MMPortProbe *self,
+                                   guint32 flags,
+                                   guint64 at_send_delay,
                                    GAsyncReadyCallback callback,
                                    gpointer user_data);
 gboolean mm_port_probe_run_finish (MMPortProbe *self,
                                    GAsyncResult *result,
                                    GError **error);
 gboolean mm_port_probe_run_cancel (MMPortProbe *self);
+
+/* Probing result getters */
+gboolean mm_port_probe_is_at (MMPortProbe *self);
 
 #endif /* MM_PORT_PROBE_H */
 

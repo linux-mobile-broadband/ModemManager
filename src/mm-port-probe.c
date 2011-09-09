@@ -10,15 +10,22 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2011 - Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2008 - 2009 Novell, Inc.
+ * Copyright (C) 2009 - 2011 Red Hat, Inc.
+ * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
  */
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "mm-port-probe.h"
 #include "mm-errors.h"
 #include "mm-log.h"
+#include "mm-at-serial-port.h"
+#include "mm-serial-port.h"
+#include "mm-serial-parsers.h"
+#include "mm-port-probe-at-command.h"
 
 G_DEFINE_TYPE (MMPortProbe, mm_port_probe, G_TYPE_OBJECT)
 
@@ -26,6 +33,20 @@ typedef struct {
     /* ---- Generic task context ---- */
     GSimpleAsyncResult *result;
     GCancellable *cancellable;
+    guint32 flags;
+    guint source_id;
+    guint buffer_full_id;
+    MMSerialPort *serial;
+
+    /* ---- AT probing specific context ---- */
+    guint64 at_send_delay;
+    /* Number of times we tried to open the AT port */
+    guint at_open_tries;
+    /* Current group of AT commands to be sent */
+    const MMPortProbeAtCommand *at_commands;
+    /* Current AT Result processor */
+    void (* at_result_processor) (MMPortProbe *self,
+                                  GValue *result);
 } PortProbeRunTask;
 
 struct _MMPortProbePrivate {
@@ -36,13 +57,32 @@ struct _MMPortProbePrivate {
     gchar *physdev_path;
     gchar *driver;
 
+    /* Probing results */
+    guint32 flags;
+    gboolean is_at;
+
     /* Current probing task. Only one can be available at a time */
     PortProbeRunTask *task;
 };
 
+static gboolean serial_probe_at (MMPortProbe *self);
+static void serial_probe_schedule (MMPortProbe *self);
+
 static void
 port_probe_run_task_free (PortProbeRunTask *task)
 {
+    if (task->source_id)
+        g_source_remove (task->source_id);
+
+    if (task->buffer_full_id)
+        g_source_remove (task->buffer_full_id);
+
+    if (task->serial) {
+        if (mm_serial_port_is_open (task->serial))
+            mm_serial_port_close (task->serial);
+        g_object_unref (task->serial);
+    }
+
     if (task->cancellable)
         g_object_unref (task->cancellable);
 
@@ -56,6 +96,13 @@ port_probe_run_task_complete (PortProbeRunTask *task,
                               gboolean result,
                               GError *error)
 {
+    /* As soon as we have the task completed, disable the buffer-full signal
+     * handling, so that we do not get unwanted errors reported */
+    if (task->buffer_full_id) {
+        g_source_remove (task->buffer_full_id);
+        task->buffer_full_id = 0;
+    }
+
     if (error)
         g_simple_async_result_take_error (task->result, error);
     else
@@ -72,7 +119,11 @@ port_probe_run_is_cancelled (MMPortProbe *self)
 {
     PortProbeRunTask *task = self->priv->task;
 
-    /* Manually check if cancelled. */
+    /* Manually check if cancelled.
+     * TODO: Make the serial port response wait cancellable,
+     * so that we can connect a callback to the cancellable and forget about
+     * manually checking it.
+     */
     if (g_cancellable_is_cancelled (task->cancellable)) {
         port_probe_run_task_complete (
             task,
@@ -85,6 +136,292 @@ port_probe_run_is_cancelled (MMPortProbe *self)
         return TRUE;
     }
 
+    return FALSE;
+}
+
+static void
+serial_probe_at_result_processor (MMPortProbe *self,
+                                  GValue *result)
+{
+    if (result) {
+        /* If any result given, it must be a boolean */
+        g_assert (G_VALUE_HOLDS_BOOLEAN (result));
+
+        if (g_value_get_boolean (result)) {
+            mm_dbg ("(%s) port is AT-capable", self->priv->name);
+            self->priv->is_at = TRUE;
+            self->priv->flags |= MM_PORT_PROBE_AT;
+            return;
+        }
+    }
+
+    mm_dbg ("(%s) port is not AT-capable", self->priv->name);
+    self->priv->is_at = FALSE;
+    self->priv->flags |= MM_PORT_PROBE_AT;
+}
+
+static void
+serial_probe_at_parse_response (MMAtSerialPort *port,
+                                GString *response,
+                                GError *error,
+                                MMPortProbe *self)
+{
+    PortProbeRunTask *task = self->priv->task;
+    GValue result = { 0 };
+    GError *result_error = NULL;
+
+    /* If already cancelled, do nothing else */
+    if (port_probe_run_is_cancelled (self))
+        return;
+
+    if (!task->at_commands->response_processor (response->str,
+                                                error,
+                                                &result,
+                                                &result_error)) {
+        /* Were we told to abort the whole probing? */
+        if (result_error) {
+            port_probe_run_task_complete (
+                task,
+                FALSE,
+                FALSE,
+                g_error_new (MM_CORE_ERROR,
+                             MM_CORE_ERROR_UNSUPPORTED,
+                             "(%s) error while probing AT features: %s",
+                             self->priv->name,
+                             result_error->message));
+            return;
+        }
+
+        /* Go on to next command */
+        task->at_commands++;
+        if (!task->at_commands->command) {
+            /* Was it the last command in the group? If so,
+             * end this partial probing */
+            task->at_result_processor (self, NULL);
+            /* Reschedule */
+            serial_probe_schedule (self);
+            return;
+        }
+
+        /* Schedule the next command in the probing group */
+        task->source_id = g_idle_add ((GSourceFunc)serial_probe_at, self);
+        return;
+    }
+
+    /* Got some processed result */
+    task->at_result_processor (self, &result);
+    g_value_unset (&result);
+
+    /* Reschedule probing */
+    serial_probe_schedule (self);
+}
+
+static gboolean
+serial_probe_at (MMPortProbe *self)
+{
+    PortProbeRunTask *task = self->priv->task;
+
+    task->source_id = 0;
+
+    /* If already cancelled, do nothing else */
+    if (port_probe_run_is_cancelled (self))
+        return FALSE;
+
+    mm_at_serial_port_queue_command (
+        MM_AT_SERIAL_PORT (task->serial),
+        task->at_commands->command,
+        3,
+        (MMAtSerialResponseFn)serial_probe_at_parse_response,
+        self);
+    return FALSE;
+}
+
+static void
+serial_probe_schedule (MMPortProbe *self)
+{
+    PortProbeRunTask *task = self->priv->task;
+
+    /* If already cancelled, do nothing else */
+    if (port_probe_run_is_cancelled (self))
+        return;
+
+    /* Cleanup */
+    task->at_result_processor = NULL;
+    task->at_commands = NULL;
+
+    /* AT check requested and not already probed? */
+    if ((task->flags & MM_PORT_PROBE_AT) &&
+        !(self->priv->flags & MM_PORT_PROBE_AT)) {
+        /* Prepare AT probing */
+        task->at_result_processor = serial_probe_at_result_processor;
+        task->at_commands = mm_port_probe_at_command_get_probing ();
+    }
+
+    /* If a next AT group detected, go for it */
+    if (task->at_result_processor &&
+        task->at_commands) {
+        task->source_id = g_idle_add ((GSourceFunc)serial_probe_at, self);
+        return;
+    }
+
+    /* All done! Finish asynchronously */
+    port_probe_run_task_complete (task, TRUE, TRUE, NULL);
+}
+
+static void
+serial_flash_done (MMSerialPort *port,
+                   GError *error,
+                   MMPortProbe *self)
+{
+    /* Schedule probing */
+    serial_probe_schedule (self);
+}
+
+static const gchar *dq_strings[] = {
+    /* Option Icera-based devices */
+    "option/faema_",
+    "os_logids.h",
+    /* Sierra CnS port */
+    "NETWORK SERVICE CHANGE",
+    "/SRC/AMSS",
+    NULL
+};
+
+static const guint8 zerobuf[32] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+};
+
+static void
+serial_buffer_full (MMSerialPort *serial,
+                    GByteArray *buffer,
+                    PortProbeRunTask *task)
+{
+    const gchar **iter;
+    size_t iter_len;
+    int i;
+
+    /* Some devices (observed on a ZTE branded "QUALCOMM INCORPORATED" model
+     * "154") spew NULLs from some ports.
+     */
+    if (   (buffer->len >= sizeof (zerobuf))
+        && (memcmp (buffer->data, zerobuf, sizeof (zerobuf)) == 0)) {
+        mm_serial_port_close (serial);
+        port_probe_run_task_complete (task, FALSE, FALSE, NULL);
+        return;
+    }
+
+    /* Check for an immediate disqualification response.  There are some
+     * ports (Option Icera-based chipsets have them, as do Qualcomm Gobi
+     * devices before their firmware is loaded) that just shouldn't be
+     * probed if we get a certain response because we know they can't be
+     * used.  Kernel bugs (at least with 2.6.31 and 2.6.32) also trigger port
+     * flow control kernel oopses if we read too much data for these ports.
+     */
+
+    for (iter = &dq_strings[0]; iter && *iter; iter++) {
+        /* Search in the response for the item; the response could have embedded
+         * nulls so we can't use memcmp() or strstr() on the whole response.
+         */
+        iter_len = strlen (*iter);
+        for (i = 0; i < buffer->len - iter_len; i++) {
+            if (!memcmp (&buffer->data[i], *iter, iter_len)) {
+                /* Immediately close the port and complete probing */
+                mm_serial_port_close (serial);
+                port_probe_run_task_complete (task, FALSE, FALSE, NULL);
+                return;
+            }
+        }
+    }
+}
+
+static gboolean
+serial_open_at (MMPortProbe *self)
+{
+    PortProbeRunTask *task = self->priv->task;
+    GError *error = NULL;
+
+    task->source_id = 0;
+
+    /* If already cancelled, do nothing else */
+    if (port_probe_run_is_cancelled (self))
+        return FALSE;
+
+    /* Create AT serial port if not done before */
+    if (!task->serial) {
+        task->serial = MM_SERIAL_PORT (mm_at_serial_port_new (self->priv->name,
+                                                              MM_PORT_TYPE_PRIMARY));
+        if (!task->serial) {
+            port_probe_run_task_complete (
+                task,
+                FALSE,
+                FALSE,
+                g_error_new (MM_CORE_ERROR,
+                             MM_CORE_ERROR_INVALID,
+                             "(%s) couldn't create AT port",
+                             self->priv->name));
+            return FALSE;
+        }
+
+        g_object_set (task->serial,
+                      MM_SERIAL_PORT_SEND_DELAY, task->at_send_delay,
+                      MM_PORT_CARRIER_DETECT, FALSE,
+                      MM_SERIAL_PORT_SPEW_CONTROL, TRUE,
+                      NULL);
+
+        mm_at_serial_port_set_response_parser (MM_AT_SERIAL_PORT (task->serial),
+                                               mm_serial_parser_v1_parse,
+                                               mm_serial_parser_v1_new (),
+                                               mm_serial_parser_v1_destroy);
+    }
+
+    /* Try to open the port */
+    if (!mm_serial_port_open (task->serial, &error)) {
+        /* Abort if maximum number of open tries reached */
+        if (++task->at_open_tries > 4) {
+            /* took too long to open the port; give up */
+            port_probe_run_task_complete (
+                task,
+                FALSE,
+                FALSE,
+                g_error_new (MM_MODEM_ERROR,
+                             MM_MODEM_ERROR_GENERAL,
+                             "(%s) failed to open port after 4 tries",
+                             self->priv->name));
+        } else if (g_error_matches (error,
+                                    MM_SERIAL_ERROR,
+                                    MM_SERIAL_ERROR_OPEN_FAILED_NO_DEVICE)) {
+            /* this is nozomi being dumb; try again */
+            task->source_id = g_timeout_add_seconds (1,
+                                                     (GSourceFunc)serial_open_at,
+                                                     self);
+        } else {
+            port_probe_run_task_complete (
+                task,
+                FALSE,
+                FALSE,
+                g_error_new (MM_SERIAL_ERROR,
+                             MM_SERIAL_ERROR_OPEN_FAILED,
+                             "(%s) failed to open port: %s",
+                             self->priv->name,
+                             (error ? error->message : "unknown error")));
+        }
+
+        g_clear_error (&error);
+        return FALSE;
+    }
+
+    /* success, start probing */
+    task->buffer_full_id = g_signal_connect (task->serial,
+                                             "buffer-full",
+                                             G_CALLBACK (serial_buffer_full),
+                                             self);
+
+    mm_serial_port_flash (MM_SERIAL_PORT (task->serial),
+                          100,
+                          TRUE,
+                          (MMSerialFlashFn)serial_flash_done,
+                          self);
     return FALSE;
 }
 
@@ -128,22 +465,44 @@ mm_port_probe_run_finish (MMPortProbe *self,
 
 void
 mm_port_probe_run (MMPortProbe *self,
+                   guint32 flags,
+                   guint64 at_send_delay,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
 {
     PortProbeRunTask *task;
 
     g_return_if_fail (MM_IS_PORT_PROBE (self));
+    g_return_if_fail (flags != 0);
     g_return_if_fail (callback != NULL);
 
     /* Shouldn't schedule more than one probing at a time */
     g_assert (self->priv->task == NULL);
 
     task = g_new0 (PortProbeRunTask, 1);
+    task->at_send_delay = at_send_delay;
+    task->flags = 0;
     task->result = g_simple_async_result_new (G_OBJECT (self),
                                               callback,
                                               user_data,
                                               mm_port_probe_run);
+
+    /* Check if we already have the requested probing results.
+     * We will fix here the 'task->flags' so that we only request probing
+     * for the missing things. */
+    if ((flags & MM_PORT_PROBE_AT) &&
+        !(self->priv->flags & MM_PORT_PROBE_AT)) {
+         task->flags += MM_PORT_PROBE_AT;
+    }
+
+    /* All requested probings already available? If so, we're done */
+    if (!task->flags) {
+        port_probe_run_task_complete (task,
+                                      TRUE, /* in idle */
+                                      TRUE,
+                                      NULL);
+        return;
+    }
 
     /* Setup internal cancellable */
     task->cancellable = g_cancellable_new ();
@@ -151,9 +510,23 @@ mm_port_probe_run (MMPortProbe *self,
     /* Store as current task */
     self->priv->task = task;
 
-    /* For now, just set successful if not cancelled */
-    if (!port_probe_run_is_cancelled (self))
-        port_probe_run_task_complete (task, TRUE, TRUE, NULL);
+    /* If any AT probing is needed, start by opening as AT port */
+    if (task->flags & MM_PORT_PROBE_AT) {
+        task->source_id = g_idle_add ((GSourceFunc)serial_open_at, self);
+        return;
+    }
+
+    /* Shouldn't happen */
+    g_assert_not_reached ();
+}
+
+gboolean
+mm_port_probe_is_at (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
+    g_return_val_if_fail (self->priv->flags & MM_PORT_PROBE_AT, FALSE);
+
+    return self->priv->is_at;
 }
 
 GUdevDevice *

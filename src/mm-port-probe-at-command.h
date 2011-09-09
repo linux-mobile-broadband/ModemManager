@@ -50,5 +50,8 @@ typedef struct {
                                      GError **result_error);
 } MMPortProbeAtCommand;
 
+/* Default commands used during probing */
+const MMPortProbeAtCommand *mm_port_probe_at_command_get_probing (void);
+
 #endif /* MM_PORT_PROBE_AT_COMMAND_H */
 
