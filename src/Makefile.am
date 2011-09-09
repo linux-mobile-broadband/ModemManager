@@ -132,6 +132,7 @@ modem_manager_SOURCES = \
 	mm-modem-simple.h \
 	mm-port-probe.h \
 	mm-port-probe.c \
+	mm-port-probe-at-command.h \
 	mm-plugin.c \
 	mm-plugin.h \
 	mm-plugin-base.c \
