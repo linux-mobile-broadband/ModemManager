@@ -60,6 +60,7 @@ struct _MMPortProbePrivate {
     /* Probing results */
     guint32 flags;
     gboolean is_at;
+    guint32 capabilities;
 
     /* Current probing task. Only one can be available at a time */
     PortProbeRunTask *task;
@@ -140,6 +141,25 @@ port_probe_run_is_cancelled (MMPortProbe *self)
 }
 
 static void
+serial_probe_at_capabilities_result_processor (MMPortProbe *self,
+                                               GValue *result)
+{
+    if (result) {
+        /* If any result given, it must be a uint */
+        g_assert (G_VALUE_HOLDS_UINT (result));
+
+        mm_dbg ("(%s) capabilities probing finished", self->priv->name);
+        self->priv->capabilities = (guint32) g_value_get_uint (result);
+        self->priv->flags |= MM_PORT_PROBE_AT_CAPABILITIES;
+        return;
+    }
+
+    mm_dbg ("(%s) no result in capabilities probing", self->priv->name);
+    self->priv->capabilities = 0;
+    self->priv->flags |= MM_PORT_PROBE_AT_CAPABILITIES;
+}
+
+static void
 serial_probe_at_result_processor (MMPortProbe *self,
                                   GValue *result)
 {
@@ -157,7 +177,8 @@ serial_probe_at_result_processor (MMPortProbe *self,
 
     mm_dbg ("(%s) port is not AT-capable", self->priv->name);
     self->priv->is_at = FALSE;
-    self->priv->flags |= MM_PORT_PROBE_AT;
+    self->priv->flags |= (MM_PORT_PROBE_AT |
+                          MM_PORT_PROBE_AT_CAPABILITIES);
 }
 
 static void
@@ -255,6 +276,13 @@ serial_probe_schedule (MMPortProbe *self)
         /* Prepare AT probing */
         task->at_result_processor = serial_probe_at_result_processor;
         task->at_commands = mm_port_probe_at_command_get_probing ();
+    }
+    /* Capabilities requested and not already probed? */
+    else if ((task->flags & MM_PORT_PROBE_AT_CAPABILITIES) &&
+             !(self->priv->flags & MM_PORT_PROBE_AT_CAPABILITIES)) {
+        /* Prepare AT capabilities probing */
+        task->at_result_processor = serial_probe_at_capabilities_result_processor;
+        task->at_commands = mm_port_probe_at_command_get_capabilities_probing ();
     }
 
     /* If a next AT group detected, go for it */
@@ -471,6 +499,7 @@ mm_port_probe_run (MMPortProbe *self,
                    gpointer user_data)
 {
     PortProbeRunTask *task;
+    guint32 i;
 
     g_return_if_fail (MM_IS_PORT_PROBE (self));
     g_return_if_fail (flags != 0);
@@ -490,9 +519,10 @@ mm_port_probe_run (MMPortProbe *self,
     /* Check if we already have the requested probing results.
      * We will fix here the 'task->flags' so that we only request probing
      * for the missing things. */
-    if ((flags & MM_PORT_PROBE_AT) &&
-        !(self->priv->flags & MM_PORT_PROBE_AT)) {
-         task->flags += MM_PORT_PROBE_AT;
+    for (i = MM_PORT_PROBE_AT; i <= MM_PORT_PROBE_AT_CAPABILITIES; i = (i << 1)) {
+        if ((flags & i) && !(self->priv->flags & i)) {
+            task->flags += i;
+        }
     }
 
     /* All requested probings already available? If so, we're done */
@@ -509,6 +539,11 @@ mm_port_probe_run (MMPortProbe *self,
 
     /* Store as current task */
     self->priv->task = task;
+
+    /* If any AT-specific probing requested, require generic AT check before */
+    if (task->flags & MM_PORT_PROBE_AT_CAPABILITIES) {
+        task->flags |= MM_PORT_PROBE_AT;
+    }
 
     /* If any AT probing is needed, start by opening as AT port */
     if (task->flags & MM_PORT_PROBE_AT) {
@@ -527,6 +562,15 @@ mm_port_probe_is_at (MMPortProbe *self)
     g_return_val_if_fail (self->priv->flags & MM_PORT_PROBE_AT, FALSE);
 
     return self->priv->is_at;
+}
+
+guint32
+mm_port_probe_get_capabilities (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), 0);
+    g_return_val_if_fail (self->priv->flags & MM_PORT_PROBE_AT_CAPABILITIES, 0);
+
+    return self->priv->capabilities;
 }
 
 GUdevDevice *
