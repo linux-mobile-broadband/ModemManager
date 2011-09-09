@@ -25,6 +25,7 @@ G_DEFINE_TYPE (MMPortProbe, mm_port_probe, G_TYPE_OBJECT)
 typedef struct {
     /* ---- Generic task context ---- */
     GSimpleAsyncResult *result;
+    GCancellable *cancellable;
 } PortProbeRunTask;
 
 struct _MMPortProbePrivate {
@@ -42,6 +43,9 @@ struct _MMPortProbePrivate {
 static void
 port_probe_run_task_free (PortProbeRunTask *task)
 {
+    if (task->cancellable)
+        g_object_unref (task->cancellable);
+
     g_object_unref (task->result);
     g_free (task);
 }
@@ -61,6 +65,41 @@ port_probe_run_task_complete (PortProbeRunTask *task,
         g_simple_async_result_complete_in_idle (task->result);
     else
         g_simple_async_result_complete (task->result);
+}
+
+static gboolean
+port_probe_run_is_cancelled (MMPortProbe *self)
+{
+    PortProbeRunTask *task = self->priv->task;
+
+    /* Manually check if cancelled. */
+    if (g_cancellable_is_cancelled (task->cancellable)) {
+        port_probe_run_task_complete (
+            task,
+            TRUE, /* in idle */
+            FALSE,
+            g_error_new (MM_CORE_ERROR,
+                         MM_CORE_ERROR_CANCELLED,
+                         "(%s) port probing cancelled",
+                         self->priv->name));
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+gboolean
+mm_port_probe_run_cancel (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
+
+    if (self->priv->task) {
+        mm_dbg ("(%s) requested to cancel the probing", self->priv->name);
+        g_cancellable_cancel (self->priv->task->cancellable);
+        return TRUE;
+    }
+
+    return FALSE;
 }
 
 gboolean
@@ -106,11 +145,15 @@ mm_port_probe_run (MMPortProbe *self,
                                               user_data,
                                               mm_port_probe_run);
 
+    /* Setup internal cancellable */
+    task->cancellable = g_cancellable_new ();
+
     /* Store as current task */
     self->priv->task = task;
 
-    /* For now, just set successful */
-    port_probe_run_task_complete (task, TRUE, TRUE, NULL);
+    /* For now, just set successful if not cancelled */
+    if (!port_probe_run_is_cancelled (self))
+        port_probe_run_task_complete (task, TRUE, TRUE, NULL);
 }
 
 GUdevDevice *

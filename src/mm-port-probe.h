@@ -62,6 +62,7 @@ void     mm_port_probe_run        (MMPortProbe *self,
 gboolean mm_port_probe_run_finish (MMPortProbe *self,
                                    GAsyncResult *result,
                                    GError **error);
+gboolean mm_port_probe_run_cancel (MMPortProbe *self);
 
 #endif /* MM_PORT_PROBE_H */
 
