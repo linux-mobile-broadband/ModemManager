@@ -130,6 +130,8 @@ modem_manager_SOURCES = \
 	mm-modem-gsm-ussd.h \
 	mm-modem-simple.c \
 	mm-modem-simple.h \
+	mm-port-probe.h \
+	mm-port-probe.c \
 	mm-plugin.c \
 	mm-plugin.h \
 	mm-plugin-base.c \
