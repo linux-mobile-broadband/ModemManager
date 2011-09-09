@@ -18,6 +18,7 @@
 
 #include <glib.h>
 #include <glib-object.h>
+#include <gio/gio.h>
 
 #define G_UDEV_API_IS_SUBJECT_TO_CHANGE
 #include <gudev/gudev.h>
@@ -53,6 +54,14 @@ const gchar *mm_port_probe_get_port_name    (MMPortProbe *self);
 const gchar *mm_port_probe_get_port_subsys  (MMPortProbe *self);
 const gchar *mm_port_probe_get_port_physdev (MMPortProbe *self);
 const gchar *mm_port_probe_get_port_driver  (MMPortProbe *self);
+
+/* Run probing */
+void     mm_port_probe_run        (MMPortProbe *self,
+                                   GAsyncReadyCallback callback,
+                                   gpointer user_data);
+gboolean mm_port_probe_run_finish (MMPortProbe *self,
+                                   GAsyncResult *result,
+                                   GError **error);
 
 #endif /* MM_PORT_PROBE_H */
 
