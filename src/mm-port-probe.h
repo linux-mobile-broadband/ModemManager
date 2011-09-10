@@ -23,6 +23,8 @@
 #define G_UDEV_API_IS_SUBJECT_TO_CHANGE
 #include <gudev/gudev.h>
 
+#include "mm-port-probe-at-command.h"
+
 #define MM_TYPE_PORT_PROBE            (mm_port_probe_get_type ())
 #define MM_PORT_PROBE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PORT_PROBE, MMPortProbe))
 #define MM_PORT_PROBE_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MM_TYPE_PORT_PROBE, MMPortProbeClass))
@@ -88,6 +90,7 @@ const gchar *mm_port_probe_get_port_driver  (MMPortProbe *self);
 void     mm_port_probe_run        (MMPortProbe *self,
                                    guint32 flags,
                                    guint64 at_send_delay,
+                                   const MMPortProbeAtCommand *at_custom_init,
                                    GAsyncReadyCallback callback,
                                    gpointer user_data);
 gboolean mm_port_probe_run_finish (MMPortProbe *self,

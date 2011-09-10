@@ -46,6 +46,8 @@ typedef struct {
     guint64 at_send_delay;
     /* Number of times we tried to open the AT port */
     guint at_open_tries;
+    /* Custom initialization commands for the AT port */
+    const MMPortProbeAtCommand *at_custom_init;
     /* Current group of AT commands to be sent */
     const MMPortProbeAtCommand *at_commands;
     /* Current AT Result processor */
@@ -367,6 +369,21 @@ serial_probe_at_result_processor (MMPortProbe *self,
 }
 
 static void
+serial_probe_at_custom_init_result_processor (MMPortProbe *self,
+                                              GValue *result)
+{
+    PortProbeRunTask *task = self->priv->task;
+
+    /* No result is really expected here, but we could get a boolean to indicate
+     * AT support */
+    if (G_VALUE_HOLDS_BOOLEAN (result))
+        serial_probe_at_result_processor (self, result);
+
+    /* Reset so that it doesn't get scheduled again */
+    task->at_custom_init = NULL;
+}
+
+static void
 serial_probe_at_parse_response (MMAtSerialPort *port,
                                 GString *response,
                                 GError *error,
@@ -415,8 +432,13 @@ serial_probe_at_parse_response (MMAtSerialPort *port,
     }
 
     /* Got some processed result */
-    task->at_result_processor (self, &result);
-    g_value_unset (&result);
+    if (G_IS_VALUE (&result)) {
+        task->at_result_processor (self, &result);
+        g_value_unset (&result);
+    } else {
+        /* Custom init commands are allowed to not return anything */
+        task->at_result_processor (self, NULL);
+    }
 
     /* Reschedule probing */
     serial_probe_schedule (self);
@@ -455,9 +477,15 @@ serial_probe_schedule (MMPortProbe *self)
     task->at_result_processor = NULL;
     task->at_commands = NULL;
 
+    /* If we got some custom initialization commands requested, go on with them
+     * first. */
+    if (task->at_custom_init) {
+        task->at_result_processor = serial_probe_at_custom_init_result_processor;
+        task->at_commands = task->at_custom_init;
+    }
     /* AT check requested and not already probed? */
-    if ((task->flags & MM_PORT_PROBE_AT) &&
-        !(self->priv->flags & MM_PORT_PROBE_AT)) {
+    else if ((task->flags & MM_PORT_PROBE_AT) &&
+             !(self->priv->flags & MM_PORT_PROBE_AT)) {
         /* Prepare AT probing */
         task->at_result_processor = serial_probe_at_result_processor;
         task->at_commands = mm_port_probe_at_command_get_probing ();
@@ -701,6 +729,7 @@ void
 mm_port_probe_run (MMPortProbe *self,
                    guint32 flags,
                    guint64 at_send_delay,
+                   const MMPortProbeAtCommand *at_custom_init,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
 {
@@ -717,6 +746,7 @@ mm_port_probe_run (MMPortProbe *self,
     task = g_new0 (PortProbeRunTask, 1);
     task->at_send_delay = at_send_delay;
     task->flags = 0;
+    task->at_custom_init = at_custom_init;
     task->result = g_simple_async_result_new (G_OBJECT (self),
                                               callback,
                                               user_data,
