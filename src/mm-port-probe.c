@@ -26,6 +26,10 @@
 #include "mm-serial-port.h"
 #include "mm-serial-parsers.h"
 #include "mm-port-probe-at-command.h"
+#include "libqcdm/src/commands.h"
+#include "libqcdm/src/utils.h"
+#include "libqcdm/src/errors.h"
+#include "mm-qcdm-serial-port.h"
 
 G_DEFINE_TYPE (MMPortProbe, mm_port_probe, G_TYPE_OBJECT)
 
@@ -60,6 +64,7 @@ struct _MMPortProbePrivate {
     /* Probing results */
     guint32 flags;
     gboolean is_at;
+    gboolean is_qcdm;
     guint32 capabilities;
     gchar *vendor;
     gchar *product;
@@ -69,6 +74,7 @@ struct _MMPortProbePrivate {
 };
 
 static gboolean serial_probe_at (MMPortProbe *self);
+static gboolean serial_probe_qcdm (MMPortProbe *self);
 static void serial_probe_schedule (MMPortProbe *self);
 
 static void
@@ -143,6 +149,139 @@ port_probe_run_is_cancelled (MMPortProbe *self)
 }
 
 static void
+serial_probe_qcdm_parse_response (MMQcdmSerialPort *port,
+                                  GByteArray *response,
+                                  GError *error,
+                                  MMPortProbe *self)
+{
+    QcdmResult *result;
+    gint err = QCDM_SUCCESS;
+
+    /* Just the initial poke; ignore it */
+    if (!self)
+        return;
+
+    /* If already cancelled, do nothing else */
+    if (port_probe_run_is_cancelled (self))
+        return;
+
+    if (!error) {
+        /* Parse the response */
+        result = qcdm_cmd_version_info_result ((const gchar *) response->data,
+                                               response->len,
+                                               &err);
+        if (!result) {
+            mm_warn ("(%s) failed to parse QCDM version info command result: %d",
+                     self->priv->name,
+                     err);
+        } else {
+            /* yay, probably a QCDM port */
+            qcdm_result_unref (result);
+            self->priv->is_qcdm = TRUE;
+
+            /* Also set as not an AT port */
+            self->priv->is_at = FALSE;
+            self->priv->flags |= MM_PORT_PROBE_AT;
+        }
+    }
+
+    /* Mark as being probed */
+    self->priv->flags |= MM_PORT_PROBE_QCDM;
+
+    /* Reschedule probing */
+    serial_probe_schedule (self);
+}
+
+static gboolean
+serial_probe_qcdm (MMPortProbe *self)
+{
+    PortProbeRunTask *task = self->priv->task;
+    GError *error = NULL;
+    GByteArray *verinfo = NULL;
+    GByteArray *verinfo2;
+    gint len;
+
+    task->source_id = 0;
+
+    /* If already cancelled, do nothing else */
+    if (port_probe_run_is_cancelled (self))
+        return FALSE;
+
+    mm_dbg ("(%s) probing QCDM...", self->priv->name);
+
+    /* If open, close the AT port */
+    if (task->serial) {
+        mm_serial_port_close (task->serial);
+        g_object_unref (task->serial);
+    }
+
+    /* Open the QCDM port */
+    task->serial = MM_SERIAL_PORT (mm_qcdm_serial_port_new (self->priv->name,
+                                                            MM_PORT_TYPE_PRIMARY));
+    if (!task->serial) {
+        port_probe_run_task_complete (
+            task,
+            FALSE,
+            FALSE,
+            g_error_new (MM_CORE_ERROR,
+                         MM_CORE_ERROR_INVALID,
+                         "(%s) Couldn't create QCDM port",
+                         self->priv->name));
+        return FALSE;
+    }
+
+    /* Try to open the port */
+    if (!mm_serial_port_open (task->serial, &error)) {
+        port_probe_run_task_complete (
+            task,
+            FALSE,
+            FALSE,
+            g_error_new (MM_SERIAL_ERROR,
+                         MM_SERIAL_ERROR_OPEN_FAILED,
+                         "(%s) Failed to open QCDM port: %s",
+                         self->priv->name,
+                         (error ? error->message : "unknown error")));
+        g_clear_error (&error);
+        return FALSE;
+    }
+
+    /* Build up the probe command */
+    verinfo = g_byte_array_sized_new (50);
+    len = qcdm_cmd_version_info_new ((gchar *) verinfo->data, 50);
+    if (len <= 0) {
+        g_byte_array_free (verinfo, TRUE);
+        port_probe_run_task_complete (
+            task,
+            FALSE,
+            FALSE,
+            g_error_new (MM_SERIAL_ERROR,
+                         MM_SERIAL_ERROR_OPEN_FAILED,
+                         "(%s) Failed to create QCDM versin info command",
+                         self->priv->name));
+        return FALSE;
+    }
+    verinfo->len = len;
+
+    /* Queuing the command takes ownership over it; dup it for the second try */
+    verinfo2 = g_byte_array_sized_new (verinfo->len);
+    g_byte_array_append (verinfo2, verinfo->data, verinfo->len);
+
+    /* Send the command twice; the ports often need to be woken up */
+    mm_qcdm_serial_port_queue_command (MM_QCDM_SERIAL_PORT (task->serial),
+                                       verinfo,
+                                       3,
+                                       (MMQcdmSerialResponseFn)serial_probe_qcdm_parse_response,
+                                       NULL);
+    mm_qcdm_serial_port_queue_command (MM_QCDM_SERIAL_PORT (task->serial),
+                                       verinfo2,
+                                       3,
+                                       (MMQcdmSerialResponseFn)serial_probe_qcdm_parse_response,
+                                       self);
+
+    return FALSE;
+}
+
+static void
 serial_probe_at_product_result_processor (MMPortProbe *self,
                                           GValue *result)
 {
@@ -211,6 +350,10 @@ serial_probe_at_result_processor (MMPortProbe *self,
             mm_dbg ("(%s) port is AT-capable", self->priv->name);
             self->priv->is_at = TRUE;
             self->priv->flags |= MM_PORT_PROBE_AT;
+
+            /* Also set as not a QCDM port */
+            self->priv->is_qcdm = FALSE;
+            self->priv->flags |= MM_PORT_PROBE_QCDM;
             return;
         }
     }
@@ -345,6 +488,13 @@ serial_probe_schedule (MMPortProbe *self)
     if (task->at_result_processor &&
         task->at_commands) {
         task->source_id = g_idle_add ((GSourceFunc)serial_probe_at, self);
+        return;
+    }
+
+    /* QCDM requested and not already probed? */
+    if ((task->flags & MM_PORT_PROBE_QCDM) &&
+        !(self->priv->flags & MM_PORT_PROBE_QCDM)) {
+        task->source_id = g_idle_add ((GSourceFunc)serial_probe_qcdm, self);
         return;
     }
 
@@ -575,7 +725,7 @@ mm_port_probe_run (MMPortProbe *self,
     /* Check if we already have the requested probing results.
      * We will fix here the 'task->flags' so that we only request probing
      * for the missing things. */
-    for (i = MM_PORT_PROBE_AT; i <= MM_PORT_PROBE_AT_PRODUCT; i = (i << 1)) {
+    for (i = MM_PORT_PROBE_AT; i <= MM_PORT_PROBE_QCDM; i = (i << 1)) {
         if ((flags & i) && !(self->priv->flags & i)) {
             task->flags += i;
         }
@@ -609,6 +759,12 @@ mm_port_probe_run (MMPortProbe *self,
         return;
     }
 
+    /* Otherwise, start by opening as QCDM port */
+    if (task->flags & MM_PORT_PROBE_QCDM) {
+        task->source_id = g_idle_add ((GSourceFunc)serial_probe_qcdm, self);
+        return;
+    }
+
     /* Shouldn't happen */
     g_assert_not_reached ();
 }
@@ -620,6 +776,15 @@ mm_port_probe_is_at (MMPortProbe *self)
     g_return_val_if_fail (self->priv->flags & MM_PORT_PROBE_AT, FALSE);
 
     return self->priv->is_at;
+}
+
+gboolean
+mm_port_probe_is_qcdm (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
+    g_return_val_if_fail (self->priv->flags & MM_PORT_PROBE_QCDM, FALSE);
+
+    return self->priv->is_qcdm;
 }
 
 guint32
