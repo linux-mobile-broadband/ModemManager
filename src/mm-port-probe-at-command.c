@@ -190,3 +190,31 @@ mm_port_probe_at_command_get_capabilities_probing (void)
     return capabilities_probing;
 }
 
+/* ---- VENDOR probing ---- */
+
+static gboolean
+parse_vendor (const gchar *response,
+              const GError *error,
+              GValue *result,
+              GError **result_error)
+{
+    gchar *str;
+
+    str = g_strstrip (g_strdelimit (g_strdup (response), "\r\n", ' '));
+    g_value_init (result, G_TYPE_STRING);
+    g_value_take_string (result, str);
+    return TRUE;
+}
+
+static const MMPortProbeAtCommand vendor_probing[] = {
+    { "+CGMI", parse_vendor },
+    { "+GMI",  parse_vendor },
+    { "I",     parse_vendor },
+    { NULL }
+};
+
+const MMPortProbeAtCommand *
+mm_port_probe_at_command_get_vendor_probing (void)
+{
+    return vendor_probing;
+}

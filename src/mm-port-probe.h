@@ -33,6 +33,7 @@
 /* Flags to request port probing */
 #define MM_PORT_PROBE_AT              0x0001
 #define MM_PORT_PROBE_AT_CAPABILITIES 0x0002
+#define MM_PORT_PROBE_AT_VENDOR       0x0004
 
 /* Flags to report probed capabilities */
 #define MM_PORT_PROBE_CAPABILITY_GSM     0x0001 /* GSM */
@@ -93,8 +94,9 @@ gboolean mm_port_probe_run_finish (MMPortProbe *self,
 gboolean mm_port_probe_run_cancel (MMPortProbe *self);
 
 /* Probing result getters */
-gboolean mm_port_probe_is_at            (MMPortProbe *self);
-guint32  mm_port_probe_get_capabilities (MMPortProbe *self);
+gboolean     mm_port_probe_is_at            (MMPortProbe *self);
+guint32      mm_port_probe_get_capabilities (MMPortProbe *self);
+const gchar *mm_port_probe_get_vendor       (MMPortProbe *self);
 
 #endif /* MM_PORT_PROBE_H */
 
