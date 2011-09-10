@@ -31,6 +31,18 @@
 #include "libqcdm/src/errors.h"
 #include "mm-qcdm-serial-port.h"
 
+/*
+ * Steps and flow of the Probing process:
+ * ----> AT Serial Open
+ *   |----> Custom Init
+ *   |----> AT?
+ *      |----> Capabilities
+ *      |----> Vendor
+ *      |----> Product
+ * ----> QCDM Serial Open
+ *   |----> QCDM?
+ */
+
 G_DEFINE_TYPE (MMPortProbe, mm_port_probe, G_TYPE_OBJECT)
 
 typedef struct {
