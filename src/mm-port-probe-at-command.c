@@ -218,3 +218,33 @@ mm_port_probe_at_command_get_vendor_probing (void)
 {
     return vendor_probing;
 }
+
+/* ---- PRODUCT probing ---- */
+
+static gboolean
+parse_product (const gchar *response,
+               const GError *error,
+               GValue *result,
+               GError **result_error)
+
+{
+    gchar *str;
+
+    str = g_strstrip (g_strdelimit (g_strdup (response), "\r\n", ' '));
+    g_value_init (result, G_TYPE_STRING);
+    g_value_take_string (result, str);
+    return TRUE;
+}
+
+static const MMPortProbeAtCommand product_probing[] = {
+    { "+CGMM", parse_product },
+    { "+GMM",  parse_product },
+    { "I",     parse_product },
+    { NULL }
+};
+
+const MMPortProbeAtCommand *
+mm_port_probe_at_command_get_product_probing (void)
+{
+    return product_probing;
+}

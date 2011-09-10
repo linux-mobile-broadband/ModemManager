@@ -54,6 +54,7 @@ typedef struct {
 const MMPortProbeAtCommand *mm_port_probe_at_command_get_probing (void);
 const MMPortProbeAtCommand *mm_port_probe_at_command_get_capabilities_probing (void);
 const MMPortProbeAtCommand *mm_port_probe_at_command_get_vendor_probing (void);
+const MMPortProbeAtCommand *mm_port_probe_at_command_get_product_probing (void);
 
 #endif /* MM_PORT_PROBE_AT_COMMAND_H */
 

@@ -62,6 +62,7 @@ struct _MMPortProbePrivate {
     gboolean is_at;
     guint32 capabilities;
     gchar *vendor;
+    gchar *product;
 
     /* Current probing task. Only one can be available at a time */
     PortProbeRunTask *task;
@@ -142,6 +143,25 @@ port_probe_run_is_cancelled (MMPortProbe *self)
 }
 
 static void
+serial_probe_at_product_result_processor (MMPortProbe *self,
+                                          GValue *result)
+{
+    if (result) {
+        /* If any result given, it must be a string */
+        g_assert (G_VALUE_HOLDS_STRING (result));
+
+        mm_dbg ("(%s) product probing finished", self->priv->name);
+        self->priv->product = g_utf8_casefold (g_value_get_string (result), -11);
+        self->priv->flags |= MM_PORT_PROBE_AT_PRODUCT;
+        return;
+    }
+
+    mm_dbg ("(%s) no result in product probing", self->priv->name);
+    self->priv->product = NULL;
+    self->priv->flags |= MM_PORT_PROBE_AT_PRODUCT;
+}
+
+static void
 serial_probe_at_vendor_result_processor (MMPortProbe *self,
                                          GValue *result)
 {
@@ -199,7 +219,8 @@ serial_probe_at_result_processor (MMPortProbe *self,
     self->priv->is_at = FALSE;
     self->priv->flags |= (MM_PORT_PROBE_AT |
                           MM_PORT_PROBE_AT_CAPABILITIES |
-                          MM_PORT_PROBE_AT_VENDOR);
+                          MM_PORT_PROBE_AT_VENDOR |
+                          MM_PORT_PROBE_AT_PRODUCT);
 }
 
 static void
@@ -311,6 +332,13 @@ serial_probe_schedule (MMPortProbe *self)
         /* Prepare AT vendor probing */
         task->at_result_processor = serial_probe_at_vendor_result_processor;
         task->at_commands = mm_port_probe_at_command_get_vendor_probing ();
+    }
+    /* Product requested and not already probed? */
+    else if ((task->flags & MM_PORT_PROBE_AT_PRODUCT) &&
+             !(self->priv->flags & MM_PORT_PROBE_AT_PRODUCT)) {
+        /* Prepare AT product probing */
+        task->at_result_processor = serial_probe_at_product_result_processor;
+        task->at_commands = mm_port_probe_at_command_get_product_probing ();
     }
 
     /* If a next AT group detected, go for it */
@@ -547,7 +575,7 @@ mm_port_probe_run (MMPortProbe *self,
     /* Check if we already have the requested probing results.
      * We will fix here the 'task->flags' so that we only request probing
      * for the missing things. */
-    for (i = MM_PORT_PROBE_AT; i <= MM_PORT_PROBE_AT_VENDOR; i = (i << 1)) {
+    for (i = MM_PORT_PROBE_AT; i <= MM_PORT_PROBE_AT_PRODUCT; i = (i << 1)) {
         if ((flags & i) && !(self->priv->flags & i)) {
             task->flags += i;
         }
@@ -570,7 +598,8 @@ mm_port_probe_run (MMPortProbe *self,
 
     /* If any AT-specific probing requested, require generic AT check before */
     if (task->flags & (MM_PORT_PROBE_AT_CAPABILITIES |
-                       MM_PORT_PROBE_AT_VENDOR)) {
+                       MM_PORT_PROBE_AT_VENDOR |
+                       MM_PORT_PROBE_AT_PRODUCT)) {
         task->flags |= MM_PORT_PROBE_AT;
     }
 
@@ -617,6 +646,15 @@ mm_port_probe_get_vendor (MMPortProbe *self)
     g_return_val_if_fail (self->priv->flags & MM_PORT_PROBE_AT_VENDOR, NULL);
 
     return self->priv->vendor;
+}
+
+const gchar *
+mm_port_probe_get_product (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), NULL);
+    g_return_val_if_fail (self->priv->flags & MM_PORT_PROBE_AT_PRODUCT, NULL);
+
+    return self->priv->product;
 }
 
 const gchar *
@@ -691,6 +729,7 @@ finalize (GObject *object)
     g_object_unref (self->priv->port);
 
     g_free (self->priv->vendor);
+    g_free (self->priv->product);
 
     G_OBJECT_CLASS (mm_port_probe_parent_class)->finalize (object);
 }
