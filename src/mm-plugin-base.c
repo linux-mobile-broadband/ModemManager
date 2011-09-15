@@ -77,6 +77,7 @@ typedef struct {
     const gchar **vendor_strings;
     const gchar **product_strings;
     const MMPortProbeAtCommand *custom_init;
+    guint64 send_delay;
 } MMPluginBasePrivate;
 
 enum {
@@ -89,6 +90,7 @@ enum {
     PROP_ALLOWED_VENDOR_STRINGS,
     PROP_ALLOWED_PRODUCT_STRINGS,
     PROP_CUSTOM_INIT,
+    PROP_SEND_DELAY,
     PROP_SORT_LAST,
     LAST_PROP
 };
@@ -1548,6 +1550,8 @@ mm_plugin_base_init (MMPluginBase *self)
                                          g_str_equal,
                                          g_free,
                                          (GDestroyNotify) g_object_unref);
+    /* Defaults */
+    priv->send_delay = 100000;
 }
 
 static void
@@ -1589,6 +1593,10 @@ set_property (GObject *object, guint prop_id,
         /* Construct only */
         priv->custom_init = (const MMPortProbeAtCommand *)g_value_get_pointer (value);
         break;
+    case PROP_SEND_DELAY:
+        /* Construct only */
+        priv->send_delay = (guint64)g_value_get_uint64 (value);
+        break;
     case PROP_SORT_LAST:
         /* Construct only */
         priv->sort_last = g_value_get_boolean (value);
@@ -1629,6 +1637,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case PROP_CUSTOM_INIT:
         g_value_set_pointer (value, (gpointer)priv->custom_init);
+        break;
+    case PROP_SEND_DELAY:
+        g_value_set_uint64 (value, priv->send_delay);
         break;
     case PROP_SORT_LAST:
         g_value_set_boolean (value, priv->sort_last);
@@ -1732,6 +1743,15 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
                                "should be an array of MMPortProbeAtCommand structs "
                                "finished with 'NULL'",
                                G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_SEND_DELAY,
+         g_param_spec_uint64 (MM_PLUGIN_BASE_SEND_DELAY,
+                              "Send delay",
+                              "Send delay for characters in the AT port, "
+                              "in microseconds",
+                              0, G_MAXUINT64, 100000,
+                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property
         (object_class, PROP_SORT_LAST,
