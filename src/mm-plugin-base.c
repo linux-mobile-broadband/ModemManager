@@ -269,6 +269,96 @@ is_virtual_port (const gchar *device_name)
     return FALSE;
 }
 
+/* Returns TRUE if the support check request was filtered out */
+static gboolean
+apply_pre_probing_filters (MMPluginBase *self,
+                           GUdevDevice *port,
+                           const gchar *subsys,
+                           const gchar *name,
+                           const gchar *driver)
+{
+    MMPluginBasePrivate *priv = MM_PLUGIN_BASE_GET_PRIVATE (self);
+    guint i;
+
+    /* The plugin may specify that only some subsystems are supported. If that
+     * is the case, filter by subsystem */
+    if (priv->subsystems) {
+        for (i = 0; priv->subsystems[i]; i++) {
+            if (g_str_equal (subsys, priv->subsystems[i]))
+                break;
+        }
+        if (!priv->subsystems[i])
+            return TRUE; /* Filtered by subsystem! */
+    }
+
+    /* The plugin may specify that only some drivers are supported. If that
+     * is the case, filter by driver */
+    if (priv->drivers) {
+        for (i = 0; priv->drivers[i]; i++) {
+            if (g_str_equal (driver, priv->drivers[i]))
+                break;
+        }
+
+        /* If we didn't match any driver: unsupported */
+        if (!priv->drivers[i])
+            return TRUE;
+    }
+
+    /* The plugin may specify that only some vendor IDs are supported. If that
+     * is the case, filter by vendor ID. */
+    if (priv->vendor_ids) {
+        guint16 vendor = 0;
+        guint16 product = 0;
+
+        mm_plugin_base_get_device_ids (self, subsys, name, &vendor, &product);
+
+        /* If we didn't get any vendor: unsupported */
+        if (!vendor)
+            return TRUE;
+
+        for (i = 0; priv->vendor_ids[i]; i++)
+            if (vendor == priv->vendor_ids[i])
+                break;
+
+        /* If we didn't match any vendor: unsupported */
+        if (!priv->vendor_ids[i])
+            return TRUE;
+
+        /* The plugin may specify that only some product IDs are supported. If
+         * that is the case, filter by product ID */
+        if (priv->product_ids) {
+            /* If we didn't get any product: unsupported */
+            if (!product)
+                return TRUE;
+
+            for (i = 0; priv->product_ids[i]; i++)
+                if (product == priv->product_ids[i])
+                    break;
+
+            /* If we didn't match any product: unsupported */
+            if (!priv->product_ids[i])
+                return TRUE;
+        }
+    }
+
+    /* The plugin may specify that only ports with some given udev tags are
+     * supported. If that is the case, filter by udev tag */
+    if (priv->udev_tags) {
+        for (i = 0; priv->udev_tags[i]; i++) {
+            /* Check if the port was tagged */
+            if (g_udev_device_get_property_as_boolean (port,
+                                                       priv->udev_tags[i]))
+                break;
+        }
+
+        /* If we didn't match any udev tag: unsupported */
+        if (!priv->udev_tags[i])
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
 static void
 port_probe_run_ready (MMPortProbe *probe,
                       GAsyncResult *probe_result,
@@ -372,6 +462,18 @@ supports_port (MMPlugin *plugin,
                                          "Couldn't find driver for (%s/%s)",
                                          subsys,
                                          name);
+        g_simple_async_result_complete_in_idle (async_result);
+        goto out;
+    }
+
+    /* Apply filters before launching the probing */
+    if (apply_pre_probing_filters (self,
+                                   port,
+                                   subsys,
+                                   name,
+                                   driver)) {
+        /* Filtered! */
+        g_simple_async_result_set_op_res_gboolean (async_result, FALSE);
         g_simple_async_result_complete_in_idle (async_result);
         goto out;
     }
