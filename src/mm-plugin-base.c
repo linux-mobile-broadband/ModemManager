@@ -76,6 +76,7 @@ typedef struct {
     const guint16 *product_ids;
     const gchar **vendor_strings;
     const gchar **product_strings;
+    gboolean qcdm;
     const MMPortProbeAtCommand *custom_init;
     guint64 send_delay;
 } MMPluginBasePrivate;
@@ -89,6 +90,7 @@ enum {
     PROP_ALLOWED_PRODUCT_IDS,
     PROP_ALLOWED_VENDOR_STRINGS,
     PROP_ALLOWED_PRODUCT_STRINGS,
+    PROP_ALLOWED_QCDM,
     PROP_CUSTOM_INIT,
     PROP_SEND_DELAY,
     PROP_SORT_LAST,
@@ -1589,6 +1591,10 @@ set_property (GObject *object, guint prop_id,
         /* Construct only */
         priv->product_strings = (const gchar **)g_value_get_pointer (value);
         break;
+    case PROP_ALLOWED_QCDM:
+        /* Construct only */
+        priv->qcdm = g_value_get_boolean (value);
+        break;
     case PROP_CUSTOM_INIT:
         /* Construct only */
         priv->custom_init = (const MMPortProbeAtCommand *)g_value_get_pointer (value);
@@ -1634,6 +1640,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case PROP_ALLOWED_PRODUCT_STRINGS:
         g_value_set_pointer (value, (gpointer)priv->product_strings);
+        break;
+    case PROP_ALLOWED_QCDM:
+        g_value_set_boolean (value, priv->qcdm);
         break;
     case PROP_CUSTOM_INIT:
         g_value_set_pointer (value, (gpointer)priv->custom_init);
@@ -1733,6 +1742,14 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
                                "Allowed product strings",
                                "List of product strings this plugin can support, "
                                "should be an array of strings finished with 'NULL'",
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_ALLOWED_QCDM,
+         g_param_spec_boolean (MM_PLUGIN_BASE_ALLOWED_QCDM,
+                               "Allowed QCDM",
+                               "Whether QCDM ports are allowed in this plugin",
+                               FALSE,
                                G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property
