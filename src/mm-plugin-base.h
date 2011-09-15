@@ -123,12 +123,14 @@ typedef struct {
     MMBaseSupportsTaskCustomInitResultFunc callback;
 } MMPluginCustomInit;
 
-#define MM_PLUGIN_BASE_NAME                "name"
-#define MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS  "allowed-subsystems"
-#define MM_PLUGIN_BASE_ALLOWED_VENDOR_IDS  "allowed-vendor-ids"
-#define MM_PLUGIN_BASE_ALLOWED_PRODUCT_IDS "allowed-product-ids"
-#define MM_PLUGIN_BASE_CUSTOM_INIT         "custom-init"
-#define MM_PLUGIN_BASE_SORT_LAST           "sort-last"
+#define MM_PLUGIN_BASE_NAME                    "name"
+#define MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS      "allowed-subsystems"
+#define MM_PLUGIN_BASE_ALLOWED_VENDOR_IDS      "allowed-vendor-ids"
+#define MM_PLUGIN_BASE_ALLOWED_PRODUCT_IDS     "allowed-product-ids"
+#define MM_PLUGIN_BASE_ALLOWED_VENDOR_STRINGS  "allowed-vendor-strings"
+#define MM_PLUGIN_BASE_ALLOWED_PRODUCT_STRINGS "allowed-product-strings"
+#define MM_PLUGIN_BASE_CUSTOM_INIT             "custom-init"
+#define MM_PLUGIN_BASE_SORT_LAST               "sort-last"
 
 typedef struct _MMPluginBase MMPluginBase;
 typedef struct _MMPluginBaseClass MMPluginBaseClass;

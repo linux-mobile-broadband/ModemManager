@@ -73,6 +73,8 @@ typedef struct {
     const gchar **subsystems;
     const guint16 *vendor_ids;
     const guint16 *product_ids;
+    const gchar **vendor_strings;
+    const gchar **product_strings;
     const MMPortProbeAtCommand *custom_init;
 } MMPluginBasePrivate;
 
@@ -82,6 +84,8 @@ enum {
     PROP_ALLOWED_SUBSYSTEMS,
     PROP_ALLOWED_VENDOR_IDS,
     PROP_ALLOWED_PRODUCT_IDS,
+    PROP_ALLOWED_VENDOR_STRINGS,
+    PROP_ALLOWED_PRODUCT_STRINGS,
     PROP_CUSTOM_INIT,
     PROP_SORT_LAST,
     LAST_PROP
@@ -1567,6 +1571,14 @@ set_property (GObject *object, guint prop_id,
         /* Construct only */
         priv->product_ids = (const guint16 *)g_value_get_pointer (value);
         break;
+    case PROP_ALLOWED_VENDOR_STRINGS:
+        /* Construct only */
+        priv->vendor_strings = (const gchar **)g_value_get_pointer (value);
+        break;
+    case PROP_ALLOWED_PRODUCT_STRINGS:
+        /* Construct only */
+        priv->product_strings = (const gchar **)g_value_get_pointer (value);
+        break;
     case PROP_CUSTOM_INIT:
         /* Construct only */
         priv->custom_init = (const MMPortProbeAtCommand *)g_value_get_pointer (value);
@@ -1599,6 +1611,12 @@ get_property (GObject *object, guint prop_id,
         break;
     case PROP_ALLOWED_PRODUCT_IDS:
         g_value_set_pointer (value, (gpointer)priv->product_ids);
+        break;
+    case PROP_ALLOWED_VENDOR_STRINGS:
+        g_value_set_pointer (value, (gpointer)priv->vendor_strings);
+        break;
+    case PROP_ALLOWED_PRODUCT_STRINGS:
+        g_value_set_pointer (value, (gpointer)priv->product_strings);
         break;
     case PROP_CUSTOM_INIT:
         g_value_set_pointer (value, (gpointer)priv->custom_init);
@@ -1670,6 +1688,23 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
                                "Allowed product IDs",
                                "List of product IDs this plugin can support, "
                                "should be an array of guint16 finished with '0'",
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+
+    g_object_class_install_property
+        (object_class, PROP_ALLOWED_VENDOR_STRINGS,
+         g_param_spec_pointer (MM_PLUGIN_BASE_ALLOWED_VENDOR_STRINGS,
+                               "Allowed vendor strings",
+                               "List of vendor strings this plugin can support, "
+                               "should be an array of strings finished with 'NULL'",
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_ALLOWED_PRODUCT_STRINGS,
+         g_param_spec_pointer (MM_PLUGIN_BASE_ALLOWED_PRODUCT_STRINGS,
+                               "Allowed product strings",
+                               "List of product strings this plugin can support, "
+                               "should be an array of strings finished with 'NULL'",
                                G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property
