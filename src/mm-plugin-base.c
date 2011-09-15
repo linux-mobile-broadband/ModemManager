@@ -287,8 +287,10 @@ apply_pre_probing_filters (MMPluginBase *self,
             if (g_str_equal (subsys, priv->subsystems[i]))
                 break;
         }
+
+        /* If we didn't match any subsystem: unsupported */
         if (!priv->subsystems[i])
-            return TRUE; /* Filtered by subsystem! */
+            return TRUE;
     }
 
     /* The plugin may specify that only some drivers are supported. If that
@@ -359,28 +361,106 @@ apply_pre_probing_filters (MMPluginBase *self,
     return FALSE;
 }
 
+/* Returns TRUE if the support check request was filtered out */
+static gboolean
+apply_post_probing_filters (MMPluginBase *self,
+                            MMPortProbe *probe)
+{
+    MMPluginBasePrivate *priv = MM_PLUGIN_BASE_GET_PRIVATE (self);
+    guint i;
+
+    /* The plugin may specify that only some capabilities are supported. If that
+     * is the case, filter by capabilities */
+    if (priv->capabilities &&
+        !(priv->capabilities & mm_port_probe_get_capabilities (probe)))
+        return TRUE;
+
+    /* The plugin may specify that only some vendor strings are supported. If
+     * that is the case, filter by vendor string. */
+    if (priv->vendor_strings) {
+        const gchar *vendor;
+
+        vendor = mm_port_probe_get_vendor (probe);
+
+        /* If we didn't get any vendor: unsupported */
+        if (!vendor)
+            return TRUE;
+
+        for (i = 0; priv->vendor_strings[i]; i++) {
+            gboolean found;
+            gchar *casefolded;
+
+            casefolded = g_utf8_casefold (priv->vendor_strings[i], -1);
+            found = !!strstr (vendor, casefolded);
+            g_free (casefolded);
+            if (found)
+                break;
+        }
+
+        /* If we didn't match any vendor: unsupported */
+        if (!priv->vendor_strings[i])
+            return TRUE;
+
+        /* The plugin may specify that only some product strings are supported.
+         * If that is the case, filter by product string */
+        if (priv->product_strings) {
+            const gchar *product;
+
+            product = mm_port_probe_get_product (probe);
+
+            /* If we didn't get any product: unsupported */
+            if (!product)
+                return TRUE;
+
+            for (i = 0; priv->product_strings[i]; i++) {
+                gboolean found;
+                gchar *casefolded;
+
+                casefolded = g_utf8_casefold (priv->product_strings[i], -1);
+                found = !!strstr (product, casefolded);
+                g_free (casefolded);
+                if (found)
+                    break;
+            }
+
+            /* If we didn't match any product: unsupported */
+            if (!priv->product_strings[i])
+                return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+/* Context for the asynchronous probing operation */
+typedef struct {
+    GSimpleAsyncResult *result;
+    MMPluginBase *plugin;
+} PortProbeRunContext;
+
 static void
 port_probe_run_ready (MMPortProbe *probe,
                       GAsyncResult *probe_result,
-                      GSimpleAsyncResult *supports_port_result)
+                      PortProbeRunContext *ctx)
 {
     GError *error = NULL;
 
     if (!mm_port_probe_run_finish (probe, probe_result, &error)) {
         /* Probing failed */
-        g_simple_async_result_take_error (supports_port_result, error);
+        g_simple_async_result_take_error (ctx->result, error);
     } else {
         /* Probing succeeded */
-        guint32 capabilities;
-
-        /* TODO: Let plugins decide which capabilities they support */
-        capabilities = mm_port_probe_get_capabilities (probe);
-        g_simple_async_result_set_op_res_gboolean (supports_port_result,
-                                                   (capabilities > 0 ? TRUE : FALSE));
+        g_simple_async_result_set_op_res_gboolean (
+            ctx->result,
+            !apply_post_probing_filters (ctx->plugin, probe));
     }
 
     /* Complete the async supports port request */
-    g_simple_async_result_complete_in_idle (supports_port_result);
+    g_simple_async_result_complete_in_idle (ctx->result);
+
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->plugin);
+    g_free (ctx);
 }
 
 static MMPluginSupportsResult
@@ -424,6 +504,8 @@ supports_port (MMPlugin *plugin,
     gchar *key = NULL;
     MMPortProbe *probe;
     GSimpleAsyncResult *async_result;
+    PortProbeRunContext *ctx;
+    guint32 probe_run_flags;
 
     async_result = g_simple_async_result_new (G_OBJECT (self),
                                               callback,
@@ -482,14 +564,32 @@ supports_port (MMPlugin *plugin,
     probe = mm_port_probe_cache_get (port, physdev_path, driver);
     g_assert (probe);
 
+    /* Build flags depending on what probing needed */
+    probe_run_flags = 0;
+    if (priv->capabilities)
+        probe_run_flags |= MM_PORT_PROBE_AT_CAPABILITIES;
+    if (priv->vendor_strings)
+        probe_run_flags |= MM_PORT_PROBE_AT_VENDOR;
+    if (priv->product_strings)
+        probe_run_flags |= MM_PORT_PROBE_AT_PRODUCT;
+    if (priv->qcdm)
+        probe_run_flags |= MM_PORT_PROBE_QCDM;
+
+    g_assert (probe_run_flags != 0);
+
+    /* Setup async call context */
+    ctx = g_new (PortProbeRunContext, 1);
+    ctx->plugin = g_object_ref (self);
+    ctx->result = g_object_ref (async_result);
+
     /* Launch the probe */
     mm_dbg ("(%s) launching probe for (%s,%s)!", priv->name, subsys, name);
     mm_port_probe_run (probe,
-                       MM_PORT_PROBE_AT_CAPABILITIES,
+                       probe_run_flags,
                        priv->send_delay,
                        priv->custom_init,
                        (GAsyncReadyCallback)port_probe_run_ready,
-                       g_object_ref (async_result));
+                       ctx);
 
     /* Keep track of the probe */
     g_hash_table_insert (priv->tasks,
