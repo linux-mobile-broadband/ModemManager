@@ -70,6 +70,7 @@ typedef struct {
     gboolean sort_last;
 
     /* Plugin-specific setups */
+    guint32 capabilities;
     const gchar **subsystems;
     const guint16 *vendor_ids;
     const guint16 *product_ids;
@@ -81,6 +82,7 @@ typedef struct {
 enum {
     PROP_0,
     PROP_NAME,
+    PROP_ALLOWED_CAPABILITIES,
     PROP_ALLOWED_SUBSYSTEMS,
     PROP_ALLOWED_VENDOR_IDS,
     PROP_ALLOWED_PRODUCT_IDS,
@@ -1559,6 +1561,10 @@ set_property (GObject *object, guint prop_id,
         /* Construct only */
         priv->name = g_value_dup_string (value);
         break;
+    case PROP_ALLOWED_CAPABILITIES:
+        /* Construct only */
+        priv->capabilities = (guint32)g_value_get_uint (value);
+        break;
     case PROP_ALLOWED_SUBSYSTEMS:
         /* Construct only */
         priv->subsystems = (const gchar **)g_value_get_pointer (value);
@@ -1602,6 +1608,9 @@ get_property (GObject *object, guint prop_id,
     switch (prop_id) {
     case PROP_NAME:
         g_value_set_string (value, priv->name);
+        break;
+    case PROP_ALLOWED_CAPABILITIES:
+        g_value_set_uint (value, (guint)priv->capabilities);
         break;
     case PROP_ALLOWED_SUBSYSTEMS:
         g_value_set_pointer (value, (gpointer)priv->subsystems);
@@ -1665,6 +1674,14 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
                               "Name",
                               NULL,
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_ALLOWED_CAPABILITIES,
+         g_param_spec_uint (MM_PLUGIN_BASE_ALLOWED_CAPABILITIES,
+                            "Allowed capabilities",
+                            "Mask of capabilities this plugin can support",
+                            0, G_MAXUINT, 0,
+                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property
         (object_class, PROP_ALLOWED_SUBSYSTEMS,
