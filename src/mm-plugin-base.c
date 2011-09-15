@@ -275,10 +275,15 @@ apply_pre_probing_filters (MMPluginBase *self,
                            GUdevDevice *port,
                            const gchar *subsys,
                            const gchar *name,
-                           const gchar *driver)
+                           const gchar *driver,
+                           gboolean *need_vendor_probing,
+                           gboolean *need_product_probing)
 {
     MMPluginBasePrivate *priv = MM_PLUGIN_BASE_GET_PRIVATE (self);
     guint i;
+
+    *need_vendor_probing = FALSE;
+    *need_product_probing = FALSE;
 
     /* The plugin may specify that only some subsystems are supported. If that
      * is the case, filter by subsystem */
@@ -309,6 +314,7 @@ apply_pre_probing_filters (MMPluginBase *self,
     /* The plugin may specify that only some vendor IDs are supported. If that
      * is the case, filter by vendor ID. */
     if (priv->vendor_ids) {
+        gboolean vendor_filtered = FALSE;
         guint16 vendor = 0;
         guint16 product = 0;
 
@@ -316,32 +322,62 @@ apply_pre_probing_filters (MMPluginBase *self,
 
         /* If we didn't get any vendor: unsupported */
         if (!vendor)
-            return TRUE;
+            vendor_filtered = TRUE;
+        else {
+            for (i = 0; priv->vendor_ids[i]; i++)
+                if (vendor == priv->vendor_ids[i])
+                    break;
 
-        for (i = 0; priv->vendor_ids[i]; i++)
-            if (vendor == priv->vendor_ids[i])
-                break;
+            /* If we didn't match any vendor: unsupported */
+            if (!priv->vendor_ids[i])
+                vendor_filtered = TRUE;
+        }
 
-        /* If we didn't match any vendor: unsupported */
-        if (!priv->vendor_ids[i])
-            return TRUE;
+        if (vendor_filtered) {
+            /* If we got filtered by vendor and we do not have vendor strings
+             * to compare with: unsupported */
+            if (!priv->vendor_strings)
+                return TRUE;
+
+            /* Otherwise, we need to probe vendor strings. This cover the
+             * case where a RS232 modem is connected via a USB<->RS232 adaptor,
+             * and we get in udev the vendor ID of the adaptor */
+            *need_vendor_probing = TRUE;
+        }
 
         /* The plugin may specify that only some product IDs are supported. If
          * that is the case, filter by product ID */
         if (priv->product_ids) {
+            gboolean product_filtered = FALSE;
+
             /* If we didn't get any product: unsupported */
             if (!product)
-                return TRUE;
+                product_filtered = TRUE;
+            else {;
+                for (i = 0; priv->product_ids[i]; i++)
+                    if (product == priv->product_ids[i])
+                        break;
 
-            for (i = 0; priv->product_ids[i]; i++)
-                if (product == priv->product_ids[i])
-                    break;
+                /* If we didn't match any product: unsupported */
+                if (!priv->product_ids[i])
+                    product_filtered = TRUE;
+            }
 
-            /* If we didn't match any product: unsupported */
-            if (!priv->product_ids[i])
-                return TRUE;
-        }
-    }
+            if (product_filtered) {
+                /* If we got filtered by product and we do not have product
+                 * strings to compare with: unsupported */
+                if (!priv->product_strings)
+                    return TRUE;
+
+                /* Otherwise, we need to probe product strings. This cover the
+                 * case where a RS232 modem is connected via a USB<->RS232
+                 * adaptor, and we get in udev the product ID of the adaptor */
+                *need_product_probing = TRUE;
+            }
+        } else if (priv->vendor_strings)
+            *need_product_probing = TRUE;
+    } else if (priv->vendor_strings)
+        *need_vendor_probing = TRUE;
 
     /* The plugin may specify that only ports with some given udev tags are
      * supported. If that is the case, filter by udev tag */
@@ -505,6 +541,8 @@ supports_port (MMPlugin *plugin,
     MMPortProbe *probe;
     GSimpleAsyncResult *async_result;
     PortProbeRunContext *ctx;
+    gboolean need_vendor_probing;
+    gboolean need_product_probing;
     guint32 probe_run_flags;
 
     async_result = g_simple_async_result_new (G_OBJECT (self),
@@ -553,7 +591,9 @@ supports_port (MMPlugin *plugin,
                                    port,
                                    subsys,
                                    name,
-                                   driver)) {
+                                   driver,
+                                   &need_vendor_probing,
+                                   &need_product_probing)) {
         /* Filtered! */
         g_simple_async_result_set_op_res_gboolean (async_result, FALSE);
         g_simple_async_result_complete_in_idle (async_result);
@@ -568,9 +608,9 @@ supports_port (MMPlugin *plugin,
     probe_run_flags = 0;
     if (priv->capabilities)
         probe_run_flags |= MM_PORT_PROBE_AT_CAPABILITIES;
-    if (priv->vendor_strings)
+    if (need_vendor_probing)
         probe_run_flags |= MM_PORT_PROBE_AT_VENDOR;
-    if (priv->product_strings)
+    if (need_product_probing)
         probe_run_flags |= MM_PORT_PROBE_AT_PRODUCT;
     if (priv->qcdm)
         probe_run_flags |= MM_PORT_PROBE_QCDM;
