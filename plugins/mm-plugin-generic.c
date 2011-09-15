@@ -38,105 +38,37 @@ G_DEFINE_TYPE (MMPluginGeneric, mm_plugin_generic, MM_TYPE_PLUGIN_BASE)
 int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
 int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
-{
-    return MM_PLUGIN (g_object_new (MM_TYPE_PLUGIN_GENERIC,
-                                    MM_PLUGIN_BASE_NAME, MM_PLUGIN_GENERIC_NAME,
-                                    NULL));
-}
-
 /*****************************************************************************/
-
-#define CAP_CDMA (MM_PLUGIN_BASE_PORT_CAP_IS707_A | \
-                  MM_PLUGIN_BASE_PORT_CAP_IS707_P | \
-                  MM_PLUGIN_BASE_PORT_CAP_IS856 | \
-                  MM_PLUGIN_BASE_PORT_CAP_IS856_A)
-
-static guint32
-get_level_for_capabilities (guint32 capabilities)
-{
-    if (capabilities & MM_PLUGIN_BASE_PORT_CAP_GSM)
-        return 5;
-    if (capabilities & CAP_CDMA)
-        return 5;
-    if (capabilities & MM_PLUGIN_BASE_PORT_CAP_QCDM)
-        return 5;
-    return 0;
-}
-
-static void
-probe_result (MMPluginBase *base,
-              MMPluginBaseSupportsTask *task,
-              guint32 capabilities,
-              gpointer user_data)
-{
-    mm_plugin_base_supports_task_complete (task, get_level_for_capabilities (capabilities));
-}
-
-static MMPluginSupportsResult
-supports_port (MMPluginBase *base,
-               MMModem *existing,
-               MMPluginBaseSupportsTask *task)
-{
-    GUdevDevice *port;
-
-    /* Can't do anything with non-serial ports */
-    port = mm_plugin_base_supports_task_get_port (task);
-    if (strcmp (g_udev_device_get_subsystem (port), "tty"))
-        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
-
-    /* Check if a previous probing was already launched in this port */
-    if (mm_plugin_base_supports_task_propagate_cached (task)) {
-        guint32 level;
-
-        /* A previous probing was already done, use its results */
-        level = get_level_for_capabilities (mm_plugin_base_supports_task_get_probed_capabilities (task));
-        if (level) {
-            mm_plugin_base_supports_task_complete (task, level);
-            return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
-        }
-        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
-    }
-
-    /* Otherwise kick off a probe */
-    if (mm_plugin_base_probe_port (base, task, 100000, NULL))
-        return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
-
-    return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
-}
 
 static MMModem *
 grab_port (MMPluginBase *base,
            MMModem *existing,
-           MMPluginBaseSupportsTask *task,
+           MMPortProbe *probe,
            GError **error)
 {
-    GUdevDevice *port = NULL;
+    GUdevDevice *port;
     MMModem *modem = NULL;
-    const char *name, *subsys, *devfile, *sysfs_path, *driver;
+    const gchar *name, *subsys, *devfile, *physdev, *driver;
     guint32 caps;
     guint16 vendor = 0, product = 0;
-    MMPortType ptype;
 
-    port = mm_plugin_base_supports_task_get_port (task);
+    subsys = mm_port_probe_get_port_subsys (probe);
+    name = mm_port_probe_get_port_name (probe);
+    driver = mm_port_probe_get_port_driver (probe);
+    port = mm_port_probe_get_port (probe);
     g_assert (port);
-
-    subsys = g_udev_device_get_subsystem (port);
-    name = g_udev_device_get_name (port);
 
     devfile = g_udev_device_get_device_file (port);
     if (!devfile) {
-        driver = mm_plugin_base_supports_task_get_driver (task);
         if (!driver || strcmp (driver, "bluetooth")) {
             g_set_error (error, 0, 0, "Could not get port's sysfs file.");
             return NULL;
-        } else {
-            mm_warn ("%s: (%s/%s) WARNING: missing udev 'device' file",
-                     mm_plugin_get_name (MM_PLUGIN (base)),
-                     subsys,
-                     name);
         }
+
+        mm_warn ("%s: (%s/%s) WARNING: missing udev 'device' file",
+                 mm_plugin_get_name (MM_PLUGIN (base)),
+                 subsys,
+                 name);
     }
 
     if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product)) {
@@ -144,35 +76,49 @@ grab_port (MMPluginBase *base,
         return NULL;
     }
 
-    caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
-    ptype = mm_plugin_base_probed_capabilities_to_port_type (caps);
-    sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
+    caps = mm_port_probe_get_capabilities (probe);
+    physdev = mm_port_probe_get_port_physdev (probe);
     if (!existing) {
-        if (caps & CAP_CDMA) {
-            modem = mm_generic_cdma_new (sysfs_path,
-                                         mm_plugin_base_supports_task_get_driver (task),
+        if (caps & MM_PORT_PROBE_CAPABILITY_CDMA) {
+            modem = mm_generic_cdma_new (physdev,
+                                         driver,
                                          mm_plugin_get_name (MM_PLUGIN (base)),
-                                         !!(caps & MM_PLUGIN_BASE_PORT_CAP_IS856),
-                                         !!(caps & MM_PLUGIN_BASE_PORT_CAP_IS856_A),
+                                         !!(caps & MM_PORT_PROBE_CAPABILITY_IS856),
+                                         !!(caps & MM_PORT_PROBE_CAPABILITY_IS856_A),
                                          vendor,
                                          product);
-        } else if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
-            modem = mm_generic_gsm_new (sysfs_path,
-                                        mm_plugin_base_supports_task_get_driver (task),
+        } else if (caps & MM_PORT_PROBE_CAPABILITY_GSM) {
+            modem = mm_generic_gsm_new (physdev,
+                                        driver,
                                         mm_plugin_get_name (MM_PLUGIN (base)),
                                         vendor,
                                         product);
         }
 
         if (modem) {
-            if (!mm_modem_grab_port (modem, subsys, name, ptype, MM_AT_PORT_FLAG_NONE, NULL, error)) {
+            if (!mm_modem_grab_port (modem,
+                                     subsys,
+                                     name,
+                                     MM_PORT_TYPE_UNKNOWN,
+                                     NULL,
+                                     error)) {
                 g_object_unref (modem);
                 return NULL;
             }
         }
-    } else if (get_level_for_capabilities (caps)) {
+    } else if (caps) {
+        MMPortType ptype = MM_PORT_TYPE_UNKNOWN;
+
+        if (mm_port_probe_is_qcdm (probe))
+            ptype = MM_PORT_TYPE_QCDM;
+
         modem = existing;
-        if (!mm_modem_grab_port (modem, subsys, name, ptype, MM_AT_PORT_FLAG_NONE, NULL, error))
+        if (!mm_modem_grab_port (modem,
+                                 subsys,
+                                 name,
+                                 ptype,
+                                 NULL,
+                                 error))
             return NULL;
     }
 
@@ -181,10 +127,26 @@ grab_port (MMPluginBase *base,
 
 /*****************************************************************************/
 
+G_MODULE_EXPORT MMPlugin *
+mm_plugin_create (void)
+{
+    static const gchar *name = MM_PLUGIN_GENERIC_NAME;
+    static const gchar *subsystems[] = { "tty", NULL };
+    static const guint32 capabilities = MM_PORT_PROBE_CAPABILITY_GSM_OR_CDMA;
+    static const gboolean qcdm = TRUE;
+
+    return MM_PLUGIN (
+        g_object_new (MM_TYPE_PLUGIN_GENERIC,
+                      MM_PLUGIN_BASE_NAME, name,
+                      MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS, subsystems,
+                      MM_PLUGIN_BASE_ALLOWED_CAPABILITIES, capabilities,
+                      MM_PLUGIN_BASE_ALLOWED_QCDM, qcdm,
+                      NULL));
+}
+
 static void
 mm_plugin_generic_init (MMPluginGeneric *self)
 {
-    g_signal_connect (self, "probe-result", G_CALLBACK (probe_result), NULL);
 }
 
 static void
@@ -192,7 +154,6 @@ mm_plugin_generic_class_init (MMPluginGenericClass *klass)
 {
     MMPluginBaseClass *pb_class = MM_PLUGIN_BASE_CLASS (klass);
 
-    pb_class->supports_port = supports_port;
     pb_class->grab_port = grab_port;
 }
 
