@@ -143,6 +143,9 @@ marshallers/Makefile
 libqcdm/Makefile
 libqcdm/src/Makefile
 libqcdm/tests/Makefile
+libwmc/Makefile
+libwmc/src/Makefile
+libwmc/tests/Makefile
 src/Makefile
 src/tests/Makefile
 plugins/Makefile

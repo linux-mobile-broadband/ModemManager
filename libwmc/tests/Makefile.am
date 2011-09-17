@@ -1,0 +1,28 @@
+INCLUDES = \
+	-I$(top_srcdir)/libwmc/src
+
+noinst_PROGRAMS = test-wmc
+
+test_wmc_SOURCES = \
+	test-wmc-crc.c \
+	test-wmc-crc.h \
+	test-wmc-escaping.c \
+	test-wmc-escaping.h \
+	test-wmc-utils.c \
+	test-wmc-utils.h \
+	test-wmc.c
+
+test_wmc_CPPFLAGS = \
+	$(MM_CFLAGS)
+
+test_wmc_LDADD = \
+	$(top_builddir)/libwmc/src/libwmc.la \
+	$(MM_LIBS)
+
+if WITH_TESTS
+
+check-local: test-wmc
+	$(abs_builddir)/test-wmc
+
+endif
+

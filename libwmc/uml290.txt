@@ -80,31 +80,74 @@ The protocol is a request/response style protocol though unsolicited responses
 are sometimes sent from the modem to the host.  There does not appear to be any
 sequence numbering in either the request or response packets.  WMC packets
 always begin with the frame start marker (0xC8).  The second byte is the command
-number.  The frame ends with a three-byte trailer including a CRC-16 and a
-standard HDLC/PPP frame terminator (0x7E), though this terminator is missing in
-some cases as described below. Thus a normal WMC packet looks like this:
+number, followed by the frame's data.  The frame ends with a three-byte trailer
+including a CRC-16 and a frame termination marker which differs between devices.
+Most older devices use the standard HDLC/PPP frame termination marker (0x7E),
+while some others (UML290) use a different termination marker as described
+below.  Thus a normal WMC packet looks like this:
 
 0xC8 <command number> <data> <CRC-16> 0x7E
 
-The entire frame (exclusive of the 0x7E frame terminator) is escaped using
-standard HDLC/PPP escaping mechanisms to ensure that the bytes 0x7E and 0x7D
-never appear in the packet.
+The entire frame (exclusive of the termination marker) is escaped using standard
+HDLC/PPP escaping mechanisms to ensure that the bytes 0x7E and 0x7D never appear
+in the packet.  Some devices (UML290) escape more than the standard HDLC escape
+characters.
+
+Frames can span multiple USB packets.  This behavior has been observed with the
+PC5740 in various responses, in which case the frame is simply split up between
+USB packets.  It has also been observed with some UML290 requests, where it
+appears that in addition to splitting the frame, each segment after the first
+is prefixed with 0x20.
+
+For example, a split response from a PC5740:
+
+* c8 06 0f 0f 0f 0f 0f 0f 0f 0f 0f 0f 00 00 00 00    ................
+  ...
+  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00       ...............
+
+* 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+  ...
+  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00       ...............
+
+* 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+  ...
+  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00       ...............
+
+* 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+  ...
+  00 00 00 01                                        ....
+
+
+and an split request from a UML290:
+
+* c8 56 86 02 00 00 00 00 00 00 39 30 30 30 38 30    .V........900080
+  ...
+  00 00 00 00 00 00 00 00 00 00 00 00 00 00          ..............
+
+* 20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ...............
+  ...
+  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+
+* 20 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ...............
+  ...
+  00 00 00 00 00 00 00 00 00 00 5b 1c 0d             ..........[..
+
 
 
 Requests
 ---------------
 
 Requests are usually short, often only 4 or 5 bytes long, including the frame
-start marker (0xC8), the command number, the CRC, and the frame termination
-marker.  Requests always receive a response from the modem containing the same
-command number.
+start marker (0xC8), the command number, the 16-bit CRC, and the frame termination
+marker.  Requests almost always receive a response from the modem containing the
+same command number.
 
 The UML290 uses different "AT"-style framing of requests, prefixing the
 request with "AT*WMC=" and using a frame termination marker of 0x0D instead
 of the standard 0x7E.  The UML290 also uses a different CRC-16 initial seed of
 0xAAFE instead of the standard 0xFFFF used on other devices and with HDLC
 framing in general.  For added lolz the UML290 HDLC-escapes all control
-characters in the request instead of only the standard 0x7D and 0x7E characters
+characters in the request in addition to the standard 0x7D and 0x7E characters
 escaped in HDLC.
 
 Thus a normal WMC request (from a PC5740) looks like this:
