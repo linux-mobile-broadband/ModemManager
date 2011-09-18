@@ -28,6 +28,7 @@
 #include "mm-errors.h"
 #include "mm-plugin.h"
 #include "mm-log.h"
+#include "mm-port-probe-cache.h"
 
 static gboolean impl_manager_enumerate_devices (MMManager *manager,
                                                 GPtrArray **devices,
@@ -609,6 +610,9 @@ device_removed (MMManager *manager, GUdevDevice *device)
 
     subsys = g_udev_device_get_subsystem (device);
     name = g_udev_device_get_name (device);
+
+    /* Ensure cached port probe infos get removed when the port is gone */
+    mm_port_probe_cache_remove (device);
 
     if (strcmp (subsys, "usb") != 0) {
         /* find_modem_for_port handles tty and net removal */
