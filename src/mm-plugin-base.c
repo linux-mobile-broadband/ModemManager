@@ -486,9 +486,15 @@ port_probe_run_ready (MMPortProbe *probe,
         g_simple_async_result_take_error (ctx->result, error);
     } else {
         /* Probing succeeded */
-        g_simple_async_result_set_op_res_gboolean (
-            ctx->result,
-            !apply_post_probing_filters (ctx->plugin, probe));
+        MMPluginSupportsResult supports_result;
+
+        supports_result = (apply_post_probing_filters (ctx->plugin,
+                                                       probe) ?
+                           MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED :
+                           MM_PLUGIN_SUPPORTS_PORT_SUPPORTED);
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                   GUINT_TO_POINTER (supports_result),
+                                                   NULL);
     }
 
     /* Complete the async supports port request */
@@ -516,12 +522,7 @@ supports_port_finish (MMPlugin *self,
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
     }
 
-    if (g_simple_async_result_get_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (result))) {
-        *level = 10; /* dummy */
-        return MM_PLUGIN_SUPPORTS_PORT_SUPPORTED;
-    }
-
-    return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
+    return (MMPluginSupportsResult) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (result)));
 }
 
 static void
@@ -595,7 +596,9 @@ supports_port (MMPlugin *plugin,
                                    &need_vendor_probing,
                                    &need_product_probing)) {
         /* Filtered! */
-        g_simple_async_result_set_op_res_gboolean (async_result, FALSE);
+        g_simple_async_result_set_op_res_gpointer (async_result,
+                                                   GUINT_TO_POINTER (MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED),
+                                                   NULL);
         g_simple_async_result_complete_in_idle (async_result);
         goto out;
     }
