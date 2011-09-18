@@ -603,6 +603,20 @@ supports_port (MMPlugin *plugin,
         goto out;
     }
 
+    /* Before launching any probing, check if the port is a net device (which
+     * cannot be probed). */
+    if (g_str_equal (subsys, "net")) {
+        /* If we already have a existing modem, then mark it as supported.
+         * Otherwise, just defer a bit */
+        g_simple_async_result_set_op_res_gpointer (async_result,
+                                                   GUINT_TO_POINTER ((existing ?
+                                                                      MM_PLUGIN_SUPPORTS_PORT_SUPPORTED :
+                                                                      MM_PLUGIN_SUPPORTS_PORT_DEFER)),
+                                                   NULL);
+        g_simple_async_result_complete_in_idle (async_result);
+        goto out;
+    }
+
     /* Need to launch new probing */
     probe = mm_port_probe_cache_get (port, physdev_path, driver);
     g_assert (probe);
