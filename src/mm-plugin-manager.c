@@ -269,11 +269,6 @@ supports_port_ready_cb (MMPlugin *plugin,
                                                  (GSourceFunc)find_port_support_idle,
                                                  info);
         break;
-
-    case MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS:
-        /* We have full asynchronous support, now, so we shouldn't get an
-         * intermediate state here. */
-        g_assert_not_reached ();
     }
 }
 

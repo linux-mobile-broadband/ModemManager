@@ -49,7 +49,6 @@ typedef void (*MMSupportsPortResultFunc) (MMPlugin *plugin,
 
 typedef enum {
     MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED = 0x0,
-    MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS,
     MM_PLUGIN_SUPPORTS_PORT_DEFER,
     MM_PLUGIN_SUPPORTS_PORT_SUPPORTED
 } MMPluginSupportsResult;
