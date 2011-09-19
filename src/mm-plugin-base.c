@@ -480,6 +480,7 @@ port_probe_run_ready (MMPortProbe *probe,
                       PortProbeRunContext *ctx)
 {
     GError *error = NULL;
+    gboolean keep_probe = FALSE;
 
     if (!mm_port_probe_run_finish (probe, probe_result, &error)) {
         /* Probing failed */
@@ -488,10 +489,16 @@ port_probe_run_ready (MMPortProbe *probe,
         /* Probing succeeded */
         MMPluginSupportsResult supports_result;
 
-        supports_result = (apply_post_probing_filters (ctx->plugin,
-                                                       probe) ?
-                           MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED :
-                           MM_PLUGIN_SUPPORTS_PORT_SUPPORTED);
+        if (!apply_post_probing_filters (ctx->plugin, probe)) {
+            /* Port is supported! Leave it in the internal HT until port gets
+             * grabbed. */
+            supports_result = MM_PLUGIN_SUPPORTS_PORT_SUPPORTED;
+            keep_probe = TRUE;
+        } else {
+            /* Unsupported port, remove from internal tracking HT */
+            supports_result = MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
+        }
+
         g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                    GUINT_TO_POINTER (supports_result),
                                                    NULL);
@@ -499,6 +506,17 @@ port_probe_run_ready (MMPortProbe *probe,
 
     /* Complete the async supports port request */
     g_simple_async_result_complete_in_idle (ctx->result);
+
+    /* If no longer needed, Remove probe from internal HT */
+    if (!keep_probe) {
+        MMPluginBasePrivate *priv = MM_PLUGIN_BASE_GET_PRIVATE (ctx->plugin);
+        gchar *key;
+
+        key = get_key (mm_port_probe_get_port_subsys (probe),
+                       mm_port_probe_get_port_name (probe));
+        g_hash_table_remove (priv->tasks, key);
+        g_free (key);
+    }
 
     g_object_unref (ctx->result);
     g_object_unref (ctx->plugin);
