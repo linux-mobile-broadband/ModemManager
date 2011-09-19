@@ -104,6 +104,28 @@ test_escape2 (void *f, void *data)
     g_assert (memcmp (escaped, data2, len) == 0);
 }
 
+static const char data_ctrl_src[] = {
+    0xc8, 0x0d, 0xda, 0x07, 0x0c, 0x00, 0x14, 0x00, 0x10, 0x00, 0x19, 0x00,
+    0x04, 0x00, 0x01, 0x00, 0x07, 0x88
+};
+
+static const char data_ctrl_expected[] = {
+    0xc8, 0x7d, 0x2d, 0xda, 0x7d, 0x27, 0x7d, 0x2c, 0x7d, 0x20, 0x7d, 0x34,
+    0x7d, 0x20, 0x7d, 0x30, 0x7d, 0x20, 0x7d, 0x39, 0x7d, 0x20, 0x7d, 0x24,
+    0x7d, 0x20, 0x7d, 0x21, 0x7d, 0x20, 0x7d, 0x27, 0x88
+};
+
+void
+test_escape_ctrl (void *f, void *data)
+{
+    char escaped[1024];
+    gsize len;
+
+    len = hdlc_escape (data_ctrl_src, sizeof (data_ctrl_src), TRUE, escaped, sizeof (escaped));
+    g_assert (len == sizeof (data_ctrl_expected));
+    g_assert (memcmp (escaped, data_ctrl_expected, len) == 0);
+}
+
 void
 test_escape_unescape (void *f, void *data)
 {
@@ -120,5 +142,24 @@ test_escape_unescape (void *f, void *data)
 
     g_assert (unlen == sizeof (data1));
     g_assert (memcmp (unescaped, data1, unlen) == 0);
+}
+
+void
+test_escape_unescape_ctrl (void *f, void *data)
+{
+    char escaped[512];
+    char unescaped[512];
+    gsize len, unlen;
+    gboolean escaping = FALSE;
+
+    /* Ensure that escaping data that needs escaping, and then unescaping it,
+     * produces the exact same data as was originally escaped.
+     */
+    len = hdlc_escape (data_ctrl_src, sizeof (data_ctrl_src), TRUE, escaped, sizeof (escaped));
+    g_assert (memcmp (escaped, data_ctrl_expected, len) == 0);
+
+    unlen = hdlc_unescape (escaped, len, unescaped, sizeof (unescaped), &escaping);
+    g_assert (unlen == sizeof (data_ctrl_src));
+    g_assert (memcmp (unescaped, data_ctrl_src, unlen) == 0);
 }
 

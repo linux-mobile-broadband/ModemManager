@@ -54,6 +54,8 @@ gsize uml290_wmc_encapsulate (char *inbuf,
 
 gboolean hdlc_decapsulate_buffer (const char *inbuf,
                                   gsize inbuf_len,
+                                  gboolean check_known_crc,
+                                  guint16 known_crc,
                                   char *outbuf,
                                   gsize outbuf_len,
                                   gsize *out_decap_len,

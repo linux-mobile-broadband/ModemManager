@@ -24,5 +24,11 @@ void test_utils_encapsulate_basic_buffer (void *f, void *data);
 
 void test_utils_decapsulate_sierra_cns (void *f, void *data);
 
+void test_utils_encapsulate_uml290_wmc1 (void *f, void *data);
+
+void test_utils_decapsulate_uml290_wmc1 (void *f, void *data);
+
+void test_utils_decapsulate_pc5740_wmc1 (void *f, void *data);
+
 #endif  /* TEST_WMC_UTILS_H */
 

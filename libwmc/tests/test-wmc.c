@@ -42,10 +42,14 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_crc16_2, NULL));
     g_test_suite_add (suite, TESTCASE (test_escape1, NULL));
     g_test_suite_add (suite, TESTCASE (test_escape2, NULL));
+    g_test_suite_add (suite, TESTCASE (test_escape_ctrl, NULL));
     g_test_suite_add (suite, TESTCASE (test_escape_unescape, NULL));
+    g_test_suite_add (suite, TESTCASE (test_escape_unescape_ctrl, NULL));
     g_test_suite_add (suite, TESTCASE (test_utils_decapsulate_basic_buffer, NULL));
     g_test_suite_add (suite, TESTCASE (test_utils_encapsulate_basic_buffer, NULL));
     g_test_suite_add (suite, TESTCASE (test_utils_decapsulate_sierra_cns, NULL));
+    g_test_suite_add (suite, TESTCASE (test_utils_decapsulate_uml290_wmc1, NULL));
+    g_test_suite_add (suite, TESTCASE (test_utils_decapsulate_pc5740_wmc1, NULL));
 
 	result = g_test_run ();
 

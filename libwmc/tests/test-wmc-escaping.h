@@ -20,7 +20,9 @@
 
 void test_escape1 (void *f, void *data);
 void test_escape2 (void *f, void *data);
+void test_escape_ctrl (void *f, void *data);
 void test_escape_unescape (void *f, void *data);
+void test_escape_unescape_ctrl (void *f, void *data);
 
 #endif  /* TEST_WMC_ESCAPING_H */
 
