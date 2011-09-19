@@ -44,7 +44,7 @@ static const char decap_inbuf[] = {
 };
 
 void
-test_utils_decapsulate_buffer (void *f, void *data)
+test_utils_decapsulate_basic_buffer (void *f, void *data)
 {
     gboolean success;
     char outbuf[512];
@@ -67,7 +67,7 @@ static const char encap_outbuf[] = {
 };
 
 void
-test_utils_encapsulate_buffer (void *f, void *data)
+test_utils_encapsulate_basic_buffer (void *f, void *data)
 {
     char cmdbuf[10];
     char outbuf[512];
