@@ -126,6 +126,7 @@ typedef struct {
 #define MM_PLUGIN_BASE_NAME                    "name"
 #define MM_PLUGIN_BASE_ALLOWED_CAPABILITIES    "allowed-capabilities"
 #define MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS      "allowed-subsystems"
+#define MM_PLUGIN_BASE_ALLOWED_DRIVERS         "allowed-drivers"
 #define MM_PLUGIN_BASE_ALLOWED_VENDOR_IDS      "allowed-vendor-ids"
 #define MM_PLUGIN_BASE_ALLOWED_PRODUCT_IDS     "allowed-product-ids"
 #define MM_PLUGIN_BASE_ALLOWED_VENDOR_STRINGS  "allowed-vendor-strings"
