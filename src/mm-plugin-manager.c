@@ -68,7 +68,6 @@ typedef struct {
     GSList *current;
     guint source_id;
     /* Output context */
-    guint best_level;
     MMPlugin *best_plugin;
 } SupportsInfo;
 
@@ -186,12 +185,10 @@ supports_port_ready_cb (MMPlugin *plugin,
 {
     MMPluginSupportsResult support_result;
     GError *error = NULL;
-    guint level = 0;
 
     /* Get supports check results */
     support_result = mm_plugin_supports_port_finish (plugin,
                                                      result,
-                                                     &level,
                                                      &error);
     if (error) {
         mm_warn ("(%s): (%s) error when checking support: '%s'",
@@ -203,41 +200,22 @@ supports_port_ready_cb (MMPlugin *plugin,
 
     switch (support_result) {
     case MM_PLUGIN_SUPPORTS_PORT_SUPPORTED:
-        /* Is this plugin's result better than any one we've tried before? */
-        if (level > info->best_level) {
-            info->best_level = level;
-            info->best_plugin = plugin;
+        /* Found a best plugin */
+        info->best_plugin = plugin;
+
+        if (info->suggested_plugin &&
+            info->suggested_plugin != plugin) {
+            /* The last plugin we tried said it supported this port, but it
+             * doesn't correspond with the one we're being suggested. */
+            g_warn_if_reached ();
         }
 
-        if (info->suggested_plugin) {
-            if (info->suggested_plugin == plugin) {
-                /* If the plugin that just completed the support check is actually
-                 * the one suggested, stop the checks */
-                info->current = NULL;
-            } else {
-                /* The last plugin we tried is NOT the one we got suggested, so
-                 * directly check support with the suggested plugin. If we
-                 * already checked its support, it won't be checked again. */
-                info->current = g_slist_find (info->current,
-                                              info->suggested_plugin);
-            }
-        } else {
-            /* Go on to the next plugin */
-            info->current = g_slist_next (info->current);
-            /* Don't bother with Generic if some other plugin already supports
-             * this port */
-            if (info->best_plugin &&
-                info->current &&
-                g_str_equal (mm_plugin_get_name (MM_PLUGIN (info->current->data)),
-                             MM_PLUGIN_GENERIC_NAME)) {
-                mm_dbg ("(%s): (%s) found best plugin for port",
-                        mm_plugin_get_name (info->best_plugin),
-                        info->name);
-                info->current = NULL;
-            }
-        }
+        mm_dbg ("(%s): (%s) found best plugin for port",
+                mm_plugin_get_name (info->best_plugin),
+                info->name);
+        info->current = NULL;
 
-        /* Schedule checking support with next plugin */
+        /* Schedule checking support, which will end the operation */
         info->source_id = g_idle_add ((GSourceFunc)find_port_support_idle,
                                       info);
         break;
@@ -254,7 +232,6 @@ supports_port_ready_cb (MMPlugin *plugin,
                         info->subsys,
                         info->name);
                 info->best_plugin = NULL;
-                info->best_level = 0;
                 info->current = NULL;
             } else {
                 /* The last plugin we tried is NOT the one we got suggested, so

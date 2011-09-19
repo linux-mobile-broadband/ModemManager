@@ -508,7 +508,6 @@ port_probe_run_ready (MMPortProbe *probe,
 static MMPluginSupportsResult
 supports_port_finish (MMPlugin *self,
                       GAsyncResult *result,
-                      guint *level,
                       GError **error)
 {
     g_return_val_if_fail (MM_IS_PLUGIN (self),

@@ -82,7 +82,6 @@ struct _MMPlugin {
     /* Allows to get the result of an asynchronous port support check. */
     MMPluginSupportsResult (* supports_port_finish) (MMPlugin *self,
                                                      GAsyncResult *result,
-                                                     guint *level,
                                                      GError **error);
 
     /* Called to cancel an ongoing supports_port() operation or to notify the
@@ -126,7 +125,6 @@ void mm_plugin_supports_port (MMPlugin *plugin,
 
 MMPluginSupportsResult mm_plugin_supports_port_finish (MMPlugin *plugin,
                                                        GAsyncResult *result,
-                                                       guint *level,
                                                        GError **error);
 
 void mm_plugin_supports_port_cancel (MMPlugin *plugin,

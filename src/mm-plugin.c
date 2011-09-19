@@ -59,7 +59,6 @@ mm_plugin_supports_port (MMPlugin *self,
 MMPluginSupportsResult
 mm_plugin_supports_port_finish (MMPlugin *self,
                                 GAsyncResult *result,
-                                guint *level,
                                 GError **error)
 {
     g_return_val_if_fail (MM_IS_PLUGIN (self),
@@ -69,7 +68,6 @@ mm_plugin_supports_port_finish (MMPlugin *self,
 
     return MM_PLUGIN_GET_INTERFACE (self)->supports_port_finish (self,
                                                                  result,
-                                                                 level,
                                                                  error);
 }
 
