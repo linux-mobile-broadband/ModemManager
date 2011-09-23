@@ -13,6 +13,9 @@
  * Copyright (C) 2011 Red Hat, Inc.
  */
 
+#include <ctype.h>
+#include <stdio.h>
+
 #include <glib.h>
 
 #include "mm-charsets.h"
@@ -200,8 +203,22 @@ sms_decode_text (const guint8 *text, int len, SmsEncoding encoding, int bit_offs
         g_free (unpacked);
     } else if (encoding == MM_SMS_ENCODING_UCS2)
         utf8 = g_convert ((char *) text, len, "UTF8", "UCS-2BE", NULL, NULL, NULL);
-    else if (encoding == MM_SMS_ENCODING_8BIT)
-        utf8 = g_strndup ((const char *)text, len);
+    else if (encoding == MM_SMS_ENCODING_8BIT) {
+        /* DBus requires UTF-8 strings, so we have some sanitizing to do */
+        char *p;
+        int i;
+        utf8 = g_malloc0 (4*len+1); /* Worst case: Every byte becomes "\xFF" */
+        p = utf8;
+        for (i = 0 ; i < len ; i++) {
+            if (isascii (text[i]) && text[i] != '\0')
+                *p++ = text[i];
+            else {
+                sprintf(p, "\\x%02x", text[i]);
+                p += 4;
+            }
+        }
+        *p = '\0';
+    }
     else
         utf8 = g_strdup ("");
 
