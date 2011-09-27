@@ -2823,7 +2823,7 @@ handle_reg_status_response (MMGenericGsm *self,
     guint32 status = 0;
     gulong lac = 0, ci = 0;
     gint act = -1;
-    gboolean cgreg = FALSE;
+    gboolean cgreg = FALSE, parsed;
     guint i;
 
     /* Try to match the response */
@@ -2843,24 +2843,23 @@ handle_reg_status_response (MMGenericGsm *self,
     }
 
     /* And parse it */
-    if (!mm_gsm_parse_creg_response (match_info, &status, &lac, &ci, &act, &cgreg, error)) {
-        g_match_info_free (match_info);
-        return FALSE;
+    parsed = mm_gsm_parse_creg_response (match_info, &status, &lac, &ci, &act, &cgreg, error);
+    g_match_info_free (match_info);
+    if (parsed) {
+        /* Success; update cached location information */
+        update_lac_ci (self, lac, ci, cgreg ? 1 : 0);
+
+        /* Only update access technology if it appeared in the CREG/CGREG response */
+        if (act != -1)
+            mm_generic_gsm_update_access_technology (self, etsi_act_to_mm_act (act));
+
+        if (status >= 0) {
+            /* Update cached registration status */
+            reg_status_updated (self, cgreg_to_reg_type (cgreg), status, NULL);
+        }
     }
 
-    /* Success; update cached location information */
-    update_lac_ci (self, lac, ci, cgreg ? 1 : 0);
-
-    /* Only update access technology if it appeared in the CREG/CGREG response */
-    if (act != -1)
-        mm_generic_gsm_update_access_technology (self, etsi_act_to_mm_act (act));
-
-    if (status >= 0) {
-        /* Update cached registration status */
-        reg_status_updated (self, cgreg_to_reg_type (cgreg), status, NULL);
-    }
-
-    return TRUE;
+    return parsed;
 }
 
 #define CS_ERROR_TAG "cs-error"
@@ -3584,9 +3583,13 @@ cid_range_read (MMAtSerialPort *port,
                 g_match_info_next (match_info, NULL);
             }
 
-            if (cid == 0)
+            if (cid == 0) {
                 /* Choose something */
                 cid = 1;
+            }
+
+            g_match_info_free (match_info);
+            g_regex_unref (r);
         }
     } else
         info->error = g_error_new_literal (MM_MODEM_ERROR,
