@@ -81,8 +81,6 @@ parse_syssel_response (GString *response,
     mode = atoi (str);
     g_free (str);
 
-    g_match_info_free (match_info);
-
     if (mode < 0 || mode > 2) {
         g_set_error_literal (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
                              "Failed to parse mode/tech response");
@@ -102,6 +100,7 @@ parse_syssel_response (GString *response,
     success = TRUE;
 
 out:
+    g_match_info_free (match_info);
     g_regex_unref (r);
     return success;
 }

@@ -125,10 +125,8 @@ mm_gsm_parse_scan_response (const char *reply, GError **error)
     /* If we didn't get any hits, try the pre-UMTS format match */
     if (!g_regex_match (r, reply, 0, &match_info)) {
         g_regex_unref (r);
-        if (match_info) {
-            g_match_info_free (match_info);
-            match_info = NULL;
-        }
+        g_match_info_free (match_info);
+        match_info = NULL;
 
         /* Pre-UMTS format doesn't include the cell access technology after
          * the numeric operator element.
@@ -778,8 +776,8 @@ mm_gsm_parse_cscs_support_response (const char *reply,
             g_match_info_next (match_info, NULL);
             success = TRUE;
         }
-        g_match_info_free (match_info);
     }
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     if (success)
@@ -1020,8 +1018,8 @@ mm_parse_cind_test_response (const char *reply, GError **error)
 
             g_match_info_next (match_info, NULL);
         }
-        g_match_info_free (match_info);
     }
+    g_match_info_free (match_info);
     g_regex_unref (r);
 
     return hash;
@@ -1086,11 +1084,10 @@ mm_parse_cind_query_response(const char *reply, GError **error)
         g_free (str);
         g_match_info_next (match_info, NULL);
     }
-    g_match_info_free (match_info);
 
 done:
-    if (r)
-        g_regex_unref (r);
+    g_match_info_free (match_info);
+    g_regex_unref (r);
 
     return array;
 }

@@ -183,6 +183,9 @@ evdo_state_done (MMAtSerialPort *port,
         }
     }
 
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+
 done:
     mm_generic_cdma_query_reg_state_set_callback_evdo_state (info, reg_state);
     mm_callback_info_schedule (info);
@@ -253,6 +256,9 @@ state_done (MMAtSerialPort *port,
             }
         }
     }
+
+    g_match_info_free (match_info);
+    g_regex_unref (r);
 
     mm_generic_cdma_query_reg_state_set_callback_1x_state (info, reg_state);
 

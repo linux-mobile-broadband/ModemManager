@@ -105,7 +105,7 @@ get_allowed_mode_done (MMAtSerialPort *port,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     GRegex *r = NULL;
-    GMatchInfo *match_info;
+    GMatchInfo *match_info = NULL;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
@@ -138,8 +138,6 @@ get_allowed_mode_done (MMAtSerialPort *port,
         pref_acq = atoi (str);
         g_free (str);
 
-        g_match_info_free (match_info);
-
         if (cm_mode < 0 || cm_mode > 2 || pref_acq < 0 || pref_acq > 2) {
             info->error = g_error_new (MM_MODEM_ERROR,
                                        MM_MODEM_ERROR_GENERAL,
@@ -164,6 +162,8 @@ get_allowed_mode_done (MMAtSerialPort *port,
     }
 
 done:
+    if (match_info)
+        g_match_info_free (match_info);
     if (r)
         g_regex_unref (r);
     mm_callback_info_schedule (info);

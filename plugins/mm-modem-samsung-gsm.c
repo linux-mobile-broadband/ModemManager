@@ -357,9 +357,9 @@ send_samsung_pinnum_done (MMAtSerialPort *port,
 
     mm_callback_info_set_result (info, GUINT_TO_POINTER (attempts_left), NULL);
 
-    g_match_info_free (match_info);
-
 done:
+    if (match_info)
+        g_match_info_free (match_info);
     if (r)
         g_regex_unref (r);
     mm_serial_port_close (MM_SERIAL_PORT (port));

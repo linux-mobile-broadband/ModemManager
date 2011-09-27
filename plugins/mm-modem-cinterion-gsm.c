@@ -652,6 +652,9 @@ get_smong_cb (MMAtSerialPort *port,
         priv->sind_psinfo = TRUE;
     }
 
+    g_match_info_free (match_info);
+    g_regex_unref (regex);
+
     mm_callback_info_set_result (info, GUINT_TO_POINTER (act), NULL);
     mm_callback_info_schedule (info);
 }
@@ -698,12 +701,14 @@ get_sind_cb (MMAtSerialPort *port,
         g_free (ind_value);
         mm_callback_info_set_result (info, GUINT_TO_POINTER (act), NULL);
         mm_callback_info_schedule (info);
-        return;
+    } else {
+        /* If there was no 'psinfo' indicator, we'll try AT^SMONG and read the cell
+         * info table. */
+        mm_at_serial_port_queue_command (port, "^SMONG", 3, get_smong_cb, info);
     }
 
-    /* If there was no 'psinfo' indicator, we'll try AT^SMONG and read the cell
-     * info table. */
-    mm_at_serial_port_queue_command (port, "^SMONG", 3, get_smong_cb, info);
+    g_match_info_free (match_info);
+    g_regex_unref (regex);
 }
 
 static void
