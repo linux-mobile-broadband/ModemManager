@@ -21,6 +21,11 @@
 #include "test-wmc-crc.h"
 #include "test-wmc-escaping.h"
 #include "test-wmc-utils.h"
+#include "test-wmc-com.h"
+
+typedef struct {
+    gpointer com_data;
+} TestData;
 
 #if GLIB_CHECK_VERSION(2,25,12)
 typedef GTestFixtureFunc TCFunc;
@@ -30,12 +35,51 @@ typedef void (*TCFunc)(void);
 
 #define TESTCASE(t, d) g_test_create_case (#t, 0, d, NULL, (TCFunc) t, NULL)
 
+static TestData *
+test_data_new (const char *port, gboolean uml290)
+{
+	TestData *d;
+
+	d = g_malloc0 (sizeof (TestData));
+	g_assert (d);
+
+    if (port)
+        d->com_data = test_com_setup (port, uml290);
+
+	return d;
+}
+
+static void
+test_data_free (TestData *d)
+{
+    if (d->com_data)
+        test_com_teardown (d->com_data);
+
+	g_free (d);
+}
+
 int main (int argc, char **argv)
 {
     GTestSuite *suite;
+    TestData *data;
+    int i;
+    const char *port = NULL;
     gint result;
+    gboolean uml290 = FALSE;
 
     g_test_init (&argc, &argv, NULL);
+
+    /* See if we got passed a serial port for live testing */
+    for (i = 0; i < argc; i++) {
+        if (!strcmp (argv[i], "--port")) {
+            /* Make sure there's actually a port in the next arg */
+            g_assert (argc > i + 1);
+            port = argv[++i];
+        } else if (!strcmp (argv[i], "--uml290"))
+            uml290 = TRUE;
+    }
+
+    data = test_data_new (port, uml290);
 
     suite = g_test_get_root ();
     g_test_suite_add (suite, TESTCASE (test_crc16_1, NULL));
@@ -51,7 +95,14 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_utils_decapsulate_uml290_wmc1, NULL));
     g_test_suite_add (suite, TESTCASE (test_utils_decapsulate_pc5740_wmc1, NULL));
 
+    /* Live tests */
+    if (port) {
+        g_test_suite_add (suite, TESTCASE (test_com_port_init, data->com_data));
+    }
+
 	result = g_test_run ();
+
+	test_data_free (data);
 
 	return result;
 }

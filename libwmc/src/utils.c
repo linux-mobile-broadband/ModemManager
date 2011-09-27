@@ -274,9 +274,11 @@ uml290_wmc_encapsulate (char *inbuf,
  * hdlc_decapsulate_buffer:
  * @inbuf: buffer in which to look for an HDLC frame
  * @inbuf_len: length of valid data in @inbuf
- * @check_known_crc: if %TRUE, validate the CRC using @known_crc
+ * @check_known_crc: if %TRUE, validate the CRC using @known_crc if the normal
+ *  CRC check fails
  * @known_crc: if @check_known_crc is %TRUE, compare the frame's CRC against
- *  @known_crc.  @known_crc must be in Little Endian (LE) byte order.
+ *  @known_crc if the normal CRC check fails.  @known_crc must be in Little
+ *  Endian (LE) byte order.
  * @outbuf: buffer in which to put decapsulated data from the HDLC frame
  * @outbuf_len: max size of @outbuf
  * @out_decap_len: on success, size of the decapsulated data
@@ -365,12 +367,14 @@ hdlc_decapsulate_buffer (const char *inbuf,
     }
 
     /* Check the CRC of the packet's data */
-    crc = check_known_crc ? known_crc : crc16 (outbuf, unesc_len - 2, 0);
+    crc = crc16 (outbuf, unesc_len - 2, 0);
     pkt_crc = outbuf[unesc_len - 2] & 0xFF;
     pkt_crc |= (outbuf[unesc_len - 1] & 0xFF) << 8;
     if (crc != pkt_crc) {
-        *out_used = pkt_len + 1; /* packet + CRC + 0x7E */
-        return FALSE;
+        if (!check_known_crc || (pkt_crc != known_crc)) {
+            *out_used = pkt_len + 1; /* packet + CRC + 0x7E */
+            return FALSE;
+        }
     }
 
     *out_used = pkt_len + 1; /* packet + CRC + 0x7E */

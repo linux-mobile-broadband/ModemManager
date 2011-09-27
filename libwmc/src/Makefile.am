@@ -1,28 +1,17 @@
-noinst_LTLIBRARIES = libwmc.la libwmc-test.la
+noinst_LTLIBRARIES = libwmc.la
 
 
 libwmc_la_CPPFLAGS = \
 	$(MM_CFLAGS)
 
 libwmc_la_SOURCES = \
+	errors.c \
+	errors.h \
 	utils.c \
-	utils.h
+	utils.h \
+	com.c \
+	com.h
 
 libwmc_la_LIBADD = \
-	$(MM_LIBS)
-
-
-###########################################
-# Test library without symbol versioning
-###########################################
-
-libwmc_test_la_CPPFLAGS = \
-	$(MM_CFLAGS)
-
-libwmc_test_la_SOURCES = \
-	utils.c \
-	utils.h
-
-libwmc_test_la_LIBADD = \
 	$(MM_LIBS)
 

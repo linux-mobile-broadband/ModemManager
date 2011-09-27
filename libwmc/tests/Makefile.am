@@ -10,6 +10,8 @@ test_wmc_SOURCES = \
 	test-wmc-escaping.h \
 	test-wmc-utils.c \
 	test-wmc-utils.h \
+	test-wmc-com.c \
+	test-wmc-com.h \
 	test-wmc.c
 
 test_wmc_CPPFLAGS = \
