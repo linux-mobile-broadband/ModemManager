@@ -18,16 +18,6 @@
 #ifndef LIBWMC_COM_H
 #define LIBWMC_COM_H
 
-#include "errors.h"
-
-enum {
-    WMC_SERIAL_ERROR = 1000
-};
-
-enum {
-    WMC_SERIAL_ERROR_CONFIG_FAILED = 1
-};
-
-wbool wmc_port_setup (int fd, WmcError **error);
+int wmc_port_setup (int fd);
 
 #endif  /* LIBWMC_COM_H */

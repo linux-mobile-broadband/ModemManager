@@ -208,16 +208,11 @@ void
 test_com_port_init (void *f, void *data)
 {
     TestComData *d = data;
-    WmcError *error = NULL;
-    gboolean success;
+    int ret;
 
-    success = wmc_port_setup (d->fd, &error);
-    if (!success) {
-        g_warning ("%s: error setting up port: (%d) %s",
-                   d->port,
-                   error ? error->code : -1,
-                   error && error->message ? error->message : "(unknown)");
-    }
-    g_assert (success);
+    ret = wmc_port_setup (d->fd);
+    if (ret < 0)
+        g_warning ("%s: error setting up serial port: (%d)", d->port, ret);
+    g_assert_cmpint (ret, ==, 0);
 }
 

@@ -19,91 +19,40 @@
 #include <stdlib.h>
 #include <string.h>
 
-WmcError *
-wmc_error_new (u_int32_t domain,
-               u_int32_t code,
-               const char *format,
-               ...)
-{
-    WmcError *error;
-    va_list args;
-    int n;
-
-    wmc_return_val_if_fail (format != NULL, NULL);
-    wmc_return_val_if_fail (format[0] != '\0', NULL);
-
-    error = malloc (sizeof (WmcError));
-    wmc_assert (error != NULL);
-
-    error->domain = domain;
-    error->code = code;
-
-    va_start (args, format);
-    n = vasprintf (&error->message, format, args);
-    va_end (args);
-
-    if (n < 0) {
-        free (error);
-        return NULL;
-    }
-
-    return error;
-}
-
 void
-wmc_error_set (WmcError **error,
-               u_int32_t domain,
-               u_int32_t code,
-               const char *format,
-               ...)
+_wmc_log (const char *file,
+          int line,
+          const char *func,
+          int level,
+          int domain,
+          const char *format,
+          ...)
 {
     va_list args;
+    char *message = NULL;
     int n;
+    const char *prefix = "info";
 
-    if (error == NULL)
-        return;
-    wmc_return_if_fail (*error == NULL);
+    wmc_return_if_fail (format != NULL);
     wmc_return_if_fail (format[0] != '\0');
 
-    *error = malloc (sizeof (WmcError));
-    wmc_assert (*error != NULL);
+    /* level & domain ignored for now */
 
-    (*error)->domain = domain;
-    (*error)->code = code;
+    if (getenv ("WMC_DEBUG") == NULL)
+        return;
 
     va_start (args, format);
-    n = vasprintf (&(*error)->message, format, args);
+    n = vasprintf (&message, format, args);
     va_end (args);
 
-    if (n < 0) {
-        free (*error);
-        *error = NULL;
-    }
-}
+    if (level & LOGL_ERR)
+        prefix = "err";
+    else if (level & LOGL_DEBUG)
+        prefix = "dbg";
 
-static void
-free_error (WmcError *error)
-{
-    if (error) {
-        if (error->message)
-            free (error->message);
-        memset (error, 0, sizeof (*error));
-        free (error);
+    if (n >= 0) {
+        fprintf (stderr, "<%s> [%s:%u] %s(): %s\n", prefix, file, line, func, message);
+        free (message);
     }
-}
-
-void
-wmc_clear_error (WmcError **error)
-{
-    if (error) {
-        free_error (*error);
-        *error = NULL;
-    }
-}
-
-void
-wmc_free_error (WmcError *error)
-{
-    free_error (error);
 }
 

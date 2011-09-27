@@ -23,16 +23,16 @@
 #include "com.h"
 #include "errors.h"
 
-wbool
-wmc_port_setup (int fd, WmcError **error)
+int
+wmc_port_setup (int fd)
 {
     struct termios stbuf;
 
     errno = 0;
     memset (&stbuf, 0, sizeof (stbuf));
     if (tcgetattr (fd, &stbuf) != 0) {
-        wmc_error_set (error, WMC_SERIAL_ERROR, WMC_SERIAL_ERROR_CONFIG_FAILED,
-                       "tcgetattr() error: %d", errno);
+        wmc_err (0, "tcgetattr() error: %d", errno);
+        return -WMC_ERROR_SERIAL_CONFIG_FAILED;
     }
 
     stbuf.c_cflag &= ~(CBAUD | CSIZE | CSTOPB | CLOCAL | PARENB);
@@ -47,11 +47,10 @@ wmc_port_setup (int fd, WmcError **error)
 
     errno = 0;
     if (tcsetattr (fd, TCSANOW, &stbuf) < 0) {
-        wmc_error_set (error, WMC_SERIAL_ERROR, WMC_SERIAL_ERROR_CONFIG_FAILED,
-                       "tcsetattr() error: %d", errno);
-        return FALSE;
+        wmc_err (0, "tcgetattr() error: %d", errno);
+        return -WMC_ERROR_SERIAL_CONFIG_FAILED;
     }
 
-    return TRUE;
+    return 0;
 }
 

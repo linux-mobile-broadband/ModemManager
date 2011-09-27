@@ -23,35 +23,18 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include <stdio.h>
 
-typedef u_int8_t wbool;
-#ifndef TRUE
-#define TRUE (u_int8_t) 1
-#endif
-#ifndef FALSE
-#define FALSE (u_int8_t) 0
-#endif
+enum {
+	LOGL_ERR   = 0x00000001,
+	LOGL_WARN  = 0x00000002,
+	LOGL_INFO  = 0x00000004,
+	LOGL_DEBUG = 0x00000008
+};
 
-typedef struct {
-    u_int32_t domain;
-    u_int32_t code;
-    char *message;
-} WmcError;
-
-WmcError *wmc_error_new (u_int32_t domain,
-                         u_int32_t code,
-                         const char *format,
-                         ...) __attribute__((__format__ (__printf__, 3, 4)));
-
-void wmc_error_set (WmcError **error,
-                    u_int32_t domain,
-                    u_int32_t code,
-                    const char *format,
-                    ...) __attribute__((__format__ (__printf__, 4, 5)));
-
-void wmc_clear_error (WmcError **error);
-void wmc_free_error (WmcError *error);
+enum {
+    WMC_SUCCESS = 0,
+    WMC_ERROR_SERIAL_CONFIG_FAILED = 1,
+};
 
 #define wmc_assert assert
 
@@ -71,4 +54,18 @@ void wmc_free_error (WmcError *error);
     } \
 }
 
-#endif  /* LIBWMC_COM_H */
+void _wmc_log (const char *file,
+               int line,
+               const char *func,
+               int domain,
+               int level,
+               const char *format,
+               ...) __attribute__((__format__ (__printf__, 6, 7)));
+
+#define wmc_dbg(domain, ...) \
+	_wmc_log (__FILE__, __LINE__, __func__, domain, LOGL_DEBUG, ## __VA_ARGS__ )
+
+#define wmc_err(domain, ...) \
+	_wmc_log (__FILE__, __LINE__, __func__, domain, LOGL_ERR, ## __VA_ARGS__ )
+
+#endif  /* LIBWMC_ERRORS_H */
