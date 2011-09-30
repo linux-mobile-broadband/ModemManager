@@ -123,6 +123,12 @@
 
     <!-- PROPERTIES -->
 
+    <property name="Sim" type="o" access="read">
+      <tp:docstring>
+	The path of the SIM object available in this device, if any.
+      </tp:docstring>
+    </property>
+
     <property name="ModemCapabilities" type="u" access="read" tp:type="MM_MODEM_CAPABILITIES">
       <tp:docstring>
         The generic family of access technologies the modem supports.  Not all
