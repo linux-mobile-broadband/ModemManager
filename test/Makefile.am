@@ -26,5 +26,6 @@ EXTRA_DIST = \
 	list-modems.py \
 	location.py \
 	mm-send-sms.py \
-	send-pin.py
+	send-pin.py \
+	modem-autoenable.py
 
