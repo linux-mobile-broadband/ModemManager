@@ -111,7 +111,7 @@
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_set_allowed_mode"/>
-      <arg name="mode" type="u" tp:type="MM_MODEM_ALLOWED_MODE">
+      <arg name="mode" type="u" tp:type="MM_MODEM_MODE">
         <tp:docstring>
           Bitmask of all the modes allowed in the modem.
         </tp:docstring>
@@ -288,7 +288,7 @@
       </tp:docstring>
     </property>
 
-    <property name="AllowedModes" type="u" access="read" tp:type="MM_MODEM_ALLOWED_MODE">
+    <property name="AllowedModes" type="u" access="read" tp:type="MM_MODEM_MODE">
       <tp:docstring>
         The access technologies (eg 2G/3G/4G preference) the device is currently
         allowed to use when connecting to a network.  For POTS devices, only the
@@ -296,7 +296,7 @@
       </tp:docstring>
     </property>
 
-    <property name="SupportedModes" type="u" access="read" tp:type="MM_MODEM_ALLOWED_MODE">
+    <property name="SupportedModes" type="u" access="read" tp:type="MM_MODEM_MODE">
       <tp:docstring>
         Access technology selection modes supported by the device.  For POTS
         devices, only the "any" mode will be returned.
@@ -490,7 +490,7 @@
       </tp:enumvalue>
     </tp:enum>
 
-    <tp:enum name="MM_MODEM_ALLOWED_MODE" type="u">
+    <tp:enum name="MM_MODEM_MODE" type="u">
       <tp:docstring>
         Describes the device's current access mode preference; ie the specific
         technology preferences the device is allowed to use when connecting to
