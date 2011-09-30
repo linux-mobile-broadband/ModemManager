@@ -104,6 +104,20 @@
       </arg>
     </method>
 
+    <method name="SetAllowedModes">
+      <tp:docstring>
+        Set the access technologies (eg 2G/3G/4G preference) the device is
+        currently allowed to use when connecting to a network.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_set_allowed_mode"/>
+      <arg name="mode" type="u" tp:type="MM_MODEM_ALLOWED_MODE">
+        <tp:docstring>
+          Bitmask of all the modes allowed in the modem.
+        </tp:docstring>
+      </arg>
+    </method>
+
     <!-- SIGNALS -->
 
     <signal name="StateChanged">
@@ -260,11 +274,11 @@
       </tp:docstring>
     </property>
 
-    <property name="AllowedMode" type="u" access="readwrite" tp:type="MM_MODEM_ALLOWED_MODE">
+    <property name="AllowedModes" type="u" access="read" tp:type="MM_MODEM_ALLOWED_MODE">
       <tp:docstring>
-        The allowed access technologies (eg 2G/3G/4G preference) the device is
-        currently allowed to use when connecting to a network.  For POTS
-        devices, only the "any" mode is supported.
+        The access technologies (eg 2G/3G/4G preference) the device is currently
+        allowed to use when connecting to a network.  For POTS devices, only the
+        "any" mode is supported.
       </tp:docstring>
     </property>
 
