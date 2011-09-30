@@ -111,9 +111,14 @@
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_set_allowed_mode"/>
-      <arg name="mode" type="u" tp:type="MM_MODEM_MODE">
+      <arg name="allowed" type="u" tp:type="MM_MODEM_MODE">
         <tp:docstring>
           Bitmask of all the modes allowed in the modem.
+        </tp:docstring>
+      </arg>
+      <arg name="preferred" type="u" tp:type="MM_MODEM_MODE">
+        <tp:docstring>
+	  Specific mode preferred among the ones allowed, if any.
         </tp:docstring>
       </arg>
     </method>
@@ -293,6 +298,13 @@
         The access technologies (eg 2G/3G/4G preference) the device is currently
         allowed to use when connecting to a network.  For POTS devices, only the
         "any" mode is supported.
+      </tp:docstring>
+    </property>
+
+    <property name="PreferredMode" type="u" access="read" tp:type="MM_MODEM_MODE">
+      <tp:docstring>
+        The preferred access technology (eg 2G/3G/4G), among the ones defined in
+        the allowed modes. Only one or none values must be given.
       </tp:docstring>
     </property>
 
@@ -492,38 +504,28 @@
 
     <tp:enum name="MM_MODEM_MODE" type="u">
       <tp:docstring>
-        Describes the device's current access mode preference; ie the specific
-        technology preferences the device is allowed to use when connecting to
-        a network.  Also used as a bitfield to indicate which allowed modes
-        the modem supports when setting the mode preference.
+        Bitfield to indicate which access modes are supported, allowed or
+        preferred in a given device.
       </tp:docstring>
-      <tp:enumvalue suffix="ANY" value="0x0000">
+      <tp:enumvalue suffix="NONE" value="0x00">
+	<tp:docstring>None</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="1G" value="0x01">
+        <tp:docstring>CSD, GSM</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="2G" value="0x02">
+        <tp:docstring>GPRS, EDGE</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="3G" value="0x04">
+        <tp:docstring>UMTS, HSxPA</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="4G" value="0x08">
+        <tp:docstring>LTE</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="ANY" value="0xFFFFFFFF">
 	<tp:docstring>
 	  Any mode can be used (only this value allowed for POTS modems)
 	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="2G_PREFERRED" value="0x0001">
-	<tp:docstring>Prefer 2G (GPRS or EDGE)</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="3G_PREFERRED" value="0x0002">
-	<tp:docstring>Prefer 3G (UMTS or HSxPA)</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="4G_PREFERRED" value="0x0004">
-	<tp:docstring>Prefer 4G (LTE)</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="2G_ONLY" value="0x0100">
-	<tp:docstring>Use only 2G (GPRS or EDGE)</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="3G_ONLY" value="0x0200">
-	<tp:docstring>Use only 3G (UMTS or HSxPA)</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="4G_ONLY" value="0x0400">
-	<tp:docstring>Use only 4G (LTE)</tp:docstring>
-      </tp:enumvalue>
-      <!-- FIXME: what about 3G/4G only? or 2G/3G only?  Should this be a
-           bitfield?  If so, do we need to indicate what combinations the
-           modem supports?
-        -->
     </tp:enum>
 
     <tp:flags name="MM_MODEM_BAND" value-prefix="MM_MODEM_BAND" type="u">
