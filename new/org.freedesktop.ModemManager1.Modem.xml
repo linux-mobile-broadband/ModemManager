@@ -82,25 +82,6 @@
       </arg>
     </method>
 
-    <method name="GetInfo">
-      <tp:docstring>
-        Retrieve modem information, like the manufacturer, hardware version,
-        firmware version, etc.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_get_info"/>
-      <arg name="info" type="a{sv}" direction="out">
-        <tp:docstring>
-          Dictionary containing various information about the modem, including
-          zero or more of the following items:
-          
-             manufacturer     : (string)
-             model            : (string)
-             version/revision : (string)
-        </tp:docstring>
-      </arg>
-    </method>
-
     <method name="Reset">
       <tp:docstring>
         Clear non-persistent configuration and state, and return the device to
@@ -176,6 +157,24 @@
         POTS and CDMA2000-only devices support one active bearer, while 
         GSM/UMTS and LTE-capable devices (including LTE/CDMA devices) typically
         support at least two active bearers.
+      </tp:docstring>
+    </property>
+
+    <property name="Manufacturer" type="s" access="read">
+      <tp:docstring>
+	The equipment manufacturer, as reported by the modem.
+      </tp:docstring>
+    </property>
+
+    <property name="Model" type="s" access="read">
+      <tp:docstring>
+	The equipment model, as reported by the modem.
+      </tp:docstring>
+    </property>
+
+    <property name="Revision" type="s" access="read">
+      <tp:docstring>
+	The revision identification of the software, as reported by the modem.
       </tp:docstring>
     </property>
 
