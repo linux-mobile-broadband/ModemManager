@@ -118,6 +118,20 @@
       </arg>
     </method>
 
+    <method name="SetAllowedBands">
+      <tp:docstring>
+        Set the radio frequency and technology bands the device is currently
+        allowed to use when connecting to a network.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_set_allowed_band"/>
+      <arg name="mode" type="u" tp:type="MM_MODEM_BAND">
+        <tp:docstring>
+          Bitmask of all the bands allowed in the modem.
+        </tp:docstring>
+      </arg>
+    </method>
+
     <!-- SIGNALS -->
 
     <signal name="StateChanged">
@@ -289,11 +303,11 @@
       </tp:docstring>
     </property>
 
-    <property name="AllowedBands" type="t" access="readwrite" tp:type="MM_MODEM_BAND">
+    <property name="AllowedBands" type="t" access="read" tp:type="MM_MODEM_BAND">
       <tp:docstring>
-        The allowed radio frequency and technology bands the device is currently
-        allowed to use when connecting to a network.  For POTS devices, only
-        the "any" value is supported.
+        The radio frequency and technology bands the device is currently allowed
+        to use when connecting to a network.  For POTS devices, only the "any"
+        value is supported.
       </tp:docstring>
     </property>
 
