@@ -251,11 +251,12 @@
       </tp:docstring>
     </property>
 
-    <property name="SignalQuality" type="u" access="read">
+    <property name="SignalQuality" type="ub" access="read">
       <tp:docstring>
         Signal quality in percent (0 - 100) of the dominant access technology
         the device is using to communicate with the network.  Always 0 for POTS
-        devices.
+        devices. The additional boolean value indicates if the quality value
+        given was recently taken.
       </tp:docstring>
     </property>
 
