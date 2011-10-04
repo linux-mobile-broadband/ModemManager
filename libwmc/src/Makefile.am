@@ -9,8 +9,12 @@ libwmc_la_SOURCES = \
 	errors.h \
 	utils.c \
 	utils.h \
+	result.c \
+	result.h \
 	com.c \
-	com.h
+	com.h \
+	commands.c \
+	commands.h
 
 libwmc_la_LIBADD = \
 	$(MM_LIBS)
