@@ -28,6 +28,8 @@ enum {
 
 /* Mode preference values */
 enum {
+    DIAG_NV_MODE_PREF_DIGITAL         = 0x00,
+    DIAG_NV_MODE_PREF_DIGITAL_ONLY    = 0x01,
     DIAG_NV_MODE_PREF_AUTO            = 0x04,
     DIAG_NV_MODE_PREF_1X_ONLY         = 0x09,
     DIAG_NV_MODE_PREF_HDR_ONLY        = 0x0A,
