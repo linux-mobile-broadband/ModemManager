@@ -7,7 +7,7 @@ if test "$GCC" = "yes" -a "$set_more_warnings" != "no"; then
 	AC_MSG_RESULT(yes)
 	CFLAGS="-Wall -Werror -std=gnu89 $CFLAGS"
 
-	for option in -Wshadow -Wmissing-declarations -Wmissing-prototypes \
+	for option in -Wmissing-declarations -Wmissing-prototypes \
 		      -Wdeclaration-after-statement -Wstrict-prototypes \
 		      -Wfloat-equal -Wno-unused-parameter -Wno-sign-compare \
 		      -fno-strict-aliasing -Wno-deprecated-declarations; do
