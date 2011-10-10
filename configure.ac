@@ -29,7 +29,13 @@ AC_SUBST(GETTEXT_PACKAGE)
 AC_DEFINE_UNQUOTED(GETTEXT_PACKAGE,"$GETTEXT_PACKAGE", [Gettext package])
 IT_PROG_INTLTOOL([0.35.0])
 
-PKG_CHECK_MODULES(MM, dbus-glib-1 >= 0.86 glib-2.0 >= 2.18 gmodule-2.0 gobject-2.0)
+PKG_CHECK_MODULES(MM,
+                  dbus-glib-1 >= 0.86
+                  glib-2.0 >= 2.30
+                  gmodule-2.0
+                  gobject-2.0
+                  gio-2.0
+                  gio-unix-2.0)
 AC_SUBST(MM_CFLAGS)
 AC_SUBST(MM_LIBS)
 
