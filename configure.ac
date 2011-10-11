@@ -170,15 +170,19 @@ policy/Makefile
 ])
 AC_OUTPUT
 
-echo
-echo Building with D-Bus system directory: ${DBUS_SYS_DIR}
-echo
-echo Building with udev base directory: ${UDEV_BASE_DIR}
-echo
-echo Building documentation: ${with_docs}
-echo
-echo Building PPP-enabled tests: ${have_pppd_headers}
-echo
-echo Building with PolicyKit support: ${with_polkit}
-echo
+echo "
+    ModemManager $VERSION
+    ==============================================
+
+    compiler:                ${CC}
+    cflags:                  ${CFLAGS}
+    Maintainer mode:         ${USE_MAINTAINER_MODE}
+
+    D-Bus system directory:  ${DBUS_SYS_DIR}
+    udev base directory:     ${UDEV_BASE_DIR}
+
+    PPP-enabled tests:       ${have_pppd_headers}
+    PolicyKit support:       ${with_polkit}
+    Documentation:           ${with_docs}
+"
 
