@@ -3,7 +3,7 @@
 
 srcdir=`dirname $0`
 test -z "$srcdir" && srcdir=.
-REQUIRED_AUTOMAKE_VERSION=1.7
+REQUIRED_AUTOMAKE_VERSION=1.9
 PKG_NAME=ModemManager
 
 (test -f $srcdir/configure.ac \
@@ -14,8 +14,9 @@ PKG_NAME=ModemManager
 }
 
 (cd $srcdir;
-    autoreconf --install --symlink &&
-    intltoolize --force &&
-    autoreconf &&
-    ./configure --enable-maintainer-mode $@
+    autopoint --force
+    AUTOPOINT='intltoolize --automake --copy' autoreconf --force --install --verbose
+    if test -z "$NOCONFIGURE"; then
+        ./configure --enable-maintainer-mode $@
+    fi
 )
