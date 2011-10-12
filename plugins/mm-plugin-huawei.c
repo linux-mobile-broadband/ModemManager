@@ -133,7 +133,7 @@ supports_port (MMPluginBase *base,
                MMPluginBaseSupportsTask *task)
 {
     GUdevDevice *port;
-    const char *subsys, *name;
+    const char *subsys, *name, *driver;
     int usbif;
     guint16 vendor = 0, product = 0;
 
@@ -149,6 +149,11 @@ supports_port (MMPluginBase *base,
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
     if (vendor != 0x12d1)
+        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
+
+    /* The Gobi driver should claim Huawei Gobi modems */
+    driver = mm_plugin_base_supports_task_get_driver (task);
+    if (g_strcmp0 (driver, "qcserial") == 0)
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
     usbif = g_udev_device_get_property_as_int (port, "ID_USB_INTERFACE_NUM");
