@@ -265,7 +265,11 @@ mm_serial_parser_v1_parse (gpointer data,
     g_return_val_if_fail (parser != NULL, FALSE);
     g_return_val_if_fail (response != NULL, FALSE);
 
-    if (G_UNLIKELY (!response->len || !strlen (response->str)))
+    /* Skip NUL bytes if they are found leading the response */
+    while (response->len > 0 && response->str[0] == '\0')
+        g_string_erase (response, 0, 1);
+
+    if (G_UNLIKELY (!response->len))
         return FALSE;
 
     /* First, check for successful responses */
