@@ -104,7 +104,6 @@ modem_manager_SOURCES = \
 	mm-generic-gsm.h \
 	mm-modem-cdma.c \
 	mm-modem-cdma.h \
-	mm-modem-gsm.h \
 	mm-modem-gsm-card.c \
 	mm-modem-gsm-card.h \
 	mm-modem-gsm-network.c \
