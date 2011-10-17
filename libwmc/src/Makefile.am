@@ -5,6 +5,8 @@ libwmc_la_CPPFLAGS = \
 	$(MM_CFLAGS)
 
 libwmc_la_SOURCES = \
+	protocol.h \
+	result-private.h \
 	errors.c \
 	errors.h \
 	utils.c \
