@@ -1,24 +1,3 @@
-XSLTPROC = xsltproc --xinclude --nonet
-
-XMLS = $(wildcard introspection/*.xml)
-
-if WITH_DOCS
-
-all:
-
-# Figure out if we need ASYNC_INTROSPECT and add it later
-
-GENERATED_FILES = \
-	docs/spec.html
-
-docs/spec.html: $(XMLS) introspection/all.xml doc-generator.xsl
-	@install -d docs
-	$(XSLTPROC) $(top_srcdir)/doc-generator.xsl $(top_srcdir)/introspection/all.xml > $@
-
-all: $(GENERATED_FILES)
-
-CLEANFILES = $(GENERATED_FILES)
-endif
 
 SUBDIRS = . marshallers build-aux include libmm-common libqcdm libwmc src plugins introspection po test
 
@@ -47,6 +26,7 @@ dbusactivation_DATA = $(dbusactivation_in_files:.service.in=.service)
 %service: %service.in
 	$(edit) $< >$@
 
+XMLS = $(wildcard introspection/*.xml)
 xmldir = $(datadir)/dbus-1/interfaces
 xml_DATA = $(filter-out introspection/all.xml introspection/org.freedesktop.DBus.Properties.xml, $(XMLS))
 
@@ -75,7 +55,6 @@ DISTCLEANFILES = \
 	po/.intltool-merge-cache
 
 EXTRA_DIST = \
-	doc-generator.xsl \
 	$(dbusactivation_in_files) \
 	$(INTLTOOL_FILES) \
 	$(dbusservice_file_polkit) \
