@@ -42,6 +42,7 @@ libqcdm/tests/test-qcdm
 libwmc/tests/test-wmc
 
 include/ModemManager.h
+include/ModemManager-names.h
 
 po/Makefile.in.in
 po/POTFILES

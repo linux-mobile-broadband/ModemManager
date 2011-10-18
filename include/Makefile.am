@@ -1,14 +1,21 @@
 XSLTPROC = xsltproc --xinclude --nonet
 
-XMLS = $(wildcard $(top_srcdir)/introspection/*.xml)
+OLD_XMLS = $(wildcard $(top_srcdir)/introspection/*.xml)
+NEW_XMLS = $(wildcard $(top_srcdir)/new/*.xml)
 
 includedir = @includedir@/mm
 
 include_HEADERS = \
+	ModemManager-names.h \
 	ModemManager.h
 
-ModemManager.h: $(XMLS) $(top_srcdir)/introspection/all.xml $(top_srcdir)/build-aux/header-generator.xsl
-	$(XSLTPROC) $(top_srcdir)/build-aux/header-generator.xsl $(top_srcdir)/introspection/all.xml > $@
+# NOTE: This is the header of the 0.5 API, which will get removed
+ModemManager.h: $(OLD_XMLS) $(top_srcdir)/introspection/all.xml $(top_srcdir)/build-aux/header-generator.xsl
+	$(AM_V_GEN) $(XSLTPROC) $(top_srcdir)/build-aux/header-generator.xsl $(top_srcdir)/introspection/all.xml > $@
+
+ModemManager-names.h: $(NEW_XMLS) $(top_srcdir)/new/all.xml $(top_srcdir)/build-aux/header-generator-new.xsl
+	$(AM_V_GEN) $(XSLTPROC) $(top_srcdir)/build-aux/header-generator-new.xsl $(top_srcdir)/new/all.xml > $@
 
 CLEANFILES = \
+	ModemManager-names.h \
 	ModemManager.h
