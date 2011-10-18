@@ -37,10 +37,11 @@ src/tests/test-qcdm-serial-port
 src/tests/test-at-serial-port
 src/tests/test-sms
 policy/org.freedesktop.modem-manager.policy
-include/
 
 libqcdm/tests/test-qcdm
 libwmc/tests/test-wmc
+
+include/ModemManager.h
 
 po/Makefile.in.in
 po/POTFILES

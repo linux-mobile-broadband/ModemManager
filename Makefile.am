@@ -20,7 +20,7 @@ all: $(GENERATED_FILES)
 CLEANFILES = $(GENERATED_FILES)
 endif
 
-SUBDIRS = . marshallers libqcdm libwmc src plugins introspection po test
+SUBDIRS = . marshallers build-aux include libqcdm libwmc src plugins introspection po test
 
 if WITH_POLKIT
 SUBDIRS += policy
@@ -43,14 +43,6 @@ endif
 dbusactivationdir = $(datadir)/dbus-1/system-services
 dbusactivation_in_files = org.freedesktop.ModemManager.service.in
 dbusactivation_DATA = $(dbusactivation_in_files:.service.in=.service)
-
-includedir = @includedir@/mm
-
-include_HEADERS = include/ModemManager.h
-
-include/ModemManager.h: $(XMLS) introspection/all.xml header-generator.xsl
-	@install -d include
-	$(XSLTPROC) $(top_srcdir)/header-generator.xsl $(top_srcdir)/introspection/all.xml > $@
 
 %service: %service.in
 	$(edit) $< >$@
@@ -84,7 +76,6 @@ DISTCLEANFILES = \
 
 EXTRA_DIST = \
 	doc-generator.xsl \
-	header-generator.xsl \
 	$(dbusactivation_in_files) \
 	$(INTLTOOL_FILES) \
 	$(dbusservice_file_polkit) \
