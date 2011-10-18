@@ -403,6 +403,11 @@ static const char *dq_strings[] = {
     NULL
 };
 
+static guint8 zerobuf[32] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+};
+
 static void
 port_buffer_full (MMSerialPort *port, GByteArray *buffer, gpointer user_data)
 {
@@ -411,6 +416,13 @@ port_buffer_full (MMSerialPort *port, GByteArray *buffer, gpointer user_data)
     const char **iter;
     size_t iter_len;
     int i;
+
+    /* Some devices (observed on a ZTE branded "QUALCOMM INCORPORATED" model
+     * "154") spew NULLs from some ports.
+     */
+    if (   (buffer->len >= sizeof (zerobuf))
+        && (memcmp (buffer->data, zerobuf, sizeof (zerobuf)) == 0))
+        goto stop_probing;
 
     /* Check for an immediate disqualification response.  There are some
      * ports (Option Icera-based chipsets have them, as do Qualcomm Gobi
@@ -428,13 +440,16 @@ port_buffer_full (MMSerialPort *port, GByteArray *buffer, gpointer user_data)
         for (i = 0; i < buffer->len - iter_len; i++) {
             if (!memcmp (&buffer->data[i], *iter, iter_len)) {
                 /* Immediately close the port and complete probing */
-                priv->probed_caps = 0;
-                mm_serial_port_close (MM_SERIAL_PORT (priv->probe_port));
-                probe_complete (task);
-                return;
+                goto stop_probing;
             }
         }
     }
+    return;
+
+stop_probing:
+    priv->probed_caps = 0;
+    mm_serial_port_close (MM_SERIAL_PORT (priv->probe_port));
+    probe_complete (task);
 }
 
 static gboolean
