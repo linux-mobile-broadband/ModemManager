@@ -17,7 +17,6 @@
 #define MM_PORT_H
 
 #include <glib.h>
-#include <glib/gtypes.h>
 #include <glib-object.h>
 
 typedef enum {

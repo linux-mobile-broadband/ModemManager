@@ -18,7 +18,6 @@
 #define MM_MODEM_BASE_H
 
 #include <glib.h>
-#include <glib/gtypes.h>
 #include <glib-object.h>
 
 #include "mm-port.h"
