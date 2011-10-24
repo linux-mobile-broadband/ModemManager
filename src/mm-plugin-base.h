@@ -17,7 +17,6 @@
 #define MM_PLUGIN_BASE_H
 
 #include <glib.h>
-#include <glib/gtypes.h>
 #include <glib-object.h>
 
 #define G_UDEV_API_IS_SUBJECT_TO_CHANGE
