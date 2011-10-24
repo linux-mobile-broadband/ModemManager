@@ -1360,7 +1360,11 @@ set_property (GObject *object, guint prop_id,
         priv->bits = g_value_get_uint (value);
         break;
     case PROP_PARITY:
+#if GLIB_CHECK_VERSION(2,31,0)
+        priv->parity = g_value_get_schar (value);
+#else
         priv->parity = g_value_get_char (value);
+#endif
         break;
     case PROP_STOPBITS:
         priv->stopbits = g_value_get_uint (value);
@@ -1400,7 +1404,11 @@ get_property (GObject *object, guint prop_id,
         g_value_set_uint (value, priv->bits);
         break;
     case PROP_PARITY:
+#if GLIB_CHECK_VERSION(2,31,0)
+        g_value_set_schar (value, priv->parity);
+#else
         g_value_set_char (value, priv->parity);
+#endif
         break;
     case PROP_STOPBITS:
         g_value_set_uint (value, priv->stopbits);
