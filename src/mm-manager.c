@@ -43,9 +43,7 @@ static void grab_port (MMManager *manager,
 
 G_DEFINE_TYPE (MMManager, mm_manager, MM_GDBUS_TYPE_ORG_FREEDESKTOP_MODEM_MANAGER1_SKELETON);
 
-#define MM_MANAGER_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MANAGER, MMManagerPrivate))
-
-typedef struct {
+struct _MMManagerPrivate {
     GDBusConnection *connection;
     GUdevClient *udev;
     GHashTable *modems;
@@ -54,7 +52,7 @@ typedef struct {
 
     /* The Plugin Manager object */
     MMPluginManager *plugin_manager;
-} MMManagerPrivate;
+};
 
 typedef struct {
     MMManager *manager;
@@ -88,7 +86,6 @@ find_port_support_context_free (FindPortSupportContext *ctx)
 static void
 remove_modem (MMManager *manager, MMModem *modem)
 {
-    MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
     char *device;
 
     device = mm_modem_get_device (modem);
@@ -97,14 +94,13 @@ remove_modem (MMManager *manager, MMModem *modem)
 
     /* GDBus TODO: Unexport object
      * g_signal_emit (manager, signals[DEVICE_REMOVED], 0, modem); */
-    g_hash_table_remove (priv->modems, device);
+    g_hash_table_remove (manager->priv->modems, device);
     g_free (device);
 }
 
 static void
 check_export_modem (MMManager *self, MMModem *modem)
 {
-    MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (self);
     char *modem_physdev;
     const gchar *name;
     const gchar *subsys;
@@ -126,7 +122,7 @@ check_export_modem (MMManager *self, MMModem *modem)
     g_assert (modem_physdev);
 
     /* Check for ports that are in the process of being interrogated by plugins */
-    if (mm_plugin_manager_is_finding_device_support (priv->plugin_manager,
+    if (mm_plugin_manager_is_finding_device_support (self->priv->plugin_manager,
                                                      modem_physdev,
                                                      &subsys,
                                                      &name)) {
@@ -156,7 +152,7 @@ check_export_modem (MMManager *self, MMModem *modem)
 
         mm_dbg ("Exported modem %s as %s", modem_physdev, path);
 
-        physdev = g_udev_client_query_by_sysfs_path (priv->udev, modem_physdev);
+        physdev = g_udev_client_query_by_sysfs_path (self->priv->udev, modem_physdev);
         if (physdev)
             subsys = g_udev_device_get_subsystem (physdev);
 
@@ -198,13 +194,12 @@ modem_valid (MMModem *modem, GParamSpec *pspec, gpointer user_data)
 static void
 add_modem (MMManager *manager, MMModem *modem, MMPlugin *plugin)
 {
-    MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
     char *device;
 
     device = mm_modem_get_device (modem);
     g_assert (device);
-    if (!g_hash_table_lookup (priv->modems, device)) {
-        g_hash_table_insert (priv->modems, g_strdup (device), modem);
+    if (!g_hash_table_lookup (manager->priv->modems, device)) {
+        g_hash_table_insert (manager->priv->modems, g_strdup (device), modem);
         g_object_set_data (G_OBJECT (modem), MANAGER_PLUGIN_TAG, plugin);
 
         mm_dbg ("Added modem %s", device);
@@ -217,12 +212,11 @@ add_modem (MMManager *manager, MMModem *modem, MMPlugin *plugin)
 static MMModem *
 find_modem_for_device (MMManager *manager, const char *device)
 {
-    MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
     GHashTableIter iter;
     gpointer key, value;
     MMModem *found = NULL;
 
-    g_hash_table_iter_init (&iter, priv->modems);
+    g_hash_table_iter_init (&iter, manager->priv->modems);
     while (g_hash_table_iter_next (&iter, &key, &value) && !found) {
         MMModem *candidate = MM_MODEM (value);
         char *candidate_device = mm_modem_get_device (candidate);
@@ -237,11 +231,10 @@ find_modem_for_device (MMManager *manager, const char *device)
 static MMModem *
 find_modem_for_port (MMManager *manager, const char *subsys, const char *name)
 {
-    MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
     GHashTableIter iter;
     gpointer key, value;
 
-    g_hash_table_iter_init (&iter, priv->modems);
+    g_hash_table_iter_init (&iter, manager->priv->modems);
     while (g_hash_table_iter_next (&iter, &key, &value)) {
         MMModem *modem = MM_MODEM (value);
 
@@ -306,13 +299,12 @@ grab_port (MMManager *manager,
            GUdevDevice *device,
            GUdevDevice *physical_device)
 {
-    MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
     MMModem *modem = NULL;
     GError *error = NULL;
     /* GSList *iter; */
     MMModem *existing;
 
-    existing = g_hash_table_lookup (priv->modems,
+    existing = g_hash_table_lookup (manager->priv->modems,
                                     g_udev_device_get_sysfs_path (physical_device));
 
     /* Create the modem */
@@ -419,7 +411,6 @@ find_physical_device (GUdevDevice *child)
 static void
 device_added (MMManager *manager, GUdevDevice *device)
 {
-    MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
     const char *subsys, *name, *physdev_path, *physdev_subsys;
     gboolean is_candidate;
     GUdevDevice *physdev = NULL;
@@ -490,7 +481,7 @@ device_added (MMManager *manager, GUdevDevice *device)
     }
 
     /* Already launched the same port support check? */
-    if (mm_plugin_manager_is_finding_port_support (priv->plugin_manager,
+    if (mm_plugin_manager_is_finding_port_support (manager->priv->plugin_manager,
                                                    subsys,
                                                    name,
                                                    physdev_path)) {
@@ -509,7 +500,7 @@ device_added (MMManager *manager, GUdevDevice *device)
 
     /* Launch supports check in the Plugin Manager */
     mm_plugin_manager_find_port_support (
-        priv->plugin_manager,
+        manager->priv->plugin_manager,
         subsys,
         name,
         physdev_path,
@@ -603,7 +594,6 @@ handle_uevent (GUdevClient *client,
 void
 mm_manager_start (MMManager *manager)
 {
-    MMManagerPrivate *priv;
     GList *devices, *iter;
 
     g_return_if_fail (manager != NULL);
@@ -611,16 +601,14 @@ mm_manager_start (MMManager *manager)
 
     mm_dbg ("Starting device scan...");
 
-    priv = MM_MANAGER_GET_PRIVATE (manager);
-
-    devices = g_udev_client_query_by_subsystem (priv->udev, "tty");
+    devices = g_udev_client_query_by_subsystem (manager->priv->udev, "tty");
     for (iter = devices; iter; iter = g_list_next (iter)) {
         device_added (manager, G_UDEV_DEVICE (iter->data));
         g_object_unref (G_OBJECT (iter->data));
     }
     g_list_free (devices);
 
-    devices = g_udev_client_query_by_subsystem (priv->udev, "net");
+    devices = g_udev_client_query_by_subsystem (manager->priv->udev, "net");
     for (iter = devices; iter; iter = g_list_next (iter)) {
         device_added (manager, G_UDEV_DEVICE (iter->data));
         g_object_unref (G_OBJECT (iter->data));
@@ -669,7 +657,7 @@ mm_manager_shutdown (MMManager *self)
     g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_MANAGER (self));
 
-    modems = g_hash_table_get_values (MM_MANAGER_GET_PRIVATE (self)->modems);
+    modems = g_hash_table_get_values (self->priv->modems);
     for (iter = modems; iter; iter = g_list_next (iter)) {
         MMModem *modem = MM_MODEM (iter->data);
 
@@ -692,7 +680,7 @@ mm_manager_num_modems (MMManager *self)
     g_return_val_if_fail (self != NULL, 0);
     g_return_val_if_fail (MM_IS_MANAGER (self), 0);
 
-    return g_hash_table_size (MM_MANAGER_GET_PRIVATE (self)->modems);
+    return g_hash_table_size (self->priv->modems);
 }
 
 static gboolean
@@ -743,10 +731,8 @@ handle_scan_devices (MmGdbusOrgFreedesktopModemManager1 *manager,
                      GDBusMethodInvocation *invocation)
 {
     GError *error = NULL;
-    MMManagerPrivate *priv;
 
-    priv = MM_MANAGER_GET_PRIVATE (manager);
-    if (!mm_auth_provider_request_auth (priv->authp,
+    if (!mm_auth_provider_request_auth (MM_MANAGER (manager)->priv->authp,
                                         MM_AUTHORIZATION_MANAGER_CONTROL,
                                         G_OBJECT (manager),
                                         g_object_ref (invocation),
@@ -772,15 +758,14 @@ mm_manager_new (GDBusConnection *connection,
 
     manager = (MMManager *) g_object_new (MM_TYPE_MANAGER, NULL);
     if (manager) {
-        MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
 
-        priv->plugin_manager = mm_plugin_manager_new (error);
-        if (!priv->plugin_manager) {
+        manager->priv->plugin_manager = mm_plugin_manager_new (error);
+        if (!manager->priv->plugin_manager) {
             g_object_unref (manager);
             return NULL;
         }
 
-        priv->connection = g_object_ref (connection);
+        manager->priv->connection = g_object_ref (connection);
 
         /* Enable processing of input DBus messages */
         g_signal_connect (manager,
@@ -794,7 +779,7 @@ mm_manager_new (GDBusConnection *connection,
 
         /* Export the manager interface */
         if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (manager),
-                                               priv->connection,
+                                               manager->priv->connection,
                                                MM_DBUS_PATH,
                                                error))
         {
@@ -809,22 +794,27 @@ mm_manager_new (GDBusConnection *connection,
 static void
 mm_manager_init (MMManager *manager)
 {
-    MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
+    MMManagerPrivate *priv;
     const char *subsys[4] = { "tty", "net", "usb", NULL };
+
+    /* Setup private data */
+    manager->priv = priv = G_TYPE_INSTANCE_GET_PRIVATE ((manager),
+                                                        MM_TYPE_MANAGER,
+                                                        MMManagerPrivate);
 
     priv->authp = mm_auth_provider_get ();
 
     priv->modems = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
 
     priv->udev = g_udev_client_new (subsys);
-    g_assert (priv->udev);
+    g_assert (manager->priv->udev);
     g_signal_connect (priv->udev, "uevent", G_CALLBACK (handle_uevent), manager);
 }
 
 static void
 finalize (GObject *object)
 {
-    MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (object);
+    MMManagerPrivate *priv = MM_MANAGER (object)->priv;
 
     mm_auth_provider_cancel_for_owner (priv->authp, object);
 

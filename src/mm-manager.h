@@ -30,8 +30,11 @@
 #define MM_IS_MANAGER_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((obj), MM_TYPE_MANAGER))
 #define MM_MANAGER_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), MM_TYPE_MANAGER, MMManagerClass))
 
+typedef struct _MMManagerPrivate MMManagerPrivate;
+
 typedef struct {
     MmGdbusOrgFreedesktopModemManager1Skeleton parent;
+    MMManagerPrivate *priv;
 } MMManager;
 
 typedef struct {
