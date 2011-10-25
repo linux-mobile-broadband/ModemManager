@@ -43,6 +43,12 @@ static void grab_port (MMManager *manager,
 
 G_DEFINE_TYPE (MMManager, mm_manager, MM_GDBUS_TYPE_ORG_FREEDESKTOP_MODEM_MANAGER1_SKELETON);
 
+enum {
+    PROP_0,
+    PROP_CONNECTION,
+    LAST_PROP
+};
+
 struct _MMManagerPrivate {
     GDBusConnection *connection;
     GUdevClient *udev;
@@ -756,16 +762,18 @@ mm_manager_new (GDBusConnection *connection,
 
     g_return_val_if_fail (G_IS_DBUS_CONNECTION (connection), NULL);
 
-    manager = (MMManager *) g_object_new (MM_TYPE_MANAGER, NULL);
+    manager = (MMManager *) g_object_new (MM_TYPE_MANAGER,
+                                          MM_MANAGER_CONNECTION, connection,
+                                          NULL);
     if (manager) {
+
+        g_assert (manager->priv->connection);
 
         manager->priv->plugin_manager = mm_plugin_manager_new (error);
         if (!manager->priv->plugin_manager) {
             g_object_unref (manager);
             return NULL;
         }
-
-        manager->priv->connection = g_object_ref (connection);
 
         /* Enable processing of input DBus messages */
         g_signal_connect (manager,
@@ -789,6 +797,44 @@ mm_manager_new (GDBusConnection *connection,
     }
 
     return manager;
+}
+
+static void
+set_property (GObject *object,
+              guint prop_id,
+              const GValue *value,
+              GParamSpec *pspec)
+{
+    MMManagerPrivate *priv = MM_MANAGER (object)->priv;
+
+    switch (prop_id) {
+    case PROP_CONNECTION:
+        if (priv->connection)
+            g_object_unref (priv->connection);
+        priv->connection = g_value_dup_object (value);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+
+static void
+get_property (GObject *object,
+              guint prop_id,
+              GValue *value,
+              GParamSpec *pspec)
+{
+    MMManagerPrivate *priv = MM_MANAGER (object)->priv;
+
+    switch (prop_id) {
+    case PROP_CONNECTION:
+        g_value_set_object (value, priv->connection);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
 }
 
 static void
@@ -840,5 +886,16 @@ mm_manager_class_init (MMManagerClass *manager_class)
     g_type_class_add_private (object_class, sizeof (MMManagerPrivate));
 
     /* Virtual methods */
+    object_class->set_property = set_property;
+    object_class->get_property = get_property;
     object_class->finalize = finalize;
+
+    /* Properties */
+    g_object_class_install_property
+        (object_class, PROP_CONNECTION,
+         g_param_spec_object (MM_MANAGER_CONNECTION,
+                              "Connection",
+                              "GDBus connection to the system bus.",
+                              G_TYPE_DBUS_CONNECTION,
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
 }

@@ -30,6 +30,8 @@
 #define MM_IS_MANAGER_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((obj), MM_TYPE_MANAGER))
 #define MM_MANAGER_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), MM_TYPE_MANAGER, MMManagerClass))
 
+#define MM_MANAGER_CONNECTION "connection" /* Construct-only */
+
 typedef struct _MMManagerPrivate MMManagerPrivate;
 
 typedef struct {
