@@ -13,15 +13,21 @@
  * Copyright (C) 2008 - 2009 Novell, Inc.
  * Copyright (C) 2009 - 2011 Red Hat, Inc.
  * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2011 Google, Inc.
  */
 
 #include <string.h>
 #include <ctype.h>
+
 #include <gmodule.h>
+
 #define G_UDEV_API_IS_SUBJECT_TO_CHANGE
 #include <gudev/gudev.h>
-#include <dbus/dbus-glib.h>
-#include <dbus/dbus-glib-lowlevel.h>
+
+#include <ModemManager.h>
+
+#include <mm-gdbus-manager.h>
+
 #include "mm-manager.h"
 #include "mm-plugin-manager.h"
 #include "mm-auth-provider.h"
@@ -30,39 +36,17 @@
 #include "mm-log.h"
 #include "mm-port-probe-cache.h"
 
-static gboolean impl_manager_enumerate_devices (MMManager *manager,
-                                                GPtrArray **devices,
-                                                GError **err);
-
-static void impl_manager_scan_devices (MMManager *manager,
-                                       DBusGMethodInvocation *context);
-
-static gboolean impl_manager_set_logging (MMManager *manager,
-                                          const char *level,
-                                          GError **error);
-
 static void grab_port (MMManager *manager,
                        MMPlugin *plugin,
                        GUdevDevice *device,
                        GUdevDevice *physical_device);
 
-#include "mm-manager-glue.h"
-
-G_DEFINE_TYPE (MMManager, mm_manager, G_TYPE_OBJECT)
-
-enum {
-    DEVICE_ADDED,
-    DEVICE_REMOVED,
-
-    LAST_SIGNAL
-};
-
-static guint signals[LAST_SIGNAL] = { 0 };
+G_DEFINE_TYPE (MMManager, mm_manager, MM_GDBUS_TYPE_ORG_FREEDESKTOP_MODEM_MANAGER1_SKELETON);
 
 #define MM_MANAGER_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MANAGER, MMManagerPrivate))
 
 typedef struct {
-    DBusGConnection *connection;
+    GDBusConnection *connection;
     GUdevClient *udev;
     GHashTable *modems;
 
@@ -101,37 +85,6 @@ find_port_support_context_free (FindPortSupportContext *ctx)
     g_free (ctx);
 }
 
-MMManager *
-mm_manager_new (DBusGConnection *bus)
-{
-    MMManager *manager;
-
-    g_return_val_if_fail (bus != NULL, NULL);
-
-    manager = (MMManager *) g_object_new (MM_TYPE_MANAGER, NULL);
-    if (manager) {
-        GError *error = NULL;
-        MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
-
-        priv->connection = dbus_g_connection_ref (bus);
-        dbus_g_connection_register_g_object (priv->connection,
-                                             MM_DBUS_PATH,
-                                             G_OBJECT (manager));
-
-        priv->plugin_manager = mm_plugin_manager_new (&error);
-        if (!priv->plugin_manager) {
-            mm_warn ("Error creating Plugin Manager: '%s'",
-                     error ? error->message : "unknown error");
-            g_clear_error (&error);
-
-            g_object_unref (manager);
-            manager = NULL;
-        }
-    }
-
-    return manager;
-}
-
 static void
 remove_modem (MMManager *manager, MMModem *modem)
 {
@@ -142,7 +95,8 @@ remove_modem (MMManager *manager, MMModem *modem)
     g_assert (device);
     mm_dbg ("Removed modem %s", device);
 
-    g_signal_emit (manager, signals[DEVICE_REMOVED], 0, modem);
+    /* GDBus TODO: Unexport object
+     * g_signal_emit (manager, signals[DEVICE_REMOVED], 0, modem); */
     g_hash_table_remove (priv->modems, device);
     g_free (device);
 }
@@ -190,13 +144,14 @@ check_export_modem (MMManager *self, MMModem *modem)
     /* No outstanding port tasks, so if the modem is valid we can export it */
     if (mm_modem_get_valid (modem)) {
         static guint32 id = 0, vid = 0, pid = 0;
-        char *path, *data_device = NULL;
+        gchar *path, *data_device = NULL;
         GUdevDevice *physdev;
 
         subsys = NULL;
 
         path = g_strdup_printf (MM_DBUS_PATH"/Modems/%d", id++);
-        dbus_g_connection_register_g_object (priv->connection, path, G_OBJECT (modem));
+        /* GDBus TODO:
+         * dbus_g_connection_register_g_object (priv->connection, path, G_OBJECT (modem)); */
         g_object_set_data_full (G_OBJECT (modem), DBUS_PATH_TAG, path, (GDestroyNotify) g_free);
 
         mm_dbg ("Exported modem %s as %s", modem_physdev, path);
@@ -211,15 +166,16 @@ check_export_modem (MMManager *self, MMModem *modem)
                       MM_MODEM_HW_PID, &pid,
                       NULL);
         mm_dbg ("(%s): VID 0x%04X PID 0x%04X (%s)",
-                 path, (vid & 0xFFFF), (pid & 0xFFFF),
-                 subsys ? subsys : "unknown");
+                path, (vid & 0xFFFF), (pid & 0xFFFF),
+                subsys ? subsys : "unknown");
         mm_dbg ("(%s): data port is %s", path, data_device);
         g_free (data_device);
 
         if (physdev)
             g_object_unref (physdev);
 
-        g_signal_emit (self, signals[DEVICE_ADDED], 0, modem);
+        /* GDBus TODO: export object
+         * g_signal_emit (self, signals[DEVICE_ADDED], 0, modem); */
     }
 
 out:
@@ -256,36 +212,6 @@ add_modem (MMManager *manager, MMModem *modem, MMPlugin *plugin)
         check_export_modem (manager, modem);
     }
     g_free (device);
-}
-
-static void
-enumerate_devices_cb (gpointer key, gpointer val, gpointer user_data)
-{
-    MMModem *modem = MM_MODEM (val);
-    GPtrArray **devices = (GPtrArray **) user_data;
-
-    if (mm_modem_get_valid (modem)) {
-        const char *path;
-
-        path = g_object_get_data (G_OBJECT (modem), DBUS_PATH_TAG);
-        /* A valid modem without dbus path may happen when enumerating devices
-         * while there is an ongoing modem probing. */
-        if (path)
-            g_ptr_array_add (*devices, g_strdup (path));
-    }
-}
-
-static gboolean
-impl_manager_enumerate_devices (MMManager *manager,
-                                GPtrArray **devices,
-                                GError **err)
-{
-    MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
-
-    *devices = g_ptr_array_sized_new (g_hash_table_size (priv->modems));
-    g_hash_table_foreach (priv->modems, enumerate_devices_cb, devices);
-
-    return TRUE;
 }
 
 static MMModem *
@@ -674,62 +600,6 @@ handle_uevent (GUdevClient *client,
         device_removed (self, device);
 }
 
-static void
-scan_devices_auth_cb (MMAuthRequest *req,
-                      GObject *owner,
-                      DBusGMethodInvocation *context,
-                      gpointer user_data)
-{
-    if (mm_auth_request_get_result (req) != MM_AUTH_RESULT_AUTHORIZED) {
-        GError *error;
-
-        error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_AUTHORIZATION_REQUIRED,
-                             "This request requires the '%s' authorization",
-                             mm_auth_request_get_authorization (req));
-        dbus_g_method_return_error (context, error);
-        g_error_free (error);
-        return;
-    }
-
-    /* Otherwise relaunch device scan */
-    mm_manager_start (MM_MANAGER (owner));
-    dbus_g_method_return (context);
-}
-
-static void
-impl_manager_scan_devices (MMManager *manager,
-                           DBusGMethodInvocation *context)
-{
-    GError *error = NULL;
-    MMManagerPrivate *priv;
-
-    priv = MM_MANAGER_GET_PRIVATE (manager);
-    if (!mm_auth_provider_request_auth (priv->authp,
-                                        MM_AUTHORIZATION_MANAGER_CONTROL,
-                                        G_OBJECT (manager),
-                                        context,
-                                        (MMAuthRequestCb)scan_devices_auth_cb,
-                                        NULL,
-                                        NULL,
-                                        &error)) {
-        dbus_g_method_return_error (context, error);
-        g_error_free (error);
-    }
-}
-
-static gboolean
-impl_manager_set_logging (MMManager *manager,
-                          const char *level,
-                          GError **error)
-{
-	if (mm_log_set_level (level, error)) {
-		mm_info ("logging: level '%s'", level);
-		return TRUE;
-	}
-	return FALSE;
-}
-
-
 void
 mm_manager_start (MMManager *manager)
 {
@@ -825,6 +695,117 @@ mm_manager_num_modems (MMManager *self)
     return g_hash_table_size (MM_MANAGER_GET_PRIVATE (self)->modems);
 }
 
+static gboolean
+handle_set_logging (MmGdbusOrgFreedesktopModemManager1 *manager,
+                    GDBusMethodInvocation *invocation,
+                    const gchar *level)
+{
+    GError *error = NULL;
+
+	if (!mm_log_set_level (level, &error)) {
+		mm_warn ("couldn't set logging level to '%s': '%s'",
+                 level,
+                 error->message);
+        g_dbus_method_invocation_return_gerror (invocation, error);
+        g_error_free (error);
+        return TRUE;
+	}
+
+    mm_info ("logging: level '%s'", level);
+    mm_gdbus_org_freedesktop_modem_manager1_complete_set_logging (manager, invocation);
+    return TRUE;
+}
+
+static void
+scan_devices_request_auth_cb (MMAuthRequest *req,
+                              MmGdbusOrgFreedesktopModemManager1 *manager,
+                              GDBusMethodInvocation *invocation,
+                              gpointer user_data)
+{
+    if (mm_auth_request_get_result (req) != MM_AUTH_RESULT_AUTHORIZED) {
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_MODEM_ERROR,
+                                               MM_MODEM_ERROR_AUTHORIZATION_REQUIRED,
+                                               "This request requires the '%s' authorization",
+                                               mm_auth_request_get_authorization (req));
+        return;
+    }
+
+    /* Otherwise relaunch device scan */
+    mm_manager_start (MM_MANAGER (manager));
+
+    mm_gdbus_org_freedesktop_modem_manager1_complete_scan_devices (manager, invocation);
+    g_object_unref (invocation);
+}
+
+static gboolean
+handle_scan_devices (MmGdbusOrgFreedesktopModemManager1 *manager,
+                     GDBusMethodInvocation *invocation)
+{
+    GError *error = NULL;
+    MMManagerPrivate *priv;
+
+    priv = MM_MANAGER_GET_PRIVATE (manager);
+    if (!mm_auth_provider_request_auth (priv->authp,
+                                        MM_AUTHORIZATION_MANAGER_CONTROL,
+                                        G_OBJECT (manager),
+                                        g_object_ref (invocation),
+                                        (MMAuthRequestCb)scan_devices_request_auth_cb,
+                                        NULL,
+                                        NULL,
+                                        &error)) {
+        g_dbus_method_invocation_return_gerror (invocation, error);
+        g_error_free (error);
+        g_object_unref (invocation);
+    }
+
+    return TRUE;
+}
+
+MMManager *
+mm_manager_new (GDBusConnection *connection,
+                GError **error)
+{
+    MMManager *manager;
+
+    g_return_val_if_fail (G_IS_DBUS_CONNECTION (connection), NULL);
+
+    manager = (MMManager *) g_object_new (MM_TYPE_MANAGER, NULL);
+    if (manager) {
+        MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (manager);
+
+        priv->plugin_manager = mm_plugin_manager_new (error);
+        if (!priv->plugin_manager) {
+            g_object_unref (manager);
+            return NULL;
+        }
+
+        priv->connection = g_object_ref (connection);
+
+        /* Enable processing of input DBus messages */
+        g_signal_connect (manager,
+                          "handle-set-logging",
+                          G_CALLBACK (handle_set_logging),
+                          NULL);
+        g_signal_connect (manager,
+                          "handle-scan-devices",
+                          G_CALLBACK (handle_scan_devices),
+                          NULL);
+
+        /* Export the manager interface */
+        if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (manager),
+                                               priv->connection,
+                                               MM_DBUS_PATH,
+                                               error))
+        {
+            g_object_unref (manager);
+            return NULL;
+        }
+    }
+
+    return manager;
+}
+
 static void
 mm_manager_init (MMManager *manager)
 {
@@ -856,7 +837,7 @@ finalize (GObject *object)
         g_object_unref (priv->plugin_manager);
 
     if (priv->connection)
-        dbus_g_connection_unref (priv->connection);
+        g_object_unref (priv->connection);
 
     G_OBJECT_CLASS (mm_manager_parent_class)->finalize (object);
 }
@@ -870,35 +851,4 @@ mm_manager_class_init (MMManagerClass *manager_class)
 
     /* Virtual methods */
     object_class->finalize = finalize;
-
-    /* Signals */
-    signals[DEVICE_ADDED] =
-        g_signal_new ("device-added",
-                      G_OBJECT_CLASS_TYPE (object_class),
-                      G_SIGNAL_RUN_FIRST,
-                      G_STRUCT_OFFSET (MMManagerClass, device_added),
-                      NULL, NULL,
-                      g_cclosure_marshal_VOID__OBJECT,
-					  G_TYPE_NONE, 1,
-					  G_TYPE_OBJECT);
-
-    signals[DEVICE_REMOVED] =
-        g_signal_new ("device-removed",
-                      G_OBJECT_CLASS_TYPE (object_class),
-                      G_SIGNAL_RUN_FIRST,
-                      G_STRUCT_OFFSET (MMManagerClass, device_removed),
-                      NULL, NULL,
-                      g_cclosure_marshal_VOID__OBJECT,
-                      G_TYPE_NONE, 1,
-                      G_TYPE_OBJECT);
-
-    dbus_g_object_type_install_info (G_TYPE_FROM_CLASS (manager_class),
-									 &dbus_glib_mm_manager_object_info);
-
-    dbus_g_error_domain_register (MM_SERIAL_ERROR, "org.freedesktop.ModemManager.Modem", MM_TYPE_SERIAL_ERROR);
-	dbus_g_error_domain_register (MM_MODEM_ERROR, "org.freedesktop.ModemManager.Modem", MM_TYPE_MODEM_ERROR);
-    dbus_g_error_domain_register (MM_MODEM_CONNECT_ERROR, "org.freedesktop.ModemManager.Modem", MM_TYPE_MODEM_CONNECT_ERROR);
-    dbus_g_error_domain_register (MM_MOBILE_ERROR, "org.freedesktop.ModemManager.Modem.Gsm", MM_TYPE_MOBILE_ERROR);
-    dbus_g_error_domain_register (MM_MSG_ERROR, "org.freedesktop.ModemManager.Modem.Gsm.SMS", MM_TYPE_MSG_ERROR);
 }
-

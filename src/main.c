@@ -19,9 +19,11 @@
 #include <syslog.h>
 #include <string.h>
 #include <unistd.h>
-#include <dbus/dbus-glib.h>
-#include <dbus/dbus-glib-lowlevel.h>
 #include <stdlib.h>
+
+#include <gio/gio.h>
+
+#include "ModemManager.h"
 
 #include "mm-manager.h"
 #include "mm-log.h"
@@ -30,7 +32,8 @@
 # define MM_DIST_VERSION VERSION
 #endif
 
-static GMainLoop *loop = NULL;
+static GMainLoop *loop;
+static MMManager *manager;
 
 static void
 mm_signal_handler (int signo)
@@ -62,68 +65,46 @@ setup_signals (void)
 }
 
 static void
-destroy_cb (DBusGProxy *proxy, gpointer user_data)
+name_acquired_cb (GDBusConnection *connection,
+                  const gchar *name,
+                  gpointer user_data)
 {
-    mm_warn ("disconnected from the system bus, exiting.");
-    g_main_loop_quit (loop);
-}
+    GError *error = NULL;
 
-static DBusGProxy *
-create_dbus_proxy (DBusGConnection *bus)
-{
-    DBusGProxy *proxy;
-    GError *err = NULL;
-    int request_name_result;
+    mm_dbg ("Service name '%s' was acquired", name);
 
-    proxy = dbus_g_proxy_new_for_name (bus,
-                                       "org.freedesktop.DBus",
-                                       "/org/freedesktop/DBus",
-                                       "org.freedesktop.DBus");
-
-    if (!dbus_g_proxy_call (proxy, "RequestName", &err,
-                            G_TYPE_STRING, MM_DBUS_SERVICE,
-                            G_TYPE_UINT, DBUS_NAME_FLAG_DO_NOT_QUEUE,
-                            G_TYPE_INVALID,
-                            G_TYPE_UINT, &request_name_result,
-                            G_TYPE_INVALID)) {
-        mm_warn ("Could not acquire the %s service.\n"
-                 "  Message: '%s'", MM_DBUS_SERVICE, err->message);
-
-        g_error_free (err);
-        g_object_unref (proxy);
-        proxy = NULL;
-    } else if (request_name_result != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
-        mm_warn ("Could not acquire the " MM_DBUS_SERVICE
-                 " service as it is already taken. Return: %d",
-                 request_name_result);
-
-        g_object_unref (proxy);
-        proxy = NULL;
-    } else {
-        dbus_g_proxy_add_signal (proxy, "NameOwnerChanged",
-                                 G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING,
-                                 G_TYPE_INVALID);
+    /* Create Manager object */
+    g_assert (!manager);
+    manager = mm_manager_new (connection, &error);
+    if (!manager) {
+        mm_warn ("Could not create manager: %s", error->message);
+        g_error_free (error);
+        g_main_loop_quit (loop);
+        return;
     }
 
-    return proxy;
+    /* Launch scan for devices */
+    mm_manager_start (manager);
 }
 
-static gboolean
-start_manager (gpointer user_data)
+static void
+name_lost_cb (GDBusConnection *connection,
+              const gchar *name,
+              gpointer user_data)
 {
-    mm_manager_start (MM_MANAGER (user_data));
-    return FALSE;
+    /* Note that we're not allowing replacement, so once the name acquired, the
+     * process won't lose it. */
+    mm_warn ("Could not acquire the '%s' service name", name);
+    g_main_loop_quit (loop);
 }
 
 int
 main (int argc, char *argv[])
 {
-    DBusGConnection *bus;
-    DBusGProxy *proxy;
-    MMManager *manager;
+    GDBusConnection *bus;
     GError *err = NULL;
     GOptionContext *opt_ctx;
-    guint id;
+    guint name_id;
     const char *log_level = NULL, *log_file = NULL;
     gboolean debug = FALSE, show_ts = FALSE, rel_ts = FALSE;
 
@@ -166,7 +147,8 @@ main (int argc, char *argv[])
 
     mm_info ("ModemManager (version " MM_DIST_VERSION ") starting...");
 
-    bus = dbus_g_bus_get (DBUS_BUS_SYSTEM, &err);
+    /* Get system bus */
+    bus = g_bus_get_sync (G_BUS_TYPE_SYSTEM, NULL, &err);
     if (!bus) {
         g_warning ("Could not get the system bus. Make sure "
                    "the message bus daemon is running! Message: %s",
@@ -175,44 +157,35 @@ main (int argc, char *argv[])
         return -1;
     }
 
-#ifndef HAVE_DBUS_GLIB_DISABLE_LEGACY_PROP_ACCESS
-#error HAVE_DBUS_GLIB_DISABLE_LEGACY_PROP_ACCESS not defined
-#endif
+    /* Acquire name, don't allow replacement */
+    name_id = g_bus_own_name_on_connection (bus,
+                                            MM_DBUS_SERVICE,
+                                            G_BUS_NAME_OWNER_FLAGS_NONE,
+                                            name_acquired_cb,
+                                            name_lost_cb,
+                                            NULL,
+                                            NULL);
 
-#if HAVE_DBUS_GLIB_DISABLE_LEGACY_PROP_ACCESS
-    /* Ensure that non-exported properties don't leak out, and that the
-     * introspection 'access' permissions are respected.
-     */
-    dbus_glib_global_set_disable_legacy_property_access ();
-#endif
-
-    proxy = create_dbus_proxy (bus);
-    if (!proxy)
-        return -1;
-
-    manager = mm_manager_new (bus);
-    g_idle_add (start_manager, manager);
-
+    /* Go into the main loop */
     loop = g_main_loop_new (NULL, FALSE);
-    id = g_signal_connect (proxy, "destroy", G_CALLBACK (destroy_cb), loop);
-
     g_main_loop_run (loop);
 
-    g_signal_handler_disconnect (proxy, id);
+    if (manager) {
+        mm_manager_shutdown (manager);
 
-    mm_manager_shutdown (manager);
+        /* Wait for all modems to be removed */
+        while (mm_manager_num_modems (manager)) {
+            GMainContext *ctx = g_main_loop_get_context (loop);
 
-    /* Wait for all modems to be removed */
-    while (mm_manager_num_modems (manager)) {
-        GMainContext *ctx = g_main_loop_get_context (loop);
+            g_main_context_iteration (ctx, FALSE);
+            g_usleep (50);
+        }
 
-        g_main_context_iteration (ctx, FALSE);
-        g_usleep (50);
+        g_object_unref (manager);
     }
 
-    g_object_unref (manager);
-    g_object_unref (proxy);
-    dbus_g_connection_unref (bus);    
+    g_bus_unown_name (name_id);
+    g_object_unref (bus);
 
     mm_log_shutdown ();
 

@@ -11,15 +11,17 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2011 Red Hat, Inc.
+ * Copyright (C) 2011 Google, Inc.
  */
 
 #ifndef MM_MANAGER_H
 #define MM_MANAGER_H
 
 #include <glib-object.h>
-#include <dbus/dbus-glib.h>
-#include "mm-modem.h"
+#include <gio/gio.h>
+
+#include "mm-gdbus-manager.h"
 
 #define MM_TYPE_MANAGER            (mm_manager_get_type ())
 #define MM_MANAGER(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_MANAGER, MMManager))
@@ -29,20 +31,17 @@
 #define MM_MANAGER_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), MM_TYPE_MANAGER, MMManagerClass))
 
 typedef struct {
-    GObject parent;
+    MmGdbusOrgFreedesktopModemManager1Skeleton parent;
 } MMManager;
 
 typedef struct {
-    GObjectClass parent;
-
-    /* Signals */
-    void (*device_added) (MMManager *manager, MMModem *device);
-    void (*device_removed) (MMManager *manager, MMModem *device);
+    MmGdbusOrgFreedesktopModemManager1SkeletonClass parent;
 } MMManagerClass;
 
 GType mm_manager_get_type (void);
 
-MMManager       *mm_manager_new         (DBusGConnection *bus);
+MMManager       *mm_manager_new         (GDBusConnection *bus,
+                                         GError **error);
 
 void             mm_manager_start       (MMManager *manager);
 
