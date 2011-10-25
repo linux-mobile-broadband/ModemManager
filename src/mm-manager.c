@@ -54,14 +54,18 @@ enum {
 };
 
 struct _MMManagerPrivate {
+    /* The connection to the system bus */
     GDBusConnection *connection;
+    /* The UDev client */
     GUdevClient *udev;
-    GHashTable *modems;
-
+    /* The authentication provider */
     MMAuthProvider *authp;
-
     /* The Plugin Manager object */
     MMPluginManager *plugin_manager;
+    /* The container of currently available modems */
+    GHashTable *modems;
+    /* DBus The Object Manager server */
+    GDBusObjectManagerServer *object_manager;
 };
 
 typedef struct {
@@ -830,6 +834,9 @@ mm_manager_init (MMManager *manager)
     priv->udev = g_udev_client_new (subsys);
     g_signal_connect (priv->udev, "uevent", G_CALLBACK (handle_uevent), manager);
 
+    /* Setup Object Manager Server */
+    priv->object_manager = g_dbus_object_manager_server_new (MM_DBUS_PATH);
+
     /* Enable processing of input DBus messages */
     g_signal_connect (manager,
                       "handle-set-logging",
@@ -860,6 +867,10 @@ initable_init (GInitable *initable,
                                            error))
         return FALSE;
 
+    /* Export the Object Manager interface */
+    g_dbus_object_manager_server_set_connection (priv->object_manager,
+                                                 priv->connection);
+
     /* All good */
     return TRUE;
 }
@@ -878,6 +889,9 @@ finalize (GObject *object)
 
     if (priv->plugin_manager)
         g_object_unref (priv->plugin_manager);
+
+    if (priv->object_manager)
+        g_object_unref (priv->object_manager);
 
     if (priv->connection)
         g_object_unref (priv->connection);
