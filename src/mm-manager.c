@@ -41,7 +41,11 @@ static void grab_port (MMManager *manager,
                        GUdevDevice *device,
                        GUdevDevice *physical_device);
 
-G_DEFINE_TYPE (MMManager, mm_manager, MM_GDBUS_TYPE_ORG_FREEDESKTOP_MODEM_MANAGER1_SKELETON);
+static void initable_iface_init (GInitableIface *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMManager, mm_manager, MM_GDBUS_TYPE_ORG_FREEDESKTOP_MODEM_MANAGER1_SKELETON, 0,
+                        G_IMPLEMENT_INTERFACE (G_TYPE_INITABLE,
+                                               initable_iface_init));
 
 enum {
     PROP_0,
@@ -758,45 +762,13 @@ MMManager *
 mm_manager_new (GDBusConnection *connection,
                 GError **error)
 {
-    MMManager *manager;
-
     g_return_val_if_fail (G_IS_DBUS_CONNECTION (connection), NULL);
 
-    manager = (MMManager *) g_object_new (MM_TYPE_MANAGER,
-                                          MM_MANAGER_CONNECTION, connection,
-                                          NULL);
-    if (manager) {
-
-        g_assert (manager->priv->connection);
-
-        manager->priv->plugin_manager = mm_plugin_manager_new (error);
-        if (!manager->priv->plugin_manager) {
-            g_object_unref (manager);
-            return NULL;
-        }
-
-        /* Enable processing of input DBus messages */
-        g_signal_connect (manager,
-                          "handle-set-logging",
-                          G_CALLBACK (handle_set_logging),
-                          NULL);
-        g_signal_connect (manager,
-                          "handle-scan-devices",
-                          G_CALLBACK (handle_scan_devices),
-                          NULL);
-
-        /* Export the manager interface */
-        if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (manager),
-                                               manager->priv->connection,
-                                               MM_DBUS_PATH,
-                                               error))
-        {
-            g_object_unref (manager);
-            return NULL;
-        }
-    }
-
-    return manager;
+    return g_initable_new (MM_TYPE_MANAGER,
+                           NULL, /* cancellable */
+                           error,
+                           MM_MANAGER_CONNECTION, connection,
+                           NULL);
 }
 
 static void
@@ -848,13 +820,48 @@ mm_manager_init (MMManager *manager)
                                                         MM_TYPE_MANAGER,
                                                         MMManagerPrivate);
 
+    /* Setup authentication provider */
     priv->authp = mm_auth_provider_get ();
 
+    /* Setup internal list of modem objects */
     priv->modems = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
 
+    /* Setup UDev client */
     priv->udev = g_udev_client_new (subsys);
-    g_assert (manager->priv->udev);
     g_signal_connect (priv->udev, "uevent", G_CALLBACK (handle_uevent), manager);
+
+    /* Enable processing of input DBus messages */
+    g_signal_connect (manager,
+                      "handle-set-logging",
+                      G_CALLBACK (handle_set_logging),
+                      NULL);
+    g_signal_connect (manager,
+                      "handle-scan-devices",
+                      G_CALLBACK (handle_scan_devices),
+                      NULL);
+}
+
+static gboolean
+initable_init (GInitable *initable,
+               GCancellable *cancellable,
+               GError **error)
+{
+    MMManagerPrivate *priv = MM_MANAGER (initable)->priv;
+
+    /* Create plugin manager */
+    priv->plugin_manager = mm_plugin_manager_new (error);
+    if (!priv->plugin_manager)
+        return FALSE;
+
+    /* Export the manager interface */
+    if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (initable),
+                                           priv->connection,
+                                           MM_DBUS_PATH,
+                                           error))
+        return FALSE;
+
+    /* All good */
+    return TRUE;
 }
 
 static void
@@ -876,6 +883,12 @@ finalize (GObject *object)
         g_object_unref (priv->connection);
 
     G_OBJECT_CLASS (mm_manager_parent_class)->finalize (object);
+}
+
+static void
+initable_iface_init (GInitableIface *iface)
+{
+	iface->init = initable_init;
 }
 
 static void
