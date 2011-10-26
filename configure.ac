@@ -60,6 +60,13 @@ PKG_CHECK_MODULES(MM,
 AC_SUBST(MM_CFLAGS)
 AC_SUBST(MM_LIBS)
 
+PKG_CHECK_MODULES(LIBMM,
+                  glib-2.0 >= 2.30
+                  gobject-2.0
+                  gio-2.0)
+AC_SUBST(LIBMM_CFLAGS)
+AC_SUBST(LIBMM_LIBS)
+
 PKG_CHECK_MODULES(GUDEV, gudev-1.0)
 AC_SUBST(GUDEV_CFLAGS)
 AC_SUBST(GUDEV_LIBS)
@@ -195,6 +202,7 @@ docs/man/modem-manager.8
 docs/reference/Makefile
 docs/reference/api/Makefile
 docs/reference/api/version.xml
+libmm-glib/Makefile
 ])
 AC_OUTPUT
 
