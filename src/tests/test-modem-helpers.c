@@ -743,6 +743,16 @@ test_creg2_gobi_weird_solicited (void *f, gpointer d)
 }
 
 static void
+test_creg2_unsolicited_with_rac (void *f, gpointer d)
+{
+    TestData *data = (TestData *) d;
+    const char *reply = "\r\n+CGREG: 1,\"1422\",\"00000142\",3,\"00\"\r\n";
+    const CregResult result = { 1, 0x1422, 0x0142, 3, 8, FALSE };
+
+    test_creg_match ("CREG=2 with RAC", FALSE, reply, data, &result);
+}
+
+static void
 test_cscs_icon225_support_response (void *f, gpointer d)
 {
     const char *reply = "\r\n+CSCS: (\"IRA\",\"GSM\",\"UCS2\")\r\n";
@@ -1262,6 +1272,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_creg2_md400_unsolicited, data));
     g_test_suite_add (suite, TESTCASE (test_creg2_s8500_wave_unsolicited, data));
     g_test_suite_add (suite, TESTCASE (test_creg2_gobi_weird_solicited, data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_unsolicited_with_rac, data));
 
     g_test_suite_add (suite, TESTCASE (test_cgreg1_solicited, data));
     g_test_suite_add (suite, TESTCASE (test_cgreg1_unsolicited, data));
