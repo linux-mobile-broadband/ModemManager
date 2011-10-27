@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2011 Google, Inc.
  */
 
 #include "config.h"
@@ -35,8 +36,9 @@
 /* Context */
 typedef struct {
     MMManager *manager;
+    GCancellable *cancellable;
 } Context;
-static Context ctxt;
+static Context *ctx;
 
 /* Options */
 static gboolean list_modems_flag;
@@ -99,23 +101,51 @@ mmcli_manager_options_enabled (void)
 }
 
 static void
-init (GDBusConnection *connection)
+context_free (Context *ctx)
 {
-    GError *error = NULL;
+    if (!ctx)
+        return;
 
-    /* Create new manager */
-    ctxt.manager = mm_manager_new (connection, NULL, &error);
-    if (!ctxt.manager) {
-        g_printerr ("error: couldn't create manager: %s\n",
-                    error ? error->message : "unknown error");
-        exit (EXIT_FAILURE);
-    }
+    if (ctx->manager)
+        g_object_unref (ctx->manager);
+    if (ctx->cancellable)
+        g_object_unref (ctx->cancellable);
+    g_free (ctx);
 }
 
 void
 mmcli_manager_shutdown (void)
 {
-    g_object_unref (ctxt.manager);
+    context_free (ctx);
+}
+
+static void
+set_logging_process_reply (gboolean      result,
+                           const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't set logging level: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("Successfully set logging level\n");
+}
+
+static void
+set_logging_ready (MMManager    *manager,
+                   GAsyncResult *result,
+                   gpointer      nothing)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_manager_set_logging_finish (manager,
+                                                      result,
+                                                      &error);
+    set_logging_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
 }
 
 static void
@@ -148,119 +178,143 @@ scan_devices_ready (MMManager    *manager,
 }
 
 static void
-enumerate_devices_process_reply (const GStrv   paths,
-                                 const GError *error)
+device_added (GDBusObjectManager *manager,
+              GDBusObject        *object)
 {
-    if (error) {
-        g_printerr ("error: couldn't enumerate devices: '%s'\n",
-                    error ? error->message : "unknown error");
-        exit (EXIT_FAILURE);
-    }
-
-    g_print ("\n");
-    if (!paths) {
-        g_print ("No modems were found");
-    } else {
-        guint i;
-
-        for (i = 0; paths[i]; i++) {
-            g_print ("%s: '%s'\n",
-                     "Found modem",
-                     paths[i]);
-        }
-    }
-    g_print ("\n");
+    g_print ("Added modem [TODO: Print path]\n");
+    fflush (stdout);
 }
 
 static void
-enumerate_devices_ready (MMManager    *manager,
-                         GAsyncResult *result,
-                         gpointer      nothing)
+device_removed (GDBusObjectManager *manager,
+                GDBusObject        *object)
 {
-    GStrv paths;
-    GError *error = NULL;
+    g_print ("Removed modem [TODO: Print path]\n");
+    fflush (stdout);
+}
 
-    paths = mm_manager_enumerate_devices_finish (manager, result, &error);
-    enumerate_devices_process_reply (paths, error);
-    g_strfreev (paths);
+static void
+list_current_modems (MMManager *manager)
+{
+    GList *modems;
 
+    modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (ctx->manager));
+
+    g_print ("\n");
+    if (!modems)
+        g_print ("No modems were found\n");
+    else {
+        GList *l;
+
+        g_print ("Found %u modems\n", g_list_length (modems));
+        for (l = modems; l; l = g_list_next (l)) {
+            g_print ("\t[TODO: Print path]\n");
+            g_object_unref (l->data);
+        }
+        g_list_free (modems);
+    }
+}
+
+static void
+cancelled (GCancellable *cancellable)
+{
     mmcli_async_operation_done ();
 }
 
 static void
-device_added (MMManager   *manager,
-              const gchar *path)
+manager_new_ready (GObject      *source,
+                   GAsyncResult *result,
+                   gpointer      none)
 {
-    g_print ("%s: '%s'\n",
-             "Added modem",
-             path);
-    fflush (stdout);
-}
+    gchar *name_owner;
+    GError *error = NULL;
 
-static void
-device_removed (MMManager   *manager,
-                const gchar *path)
-{
-    g_print ("%s: '%s'\n",
-             "Removed modem",
-             path);
-    fflush (stdout);
-}
-
-gboolean
-mmcli_manager_run_asynchronous (GDBusConnection *connection,
-                                GCancellable    *cancellable)
-{
-    gboolean keep_loop = FALSE;
-
-    if (set_logging_str) {
-        g_printerr ("error: logging level cannot be set asynchronously\n");
+    ctx->manager = mm_manager_new_finish (result, &error);
+    if (!ctx->manager) {
+        g_printerr ("error: couldn't create manager: %s\n",
+                    error ? error->message : "unknown error");
         exit (EXIT_FAILURE);
     }
 
-    /* Initialize context */
-    init (connection);
+    name_owner = g_dbus_object_manager_client_get_name_owner (G_DBUS_OBJECT_MANAGER_CLIENT (ctx->manager));
+    if (!name_owner) {
+        g_printerr ("error: couldn't find the ModemManager process in the bus\n");
+        exit (EXIT_FAILURE);
+    }
+
+    g_debug ("ModemManager process found at '%s'", name_owner);
+    g_free (name_owner);
+
+    /* Request to set log level? */
+    if (set_logging_str) {
+        mm_manager_set_logging (ctx->manager,
+                                set_logging_str,
+                                ctx->cancellable,
+                                (GAsyncReadyCallback)set_logging_ready,
+                                NULL);
+        return;
+    }
 
     /* Request to scan modems? */
     if (scan_modems_flag) {
-        mm_manager_scan_devices_async (ctxt.manager,
-                                       cancellable,
-                                       (GAsyncReadyCallback)scan_devices_ready,
-                                       NULL);
-        return keep_loop;
+        mm_manager_scan_devices (ctx->manager,
+                                 ctx->cancellable,
+                                 (GAsyncReadyCallback)scan_devices_ready,
+                                 NULL);
+        return;
     }
 
     /* Request to monitor modems? */
     if (monitor_modems_flag) {
-        g_signal_connect (ctxt.manager,
-                          "device-added",
+        g_signal_connect (ctx->manager,
+                          "object-added",
                           G_CALLBACK (device_added),
                           NULL);
-        g_signal_connect (ctxt.manager,
-                          "device-removed",
+        g_signal_connect (ctx->manager,
+                          "object-removed",
                           G_CALLBACK (device_removed),
                           NULL);
+        list_current_modems (ctx->manager);
 
-        /* We need to keep the loop */
-        keep_loop = TRUE;
+        /* If we get cancelled, operation done */
+        g_cancellable_connect (ctx->cancellable,
+                               G_CALLBACK (cancelled),
+                               NULL,
+                               NULL);
+        return;
     }
 
     /* Request to list modems? */
-    if (monitor_modems_flag || list_modems_flag) {
-        mm_manager_enumerate_devices_async (ctxt.manager,
-                                            cancellable,
-                                            (GAsyncReadyCallback)enumerate_devices_ready,
-                                            NULL);
-        return keep_loop;
+    if (list_modems_flag) {
+        list_current_modems (ctx->manager);
+        mmcli_async_operation_done ();
+        return;
     }
 
     g_warn_if_reached ();
-    return FALSE;
+}
+
+void
+mmcli_manager_run_asynchronous (GDBusConnection *connection,
+                                GCancellable    *cancellable)
+{
+    /* Initialize context */
+    ctx = g_new0 (Context, 1);
+    if (cancellable)
+        ctx->cancellable = g_object_ref (cancellable);
+
+    /* Create a new Manager object asynchronously */
+    mm_manager_new (connection,
+                    G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE,
+                    cancellable,
+                    (GAsyncReadyCallback)manager_new_ready,
+                    NULL);
 }
 
 void
 mmcli_manager_run_synchronous (GDBusConnection *connection)
 {
+    gchar *name_owner;
     GError *error = NULL;
 
     if (monitor_modems_flag) {
@@ -269,32 +323,35 @@ mmcli_manager_run_synchronous (GDBusConnection *connection)
     }
 
     /* Initialize context */
-    init (connection);
+    ctx = g_new0 (Context, 1);
+    ctx->manager = mm_manager_new_sync (connection,
+                                        G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE,
+                                        NULL,
+                                        &error);
+    if (!ctx->manager) {
+        g_printerr ("error: couldn't create manager: %s\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    name_owner = g_dbus_object_manager_client_get_name_owner (G_DBUS_OBJECT_MANAGER_CLIENT (ctx->manager));
+    if (!name_owner) {
+        g_printerr ("error: couldn't find the ModemManager process in the bus\n");
+        exit (EXIT_FAILURE);
+    }
+
+    g_debug ("ModemManager process found at '%s'", name_owner);
+    g_free (name_owner);
 
     /* Request to set log level? */
     if (set_logging_str) {
-        MMLogLevel level;
+        gboolean result;
 
-        if (g_strcmp0 (set_logging_str, "ERR") == 0)
-            level = MM_LOG_LEVEL_ERROR;
-        else if (g_strcmp0 (set_logging_str, "WARN") == 0)
-            level = MM_LOG_LEVEL_WARNING;
-        else if (g_strcmp0 (set_logging_str, "INFO") == 0)
-            level = MM_LOG_LEVEL_INFO;
-        else if (g_strcmp0 (set_logging_str, "DEBUG") == 0)
-            level = MM_LOG_LEVEL_DEBUG;
-        else {
-            g_printerr ("error: couldn't set unknown logging level: '%s'\n",
-                        set_logging_str);
-            exit (EXIT_FAILURE);
-        }
-
-        if (mm_manager_set_logging (ctxt.manager, level, &error)) {
-            g_printerr ("error: couldn't set logging level: '%s'\n",
-                        error ? error->message : "unknown error");
-            exit (EXIT_FAILURE);
-        }
-        g_print ("successfully set log level '%s'\n", set_logging_str);
+        result = mm_manager_set_logging_sync (ctx->manager,
+                                              set_logging_str,
+                                              NULL,
+                                              &error);
+        set_logging_process_reply (result, error);
         return;
     }
 
@@ -302,18 +359,16 @@ mmcli_manager_run_synchronous (GDBusConnection *connection)
     if (scan_modems_flag) {
         gboolean result;
 
-        result = mm_manager_scan_devices (ctxt.manager, &error);
+        result = mm_manager_scan_devices_sync (ctx->manager,
+                                               NULL,
+                                               &error);
         scan_devices_process_reply (result, error);
         return;
     }
 
     /* Request to list modems? */
     if (list_modems_flag) {
-        GStrv paths;
-
-        paths = mm_manager_enumerate_devices (ctxt.manager, &error);
-        enumerate_devices_process_reply (paths, error);
-        g_strfreev (paths);
+        list_current_modems (ctx->manager);
         return;
     }
 

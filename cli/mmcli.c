@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2011 Google, Inc.
  */
 
 #include "config.h"
@@ -28,7 +29,7 @@
 #include <glib.h>
 #include <gio/gio.h>
 
-#include <libmm.h>
+#include <libmm-glib.h>
 
 #include "mmcli.h"
 
@@ -37,7 +38,6 @@
 
 /* Globals */
 static GMainLoop *loop;
-static gboolean keep_loop;
 static GCancellable *cancellable;
 
 /* Context */
@@ -98,8 +98,7 @@ mmcli_async_operation_done (void)
         cancellable = NULL;
     }
 
-    if (!keep_loop)
-        g_main_loop_quit (loop);
+    g_main_loop_quit (loop);
 }
 
 gint
@@ -147,9 +146,12 @@ main (gint argc, gchar **argv)
     /* Manager options? */
     if (mmcli_manager_options_enabled ()) {
         if (async_flag)
-            keep_loop = mmcli_manager_run_asynchronous (connection, cancellable);
+            mmcli_manager_run_asynchronous (connection, cancellable);
         else
             mmcli_manager_run_synchronous (connection);
+    } else {
+        g_printerr ("error: no actions specified\n");
+        exit (EXIT_FAILURE);
     }
 
     /* Run loop only in async operations */
