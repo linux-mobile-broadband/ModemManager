@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 - 2010 Red Hat, Inc.
+ * Copyright (C) 2009 - 2011 Red Hat, Inc.
  */
 
 #include <config.h>
@@ -355,6 +355,20 @@ parse_uint (char *str, int base, glong nmin, glong nmax, gboolean *valid)
     return *valid ? (guint) ret : 0;
 }
 
+static gboolean
+item_is_lac_not_stat (GMatchInfo *info, guint32 item)
+{
+    char *str;
+    gboolean is_lac = FALSE;
+
+    /* A <stat> will always be a single digit, without quotes */
+    str = g_match_info_fetch (info, item);
+    g_assert (str);
+    is_lac = (strchr (str, '"') || strlen (str) > 1);
+    g_free (str);
+    return is_lac;
+}
+
 gboolean
 mm_gsm_parse_creg_response (GMatchInfo *info,
                             guint32 *out_reg_state,
@@ -401,13 +415,8 @@ mm_gsm_parse_creg_response (GMatchInfo *info,
          * CREG=2 (non-standard): +CREG: <n>,<stat>,<lac>,<ci>
          */
 
-        /* To distinguish, check length of the third match item.  If it's
-         * more than one digit or has quotes in it then it's a LAC and we
-         * got the first format.
-         */
-        str = g_match_info_fetch (info, 3);
-        if (str && (strchr (str, '"') || strlen (str) > 1)) {
-            g_free (str);
+        /* Check if the third item is the LAC to distinguish the two cases */
+        if (item_is_lac_not_stat (info, 3)) {
             istat = 2;
             ilac = 3;
             ici = 4;
@@ -418,12 +427,23 @@ mm_gsm_parse_creg_response (GMatchInfo *info,
             ici = 5;
         }
     } else if (n_matches == 7) {
-        /* CREG=2 (non-standard): +CREG: <n>,<stat>,<lac>,<ci>,<AcT> */
-        istat = 3;
-        ilac = 4;
-        ici = 5;
-        iact = 6;
-    }
+        /* CREG=2 (solicited):            +CREG: <n>,<stat>,<lac>,<ci>,<AcT>
+         * CREG=2 (unsolicited with RAC): +CREG: <stat>,<lac>,<ci>,<AcT>,<RAC>
+         */
+
+        /* Check if the third item is the LAC to distinguish the two cases */
+        if (item_is_lac_not_stat (info, 3)) {
+            istat = 2;
+            ilac = 3;
+            ici = 4;
+            iact = 5;
+        } else {
+            istat = 3;
+            ilac = 4;
+            ici = 5;
+            iact = 6;
+        }
+     }
 
     /* Status */
     str = g_match_info_fetch (info, istat);
