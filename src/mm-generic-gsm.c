@@ -2027,12 +2027,29 @@ disable_flash_done (MMSerialPort *port,
 }
 
 static void
+mark_disabled (gpointer user_data)
+{
+    MMCallbackInfo *info = user_data;
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+
+    mm_modem_set_state (MM_MODEM (info->modem),
+                        MM_MODEM_STATE_DISABLING,
+                        MM_MODEM_STATE_REASON_NONE);
+
+    if (mm_port_get_connected (MM_PORT (priv->primary)))
+        mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 1000, TRUE, disable_flash_done, info);
+    else
+        disable_flash_done (MM_SERIAL_PORT (priv->primary), NULL, info);
+}
+
+static void
 secondary_unsolicited_done (MMAtSerialPort *port,
                             GString *response,
                             GError *error,
                             gpointer user_data)
 {
     mm_serial_port_close_force (MM_SERIAL_PORT (port));
+    mark_disabled (user_data);
 }
 
 static void
@@ -2072,13 +2089,6 @@ disable (MMModem *modem,
     update_lac_ci (self, 0, 0, 1);
     _internal_update_access_technology (self, MM_MODEM_GSM_ACCESS_TECH_UNKNOWN);
 
-    /* Clean up the secondary port if it's open */
-    if (priv->secondary && mm_serial_port_is_open (MM_SERIAL_PORT (priv->secondary))) {
-        mm_at_serial_port_queue_command (priv->secondary, "+CREG=0", 3, NULL, NULL);
-        mm_at_serial_port_queue_command (priv->secondary, "+CGREG=0", 3, NULL, NULL);
-        mm_at_serial_port_queue_command (priv->secondary, "+CMER=0", 3, secondary_unsolicited_done, NULL);
-    }
-
     info = mm_callback_info_new (modem, callback, user_data);
 
     /* Cache the previous state so we can reset it if the operation fails */
@@ -2088,14 +2098,14 @@ disable (MMModem *modem,
                                GUINT_TO_POINTER (state),
                                NULL);
 
-    mm_modem_set_state (MM_MODEM (info->modem),
-                        MM_MODEM_STATE_DISABLING,
-                        MM_MODEM_STATE_REASON_NONE);
-
-    if (mm_port_get_connected (MM_PORT (priv->primary)))
-        mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 1000, TRUE, disable_flash_done, info);
-    else
-        disable_flash_done (MM_SERIAL_PORT (priv->primary), NULL, info);
+    /* Clean up the secondary port if it's open */
+    if (priv->secondary && mm_serial_port_is_open (MM_SERIAL_PORT (priv->secondary))) {
+        mm_dbg("Shutting down secondary port");
+        mm_at_serial_port_queue_command (priv->secondary, "+CREG=0", 3, NULL, NULL);
+        mm_at_serial_port_queue_command (priv->secondary, "+CGREG=0", 3, NULL, NULL);
+        mm_at_serial_port_queue_command (priv->secondary, "+CMER=0", 3, secondary_unsolicited_done, info);
+    } else
+        mark_disabled (info);
 }
 
 static void
