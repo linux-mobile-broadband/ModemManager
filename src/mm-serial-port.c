@@ -1021,6 +1021,7 @@ internal_queue_command (MMSerialPort *self,
     MMQueueData *info;
 
     g_return_if_fail (MM_IS_SERIAL_PORT (self));
+    g_return_if_fail (priv->open_count > 0);
     g_return_if_fail (command != NULL);
 
     info = g_slice_new0 (MMQueueData);
