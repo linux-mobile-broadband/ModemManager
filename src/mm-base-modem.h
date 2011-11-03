@@ -69,7 +69,7 @@ gboolean mm_base_modem_get_valid    (MMBaseModem *self);
 
 gboolean mm_base_modem_auth_request (MMBaseModem *self,
                                      const gchar *authorization,
-                                     DBusGMethodInvocation *context,
+                                     GDBusMethodInvocation *context,
                                      MMAuthRequestCb callback,
                                      gpointer callback_data,
                                      GDestroyNotify notify,

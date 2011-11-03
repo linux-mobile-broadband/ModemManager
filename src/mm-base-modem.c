@@ -258,12 +258,10 @@ mm_base_modem_get_valid (MMBaseModem *self)
     return self->priv->valid;
 }
 
-/*****************************************************************************/
-
 gboolean
 mm_base_modem_auth_request (MMBaseModem *self,
                             const gchar *authorization,
-                            DBusGMethodInvocation *context,
+                            GDBusMethodInvocation *invocation,
                             MMAuthRequestCb callback,
                             gpointer callback_data,
                             GDestroyNotify notify,
@@ -274,7 +272,7 @@ mm_base_modem_auth_request (MMBaseModem *self,
     return !!mm_auth_provider_request_auth (self->priv->authp,
                                             authorization,
                                             G_OBJECT (self),
-                                            context,
+                                            invocation,
                                             callback,
                                             callback_data,
                                             notify,
