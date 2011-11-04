@@ -52,6 +52,10 @@ struct _MMBaseModemPrivate {
     MMAuthProvider *authp;
 
     GHashTable *ports;
+    MMAtSerialPort *primary;
+    MMAtSerialPort *secondary;
+    MMQcdmSerialPort *qcdm;
+    MMPort *data;
 };
 
 static gchar *
@@ -85,6 +89,14 @@ mm_base_modem_get_port (MMBaseModem *self,
     return port;
 }
 
+gboolean
+mm_base_modem_owns_port (MMBaseModem *self,
+                         const gchar *subsys,
+                         const gchar *name)
+{
+    return !!mm_base_modem_get_port (self, subsys, name);
+}
+
 static gboolean
 set_invalid_unresponsive_modem_cb (MMBaseModem *self)
 {
@@ -102,11 +114,11 @@ serial_port_timed_out_cb (MMSerialPort *port,
 
     if (self->priv->max_timeouts > 0 &&
         n_consecutive_timeouts >= self->priv->max_timeouts) {
-        mm_warn ("Modem %s: Port (%s/%s) timed out %u times, marking modem as disabled",
-                 g_dbus_object_get_object_path (G_DBUS_OBJECT (self)),
+        mm_warn ("(%s/%s) port timed out %u times, marking modem '%s' as disabled",
                  mm_port_type_to_name (mm_port_get_port_type (MM_PORT (port))),
                  mm_port_get_device (MM_PORT (port)),
-                 n_consecutive_timeouts);
+                 n_consecutive_timeouts,
+                 g_dbus_object_get_object_path (G_DBUS_OBJECT (self)));
 
         /* Only set action to invalidate modem if not already done */
         if (!self->priv->set_invalid_unresponsive_modem_id)
@@ -115,60 +127,138 @@ serial_port_timed_out_cb (MMSerialPort *port,
     }
 }
 
-static void
-find_primary (gpointer key, gpointer data, gpointer user_data)
+gboolean
+mm_base_modem_grab_port (MMBaseModem *self,
+                         const gchar *subsys,
+                         const gchar *name,
+                         MMPortType suggested_type)
 {
-    MMPort **found = user_data;
-    MMPort *port = MM_PORT (data);
+    MMPort *port;
+    gchar *key;
 
-    if (!*found && (mm_port_get_port_type (port) == MM_PORT_TYPE_PRIMARY))
-        *found = port;
-}
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), FALSE);
+    g_return_val_if_fail (subsys != NULL, FALSE);
+    g_return_val_if_fail (name != NULL, FALSE);
 
-MMPort *
-mm_base_modem_add_port (MMBaseModem *self,
-                        const gchar *subsys,
-                        const gchar *name,
-                        MMPortType ptype)
-{
-    MMPort *port = NULL;
-    gchar *key, *device;
+    /* Only allow 'tty' and 'net' ports */
+    if (!g_str_equal (subsys, "net") &&
+        !g_str_equal (subsys, "tty")) {
+        mm_warn ("(%s/%s): cannot add port, unhandled subsystem",
+                 subsys, name);
+        return FALSE;
+    }
 
-    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
-    g_return_val_if_fail (subsys != NULL, NULL);
-    g_return_val_if_fail (name != NULL, NULL);
-    g_return_val_if_fail (ptype != MM_PORT_TYPE_UNKNOWN, NULL);
+    /* Don't allow more than one Primary port to be set */
+    if (self->priv->primary &&
+        suggested_type == MM_PORT_TYPE_PRIMARY) {
+        mm_warn ("(%s/%s): cannot add port, primary port already exists",
+                 subsys, name);
+        return FALSE;
+    }
 
-    /* Only 'net' or 'tty' should be given */
-    g_return_val_if_fail (g_str_equal (subsys, "net") ||
-                          g_str_equal (subsys, "tty"),
-                          NULL);
-
+    /* Check whether we already have it stored */
     key = get_hash_key (subsys, name);
     port = g_hash_table_lookup (self->priv->ports, key);
-
     if (port) {
-        mm_warn ("cannot add port (%s/%s): already exists",
+        mm_warn ("(%s/%s): cannot add port, already exists",
                  subsys, name);
         g_free (key);
-        return NULL;
+        return FALSE;
     }
 
-    if (ptype == MM_PORT_TYPE_PRIMARY) {
-        g_hash_table_foreach (self->priv->ports, find_primary, &port);
-        if (port) {
-            mm_warn ("cannot add port (%s/%s): primary port already exists",
-                     subsys, name);
-            g_free (key);
-            return NULL;
-        }
-    }
-
+    /* If we have a tty, decide whether it will be primary, secondary, or none */
     if (g_str_equal (subsys, "tty")) {
-        if (ptype == MM_PORT_TYPE_QCDM)
+        MMPortType ptype;
+
+        /* Decide port type */
+        if (suggested_type != MM_PORT_TYPE_UNKNOWN)
+            ptype = suggested_type;
+        else {
+            if (!self->priv->primary)
+                ptype = MM_PORT_TYPE_PRIMARY;
+            else if (!self->priv->secondary)
+                ptype = MM_PORT_TYPE_SECONDARY;
+            else
+                ptype = MM_PORT_TYPE_IGNORED;
+        }
+
+        if (ptype == MM_PORT_TYPE_QCDM) {
+            /* QCDM port */
             port = MM_PORT (mm_qcdm_serial_port_new (name, ptype));
-        else
+            if (!self->priv->qcdm)
+                self->priv->qcdm = g_object_ref (port);
+        } else {
+            /* AT port */
             port = MM_PORT (mm_at_serial_port_new (name, ptype));
+
+            /* TODO: setup serial port response parser and unsolicited message handlers */
+
+            /* (CDMA) */
+            /* g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL); */
+            /* mm_at_serial_port_set_response_parser (MM_AT_SERIAL_PORT (port), */
+            /*                                        mm_serial_parser_v1_e1_parse, */
+            /*                                        mm_serial_parser_v1_e1_new (), */
+            /*                                        mm_serial_parser_v1_e1_destroy); */
+
+            /* (GSM) */
+            /* { */
+            /*     GPtrArray *array; */
+            /*     int i; */
+
+            /*     mm_at_serial_port_set_response_parser (MM_AT_SERIAL_PORT (port), */
+            /*                                            mm_serial_parser_v1_parse, */
+            /*                                            mm_serial_parser_v1_new (), */
+            /*                                            mm_serial_parser_v1_destroy); */
+
+            /*     /\* Set up CREG unsolicited message handlers *\/ */
+            /*     array = mm_gsm_creg_regex_get (FALSE); */
+            /*     for (i = 0; i < array->len; i++) { */
+            /*         regex = g_ptr_array_index (array, i); */
+
+            /*         mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, reg_state_changed, self, NULL); */
+            /*     } */
+            /*     mm_gsm_creg_regex_destroy (array); */
+
+            /*     regex = g_regex_new ("\\r\\n\\+CIEV: (\\d+),(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL); */
+            /*     mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, ciev_received, self, NULL); */
+            /*     g_regex_unref (regex); */
+
+            /*     regex = g_regex_new ("\\r\\n\\+CMTI: \"(\\S+)\",(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL); */
+            /*     mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, cmti_received, self, NULL); */
+            /*     g_regex_unref (regex); */
+
+            /*     regex = g_regex_new ("\\r\\n\\+CUSD:\\s*(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL); */
+            /*     mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, cusd_received, self, NULL); */
+            /*     g_regex_unref (regex); */
+            /* } */
+
+
+            if (ptype == MM_PORT_TYPE_PRIMARY) {
+                self->priv->primary = g_object_ref (port);
+
+                /* Primary port, which will also be data port */
+                if (!self->priv->data)
+                    self->priv->data = g_object_ref (port);
+
+                /* TODO: GSM */
+                /* /\* Get the modem's general info *\/ */
+                /* initial_info_check (self); */
+                /* /\* Get modem's IMEI *\/ */
+                /* initial_imei_check (self); */
+                /* /\* Get modem's initial lock/unlock state; this also ensures the */
+                /*  * SIM is ready by waiting if necessary for the SIM to initalize. */
+                /*  *\/ */
+                /* initial_pin_check (self); */
+
+                /* TODO: CDMA */
+                /* /\* Get the modem's general info *\/ */
+                /* initial_info_check (self); */
+                /* /\* Get modem's ESN number *\/ */
+                /* initial_esn_check (self); */
+
+            } else if (ptype == MM_PORT_TYPE_SECONDARY)
+                self->priv->secondary = g_object_ref (port);
+        }
 
         /* For serial ports, enable port timeout checks */
         if (port)
@@ -176,57 +266,97 @@ mm_base_modem_add_port (MMBaseModem *self,
                               "timed-out",
                               G_CALLBACK (serial_port_timed_out_cb),
                               self);
-    } else if (!strcmp (subsys, "net")) {
+
+        mm_dbg ("(%s/%s) port (%s) grabbed by %s",
+                subsys,
+                name,
+                mm_port_type_to_name (ptype),
+                mm_port_get_device (port));
+    } else {
+        /* Net */
         port = MM_PORT (g_object_new (MM_TYPE_PORT,
                                       MM_PORT_DEVICE, name,
                                       MM_PORT_SUBSYS, MM_PORT_SUBSYS_NET,
-                                      MM_PORT_TYPE, ptype,
+                                      MM_PORT_TYPE, MM_PORT_TYPE_IGNORED,
                                       NULL));
-    }
 
-    device = mm_modem_get_device (MM_MODEM (self));
-    mm_dbg ("(%s/%s) type %s claimed by %s",
-            subsys,
-            name,
-            mm_port_type_to_name (ptype),
-            device);
-    g_free (device);
+        /* Net device (if any) is the preferred data port */
+        if (!self->priv->data || MM_IS_AT_SERIAL_PORT (self->priv->data)) {
+            g_clear_object (&self->priv->data);
+            self->priv->data = g_object_ref (port);
 
-    g_hash_table_insert (self->priv->ports, key, port);
+            /* TODO: */
+            /* g_object_notify (G_OBJECT (self), MM_MODEM_DATA_DEVICE); */
+            /* check_valid (self); */
+        }
 
-    return port;
-}
-
-gboolean
-mm_base_modem_remove_port (MMBaseModem *self, MMPort *port)
-{
-    gchar *device, *key, *name;
-    const gchar *type_name, *subsys;
-    gboolean removed;
-
-    g_return_val_if_fail (MM_IS_BASE_MODEM (self), FALSE);
-    g_return_val_if_fail (MM_IS_PORT (port), FALSE);
-
-    name = g_strdup (mm_port_get_device (port));
-    subsys = mm_port_subsys_to_name (mm_port_get_subsys (port));
-    type_name = mm_port_type_to_name (mm_port_get_port_type (port));
-
-    key = get_hash_key (subsys, name);
-    removed = g_hash_table_remove (self->priv->ports, key);
-    if (removed) {
-        /* Port may have already been destroyed by removal from the hash */
-        device = mm_modem_get_device (MM_MODEM (self));
-        mm_dbg ("(%s/%s) type %s removed from %s",
+        mm_dbg ("(%s/%s) port grabbed by %s",
                 subsys,
                 name,
-                type_name,
-                device);
-        g_free (device);
+                mm_port_get_device (port));
     }
-    g_free (key);
-    g_free (name);
 
-    return removed;
+    /* Add it to the tracking HT.
+     * Note: 'key' and 'port' now owned by the HT. */
+    g_hash_table_insert (self->priv->ports, key, port);
+
+    return TRUE;
+}
+
+void
+mm_base_modem_release_port (MMBaseModem *self,
+                            const gchar *subsys,
+                            const gchar *name)
+{
+    const gchar *type_name;
+    const gchar *device;
+    gchar *key;
+    MMPort *port;
+
+    g_return_if_fail (MM_IS_BASE_MODEM (self));
+    g_return_if_fail (name != NULL);
+    g_return_if_fail (subsys != NULL);
+
+    if (!g_str_equal (subsys, "tty") &&
+        !g_str_equal (subsys, "net"))
+        return;
+
+    key = get_hash_key (subsys, name);
+
+    /* Find the port */
+    port = g_hash_table_lookup (self->priv->ports, key);
+    if (!port) {
+        mm_warn ("(%s/%s): cannot release port, not found",
+                 subsys, name);
+        g_free (key);
+        return;
+    }
+
+    if (port == (MMPort *)self->priv->primary)
+        g_clear_object (&self->priv->primary);
+
+    if (port == (MMPort *)self->priv->data)
+        g_clear_object (&self->priv->data);
+
+    if (port == (MMPort *)self->priv->secondary)
+        g_clear_object (&self->priv->secondary);
+
+    if (port == (MMPort *)self->priv->qcdm)
+        g_clear_object (&self->priv->qcdm);
+
+    /* Remove it from the tracking HT */
+    type_name = mm_port_type_to_name (mm_port_get_port_type (port));
+    device = mm_port_get_device (port);
+    mm_dbg ("(%s/%s) type %s released from %s",
+            subsys,
+            name,
+            type_name,
+            device);
+    g_hash_table_remove (self->priv->ports, key);
+    g_free (key);
+
+    /* TODO */
+    /* check_valid (MM_GENERIC_GSM (modem)); */
 }
 
 void
@@ -237,15 +367,6 @@ mm_base_modem_set_valid (MMBaseModem *self,
 
     if (self->priv->valid != new_valid) {
         self->priv->valid = new_valid;
-
-        /* TODO */
-        /* /\* Modem starts off in disabled state, and jumps to disabled when */
-        /*  * it's no longer valid. */
-        /*  *\/ */
-        /* mm_modem_set_state (MM_MODEM (self), */
-        /*                     MM_MODEM_STATE_DISABLED, */
-        /*                     MM_MODEM_STATE_REASON_NONE); */
-
         g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_VALID]);
     }
 }
@@ -370,6 +491,11 @@ static void
 dispose (GObject *object)
 {
     MMBaseModem *self = MM_BASE_MODEM (object);
+
+    g_clear_object (&self->priv->primary);
+    g_clear_object (&self->priv->secondary);
+    g_clear_object (&self->priv->data);
+    g_clear_object (&self->priv->qcdm);
 
     if (self->priv->ports) {
         g_hash_table_destroy (self->priv->ports);
