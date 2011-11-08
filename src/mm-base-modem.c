@@ -31,6 +31,7 @@
 #include "mm-log.h"
 #include "mm-at-serial-port.h"
 #include "mm-qcdm-serial-port.h"
+#include "mm-serial-parsers.h"
 
 G_DEFINE_ABSTRACT_TYPE (MMBaseModem, mm_base_modem, MM_GDBUS_TYPE_OBJECT_SKELETON);
 
@@ -198,30 +199,21 @@ mm_base_modem_grab_port (MMBaseModem *self,
             /* AT port */
             port = MM_PORT (mm_at_serial_port_new (name, ptype));
 
-            /* TODO: setup serial port response parser and unsolicited message handlers */
+            /* Set common response parser */
+            mm_at_serial_port_set_response_parser (MM_AT_SERIAL_PORT (port),
+                                                   mm_serial_parser_v1_parse,
+                                                   mm_serial_parser_v1_new (),
+                                                   mm_serial_parser_v1_destroy);
 
-            /* (CDMA) */
-            /* g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL); */
-            /* mm_at_serial_port_set_response_parser (MM_AT_SERIAL_PORT (port), */
-            /*                                        mm_serial_parser_v1_e1_parse, */
-            /*                                        mm_serial_parser_v1_e1_new (), */
-            /*                                        mm_serial_parser_v1_e1_destroy); */
-
-            /* (GSM) */
             /* { */
+            /*     GRegex *regex; */
             /*     GPtrArray *array; */
-            /*     int i; */
-
-            /*     mm_at_serial_port_set_response_parser (MM_AT_SERIAL_PORT (port), */
-            /*                                            mm_serial_parser_v1_parse, */
-            /*                                            mm_serial_parser_v1_new (), */
-            /*                                            mm_serial_parser_v1_destroy); */
+            /*     gint i; */
 
             /*     /\* Set up CREG unsolicited message handlers *\/ */
             /*     array = mm_gsm_creg_regex_get (FALSE); */
             /*     for (i = 0; i < array->len; i++) { */
             /*         regex = g_ptr_array_index (array, i); */
-
             /*         mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, reg_state_changed, self, NULL); */
             /*     } */
             /*     mm_gsm_creg_regex_destroy (array); */
@@ -238,7 +230,6 @@ mm_base_modem_grab_port (MMBaseModem *self,
             /*     mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, cusd_received, self, NULL); */
             /*     g_regex_unref (regex); */
             /* } */
-
 
             if (ptype == MM_PORT_TYPE_PRIMARY) {
                 self->priv->primary = g_object_ref (port);
