@@ -38,12 +38,19 @@ enum {
     PROP_0,
     PROP_VALID,
     PROP_MAX_TIMEOUTS,
+    PROP_DEVICE,
+    PROP_DRIVER,
+    PROP_PLUGIN,
     PROP_LAST
 };
 
 static GParamSpec *properties[PROP_LAST];
 
 struct _MMBaseModemPrivate {
+    gchar *device;
+    gchar *driver;
+    gchar *plugin;
+
     gboolean valid;
 
     guint max_timeouts;
@@ -417,6 +424,30 @@ mm_base_modem_auth_finish (MMBaseModem *self,
     return TRUE;
 }
 
+const gchar *
+mm_base_modem_get_device (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
+
+    return self->priv->device;
+}
+
+const gchar *
+mm_base_modem_get_driver (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
+
+    return self->priv->driver;
+}
+
+const gchar *
+mm_base_modem_get_plugin (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
+
+    return self->priv->plugin;
+}
+
 /*****************************************************************************/
 
 static void
@@ -450,6 +481,18 @@ set_property (GObject *object,
     case PROP_MAX_TIMEOUTS:
         self->priv->max_timeouts = g_value_get_uint (value);
         break;
+    case PROP_DEVICE:
+        g_free (self->priv->device);
+        self->priv->device = g_value_dup_string (value);
+        break;
+    case PROP_DRIVER:
+        g_free (self->priv->driver);
+        self->priv->driver = g_value_dup_string (value);
+        break;
+    case PROP_PLUGIN:
+        g_free (self->priv->plugin);
+        self->priv->plugin = g_value_dup_string (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -471,6 +514,15 @@ get_property (GObject *object,
     case PROP_MAX_TIMEOUTS:
         g_value_set_uint (value, self->priv->max_timeouts);
         break;
+    case PROP_DEVICE:
+        g_value_set_string (value, self->priv->device);
+        break;
+    case PROP_DRIVER:
+        g_value_set_string (value, self->priv->driver);
+        break;
+    case PROP_PLUGIN:
+        g_value_set_string (value, self->priv->plugin);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -483,6 +535,10 @@ finalize (GObject *object)
     MMBaseModem *self = MM_BASE_MODEM (object);
 
     mm_auth_provider_cancel_for_owner (self->priv->authp, object);
+
+    g_free (self->priv->device);
+    g_free (self->priv->driver);
+    g_free (self->priv->plugin);
 
     G_OBJECT_CLASS (mm_base_modem_parent_class)->finalize (object);
 }
@@ -534,5 +590,29 @@ mm_base_modem_class_init (MMBaseModemClass *klass)
                               FALSE,
                               G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_VALID, properties[PROP_VALID]);
+
+    properties[PROP_DEVICE] =
+        g_param_spec_string (MM_BASE_MODEM_DEVICE,
+                             "Device",
+                             "Master modem parent device of all the modem's ports",
+                             NULL,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_DEVICE, properties[PROP_DEVICE]);
+
+    properties[PROP_DRIVER] =
+        g_param_spec_string (MM_BASE_MODEM_DRIVER,
+                             "Driver",
+                             "Kernel driver",
+                             NULL,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_DRIVER, properties[PROP_DRIVER]);
+
+    properties[PROP_PLUGIN] =
+        g_param_spec_string (MM_BASE_MODEM_PLUGIN,
+                             "Plugin",
+                             "Name of the plugin managing this modem",
+                             NULL,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_PLUGIN, properties[PROP_PLUGIN]);
 }
 

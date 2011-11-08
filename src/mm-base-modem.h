@@ -40,6 +40,9 @@ typedef struct _MMBaseModemPrivate MMBaseModemPrivate;
 
 #define MM_BASE_MODEM_MAX_TIMEOUTS   "base-modem-max-timeouts"
 #define MM_BASE_MODEM_VALID          "base-modem-valid"
+#define MM_BASE_MODEM_DEVICE         "base-modem-device"
+#define MM_BASE_MODEM_DRIVER         "base-modem-driver"
+#define MM_BASE_MODEM_PLUGIN         "base-modem-plugin"
 
 struct _MMBaseModem {
     MmGdbusObjectSkeleton parent;
@@ -81,6 +84,10 @@ gboolean mm_base_modem_auth_request (MMBaseModem *self,
 gboolean mm_base_modem_auth_finish  (MMBaseModem *self,
                                      MMAuthRequest *req,
                                      GError **error);
+
+const gchar *mm_base_modem_get_device (MMBaseModem *self);
+const gchar *mm_base_modem_get_driver (MMBaseModem *self);
+const gchar *mm_base_modem_get_plugin (MMBaseModem *self);
 
 #endif /* MM_BASE_MODEM_H */
 
