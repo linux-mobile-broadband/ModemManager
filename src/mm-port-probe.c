@@ -19,6 +19,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <ModemManager.h>
+
+#include <mm-errors-types.h>
+
 #include "mm-port-probe.h"
 #include "mm-errors.h"
 #include "mm-log.h"
@@ -238,7 +242,7 @@ serial_probe_qcdm (MMPortProbe *self)
             FALSE,
             FALSE,
             g_error_new (MM_CORE_ERROR,
-                         MM_CORE_ERROR_INVALID,
+                         MM_CORE_ERROR_FAILED,
                          "(%s) Couldn't create QCDM port",
                          self->priv->name));
         return FALSE;
@@ -631,7 +635,7 @@ serial_open_at (MMPortProbe *self)
                 FALSE,
                 FALSE,
                 g_error_new (MM_CORE_ERROR,
-                             MM_CORE_ERROR_INVALID,
+                             MM_CORE_ERROR_FAILED,
                              "(%s) couldn't create AT port",
                              self->priv->name));
             return FALSE;
