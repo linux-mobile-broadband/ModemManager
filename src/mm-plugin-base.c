@@ -24,6 +24,9 @@
 
 #include <string.h>
 
+#include <ModemManager.h>
+#include <mm-errors-types.h>
+
 #define G_UDEV_API_IS_SUBJECT_TO_CHANGE
 #include <gudev/gudev.h>
 
@@ -582,7 +585,7 @@ supports_port (MMPlugin *plugin,
                                                             name))) {
         g_simple_async_result_set_error (async_result,
                                          MM_CORE_ERROR,
-                                         MM_CORE_ERROR_INVALID,
+                                         MM_CORE_ERROR_FAILED,
                                          "Couldn't find port for (%s/%s)",
                                          subsys,
                                          name);
@@ -596,7 +599,7 @@ supports_port (MMPlugin *plugin,
                     get_driver_name (port)))) {
         g_simple_async_result_set_error (async_result,
                                          MM_CORE_ERROR,
-                                         MM_CORE_ERROR_INVALID,
+                                         MM_CORE_ERROR_FAILED,
                                          "Couldn't find driver for (%s/%s)",
                                          subsys,
                                          name);
