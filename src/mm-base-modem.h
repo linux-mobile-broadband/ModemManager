@@ -55,6 +55,16 @@ struct _MMBaseModem {
 
 struct _MMBaseModemClass {
     MmGdbusObjectSkeletonClass parent;
+
+    /* Modem initialization.
+     * Whenever the primary AT port is grabbed, this method gets called */
+    void (* initialize) (MMBaseModem *self,
+                         GCancellable *cancellable,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data);
+    gboolean (*initialize_finish) (MMBaseModem *self,
+                                   GAsyncResult *res,
+                                   GError **error);
 };
 
 GType mm_base_modem_get_type (void);

@@ -27,6 +27,7 @@
 #include <mm-gdbus-modem.h>
 
 #include "mm-base-modem.h"
+
 #include "mm-errors.h"
 #include "mm-log.h"
 #include "mm-at-serial-port.h"
@@ -144,6 +145,23 @@ serial_port_timed_out_cb (MMSerialPort *port,
     }
 }
 
+static void
+initialize_ready (MMBaseModem *self,
+                  GAsyncResult *res)
+{
+    GError *error = NULL;
+
+    if (!MM_BASE_MODEM_GET_CLASS (self)->initialize_finish (self, res, &error)) {
+        mm_warn ("couldn't initialize the modem: '%s'", error->message);
+        mm_base_modem_set_valid (self, FALSE);
+        g_error_free (error);
+        return;
+    }
+
+    mm_dbg ("modem properly initialized");
+    mm_base_modem_set_valid (self, TRUE);
+}
+
 gboolean
 mm_base_modem_grab_port (MMBaseModem *self,
                          const gchar *subsys,
@@ -247,21 +265,12 @@ mm_base_modem_grab_port (MMBaseModem *self,
                 if (!self->priv->data)
                     self->priv->data = g_object_ref (port);
 
-                /* TODO: GSM */
-                /* /\* Get the modem's general info *\/ */
-                /* initial_info_check (self); */
-                /* /\* Get modem's IMEI *\/ */
-                /* initial_imei_check (self); */
-                /* /\* Get modem's initial lock/unlock state; this also ensures the */
-                /*  * SIM is ready by waiting if necessary for the SIM to initalize. */
-                /*  *\/ */
-                /* initial_pin_check (self); */
-
-                /* TODO: CDMA */
-                /* /\* Get the modem's general info *\/ */
-                /* initial_info_check (self); */
-                /* /\* Get modem's ESN number *\/ */
-                /* initial_esn_check (self); */
+                /* As soon as we get the primary AT port, we initialize the
+                 * modem */
+                MM_BASE_MODEM_GET_CLASS (self)->initialize (self,
+                                                            NULL, /* TODO: cancellable */
+                                                            (GAsyncReadyCallback)initialize_ready,
+                                                            NULL);
 
             } else if (ptype == MM_PORT_TYPE_SECONDARY)
                 self->priv->secondary = g_object_ref (port);
@@ -293,7 +302,6 @@ mm_base_modem_grab_port (MMBaseModem *self,
             self->priv->data = g_object_ref (port);
 
             /* TODO: */
-            /* g_object_notify (G_OBJECT (self), MM_MODEM_DATA_DEVICE); */
             /* check_valid (self); */
         }
 
