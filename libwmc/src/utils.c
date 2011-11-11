@@ -236,7 +236,7 @@ hdlc_encapsulate_buffer (char *inbuf,
  *
  * Returns: size of the encapsulated data writted to @outbuf.
  */
-gsize
+static gsize
 uml290_wmc_encapsulate (char *inbuf,
                         gsize cmd_len,
                         gsize inbuf_len,
@@ -251,7 +251,7 @@ uml290_wmc_encapsulate (char *inbuf,
     g_return_val_if_fail (inbuf_len >= cmd_len + 2, 0); /* space for CRC */
     g_return_val_if_fail (outbuf != NULL, 0);
 
-    estimated_out_len = inbuf_len + strlen (AT_WMC_PREFIX);
+    estimated_out_len = cmd_len + strlen (AT_WMC_PREFIX);
     estimated_out_len += 3;  /* CRC + trailer */
     estimated_out_len += cmd_len * 1.3;  /* escaping */
     g_return_val_if_fail (outbuf_len > estimated_out_len, 0);
@@ -268,6 +268,40 @@ uml290_wmc_encapsulate (char *inbuf,
     }
 
     return encap_len;
+}
+
+/**
+ * wmc_encapsulate:
+ * @inbuf: data buffer to encapsulate
+ * @cmd_len: size of the data contained in @inbuf
+ * @inbuf_len: total size of @inbuf itself (not just the data)
+ * @outbuf: buffer in which to put the encapsulated data
+ * @outbuf_len: total size of @outbuf
+ * @uml290: if %TRUE return buffer suitable for sending to UML290 devices
+ *
+ * Escapes and CRCs given data using HDLC-style mechanisms.
+ *
+ * Returns: size of the encapsulated data writted to @outbuf.
+ */
+gsize
+wmc_encapsulate (char *inbuf,
+                 gsize cmd_len,
+                 gsize inbuf_len,
+                 char *outbuf,
+                 gsize outbuf_len,
+                 gboolean uml290)
+{
+    g_return_val_if_fail (inbuf != NULL, 0);
+    g_return_val_if_fail (cmd_len >= 1, 0);
+    g_return_val_if_fail (inbuf_len >= cmd_len + 3, 0); /* space for CRC + trailer */
+    g_return_val_if_fail (outbuf != NULL, 0);
+
+    if (uml290)
+        return uml290_wmc_encapsulate (inbuf, cmd_len, inbuf_len, outbuf, outbuf_len);
+
+    /* Otherwise do normal WMC */
+    return hdlc_encapsulate_buffer (inbuf, cmd_len, inbuf_len,
+                                    0, TRUE, FALSE, outbuf, outbuf_len);
 }
 
 /**
@@ -380,5 +414,46 @@ hdlc_decapsulate_buffer (const char *inbuf,
     *out_used = pkt_len + 1; /* packet + CRC + 0x7E */
     *out_decap_len = unesc_len - 2; /* decap_len should not include the CRC */
     return TRUE;
+}
+
+/**
+ * wmc_decapsulate:
+ * @inbuf: buffer in which to look for an HDLC frame
+ * @inbuf_len: length of valid data in @inbuf
+ * @outbuf: buffer in which to put decapsulated data from the HDLC frame
+ * @outbuf_len: max size of @outbuf
+ * @out_decap_len: on success, size of the decapsulated data
+ * @out_used: on either success or failure, amount of data used; caller should
+ *  discard this much data from @inbuf before the next call to this function
+ * @out_need_more: when TRUE, indicates that more data is required before
+ *  a determination about a valid HDLC frame can be made; caller should add
+ *  more data to @inbuf before calling this function again.
+ * @uml290: if %TRUE decapsulate response from UML290 devices
+ *
+ * Attempts to retrieve, unescape, and CRC-check an HDLC frame from the given
+ * buffer.
+ *
+ * Returns: FALSE on error (packet was invalid or malformed, or the CRC check
+ *  failed, etc) and places number of bytes to discard from @inbuf in @out_used.
+ *  When TRUE, either more data is required (in which case @out_need_more will
+ *  be TRUE), or a data packet was successfully retrieved from @inbuf and the
+ *  decapsulated packet of length @out_decap_len was placed into @outbuf.  In
+ *  all cases the caller should advance the buffer by the number of bytes
+ *  returned in @out_used before calling this function again.
+ **/
+gboolean
+wmc_decapsulate (const char *inbuf,
+                 gsize inbuf_len,
+                 char *outbuf,
+                 gsize outbuf_len,
+                 gsize *out_decap_len,
+                 gsize *out_used,
+                 gboolean *out_need_more,
+                 gboolean uml290)
+{
+    return hdlc_decapsulate_buffer (inbuf, inbuf_len,
+                                    uml290, uml290 ? 0x3030 : 0,
+                                    outbuf, outbuf_len,
+                                    out_decap_len, out_used, out_need_more);
 }
 

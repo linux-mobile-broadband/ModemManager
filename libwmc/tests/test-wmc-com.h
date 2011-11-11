@@ -18,10 +18,14 @@
 #ifndef TEST_WMC_COM_H
 #define TEST_WMC_COM_H
 
-gpointer test_com_setup (const char *port, gboolean uml290);
+gpointer test_com_setup (const char *port, gboolean uml290, gboolean debug);
 void test_com_teardown (gpointer d);
 
 void test_com_port_init (void *f, void *data);
+
+void test_com_init (void *f, void *data);
+
+void test_com_device_info (void *f, void *data);
 
 #endif  /* TEST_WMC_COM_H */
 

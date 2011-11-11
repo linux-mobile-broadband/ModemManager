@@ -126,8 +126,8 @@ test_utils_encapsulate_uml290_wmc1 (void *f, void *data)
     gsize encap_len = 0;
 
     memcpy (inbuf, uml290_encap_src, sizeof (uml290_encap_src));
-    encap_len = uml290_wmc_encapsulate (inbuf, sizeof (uml290_encap_src),
-                                         sizeof (inbuf), outbuf, sizeof (outbuf));
+    encap_len = wmc_encapsulate (inbuf, sizeof (uml290_encap_src),
+                                 sizeof (inbuf), outbuf, sizeof (outbuf), TRUE);
     g_assert (encap_len == sizeof (encap_outbuf));
     g_assert (memcmp (outbuf, encap_outbuf, encap_len) == 0);
 }

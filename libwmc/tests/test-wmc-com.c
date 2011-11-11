@@ -28,6 +28,7 @@
 #include "com.h"
 #include "utils.h"
 #include "errors.h"
+#include "commands.h"
 
 /************************************************************/
 
@@ -40,7 +41,7 @@ typedef struct {
 } TestComData;
 
 gpointer
-test_com_setup (const char *port, gboolean uml290)
+test_com_setup (const char *port, gboolean uml290, gboolean debug)
 {
 	TestComData *d;
 	int ret;
@@ -48,6 +49,7 @@ test_com_setup (const char *port, gboolean uml290)
 	d = g_malloc0 (sizeof (TestComData));
 	g_assert (d);
 	d->uml290 = uml290;
+	d->debug = debug;
 
     if (getenv ("SERIAL_DEBUG"))
         d->debug = TRUE;
@@ -90,7 +92,6 @@ test_com_teardown (gpointer user_data)
     g_free (d);
 }
 
-#if 0
 static void
 print_buf (const char *detail, const char *buf, gsize len)
 {
@@ -112,18 +113,29 @@ print_buf (const char *detail, const char *buf, gsize len)
 }
 
 static gboolean
-send_command (TestComData *d, char *buf, gsize len)
+send_command (TestComData *d,
+              char *inbuf,
+              gsize inbuf_len,
+              gsize cmd_len)
 {
     int status;
     int eagain_count = 1000;
-    gsize i = 0;
+    gsize i = 0, sendlen;
+    char sendbuf[600];
+
+    /* Encapsulate the data for the device */
+    sendlen = wmc_encapsulate (inbuf, cmd_len, inbuf_len, sendbuf, sizeof (sendbuf), d->uml290);
+    if (sendlen <= 0) {
+        g_warning ("Failed to encapsulate WMC command");
+        return FALSE;
+    }
 
     if (d->debug)
-        print_buf (">>>", buf, len);
+        print_buf (">>>", sendbuf, sendlen);
 
-    while (i < len) {
+    while (i < sendlen) {
         errno = 0;
-        status = write (d->fd, &buf[i], 1);
+        status = write (d->fd, &sendbuf[i], 1);
         if (status < 0) {
             if (errno == EAGAIN) {
                 eagain_count--;
@@ -175,9 +187,7 @@ wait_reply (TestComData *d, char *buf, gsize len)
 
             total++;
             decap_len = 0;
-            success = hdlc_decapsulate_buffer (readbuf, total, d->uml290, 0x3030,
-                                               buf, len, &decap_len,
-                                               &used, &more);
+            success = wmc_decapsulate (readbuf, total, buf, len, &decap_len, &used, &more, d->uml290);
 
             /* Discard used data */
             if (used > 0) {
@@ -202,7 +212,6 @@ wait_reply (TestComData *d, char *buf, gsize len)
 
     return decap_len;
 }
-#endif
 
 void
 test_com_port_init (void *f, void *data)
@@ -214,5 +223,78 @@ test_com_port_init (void *f, void *data)
     if (ret < 0)
         g_warning ("%s: error setting up serial port: (%d)", d->port, ret);
     g_assert_cmpint (ret, ==, 0);
+}
+
+void
+test_com_init (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    char buf[512];
+    gint len;
+    WmcResult *result;
+    gsize reply_len;
+
+    len = wmc_cmd_init_new (buf, sizeof (buf), d->uml290);
+    g_assert (len == 16);
+
+    /* Send the command */
+    success = send_command (d, buf, sizeof (buf), len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    /* Parse the response into a result structure */
+    result = wmc_cmd_init_result (buf, reply_len, d->uml290);
+    g_assert (result);
+
+    wmc_result_unref (result);
+}
+
+void
+test_com_device_info (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    char buf[1024];
+    const char *str;
+    gint len;
+    WmcResult *result;
+    gsize reply_len;
+
+    len = wmc_cmd_device_info_new (buf, sizeof (buf));
+    g_assert (len == 2);
+
+    /* Send the command */
+    success = send_command (d, buf, sizeof (buf), len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    /* Parse the response into a result structure */
+    result = wmc_cmd_device_info_result (buf, reply_len);
+    g_assert (result);
+
+    g_print ("\n");
+
+    str = NULL;
+    wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_MANUFACTURER, &str);
+    g_message ("%s: Manufacturer: %s", __func__, str);
+
+    str = NULL;
+    wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_MODEL, &str);
+    g_message ("%s: Model: %s", __func__, str);
+
+    str = NULL;
+    wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_FW_REVISION, &str);
+    g_message ("%s: FW Revision: %s", __func__, str);
+
+    str = NULL;
+    wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_HW_REVISION, &str);
+    g_message ("%s: HW Revision: %s", __func__, str);
+
+    wmc_result_unref (result);
 }
 

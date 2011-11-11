@@ -18,10 +18,13 @@
 #ifndef LIBWMC_PROTOCOL_H
 #define LIBWMC_PROTOCOL_H
 
+#define WMC_CMD_MARKER ((u_int8_t) 0xC8)
+
 enum {
     WMC_CMD_DEVICE_INFO = 0x06,
     WMC_CMD_IP_INFO = 0x0A,
     WMC_CMD_STATUS = 0x0B,
+    WMC_CMD_INIT = 0x0D,
     WMC_CMD_EPS_BEARER_INFO = 0x4D,
 };
 
@@ -32,6 +35,20 @@ struct WmcCmdHeader {
     u_int8_t cmd;
 } __attribute__ ((packed));
 typedef struct WmcCmdHeader WmcCmdHeader;
+
+/* Used on newer devices like the UML290 */
+struct WmcCmdInit2 {
+    WmcCmdHeader hdr;
+    u_int8_t _unknown1[14];
+} __attribute__ ((packed));
+typedef struct WmcCmdInit2 WmcCmdInit2;
+
+struct WmcCmdInit2Rsp {
+    WmcCmdHeader hdr;
+    u_int8_t _unknown1[4];
+} __attribute__ ((packed));
+typedef struct WmcCmdInit2Rsp WmcCmdInit2Rsp;
+
 
 struct WmcCmdDeviceInfoRsp {
     WmcCmdHeader hdr;

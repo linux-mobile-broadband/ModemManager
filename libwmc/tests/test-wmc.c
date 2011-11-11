@@ -36,7 +36,7 @@ typedef void (*TCFunc)(void);
 #define TESTCASE(t, d) g_test_create_case (#t, 0, d, NULL, (TCFunc) t, NULL)
 
 static TestData *
-test_data_new (const char *port, gboolean uml290)
+test_data_new (const char *port, gboolean uml290, gboolean debug)
 {
 	TestData *d;
 
@@ -44,7 +44,7 @@ test_data_new (const char *port, gboolean uml290)
 	g_assert (d);
 
     if (port)
-        d->com_data = test_com_setup (port, uml290);
+        d->com_data = test_com_setup (port, uml290, debug);
 
 	return d;
 }
@@ -65,7 +65,7 @@ int main (int argc, char **argv)
     int i;
     const char *port = NULL;
     gint result;
-    gboolean uml290 = FALSE;
+    gboolean uml290 = FALSE, debug = FALSE;
 
     g_test_init (&argc, &argv, NULL);
 
@@ -77,9 +77,11 @@ int main (int argc, char **argv)
             port = argv[++i];
         } else if (!strcmp (argv[i], "--uml290"))
             uml290 = TRUE;
+        else if (!strcmp (argv[i], "--debug"))
+            debug = TRUE;
     }
 
-    data = test_data_new (port, uml290);
+    data = test_data_new (port, uml290, debug);
 
     suite = g_test_get_root ();
     g_test_suite_add (suite, TESTCASE (test_crc16_1, NULL));
@@ -98,6 +100,8 @@ int main (int argc, char **argv)
     /* Live tests */
     if (port) {
         g_test_suite_add (suite, TESTCASE (test_com_port_init, data->com_data));
+        g_test_suite_add (suite, TESTCASE (test_com_init, data->com_data));
+        g_test_suite_add (suite, TESTCASE (test_com_device_info, data->com_data));
     }
 
 	result = g_test_run ();

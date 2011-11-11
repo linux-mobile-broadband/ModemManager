@@ -24,6 +24,11 @@
 
 /* Generic enums */
 
+/**********************************************************************/
+
+size_t      wmc_cmd_init_new    (char *buf, size_t buflen, int wmc2);
+
+WmcResult * wmc_cmd_init_result (const char *buf, size_t len, int wmc2);
 
 /**********************************************************************/
 

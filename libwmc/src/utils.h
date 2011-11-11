@@ -23,6 +23,8 @@
 #define DIAG_CONTROL_CHAR 0x7E
 #define DIAG_TRAILER_LEN  3
 
+/* Utility and testcase functions */
+
 guint16 crc16 (const char *buffer, gsize len, guint16 seed);
 
 gsize hdlc_escape (const char *inbuf,
@@ -46,12 +48,6 @@ gsize hdlc_encapsulate_buffer (char *inbuf,
                                char *outbuf,
                                gsize outbuf_len);
 
-gsize uml290_wmc_encapsulate (char *inbuf,
-                              gsize cmd_len,
-                              gsize inbuf_len,
-                              char *outbuf,
-                              gsize outbuf_len);
-
 gboolean hdlc_decapsulate_buffer (const char *inbuf,
                                   gsize inbuf_len,
                                   gboolean check_known_crc,
@@ -61,6 +57,24 @@ gboolean hdlc_decapsulate_buffer (const char *inbuf,
                                   gsize *out_decap_len,
                                   gsize *out_used,
                                   gboolean *out_need_more);
+
+/* Functions for actual communication */
+
+gsize wmc_encapsulate (char *inbuf,
+                       gsize cmd_len,
+                       gsize inbuf_len,
+                       char *outbuf,
+                       gsize outbuf_len,
+                       gboolean uml290);
+
+gboolean wmc_decapsulate (const char *inbuf,
+                          gsize inbuf_len,
+                          char *outbuf,
+                          gsize outbuf_len,
+                          gsize *out_decap_len,
+                          gsize *out_used,
+                          gboolean *out_need_more,
+                          gboolean uml290);
 
 #endif  /* UTILS_H */
 
