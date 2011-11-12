@@ -377,6 +377,30 @@ mm_base_modem_get_valid (MMBaseModem *self)
     return self->priv->valid;
 }
 
+MMAtSerialPort *
+mm_base_modem_get_port_primary (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
+
+    return self->priv->primary;
+}
+
+MMAtSerialPort *
+mm_base_modem_get_port_secondary (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
+
+    return self->priv->secondary;
+}
+
+MMQcdmSerialPort *
+mm_base_modem_get_port_qcdm (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
+
+    return self->priv->qcdm;
+}
+
 gboolean
 mm_base_modem_auth_request (MMBaseModem *self,
                             const gchar *authorization,

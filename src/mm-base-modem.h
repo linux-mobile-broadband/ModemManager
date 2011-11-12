@@ -25,6 +25,7 @@
 
 #include "mm-port.h"
 #include "mm-at-serial-port.h"
+#include "mm-qcdm-serial-port.h"
 #include "mm-modem.h"
 
 #define MM_TYPE_BASE_MODEM            (mm_base_modem_get_type ())
@@ -69,6 +70,9 @@ gboolean  mm_base_modem_owns_port    (MMBaseModem *self,
                                       const gchar *subsys,
                                       const gchar *name);
 
+MMAtSerialPort   *mm_base_modem_get_port_primary   (MMBaseModem *self);
+MMAtSerialPort   *mm_base_modem_get_port_secondary (MMBaseModem *self);
+MMQcdmSerialPort *mm_base_modem_get_port_qcdm      (MMBaseModem *self);
 
 void     mm_base_modem_set_valid    (MMBaseModem *self,
                                      gboolean valid);
