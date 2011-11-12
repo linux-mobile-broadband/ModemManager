@@ -131,12 +131,16 @@ wmc_cmd_device_info_result (const char *buf, gsize buflen)
 {
     WmcResult *r = NULL;
     WmcCmdDeviceInfoRsp *rsp = (WmcCmdDeviceInfoRsp *) buf;
+    WmcCmdDeviceInfo2Rsp *rsp2 = (WmcCmdDeviceInfo2Rsp *) buf;
     char tmp[65];
 
     g_return_val_if_fail (buf != NULL, NULL);
 
-    if (check_command (buf, buflen, WMC_CMD_DEVICE_INFO, sizeof (WmcCmdDeviceInfoRsp)) < 0)
-        return NULL;
+    if (check_command (buf, buflen, WMC_CMD_DEVICE_INFO, sizeof (WmcCmdDeviceInfo2Rsp)) < 0) {
+        rsp2 = NULL;
+        if (check_command (buf, buflen, WMC_CMD_DEVICE_INFO, sizeof (WmcCmdDeviceInfoRsp)) < 0)
+            return NULL;
+    }
 
     r = wmc_result_new ();
 
@@ -163,6 +167,96 @@ wmc_cmd_device_info_result (const char *buf, gsize buflen)
     g_assert (sizeof (rsp->hwrev) <= sizeof (tmp));
     memcpy (tmp, rsp->hwrev, sizeof (rsp->hwrev));
     wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_HW_REVISION, tmp);
+
+    if (rsp2) {
+        /* IMEI */
+        memset (tmp, 0, sizeof (tmp));
+        g_assert (sizeof (rsp2->imei) <= sizeof (tmp));
+        memcpy (tmp, rsp2->imei, sizeof (rsp2->imei));
+        wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_IMEI, tmp);
+
+        /* IMSI */
+        memset (tmp, 0, sizeof (tmp));
+        g_assert (sizeof (rsp2->imsi) <= sizeof (tmp));
+        memcpy (tmp, rsp2->imsi, sizeof (rsp2->imsi));
+        wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_IMSI, tmp);
+
+        /* MCC */
+        memset (tmp, 0, sizeof (tmp));
+        g_assert (sizeof (rsp2->mcc) <= sizeof (tmp));
+        memcpy (tmp, rsp2->mcc, sizeof (rsp2->mcc));
+        wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_MCC, tmp);
+
+        /* MNC */
+        memset (tmp, 0, sizeof (tmp));
+        g_assert (sizeof (rsp2->mnc) <= sizeof (tmp));
+        memcpy (tmp, rsp2->mnc, sizeof (rsp2->mnc));
+        wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_MNC, tmp);
+    }
+
+    return r;
+}
+
+/**********************************************************************/
+
+size_t
+wmc_cmd_status_new (char *buf, size_t buflen)
+{
+    WmcCmdHeader *cmd = (WmcCmdHeader *) buf;
+
+    wmc_return_val_if_fail (buf != NULL, 0);
+    wmc_return_val_if_fail (buflen >= sizeof (*cmd), 0);
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->marker = WMC_CMD_MARKER;
+    cmd->cmd = WMC_CMD_STATUS;
+    return sizeof (*cmd);
+}
+
+static u_int8_t
+sanitize_dbm (u_int8_t in_dbm)
+{
+    /* 0x7D (-125 dBm) really means no signal */
+    return in_dbm >= 0x7D ? 0 : in_dbm;
+}
+
+WmcResult *
+wmc_cmd_status_result (const char *buf, gsize buflen)
+{
+    WmcResult *r = NULL;
+    WmcCmdStatusRsp *rsp = (WmcCmdStatusRsp *) buf;
+    WmcCmdStatus2Rsp *rsp2 = (WmcCmdStatus2Rsp *) buf;
+    char tmp[65];
+
+    g_return_val_if_fail (buf != NULL, NULL);
+
+    if (check_command (buf, buflen, WMC_CMD_STATUS, sizeof (WmcCmdStatus2Rsp)) < 0) {
+        rsp2 = NULL;
+        if (check_command (buf, buflen, WMC_CMD_STATUS, sizeof (WmcCmdStatusRsp)) < 0)
+            return NULL;
+    }
+
+    r = wmc_result_new ();
+
+    wmc_result_add_u8 (r, WMC_CMD_STATUS_ITEM_CDMA_DBM, sanitize_dbm (rsp->cdma1x_dbm));
+
+    if (rsp2) {
+        wmc_result_add_u8 (r, WMC_CMD_STATUS_ITEM_HDR_DBM, sanitize_dbm (rsp2->hdr_dbm));
+        wmc_result_add_u8 (r, WMC_CMD_STATUS_ITEM_LTE_DBM, sanitize_dbm (rsp2->lte_dbm));
+
+        memset (tmp, 0, sizeof (tmp));
+        if (sanitize_dbm (rsp2->lte_dbm)) {
+            /* LTE operator name */
+            g_assert (sizeof (rsp2->lte_opname) <= sizeof (tmp));
+            memcpy (tmp, rsp2->lte_opname, sizeof (rsp2->lte_opname));
+            wmc_result_add_string (r, WMC_CMD_STATUS_ITEM_OPNAME, tmp);
+        } else if (sanitize_dbm (rsp2->hdr_dbm) || sanitize_dbm (rsp2->cdma1x_dbm)) {
+            /* CDMA2000 operator name */
+            g_assert (sizeof (rsp2->cdma_opname) <= sizeof (tmp));
+            memcpy (tmp, rsp2->cdma_opname, sizeof (rsp2->cdma_opname));
+            wmc_result_add_string (r, WMC_CMD_STATUS_ITEM_OPNAME, tmp);
+        }
+    }
 
     return r;
 }

@@ -49,7 +49,6 @@ struct WmcCmdInit2Rsp {
 } __attribute__ ((packed));
 typedef struct WmcCmdInit2Rsp WmcCmdInit2Rsp;
 
-
 struct WmcCmdDeviceInfoRsp {
     WmcCmdHeader hdr;
     u_int8_t _unknown1[27];
@@ -65,5 +64,89 @@ struct WmcCmdDeviceInfoRsp {
 } __attribute__ ((packed));
 typedef struct WmcCmdDeviceInfoRsp WmcCmdDeviceInfoRsp;
 
+struct WmcCmdDeviceInfo2Rsp {
+    WmcCmdHeader hdr;
+    u_int8_t _unknown1[27];
+    char     manf[64];
+    char     model[64];
+    char     fwrev[64];
+    char     hwrev[64];
+    u_int8_t _unknown2[64];
+    u_int8_t _unknown3[64];
+    u_int8_t _unknown4[22];
+    u_int8_t _unknown5[8];
+    u_int8_t _unknown6[6];
+    u_int8_t _unknown7[64];
+    u_int8_t _unknown8[20];
+    u_int8_t imei[22];
+    u_int8_t _unknown9[16];
+    u_int8_t imsi[22];
+    u_int8_t _unknown10[4];
+    u_int8_t mcc[16];
+    u_int8_t mnc[16];
+    u_int8_t _unknown11[4];
+    u_int8_t _unknown12[4];
+    u_int8_t _unknown13[4];
+} __attribute__ ((packed));
+typedef struct WmcCmdDeviceInfo2Rsp WmcCmdDeviceInfo2Rsp;
+
+/* Shorter response used by earlier devices like PC5740 */
+struct WmcCmdStatusRsp {
+    WmcCmdHeader hdr;
+    u_int8_t  _unknown1;
+    u_int8_t  _unknown2[3];    /* Always zero */
+    u_int8_t  _unknown3;       /* Always 0x06 */
+    u_int8_t  _unknown4;       /* Either 0x00 or 0x01 */
+    u_int8_t  magic[10];
+    u_int16_t counter1;        /* A timestamp/counter? */
+    u_int8_t  _unknown5;
+    u_int8_t  _unknown6;
+    u_int8_t  _unknown7[3];    /* Always 0xFE 0xFF 0xFF */
+    u_int8_t  cdma1x_dbm;
+    u_int8_t  _unknown8[37];   /* Always zero */
+} __attribute__ ((packed));
+typedef struct WmcCmdStatusRsp WmcCmdStatusRsp;
+
+/* Long-format response used on newer devices like the UML290 */
+struct WmcCmdStatus2Rsp {
+    WmcCmdHeader hdr;
+    u_int8_t  _unknown1;       /* 0x00 on LTE, 0x07 or 0x1F on CDMA */
+    u_int8_t  _unknown2[3];    /* Always zero */
+    u_int8_t  _unknown3;       /* 0x0E on LTE, 0x0F on CDMA */
+    u_int8_t  _unknown4;
+    u_int8_t  magic[10];       /* Whatever was passed in WMC_CMD_INIT with some changes */
+    u_int16_t counter1;        /* A timestamp/counter? */
+    u_int16_t counter2;        /* Time since firmware start? */
+    u_int8_t  _unknown5;       /* 0x00 on LTE, various values (0xD4, 0x5C) on CDMA */
+    u_int8_t  _unknown6[3];    /* always zero on LTE, 0xFE 0xFF 0xFF on CDMA */
+    u_int8_t  cdma1x_dbm;      /* 0x7D = no signal */
+    u_int8_t  _unknown7[3];    /* Always zero */
+    u_int8_t  cdma_opname[16]; /* Zero terminated? */
+    u_int8_t  _unknown8[18];   /* Always zero */
+    u_int8_t  hdr_dbm;         /* 0x7D = no signal */
+    u_int8_t  _unknown9[3];   /* Always zero */
+    u_int8_t  _unknown10;      /* 0x01 on LTE, 0x40 on CDMA */
+    u_int8_t  _unknown11[3];   /* Always zero */
+    u_int8_t  _unknown12;      /* Always 0x01 */
+    u_int8_t  lte_opname[8];   /* Zero terminated? Sometimes "MCC MNC" too */
+    u_int8_t  _unknown13[60];  /* Always zero */
+    u_int8_t  lte_dbm;         /* 0x00 if not in LTE mode */
+    u_int8_t  _unknown14[3];   /* Always zero */
+    u_int8_t  _unknown15[4];
+} __attribute__ ((packed));
+typedef struct WmcCmdStatus2Rsp WmcCmdStatus2Rsp;
+
+struct WmcCmdIpInfoRsp {
+    WmcCmdHeader hdr;
+    u_int32_t xfer_bytes;
+    u_int32_t xfer_bytes2;     /* Same value as xfer_bytes */
+    u_int8_t  _unknown3[8];
+    u_int8_t  _unknown4;       /* Either 0x01, 0x02, 0x03, or 0x04 */
+    u_int8_t  _unknown5[7];    /* Always 0xc0 0x0b 0x00 0x01 0x00 0x00 0x00 */
+    u_int8_t  ip4_address[16]; /* String format, ie "10.156.45.3" */
+    u_int8_t  _unknown6[8];    /* Netmask? */
+    u_int8_t  ip6_address[40]; /* String format */
+} __attribute__ ((packed));
+typedef struct WmcCmdIpInfoRsp WmcCmdIpInfoRsp;
 
 #endif  /* LIBWMC_PROTOCOL_H */

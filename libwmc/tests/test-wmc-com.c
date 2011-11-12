@@ -258,7 +258,7 @@ test_com_device_info (void *f, void *data)
     TestComData *d = data;
     gboolean success;
     char buf[1024];
-    const char *str;
+    const char *str, *str2;
     gint len;
     WmcResult *result;
     gsize reply_len;
@@ -294,6 +294,69 @@ test_com_device_info (void *f, void *data)
     str = NULL;
     wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_HW_REVISION, &str);
     g_message ("%s: HW Revision: %s", __func__, str);
+
+    str = NULL;
+    wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_IMEI, &str);
+    g_message ("%s: IMEI: %s", __func__, str ? str : "(none)");
+
+    str = NULL;
+    wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_IMSI, &str);
+    g_message ("%s: IMSI: %s", __func__, str ? str : "(none)");
+
+    str = NULL;
+    wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_MCC, &str);
+    str2 = NULL;
+    wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_MNC, &str2);
+    g_message ("%s: MCC/MNC: %s %s", __func__,
+               str ? str : "(none)",
+               str2 ? str2 : "(none)");
+
+    wmc_result_unref (result);
+}
+
+void
+test_com_status (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    char buf[1024];
+    const char *str;
+    u_int8_t dbm;
+    gint len;
+    WmcResult *result;
+    gsize reply_len;
+
+    len = wmc_cmd_status_new (buf, sizeof (buf));
+    g_assert (len == 2);
+
+    /* Send the command */
+    success = send_command (d, buf, sizeof (buf), len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    /* Parse the response into a result structure */
+    result = wmc_cmd_status_result (buf, reply_len);
+    g_assert (result);
+
+    g_print ("\n");
+
+    dbm = 0;
+    wmc_result_get_u8 (result, WMC_CMD_STATUS_ITEM_CDMA_DBM, &dbm);
+    g_message ("%s: CDMA 1x dBm: %d", __func__, dbm);
+
+    dbm = 0;
+    wmc_result_get_u8 (result, WMC_CMD_STATUS_ITEM_HDR_DBM, &dbm);
+    g_message ("%s: HDR dBm: %d", __func__, dbm);
+
+    dbm = 0;
+    wmc_result_get_u8 (result, WMC_CMD_STATUS_ITEM_LTE_DBM, &dbm);
+    g_message ("%s: LTE dBm: %d", __func__, dbm);
+
+    str = NULL;
+    wmc_result_get_string (result, WMC_CMD_STATUS_ITEM_OPNAME, &str);
+    g_message ("%s: Operator Name: %s", __func__, str ? str : "(none)");
 
     wmc_result_unref (result);
 }

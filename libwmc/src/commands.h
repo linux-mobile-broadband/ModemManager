@@ -36,10 +36,25 @@ WmcResult * wmc_cmd_init_result (const char *buf, size_t len, int wmc2);
 #define WMC_CMD_DEVICE_INFO_ITEM_MODEL        "model"
 #define WMC_CMD_DEVICE_INFO_ITEM_FW_REVISION  "firmware-revision"
 #define WMC_CMD_DEVICE_INFO_ITEM_HW_REVISION  "hardware-revision"
+#define WMC_CMD_DEVICE_INFO_ITEM_IMEI         "imei"
+#define WMC_CMD_DEVICE_INFO_ITEM_IMSI         "imsi"
+#define WMC_CMD_DEVICE_INFO_ITEM_MCC          "mcc"
+#define WMC_CMD_DEVICE_INFO_ITEM_MNC          "mnc"
 
 size_t      wmc_cmd_device_info_new    (char *buf, size_t buflen);
 
 WmcResult * wmc_cmd_device_info_result (const char *buf, size_t len);
+
+/**********************************************************************/
+
+#define WMC_CMD_STATUS_ITEM_CDMA_DBM    "cdma-dbm"
+#define WMC_CMD_STATUS_ITEM_HDR_DBM     "hdr-dbm"
+#define WMC_CMD_STATUS_ITEM_LTE_DBM     "lte-dbm"
+#define WMC_CMD_STATUS_ITEM_OPNAME      "opname"
+
+size_t      wmc_cmd_status_new    (char *buf, size_t buflen);
+
+WmcResult * wmc_cmd_status_result (const char *buf, size_t len);
 
 /**********************************************************************/
 

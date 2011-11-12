@@ -102,6 +102,7 @@ int main (int argc, char **argv)
         g_test_suite_add (suite, TESTCASE (test_com_port_init, data->com_data));
         g_test_suite_add (suite, TESTCASE (test_com_init, data->com_data));
         g_test_suite_add (suite, TESTCASE (test_com_device_info, data->com_data));
+        g_test_suite_add (suite, TESTCASE (test_com_status, data->com_data));
     }
 
 	result = g_test_run ();
