@@ -300,8 +300,8 @@ test_com_device_info (void *f, void *data)
     g_message ("%s: IMEI: %s", __func__, str ? str : "(none)");
 
     str = NULL;
-    wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_IMSI, &str);
-    g_message ("%s: IMSI: %s", __func__, str ? str : "(none)");
+    wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_ICCID, &str);
+    g_message ("%s: ICCID: %s", __func__, str ? str : "(none)");
 
     str = NULL;
     wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_MCC, &str);

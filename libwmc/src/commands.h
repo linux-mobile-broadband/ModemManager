@@ -37,7 +37,7 @@ WmcResult * wmc_cmd_init_result (const char *buf, size_t len, int wmc2);
 #define WMC_CMD_DEVICE_INFO_ITEM_FW_REVISION  "firmware-revision"
 #define WMC_CMD_DEVICE_INFO_ITEM_HW_REVISION  "hardware-revision"
 #define WMC_CMD_DEVICE_INFO_ITEM_IMEI         "imei"
-#define WMC_CMD_DEVICE_INFO_ITEM_IMSI         "imsi"
+#define WMC_CMD_DEVICE_INFO_ITEM_ICCID        "iccid"
 #define WMC_CMD_DEVICE_INFO_ITEM_MCC          "mcc"
 #define WMC_CMD_DEVICE_INFO_ITEM_MNC          "mnc"
 

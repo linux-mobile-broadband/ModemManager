@@ -177,9 +177,9 @@ wmc_cmd_device_info_result (const char *buf, gsize buflen)
 
         /* IMSI */
         memset (tmp, 0, sizeof (tmp));
-        g_assert (sizeof (rsp2->imsi) <= sizeof (tmp));
-        memcpy (tmp, rsp2->imsi, sizeof (rsp2->imsi));
-        wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_IMSI, tmp);
+        g_assert (sizeof (rsp2->iccid) <= sizeof (tmp));
+        memcpy (tmp, rsp2->iccid, sizeof (rsp2->iccid));
+        wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_ICCID, tmp);
 
         /* MCC */
         memset (tmp, 0, sizeof (tmp));
