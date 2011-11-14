@@ -73,14 +73,17 @@ struct WmcCmdDeviceInfo2Rsp {
     char     hwrev[64];
     u_int8_t _unknown2[64];
     u_int8_t _unknown3[64];
-    u_int8_t _unknown4[22];
-    u_int8_t _unknown5[8];
-    u_int8_t _unknown6[6];
+    u_int8_t min[10];       /* CDMA2000/IS-95 MIN */
+    u_int8_t _unknown4[12];
+    u_int16_t home_sid;     /* ? */
+    u_int8_t _unknown5[6];
+    u_int16_t eri_ver;      /* ? */
+    u_int8_t _unknown6[3];
     u_int8_t _unknown7[64];
-    u_int8_t _unknown8[20];
+    u_int8_t meid[20];
     u_int8_t imei[22];
     u_int8_t _unknown9[16];
-    u_int8_t imsi[22];
+    u_int8_t iccid[22];
     u_int8_t _unknown10[4];
     u_int8_t mcc[16];
     u_int8_t mnc[16];
