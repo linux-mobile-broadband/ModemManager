@@ -888,6 +888,16 @@ ussd_encode (MMModemGsmUssd *self, const char* command, guint *scheme)
 
     *scheme = MM_MODEM_GSM_USSD_SCHEME_7BIT;
     gsm = mm_charset_utf8_to_unpacked_gsm (command, &len);
+
+    /* If command is a multiple of 7 characters long, Huawei firmwares
+     * apparently want that padded.  Maybe all modems?
+     */
+    if (len % 7 == 0) {
+        gsm = g_realloc (gsm, len + 1);
+        gsm[len] = 0x0d;
+        len++;
+    }
+
     packed = gsm_pack (gsm, len, 0, &packed_len);
     hex = utils_bin2hexstr (packed, packed_len);
     g_free (packed);
