@@ -141,8 +141,8 @@ typedef struct WmcCmdStatus2Rsp WmcCmdStatus2Rsp;
 
 struct WmcCmdIpInfoRsp {
     WmcCmdHeader hdr;
-    u_int32_t xfer_bytes;
-    u_int32_t xfer_bytes2;     /* Same value as xfer_bytes */
+    u_int32_t rx_bytes;
+    u_int32_t tx_bytes;
     u_int8_t  _unknown3[8];
     u_int8_t  _unknown4;       /* Either 0x01, 0x02, 0x03, or 0x04 */
     u_int8_t  _unknown5[7];    /* Always 0xc0 0x0b 0x00 0x01 0x00 0x00 0x00 */
