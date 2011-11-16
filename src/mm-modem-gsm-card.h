@@ -33,8 +33,6 @@
 #define MM_MODEM_GSM_CARD_SIM_PUK "sim-puk"
 #define MM_MODEM_GSM_CARD_SIM_PUK2 "sim-puk2"
 
-#define MM_MODEM_GSM_CARD_UNLOCK_RETRIES_NOT_SUPPORTED 999
-
 typedef struct _MMModemGsmCard MMModemGsmCard;
 
 struct _MMModemGsmCard {
@@ -50,9 +48,8 @@ struct _MMModemGsmCard {
                       gpointer user_data);
 
     void (*get_unlock_retries) (MMModemGsmCard *self,
-                              const char *pin_type,
-                              MMModemUIntFn callback,
-                              gpointer user_data);
+                                MMModemArrayFn callback,
+                                gpointer user_data);
 
     void (*get_operator_id) (MMModemGsmCard *self,
                              MMModemStringFn callback,
@@ -97,8 +94,7 @@ void mm_modem_gsm_card_get_imsi (MMModemGsmCard *self,
                                  gpointer user_data);
 
 void mm_modem_gsm_card_get_unlock_retries (MMModemGsmCard *self,
-                                           const char *pin_type,
-                                           MMModemUIntFn callback,
+                                           MMModemArrayFn callback,
                                            gpointer user_data);
 
 void mm_modem_gsm_card_get_operator_id (MMModemGsmCard *self,

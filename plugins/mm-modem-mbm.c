@@ -867,8 +867,11 @@ send_epin_done (MMAtSerialPort *port,
                 gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    const char *pin_type;
-    int attempts_left = 0;
+    int matched;
+    GArray *retry_counts;
+    PinRetryCount ur[4] = {
+        {"sim-pin", 0}, {"sim-puk", 0}, {"sim-pin2", 0}, {"sim-puk2", 0}
+    };
 
     /* If the modem has already been removed, return without
      * scheduling callback */
@@ -880,28 +883,22 @@ send_epin_done (MMAtSerialPort *port,
         goto done;
     }
 
-    pin_type = mm_callback_info_get_data (info, "pin_type");
+    matched = sscanf (response->str, "*EPIN: %d, %d, %d, %d",
+                      &ur[0].count, &ur[1].count, &ur[2].count, &ur[3].count);
+    if (matched == 4) {
+        if (ur[0].count > 998) {
+            info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                       "Invalid PIN attempts left %d", ur[0].count);
+            ur[0].count = 0;
+        }
 
-    if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PIN))
-        sscanf (response->str, "*EPIN: %d", &attempts_left);
-    else if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PUK))
-        sscanf (response->str, "*EPIN: %*d, %d", &attempts_left);
-    else if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PIN2))
-        sscanf (response->str, "*EPIN: %*d, %*d, %d", &attempts_left);
-    else if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PUK2))
-        sscanf (response->str, "*EPIN: %*d, %*d, %*d, %d", &attempts_left);
-    else {
-        mm_dbg ("unhandled pin type '%s'", pin_type);
-
-        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Unhandled PIN type");
+        retry_counts = g_array_sized_new (FALSE, TRUE, sizeof (PinRetryCount), 4);
+        g_array_append_vals (retry_counts, &ur, 4);
+        mm_callback_info_set_result (info, retry_counts, NULL);
+    } else {
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse PIN retries results");
     }
-
-    if (attempts_left < 0 || attempts_left > 998) {
-        info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Invalid PIN attempts left %d", attempts_left);
-        attempts_left = 0;
-    }
-
-    mm_callback_info_set_result (info, GUINT_TO_POINTER (attempts_left), NULL);
 
 done:
     mm_serial_port_close (MM_SERIAL_PORT (port));
@@ -910,15 +907,12 @@ done:
 
 static void
 mbm_get_unlock_retries (MMModemGsmCard *modem,
-                        const char *pin_type,
-                        MMModemUIntFn callback,
+                        MMModemArrayFn callback,
                         gpointer user_data)
 {
     MMAtSerialPort *port;
     char *command;
-    MMCallbackInfo *info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-
-    mm_dbg ("pin type '%s'", pin_type);
+    MMCallbackInfo *info = mm_callback_info_array_new (MM_MODEM (modem), callback, user_data);
 
     /* Ensure we have a usable port to use for the command */
     port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
@@ -940,8 +934,6 @@ mbm_get_unlock_retries (MMModemGsmCard *modem,
     command = g_strdup_printf ("E0");
     mm_at_serial_port_queue_command (port, command, 3, NULL, NULL);
     g_free (command);
-
-    mm_callback_info_set_data (info, "pin_type", g_strdup (pin_type), g_free);
 
     command = g_strdup_printf ("*EPIN?");
     mm_at_serial_port_queue_command (port, command, 3, send_epin_done, info);

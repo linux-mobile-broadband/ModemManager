@@ -171,8 +171,21 @@
 
     <property name="UnlockRetries" type="u" access="read">
       <tp:docstring>
-        The number of unlock retries remaining for the unlock code given by the property UnlockRequired, or 999 if
-        the device does not support reporting unlock retries.
+        The number of unlock retries remaining for the unlock code given by the
+        property UnlockRequired, or 999 if the device does not support reporting
+        unlock retries. If UnlockRequired is blank, the value of this property
+        is not meaningful.
+      </tp:docstring>
+    </property>
+
+    <property name="PinRetryCounts" type="a{su}" access="read">
+      <tp:docstring>
+        A dictionary in which the keys are the names of the unlock codes
+        specified for the UnlockRequiredProperty, and the values are integers
+        giving the number of PIN tries remaining before the code becomes
+        blocked (requiring a PUK) or permanently blocked. Dictionary entries
+        exist only for the codes for which the modem is able to report retry
+        counts.
       </tp:docstring>
     </property>
 

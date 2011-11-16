@@ -33,6 +33,8 @@ static void impl_modem_factory_reset (MMModem *modem, const char *code, DBusGMet
 
 #include "mm-modem-glue.h"
 
+#define MM_MODEM_PIN_RETRY_COUNTS_PROP_TYPE (dbus_g_type_get_map ("GHashTable", G_TYPE_STRING, G_TYPE_UINT))
+
 static void
 async_op_not_supported (MMModem *self,
                         MMModemFn callback,
@@ -912,6 +914,14 @@ mm_modem_init (gpointer g_iface)
                                "The remaining number of unlock attempts",
                                0, G_MAXUINT32, 0,
                                G_PARAM_READABLE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_boxed (MM_MODEM_PIN_RETRY_COUNTS,
+                             "PinRetryCounts",
+                             "The remaining number of attempts for each PIN type",
+                             MM_MODEM_PIN_RETRY_COUNTS_PROP_TYPE,
+                             G_PARAM_READABLE));
 
     g_object_interface_install_property
         (g_iface,

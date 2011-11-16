@@ -48,6 +48,16 @@ invoke_mm_modem_string_fn (MMCallbackInfo *info)
 }
 
 static void
+invoke_mm_modem_array_fn (MMCallbackInfo *info)
+{
+    MMModemArrayFn callback = (MMModemArrayFn) info->callback;
+
+    callback (info->modem,
+              (GArray *) mm_callback_info_get_data (info, CALLBACK_INFO_RESULT),
+              info->error, info->user_data);
+}
+
+static void
 modem_destroyed_cb (gpointer data, GObject *destroyed)
 {
     MMCallbackInfo *info = data;
@@ -149,6 +159,16 @@ mm_callback_info_string_new (MMModem *modem,
     g_return_val_if_fail (modem != NULL, NULL);
 
     return mm_callback_info_new_full (modem, invoke_mm_modem_string_fn, (GCallback) callback, user_data);
+}
+
+MMCallbackInfo *
+mm_callback_info_array_new (MMModem *modem,
+                            MMModemArrayFn callback,
+                            gpointer user_data)
+{
+    g_return_val_if_fail (modem != NULL, NULL);
+
+    return mm_callback_info_new_full (modem, invoke_mm_modem_array_fn, (GCallback) callback, user_data);
 }
 
 gpointer

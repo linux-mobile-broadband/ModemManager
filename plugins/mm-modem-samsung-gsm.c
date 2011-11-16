@@ -270,22 +270,6 @@ get_band (MMModemGsmNetwork *modem,
     mm_at_serial_port_queue_command (port, "AT%IPBM?", 3, get_band_done, info);
 }
 
-static gboolean
-parse_samsung_num (const char *str, guint32 *out_num, guint32 min, guint32 max)
-{
-    unsigned long int tmp;
-
-    if (!str || !strlen (str))
-        return FALSE;
-
-    errno = 0;
-    tmp = strtoul (str, NULL, 10);
-    if (errno != 0 || tmp < min || tmp > max)
-        return FALSE;
-    *out_num = (guint32) tmp;
-    return TRUE;
-}
-
 static void
 send_samsung_pinnum_done (MMAtSerialPort *port,
                           GString *response,
@@ -293,12 +277,11 @@ send_samsung_pinnum_done (MMAtSerialPort *port,
                           gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    GRegex *r = NULL;
-    GMatchInfo *match_info = NULL;
-    const char *pin_type;
-    guint32 attempts_left = 0;
-    char *str = NULL;
-    guint32 num = 0;
+    int matched;
+    GArray *retry_counts;
+    PinRetryCount ur[4] = {
+        {"sim-pin", 0}, {"sim-puk", 0}, {"sim-pin2", 0}, {"sim-puk2", 0}
+    };
 
     /* If the modem has already been removed, return without
      * scheduling callback */
@@ -310,58 +293,24 @@ send_samsung_pinnum_done (MMAtSerialPort *port,
         goto done;
     }
 
-    pin_type = mm_callback_info_get_data (info, "pin_type");
-
-    r = g_regex_new ("\\%PINNUM:\\s*(\\d+),\\s*(\\d+),\\s*(\\d+),\\s*(\\d+)", G_REGEX_UNGREEDY, 0, NULL);
-    if (!r) {
-        g_set_error_literal (&info->error,
-                             MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                             "Could not parse %PINNUM results (error creating regex).");
-        goto done;
-    }
-
-    if (!g_regex_match_full (r, response->str, response->len, 0, 0, &match_info, &info->error)) {
-        g_set_error_literal (&info->error,
-                             MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
-                             "Could not parse %PINNUM results (match failed).");
-        goto done;
-    }
-
-    if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PIN))
-        num = 1;
-    else if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PUK))
-        num = 2;
-    else if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PIN2))
-        num = 3;
-    else if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PUK2))
-        num = 4;
-    else {
-        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Unhandled PIN type");
-    }
-
-    if (num > 0) {
-        gboolean success = FALSE;
-
-        str = g_match_info_fetch (match_info, num);
-        if (str) {
-            success = parse_samsung_num (str, &attempts_left, 0, 10);
-            g_free (str);
+    matched = sscanf (response->str, "%%PINNUM: %d, %d, %d, %d",
+                      &ur[0].count, &ur[1].count, &ur[2].count, &ur[3].count);
+    if (matched == 4) {
+        if (ur[0].count > 998) {
+            info->error = g_error_new (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                       "Invalid PIN attempts left %d", ur[0].count);
+            ur[0].count = 0;
         }
 
-        if (!success) {
-            info->error = g_error_new_literal (MM_MODEM_ERROR,
-                                               MM_MODEM_ERROR_GENERAL,
-                                               "Could not parse %PINNUM results (missing or invalid match info).");
-        }
+        retry_counts = g_array_sized_new (FALSE, TRUE, sizeof (PinRetryCount), 4);
+        g_array_append_vals (retry_counts, &ur, 4);
+        mm_callback_info_set_result (info, retry_counts, NULL);
+    } else {
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                           "Could not parse PIN retries results");
     }
-
-    mm_callback_info_set_result (info, GUINT_TO_POINTER (attempts_left), NULL);
 
 done:
-    if (match_info)
-        g_match_info_free (match_info);
-    if (r)
-        g_regex_unref (r);
     mm_serial_port_close (MM_SERIAL_PORT (port));
     mm_callback_info_schedule (info);
 }
@@ -385,14 +334,13 @@ reset (MMModem *modem,
 
 static void
 get_unlock_retries (MMModemGsmCard *modem,
-                    const char *pin_type,
-                    MMModemUIntFn callback,
+                    MMModemArrayFn callback,
                     gpointer user_data)
 {
     MMAtSerialPort *port;
-    MMCallbackInfo *info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
+    MMCallbackInfo *info = mm_callback_info_array_new (MM_MODEM (modem), callback, user_data);
 
-    mm_dbg ("pin type '%s'", pin_type);
+    mm_dbg ("get_unlock_retries");
 
     /* Ensure we have a usable port to use for the command */
     port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
@@ -412,7 +360,6 @@ get_unlock_retries (MMModemGsmCard *modem,
 
     /* if the modem have not yet been enabled we need to make sure echoing is turned off */
     mm_at_serial_port_queue_command (port, "E0", 3, NULL, NULL);
-    mm_callback_info_set_data (info, "pin_type", g_strdup (pin_type), g_free);
     mm_at_serial_port_queue_command (port, "%PINNUM?", 3, send_samsung_pinnum_done, info);
 
 }

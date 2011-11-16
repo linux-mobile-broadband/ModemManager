@@ -84,13 +84,13 @@ str_call_not_supported (MMModemGsmCard *self,
 }
 
 static void
-uint_call_not_supported (MMModemGsmCard *self,
-                         MMModemUIntFn callback,
-                         gpointer user_data)
+array_call_not_supported (MMModemGsmCard *self,
+                          MMModemArrayFn callback,
+                          gpointer user_data)
 {
     MMCallbackInfo *info;
 
-    info = mm_callback_info_uint_new (MM_MODEM (self), callback, user_data);
+    info = mm_callback_info_array_new (MM_MODEM (self), callback, user_data);
     info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
                                        "Operation not supported");
     mm_callback_info_schedule (info);
@@ -151,18 +151,16 @@ mm_modem_gsm_card_get_imsi (MMModemGsmCard *self,
 }
 
 void mm_modem_gsm_card_get_unlock_retries (MMModemGsmCard *self,
-                                           const char *pin_type,
-                                           MMModemUIntFn callback,
+                                           MMModemArrayFn callback,
                                            gpointer user_data)
 {
     g_return_if_fail (MM_IS_MODEM_GSM_CARD (self));
-    g_return_if_fail (pin_type != NULL);
     g_return_if_fail (callback != NULL);
 
     if (MM_MODEM_GSM_CARD_GET_INTERFACE (self)->get_unlock_retries)
-        MM_MODEM_GSM_CARD_GET_INTERFACE (self)->get_unlock_retries (self, pin_type, callback, user_data);
+        MM_MODEM_GSM_CARD_GET_INTERFACE (self)->get_unlock_retries (self, callback, user_data);
     else
-        uint_call_not_supported (self, callback, user_data);
+        array_call_not_supported (self, callback, user_data);
 }
 
 void

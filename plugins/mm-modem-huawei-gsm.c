@@ -511,15 +511,23 @@ get_access_technology (MMGenericGsm *modem,
 /*****************************************************************************/
 
 static gboolean
-parse_num (const char *str, guint32 *out_num, guint32 min, guint32 max)
+parse_match_as_num (GMatchInfo *match_info,
+                    guint idx,
+                    guint32 *out_num,
+                    guint32 min,
+                    guint32 max)
 {
     unsigned long int tmp;
+    char *str;
 
+    str = g_match_info_fetch (match_info, idx);
     if (!str || !strlen (str))
         return FALSE;
 
     errno = 0;
     tmp = strtoul (str, NULL, 10);
+    g_free (str);
+
     if (errno != 0 || tmp < min || tmp > max)
         return FALSE;
     *out_num = (guint32) tmp;
@@ -535,10 +543,12 @@ send_huawei_cpin_done (MMAtSerialPort *port,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     GRegex *r = NULL;
     GMatchInfo *match_info = NULL;
-    const char *pin_type;
-    guint32 attempts_left = 0;
-    char *str = NULL;
-    guint32 num = 0;
+    guint32 i = 0;
+    gboolean success = FALSE;
+    GArray *retry_counts;
+    PinRetryCount ur[4] = {
+        {"sim-puk", 0}, {"sim-pin", 0}, {"sim-puk2", 0}, {"sim-pin2", 0}
+    };
 
     /* If the modem has already been removed, return without
      * scheduling callback */
@@ -550,9 +560,7 @@ send_huawei_cpin_done (MMAtSerialPort *port,
         goto done;
     }
 
-    pin_type = mm_callback_info_get_data (info, "pin_type");
-
-	r = g_regex_new ("\\^CPIN:\\s*([^,]+),[^,]*,(\\d+),(\\d+),(\\d+),(\\d+)", G_REGEX_UNGREEDY, 0, NULL);
+    r = g_regex_new ("\\^CPIN:\\s*([^,]+),[^,]*,(\\d+),(\\d+),(\\d+),(\\d+)", G_REGEX_UNGREEDY, 0, NULL);
     if (!r) {
         g_set_error_literal (&info->error,
                              MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
@@ -567,37 +575,21 @@ send_huawei_cpin_done (MMAtSerialPort *port,
         goto done;
     }
 
-    if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PUK))
-        num = 2;
-    else if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PIN))
-        num = 3;
-    else if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PUK2))
-        num = 4;
-    else if (strstr (pin_type, MM_MODEM_GSM_CARD_SIM_PIN2))
-        num = 5;
-    else {
-        mm_dbg ("unhandled pin type '%s'", pin_type);
-
-        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL, "Unhandled PIN type");
-    }
-
-    if (num > 0) {
-        gboolean success = FALSE;
-
-        str = g_match_info_fetch (match_info, num);
-        if (str) {
-            success = parse_num (str, &attempts_left, 0, 10);
-            g_free (str);
-        }
-
+    for (i = 0; i <= 3; i++) {
+        success = parse_match_as_num (match_info, i + 2, &ur[i].count, 0, 10);
         if (!success) {
             info->error = g_error_new_literal (MM_MODEM_ERROR,
                                                MM_MODEM_ERROR_GENERAL,
                                                "Could not parse ^CPIN results (missing or invalid match info).");
+            break;
         }
     }
 
-    mm_callback_info_set_result (info, GUINT_TO_POINTER (attempts_left), NULL);
+    if (success) {
+        retry_counts = g_array_sized_new (FALSE, TRUE, sizeof (PinRetryCount), 4);
+        g_array_append_vals (retry_counts, &ur, 4);
+        mm_callback_info_set_result (info, retry_counts, NULL);
+    }
 
 done:
     if (match_info)
@@ -610,15 +602,12 @@ done:
 
 static void
 get_unlock_retries (MMModemGsmCard *modem,
-                    const char *pin_type,
-                    MMModemUIntFn callback,
+                    MMModemArrayFn callback,
                     gpointer user_data)
 {
     MMAtSerialPort *port;
     char *command;
-    MMCallbackInfo *info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
-
-    mm_dbg ("pin type '%s'", pin_type);
+    MMCallbackInfo *info = mm_callback_info_array_new (MM_MODEM (modem), callback, user_data);
 
     /* Ensure we have a usable port to use for the command */
     port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
@@ -640,8 +629,6 @@ get_unlock_retries (MMModemGsmCard *modem,
     command = g_strdup_printf ("E0");
     mm_at_serial_port_queue_command (port, command, 3, NULL, NULL);
     g_free (command);
-
-    mm_callback_info_set_data (info, "pin_type", g_strdup (pin_type), g_free);
 
     command = g_strdup_printf ("^CPIN?");
     mm_at_serial_port_queue_command (port, command, 3, send_huawei_cpin_done, info);

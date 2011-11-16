@@ -55,6 +55,7 @@ typedef struct {
     char *device_ident;
     char *unlock_required;
     guint32 unlock_retries;
+    GArray *pin_retry_counts;
     guint32 ip_method;
     gboolean valid;
     MMModemState state;
@@ -354,44 +355,64 @@ mm_modem_base_set_unlock_required (MMModemBase *self, const char *unlock_require
     g_object_notify (G_OBJECT (self), MM_MODEM_UNLOCK_REQUIRED);
 }
 
-guint32
-mm_modem_base_get_unlock_retries (MMModemBase *self)
-{
-    g_return_val_if_fail (self != NULL, 0);
-    g_return_val_if_fail (MM_IS_MODEM_BASE (self), 0);
-
-    return MM_MODEM_BASE_GET_PRIVATE (self)->unlock_retries;
-}
-
 void
-mm_modem_base_set_unlock_retries (MMModemBase *self, guint unlock_retries)
+mm_modem_base_set_pin_retry_counts (MMModemBase *self, GArray *pin_retries)
 {
     MMModemBasePrivate *priv;
-    const char *dbus_path;
+    GArray *old_retries;
+    gboolean same;
+    PinRetryCount *active = NULL;
+    guint i, j;
+    guint old_unlock_retries;
 
     g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_MODEM_BASE (self));
 
     priv = MM_MODEM_BASE_GET_PRIVATE (self);
-
-    /* Only do something if the value changes */
-    if (priv->unlock_retries == unlock_retries)
+    if (!pin_retries) {
+        priv->unlock_retries = MM_MODEM_UNLOCK_RETRIES_NOT_SUPPORTED;
         return;
+    }
 
-    priv->unlock_retries = unlock_retries;
+    old_retries = priv->pin_retry_counts;
+    old_unlock_retries = priv->unlock_retries;
 
-    dbus_path = (const char *) g_object_get_data (G_OBJECT (self), DBUS_PATH_TAG);
-    if (dbus_path) {
-        if (priv->unlock_required) {
-            mm_info ("Modem %s: # unlock retries for %s is %d",
-                     dbus_path, priv->unlock_required, priv->unlock_retries);
-        } else {
-            mm_info ("Modem %s: # unlock retries is %d",
-                     dbus_path, priv->unlock_retries);
+    /* Only do something if one of the values changes */
+    same = (old_retries != NULL) && (pin_retries->len == old_retries->len);
+    for (i = 0; i < pin_retries->len; ++i) {
+        PinRetryCount *newur = &g_array_index (pin_retries, PinRetryCount, i);
+
+        if (!g_strcmp0 (newur->name, priv->unlock_required))
+            active = newur;
+
+        if (old_retries) {
+            for (j = 0; j < old_retries->len; ++j) {
+                PinRetryCount *oldur = &g_array_index (old_retries, PinRetryCount, i);
+
+                if (!g_strcmp0 (oldur->name, newur->name)) {
+                    if (oldur->count != newur->count)
+                        same = FALSE;
+                    break;
+                }
+            }
         }
     }
 
-    g_object_notify (G_OBJECT (self), MM_MODEM_UNLOCK_RETRIES);
+    if (priv->pin_retry_counts)
+        g_array_unref (priv->pin_retry_counts);
+
+    priv->pin_retry_counts = pin_retries;
+
+    if (priv->unlock_required) {
+        g_assert (active);
+        priv->unlock_retries = active->count;
+    } else
+        priv->unlock_retries = 0;
+
+    if (old_unlock_retries != priv->unlock_retries)
+        g_object_notify (G_OBJECT (self), MM_MODEM_UNLOCK_RETRIES);
+    if (!same)
+        g_object_notify (G_OBJECT (self), MM_MODEM_PIN_RETRY_COUNTS);
 }
 
 const char *
@@ -700,6 +721,10 @@ mm_modem_base_init (MMModemBase *self)
                                                     NULL,
                                                     MM_DBUS_INTERFACE_MODEM);
     mm_properties_changed_signal_register_property (G_OBJECT (self),
+                                                    MM_MODEM_PIN_RETRY_COUNTS,
+                                                    NULL,
+                                                    MM_DBUS_INTERFACE_MODEM);
+    mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_IP_METHOD,
                                                     NULL,
                                                     MM_DBUS_INTERFACE_MODEM);
@@ -760,6 +785,7 @@ set_property (GObject *object, guint prop_id,
     case MM_MODEM_PROP_DEVICE_IDENTIFIER:
     case MM_MODEM_PROP_UNLOCK_REQUIRED:
     case MM_MODEM_PROP_UNLOCK_RETRIES:
+    case MM_MODEM_PROP_PIN_RETRY_COUNTS:
         break;
     case MM_MODEM_PROP_HW_VID:
         /* Construct only */
@@ -776,6 +802,23 @@ set_property (GObject *object, guint prop_id,
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
     }
+}
+
+static GHashTable *
+get_retry_counts (GArray *counts)
+{
+    GHashTable *map;
+    int i;
+
+    map = g_hash_table_new (g_str_hash, g_str_equal);
+
+    if (counts) {
+        for (i = 0; i < counts->len; ++i) {
+            PinRetryCount *ur = (PinRetryCount *) &g_array_index (counts, PinRetryCount, i);
+            g_hash_table_insert (map, (char *) ur->name, GUINT_TO_POINTER (ur->count));
+        }
+    }
+    return map;
 }
 
 static void
@@ -823,6 +866,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case MM_MODEM_PROP_UNLOCK_RETRIES:
         g_value_set_uint (value, priv->unlock_retries);
+        break;
+    case MM_MODEM_PROP_PIN_RETRY_COUNTS:
+        g_value_set_boxed (value, get_retry_counts (priv->pin_retry_counts));
         break;
     case MM_MODEM_PROP_HW_VID:
         g_value_set_uint (value, priv->vid);
@@ -927,6 +973,10 @@ mm_modem_base_class_init (MMModemBaseClass *klass)
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_UNLOCK_RETRIES,
                                       MM_MODEM_UNLOCK_RETRIES);
+
+    g_object_class_override_property (object_class,
+                                      MM_MODEM_PROP_PIN_RETRY_COUNTS,
+                                      MM_MODEM_PIN_RETRY_COUNTS);
 
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_HW_VID,

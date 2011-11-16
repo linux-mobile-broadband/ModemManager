@@ -43,11 +43,14 @@
 #define MM_MODEM_DEVICE_IDENTIFIER "device-identifier"
 #define MM_MODEM_UNLOCK_REQUIRED  "unlock-required"
 #define MM_MODEM_UNLOCK_RETRIES   "unlock-retries"
+#define MM_MODEM_PIN_RETRY_COUNTS   "pin-retry-counts"
 #define MM_MODEM_VALID         "valid"      /* not exported */
 #define MM_MODEM_PLUGIN        "plugin"     /* not exported */
 #define MM_MODEM_STATE         "state"      /* not exported */
 #define MM_MODEM_HW_VID        "hw-vid"     /* not exported */
 #define MM_MODEM_HW_PID        "hw-pid"     /* not exported */
+
+#define MM_MODEM_UNLOCK_RETRIES_NOT_SUPPORTED 999
 
 typedef enum {
     MM_MODEM_PROP_FIRST = 0x1000,
@@ -64,6 +67,7 @@ typedef enum {
     MM_MODEM_PROP_EQUIPMENT_IDENTIFIER,
     MM_MODEM_PROP_UNLOCK_REQUIRED,
     MM_MODEM_PROP_UNLOCK_RETRIES,
+    MM_MODEM_PROP_PIN_RETRY_COUNTS,
     MM_MODEM_PROP_DEVICE_IDENTIFIER,
     MM_MODEM_PROP_HW_VID,       /* Not exported */
     MM_MODEM_PROP_HW_PID        /* Not exported */
@@ -97,6 +101,11 @@ typedef void (*MMModemInfoFn) (MMModem *modem,
                                const char *version,
                                GError *error,
                                gpointer user_data);
+
+typedef void (*MMModemArrayFn) (MMModem *modem,
+                                GArray *items,
+                                GError *error,
+                                gpointer user_data);
 
 struct _MMModem {
     GTypeInterface g_iface;

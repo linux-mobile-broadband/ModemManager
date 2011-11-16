@@ -73,10 +73,8 @@ const char *mm_modem_base_get_unlock_required (MMModemBase *self);
 void mm_modem_base_set_unlock_required (MMModemBase *self,
                                         const char *unlock_required);
 
-guint mm_modem_base_get_unlock_retries (MMModemBase *self);
-
-void mm_modem_base_set_unlock_retries (MMModemBase *self,
-                                        guint unlock_retries);
+void mm_modem_base_set_pin_retry_counts (MMModemBase *self,
+                                         GArray *pin_retries);
 
 
 const char *mm_modem_base_get_manf (MMModemBase *self);
@@ -93,6 +91,11 @@ void mm_modem_base_get_card_info (MMModemBase *self,
                                   GError *port_error,
                                   MMModemInfoFn callback,
                                   gpointer user_data);
+
+typedef struct {
+    const char *name;
+    guint count;
+} PinRetryCount;
 
 #endif /* MM_MODEM_BASE_H */
 
