@@ -190,6 +190,11 @@ static void cusd_received (MMAtSerialPort *port,
                            GMatchInfo *info,
                            gpointer user_data);
 
+static void clck_cb (MMAtSerialPort *port,
+                     GString *response,
+                     GError *error,
+                     gpointer user_data);
+
 #define GS_HASH_TAG "get-sms"
 static GValue *simple_string_value (const char *str);
 static GValue *simple_uint_value (guint32 i);
@@ -811,8 +816,6 @@ initial_info_check (MMGenericGsm *self)
         g_clear_error (&error);
     }
 }
-
-static void clck_cb (MMAtSerialPort *port, GString *response, GError *error, gpointer user_data);
 
 static void
 initial_facility_lock_check (MMGenericGsm *self)
@@ -1858,6 +1861,10 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
     /* Get allowed mode */
     if (MM_GENERIC_GSM_GET_CLASS (self)->get_allowed_mode)
         MM_GENERIC_GSM_GET_CLASS (self)->get_allowed_mode (self, get_allowed_mode_done, NULL);
+
+    /* Try again to get facility locks */
+    if (priv->enabled_facilities == 0)
+        initial_facility_lock_check (self);
 
     /* And supported character sets */
     mm_modem_get_supported_charsets (MM_MODEM (self), supported_charsets_done, info);
@@ -6014,6 +6021,18 @@ modem_state_changed (MMGenericGsm *self, GParamSpec *pspec, gpointer user_data)
     }
 }
 
+static void
+unlock_required_changed (MMGenericGsm *self, GParamSpec *pspec, gpointer user_data)
+{
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
+    /* Some modems don't allow most commands when they're PIN locked so
+     * when they get unlocked we have to recheck various stuff.
+     */
+    if (priv->enabled_facilities == 0)
+        initial_facility_lock_check (self);
+}
+
 /*****************************************************************************/
 
 static void
@@ -6153,6 +6172,9 @@ mm_generic_gsm_init (MMGenericGsm *self)
 
     g_signal_connect (self, "notify::" MM_MODEM_STATE,
                       G_CALLBACK (modem_state_changed), NULL);
+
+    g_signal_connect (self, "notify::" MM_MODEM_UNLOCK_REQUIRED,
+                      G_CALLBACK (unlock_required_changed), NULL);
 }
 
 static void
