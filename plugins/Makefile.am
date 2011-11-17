@@ -384,7 +384,8 @@ udevrules_DATA = \
 	77-mm-zte-port-types.rules \
 	77-mm-longcheer-port-types.rules \
 	77-mm-simtech-port-types.rules \
-	77-mm-x22x-port-types.rules
+	77-mm-x22x-port-types.rules \
+	77-mm-nokia-port-types.rules
 
 BUILT_SOURCES = \
 	mm-modem-gsm-hso-glue.h
