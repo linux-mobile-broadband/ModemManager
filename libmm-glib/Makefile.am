@@ -12,7 +12,9 @@ libmm_glib_la_CPPFLAGS = \
 libmm_glib_la_SOURCES = \
 	libmm-glib.h \
 	mm-manager.h \
-	mm-manager.c
+	mm-manager.c \
+	mm-modem.h \
+	mm-modem.c
 
 libmm_glib_la_LIBADD = \
 	$(top_builddir)/libmm-common/libmm-common.la \
@@ -28,4 +30,5 @@ include_HEADERS = \
 	${top_builddir}/libmm-common/mm-gdbus-sms.h \
 	${top_builddir}/libmm-common/mm-gdbus-bearer.h \
 	libmm-glib.h \
-	mm-manager.h
+	mm-manager.h \
+	mm-modem.h

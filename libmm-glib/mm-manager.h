@@ -25,9 +25,10 @@
 #ifndef _MM_MANAGER_H_
 #define _MM_MANAGER_H_
 
-G_BEGIN_DECLS
+#include <ModemManager.h>
+#include <mm-gdbus-modem.h>
 
-#include "mm-gdbus-modem.h"
+G_BEGIN_DECLS
 
 #define MM_TYPE_MANAGER            (mm_manager_get_type ())
 #define MM_MANAGER(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_MANAGER, MMManager))

@@ -24,5 +24,6 @@
 #define _LIBMM_GLIB_H_
 
 #include <mm-manager.h>
+#include <mm-modem.h>
 
 #endif /* _LIBMM_GLIB_H_ */
