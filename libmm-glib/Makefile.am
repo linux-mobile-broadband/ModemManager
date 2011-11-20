@@ -14,7 +14,9 @@ libmm_glib_la_SOURCES = \
 	mm-manager.h \
 	mm-manager.c \
 	mm-modem.h \
-	mm-modem.c
+	mm-modem.c \
+	mm-sim.h \
+	mm-sim.c
 
 libmm_glib_la_LIBADD = \
 	$(top_builddir)/libmm-common/libmm-common.la \

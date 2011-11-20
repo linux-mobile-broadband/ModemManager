@@ -26,6 +26,8 @@
 #include <ModemManager.h>
 #include <mm-gdbus-modem.h>
 
+#include "mm-sim.h"
+
 G_BEGIN_DECLS
 
 typedef MmGdbusObject    MMModem;
@@ -35,18 +37,27 @@ typedef MmGdbusObject    MMModem;
 
 const gchar       *mm_modem_get_path                 (MMModem *self);
 const gchar       *mm_modem_get_sim_path             (MMModem *self);
+gchar             *mm_modem_dup_sim_path             (MMModem *self);
 MMModemCapability  mm_modem_get_modem_capabilities   (MMModem *self);
 MMModemCapability  mm_modem_get_current_capabilities (MMModem *self);
 guint              mm_modem_get_max_bearers          (MMModem *self);
 guint              mm_modem_get_max_active_bearers   (MMModem *self);
 const gchar       *mm_modem_get_manufacturer         (MMModem *self);
+gchar             *mm_modem_dup_manufacturer         (MMModem *self);
 const gchar       *mm_modem_get_model                (MMModem *self);
+gchar             *mm_modem_dup_model                (MMModem *self);
 const gchar       *mm_modem_get_revision             (MMModem *self);
+gchar             *mm_modem_dup_revision             (MMModem *self);
 const gchar       *mm_modem_get_device_identifier    (MMModem *self);
+gchar             *mm_modem_dup_device_identifier    (MMModem *self);
 const gchar       *mm_modem_get_device               (MMModem *self);
+gchar             *mm_modem_dup_device               (MMModem *self);
 const gchar       *mm_modem_get_driver               (MMModem *self);
+gchar             *mm_modem_dup_driver               (MMModem *self);
 const gchar       *mm_modem_get_plugin               (MMModem *self);
+gchar             *mm_modem_dup_plugin               (MMModem *self);
 const gchar       *mm_modem_get_equipment_identifier (MMModem *self);
+gchar             *mm_modem_dup_equipment_identifier (MMModem *self);
 guint              mm_modem_get_unlock_required      (MMModem *self);
 guint              mm_modem_get_unlock_retries       (MMModem *self);
 MMModemState       mm_modem_get_state                (MMModem *self);

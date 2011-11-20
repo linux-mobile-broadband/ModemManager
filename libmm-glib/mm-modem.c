@@ -20,6 +20,8 @@
  * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
  */
 
+#include <gio/gio.h>
+
 #include "mm-modem.h"
 
 /**
