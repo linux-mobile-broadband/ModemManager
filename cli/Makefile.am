@@ -12,6 +12,8 @@ mmcli_CPPFLAGS = \
 mmcli_SOURCES = \
 	mmcli.h \
 	mmcli.c \
+	mmcli-common.h \
+	mmcli-common.c \
 	mmcli-manager.c \
 	mmcli-modem.c
 

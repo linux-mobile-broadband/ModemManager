@@ -158,14 +158,11 @@ main (gint argc, gchar **argv)
             mmcli_manager_run_asynchronous (connection, cancellable);
         else
             mmcli_manager_run_synchronous (connection);
-    } else {
-        g_printerr ("error: no actions specified\n");
-        exit (EXIT_FAILURE);
     }
     /* Modem options? */
     else if (mmcli_modem_options_enabled ()) {
         if (async_flag)
-            keep_loop = mmcli_modem_run_asynchronous (connection, cancellable);
+            mmcli_modem_run_asynchronous (connection, cancellable);
         else
             mmcli_modem_run_synchronous (connection);
     }

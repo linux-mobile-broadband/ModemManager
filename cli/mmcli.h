@@ -37,7 +37,7 @@ void          mmcli_manager_shutdown         (void);
 /* Modem group */
 GOptionGroup *mmcli_modem_get_option_group   (void);
 gboolean      mmcli_modem_options_enabled    (void);
-gboolean      mmcli_modem_run_asynchronous   (GDBusConnection *connection,
+void          mmcli_modem_run_asynchronous   (GDBusConnection *connection,
                                               GCancellable    *cancellable);
 void          mmcli_modem_run_synchronous    (GDBusConnection *connection);
 void          mmcli_modem_shutdown           (void);

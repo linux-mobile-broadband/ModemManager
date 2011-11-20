@@ -1304,3 +1304,4 @@ mm_modem_get_sim_sync (MMModem *self,
                 cancellable,
                 error));
 }
+

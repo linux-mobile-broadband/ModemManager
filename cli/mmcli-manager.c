@@ -32,6 +32,7 @@
 #include "libmm-glib.h"
 
 #include "mmcli.h"
+#include "mmcli-common.h"
 
 /* Context */
 typedef struct {
@@ -90,7 +91,7 @@ mmcli_manager_options_enabled (void)
     n_actions = (list_modems_flag +
                  monitor_modems_flag +
                  scan_modems_flag +
-                 (set_logging_str ? 1 : 0));
+                 !!set_logging_str);
 
     if (n_actions > 1) {
         g_printerr ("error: too many manager actions requested\n");
@@ -206,11 +207,14 @@ list_current_modems (MMManager *manager)
     else {
         GList *l;
 
-        g_print ("Found %u modems\n", g_list_length (modems));
+        g_print ("Found %u modems:\n", g_list_length (modems));
         for (l = modems; l; l = g_list_next (l)) {
-            g_print ("\t[TODO: Print path]\n");
-            g_object_unref (l->data);
+            MMModem *modem = MM_MODEM (l->data);
+
+            g_print ("\t%s\n",
+                     mm_modem_get_path (modem));
         }
+        g_list_foreach (modems, (GFunc)g_object_unref, NULL);
         g_list_free (modems);
     }
 }
@@ -222,28 +226,11 @@ cancelled (GCancellable *cancellable)
 }
 
 static void
-manager_new_ready (GObject      *source,
+get_manager_ready (GObject      *source,
                    GAsyncResult *result,
                    gpointer      none)
 {
-    gchar *name_owner;
-    GError *error = NULL;
-
-    ctx->manager = mm_manager_new_finish (result, &error);
-    if (!ctx->manager) {
-        g_printerr ("error: couldn't create manager: %s\n",
-                    error ? error->message : "unknown error");
-        exit (EXIT_FAILURE);
-    }
-
-    name_owner = g_dbus_object_manager_client_get_name_owner (G_DBUS_OBJECT_MANAGER_CLIENT (ctx->manager));
-    if (!name_owner) {
-        g_printerr ("error: couldn't find the ModemManager process in the bus\n");
-        exit (EXIT_FAILURE);
-    }
-
-    g_debug ("ModemManager process found at '%s'", name_owner);
-    g_free (name_owner);
+    ctx->manager = mmcli_get_manager_finish (result);
 
     /* Request to set log level? */
     if (set_logging_str) {
@@ -304,17 +291,15 @@ mmcli_manager_run_asynchronous (GDBusConnection *connection,
         ctx->cancellable = g_object_ref (cancellable);
 
     /* Create a new Manager object asynchronously */
-    mm_manager_new (connection,
-                    G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE,
-                    cancellable,
-                    (GAsyncReadyCallback)manager_new_ready,
-                    NULL);
+    mmcli_get_manager (connection,
+                       cancellable,
+                       (GAsyncReadyCallback)get_manager_ready,
+                       NULL);
 }
 
 void
 mmcli_manager_run_synchronous (GDBusConnection *connection)
 {
-    gchar *name_owner;
     GError *error = NULL;
 
     if (monitor_modems_flag) {
@@ -324,24 +309,7 @@ mmcli_manager_run_synchronous (GDBusConnection *connection)
 
     /* Initialize context */
     ctx = g_new0 (Context, 1);
-    ctx->manager = mm_manager_new_sync (connection,
-                                        G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE,
-                                        NULL,
-                                        &error);
-    if (!ctx->manager) {
-        g_printerr ("error: couldn't create manager: %s\n",
-                    error ? error->message : "unknown error");
-        exit (EXIT_FAILURE);
-    }
-
-    name_owner = g_dbus_object_manager_client_get_name_owner (G_DBUS_OBJECT_MANAGER_CLIENT (ctx->manager));
-    if (!name_owner) {
-        g_printerr ("error: couldn't find the ModemManager process in the bus\n");
-        exit (EXIT_FAILURE);
-    }
-
-    g_debug ("ModemManager process found at '%s'", name_owner);
-    g_free (name_owner);
+    ctx->manager = mmcli_get_manager_sync (connection);
 
     /* Request to set log level? */
     if (set_logging_str) {
