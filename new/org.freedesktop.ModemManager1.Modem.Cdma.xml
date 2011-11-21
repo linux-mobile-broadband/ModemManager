@@ -92,11 +92,11 @@
       </tp:docstring>
     </property>
 
-    <property name="Cdma1xRegState" type="u" access="read" tp:type="MM_MODEM_CDMA_REGISTRATION_STATE">
+    <property name="Cdma1xRegistrationState" type="u" access="read" tp:type="MM_MODEM_CDMA_REGISTRATION_STATE">
       <tp:docstring>CDMA 1x registration state.</tp:docstring>
     </property>
 
-    <property name="EvdoRegState" type="u" access="read" tp:type="MM_MODEM_CDMA_REGISTRATION_STATE">
+    <property name="EvdoRegistrationState" type="u" access="read" tp:type="MM_MODEM_CDMA_REGISTRATION_STATE">
       <tp:docstring>EVDO registration state.</tp:docstring>
     </property>
 
