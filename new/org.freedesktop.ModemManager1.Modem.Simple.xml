@@ -1,115 +1,186 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
-<node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
+<!--
+ ModemManager 0.6 Interface Specification
+
+   Copyright (C) 2008 Novell, Inc.
+   Copyright (C) 2008-2011 Red Hat, Inc.
+   Copyright (C) 2011 The Chromium OS Authors
+   Copyright (C) 2011 Google, Inc.
+-->
+
+<node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
+
+  <!--
+      org.freedesktop.ModemManager1.Modem.Simple:
+      @short_description: The ModemManager Simple interface.
+
+      The Simple interface allows controlling and querying the status of Modems.
+  -->
   <interface name="org.freedesktop.ModemManager1.Modem.Simple">
 
-    <!-- METHODS -->
+    <!--
+        Connect:
+        @properties: Dictionary of properties needed to get the modem connected.
+        @bearer: On successful connect, returns the object path of the connected packet data bearer used for the connection attempt.
+        @interface: The operating system name for the network data interface that provides packet data using this bearer. Connection managers must configure this interface using the given IP configuration returned by bearer activation.
+        @ip4config: If the bearer was configured for IPv4 addressing, upon successful connect this argument contains the addressing details for assignment to the data interface. See <link linkend="gdbus-property-org-freedesktop-ModemManager1-Bearer.Ip4Config">Ip4Config</link>.
+        @ip6config: If the bearer was configured for IPv6 addressing, upon successful connect this argument contains the addressing details for assignment to the data interface. See <link linkend="gdbus-property-org-freedesktop-ModemManager1-Bearer.Ip6Config">Ip6Config</link>.
 
+        Do everything needed to connect the modem using the given properties.
+
+        This method will attempt to find a matching packet data bearer and
+        activate it if necessary, returning the bearer's IP details.  If no
+        matching bearer is found, a new bearer will be created and activated,
+        but this operation may fail if no resources are available to complete
+        this connection attempt (ie, if a conflicting bearer is already active).
+
+        This call may make a large number of changes to modem configuration
+        based on properties passed in. For example, given a PIN-locked, disabled
+        GSM/UMTS modem, this call may unlock the SIM PIN, alter the access
+        technology preference, wait for network registration (or force
+        registration to a specific provider), create a new packet data bearer
+        using the given "apn", and connect that bearer.
+
+        Allowed key/value pairs in @properties are:
+        <variablelist>
+          <varlistentry><term><literal>"pin"</literal></term>
+            <listitem>
+              SIM-PIN unlock code, given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"network-id"</literal></term>
+            <listitem>
+              ETSI MCC-MNC of a network to force registration with,
+              given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"allowed-bands"</literal></term>
+            <listitem>
+              Bitmask of <link linkend="MMModemBand">MMModemBand</link> values,
+              to specify all the bands allowed in the modem, given as a 64bit
+              unsigned integer value (signature <literal>"t"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"allowed-modes"</literal></term>
+            <listitem>
+              Bitmask of <link linkend="MMModemMode">MMModemMode</link> values,
+              to specify all the modes allowed in the modem, given as an
+              unsigned integer value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"preferred-mode"</literal></term>
+            <listitem>
+              Specific <link linkend="MMModemMode">MMModemMode</link> preferred
+              among the ones allowed, if any. Given as an unsigned integer value
+              (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"apn"</literal></term>
+            <listitem>
+              For GSM/UMTS and LTE devices the APN to use,
+              given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"ip-type"</literal></term>
+            <listitem>
+              For GSM/UMTS and LTE devices the IP addressing type to use,
+              one of "IPV4", "IPV4V6" or "IPV6".
+              Given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"number"</literal></term>
+            <listitem>
+              For POTS devices the number to dial,,
+              given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"home-only"</literal></term>
+            <listitem>
+              %TRUE to allow only connections to home networks,
+              given as a boolean value (signature <literal>"b"</literal>).
+            </listitem>
+          </varlistentry>
+        </variablelist>
+    -->
     <method name="Connect">
-      <tp:docstring>
-	Do everything needed to connect the modem using the given properties.
-	This method will attempt to find a matching packet data bearer and
-	activate it if necessary, returning the bearer's IP details.  If no
-	matching bearer is found, a new bearer will be created and activated,
-	but this operation may fail if no resources are available to complete
-	this connection attempt (ie, if a conflicting bearer is already active).
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_simple_connect"/>
-      <arg name="properties" type="a{sv}" direction="in">
-	<tp:docstring>
-	  Dictionary of properties needed to get the modem connected.  This
-	  call may make a large number of changes to modem configuration based
-	  on properties passed in.  For example, given a PIN-locked, disabled
-	  GSM/UMTS modem, this call may unlock the SIM PIN, alter the access
-	  technology preference, wait for network registration (or force
-	  registration to a specific provider), create a new packet data bearer
-	  using the given 'apn', and connect that bearer.
-
-	  'pin'          : (string) SIM-PIN unlock code
-	  'network-id'   : (string) ETSI MCC-MNC of a network to force registration with
-	  'band'         : (uint)   Bitfield of radio bands the modem may use
-	  'allowed-mode' : (uint)   Allowed network technology preference (ie, 2G/3G, etc)
-	  'apn'          : (string) For GSM/UMTS and LTE devices the APN to use
-	  'ip-type'      : (string) For GSM/UMTS and LTE devices the IP addressing
-	                              type to use, one of "IPV4", "IPV4V6", or "IPV6"
-	  'number'       : (string) For POTS devices, the number to dial
-	  'home_only'    : (uint)   1 to allow only connections to home networks
-	</tp:docstring>
-      </arg>
-      <arg name="bearer" type="o" direction="out">
-        <tp:docstring>
-          On successful connect, returns the object path of the connected
-          packet data bearer used for the connection attempt.
-        </tp:docstring>
-      </arg>
-      <arg name="interface" type="s" direction="out">
-        <tp:docstring>
-          The operating system name for the network data interface that provides
-          packet data using this bearer.  Connection managers must configure this
-          interface using the given IP configuration returned by bearer activation.
-        </tp:docstring>
-      </arg>
-      <arg name="ip4config" type="a{sv}" direction="out">
-        <tp:docstring>
-          If the bearer was configured for IPv4 addressing, upon successful
-          connect this argument contains the addressing details for assignment
-          to the data interface.  If the bearer specifies configuration via PPP
-          or DHCP, only the 'method' item will be present.  See the description
-          of the property of this name in the
-          org.freedesktop.ModemManager1.Modem.Bearer interface.
-        </tp:docstring>
-      </arg>
-      <arg name="ip6config" type="a{sv}" direction="out">
-        <tp:docstring>
-          If the bearer was configured for IPv6 addressing, upon successful
-          connect this argument contains the addressing details for assignment
-          to the data interface.  If the bearer specifies configuration via PPP
-          or DHCP, only the 'method' item will be present.  See the description
-          of the property of this name in the
-          org.freedesktop.ModemManager1.Modem.Bearer interface.
-        </tp:docstring>
-      </arg>
+      <arg name="properties" type="a{sv}" direction="in"  />
+      <arg name="bearer"     type="o"     direction="out" />
+      <arg name="interface"  type="s"     direction="out" />
+      <arg name="ip4config"  type="a{sv}" direction="out" />
+      <arg name="ip6config"  type="a{sv}" direction="out" />
     </method>
 
+    <!--
+        Disconnect:
+        @bearer: If given this method will disconnect the referenced packet
+        data bearer, while if "/" (ie, no object given) this method will
+        disconnect all active packet data bearers.
+
+        Disconnect an active packet data connection.
+    -->
     <method name="Disconnect">
-      <tp:docstring>
-	Disconnect an active packet data connection.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_simple_disconnect"/>
-      <arg name="bearer" type="o" direction="in">
-        <tp:docstring>
-          If given this method will disconnect the referenced packet data bearer,
-          while if "/" (ie, no object given) this method will disconnect all
-          active packet data bearers.
-        </tp:docstring>
-      </arg>
+      <arg name="bearer" type="o" direction="in" />
     </method>
 
-    <method name="GetStatus">
-      <!-- FIXME: either convert this to properties (which duplicate properties
-           of the base modem object already) or expand the returned property
-           list to include "registration" and add a StatusChanged signal so
-           clients can monitor changes without having to poll.
-        -->
-      <tp:docstring>
-	Get the modem status.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_simple_get_status"/>
-      <arg name="properties" type="a{sv}" direction="out">
-	<tp:docstring>
-	  Dictionary of properties. The predefined common properties are:
+    <!--
+        GetStatus:
+        @properties: Dictionary of properties.
 
-	  'state'             : (uint, always) Modem state
-	  'signal-quality'    : (uint, state >= registered)
-	  'operator-code'     : (string, state >= registered) Operator MCC-MNC
-	  'operator-name'     : (string, state >= registered)
-	  'band'              : (uint, state >= registered)
-	  'access-technology' : (uint, state >= registered) See MM_MODEM_ACCESS_TECH
-	</tp:docstring>
-      </arg>
+        Get the general modem status.
+
+        The predefined common properties returned are:
+        <variablelist>
+          <varlistentry><term><literal>"state"</literal></term>
+            <listitem>
+              A <link linkend="MMModemState">MMModemState</link> value
+              specifying the overall state of the modem, given as an
+              unsigned integer value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"signal-quality"</literal></term>
+            <listitem>
+              Signal quality value, given only when registered,
+              as an unsigned integer value
+              (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"operator-code"</literal></term>
+            <listitem>
+              Operator <literal>MCC-MNC</literal>, given only when registered,
+              as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"operator-name"</literal></term>
+            <listitem>
+              Operator name, given only when registered,
+              as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"bands"</literal></term>
+            <listitem>
+              Bitmask of <link linkend="MMModemBand">MMModemBand</link> values,
+              given only when registerd, as a 64bit
+              unsigned integer value (signature <literal>"t"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"access-technology"</literal></term>
+            <listitem>
+              A <link linkend="MMModemAccessTech">MMModemAccessTech</link> value,
+              given only when registered, as an unsigned integer value
+              (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        FIXME:
+            Either convert this to properties (which duplicate properties
+            of the base modem object already) or expand the returned property
+            list to include "registration" and add a StatusChanged signal so
+            clients can monitor changes without having to poll.
+    -->
+    <method name="GetStatus">
+      <arg name="properties" type="a{sv}" direction="out" />
     </method>
 
   </interface>

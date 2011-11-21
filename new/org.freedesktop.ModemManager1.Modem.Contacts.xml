@@ -1,154 +1,176 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
-<node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
-  <interface name="org.freedesktop.ModemManager1.Modem.Contacts">
+<!--
+ ModemManager 0.6 Interface Specification
 
-    <tp:docstring>
+   Copyright (C) 2008 Novell, Inc.
+   Copyright (C) 2008-2011 Red Hat, Inc.
+   Copyright (C) 2011 The Chromium OS Authors
+   Copyright (C) 2011 Google, Inc.
+-->
+
+<node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
+
+  <!--
+      org.freedesktop.ModemManager1.Modem.Contacts:
+      @short_description: The ModemManager Contacts interface.
+
       This interface provides access to contacts stored in various locations,
       including SIM cards, device storage, and other locations. Operations
       generally operate on all contacts regardless of their actual storage
-      location.  Contacts are referred to by index numbers, which are internal
-      to ModemManager and do not represent indexs of SIM cards or the device.
+      location.
+
+      Contacts are referred to by index numbers, which are internal to
+      ModemManager and do not represent indexes of SIM cards or the device.
       Indexes may not be contiguous.
-    </tp:docstring>
+  -->
+  <interface name="org.freedesktop.ModemManager1.Modem.Contacts">
 
+    <!--
+        Add:
+        @properties: Dictionary of properties describing the contact.
+        @index: The index number of the new contact
+
+        Add a new contact.
+
+        If any of the property in @properties exceeds the modem's size limit,
+        that property will be truncated to fit.
+
+        Known properties are:
+        <variablelist>
+          <varlistentry><term><literal>"name"</literal></term>
+            <listitem>
+              Full name of the contact, given as a string value
+              (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"number"</literal></term>
+            <listitem>
+              Telephone number, given as a string value
+              (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"email"</literal></term>
+            <listitem>
+              Email address, given as a string value
+              (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"group"</literal></term>
+            <listitem>
+              Group this contact belongs to, given as a string value
+              (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"name2"</literal></term>
+            <listitem>
+              Additional contact name, given as a string value
+              (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"number2"</literal></term>
+            <listitem>
+              Additional contact telephone number, given as a string value
+              (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"hidden"</literal></term>
+            <listitem>
+              Boolean flag to specify whether this entry is hidden or not,
+              (signature <literal>"b"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"storage"</literal></term>
+            <listitem>
+              Phonebook in which the contact is stored, given as a
+              <link linkend="MMModemContactsStorage">MMModemContactsStorage</link>,
+              (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        The @index number is an internal private number to ModemManager and does
+        not correspond to the index of the contact in the modem or SIM itself.
+    -->
     <method name="Add">
-      <tp:docstring>
-	Add a new contact.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_contacts_add"/>
-      <arg name="properties" type="a{sv}" direction="in">
-	<tp:docstring>
-	  Dictionary of properties describing the contact.  If any property
-	  exceeds the modem's size limit, that property will be truncated to fit.
-	  Known properties are:
-	  
-	    name    : (string) Full name of the contact
-	    number  : (string) Telephone number
-	    email   : (string) Email address
-	    group   : (string) Group this contact belongs to
-	    name2   : (string) Additional contact name
-	    number2 : (string) Additional contact telephone number
-	    hidden  : (bool)   Whether this entry is hidden or not
-	    storage : (uint)   Phonebook in which contact is stored, one of
-	                        MM_MODEM_CONTACTS_STORAGE
-	</tp:docstring>
-      </arg>
-      <arg name="index" type="u" direction="out">
-	<tp:docstring>
-	  The index number of the new contact; this number is an internal
-	  private number to ModemManager and does not correspond to the index
-	  of the contact in the modem or SIM itself.
-	</tp:docstring>
-      </arg>
+      <arg name="properties" type="a{sv}" direction="in"  />
+      <arg name="index"      type="u"     direction="out" />
     </method>
 
+    <!--
+        Delete:
+        @index: The index of the contact to delete.
+
+        Delete a contact.
+    -->
     <method name="Delete">
-      <tp:docstring>
-	Delete a contact.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_contacts_delete"/>
-      <arg name="index" type="u" direction="in">
-	<tp:docstring>
-	  The index of the contact to delete.
-	</tp:docstring>
-      </arg>
+      <arg name="index" type="u" direction="in" />
     </method>
 
+    <!--
+        Get:
+        @index: The index of the contact.
+        @properties: The properties of the contact.
+
+        Retrieve a contact.
+    -->
     <method name="Get">
-      <tp:docstring>
-	Retrieve a contact.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_contacts_get"/>
-      <arg name="index" type="u" direction="in">
-	<tp:docstring>
-	  The index of the contact.
-	</tp:docstring>
-      </arg>
-      <arg name="properties" type="a{sv}" direction="out">
-	<tp:docstring>
-	  The properties of the contact including those properties defined by
-	  the Add method.
-	</tp:docstring>
-      </arg>
+      <arg name="index"      type="u"     direction="in"  />
+      <arg name="properties" type="a{sv}" direction="out" />
     </method>
 
+    <!--
+        List:
+        @results: An array of dictionaries, each dictionary representing a contact.
+
+        List all contacts.
+    -->
     <method name="List">
-      <tp:docstring>
-	List all contacts.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_contacts_list"/>
-      <arg name="results" type="aa{sv}" direction="out">
-	<tp:docstring>
-	  An array of dictionaries, each dictionary representing a contact.
-	</tp:docstring>
-      </arg>
+      <arg name="results" type="aa{sv}" direction="out" />
     </method>
 
+    <!--
+        Find:
+        @pattern: The pattern to search for.
+        @results: An array of dictionaries, each dictionary representing a contact.
+
+        Find a contact.
+    -->
     <method name="Find">
-      <tp:docstring>
-	Find a contact.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_contacts_find"/>
-      <arg name="pattern" type="s" direction="in">
-	<tp:docstring>
-	  The pattern to search for.
-	</tp:docstring>
-      </arg>
-      <arg name="results" type="aa{sv}" direction="out">
-	<tp:docstring>
-	  An array of dictionaries, each dictionary representing a contact which
-	  matches the query pattern.
-	</tp:docstring>
-      </arg>
+      <arg name="pattern" type="s"      direction="in"  />
+      <arg name="results" type="aa{sv}" direction="out" />
     </method>
 
+    <!--
+        GetCount:
+        @count: The number of contacts.
+
+        Get the number of contacts.
+    -->
     <method name="GetCount">
-      <tp:docstring>
-	Get the number of contacts.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_contacts_count"/>
-      <arg name="count" type="u" direction="out">
-	<tp:docstring>
-	  The number of contacts.
-	</tp:docstring>
-      </arg>
+      <arg name="count" type="u" direction="out" />
     </method>
 
-    <!-- SIGNALS -->
+    <!--
+        Added:
+        @index: The index number of the new contact.
+        @properties: The properties of the contact.
 
-    <signal name="Added">
-      <tp:docstring>
         Emitted when a new contact is added.
-      </tp:docstring>
-      <arg name="index" type="u">
-        <tp:docstring>
-          The index number of the new contact.
-        </tp:docstring>
-      </arg>
-      <arg name="properties" type="a{sv}">
-	<tp:docstring>
-	  The properties of the contact including those properties defined by
-	  the Add method.
-	</tp:docstring>
-      </arg>
+    -->
+    <signal name="Added">
+      <arg name="index"      type="u"     />
+      <arg name="properties" type="a{sv}" />
     </signal>
 
+    <!--
+        Deleted:
+        @index: The index number of the now deleted contact.
+
+        Emitted when a new contact has been deleted.
+    -->
     <signal name="Deleted">
-      <tp:docstring>
-        Emitted when a contact has been deleted.
-      </tp:docstring>
-      <arg name="index" type="u">
-        <tp:docstring>
-          Index number of the now deleted contact.
-        </tp:docstring>
-      </arg>
+      <arg name="index" type="u" />
     </signal>
 
     <!-- ENUMS -->

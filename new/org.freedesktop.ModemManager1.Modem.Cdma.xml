@@ -1,104 +1,124 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
-<node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
+<!--
+ ModemManager 0.6 Interface Specification
+
+   Copyright (C) 2008 Novell, Inc.
+   Copyright (C) 2008-2011 Red Hat, Inc.
+   Copyright (C) 2011 The Chromium OS Authors
+   Copyright (C) 2011 Google, Inc.
+-->
+
+<node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
+
+  <!--
+      org.freedesktop.ModemManager1.Modem.Cdma:
+      @short_description: The ModemManager CDMA interface.
+
+      This interface provides access to specific actions that may be performed
+      in modems with CDMA capabilities.
+  -->
   <interface name="org.freedesktop.ModemManager1.Modem.Cdma">
 
-    <!-- METHODS -->
+    <!--
+        Activate:
+        @carrier: Name of carrier.
+        @immediate_error: A <link linkend="MMModemCdmaActivationError">MMModemCdmaActivationError</link> value, which is returned for immediate errors. Delayed errors are returned via an #org.freedesktop.ModemManager1.Modem.Cdma::ActivationStateChanged signal.
 
-    <method name="Activate">
-      <tp:docstring>
         Provisions the modem for use with a given carrier using the modem's
-        Over-The-Air (OTA) activation functionality, if any.  In the event of
-        immediate failure, returns an error value instead of setting a DBus error.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_cdma_activate"/>
-      <arg name="carrier" type="s" direction="in">
-        <tp:docstring>
-          Name of carrier.
-        </tp:docstring>
-      </arg>
-      <arg name="immediate_error" type="u" direction="out">
-        <tp:docstring>
-          An enum from MM_MODEM_CDMA_ACTIVATION_ERROR.  This is
-          returned for immediate errors.  Delayed errors are returned
-          via an ActivationStateChanged signal
-        </tp:docstring>
-      </arg>
+        <ulink url="http://en.wikipedia.org/wiki/Over-the-air_programming">Over-The-Air (OTA)</ulink>
+        activation functionality, if any.
+
+        In the event of immediate failure, returns an error value instead of
+        setting a DBus error.
+    -->
+    <method name="Activate">
+      <arg name="carrier"         type="s" direction="in"  />
+      <arg name="immediate_error" type="u" direction="out" />
     </method>
 
-    <method name="ActivateManual">
-      <tp:docstring>
+    <!--
+        ActivateManual:
+        @properties: A dictionary of properties to set on the modem, including <literal>"mdn"</literal> and <literal>"min"</literal>.
+
         Sets the modem provisioning data directly, without contacting the
-        carrier over the air.  Some modems will reboot after this call is made.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_cdma_activate_manual"/>
-      <arg name="properties" type="a{sv}" direction="in">
-        <tp:docstring>
-          A dictionary of properties to set on the modem.  Keys include 'mdn', 'min'
-        </tp:docstring>
-      </arg>
+        carrier over the air.
+
+        Some modems will reboot after this call is made.
+    -->
+    <method name="ActivateManual">
+      <arg name="properties" type="a{sv}" direction="in" />
     </method>
 
-    <!-- SIGNALS -->
+    <!--
+        ActivationStateChanged:
+        @activation_state: Current activation state, given as a <link linkend="MMModemCdmaActivationState">MMModemCdmaActivationState</link>.
+        @activation_error: Carrier-specific error code, given as a <link linkend="MMModemCdmaActivationError">MMModemCdmaActivationError</link>.
+        @status_changes: Properties that have changed as a result of this activation state chage, including <literal>"mdn"</literal> and <literal>"min"</literal>.
 
+        The device activation state changed.
+    -->
     <signal name="ActivationStateChanged">
-      <tp:docstring>
-	    The device activation state changed.
-      </tp:docstring>
-      <arg name="activation_state" type="u" tp:type="MM_MODEM_CDMA_ACTIVATION_STATE">
-        <tp:docstring>Current activation state</tp:docstring>
-      </arg>
-      <arg name="activation_error" type="u" tp:type="MM_MODEM_CDMA_ACTIVATION_ERROR">
-        <tp:docstring>Carrier-specific error code</tp:docstring>
-      </arg>
-      <arg name="status_changes" type="a{sv}">
-        <tp:docstring>
-          Selected Modem.Simple.GetStatus keys that have changed as a result of
-          this activation state change.  Will include 'mdn' and 'min'.
-        </tp:docstring>
-      </arg>
+      <arg name="activation_state" type="u"     />
+      <arg name="activation_error" type="u"     />
+      <arg name="status_changes"   type="a{sv}" />
     </signal>
 
-    <!-- PROPERTIES -->
+    <!--
+        Meid:
 
-    <property name="Meid" type="s" access="read">
-      <tp:docstring>
-        The modem's Mobile Equipment Identifier.
-      </tp:docstring>
-    </property>
+        The modem's <ulink url="http://en.wikipedia.org/wiki/MEID">Mobile Equipment Identifier</ulink>.
+    -->
+    <property name="Meid" type="s" access="read" />
 
-    <property name="Esn" type="s" access="read">
-      <tp:docstring>
-        The modem's Electronic Serial Number (superceded by the MEID but still
-        used by older devices).
-      </tp:docstring>
-    </property>
 
-    <property name="Sid" type="u" access="read">
-      <tp:docstring>
-        The System Identifier of the serving CDMA 1x network, if known, and
-        if the modem is registered with a CDMA 1x network.  See ifast.org or
-        the mobile broadband provider database for mappings of SIDs to network
-        providers.
-      </tp:docstring>
-    </property>
+    <!--
+        Esn:
 
-    <property name="Nid" type="u" access="read">
-      <tp:docstring>
-        The Network Identifier of the serving CDMA 1x network, if known, and
+        The modem's
+        <ulink url="http://en.wikipedia.org/wiki/Electronic_serial_number">Electronic Serial Number</ulink>
+        (superceded by MEID but still used by older devices).
+    -->
+    <property name="Esn" type="s" access="read" />
+
+    <!--
+        Sid:
+
+        The
+        <ulink url="http://en.wikipedia.org/wiki/System_Identification_Number">System Identifier</ulink>
+        of the serving CDMA 1x network, if known, and
         if the modem is registered with a CDMA 1x network.
-      </tp:docstring>
-    </property>
 
-    <property name="Cdma1xRegistrationState" type="u" access="read" tp:type="MM_MODEM_CDMA_REGISTRATION_STATE">
-      <tp:docstring>CDMA 1x registration state.</tp:docstring>
-    </property>
+        See <ulink url="http://ifast.org">ifast.org</ulink> or the mobile
+        broadband provider database for mappings of SIDs to network providers.
+    -->
+    <property name="Sid" type="u" access="read" />
 
-    <property name="EvdoRegistrationState" type="u" access="read" tp:type="MM_MODEM_CDMA_REGISTRATION_STATE">
-      <tp:docstring>EVDO registration state.</tp:docstring>
-    </property>
+    <!--
+        Nid:
+
+        The
+        <ulink url="http://en.wikipedia.org/wiki/Network_Identification_Number">Network Identifier</ulink>
+        of the serving CDMA 1x network, if known, and
+        if the modem is registered with a CDMA 1x network.
+    -->
+    <property name="Nid" type="u" access="read" />
+
+    <!--
+        Cdma1xRegistrationState:
+
+        A <link linkend="MMModemCdmaRegistrationState">MMModemCdmaRegistrationState</link>
+        value specifying the CDMA 1x registration state.
+    -->
+    <property name="Cdma1xRegistrationState" type="u" access="read" />
+
+    <!--
+        EvdoRegistrationState:
+
+        A <link linkend="MMModemCdmaRegistrationState">MMModemCdmaRegistrationState</link>
+        value specifying the EVDO registration state.
+    -->
+    <property name="EvdoRegistrationState" type="u" access="read" />
 
     <!-- ENUMS -->
 

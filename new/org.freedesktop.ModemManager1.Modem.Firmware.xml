@@ -1,8 +1,20 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
-<node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
-  <interface name="org.freedesktop.ModemManager1.Modem.Firmware">
-    <tp:docstring>
+<!--
+ ModemManager 0.6 Interface Specification
+
+   Copyright (C) 2008 Novell, Inc.
+   Copyright (C) 2008-2011 Red Hat, Inc.
+   Copyright (C) 2011 The Chromium OS Authors
+   Copyright (C) 2011 Google, Inc.
+-->
+
+<node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
+
+  <!--
+      org.freedesktop.ModemManager1.Modem.Firmware:
+      @short_description: The ModemManager Firmware interface.
+
       This interface allows clients to select or install firmware images on
       modems.
 
@@ -12,103 +24,82 @@
       Firmware images are represented as dictionaries of properties.
       Certain properties are pre-defined, and some are required:
 
-      Name (string, required): A user-readable name for the firmware image.
-      Version (string, optional): The version of the firmware.  The format is
-        unspecified; tools attempting to upgrade firmware automatically must
-        understand the versioning scheme used by the modem driver they are
-        interacting with.  May be displayed to the user.
-    </tp:docstring>
+      <variablelist>
+        <varlistentry><term><literal>"name"</literal></term>
+          <listitem>
+            (Required) A user-readable name for the firmware image, given as a
+            string value (signature <literal>"s"</literal>).
+          </listitem>
+        </varlistentry>
+        <varlistentry><term><literal>"version"</literal></term>
+          <listitem>
+            (Optional) The version of the firmware, given as a string value
+            (signature <literal>"s"</literal>). The format is
+            unspecified; tools attempting to upgrade firmware automatically must
+            understand the versioning scheme used by the modem driver they are
+            interacting with.
+          </listitem>
+        </varlistentry>
+      </variablelist>
+  -->
+  <interface name="org.freedesktop.ModemManager1.Modem.Firmware">
 
-    <method name="List">
-      <tp:docstring>
+    <!--
+        List:
+        @selected: The identifier of the selected firmware slot, or the empty string if no slot is selected (such as if all slots are empty, or no slots exist).
+        @installed: A dictionary of slots into which firmware is and/or can be installed. The key of each entry is the identifier of the slot, and the value is either an empty dictionary if the slot is empty, or a dictionary of properties of the firmware image installed in that slot. The slot identifiers and the mapping between slots and firmware images are guaranteed to remain stable only as long as the modem remains present.
+        @available: A dictionary of available firmware images. The key of each entry is the identifier of the image, and the value is a dictionary of properties of the image. The image identifiers are guaranteed to remain stable only as long as the modem remains present.
+
         List installed and available firmware images.
 
         Depending on the type of modem, installed images may be stored on the
-        host or the modem.  The distinction between "installed" and
-        "available" is not one of where the firmware is stored, but that
+        host or the modem.  The distinction between @installed and
+        @available is not one of where the firmware is stored, but that
         installed images can be selected non-destructively, while available
         images must be installed into a slot, possibly overwriting another
         installed image.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol"
-                  value="impl_modem_firmware_list" />
-      <arg name="selected" type="s" direction="out">
-        <tp:docstring>
-          The identifier of the selected firmware slot, or the empty string if
-          no slot is selected (such as if all slots are empty, or no slots
-          exist).
-        </tp:docstring>
-      </arg>
-      <arg name="installed" type="a{sa{sv}}" direction="out">
-        <tp:docstring>
-          A dictionary of slots into which firmware is and/or can be
-          installed.  The key of each entry is the identifier of the slot,
-          and the value is either an empty dictionary if the slot is empty,
-          or a dictionary of properties of the firmware image installed in
-          that slot.
-
-          The slot identifiers and the mapping between slots and firmware
-          images are guaranteed to remain stable only as long as the modem
-          remains present.
-        </tp:docstring>
-      </arg>
-      <arg name="available" type="a{sa{sv}}" direction="out">
-        <tp:docstring>
-          A dictionary of available firmware images.  The key of each entry is
-          the identifier of the image, and the value is a dictionary of
-          properties of the image.
-
-          The image identifiers are guaranteed to remain stable only as  long
-          as the modem remains present.
-        </tp:docstring>
-      </arg>
+    -->
+    <method name="List">
+      <arg name="selected"  type="s"         direction="out" />
+      <arg name="installed" type="a{sa{sv}}" direction="out" />
+      <arg name="available" type="a{sa{sv}}" direction="out" />
     </method>
 
-    <method name="Select">
-      <tp:docstring>
+    <!--
+        Select:
+        @slot: The identifier of the firmware slot to select.
+
         Selects a different firmware image to use, and immediately resets the
         modem so that it begins using the new firmware image.
 
-        Select will fail if the identifier does not match any of the slot
-        identifiers returned by List, or if the slot could not be selected
-        for some reason.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value="" />
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol"
-	              value="impl_modem_firmware_select" />
-      <arg name="slot" type="s" direction="in">
-        <tp:docstring>
-          The identifier of the firmware slot to select.
-        </tp:docstring>
-      </arg>
+        The method will fail if the identifier does not match any of the slot
+        identifiers returned by
+        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Firmware.List">List()</link>,
+        or if the slot could not be selected for some reason.
+    -->
+    <method name="Select">
+      <arg name="slot" type="s" direction="in" />
     </method>
 
-    <method name="Install">
-      <tp:docstring>
+    <!--
+        Install:
+        @image: The identifier of the firmware image to install.
+        @slot: The identifier of the slot into which the firmware should be installed.
+
         Install an available firmware image into a slot.
 
-        Install does not guarantee that the image will be installed into the
+        It does not guarantee that the image will be installed into the
         specified slot, but does guarantee that, if the slot is empty, no
         image will be overwritten, and if the slot is not empty, no image
         other than the one in that slot will be overwritten.
 
-        Install will fail if either of the identifiers is invalid, or if the
+        The method will fail if either of the identifiers is invalid, or if the
         image could not be installed into the slot for some reason.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value="" />
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol"
-                  value="impl_modem_firmware_install" />
-      <arg name="image" type="s" direction="in">
-        <tp:docstring>
-          The identifier of the firmware image to install.
-        </tp:docstring>
-      </arg>
-      <arg name="slot" type="s" direction="in">
-        <tp:docstring>
-          The identifier of the slot into which the firmware should be
-          installed.
-        </tp:docstring>
-      </arg>
+    -->
+    <method name="Install">
+      <arg name="image" type="s" direction="in" />
+      <arg name="slot"  type="s" direction="in" />
     </method>
+
   </interface>
 </node>

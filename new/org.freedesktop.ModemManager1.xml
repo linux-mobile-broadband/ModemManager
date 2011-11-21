@@ -1,28 +1,40 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
-<node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
+<!--
+ ModemManager 0.6 Interface Specification
+
+   Copyright (C) 2008 Novell, Inc.
+   Copyright (C) 2008-2011 Red Hat, Inc.
+   Copyright (C) 2011 The Chromium OS Authors
+   Copyright (C) 2011 Google, Inc.
+-->
+
+<node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
+
+  <!--
+      org.freedesktop.ModemManager1:
+      @short_description: The ModemManager Manager interface.
+
+      The Manager interface allows controlling and querying the status of the
+      ModemManager daemon.
+  -->
   <interface name="org.freedesktop.ModemManager1">
 
-    <!-- METHODS -->
+    <!--
+        ScanDevices:
 
-    <method name="ScanDevices">
-      <tp:docstring>
         Start a new scan for connected modem devices.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_manager_scan_devices"/>
-    </method>
+    -->
+    <method name="ScanDevices" />
 
-    <method name="SetLogging">
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_manager_set_logging"/>
-      <tp:docstring>
+    <!--
+        SetLogging:
+        @level: One of <literal>"ERR"</literal>, <literal>"WARN"</literal>, <literal>"INFO"</literal>, <literal>"DEBUG"</literal>.
+
         Set logging verbosity.
-      </tp:docstring>
-      <arg name="level" type="s" direction="in">
-        <tp:docstring>
-          One of [ERR, WARN, INFO, DEBUG].
-        </tp:docstring>
-      </arg>
+    -->
+    <method name="SetLogging">
+      <arg name="level" type="s" direction="in" />
     </method>
 
   </interface>

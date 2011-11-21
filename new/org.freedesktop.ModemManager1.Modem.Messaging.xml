@@ -1,132 +1,122 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
-<node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
+<!--
+ ModemManager 0.6 Interface Specification
+
+   Copyright (C) 2008 Novell, Inc.
+   Copyright (C) 2008-2011 Red Hat, Inc.
+   Copyright (C) 2011 The Chromium OS Authors
+   Copyright (C) 2011 Google, Inc.
+-->
+
+<node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
+
+  <!--
+      org.freedesktop.ModemManager1.Modem.Messaging:
+      @short_description: The ModemManager Messaging interface.
+
+      The Messaging interface handles sending SMS messages and notification of new
+      incoming messages.
+  -->
   <interface name="org.freedesktop.ModemManager1.Modem.Messaging">
 
-    <tp:docstring>
-      This interface handles sending SMS messages and notification of new
-      incoming messages.
-    </tp:docstring>
+    <!--
+        List:
+        @result: A dict of message object paths mapped to a dictionary containing that message's properties as specified in the <link linkend="gdbus-org.freedesktop.ModemManager1.Sms">SMS D-Bus interface</link>.
 
-    <!-- METHODS -->
-
-    <method name="List">
-      <tp:docstring>
         Retrieve all SMS messages.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_messaging_list"/>
-      <arg name="result" type="a{oa{sv}}" direction="out">
-        <tp:docstring>
-          A dict of message object paths mapped to a dictionary containing that
-          message's properties as specified in the
-          org.freedesktop.ModemManager1.Modem.SMS D-Bus interface.  This method
-          should only be used once and subsequent information retreived either
-          by listening for the Received and Completed signals, or by querying
-          the specific SMS object of interest.
-        </tp:docstring>
-      </arg>
+
+        This method should only be used once and subsequent information
+        retreived either by listening for the
+        #org.freedesktop.ModemManager1.Modem.Messaging::Added and
+        #org.freedesktop.ModemManager1.Modem.Messaging::Completed signals,
+        or by querying the specific SMS object of interest.
+    -->
+    <method name="List">
+      <arg name="result" type="a{oa{sv}}" direction="out" />
     </method>
 
+    <!--
+        Delete:
+        @path: The object path of the SMS to delete.
+
+        Delete an SMS message. Alternatively you may use the
+        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Sms.Delete">Delete()</link>
+        method on the message object itself.
+    -->
     <method name="Delete">
-      <tp:docstring>
-	Delete an SMS message.  Alternatively you may use the Delete() method
-	on the message object itself.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_messaging_delete"/>
-      <arg name="path" type="o" direction="in">
-	<tp:docstring>
-	  The object path of the SMS to delete.
-	</tp:docstring>
-      </arg>
+      <arg name="path" type="o" direction="in" />
     </method>
 
-    <method name="Create">
-      <tp:docstring>
+    <!--
+        Create:
+        @properties: Message properties from the <link linkend="gdbus-org.freedesktop.ModemManager1.Sms">SMS D-Bus interface</link>.
+        @send: If %TRUE, queue the message for immediate delivery.
+        @path: The object path of the new message object.
+
         Creates a new message object and optionally queues it for delivery.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_modem_messaging_create"/>
-      <arg name="properties" type="a{sv}" direction="in">
-	<tp:docstring>
-	  Message properties from the org.freedesktop.ModemManager1.Modem.SMS
-	  D-Bus interface.  The 'Number' and 'Text' properties are mandatory,
-	  others are optional.  If the SMSC is not specified and one is
-	  required, the default SMSC is used.
-	</tp:docstring>
-      </arg>
-      <arg name="send" type="b" direction="in">
-        <tp:docstring>
-          If TRUE, queue the message for immediate delivery.
-        </tp:docstring>
-      </arg>
-      <arg name="path" type="o" direction="out">
-        <tp:docstring>
-          The object path of the new message object.
-        </tp:docstring>
-      </arg>
+
+        The '<link linkend="gdbus-property-org-freedesktop-ModemManager1-Sms.To">To</link>'
+        and
+        '<link linkend="gdbus-property-org-freedesktop-ModemManager1-Sms.Text">Text</link>'
+        properties are mandatory, others are optional.
+
+        If the SMSC is not specified and one is required, the default SMSC is
+        used.
+    -->
+    <method name="Create">
+      <arg name="properties" type="a{sv}" direction="in"  />
+      <arg name="send"       type="b"     direction="in"  />
+      <arg name="path"       type="o"     direction="out" />
     </method>
 
-    <!-- SIGNALS -->
+    <!--
+        Added:
+        @path: Object path of the new SMS.
+        @received: %TRUE if the message was received from the network, as opposed to being added locally.
+        @properties: Message properties from the <link linkend="gdbus-org.freedesktop.ModemManager1.Sms">SMS D-Bus interface</link>.
 
-    <signal name="Added">
-      <tp:docstring>
         Emitted when any part of a new SMS has been received or added (but not
-        for subsequent parts, if any).  For messages received from the network,
+        for subsequent parts, if any). For messages received from the network,
         not all parts may have been received and the message may not be
-        complete.  The Completed signal will be emitted when the message is
         complete.
-      </tp:docstring>
-      <arg name="path" type="o">
-        <tp:docstring>
-          Object path of the new SMS.
-        </tp:docstring>
-      </arg>
-      <arg name="received" type="b">
-        <tp:docstring>
-          TRUE if the message was received from the network, as opposed to being
-          added locally.
-        </tp:docstring>
-      </arg>
-      <arg name="properties" type="a{sv}">
-	<tp:docstring>
-	  Message properties from the org.freedesktop.ModemManager1.Modem.SMS
-	  D-Bus interface.  Check the 'State' property to determine if the
-	  message is complete.
-	</tp:docstring>
-      </arg>
+
+        Check the
+        '<link linkend="gdbus-property-org-freedesktop-ModemManager1-Sms.State">State</link>'
+        property to determine if the message is complete. The
+        #org.freedesktop.ModemManager1.Modem.Messaging::Completed
+        signal will also be emitted when the message is complete.
+    -->
+    <signal name="Added">
+      <arg name="path"       type="o"     />
+      <arg name="received"   type="b"     />
+      <arg name="properties" type="a{sv}" />
     </signal>
 
-    <signal name="Completed">
-      <tp:docstring>
-        Emitted when the complete-ness status of an SMS message changes. An SMS
-        may not necessarily be complete when the first part is received; this
-        signal will be emitted when all parts have been received, even for
+    <!--
+        Completed:
+        @path: Object path of the new SMS.
+        @properties: Message properties from the <link linkend="gdbus-org.freedesktop.ModemManager1.Sms">SMS D-Bus interface</link>.
+
+        Emitted when the complete-ness status of an SMS message changes.
+
+        An SMS may not necessarily be complete when the first part is received;
+        this signal will be emitted when all parts have been received, even for
         single-part messages.
-      </tp:docstring>
-      <arg name="path" type="o">
-        <tp:docstring>
-          Object path of the new SMS.
-        </tp:docstring>
-      </arg>
-      <arg name="properties" type="a{sv}">
-	<tp:docstring>
-	  Message properties from the org.freedesktop.ModemManager1.Modem.SMS
-	  D-Bus interface.
-	</tp:docstring>
-      </arg>
+    -->
+    <signal name="Completed">
+      <arg name="path"       type="o"     />
+      <arg name="properties" type="a{sv}" />
     </signal>
 
-    <signal name="Deleted">
-      <tp:docstring>
+    <!--
+        Deleted:
+        @path: Object path of the now deleted SMS.
+
         Emitted when a message has been deleted.
-      </tp:docstring>
-      <arg name="path" type="o">
-        <tp:docstring>
-          Object path of the now deleted SMS.
-        </tp:docstring>
-      </arg>
+    -->
+    <signal name="Deleted">
+      <arg name="path" type="o" />
     </signal>
 
   </interface>
