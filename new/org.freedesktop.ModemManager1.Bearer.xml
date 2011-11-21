@@ -228,26 +228,5 @@
     -->
     <property name="Ip6Config" type="a{sv}" access="read" />
 
-    <!-- ENUMS -->
-    <tp:enum name="MM_MODEM_BEARER_IP_METHOD" type="u">
-      <tp:enumvalue suffix="PPP" value="0">
-	<tp:docstring>
-	  Connection managers should use PPP to get the address.
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="STATIC" value="1">
-	<tp:docstring>
-	  Connection managers should use the provided static IP configuration
-	  given by the modem to configure the IP data interface.
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="DHCP" value="2">
-	<tp:docstring>
-	  Connection managers should begin DHCP on the data interface to obtain
-	  necessary IP configuration details.
-	</tp:docstring>
-      </tp:enumvalue>
-    </tp:enum>
-
   </interface>
 </node>

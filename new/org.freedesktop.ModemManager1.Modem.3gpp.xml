@@ -138,44 +138,6 @@
     -->
     <property name="EnabledFacilityLocks" type="u" access="read" />
 
-    <!-- ENUMS -->
-
-    <tp:enum name="MM_MODEM_3GPP_REGISTRATION_STATE" type="u">
-      <tp:docstring>
-        GSM registration code as defined in 3GPP TS 27.007 section 10.1.19.
-      </tp:docstring>
-      <tp:enumvalue suffix="IDLE" value="0">
-	<tp:docstring>
-	  Not registered, not searching for new operator to register.
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="HOME" value="1">
-	<tp:docstring>
-	  Registered on home network.
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="SEARCHING" value="2">
-	<tp:docstring>
-	  Not registered, searching for new operator to register with.
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="DENIED" value="3">
-	<tp:docstring>
-	  Registration denied.
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="UNKNOWN" value="4">
-	<tp:docstring>
-	  Unknown registration status.
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="ROAMING" value="5">
-	<tp:docstring>
-	  Registered on a roaming network.
-	</tp:docstring>
-      </tp:enumvalue>
-    </tp:enum>
-
   </interface>
 </node>
 

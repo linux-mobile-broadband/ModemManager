@@ -94,40 +94,5 @@
     -->
     <property name="Timestamp" type="s" access="read" />
 
-    <!-- ENUMS -->
-
-    <tp:enum name="MM_MODEM_SMS_STATE" type="u">
-      <tp:enumvalue suffix="UNKNOWN" value="0">
-        <tp:docstring>
-          State unknown or not reportable.
-        </tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="STORED" value="0">
-        <tp:docstring>
-          The message has been neither received nor yet sent.
-        </tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="RECEIVING" value="1">
-        <tp:docstring>
-          The message is being received but is not yet complete.
-        </tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="RECEIVED" value="2">
-        <tp:docstring>
-          The message received and is complete.
-        </tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="SENDING" value="3">
-        <tp:docstring>
-          The message is queued for delivery.
-        </tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="SENT" value="4">
-        <tp:docstring>
-          The message was successfully sent.
-        </tp:docstring>
-      </tp:enumvalue>
-    </tp:enum>
-
   </interface>
 </node>

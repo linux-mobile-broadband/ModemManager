@@ -173,28 +173,5 @@
       <arg name="index" type="u" />
     </signal>
 
-    <!-- ENUMS -->
-
-    <tp:enum name="MM_MODEM_CONTACTS_STORAGE" type="u">
-      <tp:docstring>
-        Specifies different storage locations for contact information.
-      </tp:docstring>
-      <tp:enumvalue suffix="ME" value="0">
-	<tp:docstring>
-	  Store information in device's local memory.
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="SM" value="1">
-	<tp:docstring>
-	  Store information in a card inserted in the device (like a SIM/RUIM).
-	</tp:docstring>
-      </tp:enumvalue>
-      <tp:enumvalue suffix="MT" value="2">
-	<tp:docstring>
-	  Store information in the combined device/ME and SIM/SM phonebook.
-	</tp:docstring>
-      </tp:enumvalue>
-    </tp:enum>
-
   </interface>
 </node>
