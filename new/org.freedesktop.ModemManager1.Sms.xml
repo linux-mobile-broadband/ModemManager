@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
 <node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
-  <interface name="org.freedesktop.ModemManager1.Modem.SMS">
+  <interface name="org.freedesktop.ModemManager1.Sms">
 
     <tp:docstring>
       Defines operations and properties of a single SMS message.
