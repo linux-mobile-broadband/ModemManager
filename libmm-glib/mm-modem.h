@@ -172,6 +172,17 @@ gboolean mm_modem_set_allowed_bands_sync   (MMModem *self,
                                             GCancellable *cancellable,
                                             GError **error);
 
+void   mm_modem_get_sim        (MMModem *self,
+                                GCancellable *cancellable,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data);
+MMSim *mm_modem_get_sim_finish (MMModem *self,
+                                GAsyncResult *res,
+                                GError **error);
+MMSim *mm_modem_get_sim_sync   (MMModem *self,
+                                GCancellable *cancellable,
+                                GError **error);
+
 G_END_DECLS
 
 #endif /* _MM_MODEM_H_ */

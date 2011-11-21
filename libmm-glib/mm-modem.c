@@ -1213,3 +1213,94 @@ mm_modem_set_allowed_bands_sync (MMModem *self,
                 cancellable,
                 error));
 }
+
+static void
+modem_get_sim_ready (GDBusConnection *connection,
+                     GAsyncResult *res,
+                     GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    MMSim *sim;
+
+    sim = mm_gdbus_sim_proxy_new_finish (res, &error);
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gpointer (simple, sim, NULL);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+void
+mm_modem_get_sim (MMModem *self,
+                  GCancellable *cancellable,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    const gchar *sim_path;
+
+    g_return_if_fail (MM_GDBUS_IS_OBJECT (self));
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        mm_modem_get_sim);
+
+    sim_path = mm_modem_get_sim_path (self);
+    if (!sim_path) {
+        g_simple_async_result_set_op_res_gpointer (result, NULL, NULL);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    mm_gdbus_sim_proxy_new (
+        g_dbus_object_proxy_get_connection (
+            G_DBUS_OBJECT_PROXY (
+                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self)))),
+        G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+        MM_DBUS_SERVICE,
+        sim_path,
+        cancellable,
+        (GAsyncReadyCallback)modem_get_sim_ready,
+        result);
+}
+
+MMSim *
+mm_modem_get_sim_finish (MMModem *self,
+                         GAsyncResult *res,
+                         GError **error)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+}
+
+MMSim *
+mm_modem_get_sim_sync (MMModem *self,
+                       GCancellable *cancellable,
+                       GError **error)
+{
+    const gchar *sim_path;
+
+    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
+
+    sim_path = mm_modem_get_sim_path (self);
+    if (!sim_path)
+        return NULL;
+
+    return (mm_gdbus_sim_proxy_new_sync (
+                g_dbus_object_proxy_get_connection (
+                    G_DBUS_OBJECT_PROXY (
+                        mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self)))),
+                G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+                MM_DBUS_SERVICE,
+                sim_path,
+                cancellable,
+                error));
+}
