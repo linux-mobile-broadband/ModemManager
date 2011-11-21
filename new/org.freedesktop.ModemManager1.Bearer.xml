@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
 <node name="/" xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0">
-  <interface name="org.freedesktop.ModemManager1.Modem.Bearer">
+  <interface name="org.freedesktop.ModemManager1.Bearer">
 
     <!-- METHODS -->
 
