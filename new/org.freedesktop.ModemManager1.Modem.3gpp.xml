@@ -25,7 +25,7 @@
       </tp:docstring>
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_3gpp_modem_scan"/>
-      <arg name="results" type="aa{ss}" direction="out">
+      <arg name="results" type="aa{sv}" direction="out">
 	<tp:docstring>
           <p>Found networks. It's an array of dictionaries (strings for both
           keys and values) with each array element describing a mobile network
