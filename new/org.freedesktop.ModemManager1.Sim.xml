@@ -7,46 +7,6 @@
       Handles communication with SIM, USIM, and RUIM (CDMA SIM) cards.
     </tp:docstring>
 
-    <method name="GetImsi">
-      <tp:docstring>
-	Get the IMSI of the SIM card.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_sim_get_imsi"/>
-      <arg name="imsi" type="s" direction="out">
-	<tp:docstring>
-	  The IMSI.
-	</tp:docstring>
-      </arg>
-    </method>
-
-    <method name="GetOperatorId">
-      <tp:docstring>
-        Returns the ID of the network operator that issued the SIM card,
-        formatted as a 5 or 6-digit MCC/MNC code (ex "310410").
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_sim_get_operator_id"/>
-      <arg name="operator_id" type="s" direction="out">
-	<tp:docstring>
-	  The operator ID formatted as an MCC/MNC code.
-	</tp:docstring>
-      </arg>
-    </method>
-
-    <method name="GetOperatorName">
-      <tp:docstring>
-        Returns the name of the operator as given by the SIM card, if known.
-      </tp:docstring>
-      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_sim_get_operator_name"/>
-      <arg name="operator_name" type="s" direction="out">
-	<tp:docstring>
-	  The operator name.
-	</tp:docstring>
-      </arg>
-    </method>
-
     <method name="SendPuk">
       <tp:docstring>
 	Send the PUK and a new PIN to unlock the SIM card.
@@ -122,5 +82,23 @@
       </tp:docstring>
     </property>
 
+    <property name="Imsi" type="s" access="read">
+      <tp:docstring>
+        The IMSI of the SIM card, if any.
+      </tp:docstring>
+    </property>
+
+    <property name="OperatorId" type="s" access="read">
+      <tp:docstring>
+        The ID of the network operator that issued the SIM card,
+        formatted as a 5 or 6-digit MCC/MNC code (e.g. "310410").
+      </tp:docstring>
+    </property>
+
+    <property name="OperatorName" type="s" access="read">
+      <tp:docstring>
+        The name of the network operator, as given by the SIM card, if known.
+      </tp:docstring>
+    </property>
   </interface>
 </node>
