@@ -452,4 +452,20 @@ typedef enum { /*< underscore_name=mm_modem_3gpp_facility >*/
     MM_MODEM_3GPP_FACILITY_CORP_PERS     = 0x80
 } MMModem3gppFacility;
 
+/**
+ * MMModem3gppNetworkAvailability:
+ * @MM_MODEM_3GPP_NETWORK_AVAILABILITY_UNKNOWN: Unknown availability.
+ * @MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE: Network is available.
+ * @MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT: Network is the current one.
+ * @MM_MODEM_3GPP_NETWORK_AVAILABILITY_FORBIDDEN: Network is forbidden.
+ *
+ * Network availability status as defined in 3GPP TS 27.007 section 7.3
+ */
+typedef enum { /*< underscore_name=mm_modem_3gpp_network_availability >*/
+    MM_MODEM_3GPP_NETWORK_AVAILABILITY_UNKNOWN   = 0,
+    MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE = 1,
+    MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT   = 2,
+    MM_MODEM_3GPP_NETWORK_AVAILABILITY_FORBIDDEN = 3,
+} MMModem3gppNetworkAvailability;
+
 #endif /*  _MODEMMANAGER_ENUMS_H_ */
