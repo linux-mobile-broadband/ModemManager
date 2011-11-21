@@ -70,14 +70,14 @@
       </tp:docstring>
     </property>
 
-    <property name="RegStatus" type="u" access="read" tp:type="MM_MODEM_3GPP_NETWORK_REG_STATUS">
+    <property name="RegistrationState" type="u" access="read" tp:type="MM_MODEM_3GPP_REGISTRATION_STATE">
       <tp:docstring>
         Mobile registration status as defined in 3GPP TS 27.007 section
         10.1.19.
       </tp:docstring>
     </property>
 
-    <property name="OperCode" type="s" access="read">
+    <property name="OperatorCode" type="s" access="read">
       <tp:docstring>
         Current operator code of the operator to which the mobile is
         currently registered.  Returned in the format "MCCMNC", where MCC
@@ -88,7 +88,7 @@
       </tp:docstring>
     </property>
 
-    <property name="OperName" type="s" access="read">
+    <property name="OperatorName" type="s" access="read">
       <tp:docstring>
         Current operator name of the operator to which the mobile is
         currently registered.  If the operator name is not knowon or the
@@ -99,7 +99,7 @@
 
     <!-- ENUMS -->
 
-    <tp:enum name="MM_MODEM_3GPP_NETWORK_REG_STATUS" type="u">
+    <tp:enum name="MM_MODEM_3GPP_REGISTRATION_STATE" type="u">
       <tp:docstring>
         GSM registration code as defined in 3GPP TS 27.007 section 10.1.19.
       </tp:docstring>
