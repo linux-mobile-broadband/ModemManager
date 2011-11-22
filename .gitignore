@@ -44,6 +44,9 @@ libwmc/tests/test-wmc
 include/ModemManager.h
 include/ModemManager-names.h
 
+libmm-common/*.[ch]
+libmm-common/*.xml
+
 po/Makefile.in.in
 po/POTFILES
 po/stamp-it

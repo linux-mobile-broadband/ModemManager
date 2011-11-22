@@ -20,7 +20,7 @@ all: $(GENERATED_FILES)
 CLEANFILES = $(GENERATED_FILES)
 endif
 
-SUBDIRS = . marshallers build-aux include libqcdm libwmc src plugins introspection po test
+SUBDIRS = . marshallers build-aux include libmm-common libqcdm libwmc src plugins introspection po test
 
 if WITH_POLKIT
 SUBDIRS += policy

@@ -158,6 +158,7 @@ Makefile
 marshallers/Makefile
 include/Makefile
 build-aux/Makefile
+libmm-common/Makefile
 libqcdm/Makefile
 libqcdm/src/Makefile
 libqcdm/tests/Makefile
