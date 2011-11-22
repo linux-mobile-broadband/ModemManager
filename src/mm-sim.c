@@ -439,6 +439,127 @@ load_operator_identifier (MMSim *self,
 }
 
 /*****************************************************************************/
+/* Operator Name (Service Provider Name) */
+
+static gboolean
+parse_spn (MMSim *self,
+           gpointer none,
+           const gchar *command,
+           const gchar *response,
+           const GError *error,
+           GVariant **result,
+           GError **result_error)
+{
+    gint sw1;
+    gint sw2;
+    gboolean success = FALSE;
+    gchar hex[51];
+
+    if (error) {
+        *result_error = g_error_copy (error);
+        return FALSE;
+    }
+
+    memset (hex, 0, sizeof (hex));
+    if (sscanf (response, "+CRSM:%d,%d,\"%50c\"", &sw1, &sw2, (char *) &hex) == 3)
+        success = TRUE;
+    else {
+        /* May not include quotes... */
+        if (sscanf (response, "+CRSM:%d,%d,%50c", &sw1, &sw2, (char *) &hex) == 3)
+            success = TRUE;
+    }
+
+    if (!success) {
+        *result_error = g_error_new_literal (MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Could not parse the CRSM response");
+        return FALSE;
+    }
+
+    if ((sw1 == 0x90 && sw2 == 0x00) ||
+        (sw1 == 0x91) ||
+        (sw1 == 0x92) ||
+        (sw1 == 0x9f)) {
+        gsize buflen = 0;
+        gchar *bin;
+        gchar *utf8;
+
+        /* Make sure the buffer is only hex characters */
+        while (buflen < sizeof (hex) && hex[buflen]) {
+            if (!isxdigit (hex[buflen])) {
+                hex[buflen] = 0x0;
+                break;
+            }
+            buflen++;
+        }
+
+        /* Convert hex string to binary */
+        bin = utils_hexstr2bin (hex, &buflen);
+        if (!bin) {
+            *result_error = g_error_new (MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "SIM returned malformed response '%s'",
+                                         hex);
+            return FALSE;
+        }
+
+        /* Remove the FF filler at the end */
+        while (buflen > 1 && bin[buflen - 1] == (char)0xff)
+            buflen--;
+
+        /* First byte is metadata; remainder is GSM-7 unpacked into octets; convert to UTF8 */
+        utf8 = (gchar *)mm_charset_gsm_unpacked_to_utf8 ((guint8 *)bin + 1, buflen - 1);
+        *result = g_variant_new_string (utf8);
+        g_free (utf8);
+        g_free (bin);
+        return TRUE;
+    }
+
+    *result_error = g_error_new (MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "SIM failed to handle CRSM request (sw1 %d sw2 %d)",
+                                 sw1, sw2);
+    return FALSE;
+}
+
+static gchar *
+load_operator_name_finish (MMSim *self,
+                           GAsyncResult *res,
+                           GError **error)
+{
+    GVariant *result;
+    gchar *operator_name;
+
+    result = mm_at_command_finish (G_OBJECT (self), res, error);
+    if (!result)
+        return NULL;
+
+    operator_name = g_variant_dup_string (result, NULL);
+    g_variant_unref (result);
+    return operator_name;
+}
+
+static void
+load_operator_name (MMSim *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    mm_dbg ("loading Operator Name...");
+
+    /* READ BINARY of EFspn (Service Provider Name) ETSI 51.011 section 10.3.11 */
+    mm_at_command (G_OBJECT (self),
+                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self->priv->modem)),
+                   "+CRSM=176,28486,0,0,17",
+                   3,
+                   (MMAtResponseProcessor)parse_spn,
+                   NULL, /* response_processor_context */
+                   "s", /* spn */
+                   NULL, /*TODO: cancellable */
+                   callback,
+                   user_data);
+}
+
+/*****************************************************************************/
 
 
 typedef enum {
@@ -446,6 +567,7 @@ typedef enum {
     INITIALIZATION_STEP_SIM_IDENTIFIER,
     INITIALIZATION_STEP_IMSI,
     INITIALIZATION_STEP_OPERATOR_ID,
+    INITIALIZATION_STEP_OPERATOR_NAME,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -549,6 +671,7 @@ load_sim_identifier_ready (MMSim *self,
 
 STR_REPLY_READY_FN (imsi, "IMSI")
 STR_REPLY_READY_FN (operator_identifier, "Operator identifier")
+STR_REPLY_READY_FN (operator_name, "Operator name")
 
 static void
 interface_initialization_step (InitAsyncContext *ctx)
@@ -592,6 +715,19 @@ interface_initialization_step (InitAsyncContext *ctx)
             load_operator_identifier (
                 ctx->self,
                 (GAsyncReadyCallback)load_operator_identifier_ready,
+                ctx);
+            return;
+        }
+        break;
+
+    case INITIALIZATION_STEP_OPERATOR_NAME:
+        /* Operator Name is meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_sim_get_operator_name (MM_GDBUS_SIM (ctx->self)) == NULL) {
+            load_operator_name (
+                ctx->self,
+                (GAsyncReadyCallback)load_operator_name_ready,
                 ctx);
             return;
         }
