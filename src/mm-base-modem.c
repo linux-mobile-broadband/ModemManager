@@ -42,6 +42,8 @@ enum {
     PROP_DEVICE,
     PROP_DRIVER,
     PROP_PLUGIN,
+    PROP_VENDOR_ID,
+    PROP_PRODUCT_ID,
     PROP_LAST
 };
 
@@ -51,6 +53,9 @@ struct _MMBaseModemPrivate {
     gchar *device;
     gchar *driver;
     gchar *plugin;
+
+    guint vendor_id;
+    guint product_id;
 
     gboolean valid;
 
@@ -463,6 +468,22 @@ mm_base_modem_get_plugin (MMBaseModem *self)
     return self->priv->plugin;
 }
 
+guint
+mm_base_modem_get_vendor_id  (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), 0);
+
+    return self->priv->vendor_id;
+}
+
+guint
+mm_base_modem_get_product_id (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), 0);
+
+    return self->priv->product_id;
+}
+
 /*****************************************************************************/
 
 static void
@@ -508,6 +529,12 @@ set_property (GObject *object,
         g_free (self->priv->plugin);
         self->priv->plugin = g_value_dup_string (value);
         break;
+    case PROP_VENDOR_ID:
+        self->priv->vendor_id = g_value_get_uint (value);
+        break;
+    case PROP_PRODUCT_ID:
+        self->priv->product_id = g_value_get_uint (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -537,6 +564,12 @@ get_property (GObject *object,
         break;
     case PROP_PLUGIN:
         g_value_set_string (value, self->priv->plugin);
+        break;
+    case PROP_VENDOR_ID:
+        g_value_set_uint (value, self->priv->vendor_id);
+        break;
+    case PROP_PRODUCT_ID:
+        g_value_set_uint (value, self->priv->product_id);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -629,5 +662,21 @@ mm_base_modem_class_init (MMBaseModemClass *klass)
                              NULL,
                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
     g_object_class_install_property (object_class, PROP_PLUGIN, properties[PROP_PLUGIN]);
+
+    properties[PROP_VENDOR_ID] =
+        g_param_spec_uint (MM_BASE_MODEM_VENDOR_ID,
+                           "Hardware vendor ID",
+                           "Hardware vendor ID. May be unknown for serial devices.",
+                           0, G_MAXUINT, 0,
+                           G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_VENDOR_ID, properties[PROP_VENDOR_ID]);
+
+    properties[PROP_PRODUCT_ID] =
+        g_param_spec_uint (MM_BASE_MODEM_PRODUCT_ID,
+                           "Hardware product ID",
+                           "Hardware product ID. May be unknown for serial devices.",
+                           0, G_MAXUINT, 0,
+                           G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_PRODUCT_ID, properties[PROP_PRODUCT_ID]);
 }
 

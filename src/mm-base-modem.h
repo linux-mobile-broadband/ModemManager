@@ -44,6 +44,8 @@ typedef struct _MMBaseModemPrivate MMBaseModemPrivate;
 #define MM_BASE_MODEM_DEVICE         "base-modem-device"
 #define MM_BASE_MODEM_DRIVER         "base-modem-driver"
 #define MM_BASE_MODEM_PLUGIN         "base-modem-plugin"
+#define MM_BASE_MODEM_VENDOR_ID      "base-modem-vendor-id"
+#define MM_BASE_MODEM_PRODUCT_ID     "base-modem-product-id"
 
 struct _MMBaseModem {
     MmGdbusObjectSkeleton parent;
@@ -92,6 +94,9 @@ gboolean mm_base_modem_auth_finish  (MMBaseModem *self,
 const gchar *mm_base_modem_get_device (MMBaseModem *self);
 const gchar *mm_base_modem_get_driver (MMBaseModem *self);
 const gchar *mm_base_modem_get_plugin (MMBaseModem *self);
+
+guint mm_base_modem_get_vendor_id  (MMBaseModem *self);
+guint mm_base_modem_get_product_id (MMBaseModem *self);
 
 #endif /* MM_BASE_MODEM_H */
 
