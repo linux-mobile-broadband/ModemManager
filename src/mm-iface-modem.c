@@ -114,6 +114,8 @@ typedef enum {
     INITIALIZATION_STEP_MANUFACTURER,
     INITIALIZATION_STEP_MODEL,
     INITIALIZATION_STEP_REVISION,
+    INITIALIZATION_STEP_EQUIPMENT_ID,
+    INITIALIZATION_STEP_DEVICE_ID,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -219,6 +221,8 @@ UINT_REPLY_READY_FN (max_active_bearers, "Max Active Bearers")
 STR_REPLY_READY_FN (manufacturer, "Manufacturer")
 STR_REPLY_READY_FN (model, "Model")
 STR_REPLY_READY_FN (revision, "Revision")
+STR_REPLY_READY_FN (equipment_identifier, "Equipment Identifier")
+STR_REPLY_READY_FN (device_identifier, "Device Identifier")
 
 static void
 interface_initialization_step (InitializationContext *ctx)
@@ -368,6 +372,36 @@ interface_initialization_step (InitializationContext *ctx)
             MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_revision (
                 ctx->self,
                 (GAsyncReadyCallback)load_revision_ready,
+                ctx);
+            return;
+        }
+        break;
+
+    case INITIALIZATION_STEP_EQUIPMENT_ID:
+        /* Equipment ID is meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_modem_get_equipment_identifier (ctx->skeleton) == NULL &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_equipment_identifier &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_equipment_identifier_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_equipment_identifier (
+                ctx->self,
+                (GAsyncReadyCallback)load_equipment_identifier_ready,
+                ctx);
+            return;
+        }
+        break;
+
+    case INITIALIZATION_STEP_DEVICE_ID:
+        /* Device ID is meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_modem_get_device_identifier (ctx->skeleton) == NULL &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_device_identifier &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_device_identifier_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_device_identifier (
+                ctx->self,
+                (GAsyncReadyCallback)load_device_identifier_ready,
                 ctx);
             return;
         }

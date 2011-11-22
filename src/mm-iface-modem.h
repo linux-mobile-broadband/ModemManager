@@ -86,6 +86,22 @@ struct _MMIfaceModem {
     gchar * (*load_revision_finish) (MMIfaceModem *self,
                                      GAsyncResult *res,
                                      GError **error);
+
+    /* Loading of the EquipmentIdentifier property */
+    void (*load_equipment_identifier) (MMIfaceModem *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data);
+    gchar * (*load_equipment_identifier_finish) (MMIfaceModem *self,
+                                                 GAsyncResult *res,
+                                                 GError **error);
+
+    /* Loading of the DeviceIdentifier property */
+    void (*load_device_identifier) (MMIfaceModem *self,
+                                    GAsyncReadyCallback callback,
+                                    gpointer user_data);
+    gchar * (*load_device_identifier_finish) (MMIfaceModem *self,
+                                              GAsyncResult *res,
+                                              GError **error);
 };
 
 GType mm_iface_modem_get_type (void);
