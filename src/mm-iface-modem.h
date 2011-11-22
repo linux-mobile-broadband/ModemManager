@@ -46,6 +46,22 @@ struct _MMIfaceModem {
     MMModemCapability (*load_current_capabilities_finish) (MMIfaceModem *self,
                                                            GAsyncResult *res,
                                                            GError **error);
+
+    /* Loading of the MaxBearers property */
+    void (*load_max_bearers) (MMIfaceModem *self,
+                              GAsyncReadyCallback callback,
+                              gpointer user_data);
+    guint (*load_max_bearers_finish) (MMIfaceModem *self,
+                                      GAsyncResult *res,
+                                      GError **error);
+
+    /* Loading of the MaxActiveBearers property */
+    void (*load_max_active_bearers) (MMIfaceModem *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data);
+    guint (*load_max_active_bearers_finish) (MMIfaceModem *self,
+                                             GAsyncResult *res,
+                                             GError **error);
 };
 
 GType mm_iface_modem_get_type (void);

@@ -109,6 +109,8 @@ typedef enum {
     INITIALIZATION_STEP_FIRST,
     INITIALIZATION_STEP_MODEM_CAPABILITIES,
     INITIALIZATION_STEP_CURRENT_CAPABILITIES,
+    INITIALIZATION_STEP_MAX_BEARERS,
+    INITIALIZATION_STEP_MAX_ACTIVE_BEARERS,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -185,6 +187,8 @@ interface_initialization_finish (MMIfaceModem *self,
 
 UINT_REPLY_READY_FN (modem_capabilities, "Modem Capabilities")
 UINT_REPLY_READY_FN (current_capabilities, "Current Capabilities")
+UINT_REPLY_READY_FN (max_bearers, "Max Bearers")
+UINT_REPLY_READY_FN (max_active_bearers, "Max Active Bearers")
 
 static void
 interface_initialization_step (InitializationContext *ctx)
@@ -255,6 +259,43 @@ interface_initialization_step (InitializationContext *ctx)
         mm_gdbus_modem_set_current_capabilities (
             ctx->skeleton,
             mm_gdbus_modem_get_current_capabilities (ctx->skeleton));
+        break;
+
+    case INITIALIZATION_STEP_MAX_BEARERS:
+        /* Max bearers value is meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_modem_get_max_bearers (ctx->skeleton) == 0 &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_max_bearers &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_max_bearers_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_max_bearers (
+                ctx->self,
+                (GAsyncReadyCallback)load_max_bearers_ready,
+                ctx);
+            return;
+        }
+        /* Default to one bearer */
+        mm_gdbus_modem_set_max_bearers (ctx->skeleton, 1);
+        break;
+
+    case INITIALIZATION_STEP_MAX_ACTIVE_BEARERS:
+        /* Max active bearers value is meant to be loaded only once during the
+         * whole lifetime of the modem. Therefore, if we already have them
+         * loaded, don't try to load them again. */
+        if (mm_gdbus_modem_get_max_active_bearers (ctx->skeleton) == 0 &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_max_active_bearers &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_max_active_bearers_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_max_active_bearers (
+                ctx->self,
+                (GAsyncReadyCallback)load_max_active_bearers_ready,
+                ctx);
+            return;
+        }
+       /* If no specific way of getting max active bearers, assume they are
+        * equal to the absolute max bearers */
+        mm_gdbus_modem_set_max_active_bearers (
+            ctx->skeleton,
+            mm_gdbus_modem_get_max_bearers (ctx->skeleton));
         break;
 
     case INITIALIZATION_STEP_LAST:
