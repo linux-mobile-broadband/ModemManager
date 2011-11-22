@@ -7,6 +7,9 @@ includedir = @includedir@/mm
 
 include_HEADERS = \
 	ModemManager-names.h \
+	ModemManager-enums.h \
+	ModemManager-errors.h \
+	ModemManager1.h \
 	ModemManager.h
 
 # NOTE: This is the header of the 0.5 API, which will get removed
