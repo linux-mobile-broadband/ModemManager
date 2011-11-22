@@ -153,6 +153,15 @@ struct _MMIfaceModem {
     gboolean (*factory_reset_finish) (MMIfaceModem *self,
                                       GAsyncResult *res,
                                       GError **error);
+
+    /* Asynchronous allowed band setting operation */
+    void (*set_allowed_bands) (MMIfaceModem *self,
+                               MMModemBand bands,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data);
+    gboolean (*set_allowed_bands_finish) (MMIfaceModem *self,
+                                          GAsyncResult *res,
+                                          GError **error);
 };
 
 GType mm_iface_modem_get_type (void);
