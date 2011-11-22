@@ -173,6 +173,7 @@ AM_CONDITIONAL(WMC_STANDALONE, test "yes" = "no")
 AC_CONFIG_FILES([
 Makefile
 marshallers/Makefile
+data/Makefile
 include/Makefile
 build-aux/Makefile
 libmm-common/Makefile
@@ -188,7 +189,6 @@ plugins/Makefile
 test/Makefile
 introspection/Makefile
 po/Makefile.in
-policy/Makefile
 docs/Makefile
 docs/man/Makefile
 docs/man/modem-manager.8
