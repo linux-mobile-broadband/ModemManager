@@ -102,6 +102,22 @@ struct _MMIfaceModem {
     gchar * (*load_device_identifier_finish) (MMIfaceModem *self,
                                               GAsyncResult *res,
                                               GError **error);
+
+    /* Loading of the UnlockRequired property */
+    void (*load_unlock_required) (MMIfaceModem *self,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data);
+    MMModemLock (*load_unlock_required_finish) (MMIfaceModem *self,
+                                                GAsyncResult *res,
+                                                GError **error);
+
+    /* Loading of the UnlockRetries property */
+    void (*load_unlock_retries) (MMIfaceModem *self,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data);
+    MMModemLock (*load_unlock_retries_finish) (MMIfaceModem *self,
+                                               GAsyncResult *res,
+                                               GError **error);
 };
 
 GType mm_iface_modem_get_type (void);
@@ -117,5 +133,15 @@ gboolean mm_iface_modem_initialize_finish (MMIfaceModem *self,
 /* Shutdown Modem interface */
 gboolean mm_iface_modem_shutdown (MMIfaceModem *self,
                                   GError **error);
+
+/* Request unlock recheck.
+ * It will not only return the lock status, but also set the property values
+ * in the DBus interface. */
+void        mm_iface_modem_unlock_check        (MMIfaceModem *self,
+                                                GAsyncReadyCallback callback,
+                                                gpointer user_data);
+MMModemLock mm_iface_modem_unlock_check_finish (MMIfaceModem *self,
+                                                GAsyncResult *res,
+                                                GError **error);
 
 #endif /* MM_IFACE_MODEM_H */

@@ -105,6 +105,150 @@ handle_set_allowed_modes (MmGdbusModem *object,
 
 /*****************************************************************************/
 
+typedef struct _UnlockCheckContext UnlockCheckContext;
+struct _UnlockCheckContext {
+    MMIfaceModem *self;
+    MMAtSerialPort *port;
+    guint pin_check_tries;
+    guint pin_check_timeout_id;
+    GSimpleAsyncResult *result;
+    MmGdbusModem *skeleton;
+};
+
+static UnlockCheckContext *
+unlock_check_context_new (MMIfaceModem *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    UnlockCheckContext *ctx;
+
+    ctx = g_new0 (UnlockCheckContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->port = g_object_ref (mm_base_modem_get_port_primary (MM_BASE_MODEM (self)));
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             unlock_check_context_new);
+    g_object_get (ctx->self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
+                  NULL);
+    g_assert (ctx->skeleton != NULL);
+    return ctx;
+}
+
+static void
+unlock_check_context_free (UnlockCheckContext *ctx)
+{
+    g_object_unref (ctx->self);
+    g_object_unref (ctx->port);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->skeleton);
+    g_free (ctx);
+}
+
+static void
+set_lock_status (MMIfaceModem *self,
+                 MmGdbusModem *skeleton,
+                 MMModemLock lock)
+{
+    mm_gdbus_modem_set_unlock_required (skeleton, lock);
+}
+
+MMModemLock
+mm_iface_modem_unlock_check_finish (MMIfaceModem *self,
+                                    GAsyncResult *res,
+                                    GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error)) {
+        return MM_MODEM_LOCK_UNKNOWN;
+    }
+
+    return (MMModemLock) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void unlock_check_ready (MMIfaceModem *self,
+                                GAsyncResult *res,
+                                UnlockCheckContext *ctx);
+
+static gboolean
+unlock_check_again  (UnlockCheckContext *ctx)
+{
+    ctx->pin_check_timeout_id = 0;
+
+    MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required (
+        ctx->self,
+        (GAsyncReadyCallback)unlock_check_ready,
+        ctx);
+    return FALSE;
+}
+
+static void
+unlock_check_ready (MMIfaceModem *self,
+                    GAsyncResult *res,
+                    UnlockCheckContext *ctx)
+{
+    GError *error = NULL;
+    MMModemLock lock;
+
+    lock = MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_required_finish (self,
+                                                                             res,
+                                                                             &error);
+    if (error) {
+        /* Retry up to 3 times */
+        if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE &&
+            ++ctx->pin_check_tries < 3) {
+
+            if (ctx->pin_check_timeout_id)
+                g_source_remove (ctx->pin_check_timeout_id);
+            ctx->pin_check_timeout_id = g_timeout_add_seconds (
+                2,
+                (GSourceFunc)unlock_check_again,
+                ctx);
+            return;
+        }
+
+        /* If reached max retries and still reporting error, set UNKNOWN */
+        lock = MM_MODEM_LOCK_UNKNOWN;
+    }
+
+    /* Update lock status and modem status if needed */
+    set_lock_status (self, ctx->skeleton, lock);
+
+    g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                               GUINT_TO_POINTER (lock),
+                                               NULL);
+    g_simple_async_result_complete (ctx->result);
+    unlock_check_context_free (ctx);
+}
+
+void
+mm_iface_modem_unlock_check (MMIfaceModem *self,
+                             GAsyncReadyCallback callback,
+                             gpointer user_data)
+{
+    UnlockCheckContext *ctx;
+
+    ctx = unlock_check_context_new (self, callback, user_data);
+
+    if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required &&
+        MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required_finish) {
+        MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required (
+            self,
+            (GAsyncReadyCallback)unlock_check_ready,
+            ctx);
+        return;
+    }
+
+    /* Just assume that no lock is required */
+    g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                               GUINT_TO_POINTER (MM_MODEM_LOCK_NONE),
+                                               NULL);
+    g_simple_async_result_complete_in_idle (ctx->result);
+    unlock_check_context_free (ctx);
+}
+
+/*****************************************************************************/
+
 typedef enum {
     INITIALIZATION_STEP_FIRST,
     INITIALIZATION_STEP_MODEM_CAPABILITIES,
@@ -116,6 +260,8 @@ typedef enum {
     INITIALIZATION_STEP_REVISION,
     INITIALIZATION_STEP_EQUIPMENT_ID,
     INITIALIZATION_STEP_DEVICE_ID,
+    INITIALIZATION_STEP_UNLOCK_REQUIRED,
+    INITIALIZATION_STEP_UNLOCK_RETRIES,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -123,6 +269,8 @@ struct _InitializationContext {
     MMIfaceModem *self;
     MMAtSerialPort *port;
     InitializationStep step;
+    guint pin_check_tries;
+    guint pin_check_timeout_id;
     GSimpleAsyncResult *result;
     MmGdbusModem *skeleton;
 };
@@ -223,6 +371,27 @@ STR_REPLY_READY_FN (model, "Model")
 STR_REPLY_READY_FN (revision, "Revision")
 STR_REPLY_READY_FN (equipment_identifier, "Equipment Identifier")
 STR_REPLY_READY_FN (device_identifier, "Device Identifier")
+
+static void
+load_unlock_required_ready (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            InitializationContext *ctx)
+{
+    GError *error = NULL;
+
+    /* NOTE: we already propagated the lock state, no need to do it again */
+    mm_iface_modem_unlock_check_finish (self, res, &error);
+    if (error) {
+        mm_warn ("couldn't load unlock required status: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
+
+UINT_REPLY_READY_FN (unlock_retries, "Unlock Retries")
 
 static void
 interface_initialization_step (InitializationContext *ctx)
@@ -404,6 +573,35 @@ interface_initialization_step (InitializationContext *ctx)
                 (GAsyncReadyCallback)load_device_identifier_ready,
                 ctx);
             return;
+        }
+        break;
+
+    case INITIALIZATION_STEP_UNLOCK_REQUIRED:
+        /* Only check unlock required if we were previously not unlocked */
+        if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE) {
+            mm_iface_modem_unlock_check (ctx->self,
+                                         (GAsyncReadyCallback)load_unlock_required_ready,
+                                         ctx);
+            return;
+        }
+        break;
+
+    case INITIALIZATION_STEP_UNLOCK_RETRIES:
+        if ((MMModemLock)mm_gdbus_modem_get_unlock_required (ctx->skeleton) == MM_MODEM_LOCK_NONE) {
+            /* Default to 0 when unlocked */
+            mm_gdbus_modem_set_unlock_retries (ctx->skeleton, 0);
+        } else {
+            if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_retries &&
+                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_retries_finish) {
+                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_retries (
+                    ctx->self,
+                    (GAsyncReadyCallback)load_unlock_retries_ready,
+                    ctx);
+                return;
+            }
+
+            /* Default to 999 when we cannot check it */
+            mm_gdbus_modem_set_unlock_retries (ctx->skeleton, 999);
         }
         break;
 
