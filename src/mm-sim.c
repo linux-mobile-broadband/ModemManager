@@ -199,6 +199,44 @@ handle_change_pin (MMSim *self,
 }
 
 /*****************************************************************************/
+/* ENABLE PIN */
+
+NO_REPLY_READY_FN (enable_pin)
+
+static gboolean
+handle_enable_pin (MMSim *self,
+                   GDBusMethodInvocation *invocation,
+                   const gchar *arg_pin,
+                   gboolean arg_enabled)
+{
+    gchar *command;
+    DbusCallContext *ctx;
+    GError *error = NULL;
+
+    ctx = dbus_call_context_new (self, invocation, &error);
+    if (!ctx) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        return TRUE;
+    }
+
+    command = g_strdup_printf ("+CLCK=\"SC\",%d,\"%s\"",
+                               arg_enabled ? 1 : 0,
+                               arg_pin);
+    mm_at_command (G_OBJECT (self),
+                   ctx->port,
+                   command,
+                   3,
+                   (MMAtResponseProcessor)common_parse_no_reply,
+                   NULL, /* response_processor_context */
+                   NULL, /* result_signature */
+                   NULL, /* TODO: cancellable */
+                   (GAsyncReadyCallback)handle_enable_pin_ready,
+                   ctx);
+    g_free (command);
+    return TRUE;
+}
+
+/*****************************************************************************/
 
 static void
 mm_sim_export (MMSim *self)
@@ -209,6 +247,10 @@ mm_sim_export (MMSim *self)
     g_signal_connect (self,
                       "handle-change-pin",
                       G_CALLBACK (handle_change_pin),
+                      NULL);
+    g_signal_connect (self,
+                      "handle-enable-pin",
+                      G_CALLBACK (handle_enable_pin),
                       NULL);
 
     if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (self),
