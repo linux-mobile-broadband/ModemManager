@@ -65,6 +65,64 @@ struct _MMSimPrivate {
     gchar *path;
 };
 
+typedef struct {
+    MMSim *self;
+    GDBusMethodInvocation *invocation;
+    MMAtSerialPort *port;
+    GError *save_error;
+} DbusCallContext;
+
+static void
+dbus_call_context_free (DbusCallContext *ctx,
+                        gboolean close_port)
+{
+    if (close_port)
+        mm_serial_port_close (MM_SERIAL_PORT (ctx->port));
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    if (ctx->save_error)
+        g_error_free (ctx->save_error);
+    g_free (ctx);
+}
+
+static DbusCallContext *
+dbus_call_context_new (MMSim *self,
+                       GDBusMethodInvocation *invocation,
+                       GError **error)
+{
+    DbusCallContext *ctx;
+
+    ctx = g_new0 (DbusCallContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->port = mm_base_modem_get_port_primary (self->priv->modem);
+
+    if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->port), error)) {
+        dbus_call_context_free (ctx, FALSE);
+        return NULL;
+    }
+
+    return ctx;
+}
+
+static gboolean
+common_parse_no_reply (MMSim *self,
+                       gpointer none,
+                       const gchar *command,
+                       const gchar *response,
+                       const GError *error,
+                       GVariant **result,
+                       GError **result_error)
+{
+    if (error) {
+        *result_error = g_error_copy (error);
+        return FALSE;
+    }
+
+    *result = NULL;
+    return TRUE;
+}
+
 static gboolean
 common_parse_string_reply (MMSim *self,
                            gpointer none,
@@ -83,12 +141,75 @@ common_parse_string_reply (MMSim *self,
     return TRUE;
 }
 
+#define NO_REPLY_READY_FN(NAME)                                         \
+    static void                                                         \
+    handle_##NAME##_ready (MMSim *self,                                 \
+                           GAsyncResult *res,                           \
+                           DbusCallContext *ctx)                        \
+    {                                                                   \
+        GError *error = NULL;                                           \
+        GVariant *reply;                                                \
+                                                                        \
+        reply = mm_at_command_finish (G_OBJECT (self), res, &error);    \
+        g_assert (reply == NULL);                                       \
+                                                                        \
+        if (error)                                                      \
+            g_dbus_method_invocation_take_error (ctx->invocation, error); \
+        else                                                            \
+            mm_gdbus_sim_complete_##NAME (MM_GDBUS_SIM (self), ctx->invocation); \
+        dbus_call_context_free (ctx, TRUE);                             \
+    }
+
+/*****************************************************************************/
+/* CHANGE PIN */
+
+NO_REPLY_READY_FN (change_pin)
+
+static gboolean
+handle_change_pin (MMSim *self,
+                   GDBusMethodInvocation *invocation,
+                   const gchar *arg_old_pin,
+                   const gchar *arg_new_pin)
+{
+    gchar *command;
+    DbusCallContext *ctx;
+    GError *error = NULL;
+
+    ctx = dbus_call_context_new (self, invocation, &error);
+    if (!ctx) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        return TRUE;
+    }
+
+    command = g_strdup_printf ("+CPWD=\"SC\",\"%s\",\"%s\"",
+                               arg_old_pin,
+                               arg_new_pin);
+    mm_at_command (G_OBJECT (self),
+                   ctx->port,
+                   command,
+                   3,
+                   (MMAtResponseProcessor)common_parse_no_reply,
+                   NULL, /* response_processor_context */
+                   NULL, /* result_signature */
+                   NULL, /* TODO: cancellable */
+                   (GAsyncReadyCallback)handle_change_pin_ready,
+                   ctx);
+    g_free (command);
+    return TRUE;
+}
+
 /*****************************************************************************/
 
 static void
 mm_sim_export (MMSim *self)
 {
     GError *error = NULL;
+
+    /* Handle method invocations */
+    g_signal_connect (self,
+                      "handle-change-pin",
+                      G_CALLBACK (handle_change_pin),
+                      NULL);
 
     if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (self),
                                            self->priv->connection,
