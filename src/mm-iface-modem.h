@@ -118,6 +118,22 @@ struct _MMIfaceModem {
     MMModemLock (*load_unlock_retries_finish) (MMIfaceModem *self,
                                                GAsyncResult *res,
                                                GError **error);
+
+    /* Loading of the SupportedModes property */
+    void (*load_supported_modes) (MMIfaceModem *self,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data);
+    MMModemMode (*load_supported_modes_finish) (MMIfaceModem *self,
+                                                GAsyncResult *res,
+                                                GError **error);
+
+    /* Loading of the SupportedBands property */
+    void (*load_supported_bands) (MMIfaceModem *self,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data);
+    MMModemBand (*load_supported_bands_finish) (MMIfaceModem *self,
+                                                GAsyncResult *res,
+                                                GError **error);
 };
 
 GType mm_iface_modem_get_type (void);

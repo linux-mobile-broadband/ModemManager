@@ -262,6 +262,8 @@ typedef enum {
     INITIALIZATION_STEP_DEVICE_ID,
     INITIALIZATION_STEP_UNLOCK_REQUIRED,
     INITIALIZATION_STEP_UNLOCK_RETRIES,
+    INITIALIZATION_STEP_SUPPORTED_MODES,
+    INITIALIZATION_STEP_SUPPORTED_BANDS,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -371,6 +373,8 @@ STR_REPLY_READY_FN (model, "Model")
 STR_REPLY_READY_FN (revision, "Revision")
 STR_REPLY_READY_FN (equipment_identifier, "Equipment Identifier")
 STR_REPLY_READY_FN (device_identifier, "Device Identifier")
+UINT_REPLY_READY_FN (supported_modes, "Supported Modes")
+UINT_REPLY_READY_FN (supported_bands, "Supported Bands")
 
 static void
 load_unlock_required_ready (MMIfaceModem *self,
@@ -602,6 +606,36 @@ interface_initialization_step (InitializationContext *ctx)
 
             /* Default to 999 when we cannot check it */
             mm_gdbus_modem_set_unlock_retries (ctx->skeleton, 999);
+        }
+        break;
+
+    case INITIALIZATION_STEP_SUPPORTED_MODES:
+        /* Supported modes are meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_modem_get_supported_modes (ctx->skeleton) == MM_MODEM_MODE_NONE &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes (
+                ctx->self,
+                (GAsyncReadyCallback)load_supported_modes_ready,
+                ctx);
+            return;
+        }
+        break;
+
+    case INITIALIZATION_STEP_SUPPORTED_BANDS:
+        /* Supported bands are meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_modem_get_supported_bands (ctx->skeleton) == MM_MODEM_BAND_UNKNOWN &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_bands &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_bands_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_bands (
+                ctx->self,
+                (GAsyncReadyCallback)load_supported_bands_ready,
+                ctx);
+            return;
         }
         break;
 
