@@ -42,7 +42,6 @@ policy/org.freedesktop.modem-manager.policy
 libqcdm/tests/test-qcdm
 libwmc/tests/test-wmc
 
-include/ModemManager.h
 include/ModemManager-names.h
 
 libmm-common/*.[ch]
