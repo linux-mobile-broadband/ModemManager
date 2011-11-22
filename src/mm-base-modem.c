@@ -44,12 +44,16 @@ enum {
     PROP_PLUGIN,
     PROP_VENDOR_ID,
     PROP_PRODUCT_ID,
+    PROP_CONNECTION,
     PROP_LAST
 };
 
 static GParamSpec *properties[PROP_LAST];
 
 struct _MMBaseModemPrivate {
+    /* The connection to the system bus */
+    GDBusConnection *connection;
+
     gchar *device;
     gchar *driver;
     gchar *plugin;
@@ -535,6 +539,11 @@ set_property (GObject *object,
     case PROP_PRODUCT_ID:
         self->priv->product_id = g_value_get_uint (value);
         break;
+    case PROP_CONNECTION:
+        if (self->priv->connection)
+            g_object_unref (self->priv->connection);
+        self->priv->connection = g_value_dup_object (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -571,6 +580,9 @@ get_property (GObject *object,
     case PROP_PRODUCT_ID:
         g_value_set_uint (value, self->priv->product_id);
         break;
+    case PROP_CONNECTION:
+        g_value_set_object (value, self->priv->connection);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -605,6 +617,8 @@ dispose (GObject *object)
         g_hash_table_destroy (self->priv->ports);
         self->priv->ports = NULL;
     }
+
+    g_clear_object (&self->priv->connection);
 
     G_OBJECT_CLASS (mm_base_modem_parent_class)->dispose (object);
 }
@@ -678,5 +692,13 @@ mm_base_modem_class_init (MMBaseModemClass *klass)
                            0, G_MAXUINT, 0,
                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
     g_object_class_install_property (object_class, PROP_PRODUCT_ID, properties[PROP_PRODUCT_ID]);
+
+    properties[PROP_CONNECTION] =
+        g_param_spec_object (MM_BASE_MODEM_CONNECTION,
+                             "Connection",
+                             "GDBus connection to the system bus.",
+                             G_TYPE_DBUS_CONNECTION,
+                             G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_CONNECTION, properties[PROP_CONNECTION]);
 }
 
