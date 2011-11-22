@@ -3,6 +3,7 @@ noinst_LTLIBRARIES = libmm-common.la
 
 GENERATED_H = \
 	mm-enums-types.h \
+	mm-errors-types.h \
 	mm-gdbus-manager.h \
 	mm-gdbus-sim.h \
 	mm-gdbus-sms.h \
@@ -11,6 +12,7 @@ GENERATED_H = \
 
 GENERATED_C = \
 	mm-enums-types.c \
+	mm-errors-types.c \
 	mm-gdbus-manager.c \
 	mm-gdbus-sim.c \
 	mm-gdbus-sms.c \
@@ -42,6 +44,17 @@ mm-enums-types.c: $(top_srcdir)/include/ModemManager-enums.h $(top_srcdir)/build
 	$(AM_V_GEN) glib-mkenums \
 		--template $(top_srcdir)/build-aux/mm-enums-types.c.template \
 		$(top_srcdir)/include/ModemManager-enums.h > $@
+
+# Error types
+mm-errors-types.h: $(top_srcdir)/include/ModemManager-errors.h $(top_srcdir)/build-aux/mm-errors-types.h.template
+	$(AM_V_GEN) glib-mkenums \
+		--template $(top_srcdir)/build-aux/mm-errors-types.h.template \
+		$(top_srcdir)/include/ModemManager-errors.h > $@
+
+mm-errors-types.c: $(top_srcdir)/include/ModemManager-errors.h $(top_srcdir)/build-aux/mm-errors-types.c.template mm-errors-types.h
+	$(AM_V_GEN) glib-mkenums \
+		--template $(top_srcdir)/build-aux/mm-errors-types.c.template \
+		$(top_srcdir)/include/ModemManager-errors.h > $@
 
 # Manager interface
 mm_gdbus_manager_generated = \
@@ -126,7 +139,8 @@ $(mm_gdbus_bearer_generated): $(top_srcdir)/new/org.freedesktop.ModemManager1.Be
 
 libmm_common_la_SOURCES = \
 	$(GENERATED_H) \
-	$(GENERATED_C)
+	$(GENERATED_C) \
+	mm-errors-quarks.c
 
 libmm_common_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
