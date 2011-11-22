@@ -111,6 +111,9 @@ typedef enum {
     INITIALIZATION_STEP_CURRENT_CAPABILITIES,
     INITIALIZATION_STEP_MAX_BEARERS,
     INITIALIZATION_STEP_MAX_ACTIVE_BEARERS,
+    INITIALIZATION_STEP_MANUFACTURER,
+    INITIALIZATION_STEP_MODEL,
+    INITIALIZATION_STEP_REVISION,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -162,6 +165,30 @@ interface_initialization_finish (MMIfaceModem *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
+#undef STR_REPLY_READY_FN
+#define STR_REPLY_READY_FN(NAME,DISPLAY)                                \
+    static void                                                         \
+    load_##NAME##_ready (MMIfaceModem *self,                            \
+                         GAsyncResult *res,                             \
+                         InitializationContext *ctx)                    \
+    {                                                                   \
+        GError *error = NULL;                                           \
+        gchar *val;                                                     \
+                                                                        \
+        val = MM_IFACE_MODEM_GET_INTERFACE (self)->load_##NAME##_finish (self, res, &error); \
+        mm_gdbus_modem_set_##NAME (ctx->skeleton, val); \
+        g_free (val);                                                   \
+                                                                        \
+        if (error) {                                                    \
+            mm_warn ("couldn't load %s: '%s'", DISPLAY, error->message); \
+            g_error_free (error);                                       \
+        }                                                               \
+                                                                        \
+        /* Go on to next step */                                        \
+        ctx->step++;                                                    \
+        interface_initialization_step (ctx);                            \
+    }
+
 #undef UINT_REPLY_READY_FN
 #define UINT_REPLY_READY_FN(NAME,DISPLAY)                               \
     static void                                                         \
@@ -189,6 +216,9 @@ UINT_REPLY_READY_FN (modem_capabilities, "Modem Capabilities")
 UINT_REPLY_READY_FN (current_capabilities, "Current Capabilities")
 UINT_REPLY_READY_FN (max_bearers, "Max Bearers")
 UINT_REPLY_READY_FN (max_active_bearers, "Max Active Bearers")
+STR_REPLY_READY_FN (manufacturer, "Manufacturer")
+STR_REPLY_READY_FN (model, "Model")
+STR_REPLY_READY_FN (revision, "Revision")
 
 static void
 interface_initialization_step (InitializationContext *ctx)
@@ -296,6 +326,51 @@ interface_initialization_step (InitializationContext *ctx)
         mm_gdbus_modem_set_max_active_bearers (
             ctx->skeleton,
             mm_gdbus_modem_get_max_bearers (ctx->skeleton));
+        break;
+
+    case INITIALIZATION_STEP_MANUFACTURER:
+        /* Manufacturer is meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_modem_get_manufacturer (ctx->skeleton) == NULL &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_manufacturer &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_manufacturer_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_manufacturer (
+                ctx->self,
+                (GAsyncReadyCallback)load_manufacturer_ready,
+                ctx);
+            return;
+        }
+        break;
+
+    case INITIALIZATION_STEP_MODEL:
+        /* Model is meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_modem_get_model (ctx->skeleton) == NULL &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_model &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_model_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_model (
+                ctx->self,
+                (GAsyncReadyCallback)load_model_ready,
+                ctx);
+            return;
+        }
+        break;
+
+    case INITIALIZATION_STEP_REVISION:
+        /* Revision is meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_modem_get_revision (ctx->skeleton) == NULL &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_revision &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_revision_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_revision (
+                ctx->self,
+                (GAsyncReadyCallback)load_revision_ready,
+                ctx);
+            return;
+        }
         break;
 
     case INITIALIZATION_STEP_LAST:
