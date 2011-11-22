@@ -162,6 +162,16 @@ struct _MMIfaceModem {
     gboolean (*set_allowed_bands_finish) (MMIfaceModem *self,
                                           GAsyncResult *res,
                                           GError **error);
+
+    /* Asynchronous allowed mode setting operation */
+    void (*set_allowed_modes) (MMIfaceModem *self,
+                               MMModemMode modes,
+                               MMModemMode preferred,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data);
+    gboolean (*set_allowed_modes_finish) (MMIfaceModem *self,
+                                          GAsyncResult *res,
+                                          GError **error);
 };
 
 GType mm_iface_modem_get_type (void);

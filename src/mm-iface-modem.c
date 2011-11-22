@@ -321,14 +321,81 @@ handle_set_allowed_bands (MmGdbusModem *skeleton,
     return TRUE;
 }
 
+/*****************************************************************************/
+
+static void
+set_allowed_modes_ready (MMIfaceModem *self,
+                         GAsyncResult *res,
+                         DbusCallContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_modes_finish (self,
+                                                                        res,
+                                                                        &error))
+        g_dbus_method_invocation_take_error (ctx->invocation,
+                                             error);
+    else
+        mm_gdbus_modem_complete_set_allowed_modes (ctx->skeleton,
+                                                   ctx->invocation);
+    dbus_call_context_free (ctx);
+}
+
 static gboolean
-handle_set_allowed_modes (MmGdbusModem *object,
+handle_set_allowed_modes (MmGdbusModem *skeleton,
                           GDBusMethodInvocation *invocation,
                           guint arg_modes,
                           guint arg_preferred,
                           MMIfaceModem *self)
 {
-    return FALSE; /* Currently unhandled */
+    MMModemState modem_state;
+
+    /* If setting allowed modes is not implemented, report an error */
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_modes ||
+        !MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_modes_finish) {
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Setting allowed modes not supported");
+        return TRUE;
+
+    }
+
+    modem_state = MM_MODEM_STATE_UNKNOWN;
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+
+    switch (modem_state) {
+    case MM_MODEM_STATE_UNKNOWN:
+    case MM_MODEM_STATE_LOCKED:
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot reset the modem to factory defaults: "
+                                               "not initialized/unlocked yet");
+        break;
+
+    case MM_MODEM_STATE_DISABLED:
+    case MM_MODEM_STATE_DISABLING:
+    case MM_MODEM_STATE_ENABLING:
+    case MM_MODEM_STATE_ENABLED:
+    case MM_MODEM_STATE_SEARCHING:
+    case MM_MODEM_STATE_REGISTERED:
+    case MM_MODEM_STATE_DISCONNECTING:
+    case MM_MODEM_STATE_CONNECTING:
+    case MM_MODEM_STATE_CONNECTED:
+        MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_modes (self,
+                                                                arg_modes,
+                                                                arg_preferred,
+                                                                (GAsyncReadyCallback)set_allowed_modes_ready,
+                                                                dbus_call_context_new (skeleton,
+                                                                                       invocation,
+                                                                                       self));
+        break;
+    }
+
+    return TRUE;
 }
 
 /*****************************************************************************/
