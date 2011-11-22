@@ -2,6 +2,7 @@
 noinst_LTLIBRARIES = libmm-common.la
 
 GENERATED_H = \
+	mm-enums-types.h \
 	mm-gdbus-manager.h \
 	mm-gdbus-sim.h \
 	mm-gdbus-sms.h \
@@ -9,6 +10,7 @@ GENERATED_H = \
 	mm-gdbus-modem.h
 
 GENERATED_C = \
+	mm-enums-types.c \
 	mm-gdbus-manager.c \
 	mm-gdbus-sim.c \
 	mm-gdbus-sms.c \
@@ -29,6 +31,17 @@ GENERATED_DOC = \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.3gpp.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.3gpp.Ussd.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml
+
+# Enum types
+mm-enums-types.h: $(top_srcdir)/include/ModemManager-enums.h $(top_srcdir)/build-aux/mm-enums-types.h.template
+	$(AM_V_GEN) glib-mkenums \
+		--template $(top_srcdir)/build-aux/mm-enums-types.h.template \
+		$(top_srcdir)/include/ModemManager-enums.h > $@
+
+mm-enums-types.c: $(top_srcdir)/include/ModemManager-enums.h $(top_srcdir)/build-aux/mm-enums-types.c.template mm-enums-types.h
+	$(AM_V_GEN) glib-mkenums \
+		--template $(top_srcdir)/build-aux/mm-enums-types.c.template \
+		$(top_srcdir)/include/ModemManager-enums.h > $@
 
 # Manager interface
 mm_gdbus_manager_generated = \
