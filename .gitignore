@@ -74,6 +74,8 @@ docs/reference/api/html
 docs/reference/api/tmpl
 docs/reference/api/xml
 
+docs/man/modem-manager.8
+
 m4/gtk-doc.m4
 m4/intltool.m4
 m4/libtool.m4

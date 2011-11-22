@@ -190,6 +190,8 @@ introspection/Makefile
 po/Makefile.in
 policy/Makefile
 docs/Makefile
+docs/man/Makefile
+docs/man/modem-manager.8
 docs/reference/Makefile
 docs/reference/api/Makefile
 docs/reference/api/version.xml
