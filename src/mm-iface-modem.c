@@ -17,6 +17,7 @@
 #include <ModemManager.h>
 
 #include <mm-gdbus-modem.h>
+#include <mm-enums-types.h>
 #include <mm-errors-types.h>
 
 #include "mm-iface-modem.h"
@@ -151,7 +152,26 @@ set_lock_status (MMIfaceModem *self,
                  MmGdbusModem *skeleton,
                  MMModemLock lock)
 {
+    MMModemLock old_lock;
+
+    old_lock = mm_gdbus_modem_get_unlock_required (skeleton);
     mm_gdbus_modem_set_unlock_required (skeleton, lock);
+
+    if (lock == MM_MODEM_LOCK_NONE) {
+        if (old_lock != MM_MODEM_LOCK_NONE) {
+            /* Notify transition from UNKNOWN/LOCKED to DISABLED */
+            g_object_set (self,
+                          MM_IFACE_MODEM_STATE, MM_MODEM_STATE_DISABLED,
+                          NULL);
+        }
+    } else {
+        if (old_lock == MM_MODEM_LOCK_UNKNOWN) {
+            /* Notify transition from UNKNOWN to LOCKED */
+            g_object_set (self,
+                          MM_IFACE_MODEM_STATE, MM_MODEM_STATE_LOCKED,
+                          NULL);
+        }
+    }
 }
 
 MMModemLock
@@ -803,10 +823,12 @@ mm_iface_modem_initialize (MMIfaceModem *self,
     case INTERFACE_STATUS_INITIALIZED:
     case INTERFACE_STATUS_SHUTDOWN: {
         MmGdbusModem *skeleton = NULL;
+        MMModemState modem_state = MM_MODEM_STATE_UNKNOWN;
 
         /* Did we already create it? */
         g_object_get (self,
                       MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                      MM_IFACE_MODEM_STATE, &modem_state,
                       NULL);
         if (!skeleton) {
             skeleton = mm_gdbus_modem_skeleton_new ();
@@ -834,7 +856,12 @@ mm_iface_modem_initialize (MMIfaceModem *self,
             mm_gdbus_modem_set_preferred_mode (skeleton, MM_MODEM_MODE_NONE);
             mm_gdbus_modem_set_supported_bands (skeleton, MM_MODEM_BAND_UNKNOWN);
             mm_gdbus_modem_set_allowed_bands (skeleton, MM_MODEM_BAND_ANY);
-            mm_gdbus_modem_set_state (skeleton, MM_MODEM_STATE_UNKNOWN);
+
+            /* Bind our State property */
+            mm_gdbus_modem_set_state (skeleton, modem_state);
+            g_object_bind_property (self, MM_IFACE_MODEM_STATE,
+                                    skeleton, "state",
+                                    G_BINDING_DEFAULT);
 
             /* Keep a reference to it */
             g_object_set (self,
@@ -909,6 +936,15 @@ iface_modem_init (gpointer g_iface)
                               "DBus skeleton for the Modem interface",
                               MM_GDBUS_TYPE_MODEM_SKELETON,
                               G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_enum (MM_IFACE_MODEM_STATE,
+                            "State",
+                            "State of the modem",
+                            MM_TYPE_MODEM_STATE,
+                            MM_MODEM_STATE_UNKNOWN,
+                            G_PARAM_READWRITE));
 
     initialized = TRUE;
 }

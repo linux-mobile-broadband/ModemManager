@@ -25,6 +25,7 @@
 #define MM_IFACE_MODEM_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM, MMIfaceModem))
 
 #define MM_IFACE_MODEM_DBUS_SKELETON   "iface-modem-dbus-skeleton"
+#define MM_IFACE_MODEM_STATE           "iface-modem-state"
 
 typedef struct _MMIfaceModem MMIfaceModem;
 
