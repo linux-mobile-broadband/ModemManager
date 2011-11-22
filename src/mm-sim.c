@@ -88,9 +88,162 @@ mm_sim_unexport (MMSim *self)
 }
 
 /*****************************************************************************/
+/* SIM IDENTIFIER */
+
+static gboolean
+parse_iccid (MMSim *self,
+             gpointer none,
+             const gchar *command,
+             const gchar *response,
+             const GError *error,
+             GVariant **result,
+             GError **result_error)
+{
+    gchar buf[21];
+    gchar swapped[21];
+    const gchar *str;
+    gint sw1;
+    gint sw2;
+    gboolean success = FALSE;
+
+    if (error) {
+        *result_error = g_error_copy (error);
+        return FALSE;
+    }
+
+    memset (buf, 0, sizeof (buf));
+    str = mm_strip_tag (response, "+CRSM:");
+    if (sscanf (str, "%d,%d,\"%20c\"", &sw1, &sw2, (char *) &buf) == 3)
+        success = TRUE;
+    else {
+        /* May not include quotes... */
+        if (sscanf (str, "%d,%d,%20c", &sw1, &sw2, (char *) &buf) == 3)
+            success = TRUE;
+    }
+
+    if (!success) {
+        *result_error = g_error_new_literal (MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Could not parse the CRSM response");
+        return FALSE;
+    }
+
+    if ((sw1 == 0x90 && sw2 == 0x00) ||
+        (sw1 == 0x91) ||
+        (sw1 == 0x92) ||
+        (sw1 == 0x9f)) {
+        gsize len = 0;
+        gint f_pos = -1;
+        gint i;
+
+        /* Make sure the buffer is only digits or 'F' */
+        for (len = 0; len < sizeof (buf) && buf[len]; len++) {
+            if (isdigit (buf[len]))
+                continue;
+            if (buf[len] == 'F' || buf[len] == 'f') {
+                buf[len] = 'F';  /* canonicalize the F */
+                f_pos = len;
+                continue;
+            }
+            if (buf[len] == '\"') {
+                buf[len] = 0;
+                break;
+            }
+
+            /* Invalid character */
+            *result_error = g_error_new (MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "CRSM ICCID response contained invalid character '%c'",
+                                         buf[len]);
+            return FALSE;
+        }
+
+        /* BCD encoded ICCIDs are 20 digits long */
+        if (len != 20) {
+            *result_error = g_error_new (MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Invalid +CRSM ICCID response size (was %zd, expected 20)",
+                                         len);
+            return FALSE;
+        }
+
+        /* Ensure if there's an 'F' that it's second-to-last */
+        if ((f_pos >= 0) && (f_pos != len - 2)) {
+            *result_error = g_error_new_literal (MM_CORE_ERROR,
+                                                 MM_CORE_ERROR_FAILED,
+                                                 "Invalid +CRSM ICCID length (unexpected F)");
+            return FALSE;
+        }
+
+        /* Swap digits in the EFiccid response to get the actual ICCID, each
+         * group of 2 digits is reversed in the +CRSM response.  i.e.:
+         *
+         *    21436587 -> 12345678
+         */
+        memset (swapped, 0, sizeof (swapped));
+        for (i = 0; i < 10; i++) {
+            swapped[i * 2] = buf[(i * 2) + 1];
+            swapped[(i * 2) + 1] = buf[i * 2];
+        }
+
+        /* Zero out the F for 19 digit ICCIDs */
+        if (swapped[len - 1] == 'F')
+            swapped[len - 1] = 0;
+
+        *result = g_variant_new_string (swapped);
+        return TRUE;
+    } else {
+        *result_error = g_error_new (MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "SIM failed to handle CRSM request (sw1 %d sw2 %d)",
+                                     sw1, sw2);
+        return FALSE;
+    }
+}
+
+static gchar *
+load_sim_identifier_finish (MMSim *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    GVariant *result;
+    gchar *sim_identifier;
+
+    result = mm_at_command_finish (G_OBJECT (self), res, error);
+    if (!result)
+        return NULL;
+
+    sim_identifier = g_variant_dup_string (result, NULL);
+    mm_dbg ("loaded SIM identifier: %s", sim_identifier);
+    g_variant_unref (result);
+    return sim_identifier;
+}
+
+static void
+load_sim_identifier (MMSim *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    mm_dbg ("loading SIM identifier...");
+
+    /* READ BINARY of EFiccid (ICC Identification) ETSI TS 102.221 section 13.2 */
+    mm_at_command (G_OBJECT (self),
+                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self->priv->modem)),
+                   "+CRSM=176,12258,0,0,10",
+                   20,
+                   (MMAtResponseProcessor)parse_iccid,
+                   NULL, /* response_processor_context */
+                   "s",
+                   NULL, /*TODO: cancellable */
+                   callback,
+                   user_data);
+}
+
+/*****************************************************************************/
 
 typedef enum {
     INITIALIZATION_STEP_FIRST,
+    INITIALIZATION_STEP_SIM_IDENTIFIER,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -137,10 +290,57 @@ initable_init_finish (GAsyncInitable  *initable,
 }
 
 static void
+load_sim_identifier_ready (MMSim *self,
+                           GAsyncResult *res,
+                           InitAsyncContext *ctx)
+{
+    GError *error = NULL;
+    gchar *simid;
+
+    simid  = load_sim_identifier_finish (self, res, &error);
+    if (!simid) {
+        /* Try one more time... Gobi 1K cards may reply to the first
+         * request with '+CRSM: 106,134,""' which is bogus because
+         * subsequent requests work fine.
+         */
+        if (++ctx->sim_identifier_tries < 2) {
+            g_clear_error (&error);
+            interface_initialization_step (ctx);
+            return;
+        }
+
+        mm_warn ("couldn't load SIM identifier: '%s'",
+                 error ? error->message : "unknown error");
+        g_clear_error (&error);
+    }
+
+    mm_gdbus_sim_set_sim_identifier (MM_GDBUS_SIM (self), simid);
+    g_free (simid);
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
+
+static void
 interface_initialization_step (InitAsyncContext *ctx)
 {
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_SIM_IDENTIFIER:
+        /* SIM ID is meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_sim_get_sim_identifier (MM_GDBUS_SIM (ctx->self)) == NULL) {
+            load_sim_identifier (
+                ctx->self,
+                (GAsyncReadyCallback)load_sim_identifier_ready,
+                ctx);
+            return;
+        }
         break;
 
     case INITIALIZATION_STEP_LAST:
