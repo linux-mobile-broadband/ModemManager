@@ -5,11 +5,11 @@
   <!-- This config allows anyone to control ModemManager -->
 
   <policy context="default">
-    <allow send_destination="org.freedesktop.ModemManager"/>
+    <allow send_destination="org.freedesktop.ModemManager1"/>
   </policy>
 
   <policy user="root">
-    <allow own="org.freedesktop.ModemManager"/>
+    <allow own="org.freedesktop.ModemManager1"/>
   </policy>
 
   <limit name="max_replies_per_connection">512</limit>

@@ -9,7 +9,7 @@
   <vendor_url>http://www.freedesktop.org/wiki/ModemManager</vendor_url>
   <icon_name>modem-manager</icon_name>
 
-  <action id="org.freedesktop.ModemManager.Control">
+  <action id="org.freedesktop.ModemManager1.Control">
     <_description>Control the Modem Manager daemon</_description>
     <_message>System policy prevents controlling the Modem Manager.</_message>
     <defaults>
@@ -18,7 +18,7 @@
     </defaults>
   </action>
 
-  <action id="org.freedesktop.ModemManager.Device.Control">
+  <action id="org.freedesktop.ModemManager1.Device.Control">
     <_description>Unlock and control a mobile broadband device</_description>
     <_message>System policy prevents unlocking or controlling the mobile broadband device.</_message>
     <defaults>
@@ -27,7 +27,7 @@
     </defaults>
   </action>
 
-  <action id="org.freedesktop.ModemManager.Device.Info">
+  <action id="org.freedesktop.ModemManager1.Device.Info">
     <_description>Request mobile broadband device identifying information</_description>
     <_message>System policy prevents requesting identifying information from the mobile broadband device.</_message>
     <defaults>
@@ -36,7 +36,7 @@
     </defaults>
   </action>
 
-  <action id="org.freedesktop.ModemManager.Contacts">
+  <action id="org.freedesktop.ModemManager1.Contacts">
     <_description>Add, modify, and delete mobile broadband contacts</_description>
     <_message>System policy prevents adding, modifying, or deleting this device's contacts.</_message>
     <defaults>
@@ -45,7 +45,7 @@
     </defaults>
   </action>
 
-  <action id="org.freedesktop.ModemManager.SMS">
+  <action id="org.freedesktop.ModemManager1.Sms">
     <_description>Send, save, modify, and delete text messages</_description>
     <_message>System policy prevents sending or maniuplating this device's text messages.</_message>
     <defaults>
@@ -54,7 +54,7 @@
     </defaults>
   </action>
 
-  <action id="org.freedesktop.ModemManager.Location">
+  <action id="org.freedesktop.ModemManager1.Location">
     <_description>Enable and view geographic location and positioning information</_description>
     <_message>System policy prevents enabling or viewing geographic location information.</_message>
     <defaults>
@@ -63,7 +63,7 @@
     </defaults>
   </action>
 
-  <action id="org.freedesktop.ModemManager.USSD">
+  <action id="org.freedesktop.ModemManager1.USSD">
     <_description>Query and utilize network information and services</_description>
     <_message>System policy prevents querying or utilizing network information and services.</_message>
     <defaults>
@@ -72,7 +72,7 @@
     </defaults>
   </action>
 
-  <action id="org.freedesktop.ModemManager.Firmware">
+  <action id="org.freedesktop.ModemManager1.Firmware">
     <_description>Query and manage firmware on a mobile broadband device</_description>
     <_message>System policy prevents querying or managing this device's firmware.</_message>
     <defaults>

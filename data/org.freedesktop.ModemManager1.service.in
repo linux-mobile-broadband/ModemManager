@@ -1,4 +1,4 @@
 [D-BUS Service]
-Name=org.freedesktop.ModemManager
+Name=org.freedesktop.ModemManager1
 Exec=@sbindir@/modem-manager
 User=root

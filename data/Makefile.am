@@ -1,15 +1,15 @@
 
 # DBus Service file
 dbusservicedir = $(DBUS_SYS_DIR)
-dbusservice_DATA = org.freedesktop.ModemManager.conf
-dbusservice_file_polkit = org.freedesktop.ModemManager.conf.polkit
-dbusservice_file_nopolkit = org.freedesktop.ModemManager.conf.nopolkit
+dbusservice_DATA = org.freedesktop.ModemManager1.conf
+dbusservice_file_polkit = org.freedesktop.ModemManager1.conf.polkit
+dbusservice_file_nopolkit = org.freedesktop.ModemManager1.conf.nopolkit
 
 if WITH_POLKIT
-org.freedesktop.ModemManager.conf: $(top_srcdir)/data/$(dbusservice_file_polkit)
+org.freedesktop.ModemManager1.conf: $(top_srcdir)/data/$(dbusservice_file_polkit)
 	cp -f $(top_srcdir)/data/$(dbusservice_file_polkit) $(dbusservice_DATA)
 else
-org.freedesktop.ModemManager.conf:  $(top_srcdir)/data/$(dbusservice_file_nopolkit)
+org.freedesktop.ModemManager1.conf:  $(top_srcdir)/data/$(dbusservice_file_nopolkit)
 	cp -f $(top_srcdir)/data/$(dbusservice_file_nopolkit) $(dbusservice_DATA)
 endif
 
@@ -21,16 +21,16 @@ edit = @sed \
        -e 's|@localstatedir[@]|$(localstatedir)|g' \
        -e 's|@libexecdir[@]|$(libexecdir)|g'
 dbusactivationdir = $(datadir)/dbus-1/system-services
-dbusactivation_in_files = org.freedesktop.ModemManager.service.in
+dbusactivation_in_files = org.freedesktop.ModemManager1.service.in
 dbusactivation_DATA = $(dbusactivation_in_files:.service.in=.service)
 %service: %service.in
 	$(edit) $< >$@
 
 
 # DBus Introspection files
-XMLS = $(wildcard $(top_srcdir)/introspection/*.xml)
+XMLS = $(wildcard $(top_srcdir)/new/*.xml)
 xmldir = $(datadir)/dbus-1/interfaces
-xml_DATA = $(filter-out $(top_srcdir)/introspection/all.xml, $(XMLS))
+xml_DATA = $(filter-out $(top_srcdir)/new/all.xml, $(XMLS))
 
 
 # Icon
@@ -39,7 +39,7 @@ icon_DATA = modem-manager.png
 
 
 # Polkit
-dist_polkit_policy_in_files = org.freedesktop.modem-manager.policy.in
+dist_polkit_policy_in_files = org.freedesktop.ModemManager1.policy.in
 if WITH_POLKIT
 polkit_policydir = $(datadir)/polkit-1/actions
 dist_polkit_policy_DATA = $(dist_polkit_policy_in_files:.policy.in=.policy)

@@ -1,0 +1,22 @@
+<!DOCTYPE busconfig PUBLIC
+ "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+  <policy context="default">
+    <deny send_destination="org.freedesktop.ModemManager1"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.DBus.Introspectable"/>
+
+    <!-- Methods listed here are explicitly allowed or PolicyKit protected.
+         The rest are restricted to root for security.
+      -->
+  </policy>
+
+  <policy user="root">
+    <allow own="org.freedesktop.ModemManager1"/>
+    <allow send_destination="org.freedesktop.ModemManager1"/>
+  </policy>
+
+  <limit name="max_replies_per_connection">512</limit>
+</busconfig>
