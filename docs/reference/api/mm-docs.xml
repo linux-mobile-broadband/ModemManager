@@ -1,0 +1,138 @@
+<?xml version="1.0"?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN"
+"http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd" [
+<!ENTITY version SYSTEM "version.xml">
+]>
+<book id="mm" xmlns:xi="http://www.w3.org/2003/XInclude">
+  <bookinfo>
+    <title>ModemManager Reference Manual</title>
+    <releaseinfo>Version &version;</releaseinfo>
+
+    <copyright>
+      <year>2008</year>
+      <holder>Novell, Inc.</holder>
+    </copyright>
+    <copyright>
+      <year>2008</year>
+      <year>2009</year>
+      <year>2010</year>
+      <year>2011</year>
+      <holder>Red Hat, Inc.</holder>
+    </copyright>
+    <copyright>
+      <year>2011</year>
+      <holder>The Chromium OS Authors</holder>
+    </copyright>
+    <copyright>
+      <year>2011</year>
+      <holder>Google, Inc.</holder>
+    </copyright>
+
+    <legalnotice>
+      <para>
+        Permission is granted to copy, distribute and/or modify this
+        document under the terms of the <citetitle>GNU Free
+        Documentation License</citetitle>, Version 1.1 or any later
+        version published by the Free Software Foundation with no
+        Invariant Sections, no Front-Cover Texts, and no Back-Cover
+        Texts. You may obtain a copy of the <citetitle>GNU Free
+        Documentation License</citetitle> from the Free Software
+        Foundation by visiting <ulink type="http"
+        url="http://www.fsf.org">their Web site</ulink> or by writing
+        to:
+        <address>
+          <street>51 Franklin Street</street>, Suite 500
+          <city>Boston</city>, <state>MA</state> <postcode>02110-1335</postcode>
+          <country>USA</country>
+        </address>
+      </para>
+    </legalnotice>
+  </bookinfo>
+
+  <xi:include href="xml/mm-overview.xml"/>
+
+  <part id="ref-dbus">
+    <title>D-Bus API Reference</title>
+
+    <chapter id="ref-dbus-objects-names">
+      <title>Objects &amp; Names</title>
+      <sect1 id="ref-dbus-well-known-name">
+        <title>The <literal>org.freedesktop.ModemManager1</literal> bus name</title>
+        <para>
+          The D-Bus name <literal>org.freedesktop.ModemManager1</literal>
+          on the system bus is used by the ModemManager daemon. If this daemon
+          isn't running, it will be started if D-Bus messages are sent to the
+          name.
+        </para>
+      </sect1>
+      <sect1 id="ref-dbus-well-known-object">
+        <title>
+          The <literal>/org/freedesktop/ModemManager</literal>
+          and <literal>/org/freedesktop/ModemManager/Modems</literal> objects
+        </title>
+        <para>
+          The ModemManager process will export an object at the well-known
+          path <literal>/org/freedesktop/ModemManager1</literal>. This object can
+          be used to list available modem objects, which will also be exposed
+          on paths with the folowing pattern
+          <literal>/org/freedesktop/ModemManager1/Modems/#</literal>.
+        </para>
+      </sect1>
+    </chapter>
+
+    <chapter>
+      <title>Common types</title>
+      <xi:include href="xml/mm-enums.xml"/>
+      <xi:include href="xml/mm-errors.xml"/>
+    </chapter>
+    <chapter>
+      <title>Manager interface</title>
+      <xi:include href="../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.xml"/>
+    </chapter>
+    <chapter>
+      <title>SIM interface</title>
+      <xi:include href="../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Sim.xml"/>
+    </chapter>
+    <chapter>
+      <title>SMS interface</title>
+      <xi:include href="../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Sms.xml"/>
+    </chapter>
+    <chapter>
+      <title>Bearer interface</title>
+      <xi:include href="../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Bearer.xml"/>
+    </chapter>
+    <chapter>
+      <title>Modem interfaces</title>
+      <section>
+        <title>Generic</title>
+        <xi:include href="../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.xml"/>
+        <xi:include href="../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml"/>
+      </section>
+      <section>
+        <title>3GPP specific</title>
+        <xi:include href="../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.3gpp.xml"/>
+        <xi:include href="../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.3gpp.Ussd.xml"/>
+      </section>
+      <section>
+        <title>CDMA specific</title>
+        <xi:include href="../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Cdma.xml"/>
+      </section>
+      <section>
+        <title>Other</title>
+        <xi:include href="../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Messaging.xml"/>
+        <xi:include href="../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Location.xml"/>
+        <xi:include href="../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Firmware.xml"/>
+        <xi:include href="../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Contacts.xml"/>
+      </section>
+    </chapter>
+  </part>
+
+  <index>
+    <title>Index</title>
+  </index>
+
+  <chapter id="mm-hierarchy">
+    <title>Object Hierarchy</title>
+      <xi:include href="xml/tree_index.sgml"/>
+  </chapter>
+</book>

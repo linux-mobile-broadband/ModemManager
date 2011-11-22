@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<!DOCTYPE part PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN"
+"http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd" [
+<!ENTITY version SYSTEM "version.xml">
+]>
+<part id="overview">
+  <title>ModemManager Overview</title>
+
+  <chapter id="overview-modemmanager">
+    <title>ModemManager</title>
+    <para>
+      ModemManager provides a unified high level API for communicating with
+      (mobile broadband) modems. While the basic commands are standardized,
+      the more advanced operations (like signal quality monitoring while
+      connected) varies a lot.
+    </para>
+
+    <formalpara>
+      <title>Using</title>
+      <para>
+        ModemManager is a system daemon and is not meant to be used directly from
+        the command line. However, since it provides DBus API, it is possible to use
+        'dbus-send' command to control it from the terminal. There's an example
+        program (tests/mm-test.py) that demonstrates the basic API usage.
+      </para>
+    </formalpara>
+
+    <formalpara>
+      <title>Implementation</title>
+      <para>
+        ModemManager is a DBus system bus activated service (meaning it's started
+        automatically when a request arrives). It is written in C. The devices are
+        queried from udev and automatically updated based on hardware events. There's
+        a GInterface (MMModem) that defines the modem interface and any device specific
+        implementation must implement it. There are two generic MMModem implementations
+        to support the basic operations (one for GSM, one for CDMA,) which are common
+        for all cards.
+      </para>
+    </formalpara>
+
+    <formalpara>
+      <title>Plugins</title>
+      <para>
+        Plugins are loaded on startup, and must implement the MMPlugin interface. It
+        consists of a couple of methods which tell the daemon whether the plugin
+        supports a port and to create custom MMModem implementations. It most likely
+        makes sense to derive custom modem implementations from one of the generic
+        classes and just add (or override) operations which are not standard. There's a
+        fully working plugin in the plugins/ directory for Huawei cards that can be
+        used as an example for writing new plugins. Writing new plugins is highly
+        encouraged!
+      </para>
+    </formalpara>
+
+  </chapter>
+</part>

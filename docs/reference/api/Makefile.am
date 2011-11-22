@@ -1,0 +1,93 @@
+
+# The name of the module.
+DOC_MODULE = mm
+
+# The top-level SGML file.
+DOC_MAIN_SGML_FILE = $(DOC_MODULE)-docs.xml
+
+# Extra options to supply to gtkdoc-scan
+SCAN_OPTIONS =
+
+# The directory containing the source code.
+DOC_SOURCE_DIR = $(top_srcdir)/include
+
+HFILE_GLOB =
+CFILE_GLOB =
+
+# Headers to ignore
+IGNORE_HFILES = \
+	ModemManager.h \
+	ModemManager-names.h \
+	$(NULL)
+
+# CFLAGS and LDFLAGS for compiling scan program. Only needed
+# if $(DOC_MODULE).types is non-empty.
+INCLUDES = \
+	-I$(srcdir) \
+	-I$(top_srcdir) \
+	-I$(top_builddir) \
+	$(MM_CFLAGS) \
+	$(NULL)
+
+GTKDOC_LIBS = \
+	$(MM_LIBS) \
+	$(NULL)
+
+# Extra options to supply to gtkdoc-mkdb
+MKDB_OPTIONS = --output-format=xml --sgml-mode --name-space=mm
+
+# Images to copy into HTML directory
+HTML_IMAGES = \
+	$(NULL)
+
+content_files = \
+	$(NULL)
+
+expand_content_files = \
+	mm-overview.xml \
+	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.xml \
+	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Sim.xml \
+	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Sms.xml \
+	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Bearer.xml \
+	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.xml \
+	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Messaging.xml \
+	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Location.xml \
+	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Firmware.xml \
+	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Contacts.xml \
+	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Cdma.xml \
+	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.3gpp.xml \
+	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.3gpp.Ussd.xml \
+	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml \
+	$(NULL)
+
+extra_files = \
+	$(NULL)
+
+if ENABLE_GTK_DOC
+include $(top_srcdir)/gtk-doc.make
+else
+EXTRA_DIST =
+CLEANFILES =
+endif
+
+EXTRA_DIST += \
+	mm-overview.xml \
+	version.xml.in \
+	$(NULL)
+
+CLEANFILES += \
+	$(DOC_MODULE)-decl-list.txt \
+	$(DOC_MODULE)-decl.txt \
+	$(DOC_MODULE)-overrides.txt \
+	$(DOC_MODULE)-undeclared.txt \
+	$(DOC_MODULE)-undocumented.txt \
+	$(DOC_MODULE)-overrides.txt \
+	$(DOC_MODULE)-unused.txt \
+	$(DOC_MODULE).args \
+	$(DOC_MODULE).hierarchy \
+	$(DOC_MODULE).interfaces \
+	$(DOC_MODULE).prerequisites \
+	$(DOC_MODULE).signals \
+	*.stamp \
+	-rf xml html tmpl \
+	$(NULL)

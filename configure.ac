@@ -22,6 +22,23 @@ LT_PREREQ([2.2])
 LT_INIT
 
 dnl
+dnl Documentation
+dnl
+
+AC_ARG_WITH(docs, AS_HELP_STRING([--with-docs], [Build ModemManager documentation]))
+AM_CONDITIONAL(WITH_DOCS, test "x$with_docs" = "xyes")
+case $with_docs in
+    yes)
+        enable_gtk_doc=yes
+        ;;
+    *)
+        with_docs=no
+        ;;
+esac
+
+GTK_DOC_CHECK(1.0)
+
+dnl
 dnl translation support
 dnl
 IT_PROG_INTLTOOL([0.40.0])
@@ -172,6 +189,10 @@ test/Makefile
 introspection/Makefile
 po/Makefile.in
 policy/Makefile
+docs/Makefile
+docs/reference/Makefile
+docs/reference/api/Makefile
+docs/reference/api/version.xml
 ])
 AC_OUTPUT
 

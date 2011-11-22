@@ -12,6 +12,7 @@ ltmain.sh
 intltool-*
 missing
 stamp-h1
+gtk-doc.make
 *~
 *.o
 *.lo
@@ -60,6 +61,18 @@ po/en@quot.header
 po/insert-header.sin
 po/quot.sed
 po/remove-potcdate.sin
+
+docs/reference/api/version.xml
+docs/reference/api/mm.args
+docs/reference/api/mm.hierarchy
+docs/reference/api/mm.interfaces
+docs/reference/api/mm.prerequisites
+docs/reference/api/mm.signals
+docs/reference/api/*.stamp
+docs/reference/api/*.txt
+docs/reference/api/html
+docs/reference/api/tmpl
+docs/reference/api/xml
 
 m4/gtk-doc.m4
 m4/intltool.m4

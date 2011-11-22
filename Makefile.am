@@ -1,5 +1,5 @@
 
-SUBDIRS = . marshallers build-aux include libmm-common libqcdm libwmc src plugins introspection po test
+SUBDIRS = . marshallers build-aux include libmm-common libqcdm libwmc src plugins introspection po test docs
 
 if WITH_POLKIT
 SUBDIRS += policy
