@@ -257,15 +257,9 @@
       </tp:docstring>
     </property>
 
-    <property name="UnlockRequired" type="s" access="read">
+    <property name="UnlockRequired" type="u" access="read" tp:type="MM_MODEM_LOCK">
       <tp:docstring>
-        Empty if the device is usable without an unlock code or has already
-        been unlocked. If the device needs to be unlocked before becoming usable this
-        property contains the specific unlock code required.  Valid unlock code values
-        are "" (blank), "sim-pin", "sim-puk", "ph-sim-pin", "ph-fsim-pin",
-        "ph-fsim-puk", "sim-pin2", "sim-puk2", "ph-net-pin", "ph-net-puk",
-        "ph-netsub-pin", "ph-netsub-puk", "ph-sp-pin", "ph-sp-puk", "ph-corp-pin", and
-        "ph-corp-puk".
+        Current lock state of the device.
       </tp:docstring>
     </property>
 
@@ -375,6 +369,94 @@
         </tp:docstring>
       </tp:flag>
     </tp:flags>
+
+    <tp:enum name="MM_MODEM_LOCK" type="u">
+      <tp:enumvalue suffix="UNKNOWN" value="0">
+        <tp:docstring>
+          Lock reason unknown.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="NONE" value="1">
+        <tp:docstring>
+          Modem is unlocked.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="SIM_PIN" value="2">
+        <tp:docstring>
+          SIM requires the PIN code.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="SIM_PIN2" value="3">
+        <tp:docstring>
+          SIM requires the PIN2 code.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="SIM_PUK" value="4">
+        <tp:docstring>
+          SIM requires the PUK code
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="SIM_PUK2" value="5">
+        <tp:docstring>
+          SIM requires the PUK2 code
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="PH_SP_PIN" value="6">
+        <tp:docstring>
+          Modem requires the service provider PIN code.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="PH_SP_PUK" value="7">
+        <tp:docstring>
+          Modem requires the service provider PUK code.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="PH_NET_PIN" value="8">
+        <tp:docstring>
+          Modem requires the network PIN code.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="PH_NET_PUK" value="9">
+        <tp:docstring>
+          Modem requires the network PUK code.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="PH_SIM_PIN" value="10">
+        <tp:docstring>
+          Modem requires the PIN code.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="PH_CORP_PIN" value="11">
+        <tp:docstring>
+          Modem requires the corporate PIN code.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="PH_CORP_PUK" value="12">
+        <tp:docstring>
+          Modem requires the corporate PUK code.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="PH_FSIM_PIN" value="13">
+        <tp:docstring>
+          Modem requires the FSIM-PIN code.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="PH_FSIM_PUK" value="14">
+        <tp:docstring>
+          Modem requires the FSIM-PUK code.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="PH_NETSUB_PIN" value="15">
+        <tp:docstring>
+          Modem requires the network subset PIN code.
+        </tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="PH_NETSUB_PUK" value="16">
+        <tp:docstring>
+          Modem requires the network subset PUK code.
+        </tp:docstring>
+      </tp:enumvalue>
+    </tp:enum>
 
     <tp:enum name="MM_MODEM_STATE" type="u">
       <tp:enumvalue suffix="UNKNOWN" value="0">
