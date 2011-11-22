@@ -746,28 +746,22 @@ interface_initialization_step (InitAsyncContext *ctx)
     interface_initialization_step (ctx);
 }
 
-
 static void
-initable_init_async (GAsyncInitable *initable,
-                     int io_priority,
-                     GCancellable *cancellable,
-                     GAsyncReadyCallback callback,
-                     gpointer user_data)
+common_init_async (GAsyncInitable *initable,
+                   GCancellable *cancellable,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
+
 {
     InitAsyncContext *ctx;
     GError *error = NULL;
-
-    mm_gdbus_sim_set_sim_identifier (MM_GDBUS_SIM (initable), NULL);
-    mm_gdbus_sim_set_imsi (MM_GDBUS_SIM (initable), NULL);
-    mm_gdbus_sim_set_operator_identifier (MM_GDBUS_SIM (initable), NULL);
-    mm_gdbus_sim_set_operator_name (MM_GDBUS_SIM (initable), NULL);
 
     ctx = g_new (InitAsyncContext, 1);
     ctx->self = g_object_ref (initable);
     ctx->result = g_simple_async_result_new (G_OBJECT (initable),
                                              callback,
                                              user_data,
-                                             initable_init_async);
+                                             common_init_async);
     ctx->cancellable = (cancellable ?
                         g_object_ref (cancellable) :
                         NULL);
@@ -783,6 +777,21 @@ initable_init_async (GAsyncInitable *initable,
     }
 
     interface_initialization_step (ctx);
+}
+
+static void
+initable_init_async (GAsyncInitable *initable,
+                     int io_priority,
+                     GCancellable *cancellable,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    mm_gdbus_sim_set_sim_identifier (MM_GDBUS_SIM (initable), NULL);
+    mm_gdbus_sim_set_imsi (MM_GDBUS_SIM (initable), NULL);
+    mm_gdbus_sim_set_operator_identifier (MM_GDBUS_SIM (initable), NULL);
+    mm_gdbus_sim_set_operator_name (MM_GDBUS_SIM (initable), NULL);
+
+    common_init_async (initable, cancellable, callback, user_data);
 }
 
 void
@@ -805,6 +814,26 @@ mm_sim_new (MMBaseModem *modem,
                                 MM_SIM_MODEM, modem,
                                 NULL);
     g_free (path);
+}
+
+gboolean
+mm_sim_initialize_finish (MMSim *self,
+                          GAsyncResult *result,
+                          GError **error)
+{
+    return initable_init_finish (G_ASYNC_INITABLE (self), result, error);
+}
+
+void
+mm_sim_initialize (MMSim *self,
+                   GCancellable *cancellable,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
+{
+    common_init_async (G_ASYNC_INITABLE (self),
+                       cancellable,
+                       callback,
+                       user_data);
 }
 
 static void

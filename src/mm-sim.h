@@ -58,6 +58,13 @@ MMSim *mm_sim_new_finish (GAsyncInitable *initable,
                           GAsyncResult  *res,
                           GError       **error);
 
+void     mm_sim_initialize        (MMSim *self,
+                                   GCancellable *cancellable,
+                                   GAsyncReadyCallback callback,
+                                   gpointer user_data);
+gboolean mm_sim_initialize_finish (MMSim *self,
+                                   GAsyncResult *result,
+                                   GError **error);
 
 #endif /* MM_SIM_H */
 
