@@ -19,21 +19,8 @@
 
 #include <glib-object.h>
 
-enum {
-    MM_SERIAL_ERROR_OPEN_FAILED = 0,
-    MM_SERIAL_ERROR_SEND_FAILED = 1,
-    MM_SERIAL_ERROR_RESPONSE_TIMEOUT = 2,
-    MM_SERIAL_ERROR_OPEN_FAILED_NO_DEVICE = 3,
-    MM_SERIAL_ERROR_FLASH_FAILED = 4,
-    MM_SERIAL_ERROR_NOT_OPEN = 5,
-};
-
-#define MM_SERIAL_ERROR (mm_serial_error_quark ())
-#define MM_TYPE_SERIAL_ERROR (mm_serial_error_get_type ())
-
-GQuark mm_serial_error_quark    (void);
-GType  mm_serial_error_get_type (void);
-
+#include <ModemManager-errors.h>
+#include <mm-errors-types.h>
 
 enum {
     MM_MODEM_ERROR_GENERAL = 0,

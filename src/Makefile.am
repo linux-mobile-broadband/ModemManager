@@ -14,7 +14,14 @@ noinst_LTLIBRARIES = libmodem-helpers.la libserial.la
 
 libmodem_helpers_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
-	-I$(top_srcdir)/include
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/include \
+	-I$(top_builddir)/include \
+	-I$(top_srcdir)/libmm-common \
+	-I$(top_builddir)/libmm-common
+
+libmodem_helpers_la_LIBADD = \
+	$(top_builddir)/libmm-common/libmm-common.la
 
 libmodem_helpers_la_SOURCES = \
 	mm-errors.c \
@@ -30,7 +37,11 @@ libmodem_helpers_la_SOURCES = \
 
 libserial_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
-	-I$(top_srcdir)
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/include \
+	-I$(top_builddir)/include \
+	-I$(top_srcdir)/libmm-common \
+	-I$(top_builddir)/libmm-common
 
 libserial_la_SOURCES = \
 	mm-port.c \
@@ -49,6 +60,9 @@ modem_manager_CPPFLAGS = \
 	$(GUDEV_CFLAGS) \
 	-I$(top_srcdir) \
 	-I$(top_srcdir)/include \
+	-I$(top_builddir)/include \
+	-I$(top_srcdir)/libmm-common \
+	-I$(top_builddir)/libmm-common \
 	-I${top_builddir}/marshallers \
 	-DPLUGINDIR=\"$(pkglibdir)\"
 

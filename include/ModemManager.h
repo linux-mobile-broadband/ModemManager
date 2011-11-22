@@ -24,55 +24,8 @@
 #ifndef _MODEM_MANAGER_H_
 #define _MODEM_MANAGER_H_
 
-#define MM_DBUS_PATH    "/org/freedesktop/ModemManager"
-#define MM_DBUS_SERVICE "org.freedesktop.ModemManager"
-
-/**************
- * Interfaces *
- **************/
-
-#define MM_DBUS_INTERFACE "org.freedesktop.ModemManager"
-#define MM_DBUS_INTERFACE_MODEM "org.freedesktop.ModemManager.Modem"
-#define MM_DBUS_INTERFACE_MODEM_SIMPLE "org.freedesktop.ModemManager.Modem.Simple"
-#define MM_DBUS_INTERFACE_MODEM_FIRMWARE "org.freedesktop.ModemManager.Modem.Firmware"
-#define MM_DBUS_INTERFACE_MODEM_LOCATION "org.freedesktop.ModemManager.Modem.Location"
-#define MM_DBUS_INTERFACE_MODEM_CDMA "org.freedesktop.ModemManager.Modem.Cdma"
-#define MM_DBUS_INTERFACE_MODEM_GSM "org.freedesktop.ModemManager.Modem.Gsm"
-#define MM_DBUS_INTERFACE_MODEM_GSM_CARD "org.freedesktop.ModemManager.Modem.Gsm.Card"
-#define MM_DBUS_INTERFACE_MODEM_GSM_CONTACTS "org.freedesktop.ModemManager.Modem.Gsm.Contacts"
-#define MM_DBUS_INTERFACE_MODEM_GSM_NETWORK "org.freedesktop.ModemManager.Modem.Gsm.Network"
-#define MM_DBUS_INTERFACE_MODEM_GSM_SMS "org.freedesktop.ModemManager.Modem.Gsm.SMS"
-#define MM_DBUS_INTERFACE_MODEM_GSM_HSO "org.freedesktop.ModemManager.Modem.Gsm.Hso"
-#define MM_DBUS_INTERFACE_MODEM_GSM_USSD "org.freedesktop.ModemManager.Modem.Gsm.Ussd"
-
-/***********************
- * Methods/Enums/Flags *
- ***********************/
-
-/*
- * Interface org.freedesktop.ModemManager
- */
-
-#define MM_MANAGER_METHOD_ENUMERATEDEVICES "EnumerateDevices"
-#define MM_MANAGER_METHOD_SCANDEVICES "ScanDevices"
-#define MM_MANAGER_METHOD_SETLOGGING "SetLogging"
-
-#define MM_MANAGER_SIGNAL_DEVICEADDED "DeviceAdded"
-#define MM_MANAGER_SIGNAL_DEVICEREMOVED "DeviceRemoved"
-
-/*
- * Interface org.freedesktop.ModemManager.Modem
- */
-
-#define MM_MODEM_METHOD_ENABLE "Enable"
-#define MM_MODEM_METHOD_CONNECT "Connect"
-#define MM_MODEM_METHOD_DISCONNECT "Disconnect"
-#define MM_MODEM_METHOD_GETIP4CONFIG "GetIP4Config"
-#define MM_MODEM_METHOD_GETINFO "GetInfo"
-#define MM_MODEM_METHOD_RESET "Reset"
-#define MM_MODEM_METHOD_FACTORYRESET "FactoryReset"
-
-#define MM_MODEM_SIGNAL_STATECHANGED "StateChanged"
+/* Temporarily include the new header in order to resolve conflicts */
+#include "ModemManager1.h"
 
 /* MM_MODEM_TYPE enum values */
 
@@ -90,21 +43,6 @@ typedef enum {
     MM_MODEM_IP_METHOD_DHCP = 2,
 } MMModemIpMethod;
 
-/* MM_MODEM_STATE enum values */
-
-typedef enum {
-    MM_MODEM_STATE_UNKNOWN = 0,
-    MM_MODEM_STATE_DISABLED = 10,
-    MM_MODEM_STATE_DISABLING = 20,
-    MM_MODEM_STATE_ENABLING = 30,
-    MM_MODEM_STATE_ENABLED = 40,
-    MM_MODEM_STATE_SEARCHING = 50,
-    MM_MODEM_STATE_REGISTERED = 60,
-    MM_MODEM_STATE_DISCONNECTING = 70,
-    MM_MODEM_STATE_CONNECTING = 80,
-    MM_MODEM_STATE_CONNECTED = 90,
-} MMModemState;
-
 /* MM_MODEM_STATE_REASON enum values */
 
 typedef enum {
@@ -112,28 +50,6 @@ typedef enum {
     MM_MODEM_STATE_REASON_USER_REQUESTED = 1,
     MM_MODEM_STATE_REASON_SUSPEND = 2,
 } MMModemStateReason;
-
-/*
- * Interface org.freedesktop.ModemManager.Modem.Simple
- */
-
-#define MM_MODEM_SIMPLE_METHOD_CONNECT "Connect"
-#define MM_MODEM_SIMPLE_METHOD_GETSTATUS "GetStatus"
-
-/*
- * Interface org.freedesktop.ModemManager.Modem.Firmware
- */
-
-#define MM_MODEM_FIRMWARE_METHOD_LIST "List"
-#define MM_MODEM_FIRMWARE_METHOD_SELECT "Select"
-#define MM_MODEM_FIRMWARE_METHOD_INSTALL "Install"
-
-/*
- * Interface org.freedesktop.ModemManager.Modem.Location
- */
-
-#define MM_MODEM_LOCATION_METHOD_ENABLE "Enable"
-#define MM_MODEM_LOCATION_METHOD_GETLOCATION "GetLocation"
 
 /* MM_MODEM_LOCATION_CAPABILITIES flag values */
 
@@ -144,57 +60,6 @@ typedef enum {
     MM_MODEM_LOCATION_CAPABILITY_GPS_RAW = 0x4,
 } MMModemLocationCapabilities;
 
-/*
- * Interface org.freedesktop.ModemManager.Modem.Cdma
- */
-
-#define MM_MODEM_CDMA_METHOD_ACTIVATE "Activate"
-#define MM_MODEM_CDMA_METHOD_ACTIVATEMANUAL "ActivateManual"
-#define MM_MODEM_CDMA_METHOD_GETSIGNALQUALITY "GetSignalQuality"
-#define MM_MODEM_CDMA_METHOD_GETESN "GetEsn"
-#define MM_MODEM_CDMA_METHOD_GETSERVINGSYSTEM "GetServingSystem"
-#define MM_MODEM_CDMA_METHOD_GETREGISTRATIONSTATE "GetRegistrationState"
-
-#define MM_MODEM_CDMA_SIGNAL_ACTIVATIONSTATECHANGED "ActivationStateChanged"
-#define MM_MODEM_CDMA_SIGNAL_SIGNALQUALITY "SignalQuality"
-#define MM_MODEM_CDMA_SIGNAL_REGISTRATIONSTATECHANGED "RegistrationStateChanged"
-
-/* MM_MODEM_CDMA_REGISTRATION_STATE enum values */
-
-typedef enum {
-    MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN = 0,
-    MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED = 1,
-    MM_MODEM_CDMA_REGISTRATION_STATE_HOME = 2,
-    MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING = 3,
-} MMModemCdmaRegistrationState;
-
-/* MM_MODEM_CDMA_ACTIVATION_STATE enum values */
-
-typedef enum {
-    MM_MODEM_CDMA_ACTIVATION_STATE_NOT_ACTIVATED = 0,
-    MM_MODEM_CDMA_ACTIVATION_STATE_ACTIVATING = 1,
-    MM_MODEM_CDMA_ACTIVATION_STATE_PARTIALLY_ACTIVATED = 2,
-    MM_MODEM_CDMA_ACTIVATION_STATE_ACTIVATED = 3,
-} MMModemCdmaActivationState;
-
-/* MM_MODEM_CDMA_ACTIVATION_ERROR enum values */
-
-typedef enum {
-    MM_MODEM_CDMA_ACTIVATION_ERROR_NO_ERROR = 0,
-    MM_MODEM_CDMA_ACTIVATION_ERROR_ROAMING = 1,
-    MM_MODEM_CDMA_ACTIVATION_ERROR_WRONG_RADIO_INTERFACE = 2,
-    MM_MODEM_CDMA_ACTIVATION_ERROR_COULD_NOT_CONNECT = 3,
-    MM_MODEM_CDMA_ACTIVATION_ERROR_SECURITY_AUTHENTICATION_FAILED = 4,
-    MM_MODEM_CDMA_ACTIVATION_ERROR_PROVISIONING_FAILED = 5,
-    MM_MODEM_CDMA_ACTIVATION_ERROR_NO_SIGNAL = 6,
-    MM_MODEM_CDMA_ACTIVATION_ERROR_UNKNOWN = 7,
-    MM_MODEM_CDMA_ACTIVATION_ERROR_TIMED_OUT = 8,
-    MM_MODEM_CDMA_ACTIVATION_ERROR_START_FAILED = 9,
-} MMModemCdmaActivationError;
-
-/*
- * Interface org.freedesktop.ModemManager.Modem.Gsm
- */
 
 /* MM_MODEM_GSM_ALLOWED_MODE enum values */
 
@@ -275,49 +140,6 @@ typedef enum {
     MM_MODEM_GSM_FACILITY_CORP_PERS = 0x80,
 } MMModemGsmFacility;
 
-/*
- * Interface org.freedesktop.ModemManager.Modem.Gsm.Card
- */
-
-#define MM_MODEM_GSM_CARD_METHOD_GETIMEI "GetImei"
-#define MM_MODEM_GSM_CARD_METHOD_GETIMSI "GetImsi"
-#define MM_MODEM_GSM_CARD_METHOD_GETOPERATORID "GetOperatorId"
-#define MM_MODEM_GSM_CARD_METHOD_GETSPN "GetSpn"
-#define MM_MODEM_GSM_CARD_METHOD_SENDPUK "SendPuk"
-#define MM_MODEM_GSM_CARD_METHOD_SENDPIN "SendPin"
-#define MM_MODEM_GSM_CARD_METHOD_ENABLEPIN "EnablePin"
-#define MM_MODEM_GSM_CARD_METHOD_CHANGEPIN "ChangePin"
-
-/*
- * Interface org.freedesktop.ModemManager.Modem.Gsm.Contacts
- */
-
-#define MM_MODEM_GSM_CONTACTS_METHOD_ADD "Add"
-#define MM_MODEM_GSM_CONTACTS_METHOD_DELETE "Delete"
-#define MM_MODEM_GSM_CONTACTS_METHOD_GET "Get"
-#define MM_MODEM_GSM_CONTACTS_METHOD_LIST "List"
-#define MM_MODEM_GSM_CONTACTS_METHOD_FIND "Find"
-#define MM_MODEM_GSM_CONTACTS_METHOD_GETCOUNT "GetCount"
-
-/*
- * Interface org.freedesktop.ModemManager.Modem.Gsm.Network
- */
-
-#define MM_MODEM_GSM_NETWORK_METHOD_REGISTER "Register"
-#define MM_MODEM_GSM_NETWORK_METHOD_SCAN "Scan"
-#define MM_MODEM_GSM_NETWORK_METHOD_SETAPN "SetApn"
-#define MM_MODEM_GSM_NETWORK_METHOD_GETSIGNALQUALITY "GetSignalQuality"
-#define MM_MODEM_GSM_NETWORK_METHOD_SETBAND "SetBand"
-#define MM_MODEM_GSM_NETWORK_METHOD_GETBAND "GetBand"
-#define MM_MODEM_GSM_NETWORK_METHOD_SETNETWORKMODE "SetNetworkMode"
-#define MM_MODEM_GSM_NETWORK_METHOD_GETNETWORKMODE "GetNetworkMode"
-#define MM_MODEM_GSM_NETWORK_METHOD_GETREGISTRATIONINFO "GetRegistrationInfo"
-#define MM_MODEM_GSM_NETWORK_METHOD_SETALLOWEDMODE "SetAllowedMode"
-
-#define MM_MODEM_GSM_NETWORK_SIGNAL_SIGNALQUALITY "SignalQuality"
-#define MM_MODEM_GSM_NETWORK_SIGNAL_REGISTRATIONINFO "RegistrationInfo"
-#define MM_MODEM_GSM_NETWORK_SIGNAL_NETWORKMODE "NetworkMode"
-
 /* MM_MODEM_GSM_NETWORK_REG_STATUS enum values */
 
 typedef enum {
@@ -344,116 +166,6 @@ typedef enum {
     MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_HSUPA = 9,
     MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_HSPA = 10,
 } MMModemGsmNetworkDeprecatedMode;
-
-/*
- * Interface org.freedesktop.ModemManager.Modem.Gsm.SMS
- */
-
-#define MM_MODEM_GSM_SMS_METHOD_DELETE "Delete"
-#define MM_MODEM_GSM_SMS_METHOD_GET "Get"
-#define MM_MODEM_GSM_SMS_METHOD_GETFORMAT "GetFormat"
-#define MM_MODEM_GSM_SMS_METHOD_SETFORMAT "SetFormat"
-#define MM_MODEM_GSM_SMS_METHOD_GETSMSC "GetSmsc"
-#define MM_MODEM_GSM_SMS_METHOD_SETSMSC "SetSmsc"
-#define MM_MODEM_GSM_SMS_METHOD_LIST "List"
-#define MM_MODEM_GSM_SMS_METHOD_SAVE "Save"
-#define MM_MODEM_GSM_SMS_METHOD_SEND "Send"
-#define MM_MODEM_GSM_SMS_METHOD_SENDFROMSTORAGE "SendFromStorage"
-#define MM_MODEM_GSM_SMS_METHOD_SETINDICATION "SetIndication"
-
-#define MM_MODEM_GSM_SMS_SIGNAL_SMSRECEIVED "SmsReceived"
-#define MM_MODEM_GSM_SMS_SIGNAL_COMPLETED "Completed"
-
-/*
- * Interface org.freedesktop.ModemManager.Modem.Gsm.Hso
- */
-
-#define MM_MODEM_GSM_HSO_METHOD_AUTHENTICATE "Authenticate"
-
-/*
- * Interface org.freedesktop.ModemManager.Modem.Gsm.Ussd
- */
-
-#define MM_MODEM_GSM_USSD_METHOD_INITIATE "Initiate"
-#define MM_MODEM_GSM_USSD_METHOD_RESPOND "Respond"
-#define MM_MODEM_GSM_USSD_METHOD_CANCEL "Cancel"
-
-/*
- * Interface org.freedesktop.DBus.Properties
- */
-
-#define MM_MANAGER_SIGNAL_MMPROPERTIESCHANGED "MmPropertiesChanged"
-#define MM_MANAGER_SIGNAL_PROPERTIESCHANGED "PropertiesChanged"
-
-
-/**********
- * Errors *
- **********/
-
-#define MM_ERROR_MODEM_SERIALOPENFAILED "SerialOpenFailed"
-#define MM_ERROR_MODEM_SERIALSENDFAILED "SerialSendFailed"
-#define MM_ERROR_MODEM_SERIALRESPONSETIMEOUT "SerialResponseTimeout"
-#define MM_ERROR_MODEM_GENERAL "General"
-#define MM_ERROR_MODEM_OPERATIONNOTSUPPORTED "OperationNotSupported"
-#define MM_ERROR_MODEM_CONNECTED "Connected"
-#define MM_ERROR_MODEM_DISCONNECTED "Disconnected"
-#define MM_ERROR_MODEM_OPERATIONINPROGRESS "OperationInProgress"
-#define MM_ERROR_MODEM_NOCARRIER "NoCarrier"
-#define MM_ERROR_MODEM_NODIALTONE "NoDialtone"
-#define MM_ERROR_MODEM_BUSY "Busy"
-#define MM_ERROR_MODEM_NOANSWER "NoAnswer"
-#define MM_ERROR_MODEM_GSM_PHONEFAILURE "PhoneFailure"
-#define MM_ERROR_MODEM_GSM_NOCONNECTION "NoConnection"
-#define MM_ERROR_MODEM_GSM_LINKRESERVED "LinkReserved"
-#define MM_ERROR_MODEM_GSM_OPERATIONNOTALLOWED "OperationNotAllowed"
-#define MM_ERROR_MODEM_GSM_OPERATIONNOTSUPPORTED "OperationNotSupported"
-#define MM_ERROR_MODEM_GSM_PHSIMPINREQUIRED "PhSimPinRequired"
-#define MM_ERROR_MODEM_GSM_PHFSIMPINREQUIRED "PhFSimPinRequired"
-#define MM_ERROR_MODEM_GSM_PHFSIMPUKREQUIRED "PhFSimPukRequired"
-#define MM_ERROR_MODEM_GSM_SIMNOTINSERTED "SimNotInserted"
-#define MM_ERROR_MODEM_GSM_SIMPINREQUIRED "SimPinRequired"
-#define MM_ERROR_MODEM_GSM_SIMPUKREQUIRED "SimPukRequired"
-#define MM_ERROR_MODEM_GSM_SIMFAILURE "SimFailure"
-#define MM_ERROR_MODEM_GSM_SIMBUSY "SimBusy"
-#define MM_ERROR_MODEM_GSM_SIMWRONG "SimWrong"
-#define MM_ERROR_MODEM_GSM_INCORRECTPASSWORD "IncorrectPassword"
-#define MM_ERROR_MODEM_GSM_SIMPIN2REQUIRED "SimPin2Required"
-#define MM_ERROR_MODEM_GSM_SIMPUK2REQUIRED "SimPuk2Required"
-#define MM_ERROR_MODEM_GSM_MEMORYFULL "MemoryFull"
-#define MM_ERROR_MODEM_GSM_INVALIDINDEX "InvalidIndex"
-#define MM_ERROR_MODEM_GSM_NOTFOUND "NotFound"
-#define MM_ERROR_MODEM_GSM_MEMORYFAILURE "MemoryFailure"
-#define MM_ERROR_MODEM_GSM_TEXTTOOLONG "TextTooLong"
-#define MM_ERROR_MODEM_GSM_INVALIDCHARS "InvalidChars"
-#define MM_ERROR_MODEM_GSM_DIALSTRINGTOOLONG "DialStringTooLong"
-#define MM_ERROR_MODEM_GSM_INVALIDDIALSTRING "InvalidDialString"
-#define MM_ERROR_MODEM_GSM_NONETWORK "NoNetwork"
-#define MM_ERROR_MODEM_GSM_NETWORKTIMEOUT "NetworkTimeout"
-#define MM_ERROR_MODEM_GSM_NETWORKNOTALLOWED "NetworkNotAllowed"
-#define MM_ERROR_MODEM_GSM_NETWORKPINREQUIRED "NetworkPinRequired"
-#define MM_ERROR_MODEM_GSM_NETWORKPUKREQUIRED "NetworkPukRequired"
-#define MM_ERROR_MODEM_GSM_NETWORKSUBSETPINREQUIRED "NetworkSubsetPinRequired"
-#define MM_ERROR_MODEM_GSM_NETWORKSUBSETPUKREQUIRED "NetworkSubsetPukRequired"
-#define MM_ERROR_MODEM_GSM_SERVICEPINREQUIRED "ServicePinRequired"
-#define MM_ERROR_MODEM_GSM_SERVICEPUKREQUIRED "ServicePukRequired"
-#define MM_ERROR_MODEM_GSM_CORPORATEPINREQUIRED "CorporatePinRequired"
-#define MM_ERROR_MODEM_GSM_CORPORATEPUKREQUIRED "CorporatePukRequired"
-#define MM_ERROR_MODEM_GSM_HIDDENKEYREQUIRED "HiddenKeyRequired"
-#define MM_ERROR_MODEM_GSM_EAPMETHODNOTSUPPORTED "EapMethodNotSupported"
-#define MM_ERROR_MODEM_GSM_INCORRECTPARAMS "IncorrectParams"
-#define MM_ERROR_MODEM_GSM_UNKNOWN "Unknown"
-#define MM_ERROR_MODEM_GSM_GPRSILLEGALMS "GprsIllegalMs"
-#define MM_ERROR_MODEM_GSM_GPRSILLEGALME "GprsIllegalMe"
-#define MM_ERROR_MODEM_GSM_GPRSSERVICENOTALLOWED "GprsServiceNotAllowed"
-#define MM_ERROR_MODEM_GSM_GPRSPLMNNOTALLOWED "GprsPlmnNotAllowed"
-#define MM_ERROR_MODEM_GSM_GPRSLOCATIONNOTALLOWED "GprsLocationNotAllowed"
-#define MM_ERROR_MODEM_GSM_GPRSROAMINGNOTALLOWED "GprsRoamingNotAllowed"
-#define MM_ERROR_MODEM_GSM_GPRSOPTIONNOTSUPPORTED "GprsOptionNotSupported"
-#define MM_ERROR_MODEM_GSM_GPRSNOTSUBSCRIBED "GprsNotSubscribed"
-#define MM_ERROR_MODEM_GSM_GPRSOUTOFORDER "GprsOutOfOrder"
-#define MM_ERROR_MODEM_GSM_GPRSPDPAUTHFAILURE "GprsPdpAuthFailure"
-#define MM_ERROR_MODEM_GSM_GPRSUNSPECIFIED "GprsUnspecified"
-#define MM_ERROR_MODEM_GSM_GPRSINVALIDCLASS "GprsInvalidClass"
 
 #endif /*  _MODEM_MANAGER_H_ */
 

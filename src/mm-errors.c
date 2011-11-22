@@ -22,39 +22,6 @@
 #define ENUM_ENTRY(NAME, DESC) { NAME, "" #NAME "", DESC }
 
 GQuark
-mm_serial_error_quark (void)
-{
-    static GQuark ret = 0;
-
-    if (ret == 0)
-        ret = g_quark_from_static_string ("mm_serial_error");
-
-    return ret;
-}
-
-GType
-mm_serial_error_get_type (void)
-{
-    static GType etype = 0;
-
-    if (etype == 0) {
-        static const GEnumValue values[] = {
-            ENUM_ENTRY (MM_SERIAL_ERROR_OPEN_FAILED,           "SerialOpenFailed"),
-            ENUM_ENTRY (MM_SERIAL_ERROR_SEND_FAILED,           "SerialSendfailed"),
-            ENUM_ENTRY (MM_SERIAL_ERROR_RESPONSE_TIMEOUT,      "SerialResponseTimeout"),
-            ENUM_ENTRY (MM_SERIAL_ERROR_OPEN_FAILED_NO_DEVICE, "SerialOpenFailedNoDevice"),
-            ENUM_ENTRY (MM_SERIAL_ERROR_FLASH_FAILED,          "SerialFlashFailed"),
-            ENUM_ENTRY (MM_SERIAL_ERROR_NOT_OPEN,              "SerialNotOpen"),
-            { 0, 0, 0 }
-        };
-
-        etype = g_enum_register_static ("MMSerialError", values);
-    }
-
-    return etype;
-}
-
-GQuark
 mm_modem_error_quark (void)
 {
     static GQuark ret = 0;

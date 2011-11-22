@@ -28,9 +28,6 @@
 #define MM_IS_MANAGER_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((obj), MM_TYPE_MANAGER))
 #define MM_MANAGER_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), MM_TYPE_MANAGER, MMManagerClass))
 
-#define MM_DBUS_SERVICE "org.freedesktop.ModemManager"
-#define MM_DBUS_PATH "/org/freedesktop/ModemManager"
-
 typedef struct {
     GObject parent;
 } MMManager;
