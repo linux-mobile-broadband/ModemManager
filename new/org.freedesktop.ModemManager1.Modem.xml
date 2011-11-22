@@ -244,6 +244,12 @@
       </tp:docstring>
     </property>
 
+    <property name="Plugin" type="s" access="read">
+      <tp:docstring>
+        The name of the plugin handling this modem.
+      </tp:docstring>
+    </property>
+
     <property name="EquipmentIdentifier" type="s" access="read">
       <tp:docstring>
         The identity of the device. This will be the IMEI number for
