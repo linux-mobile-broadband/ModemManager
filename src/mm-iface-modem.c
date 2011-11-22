@@ -107,6 +107,8 @@ handle_set_allowed_modes (MmGdbusModem *object,
 
 typedef enum {
     INITIALIZATION_STEP_FIRST,
+    INITIALIZATION_STEP_MODEM_CAPABILITIES,
+    INITIALIZATION_STEP_CURRENT_CAPABILITIES,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -158,6 +160,32 @@ interface_initialization_finish (MMIfaceModem *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
+#undef UINT_REPLY_READY_FN
+#define UINT_REPLY_READY_FN(NAME,DISPLAY)                               \
+    static void                                                         \
+    load_##NAME##_ready (MMIfaceModem *self,                            \
+                         GAsyncResult *res,                             \
+                         InitializationContext *ctx)                    \
+    {                                                                   \
+        GError *error = NULL;                                           \
+                                                                        \
+        mm_gdbus_modem_set_##NAME (                                     \
+            ctx->skeleton,                                              \
+            MM_IFACE_MODEM_GET_INTERFACE (self)->load_##NAME##_finish (self, res, &error)); \
+                                                                        \
+        if (error) {                                                    \
+            mm_warn ("couldn't load %s: '%s'", DISPLAY, error->message); \
+            g_error_free (error);                                       \
+        }                                                               \
+                                                                        \
+        /* Go on to next step */                                        \
+        ctx->step++;                                                    \
+        interface_initialization_step (ctx);                            \
+    }
+
+UINT_REPLY_READY_FN (modem_capabilities, "Modem Capabilities")
+UINT_REPLY_READY_FN (current_capabilities, "Current Capabilities")
+
 static void
 interface_initialization_step (InitializationContext *ctx)
 {
@@ -195,6 +223,40 @@ interface_initialization_step (InitializationContext *ctx)
         }
         break;
     }
+
+    case INITIALIZATION_STEP_MODEM_CAPABILITIES:
+        /* Modem capabilities are meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_modem_get_modem_capabilities (ctx->skeleton) == MM_MODEM_CAPABILITY_NONE &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_modem_capabilities &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_modem_capabilities_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_modem_capabilities (
+                ctx->self,
+                (GAsyncReadyCallback)load_modem_capabilities_ready,
+                ctx);
+            return;
+        }
+        break;
+
+    case INITIALIZATION_STEP_CURRENT_CAPABILITIES:
+        /* In theory, this property is able to change during runtime, so if
+         * possible we'll reload it. */
+       if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_capabilities &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_capabilities_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_capabilities (
+                ctx->self,
+                (GAsyncReadyCallback)load_current_capabilities_ready,
+                ctx);
+            return;
+        }
+       /* If no specific way of getting current capabilities, assume they are
+        * equal to the modem capabilities */
+        mm_gdbus_modem_set_current_capabilities (
+            ctx->skeleton,
+            mm_gdbus_modem_get_current_capabilities (ctx->skeleton));
+        break;
+
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
@@ -435,10 +497,6 @@ mm_iface_modem_shutdown (MMIfaceModem *self,
                      "Iinterface being currently initialized");
         return FALSE;
     case INTERFACE_STATUS_INITIALIZED:
-        /* Remove SIM object */
-        g_object_set (self,
-                      MM_IFACE_MODEM_SIM, NULL,
-                      NULL);
         /* Unexport DBus interface and remove the skeleton */
         mm_gdbus_object_skeleton_set_modem (MM_GDBUS_OBJECT_SKELETON (self), NULL);
         g_object_set (self,

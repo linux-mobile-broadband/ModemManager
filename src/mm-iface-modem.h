@@ -30,6 +30,22 @@ typedef struct _MMIfaceModem MMIfaceModem;
 
 struct _MMIfaceModem {
     GTypeInterface g_iface;
+
+    /* Loading of the ModemCapabilities property */
+    void (*load_modem_capabilities) (MMIfaceModem *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data);
+    MMModemCapability (*load_modem_capabilities_finish) (MMIfaceModem *self,
+                                                         GAsyncResult *res,
+                                                         GError **error);
+
+    /* Loading of the CurrentCapabilities property */
+    void (*load_current_capabilities) (MMIfaceModem *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data);
+    MMModemCapability (*load_current_capabilities_finish) (MMIfaceModem *self,
+                                                           GAsyncResult *res,
+                                                           GError **error);
 };
 
 GType mm_iface_modem_get_type (void);
