@@ -65,6 +65,26 @@ struct _MMSimPrivate {
     gchar *path;
 };
 
+static gboolean
+common_parse_string_reply (MMSim *self,
+                           gpointer none,
+                           const gchar *command,
+                           const gchar *response,
+                           const GError *error,
+                           GVariant **result,
+                           GError **result_error)
+{
+    if (error) {
+        *result_error = g_error_copy (error);
+        return FALSE;
+    }
+
+    *result = g_variant_new_string (response);;
+    return TRUE;
+}
+
+/*****************************************************************************/
+
 static void
 mm_sim_export (MMSim *self)
 {
@@ -240,10 +260,52 @@ load_sim_identifier (MMSim *self,
 }
 
 /*****************************************************************************/
+/* IMSI */
+
+static gchar *
+load_imsi_finish (MMSim *self,
+                  GAsyncResult *res,
+                  GError **error)
+{
+    GVariant *result;
+    gchar *imsi;
+
+    result = mm_at_command_finish (G_OBJECT (self), res, error);
+    if (!result)
+        return NULL;
+
+    imsi = g_variant_dup_string (result, NULL);
+    mm_dbg ("loaded IMSI: %s", imsi);
+    g_variant_unref (result);
+    return imsi;
+}
+
+static void
+load_imsi (MMSim *self,
+           GAsyncReadyCallback callback,
+           gpointer user_data)
+{
+    mm_dbg ("loading IMSI...");
+
+    mm_at_command (G_OBJECT (self),
+                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self->priv->modem)),
+                   "+CIMI",
+                   3,
+                   (MMAtResponseProcessor)common_parse_string_reply,
+                   NULL, /* response_processor_context */
+                   "s",
+                   NULL, /*TODO: cancellable */
+                   callback,
+                   user_data);
+}
+
+/*****************************************************************************/
+
 
 typedef enum {
     INITIALIZATION_STEP_FIRST,
     INITIALIZATION_STEP_SIM_IDENTIFIER,
+    INITIALIZATION_STEP_IMSI,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -322,6 +384,31 @@ load_sim_identifier_ready (MMSim *self,
     interface_initialization_step (ctx);
 }
 
+#define STR_REPLY_READY_FN(NAME,DISPLAY)                                \
+    static void                                                         \
+    load_##NAME##_ready (MMSim *self,                                   \
+                         GAsyncResult *res,                             \
+                         InitAsyncContext *ctx)                         \
+    {                                                                   \
+        GError *error = NULL;                                           \
+        gchar *val;                                                     \
+                                                                        \
+        val = load_##NAME##_finish (self, res, &error);                 \
+        mm_gdbus_sim_set_##NAME (MM_GDBUS_SIM (self), val);             \
+        g_free (val);                                                   \
+                                                                        \
+        if (error) {                                                    \
+            mm_warn ("couldn't load %s: '%s'", DISPLAY, error->message); \
+            g_error_free (error);                                       \
+        }                                                               \
+                                                                        \
+        /* Go on to next step */                                        \
+        ctx->step++;                                                    \
+        interface_initialization_step (ctx);                            \
+    }
+
+STR_REPLY_READY_FN (imsi, "IMSI")
+
 static void
 interface_initialization_step (InitAsyncContext *ctx)
 {
@@ -338,6 +425,19 @@ interface_initialization_step (InitAsyncContext *ctx)
             load_sim_identifier (
                 ctx->self,
                 (GAsyncReadyCallback)load_sim_identifier_ready,
+                ctx);
+            return;
+        }
+        break;
+
+    case INITIALIZATION_STEP_IMSI:
+        /* IMSI is meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_sim_get_imsi (MM_GDBUS_SIM (ctx->self)) == NULL) {
+            load_imsi (
+                ctx->self,
+                (GAsyncReadyCallback)load_imsi_ready,
                 ctx);
             return;
         }
