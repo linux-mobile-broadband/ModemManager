@@ -136,6 +136,14 @@ struct _MMIfaceModem {
     MMModemBand (*load_supported_bands_finish) (MMIfaceModem *self,
                                                 GAsyncResult *res,
                                                 GError **error);
+
+    /* Asynchronous reset operation */
+    void (*reset) (MMIfaceModem *self,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data);
+    gboolean (*reset_finish) (MMIfaceModem *self,
+                              GAsyncResult *res,
+                              GError **error);
 };
 
 GType mm_iface_modem_get_type (void);

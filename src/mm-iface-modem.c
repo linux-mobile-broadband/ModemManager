@@ -35,6 +35,37 @@ typedef enum {
     INTERFACE_STATUS_INITIALIZED
 } InterfaceStatus;
 
+typedef struct {
+    MmGdbusModem *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModem *self;
+} DbusCallContext;
+
+static void
+dbus_call_context_free (DbusCallContext *ctx)
+{
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static DbusCallContext *
+dbus_call_context_new (MmGdbusModem *skeleton,
+                       GDBusMethodInvocation *invocation,
+                       MMIfaceModem *self)
+{
+    DbusCallContext *ctx;
+
+    ctx = g_new (DbusCallContext, 1);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+    return ctx;
+}
+
+/*****************************************************************************/
+
 static gboolean
 handle_create_bearer (MmGdbusModem *object,
                       GDBusMethodInvocation *invocation,
@@ -70,12 +101,75 @@ handle_enable (MmGdbusModem *object,
     return FALSE; /* Currently unhandled */
 }
 
+/*****************************************************************************/
+
+static void
+reset_ready (MMIfaceModem *self,
+             GAsyncResult *res,
+             DbusCallContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->reset_finish (self,
+                                                            res,
+                                                            &error))
+        g_dbus_method_invocation_take_error (ctx->invocation,
+                                             error);
+    else
+        mm_gdbus_modem_complete_reset (ctx->skeleton,
+                                       ctx->invocation);
+    dbus_call_context_free (ctx);
+}
+
 static gboolean
-handle_reset (MmGdbusModem *object,
+handle_reset (MmGdbusModem *skeleton,
               GDBusMethodInvocation *invocation,
               MMIfaceModem *self)
 {
-    return FALSE; /* Currently unhandled */
+    MMModemState modem_state;
+
+    /* If reseting is not implemented, report an error */
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->reset ||
+        !MM_IFACE_MODEM_GET_INTERFACE (self)->reset_finish) {
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot reset the modem: operation not supported");
+        return TRUE;
+    }
+
+    modem_state = MM_MODEM_STATE_UNKNOWN;
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+
+    switch (modem_state) {
+    case MM_MODEM_STATE_UNKNOWN:
+    case MM_MODEM_STATE_LOCKED:
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot reset modem: not initialized/unlocked yet");
+        break;
+
+    case MM_MODEM_STATE_DISABLED:
+    case MM_MODEM_STATE_DISABLING:
+    case MM_MODEM_STATE_ENABLING:
+    case MM_MODEM_STATE_ENABLED:
+    case MM_MODEM_STATE_SEARCHING:
+    case MM_MODEM_STATE_REGISTERED:
+    case MM_MODEM_STATE_DISCONNECTING:
+    case MM_MODEM_STATE_CONNECTING:
+    case MM_MODEM_STATE_CONNECTED:
+        MM_IFACE_MODEM_GET_INTERFACE (self)->reset (self,
+                                                    (GAsyncReadyCallback)reset_ready,
+                                                    dbus_call_context_new (skeleton,
+                                                                           invocation,
+                                                                           self));
+        break;
+    }
+
+    return TRUE;
 }
 
 static gboolean
