@@ -237,6 +237,166 @@ handle_enable_pin (MMSim *self,
 }
 
 /*****************************************************************************/
+/* SEND PIN/PUK */
+
+static GError *
+error_for_unlock_check (MMModemLock lock)
+{
+    static const MMMobileEquipmentError errors_for_locks [] = {
+        MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,            /* MM_MODEM_LOCK_UNKNOWN */
+        MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,            /* MM_MODEM_LOCK_NONE */
+        MM_MOBILE_EQUIPMENT_ERROR_SIM_PIN,            /* MM_MODEM_LOCK_SIM_PIN */
+        MM_MOBILE_EQUIPMENT_ERROR_SIM_PIN2,           /* MM_MODEM_LOCK_SIM_PIN2 */
+        MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK,            /* MM_MODEM_LOCK_SIM_PUK */
+        MM_MOBILE_EQUIPMENT_ERROR_SIM_PUK2,           /* MM_MODEM_LOCK_SIM_PUK2 */
+        MM_MOBILE_EQUIPMENT_ERROR_SERVICE_PIN,        /* MM_MODEM_LOCK_PH_SP_PIN */
+        MM_MOBILE_EQUIPMENT_ERROR_SERVICE_PUK,        /* MM_MODEM_LOCK_PH_SP_PUK */
+        MM_MOBILE_EQUIPMENT_ERROR_NETWORK_PIN,        /* MM_MODEM_LOCK_PH_NET_PIN */
+        MM_MOBILE_EQUIPMENT_ERROR_NETWORK_PUK,        /* MM_MODEM_LOCK_PH_NET_PUK */
+        MM_MOBILE_EQUIPMENT_ERROR_PH_SIM_PIN,         /* MM_MODEM_LOCK_PH_SIM_PIN */
+        MM_MOBILE_EQUIPMENT_ERROR_CORP_PIN,           /* MM_MODEM_LOCK_PH_CORP_PIN */
+        MM_MOBILE_EQUIPMENT_ERROR_CORP_PUK,           /* MM_MODEM_LOCK_PH_CORP_PUK */
+        MM_MOBILE_EQUIPMENT_ERROR_PH_FSIM_PIN,        /* MM_MODEM_LOCK_PH_FSIM_PIN */
+        MM_MOBILE_EQUIPMENT_ERROR_PH_FSIM_PUK,        /* MM_MODEM_LOCK_PH_FSIM_PUK */
+        MM_MOBILE_EQUIPMENT_ERROR_NETWORK_SUBSET_PIN, /* MM_MODEM_LOCK_PH_NETSUB_PIN */
+        MM_MOBILE_EQUIPMENT_ERROR_NETWORK_SUBSET_PUK, /* MM_MODEM_LOCK_PH_NETSUB_PUK */
+    };
+	GEnumClass *enum_class;
+    GEnumValue *enum_value;
+    GError *error;
+
+    g_assert (lock >= MM_MODEM_LOCK_UNKNOWN);
+    g_assert (lock <= MM_MODEM_LOCK_PH_NETSUB_PUK);
+
+    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_LOCK));
+    enum_value = g_enum_get_value (enum_class, lock);
+    error =  g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                          errors_for_locks[lock],
+                          "Device is locked: '%s'",
+                          enum_value->value_nick);
+
+    mm_warn ("ERROR: %s", error->message);
+
+    g_type_class_unref (enum_class);
+    return error;
+}
+
+static void
+unlock_check_ready (MMIfaceModem *modem,
+                    GAsyncResult *res,
+                    DbusCallContext *ctx)
+{
+    GError *error = NULL;
+    MMModemLock lock;
+
+    lock = mm_iface_modem_unlock_check_finish (modem, res, &error);
+    if (lock != MM_MODEM_LOCK_NONE) {
+        /* Device is locked. Now:
+         *   - If we got an error in the original send-pin action, report it.
+         *   - If we got an error in the pin-check action, report it.
+         *   - Otherwise, build our own error from the lock code.
+         */
+        if (ctx->save_error) {
+            g_dbus_method_invocation_return_gerror (ctx->invocation, ctx->save_error);
+            g_clear_error (&error);
+        }
+        else if (error)
+            g_dbus_method_invocation_take_error (ctx->invocation, error);
+        else
+            g_dbus_method_invocation_take_error (ctx->invocation,
+                                                 error_for_unlock_check (lock));
+    } else {
+        if (g_str_equal (g_dbus_method_invocation_get_method_name (ctx->invocation), "SendPin"))
+            mm_gdbus_sim_complete_send_pin (MM_GDBUS_SIM (ctx->self), ctx->invocation);
+        else if (g_str_equal (g_dbus_method_invocation_get_method_name (ctx->invocation), "SendPuk"))
+            mm_gdbus_sim_complete_send_puk (MM_GDBUS_SIM (ctx->self), ctx->invocation);
+        else
+            g_warn_if_reached ();
+    }
+
+    dbus_call_context_free (ctx, TRUE);
+}
+
+static void
+handle_send_pin_puk_ready (MMSim *self,
+                           GAsyncResult *res,
+                           DbusCallContext *ctx)
+{
+    GVariant *reply;
+
+    reply = mm_at_command_finish (G_OBJECT (self), res, &ctx->save_error);
+    g_assert (reply == NULL);
+
+    /* Once pin/puk has been sent, recheck lock */
+    mm_iface_modem_unlock_check (MM_IFACE_MODEM (self->priv->modem),
+                                 (GAsyncReadyCallback)unlock_check_ready,
+                                 ctx);
+}
+
+static gboolean
+handle_send_pin (MMSim *self,
+                 GDBusMethodInvocation *invocation,
+                 const gchar *arg_pin)
+{
+    gchar *command;
+    DbusCallContext *ctx;
+    GError *error = NULL;
+
+    ctx = dbus_call_context_new (self, invocation, &error);
+    if (!ctx) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        return TRUE;
+    }
+
+    command = g_strdup_printf ("+CPIN=\"%s\"", arg_pin);
+    mm_at_command (G_OBJECT (self),
+                   ctx->port,
+                   command,
+                   3,
+                   (MMAtResponseProcessor)common_parse_no_reply,
+                   NULL, /* response_processor_context */
+                   NULL, /* result_signature */
+                   NULL, /* TODO: cancellable */
+                   (GAsyncReadyCallback)handle_send_pin_puk_ready,
+                   ctx);
+    g_free (command);
+    return TRUE;
+}
+
+static gboolean
+handle_send_puk (MMSim *self,
+                 GDBusMethodInvocation *invocation,
+                 const gchar *arg_puk,
+                 const gchar *arg_pin)
+{
+    gchar *command;
+    DbusCallContext *ctx;
+    GError *error = NULL;
+
+    ctx = dbus_call_context_new (self, invocation, &error);
+    if (!ctx) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        return TRUE;
+    }
+
+    command = g_strdup_printf ("+CPIN=\"%s\",\"%s\"",
+                               arg_puk,
+                               arg_pin);
+    mm_at_command (G_OBJECT (self),
+                   ctx->port,
+                   command,
+                   3,
+                   (MMAtResponseProcessor)common_parse_no_reply,
+                   NULL, /* response_processor_context */
+                   NULL, /* result_signature */
+                   NULL, /* TODO: cancellable */
+                   (GAsyncReadyCallback)handle_send_pin_puk_ready,
+                   ctx);
+    g_free (command);
+    return TRUE;
+}
+
+/*****************************************************************************/
 
 static void
 mm_sim_export (MMSim *self)
@@ -251,6 +411,14 @@ mm_sim_export (MMSim *self)
     g_signal_connect (self,
                       "handle-enable-pin",
                       G_CALLBACK (handle_enable_pin),
+                      NULL);
+    g_signal_connect (self,
+                      "handle-send-pin",
+                      G_CALLBACK (handle_send_pin),
+                      NULL);
+    g_signal_connect (self,
+                      "handle-send-puk",
+                      G_CALLBACK (handle_send_puk),
                       NULL);
 
     if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (self),
