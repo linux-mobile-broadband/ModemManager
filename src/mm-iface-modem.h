@@ -144,6 +144,15 @@ struct _MMIfaceModem {
     gboolean (*reset_finish) (MMIfaceModem *self,
                               GAsyncResult *res,
                               GError **error);
+
+    /* Asynchronous factory-reset operation */
+    void (*factory_reset) (MMIfaceModem *self,
+                           const gchar *code,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data);
+    gboolean (*factory_reset_finish) (MMIfaceModem *self,
+                                      GAsyncResult *res,
+                                      GError **error);
 };
 
 GType mm_iface_modem_get_type (void);
