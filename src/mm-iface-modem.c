@@ -163,6 +163,36 @@ interface_initialization_step (InitializationContext *ctx)
 {
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST: {
+        /* Load device if not done before */
+        if (!mm_gdbus_modem_get_device (ctx->skeleton)) {
+            gchar *device;
+
+            g_object_get (ctx->self,
+                          MM_BASE_MODEM_DEVICE, &device,
+                          NULL);
+            mm_gdbus_modem_set_device (ctx->skeleton, device);
+            g_free (device);
+        }
+        /* Load driver if not done before */
+        if (!mm_gdbus_modem_get_driver (ctx->skeleton)) {
+            gchar *driver;
+
+            g_object_get (ctx->self,
+                          MM_BASE_MODEM_DRIVER, &driver,
+                          NULL);
+            mm_gdbus_modem_set_driver (ctx->skeleton, driver);
+            g_free (driver);
+        }
+        /* Load plugin if not done before */
+        if (!mm_gdbus_modem_get_plugin (ctx->skeleton)) {
+            gchar *plugin;
+
+            g_object_get (ctx->self,
+                          MM_BASE_MODEM_PLUGIN, &plugin,
+                          NULL);
+            mm_gdbus_modem_set_plugin (ctx->skeleton, plugin);
+            g_free (plugin);
+        }
         break;
     }
     case INITIALIZATION_STEP_LAST:
