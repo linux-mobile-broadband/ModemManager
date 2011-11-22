@@ -300,12 +300,152 @@ load_imsi (MMSim *self,
 }
 
 /*****************************************************************************/
+/* Operator ID */
+
+static gboolean
+parse_mnc_length (MMSim *self,
+                  gpointer none,
+                  const gchar *command,
+                  const gchar *response,
+                  const GError *error,
+                  GVariant **result,
+                  GError **result_error)
+{
+    gint sw1;
+    gint sw2;
+    gboolean success = FALSE;
+    gchar hex[51];
+
+    if (error) {
+        *result_error = g_error_copy (error);
+        return FALSE;
+    }
+
+    memset (hex, 0, sizeof (hex));
+    if (sscanf (response, "+CRSM:%d,%d,\"%50c\"", &sw1, &sw2, (char *) &hex) == 3)
+        success = TRUE;
+    else {
+        /* May not include quotes... */
+        if (sscanf (response, "+CRSM:%d,%d,%50c", &sw1, &sw2, (char *) &hex) == 3)
+            success = TRUE;
+    }
+
+    if (!success) {
+        *result_error = g_error_new_literal (MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Could not parse the CRSM response");
+        return FALSE;
+    }
+
+    if ((sw1 == 0x90 && sw2 == 0x00) ||
+        (sw1 == 0x91) ||
+        (sw1 == 0x92) ||
+        (sw1 == 0x9f)) {
+        gsize buflen = 0;
+        guint32 mnc_len;
+        gchar *bin;
+
+        /* Make sure the buffer is only hex characters */
+        while (buflen < sizeof (hex) && hex[buflen]) {
+            if (!isxdigit (hex[buflen])) {
+                hex[buflen] = 0x0;
+                break;
+            }
+            buflen++;
+        }
+
+        /* Convert hex string to binary */
+        bin = utils_hexstr2bin (hex, &buflen);
+        if (!bin || buflen < 4) {
+            *result_error = g_error_new (MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "SIM returned malformed response '%s'",
+                                         hex);
+            g_free (bin);
+            return FALSE;
+        }
+
+        /* MNC length is byte 4 of this SIM file */
+        mnc_len = bin[3] & 0xFF;
+        if (mnc_len == 2 || mnc_len == 3) {
+            *result = g_variant_new_uint32 (mnc_len);
+            g_free (bin);
+            return TRUE;
+        }
+
+        *result_error = g_error_new (MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "SIM returned invalid MNC length %d (should be either 2 or 3)",
+                                     mnc_len);
+        g_free (bin);
+        return FALSE;
+    }
+
+    *result_error = g_error_new (MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "SIM failed to handle CRSM request (sw1 %d sw2 %d)",
+                                 sw1, sw2);
+    return FALSE;
+}
+
+static gchar *
+load_operator_identifier_finish (MMSim *self,
+                                 GAsyncResult *res,
+                                 GError **error)
+{
+    GVariant *result;
+    gchar *operator_id;
+    const gchar *imsi;
+
+    result = mm_at_command_finish (G_OBJECT (self), res, error);
+    if (!result)
+        return NULL;
+
+    imsi = mm_gdbus_sim_get_imsi (MM_GDBUS_SIM (self));
+    if (!imsi) {
+        g_variant_unref (result);
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Cannot load Operator ID without IMSI");
+        return NULL;
+    }
+
+    /* Build Operator ID */
+    operator_id = g_strndup (imsi,
+                             3 + g_variant_get_uint32 (result));
+    g_variant_unref (result);
+    return operator_id;
+}
+
+static void
+load_operator_identifier (MMSim *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    mm_dbg ("loading Operator ID...");
+
+    /* READ BINARY of EFad (Administrative Data) ETSI 51.011 section 10.3.18 */
+    mm_at_command (G_OBJECT (self),
+                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self->priv->modem)),
+                   "+CRSM=176,28589,0,0,4",
+                   3,
+                   (MMAtResponseProcessor)parse_mnc_length,
+                   NULL, /* response_processor_context */
+                   "u", /* mnc length */
+                   NULL, /*TODO: cancellable */
+                   callback,
+                   user_data);
+}
+
+/*****************************************************************************/
 
 
 typedef enum {
     INITIALIZATION_STEP_FIRST,
     INITIALIZATION_STEP_SIM_IDENTIFIER,
     INITIALIZATION_STEP_IMSI,
+    INITIALIZATION_STEP_OPERATOR_ID,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -408,6 +548,7 @@ load_sim_identifier_ready (MMSim *self,
     }
 
 STR_REPLY_READY_FN (imsi, "IMSI")
+STR_REPLY_READY_FN (operator_identifier, "Operator identifier")
 
 static void
 interface_initialization_step (InitAsyncContext *ctx)
@@ -438,6 +579,19 @@ interface_initialization_step (InitAsyncContext *ctx)
             load_imsi (
                 ctx->self,
                 (GAsyncReadyCallback)load_imsi_ready,
+                ctx);
+            return;
+        }
+        break;
+
+    case INITIALIZATION_STEP_OPERATOR_ID:
+        /* Operator ID is meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_sim_get_operator_identifier (MM_GDBUS_SIM (ctx->self)) == NULL) {
+            load_operator_identifier (
+                ctx->self,
+                (GAsyncReadyCallback)load_operator_identifier_ready,
                 ctx);
             return;
         }
