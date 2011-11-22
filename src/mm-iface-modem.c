@@ -17,11 +17,13 @@
 #include <ModemManager.h>
 
 #include <mm-gdbus-modem.h>
+#include <mm-gdbus-sim.h>
 #include <mm-enums-types.h>
 #include <mm-errors-types.h>
 
 #include "mm-iface-modem.h"
 #include "mm-base-modem.h"
+#include "mm-sim.h"
 #include "mm-log.h"
 
 typedef struct _InitializationContext InitializationContext;
@@ -291,6 +293,7 @@ typedef enum {
     INITIALIZATION_STEP_DEVICE_ID,
     INITIALIZATION_STEP_UNLOCK_REQUIRED,
     INITIALIZATION_STEP_UNLOCK_RETRIES,
+    INITIALIZATION_STEP_SIM,
     INITIALIZATION_STEP_SUPPORTED_MODES,
     INITIALIZATION_STEP_SUPPORTED_BANDS,
     INITIALIZATION_STEP_LAST
@@ -425,6 +428,61 @@ load_unlock_required_ready (MMIfaceModem *self,
 }
 
 UINT_REPLY_READY_FN (unlock_retries, "Unlock Retries")
+
+static void
+sim_new_ready (GAsyncInitable *initable,
+               GAsyncResult *res,
+               InitializationContext *ctx)
+{
+    MMSim *sim;
+    GError *error = NULL;
+
+    sim = mm_sim_new_finish (initable, res, &error);
+    if (!sim) {
+        mm_warn ("couldn't create SIM: '%s'",
+                 error ? error->message : "Unknown error");
+        g_clear_error (&error);
+    } else {
+        gchar *path = NULL;
+
+        g_object_get (sim,
+                      MM_SIM_PATH, &path,
+                      NULL);
+        mm_gdbus_modem_set_sim (MM_GDBUS_MODEM (ctx->skeleton),
+                                path);
+        g_object_bind_property (sim, MM_SIM_PATH,
+                                ctx->skeleton, "sim",
+                                G_BINDING_DEFAULT);
+        g_free (path);
+
+        g_object_set (ctx->self,
+                      MM_IFACE_MODEM_SIM, sim,
+                      NULL);
+        g_object_unref (sim);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
+
+static void
+sim_reinit_ready (MMSim *sim,
+                  GAsyncResult *res,
+                  InitializationContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_sim_initialize_finish (sim, res, &error)) {
+        mm_warn ("SIM re-initialization failed: '%s'",
+                 error ? error->message : "Unknown error");
+        g_clear_error (&error);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
 
 static void
 interface_initialization_step (InitializationContext *ctx)
@@ -637,6 +695,30 @@ interface_initialization_step (InitializationContext *ctx)
             mm_gdbus_modem_set_unlock_retries (ctx->skeleton, 999);
         }
         break;
+
+    case INITIALIZATION_STEP_SIM: {
+        MMSim *sim = NULL;
+
+        g_object_get (ctx->self,
+                      MM_IFACE_MODEM_SIM, &sim,
+                      NULL);
+        if (!sim) {
+            mm_sim_new (MM_BASE_MODEM (ctx->self),
+                        NULL, /* TODO: cancellable */
+                        (GAsyncReadyCallback)sim_new_ready,
+                        ctx);
+            return;
+        }
+
+        /* If already available the sim object, relaunch initialization.
+         * This will try to load any missing property value that couldn't be
+         * retrieved before due to having the SIM locked. */
+        mm_sim_initialize (sim,
+                           NULL, /* TODO: cancellable */
+                           (GAsyncReadyCallback)sim_reinit_ready,
+                           ctx);
+        return;
+    }
 
     case INITIALIZATION_STEP_SUPPORTED_MODES:
         /* Supported modes are meant to be loaded only once during the whole
@@ -915,6 +997,10 @@ mm_iface_modem_shutdown (MMIfaceModem *self,
                      "Iinterface being currently initialized");
         return FALSE;
     case INTERFACE_STATUS_INITIALIZED:
+        /* Remove SIM object */
+        g_object_set (self,
+                      MM_IFACE_MODEM_SIM, NULL,
+                      NULL);
         /* Unexport DBus interface and remove the skeleton */
         mm_gdbus_object_skeleton_set_modem (MM_GDBUS_OBJECT_SKELETON (self), NULL);
         g_object_set (self,
@@ -944,6 +1030,14 @@ iface_modem_init (gpointer g_iface)
                               "Modem DBus skeleton",
                               "DBus skeleton for the Modem interface",
                               MM_GDBUS_TYPE_MODEM_SKELETON,
+                              G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_object (MM_IFACE_MODEM_SIM,
+                              "SIM",
+                              "SIM object",
+                              MM_TYPE_SIM,
                               G_PARAM_READWRITE));
 
     g_object_interface_install_property

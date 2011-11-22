@@ -26,6 +26,7 @@
 
 #define MM_IFACE_MODEM_DBUS_SKELETON   "iface-modem-dbus-skeleton"
 #define MM_IFACE_MODEM_STATE           "iface-modem-state"
+#define MM_IFACE_MODEM_SIM             "iface-modem-sim"
 
 typedef struct _MMIfaceModem MMIfaceModem;
 
