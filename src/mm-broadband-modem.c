@@ -32,6 +32,7 @@
 #include "mm-sim.h"
 #include "mm-errors.h"
 #include "mm-log.h"
+#include "mm-modem-helpers.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 
@@ -432,6 +433,143 @@ load_equipment_identifier (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* DEVICE IDENTIFIER */
+
+static gboolean
+parse_optional_string_reply (MMBroadbandModem *self,
+                             gpointer none,
+                             const gchar *command,
+                             const gchar *response,
+                             const GError *error,
+                             GVariant **result,
+                             GError **result_error)
+{
+    *result = (error ?
+               NULL :
+               g_variant_new_string (response));
+    return TRUE;
+}
+
+typedef struct {
+    gchar *ati;
+    gchar *ati1;
+    GSimpleAsyncResult *result;
+} DeviceIdentifierContext;
+
+static void
+device_identifier_context_free (DeviceIdentifierContext *ctx)
+{
+    g_object_unref (ctx->result);
+    g_free (ctx->ati);
+    g_free (ctx->ati1);
+    g_free (ctx);
+}
+
+static gchar *
+load_device_identifier_finish (MMIfaceModem *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    gchar *device_identifier;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    device_identifier = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    mm_dbg ("loaded device identifier: %s", device_identifier);
+    return device_identifier;
+}
+
+static void
+ati1_ready (MMBroadbandModem *self,
+            GAsyncResult *res,
+            DeviceIdentifierContext *ctx)
+{
+    gchar *device_identifier;
+    GVariant *result;
+
+    result = mm_at_command_finish (G_OBJECT (self), res, NULL);
+    if (result) {
+        ctx->ati1 = g_variant_dup_string (result, NULL);
+        g_variant_unref (result);
+    }
+
+    device_identifier = mm_create_device_identifier (
+        mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)),
+        mm_base_modem_get_product_id (MM_BASE_MODEM (self)),
+        ctx->ati,
+        ctx->ati1,
+        mm_gdbus_modem_get_equipment_identifier (MM_GDBUS_MODEM (self->priv->modem_dbus_skeleton)),
+        mm_gdbus_modem_get_revision (MM_GDBUS_MODEM (self->priv->modem_dbus_skeleton)),
+        mm_gdbus_modem_get_model (MM_GDBUS_MODEM (self->priv->modem_dbus_skeleton)),
+        mm_gdbus_modem_get_manufacturer (MM_GDBUS_MODEM (self->priv->modem_dbus_skeleton)));
+
+    g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                               device_identifier,
+                                               NULL);
+    g_simple_async_result_complete (ctx->result);
+    device_identifier_context_free (ctx);
+}
+
+static void
+ati_ready (MMBroadbandModem *self,
+           GAsyncResult *res,
+           DeviceIdentifierContext *ctx)
+{
+    GVariant *result;
+
+    result = mm_at_command_finish (G_OBJECT (self), res, NULL);
+    if (result) {
+        ctx->ati = g_variant_dup_string (result, NULL);
+        g_variant_unref (result);
+    }
+
+    /* Go on with ATI1 */
+    mm_at_command (G_OBJECT (self),
+                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                   "ATI1",
+                   3,
+                   (MMAtResponseProcessor)parse_optional_string_reply,
+                   NULL, /* response_processor_context */
+                   "s",
+                   NULL, /* TODO: cancellable */
+                   (GAsyncReadyCallback)ati1_ready,
+                   ctx);
+}
+
+static void
+load_device_identifier (MMIfaceModem *self,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
+{
+    DeviceIdentifierContext *ctx;
+
+    mm_dbg ("loading device identifier...");
+
+    /* To build the device identifier, we still need to get the replies for:
+     *  - ATI
+     *  - ATI1
+     */
+
+    ctx = g_new0 (DeviceIdentifierContext, 1);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             load_device_identifier);
+
+    mm_at_command (G_OBJECT (self),
+                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                   "ATI",
+                   3,
+                   (MMAtResponseProcessor)parse_optional_string_reply,
+                   NULL, /* response_processor_context */
+                   "s",
+                   NULL, /* TODO: cancellable */
+                   (GAsyncReadyCallback)ati_ready,
+                   ctx);
+}
+
+/*****************************************************************************/
 
 static void
 enable (MMBaseModem *self,
@@ -655,6 +793,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_revision_finish = load_revision_finish;
     iface->load_equipment_identifier = load_equipment_identifier;
     iface->load_equipment_identifier_finish = load_equipment_identifier_finish;
+    iface->load_device_identifier = load_device_identifier;
+    iface->load_device_identifier_finish = load_device_identifier_finish;
 }
 
 static void
