@@ -147,6 +147,13 @@ unlock_check_context_free (UnlockCheckContext *ctx)
     g_free (ctx);
 }
 
+static gboolean
+restart_initialize_idle (MMIfaceModem *self)
+{
+    mm_iface_modem_initialize (self, NULL, NULL);
+    return FALSE;
+}
+
 static void
 set_lock_status (MMIfaceModem *self,
                  MmGdbusModem *skeleton,
@@ -163,6 +170,8 @@ set_lock_status (MMIfaceModem *self,
             g_object_set (self,
                           MM_IFACE_MODEM_STATE, MM_MODEM_STATE_DISABLED,
                           NULL);
+
+            g_idle_add ((GSourceFunc)restart_initialize_idle, self);
         }
     } else {
         if (old_lock == MM_MODEM_LOCK_UNKNOWN) {
