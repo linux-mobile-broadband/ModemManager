@@ -65,6 +65,26 @@ struct _MMBaseModemClass {
     gboolean (*initialize_finish) (MMBaseModem *self,
                                    GAsyncResult *res,
                                    GError **error);
+
+    /* Modem enabling.
+     * User action requested from DBus, usually */
+    void (* enable) (MMBaseModem *self,
+                     GCancellable *cancellable,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data);
+    gboolean (*enable_finish) (MMBaseModem *self,
+                               GAsyncResult *res,
+                               GError **error);
+
+    /* Modem disabling.
+     * User action requested from DBus, usually */
+    void (* disable) (MMBaseModem *self,
+                      GCancellable *cancellable,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data);
+    gboolean (*disable_finish) (MMBaseModem *self,
+                                GAsyncResult *res,
+                                GError **error);
 };
 
 GType mm_base_modem_get_type (void);
