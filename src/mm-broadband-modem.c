@@ -52,6 +52,24 @@ struct _MMBroadbandModemPrivate {
     MMModemState modem_state;
 };
 
+static gboolean
+common_parse_string_reply (MMBroadbandModem *self,
+                           gpointer none,
+                           const gchar *command,
+                           const gchar *response,
+                           const GError *error,
+                           GVariant **result,
+                           GError **result_error)
+{
+    if (error) {
+        *result_error = g_error_copy (error);
+        return FALSE;
+    }
+
+    *result = g_variant_new_string (response);
+    return TRUE;
+}
+
 /*****************************************************************************/
 /* CAPABILITIES */
 
@@ -232,6 +250,50 @@ load_modem_capabilities (MMIfaceModem *self,
                     NULL, /* response_processor_context */
                     FALSE,
                     "u",
+                    NULL, /* TODO: cancellable */
+                    callback,
+                    user_data);
+}
+
+/*****************************************************************************/
+/* MANUFACTURER */
+
+static gchar *
+load_manufacturer_finish (MMIfaceModem *self,
+                          GAsyncResult *res,
+                          GError **error)
+{
+    GVariant *result;
+    gchar *manufacturer;
+
+    result = mm_at_sequence_finish (G_OBJECT (self), res, error);
+    if (!result)
+        return NULL;
+
+    manufacturer = g_variant_dup_string (result, NULL);
+    mm_dbg ("loaded manufacturer: %s", manufacturer);
+    g_variant_unref (result);
+    return manufacturer;
+}
+
+static const MMAtCommand manufacturers[] = {
+    { "+CGMI",  3, (MMAtResponseProcessor)common_parse_string_reply },
+    { "+GMI",   3, (MMAtResponseProcessor)common_parse_string_reply },
+    { NULL }
+};
+
+static void
+load_manufacturer (MMIfaceModem *self,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
+{
+    mm_dbg ("loading manufacturer...");
+    mm_at_sequence (G_OBJECT (self),
+                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                    (MMAtCommand *)manufacturers,
+                    NULL, /* response_processor_context */
+                    FALSE,
+                    "s",
                     NULL, /* TODO: cancellable */
                     callback,
                     user_data);
@@ -453,6 +515,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface->load_modem_capabilities = load_modem_capabilities;
     iface->load_modem_capabilities_finish = load_modem_capabilities_finish;
+    iface->load_manufacturer = load_manufacturer;
+    iface->load_manufacturer_finish = load_manufacturer_finish;
 }
 
 static void
