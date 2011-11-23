@@ -300,6 +300,50 @@ load_manufacturer (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* MODEL */
+
+static gchar *
+load_model_finish (MMIfaceModem *self,
+                   GAsyncResult *res,
+                   GError **error)
+{
+    GVariant *result;
+    gchar *model;
+
+    result = mm_at_sequence_finish (G_OBJECT (self), res, error);
+    if (!result)
+        return NULL;
+
+    model = g_variant_dup_string (result, NULL);
+    mm_dbg ("loaded model: %s", model);
+    g_variant_unref (result);
+    return model;
+}
+
+static const MMAtCommand models[] = {
+    { "+CGMM",  3, (MMAtResponseProcessor)common_parse_string_reply },
+    { "+GMM",   3, (MMAtResponseProcessor)common_parse_string_reply },
+    { NULL }
+};
+
+static void
+load_model (MMIfaceModem *self,
+            GAsyncReadyCallback callback,
+            gpointer user_data)
+{
+    mm_dbg ("loading model...");
+    mm_at_sequence (G_OBJECT (self),
+                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                    (MMAtCommand *)models,
+                    NULL, /* response_processor_context */
+                    FALSE,
+                    "s",
+                    NULL, /* TODO: cancellable */
+                    callback,
+                    user_data);
+}
+
+/*****************************************************************************/
 
 static void
 enable (MMBaseModem *self,
@@ -517,6 +561,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_modem_capabilities_finish = load_modem_capabilities_finish;
     iface->load_manufacturer = load_manufacturer;
     iface->load_manufacturer_finish = load_manufacturer_finish;
+    iface->load_model = load_model;
+    iface->load_model_finish = load_model_finish;
 }
 
 static void
