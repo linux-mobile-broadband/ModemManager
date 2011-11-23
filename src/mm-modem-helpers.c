@@ -23,7 +23,9 @@
 #include <stdlib.h>
 #include <errno.h>
 
-#include "mm-errors.h"
+#include <ModemManager.h>
+#include <mm-errors-types.h>
+
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 
@@ -91,7 +93,7 @@ mm_gsm_parse_scan_response (const char *reply, GError **error)
 
     if (!strstr (reply, "+COPS: ")) {
         g_set_error_literal (error,
-                             MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                              "Could not parse scan results.");
         return NULL;
     }
@@ -117,7 +119,7 @@ mm_gsm_parse_scan_response (const char *reply, GError **error)
         mm_err ("Invalid regular expression: %s", err->message);
         g_error_free (err);
         g_set_error_literal (error,
-                             MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                              "Could not parse scan results.");
         return NULL;
     }
@@ -146,7 +148,7 @@ mm_gsm_parse_scan_response (const char *reply, GError **error)
             mm_err ("Invalid regular expression: %s", err->message);
             g_error_free (err);
             g_set_error_literal (error,
-                                 MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                 MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                                  "Could not parse scan results.");
             return NULL;
         }
@@ -452,7 +454,7 @@ mm_gsm_parse_creg_response (GMatchInfo *info,
     g_free (str);
     if (!success) {
         g_set_error_literal (error,
-                             MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                              "Could not parse the registration status response");
         return FALSE;
     }
@@ -1170,7 +1172,7 @@ mm_parse_cind_test_response (const char *reply, GError **error)
     r = g_regex_new ("\\(([^,]*),\\((\\d+)[-,](\\d+)\\)", G_REGEX_UNGREEDY, 0, NULL);
     if (!r) {
         g_set_error_literal (error,
-                             MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                              "Could not parse scan results.");
         return NULL;
     }
@@ -1220,7 +1222,7 @@ mm_parse_cind_query_response(const char *reply, GError **error)
     g_return_val_if_fail (reply != NULL, NULL);
 
     if (!g_str_has_prefix (p, CIND_TAG)) {
-        g_set_error_literal (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                              "Could not parse the +CIND response");
         return NULL;
     }
@@ -1231,13 +1233,13 @@ mm_parse_cind_query_response(const char *reply, GError **error)
 
     r = g_regex_new ("(\\d+)[^0-9]+", G_REGEX_UNGREEDY, 0, NULL);
     if (!r) {
-        g_set_error_literal (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                              "Internal failure attempting to parse +CIND response");
         return NULL;
     }
 
     if (!g_regex_match_full (r, p, strlen (p), 0, 0, &match_info, NULL)) {
-        g_set_error_literal (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                              "Failure parsing the +CIND response");
         goto done;
     }

@@ -18,8 +18,10 @@
 
 #include <glib.h>
 
+#include <ModemManager.h>
+#include <mm-errors-types.h>
+
 #include "mm-charsets.h"
-#include "mm-errors.h"
 #include "mm-utils.h"
 #include "mm-sms-utils.h"
 #include "mm-log.h"
@@ -397,7 +399,7 @@ sms_parse_pdu (const char *hexpdu, GError **error)
     /* Convert PDU from hex to binary */
     pdu = (guint8 *) utils_hexstr2bin (hexpdu, &pdu_len);
     if (!pdu) {
-        g_set_error_literal (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                              "Couldn't parse PDU of SMS GET response from hex");
         return NULL;
     }
@@ -406,7 +408,7 @@ sms_parse_pdu (const char *hexpdu, GError **error)
     smsc_addr_num_octets = pdu[0];
     variable_length_items = smsc_addr_num_octets;
     if (pdu_len < variable_length_items + SMS_MIN_PDU_LEN) {
-        g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "PDU too short (1): %zd vs %d",
                      pdu_len,
                      variable_length_items + SMS_MIN_PDU_LEN);
@@ -424,7 +426,7 @@ sms_parse_pdu (const char *hexpdu, GError **error)
     sender_addr_num_octets = (sender_addr_num_digits + 1) >> 1;
     variable_length_items += sender_addr_num_octets;
     if (pdu_len < variable_length_items + SMS_MIN_PDU_LEN) {
-        g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "PDU too short (2): %zd vs %d",
                      pdu_len,
                      variable_length_items + SMS_MIN_PDU_LEN);
@@ -444,7 +446,7 @@ sms_parse_pdu (const char *hexpdu, GError **error)
     else
         variable_length_items += user_data_len;
     if (pdu_len < variable_length_items + SMS_MIN_PDU_LEN) {
-        g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "PDU too short (3): %zd vs %d",
                      pdu_len,
                      variable_length_items + SMS_MIN_PDU_LEN);
@@ -454,7 +456,7 @@ sms_parse_pdu (const char *hexpdu, GError **error)
 
     /* Only handle SMS-DELIVER */
     if ((pdu[msg_start_offset] & SMS_TP_MTI_MASK) != SMS_TP_MTI_SMS_DELIVER) {
-        g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                      "Unhandled message type: 0x%02x",
                      pdu[msg_start_offset]);
         g_free (pdu);
@@ -662,8 +664,8 @@ sms_create_submit_pdu (const char *number,
     textlen = mm_charset_get_encoded_len (text, MM_MODEM_CHARSET_GSM, &gsm_unsupported);
     if (textlen > 160) {
         g_set_error_literal (error,
-                             MM_MODEM_ERROR,
-                             MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_UNSUPPORTED,
                              "Cannot encode message to fit into an SMS.");
         return NULL;
     }
@@ -679,7 +681,7 @@ sms_create_submit_pdu (const char *number,
             textlen = ucs2len;
         }
     }
-    
+
     /* Build up the PDU */
     pdu = g_malloc0 (PDU_SIZE);
     g_return_val_if_fail (pdu != NULL, NULL);
@@ -688,8 +690,8 @@ sms_create_submit_pdu (const char *number,
         len = sms_encode_address (smsc, pdu, PDU_SIZE, TRUE);
         if (len == 0) {
             g_set_error (error,
-                         MM_MSG_ERROR,
-                         MM_MSG_ERROR_INVALID_PDU_PARAMETER,
+                         MM_MESSAGE_ERROR,
+                         MM_MESSAGE_ERROR_INVALID_PDU_PARAMETER,
                          "Invalid SMSC address '%s'", smsc);
             goto error;
         }
@@ -713,8 +715,8 @@ sms_create_submit_pdu (const char *number,
     len = sms_encode_address (number, &pdu[offset], PDU_SIZE - offset, FALSE);
     if (len == 0) {
         g_set_error (error,
-                     MM_MSG_ERROR,
-                     MM_MSG_ERROR_INVALID_PDU_PARAMETER,
+                     MM_MESSAGE_ERROR,
+                     MM_MESSAGE_ERROR_INVALID_PDU_PARAMETER,
                      "Invalid send-to number '%s'", number);
         goto error;
     }
@@ -744,8 +746,8 @@ sms_create_submit_pdu (const char *number,
         if (!unpacked || unlen == 0) {
             g_free (unpacked);
             g_set_error_literal (error,
-                                 MM_MSG_ERROR,
-                                 MM_MSG_ERROR_INVALID_PDU_PARAMETER,
+                                 MM_MESSAGE_ERROR,
+                                 MM_MESSAGE_ERROR_INVALID_PDU_PARAMETER,
                                  "Failed to convert message text to GSM.");
             goto error;
         }
@@ -755,8 +757,8 @@ sms_create_submit_pdu (const char *number,
         if (!packed || packlen == 0) {
             g_free (packed);
             g_set_error_literal (error,
-                                 MM_MSG_ERROR,
-                                 MM_MSG_ERROR_INVALID_PDU_PARAMETER,
+                                 MM_MESSAGE_ERROR,
+                                 MM_MESSAGE_ERROR_INVALID_PDU_PARAMETER,
                                  "Failed to pack message text to GSM.");
             goto error;
         }
@@ -771,8 +773,8 @@ sms_create_submit_pdu (const char *number,
         if (!mm_modem_charset_byte_array_append (array, text, FALSE, best_cs)) {
             g_byte_array_free (array, TRUE);
             g_set_error_literal (error,
-                                 MM_MSG_ERROR,
-                                 MM_MSG_ERROR_INVALID_PDU_PARAMETER,
+                                 MM_MESSAGE_ERROR,
+                                 MM_MESSAGE_ERROR_INVALID_PDU_PARAMETER,
                                  "Failed to convert message text to UCS2.");
             goto error;
         }
@@ -791,4 +793,3 @@ error:
     g_free (pdu);
     return NULL;
 }
-

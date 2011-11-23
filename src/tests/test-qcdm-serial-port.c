@@ -26,7 +26,9 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-#include "mm-errors.h"
+#include <ModemManager.h>
+#include <mm-errors-types.h>
+
 #include "mm-qcdm-serial-port.h"
 #include "libqcdm/src/commands.h"
 #include "libqcdm/src/utils.h"
@@ -275,7 +277,7 @@ qcdm_verinfo_expect_fail_cb (MMQcdmSerialPort *port,
 {
     GMainLoop *loop = user_data;
 
-    g_assert_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL);
+    g_assert_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED);
     g_main_loop_quit (loop);
 }
 
@@ -461,7 +463,7 @@ int main (int argc, char **argv)
     GTestSuite *suite;
     gint result;
     TestData *data = NULL;
-    
+
     g_test_init (&argc, &argv, NULL);
 
     suite = g_test_get_root ();

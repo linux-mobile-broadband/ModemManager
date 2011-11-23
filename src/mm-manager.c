@@ -25,13 +25,12 @@
 #include <gudev/gudev.h>
 
 #include <ModemManager.h>
-
+#include <mm-errors-types.h>
 #include <mm-gdbus-manager.h>
 
 #include "mm-manager.h"
 #include "mm-plugin-manager.h"
 #include "mm-auth-provider.h"
-#include "mm-errors.h"
 #include "mm-plugin.h"
 #include "mm-log.h"
 #include "mm-port-probe-cache.h"
@@ -748,8 +747,8 @@ scan_devices_request_auth_cb (MMAuthRequest *req,
 {
     if (mm_auth_request_get_result (req) != MM_AUTH_RESULT_AUTHORIZED) {
         g_dbus_method_invocation_return_error (invocation,
-                                               MM_MODEM_ERROR,
-                                               MM_MODEM_ERROR_AUTHORIZATION_REQUIRED,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNAUTHORIZED,
                                                "This request requires the '%s' authorization",
                                                mm_auth_request_get_authorization (req));
         return;

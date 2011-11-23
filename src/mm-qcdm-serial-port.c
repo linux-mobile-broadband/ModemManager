@@ -19,8 +19,10 @@
 #include <unistd.h>
 #include <string.h>
 
+#include <ModemManager.h>
+#include <mm-errors-types.h>
+
 #include "mm-qcdm-serial-port.h"
-#include "mm-errors.h"
 #include "libqcdm/src/com.h"
 #include "libqcdm/src/utils.h"
 #include "libqcdm/src/errors.h"
@@ -92,7 +94,7 @@ handle_response (MMSerialPort *port,
     /* Get the offset into the buffer of where the QCDM frame starts */
     if (!find_qcdm_start (response, &start)) {
         g_set_error_literal (&dm_error,
-                             MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                              "Failed to parse QCDM packet.");
         /* Discard the unparsable data */
         used = response->len;
@@ -110,7 +112,7 @@ handle_response (MMSerialPort *port,
                                      &more);
     if (!success) {
         g_set_error_literal (&dm_error,
-                             MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
                              "Failed to unescape QCDM packet.");
         g_byte_array_free (unescaped, TRUE);
         unescaped = NULL;

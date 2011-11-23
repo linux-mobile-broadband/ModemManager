@@ -35,7 +35,6 @@
 #include "mm-at-serial-port.h"
 #include "mm-qcdm-serial-port.h"
 #include "mm-serial-parsers.h"
-#include "mm-errors.h"
 #include "mm-marshal.h"
 #include "mm-utils.h"
 #include "libqcdm/src/commands.h"

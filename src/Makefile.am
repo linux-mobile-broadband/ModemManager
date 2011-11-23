@@ -24,8 +24,8 @@ libmodem_helpers_la_LIBADD = \
 	$(top_builddir)/libmm-common/libmm-common.la
 
 libmodem_helpers_la_SOURCES = \
-	mm-errors.c \
-	mm-errors.h \
+	mm-error-helpers.c \
+	mm-error-helpers.h \
 	mm-modem-helpers.c \
 	mm-modem-helpers.h \
 	mm-charsets.c \

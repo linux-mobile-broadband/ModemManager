@@ -15,7 +15,9 @@
  */
 
 #include "mm-callback-info.h"
-#include "mm-errors.h"
+
+#include <ModemManager.h>
+#include <mm-errors-types.h>
 
 #define CALLBACK_INFO_RESULT "callback-info-result"
 
@@ -68,8 +70,8 @@ modem_destroyed_cb (gpointer data, GObject *destroyed)
 
     /* Overwrite any possible previous error set */
     g_clear_error (&(info->error));
-    info->error = g_error_new_literal (MM_MODEM_ERROR,
-                                       MM_MODEM_ERROR_REMOVED,
+    info->error = g_error_new_literal (MM_CORE_ERROR,
+                                       MM_CORE_ERROR_ABORTED,
                                        "The modem was removed.");
 
     /* Only schedule the info if not already done before */

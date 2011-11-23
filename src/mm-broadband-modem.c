@@ -22,7 +22,6 @@
 #include <string.h>
 
 #include <ModemManager.h>
-
 #include <mm-errors-types.h>
 #include <mm-enums-types.h>
 
@@ -30,7 +29,6 @@
 #include "mm-broadband-modem.h"
 #include "mm-iface-modem.h"
 #include "mm-sim.h"
-#include "mm-errors.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 

@@ -20,11 +20,9 @@
 #include <string.h>
 
 #include <ModemManager.h>
-
 #include <mm-errors-types.h>
 
 #include "mm-port-probe.h"
-#include "mm-errors.h"
 #include "mm-log.h"
 #include "mm-at-serial-port.h"
 #include "mm-serial-port.h"
@@ -633,8 +631,8 @@ serial_open_at (MMPortProbe *self)
                 task,
                 FALSE,
                 FALSE,
-                g_error_new (MM_MODEM_ERROR,
-                             MM_MODEM_ERROR_GENERAL,
+                g_error_new (MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
                              "(%s) failed to open port after 4 tries",
                              self->priv->name));
         } else if (g_error_matches (error,

@@ -34,7 +34,6 @@
 #include "mm-sim.h"
 #include "mm-base-modem.h"
 #include "mm-utils.h"
-#include "mm-errors.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 

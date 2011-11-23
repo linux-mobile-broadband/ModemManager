@@ -28,8 +28,10 @@
 #include <string.h>
 #include <linux/serial.h>
 
+#include <ModemManager.h>
+#include <mm-errors-types.h>
+
 #include "mm-serial-port.h"
-#include "mm-errors.h"
 #include "mm-log.h"
 
 static gboolean mm_serial_port_queue_process (gpointer data);
@@ -365,8 +367,8 @@ real_config_fd (MMSerialPort *self, int fd, GError **error)
     errno = 0;
     if (cfsetispeed (&stbuf, speed) != 0) {
         g_set_error (error,
-                     MM_MODEM_ERROR,
-                     MM_MODEM_ERROR_GENERAL,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
                      "%s: failed to set serial port input speed; errno %d",
                      __func__, errno);
         return FALSE;
@@ -375,8 +377,8 @@ real_config_fd (MMSerialPort *self, int fd, GError **error)
     errno = 0;
     if (cfsetospeed (&stbuf, speed) != 0) {
         g_set_error (error,
-                     MM_MODEM_ERROR,
-                     MM_MODEM_ERROR_GENERAL,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
                      "%s: failed to set serial port output speed; errno %d",
                      __func__, errno);
         return FALSE;
@@ -384,8 +386,8 @@ real_config_fd (MMSerialPort *self, int fd, GError **error)
 
     if (tcsetattr (fd, TCSANOW, &stbuf) < 0) {
         g_set_error (error,
-                     MM_MODEM_ERROR,
-                     MM_MODEM_ERROR_GENERAL,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
                      "%s: failed to set serial port attributes; errno %d",
                      __func__, errno);
         return FALSE;
@@ -1091,8 +1093,8 @@ get_speed (MMSerialPort *self, speed_t *speed, GError **error)
     memset (&options, 0, sizeof (struct termios));
     if (tcgetattr (MM_SERIAL_PORT_GET_PRIVATE (self)->fd, &options) != 0) {
         g_set_error (error,
-                     MM_MODEM_ERROR,
-                     MM_MODEM_ERROR_GENERAL,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
                      "%s: tcgetattr() error %d",
                      __func__, errno);
         return FALSE;
@@ -1115,8 +1117,8 @@ set_speed (MMSerialPort *self, speed_t speed, GError **error)
     memset (&options, 0, sizeof (struct termios));
     if (tcgetattr (fd, &options) != 0) {
         g_set_error (error,
-                     MM_MODEM_ERROR,
-                     MM_MODEM_ERROR_GENERAL,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
                      "%s: tcgetattr() error %d",
                      __func__, errno);
         return FALSE;
@@ -1142,8 +1144,8 @@ set_speed (MMSerialPort *self, speed_t speed, GError **error)
         else {
             /* If not EAGAIN, hard error */
             g_set_error (error,
-                            MM_MODEM_ERROR,
-                            MM_MODEM_ERROR_GENERAL,
+                            MM_CORE_ERROR,
+                            MM_CORE_ERROR_FAILED,
                             "%s: tcsetattr() error %d",
                             __func__, errno);
             return FALSE;
@@ -1152,8 +1154,8 @@ set_speed (MMSerialPort *self, speed_t speed, GError **error)
 
     if (!success) {
         g_set_error (error,
-                        MM_MODEM_ERROR,
-                        MM_MODEM_ERROR_GENERAL,
+                        MM_CORE_ERROR,
+                        MM_CORE_ERROR_FAILED,
                         "%s: tcsetattr() retry timeout",
                         __func__);
         return FALSE;
@@ -1220,8 +1222,8 @@ mm_serial_port_flash (MMSerialPort *self,
     }
 
     if (priv->flash_id > 0) {
-        error = g_error_new_literal (MM_MODEM_ERROR,
-                                     MM_MODEM_ERROR_OPERATION_IN_PROGRESS,
+        error = g_error_new_literal (MM_CORE_ERROR,
+                                     MM_CORE_ERROR_IN_PROGRESS,
                                      "Modem is already being flashed.");
         goto error;
     }

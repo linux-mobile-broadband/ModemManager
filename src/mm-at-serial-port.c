@@ -22,7 +22,6 @@
 #include <string.h>
 
 #include "mm-at-serial-port.h"
-#include "mm-errors.h"
 #include "mm-log.h"
 
 G_DEFINE_TYPE (MMAtSerialPort, mm_at_serial_port, MM_TYPE_SERIAL_PORT)

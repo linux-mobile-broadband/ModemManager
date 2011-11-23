@@ -17,8 +17,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "mm-error-helpers.h"
 #include "mm-serial-parsers.h"
-#include "mm-errors.h"
 #include "mm-log.h"
 
 /* Clean up the response by removing control characters like <CR><LF> etc */
@@ -125,7 +125,7 @@ mm_serial_parser_v0_parse (gpointer data,
             code = atoi (str);
             g_free (str);
         } else
-            code = MM_MOBILE_ERROR_UNKNOWN;
+            code = MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN;
 
         switch (code) {
         case 0: /* OK */
@@ -133,22 +133,22 @@ mm_serial_parser_v0_parse (gpointer data,
         case 1: /* CONNECT */
             break;
         case 3: /* NO CARRIER */
-            local_error = mm_modem_connect_error_for_code (MM_MODEM_CONNECT_ERROR_NO_CARRIER);
+            local_error = mm_connection_error_for_code (MM_CONNECTION_ERROR_NO_CARRIER);
             break;
         case 4: /* ERROR */
-            local_error = mm_mobile_error_for_code (MM_MOBILE_ERROR_UNKNOWN);
+            local_error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN);
             break;
         case 6: /* NO DIALTONE */
-            local_error = mm_modem_connect_error_for_code (MM_MODEM_CONNECT_ERROR_NO_DIALTONE);
+            local_error = mm_connection_error_for_code (MM_CONNECTION_ERROR_NO_DIALTONE);
             break;
         case 7: /* BUSY */
-            local_error = mm_modem_connect_error_for_code (MM_MODEM_CONNECT_ERROR_BUSY);
+            local_error = mm_connection_error_for_code (MM_CONNECTION_ERROR_BUSY);
             break;
         case 8: /* NO ANSWER */
-            local_error = mm_modem_connect_error_for_code (MM_MODEM_CONNECT_ERROR_NO_ANSWER);
+            local_error = mm_connection_error_for_code (MM_CONNECTION_ERROR_NO_ANSWER);
             break;
         default:
-            local_error = mm_mobile_error_for_code (MM_MOBILE_ERROR_UNKNOWN);
+            local_error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN);
             break;
         }
 
@@ -165,9 +165,9 @@ mm_serial_parser_v0_parse (gpointer data,
                 code = atoi (str);
                 g_free (str);
             } else
-                code = MM_MOBILE_ERROR_UNKNOWN;
+                code = MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN;
 
-            local_error = mm_mobile_error_for_code (code);
+            local_error = mm_mobile_equipment_error_for_code (code);
         }
         g_match_info_free (match_info);
 
@@ -179,9 +179,9 @@ mm_serial_parser_v0_parse (gpointer data,
                     code = atoi (str);
                     g_free (str);
                 } else
-                    code = MM_MSG_ERROR_UNKNOWN;
+                    code = MM_MESSAGE_ERROR_UNKNOWN;
 
-                local_error = mm_msg_error_for_code (code);
+                local_error = mm_message_error_for_code (code);
             }
             g_match_info_free (match_info);
         }
@@ -280,7 +280,6 @@ mm_serial_parser_v1_parse (gpointer data,
     GError *local_error = NULL;
     gboolean found = FALSE;
     char *str = NULL;
-    int code;
 
     g_return_val_if_fail (parser != NULL, FALSE);
     g_return_val_if_fail (response != NULL, FALSE);
@@ -328,7 +327,7 @@ mm_serial_parser_v1_parse (gpointer data,
         if (found) {
             str = g_match_info_fetch (match_info, 1);
             g_assert (str);
-            local_error = mm_mobile_error_for_code (atoi (str));
+            local_error = mm_mobile_equipment_error_for_code (atoi (str));
             goto done;
         }
         g_match_info_free (match_info);
@@ -341,7 +340,7 @@ mm_serial_parser_v1_parse (gpointer data,
     if (found) {
         str = g_match_info_fetch (match_info, 1);
         g_assert (str);
-        local_error = mm_mobile_error_for_code (atoi (str));
+        local_error = mm_mobile_equipment_error_for_code (atoi (str));
         goto done;
     }
     g_match_info_free (match_info);
@@ -353,7 +352,7 @@ mm_serial_parser_v1_parse (gpointer data,
     if (found) {
         str = g_match_info_fetch (match_info, 1);
         g_assert (str);
-        local_error = mm_msg_error_for_code (atoi (str));
+        local_error = mm_message_error_for_code (atoi (str));
         goto done;
     }
     g_match_info_free (match_info);
@@ -365,7 +364,7 @@ mm_serial_parser_v1_parse (gpointer data,
     if (found) {
         str = g_match_info_fetch (match_info, 1);
         g_assert (str);
-        local_error = mm_mobile_error_for_string (str);
+        local_error = mm_mobile_equipment_error_for_string (str);
         goto done;
     }
     g_match_info_free (match_info);
@@ -377,7 +376,7 @@ mm_serial_parser_v1_parse (gpointer data,
     if (found) {
         str = g_match_info_fetch (match_info, 1);
         g_assert (str);
-        local_error = mm_msg_error_for_string (str);
+        local_error = mm_message_error_for_string (str);
         goto done;
     }
     g_match_info_free (match_info);
@@ -389,7 +388,7 @@ mm_serial_parser_v1_parse (gpointer data,
     if (found) {
         str = g_match_info_fetch (match_info, 1);
         g_assert (str);
-        local_error = mm_mobile_error_for_code (MM_MOBILE_ERROR_UNKNOWN);
+        local_error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN);
         goto done;
     }
     g_match_info_free (match_info);
@@ -399,7 +398,7 @@ mm_serial_parser_v1_parse (gpointer data,
                                 response->str, response->len,
                                 0, 0, &match_info, NULL);
     if (found) {
-        local_error = mm_mobile_error_for_code (MM_MOBILE_ERROR_UNKNOWN);
+        local_error = mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN);
         goto done;
     }
     g_match_info_free (match_info);
@@ -409,23 +408,25 @@ mm_serial_parser_v1_parse (gpointer data,
                                 response->str, response->len,
                                 0, 0, &match_info, NULL);
     if (found) {
+        MMConnectionError code;
+
         str = g_match_info_fetch (match_info, 1);
         g_assert (str);
 
         if (!strcmp (str, "NO CARRIER"))
-            code = MM_MODEM_CONNECT_ERROR_NO_CARRIER;
+            code = MM_CONNECTION_ERROR_NO_CARRIER;
         else if (!strcmp (str, "BUSY"))
-            code = MM_MODEM_CONNECT_ERROR_BUSY;
+            code = MM_CONNECTION_ERROR_BUSY;
         else if (!strcmp (str, "NO ANSWER"))
-            code = MM_MODEM_CONNECT_ERROR_NO_ANSWER;
+            code = MM_CONNECTION_ERROR_NO_ANSWER;
         else if (!strcmp (str, "NO DIALTONE"))
-            code = MM_MODEM_CONNECT_ERROR_NO_DIALTONE;
+            code = MM_CONNECTION_ERROR_NO_DIALTONE;
         else {
             /* uhm... make something up (yes, ok, lie!). */
-            code = MM_MODEM_CONNECT_ERROR_NO_CARRIER;
+            code = MM_CONNECTION_ERROR_NO_CARRIER;
         }
 
-        local_error = mm_modem_connect_error_for_code (code);
+        local_error = mm_connection_error_for_code (code);
     }
 
 done:

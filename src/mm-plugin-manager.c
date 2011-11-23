@@ -21,9 +21,11 @@
 #include <gmodule.h>
 #include <gio/gio.h>
 
+#include <ModemManager.h>
+#include <mm-errors-types.h>
+
 #include "mm-plugin-manager.h"
 #include "mm-plugin.h"
-#include "mm-errors.h"
 #include "mm-log.h"
 
 /* Default time to defer probing checks */

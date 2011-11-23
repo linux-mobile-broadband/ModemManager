@@ -24,6 +24,9 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <ModemManager.h>
+#include <mm-errors-types.h>
+
 #include "mm-log.h"
 
 enum {
@@ -176,7 +179,8 @@ mm_log_set_level (const char *level, GError **error)
         }
     }
     if (!found)
-       g_set_error (error, 0, 0, "Unknown log level '%s'", level);
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_INVALID_ARGS,
+                     "Unknown log level '%s'", level);
     return found;
 }
 
@@ -206,13 +210,14 @@ mm_log_setup (const char *level,
                       O_CREAT | O_APPEND | O_WRONLY,
                       S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
         if (logfd < 0) {
-            g_set_error (error, 0, 0, "Failed to open log file: (%d) %s",
+            g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                         "Couldn't open log file: (%d) %s",
                          errno, strerror (errno));
             return FALSE;
         }
     }
 
-    g_log_set_handler (G_LOG_DOMAIN, 
+    g_log_set_handler (G_LOG_DOMAIN,
                        G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION,
                        log_handler,
                        NULL);

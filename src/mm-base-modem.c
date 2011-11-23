@@ -22,13 +22,11 @@
 #include <string.h>
 
 #include <ModemManager.h>
-
 #include <mm-errors-types.h>
 #include <mm-gdbus-modem.h>
 
 #include "mm-base-modem.h"
 
-#include "mm-errors.h"
 #include "mm-log.h"
 #include "mm-at-serial-port.h"
 #include "mm-qcdm-serial-port.h"

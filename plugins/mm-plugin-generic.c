@@ -28,7 +28,6 @@
 
 #include "mm-plugin-generic.h"
 #include "mm-broadband-modem.h"
-#include "mm-errors.h"
 #include "mm-serial-parsers.h"
 #include "mm-log.h"
 

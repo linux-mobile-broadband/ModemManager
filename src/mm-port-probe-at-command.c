@@ -20,7 +20,9 @@
 
 #include <glib.h>
 
-#include "mm-errors.h"
+#include <ModemManager.h>
+#include <mm-errors-types.h>
+
 #include "mm-port-probe.h"
 #include "mm-port-probe-at-command.h"
 
@@ -40,7 +42,7 @@ parse_at (const gchar *response,
             return FALSE; /* Retry */
 
         /* If error is not recognizable, request to abort */
-        if (error->domain != MM_MOBILE_ERROR) {
+        if (error->domain != MM_MOBILE_EQUIPMENT_ERROR) {
             *result_error = g_error_copy (error);
             g_prefix_error (result_error,
                             "Couldn't parse AT reply. ");
