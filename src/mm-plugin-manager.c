@@ -62,7 +62,7 @@ typedef struct {
     gchar *subsys;
     gchar *name;
     gchar *physdev_path;
-    MMModem *existing;
+    MMBaseModem *existing;
     /* Current context */
     MMPlugin *suggested_plugin;
     GSList *current;
@@ -341,7 +341,7 @@ mm_plugin_manager_find_port_support (MMPluginManager *self,
                                      const gchar *name,
                                      const gchar *physdev_path,
                                      MMPlugin *suggested_plugin,
-                                     MMModem *existing,
+                                     MMBaseModem *existing,
                                      GAsyncReadyCallback callback,
                                      gpointer user_data)
 {

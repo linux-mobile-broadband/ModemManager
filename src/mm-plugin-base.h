@@ -23,7 +23,7 @@
 #include <gudev/gudev.h>
 
 #include "mm-plugin.h"
-#include "mm-modem.h"
+#include "mm-base-modem.h"
 #include "mm-port.h"
 #include "mm-port-probe.h"
 
@@ -59,8 +59,8 @@ struct _MMPluginBaseClass {
     GObjectClass parent;
 
     /* Mandatory subclass functions */
-    MMModem *(*grab_port)     (MMPluginBase *plugin,
-                               MMModem *existing,
+    MMBaseModem *(*grab_port) (MMPluginBase *plugin,
+                               MMBaseModem *existing,
                                MMPortProbe *probe,
                                GError **error);
 };

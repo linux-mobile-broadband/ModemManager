@@ -20,7 +20,7 @@
 #include <glib-object.h>
 #include <gio/gio.h>
 
-#include <mm-modem.h>
+#include "mm-base-modem.h"
 
 #define MM_PLUGIN_GENERIC_NAME "Generic"
 
@@ -74,7 +74,7 @@ struct _MMPlugin {
                             const gchar *subsys,
                             const gchar *name,
                             const gchar *physdev_path,
-                            MMModem *existing,
+                            MMBaseModem *existing,
                             GAsyncReadyCallback callback,
                             gpointer user_data);
 
@@ -101,11 +101,11 @@ struct _MMPlugin {
      * while claiming the port, the error information should be returned in the
      * error argument, and the plugin should return NULL.
      */
-    MMModem * (*grab_port)    (MMPlugin *self,
-                               const char *subsys,
-                               const char *name,
-                               MMModem *existing,
-                               GError **error);
+    MMBaseModem * (*grab_port)    (MMPlugin *self,
+                                   const char *subsys,
+                                   const char *name,
+                                   MMBaseModem *existing,
+                                   GError **error);
 };
 
 GType mm_plugin_get_type (void);
@@ -118,7 +118,7 @@ void mm_plugin_supports_port (MMPlugin *plugin,
                               const gchar *subsys,
                               const gchar *name,
                               const gchar *physdev_path,
-                              MMModem *existing,
+                              MMBaseModem *existing,
                               GAsyncReadyCallback callback,
                               gpointer user_data);
 
@@ -130,11 +130,11 @@ void mm_plugin_supports_port_cancel (MMPlugin *plugin,
                                      const char *subsys,
                                      const char *name);
 
-MMModem *mm_plugin_grab_port     (MMPlugin *plugin,
-                                  const char *subsys,
-                                  const char *name,
-                                  MMModem *existing,
-                                  GError **error);
+MMBaseModem *mm_plugin_grab_port    (MMPlugin *plugin,
+                                     const char *subsys,
+                                     const char *name,
+                                     MMBaseModem *existing,
+                                     GError **error);
 
 #endif /* MM_PLUGIN_H */
 

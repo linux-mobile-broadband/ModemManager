@@ -27,8 +27,7 @@
 #include <gmodule.h>
 
 #include "mm-plugin-generic.h"
-#include "mm-generic-gsm.h"
-#include "mm-generic-cdma.h"
+#include "mm-broadband-modem.h"
 #include "mm-errors.h"
 #include "mm-serial-parsers.h"
 #include "mm-log.h"
@@ -40,27 +39,33 @@ int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 
 /*****************************************************************************/
 
-static MMModem *
+static MMBaseModem *
 grab_port (MMPluginBase *base,
-           MMModem *existing,
+           MMBaseModem *existing,
            MMPortProbe *probe,
            GError **error)
 {
     GUdevDevice *port;
-    MMModem *modem = NULL;
-    const gchar *name, *subsys, *devfile, *physdev, *driver;
-    guint32 caps;
+    MMBaseModem *modem = NULL;
+    const gchar *name, *subsys, *devfile, *driver;
     guint16 vendor = 0, product = 0;
 
     subsys = mm_port_probe_get_port_subsys (probe);
     name = mm_port_probe_get_port_name (probe);
+
+    /* The generic plugin cannot do anything with non-AT ports */
+    if (!mm_port_probe_is_at (probe)) {
+        g_set_error (error, 0, 0, "Ignoring non-AT port");
+        return NULL;
+    }
+
     driver = mm_port_probe_get_port_driver (probe);
     port = mm_port_probe_get_port (probe);
-    g_assert (port);
 
+    /* Check device file of the port, we expect one */
     devfile = g_udev_device_get_device_file (port);
     if (!devfile) {
-        if (!driver || strcmp (driver, "bluetooth")) {
+        if (!driver || !g_str_equal (driver, "bluetooth")) {
             g_set_error (error, 0, 0, "Could not get port's sysfs file.");
             return NULL;
         }
@@ -71,58 +76,29 @@ grab_port (MMPluginBase *base,
                  name);
     }
 
-    if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product)) {
-        g_set_error (error, 0, 0, "Could not get modem product ID.");
+    /* Vendor and Product IDs are really optional, we'll just warn if they
+     * cannot get loaded */
+    if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product))
+        mm_warn ("Could not get modem vendor/product ID");
+
+    /* If this is the first port being grabbed, create a new modem object */
+    if (!existing)
+        modem = MM_BASE_MODEM (mm_broadband_modem_new (mm_port_probe_get_port_physdev (probe),
+                                                       driver,
+                                                       mm_plugin_get_name (MM_PLUGIN (base)),
+                                                       vendor,
+                                                       product));
+
+    if (!mm_base_modem_grab_port (existing ? existing : modem,
+                                  subsys,
+                                  name,
+                                  MM_PORT_TYPE_UNKNOWN)) {
+        if (modem)
+            g_object_unref (modem);
         return NULL;
     }
 
-    caps = mm_port_probe_get_capabilities (probe);
-    physdev = mm_port_probe_get_port_physdev (probe);
-    if (!existing) {
-        if (caps & MM_PORT_PROBE_CAPABILITY_CDMA) {
-            modem = mm_generic_cdma_new (physdev,
-                                         driver,
-                                         mm_plugin_get_name (MM_PLUGIN (base)),
-                                         !!(caps & MM_PORT_PROBE_CAPABILITY_IS856),
-                                         !!(caps & MM_PORT_PROBE_CAPABILITY_IS856_A),
-                                         vendor,
-                                         product);
-        } else if (caps & MM_PORT_PROBE_CAPABILITY_GSM) {
-            modem = mm_generic_gsm_new (physdev,
-                                        driver,
-                                        mm_plugin_get_name (MM_PLUGIN (base)),
-                                        vendor,
-                                        product);
-        }
-
-        if (modem) {
-            if (!mm_modem_grab_port (modem,
-                                     subsys,
-                                     name,
-                                     MM_PORT_TYPE_UNKNOWN,
-                                     NULL,
-                                     error)) {
-                g_object_unref (modem);
-                return NULL;
-            }
-        }
-    } else if (caps) {
-        MMPortType ptype = MM_PORT_TYPE_UNKNOWN;
-
-        if (mm_port_probe_is_qcdm (probe))
-            ptype = MM_PORT_TYPE_QCDM;
-
-        modem = existing;
-        if (!mm_modem_grab_port (modem,
-                                 subsys,
-                                 name,
-                                 ptype,
-                                 NULL,
-                                 error))
-            return NULL;
-    }
-
-    return modem;
+    return existing ? existing : modem;
 }
 
 /*****************************************************************************/
@@ -130,17 +106,13 @@ grab_port (MMPluginBase *base,
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    static const gchar *name = MM_PLUGIN_GENERIC_NAME;
     static const gchar *subsystems[] = { "tty", NULL };
-    static const guint32 capabilities = MM_PORT_PROBE_CAPABILITY_GSM_OR_CDMA;
-    static const gboolean qcdm = TRUE;
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_GENERIC,
-                      MM_PLUGIN_BASE_NAME, name,
+                      MM_PLUGIN_BASE_NAME, MM_PLUGIN_GENERIC_NAME,
                       MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS, subsystems,
-                      MM_PLUGIN_BASE_ALLOWED_CAPABILITIES, capabilities,
-                      MM_PLUGIN_BASE_ALLOWED_QCDM, qcdm,
+                      MM_PLUGIN_BASE_ALLOWED_AT, TRUE,
                       NULL));
 }
 

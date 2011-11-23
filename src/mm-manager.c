@@ -98,24 +98,71 @@ find_port_support_context_free (FindPortSupportContext *ctx)
 }
 
 static void
-remove_modem (MMManager *manager, MMModem *modem)
+remove_modem (MMManager *manager,
+              MMBaseModem *modem)
 {
-    char *device;
+    gchar *path;
+    gchar *device;
 
-    device = mm_modem_get_device (modem);
-    g_assert (device);
-    mm_dbg ("Removed modem %s", device);
+    device = g_strdup (mm_base_modem_get_device (modem));
+    path = g_strdup (g_dbus_object_get_object_path (G_DBUS_OBJECT (modem)));
 
-    /* GDBus TODO: Unexport object
-     * g_signal_emit (manager, signals[DEVICE_REMOVED], 0, modem); */
+    /* If we get DBus object path, modem was exported */
+    if (path) {
+        g_dbus_object_manager_server_unexport (manager->priv->object_manager, path);
+        g_object_set (modem,
+                      MM_BASE_MODEM_CONNECTION, NULL,
+                      NULL);
+
+        mm_dbg ("Unexported modem '%s' from path '%s'", device, path);
+        g_free (path);
+    }
+
+    /* Run dispose before unref-ing, in order to cleanup the SIM object,
+     * if any (which also holds a reference to the modem object) */
+    g_object_run_dispose (G_OBJECT (modem));
     g_hash_table_remove (manager->priv->modems, device);
     g_free (device);
 }
 
 static void
-check_export_modem (MMManager *self, MMModem *modem)
+debug_modem_info (MMManager *self,
+                  MMBaseModem *modem)
 {
-    char *modem_physdev;
+    /* guint32 vid = 0; */
+    /* guint32 pid = 0; */
+    /* GUdevDevice *physdev; */
+    /* const gchar *subsys; */
+
+    /* physdev = g_udev_client_query_by_sysfs_path ( */
+    /*     self->priv->udev, */
+    /*     mm_base_modem_get_device (modem)); */
+    /* subsys = (physdev ? */
+    /*           g_udev_device_get_subsystem (physdev) : */
+    /*           NULL); */
+
+    /* g_object_get (G_OBJECT (modem), */
+    /*               MM_MODEM_DATA_DEVICE, &data_device, */
+    /*               MM_MODEM_HW_VID, &vid, */
+    /*               MM_MODEM_HW_PID, &pid, */
+    /*               NULL); */
+    /* mm_dbg ("(%s): VID 0x%04X PID 0x%04X (%s)", */
+    /*         path, */
+    /*         (vid & 0xFFFF), */
+    /*         (pid & 0xFFFF), */
+    /*         subsys ? subsys : "unknown"); */
+    /* mm_dbg ("(%s): data port is %s", path, data_device); */
+    /* g_free (data_device); */
+
+    /* if (physdev) */
+    /*     g_object_unref (physdev); */
+}
+
+static void
+check_export_modem (MMManager *self,
+                    MMBaseModem *modem)
+{
+    const gchar *modem_physdev;
     const gchar *name;
     const gchar *subsys;
 
@@ -132,7 +179,8 @@ check_export_modem (MMManager *self, MMModem *modem)
      * chance that a port could show up after the modem is already created and
      * all other ports are already handled.  That chance is very small though.
      */
-    modem_physdev = mm_modem_get_device (modem);
+
+    modem_physdev = mm_base_modem_get_device (modem);
     g_assert (modem_physdev);
 
     /* Check for ports that are in the process of being interrogated by plugins */
@@ -140,64 +188,42 @@ check_export_modem (MMManager *self, MMModem *modem)
                                                      modem_physdev,
                                                      &subsys,
                                                      &name)) {
-        mm_dbg ("(%s/%s): outstanding support task prevents export of %s",
+        mm_dbg ("(%s/%s): outstanding support task prevents export of '%s'",
                 subsys, name, modem_physdev);
-        goto out;
+        return;
     }
-
-    /* Already exported?  This can happen if the modem is exported and the kernel
-     * discovers another of the modem's ports.
-     */
-    if (g_object_get_data (G_OBJECT (modem), DBUS_PATH_TAG))
-        goto out;
 
     /* No outstanding port tasks, so if the modem is valid we can export it */
-    if (mm_modem_get_valid (modem)) {
-        static guint32 id = 0, vid = 0, pid = 0;
-        gchar *path, *data_device = NULL;
-        GUdevDevice *physdev;
-
-        subsys = NULL;
+    if (mm_base_modem_get_valid (modem)) {
+        gchar *path;
+        static guint32 id = 0;
 
         path = g_strdup_printf (MM_DBUS_PATH"/Modems/%d", id++);
-        /* GDBus TODO:
-         * dbus_g_connection_register_g_object (priv->connection, path, G_OBJECT (modem)); */
-        g_object_set_data_full (G_OBJECT (modem), DBUS_PATH_TAG, path, (GDestroyNotify) g_free);
-
-        mm_dbg ("Exported modem %s as %s", modem_physdev, path);
-
-        physdev = g_udev_client_query_by_sysfs_path (self->priv->udev, modem_physdev);
-        if (physdev)
-            subsys = g_udev_device_get_subsystem (physdev);
-
-        g_object_get (G_OBJECT (modem),
-                      MM_MODEM_DATA_DEVICE, &data_device,
-                      MM_MODEM_HW_VID, &vid,
-                      MM_MODEM_HW_PID, &pid,
+        g_object_set (modem,
+                      "g-object-path", path,
+                      MM_BASE_MODEM_CONNECTION, self->priv->connection,
                       NULL);
-        mm_dbg ("(%s): VID 0x%04X PID 0x%04X (%s)",
-                path, (vid & 0xFFFF), (pid & 0xFFFF),
-                subsys ? subsys : "unknown");
-        mm_dbg ("(%s): data port is %s", path, data_device);
-        g_free (data_device);
+        g_dbus_object_manager_server_export (self->priv->object_manager,
+                                             G_DBUS_OBJECT_SKELETON (modem));
+        mm_dbg ("Exported modem '%s' at path '%s'", modem_physdev, path);
+        g_free (path);
 
-        if (physdev)
-            g_object_unref (physdev);
-
-        /* GDBus TODO: export object
-         * g_signal_emit (self, signals[DEVICE_ADDED], 0, modem); */
+        /* Once connected, dump additional debug info about the modem */
+        debug_modem_info (self, modem);
+        return;
     }
 
-out:
-    g_free (modem_physdev);
+    mm_dbg ("Not exporting invalid modem '%s'", modem_physdev);
 }
 
 static void
-modem_valid (MMModem *modem, GParamSpec *pspec, gpointer user_data)
+modem_valid (MMBaseModem *modem,
+             GParamSpec *pspec,
+             gpointer user_data)
 {
     MMManager *manager = MM_MANAGER (user_data);
 
-    if (mm_modem_get_valid (modem))
+    if (mm_base_modem_get_valid (modem))
         check_export_modem (manager, modem);
     else
         remove_modem (manager, modem);
@@ -206,54 +232,58 @@ modem_valid (MMModem *modem, GParamSpec *pspec, gpointer user_data)
 #define MANAGER_PLUGIN_TAG "manager-plugin"
 
 static void
-add_modem (MMManager *manager, MMModem *modem, MMPlugin *plugin)
+add_modem (MMManager *manager,
+           MMBaseModem *modem,
+           MMPlugin *plugin)
 {
-    char *device;
+    const gchar *device;
 
-    device = mm_modem_get_device (modem);
-    g_assert (device);
+    device = mm_base_modem_get_device (modem);
     if (!g_hash_table_lookup (manager->priv->modems, device)) {
-        g_hash_table_insert (manager->priv->modems, g_strdup (device), modem);
-        g_object_set_data (G_OBJECT (modem), MANAGER_PLUGIN_TAG, plugin);
-
         mm_dbg ("Added modem %s", device);
-        g_signal_connect (modem, "notify::" MM_MODEM_VALID, G_CALLBACK (modem_valid), manager);
-        check_export_modem (manager, modem);
+        g_hash_table_insert (manager->priv->modems,
+                             g_strdup (device),
+                             modem);
+        g_object_set_data (G_OBJECT (modem), MANAGER_PLUGIN_TAG, plugin);
+        g_signal_connect (modem, "notify::" MM_BASE_MODEM_VALID, G_CALLBACK (modem_valid), manager);
     }
-    g_free (device);
+
+    check_export_modem (manager, modem);
 }
 
-static MMModem *
-find_modem_for_device (MMManager *manager, const char *device)
-{
-    GHashTableIter iter;
-    gpointer key, value;
-    MMModem *found = NULL;
-
-    g_hash_table_iter_init (&iter, manager->priv->modems);
-    while (g_hash_table_iter_next (&iter, &key, &value) && !found) {
-        MMModem *candidate = MM_MODEM (value);
-        char *candidate_device = mm_modem_get_device (candidate);
-
-        if (!strcmp (device, candidate_device))
-            found = candidate;
-        g_free (candidate_device);
-    }
-    return found;
-}
-
-static MMModem *
-find_modem_for_port (MMManager *manager, const char *subsys, const char *name)
+static MMBaseModem *
+find_modem_for_device (MMManager *manager,
+                       const gchar *device)
 {
     GHashTableIter iter;
     gpointer key, value;
 
     g_hash_table_iter_init (&iter, manager->priv->modems);
     while (g_hash_table_iter_next (&iter, &key, &value)) {
-        MMModem *modem = MM_MODEM (value);
+        MMBaseModem *candidate = MM_BASE_MODEM (value);
 
-        if (mm_modem_owns_port (modem, subsys, name))
-            return modem;
+        if (g_str_equal (device,
+                         mm_base_modem_get_device (candidate)))
+            return candidate;
+    }
+
+    return NULL;
+}
+
+static MMBaseModem *
+find_modem_for_port (MMManager *manager,
+                     const gchar *subsys,
+                     const gchar *name)
+{
+    GHashTableIter iter;
+    gpointer key, value;
+
+    g_hash_table_iter_init (&iter, manager->priv->modems);
+    while (g_hash_table_iter_next (&iter, &key, &value)) {
+        MMBaseModem *candidate = MM_BASE_MODEM (value);
+
+        if (mm_base_modem_owns_port (candidate, subsys, name))
+            return candidate;
     }
     return NULL;
 }
@@ -270,7 +300,7 @@ find_port_support_ready_cb (MMPluginManager *plugin_manager,
                                                               result,
                                                               &error);
     if (!best_plugin) {
-        MMModem *existing;
+        MMBaseModem *existing;
 
         if (error) {
             mm_dbg ("(%s/%s): error checking support: '%s'",
@@ -313,51 +343,40 @@ grab_port (MMManager *manager,
            GUdevDevice *device,
            GUdevDevice *physical_device)
 {
-    MMModem *modem = NULL;
     GError *error = NULL;
-    /* GSList *iter; */
-    MMModem *existing;
+    MMBaseModem *modem;
+    MMBaseModem *existing;
 
     existing = g_hash_table_lookup (manager->priv->modems,
                                     g_udev_device_get_sysfs_path (physical_device));
 
-    /* Create the modem */
+    /* While grabbing the first port, modem will get created */
     modem = mm_plugin_grab_port (plugin,
                                  g_udev_device_get_subsystem (device),
                                  g_udev_device_get_name (device),
                                  existing,
                                  &error);
-    if (modem) {
-        guint32 modem_type = MM_MODEM_TYPE_UNKNOWN;
-        const gchar *type_name = "UNKNOWN";
-        gchar *modem_device;
-
-        g_object_get (G_OBJECT (modem), MM_MODEM_TYPE, &modem_type, NULL);
-        if (modem_type == MM_MODEM_TYPE_GSM)
-            type_name = "GSM";
-        else if (modem_type == MM_MODEM_TYPE_CDMA)
-            type_name = "CDMA";
-
-        modem_device = mm_modem_get_device (modem);
-        mm_info ("(%s): %s modem %s claimed port %s",
-                 mm_plugin_get_name (plugin),
-                 type_name,
-                 modem_device,
-                 g_udev_device_get_name (device));
-        g_free (modem_device);
-
-        add_modem (manager, modem, plugin);
-    } else {
+    if (!modem) {
         mm_warn ("plugin '%s' claimed to support %s/%s but couldn't: (%d) %s",
                  mm_plugin_get_name (plugin),
                  g_udev_device_get_subsystem (device),
                  g_udev_device_get_name (device),
                  error ? error->code : -1,
                  (error && error->message) ? error->message : "(unknown)");
-        modem = existing;
+
+        if (existing)
+            check_export_modem (manager, existing);
+        return;
     }
 
-    check_export_modem (manager, modem);
+    mm_info ("(%s): modem %s claimed port %s",
+             mm_plugin_get_name (plugin),
+             mm_base_modem_get_device (modem),
+             g_udev_device_get_name (device));
+
+    /* If the modem was just created, store it */
+    if (!existing)
+        add_modem (manager, modem, plugin);
 }
 
 static GUdevDevice *
@@ -423,13 +442,14 @@ find_physical_device (GUdevDevice *child)
 }
 
 static void
-device_added (MMManager *manager, GUdevDevice *device)
+device_added (MMManager *manager,
+              GUdevDevice *device)
 {
     const char *subsys, *name, *physdev_path, *physdev_subsys;
     gboolean is_candidate;
     GUdevDevice *physdev = NULL;
     MMPlugin *plugin;
-    MMModem *existing;
+    MMBaseModem *existing;
 
     g_return_if_fail (device != NULL);
 
@@ -531,11 +551,11 @@ out:
 }
 
 static void
-device_removed (MMManager *manager, GUdevDevice *device)
+device_removed (MMManager *manager,
+                GUdevDevice *device)
 {
-    MMModem *modem;
+    MMBaseModem *modem;
     const char *subsys, *name;
-    gchar *modem_device;
 
     g_return_if_fail (device != NULL);
 
@@ -549,10 +569,11 @@ device_removed (MMManager *manager, GUdevDevice *device)
         /* find_modem_for_port handles tty and net removal */
         modem = find_modem_for_port (manager, subsys, name);
         if (modem) {
-            modem_device = mm_modem_get_device (modem);
-            mm_info ("(%s/%s): released by modem %s", subsys, name, modem_device);
-            g_free (modem_device);
-            mm_modem_release_port (modem, subsys, name);
+            mm_info ("(%s/%s): released by modem %s",
+                     subsys,
+                     name,
+                     mm_base_modem_get_device (modem));
+            mm_base_modem_release_port (modem, subsys, name);
             return;
         }
     } else {
@@ -634,7 +655,7 @@ mm_manager_start (MMManager *manager)
 
 typedef struct {
     MMManager *manager;
-    MMModem *modem;
+    MMBaseModem *modem;
 } RemoveInfo;
 
 static gboolean
@@ -648,7 +669,7 @@ remove_disable_one (gpointer user_data)
 }
 
 static void
-remove_disable_done (MMModem *modem,
+remove_disable_done (MMBaseModem *modem,
                      GError *error,
                      gpointer user_data)
 {
@@ -673,12 +694,13 @@ mm_manager_shutdown (MMManager *self)
 
     modems = g_hash_table_get_values (self->priv->modems);
     for (iter = modems; iter; iter = g_list_next (iter)) {
-        MMModem *modem = MM_MODEM (iter->data);
+        MMBaseModem *modem = MM_BASE_MODEM (iter->data);
 
-        if (mm_modem_get_state (modem) >= MM_MODEM_STATE_ENABLING)
-            mm_modem_disable (modem, remove_disable_done, self);
-        else
-            remove_disable_done (modem, NULL, self);
+        /* TODO */
+        /* if (mm_modem_get_state (modem) >= MM_MODEM_STATE_ENABLING) */
+        /*     mm_modem_disable (modem, remove_disable_done, self); */
+        /* else */
+        remove_disable_done (modem, NULL, self);
     }
     g_list_free (modems);
 

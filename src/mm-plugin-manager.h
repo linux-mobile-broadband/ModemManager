@@ -21,7 +21,7 @@
 #include <glib-object.h>
 
 #include "mm-plugin.h"
-#include "mm-modem.h"
+#include "mm-base-modem.h"
 
 #define MM_TYPE_PLUGIN_MANAGER            (mm_plugin_manager_get_type ())
 #define MM_PLUGIN_MANAGER(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_MANAGER, MMPluginManager))
@@ -52,7 +52,7 @@ void      mm_plugin_manager_find_port_support        (MMPluginManager *self,
                                                       const gchar *name,
                                                       const gchar *physdev_path,
                                                       MMPlugin *suggested_plugin,
-                                                      MMModem *existing,
+                                                      MMBaseModem *existing,
                                                       GAsyncReadyCallback callback,
                                                       gpointer user_data);
 MMPlugin *mm_plugin_manager_find_port_support_finish (MMPluginManager *self,

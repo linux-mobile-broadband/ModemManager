@@ -37,7 +37,7 @@ mm_plugin_supports_port (MMPlugin *self,
                          const gchar *subsys,
                          const gchar *name,
                          const gchar *physdev_path,
-                         MMModem *existing,
+                         MMBaseModem *existing,
                          GAsyncReadyCallback callback,
                          gpointer user_data)
 {
@@ -83,11 +83,11 @@ mm_plugin_supports_port_cancel (MMPlugin *plugin,
     MM_PLUGIN_GET_INTERFACE (plugin)->supports_port_cancel (plugin, subsys, name);
 }
 
-MMModem *
+MMBaseModem *
 mm_plugin_grab_port (MMPlugin *plugin,
                      const char *subsys,
                      const char *name,
-                     MMModem *existing,
+                     MMBaseModem *existing,
                      GError **error)
 {
     g_return_val_if_fail (MM_IS_PLUGIN (plugin), FALSE);

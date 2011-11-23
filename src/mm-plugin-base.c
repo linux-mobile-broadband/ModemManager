@@ -544,7 +544,7 @@ supports_port (MMPlugin *plugin,
                const gchar *subsys,
                const gchar *name,
                const gchar *physdev_path,
-               MMModem *existing,
+               MMBaseModem *existing,
                GAsyncReadyCallback callback,
                gpointer user_data)
 {
@@ -695,17 +695,17 @@ supports_port_cancel (MMPlugin *plugin,
     g_free (key);
 }
 
-static MMModem *
+static MMBaseModem *
 grab_port (MMPlugin *plugin,
            const char *subsys,
            const char *name,
-           MMModem *existing,
+           MMBaseModem *existing,
            GError **error)
 {
     MMPluginBase *self = MM_PLUGIN_BASE (plugin);
     MMPluginBasePrivate *priv = MM_PLUGIN_BASE_GET_PRIVATE (self);
     MMPortProbe *probe;
-    MMModem *modem = NULL;
+    MMBaseModem *modem = NULL;
     char *key;
 
     key = get_key (subsys, name);
