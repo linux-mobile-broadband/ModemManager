@@ -956,8 +956,16 @@ internal_queue_command (MMSerialPort *self,
     MMQueueData *info;
 
     g_return_if_fail (MM_IS_SERIAL_PORT (self));
-    g_return_if_fail (priv->open_count > 0);
     g_return_if_fail (command != NULL);
+
+    if (priv->open_count == 0) {
+        GError *error = g_error_new_literal (MM_SERIAL_ERROR,
+                                             MM_SERIAL_ERROR_SEND_FAILED,
+                                             "Sending command failed: device is not enabled");
+        callback (self, NULL, error, user_data);
+        g_error_free (error);
+        return;
+    }
 
     info = g_slice_new0 (MMQueueData);
     if (take_command)

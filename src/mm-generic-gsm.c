@@ -4091,7 +4091,7 @@ get_csq_done (MMAtSerialPort *port,
               gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    char *reply = response->str;
+    char *reply;
     gboolean parsed = FALSE;
 
     /* If the modem has already been removed, return without
@@ -4104,6 +4104,7 @@ get_csq_done (MMAtSerialPort *port,
         goto done;
     }
 
+    reply = response->str;
     if (!strncmp (reply, "+CSQ: ", 6)) {
         /* Got valid reply */
         int quality;
@@ -5620,6 +5621,9 @@ simple_status_got_signal_quality (MMModem *modem,
     if (!error) {
         properties = (GHashTable *) mm_callback_info_get_data (info, SS_HASH_TAG);
         g_hash_table_insert (properties, "signal_quality", simple_uint_value (result));
+    } else {
+        g_clear_error (&info->error);
+        info->error = g_error_copy (error);
     }
     mm_callback_info_chain_complete_one (info);
 }
@@ -5636,6 +5640,9 @@ simple_status_got_band (MMModem *modem,
     if (!error) {
         properties = (GHashTable *) mm_callback_info_get_data (info, SS_HASH_TAG);
         g_hash_table_insert (properties, "band", simple_uint_value (result));
+    } else {
+        g_clear_error (&info->error);
+        info->error = g_error_copy (error);
     }
     mm_callback_info_chain_complete_one (info);
 }
@@ -5655,9 +5662,10 @@ simple_status_got_reg_info (MMModemGsmNetwork *modem,
     if (!modem || mm_callback_info_check_modem_removed (info))
         return;
 
-    if (error)
+    if (error) {
+        g_clear_error (&info->error);
         info->error = g_error_copy (error);
-    else {
+    } else {
         properties = (GHashTable *) mm_callback_info_get_data (info, SS_HASH_TAG);
 
         g_hash_table_insert (properties, "registration_status", simple_uint_value (status));
