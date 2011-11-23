@@ -60,7 +60,6 @@ typedef struct {
     gboolean sort_last;
 
     /* Plugin-specific setups */
-    guint32 capabilities;
     const gchar **subsystems;
     const gchar **drivers;
     const guint16 *vendor_ids;
@@ -76,7 +75,6 @@ typedef struct {
 enum {
     PROP_0,
     PROP_NAME,
-    PROP_ALLOWED_CAPABILITIES,
     PROP_ALLOWED_SUBSYSTEMS,
     PROP_ALLOWED_DRIVERS,
     PROP_ALLOWED_VENDOR_IDS,
@@ -408,12 +406,6 @@ apply_post_probing_filters (MMPluginBase *self,
     MMPluginBasePrivate *priv = MM_PLUGIN_BASE_GET_PRIVATE (self);
     guint i;
 
-    /* The plugin may specify that only some capabilities are supported. If that
-     * is the case, filter by capabilities */
-    if (priv->capabilities &&
-        !(priv->capabilities & mm_port_probe_get_capabilities (probe)))
-        return TRUE;
-
     /* The plugin may specify that only some vendor strings are supported. If
      * that is the case, filter by vendor string. */
     if (priv->vendor_strings) {
@@ -643,8 +635,6 @@ supports_port (MMPlugin *plugin,
 
     /* Build flags depending on what probing needed */
     probe_run_flags = 0;
-    if (priv->capabilities)
-        probe_run_flags |= MM_PORT_PROBE_AT_CAPABILITIES;
     if (need_vendor_probing)
         probe_run_flags |= MM_PORT_PROBE_AT_VENDOR;
     if (need_product_probing)
@@ -770,10 +760,6 @@ set_property (GObject *object, guint prop_id,
         /* Construct only */
         priv->name = g_value_dup_string (value);
         break;
-    case PROP_ALLOWED_CAPABILITIES:
-        /* Construct only */
-        priv->capabilities = (guint32)g_value_get_uint (value);
-        break;
     case PROP_ALLOWED_SUBSYSTEMS:
         /* Construct only */
         priv->subsystems = (const gchar **)g_value_get_pointer (value);
@@ -833,9 +819,6 @@ get_property (GObject *object, guint prop_id,
     switch (prop_id) {
     case PROP_NAME:
         g_value_set_string (value, priv->name);
-        break;
-    case PROP_ALLOWED_CAPABILITIES:
-        g_value_set_uint (value, (guint)priv->capabilities);
         break;
     case PROP_ALLOWED_SUBSYSTEMS:
         g_value_set_pointer (value, (gpointer)priv->subsystems);
@@ -909,14 +892,6 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
                               "Name",
                               NULL,
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
-
-    g_object_class_install_property
-        (object_class, PROP_ALLOWED_CAPABILITIES,
-         g_param_spec_uint (MM_PLUGIN_BASE_ALLOWED_CAPABILITIES,
-                            "Allowed capabilities",
-                            "Mask of capabilities this plugin can support",
-                            0, G_MAXUINT, 0,
-                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property
         (object_class, PROP_ALLOWED_SUBSYSTEMS,

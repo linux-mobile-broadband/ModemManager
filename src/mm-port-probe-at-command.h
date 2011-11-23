@@ -26,7 +26,6 @@ typedef struct {
     /* The response processor. The expected result depends on the
      * probing type:
      *  - AT             --> G_TYPE_BOOLEAN
-     *  - Capabilities   --> G_TYPE_UINT
      *  - Vendor         --> G_TYPE_STRING
      *  - Product        --> G_TYPE_STRING
      * When a result is given, TRUE is returned.
@@ -52,7 +51,6 @@ typedef struct {
 
 /* Default commands used during probing */
 const MMPortProbeAtCommand *mm_port_probe_at_command_get_probing (void);
-const MMPortProbeAtCommand *mm_port_probe_at_command_get_capabilities_probing (void);
 const MMPortProbeAtCommand *mm_port_probe_at_command_get_vendor_probing (void);
 const MMPortProbeAtCommand *mm_port_probe_at_command_get_product_probing (void);
 

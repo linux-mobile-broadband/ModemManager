@@ -35,7 +35,6 @@
 #define MM_PLUGIN_BASE_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PLUGIN_BASE, MMPluginBaseClass))
 
 #define MM_PLUGIN_BASE_NAME                    "name"
-#define MM_PLUGIN_BASE_ALLOWED_CAPABILITIES    "allowed-capabilities"
 #define MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS      "allowed-subsystems"
 #define MM_PLUGIN_BASE_ALLOWED_DRIVERS         "allowed-drivers"
 #define MM_PLUGIN_BASE_ALLOWED_VENDOR_IDS      "allowed-vendor-ids"

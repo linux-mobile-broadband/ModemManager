@@ -34,32 +34,9 @@
 
 /* Flags to request port probing */
 #define MM_PORT_PROBE_AT              0x0001
-#define MM_PORT_PROBE_AT_CAPABILITIES 0x0002
-#define MM_PORT_PROBE_AT_VENDOR       0x0004
-#define MM_PORT_PROBE_AT_PRODUCT      0x0008
-#define MM_PORT_PROBE_QCDM            0x0010
-
-/* Flags to report probed capabilities */
-#define MM_PORT_PROBE_CAPABILITY_GSM     0x0001 /* GSM */
-#define MM_PORT_PROBE_CAPABILITY_IS707_A 0x0002 /* CDMA Circuit Switched Data */
-#define MM_PORT_PROBE_CAPABILITY_IS707_P 0x0004 /* CDMA Packet Switched Data */
-#define MM_PORT_PROBE_CAPABILITY_DS      0x0008 /* Data compression selection (v.42bis) */
-#define MM_PORT_PROBE_CAPABILITY_ES      0x0010 /* Error control selection (v.42) */
-#define MM_PORT_PROBE_CAPABILITY_FCLASS  0x0020 /* Group III Fax */
-#define MM_PORT_PROBE_CAPABILITY_MS      0x0040 /* Modulation selection */
-#define MM_PORT_PROBE_CAPABILITY_W       0x0080 /* Wireless commands */
-#define MM_PORT_PROBE_CAPABILITY_IS856   0x0100 /* CDMA 3G EVDO rev 0 */
-#define MM_PORT_PROBE_CAPABILITY_IS856_A 0x0200 /* CDMA 3G EVDO rev A */
-
-#define MM_PORT_PROBE_CAPABILITY_CDMA        \
-    (MM_PORT_PROBE_CAPABILITY_IS707_A |      \
-     MM_PORT_PROBE_CAPABILITY_IS707_P |      \
-     MM_PORT_PROBE_CAPABILITY_IS856 |        \
-     MM_PORT_PROBE_CAPABILITY_IS856_A)
-
-#define MM_PORT_PROBE_CAPABILITY_GSM_OR_CDMA \
-    (MM_PORT_PROBE_CAPABILITY_CDMA |         \
-     MM_PORT_PROBE_CAPABILITY_GSM)
+#define MM_PORT_PROBE_AT_VENDOR       0x0002
+#define MM_PORT_PROBE_AT_PRODUCT      0x0004
+#define MM_PORT_PROBE_QCDM            0x0008
 
 typedef struct _MMPortProbe MMPortProbe;
 typedef struct _MMPortProbeClass MMPortProbeClass;
@@ -101,7 +78,6 @@ gboolean mm_port_probe_run_cancel (MMPortProbe *self);
 /* Probing result getters */
 gboolean     mm_port_probe_is_at            (MMPortProbe *self);
 gboolean     mm_port_probe_is_qcdm          (MMPortProbe *self);
-guint32      mm_port_probe_get_capabilities (MMPortProbe *self);
 const gchar *mm_port_probe_get_vendor       (MMPortProbe *self);
 const gchar *mm_port_probe_get_product      (MMPortProbe *self);
 

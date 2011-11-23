@@ -40,7 +40,6 @@
  * ----> AT Serial Open
  *   |----> Custom Init
  *   |----> AT?
- *      |----> Capabilities
  *      |----> Vendor
  *      |----> Product
  * ----> QCDM Serial Open
@@ -83,7 +82,6 @@ struct _MMPortProbePrivate {
     guint32 flags;
     gboolean is_at;
     gboolean is_qcdm;
-    guint32 capabilities;
     gchar *vendor;
     gchar *product;
 
@@ -338,25 +336,6 @@ serial_probe_at_vendor_result_processor (MMPortProbe *self,
 }
 
 static void
-serial_probe_at_capabilities_result_processor (MMPortProbe *self,
-                                               GValue *result)
-{
-    if (result) {
-        /* If any result given, it must be a uint */
-        g_assert (G_VALUE_HOLDS_UINT (result));
-
-        mm_dbg ("(%s) capabilities probing finished", self->priv->name);
-        self->priv->capabilities = (guint32) g_value_get_uint (result);
-        self->priv->flags |= MM_PORT_PROBE_AT_CAPABILITIES;
-        return;
-    }
-
-    mm_dbg ("(%s) no result in capabilities probing", self->priv->name);
-    self->priv->capabilities = 0;
-    self->priv->flags |= MM_PORT_PROBE_AT_CAPABILITIES;
-}
-
-static void
 serial_probe_at_result_processor (MMPortProbe *self,
                                   GValue *result)
 {
@@ -379,7 +358,6 @@ serial_probe_at_result_processor (MMPortProbe *self,
     mm_dbg ("(%s) port is not AT-capable", self->priv->name);
     self->priv->is_at = FALSE;
     self->priv->flags |= (MM_PORT_PROBE_AT |
-                          MM_PORT_PROBE_AT_CAPABILITIES |
                           MM_PORT_PROBE_AT_VENDOR |
                           MM_PORT_PROBE_AT_PRODUCT);
 }
@@ -505,13 +483,6 @@ serial_probe_schedule (MMPortProbe *self)
         /* Prepare AT probing */
         task->at_result_processor = serial_probe_at_result_processor;
         task->at_commands = mm_port_probe_at_command_get_probing ();
-    }
-    /* Capabilities requested and not already probed? */
-    else if ((task->flags & MM_PORT_PROBE_AT_CAPABILITIES) &&
-             !(self->priv->flags & MM_PORT_PROBE_AT_CAPABILITIES)) {
-        /* Prepare AT capabilities probing */
-        task->at_result_processor = serial_probe_at_capabilities_result_processor;
-        task->at_commands = mm_port_probe_at_command_get_capabilities_probing ();
     }
     /* Vendor requested and not already probed? */
     else if ((task->flags & MM_PORT_PROBE_AT_VENDOR) &&
@@ -793,8 +764,7 @@ mm_port_probe_run (MMPortProbe *self,
     self->priv->task = task;
 
     /* If any AT-specific probing requested, require generic AT check before */
-    if (task->flags & (MM_PORT_PROBE_AT_CAPABILITIES |
-                       MM_PORT_PROBE_AT_VENDOR |
+    if (task->flags & (MM_PORT_PROBE_AT_VENDOR |
                        MM_PORT_PROBE_AT_PRODUCT)) {
         task->flags |= MM_PORT_PROBE_AT;
     }
@@ -831,15 +801,6 @@ mm_port_probe_is_qcdm (MMPortProbe *self)
     g_return_val_if_fail (self->priv->flags & MM_PORT_PROBE_QCDM, FALSE);
 
     return self->priv->is_qcdm;
-}
-
-guint32
-mm_port_probe_get_capabilities (MMPortProbe *self)
-{
-    g_return_val_if_fail (MM_IS_PORT_PROBE (self), 0);
-    g_return_val_if_fail (self->priv->flags & MM_PORT_PROBE_AT_CAPABILITIES, 0);
-
-    return self->priv->capabilities;
 }
 
 GUdevDevice *
