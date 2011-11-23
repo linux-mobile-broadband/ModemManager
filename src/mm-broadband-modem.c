@@ -344,6 +344,50 @@ load_model (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* REVISION */
+
+static gchar *
+load_revision_finish (MMIfaceModem *self,
+                      GAsyncResult *res,
+                      GError **error)
+{
+    GVariant *result;
+    gchar *revision;
+
+    result = mm_at_sequence_finish (G_OBJECT (self), res, error);
+    if (!result)
+        return NULL;
+
+    revision = g_variant_dup_string (result, NULL);
+    mm_dbg ("loaded revision: %s", revision);
+    g_variant_unref (result);
+    return revision;
+}
+
+static const MMAtCommand revisions[] = {
+    { "+CGMR",  3, (MMAtResponseProcessor)common_parse_string_reply },
+    { "+GMR",   3, (MMAtResponseProcessor)common_parse_string_reply },
+    { NULL }
+};
+
+static void
+load_revision (MMIfaceModem *self,
+               GAsyncReadyCallback callback,
+               gpointer user_data)
+{
+    mm_dbg ("loading revision...");
+    mm_at_sequence (G_OBJECT (self),
+                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                    (MMAtCommand *)revisions,
+                    NULL, /* response_processor_context */
+                    FALSE,
+                    "s",
+                    NULL, /* TODO: cancellable */
+                    callback,
+                    user_data);
+}
+
+/*****************************************************************************/
 
 static void
 enable (MMBaseModem *self,
@@ -563,6 +607,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_manufacturer_finish = load_manufacturer_finish;
     iface->load_model = load_model;
     iface->load_model_finish = load_model_finish;
+    iface->load_revision = load_revision;
+    iface->load_revision_finish = load_revision_finish;
 }
 
 static void
