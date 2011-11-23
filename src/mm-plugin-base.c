@@ -67,6 +67,7 @@ typedef struct {
     const gchar **vendor_strings;
     const gchar **product_strings;
     const gchar **udev_tags;
+    gboolean at;
     gboolean qcdm;
     const MMPortProbeAtCommand *custom_init;
     guint64 send_delay;
@@ -82,6 +83,7 @@ enum {
     PROP_ALLOWED_VENDOR_STRINGS,
     PROP_ALLOWED_PRODUCT_STRINGS,
     PROP_ALLOWED_UDEV_TAGS,
+    PROP_ALLOWED_AT,
     PROP_ALLOWED_QCDM,
     PROP_CUSTOM_INIT,
     PROP_SEND_DELAY,
@@ -635,6 +637,8 @@ supports_port (MMPlugin *plugin,
 
     /* Build flags depending on what probing needed */
     probe_run_flags = 0;
+    if (priv->at)
+        probe_run_flags |= MM_PORT_PROBE_AT;
     if (need_vendor_probing)
         probe_run_flags |= MM_PORT_PROBE_AT_VENDOR;
     if (need_product_probing)
@@ -788,6 +792,10 @@ set_property (GObject *object, guint prop_id,
         /* Construct only */
         priv->udev_tags = (const gchar **)g_value_get_pointer (value);
         break;
+    case PROP_ALLOWED_AT:
+        /* Construct only */
+        priv->at = g_value_get_boolean (value);
+        break;
     case PROP_ALLOWED_QCDM:
         /* Construct only */
         priv->qcdm = g_value_get_boolean (value);
@@ -837,6 +845,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case PROP_ALLOWED_PRODUCT_STRINGS:
         g_value_set_pointer (value, (gpointer)priv->product_strings);
+        break;
+    case PROP_ALLOWED_AT:
+        g_value_set_boolean (value, priv->at);
         break;
     case PROP_ALLOWED_QCDM:
         g_value_set_boolean (value, priv->qcdm);
@@ -948,6 +959,14 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
                                "Allowed Udev tags",
                                "List of udev tags this plugin may expect, "
                                "should be an array of strings finished with 'NULL'",
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_ALLOWED_AT,
+         g_param_spec_boolean (MM_PLUGIN_BASE_ALLOWED_AT,
+                               "Allowed AT",
+                               "Whether AT ports are allowed in this plugin",
+                               FALSE,
                                G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property
