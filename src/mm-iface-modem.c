@@ -572,6 +572,127 @@ mm_iface_modem_unlock_check (MMIfaceModem *self,
 
 /*****************************************************************************/
 
+typedef struct _SignalQualityCheckContext SignalQualityCheckContext;
+struct _SignalQualityCheckContext {
+    MMIfaceModem *self;
+    MMAtSerialPort *port;
+    GSimpleAsyncResult *result;
+    MmGdbusModem *skeleton;
+};
+
+static SignalQualityCheckContext *
+signal_quality_check_context_new (MMIfaceModem *self,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
+{
+    SignalQualityCheckContext *ctx;
+
+    ctx = g_new0 (SignalQualityCheckContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->port = g_object_ref (mm_base_modem_get_port_primary (MM_BASE_MODEM (self)));
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             signal_quality_check_context_new);
+    g_object_get (ctx->self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
+                  NULL);
+    g_assert (ctx->skeleton != NULL);
+    return ctx;
+}
+
+static void
+signal_quality_check_context_free (SignalQualityCheckContext *ctx)
+{
+    g_object_unref (ctx->self);
+    g_object_unref (ctx->port);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->skeleton);
+    g_free (ctx);
+}
+
+guint
+mm_iface_modem_signal_quality_check_finish (MMIfaceModem *self,
+                                            GAsyncResult *res,
+                                            gboolean *recent,
+                                            GError **error)
+{
+    guint quality = 0;
+    gboolean is_recent = FALSE;
+
+    if (!g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error)) {
+        GVariant *result;
+
+        result = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+        g_variant_get (result, "(ub)", &quality, &is_recent);
+    }
+
+    if (recent)
+        *recent = is_recent;
+    return quality;
+}
+
+static void
+signal_quality_check_ready (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            SignalQualityCheckContext *ctx)
+{
+    GError *error = NULL;
+    guint quality;
+    gboolean is_recent;
+
+    quality = MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality_finish (self,
+                                                                               res,
+                                                                               &is_recent,
+                                                                               &error);
+    if (error)
+        g_simple_async_result_take_error (ctx->result, error);
+    else {
+        GVariant *result;
+
+        result = g_variant_new ("(ub)", quality, is_recent);
+        /* Set operation result */
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                   g_variant_ref (result),
+                                                   (GDestroyNotify)g_variant_unref);
+        /* Set the property value in the DBus skeleton */
+        mm_gdbus_modem_set_signal_quality (ctx->skeleton, g_variant_ref (result));
+        g_variant_unref (result);
+    }
+    g_simple_async_result_complete (ctx->result);
+    signal_quality_check_context_free (ctx);
+}
+
+void
+mm_iface_modem_signal_quality_check (MMIfaceModem *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
+{
+    SignalQualityCheckContext *ctx;
+
+    ctx = signal_quality_check_context_new (self,
+                                            callback,
+                                            user_data);
+
+    if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_signal_quality &&
+        MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_signal_quality_finish) {
+        MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_signal_quality (
+            ctx->self,
+            (GAsyncReadyCallback)signal_quality_check_ready,
+            ctx);
+        return;
+    }
+
+    /* Cannot load signal quality... set operation result */
+    g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                               g_variant_new ("(ub)", 0, FALSE),
+                                               (GDestroyNotify)g_variant_unref);
+    g_simple_async_result_complete_in_idle (ctx->result);
+    signal_quality_check_context_free (ctx);
+}
+
+/*****************************************************************************/
+
 typedef enum {
     INITIALIZATION_STEP_FIRST,
     INITIALIZATION_STEP_MODEM_CAPABILITIES,

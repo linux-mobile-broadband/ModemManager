@@ -137,6 +137,15 @@ struct _MMIfaceModem {
                                                 GAsyncResult *res,
                                                 GError **error);
 
+    /* Loading of the SignalQuality property */
+    void  (*load_signal_quality) (MMIfaceModem *self,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data);
+    guint (*load_signal_quality_finish) (MMIfaceModem *self,
+                                         GAsyncResult *res,
+                                         gboolean *recent,
+                                         GError **error);
+
     /* Asynchronous reset operation */
     void (*reset) (MMIfaceModem *self,
                    GAsyncReadyCallback callback,
@@ -197,5 +206,16 @@ void        mm_iface_modem_unlock_check        (MMIfaceModem *self,
 MMModemLock mm_iface_modem_unlock_check_finish (MMIfaceModem *self,
                                                 GAsyncResult *res,
                                                 GError **error);
+
+/* Request signal quality check update.
+ * It will not only return the signal quality status, but also set the property
+ * values in the DBus interface. */
+void  mm_iface_modem_signal_quality_check        (MMIfaceModem *self,
+                                                  GAsyncReadyCallback callback,
+                                                  gpointer user_data);
+guint mm_iface_modem_signal_quality_check_finish (MMIfaceModem *self,
+                                                  GAsyncResult *res,
+                                                  gboolean *recent,
+                                                  GError **error);
 
 #endif /* MM_IFACE_MODEM_H */
