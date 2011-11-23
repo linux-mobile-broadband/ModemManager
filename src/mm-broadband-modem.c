@@ -570,6 +570,136 @@ load_device_identifier (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* UNLOCK REQUIRED */
+
+typedef struct {
+    const gchar *result;
+    MMModemLock code;
+} CPinResult;
+
+static CPinResult unlock_results[] = {
+    /* Longer entries first so we catch the correct one with strcmp() */
+    { "READY",         MM_MODEM_LOCK_NONE           },
+    { "SIM PIN2",      MM_MODEM_LOCK_SIM_PIN2       },
+    { "SIM PUK2",      MM_MODEM_LOCK_SIM_PUK2       },
+    { "SIM PIN",       MM_MODEM_LOCK_SIM_PIN        },
+    { "SIM PUK",       MM_MODEM_LOCK_SIM_PUK        },
+    { "PH-NETSUB PIN", MM_MODEM_LOCK_PH_NETSUB_PIN  },
+    { "PH-NETSUB PUK", MM_MODEM_LOCK_PH_NETSUB_PUK  },
+    { "PH-FSIM PIN",   MM_MODEM_LOCK_PH_FSIM_PIN    },
+    { "PH-FSIM PUK",   MM_MODEM_LOCK_PH_FSIM_PUK    },
+    { "PH-CORP PIN",   MM_MODEM_LOCK_PH_CORP_PIN    },
+    { "PH-CORP PUK",   MM_MODEM_LOCK_PH_CORP_PUK    },
+    { "PH-SIM PIN",    MM_MODEM_LOCK_PH_SIM_PIN     },
+    { "PH-NET PIN",    MM_MODEM_LOCK_PH_NET_PIN     },
+    { "PH-NET PUK",    MM_MODEM_LOCK_PH_NET_PUK     },
+    { "PH-SP PIN",     MM_MODEM_LOCK_PH_SP_PIN      },
+    { "PH-SP PUK",     MM_MODEM_LOCK_PH_SP_PUK      },
+    { NULL }
+};
+
+static gboolean
+parse_unlock_required_reply (MMBroadbandModem *self,
+                             gpointer none,
+                             const gchar *command,
+                             const gchar *response,
+                             const GError *error,
+                             GVariant **result,
+                             GError **result_error)
+{
+    if (error) {
+        /* Let errors here be fatal */
+        *result_error = g_error_copy (error);
+        return FALSE;
+    }
+
+    if (response &&
+        strstr (response, "+CPIN: ")) {
+        CPinResult *iter = &unlock_results[0];
+        const gchar *str;
+
+        str = strstr (response, "+CPIN: ") + 7;
+
+        /* Some phones (Motorola EZX models) seem to quote the response */
+        if (str[0] == '"')
+            str++;
+
+        /* Translate the reply */
+        while (iter->result) {
+            if (g_str_has_prefix (str, iter->result)) {
+                *result = g_variant_new_uint32 (iter->code);
+                return TRUE;
+            }
+            iter++;
+        }
+    }
+
+    /* Assume unlocked if we don't recognize the pin request result */
+    *result = g_variant_new_uint32 (MM_MODEM_LOCK_NONE);
+    return TRUE;
+}
+
+static MMModemLock
+load_unlock_required_finish (MMIfaceModem *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_LOCK_UNKNOWN;
+
+    return (MMModemLock) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+load_unlock_required_ready (MMBroadbandModem *self,
+                            GAsyncResult *res,
+                            GSimpleAsyncResult *unlock_required_result)
+{
+    GError *error = NULL;
+    GVariant *command_result;
+
+    command_result = mm_at_command_finish (G_OBJECT (self), res, &error);
+    if (!command_result) {
+        g_assert (error);
+        g_simple_async_result_take_error (unlock_required_result, error);
+    }
+    else {
+        g_simple_async_result_set_op_res_gpointer (unlock_required_result,
+                                                   GUINT_TO_POINTER (g_variant_get_uint32 (command_result)),
+                                                   NULL);
+        g_variant_unref (command_result);
+    }
+
+    g_simple_async_result_complete (unlock_required_result);
+    g_object_unref (unlock_required_result);
+}
+
+static void
+load_unlock_required (MMIfaceModem *self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    mm_dbg ("checking if unlock required...");
+
+    result  = g_simple_async_result_new (G_OBJECT (self),
+                                         callback,
+                                         user_data,
+                                         load_unlock_required);
+    mm_at_command (G_OBJECT (self),
+                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                   "+CPIN?",
+                   3,
+                   (MMAtResponseProcessor)parse_unlock_required_reply,
+                   NULL, /* response_processor_context */
+                   "u",
+                   NULL, /* TODO: cancellable */
+                   (GAsyncReadyCallback)load_unlock_required_ready,
+                   result);
+}
+
+/*****************************************************************************/
 
 static void
 enable (MMBaseModem *self,
@@ -795,6 +925,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_equipment_identifier_finish = load_equipment_identifier_finish;
     iface->load_device_identifier = load_device_identifier;
     iface->load_device_identifier_finish = load_device_identifier_finish;
+    iface->load_unlock_required = load_unlock_required;
+    iface->load_unlock_required_finish = load_unlock_required_finish;
 }
 
 static void
