@@ -26,6 +26,7 @@
 #include <mm-errors-types.h>
 #include <mm-enums-types.h>
 
+#include "mm-at.h"
 #include "mm-broadband-modem.h"
 #include "mm-iface-modem.h"
 #include "mm-sim.h"
@@ -50,6 +51,191 @@ struct _MMBroadbandModemPrivate {
     MMSim *modem_sim;
     MMModemState modem_state;
 };
+
+/*****************************************************************************/
+/* CAPABILITIES */
+
+typedef struct {
+	gchar *name;
+	MMModemCapability bits;
+} ModemCaps;
+
+static const ModemCaps modem_caps[] = {
+	{ "+CGSM",     MM_MODEM_CAPABILITY_GSM_UMTS  },
+	{ "+CIS707-A", MM_MODEM_CAPABILITY_CDMA_EVDO },
+	{ "+CIS707A",  MM_MODEM_CAPABILITY_CDMA_EVDO }, /* Cmotech */
+	{ "+CIS707",   MM_MODEM_CAPABILITY_CDMA_EVDO },
+	{ "CIS707",    MM_MODEM_CAPABILITY_CDMA_EVDO }, /* Qualcomm Gobi */
+	{ "+CIS707P",  MM_MODEM_CAPABILITY_CDMA_EVDO },
+	{ "CIS-856",   MM_MODEM_CAPABILITY_CDMA_EVDO },
+	{ "+IS-856",   MM_MODEM_CAPABILITY_CDMA_EVDO }, /* Cmotech */
+	{ "CIS-856-A", MM_MODEM_CAPABILITY_CDMA_EVDO },
+	{ "CIS-856A",  MM_MODEM_CAPABILITY_CDMA_EVDO }, /* Kyocera KPC680 */
+    /* TODO: FCLASS, MS, ES, DS? */
+	{ NULL }
+};
+
+static gboolean
+parse_caps_gcap (MMBroadbandModem *self,
+                 gpointer none,
+                 const gchar *command,
+                 const gchar *response,
+                 const GError *error,
+                 GVariant **variant,
+                 GError **result_error)
+{
+    const ModemCaps *cap = modem_caps;
+    guint32 ret = 0;
+
+    /* Some modems (Huawei E160g) won't respond to +GCAP with no SIM, but
+     * will respond to ATI.  Ignore the error and continue.
+     */
+    if (response && strstr (response, "+CME ERROR:"))
+        return FALSE;
+
+    while (cap->name) {
+        if (strstr (response, cap->name))
+            ret |= cap->bits;
+        cap++;
+    }
+
+    /* No result built? */
+    if (ret == 0)
+        return FALSE;
+
+    *variant = g_variant_new_uint32 (ret);
+    return TRUE;
+}
+
+static gboolean
+parse_caps_cpin (MMBroadbandModem *self,
+                 gpointer none,
+                 const gchar *command,
+                 const gchar *response,
+                 const GError *error,
+                 GVariant **result,
+                 GError **result_error)
+{
+    if (strcasestr (response, "SIM PIN") ||
+        strcasestr (response, "SIM PUK") ||
+        strcasestr (response, "PH-SIM PIN") ||
+        strcasestr (response, "PH-FSIM PIN") ||
+        strcasestr (response, "PH-FSIM PUK") ||
+        strcasestr (response, "SIM PIN2") ||
+        strcasestr (response, "SIM PUK2") ||
+        strcasestr (response, "PH-NET PIN") ||
+        strcasestr (response, "PH-NET PUK") ||
+        strcasestr (response, "PH-NETSUB PIN") ||
+        strcasestr (response, "PH-NETSUB PUK") ||
+        strcasestr (response, "PH-SP PIN") ||
+        strcasestr (response, "PH-SP PUK") ||
+        strcasestr (response, "PH-CORP PIN") ||
+        strcasestr (response, "PH-CORP PUK") ||
+        strcasestr (response, "READY")) {
+        /* At least, it's a GSM modem */
+        *result = g_variant_new_uint32 (MM_MODEM_CAPABILITY_GSM_UMTS);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static gboolean
+parse_caps_cgmm (MMBroadbandModem *self,
+                 gpointer none,
+                 const gchar *command,
+                 const gchar *response,
+                 const GError *error,
+                 GVariant **result,
+                 GError **result_error)
+{
+    if (strstr (response, "GSM900") ||
+        strstr (response, "GSM1800") ||
+        strstr (response, "GSM1900") ||
+        strstr (response, "GSM850")) {
+        /* At least, it's a GSM modem */
+        *result = g_variant_new_uint32 (MM_MODEM_CAPABILITY_GSM_UMTS);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static gchar *
+create_capabilities_string (MMModemCapability caps)
+{
+	GFlagsClass *flags_class;
+    GString *str;
+    MMModemCapability it;
+    gboolean first = TRUE;
+
+    str = g_string_new ("");
+    flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_MODEM_CAPABILITY));
+
+    for (it = MM_MODEM_CAPABILITY_POTS; /* first */
+         it <= MM_MODEM_CAPABILITY_LTE_ADVANCED; /* last */
+         it = it << 1) {
+        if (caps & it) {
+            GFlagsValue *value;
+
+            value = g_flags_get_first_value (flags_class, it);
+            g_string_append_printf (str, "%s%s",
+                                    first ? "" : ", ",
+                                    value->value_nick);
+
+            if (first)
+                first = FALSE;
+        }
+    }
+    g_type_class_unref (flags_class);
+
+    return g_string_free (str, FALSE);
+}
+
+static MMModemCapability
+load_modem_capabilities_finish (MMIfaceModem *self,
+                                GAsyncResult *res,
+                                GError **error)
+{
+    GVariant *result;
+    MMModemCapability caps;
+    gchar *caps_str;
+
+    result = mm_at_sequence_finish (G_OBJECT (self), res, error);
+    if (!result)
+        return MM_MODEM_CAPABILITY_NONE;
+
+    caps = (MMModemCapability)g_variant_get_uint32 (result);
+    caps_str = create_capabilities_string (caps);
+    mm_dbg ("loaded modem capabilities: %s", caps_str);
+    g_free (caps_str);
+
+    g_variant_unref (result);
+    return caps;
+}
+
+static const MMAtCommand capabilities[] = {
+    { "+GCAP",  2, (MMAtResponseProcessor)parse_caps_gcap },
+    { "I",      1, (MMAtResponseProcessor)parse_caps_gcap },
+    { "+CPIN?", 1, (MMAtResponseProcessor)parse_caps_cpin },
+    { "+CGMM",  1, (MMAtResponseProcessor)parse_caps_cgmm },
+    { NULL }
+};
+
+static void
+load_modem_capabilities (MMIfaceModem *self,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data)
+{
+    mm_dbg ("loading modem capabilities...");
+    mm_at_sequence (G_OBJECT (self),
+                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                    (MMAtCommand *)capabilities,
+                    NULL, /* response_processor_context */
+                    FALSE,
+                    "u",
+                    NULL, /* TODO: cancellable */
+                    callback,
+                    user_data);
+}
 
 /*****************************************************************************/
 
@@ -265,6 +451,8 @@ dispose (GObject *object)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    iface->load_modem_capabilities = load_modem_capabilities;
+    iface->load_modem_capabilities_finish = load_modem_capabilities_finish;
 }
 
 static void
