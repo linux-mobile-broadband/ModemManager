@@ -118,28 +118,8 @@ modem_manager_SOURCES = \
 	mm-iface-modem.c \
 	mm-broadband-modem.h \
 	mm-broadband-modem.c \
-	mm-modem.c \
-	mm-modem.h \
 	mm-serial-parsers.c \
 	mm-serial-parsers.h \
-	mm-modem-base.c \
-	mm-modem-base.h \
-	mm-generic-cdma.c \
-	mm-generic-cdma.h \
-	mm-generic-gsm.c \
-	mm-generic-gsm.h \
-	mm-modem-cdma.c \
-	mm-modem-cdma.h \
-	mm-modem-gsm-card.c \
-	mm-modem-gsm-card.h \
-	mm-modem-gsm-network.c \
-	mm-modem-gsm-network.h \
-	mm-modem-gsm-sms.c \
-	mm-modem-gsm-sms.h \
-	mm-modem-gsm-ussd.c \
-	mm-modem-gsm-ussd.h \
-	mm-modem-simple.c \
-	mm-modem-simple.h \
 	mm-port-probe.h \
 	mm-port-probe.c \
 	mm-port-probe-at-command.h \
@@ -149,65 +129,5 @@ modem_manager_SOURCES = \
 	mm-plugin.c \
 	mm-plugin.h \
 	mm-plugin-base.c \
-	mm-plugin-base.h \
-	mm-properties-changed-signal.c \
-	mm-properties-changed-signal.h \
-	mm-modem-location.c \
-	mm-modem-location.h \
-	mm-modem-firmware.c \
-	mm-modem-firmware.h \
-	mm-modem-time.c \
-	mm-modem-time.h
+	mm-plugin-base.h
 
-mm-manager-glue.h: $(top_srcdir)/introspection/org.freedesktop.ModemManager.xml
-	$(AM_V_GEN) dbus-binding-tool --prefix=mm_manager --mode=glib-server --output=$@ $<
-
-mm-modem-glue.h: $(top_srcdir)/introspection/org.freedesktop.ModemManager.Modem.xml
-	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem --mode=glib-server --output=$@ $<
-
-mm-modem-simple-glue.h: $(top_srcdir)/introspection/org.freedesktop.ModemManager.Modem.Simple.xml
-	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_simple --mode=glib-server --output=$@ $<
-
-mm-modem-cdma-glue.h: $(top_srcdir)/introspection/org.freedesktop.ModemManager.Modem.Cdma.xml
-	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_cdma --mode=glib-server --output=$@ $<
-
-mm-modem-gsm-card-glue.h: $(top_srcdir)/introspection/org.freedesktop.ModemManager.Modem.Gsm.Card.xml
-	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_gsm_card --mode=glib-server --output=$@ $<
-
-mm-modem-gsm-network-glue.h: $(top_srcdir)/introspection/org.freedesktop.ModemManager.Modem.Gsm.Network.xml
-	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_gsm_network --mode=glib-server --output=$@ $<
-
-mm-modem-gsm-sms-glue.h: $(top_srcdir)/introspection/org.freedesktop.ModemManager.Modem.Gsm.SMS.xml
-	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_gsm_sms --mode=glib-server --output=$@ $<
-
-mm-modem-gsm-ussd-glue.h: $(top_srcdir)/introspection/org.freedesktop.ModemManager.Modem.Gsm.Ussd.xml
-	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_gsm_ussd --mode=glib-server --output=$@ $<
-
-mm-properties-changed-glue.h: $(top_srcdir)/introspection/org.freedesktop.DBus.Properties.xml
-	$(AM_V_GEN) dbus-binding-tool --prefix=mm_properties_changed --mode=glib-server --output=$@ $<
-
-BUILT_SOURCES = \
-	mm-manager-glue.h \
-	mm-modem-glue.h \
-	mm-modem-simple-glue.h \
-	mm-modem-cdma-glue.h \
-	mm-modem-gsm-card-glue.h \
-	mm-modem-gsm-network-glue.h \
-	mm-modem-gsm-sms-glue.h \
-	mm-modem-gsm-ussd-glue.h \
-	mm-properties-changed-glue.h
-
-mm-modem-location-glue.h: $(top_srcdir)/introspection/org.freedesktop.ModemManager.Modem.Location.xml
-	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_location --mode=glib-server --output=$@ $<
-
-mm-modem-firmware-glue.h: $(top_srcdir)/introspection/org.freedesktop.ModemManager.Modem.Firmware.xml
-	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_firmware --mode=glib-server --output=$@ $<
-
-mm-modem-time-glue.h: $(top_srcdir)/introspection/org.freedesktop.ModemManager.Modem.Time.xml
-	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_time --mode=glib-server --output=$@ $<
-
-modem_manager_SOURCES += $(loc_sources)
-
-BUILT_SOURCES += mm-modem-location-glue.h mm-modem-firmware-glue.h mm-modem-time-glue.h
-
-CLEANFILES = $(BUILT_SOURCES)
