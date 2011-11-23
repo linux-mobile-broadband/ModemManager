@@ -388,6 +388,50 @@ load_revision (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* EQUIPMENT ID */
+
+static gchar *
+load_equipment_identifier_finish (MMIfaceModem *self,
+                                  GAsyncResult *res,
+                                  GError **error)
+{
+    GVariant *result;
+    gchar *equipment_identifier;
+
+    result = mm_at_sequence_finish (G_OBJECT (self), res, error);
+    if (!result)
+        return NULL;
+
+    equipment_identifier = g_variant_dup_string (result, NULL);
+    mm_dbg ("loaded equipment identifier: %s", equipment_identifier);
+    g_variant_unref (result);
+    return equipment_identifier;
+}
+
+static const MMAtCommand equipment_identifiers[] = {
+    { "+CGSN",  3, (MMAtResponseProcessor)common_parse_string_reply },
+    { "+GSN",   3, (MMAtResponseProcessor)common_parse_string_reply },
+    { NULL }
+};
+
+static void
+load_equipment_identifier (MMIfaceModem *self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    mm_dbg ("loading equipment identifier...");
+    mm_at_sequence (G_OBJECT (self),
+                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                    (MMAtCommand *)equipment_identifiers,
+                    NULL, /* response_processor_context */
+                    FALSE,
+                    "s",
+                    NULL, /* TODO: cancellable */
+                    callback,
+                    user_data);
+}
+
+/*****************************************************************************/
 
 static void
 enable (MMBaseModem *self,
@@ -609,6 +653,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_model_finish = load_model_finish;
     iface->load_revision = load_revision;
     iface->load_revision_finish = load_revision_finish;
+    iface->load_equipment_identifier = load_equipment_identifier;
+    iface->load_equipment_identifier_finish = load_equipment_identifier_finish;
 }
 
 static void
