@@ -702,6 +702,34 @@ load_unlock_required (MMIfaceModem *self,
 /*****************************************************************************/
 
 static gboolean
+modem_flow_control_finish (MMIfaceModem *self,
+                           GAsyncResult *res,
+                           GError **error)
+{
+    return !mm_at_sequence_finish (G_OBJECT (self), res, error);
+}
+
+static void
+modem_flow_control (MMIfaceModem *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    /* By default, try to set XOFF/XON flow control, and ignore errors */
+    mm_at_command (G_OBJECT (self),
+                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                   "+IFC=1,1",
+                   3,
+                   NULL,  /* response processor */
+                   NULL,  /* response processor context */
+                   NULL,  /* result signature */
+                   NULL,  /* cancellable */
+                   callback,
+                   user_data);
+}
+
+/*****************************************************************************/
+
+static gboolean
 modem_power_up_finish (MMIfaceModem *self,
                        GAsyncResult *res,
                        GError **error)
@@ -1040,6 +1068,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_init_finish = modem_init_finish;
     iface->modem_power_up = modem_power_up;
     iface->modem_power_up_finish = modem_power_up_finish;
+    iface->modem_flow_control = modem_flow_control;
+    iface->modem_flow_control_finish = modem_flow_control_finish;
 }
 
 static void
