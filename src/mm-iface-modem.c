@@ -695,8 +695,8 @@ mm_iface_modem_signal_quality_check (MMIfaceModem *self,
 
 typedef enum {
     INITIALIZATION_STEP_FIRST,
-    INITIALIZATION_STEP_MODEM_CAPABILITIES,
     INITIALIZATION_STEP_CURRENT_CAPABILITIES,
+    INITIALIZATION_STEP_MODEM_CAPABILITIES,
     INITIALIZATION_STEP_MAX_BEARERS,
     INITIALIZATION_STEP_MAX_ACTIVE_BEARERS,
     INITIALIZATION_STEP_MANUFACTURER,
@@ -809,8 +809,31 @@ interface_initialization_finish (MMIfaceModem *self,
         interface_initialization_step (ctx);                            \
     }
 
+static void
+load_current_capabilities_ready (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 InitializationContext *ctx)
+{
+    GError *error = NULL;
+
+    /* We have the property in the interface bound to the property in the
+     * skeleton. */
+    g_object_set (self,
+                  MM_IFACE_MODEM_CURRENT_CAPABILITIES,
+                  MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_capabilities_finish (self, res, &error),
+                  NULL);
+
+    if (error) {
+        mm_warn ("couldn't load Current Capabilities: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
+
 UINT_REPLY_READY_FN (modem_capabilities, "Modem Capabilities")
-UINT_REPLY_READY_FN (current_capabilities, "Current Capabilities")
 UINT_REPLY_READY_FN (max_bearers, "Max Bearers")
 UINT_REPLY_READY_FN (max_active_bearers, "Max Active Bearers")
 STR_REPLY_READY_FN (manufacturer, "Manufacturer")
@@ -935,6 +958,22 @@ interface_initialization_step (InitializationContext *ctx)
         break;
     }
 
+    case INITIALIZATION_STEP_CURRENT_CAPABILITIES:
+        /* Current capabilities may change during runtime, i.e. if new firmware reloaded; but we'll
+         * try to handle that by making sure the capabilities are cleared when the new firmware is
+         * reloaded. So if we're asked to re-initialize, if we already have current capabilities loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_modem_get_current_capabilities (ctx->skeleton) == MM_MODEM_CAPABILITY_NONE &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_capabilities &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_capabilities_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_capabilities (
+                ctx->self,
+                (GAsyncReadyCallback)load_current_capabilities_ready,
+                ctx);
+            return;
+        }
+        break;
+
     case INITIALIZATION_STEP_MODEM_CAPABILITIES:
         /* Modem capabilities are meant to be loaded only once during the whole
          * lifetime of the modem. Therefore, if we already have them loaded,
@@ -948,22 +987,9 @@ interface_initialization_step (InitializationContext *ctx)
                 ctx);
             return;
         }
-        break;
-
-    case INITIALIZATION_STEP_CURRENT_CAPABILITIES:
-        /* In theory, this property is able to change during runtime, so if
-         * possible we'll reload it. */
-       if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_capabilities &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_capabilities_finish) {
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_capabilities (
-                ctx->self,
-                (GAsyncReadyCallback)load_current_capabilities_ready,
-                ctx);
-            return;
-        }
-       /* If no specific way of getting current capabilities, assume they are
-        * equal to the modem capabilities */
-        mm_gdbus_modem_set_current_capabilities (
+       /* If no specific way of getting modem capabilities, assume they are
+        * equal to the current capabilities */
+        mm_gdbus_modem_set_modem_capabilities (
             ctx->skeleton,
             mm_gdbus_modem_get_current_capabilities (ctx->skeleton));
         break;
@@ -1340,7 +1366,6 @@ mm_iface_modem_initialize (MMIfaceModem *self,
             /* Set all initial property defaults */
             mm_gdbus_modem_set_sim (skeleton, NULL);
             mm_gdbus_modem_set_modem_capabilities (skeleton, MM_MODEM_CAPABILITY_NONE);
-            mm_gdbus_modem_set_current_capabilities (skeleton, MM_MODEM_CAPABILITY_NONE);
             mm_gdbus_modem_set_max_bearers (skeleton, 0);
             mm_gdbus_modem_set_max_active_bearers (skeleton, 0);
             mm_gdbus_modem_set_manufacturer (skeleton, NULL);
@@ -1362,13 +1387,17 @@ mm_iface_modem_initialize (MMIfaceModem *self,
             mm_gdbus_modem_set_allowed_bands (skeleton, MM_MODEM_BAND_ANY);
 
             /* Bind our State property */
-            mm_gdbus_modem_set_state (skeleton, modem_state);
             g_object_bind_property (self, MM_IFACE_MODEM_STATE,
                                     skeleton, "state",
                                     G_BINDING_DEFAULT);
+            /* Bind our Capabilities property */
+            g_object_bind_property (self, MM_IFACE_MODEM_CURRENT_CAPABILITIES,
+                                    skeleton, "current-capabilities",
+                                    G_BINDING_DEFAULT);
 
-            /* Keep a reference to it */
             g_object_set (self,
+                          MM_IFACE_MODEM_STATE, modem_state,
+                          MM_IFACE_MODEM_CURRENT_CAPABILITIES, MM_MODEM_CAPABILITY_NONE,
                           MM_IFACE_MODEM_DBUS_SKELETON, skeleton,
                           NULL);
         }
@@ -1461,6 +1490,15 @@ iface_modem_init (gpointer g_iface)
                             MM_TYPE_MODEM_STATE,
                             MM_MODEM_STATE_UNKNOWN,
                             G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_flags (MM_IFACE_MODEM_CURRENT_CAPABILITIES,
+                             "Current capabilities",
+                             "Current capabilities of the modem",
+                             MM_TYPE_MODEM_CAPABILITY,
+                             MM_MODEM_CAPABILITY_NONE,
+                             G_PARAM_READWRITE));
 
     initialized = TRUE;
 }

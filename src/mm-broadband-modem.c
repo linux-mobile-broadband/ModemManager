@@ -208,9 +208,9 @@ create_capabilities_string (MMModemCapability caps)
 }
 
 static MMModemCapability
-load_modem_capabilities_finish (MMIfaceModem *self,
-                                GAsyncResult *res,
-                                GError **error)
+load_current_capabilities_finish (MMIfaceModem *self,
+                                  GAsyncResult *res,
+                                  GError **error)
 {
     GVariant *result;
     MMModemCapability caps;
@@ -222,7 +222,7 @@ load_modem_capabilities_finish (MMIfaceModem *self,
 
     caps = (MMModemCapability)g_variant_get_uint32 (result);
     caps_str = create_capabilities_string (caps);
-    mm_dbg ("loaded modem capabilities: %s", caps_str);
+    mm_dbg ("loaded current capabilities: %s", caps_str);
     g_free (caps_str);
 
     g_variant_unref (result);
@@ -238,11 +238,11 @@ static const MMAtCommand capabilities[] = {
 };
 
 static void
-load_modem_capabilities (MMIfaceModem *self,
-                         GAsyncReadyCallback callback,
-                         gpointer user_data)
+load_current_capabilities (MMIfaceModem *self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
 {
-    mm_dbg ("loading modem capabilities...");
+    mm_dbg ("loading current capabilities...");
     mm_at_sequence (G_OBJECT (self),
                     mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
                     (MMAtCommand *)capabilities,
@@ -911,8 +911,8 @@ dispose (GObject *object)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
-    iface->load_modem_capabilities = load_modem_capabilities;
-    iface->load_modem_capabilities_finish = load_modem_capabilities_finish;
+    iface->load_current_capabilities = load_current_capabilities;
+    iface->load_current_capabilities_finish = load_current_capabilities_finish;
     iface->load_manufacturer = load_manufacturer;
     iface->load_manufacturer_finish = load_manufacturer_finish;
     iface->load_model = load_model;

@@ -24,9 +24,10 @@
 #define MM_IS_IFACE_MODEM(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM))
 #define MM_IFACE_MODEM_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM, MMIfaceModem))
 
-#define MM_IFACE_MODEM_DBUS_SKELETON   "iface-modem-dbus-skeleton"
-#define MM_IFACE_MODEM_STATE           "iface-modem-state"
-#define MM_IFACE_MODEM_SIM             "iface-modem-sim"
+#define MM_IFACE_MODEM_DBUS_SKELETON        "iface-modem-dbus-skeleton"
+#define MM_IFACE_MODEM_CURRENT_CAPABILITIES "iface-modem-current-capabilities"
+#define MM_IFACE_MODEM_STATE                "iface-modem-state"
+#define MM_IFACE_MODEM_SIM                  "iface-modem-sim"
 
 typedef struct _MMIfaceModem MMIfaceModem;
 
