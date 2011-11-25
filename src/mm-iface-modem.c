@@ -29,10 +29,14 @@
 typedef struct _InitializationContext InitializationContext;
 static void interface_initialization_step (InitializationContext *ctx);
 
+typedef struct _EnablingContext EnablingContext;
+static void interface_enabling_step (EnablingContext *ctx);
+
 typedef enum {
     INTERFACE_STATUS_SHUTDOWN,
     INTERFACE_STATUS_INITIALIZING,
-    INTERFACE_STATUS_INITIALIZED
+    INTERFACE_STATUS_INITIALIZED,
+    INTERFACE_STATUS_ENABLED,
 } InterfaceStatus;
 
 typedef struct {
@@ -746,6 +750,109 @@ mm_iface_modem_signal_quality_check (MMIfaceModem *self,
 /*****************************************************************************/
 
 typedef enum {
+    ENABLING_STEP_FIRST,
+    ENABLING_STEP_LAST
+} EnablingStep;
+
+struct _EnablingContext {
+    MMIfaceModem *self;
+    EnablingStep step;
+    gboolean enabled;
+    GSimpleAsyncResult *result;
+    MmGdbusModem *skeleton;
+};
+
+static EnablingContext *
+enabling_context_new (MMIfaceModem *self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    EnablingContext *ctx;
+
+    ctx = g_new0 (EnablingContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             enabling_context_new);
+    ctx->step = ENABLING_STEP_FIRST;
+    g_object_get (ctx->self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
+                  NULL);
+    g_assert (ctx->skeleton != NULL);
+
+    update_state (ctx->self,
+                  MM_MODEM_STATE_ENABLING,
+                  MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
+
+    return ctx;
+}
+
+static void
+enabling_context_complete_and_free (EnablingContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+
+    if (ctx->enabled)
+        update_state (ctx->self,
+                      MM_MODEM_STATE_ENABLED,
+                      MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
+    else {
+        /* Fallback to DISABLED/LOCKED */
+        update_state (ctx->self,
+                      (mm_gdbus_modem_get_unlock_required (ctx->skeleton) == MM_MODEM_LOCK_NONE ?
+                       MM_MODEM_STATE_DISABLED :
+                       MM_MODEM_STATE_LOCKED),
+                      MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+    }
+
+    g_object_unref (ctx->self);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->skeleton);
+    g_free (ctx);
+}
+
+gboolean
+mm_iface_modem_enable_finish (MMIfaceModem *self,
+                              GAsyncResult *res,
+                              GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+interface_enabling_step (EnablingContext *ctx)
+{
+    switch (ctx->step) {
+    case ENABLING_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_LAST:
+        /* We are done without errors! */
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        ctx->enabled = TRUE;
+        enabling_context_complete_and_free (ctx);
+        /* mm_serial_port_close (MM_SERIAL_PORT (ctx->port)); */
+        return;
+    }
+
+    g_assert_not_reached ();
+}
+
+void
+mm_iface_modem_enable (MMIfaceModem *self,
+                       GAsyncReadyCallback callback,
+                       gpointer user_data)
+{
+    interface_enabling_step (enabling_context_new (self,
+                                                   callback,
+                                                   user_data));
+}
+
+/*****************************************************************************/
+
+typedef enum {
     INITIALIZATION_STEP_FIRST,
     INITIALIZATION_STEP_CURRENT_CAPABILITIES,
     INITIALIZATION_STEP_MODEM_CAPABILITIES,
@@ -1287,6 +1394,7 @@ static InterfaceStatus
 get_status (MMIfaceModem *self)
 {
     GObject *skeleton = NULL;
+    MMModemState modem_state;
 
     /* Are we already disabled? */
     g_object_get (self,
@@ -1298,12 +1406,18 @@ get_status (MMIfaceModem *self)
 
     /* Are we being initialized? (interface not yet exported) */
     skeleton = G_OBJECT (mm_gdbus_object_get_modem (MM_GDBUS_OBJECT (self)));
-    if (skeleton) {
-        g_object_unref (skeleton);
-        return INTERFACE_STATUS_INITIALIZED;
-    }
+    if (!skeleton)
+        return INTERFACE_STATUS_INITIALIZING;
 
-    return INTERFACE_STATUS_INITIALIZING;
+    modem_state = MM_MODEM_STATE_UNKNOWN;
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+    g_object_unref (skeleton);
+
+    return (modem_state > MM_MODEM_STATE_DISABLED ?
+            INTERFACE_STATUS_ENABLED :
+            INTERFACE_STATUS_INITIALIZED);
 }
 
 gboolean
@@ -1402,6 +1516,7 @@ mm_iface_modem_initialize (MMIfaceModem *self,
                                         mm_iface_modem_initialize);
 
     switch (get_status (self)) {
+    case INTERFACE_STATUS_ENABLED:
     case INTERFACE_STATUS_INITIALIZED:
     case INTERFACE_STATUS_SHUTDOWN: {
         MmGdbusModem *skeleton = NULL;
@@ -1490,6 +1605,7 @@ mm_iface_modem_shutdown (MMIfaceModem *self,
                      MM_CORE_ERROR_IN_PROGRESS,
                      "Iinterface being currently initialized");
         return FALSE;
+    case INTERFACE_STATUS_ENABLED:
     case INTERFACE_STATUS_INITIALIZED:
         /* Remove SIM object */
         g_object_set (self,
