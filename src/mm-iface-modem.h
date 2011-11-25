@@ -207,6 +207,14 @@ struct _MMIfaceModem {
     gboolean (*modem_after_power_up_finish) (MMIfaceModem *self,
                                              GAsyncResult *res,
                                              GError **error);
+
+    /* Asynchronous flow control setup */
+    void (*modem_flow_control) (MMIfaceModem *self,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data);
+    gboolean (*modem_flow_control_finish) (MMIfaceModem *self,
+                                           GAsyncResult *res,
+                                           GError **error);
 };
 
 GType mm_iface_modem_get_type (void);

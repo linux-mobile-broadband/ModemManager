@@ -756,6 +756,7 @@ typedef enum {
     ENABLING_STEP_MODEM_INIT,
     ENABLING_STEP_MODEM_POWER_UP,
     ENABLING_STEP_MODEM_AFTER_POWER_UP,
+    ENABLING_STEP_FLOW_CONTROL,
     ENABLING_STEP_LAST
 } EnablingStep;
 
@@ -856,6 +857,7 @@ mm_iface_modem_enable_finish (MMIfaceModem *self,
 VOID_REPLY_READY_FN (modem_init);
 VOID_REPLY_READY_FN (modem_power_up);
 VOID_REPLY_READY_FN (modem_after_power_up);
+VOID_REPLY_READY_FN (modem_flow_control);
 
 static void
 interface_enabling_flash_done (MMSerialPort *port,
@@ -936,6 +938,18 @@ interface_enabling_step (EnablingContext *ctx)
             MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_after_power_up (
                 ctx->self,
                 (GAsyncReadyCallback)modem_after_power_up_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_FLOW_CONTROL:
+        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_flow_control &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_flow_control_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_flow_control (
+                ctx->self,
+                (GAsyncReadyCallback)modem_flow_control_ready,
                 ctx);
             return;
         }
