@@ -754,6 +754,7 @@ mm_iface_modem_signal_quality_check (MMIfaceModem *self,
 
 typedef enum {
     DISABLING_STEP_FIRST,
+    DISABLING_STEP_FLASH_PORT,
     DISABLING_STEP_LAST
 } DisablingStep;
 
@@ -826,10 +827,41 @@ mm_iface_modem_disable_finish (MMIfaceModem *self,
 }
 
 static void
+interface_disabling_flash_done (MMSerialPort *port,
+                                GError *error,
+                                gpointer user_data)
+{
+    DisablingContext *ctx = user_data;
+
+    if (error) {
+        g_simple_async_result_set_from_error (ctx->result, error);
+        disabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_disabling_step (ctx);
+}
+
+static void
 interface_disabling_step (DisablingContext *ctx)
 {
     switch (ctx->step) {
     case DISABLING_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case DISABLING_STEP_FLASH_PORT:
+        /* If primary port connected, flash port */
+        if (mm_port_get_connected (MM_PORT (ctx->primary))) {
+            mm_serial_port_flash (MM_SERIAL_PORT (ctx->primary),
+                                  100,
+                                  TRUE,
+                                  interface_disabling_flash_done,
+                                  ctx);
+            return;
+        }
         /* Fall down to next step */
         ctx->step++;
 
