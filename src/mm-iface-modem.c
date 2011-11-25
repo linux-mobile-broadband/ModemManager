@@ -152,13 +152,166 @@ update_state (MMIfaceModem *self,
 
 /*****************************************************************************/
 
+static void
+enable_disable_ready (MMIfaceModem *self,
+                      GAsyncResult *res,
+                      DbusCallContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_BASE_MODEM_GET_CLASS (self)->enable_finish (MM_BASE_MODEM (self),
+                                                        res,
+                                                        &error))
+        g_dbus_method_invocation_take_error (ctx->invocation,
+                                             error);
+    else
+        mm_gdbus_modem_complete_enable (ctx->skeleton,
+                                        ctx->invocation);
+    dbus_call_context_free (ctx);
+}
+
 static gboolean
-handle_enable (MmGdbusModem *object,
+run_enable (MMIfaceModem *self,
+            MmGdbusModem *skeleton,
+            MMModemState modem_state,
+            GDBusMethodInvocation *invocation)
+{
+    switch (modem_state) {
+    case MM_MODEM_STATE_UNKNOWN:
+        /* We should never have a UNKNOWN->ENABLED transition */
+        g_assert_not_reached ();
+        break;
+
+    case MM_MODEM_STATE_LOCKED: {
+        MMModemLock lock;
+
+        lock = mm_gdbus_modem_get_unlock_required (skeleton);
+        /* We don't care about SIM-PIN2/SIM-PUK2 since the device is
+         * operational without it. */
+        if (lock != MM_MODEM_LOCK_NONE &&
+            lock != MM_MODEM_LOCK_SIM_PIN2 &&
+            lock != MM_MODEM_LOCK_SIM_PUK2) {
+            g_dbus_method_invocation_return_error (invocation,
+                                                   MM_CORE_ERROR,
+                                                   MM_CORE_ERROR_WRONG_STATE,
+                                                   "Cannot enable modem: device locked");
+            break;
+        }
+
+        /* Fall through, treat as disabled */
+    }
+
+    case MM_MODEM_STATE_DISABLED:
+        MM_BASE_MODEM_GET_CLASS (self)->enable (MM_BASE_MODEM (self),
+                                                NULL, /* cancellable */
+                                                (GAsyncReadyCallback)enable_disable_ready,
+                                                dbus_call_context_new (skeleton,
+                                                                       invocation,
+                                                                       self));
+        break;
+
+    case MM_MODEM_STATE_DISABLING:
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot enable modem: "
+                                               "currently being disabled");
+        break;
+
+    case MM_MODEM_STATE_ENABLING:
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot enable modem: "
+                                               "already being enabled");
+        break;
+
+    case MM_MODEM_STATE_ENABLED:
+    case MM_MODEM_STATE_SEARCHING:
+    case MM_MODEM_STATE_REGISTERED:
+    case MM_MODEM_STATE_DISCONNECTING:
+    case MM_MODEM_STATE_CONNECTING:
+    case MM_MODEM_STATE_CONNECTED:
+        /* Just return success, don't relaunch enabling */
+        mm_gdbus_modem_complete_enable (skeleton, invocation);
+        break;
+    }
+
+    return TRUE;
+}
+
+static gboolean
+run_disable (MMIfaceModem *self,
+             MmGdbusModem *skeleton,
+             MMModemState modem_state,
+             GDBusMethodInvocation *invocation)
+{
+    switch (modem_state) {
+    case MM_MODEM_STATE_UNKNOWN:
+        /* We should never have a UNKNOWN->DISABLED transition requested by
+         * the user. */
+        g_assert_not_reached ();
+        break;
+
+    case MM_MODEM_STATE_LOCKED:
+    case MM_MODEM_STATE_DISABLED:
+        /* Just return success, don't relaunch enabling */
+        mm_gdbus_modem_complete_enable (skeleton, invocation);
+        break;
+
+    case MM_MODEM_STATE_DISABLING:
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot disable modem: "
+                                               "already being disabled");
+        break;
+
+    case MM_MODEM_STATE_ENABLING:
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot disable modem: "
+                                               "currently being enabled");
+        break;
+
+    case MM_MODEM_STATE_ENABLED:
+    case MM_MODEM_STATE_SEARCHING:
+    case MM_MODEM_STATE_REGISTERED:
+    case MM_MODEM_STATE_DISCONNECTING:
+    case MM_MODEM_STATE_CONNECTING:
+    case MM_MODEM_STATE_CONNECTED:
+        MM_BASE_MODEM_GET_CLASS (self)->disable (MM_BASE_MODEM (self),
+                                                 NULL, /* cancellable */
+                                                 (GAsyncReadyCallback)enable_disable_ready,
+                                                 dbus_call_context_new (skeleton,
+                                                                        invocation,
+                                                                        self));
+        break;
+    }
+
+    return TRUE;
+}
+
+static gboolean
+handle_enable (MmGdbusModem *skeleton,
                GDBusMethodInvocation *invocation,
                gboolean arg_enable,
                MMIfaceModem *self)
 {
-    return FALSE; /* Currently unhandled */
+    MMModemState modem_state;
+
+    g_assert (MM_BASE_MODEM_GET_CLASS (self)->enable != NULL);
+    g_assert (MM_BASE_MODEM_GET_CLASS (self)->enable_finish != NULL);
+
+    modem_state = MM_MODEM_STATE_UNKNOWN;
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+
+    return (arg_enable ?
+            run_enable (self, skeleton, modem_state, invocation) :
+            run_disable (self, skeleton, modem_state, invocation));
 }
 
 /*****************************************************************************/
