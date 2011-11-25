@@ -42,6 +42,7 @@ enum {
     PROP_MODEM_DBUS_SKELETON,
     PROP_MODEM_SIM,
     PROP_MODEM_STATE,
+    PROP_MODEM_CURRENT_CAPABILITIES,
     PROP_LAST
 };
 
@@ -49,6 +50,7 @@ struct _MMBroadbandModemPrivate {
     GObject *modem_dbus_skeleton;
     MMSim *modem_sim;
     MMModemState modem_state;
+    MMModemCapability modem_current_capabilities;
 };
 
 static gboolean
@@ -845,6 +847,9 @@ set_property (GObject *object,
     case PROP_MODEM_STATE:
         self->priv->modem_state = g_value_get_enum (value);
         break;
+    case PROP_MODEM_CURRENT_CAPABILITIES:
+        self->priv->modem_current_capabilities = g_value_get_flags (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -869,6 +874,9 @@ get_property (GObject *object,
     case PROP_MODEM_STATE:
         g_value_set_enum (value, self->priv->modem_state);
         break;
+    case PROP_MODEM_CURRENT_CAPABILITIES:
+        g_value_set_flags (value, self->priv->modem_current_capabilities);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -883,6 +891,7 @@ mm_broadband_modem_init (MMBroadbandModem *self)
                                               MM_TYPE_BROADBAND_MODEM,
                                               MMBroadbandModemPrivate);
     self->priv->modem_state = MM_MODEM_STATE_UNKNOWN;
+    self->priv->modem_current_capabilities = MM_MODEM_CAPABILITY_NONE;
 }
 
 static void
@@ -958,4 +967,8 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_STATE,
                                       MM_IFACE_MODEM_STATE);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_CURRENT_CAPABILITIES,
+                                      MM_IFACE_MODEM_CURRENT_CAPABILITIES);
 }
