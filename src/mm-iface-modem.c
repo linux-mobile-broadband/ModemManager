@@ -756,6 +756,7 @@ typedef enum {
     DISABLING_STEP_FIRST,
     DISABLING_STEP_FLASH_PORT,
     DISABLING_STEP_MODEM_POWER_DOWN,
+    DISABLING_STEP_CLOSE_PORT,
     DISABLING_STEP_LAST
 } DisablingStep;
 
@@ -905,6 +906,17 @@ interface_disabling_step (DisablingContext *ctx)
                 ctx);
             return;
         }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case DISABLING_STEP_CLOSE_PORT:
+        /* While the modem is enabled ports are kept open, so we need to close
+         * them when the modem gets disabled. As this (should) be the last
+         * closing in order to get it really closed (open count = 1), it should
+         * be safe to check whether they are really open before trying to close.
+         */
+        if (mm_serial_port_is_open (MM_SERIAL_PORT (ctx->primary)))
+            mm_serial_port_close (MM_SERIAL_PORT (ctx->primary));
         /* Fall down to next step */
         ctx->step++;
 
