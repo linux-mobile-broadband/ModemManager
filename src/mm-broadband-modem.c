@@ -1084,6 +1084,35 @@ modem_init (MMIfaceModem *self,
 
 /*****************************************************************************/
 
+static gboolean
+enable_finish (MMBaseModem *self,
+               GAsyncResult *res,
+               GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    return TRUE;
+}
+
+static void
+iface_modem_enable_ready (MMBroadbandModem *self,
+                          GAsyncResult *result,
+                          GAsyncResult *enable_result)
+{
+    GError *error = NULL;
+
+    if (!mm_iface_modem_enable_finish (MM_IFACE_MODEM (self),
+                                       result,
+                                       &error))
+        g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (enable_result), error);
+    else
+        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (enable_result), TRUE);
+
+    g_simple_async_result_complete (G_SIMPLE_ASYNC_RESULT (enable_result));
+    g_object_unref (enable_result);
+}
+
 static void
 enable (MMBaseModem *self,
         GCancellable *cancellable,
@@ -1097,20 +1126,10 @@ enable (MMBaseModem *self,
                                      user_data,
                                      enable);
 
-    g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res), TRUE);
-    g_simple_async_result_complete_in_idle (G_SIMPLE_ASYNC_RESULT (res));
-    g_object_unref (res);
-}
-
-static gboolean
-enable_finish (MMBaseModem *self,
-               GAsyncResult *res,
-               GError **error)
-{
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return FALSE;
-
-    return TRUE;
+    /* Enable the Modem interface */
+    mm_iface_modem_enable (MM_IFACE_MODEM (self),
+                           (GAsyncReadyCallback)iface_modem_enable_ready,
+                           res);
 }
 
 /*****************************************************************************/
