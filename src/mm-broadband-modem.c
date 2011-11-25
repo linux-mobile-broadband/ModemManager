@@ -701,6 +701,77 @@ load_unlock_required (MMIfaceModem *self,
 
 /*****************************************************************************/
 
+static gboolean
+modem_init_finish (MMIfaceModem *self,
+                   GAsyncResult *res,
+                   GError **error)
+{
+    return !mm_at_sequence_finish (G_OBJECT (self), res, error);
+}
+
+static gboolean
+parse_init_response (MMBroadbandModem *self,
+                     gpointer none,
+                     const gchar *command,
+                     const gchar *response,
+                     const GError *error,
+                     GVariant **variant,
+                     GError **result_error)
+{
+    /* Errors in the mandatory init commands will abort the whole modem
+     * initialization process */
+    if (error)
+        *result_error = g_error_copy (error);
+
+    /* Return FALSE so that we keep on with the next steps in the sequence */
+    return FALSE;
+}
+
+static const MMAtCommand modem_init_sequence[] = {
+    /* Send the init command twice; some devices (Nokia N900) appear to take a
+     * few commands before responding correctly.  Instead of penalizing them for
+     * being stupid the first time by failing to enable the device, just
+     * try again.
+
+     * TODO: only send init command 2nd time if 1st time failed?
+     */
+    { "Z E0 V1", 3, NULL },
+    { "Z E0 V1", 3, (MMAtResponseProcessor)parse_init_response },
+
+    /* Ensure echo is off after the init command; some modems ignore the
+     * E0 when it's in the same line as ATZ (Option GIO322).
+     */
+    { "E0",      3, NULL },
+
+    /* Some phones (like Blackberries) don't support +CMEE=1, so make it
+     * optional.  It completely violates 3GPP TS 27.007 (9.1) but what can we do...
+     */
+    { "+CMEE=1", 3, NULL },
+
+    /* Additional OPTIONAL initialization */
+    { "X4 &C1",  3, NULL },
+
+    { NULL }
+};
+
+static void
+modem_init (MMIfaceModem *self,
+            GAsyncReadyCallback callback,
+            gpointer user_data)
+{
+    mm_at_sequence (G_OBJECT (self),
+                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                    (MMAtCommand *)modem_init_sequence,
+                    NULL,  /* response processor context */
+                    FALSE, /* free sequence */
+                    NULL,  /* result signature */
+                    NULL,  /* cancellable */
+                    callback,
+                    user_data);
+}
+
+/*****************************************************************************/
+
 static void
 enable (MMBaseModem *self,
         GCancellable *cancellable,
@@ -934,6 +1005,9 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_device_identifier_finish = load_device_identifier_finish;
     iface->load_unlock_required = load_unlock_required;
     iface->load_unlock_required_finish = load_unlock_required_finish;
+
+    iface->modem_init = modem_init;
+    iface->modem_init_finish = modem_init_finish;
 }
 
 static void
