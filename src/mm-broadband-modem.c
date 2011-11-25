@@ -701,6 +701,260 @@ load_unlock_required (MMIfaceModem *self,
 
 /*****************************************************************************/
 
+typedef struct {
+    GSimpleAsyncResult *result;
+    MMModemCharset charset;
+    gboolean tried_without_quotes;
+} ModemCharsetContext;
+
+static void
+modem_charset_context_free (ModemCharsetContext *ctx)
+{
+    g_object_unref (ctx->result);
+    g_free (ctx);
+}
+
+static gboolean
+modem_charset_finish (MMIfaceModem *self,
+                      GAsyncResult *res,
+                      GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    return TRUE;
+}
+
+static gboolean
+parse_modem_charset_reply (MMBroadbandModem *self,
+                           gpointer none,
+                           const gchar *command,
+                           const gchar *response,
+                           const GError *error,
+                           GVariant **result,
+                           GError **result_error)
+{
+    if (error) {
+        *result_error = g_error_copy (error);
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static gboolean
+parse_current_charset_reply (MMBroadbandModem *self,
+                             gpointer none,
+                             const gchar *command,
+                             const gchar *response,
+                             const GError *error,
+                             GVariant **result,
+                             GError **result_error)
+{
+    const gchar *p;
+    MMModemCharset current;
+
+    if (error) {
+        *result_error = g_error_copy (error);
+        return FALSE;
+    }
+
+    p = response;
+    if (g_str_has_prefix (p, "+CSCS:"))
+        p += 6;
+    while (*p == ' ')
+        p++;
+
+    current = mm_modem_charset_from_string (p);
+    *result = g_variant_new_uint32 (current);
+    return TRUE;
+}
+
+static void
+current_charset_ready (MMBroadbandModem *self,
+                       GAsyncResult *result,
+                       ModemCharsetContext *ctx)
+{
+    GError *error = NULL;
+    GVariant *reply;
+    MMModemCharset current;
+
+    reply = mm_at_command_finish (G_OBJECT (self), result, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+    } else {
+        g_assert (reply != NULL);
+        current = g_variant_get_uint32 (reply);
+        if (ctx->charset != current)
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Modem failed to change character set to %s",
+                                             mm_modem_charset_to_string (ctx->charset));
+        else
+            g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    }
+
+    g_simple_async_result_complete (ctx->result);
+    modem_charset_context_free (ctx);
+}
+
+static void
+modem_charset_ready (MMBroadbandModem *self,
+                     GAsyncResult *result,
+                     ModemCharsetContext *ctx)
+{
+    GError *error = NULL;
+
+    mm_at_command_finish (G_OBJECT (self), result, &error);
+    if (error) {
+        if (!ctx->tried_without_quotes) {
+            gchar *command;
+
+            g_error_free (error);
+            ctx->tried_without_quotes = TRUE;
+
+            /* Some modems puke if you include the quotes around the character
+             * set name, so lets try it again without them.
+             */
+            command = g_strdup_printf ("+CSCS=%s",
+                                       mm_modem_charset_to_string (ctx->charset));
+            mm_at_command (G_OBJECT (self),
+                           mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                           command,
+                           3,
+                           (MMAtResponseProcessor)parse_modem_charset_reply,
+                           NULL,  /* response processor context */
+                           NULL,  /* reply signature */
+                           NULL,  /* cancellable */
+                           (GAsyncReadyCallback)modem_charset_ready,
+                           ctx);
+            g_free (command);
+            return;
+        }
+
+        g_simple_async_result_take_error (ctx->result, error);
+        g_simple_async_result_complete (ctx->result);
+        modem_charset_context_free (ctx);
+        return;
+    }
+
+    /* Check whether we did properly set the charset */
+    mm_at_command (G_OBJECT (self),
+                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                   "+CSCS?",
+                   3,
+                   (MMAtResponseProcessor)parse_current_charset_reply,
+                   NULL,  /* response processor context */
+                   "u",
+                   NULL,  /* cancellable */
+                   (GAsyncReadyCallback)current_charset_ready,
+                   ctx);
+}
+
+static void
+modem_charset (MMIfaceModem *self,
+               MMModemCharset charset,
+               GAsyncReadyCallback callback,
+               gpointer user_data)
+{
+    ModemCharsetContext *ctx;
+    const gchar *charset_str;
+    gchar *command;
+
+    ctx = g_new0 (ModemCharsetContext, 1);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_charset);
+    ctx->charset = charset;
+
+    charset_str = mm_modem_charset_to_string (charset);
+    if (!charset_str) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Unhandled character set 0x%X",
+                                         charset);
+        g_simple_async_result_complete_in_idle (ctx->result);
+        modem_charset_context_free (ctx);
+        return;
+    }
+
+    command = g_strdup_printf ("+CSCS=\"%s\"", charset_str);
+    mm_at_command (G_OBJECT (self),
+                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                   command,
+                   3,
+                   (MMAtResponseProcessor)parse_modem_charset_reply,
+                   NULL,  /* response processor context */
+                   NULL,  /* reply signature */
+                   NULL,  /* cancellable */
+                   (GAsyncReadyCallback)modem_charset_ready,
+                   ctx);
+    g_free (command);
+}
+
+/*****************************************************************************/
+
+static MMModemCharset
+load_supported_charsets_finish (MMIfaceModem *self,
+                                GAsyncResult *res,
+                                GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_CHARSET_UNKNOWN;
+
+    return (MMModemCharset) g_variant_get_uint32 (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static gboolean
+parse_load_supported_charsets_reply (MMBroadbandModem *self,
+                                     gpointer none,
+                                     const gchar *command,
+                                     const gchar *response,
+                                     const GError *error,
+                                     GVariant **result,
+                                     GError **result_error)
+{
+    MMModemCharset charsets;
+
+    if (error) {
+        *result_error = g_error_copy (error);
+        return FALSE;
+    }
+
+    charsets = MM_MODEM_CHARSET_UNKNOWN;
+    if (!mm_gsm_parse_cscs_support_response (response, &charsets)) {
+        *result_error = g_error_new_literal (MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Failed to parse the supported character "
+                                             "sets response");
+        return FALSE;
+    }
+
+    *result = g_variant_new_uint32 (charsets);
+    return TRUE;
+}
+
+static void
+load_supported_charsets (MMIfaceModem *self,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data)
+{
+    mm_at_command (G_OBJECT (self),
+                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                   "+CSCS=?",
+                   3,
+                   (MMAtResponseProcessor)parse_load_supported_charsets_reply,
+                   NULL,  /* response processor context */
+                   "u",
+                   NULL,  /* cancellable */
+                   callback,
+                   user_data);
+}
+
+/*****************************************************************************/
+
 static gboolean
 modem_flow_control_finish (MMIfaceModem *self,
                            GAsyncResult *res,
@@ -1070,6 +1324,10 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_power_up_finish = modem_power_up_finish;
     iface->modem_flow_control = modem_flow_control;
     iface->modem_flow_control_finish = modem_flow_control_finish;
+    iface->load_supported_charsets = load_supported_charsets;
+    iface->load_supported_charsets_finish = load_supported_charsets_finish;
+    iface->modem_charset = modem_charset;
+    iface->modem_charset_finish = modem_charset_finish;
 }
 
 static void
