@@ -1022,7 +1022,8 @@ interface_initialization_step (InitAsyncContext *ctx)
                 ctx);
             return;
         }
-        break;
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_IMSI:
         /* IMSI is meant to be loaded only once during the whole
@@ -1035,7 +1036,8 @@ interface_initialization_step (InitAsyncContext *ctx)
                 ctx);
             return;
         }
-        break;
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_OPERATOR_ID:
         /* Operator ID is meant to be loaded only once during the whole
@@ -1048,7 +1050,8 @@ interface_initialization_step (InitAsyncContext *ctx)
                 ctx);
             return;
         }
-        break;
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_OPERATOR_NAME:
         /* Operator Name is meant to be loaded only once during the whole
@@ -1061,7 +1064,8 @@ interface_initialization_step (InitAsyncContext *ctx)
                 ctx);
             return;
         }
-        break;
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
@@ -1071,9 +1075,8 @@ interface_initialization_step (InitAsyncContext *ctx)
         return;
     }
 
-    /* Go on to next step */
-    ctx->step++;
-    interface_initialization_step (ctx);
+
+    g_assert_not_reached ();
 }
 
 static void
