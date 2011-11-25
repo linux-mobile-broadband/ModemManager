@@ -198,6 +198,15 @@ struct _MMIfaceModem {
     gboolean (*modem_power_up_finish) (MMIfaceModem *self,
                                        GAsyncResult *res,
                                        GError **error);
+
+    /* Asynchronous additional setup needed after power-up,
+     * Plugins can implement this to provide custom setups. */
+    void (*modem_after_power_up) (MMIfaceModem *self,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data);
+    gboolean (*modem_after_power_up_finish) (MMIfaceModem *self,
+                                             GAsyncResult *res,
+                                             GError **error);
 };
 
 GType mm_iface_modem_get_type (void);
