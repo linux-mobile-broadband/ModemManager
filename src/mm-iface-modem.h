@@ -234,6 +234,14 @@ struct _MMIfaceModem {
     gboolean (*modem_charset_finish) (MMIfaceModem *self,
                                       GAsyncResult *res,
                                       GError **error);
+
+    /* Asynchronous modem power-down operation */
+    void (*modem_power_down) (MMIfaceModem *self,
+                              GAsyncReadyCallback callback,
+                              gpointer user_data);
+    gboolean (*modem_power_down_finish) (MMIfaceModem *self,
+                                         GAsyncResult *res,
+                                         GError **error);
 };
 
 GType mm_iface_modem_get_type (void);

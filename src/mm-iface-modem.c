@@ -755,6 +755,7 @@ mm_iface_modem_signal_quality_check (MMIfaceModem *self,
 typedef enum {
     DISABLING_STEP_FIRST,
     DISABLING_STEP_FLASH_PORT,
+    DISABLING_STEP_MODEM_POWER_DOWN,
     DISABLING_STEP_LAST
 } DisablingStep;
 
@@ -826,6 +827,29 @@ mm_iface_modem_disable_finish (MMIfaceModem *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
+#undef VOID_REPLY_READY_FN
+#define VOID_REPLY_READY_FN(NAME)                                       \
+    static void                                                         \
+    NAME##_ready (MMIfaceModem *self,                                   \
+                  GAsyncResult *res,                                    \
+                  DisablingContext *ctx)                                \
+    {                                                                   \
+        GError *error = NULL;                                           \
+                                                                        \
+        MM_IFACE_MODEM_GET_INTERFACE (self)->NAME##_finish (self, res, &error); \
+        if (error) {                                                    \
+            g_simple_async_result_take_error (ctx->result, error);      \
+            disabling_context_complete_and_free (ctx);                  \
+            return;                                                     \
+        }                                                               \
+                                                                        \
+        /* Go on to next step */                                        \
+        ctx->step++;                                                    \
+        interface_disabling_step (ctx);                                 \
+    }
+
+VOID_REPLY_READY_FN (modem_power_down)
+
 static void
 interface_disabling_flash_done (MMSerialPort *port,
                                 GError *error,
@@ -860,6 +884,25 @@ interface_disabling_step (DisablingContext *ctx)
                                   TRUE,
                                   interface_disabling_flash_done,
                                   ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case DISABLING_STEP_MODEM_POWER_DOWN:
+        /* CFUN=0 is dangerous and often will shoot devices in the head (that's
+         * what it's supposed to do).  So don't use CFUN=0 by default, but let
+         * specific plugins use it when they know it's safe to do so.  For
+         * example, CFUN=0 will often make phones turn themselves off, but some
+         * dedicated devices (ex Sierra WWAN cards) will just turn off their
+         * radio but otherwise still work.
+         */
+        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_power_down &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_power_down_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_power_down (
+                ctx->self,
+                (GAsyncReadyCallback)modem_power_down_ready,
+                ctx);
             return;
         }
         /* Fall down to next step */
