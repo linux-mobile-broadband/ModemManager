@@ -702,6 +702,36 @@ load_unlock_required (MMIfaceModem *self,
 /*****************************************************************************/
 
 static gboolean
+modem_power_up_finish (MMIfaceModem *self,
+                       GAsyncResult *res,
+                       GError **error)
+{
+    return !mm_at_command_finish (G_OBJECT (self), res, error);
+}
+
+static void
+modem_power_up (MMIfaceModem *self,
+                GAsyncReadyCallback callback,
+                gpointer user_data)
+{
+    /* By default, errors in the power up command are ignored.
+     * Plugins wanting to treat power up errors should subclass the power up
+     * handling. */
+    mm_at_command (G_OBJECT (self),
+                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                   "+CFUN=1",
+                   5,
+                   NULL,  /* response processor */
+                   NULL,  /* response processor context */
+                   NULL,  /* result signature */
+                   NULL,  /* cancellable */
+                   callback,
+                   user_data);
+}
+
+/*****************************************************************************/
+
+static gboolean
 modem_init_finish (MMIfaceModem *self,
                    GAsyncResult *res,
                    GError **error)
@@ -1008,6 +1038,8 @@ iface_modem_init (MMIfaceModem *iface)
 
     iface->modem_init = modem_init;
     iface->modem_init_finish = modem_init_finish;
+    iface->modem_power_up = modem_power_up;
+    iface->modem_power_up_finish = modem_power_up_finish;
 }
 
 static void
