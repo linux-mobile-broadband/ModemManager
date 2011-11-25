@@ -32,6 +32,9 @@ static void interface_initialization_step (InitializationContext *ctx);
 typedef struct _EnablingContext EnablingContext;
 static void interface_enabling_step (EnablingContext *ctx);
 
+typedef struct _DisablingContext DisablingContext;
+static void interface_disabling_step (DisablingContext *ctx);
+
 typedef enum {
     INTERFACE_STATUS_SHUTDOWN,
     INTERFACE_STATUS_INITIALIZING,
@@ -745,6 +748,110 @@ mm_iface_modem_signal_quality_check (MMIfaceModem *self,
                                                (GDestroyNotify)g_variant_unref);
     g_simple_async_result_complete_in_idle (ctx->result);
     signal_quality_check_context_free (ctx);
+}
+
+/*****************************************************************************/
+
+typedef enum {
+    DISABLING_STEP_FIRST,
+    DISABLING_STEP_LAST
+} DisablingStep;
+
+struct _DisablingContext {
+    MMIfaceModem *self;
+    MMAtSerialPort *primary;
+    DisablingStep step;
+    MMModemState previous_state;
+    gboolean disabled;
+    GSimpleAsyncResult *result;
+    MmGdbusModem *skeleton;
+};
+
+static DisablingContext *
+disabling_context_new (MMIfaceModem *self,
+                       GAsyncReadyCallback callback,
+                       gpointer user_data)
+{
+    DisablingContext *ctx;
+
+    ctx = g_new0 (DisablingContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->primary = g_object_ref (mm_base_modem_get_port_primary (MM_BASE_MODEM (self)));
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             disabling_context_new);
+    ctx->step = DISABLING_STEP_FIRST;
+    g_object_get (ctx->self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
+                  MM_IFACE_MODEM_STATE, &ctx->previous_state,
+                  NULL);
+    g_assert (ctx->skeleton != NULL);
+
+    update_state (ctx->self,
+                  MM_MODEM_STATE_DISABLING,
+                  MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
+
+    return ctx;
+}
+
+static void
+disabling_context_complete_and_free (DisablingContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+
+    if (ctx->disabled)
+        update_state (ctx->self,
+                      MM_MODEM_STATE_DISABLED,
+                      MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
+    else
+        /* Fallback to previous state */
+        update_state (ctx->self,
+                      ctx->previous_state,
+                      MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+
+    g_object_unref (ctx->self);
+    g_object_unref (ctx->primary);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->skeleton);
+    g_free (ctx);
+}
+
+gboolean
+mm_iface_modem_disable_finish (MMIfaceModem *self,
+                              GAsyncResult *res,
+                              GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+interface_disabling_step (DisablingContext *ctx)
+{
+    switch (ctx->step) {
+    case DISABLING_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case DISABLING_STEP_LAST:
+        /* We are done without errors! */
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        ctx->disabled = TRUE;
+        disabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    g_assert_not_reached ();
+}
+
+void
+mm_iface_modem_disable (MMIfaceModem *self,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
+{
+    interface_disabling_step (disabling_context_new (self,
+                                                     callback,
+                                                     user_data));
 }
 
 /*****************************************************************************/

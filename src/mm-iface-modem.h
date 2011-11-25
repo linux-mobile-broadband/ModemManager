@@ -254,6 +254,14 @@ gboolean mm_iface_modem_enable_finish (MMIfaceModem *self,
                                        GAsyncResult *res,
                                        GError **error);
 
+/* Disable Modem interface (async) */
+void     mm_iface_modem_disable        (MMIfaceModem *self,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data);
+gboolean mm_iface_modem_disable_finish (MMIfaceModem *self,
+                                        GAsyncResult *res,
+                                        GError **error);
+
 /* Shutdown Modem interface */
 gboolean mm_iface_modem_shutdown (MMIfaceModem *self,
                                   GError **error);
