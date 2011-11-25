@@ -19,6 +19,8 @@
 #include <glib-object.h>
 #include <gio/gio.h>
 
+#include "mm-charsets.h"
+
 #define MM_TYPE_IFACE_MODEM            (mm_iface_modem_get_type ())
 #define MM_IFACE_MODEM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM, MMIfaceModem))
 #define MM_IS_IFACE_MODEM(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM))
@@ -215,6 +217,23 @@ struct _MMIfaceModem {
     gboolean (*modem_flow_control_finish) (MMIfaceModem *self,
                                            GAsyncResult *res,
                                            GError **error);
+
+    /* Asynchronous loading of supported charsets */
+    void (*load_supported_charsets) (MMIfaceModem *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data);
+    MMModemCharset (*load_supported_charsets_finish) (MMIfaceModem *self,
+                                                      GAsyncResult *res,
+                                                      GError **error);
+
+    /* Asynchronous charset setting setup */
+    void (*modem_charset) (MMIfaceModem *self,
+                           MMModemCharset charset,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data);
+    gboolean (*modem_charset_finish) (MMIfaceModem *self,
+                                      GAsyncResult *res,
+                                      GError **error);
 };
 
 GType mm_iface_modem_get_type (void);
