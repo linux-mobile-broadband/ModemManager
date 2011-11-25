@@ -92,6 +92,59 @@ handle_list_bearers (MmGdbusModem *object,
     return FALSE; /* Currently unhandled */
 }
 
+/*****************************************************************************/
+
+static void
+update_state (MMIfaceModem *self,
+              MMModemState new_state,
+              MMModemStateReason reason)
+{
+    MMModemState old_state = MM_MODEM_STATE_UNKNOWN;
+    MmGdbusModem *skeleton = NULL;
+
+    /* Did we already create it? */
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &old_state,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    if (new_state != old_state) {
+        GEnumClass *enum_class;
+        GEnumValue *new_value;
+        GEnumValue *old_value;
+        const gchar *dbus_path;
+
+        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_STATE));
+        new_value = g_enum_get_value (enum_class, new_state);
+        old_value = g_enum_get_value (enum_class, old_state);
+        dbus_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (self));
+        if (dbus_path)
+            mm_info ("Modem %s: state changed (%s -> %s)",
+                     dbus_path,
+                     old_value->value_nick,
+                     new_value->value_nick);
+        else
+            mm_info ("Modem: state changed (%s -> %s)",
+                     old_value->value_nick,
+                     new_value->value_nick);
+        g_type_class_unref (enum_class);
+
+        /* The property in the interface is bound to the property
+         * in the skeleton, so just updating here is enough */
+        g_object_set (self,
+                      MM_IFACE_MODEM_STATE, new_state,
+                      NULL);
+
+        /* Signal status change */
+        mm_gdbus_modem_emit_state_changed (skeleton,
+                                           old_state,
+                                           new_state,
+                                           reason);
+    }
+}
+
+/*****************************************************************************/
+
 static gboolean
 handle_enable (MmGdbusModem *object,
                GDBusMethodInvocation *invocation,
@@ -461,18 +514,17 @@ set_lock_status (MMIfaceModem *self,
     if (lock == MM_MODEM_LOCK_NONE) {
         if (old_lock != MM_MODEM_LOCK_NONE) {
             /* Notify transition from UNKNOWN/LOCKED to DISABLED */
-            g_object_set (self,
-                          MM_IFACE_MODEM_STATE, MM_MODEM_STATE_DISABLED,
-                          NULL);
-
+            update_state (self,
+                          MM_MODEM_STATE_DISABLED,
+                          MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
             g_idle_add ((GSourceFunc)restart_initialize_idle, self);
         }
     } else {
         if (old_lock == MM_MODEM_LOCK_UNKNOWN) {
             /* Notify transition from UNKNOWN to LOCKED */
-            g_object_set (self,
-                          MM_IFACE_MODEM_STATE, MM_MODEM_STATE_LOCKED,
-                          NULL);
+            update_state (self,
+                          MM_MODEM_STATE_LOCKED,
+                          MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
         }
     }
 }
