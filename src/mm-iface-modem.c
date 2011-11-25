@@ -1083,7 +1083,7 @@ static void
 interface_initialization_step (InitializationContext *ctx)
 {
     switch (ctx->step) {
-    case INITIALIZATION_STEP_FIRST: {
+    case INITIALIZATION_STEP_FIRST:
         /* Load device if not done before */
         if (!mm_gdbus_modem_get_device (ctx->skeleton)) {
             gchar *device;
@@ -1114,8 +1114,8 @@ interface_initialization_step (InitializationContext *ctx)
             mm_gdbus_modem_set_plugin (ctx->skeleton, plugin);
             g_free (plugin);
         }
-        break;
-    }
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_CURRENT_CAPABILITIES:
         /* Current capabilities may change during runtime, i.e. if new firmware reloaded; but we'll
@@ -1131,7 +1131,8 @@ interface_initialization_step (InitializationContext *ctx)
                 ctx);
             return;
         }
-        break;
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_MODEM_CAPABILITIES:
         /* Modem capabilities are meant to be loaded only once during the whole
@@ -1151,7 +1152,8 @@ interface_initialization_step (InitializationContext *ctx)
         mm_gdbus_modem_set_modem_capabilities (
             ctx->skeleton,
             mm_gdbus_modem_get_current_capabilities (ctx->skeleton));
-        break;
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_MAX_BEARERS:
         /* Max bearers value is meant to be loaded only once during the whole
@@ -1168,7 +1170,8 @@ interface_initialization_step (InitializationContext *ctx)
         }
         /* Default to one bearer */
         mm_gdbus_modem_set_max_bearers (ctx->skeleton, 1);
-        break;
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_MAX_ACTIVE_BEARERS:
         /* Max active bearers value is meant to be loaded only once during the
@@ -1188,7 +1191,8 @@ interface_initialization_step (InitializationContext *ctx)
         mm_gdbus_modem_set_max_active_bearers (
             ctx->skeleton,
             mm_gdbus_modem_get_max_bearers (ctx->skeleton));
-        break;
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_MANUFACTURER:
         /* Manufacturer is meant to be loaded only once during the whole
@@ -1203,7 +1207,8 @@ interface_initialization_step (InitializationContext *ctx)
                 ctx);
             return;
         }
-        break;
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_MODEL:
         /* Model is meant to be loaded only once during the whole
@@ -1218,7 +1223,8 @@ interface_initialization_step (InitializationContext *ctx)
                 ctx);
             return;
         }
-        break;
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_REVISION:
         /* Revision is meant to be loaded only once during the whole
@@ -1233,7 +1239,8 @@ interface_initialization_step (InitializationContext *ctx)
                 ctx);
             return;
         }
-        break;
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_EQUIPMENT_ID:
         /* Equipment ID is meant to be loaded only once during the whole
@@ -1248,7 +1255,8 @@ interface_initialization_step (InitializationContext *ctx)
                 ctx);
             return;
         }
-        break;
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_DEVICE_ID:
         /* Device ID is meant to be loaded only once during the whole
@@ -1263,7 +1271,8 @@ interface_initialization_step (InitializationContext *ctx)
                 ctx);
             return;
         }
-        break;
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_UNLOCK_REQUIRED:
         /* Only check unlock required if we were previously not unlocked */
@@ -1273,7 +1282,8 @@ interface_initialization_step (InitializationContext *ctx)
                                          ctx);
             return;
         }
-        break;
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_UNLOCK_RETRIES:
         if ((MMModemLock)mm_gdbus_modem_get_unlock_required (ctx->skeleton) == MM_MODEM_LOCK_NONE) {
@@ -1292,7 +1302,8 @@ interface_initialization_step (InitializationContext *ctx)
             /* Default to 999 when we cannot check it */
             mm_gdbus_modem_set_unlock_retries (ctx->skeleton, 999);
         }
-        break;
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_SIM: {
         MMSim *sim = NULL;
@@ -1331,7 +1342,8 @@ interface_initialization_step (InitializationContext *ctx)
                 ctx);
             return;
         }
-        break;
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_SUPPORTED_BANDS:
         /* Supported bands are meant to be loaded only once during the whole
@@ -1346,7 +1358,8 @@ interface_initialization_step (InitializationContext *ctx)
                 ctx);
             return;
         }
-        break;
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
@@ -1357,9 +1370,7 @@ interface_initialization_step (InitializationContext *ctx)
         return;
     }
 
-    /* Go on to next step */
-    ctx->step++;
-    interface_initialization_step (ctx);
+    g_assert_not_reached ();
 }
 
 static void
