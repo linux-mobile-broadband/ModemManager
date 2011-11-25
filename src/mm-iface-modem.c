@@ -753,6 +753,7 @@ typedef enum {
     ENABLING_STEP_FIRST,
     ENABLING_STEP_OPEN_PORT,
     ENABLING_STEP_FLASH_PORT,
+    ENABLING_STEP_MODEM_INIT,
     ENABLING_STEP_LAST
 } EnablingStep;
 
@@ -829,6 +830,29 @@ mm_iface_modem_enable_finish (MMIfaceModem *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
+#undef VOID_REPLY_READY_FN
+#define VOID_REPLY_READY_FN(NAME)                                       \
+    static void                                                         \
+    NAME##_ready (MMIfaceModem *self,                                   \
+                  GAsyncResult *res,                                    \
+                  EnablingContext *ctx)                                 \
+    {                                                                   \
+        GError *error = NULL;                                           \
+                                                                        \
+        MM_IFACE_MODEM_GET_INTERFACE (self)->NAME##_finish (self, res, &error); \
+        if (error) {                                                    \
+            g_simple_async_result_take_error (ctx->result, error);      \
+            enabling_context_complete_and_free (ctx);                   \
+            return;                                                     \
+        }                                                               \
+                                                                        \
+        /* Go on to next step */                                        \
+        ctx->step++;                                                    \
+        interface_enabling_step (ctx);                                  \
+    }
+
+VOID_REPLY_READY_FN (modem_init);
+
 static void
 interface_enabling_flash_done (MMSerialPort *port,
                                GError *error,
@@ -877,6 +901,18 @@ interface_enabling_step (EnablingContext *ctx)
                               interface_enabling_flash_done,
                               ctx);
         return;
+
+    case ENABLING_STEP_MODEM_INIT:
+        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_init &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_init_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_init (
+                ctx->self,
+                (GAsyncReadyCallback)modem_init_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
 
     case ENABLING_STEP_LAST:
         /* We are done without errors! */

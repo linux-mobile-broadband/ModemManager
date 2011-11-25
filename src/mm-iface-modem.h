@@ -182,6 +182,14 @@ struct _MMIfaceModem {
     gboolean (*set_allowed_modes_finish) (MMIfaceModem *self,
                                           GAsyncResult *res,
                                           GError **error);
+
+    /* Asynchronous modem initialization operation */
+    void (*modem_init) (MMIfaceModem *self,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data);
+    gboolean (*modem_init_finish) (MMIfaceModem *self,
+                                   GAsyncResult *res,
+                                   GError **error);
 };
 
 GType mm_iface_modem_get_type (void);
