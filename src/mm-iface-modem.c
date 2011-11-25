@@ -751,11 +751,15 @@ mm_iface_modem_signal_quality_check (MMIfaceModem *self,
 
 typedef enum {
     ENABLING_STEP_FIRST,
+    ENABLING_STEP_OPEN_PORT,
+    ENABLING_STEP_FLASH_PORT,
     ENABLING_STEP_LAST
 } EnablingStep;
 
 struct _EnablingContext {
     MMIfaceModem *self;
+    MMAtSerialPort *primary;
+    gboolean primary_open;
     EnablingStep step;
     gboolean enabled;
     GSimpleAsyncResult *result;
@@ -771,6 +775,7 @@ enabling_context_new (MMIfaceModem *self,
 
     ctx = g_new0 (EnablingContext, 1);
     ctx->self = g_object_ref (self);
+    ctx->primary = g_object_ref (mm_base_modem_get_port_primary (MM_BASE_MODEM (self)));
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -804,9 +809,13 @@ enabling_context_complete_and_free (EnablingContext *ctx)
                        MM_MODEM_STATE_DISABLED :
                        MM_MODEM_STATE_LOCKED),
                       MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+        /* Close the port if enabling failed */
+        if (ctx->primary_open)
+            mm_serial_port_close_force (MM_SERIAL_PORT (ctx->primary));
     }
 
     g_object_unref (ctx->self);
+    g_object_unref (ctx->primary);
     g_object_unref (ctx->result);
     g_object_unref (ctx->skeleton);
     g_free (ctx);
@@ -821,12 +830,53 @@ mm_iface_modem_enable_finish (MMIfaceModem *self,
 }
 
 static void
+interface_enabling_flash_done (MMSerialPort *port,
+                               GError *error,
+                               gpointer user_data)
+{
+    EnablingContext *ctx = user_data;
+
+    if (error) {
+        g_simple_async_result_set_from_error (ctx->result, error);
+        enabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_enabling_step (ctx);
+}
+
+static void
 interface_enabling_step (EnablingContext *ctx)
 {
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
         /* Fall down to next step */
         ctx->step++;
+
+    case ENABLING_STEP_OPEN_PORT: {
+        GError *error = NULL;
+
+        /* Open port */
+        if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->primary), &error)) {
+            g_simple_async_result_take_error (ctx->result, error);
+            enabling_context_complete_and_free (ctx);
+            return;
+        }
+        ctx->primary_open = TRUE;
+        /* Fall down to next step */
+        ctx->step++;
+    }
+
+    case ENABLING_STEP_FLASH_PORT:
+        /* Flash port */
+        mm_serial_port_flash (MM_SERIAL_PORT (ctx->primary),
+                              100,
+                              FALSE,
+                              interface_enabling_flash_done,
+                              ctx);
+        return;
 
     case ENABLING_STEP_LAST:
         /* We are done without errors! */
