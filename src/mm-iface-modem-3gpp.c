@@ -49,6 +49,8 @@ static void interface_enabling_step (EnablingContext *ctx);
 
 typedef enum {
     ENABLING_STEP_FIRST,
+    ENABLING_STEP_SETUP_CS_REGISTRATION,
+    ENABLING_STEP_SETUP_PS_REGISTRATION,
     ENABLING_STEP_LAST
 } EnablingStep;
 
@@ -102,11 +104,59 @@ mm_iface_modem_3gpp_enable_finish (MMIfaceModem3gpp *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
+#undef VOID_REPLY_READY_FN
+#define VOID_REPLY_READY_FN(NAME)                                       \
+    static void                                                         \
+    NAME##_ready (MMIfaceModem3gpp *self,                               \
+                  GAsyncResult *res,                                    \
+                  EnablingContext *ctx)                                 \
+    {                                                                   \
+        GError *error = NULL;                                           \
+                                                                        \
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->NAME##_finish (self, res, &error); \
+        if (error) {                                                    \
+            g_simple_async_result_take_error (ctx->result, error);      \
+            enabling_context_complete_and_free (ctx);                   \
+            return;                                                     \
+        }                                                               \
+                                                                        \
+        /* Go on to next step */                                        \
+        ctx->step++;                                                    \
+        interface_enabling_step (ctx);                                  \
+    }
+
+VOID_REPLY_READY_FN (setup_cs_registration)
+VOID_REPLY_READY_FN (setup_ps_registration)
+
 static void
 interface_enabling_step (EnablingContext *ctx)
 {
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_SETUP_CS_REGISTRATION:
+        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_cs_registration &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_cs_registration_finish) {
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_cs_registration (
+                ctx->self,
+                (GAsyncReadyCallback)setup_cs_registration_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_SETUP_PS_REGISTRATION:
+        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_ps_registration &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_ps_registration_finish) {
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_ps_registration (
+                ctx->self,
+                (GAsyncReadyCallback)setup_ps_registration_ready,
+                ctx);
+            return;
+        }
         /* Fall down to next step */
         ctx->step++;
 

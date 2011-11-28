@@ -40,6 +40,22 @@ struct _MMIfaceModem3gpp {
     gchar * (*load_imei_finish) (MMIfaceModem3gpp *self,
                                  GAsyncResult *res,
                                  GError **error);
+
+    /* Setup CS Registration */
+    void (* setup_cs_registration) (MMIfaceModem3gpp *self,
+                                    GAsyncReadyCallback callback,
+                                    gpointer user_data);
+    gboolean (*setup_cs_registration_finish) (MMIfaceModem3gpp *self,
+                                              GAsyncResult *res,
+                                              GError **error);
+
+    /* Setup PS Registration */
+    void (* setup_ps_registration) (MMIfaceModem3gpp *self,
+                                    GAsyncReadyCallback callback,
+                                    gpointer user_data);
+    gboolean (*setup_ps_registration_finish) (MMIfaceModem3gpp *self,
+                                              GAsyncResult *res,
+                                              GError **error);
 };
 
 GType mm_iface_modem_3gpp_get_type (void);
