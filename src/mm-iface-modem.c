@@ -1482,8 +1482,9 @@ initialization_context_new (MMIfaceModem *self,
 }
 
 static void
-initialization_context_free (InitializationContext *ctx)
+initialization_context_complete_and_free (InitializationContext *ctx)
 {
+    g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->self);
     g_object_unref (ctx->port);
     g_object_unref (ctx->result);
@@ -1973,8 +1974,7 @@ interface_initialization_step (InitializationContext *ctx)
                                             MM_GDBUS_MODEM (ctx->skeleton));
 
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        g_simple_async_result_complete_in_idle (ctx->result);
-        initialization_context_free (ctx);
+        initialization_context_complete_and_free (ctx);
         return;
     }
 
