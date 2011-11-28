@@ -1208,6 +1208,8 @@ typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
     InitializeStep step;
+    MMAtSerialPort *port;
+    gboolean close_port;
 } InitializeContext;
 
 static void initialize_step (InitializeContext *ctx);
@@ -1217,6 +1219,10 @@ initialize_context_complete_and_free (InitializeContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
+    /* balance open/close count */
+    if (ctx->close_port)
+        mm_serial_port_close (MM_SERIAL_PORT (ctx->port));
+    g_object_unref (ctx->port);
     g_object_unref (ctx->self);
     g_free (ctx);
 }
@@ -1259,13 +1265,28 @@ static void
 initialize_step (InitializeContext *ctx)
 {
     switch (ctx->step) {
-    case INITIALIZE_STEP_FIRST:
+    case INITIALIZE_STEP_FIRST: {
+        GError *error = NULL;
+
+        /* Open and send first commands to the serial port */
+        if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->port), &error)) {
+            g_simple_async_result_take_error (ctx->result, error);
+            initialize_context_complete_and_free (ctx);
+            return;
+        }
+        ctx->close_port = TRUE;
+        /* Try to disable echo */
+        mm_at_serial_port_queue_command (ctx->port, "E0", 3, NULL, NULL);
+        /* Try to get extended errors */
+        mm_at_serial_port_queue_command (ctx->port, "+CMEE=1", 2, NULL, NULL);
         /* Fall down to next step */
         ctx->step++;
+    }
 
     case INITIALIZE_STEP_IFACE_MODEM:
         /* Initialize the Modem interface */
         mm_iface_modem_initialize (MM_IFACE_MODEM (ctx->self),
+                                   ctx->port,
                                    (GAsyncReadyCallback)iface_modem_initialize_ready,
                                    ctx);
         return;
@@ -1321,6 +1342,7 @@ initialize_step (InitializeContext *ctx)
 
 static void
 initialize (MMBaseModem *self,
+            MMAtSerialPort *port,
             GCancellable *cancellable,
             GAsyncReadyCallback callback,
             gpointer user_data)
@@ -1329,6 +1351,7 @@ initialize (MMBaseModem *self,
 
     ctx = g_new0 (InitializeContext, 1);
     ctx->self = g_object_ref (self);
+    ctx->port = g_object_ref (port);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,

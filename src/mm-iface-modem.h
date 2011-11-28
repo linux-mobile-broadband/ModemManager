@@ -20,6 +20,7 @@
 #include <gio/gio.h>
 
 #include "mm-charsets.h"
+#include "mm-at-serial-port.h"
 
 #define MM_TYPE_IFACE_MODEM            (mm_iface_modem_get_type ())
 #define MM_IFACE_MODEM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM, MMIfaceModem))
@@ -248,6 +249,7 @@ GType mm_iface_modem_get_type (void);
 
 /* Initialize Modem interface (async) */
 void     mm_iface_modem_initialize        (MMIfaceModem *self,
+                                           MMAtSerialPort *port,
                                            GAsyncReadyCallback callback,
                                            gpointer user_data);
 gboolean mm_iface_modem_initialize_finish (MMIfaceModem *self,

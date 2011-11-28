@@ -266,6 +266,7 @@ mm_base_modem_grab_port (MMBaseModem *self,
                 /* As soon as we get the primary AT port, we initialize the
                  * modem */
                 MM_BASE_MODEM_GET_CLASS (self)->initialize (self,
+                                                            MM_AT_SERIAL_PORT (port),
                                                             NULL, /* TODO: cancellable */
                                                             (GAsyncReadyCallback)initialize_ready,
                                                             NULL);
@@ -707,4 +708,3 @@ mm_base_modem_class_init (MMBaseModemClass *klass)
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_CONNECTION, properties[PROP_CONNECTION]);
 }
-

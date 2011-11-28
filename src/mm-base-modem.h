@@ -59,6 +59,7 @@ struct _MMBaseModemClass {
     /* Modem initialization.
      * Whenever the primary AT port is grabbed, this method gets called */
     void (* initialize) (MMBaseModem *self,
+                         MMAtSerialPort *port,
                          GCancellable *cancellable,
                          GAsyncReadyCallback callback,
                          gpointer user_data);
@@ -130,4 +131,3 @@ guint mm_base_modem_get_vendor_id  (MMBaseModem *self);
 guint mm_base_modem_get_product_id (MMBaseModem *self);
 
 #endif /* MM_BASE_MODEM_H */
-

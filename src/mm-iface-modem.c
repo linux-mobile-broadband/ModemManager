@@ -650,7 +650,10 @@ unlock_check_context_free (UnlockCheckContext *ctx)
 static gboolean
 restart_initialize_idle (MMIfaceModem *self)
 {
-    mm_iface_modem_initialize (self, NULL, NULL);
+    mm_iface_modem_initialize (self,
+                               mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                               NULL,
+                               NULL);
     return FALSE;
 }
 
@@ -1457,6 +1460,7 @@ struct _InitializationContext {
 
 static InitializationContext *
 initialization_context_new (MMIfaceModem *self,
+                            MMAtSerialPort *port,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
@@ -1464,7 +1468,7 @@ initialization_context_new (MMIfaceModem *self,
 
     ctx = g_new0 (InitializationContext, 1);
     ctx->self = g_object_ref (self);
-    ctx->port = g_object_ref (mm_base_modem_get_port_primary (MM_BASE_MODEM (self)));
+    ctx->port = g_object_ref (port);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -1939,7 +1943,6 @@ interface_initialization_step (InitializationContext *ctx)
         /* We are done without errors! */
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         g_simple_async_result_complete_in_idle (ctx->result);
-        mm_serial_port_close (MM_SERIAL_PORT (ctx->port));
         initialization_context_free (ctx);
         return;
     }
@@ -1949,27 +1952,14 @@ interface_initialization_step (InitializationContext *ctx)
 
 static void
 interface_initialization (MMIfaceModem *self,
+                          MMAtSerialPort *port,
                           GAsyncReadyCallback callback,
                           gpointer user_data)
 {
-    InitializationContext *ctx;
-    GError *error = NULL;
-
-    ctx = initialization_context_new (self, callback, user_data);
-
-    if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->port), &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        g_simple_async_result_complete_in_idle (ctx->result);
-        initialization_context_free (ctx);
-        return;
-    }
-
-    /* Try to disable echo */
-    mm_at_serial_port_queue_command (ctx->port, "E0", 3, NULL, NULL);
-    /* Try to get extended errors */
-    mm_at_serial_port_queue_command (ctx->port, "+CMEE=1", 2, NULL, NULL);
-
-    interface_initialization_step (ctx);
+    interface_initialization_step (initialization_context_new (self,
+                                                               port,
+                                                               callback,
+                                                               user_data));
 }
 
 /*****************************************************************************/
@@ -2056,6 +2046,7 @@ interface_initialization_ready (MMIfaceModem *self,
 
 void
 mm_iface_modem_initialize (MMIfaceModem *self,
+                           MMAtSerialPort *port,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
@@ -2120,6 +2111,7 @@ mm_iface_modem_initialize (MMIfaceModem *self,
 
     /* Perform async initialization here */
     interface_initialization (self,
+                              port,
                               (GAsyncReadyCallback)interface_initialization_ready,
                               result);
     g_object_unref (skeleton);
