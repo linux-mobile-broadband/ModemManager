@@ -1188,6 +1188,37 @@ disable (MMBaseModem *self,
 
 /*****************************************************************************/
 
+typedef enum {
+    ENABLING_STEP_FIRST,
+    ENABLING_STEP_IFACE_MODEM,
+    ENABLING_STEP_IFACE_3GPP,
+    ENABLING_STEP_IFACE_3GPP_USSD,
+    ENABLING_STEP_IFACE_CDMA,
+    ENABLING_STEP_IFACE_CONTACTS,
+    ENABLING_STEP_IFACE_FIRMWARE,
+    ENABLING_STEP_IFACE_LOCATION,
+    ENABLING_STEP_IFACE_MESSAGING,
+    ENABLING_STEP_IFACE_SIMPLE,
+    ENABLING_STEP_LAST,
+} EnablingStep;
+
+typedef struct {
+    MMBroadbandModem *self;
+    GSimpleAsyncResult *result;
+    EnablingStep step;
+} EnablingContext;
+
+static void enabling_step (EnablingContext *ctx);
+
+static void
+enabling_context_complete_and_free (EnablingContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
 static gboolean
 enable_finish (MMBaseModem *self,
                GAsyncResult *res,
@@ -1199,22 +1230,98 @@ enable_finish (MMBaseModem *self,
     return TRUE;
 }
 
+#undef INTERFACE_ENABLE_READY_FN
+#define INTERFACE_ENABLE_READY_FN(NAME,TYPE)                            \
+    static void                                                         \
+    NAME##_enable_ready (MMBroadbandModem *self,                        \
+                         GAsyncResult *result,                          \
+                         EnablingContext *ctx)                          \
+    {                                                                   \
+        GError *error = NULL;                                           \
+                                                                        \
+        if (!mm_##NAME##_enable_finish (TYPE (self),                    \
+                                        result,                         \
+                                        &error)) {                      \
+            g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (ctx->result), error); \
+            enabling_context_complete_and_free (ctx);                   \
+        }                                                               \
+                                                                        \
+        /* Go on to next step */                                        \
+        ctx->step++;                                                    \
+        enabling_step (ctx);                                            \
+    }
+
+INTERFACE_ENABLE_READY_FN (iface_modem, MM_IFACE_MODEM)
+INTERFACE_ENABLE_READY_FN (iface_modem_3gpp, MM_IFACE_MODEM_3GPP)
+
 static void
-iface_modem_enable_ready (MMBroadbandModem *self,
-                          GAsyncResult *result,
-                          GAsyncResult *enable_result)
+enabling_step (EnablingContext *ctx)
 {
-    GError *error = NULL;
+    switch (ctx->step) {
+    case ENABLING_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
 
-    if (!mm_iface_modem_enable_finish (MM_IFACE_MODEM (self),
-                                       result,
-                                       &error))
-        g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (enable_result), error);
-    else
-        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (enable_result), TRUE);
+    case ENABLING_STEP_IFACE_MODEM:
+        g_assert (ctx->self->priv->modem_dbus_skeleton != NULL);
+        /* Enabling the Modem interface */
+        mm_iface_modem_enable (MM_IFACE_MODEM (ctx->self),
+                               (GAsyncReadyCallback)iface_modem_enable_ready,
+                               ctx);
+        return;
 
-    g_simple_async_result_complete (G_SIMPLE_ASYNC_RESULT (enable_result));
-    g_object_unref (enable_result);
+    case ENABLING_STEP_IFACE_3GPP:
+        if (ctx->self->priv->modem_3gpp_dbus_skeleton) {
+            mm_dbg ("Modem has 3GPP capabilities, enabling the Modem 3GPP interface...");
+            /* Enabling the Modem 3GPP interface */
+            mm_iface_modem_3gpp_enable (MM_IFACE_MODEM_3GPP (ctx->self),
+                                        (GAsyncReadyCallback)iface_modem_3gpp_enable_ready,
+                                        ctx);
+            return;
+        }
+
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_IFACE_3GPP_USSD:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_IFACE_CDMA:
+        if (ctx->self->priv->modem_current_capabilities & MM_MODEM_CAPABILITY_CDMA_EVDO) {
+            /* TODO: Expose the CDMA interface */
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_IFACE_CONTACTS:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_IFACE_FIRMWARE:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_IFACE_LOCATION:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_IFACE_MESSAGING:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_IFACE_SIMPLE:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_LAST:
+        /* All enabled without errors! */
+        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (ctx->result), TRUE);
+        enabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    g_assert_not_reached ();
 }
 
 static void
@@ -1223,17 +1330,17 @@ enable (MMBaseModem *self,
         GAsyncReadyCallback callback,
         gpointer user_data)
 {
-    GSimpleAsyncResult *res;
+    EnablingContext *ctx;
 
-    res = g_simple_async_result_new (G_OBJECT (self),
-                                     callback,
-                                     user_data,
-                                     enable);
+    ctx = g_new0 (EnablingContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             enable);
+    ctx->step = ENABLING_STEP_FIRST;
 
-    /* Enable the Modem interface */
-    mm_iface_modem_enable (MM_IFACE_MODEM (self),
-                           (GAsyncReadyCallback)iface_modem_enable_ready,
-                           res);
+    enabling_step (ctx);
 }
 
 /*****************************************************************************/
