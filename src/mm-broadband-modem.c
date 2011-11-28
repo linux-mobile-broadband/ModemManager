@@ -1425,16 +1425,10 @@ static void
 dispose (GObject *object)
 {
     MMBroadbandModem *self = MM_BROADBAND_MODEM (object);
-    GError *error = NULL;
 
     if (self->priv->modem_dbus_skeleton) {
-        if (!mm_iface_modem_shutdown (MM_IFACE_MODEM (object), &error)) {
-            /* TODO: Cancel initialization/enabling/disabling, whatever */
-            mm_warn ("couldn't shutdown interface: '%s'",
-                     error ? error->message : "unknown error");
-            g_clear_error (&error);
-        }
-
+        /* TODO: Cancel initialization/enabling/disabling, whatever */
+        mm_iface_modem_shutdown (MM_IFACE_MODEM (object));
         g_clear_object (&self->priv->modem_dbus_skeleton);
     }
 

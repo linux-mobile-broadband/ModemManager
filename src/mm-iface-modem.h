@@ -271,8 +271,7 @@ gboolean mm_iface_modem_disable_finish (MMIfaceModem *self,
                                         GError **error);
 
 /* Shutdown Modem interface */
-gboolean mm_iface_modem_shutdown (MMIfaceModem *self,
-                                  GError **error);
+void mm_iface_modem_shutdown (MMIfaceModem *self);
 
 /* Request unlock recheck.
  * It will not only return the lock status, but also set the property values

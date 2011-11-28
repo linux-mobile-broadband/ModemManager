@@ -35,13 +35,6 @@ static void interface_enabling_step (EnablingContext *ctx);
 typedef struct _DisablingContext DisablingContext;
 static void interface_disabling_step (DisablingContext *ctx);
 
-typedef enum {
-    INTERFACE_STATUS_SHUTDOWN,
-    INTERFACE_STATUS_INITIALIZING,
-    INTERFACE_STATUS_INITIALIZED,
-    INTERFACE_STATUS_ENABLED,
-} InterfaceStatus;
-
 typedef struct {
     MmGdbusModem *skeleton;
     GDBusMethodInvocation *invocation;
@@ -1981,37 +1974,6 @@ interface_initialization (MMIfaceModem *self,
 
 /*****************************************************************************/
 
-
-static InterfaceStatus
-get_status (MMIfaceModem *self)
-{
-    GObject *skeleton = NULL;
-    MMModemState modem_state;
-
-    /* Are we already disabled? */
-    g_object_get (self,
-                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
-                  NULL);
-    if (!skeleton)
-        return INTERFACE_STATUS_SHUTDOWN;
-    g_object_unref (skeleton);
-
-    /* Are we being initialized? (interface not yet exported) */
-    skeleton = G_OBJECT (mm_gdbus_object_get_modem (MM_GDBUS_OBJECT (self)));
-    if (!skeleton)
-        return INTERFACE_STATUS_INITIALIZING;
-
-    modem_state = MM_MODEM_STATE_UNKNOWN;
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &modem_state,
-                  NULL);
-    g_object_unref (skeleton);
-
-    return (modem_state > MM_MODEM_STATE_DISABLED ?
-            INTERFACE_STATUS_ENABLED :
-            INTERFACE_STATUS_INITIALIZED);
-}
-
 gboolean
 mm_iface_modem_initialize_finish (MMIfaceModem *self,
                                   GAsyncResult *res,
@@ -2098,6 +2060,8 @@ mm_iface_modem_initialize (MMIfaceModem *self,
                            gpointer user_data)
 {
     GSimpleAsyncResult *result;
+    MmGdbusModem *skeleton = NULL;
+    MMModemState modem_state = MM_MODEM_STATE_UNKNOWN;
 
     g_return_if_fail (MM_IS_IFACE_MODEM (self));
 
@@ -2107,111 +2071,75 @@ mm_iface_modem_initialize (MMIfaceModem *self,
                                         user_data,
                                         mm_iface_modem_initialize);
 
-    switch (get_status (self)) {
-    case INTERFACE_STATUS_ENABLED:
-    case INTERFACE_STATUS_INITIALIZED:
-    case INTERFACE_STATUS_SHUTDOWN: {
-        MmGdbusModem *skeleton = NULL;
-        MMModemState modem_state = MM_MODEM_STATE_UNKNOWN;
+    /* Did we already create it? */
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+    if (!skeleton) {
+        skeleton = mm_gdbus_modem_skeleton_new ();
 
-        /* Did we already create it? */
-        g_object_get (self,
-                      MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
-                      MM_IFACE_MODEM_STATE, &modem_state,
+        /* Set all initial property defaults */
+        mm_gdbus_modem_set_sim (skeleton, NULL);
+        mm_gdbus_modem_set_modem_capabilities (skeleton, MM_MODEM_CAPABILITY_NONE);
+        mm_gdbus_modem_set_max_bearers (skeleton, 0);
+        mm_gdbus_modem_set_max_active_bearers (skeleton, 0);
+        mm_gdbus_modem_set_manufacturer (skeleton, NULL);
+        mm_gdbus_modem_set_model (skeleton, NULL);
+        mm_gdbus_modem_set_revision (skeleton, NULL);
+        mm_gdbus_modem_set_device_identifier (skeleton, NULL);
+        mm_gdbus_modem_set_device (skeleton, NULL);
+        mm_gdbus_modem_set_driver (skeleton, NULL);
+        mm_gdbus_modem_set_plugin (skeleton, NULL);
+        mm_gdbus_modem_set_equipment_identifier (skeleton, NULL);
+        mm_gdbus_modem_set_unlock_required (skeleton, MM_MODEM_LOCK_UNKNOWN);
+        mm_gdbus_modem_set_unlock_retries (skeleton, 0);
+        mm_gdbus_modem_set_access_technology (skeleton, MM_MODEM_ACCESS_TECH_UNKNOWN);
+        mm_gdbus_modem_set_signal_quality (skeleton, g_variant_new ("(ub)", 0, FALSE));
+        mm_gdbus_modem_set_supported_modes (skeleton, MM_MODEM_MODE_NONE);
+        mm_gdbus_modem_set_allowed_modes (skeleton, MM_MODEM_MODE_ANY);
+        mm_gdbus_modem_set_preferred_mode (skeleton, MM_MODEM_MODE_NONE);
+        mm_gdbus_modem_set_supported_bands (skeleton, MM_MODEM_BAND_UNKNOWN);
+        mm_gdbus_modem_set_allowed_bands (skeleton, MM_MODEM_BAND_ANY);
+
+        /* Bind our State property */
+        g_object_bind_property (self, MM_IFACE_MODEM_STATE,
+                                skeleton, "state",
+                                G_BINDING_DEFAULT);
+        /* Bind our Capabilities property */
+        g_object_bind_property (self, MM_IFACE_MODEM_CURRENT_CAPABILITIES,
+                                skeleton, "current-capabilities",
+                                G_BINDING_DEFAULT);
+
+        g_object_set (self,
+                      MM_IFACE_MODEM_STATE, modem_state,
+                      MM_IFACE_MODEM_CURRENT_CAPABILITIES, MM_MODEM_CAPABILITY_NONE,
+                      MM_IFACE_MODEM_DBUS_SKELETON, skeleton,
                       NULL);
-        if (!skeleton) {
-            skeleton = mm_gdbus_modem_skeleton_new ();
-
-            /* Set all initial property defaults */
-            mm_gdbus_modem_set_sim (skeleton, NULL);
-            mm_gdbus_modem_set_modem_capabilities (skeleton, MM_MODEM_CAPABILITY_NONE);
-            mm_gdbus_modem_set_max_bearers (skeleton, 0);
-            mm_gdbus_modem_set_max_active_bearers (skeleton, 0);
-            mm_gdbus_modem_set_manufacturer (skeleton, NULL);
-            mm_gdbus_modem_set_model (skeleton, NULL);
-            mm_gdbus_modem_set_revision (skeleton, NULL);
-            mm_gdbus_modem_set_device_identifier (skeleton, NULL);
-            mm_gdbus_modem_set_device (skeleton, NULL);
-            mm_gdbus_modem_set_driver (skeleton, NULL);
-            mm_gdbus_modem_set_plugin (skeleton, NULL);
-            mm_gdbus_modem_set_equipment_identifier (skeleton, NULL);
-            mm_gdbus_modem_set_unlock_required (skeleton, MM_MODEM_LOCK_UNKNOWN);
-            mm_gdbus_modem_set_unlock_retries (skeleton, 0);
-            mm_gdbus_modem_set_access_technology (skeleton, MM_MODEM_ACCESS_TECH_UNKNOWN);
-            mm_gdbus_modem_set_signal_quality (skeleton, g_variant_new ("(ub)", 0, FALSE));
-            mm_gdbus_modem_set_supported_modes (skeleton, MM_MODEM_MODE_NONE);
-            mm_gdbus_modem_set_allowed_modes (skeleton, MM_MODEM_MODE_ANY);
-            mm_gdbus_modem_set_preferred_mode (skeleton, MM_MODEM_MODE_NONE);
-            mm_gdbus_modem_set_supported_bands (skeleton, MM_MODEM_BAND_UNKNOWN);
-            mm_gdbus_modem_set_allowed_bands (skeleton, MM_MODEM_BAND_ANY);
-
-            /* Bind our State property */
-            g_object_bind_property (self, MM_IFACE_MODEM_STATE,
-                                    skeleton, "state",
-                                    G_BINDING_DEFAULT);
-            /* Bind our Capabilities property */
-            g_object_bind_property (self, MM_IFACE_MODEM_CURRENT_CAPABILITIES,
-                                    skeleton, "current-capabilities",
-                                    G_BINDING_DEFAULT);
-
-            g_object_set (self,
-                          MM_IFACE_MODEM_STATE, modem_state,
-                          MM_IFACE_MODEM_CURRENT_CAPABILITIES, MM_MODEM_CAPABILITY_NONE,
-                          MM_IFACE_MODEM_DBUS_SKELETON, skeleton,
-                          NULL);
-        }
-
-        /* Perform async initialization here */
-        interface_initialization (self,
-                                  (GAsyncReadyCallback)interface_initialization_ready,
-                                  result);
-        g_object_unref (skeleton);
-        return;
     }
 
-    case INTERFACE_STATUS_INITIALIZING:
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_IN_PROGRESS,
-                                         "Interface is already being enabled");
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
-        return;
-    }
-
-    g_return_if_reached ();
+    /* Perform async initialization here */
+    interface_initialization (self,
+                              (GAsyncReadyCallback)interface_initialization_ready,
+                              result);
+    g_object_unref (skeleton);
+    return;
 }
 
-gboolean
-mm_iface_modem_shutdown (MMIfaceModem *self,
-                         GError **error)
+void
+mm_iface_modem_shutdown (MMIfaceModem *self)
 {
-    g_return_val_if_fail (MM_IS_IFACE_MODEM (self), FALSE);
+    g_return_if_fail (MM_IS_IFACE_MODEM (self));
 
-    switch (get_status (self)) {
-    case INTERFACE_STATUS_SHUTDOWN:
-        return TRUE;
-    case INTERFACE_STATUS_INITIALIZING:
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_IN_PROGRESS,
-                     "Iinterface being currently initialized");
-        return FALSE;
-    case INTERFACE_STATUS_ENABLED:
-    case INTERFACE_STATUS_INITIALIZED:
-        /* Remove SIM object */
-        g_object_set (self,
-                      MM_IFACE_MODEM_SIM, NULL,
-                      NULL);
-        /* Unexport DBus interface and remove the skeleton */
-        mm_gdbus_object_skeleton_set_modem (MM_GDBUS_OBJECT_SKELETON (self), NULL);
-        g_object_set (self,
-                      MM_IFACE_MODEM_DBUS_SKELETON, NULL,
-                      NULL);
-        return TRUE;
-    }
-
-    g_return_val_if_reached (FALSE);
+    /* Remove SIM object */
+    g_object_set (self,
+                  MM_IFACE_MODEM_SIM, NULL,
+                  NULL);
+    /* Unexport DBus interface and remove the skeleton */
+    mm_gdbus_object_skeleton_set_modem (MM_GDBUS_OBJECT_SKELETON (self), NULL);
+    g_object_set (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, NULL,
+                  NULL);
 }
 
 
