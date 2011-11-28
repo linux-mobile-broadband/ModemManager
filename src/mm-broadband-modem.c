@@ -32,6 +32,11 @@
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 
+#define MM_MODEM_CAPABILITY_3GPP        \
+    (MM_MODEM_CAPABILITY_GSM_UMTS |     \
+     MM_MODEM_CAPABILITY_LTE |          \
+     MM_MODEM_CAPABILITY_LTE_ADVANCED)
+
 static void iface_modem_init (MMIfaceModem *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModem, mm_broadband_modem, MM_TYPE_BASE_MODEM, 0,
@@ -1085,6 +1090,57 @@ modem_init (MMIfaceModem *self,
 /*****************************************************************************/
 
 static gboolean
+disable_finish (MMBaseModem *self,
+                GAsyncResult *res,
+                GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    return TRUE;
+}
+
+static void
+iface_modem_disable_ready (MMBroadbandModem *self,
+                           GAsyncResult *result,
+                           GAsyncResult *disable_result)
+{
+    GError *error = NULL;
+
+    if (!mm_iface_modem_disable_finish (MM_IFACE_MODEM (self),
+                                        result,
+                                        &error))
+        g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (disable_result), error);
+    else
+        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (disable_result), TRUE);
+
+    g_simple_async_result_complete (G_SIMPLE_ASYNC_RESULT (disable_result));
+    g_object_unref (disable_result);
+}
+
+static void
+disable (MMBaseModem *self,
+         GCancellable *cancellable,
+         GAsyncReadyCallback callback,
+         gpointer user_data)
+{
+    GSimpleAsyncResult *res;
+
+    res = g_simple_async_result_new (G_OBJECT (self),
+                                     callback,
+                                     user_data,
+                                     disable);
+
+    /* Disable the Modem interface */
+    mm_iface_modem_disable (MM_IFACE_MODEM (self),
+                            (GAsyncReadyCallback)iface_modem_disable_ready,
+                            res);
+}
+
+
+/*****************************************************************************/
+
+static gboolean
 enable_finish (MMBaseModem *self,
                GAsyncResult *res,
                GError **error)
@@ -1134,55 +1190,36 @@ enable (MMBaseModem *self,
 
 /*****************************************************************************/
 
-static gboolean
-disable_finish (MMBaseModem *self,
-                GAsyncResult *res,
-                GError **error)
-{
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return FALSE;
+typedef enum {
+    INITIALIZE_STEP_FIRST,
+    INITIALIZE_STEP_IFACE_MODEM,
+    INITIALIZE_STEP_IFACE_3GPP,
+    INITIALIZE_STEP_IFACE_3GPP_USSD,
+    INITIALIZE_STEP_IFACE_CDMA,
+    INITIALIZE_STEP_IFACE_CONTACTS,
+    INITIALIZE_STEP_IFACE_FIRMWARE,
+    INITIALIZE_STEP_IFACE_LOCATION,
+    INITIALIZE_STEP_IFACE_MESSAGING,
+    INITIALIZE_STEP_IFACE_SIMPLE,
+    INITIALIZE_STEP_LAST,
+} InitializeStep;
 
-    return TRUE;
-}
+typedef struct {
+    MMBroadbandModem *self;
+    GSimpleAsyncResult *result;
+    InitializeStep step;
+} InitializeContext;
 
-static void
-iface_modem_disable_ready (MMBroadbandModem *self,
-                           GAsyncResult *result,
-                           GAsyncResult *disable_result)
-{
-    GError *error = NULL;
-
-    if (!mm_iface_modem_disable_finish (MM_IFACE_MODEM (self),
-                                        result,
-                                        &error))
-        g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (disable_result), error);
-    else
-        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (disable_result), TRUE);
-
-    g_simple_async_result_complete (G_SIMPLE_ASYNC_RESULT (disable_result));
-    g_object_unref (disable_result);
-}
+static void initialize_step (InitializeContext *ctx);
 
 static void
-disable (MMBaseModem *self,
-         GCancellable *cancellable,
-         GAsyncReadyCallback callback,
-         gpointer user_data)
+initialize_context_complete_and_free (InitializeContext *ctx)
 {
-    GSimpleAsyncResult *res;
-
-    res = g_simple_async_result_new (G_OBJECT (self),
-                                     callback,
-                                     user_data,
-                                     disable);
-
-    /* Disable the Modem interface */
-    mm_iface_modem_disable (MM_IFACE_MODEM (self),
-                            (GAsyncReadyCallback)iface_modem_disable_ready,
-                            res);
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx);
 }
-
-/*****************************************************************************/
 
 static gboolean
 initialize_finish (MMBaseModem *self,
@@ -1195,22 +1232,91 @@ initialize_finish (MMBaseModem *self,
     return TRUE;
 }
 
+#undef INTERFACE_INIT_READY_FN
+#define INTERFACE_INIT_READY_FN(NAME,TYPE)                              \
+    static void                                                         \
+    NAME##_initialize_ready (MMBroadbandModem *self,                    \
+                             GAsyncResult *result,                      \
+                             InitializeContext *ctx)                    \
+    {                                                                   \
+        GError *error = NULL;                                           \
+                                                                        \
+        if (!mm_##NAME##_initialize_finish (TYPE (self),                \
+                                            result,                     \
+                                            &error)) {                  \
+            g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (ctx->result), error); \
+            initialize_context_complete_and_free (ctx);                 \
+        }                                                               \
+                                                                        \
+        /* Go on to next step */                                        \
+        ctx->step++;                                                    \
+        initialize_step (ctx);                                          \
+    }
+
+INTERFACE_INIT_READY_FN (iface_modem, MM_IFACE_MODEM)
+
 static void
-iface_modem_initialize_ready (MMBroadbandModem *self,
-                              GAsyncResult *result,
-                              GAsyncResult *initialize_result)
+initialize_step (InitializeContext *ctx)
 {
-    GError *error = NULL;
+    switch (ctx->step) {
+    case INITIALIZE_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
 
-    if (!mm_iface_modem_initialize_finish (MM_IFACE_MODEM (self),
-                                           result,
-                                           &error))
-        g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (initialize_result), error);
-    else
-        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (initialize_result), TRUE);
+    case INITIALIZE_STEP_IFACE_MODEM:
+        /* Initialize the Modem interface */
+        mm_iface_modem_initialize (MM_IFACE_MODEM (ctx->self),
+                                   (GAsyncReadyCallback)iface_modem_initialize_ready,
+                                   ctx);
+        return;
 
-    g_simple_async_result_complete (G_SIMPLE_ASYNC_RESULT (initialize_result));
-    g_object_unref (initialize_result);
+    case INITIALIZE_STEP_IFACE_3GPP:
+        if (ctx->self->priv->modem_current_capabilities & MM_MODEM_CAPABILITY_3GPP) {
+            /* TODO: expose the 3GPP interfaces */
+        }
+
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZE_STEP_IFACE_3GPP_USSD:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZE_STEP_IFACE_CDMA:
+        if (ctx->self->priv->modem_current_capabilities & MM_MODEM_CAPABILITY_CDMA_EVDO) {
+            /* TODO: Expose the CDMA interface */
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZE_STEP_IFACE_CONTACTS:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZE_STEP_IFACE_FIRMWARE:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZE_STEP_IFACE_LOCATION:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZE_STEP_IFACE_MESSAGING:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZE_STEP_IFACE_SIMPLE:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZE_STEP_LAST:
+        /* All initialized without errors! */
+        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (ctx->result), TRUE);
+        initialize_context_complete_and_free (ctx);
+        return;
+    }
+
+    g_assert_not_reached ();
 }
 
 static void
@@ -1219,17 +1325,17 @@ initialize (MMBaseModem *self,
             GAsyncReadyCallback callback,
             gpointer user_data)
 {
-    GSimpleAsyncResult *res;
+    InitializeContext *ctx;
 
-    res = g_simple_async_result_new (G_OBJECT (self),
-                                     callback,
-                                     user_data,
-                                     initialize);
+    ctx = g_new0 (InitializeContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             initialize);
+    ctx->step = INITIALIZE_STEP_FIRST;
 
-    /* Initialize the Modem interface */
-    mm_iface_modem_initialize (MM_IFACE_MODEM (self),
-                               (GAsyncReadyCallback)iface_modem_initialize_ready,
-                               res);
+    initialize_step (ctx);
 }
 
 /*****************************************************************************/
@@ -1323,7 +1429,7 @@ dispose (GObject *object)
 
     if (self->priv->modem_dbus_skeleton) {
         if (!mm_iface_modem_shutdown (MM_IFACE_MODEM (object), &error)) {
-            /* TODO: Cancel initialization */
+            /* TODO: Cancel initialization/enabling/disabling, whatever */
             mm_warn ("couldn't shutdown interface: '%s'",
                      error ? error->message : "unknown error");
             g_clear_error (&error);
