@@ -30,6 +30,7 @@ static void interface_initialization_step (InitializationContext *ctx);
 
 typedef enum {
     INITIALIZATION_STEP_FIRST,
+    INITIALIZATION_STEP_IMEI,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -75,10 +76,48 @@ initialization_context_free (InitializationContext *ctx)
 }
 
 static void
+load_imei_ready (MMIfaceModem3gpp *self,
+                 GAsyncResult *res,
+                 InitializationContext *ctx)
+{
+    GError *error = NULL;
+    gchar *imei;
+
+    imei = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_imei_finish (self, res, &error);
+    mm_gdbus_modem3gpp_set_imei (ctx->skeleton, imei);
+    g_free (imei);
+
+    if (error) {
+        mm_warn ("couldn't load IMEI: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
+
+static void
 interface_initialization_step (InitializationContext *ctx)
 {
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_IMEI:
+        /* IMEI value is meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have it loaded,
+         * don't try to load it again. */
+        if (!mm_gdbus_modem3gpp_get_imei (ctx->skeleton) &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->load_imei &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->load_imei_finish) {
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->load_imei (
+                ctx->self,
+                (GAsyncReadyCallback)load_imei_ready,
+                ctx);
+            return;
+        }
         /* Fall down to next step */
         ctx->step++;
 

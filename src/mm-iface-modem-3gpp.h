@@ -32,6 +32,14 @@ typedef struct _MMIfaceModem3gpp MMIfaceModem3gpp;
 
 struct _MMIfaceModem3gpp {
     GTypeInterface g_iface;
+
+    /* Loading of the IMEI property */
+    void (*load_imei) (MMIfaceModem3gpp *self,
+                       GAsyncReadyCallback callback,
+                       gpointer user_data);
+    gchar * (*load_imei_finish) (MMIfaceModem3gpp *self,
+                                 GAsyncResult *res,
+                                 GError **error);
 };
 
 GType mm_iface_modem_3gpp_get_type (void);
