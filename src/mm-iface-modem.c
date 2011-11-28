@@ -1491,14 +1491,6 @@ initialization_context_free (InitializationContext *ctx)
     g_free (ctx);
 }
 
-static gboolean
-interface_initialization_finish (MMIfaceModem *self,
-                                 GAsyncResult *res,
-                                 GError **error)
-{
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
-}
-
 #undef STR_REPLY_READY_FN
 #define STR_REPLY_READY_FN(NAME,DISPLAY)                                \
     static void                                                         \
@@ -1941,6 +1933,45 @@ interface_initialization_step (InitializationContext *ctx)
 
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
+
+        /* Handle method invocations */
+        g_signal_connect (ctx->skeleton,
+                          "handle-create-bearer",
+                          G_CALLBACK (handle_create_bearer),
+                          ctx->self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-delete-bearer",
+                          G_CALLBACK (handle_delete_bearer),
+                          ctx->self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-list-bearers",
+                          G_CALLBACK (handle_list_bearers),
+                          ctx->self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-enable",
+                          G_CALLBACK (handle_enable),
+                          ctx->self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-reset",
+                          G_CALLBACK (handle_reset),
+                          ctx->self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-factory-reset",
+                          G_CALLBACK (handle_factory_reset),
+                          ctx->self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-set-allowed-bands",
+                          G_CALLBACK (handle_set_allowed_bands),
+                          ctx->self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-set-allowed-modes",
+                          G_CALLBACK (handle_set_allowed_modes),
+                          ctx->self);
+
+        /* Finally, export the new interface */
+        mm_gdbus_object_skeleton_set_modem (MM_GDBUS_OBJECT_SKELETON (ctx->self),
+                                            MM_GDBUS_MODEM (ctx->skeleton));
+
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         g_simple_async_result_complete_in_idle (ctx->result);
         initialization_context_free (ctx);
@@ -1949,20 +1980,6 @@ interface_initialization_step (InitializationContext *ctx)
 
     g_assert_not_reached ();
 }
-
-static void
-interface_initialization (MMIfaceModem *self,
-                          MMAtSerialPort *port,
-                          GAsyncReadyCallback callback,
-                          gpointer user_data)
-{
-    interface_initialization_step (initialization_context_new (self,
-                                                               port,
-                                                               callback,
-                                                               user_data));
-}
-
-/*****************************************************************************/
 
 gboolean
 mm_iface_modem_initialize_finish (MMIfaceModem *self,
@@ -1975,92 +1992,16 @@ mm_iface_modem_initialize_finish (MMIfaceModem *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
-static void
-interface_initialization_ready (MMIfaceModem *self,
-                                GAsyncResult *init_result,
-                                GSimpleAsyncResult *op_result)
-{
-    GObject *skeleton = NULL;
-    GError *inner_error = NULL;
-
-    /* If initialization failed, remove the skeleton and return the error */
-    if (!interface_initialization_finish (self,
-                                          init_result,
-                                          &inner_error)) {
-        g_object_set (self,
-                      MM_IFACE_MODEM_DBUS_SKELETON, NULL,
-                      NULL);
-        g_simple_async_result_take_error (op_result, inner_error);
-        g_simple_async_result_complete (op_result);
-        g_object_unref (op_result);
-        return;
-    }
-
-    /* Finish current initialization by setting up the DBus skeleton */
-    g_object_get (self,
-                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
-                  NULL);
-    g_assert (skeleton != NULL);
-
-    /* Handle method invocations */
-    g_signal_connect (skeleton,
-                      "handle-create-bearer",
-                      G_CALLBACK (handle_create_bearer),
-                      self);
-    g_signal_connect (skeleton,
-                      "handle-delete-bearer",
-                      G_CALLBACK (handle_delete_bearer),
-                      self);
-    g_signal_connect (skeleton,
-                      "handle-list-bearers",
-                      G_CALLBACK (handle_list_bearers),
-                      self);
-    g_signal_connect (skeleton,
-                      "handle-enable",
-                      G_CALLBACK (handle_enable),
-                      self);
-    g_signal_connect (skeleton,
-                      "handle-reset",
-                      G_CALLBACK (handle_reset),
-                      self);
-    g_signal_connect (skeleton,
-                      "handle-factory-reset",
-                      G_CALLBACK (handle_factory_reset),
-                      self);
-    g_signal_connect (skeleton,
-                      "handle-set-allowed-bands",
-                      G_CALLBACK (handle_set_allowed_bands),
-                      self);
-    g_signal_connect (skeleton,
-                      "handle-set-allowed-modes",
-                      G_CALLBACK (handle_set_allowed_modes),
-                      self);
-
-    /* Finally, export the new interface */
-    mm_gdbus_object_skeleton_set_modem (MM_GDBUS_OBJECT_SKELETON (self),
-                                        MM_GDBUS_MODEM (skeleton));
-    g_simple_async_result_set_op_res_gboolean (op_result, TRUE);
-    g_simple_async_result_complete (op_result);
-    g_object_unref (op_result);
-}
-
 void
 mm_iface_modem_initialize (MMIfaceModem *self,
                            MMAtSerialPort *port,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
-    GSimpleAsyncResult *result;
     MmGdbusModem *skeleton = NULL;
     MMModemState modem_state = MM_MODEM_STATE_UNKNOWN;
 
     g_return_if_fail (MM_IS_IFACE_MODEM (self));
-
-    /* Setup asynchronous result */
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_iface_modem_initialize);
 
     /* Did we already create it? */
     g_object_get (self,
@@ -2110,10 +2051,10 @@ mm_iface_modem_initialize (MMIfaceModem *self,
     }
 
     /* Perform async initialization here */
-    interface_initialization (self,
-                              port,
-                              (GAsyncReadyCallback)interface_initialization_ready,
-                              result);
+    interface_initialization_step (initialization_context_new (self,
+                                                               port,
+                                                               callback,
+                                                               user_data));
     g_object_unref (skeleton);
     return;
 }
