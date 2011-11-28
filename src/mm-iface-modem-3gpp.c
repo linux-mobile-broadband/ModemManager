@@ -25,6 +25,25 @@
 
 /*****************************************************************************/
 
+static gboolean
+handle_register (MmGdbusModem3gpp *skeleton,
+                 GDBusMethodInvocation *invocation,
+                 const gchar *arg_network_id,
+                 MMIfaceModem3gpp *self)
+{
+    return FALSE; /* Currently unhandled */
+}
+
+static gboolean
+handle_scan (MmGdbusModem3gpp *skeleton,
+             GDBusMethodInvocation *invocation,
+             MMIfaceModem3gpp *self)
+{
+    return FALSE; /* Currently unhandled */
+}
+
+/*****************************************************************************/
+
 typedef struct _InitializationContext InitializationContext;
 static void interface_initialization_step (InitializationContext *ctx);
 
@@ -66,8 +85,9 @@ initialization_context_new (MMIfaceModem3gpp *self,
 }
 
 static void
-initialization_context_free (InitializationContext *ctx)
+initialization_context_complete_and_free (InitializationContext *ctx)
 {
+    g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->self);
     g_object_unref (ctx->port);
     g_object_unref (ctx->result);
@@ -123,10 +143,24 @@ interface_initialization_step (InitializationContext *ctx)
 
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
+
+        /* Handle method invocations */
+        g_signal_connect (ctx->skeleton,
+                          "handle-register",
+                          G_CALLBACK (handle_register),
+                          ctx->self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-scan",
+                          G_CALLBACK (handle_scan),
+                          ctx->self);
+
+
+        /* Finally, export the new interface */
+        mm_gdbus_object_skeleton_set_modem3gpp (MM_GDBUS_OBJECT_SKELETON (ctx->self),
+                                                MM_GDBUS_MODEM3GPP (ctx->skeleton));
+
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        g_simple_async_result_complete_in_idle (ctx->result);
-        mm_serial_port_close (MM_SERIAL_PORT (ctx->port));
-        initialization_context_free (ctx);
+        initialization_context_complete_and_free (ctx);
         return;
     }
 
