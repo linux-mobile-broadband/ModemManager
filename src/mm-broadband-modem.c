@@ -1093,6 +1093,49 @@ modem_init (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* IMEI */
+
+static gchar *
+load_imei_finish (MMIfaceModem3gpp *self,
+                  GAsyncResult *res,
+                  GError **error)
+{
+    GVariant *result;
+    gchar *imei;
+
+    result = mm_at_sequence_finish (G_OBJECT (self), res, error);
+    if (!result)
+        return NULL;
+
+    imei = g_variant_dup_string (result, NULL);
+    mm_dbg ("loaded IMEI: %s", imei);
+    g_variant_unref (result);
+    return imei;
+}
+
+static const MMAtCommand imei_commands[] = {
+    { "+CGSN",  3, (MMAtResponseProcessor)common_parse_string_reply },
+    { NULL }
+};
+
+static void
+load_imei (MMIfaceModem3gpp *self,
+           GAsyncReadyCallback callback,
+           gpointer user_data)
+{
+    mm_dbg ("loading IMEI...");
+    mm_at_sequence (G_OBJECT (self),
+                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                    (MMAtCommand *)imei_commands,
+                    NULL, /* response_processor_context */
+                    FALSE,
+                    "s",
+                    NULL, /* TODO: cancellable */
+                    callback,
+                    user_data);
+}
+
+/*****************************************************************************/
 
 static gboolean
 disable_finish (MMBaseModem *self,
@@ -1511,6 +1554,8 @@ iface_modem_init (MMIfaceModem *iface)
 static void
 iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 {
+    iface->load_imei = load_imei;
+    iface->load_imei_finish = load_imei_finish;
 }
 
 static void
