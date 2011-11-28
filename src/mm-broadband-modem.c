@@ -1136,6 +1136,141 @@ load_imei (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* CS and PS Registrations (3GPP) */
+
+static gboolean
+setup_cs_registration_finish (MMIfaceModem3gpp *self,
+                              GAsyncResult *res,
+                              GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static gboolean
+setup_ps_registration_finish (MMIfaceModem3gpp *self,
+                              GAsyncResult *res,
+                              GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static gboolean
+parse_reg_setup_reply (MMBroadbandModem *self,
+                       gpointer none,
+                       const gchar *command,
+                       const gchar *response,
+                       const GError *error,
+                       GVariant **result,
+                       GError **result_error)
+{
+    /* If error, try next command */
+    if (error)
+        return FALSE;
+
+    *result = g_variant_new_string (command);
+    return TRUE;
+}
+
+static const MMAtCommand cs_registration_sequence[] = {
+    /* Enable unsolicited registration notifications in CS network, with location */
+    { "+CREG=2", 3, (MMAtResponseProcessor)parse_reg_setup_reply },
+    /* Enable unsolicited registration notifications in CS network, without location */
+    { "+CREG=1", 3, (MMAtResponseProcessor)parse_reg_setup_reply },
+    { NULL }
+};
+
+static const MMAtCommand ps_registration_sequence[] = {
+    /* Enable unsolicited registration notifications in PS network, with location */
+    { "+CGREG=2", 3, (MMAtResponseProcessor)parse_reg_setup_reply },
+    /* Enable unsolicited registration notifications in PS network, without location */
+    { "+CGREG=1", 3, (MMAtResponseProcessor)parse_reg_setup_reply },
+    { NULL }
+};
+
+static void
+setup_registration_sequence_ready (MMBroadbandModem *self,
+                                   GAsyncResult *res,
+                                   GSimpleAsyncResult *operation_result)
+{
+    MMAtSerialPort *secondary;
+    GError *error = NULL;
+    GVariant *reply;
+
+    reply = mm_at_sequence_finish (G_OBJECT (self), res, &error);
+    if (error) {
+        g_simple_async_result_take_error (operation_result, error);
+        g_simple_async_result_complete (operation_result);
+        g_object_unref (operation_result);
+        return;
+    }
+
+    secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+    if (secondary) {
+        /* Now use the same registration setup in secondary port, if any */
+        mm_at_command (G_OBJECT (self),
+                       secondary,
+                       g_variant_get_string (reply, NULL),
+                       3,
+                       NULL, /* response processor */
+                       NULL, /* response processor context */
+                       NULL, /* result signature */
+                       NULL, /* cancellable */
+                       NULL, /* NO callback, just queue the command and forget */
+                       NULL); /* user data */
+    }
+
+    /* We're done */
+    g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
+    g_simple_async_result_complete (operation_result);
+    g_object_unref (operation_result);
+    g_variant_unref (reply);
+}
+
+static void
+setup_cs_registration (MMIfaceModem3gpp *self,
+                       GAsyncReadyCallback callback,
+                       gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        setup_cs_registration);
+    mm_at_sequence (G_OBJECT (self),
+                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                    (MMAtCommand *)cs_registration_sequence,
+                    NULL,  /* response processor context */
+                    FALSE, /* free sequence */
+                    "s",   /* The command which worked */
+                    NULL,  /* cancellable */
+                    (GAsyncReadyCallback)setup_registration_sequence_ready,
+                    result);
+}
+
+static void
+setup_ps_registration (MMIfaceModem3gpp *self,
+                       GAsyncReadyCallback callback,
+                       gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        setup_ps_registration);
+    mm_at_sequence (G_OBJECT (self),
+                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                    (MMAtCommand *)ps_registration_sequence,
+                    NULL,  /* response processor context */
+                    FALSE, /* free sequence */
+                    "s",   /* The command which worked */
+                    NULL,  /* cancellable */
+                    (GAsyncReadyCallback)setup_registration_sequence_ready,
+                    result);
+}
+
+/*****************************************************************************/
 
 static gboolean
 disable_finish (MMBaseModem *self,
@@ -1663,6 +1798,11 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 {
     iface->load_imei = load_imei;
     iface->load_imei_finish = load_imei_finish;
+
+    iface->setup_cs_registration = setup_cs_registration;
+    iface->setup_cs_registration_finish = setup_cs_registration_finish;
+    iface->setup_ps_registration = setup_ps_registration;
+    iface->setup_ps_registration_finish = setup_ps_registration_finish;
 }
 
 static void
