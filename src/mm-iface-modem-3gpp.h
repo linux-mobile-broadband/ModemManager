@@ -53,6 +53,14 @@ gboolean mm_iface_modem_3gpp_initialize_finish (MMIfaceModem3gpp *self,
                                                 GAsyncResult *res,
                                                 GError **error);
 
+/* Enable Modem interface (async) */
+void     mm_iface_modem_3gpp_enable        (MMIfaceModem3gpp *self,
+                                            GAsyncReadyCallback callback,
+                                            gpointer user_data);
+gboolean mm_iface_modem_3gpp_enable_finish (MMIfaceModem3gpp *self,
+                                            GAsyncResult *res,
+                                            GError **error);
+
 /* Shutdown Modem 3GPP interface */
 void mm_iface_modem_3gpp_shutdown (MMIfaceModem3gpp *self);
 

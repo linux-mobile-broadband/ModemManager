@@ -44,6 +44,94 @@ handle_scan (MmGdbusModem3gpp *skeleton,
 
 /*****************************************************************************/
 
+typedef struct _EnablingContext EnablingContext;
+static void interface_enabling_step (EnablingContext *ctx);
+
+typedef enum {
+    ENABLING_STEP_FIRST,
+    ENABLING_STEP_LAST
+} EnablingStep;
+
+struct _EnablingContext {
+    MMIfaceModem3gpp *self;
+    MMAtSerialPort *primary;
+    EnablingStep step;
+    GSimpleAsyncResult *result;
+    MmGdbusModem3gpp *skeleton;
+};
+
+static EnablingContext *
+enabling_context_new (MMIfaceModem3gpp *self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    EnablingContext *ctx;
+
+    ctx = g_new0 (EnablingContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->primary = g_object_ref (mm_base_modem_get_port_primary (MM_BASE_MODEM (self)));
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             enabling_context_new);
+    ctx->step = ENABLING_STEP_FIRST;
+    g_object_get (ctx->self,
+                  MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &ctx->skeleton,
+                  NULL);
+    g_assert (ctx->skeleton != NULL);
+
+    return ctx;
+}
+
+static void
+enabling_context_complete_and_free (EnablingContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->self);
+    g_object_unref (ctx->primary);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->skeleton);
+    g_free (ctx);
+}
+
+gboolean
+mm_iface_modem_3gpp_enable_finish (MMIfaceModem3gpp *self,
+                                   GAsyncResult *res,
+                                   GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+interface_enabling_step (EnablingContext *ctx)
+{
+    switch (ctx->step) {
+    case ENABLING_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_LAST:
+        /* We are done without errors! */
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        enabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    g_assert_not_reached ();
+}
+
+void
+mm_iface_modem_3gpp_enable (MMIfaceModem3gpp *self,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
+{
+    interface_enabling_step (enabling_context_new (self,
+                                                   callback,
+                                                   user_data));
+}
+
+/*****************************************************************************/
+
 typedef struct _InitializationContext InitializationContext;
 static void interface_initialization_step (InitializationContext *ctx);
 
