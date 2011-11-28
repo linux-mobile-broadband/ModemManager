@@ -25,6 +25,138 @@
 
 /*****************************************************************************/
 
+typedef struct _InitializationContext InitializationContext;
+static void interface_initialization_step (InitializationContext *ctx);
+
+typedef enum {
+    INITIALIZATION_STEP_FIRST,
+    INITIALIZATION_STEP_LAST
+} InitializationStep;
+
+struct _InitializationContext {
+    MMIfaceModem3gpp *self;
+    MMAtSerialPort *port;
+    MmGdbusModem3gpp *skeleton;
+    GSimpleAsyncResult *result;
+    InitializationStep step;
+};
+
+static InitializationContext *
+initialization_context_new (MMIfaceModem3gpp *self,
+                            MMAtSerialPort *port,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
+{
+    InitializationContext *ctx;
+
+    ctx = g_new0 (InitializationContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->port = g_object_ref (port);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             initialization_context_new);
+    ctx->step = INITIALIZATION_STEP_FIRST;
+    g_object_get (ctx->self,
+                  MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &ctx->skeleton,
+                  NULL);
+    g_assert (ctx->skeleton != NULL);
+    return ctx;
+}
+
+static void
+initialization_context_free (InitializationContext *ctx)
+{
+    g_object_unref (ctx->self);
+    g_object_unref (ctx->port);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->skeleton);
+    g_free (ctx);
+}
+
+static void
+interface_initialization_step (InitializationContext *ctx)
+{
+    switch (ctx->step) {
+    case INITIALIZATION_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_LAST:
+        /* We are done without errors! */
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        g_simple_async_result_complete_in_idle (ctx->result);
+        mm_serial_port_close (MM_SERIAL_PORT (ctx->port));
+        initialization_context_free (ctx);
+        return;
+    }
+
+    g_assert_not_reached ();
+}
+
+gboolean
+mm_iface_modem_3gpp_initialize_finish (MMIfaceModem3gpp *self,
+                                       GAsyncResult *res,
+                                       GError **error)
+{
+    g_return_val_if_fail (MM_IS_IFACE_MODEM_3GPP (self), FALSE);
+    g_return_val_if_fail (G_IS_ASYNC_RESULT (res), FALSE);
+
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+void
+mm_iface_modem_3gpp_initialize (MMIfaceModem3gpp *self,
+                                MMAtSerialPort *port,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data)
+{
+    MmGdbusModem3gpp *skeleton = NULL;
+
+    g_return_if_fail (MM_IS_IFACE_MODEM_3GPP (self));
+
+    /* Did we already create it? */
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &skeleton,
+                  NULL);
+    if (!skeleton) {
+        skeleton = mm_gdbus_modem3gpp_skeleton_new ();
+
+        /* Set all initial property defaults */
+        mm_gdbus_modem3gpp_set_imei (skeleton, NULL);
+        mm_gdbus_modem3gpp_set_registration_state (skeleton, MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
+        mm_gdbus_modem3gpp_set_operator_code (skeleton, NULL);
+        mm_gdbus_modem3gpp_set_operator_name (skeleton, NULL);
+        mm_gdbus_modem3gpp_set_enabled_facility_locks (skeleton, MM_MODEM_3GPP_FACILITY_NONE);
+
+        g_object_set (self,
+                      MM_IFACE_MODEM_3GPP_DBUS_SKELETON, skeleton,
+                      NULL);
+    }
+
+    /* Perform async initialization here */
+    interface_initialization_step (initialization_context_new (self,
+                                                               port,
+                                                               callback,
+                                                               user_data));
+    g_object_unref (skeleton);
+    return;
+}
+
+void
+mm_iface_modem_3gpp_shutdown (MMIfaceModem3gpp *self)
+{
+    g_return_if_fail (MM_IS_IFACE_MODEM_3GPP (self));
+
+    /* Unexport DBus interface and remove the skeleton */
+    mm_gdbus_object_skeleton_set_modem3gpp (MM_GDBUS_OBJECT_SKELETON (self), NULL);
+    g_object_set (self,
+                  MM_IFACE_MODEM_3GPP_DBUS_SKELETON, NULL,
+                  NULL);
+}
+
+/*****************************************************************************/
+
 static void
 iface_modem_3gpp_init (gpointer g_iface)
 {

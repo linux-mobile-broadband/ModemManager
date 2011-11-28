@@ -19,6 +19,8 @@
 #include <glib-object.h>
 #include <gio/gio.h>
 
+#include "mm-at-serial-port.h"
+
 #define MM_TYPE_IFACE_MODEM_3GPP               (mm_iface_modem_3gpp_get_type ())
 #define MM_IFACE_MODEM_3GPP(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM_3GPP, MMIfaceModem3gpp))
 #define MM_IS_IFACE_MODEM_3GPP(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_3GPP))
@@ -33,5 +35,17 @@ struct _MMIfaceModem3gpp {
 };
 
 GType mm_iface_modem_3gpp_get_type (void);
+
+/* Initialize Modem 3GPP interface (async) */
+void     mm_iface_modem_3gpp_initialize        (MMIfaceModem3gpp *self,
+                                                MMAtSerialPort *port,
+                                                GAsyncReadyCallback callback,
+                                                gpointer user_data);
+gboolean mm_iface_modem_3gpp_initialize_finish (MMIfaceModem3gpp *self,
+                                                GAsyncResult *res,
+                                                GError **error);
+
+/* Shutdown Modem 3GPP interface */
+void mm_iface_modem_3gpp_shutdown (MMIfaceModem3gpp *self);
 
 #endif /* MM_IFACE_MODEM_3GPP_H */
