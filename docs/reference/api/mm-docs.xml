@@ -110,12 +110,12 @@
       </section>
       <section>
         <title>3GPP specific</title>
-        <xi:include href="../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.3gpp.xml"/>
-        <xi:include href="../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.3gpp.Ussd.xml"/>
+        <xi:include href="../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.xml"/>
+        <xi:include href="../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml"/>
       </section>
       <section>
         <title>CDMA specific</title>
-        <xi:include href="../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Cdma.xml"/>
+        <xi:include href="../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.ModemCdma.xml"/>
       </section>
       <section>
         <title>Other</title>

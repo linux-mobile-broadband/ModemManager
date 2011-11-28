@@ -54,9 +54,9 @@ expand_content_files = \
 	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Location.xml \
 	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Firmware.xml \
 	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Contacts.xml \
-	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Cdma.xml \
-	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.3gpp.xml \
-	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.3gpp.Ussd.xml \
+	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.ModemCdma.xml \
+	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.xml \
+	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml \
 	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml \
 	$(NULL)
 

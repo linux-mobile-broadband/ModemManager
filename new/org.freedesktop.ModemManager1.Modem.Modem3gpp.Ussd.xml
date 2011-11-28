@@ -12,12 +12,12 @@
 <node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
 
   <!--
-      org.freedesktop.ModemManager1.Modem.3gpp.Ussd:
+      org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd:
       @short_description: The ModemManager 3GPP USSD interface.
 
       This interface provides access to actions based on the USSD protocol.
   -->
-  <interface name="org.freedesktop.ModemManager1.Modem.3gpp.Ussd">
+  <interface name="org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd">
 
     <!--
         Initiate:
@@ -43,7 +43,7 @@
 
         Respond to a USSD request that is either initiated by the mobile network,
         or that is awaiting further input after
-        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-3gpp-Ussd.Initiate">Initiate()</link>
+        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Modem3gpp-Ussd.Initiate">Initiate()</link>
         was called.
     -->
     <method name="Respond">
@@ -82,7 +82,7 @@
 
         Contains any pending network-initiated request for a response. Client
         should call
-        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-3gpp-Ussd.Respond">Respond()</link>
+        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Modem3gpp-Ussd.Respond">Respond()</link>
         with the appropriate response to this request.
 
         When no USSD session is active, or when there is no pending

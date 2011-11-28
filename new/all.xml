@@ -7,9 +7,9 @@
   <xi:include href="org.freedesktop.ModemManager1.Bearer.xml"/>
   <xi:include href="org.freedesktop.ModemManager1.Sms.xml"/>
   <xi:include href="org.freedesktop.ModemManager1.Modem.xml"/>
-  <xi:include href="org.freedesktop.ModemManager1.Modem.3gpp.xml"/>
-  <xi:include href="org.freedesktop.ModemManager1.Modem.3gpp.Ussd.xml"/>
-  <xi:include href="org.freedesktop.ModemManager1.Modem.Cdma.xml"/>
+  <xi:include href="org.freedesktop.ModemManager1.Modem.Modem3gpp.xml"/>
+  <xi:include href="org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml"/>
+  <xi:include href="org.freedesktop.ModemManager1.Modem.ModemCdma.xml"/>
   <xi:include href="org.freedesktop.ModemManager1.Modem.Messaging.xml"/>
   <xi:include href="org.freedesktop.ModemManager1.Modem.Location.xml"/>
   <xi:include href="org.freedesktop.ModemManager1.Modem.Firmware.xml"/>

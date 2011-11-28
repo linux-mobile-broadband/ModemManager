@@ -12,13 +12,13 @@
 <node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
 
   <!--
-      org.freedesktop.ModemManager1.Modem.3gpp:
+      org.freedesktop.ModemManager1.Modem.Modem3gpp:
       @short_description: The ModemManager 3GPP interface.
 
       This interface provides access to specific actions that may be performed
       in modems with 3GPP capabilities.
   -->
-  <interface name="org.freedesktop.ModemManager1.Modem.3gpp">
+  <interface name="org.freedesktop.ModemManager1.Modem.Modem3gpp">
 
     <!--
         Register:
@@ -140,4 +140,3 @@
 
   </interface>
 </node>
-

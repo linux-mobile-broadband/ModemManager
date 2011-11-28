@@ -29,9 +29,9 @@ GENERATED_DOC = \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Location.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Firmware.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Contacts.xml \
-	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Cdma.xml \
-	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.3gpp.xml \
-	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.3gpp.Ussd.xml \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.ModemCdma.xml \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.xml \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml
 
 # Enum types
@@ -95,9 +95,9 @@ mm_gdbus_modem_deps = \
 	$(top_srcdir)/new/org.freedesktop.ModemManager1.Modem.Location.xml \
 	$(top_srcdir)/new/org.freedesktop.ModemManager1.Modem.Firmware.xml \
 	$(top_srcdir)/new/org.freedesktop.ModemManager1.Modem.Contacts.xml \
-	$(top_srcdir)/new/org.freedesktop.ModemManager1.Modem.Cdma.xml \
-	$(top_srcdir)/new/org.freedesktop.ModemManager1.Modem.3gpp.xml \
-	$(top_srcdir)/new/org.freedesktop.ModemManager1.Modem.3gpp.Ussd.xml \
+	$(top_srcdir)/new/org.freedesktop.ModemManager1.Modem.ModemCdma.xml \
+	$(top_srcdir)/new/org.freedesktop.ModemManager1.Modem.Modem3gpp.xml \
+	$(top_srcdir)/new/org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml \
 	$(top_srcdir)/new/org.freedesktop.ModemManager1.Modem.Simple.xml
 $(mm_gdbus_modem_generated): $(mm_gdbus_modem_deps)
 	$(AM_V_GEN) gdbus-codegen \
@@ -106,6 +106,9 @@ $(mm_gdbus_modem_generated): $(mm_gdbus_modem_deps)
 		--generate-docbook mm-gdbus-doc \
 		--generate-c-code mm-gdbus-modem \
 		--c-generate-object-manager \
+		--annotate "org.freedesktop.ModemManager1.Modem.ModemCdma" org.gtk.GDBus.C.Name ModemCdma \
+		--annotate "org.freedesktop.ModemManager1.Modem.Modem3gpp" org.gtk.GDBus.C.Name Modem3gpp \
+		--annotate "org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd" org.gtk.GDBus.C.Name Modem3gppUssd \
 		$^ \
 		$(NULL)
 
