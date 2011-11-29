@@ -2317,6 +2317,7 @@ simple_connect (MMModemSimple *simple,
     }
 
     simple_state_machine (MM_MODEM (simple), error, info);
+    g_error_free (error);
 }
 
 static void

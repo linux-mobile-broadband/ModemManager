@@ -4648,6 +4648,7 @@ sms_get (MMModemGsmSms *modem,
         callback (modem, properties, error, user_data);
         if (properties != NULL)
             g_hash_table_unref (properties);
+        g_error_free (error);
         return;
     }
 
