@@ -1138,6 +1138,105 @@ load_imei (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Unsolicited registration messages handling (3GPP) */
+
+static gboolean
+setup_unsolicited_registration_finish (MMIfaceModem3gpp *self,
+                                       GAsyncResult *res,
+                                       GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+reg_state_changed (MMAtSerialPort *port,
+                   GMatchInfo *match_info,
+                   MMBroadbandModem *self)
+{
+    MMModem3gppRegistrationState state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    gulong lac = 0, cell_id = 0;
+    gint act = -1;
+    gboolean cgreg = FALSE;
+    GError *error = NULL;
+
+    if (!mm_gsm_parse_creg_response (match_info,
+                                     &state,
+                                     &lac,
+                                     &cell_id,
+                                     &act,
+                                     &cgreg,
+                                     &error)) {
+        mm_warn ("error parsing unsolicited registration: %s",
+                 error && error->message ? error->message : "(unknown)");
+        g_clear_error (&error);
+        return;
+    }
+
+    /* Report new registration state */
+    mm_iface_modem_3gpp_update_registration_state (MM_IFACE_MODEM_3GPP (self), state);
+
+    /* /\* If registration is finished (either registered or failed) but the */
+    /*  * registration query hasn't completed yet, just remove the timeout and */
+    /*  * let the registration query complete. */
+    /*  *\/ */
+    /* if (priv->pending_reg_id) { */
+    /*     g_source_remove (priv->pending_reg_id); */
+    /*     priv->pending_reg_id = 0; */
+    /* } */
+
+    /* TODO: report LAC/CI location */
+    /* update_lac_ci (self, lac, cell_id, cgreg ? 1 : 0); */
+
+    /* Report access technology, if available */
+    /* Only update access technology if it appeared in the CREG/CGREG response */
+    /* if (act != -1) */
+    /*     mm_generic_gsm_update_access_technology (self, etsi_act_to_mm_act (act)); */
+}
+
+static void
+setup_unsolicited_registration (MMIfaceModem3gpp *self,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    MMAtSerialPort *ports[2];
+    GPtrArray *array;
+    guint i;
+
+    mm_dbg ("setting up unsolicited registration messages handling");
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        setup_unsolicited_registration);
+
+    ports[0] = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+
+    /* Set up CREG unsolicited message handlers in both ports */
+    array = mm_gsm_creg_regex_get (FALSE);
+    for (i = 0; i < 2; i++) {
+        if (ports[i]) {
+            guint j;
+
+            for (j = 0; j < array->len; j++) {
+                mm_at_serial_port_add_unsolicited_msg_handler (
+                    MM_AT_SERIAL_PORT (ports[i]),
+                    (GRegex *) g_ptr_array_index (array, j),
+                    (MMAtSerialUnsolicitedMsgFn) reg_state_changed,
+                    self,
+                    NULL);
+            }
+        }
+    }
+    mm_gsm_creg_regex_destroy (array);
+
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* CS and PS Registrations (3GPP) */
 
 static gboolean
@@ -1808,6 +1907,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->load_imei = load_imei;
     iface->load_imei_finish = load_imei_finish;
 
+    iface->setup_unsolicited_registration = setup_unsolicited_registration;
+    iface->setup_unsolicited_registration_finish = setup_unsolicited_registration_finish;
     iface->setup_cs_registration = setup_cs_registration;
     iface->setup_cs_registration_finish = setup_cs_registration_finish;
     iface->setup_ps_registration = setup_ps_registration;
