@@ -89,4 +89,11 @@ gboolean mm_iface_modem_3gpp_enable_finish (MMIfaceModem3gpp *self,
 /* Shutdown Modem 3GPP interface */
 void mm_iface_modem_3gpp_shutdown (MMIfaceModem3gpp *self);
 
+/* Objects implementing this interface can report new registration states.
+ * This may happen when handling unsolicited registration messages, or when
+ * the interface asks to run registration state checks.
+ * Returns FALSE if registration process is still ongoing. */
+void mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
+                                                    MMModem3gppRegistrationState new_state);
+
 #endif /* MM_IFACE_MODEM_3GPP_H */

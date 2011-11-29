@@ -19,6 +19,7 @@
 #include <mm-enums-types.h>
 #include <mm-errors-types.h>
 
+#include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-base-modem.h"
 #include "mm-log.h"
@@ -40,6 +41,51 @@ handle_scan (MmGdbusModem3gpp *skeleton,
              MMIfaceModem3gpp *self)
 {
     return FALSE; /* Currently unhandled */
+}
+
+/*****************************************************************************/
+
+void
+mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
+                                               MMModem3gppRegistrationState new_state)
+{
+    MMModem3gppRegistrationState previous_state;
+
+    /* Only set new state if different */
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, &previous_state,
+                  NULL);
+    if (new_state == previous_state)
+        return;
+
+    g_object_set (self,
+                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, new_state,
+                  NULL);
+
+    /* TODO:
+     * While connected we don't want registration status changes to change
+     * the modem's state away from CONNECTED.
+     */
+    switch (new_state) {
+    case MM_MODEM_3GPP_REGISTRATION_STATE_HOME:
+    case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING:
+        mm_iface_modem_update_state (MM_IFACE_MODEM (self),
+                                     MM_MODEM_STATE_REGISTERED,
+                                     MM_MODEM_STATE_REASON_NONE);
+        break;
+    case MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING:
+        mm_iface_modem_update_state (MM_IFACE_MODEM (self),
+                                     MM_MODEM_STATE_SEARCHING,
+                                     MM_MODEM_STATE_REASON_NONE);
+        break;
+    case MM_MODEM_3GPP_REGISTRATION_STATE_IDLE:
+    case MM_MODEM_3GPP_REGISTRATION_STATE_DENIED:
+    case MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN:
+        mm_iface_modem_update_state (MM_IFACE_MODEM (self),
+                                     MM_MODEM_STATE_ENABLED,
+                                     MM_MODEM_STATE_REASON_NONE);
+        break;
+    }
 }
 
 /*****************************************************************************/
@@ -433,7 +479,7 @@ mm_iface_modem_3gpp_get_type (void)
                                                         &info,
                                                         0);
 
-        g_type_interface_add_prerequisite (iface_modem_3gpp_type, MM_TYPE_BASE_MODEM);
+        g_type_interface_add_prerequisite (iface_modem_3gpp_type, MM_TYPE_IFACE_MODEM);
     }
 
     return iface_modem_3gpp_type;
