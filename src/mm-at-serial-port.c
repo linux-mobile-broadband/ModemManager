@@ -145,6 +145,14 @@ typedef struct {
     GDestroyNotify notify;
 } MMAtUnsolicitedMsgHandler;
 
+static gint
+unsolicited_msg_handler_cmp (MMAtUnsolicitedMsgHandler *handler,
+                             GRegex *regex)
+{
+    return g_strcmp0 (g_regex_get_pattern (handler->regex),
+                      g_regex_get_pattern (regex));
+}
+
 void
 mm_at_serial_port_add_unsolicited_msg_handler (MMAtSerialPort *self,
                                                GRegex *regex,
@@ -152,20 +160,32 @@ mm_at_serial_port_add_unsolicited_msg_handler (MMAtSerialPort *self,
                                                gpointer user_data,
                                                GDestroyNotify notify)
 {
+    GSList *existing;
     MMAtUnsolicitedMsgHandler *handler;
     MMAtSerialPortPrivate *priv;
 
     g_return_if_fail (MM_IS_AT_SERIAL_PORT (self));
     g_return_if_fail (regex != NULL);
 
-    handler = g_slice_new (MMAtUnsolicitedMsgHandler);
-    handler->regex = g_regex_ref (regex);
+    priv = MM_AT_SERIAL_PORT_GET_PRIVATE (self);
+
+    existing = g_slist_find_custom (priv->unsolicited_msg_handlers,
+                                    regex,
+                                    (GCompareFunc)unsolicited_msg_handler_cmp);
+    if (existing) {
+        handler = existing->data;
+        /* We OVERWRITE any existing one, so if any context data existing, free it */
+        if (handler->notify)
+            handler->notify (handler->user_data);
+    } else {
+        handler = g_slice_new (MMAtUnsolicitedMsgHandler);
+        priv->unsolicited_msg_handlers = g_slist_append (priv->unsolicited_msg_handlers, handler);
+        handler->regex = g_regex_ref (regex);
+    }
+
     handler->callback = callback;
     handler->user_data = user_data;
     handler->notify = notify;
-
-    priv = MM_AT_SERIAL_PORT_GET_PRIVATE (self);
-    priv->unsolicited_msg_handlers = g_slist_append (priv->unsolicited_msg_handlers, handler);
 }
 
 static gboolean
