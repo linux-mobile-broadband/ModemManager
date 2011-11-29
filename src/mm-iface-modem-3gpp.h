@@ -65,6 +65,26 @@ struct _MMIfaceModem3gpp {
     gboolean (*setup_ps_registration_finish) (MMIfaceModem3gpp *self,
                                               GAsyncResult *res,
                                               GError **error);
+
+    /* Run CS registration state check.
+     * Note that no registration state is returned, implementations should call
+     * mm_iface_modem_3gpp_update_registration_state(). */
+    void (* run_cs_registration_check) (MMIfaceModem3gpp *self,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data);
+    gboolean (*run_cs_registration_check_finish) (MMIfaceModem3gpp *self,
+                                                  GAsyncResult *res,
+                                                  GError **error);
+
+    /* Run PS registration state check.
+     * Note that no registration state is returned, implementations should call
+     * mm_iface_modem_3gpp_update_registration_state(). */
+    void (* run_ps_registration_check) (MMIfaceModem3gpp *self,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data);
+    gboolean (*run_ps_registration_check_finish) (MMIfaceModem3gpp *self,
+                                                  GAsyncResult *res,
+                                                  GError **error);
 };
 
 GType mm_iface_modem_3gpp_get_type (void);

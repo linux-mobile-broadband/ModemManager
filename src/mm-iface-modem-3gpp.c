@@ -97,7 +97,9 @@ typedef enum {
     ENABLING_STEP_FIRST,
     ENABLING_STEP_SETUP_UNSOLICITED_REGISTRATION,
     ENABLING_STEP_SETUP_CS_REGISTRATION,
+    ENABLING_STEP_RUN_CS_REGISTRATION_CHECK,
     ENABLING_STEP_SETUP_PS_REGISTRATION,
+    ENABLING_STEP_RUN_PS_REGISTRATION_CHECK,
     ENABLING_STEP_LAST
 } EnablingStep;
 
@@ -173,7 +175,9 @@ mm_iface_modem_3gpp_enable_finish (MMIfaceModem3gpp *self,
     }
 
 VOID_REPLY_READY_FN (setup_cs_registration)
+VOID_REPLY_READY_FN (run_cs_registration_check)
 VOID_REPLY_READY_FN (setup_ps_registration)
+VOID_REPLY_READY_FN (run_ps_registration_check)
 VOID_REPLY_READY_FN (setup_unsolicited_registration)
 
 static void
@@ -208,12 +212,36 @@ interface_enabling_step (EnablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
+    case ENABLING_STEP_RUN_CS_REGISTRATION_CHECK:
+        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->run_cs_registration_check &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->run_cs_registration_check_finish) {
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->run_cs_registration_check (
+                ctx->self,
+                (GAsyncReadyCallback)run_cs_registration_check_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
     case ENABLING_STEP_SETUP_PS_REGISTRATION:
         if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_ps_registration &&
             MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_ps_registration_finish) {
             MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_ps_registration (
                 ctx->self,
                 (GAsyncReadyCallback)setup_ps_registration_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_RUN_PS_REGISTRATION_CHECK:
+        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->run_ps_registration_check &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->run_ps_registration_check_finish) {
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->run_ps_registration_check (
+                ctx->self,
+                (GAsyncReadyCallback)run_ps_registration_check_ready,
                 ctx);
             return;
         }
