@@ -94,10 +94,10 @@ handle_list_bearers (MmGdbusModem *object,
 
 /*****************************************************************************/
 
-static void
-update_state (MMIfaceModem *self,
-              MMModemState new_state,
-              MMModemStateReason reason)
+void
+mm_iface_modem_update_state (MMIfaceModem *self,
+                             MMModemState new_state,
+                             MMModemStateReason reason)
 {
     MMModemState old_state = MM_MODEM_STATE_UNKNOWN;
     MmGdbusModem *skeleton = NULL;
@@ -670,17 +670,17 @@ set_lock_status (MMIfaceModem *self,
     if (lock == MM_MODEM_LOCK_NONE) {
         if (old_lock != MM_MODEM_LOCK_NONE) {
             /* Notify transition from UNKNOWN/LOCKED to DISABLED */
-            update_state (self,
-                          MM_MODEM_STATE_DISABLED,
-                          MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+            mm_iface_modem_update_state (self,
+                                         MM_MODEM_STATE_DISABLED,
+                                         MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
             g_idle_add ((GSourceFunc)restart_initialize_idle, self);
         }
     } else {
         if (old_lock == MM_MODEM_LOCK_UNKNOWN) {
             /* Notify transition from UNKNOWN to LOCKED */
-            update_state (self,
-                          MM_MODEM_STATE_LOCKED,
-                          MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+            mm_iface_modem_update_state (self,
+                                         MM_MODEM_STATE_LOCKED,
+                                         MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
         }
     }
 }
@@ -940,9 +940,9 @@ disabling_context_new (MMIfaceModem *self,
                   NULL);
     g_assert (ctx->skeleton != NULL);
 
-    update_state (ctx->self,
-                  MM_MODEM_STATE_DISABLING,
-                  MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
+    mm_iface_modem_update_state (ctx->self,
+                                 MM_MODEM_STATE_DISABLING,
+                                 MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
 
     return ctx;
 }
@@ -953,14 +953,14 @@ disabling_context_complete_and_free (DisablingContext *ctx)
     g_simple_async_result_complete_in_idle (ctx->result);
 
     if (ctx->disabled)
-        update_state (ctx->self,
-                      MM_MODEM_STATE_DISABLED,
-                      MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
+        mm_iface_modem_update_state (ctx->self,
+                                     MM_MODEM_STATE_DISABLED,
+                                     MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
     else
         /* Fallback to previous state */
-        update_state (ctx->self,
-                      ctx->previous_state,
-                      MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+        mm_iface_modem_update_state (ctx->self,
+                                     ctx->previous_state,
+                                     MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
 
     g_object_unref (ctx->self);
     g_object_unref (ctx->primary);
@@ -1137,9 +1137,9 @@ enabling_context_new (MMIfaceModem *self,
                   NULL);
     g_assert (ctx->skeleton != NULL);
 
-    update_state (ctx->self,
-                  MM_MODEM_STATE_ENABLING,
-                  MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
+    mm_iface_modem_update_state (ctx->self,
+                                 MM_MODEM_STATE_ENABLING,
+                                 MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
 
     return ctx;
 }
@@ -1150,16 +1150,17 @@ enabling_context_complete_and_free (EnablingContext *ctx)
     g_simple_async_result_complete_in_idle (ctx->result);
 
     if (ctx->enabled)
-        update_state (ctx->self,
-                      MM_MODEM_STATE_ENABLED,
-                      MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
+        mm_iface_modem_update_state (ctx->self,
+                                     MM_MODEM_STATE_ENABLED,
+                                     MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
     else {
         /* Fallback to DISABLED/LOCKED */
-        update_state (ctx->self,
-                      (mm_gdbus_modem_get_unlock_required (ctx->skeleton) == MM_MODEM_LOCK_NONE ?
-                       MM_MODEM_STATE_DISABLED :
-                       MM_MODEM_STATE_LOCKED),
-                      MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+        mm_iface_modem_update_state (
+            ctx->self,
+            (mm_gdbus_modem_get_unlock_required (ctx->skeleton) == MM_MODEM_LOCK_NONE ?
+             MM_MODEM_STATE_DISABLED :
+             MM_MODEM_STATE_LOCKED),
+            MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
         /* Close the port if enabling failed */
         if (ctx->primary_open)
             mm_serial_port_close_force (MM_SERIAL_PORT (ctx->primary));
