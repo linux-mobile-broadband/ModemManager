@@ -49,6 +49,7 @@ static void interface_enabling_step (EnablingContext *ctx);
 
 typedef enum {
     ENABLING_STEP_FIRST,
+    ENABLING_STEP_SETUP_UNSOLICITED_REGISTRATION,
     ENABLING_STEP_SETUP_CS_REGISTRATION,
     ENABLING_STEP_SETUP_PS_REGISTRATION,
     ENABLING_STEP_LAST
@@ -127,12 +128,25 @@ mm_iface_modem_3gpp_enable_finish (MMIfaceModem3gpp *self,
 
 VOID_REPLY_READY_FN (setup_cs_registration)
 VOID_REPLY_READY_FN (setup_ps_registration)
+VOID_REPLY_READY_FN (setup_unsolicited_registration)
 
 static void
 interface_enabling_step (EnablingContext *ctx)
 {
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_SETUP_UNSOLICITED_REGISTRATION:
+        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_unsolicited_registration &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_unsolicited_registration_finish) {
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_unsolicited_registration (
+                ctx->self,
+                (GAsyncReadyCallback)setup_unsolicited_registration_ready,
+                ctx);
+            return;
+        }
         /* Fall down to next step */
         ctx->step++;
 
