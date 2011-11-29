@@ -478,9 +478,9 @@ test_creg_match (const char *test,
 {
     int i;
     GMatchInfo *info  = NULL;
-    guint32 state = 0;
+    MMModem3gppRegistrationState state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    MMModemAccessTech access_tech = MM_MODEM_ACCESS_TECH_UNKNOWN;
     gulong lac = 0, ci = 0;
-    gint access_tech = -1;
     GError *error = NULL;
     gboolean success, cgreg = FALSE;
     guint regex_num = 0;
@@ -1323,4 +1323,3 @@ int main (int argc, char **argv)
 
     return result;
 }
-
