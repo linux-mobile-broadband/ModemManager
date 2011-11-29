@@ -32,6 +32,7 @@
 #include "mm-sim.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
+#include "mm-error-helpers.h"
 
 #define MM_MODEM_CAPABILITY_3GPP        \
     (MM_MODEM_CAPABILITY_GSM_UMTS |     \
@@ -68,6 +69,9 @@ struct _MMBroadbandModemPrivate {
     GPtrArray *reg_regex;
     MMModem3gppRegistrationState reg_cs;
     MMModem3gppRegistrationState reg_ps;
+    gboolean manual_reg;
+    guint pending_reg_id;
+    GSimpleAsyncResult *pending_reg_request;
 };
 
 static gboolean
@@ -85,6 +89,22 @@ common_parse_string_reply (MMBroadbandModem *self,
     }
 
     *result = g_variant_new_string (response);
+    return TRUE;
+}
+
+static gboolean
+common_parse_no_reply (MMBroadbandModem *self,
+                       gpointer none,
+                       const gchar *command,
+                       const gchar *response,
+                       const GError *error,
+                       GVariant **result,
+                       GError **result_error)
+{
+    if (error) {
+        *result_error = g_error_copy (error);
+        return FALSE;
+    }
     return TRUE;
 }
 
@@ -1145,6 +1165,9 @@ load_imei (MMIfaceModem3gpp *self,
 /*****************************************************************************/
 /* Unsolicited registration messages handling (3GPP) */
 
+static void clear_previous_registration_request (MMBroadbandModem *self,
+                                                 gboolean complete_with_cancel);
+
 static MMModem3gppRegistrationState
 get_consolidated_reg_state (MMBroadbandModem *self)
 {
@@ -1211,14 +1234,11 @@ reg_state_changed (MMAtSerialPort *port,
     mm_iface_modem_3gpp_update_registration_state (MM_IFACE_MODEM_3GPP (self),
                                                    get_consolidated_reg_state (self));
 
-    /* /\* If registration is finished (either registered or failed) but the */
-    /*  * registration query hasn't completed yet, just remove the timeout and */
-    /*  * let the registration query complete. */
-    /*  *\/ */
-    /* if (priv->pending_reg_id) { */
-    /*     g_source_remove (priv->pending_reg_id); */
-    /*     priv->pending_reg_id = 0; */
-    /* } */
+    /* If registration is finished (either registered or failed) but the
+     * registration query hasn't completed yet, just remove the timeout and
+     * let the registration query complete by itself.
+     */
+    clear_previous_registration_request (self, FALSE);
 
     /* TODO: report LAC/CI location */
     /* update_lac_ci (self, lac, cell_id, cgreg ? 1 : 0); */
@@ -1270,6 +1290,233 @@ setup_unsolicited_registration (MMIfaceModem3gpp *self,
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
+}
+
+/*****************************************************************************/
+/* Register in network (3GPP) */
+
+static void run_all_registration_checks_ready (MMBroadbandModem *self,
+                                               GAsyncResult *res,
+                                               GSimpleAsyncResult *operation_result);
+
+static gboolean
+register_in_network_finish (MMIfaceModem3gpp *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+#define REG_IS_IDLE(state)                                  \
+    (state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||      \
+     state == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING || \
+     state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
+
+#define REG_IS_DONE(state)                                  \
+    (state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||      \
+     state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING ||   \
+     state == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED)
+
+static void
+clear_previous_registration_request (MMBroadbandModem *self,
+                                     gboolean complete_with_cancel)
+{
+
+    if (self->priv->pending_reg_id) {
+        /* Clear the registration timeout handler */
+        g_source_remove (self->priv->pending_reg_id);
+        self->priv->pending_reg_id = 0;
+    }
+
+    if (self->priv->pending_reg_request) {
+        if (complete_with_cancel) {
+            g_simple_async_result_set_error (self->priv->pending_reg_request,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_CANCELLED,
+                                             "New registration request to be processed");
+            g_simple_async_result_complete_in_idle (self->priv->pending_reg_request);
+        }
+        g_object_unref (self->priv->pending_reg_request);
+        self->priv->pending_reg_request = NULL;
+    }
+}
+
+static gboolean
+register_in_network_timed_out (MMBroadbandModem *self)
+{
+    g_assert (self->priv->pending_reg_request != NULL);
+
+    /* Report IDLE registration state */
+    mm_iface_modem_3gpp_update_registration_state (MM_IFACE_MODEM_3GPP (self),
+                                                   MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
+
+    g_simple_async_result_take_error (
+        self->priv->pending_reg_request,
+        mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT));
+    g_simple_async_result_complete (self->priv->pending_reg_request);
+    g_object_unref (self->priv->pending_reg_request);
+    self->priv->pending_reg_request = NULL;
+    self->priv->pending_reg_id = 0;
+    return FALSE;
+}
+
+static gboolean
+run_all_registration_checks_again (GSimpleAsyncResult *operation_result)
+{
+    MMBroadbandModem *self;
+
+    self = MM_BROADBAND_MODEM (g_async_result_get_source_object (G_ASYNC_RESULT (operation_result)));
+
+    /* If the registration timed out (and thus pending_reg_info will be NULL)
+     * and the modem eventually got around to sending the response for the
+     * registration request then just ignore the response since the callback is
+     * already called.
+     */
+    if (!self->priv->pending_reg_request)
+        g_object_unref (operation_result);
+    else
+        /* Get fresh registration state */
+        mm_iface_modem_3gpp_run_all_registration_checks (
+            MM_IFACE_MODEM_3GPP (self),
+            (GAsyncReadyCallback)run_all_registration_checks_ready,
+            operation_result);
+    g_object_unref (self);
+    return FALSE;
+}
+
+static void
+run_all_registration_checks_ready (MMBroadbandModem *self,
+                                   GAsyncResult *res,
+                                   GSimpleAsyncResult *operation_result)
+{
+    GError *error = NULL;
+
+    mm_iface_modem_3gpp_run_all_registration_checks_finish (MM_IFACE_MODEM_3GPP (self),
+                                                            res,
+                                                            &error);
+
+    /* If the registration timed out (and thus pending_reg_info will be NULL)
+     * and the modem eventually got around to sending the response for the
+     * registration request then just ignore the response since the callback is
+     * already called.
+     */
+    if (!self->priv->pending_reg_request) {
+        g_object_unref (operation_result);
+        g_clear_error (&error);
+        return;
+    }
+
+    if (error)
+        g_simple_async_result_take_error (operation_result, error);
+    else if (REG_IS_DONE (self->priv->modem_3gpp_registration_state))
+        g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
+    else {
+        /* If we're still waiting for automatic registration to complete or
+         * fail, check again in a few seconds.
+         */
+        g_timeout_add_seconds (1,
+                               (GSourceFunc)run_all_registration_checks_again,
+                               operation_result);
+        return;
+    }
+
+    g_simple_async_result_complete (operation_result);
+    clear_previous_registration_request (self, FALSE);
+    g_object_unref (operation_result);
+}
+
+static void
+register_in_network_ready (MMBroadbandModem *self,
+                           GAsyncResult *res,
+                           GSimpleAsyncResult *operation_result)
+{
+    GError *error = NULL;
+
+    mm_at_command_finish (G_OBJECT (self), res, &error);
+
+    /* If the registration timed out (and thus pending_reg_info will be NULL)
+     * and the modem eventually got around to sending the response for the
+     * registration request then just ignore the response since the callback is
+     * already called.
+     */
+    if (!self->priv->pending_reg_request) {
+        g_object_unref (operation_result);
+        g_clear_error (&error);
+        return;
+    }
+
+    if (error) {
+        /* Propagate error in COPS, if any */
+        g_simple_async_result_take_error (operation_result, error);
+        g_simple_async_result_complete (operation_result);
+        clear_previous_registration_request (self, FALSE);
+        g_object_unref (operation_result);
+        return;
+    }
+
+    /* Get fresh registration state */
+    mm_iface_modem_3gpp_run_all_registration_checks (
+        MM_IFACE_MODEM_3GPP (self),
+        (GAsyncReadyCallback)run_all_registration_checks_ready,
+        operation_result);
+}
+
+static void
+register_in_network (MMIfaceModem3gpp *self,
+                     const gchar *network_id,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    MMBroadbandModem *broadband = MM_BROADBAND_MODEM (self);
+    GSimpleAsyncResult *result;
+    gchar *command = NULL;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        register_in_network);
+
+    /* Cleanup any previous registration, completing it with a cancelled error */
+    clear_previous_registration_request (broadband, TRUE);
+
+    /* Setup timeout */
+    broadband->priv->pending_reg_id =
+        g_timeout_add_seconds (60,
+                               (GSourceFunc)register_in_network_timed_out,
+                               self);
+    broadband->priv->pending_reg_request = g_object_ref (result);
+
+    /* If the user sent a specific network to use, lock it in. */
+    if (network_id && network_id[0]) {
+        command = g_strdup_printf ("+COPS=1,2,\"%s\"", network_id);
+        broadband->priv->manual_reg = TRUE;
+    }
+    /* If no specific network was given, and the modem is not registered and not
+     * searching, kick it to search for a network. Also do auto registration if
+     * the modem had been set to manual registration last time but now is not.
+     */
+    else if (REG_IS_IDLE (broadband->priv->modem_3gpp_registration_state) ||
+             broadband->priv->manual_reg) {
+        command = g_strdup ("+COPS=0,,");
+        broadband->priv->manual_reg = FALSE;
+    } else
+        mm_dbg ("Not launching any new network selection request");
+
+    if (command) {
+        mm_at_command (G_OBJECT (self),
+                       mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                       command,
+                       120,
+                       (MMAtResponseProcessor)common_parse_no_reply,
+                       NULL, /* response processor context */
+                       NULL, /* reply signature */
+                       NULL, /* cancellable */
+                       (GAsyncReadyCallback)register_in_network_ready,
+                       result);
+    } else
+        /* Just rely on the unsolicited registration, periodic registration
+         * checks or the timeout. */
+        g_object_unref (result);
 }
 
 /*****************************************************************************/
@@ -2131,6 +2378,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->setup_ps_registration_finish = setup_ps_registration_finish;
     iface->run_ps_registration_check = run_ps_registration_check;
     iface->run_ps_registration_check_finish = run_ps_registration_check_finish;
+    iface->register_in_network = register_in_network;
+    iface->register_in_network_finish = register_in_network_finish;
 }
 
 static void
