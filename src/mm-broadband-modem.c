@@ -63,6 +63,11 @@ struct _MMBroadbandModemPrivate {
     MMModemState modem_state;
     MMModemCapability modem_current_capabilities;
     MMModem3gppRegistrationState modem_3gpp_registration_state;
+
+    /* 3GPP registration helpers */
+    GPtrArray *reg_regex;
+    MMModem3gppRegistrationState reg_cs;
+    MMModem3gppRegistrationState reg_ps;
 };
 
 static gboolean
@@ -1140,6 +1145,31 @@ load_imei (MMIfaceModem3gpp *self,
 /*****************************************************************************/
 /* Unsolicited registration messages handling (3GPP) */
 
+static MMModem3gppRegistrationState
+get_consolidated_reg_state (MMBroadbandModem *self)
+{
+    /* Some devices (Blackberries for example) will respond to +CGREG, but
+     * return ERROR for +CREG, probably because their firmware is just stupid.
+     * So here we prefer the +CREG response, but if we never got a successful
+     * +CREG response, we'll take +CGREG instead.
+     */
+    if (self->priv->reg_cs == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+        self->priv->reg_cs == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
+        return self->priv->reg_cs;
+
+    if (self->priv->reg_ps == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+        self->priv->reg_ps == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
+        return self->priv->reg_ps;
+
+    if (self->priv->reg_cs == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING)
+        return self->priv->reg_cs;
+
+    if (self->priv->reg_ps == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING)
+        return self->priv->reg_ps;
+
+    return self->priv->reg_cs;
+}
+
 static gboolean
 setup_unsolicited_registration_finish (MMIfaceModem3gpp *self,
                                        GAsyncResult *res,
@@ -1155,7 +1185,7 @@ reg_state_changed (MMAtSerialPort *port,
 {
     MMModem3gppRegistrationState state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     gulong lac = 0, cell_id = 0;
-    gint act = -1;
+    MMModemAccessTech act = MM_MODEM_ACCESS_TECH_UNKNOWN;
     gboolean cgreg = FALSE;
     GError *error = NULL;
 
@@ -1172,8 +1202,14 @@ reg_state_changed (MMAtSerialPort *port,
         return;
     }
 
+    if (cgreg)
+        self->priv->reg_ps = state;
+    else
+        self->priv->reg_cs = state;
+
     /* Report new registration state */
-    mm_iface_modem_3gpp_update_registration_state (MM_IFACE_MODEM_3GPP (self), state);
+    mm_iface_modem_3gpp_update_registration_state (MM_IFACE_MODEM_3GPP (self),
+                                                   get_consolidated_reg_state (self));
 
     /* /\* If registration is finished (either registered or failed) but the */
     /*  * registration query hasn't completed yet, just remove the timeout and */
@@ -1234,6 +1270,170 @@ setup_unsolicited_registration (MMIfaceModem3gpp *self,
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
+}
+
+/*****************************************************************************/
+/* CS and PS Registration checks (3GPP) */
+
+static gboolean
+run_cs_registration_check_finish (MMIfaceModem3gpp *self,
+                                  GAsyncResult *res,
+                                  GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static gboolean
+run_ps_registration_check_finish (MMIfaceModem3gpp *self,
+                                  GAsyncResult *res,
+                                  GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+registration_status_check_ready (MMBroadbandModem *self,
+                                 GAsyncResult *res,
+                                 GSimpleAsyncResult *operation_result)
+{
+    GVariant *response_variant;
+    const gchar *response = NULL;
+    GError *error = NULL;
+
+    response_variant = mm_at_command_finish (G_OBJECT (self), res, &error);
+    if (response_variant)
+        response = g_variant_get_string (response_variant, NULL);
+
+    if (!response) {
+        g_assert (error != NULL);
+        g_simple_async_result_take_error (operation_result, error);
+    }
+    /* Unsolicited registration status handlers will usually process the
+     * response for us, but just in case they don't, do that here.
+     */
+    else if (!response[0])
+        /* Done */
+        g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
+    else {
+        GMatchInfo *match_info;
+        guint i;
+
+        /* Try to match the response */
+        for (i = 0; i < self->priv->reg_regex->len; i++) {
+            if (g_regex_match ((GRegex *)g_ptr_array_index (self->priv->reg_regex, i),
+                               response,
+                               0,
+                               &match_info))
+                break;
+            g_match_info_free (match_info);
+            match_info = NULL;
+        }
+
+        if (!match_info) {
+            g_simple_async_result_set_error (operation_result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Unknown registration status response: '%s'",
+                                             response);
+        } else {
+            GError *inner_error = NULL;
+            gboolean parsed;
+            gboolean cgreg = FALSE;
+            MMModem3gppRegistrationState state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+            MMModemAccessTech act = MM_MODEM_ACCESS_TECH_UNKNOWN;
+            gulong lac = 0;
+            gulong cid = 0;
+
+            parsed = mm_gsm_parse_creg_response (match_info,
+                                                 &state,
+                                                 &lac,
+                                                 &cid,
+                                                 &act,
+                                                 &cgreg,
+                                                 &inner_error);
+            g_match_info_free (match_info);
+
+            if (!parsed) {
+                if (inner_error)
+                    g_simple_async_result_take_error (operation_result, inner_error);
+                else
+                    g_simple_async_result_set_error (operation_result,
+                                                     MM_CORE_ERROR,
+                                                     MM_CORE_ERROR_FAILED,
+                                                     "Error parsing registration response: '%s'",
+                                                     response);
+            } else {
+                if (cgreg)
+                    self->priv->reg_ps = state;
+                else
+                    self->priv->reg_cs = state;
+
+                /* Report new registration state */
+                mm_iface_modem_3gpp_update_registration_state (MM_IFACE_MODEM_3GPP (self),
+                                                               get_consolidated_reg_state (self));
+
+                /* TODO: report LAC/CI location */
+                /* TODO: report access technology, if available */
+
+                g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
+            }
+        }
+    }
+
+    if (response_variant)
+        g_variant_unref (response_variant);
+    g_simple_async_result_complete (operation_result);
+    g_object_unref (operation_result);
+}
+
+static void
+run_cs_registration_check (MMIfaceModem3gpp *self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        run_cs_registration_check);
+
+    /* Check current CS-registration state. */
+    mm_at_command (G_OBJECT (self),
+                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                   "+CREG?",
+                   10,
+                   (MMAtResponseProcessor)common_parse_string_reply,
+                   NULL, /* response processor context */
+                   "s",  /* raw reply */
+                   NULL, /* cancellable */
+                   (GAsyncReadyCallback)registration_status_check_ready,
+                   result);
+}
+
+static void
+run_ps_registration_check (MMIfaceModem3gpp *self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        run_ps_registration_check);
+
+    /* Check current PS-registration state. */
+    mm_at_command (G_OBJECT (self),
+                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                   "+CGREG?",
+                   10,
+                   (MMAtResponseProcessor)common_parse_string_reply,
+                   NULL, /* response processor context */
+                   "s",  /* raw reply */
+                   NULL, /* cancellable */
+                   (GAsyncReadyCallback)registration_status_check_ready,
+                   result);
 }
 
 /*****************************************************************************/
@@ -1480,6 +1680,7 @@ enable_finish (MMBaseModem *self,
                                         &error)) {                      \
             g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (ctx->result), error); \
             enabling_context_complete_and_free (ctx);                   \
+            return;                                                     \
         }                                                               \
                                                                         \
         /* Go on to next step */                                        \
@@ -1515,7 +1716,6 @@ enabling_step (EnablingContext *ctx)
                                         ctx);
             return;
         }
-
         /* Fall down to next step */
         ctx->step++;
 
@@ -1852,6 +2052,20 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv->modem_state = MM_MODEM_STATE_UNKNOWN;
     self->priv->modem_current_capabilities = MM_MODEM_CAPABILITY_NONE;
     self->priv->modem_3gpp_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    self->priv->reg_regex = mm_gsm_creg_regex_get (TRUE);
+    self->priv->reg_cs = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    self->priv->reg_ps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+}
+
+static void
+finalize (GObject *object)
+{
+    MMBroadbandModem *self = MM_BROADBAND_MODEM (object);
+
+    if (self->priv->reg_regex)
+        mm_gsm_creg_regex_destroy (self->priv->reg_regex);
+
+    G_OBJECT_CLASS (mm_broadband_modem_parent_class)->finalize (object);
 }
 
 static void
@@ -1911,8 +2125,12 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->setup_unsolicited_registration_finish = setup_unsolicited_registration_finish;
     iface->setup_cs_registration = setup_cs_registration;
     iface->setup_cs_registration_finish = setup_cs_registration_finish;
+    iface->run_cs_registration_check = run_cs_registration_check;
+    iface->run_cs_registration_check_finish = run_cs_registration_check_finish;
     iface->setup_ps_registration = setup_ps_registration;
     iface->setup_ps_registration_finish = setup_ps_registration_finish;
+    iface->run_ps_registration_check = run_ps_registration_check;
+    iface->run_ps_registration_check_finish = run_ps_registration_check_finish;
 }
 
 static void
@@ -1927,6 +2145,7 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     object_class->set_property = set_property;
     object_class->get_property = get_property;
     object_class->dispose = dispose;
+    object_class->finalize = finalize;
 
     base_modem_class->initialize = initialize;
     base_modem_class->initialize_finish = initialize_finish;
