@@ -673,7 +673,9 @@ set_lock_status (MMIfaceModem *self,
             mm_iface_modem_update_state (self,
                                          MM_MODEM_STATE_DISABLED,
                                          MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
-            g_idle_add ((GSourceFunc)restart_initialize_idle, self);
+            /* Only restart initialization if going from LOCKED to DISABLED */
+            if (old_lock != MM_MODEM_LOCK_UNKNOWN)
+                g_idle_add ((GSourceFunc)restart_initialize_idle, self);
         }
     } else {
         if (old_lock == MM_MODEM_LOCK_UNKNOWN) {
