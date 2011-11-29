@@ -37,7 +37,7 @@ GPtrArray *mm_gsm_creg_regex_get (gboolean solicited);
 void mm_gsm_creg_regex_destroy (GPtrArray *array);
 
 gboolean mm_gsm_parse_creg_response (GMatchInfo *info,
-                                     guint32 *out_reg_state,
+                                     MMModem3gppRegistrationState *out_reg_state,
                                      gulong *out_lac,
                                      gulong *out_ci,
                                      gint *out_act,
@@ -86,4 +86,3 @@ gint        cind_response_get_max       (CindResponse *r);
 GByteArray *mm_parse_cind_query_response(const char *reply, GError **error);
 
 #endif  /* MM_MODEM_HELPERS_H */
-

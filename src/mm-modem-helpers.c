@@ -373,7 +373,7 @@ item_is_lac_not_stat (GMatchInfo *info, guint32 item)
 
 gboolean
 mm_gsm_parse_creg_response (GMatchInfo *info,
-                            guint32 *out_reg_state,
+                            MMModem3gppRegistrationState *out_reg_state,
                             gulong *out_lac,
                             gulong *out_ci,
                             gint *out_act,
@@ -485,8 +485,14 @@ mm_gsm_parse_creg_response (GMatchInfo *info,
             act = -1;
     }
 
-    *out_reg_state = (guint32) stat;
-    if (stat != 4) {
+    /* 'roaming' is the last valid state */
+    if (stat > MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
+        mm_warn ("Registration State '%lu' is unknown", stat);
+        stat = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    }
+
+    *out_reg_state = (MMModem3gppRegistrationState) stat;
+    if (stat != MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN) {
         /* Don't fill in lac/ci/act if the device's state is unknown */
         *out_lac = lac;
         *out_ci = ci;
