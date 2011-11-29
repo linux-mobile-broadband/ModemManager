@@ -175,24 +175,12 @@ run_enable (MMIfaceModem *self,
         g_assert_not_reached ();
         break;
 
-    case MM_MODEM_STATE_LOCKED: {
-        MMModemLock lock;
-
-        lock = mm_gdbus_modem_get_unlock_required (skeleton);
-        /* We don't care about SIM-PIN2/SIM-PUK2 since the device is
-         * operational without it. */
-        if (lock != MM_MODEM_LOCK_NONE &&
-            lock != MM_MODEM_LOCK_SIM_PIN2 &&
-            lock != MM_MODEM_LOCK_SIM_PUK2) {
-            g_dbus_method_invocation_return_error (invocation,
-                                                   MM_CORE_ERROR,
-                                                   MM_CORE_ERROR_WRONG_STATE,
-                                                   "Cannot enable modem: device locked");
-            break;
-        }
-
-        /* Fall through, treat as disabled */
-    }
+    case MM_MODEM_STATE_LOCKED:
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot enable modem: device locked");
+        break;
 
     case MM_MODEM_STATE_DISABLED:
         MM_BASE_MODEM_GET_CLASS (self)->enable (MM_BASE_MODEM (self),
@@ -667,7 +655,11 @@ set_lock_status (MMIfaceModem *self,
     old_lock = mm_gdbus_modem_get_unlock_required (skeleton);
     mm_gdbus_modem_set_unlock_required (skeleton, lock);
 
-    if (lock == MM_MODEM_LOCK_NONE) {
+    /* We don't care about SIM-PIN2/SIM-PUK2 since the device is
+     * operational without it. */
+    if (lock == MM_MODEM_LOCK_NONE ||
+        lock == MM_MODEM_LOCK_SIM_PIN2 ||
+        lock == MM_MODEM_LOCK_SIM_PUK2) {
         if (old_lock != MM_MODEM_LOCK_NONE) {
             /* Notify transition from UNKNOWN/LOCKED to DISABLED */
             mm_iface_modem_update_state (self,
