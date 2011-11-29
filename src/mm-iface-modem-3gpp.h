@@ -85,6 +85,15 @@ struct _MMIfaceModem3gpp {
     gboolean (*run_ps_registration_check_finish) (MMIfaceModem3gpp *self,
                                                   GAsyncResult *res,
                                                   GError **error);
+
+    /* Try to register in the network */
+    void (* register_in_network) (MMIfaceModem3gpp *self,
+                                  const gchar *network_id,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data);
+    gboolean (*register_in_network_finish) (MMIfaceModem3gpp *self,
+                                            GAsyncResult *res,
+                                            GError **error);
 };
 
 GType mm_iface_modem_3gpp_get_type (void);

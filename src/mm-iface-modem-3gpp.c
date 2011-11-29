@@ -24,7 +24,54 @@
 #include "mm-base-modem.h"
 #include "mm-log.h"
 
+typedef struct {
+    MmGdbusModem3gpp *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModem3gpp *self;
+} DbusCallContext;
+
+static void
+dbus_call_context_free (DbusCallContext *ctx)
+{
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static DbusCallContext *
+dbus_call_context_new (MmGdbusModem3gpp *skeleton,
+                       GDBusMethodInvocation *invocation,
+                       MMIfaceModem3gpp *self)
+{
+    DbusCallContext *ctx;
+
+    ctx = g_new (DbusCallContext, 1);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+    return ctx;
+}
+
 /*****************************************************************************/
+
+static void
+register_in_network_ready (MMIfaceModem3gpp *self,
+                           GAsyncResult *res,
+                           DbusCallContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network_finish (self,
+                                                                               res,
+                                                                               &error))
+        g_dbus_method_invocation_take_error (ctx->invocation,
+                                             error);
+    else
+        mm_gdbus_modem3gpp_complete_register (ctx->skeleton,
+                                               ctx->invocation);
+    dbus_call_context_free (ctx);
+}
 
 static gboolean
 handle_register (MmGdbusModem3gpp *skeleton,
@@ -32,7 +79,70 @@ handle_register (MmGdbusModem3gpp *skeleton,
                  const gchar *arg_network_id,
                  MMIfaceModem3gpp *self)
 {
-    return FALSE; /* Currently unhandled */
+    MMModemState modem_state;
+
+    g_assert (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network != NULL);
+    g_assert (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network_finish != NULL);
+
+    modem_state = MM_MODEM_STATE_UNKNOWN;
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+
+    switch (modem_state) {
+    case MM_MODEM_STATE_UNKNOWN:
+        /* We should never have a UNKNOWN->REGISTERED transition */
+        g_assert_not_reached ();
+        break;
+
+    case MM_MODEM_STATE_LOCKED:
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot register modem: device locked");
+        break;
+
+    case MM_MODEM_STATE_ENABLED:
+    case MM_MODEM_STATE_SEARCHING:
+    case MM_MODEM_STATE_REGISTERED:
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network (
+            self,
+            arg_network_id,
+            (GAsyncReadyCallback)register_in_network_ready,
+            dbus_call_context_new (skeleton,
+                                   invocation,
+                                   self));
+        break;
+
+    case MM_MODEM_STATE_DISABLING:
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot register modem: "
+                                               "currently being disabled");
+        break;
+
+    case MM_MODEM_STATE_ENABLING:
+    case MM_MODEM_STATE_DISABLED:
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot register modem: "
+                                               "not yet enabled");
+        break;
+
+    case MM_MODEM_STATE_DISCONNECTING:
+    case MM_MODEM_STATE_CONNECTING:
+    case MM_MODEM_STATE_CONNECTED:
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot register modem: "
+                                               "modem is connected");
+        break;
+    }
+
+    return TRUE;
 }
 
 static gboolean
