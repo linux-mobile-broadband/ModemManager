@@ -27,6 +27,7 @@
 #define MM_IFACE_MODEM_3GPP_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_3GPP, MMIfaceModem3gpp))
 
 #define MM_IFACE_MODEM_3GPP_DBUS_SKELETON        "iface-modem-3gpp-dbus-skeleton"
+#define MM_IFACE_MODEM_3GPP_REGISTRATION_STATE   "iface-modem-3gpp-registration-state"
 
 typedef struct _MMIfaceModem3gpp MMIfaceModem3gpp;
 

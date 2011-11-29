@@ -349,13 +349,18 @@ mm_iface_modem_3gpp_initialize (MMIfaceModem3gpp *self,
 
         /* Set all initial property defaults */
         mm_gdbus_modem3gpp_set_imei (skeleton, NULL);
-        mm_gdbus_modem3gpp_set_registration_state (skeleton, MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
         mm_gdbus_modem3gpp_set_operator_code (skeleton, NULL);
         mm_gdbus_modem3gpp_set_operator_name (skeleton, NULL);
         mm_gdbus_modem3gpp_set_enabled_facility_locks (skeleton, MM_MODEM_3GPP_FACILITY_NONE);
 
+        /* Bind our RegistrationState property */
+        g_object_bind_property (self, MM_IFACE_MODEM_3GPP_REGISTRATION_STATE,
+                                skeleton, "registration-state",
+                                G_BINDING_DEFAULT);
+
         g_object_set (self,
                       MM_IFACE_MODEM_3GPP_DBUS_SKELETON, skeleton,
+                      MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN,
                       NULL);
     }
 
@@ -398,6 +403,15 @@ iface_modem_3gpp_init (gpointer g_iface)
                               "DBus skeleton for the 3GPP interface",
                               MM_GDBUS_TYPE_MODEM3GPP_SKELETON,
                               G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_enum (MM_IFACE_MODEM_3GPP_REGISTRATION_STATE,
+                            "RegistrationState",
+                            "Registration state of the modem",
+                            MM_TYPE_MODEM_3GPP_REGISTRATION_STATE,
+                            MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN,
+                            G_PARAM_READWRITE));
 
     initialized = TRUE;
 }
