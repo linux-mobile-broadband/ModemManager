@@ -31,6 +31,7 @@
 #include "mm-at-serial-port.h"
 #include "mm-qcdm-serial-port.h"
 #include "mm-serial-parsers.h"
+#include "mm-modem-helpers.h"
 
 G_DEFINE_ABSTRACT_TYPE (MMBaseModem, mm_base_modem, MM_GDBUS_TYPE_OBJECT_SKELETON);
 
@@ -221,6 +222,9 @@ mm_base_modem_grab_port (MMBaseModem *self,
             if (!self->priv->qcdm)
                 self->priv->qcdm = g_object_ref (port);
         } else {
+            GPtrArray *array;
+            int i;
+
             /* AT port */
             port = MM_PORT (mm_at_serial_port_new (name, ptype));
 
@@ -230,19 +234,18 @@ mm_base_modem_grab_port (MMBaseModem *self,
                                                    mm_serial_parser_v1_new (),
                                                    mm_serial_parser_v1_destroy);
 
+            /* Set up CREG unsolicited message handlers, with NULL callbacks */
+            array = mm_gsm_creg_regex_get (FALSE);
+            for (i = 0; i < array->len; i++) {
+                mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port),
+                                                               (GRegex *)g_ptr_array_index (array, i),
+                                                               NULL,
+                                                               NULL,
+                                                               NULL);
+            }
+            mm_gsm_creg_regex_destroy (array);
+
             /* { */
-            /*     GRegex *regex; */
-            /*     GPtrArray *array; */
-            /*     gint i; */
-
-            /*     /\* Set up CREG unsolicited message handlers *\/ */
-            /*     array = mm_gsm_creg_regex_get (FALSE); */
-            /*     for (i = 0; i < array->len; i++) { */
-            /*         regex = g_ptr_array_index (array, i); */
-            /*         mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, reg_state_changed, self, NULL); */
-            /*     } */
-            /*     mm_gsm_creg_regex_destroy (array); */
-
             /*     regex = g_regex_new ("\\r\\n\\+CIEV: (\\d+),(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL); */
             /*     mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, ciev_received, self, NULL); */
             /*     g_regex_unref (regex); */
