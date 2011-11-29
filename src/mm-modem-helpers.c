@@ -51,6 +51,32 @@ save_scan_value (GHashTable *hash, const char *key, GMatchInfo *info, guint32 nu
     char *quoted;
     size_t len;
 
+static MMModemAccessTech
+get_mm_access_tech_from_etsi_access_tech (guint act)
+{
+    /* See ETSI TS 27.007 */
+    switch (act) {
+    case 0:
+        return MM_MODEM_ACCESS_TECH_GSM;
+    case 1:
+        return MM_MODEM_ACCESS_TECH_GSM_COMPACT;
+    case 2:
+        return MM_MODEM_ACCESS_TECH_UMTS;
+    case 3:
+        return MM_MODEM_ACCESS_TECH_EDGE;
+    case 4:
+        return MM_MODEM_ACCESS_TECH_HSDPA;
+    case 5:
+        return MM_MODEM_ACCESS_TECH_HSUPA;
+    case 6:
+        return MM_MODEM_ACCESS_TECH_HSPA;
+    case 7:
+        return MM_MODEM_ACCESS_TECH_LTE;
+    default:
+        return MM_MODEM_ACCESS_TECH_UNKNOWN;
+    }
+}
+
     g_return_if_fail (info != NULL);
 
     quoted = g_match_info_fetch (info, num);
@@ -376,7 +402,7 @@ mm_gsm_parse_creg_response (GMatchInfo *info,
                             MMModem3gppRegistrationState *out_reg_state,
                             gulong *out_lac,
                             gulong *out_ci,
-                            gint *out_act,
+                            MMModemAccessTech *out_act,
                             gboolean *out_cgreg,
                             GError **error)
 {
@@ -496,7 +522,8 @@ mm_gsm_parse_creg_response (GMatchInfo *info,
         /* Don't fill in lac/ci/act if the device's state is unknown */
         *out_lac = lac;
         *out_ci = ci;
-        *out_act = act;
+
+        *out_act = get_mm_access_tech_from_etsi_access_tech (act);
     }
     return TRUE;
 }

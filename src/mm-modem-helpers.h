@@ -40,7 +40,7 @@ gboolean mm_gsm_parse_creg_response (GMatchInfo *info,
                                      MMModem3gppRegistrationState *out_reg_state,
                                      gulong *out_lac,
                                      gulong *out_ci,
-                                     gint *out_act,
+                                     MMModemAccessTech *out_act,
                                      gboolean *out_cgreg,
                                      GError **error);
 
