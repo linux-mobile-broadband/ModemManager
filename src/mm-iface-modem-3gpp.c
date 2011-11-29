@@ -155,6 +155,111 @@ handle_scan (MmGdbusModem3gpp *skeleton,
 
 /*****************************************************************************/
 
+typedef struct {
+    GSimpleAsyncResult *result;
+    gboolean cs_done;
+    GError *cs_reg_error;
+    GError *ps_reg_error;
+} RunAllRegistrationChecksContext;
+
+static void
+run_all_registration_checks_context_complete_and_free (RunAllRegistrationChecksContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_clear_error (&ctx->cs_reg_error);
+    g_clear_error (&ctx->ps_reg_error);
+    g_object_unref (ctx->result);
+    g_free (ctx);
+}
+
+gboolean
+mm_iface_modem_3gpp_run_all_registration_checks_finish (MMIfaceModem3gpp *self,
+                                                        GAsyncResult *res,
+                                                        GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+run_ps_registration_check_ready (MMIfaceModem3gpp *self,
+                                 GAsyncResult *res,
+                                 RunAllRegistrationChecksContext *ctx)
+{
+    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_ps_registration_check_finish (self, res, &ctx->ps_reg_error);
+
+    /* If both CS and PS registration checks returned errors we fail */
+    if (ctx->ps_reg_error &&
+        (ctx->cs_reg_error || !ctx->cs_done))
+        /* Prefer the PS error */
+        g_simple_async_result_set_from_error (ctx->result, ctx->ps_reg_error);
+    else
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    run_all_registration_checks_context_complete_and_free (ctx);
+}
+
+static void
+run_cs_registration_check_ready (MMIfaceModem3gpp *self,
+                                 GAsyncResult *res,
+                                 RunAllRegistrationChecksContext *ctx)
+{
+    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_cs_registration_check_finish (self, res, &ctx->cs_reg_error);
+
+    if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_ps_registration_check &&
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_ps_registration_check_finish) {
+        ctx->cs_done = TRUE;
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_ps_registration_check (
+            self,
+            (GAsyncReadyCallback)run_ps_registration_check_ready,
+            ctx);
+        return;
+    }
+
+    /* All done */
+    if (ctx->cs_reg_error)
+        g_simple_async_result_set_from_error (ctx->result, ctx->cs_reg_error);
+    else
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    run_all_registration_checks_context_complete_and_free (ctx);
+}
+
+void
+mm_iface_modem_3gpp_run_all_registration_checks (MMIfaceModem3gpp *self,
+                                                 GAsyncReadyCallback callback,
+                                                 gpointer user_data)
+{
+    RunAllRegistrationChecksContext *ctx;
+
+    ctx = g_new0 (RunAllRegistrationChecksContext, 1);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_3gpp_run_all_registration_checks);
+
+    if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_cs_registration_check &&
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_cs_registration_check_finish) {
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_cs_registration_check (
+            self,
+            (GAsyncReadyCallback)run_cs_registration_check_ready,
+            ctx);
+        return;
+    }
+
+    if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_ps_registration_check &&
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_ps_registration_check_finish) {
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_ps_registration_check (
+            self,
+            (GAsyncReadyCallback)run_ps_registration_check_ready,
+            ctx);
+        return;
+    }
+
+    /* Nothing to do :-/ all done */
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    run_all_registration_checks_context_complete_and_free (ctx);
+}
+
+/*****************************************************************************/
+
 void
 mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
                                                MMModem3gppRegistrationState new_state)
@@ -207,9 +312,8 @@ typedef enum {
     ENABLING_STEP_FIRST,
     ENABLING_STEP_SETUP_UNSOLICITED_REGISTRATION,
     ENABLING_STEP_SETUP_CS_REGISTRATION,
-    ENABLING_STEP_RUN_CS_REGISTRATION_CHECK,
     ENABLING_STEP_SETUP_PS_REGISTRATION,
-    ENABLING_STEP_RUN_PS_REGISTRATION_CHECK,
+    ENABLING_STEP_RUN_ALL_REGISTRATION_CHECKS,
     ENABLING_STEP_LAST
 } EnablingStep;
 
@@ -285,9 +389,27 @@ mm_iface_modem_3gpp_enable_finish (MMIfaceModem3gpp *self,
     }
 
 VOID_REPLY_READY_FN (setup_cs_registration)
-VOID_REPLY_READY_FN (run_cs_registration_check)
 VOID_REPLY_READY_FN (setup_ps_registration)
-VOID_REPLY_READY_FN (run_ps_registration_check)
+
+static void
+run_all_registration_checks_ready (MMIfaceModem3gpp *self,
+                                   GAsyncResult *res,
+                                   EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    mm_iface_modem_3gpp_run_all_registration_checks_finish (self, res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        enabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_enabling_step (ctx);
+}
+
 VOID_REPLY_READY_FN (setup_unsolicited_registration)
 
 static void
@@ -322,18 +444,6 @@ interface_enabling_step (EnablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case ENABLING_STEP_RUN_CS_REGISTRATION_CHECK:
-        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->run_cs_registration_check &&
-            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->run_cs_registration_check_finish) {
-            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->run_cs_registration_check (
-                ctx->self,
-                (GAsyncReadyCallback)run_cs_registration_check_ready,
-                ctx);
-            return;
-        }
-        /* Fall down to next step */
-        ctx->step++;
-
     case ENABLING_STEP_SETUP_PS_REGISTRATION:
         if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_ps_registration &&
             MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_ps_registration_finish) {
@@ -346,17 +456,12 @@ interface_enabling_step (EnablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case ENABLING_STEP_RUN_PS_REGISTRATION_CHECK:
-        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->run_ps_registration_check &&
-            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->run_ps_registration_check_finish) {
-            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->run_ps_registration_check (
-                ctx->self,
-                (GAsyncReadyCallback)run_ps_registration_check_ready,
-                ctx);
-            return;
-        }
-        /* Fall down to next step */
-        ctx->step++;
+    case ENABLING_STEP_RUN_ALL_REGISTRATION_CHECKS:
+        mm_iface_modem_3gpp_run_all_registration_checks (
+            ctx->self,
+            (GAsyncReadyCallback)run_all_registration_checks_ready,
+            ctx);
+        return;
 
     case ENABLING_STEP_LAST:
         /* We are done without errors! */

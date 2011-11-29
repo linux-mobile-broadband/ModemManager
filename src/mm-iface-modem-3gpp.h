@@ -125,4 +125,12 @@ void mm_iface_modem_3gpp_shutdown (MMIfaceModem3gpp *self);
 void mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
                                                     MMModem3gppRegistrationState new_state);
 
+/* Run all registration checks */
+void mm_iface_modem_3gpp_run_all_registration_checks (MMIfaceModem3gpp *self,
+                                                      GAsyncReadyCallback callback,
+                                                      gpointer user_data);
+gboolean mm_iface_modem_3gpp_run_all_registration_checks_finish (MMIfaceModem3gpp *self,
+                                                                 GAsyncResult *res,
+                                                                 GError **error);
+
 #endif /* MM_IFACE_MODEM_3GPP_H */
