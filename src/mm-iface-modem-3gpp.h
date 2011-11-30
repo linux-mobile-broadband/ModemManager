@@ -50,6 +50,14 @@ struct _MMIfaceModem3gpp {
                                                        GAsyncResult *res,
                                                        GError **error);
 
+    /* Cleanup unsolicited registration messages */
+    void (* cleanup_unsolicited_registration) (MMIfaceModem3gpp *self,
+                                               GAsyncReadyCallback callback,
+                                               gpointer user_data);
+    gboolean (*cleanup_unsolicited_registration_finish) (MMIfaceModem3gpp *self,
+                                                         GAsyncResult *res,
+                                                         GError **error);
+
     /* Setup CS Registration */
     void (* setup_cs_registration) (MMIfaceModem3gpp *self,
                                     GAsyncReadyCallback callback,
