@@ -243,6 +243,33 @@ struct _MMIfaceModem {
     gboolean (*modem_power_down_finish) (MMIfaceModem *self,
                                          GAsyncResult *res,
                                          GError **error);
+
+    /* Create bearer */
+    void (*create_bearer) (MMIfaceModem *self,
+                           GVariant *properties,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data);
+    gchar * (*create_bearer_finish) (MMIfaceModem *self,
+                                     GAsyncResult *res,
+                                     GError **error);
+
+    /* List bearers */
+    void (*list_bearers) (MMIfaceModem *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data);
+    GStrv (*list_bearers_finish) (MMIfaceModem *self,
+                                  GAsyncResult *res,
+                                  GError **error);
+
+    /* Delete bearer */
+    void (*delete_bearer) (MMIfaceModem *self,
+                           const gchar *path,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data);
+    gboolean (*delete_bearer_finish) (MMIfaceModem *self,
+                                      GAsyncResult *res,
+                                      GError **error);
+
 };
 
 GType mm_iface_modem_get_type (void);

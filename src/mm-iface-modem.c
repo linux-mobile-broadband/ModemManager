@@ -66,30 +66,116 @@ dbus_call_context_new (MmGdbusModem *skeleton,
 
 /*****************************************************************************/
 
+static void
+handle_create_bearer_ready (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            DbusCallContext *ctx)
+{
+    gchar *path;
+    GError *error = NULL;
+
+    path = MM_IFACE_MODEM_GET_INTERFACE (self)->create_bearer_finish (self,
+                                                                      res,
+                                                                      &error);
+    if (error)
+        g_dbus_method_invocation_take_error (ctx->invocation,
+                                             error);
+    else
+        mm_gdbus_modem_complete_create_bearer (ctx->skeleton,
+                                               ctx->invocation,
+                                               path);
+    g_free (path);
+    dbus_call_context_free (ctx);
+}
+
 static gboolean
-handle_create_bearer (MmGdbusModem *object,
+handle_create_bearer (MmGdbusModem *skeleton,
                       GDBusMethodInvocation *invocation,
                       GVariant *arg_properties,
                       MMIfaceModem *self)
 {
-    return FALSE; /* Currently unhandled */
+    MM_IFACE_MODEM_GET_INTERFACE (self)->create_bearer (
+        self,
+        arg_properties,
+        (GAsyncReadyCallback)handle_create_bearer_ready,
+        dbus_call_context_new (skeleton,
+                               invocation,
+                               self));
+    return TRUE;
+}
+
+/*****************************************************************************/
+
+static void
+handle_delete_bearer_ready (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            DbusCallContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->delete_bearer_finish (self,
+                                                                    res,
+                                                                    &error))
+        g_dbus_method_invocation_take_error (ctx->invocation,
+                                             error);
+    else
+        mm_gdbus_modem_complete_delete_bearer (ctx->skeleton,
+                                               ctx->invocation);
+    dbus_call_context_free (ctx);
 }
 
 static gboolean
-handle_delete_bearer (MmGdbusModem *object,
+handle_delete_bearer (MmGdbusModem *skeleton,
                       GDBusMethodInvocation *invocation,
                       const gchar *arg_bearer,
                       MMIfaceModem *self)
 {
-    return FALSE; /* Currently unhandled */
+    MM_IFACE_MODEM_GET_INTERFACE (self)->delete_bearer (
+        self,
+        arg_bearer,
+        (GAsyncReadyCallback)handle_delete_bearer_ready,
+        dbus_call_context_new (skeleton,
+                               invocation,
+                               self));
+    return TRUE;
+}
+
+/*****************************************************************************/
+
+static void
+handle_list_bearers_ready (MMIfaceModem *self,
+                           GAsyncResult *res,
+                           DbusCallContext *ctx)
+{
+    GStrv path_list;
+    GError *error = NULL;
+
+    path_list = MM_IFACE_MODEM_GET_INTERFACE (self)->list_bearers_finish (self,
+                                                                          res,
+                                                                          &error);
+    if (error)
+        g_dbus_method_invocation_take_error (ctx->invocation,
+                                             error);
+    else
+        mm_gdbus_modem_complete_list_bearers (ctx->skeleton,
+                                              ctx->invocation,
+                                              (const gchar *const *)path_list);
+    g_strfreev (path_list);
+    dbus_call_context_free (ctx);
 }
 
 static gboolean
-handle_list_bearers (MmGdbusModem *object,
+handle_list_bearers (MmGdbusModem *skeleton,
                      GDBusMethodInvocation *invocation,
                      MMIfaceModem *self)
 {
-    return FALSE; /* Currently unhandled */
+    MM_IFACE_MODEM_GET_INTERFACE (self)->list_bearers (
+        self,
+        (GAsyncReadyCallback)handle_list_bearers_ready,
+        dbus_call_context_new (skeleton,
+                               invocation,
+                               self));
+    return TRUE;
 }
 
 /*****************************************************************************/
