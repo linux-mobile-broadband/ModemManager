@@ -94,6 +94,22 @@ struct _MMIfaceModem3gpp {
     gboolean (*register_in_network_finish) (MMIfaceModem3gpp *self,
                                             GAsyncResult *res,
                                             GError **error);
+
+    /* Loading of the Operator Code property */
+    void (*load_operator_code) (MMIfaceModem3gpp *self,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data);
+    gchar * (*load_operator_code_finish) (MMIfaceModem3gpp *self,
+                                          GAsyncResult *res,
+                                          GError **error);
+
+    /* Loading of the Operator Name property */
+    void (*load_operator_name) (MMIfaceModem3gpp *self,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data);
+    gchar * (*load_operator_name_finish) (MMIfaceModem3gpp *self,
+                                          GAsyncResult *res,
+                                          GError **error);
 };
 
 GType mm_iface_modem_3gpp_get_type (void);

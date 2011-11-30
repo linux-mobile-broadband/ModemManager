@@ -260,6 +260,34 @@ mm_iface_modem_3gpp_run_all_registration_checks (MMIfaceModem3gpp *self,
 
 /*****************************************************************************/
 
+#undef STR_REPLY_READY_FN
+#define STR_REPLY_READY_FN(NAME, DISPLAY)                               \
+    static void                                                         \
+    load_##NAME##_ready (MMIfaceModem3gpp *self,                        \
+                  GAsyncResult *res)                                    \
+    {                                                                   \
+        GError *error = NULL;                                           \
+        MmGdbusModem3gpp *skeleton = NULL;                              \
+        gchar *str;                                                     \
+                                                                        \
+        str = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_##NAME##_finish (self, res, &error); \
+        if (error) {                                                    \
+            mm_warn ("Couldn't load %s: '%s'", DISPLAY, error->message); \
+            g_error_free (error);                                       \
+            return;                                                     \
+        }                                                               \
+                                                                        \
+        g_object_get (self,                                             \
+                      MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &skeleton,     \
+                      NULL);                                            \
+        mm_gdbus_modem3gpp_set_##NAME (skeleton, str);                  \
+        g_free (str);                                                   \
+        g_object_unref (skeleton);                                      \
+    }
+
+STR_REPLY_READY_FN (operator_code, "Operator Code")
+STR_REPLY_READY_FN (operator_name, "Operator Name")
+
 void
 mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
                                                MMModem3gppRegistrationState new_state)
@@ -295,10 +323,33 @@ mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
         /* TODO:
          * While connected we don't want registration status changes to change
          * the modem's state away from CONNECTED.
+         *
+         * TODO:
+         * If we're connected and we're not supposed to roam, but the device
+         * just roamed, disconnect the connection to avoid charging the user
+         * loads of money.
          */
         switch (new_state) {
         case MM_MODEM_3GPP_REGISTRATION_STATE_HOME:
         case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING:
+            /* Launch operator code update */
+            if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_code &&
+                MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_code_finish)
+                MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_code (
+                    self,
+                    (GAsyncReadyCallback)load_operator_code_ready,
+                    NULL);
+            /* Launch operator name update */
+            if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_name &&
+                MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_name_finish)
+                MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_name (
+                    self,
+                    (GAsyncReadyCallback)load_operator_name_ready,
+                    NULL);
+
+            /* TODO: Update signal quality */
+            /* TODO: Update access technology */
+
             mm_iface_modem_update_state (MM_IFACE_MODEM (self),
                                          MM_MODEM_STATE_REGISTERED,
                                          MM_MODEM_STATE_REASON_NONE);
