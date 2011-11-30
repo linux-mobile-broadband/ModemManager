@@ -66,11 +66,27 @@ struct _MMIfaceModem3gpp {
                                               GAsyncResult *res,
                                               GError **error);
 
+    /* Cleanup CS Registration */
+    void (* cleanup_cs_registration) (MMIfaceModem3gpp *self,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data);
+    gboolean (*cleanup_cs_registration_finish) (MMIfaceModem3gpp *self,
+                                                GAsyncResult *res,
+                                                GError **error);
+
     /* Setup PS Registration */
     void (* setup_ps_registration) (MMIfaceModem3gpp *self,
                                     GAsyncReadyCallback callback,
                                     gpointer user_data);
     gboolean (*setup_ps_registration_finish) (MMIfaceModem3gpp *self,
+                                              GAsyncResult *res,
+                                              GError **error);
+
+    /* Cleanup PS Registration */
+    void (* cleanup_ps_registration) (MMIfaceModem3gpp *self,
+                                    GAsyncReadyCallback callback,
+                                    gpointer user_data);
+    gboolean (*cleanup_ps_registration_finish) (MMIfaceModem3gpp *self,
                                               GAsyncResult *res,
                                               GError **error);
 

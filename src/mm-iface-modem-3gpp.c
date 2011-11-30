@@ -570,6 +570,8 @@ static void interface_disabling_step (DisablingContext *ctx);
 
 typedef enum {
     DISABLING_STEP_FIRST,
+    DISABLING_STEP_CLEANUP_PS_REGISTRATION,
+    DISABLING_STEP_CLEANUP_CS_REGISTRATION,
     DISABLING_STEP_CLEANUP_UNSOLICITED_REGISTRATION,
     DISABLING_STEP_LAST
 } DisablingStep;
@@ -646,12 +648,40 @@ mm_iface_modem_3gpp_disable_finish (MMIfaceModem3gpp *self,
 
 VOID_REPLY_READY_FN (cleanup_unsolicited_registration,
                      "cleanup unsolicited registration")
+VOID_REPLY_READY_FN (cleanup_ps_registration,
+                     "cleanup PS registration")
+VOID_REPLY_READY_FN (cleanup_cs_registration,
+                     "cleanup CS registration")
 
 static void
 interface_disabling_step (DisablingContext *ctx)
 {
     switch (ctx->step) {
     case DISABLING_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case DISABLING_STEP_CLEANUP_PS_REGISTRATION:
+        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->cleanup_ps_registration &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->cleanup_ps_registration_finish) {
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->cleanup_ps_registration (
+                ctx->self,
+                (GAsyncReadyCallback)cleanup_ps_registration_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case DISABLING_STEP_CLEANUP_CS_REGISTRATION:
+        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->cleanup_cs_registration &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->cleanup_cs_registration_finish) {
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->cleanup_cs_registration (
+                ctx->self,
+                (GAsyncReadyCallback)cleanup_cs_registration_ready,
+                ctx);
+            return;
+        }
         /* Fall down to next step */
         ctx->step++;
 
