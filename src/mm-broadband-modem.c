@@ -1880,6 +1880,124 @@ run_ps_registration_check (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* CS and PS Registrations cleanup (3GPP) */
+
+static gboolean
+cleanup_cs_registration_finish (MMIfaceModem3gpp *self,
+                                GAsyncResult *res,
+                                GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static gboolean
+cleanup_ps_registration_finish (MMIfaceModem3gpp *self,
+                                GAsyncResult *res,
+                                GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static gboolean
+parse_reg_cleanup_reply (MMBroadbandModem *self,
+                         gpointer none,
+                         const gchar *command,
+                         const gchar *response,
+                         const GError *error,
+                         GVariant **result,
+                         GError **result_error)
+{
+    /* Ignore errors, just set as reply the command used */
+    *result = g_variant_new_string (command);
+    return TRUE;
+}
+
+static void
+cleanup_registration_sequence_ready (MMBroadbandModem *self,
+                                     GAsyncResult *res,
+                                     GSimpleAsyncResult *operation_result)
+{
+    MMAtSerialPort *secondary;
+    GError *error = NULL;
+    GVariant *reply;
+
+    reply = mm_at_command_finish (G_OBJECT (self), res, &error);
+    if (error) {
+        g_simple_async_result_take_error (operation_result, error);
+        g_simple_async_result_complete (operation_result);
+        g_object_unref (operation_result);
+        return;
+    }
+
+    secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+    if (secondary) {
+        /* Now use the same registration setup in secondary port, if any */
+        mm_at_command (G_OBJECT (self),
+                       secondary,
+                       g_variant_get_string (reply, NULL),
+                       3,
+                       NULL, /* response processor */
+                       NULL, /* response processor context */
+                       NULL, /* result signature */
+                       NULL, /* cancellable */
+                       NULL, /* NO callback, just queue the command and forget */
+                       NULL); /* user data */
+    }
+
+    /* We're done */
+    g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
+    g_simple_async_result_complete (operation_result);
+    g_object_unref (operation_result);
+    g_variant_unref (reply);
+}
+
+static void
+cleanup_cs_registration (MMIfaceModem3gpp *self,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        cleanup_cs_registration);
+    mm_at_command (G_OBJECT (self),
+                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                   "+CREG=0",
+                   3,
+                   (MMAtResponseProcessor)parse_reg_cleanup_reply,
+                   NULL,  /* response processor context */
+                   "s",   /* The cleanup command */
+                   NULL,  /* cancellable */
+                   (GAsyncReadyCallback)cleanup_registration_sequence_ready,
+                   result);
+}
+
+static void
+cleanup_ps_registration (MMIfaceModem3gpp *self,
+                       GAsyncReadyCallback callback,
+                       gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        cleanup_ps_registration);
+    mm_at_command (G_OBJECT (self),
+                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                   "+CGREG=0",
+                   3,
+                   (MMAtResponseProcessor)parse_reg_cleanup_reply,
+                   NULL,  /* response processor context */
+                   "s",   /* The cleanup command */
+                   NULL,  /* cancellable */
+                   (GAsyncReadyCallback)cleanup_registration_sequence_ready,
+                   result);
+}
+
+/*****************************************************************************/
 /* CS and PS Registrations (3GPP) */
 
 static gboolean
@@ -2678,10 +2796,14 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->cleanup_unsolicited_registration_finish = cleanup_unsolicited_registration_finish;
     iface->setup_cs_registration = setup_cs_registration;
     iface->setup_cs_registration_finish = setup_cs_registration_finish;
+    iface->cleanup_cs_registration = cleanup_cs_registration;
+    iface->cleanup_cs_registration_finish = cleanup_cs_registration_finish;
     iface->run_cs_registration_check = run_cs_registration_check;
     iface->run_cs_registration_check_finish = run_cs_registration_check_finish;
     iface->setup_ps_registration = setup_ps_registration;
     iface->setup_ps_registration_finish = setup_ps_registration_finish;
+    iface->cleanup_ps_registration = cleanup_ps_registration;
+    iface->cleanup_ps_registration_finish = cleanup_ps_registration_finish;
     iface->run_ps_registration_check = run_ps_registration_check;
     iface->run_ps_registration_check_finish = run_ps_registration_check_finish;
     iface->register_in_network = register_in_network;
