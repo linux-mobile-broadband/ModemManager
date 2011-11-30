@@ -110,6 +110,14 @@ struct _MMIfaceModem3gpp {
     gchar * (*load_operator_name_finish) (MMIfaceModem3gpp *self,
                                           GAsyncResult *res,
                                           GError **error);
+
+    /* Scan current networks, expect a GList of MMModem3gppNetworkInfo */
+    void (* scan_networks) (MMIfaceModem3gpp *self,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data);
+    GList * (*scan_networks_finish) (MMIfaceModem3gpp *self,
+                                     GAsyncResult *res,
+                                     GError **error);
 };
 
 GType mm_iface_modem_3gpp_get_type (void);

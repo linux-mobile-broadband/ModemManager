@@ -22,6 +22,7 @@
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-base-modem.h"
+#include "mm-modem-helpers.h"
 #include "mm-log.h"
 
 typedef struct {
@@ -145,12 +146,133 @@ handle_register (MmGdbusModem3gpp *skeleton,
     return TRUE;
 }
 
+/*****************************************************************************/
+
+static GVariant *
+scan_networks_build_result (GList *info_list)
+{
+    GList *l;
+    GVariantBuilder builder;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("aa{sv}"));
+
+    for (l = info_list; l; l = g_list_next (l)) {
+        MM3gppNetworkInfo *info = l->data;
+
+        if (!info->operator_code) {
+            g_warn_if_reached ();
+            continue;
+        }
+
+        g_variant_builder_open (&builder, G_VARIANT_TYPE ("a{sv}"));
+
+        g_variant_builder_add (&builder, "{sv}",
+                               "operator-code", g_variant_new_string (info->operator_code));
+        g_variant_builder_add (&builder, "{sv}",
+                               "status", g_variant_new_uint32 (info->status));
+        g_variant_builder_add (&builder, "{sv}",
+                               "access-tech", g_variant_new_uint32 (info->access_tech));
+        if (info->operator_long)
+            g_variant_builder_add (&builder, "{sv}",
+                                   "operator-long", g_variant_new_string (info->operator_long));
+        if (info->operator_short)
+            g_variant_builder_add (&builder, "{sv}",
+                                   "operator-short", g_variant_new_string (info->operator_short));
+        g_variant_builder_close (&builder);
+    }
+
+    return g_variant_builder_end (&builder);
+}
+
+static void
+scan_networks_ready (MMIfaceModem3gpp *self,
+                     GAsyncResult *res,
+                     DbusCallContext *ctx)
+{
+    GError *error = NULL;
+    GList *info_list;
+
+    info_list = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->scan_networks_finish (self,
+                                                                                res,
+                                                                                &error);
+    if (error)
+        g_dbus_method_invocation_take_error (ctx->invocation,
+                                             error);
+    else {
+        GVariant *dict_array;
+
+        dict_array = scan_networks_build_result (info_list);
+        mm_gdbus_modem3gpp_complete_scan (ctx->skeleton,
+                                          ctx->invocation,
+                                          dict_array);
+        g_variant_unref (dict_array);
+    }
+
+    mm_3gpp_network_info_list_free (info_list);
+    dbus_call_context_free (ctx);
+}
+
 static gboolean
 handle_scan (MmGdbusModem3gpp *skeleton,
              GDBusMethodInvocation *invocation,
              MMIfaceModem3gpp *self)
 {
-    return FALSE; /* Currently unhandled */
+
+    MMModemState modem_state;
+
+    /* If scanning is not implemented, report an error */
+    if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->scan_networks ||
+        !MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->scan_networks_finish) {
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot scan networks: operation not supported");
+        return TRUE;
+    }
+
+    modem_state = MM_MODEM_STATE_UNKNOWN;
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+
+    switch (modem_state) {
+    case MM_MODEM_STATE_UNKNOWN:
+        /* We should never have such request in UNKNOWN state */
+        g_assert_not_reached ();
+        break;
+
+    case MM_MODEM_STATE_LOCKED:
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot scan networks: device locked");
+        break;
+
+    case MM_MODEM_STATE_DISABLED:
+    case MM_MODEM_STATE_DISABLING:
+    case MM_MODEM_STATE_ENABLING:
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot scan networks: not enabled yet");
+        break;
+
+    case MM_MODEM_STATE_ENABLED:
+    case MM_MODEM_STATE_SEARCHING:
+    case MM_MODEM_STATE_REGISTERED:
+    case MM_MODEM_STATE_DISCONNECTING:
+    case MM_MODEM_STATE_CONNECTING:
+    case MM_MODEM_STATE_CONNECTED:
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->scan_networks (
+            self,
+            (GAsyncReadyCallback)scan_networks_ready,
+            dbus_call_context_new (skeleton,
+                                   invocation,
+                                   self));
+        break;
+    }
+
+    return TRUE;
 }
 
 /*****************************************************************************/
