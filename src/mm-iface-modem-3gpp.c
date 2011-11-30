@@ -494,6 +494,77 @@ mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
 
 /*****************************************************************************/
 
+#define PERIODIC_REG_CHECK_ENABLED_TAG "3gpp-reg-check-timeout-enabled-tag"
+#define PERIODIC_REG_CHECK_RUNNING_TAG "3gpp-reg-check-timeout-running-tag"
+
+static GQuark check_enabled;
+static GQuark check_running;
+
+static void
+periodic_registration_checks_ready (MMIfaceModem3gpp *self,
+                                    GAsyncResult *res)
+{
+    GError *error = NULL;
+
+    mm_iface_modem_3gpp_run_all_registration_checks_finish (self, res, &error);
+    if (error) {
+        mm_dbg ("Couldn't refresh registration status: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Remove the running tag */
+    g_object_set_qdata (G_OBJECT (self), check_running, GUINT_TO_POINTER (FALSE));
+}
+
+static gboolean
+periodic_registration_check (MMIfaceModem3gpp *self)
+{
+    /* Only launch a new one if not one running already */
+    if (!GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (self), check_running))) {
+        g_object_set_qdata (G_OBJECT (self), check_running, GUINT_TO_POINTER (TRUE));
+        mm_iface_modem_3gpp_run_all_registration_checks (
+            self,
+            (GAsyncReadyCallback)periodic_registration_checks_ready,
+            NULL);
+    }
+    return TRUE;
+}
+
+/* static void */
+/* periodic_registration_check_disable (MMIfaceModem3gpp *self) */
+/* { */
+/*     guint timeout_source; */
+
+/*     timeout_source = GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (self), check_enabled)); */
+/*     if (timeout_source) { */
+/*         g_source_remove (timeout_source); */
+/*         g_object_set_qdata (G_OBJECT (self), check_enabled, GUINT_TO_POINTER (FALSE)); */
+/*         mm_dbg ("Periodic registration checks disabled"); */
+/*     } */
+/* } */
+
+static void
+periodic_registration_check_enable (MMIfaceModem3gpp *self)
+{
+    guint timeout_source;
+
+    if (G_UNLIKELY (!check_enabled))
+        check_enabled = g_quark_from_static_string (PERIODIC_REG_CHECK_ENABLED_TAG);
+    if (G_UNLIKELY (!check_running))
+        check_running = g_quark_from_static_string (PERIODIC_REG_CHECK_RUNNING_TAG);
+
+    timeout_source = GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (self), check_enabled));
+    if (!timeout_source) {
+        mm_dbg ("Periodic registration checks enabled");
+        timeout_source = g_timeout_add_seconds (30,
+                                                (GSourceFunc)periodic_registration_check,
+                                                self);
+        g_object_set_qdata (G_OBJECT (self), check_enabled, GUINT_TO_POINTER (timeout_source));
+    }
+}
+
+/*****************************************************************************/
+
 typedef struct _EnablingContext EnablingContext;
 static void interface_enabling_step (EnablingContext *ctx);
 
@@ -577,8 +648,47 @@ mm_iface_modem_3gpp_enable_finish (MMIfaceModem3gpp *self,
         interface_enabling_step (ctx);                                  \
     }
 
-VOID_REPLY_READY_FN (setup_cs_registration)
-VOID_REPLY_READY_FN (setup_ps_registration)
+static void
+setup_cs_registration_ready (MMIfaceModem3gpp *self,
+                             GAsyncResult *res,
+                             EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->setup_cs_registration_finish (self, res, &error);
+    if (error) {
+        /* If error, setup periodic registration checks */
+        periodic_registration_check_enable (ctx->self);
+        mm_dbg ("Couldn't setup CS registration: '%s'",
+                error->message);
+        g_error_free (error);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_enabling_step (ctx);
+}
+
+static void
+setup_ps_registration_ready (MMIfaceModem3gpp *self,
+                             GAsyncResult *res,
+                             EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->setup_ps_registration_finish (self, res, &error);
+    if (error) {
+        /* If error, setup periodic registration checks */
+        periodic_registration_check_enable (ctx->self);
+        mm_dbg ("Couldn't setup PS registration: '%s'",
+                error->message);
+        g_error_free (error);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_enabling_step (ctx);
+}
 
 static void
 run_all_registration_checks_ready (MMIfaceModem3gpp *self,
