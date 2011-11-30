@@ -1391,6 +1391,48 @@ setup_unsolicited_registration (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Scan networks (3GPP) */
+
+static GList *
+scan_networks_finish (MMIfaceModem3gpp *self,
+                      GAsyncResult *res,
+                      GError **error)
+{
+    GVariant *reply;
+    GList *info_list;
+
+    reply = mm_at_command_finish (G_OBJECT (self), res, error);
+    if (!reply)
+        return NULL;
+
+    info_list = mm_3gpp_parse_scan_response (g_variant_get_string (reply, NULL),
+                                             error);
+    g_variant_unref (reply);
+    return info_list;
+}
+
+static void
+scan_networks (MMIfaceModem3gpp *self,
+               GAsyncReadyCallback callback,
+               gpointer user_data)
+{
+    /* It is mandatory to have a callback here right now, otherwise we may leak
+     * the info list */
+    g_assert (callback != NULL);
+
+    mm_at_command (G_OBJECT (self),
+                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                   "+COPS=?",
+                   120,
+                   (MMAtResponseProcessor)common_parse_string_reply,
+                   NULL, /* response processor context */
+                   "s", /* reply signature */
+                   NULL, /* cancellable */
+                   callback,
+                   user_data);
+}
+
+/*****************************************************************************/
 /* Register in network (3GPP) */
 
 static void run_all_registration_checks_ready (MMBroadbandModem *self,
@@ -1419,7 +1461,6 @@ static void
 clear_previous_registration_request (MMBroadbandModem *self,
                                      gboolean complete_with_cancel)
 {
-
     if (self->priv->pending_reg_id) {
         /* Clear the registration timeout handler */
         g_source_remove (self->priv->pending_reg_id);
@@ -2483,6 +2524,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->run_ps_registration_check_finish = run_ps_registration_check_finish;
     iface->register_in_network = register_in_network;
     iface->register_in_network_finish = register_in_network_finish;
+    iface->scan_networks = scan_networks;
+    iface->scan_networks_finish = scan_networks_finish;
 }
 
 static void
