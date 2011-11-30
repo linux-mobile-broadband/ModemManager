@@ -1541,10 +1541,6 @@ cmti_received_has_sms (MMModemGsmSms *modem,
     gboolean complete;
     GValue *ref;
 
-    /*
-     * But how will the 'received', non-complete signal get sent?
-     * Maybe that should happen earlier.
-     */
     if (properties == NULL)
         return;
 
@@ -1604,6 +1600,10 @@ cmti_received (MMAtSerialPort *port,
                                         sms_get_invoke,
                                         G_CALLBACK (cmti_received_has_sms),
                                         user_data);
+    mm_callback_info_set_data (cbinfo,
+                               "complete-sms-only",
+                               GUINT_TO_POINTER (FALSE),
+                               NULL);
 
     if (priv->sms_fetch_pending != 0) {
         mm_err("sms_fetch_pending is %d, not 0", priv->sms_fetch_pending);
@@ -4564,6 +4564,7 @@ sms_get_done (MMAtSerialPort *port,
     int rv, status, tpdu_len;
     guint idx;
     char pdu[SMS_MAX_PDU_LEN + 1];
+    gboolean look_for_complete;
 
     idx = priv->sms_fetch_pending;
     priv->sms_fetch_pending = 0;
@@ -4598,12 +4599,18 @@ sms_get_done (MMAtSerialPort *port,
                          simple_uint_value (idx));
     sms_cache_insert (info->modem, properties, idx);
 
-    /*
-     * If this is a standalone message, or the key part of a
-     * multipart message, pass it along, otherwise report that there's
-     * no such message.
-     */
-    properties = sms_cache_lookup_full (info->modem, properties, &info->error);
+    look_for_complete = GPOINTER_TO_UINT (mm_callback_info_get_data(info,
+                                                           "complete-sms-only"));
+
+    if (look_for_complete == TRUE) {
+        /*
+         * If this is a standalone message, or the key part of a
+         * multipart message, pass it along, otherwise report that there's
+         * no such message.
+         */
+        properties = sms_cache_lookup_full (info->modem, properties,
+                                            &info->error);
+    }
     if (properties)
         mm_callback_info_set_data (info, GS_HASH_TAG, properties,
                                    (GDestroyNotify) g_hash_table_unref);
@@ -4656,6 +4663,10 @@ sms_get (MMModemGsmSms *modem,
                                       sms_get_invoke,
                                       G_CALLBACK (callback),
                                       user_data);
+    mm_callback_info_set_data (info,
+                               "complete-sms-only",
+                               GUINT_TO_POINTER (TRUE),
+                               NULL);
 
     port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
     if (!port) {
@@ -4843,6 +4854,7 @@ sms_list_done (MMAtSerialPort *port,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
     GPtrArray *results = NULL;
     int rv, status, tpdu_len, offset;
     char *rstr;
@@ -4855,6 +4867,8 @@ sms_list_done (MMAtSerialPort *port,
     if (error)
         info->error = g_error_copy (error);
     else {
+        GHashTableIter iter;
+        gpointer key, value;
         results = g_ptr_array_new ();
         rstr = response->str;
 
@@ -4877,14 +4891,23 @@ sms_list_done (MMAtSerialPort *port,
                 g_hash_table_insert (properties, "index",
                                      simple_uint_value (idx));
                 sms_cache_insert (info->modem, properties, idx);
-                /* Only add complete messages to the results */
-                properties = sms_cache_lookup_full (info->modem, properties, &info->error);
-                if (properties)
-                    g_ptr_array_add (results, properties);
+                /* The cache holds a reference, so we don't need it anymore */
+                g_hash_table_unref (properties);
             } else {
                 /* Ignore the error */
                 g_clear_error(&local);
             }
+        }
+
+        /* Add all the complete messages to the results */
+        g_hash_table_iter_init (&iter, priv->sms_contents);
+        while (g_hash_table_iter_next (&iter, &key, &value)) {
+            GHashTable *properties = value;
+            g_hash_table_ref (properties);
+            properties = sms_cache_lookup_full (info->modem, properties,
+                                                &info->error);
+            if (properties)
+                g_ptr_array_add (results, properties);
         }
         if (results)
             mm_callback_info_set_data (info, "list-sms", results,
