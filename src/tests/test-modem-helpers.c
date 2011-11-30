@@ -24,394 +24,373 @@ typedef struct {
     GPtrArray *unsolicited_creg;
 } TestData;
 
-#define MM_SCAN_TAG_STATUS "status"
-#define MM_SCAN_TAG_OPER_LONG "operator-long"
-#define MM_SCAN_TAG_OPER_SHORT "operator-short"
-#define MM_SCAN_TAG_OPER_NUM "operator-num"
-#define MM_SCAN_TAG_ACCESS_TECH "access-tech"
-
-typedef struct {
-    const char *status;
-    const char *oper_long;
-    const char *oper_short;
-    const char *oper_num;
-    const char *tech;
-} OperEntry;
-
-#define ARRAY_LEN(i) (sizeof (i) / sizeof (i[0]))
-
 static void
-test_cops_results (const char *desc,
-                   const char *reply,
-                   OperEntry *expected_results,
+test_cops_results (const gchar *desc,
+                   const gchar *reply,
+                   MM3gppNetworkInfo *expected_results,
                    guint32 expected_results_len)
 {
-    guint i;
+    GList *l;
     GError *error = NULL;
-    GPtrArray *results;
+    GList *results;
 
     g_print ("\nTesting %s +COPS response...\n", desc);
 
-    results = mm_gsm_parse_scan_response (reply, &error);
+    results = mm_3gpp_parse_scan_response (reply, &error);
     g_assert (results);
-    g_assert (error == NULL);
+    g_assert_no_error (error);
+    g_assert_cmpuint (g_list_length (results), ==, expected_results_len);
 
-    g_assert (results->len == expected_results_len);
+    for (l = results; l; l = g_list_next (l)) {
+        MM3gppNetworkInfo *info = l->data;
+        gboolean found = FALSE;
+        guint i;
 
-    for (i = 0; i < results->len; i++) {
-        GHashTable *entry = g_ptr_array_index (results, i);
-        const char *value;
-        OperEntry *expected = &expected_results[i];
+        for (i = 0; !found && i < expected_results_len; i++) {
+            MM3gppNetworkInfo *expected;
 
-        value = g_hash_table_lookup (entry, MM_SCAN_TAG_STATUS);
-        g_assert (value);
-        g_assert (strcmp (value, expected->status) == 0);
+            expected = &expected_results[i];
+            if (g_str_equal (info->operator_code, expected->operator_code) &&
+                info->access_tech == expected->access_tech) {
+                found = TRUE;
 
-        value = g_hash_table_lookup (entry, MM_SCAN_TAG_OPER_LONG);
-        if (expected->oper_long) {
-            g_assert (value);
-            g_assert (strcmp (value, expected->oper_long) == 0);
-        } else
-            g_assert (value == NULL);
+                g_assert_cmpuint (info->status, ==, expected->status);
 
-        value = g_hash_table_lookup (entry, MM_SCAN_TAG_OPER_SHORT);
-        if (expected->oper_short) {
-            g_assert (value);
-            g_assert (strcmp (value, expected->oper_short) == 0);
-        } else
-            g_assert (value == NULL);
+                if (expected->operator_long)
+                    g_assert_cmpstr (info->operator_long, ==, expected->operator_long);
+                else
+                    g_assert (info->operator_long == NULL);
 
-        value = g_hash_table_lookup (entry, MM_SCAN_TAG_OPER_NUM);
-        g_assert (expected->oper_num);
-        g_assert (value);
-        g_assert (strcmp (value, expected->oper_num) == 0);
+                if (expected->operator_short)
+                    g_assert_cmpstr (info->operator_short, ==, expected->operator_short);
+                else
+                    g_assert (info->operator_short == NULL);
 
-        value = g_hash_table_lookup (entry, MM_SCAN_TAG_ACCESS_TECH);
-        if (expected->tech) {
-            g_assert (value);
-            g_assert (strcmp (value, expected->tech) == 0);
-        } else
-            g_assert (value == NULL);
+                g_debug ("info: %s, expected: %s", info->operator_code, expected->operator_code);
+            }
+        }
+
+        g_assert (found == TRUE);
     }
 
-    mm_gsm_destroy_scan_data (results);
+    mm_3gpp_network_info_list_free (results);
 }
 
 static void
 test_cops_response_tm506 (void *f, gpointer d)
 {
-    const char *reply = "+COPS: (2,\"\",\"T-Mobile\",\"31026\",0),(2,\"T - Mobile\",\"T - Mobile\",\"310260\"),2),(1,\"AT&T\",\"AT&T\",\"310410\"),0)";
-    static OperEntry expected[] = {
-        { "2", NULL, "T-Mobile", "31026", "0" },
-        { "2", "T - Mobile", "T - Mobile", "310260", "2" },
-        { "1", "AT&T", "AT&T", "310410", "0" }
+    const gchar *reply = "+COPS: (2,\"\",\"T-Mobile\",\"31026\",0),(2,\"T - Mobile\",\"T - Mobile\",\"310260\"),2),(1,\"AT&T\",\"AT&T\",\"310410\"),0)";
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, NULL, "T-Mobile", "31026", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "T - Mobile", "T - Mobile", "310260", MM_MODEM_ACCESS_TECH_UMTS },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_GSM }
     };
 
-    test_cops_results ("TM-506", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("TM-506", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_gt3gplus (void *f, gpointer d)
 {
     const char *reply = "+COPS: (1,\"T-Mobile US\",\"TMO US\",\"31026\",0),(1,\"Cingular\",\"Cingular\",\"310410\",0),,(0, 1, 3),(0-2)";
-    static OperEntry expected[] = {
-        { "1", "T-Mobile US", "TMO US", "31026", "0" },
-        { "1", "Cingular", "Cingular", "310410", "0" },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "T-Mobile US", "TMO US", "31026", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "Cingular", "Cingular", "310410", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("GlobeTrotter 3G+ (nozomi)", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("GlobeTrotter 3G+ (nozomi)", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_ac881 (void *f, gpointer d)
 {
     const char *reply = "+COPS: (1,\"T-Mobile\",\"TMO\",\"31026\",0),(1,\"AT&T\",\"AT&T\",\"310410\",2),(1,\"AT&T\",\"AT&T\",\"310410\",0),,(0,1,2,3,4),)";
-    static OperEntry expected[] = {
-        { "1", "T-Mobile", "TMO", "31026", "0" },
-        { "1", "AT&T", "AT&T", "310410", "2" },
-        { "1", "AT&T", "AT&T", "310410", "0" },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "T-Mobile", "TMO", "31026", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_UMTS },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("Sierra AirCard 881", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("Sierra AirCard 881", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_gtmax36 (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"T-Mobile US\",\"TMO US\",\"31026\",0),(1,\"AT&T\",\"AT&T\",\"310410\",2),(1,\"AT&T\",\"AT&T\",\"310410\",0),,(0, 1,)";
-    static OperEntry expected[] = {
-        { "2", "T-Mobile US", "TMO US", "31026", "0" },
-        { "1", "AT&T", "AT&T", "310410", "2" },
-        { "1", "AT&T", "AT&T", "310410", "0" },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "T-Mobile US", "TMO US", "31026", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_UMTS },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("Option GlobeTrotter MAX 3.6", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("Option GlobeTrotter MAX 3.6", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_ac860 (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"T-Mobile\",\"TMO\",\"31026\",0),(1,\"Cingular\",\"Cinglr\",\"310410\",2),(1,\"Cingular\",\"Cinglr\",\"310410\",0),,)";
-    static OperEntry expected[] = {
-        { "2", "T-Mobile", "TMO", "31026", "0" },
-        { "1", "Cingular", "Cinglr", "310410", "2" },
-        { "1", "Cingular", "Cinglr", "310410", "0" },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "T-Mobile", "TMO", "31026", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "Cingular", "Cinglr", "310410", MM_MODEM_ACCESS_TECH_UMTS },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "Cingular", "Cinglr", "310410", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("Sierra AirCard 860", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("Sierra AirCard 860", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_gtm378 (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"T-Mobile\",\"T-Mobile\",\"31026\",0),(1,\"AT&T\",\"AT&T\",\"310410\",2),(1,\"AT&T\",\"AT&T\",\"310410\",0),,(0, 1, 3),(0-2)";
-    static OperEntry expected[] = {
-        { "2", "T-Mobile", "T-Mobile", "31026", "0" },
-        { "1", "AT&T", "AT&T", "310410", "2" },
-        { "1", "AT&T", "AT&T", "310410", "0" },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "T-Mobile", "T-Mobile", "31026", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_UMTS },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("Option GTM378", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("Option GTM378", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_motoc (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"T-Mobile\",\"\",\"310260\"),(0,\"Cingular Wireless\",\"\",\"310410\")";
-    static OperEntry expected[] = {
-        { "2", "T-Mobile", NULL, "310260", NULL },
-        { "0", "Cingular Wireless", NULL, "310410", NULL },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "T-Mobile", NULL, "310260", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_UNKNOWN, "Cingular Wireless", NULL, "310410", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("BUSlink SCWi275u (Motorola C-series)", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("BUSlink SCWi275u (Motorola C-series)", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_mf627a (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"AT&T@\",\"AT&TD\",\"310410\",0),(3,\"Voicestream Wireless Corporation\",\"VSTREAM\",\"31026\",0),";
-    static OperEntry expected[] = {
-        { "2", "AT&T@", "AT&TD", "310410", "0" },
-        { "3", "Voicestream Wireless Corporation", "VSTREAM", "31026", "0" },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "AT&T@", "AT&TD", "310410", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_FORBIDDEN, "Voicestream Wireless Corporation", "VSTREAM", "31026", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("ZTE MF627 (A)", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("ZTE MF627 (A)", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_mf627b (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"AT&Tp\",\"AT&T@\",\"310410\",0),(3,\"\",\"\",\"31026\",0),";
-    static OperEntry expected[] = {
-        { "2", "AT&Tp", "AT&T@", "310410", "0" },
-        { "3", NULL, NULL, "31026", "0" },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "AT&Tp", "AT&T@", "310410", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_FORBIDDEN, NULL, NULL, "31026", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("ZTE MF627 (B)", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("ZTE MF627 (B)", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_e160g (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"T-Mobile\",\"TMO\",\"31026\",0),(1,\"AT&T\",\"AT&T\",\"310410\",0),,(0,1,2,3,4),(0,1,2)";
-    static OperEntry expected[] = {
-        { "2", "T-Mobile", "TMO", "31026", "0" },
-        { "1", "AT&T", "AT&T", "310410", "0" },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "T-Mobile", "TMO", "31026", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("Huawei E160G", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("Huawei E160G", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_mercury (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"\",\"\",\"310410\",2),(1,\"AT&T\",\"AT&T\",\"310410\",0),(1,\"T-Mobile\",\"TMO\",\"31026\",0),,(0,1,2,3,4),(0,1,2)";
-    static OperEntry expected[] = {
-        { "2", NULL, NULL, "310410", "2" },
-        { "1", "AT&T", "AT&T", "310410", "0" },
-        { "1", "T-Mobile", "TMO", "31026", "0" },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, NULL, NULL, "310410", MM_MODEM_ACCESS_TECH_UMTS },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "T-Mobile", "TMO", "31026", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("Sierra AT&T USBConnect Mercury", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("Sierra AT&T USBConnect Mercury", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_quicksilver (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"AT&T\",\"\",\"310410\",0),(2,\"\",\"\",\"3104100\",2),(1,\"AT&T\",\"\",\"310260\",0),,(0-4),(0-2)";
-    static OperEntry expected[] = {
-        { "2", "AT&T", NULL, "310410", "0" },
-        { "2", NULL, NULL, "3104100", "2" },
-        { "1", "AT&T", NULL, "310260", "0" },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "AT&T", NULL, "310410", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, NULL, NULL, "3104100", MM_MODEM_ACCESS_TECH_UMTS },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", NULL, "310260", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("Option AT&T Quicksilver", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("Option AT&T Quicksilver", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_icon225 (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"T-Mobile US\",\"TMO US\",\"31026\",0),(1,\"AT&T\",\"AT&T\",\"310410\",0),,(0, 1, 3),(0-2)";
-    static OperEntry expected[] = {
-        { "2", "T-Mobile US", "TMO US", "31026", "0" },
-        { "1", "AT&T", "AT&T", "310410", "0" },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "T-Mobile US", "TMO US", "31026", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("Option iCON 225", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("Option iCON 225", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_icon452 (void *f, gpointer d)
 {
     const char *reply = "+COPS: (1,\"T-Mobile US\",\"TMO US\",\"31026\",0),(2,\"T-Mobile\",\"T-Mobile\",\"310260\",2),(1,\"AT&T\",\"AT&T\",\"310410\",2),(1,\"AT&T\",\"AT&T\",\"310410\",0),,(0,1,2,3,4),(0,1,2)";
-    static OperEntry expected[] = {
-        { "1", "T-Mobile US", "TMO US", "31026", "0" },
-        { "2", "T-Mobile", "T-Mobile", "310260", "2" },
-        { "1", "AT&T", "AT&T", "310410", "2" },
-        { "1", "AT&T", "AT&T", "310410", "0" }
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "T-Mobile US", "TMO US", "31026", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "T-Mobile", "T-Mobile", "310260", MM_MODEM_ACCESS_TECH_UMTS },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_UMTS },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_GSM }
     };
 
-    test_cops_results ("Option iCON 452", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("Option iCON 452", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_f3507g (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"T - Mobile\",\"T - Mobile\",\"31026\",0),(1,\"AT&T\",\"AT&T\",\"310410\",0),(1,\"AT&T\",\"AT&T\",\"310410\",2)";
-    static OperEntry expected[] = {
-        { "2", "T - Mobile", "T - Mobile", "31026", "0" },
-        { "1", "AT&T", "AT&T", "310410", "0" },
-        { "1", "AT&T", "AT&T", "310410", "2" }
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "T - Mobile", "T - Mobile", "31026", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_UMTS }
     };
 
-    test_cops_results ("Ericsson F3507g", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("Ericsson F3507g", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_f3607gw (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"T - Mobile\",\"T - Mobile\",\"31026\",0),(1,\"AT&T\",\"AT&T\",\"310410\"),2),(1,\"AT&T\",\"AT&T\",\"310410\"),0)";
-    static OperEntry expected[] = {
-        { "2", "T - Mobile", "T - Mobile", "31026", "0" },
-        { "1", "AT&T", "AT&T", "310410", "2" },
-        { "1", "AT&T", "AT&T", "310410", "0" }
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "T - Mobile", "T - Mobile", "31026", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_UMTS },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_GSM }
     };
 
-    test_cops_results ("Ericsson F3607gw", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("Ericsson F3607gw", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_mc8775 (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"T-Mobile\",\"T-Mobile\",\"31026\",0),(1,\"AT&T\",\"AT&T\",\"310410\",2),(1,\"AT&T\",\"AT&T\",\"310410\",0),,(0,1,2,3,4),(0,1,2)";
-    static OperEntry expected[] = {
-        { "2", "T-Mobile", "T-Mobile", "31026", "0" },
-        { "1", "AT&T", "AT&T", "310410", "2" },
-        { "1", "AT&T", "AT&T", "310410", "0" }
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "T-Mobile", "T-Mobile", "31026", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_UMTS },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_GSM }
     };
 
-    test_cops_results ("Sierra MC8775", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("Sierra MC8775", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_n80 (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"T - Mobile\",,\"31026\"),(1,\"Einstein PCS\",,\"31064\"),(1,\"Cingular\",,\"31041\"),,(0,1,3),(0,2)";
-    static OperEntry expected[] = {
-        { "2", "T - Mobile", NULL, "31026", NULL },
-        { "1", "Einstein PCS", NULL, "31064", NULL },
-        { "1", "Cingular", NULL, "31041", NULL },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "T - Mobile", NULL, "31026", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "Einstein PCS", NULL, "31064", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "Cingular", NULL, "31041", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("Nokia N80", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("Nokia N80", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_e1550 (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"T-Mobile\",\"TMO\",\"31026\",0),(1,\"AT&T\",\"AT&T\",\"310410\",0),,(0,1,2,3,4),(0,1,2)";
-    static OperEntry expected[] = {
-        { "2", "T-Mobile", "TMO", "31026", "0" },
-        { "1", "AT&T", "AT&T", "310410", "0" },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "T-Mobile", "TMO", "31026", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("Huawei E1550", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("Huawei E1550", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_mf622 (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"T-Mobile\",\"T-Mobile\",\"31026\",0),(1,\"\",\"\",\"310410\",0),";
-    static OperEntry expected[] = {
-        { "2", "T-Mobile", "T-Mobile", "31026", "0" },
-        { "1", NULL, NULL, "310410", "0" },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "T-Mobile", "T-Mobile", "31026", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, NULL, NULL, "310410", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("ZTE MF622", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("ZTE MF622", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_e226 (void *f, gpointer d)
 {
     const char *reply = "+COPS: (1,\"\",\"\",\"31026\",0),(1,\"\",\"\",\"310410\",2),(1,\"\",\"\",\"310410\",0),,(0,1,3,4),(0,1,2)";
-    static OperEntry expected[] = {
-        { "1", NULL, NULL, "31026", "0" },
-        { "1", NULL, NULL, "310410", "2" },
-        { "1", NULL, NULL, "310410", "0" },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, NULL, NULL, "31026", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, NULL, NULL, "310410", MM_MODEM_ACCESS_TECH_UMTS },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, NULL, NULL, "310410", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("Huawei E226", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("Huawei E226", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_xu870 (void *f, gpointer d)
 {
     const char *reply = "+COPS: (0,\"AT&T MicroCell\",\"AT&T MicroCell\",\"310410\",2)\r\n+COPS: (1,\"AT&T MicroCell\",\"AT&T MicroCell\",\"310410\",0)\r\n+COPS: (1,\"T-Mobile\",\"TMO\",\"31026\",0)\r\n";
-    static OperEntry expected[] = {
-        { "0", "AT&T MicroCell", "AT&T MicroCell", "310410", "2" },
-        { "1", "AT&T MicroCell", "AT&T MicroCell", "310410", "0" },
-        { "1", "T-Mobile", "TMO", "31026", "0" },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_UNKNOWN, "AT&T MicroCell", "AT&T MicroCell", "310410", MM_MODEM_ACCESS_TECH_UMTS },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T MicroCell", "AT&T MicroCell", "310410", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "T-Mobile", "TMO", "31026", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("Novatel XU870", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("Novatel XU870", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_gtultraexpress (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"T-Mobile US\",\"TMO US\",\"31026\",0),(1,\"AT&T\",\"AT&T\",\"310410\",2),(1,\"AT&T\",\"AT&T\",\"310410\",0),,(0,1,2,3,4),(0,1,2)";
-    static OperEntry expected[] = {
-        { "2", "T-Mobile US", "TMO US", "31026", "0" },
-        { "1", "AT&T", "AT&T", "310410", "2" },
-        { "1", "AT&T", "AT&T", "310410", "0" },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "T-Mobile US", "TMO US", "31026", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_UMTS },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("Option GlobeTrotter Ultra Express", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("Option GlobeTrotter Ultra Express", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_n2720 (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"T - Mobile\",,\"31026\",0),\r\n(1,\"AT&T\",,\"310410\",0),,(0,1,3),(0,2)";
-    static OperEntry expected[] = {
-        { "2", "T - Mobile", NULL, "31026", "0" },
-        { "1", "AT&T", NULL, "310410", "0" },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "T - Mobile", NULL, "31026", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", NULL, "310410", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("Nokia 2720", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("Nokia 2720", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_gobi (void *f, gpointer d)
 {
     const char *reply = "+COPS: (2,\"T-Mobile\",\"T-Mobile\",\"31026\",0),(1,\"AT&T\",\"AT&T\",\"310410\",2),(1,\"AT&T\",\"AT&T\",\"310410\",0),,(0,1,2,3,4),(0,1,2)";
-    static OperEntry expected[] = {
-        { "2", "T-Mobile", "T-Mobile", "31026", "0" },
-        { "1", "AT&T", "AT&T", "310410", "2" },
-        { "1", "AT&T", "AT&T", "310410", "0" },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "T-Mobile", "T-Mobile", "31026", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_UMTS },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_AVAILABLE, "AT&T", "AT&T", "310410", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("Qualcomm Gobi", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("Qualcomm Gobi", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -422,41 +401,41 @@ test_cops_response_sek600i (void *f, gpointer d)
      * which is which...
      */
     const char *reply = "+COPS: (2,\"blau\",\"\",\"26203\"),(2,\"blau\",\"\",\"26203\"),(3,\"\",\"\",\"26201\"),(3,\"\",\"\",\"26202\"),(3,\"\",\"\",\"26207\"),(3,\"\",\"\",\"26201\"),(3,\"\",\"\",\"26207\")";
-    static OperEntry expected[] = {
-        { "2", "blau", NULL, "26203", NULL },
-        { "2", "blau", NULL, "26203", NULL },
-        { "3", NULL, NULL, "26201", NULL },
-        { "3", NULL, NULL, "26202", NULL },
-        { "3", NULL, NULL, "26207", NULL },
-        { "3", NULL, NULL, "26201", NULL },
-        { "3", NULL, NULL, "26207", NULL },
+    static MM3gppNetworkInfo expected[] = {
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "blau", NULL, "26203", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_CURRENT, "blau", NULL, "26203", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_FORBIDDEN, NULL, NULL, "26201", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_FORBIDDEN, NULL, NULL, "26202", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_FORBIDDEN, NULL, NULL, "26207", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_FORBIDDEN, NULL, NULL, "26201", MM_MODEM_ACCESS_TECH_GSM },
+        { MM_MODEM_3GPP_NETWORK_AVAILABILITY_FORBIDDEN, NULL, NULL, "26207", MM_MODEM_ACCESS_TECH_GSM },
     };
 
-    test_cops_results ("Sony-Ericsson K600i", reply, &expected[0], ARRAY_LEN (expected));
+    test_cops_results ("Sony-Ericsson K600i", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
 test_cops_response_gsm_invalid (void *f, gpointer d)
 {
-    const char *reply = "+COPS: (0,1,2,3),(1,2,3,4)";
-    GPtrArray *results;
+    const gchar *reply = "+COPS: (0,1,2,3),(1,2,3,4)";
+    GList *results;
     GError *error = NULL;
 
-    results = mm_gsm_parse_scan_response (reply, &error);
-    g_assert (results != NULL);
-    g_assert (error == NULL);
+    results = mm_3gpp_parse_scan_response (reply, &error);
+    g_assert (results == NULL);
+    g_assert_no_error (error);
 }
 
 static void
 test_cops_response_umts_invalid (void *f, gpointer d)
 {
     const char *reply = "+COPS: (0,1,2,3,4),(1,2,3,4,5)";
-    GPtrArray *results;
+   GList *results;
     GError *error = NULL;
 
-    results = mm_gsm_parse_scan_response (reply, &error);
-    g_assert (results != NULL);
-    g_assert (error == NULL);
+    results = mm_3gpp_parse_scan_response (reply, &error);
+    g_assert (results == NULL);
+    g_assert_no_error (error);
 }
 
 typedef struct {
@@ -1178,7 +1157,7 @@ test_cind_response_linktop_lw273 (void *f, gpointer d)
         { "message", 0, 1 }
     };
 
-    test_cind_results ("LW273", reply, &expected[0], ARRAY_LEN (expected));
+    test_cind_results ("LW273", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static void
@@ -1195,7 +1174,7 @@ test_cind_response_moto_v3m (void *f, gpointer d)
         { "smsfull", 0, 1 }
     };
 
-    test_cind_results ("Motorola V3m", reply, &expected[0], ARRAY_LEN (expected));
+    test_cind_results ("Motorola V3m", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
 static TestData *
@@ -1242,6 +1221,7 @@ int main (int argc, char **argv)
     gint result;
     DevidItem *item = &devids[0];
 
+    g_type_init ();
 	g_test_init (&argc, &argv, NULL);
 
 	suite = g_test_get_root ();

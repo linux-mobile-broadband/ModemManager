@@ -22,15 +22,19 @@
 #include "mm-modem-cdma.h"
 #include "mm-charsets.h"
 
-#define MM_SCAN_TAG_STATUS "status"
-#define MM_SCAN_TAG_OPER_LONG "operator-long"
-#define MM_SCAN_TAG_OPER_SHORT "operator-short"
-#define MM_SCAN_TAG_OPER_NUM "operator-num"
-#define MM_SCAN_TAG_ACCESS_TECH "access-tech"
+/* Network scan results expected */
+typedef struct {
+    MMModem3gppNetworkAvailability status;
+    gchar *operator_long;
+    gchar *operator_short;
+    gchar *operator_code; /* mandatory */
+    MMModemAccessTech access_tech;
+} MM3gppNetworkInfo;
 
-GPtrArray *mm_gsm_parse_scan_response (const char *reply, GError **error);
+void mm_3gpp_network_info_list_free (GList *info_list);
 
-void mm_gsm_destroy_scan_data (gpointer data);
+GList *mm_3gpp_parse_scan_response (const gchar *reply,
+                                    GError **error);
 
 GPtrArray *mm_gsm_creg_regex_get (gboolean solicited);
 
