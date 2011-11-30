@@ -855,6 +855,81 @@ mm_gsm_parse_cscs_support_response (const char *reply,
 
 /*************************************************************************/
 
+static void
+convert_operator_from_ucs2 (gchar **operator)
+{
+    const gchar *p;
+    gchar *converted;
+    gsize len;
+
+    g_return_if_fail (operator != NULL);
+    g_return_if_fail (*operator != NULL);
+
+    p = *operator;
+    len = strlen (p);
+
+    /* Len needs to be a multiple of 4 for UCS2 */
+    if ((len < 4) || ((len % 4) != 0))
+        return;
+
+    while (*p) {
+        if (!isxdigit (*p++))
+            return;
+    }
+
+    converted = mm_modem_charset_hex_to_utf8 (*operator, MM_MODEM_CHARSET_UCS2);
+    if (converted) {
+        g_free (*operator);
+        *operator = converted;
+    }
+}
+
+gchar *
+mm_3gpp_parse_operator (const gchar *reply,
+                        MMModemCharset cur_charset)
+{
+    gchar *operator = NULL;
+
+    if (reply && !strncmp (reply, "+COPS: ", 7)) {
+        /* Got valid reply */
+		GRegex *r;
+		GMatchInfo *match_info;
+
+		reply += 7;
+		r = g_regex_new ("(\\d),(\\d),\"(.+)\"", G_REGEX_UNGREEDY, 0, NULL);
+		if (!r)
+            return NULL;
+
+		g_regex_match (r, reply, 0, &match_info);
+		if (g_match_info_matches (match_info))
+            operator = g_match_info_fetch (match_info, 3);
+
+		g_match_info_free (match_info);
+		g_regex_unref (r);
+    }
+
+    if (operator) {
+        /* Some modems (Option & HSO) return the operator name as a hexadecimal
+         * string of the bytes of the operator name as encoded by the current
+         * character set.
+         */
+        if (cur_charset == MM_MODEM_CHARSET_UCS2)
+            convert_operator_from_ucs2 (&operator);
+
+        /* Ensure the operator name is valid UTF-8 so that we can send it
+         * through D-Bus and such.
+         */
+        if (!g_utf8_validate (operator, -1, NULL)) {
+            g_free (operator);
+            operator = NULL;
+        }
+    }
+
+    return operator;
+}
+
+/*************************************************************************/
+
 /* Map two letter facility codes into flag values. There are
  * many more facilities defined (for various flavors of call
  * barring); we only map the ones we care about. */

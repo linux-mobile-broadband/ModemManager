@@ -65,6 +65,9 @@ struct _MMBroadbandModemPrivate {
     MMModemCapability modem_current_capabilities;
     MMModem3gppRegistrationState modem_3gpp_registration_state;
 
+    /* Modem helpers */
+    MMModemCharset current_charset;
+
     /* 3GPP registration helpers */
     GPtrArray *reg_regex;
     MMModem3gppRegistrationState reg_cs;
@@ -827,8 +830,11 @@ current_charset_ready (MMBroadbandModem *self,
                                              MM_CORE_ERROR_FAILED,
                                              "Modem failed to change character set to %s",
                                              mm_modem_charset_to_string (ctx->charset));
-        else
+        else {
+            /* We'll keep track ourselves of the current charset */
+            self->priv->current_charset = current;
             g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        }
     }
 
     g_simple_async_result_complete (ctx->result);
@@ -1154,6 +1160,98 @@ load_imei (MMIfaceModem3gpp *self,
     mm_at_sequence (G_OBJECT (self),
                     mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
                     (MMAtCommand *)imei_commands,
+                    NULL, /* response_processor_context */
+                    FALSE,
+                    "s",
+                    NULL, /* TODO: cancellable */
+                    callback,
+                    user_data);
+}
+
+/*****************************************************************************/
+/* Operator Code */
+
+static gchar *
+load_operator_code_finish (MMIfaceModem3gpp *self,
+                           GAsyncResult *res,
+                           GError **error)
+{
+    GVariant *result;
+    gchar *operator_code;
+
+    result = mm_at_sequence_finish (G_OBJECT (self), res, error);
+    if (!result)
+        return NULL;
+
+    operator_code = mm_3gpp_parse_operator (g_variant_get_string (result, NULL),
+                                            MM_MODEM_CHARSET_UNKNOWN);
+    if (operator_code)
+        mm_dbg ("loaded Operator Code: %s", operator_code);
+
+    g_variant_unref (result);
+    return operator_code;
+}
+
+static const MMAtCommand operator_code_commands[] = {
+    { "+COPS=3,2;+COPS?",  3, (MMAtResponseProcessor)common_parse_string_reply },
+    { NULL }
+};
+
+static void
+load_operator_code (MMIfaceModem3gpp *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    mm_dbg ("loading Operator Code...");
+    mm_at_sequence (G_OBJECT (self),
+                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                    (MMAtCommand *)operator_code_commands,
+                    NULL, /* response_processor_context */
+                    FALSE,
+                    "s",
+                    NULL, /* TODO: cancellable */
+                    callback,
+                    user_data);
+}
+
+/*****************************************************************************/
+/* Operator Name */
+
+static gchar *
+load_operator_name_finish (MMIfaceModem3gpp *self,
+                           GAsyncResult *res,
+                           GError **error)
+{
+    GVariant *result;
+    gchar *operator_name;
+
+    result = mm_at_sequence_finish (G_OBJECT (self), res, error);
+    if (!result)
+        return NULL;
+
+    operator_name = mm_3gpp_parse_operator (g_variant_get_string (result, NULL),
+                                            MM_MODEM_CHARSET_UNKNOWN);
+    if (operator_name)
+        mm_dbg ("loaded Operator Name: %s", operator_name);
+
+    g_variant_unref (result);
+    return operator_name;
+}
+
+static const MMAtCommand operator_name_commands[] = {
+    { "+COPS=3,0;+COPS?",  3, (MMAtResponseProcessor)common_parse_string_reply },
+    { NULL }
+};
+
+static void
+load_operator_name (MMIfaceModem3gpp *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    mm_dbg ("loading Operator Name...");
+    mm_at_sequence (G_OBJECT (self),
+                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                    (MMAtCommand *)operator_name_commands,
                     NULL, /* response_processor_context */
                     FALSE,
                     "s",
@@ -2302,6 +2400,7 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv->reg_regex = mm_gsm_creg_regex_get (TRUE);
     self->priv->reg_cs = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     self->priv->reg_ps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    self->priv->current_charset = MM_MODEM_CHARSET_UNKNOWN;
 }
 
 static void
@@ -2367,6 +2466,10 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 {
     iface->load_imei = load_imei;
     iface->load_imei_finish = load_imei_finish;
+    iface->load_operator_code = load_operator_code;
+    iface->load_operator_code_finish = load_operator_code_finish;
+    iface->load_operator_name = load_operator_name;
+    iface->load_operator_name_finish = load_operator_name_finish;
 
     iface->setup_unsolicited_registration = setup_unsolicited_registration;
     iface->setup_unsolicited_registration_finish = setup_unsolicited_registration_finish;
