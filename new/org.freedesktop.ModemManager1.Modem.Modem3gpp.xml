@@ -62,7 +62,7 @@
               should not be present.
             </listitem>
           </varlistentry>
-          <varlistentry><term><literal>"operator-num"</literal></term>
+          <varlistentry><term><literal>"operator-code"</literal></term>
             <listitem>
               Mobile code of the operator, given as a string value (signature
               <literal>"s"</literal>). Returned in the format
