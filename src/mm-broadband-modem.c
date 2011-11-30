@@ -1391,6 +1391,63 @@ setup_unsolicited_registration (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Unsolicited registration messages cleaning up (3GPP) */
+
+static gboolean
+cleanup_unsolicited_registration_finish (MMIfaceModem3gpp *self,
+                                         GAsyncResult *res,
+                                         GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+cleanup_unsolicited_registration (MMIfaceModem3gpp *self,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    MMAtSerialPort *ports[2];
+    GPtrArray *array;
+    guint i;
+
+    mm_dbg ("cleaning up unsolicited registration messages handling");
+
+    /* Cancel any ongoing registration request */
+    clear_previous_registration_request (MM_BROADBAND_MODEM (self), TRUE);
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        cleanup_unsolicited_registration);
+
+    ports[0] = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+
+    /* Set up CREG unsolicited message handlers in both ports */
+    array = mm_gsm_creg_regex_get (FALSE);
+    for (i = 0; i < 2; i++) {
+        if (ports[i]) {
+            guint j;
+
+            for (j = 0; j < array->len; j++) {
+                mm_at_serial_port_add_unsolicited_msg_handler (
+                    MM_AT_SERIAL_PORT (ports[i]),
+                    (GRegex *) g_ptr_array_index (array, j),
+                    NULL,
+                    NULL,
+                    NULL);
+            }
+        }
+    }
+    mm_gsm_creg_regex_destroy (array);
+
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* Scan networks (3GPP) */
 
 static GList *
@@ -2617,6 +2674,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 
     iface->setup_unsolicited_registration = setup_unsolicited_registration;
     iface->setup_unsolicited_registration_finish = setup_unsolicited_registration_finish;
+    iface->cleanup_unsolicited_registration = cleanup_unsolicited_registration;
+    iface->cleanup_unsolicited_registration_finish = cleanup_unsolicited_registration_finish;
     iface->setup_cs_registration = setup_cs_registration;
     iface->setup_cs_registration_finish = setup_cs_registration_finish;
     iface->run_cs_registration_check = run_cs_registration_check;
