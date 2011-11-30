@@ -264,42 +264,58 @@ void
 mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
                                                MMModem3gppRegistrationState new_state)
 {
-    MMModem3gppRegistrationState previous_state;
+    MMModem3gppRegistrationState old_state;
 
     /* Only set new state if different */
     g_object_get (self,
-                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, &previous_state,
+                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, &old_state,
                   NULL);
-    if (new_state == previous_state)
-        return;
+    if (new_state != old_state) {
+        GEnumClass *enum_class;
+        GEnumValue *new_value;
+        GEnumValue *old_value;
+        const gchar *dbus_path;
 
-    g_object_set (self,
-                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, new_state,
-                  NULL);
+        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_3GPP_REGISTRATION_STATE));
+        new_value = g_enum_get_value (enum_class, new_state);
+        old_value = g_enum_get_value (enum_class, old_state);
+        dbus_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (self));
+        mm_info ("Modem %s: 3GPP Registration state changed (%s -> %s)",
+                 dbus_path,
+                 old_value->value_nick,
+                 new_value->value_nick);
+        g_type_class_unref (enum_class);
 
-    /* TODO:
-     * While connected we don't want registration status changes to change
-     * the modem's state away from CONNECTED.
-     */
-    switch (new_state) {
-    case MM_MODEM_3GPP_REGISTRATION_STATE_HOME:
-    case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING:
-        mm_iface_modem_update_state (MM_IFACE_MODEM (self),
-                                     MM_MODEM_STATE_REGISTERED,
-                                     MM_MODEM_STATE_REASON_NONE);
-        break;
-    case MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING:
-        mm_iface_modem_update_state (MM_IFACE_MODEM (self),
-                                     MM_MODEM_STATE_SEARCHING,
-                                     MM_MODEM_STATE_REASON_NONE);
-        break;
-    case MM_MODEM_3GPP_REGISTRATION_STATE_IDLE:
-    case MM_MODEM_3GPP_REGISTRATION_STATE_DENIED:
-    case MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN:
-        mm_iface_modem_update_state (MM_IFACE_MODEM (self),
-                                     MM_MODEM_STATE_ENABLED,
-                                     MM_MODEM_STATE_REASON_NONE);
-        break;
+        /* The property in the interface is bound to the property
+         * in the skeleton, so just updating here is enough */
+        g_object_set (self,
+                      MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, new_state,
+                      NULL);
+
+        /* TODO:
+         * While connected we don't want registration status changes to change
+         * the modem's state away from CONNECTED.
+         */
+        switch (new_state) {
+        case MM_MODEM_3GPP_REGISTRATION_STATE_HOME:
+        case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING:
+            mm_iface_modem_update_state (MM_IFACE_MODEM (self),
+                                         MM_MODEM_STATE_REGISTERED,
+                                         MM_MODEM_STATE_REASON_NONE);
+            break;
+        case MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING:
+            mm_iface_modem_update_state (MM_IFACE_MODEM (self),
+                                         MM_MODEM_STATE_SEARCHING,
+                                         MM_MODEM_STATE_REASON_NONE);
+            break;
+        case MM_MODEM_3GPP_REGISTRATION_STATE_IDLE:
+        case MM_MODEM_3GPP_REGISTRATION_STATE_DENIED:
+        case MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN:
+            mm_iface_modem_update_state (MM_IFACE_MODEM (self),
+                                         MM_MODEM_STATE_ENABLED,
+                                         MM_MODEM_STATE_REASON_NONE);
+            break;
+        }
     }
 }
 
