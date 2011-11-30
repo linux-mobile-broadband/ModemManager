@@ -112,9 +112,9 @@ mm_gsm_parse_scan_response (const char *reply, GError **error)
      *       +COPS: (2,"","T-Mobile","31026",0),(1,"AT&T","AT&T","310410"),0)
      */
 
-    r = g_regex_new ("\\((\\d),([^,\\)]*),([^,\\)]*),([^,\\)]*)[\\)]?,(\\d)\\)", G_REGEX_UNGREEDY, 0, NULL);
+    r = g_regex_new ("\\((\\d),([^,\\)]*),([^,\\)]*),([^,\\)]*)[\\)]?,(\\d)\\)", G_REGEX_UNGREEDY, 0, &err);
     if (err) {
-        g_error ("Invalid regular expression: %s", err->message);
+        mm_err ("Invalid regular expression: %s", err->message);
         g_error_free (err);
         g_set_error_literal (error,
                              MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
@@ -141,9 +141,9 @@ mm_gsm_parse_scan_response (const char *reply, GError **error)
          *       +COPS: (2,"T - Mobile",,"31026"),(1,"Einstein PCS",,"31064"),(1,"Cingular",,"31041"),,(0,1,3),(0,2)
          */
 
-        r = g_regex_new ("\\((\\d),([^,\\)]*),([^,\\)]*),([^\\)]*)\\)", G_REGEX_UNGREEDY, 0, NULL);
+        r = g_regex_new ("\\((\\d),([^,\\)]*),([^,\\)]*),([^\\)]*)\\)", G_REGEX_UNGREEDY, 0, &err);
         if (err) {
-            g_error ("Invalid regular expression: %s", err->message);
+            mm_err ("Invalid regular expression: %s", err->message);
             g_error_free (err);
             g_set_error_literal (error,
                                  MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
