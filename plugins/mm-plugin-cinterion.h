@@ -24,7 +24,6 @@
 #define MM_PLUGIN_CINTERION_H
 
 #include "mm-plugin-base.h"
-#include "mm-generic-gsm.h"
 
 #define MM_TYPE_PLUGIN_CINTERION            (mm_plugin_cinterion_get_type ())
 #define MM_PLUGIN_CINTERION(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_CINTERION, MMPluginCinterion))
