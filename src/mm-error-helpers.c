@@ -116,25 +116,21 @@ static ErrorTable me_errors[] = {
 GError *
 mm_mobile_equipment_error_for_code (MMMobileEquipmentError code)
 {
-    const gchar *msg = NULL;
     guint i;
 
     /* Look for the code */
     for (i = 0; i < G_N_ELEMENTS (me_errors); i++) {
-        if (me_errors[i].code == code) {
-            msg = me_errors[i].message;
-            break;
-        }
+        if (me_errors[i].code == code)
+            return g_error_new_literal (MM_MOBILE_EQUIPMENT_ERROR,
+                                        code,
+                                        me_errors[i].message);
     }
 
     /* Not found? Then, default */
-    if (!msg) {
-        g_warning ("Invalid mobile equipment error code: %d", code);
-        code = MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN;
-        msg = "Unknown error";
-    }
-
-    return g_error_new_literal (MM_MOBILE_EQUIPMENT_ERROR, code, msg);
+    g_warning ("Invalid mobile equipment error code: %u", (guint)code);
+    return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                        MM_MOBILE_EQUIPMENT_ERROR_UNKNOWN,
+                        "Unknown error");
 }
 
 GError *
