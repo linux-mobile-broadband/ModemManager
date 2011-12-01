@@ -36,6 +36,7 @@
  * @MM_CORE_ERROR_INVALID_ARGS: Invalid arguments given.
  * @MM_CORE_ERROR_IN_PROGRESS: Operation is already in progress.
  * @MM_CORE_ERROR_WRONG_STATE: Operation cannot be executed in the current state.
+ * @MM_CORE_ERROR_CONNECTED: Operation cannot be executed while being connected.
  *
  * Common errors that may be reported by ModemManager.
  */
@@ -49,6 +50,7 @@ typedef enum { /*< underscore_name=mm_core_error >*/
     MM_CORE_ERROR_INVALID_ARGS = 6,
     MM_CORE_ERROR_IN_PROGRESS  = 7,
     MM_CORE_ERROR_WRONG_STATE  = 8,
+    MM_CORE_ERROR_CONNECTED    = 9,
 } MMCoreError;
 
 /**
