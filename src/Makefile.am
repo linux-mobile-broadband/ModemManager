@@ -112,6 +112,8 @@ modem_manager_SOURCES = \
 	mm-plugin-manager.h \
 	mm-sim.h \
 	mm-sim.c \
+	mm-base-modem-at.h \
+	mm-base-modem-at.c \
 	mm-base-modem.h \
 	mm-base-modem.c \
 	mm-iface-modem.h \
