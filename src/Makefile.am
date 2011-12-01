@@ -101,8 +101,6 @@ modem_manager_SOURCES = \
 	main.c \
 	mm-log.c \
 	mm-log.h \
-	mm-at.h \
-	mm-at.c \
 	mm-callback-info.c \
 	mm-callback-info.h \
 	$(auth_sources) \

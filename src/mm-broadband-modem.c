@@ -25,7 +25,7 @@
 #include <mm-errors-types.h>
 #include <mm-enums-types.h>
 
-#include "mm-at.h"
+#include "mm-base-modem-at.h"
 #include "mm-broadband-modem.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
@@ -77,40 +77,6 @@ struct _MMBroadbandModemPrivate {
     GSimpleAsyncResult *pending_reg_request;
 };
 
-static gboolean
-common_parse_string_reply (MMBroadbandModem *self,
-                           gpointer none,
-                           const gchar *command,
-                           const gchar *response,
-                           const GError *error,
-                           GVariant **result,
-                           GError **result_error)
-{
-    if (error) {
-        *result_error = g_error_copy (error);
-        return FALSE;
-    }
-
-    *result = g_variant_new_string (response);
-    return TRUE;
-}
-
-static gboolean
-common_parse_no_reply (MMBroadbandModem *self,
-                       gpointer none,
-                       const gchar *command,
-                       const gchar *response,
-                       const GError *error,
-                       GVariant **result,
-                       GError **result_error)
-{
-    if (error) {
-        *result_error = g_error_copy (error);
-        return FALSE;
-    }
-    return TRUE;
-}
-
 /*****************************************************************************/
 /* CAPABILITIES */
 
@@ -135,7 +101,7 @@ static const ModemCaps modem_caps[] = {
 };
 
 static gboolean
-parse_caps_gcap (MMBroadbandModem *self,
+parse_caps_gcap (MMBaseModem *self,
                  gpointer none,
                  const gchar *command,
                  const gchar *response,
@@ -167,7 +133,7 @@ parse_caps_gcap (MMBroadbandModem *self,
 }
 
 static gboolean
-parse_caps_cpin (MMBroadbandModem *self,
+parse_caps_cpin (MMBaseModem *self,
                  gpointer none,
                  const gchar *command,
                  const gchar *response,
@@ -199,7 +165,7 @@ parse_caps_cpin (MMBroadbandModem *self,
 }
 
 static gboolean
-parse_caps_cgmm (MMBroadbandModem *self,
+parse_caps_cgmm (MMBaseModem *self,
                  gpointer none,
                  const gchar *command,
                  const gchar *response,
@@ -258,7 +224,7 @@ load_current_capabilities_finish (MMIfaceModem *self,
     MMModemCapability caps;
     gchar *caps_str;
 
-    result = mm_at_sequence_finish (G_OBJECT (self), res, error);
+    result = mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
     if (!result)
         return MM_MODEM_CAPABILITY_NONE;
 
@@ -266,16 +232,14 @@ load_current_capabilities_finish (MMIfaceModem *self,
     caps_str = create_capabilities_string (caps);
     mm_dbg ("loaded current capabilities: %s", caps_str);
     g_free (caps_str);
-
-    g_variant_unref (result);
     return caps;
 }
 
-static const MMAtCommand capabilities[] = {
-    { "+GCAP",  2, (MMAtResponseProcessor)parse_caps_gcap },
-    { "I",      1, (MMAtResponseProcessor)parse_caps_gcap },
-    { "+CPIN?", 1, (MMAtResponseProcessor)parse_caps_cpin },
-    { "+CGMM",  1, (MMAtResponseProcessor)parse_caps_cgmm },
+static const MMBaseModemAtCommand capabilities[] = {
+    { "+GCAP",  2, TRUE,  parse_caps_gcap },
+    { "I",      1, TRUE,  parse_caps_gcap }, /* yes, really parse as +GCAP */
+    { "+CPIN?", 1, FALSE, parse_caps_cpin },
+    { "+CGMM",  1, TRUE,  parse_caps_cgmm },
     { NULL }
 };
 
@@ -285,15 +249,16 @@ load_current_capabilities (MMIfaceModem *self,
                            gpointer user_data)
 {
     mm_dbg ("loading current capabilities...");
-    mm_at_sequence (G_OBJECT (self),
-                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                    (MMAtCommand *)capabilities,
-                    NULL, /* response_processor_context */
-                    FALSE,
-                    "u",
-                    NULL, /* TODO: cancellable */
-                    callback,
-                    user_data);
+
+    /* Launch sequence, we will expect a "u" GVariant */
+    mm_base_modem_at_sequence (
+        MM_BASE_MODEM (self),
+        capabilities,
+        NULL, /* response_processor_context */
+        NULL, /* response_processor_context_free */
+        NULL, /* cancellable */
+        callback,
+        user_data);
 }
 
 /*****************************************************************************/
@@ -307,19 +272,18 @@ load_manufacturer_finish (MMIfaceModem *self,
     GVariant *result;
     gchar *manufacturer;
 
-    result = mm_at_sequence_finish (G_OBJECT (self), res, error);
+    result = mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
     if (!result)
         return NULL;
 
     manufacturer = g_variant_dup_string (result, NULL);
     mm_dbg ("loaded manufacturer: %s", manufacturer);
-    g_variant_unref (result);
     return manufacturer;
 }
 
-static const MMAtCommand manufacturers[] = {
-    { "+CGMI",  3, (MMAtResponseProcessor)common_parse_string_reply },
-    { "+GMI",   3, (MMAtResponseProcessor)common_parse_string_reply },
+static const MMBaseModemAtCommand manufacturers[] = {
+    { "+CGMI",  3, TRUE, mm_base_modem_response_processor_string },
+    { "+GMI",   3, TRUE, mm_base_modem_response_processor_string },
     { NULL }
 };
 
@@ -329,15 +293,14 @@ load_manufacturer (MMIfaceModem *self,
                    gpointer user_data)
 {
     mm_dbg ("loading manufacturer...");
-    mm_at_sequence (G_OBJECT (self),
-                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                    (MMAtCommand *)manufacturers,
-                    NULL, /* response_processor_context */
-                    FALSE,
-                    "s",
-                    NULL, /* TODO: cancellable */
-                    callback,
-                    user_data);
+    mm_base_modem_at_sequence (
+        MM_BASE_MODEM (self),
+        manufacturers,
+        NULL, /* response_processor_context */
+        NULL, /* response_processor_context_free */
+        NULL, /* cancellable */
+        callback,
+        user_data);
 }
 
 /*****************************************************************************/
@@ -351,19 +314,18 @@ load_model_finish (MMIfaceModem *self,
     GVariant *result;
     gchar *model;
 
-    result = mm_at_sequence_finish (G_OBJECT (self), res, error);
+    result = mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
     if (!result)
         return NULL;
 
     model = g_variant_dup_string (result, NULL);
     mm_dbg ("loaded model: %s", model);
-    g_variant_unref (result);
     return model;
 }
 
-static const MMAtCommand models[] = {
-    { "+CGMM",  3, (MMAtResponseProcessor)common_parse_string_reply },
-    { "+GMM",   3, (MMAtResponseProcessor)common_parse_string_reply },
+static const MMBaseModemAtCommand models[] = {
+    { "+CGMM",  3, TRUE, mm_base_modem_response_processor_string },
+    { "+GMM",   3, TRUE, mm_base_modem_response_processor_string },
     { NULL }
 };
 
@@ -373,15 +335,14 @@ load_model (MMIfaceModem *self,
             gpointer user_data)
 {
     mm_dbg ("loading model...");
-    mm_at_sequence (G_OBJECT (self),
-                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                    (MMAtCommand *)models,
-                    NULL, /* response_processor_context */
-                    FALSE,
-                    "s",
-                    NULL, /* TODO: cancellable */
-                    callback,
-                    user_data);
+    mm_base_modem_at_sequence (
+        MM_BASE_MODEM (self),
+        models,
+        NULL, /* response_processor_context */
+        NULL, /* response_processor_context_free */
+        NULL, /* cancellable */
+        callback,
+        user_data);
 }
 
 /*****************************************************************************/
@@ -395,19 +356,18 @@ load_revision_finish (MMIfaceModem *self,
     GVariant *result;
     gchar *revision;
 
-    result = mm_at_sequence_finish (G_OBJECT (self), res, error);
+    result = mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
     if (!result)
         return NULL;
 
     revision = g_variant_dup_string (result, NULL);
     mm_dbg ("loaded revision: %s", revision);
-    g_variant_unref (result);
     return revision;
 }
 
-static const MMAtCommand revisions[] = {
-    { "+CGMR",  3, (MMAtResponseProcessor)common_parse_string_reply },
-    { "+GMR",   3, (MMAtResponseProcessor)common_parse_string_reply },
+static const MMBaseModemAtCommand revisions[] = {
+    { "+CGMR",  3, TRUE, mm_base_modem_response_processor_string },
+    { "+GMR",   3, TRUE, mm_base_modem_response_processor_string },
     { NULL }
 };
 
@@ -417,15 +377,14 @@ load_revision (MMIfaceModem *self,
                gpointer user_data)
 {
     mm_dbg ("loading revision...");
-    mm_at_sequence (G_OBJECT (self),
-                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                    (MMAtCommand *)revisions,
-                    NULL, /* response_processor_context */
-                    FALSE,
-                    "s",
-                    NULL, /* TODO: cancellable */
-                    callback,
-                    user_data);
+    mm_base_modem_at_sequence (
+        MM_BASE_MODEM (self),
+        revisions,
+        NULL, /* response_processor_context */
+        NULL, /* response_processor_context_free */
+        NULL, /* cancellable */
+        callback,
+        user_data);
 }
 
 /*****************************************************************************/
@@ -439,19 +398,18 @@ load_equipment_identifier_finish (MMIfaceModem *self,
     GVariant *result;
     gchar *equipment_identifier;
 
-    result = mm_at_sequence_finish (G_OBJECT (self), res, error);
+    result = mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
     if (!result)
         return NULL;
 
     equipment_identifier = g_variant_dup_string (result, NULL);
     mm_dbg ("loaded equipment identifier: %s", equipment_identifier);
-    g_variant_unref (result);
     return equipment_identifier;
 }
 
-static const MMAtCommand equipment_identifiers[] = {
-    { "+CGSN",  3, (MMAtResponseProcessor)common_parse_string_reply },
-    { "+GSN",   3, (MMAtResponseProcessor)common_parse_string_reply },
+static const MMBaseModemAtCommand equipment_identifiers[] = {
+    { "+CGSN",  3, TRUE, mm_base_modem_response_processor_string },
+    { "+GSN",   3, TRUE, mm_base_modem_response_processor_string },
     { NULL }
 };
 
@@ -461,45 +419,27 @@ load_equipment_identifier (MMIfaceModem *self,
                            gpointer user_data)
 {
     mm_dbg ("loading equipment identifier...");
-    mm_at_sequence (G_OBJECT (self),
-                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                    (MMAtCommand *)equipment_identifiers,
-                    NULL, /* response_processor_context */
-                    FALSE,
-                    "s",
-                    NULL, /* TODO: cancellable */
-                    callback,
-                    user_data);
+    mm_base_modem_at_sequence (
+        MM_BASE_MODEM (self),
+        equipment_identifiers,
+        NULL, /* response_processor_context */
+        NULL, /* response_processor_context_free */
+        NULL, /* cancellable */
+        callback,
+        user_data);
 }
 
 /*****************************************************************************/
 /* DEVICE IDENTIFIER */
 
-static gboolean
-parse_optional_string_reply (MMBroadbandModem *self,
-                             gpointer none,
-                             const gchar *command,
-                             const gchar *response,
-                             const GError *error,
-                             GVariant **result,
-                             GError **result_error)
-{
-    *result = (error ?
-               NULL :
-               g_variant_new_string (response));
-    return TRUE;
-}
-
 typedef struct {
     gchar *ati;
     gchar *ati1;
-    GSimpleAsyncResult *result;
 } DeviceIdentifierContext;
 
 static void
 device_identifier_context_free (DeviceIdentifierContext *ctx)
 {
-    g_object_unref (ctx->result);
     g_free (ctx->ati);
     g_free (ctx->ati1);
     g_free (ctx);
@@ -510,103 +450,77 @@ load_device_identifier_finish (MMIfaceModem *self,
                                GAsyncResult *res,
                                GError **error)
 {
+    GError *inner_error = NULL;
+    gpointer ctx = NULL;
     gchar *device_identifier;
 
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, &ctx, &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
         return NULL;
+    }
 
-    device_identifier = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    g_assert (ctx != NULL);
+    device_identifier = mm_create_device_identifier (
+        mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)),
+        mm_base_modem_get_product_id (MM_BASE_MODEM (self)),
+        ((DeviceIdentifierContext *)ctx)->ati,
+        ((DeviceIdentifierContext *)ctx)->ati1,
+        mm_gdbus_modem_get_equipment_identifier (
+            MM_GDBUS_MODEM (MM_BROADBAND_MODEM (self)->priv->modem_dbus_skeleton)),
+        mm_gdbus_modem_get_revision (
+            MM_GDBUS_MODEM (MM_BROADBAND_MODEM (self)->priv->modem_dbus_skeleton)),
+        mm_gdbus_modem_get_model (
+            MM_GDBUS_MODEM (MM_BROADBAND_MODEM (self)->priv->modem_dbus_skeleton)),
+        mm_gdbus_modem_get_manufacturer (
+            MM_GDBUS_MODEM (MM_BROADBAND_MODEM (self)->priv->modem_dbus_skeleton)));
+
     mm_dbg ("loaded device identifier: %s", device_identifier);
     return device_identifier;
 }
 
-static void
-ati1_ready (MMBroadbandModem *self,
-            GAsyncResult *res,
-            DeviceIdentifierContext *ctx)
+static gboolean
+parse_ati_reply (MMBaseModem *self,
+                 DeviceIdentifierContext *ctx,
+                 const gchar *command,
+                 const gchar *response,
+                 const GError *error,
+                 GVariant **result,
+                 GError **result_error)
 {
-    gchar *device_identifier;
-    GVariant *result;
-
-    result = mm_at_command_finish (G_OBJECT (self), res, NULL);
-    if (result) {
-        ctx->ati1 = g_variant_dup_string (result, NULL);
-        g_variant_unref (result);
+    /* Store the proper string in the proper place */
+    if (!error) {
+        if (g_str_equal (command, "ATI1"))
+            ctx->ati1 = g_strdup (response);
+        else
+            ctx->ati = g_strdup (response);
     }
 
-    device_identifier = mm_create_device_identifier (
-        mm_base_modem_get_vendor_id (MM_BASE_MODEM (self)),
-        mm_base_modem_get_product_id (MM_BASE_MODEM (self)),
-        ctx->ati,
-        ctx->ati1,
-        mm_gdbus_modem_get_equipment_identifier (MM_GDBUS_MODEM (self->priv->modem_dbus_skeleton)),
-        mm_gdbus_modem_get_revision (MM_GDBUS_MODEM (self->priv->modem_dbus_skeleton)),
-        mm_gdbus_modem_get_model (MM_GDBUS_MODEM (self->priv->modem_dbus_skeleton)),
-        mm_gdbus_modem_get_manufacturer (MM_GDBUS_MODEM (self->priv->modem_dbus_skeleton)));
-
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               device_identifier,
-                                               NULL);
-    g_simple_async_result_complete (ctx->result);
-    device_identifier_context_free (ctx);
+    /* Always keep on, this is a sequence where all the steps should be taken */
+    return TRUE;
 }
 
-static void
-ati_ready (MMBroadbandModem *self,
-           GAsyncResult *res,
-           DeviceIdentifierContext *ctx)
-{
-    GVariant *result;
-
-    result = mm_at_command_finish (G_OBJECT (self), res, NULL);
-    if (result) {
-        ctx->ati = g_variant_dup_string (result, NULL);
-        g_variant_unref (result);
-    }
-
-    /* Go on with ATI1 */
-    mm_at_command (G_OBJECT (self),
-                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                   "ATI1",
-                   3,
-                   (MMAtResponseProcessor)parse_optional_string_reply,
-                   NULL, /* response_processor_context */
-                   "s",
-                   NULL, /* TODO: cancellable */
-                   (GAsyncReadyCallback)ati1_ready,
-                   ctx);
-}
+static const MMBaseModemAtCommand device_identifier_steps[] = {
+    { "ATI",  3, TRUE, (MMBaseModemAtResponseProcessor)parse_ati_reply },
+    { "ATI1", 3, TRUE, (MMBaseModemAtResponseProcessor)parse_ati_reply },
+    { NULL }
+};
 
 static void
 load_device_identifier (MMIfaceModem *self,
                         GAsyncReadyCallback callback,
                         gpointer user_data)
 {
-    DeviceIdentifierContext *ctx;
-
     mm_dbg ("loading device identifier...");
 
-    /* To build the device identifier, we still need to get the replies for:
-     *  - ATI
-     *  - ATI1
-     */
-
-    ctx = g_new0 (DeviceIdentifierContext, 1);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             load_device_identifier);
-
-    mm_at_command (G_OBJECT (self),
-                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                   "ATI",
-                   3,
-                   (MMAtResponseProcessor)parse_optional_string_reply,
-                   NULL, /* response_processor_context */
-                   "s",
-                   NULL, /* TODO: cancellable */
-                   (GAsyncReadyCallback)ati_ready,
-                   ctx);
+    mm_base_modem_at_sequence (
+        MM_BASE_MODEM (self),
+        device_identifier_steps,
+        g_new0 (DeviceIdentifierContext, 1),
+        (GDestroyNotify)device_identifier_context_free,
+        NULL, /* cancellable */
+        callback,
+        user_data);
 }
 
 /*****************************************************************************/
@@ -638,27 +552,24 @@ static CPinResult unlock_results[] = {
     { NULL }
 };
 
-static gboolean
-parse_unlock_required_reply (MMBroadbandModem *self,
-                             gpointer none,
-                             const gchar *command,
-                             const gchar *response,
-                             const GError *error,
-                             GVariant **result,
-                             GError **result_error)
+static MMModemLock
+load_unlock_required_finish (MMIfaceModem *self,
+                             GAsyncResult *res,
+                             GError **error)
 {
-    if (error) {
-        /* Let errors here be fatal */
-        *result_error = g_error_copy (error);
-        return FALSE;
-    }
+    MMModemLock lock = MM_MODEM_LOCK_UNKNOWN;
+    const gchar *result;
 
-    if (response &&
-        strstr (response, "+CPIN: ")) {
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!result)
+        return lock;
+
+    if (result &&
+        strstr (result, "+CPIN: ")) {
         CPinResult *iter = &unlock_results[0];
         const gchar *str;
 
-        str = strstr (response, "+CPIN: ") + 7;
+        str = strstr (result, "+CPIN: ") + 7;
 
         /* Some phones (Motorola EZX models) seem to quote the response */
         if (str[0] == '"')
@@ -667,51 +578,14 @@ parse_unlock_required_reply (MMBroadbandModem *self,
         /* Translate the reply */
         while (iter->result) {
             if (g_str_has_prefix (str, iter->result)) {
-                *result = g_variant_new_uint32 (iter->code);
-                return TRUE;
+                lock = iter->code;
+                break;
             }
             iter++;
         }
     }
 
-    /* Assume unlocked if we don't recognize the pin request result */
-    *result = g_variant_new_uint32 (MM_MODEM_LOCK_NONE);
-    return TRUE;
-}
-
-static MMModemLock
-load_unlock_required_finish (MMIfaceModem *self,
-                             GAsyncResult *res,
-                             GError **error)
-{
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_LOCK_UNKNOWN;
-
-    return (MMModemLock) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-}
-
-static void
-load_unlock_required_ready (MMBroadbandModem *self,
-                            GAsyncResult *res,
-                            GSimpleAsyncResult *unlock_required_result)
-{
-    GError *error = NULL;
-    GVariant *command_result;
-
-    command_result = mm_at_command_finish (G_OBJECT (self), res, &error);
-    if (!command_result) {
-        g_assert (error);
-        g_simple_async_result_take_error (unlock_required_result, error);
-    }
-    else {
-        g_simple_async_result_set_op_res_gpointer (unlock_required_result,
-                                                   GUINT_TO_POINTER (g_variant_get_uint32 (command_result)),
-                                                   NULL);
-        g_variant_unref (command_result);
-    }
-
-    g_simple_async_result_complete (unlock_required_result);
-    g_object_unref (unlock_required_result);
+    return lock;
 }
 
 static void
@@ -719,38 +593,36 @@ load_unlock_required (MMIfaceModem *self,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
-    GSimpleAsyncResult *result;
-
     mm_dbg ("checking if unlock required...");
 
-    result  = g_simple_async_result_new (G_OBJECT (self),
-                                         callback,
-                                         user_data,
-                                         load_unlock_required);
-    mm_at_command (G_OBJECT (self),
-                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                   "+CPIN?",
-                   3,
-                   (MMAtResponseProcessor)parse_unlock_required_reply,
-                   NULL, /* response_processor_context */
-                   "u",
-                   NULL, /* TODO: cancellable */
-                   (GAsyncReadyCallback)load_unlock_required_ready,
-                   result);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CPIN?",
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              callback,
+                              user_data);
 }
 
 /*****************************************************************************/
+/* SETTING MODEM CHARSET */
 
 typedef struct {
     GSimpleAsyncResult *result;
     MMModemCharset charset;
-    gboolean tried_without_quotes;
+    /* Commands to try in the sequence:
+     *  First one with quotes
+     *  Second without.
+     *  + last NUL */
+    MMBaseModemAtCommand charset_commands[3];
 } ModemCharsetContext;
 
 static void
 modem_charset_context_free (ModemCharsetContext *ctx)
 {
     g_object_unref (ctx->result);
+    g_free (ctx->charset_commands[0].command);
+    g_free (ctx->charset_commands[1].command);
     g_free (ctx);
 }
 
@@ -765,65 +637,28 @@ modem_charset_finish (MMIfaceModem *self,
     return TRUE;
 }
 
-static gboolean
-parse_modem_charset_reply (MMBroadbandModem *self,
-                           gpointer none,
-                           const gchar *command,
-                           const gchar *response,
-                           const GError *error,
-                           GVariant **result,
-                           GError **result_error)
-{
-    if (error) {
-        *result_error = g_error_copy (error);
-        return FALSE;
-    }
-    return TRUE;
-}
-
-static gboolean
-parse_current_charset_reply (MMBroadbandModem *self,
-                             gpointer none,
-                             const gchar *command,
-                             const gchar *response,
-                             const GError *error,
-                             GVariant **result,
-                             GError **result_error)
-{
-    const gchar *p;
-    MMModemCharset current;
-
-    if (error) {
-        *result_error = g_error_copy (error);
-        return FALSE;
-    }
-
-    p = response;
-    if (g_str_has_prefix (p, "+CSCS:"))
-        p += 6;
-    while (*p == ' ')
-        p++;
-
-    current = mm_modem_charset_from_string (p);
-    *result = g_variant_new_uint32 (current);
-    return TRUE;
-}
-
 static void
 current_charset_ready (MMBroadbandModem *self,
-                       GAsyncResult *result,
+                       GAsyncResult *res,
                        ModemCharsetContext *ctx)
 {
     GError *error = NULL;
-    GVariant *reply;
-    MMModemCharset current;
+    const gchar *response;
 
-    reply = mm_at_command_finish (G_OBJECT (self), result, &error);
-    if (error) {
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response)
         g_simple_async_result_take_error (ctx->result, error);
-    } else {
-        g_assert (reply != NULL);
-        current = g_variant_get_uint32 (reply);
+    else {
+        MMModemCharset current;
+        const gchar *p;
+
+        p = response;
+        if (g_str_has_prefix (p, "+CSCS:"))
+            p += 6;
+        while (*p == ' ')
+            p++;
+
+        current = mm_modem_charset_from_string (p);
         if (ctx->charset != current)
             g_simple_async_result_set_error (ctx->result,
                                              MM_CORE_ERROR,
@@ -831,7 +666,8 @@ current_charset_ready (MMBroadbandModem *self,
                                              "Modem failed to change character set to %s",
                                              mm_modem_charset_to_string (ctx->charset));
         else {
-            /* We'll keep track ourselves of the current charset */
+            /* We'll keep track ourselves of the current charset.
+             * TODO: Make this a property so that plugins can also store it. */
             self->priv->current_charset = current;
             g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         }
@@ -843,38 +679,13 @@ current_charset_ready (MMBroadbandModem *self,
 
 static void
 modem_charset_ready (MMBroadbandModem *self,
-                     GAsyncResult *result,
+                     GAsyncResult *res,
                      ModemCharsetContext *ctx)
 {
     GError *error = NULL;
 
-    mm_at_command_finish (G_OBJECT (self), result, &error);
+    mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, &error);
     if (error) {
-        if (!ctx->tried_without_quotes) {
-            gchar *command;
-
-            g_error_free (error);
-            ctx->tried_without_quotes = TRUE;
-
-            /* Some modems puke if you include the quotes around the character
-             * set name, so lets try it again without them.
-             */
-            command = g_strdup_printf ("+CSCS=%s",
-                                       mm_modem_charset_to_string (ctx->charset));
-            mm_at_command (G_OBJECT (self),
-                           mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                           command,
-                           3,
-                           (MMAtResponseProcessor)parse_modem_charset_reply,
-                           NULL,  /* response processor context */
-                           NULL,  /* reply signature */
-                           NULL,  /* cancellable */
-                           (GAsyncReadyCallback)modem_charset_ready,
-                           ctx);
-            g_free (command);
-            return;
-        }
-
         g_simple_async_result_take_error (ctx->result, error);
         g_simple_async_result_complete (ctx->result);
         modem_charset_context_free (ctx);
@@ -882,16 +693,13 @@ modem_charset_ready (MMBroadbandModem *self,
     }
 
     /* Check whether we did properly set the charset */
-    mm_at_command (G_OBJECT (self),
-                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                   "+CSCS?",
-                   3,
-                   (MMAtResponseProcessor)parse_current_charset_reply,
-                   NULL,  /* response processor context */
-                   "u",
-                   NULL,  /* cancellable */
-                   (GAsyncReadyCallback)current_charset_ready,
-                   ctx);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CSCS?",
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)current_charset_ready,
+                              ctx);
 }
 
 static void
@@ -902,81 +710,79 @@ modem_charset (MMIfaceModem *self,
 {
     ModemCharsetContext *ctx;
     const gchar *charset_str;
-    gchar *command;
 
+    /* Build charset string to use */
+    charset_str = mm_modem_charset_to_string (charset);
+    if (!charset_str) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Unhandled character set 0x%X",
+                                             charset);
+        return;
+    }
+
+    /* Setup context, including commands to try */
     ctx = g_new0 (ModemCharsetContext, 1);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
                                              modem_charset);
     ctx->charset = charset;
+    /* First try, with quotes */
+    ctx->charset_commands[0].command = g_strdup_printf ("+CSCS=\"%s\"", charset_str);
+    ctx->charset_commands[0].timeout = 3;
+    ctx->charset_commands[0].allow_cached = FALSE;
+    ctx->charset_commands[0].response_processor = mm_base_modem_response_processor_no_result;
+    /* Second try.
+     * Some modems puke if you include the quotes around the character
+     * set name, so lets try it again without them.
+     */
+    ctx->charset_commands[1].command = g_strdup_printf ("+CSCS=%s", charset_str);
+    ctx->charset_commands[1].timeout = 3;
+    ctx->charset_commands[1].allow_cached = FALSE;
+    ctx->charset_commands[1].response_processor = mm_base_modem_response_processor_no_result;
 
-    charset_str = mm_modem_charset_to_string (charset);
-    if (!charset_str) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Unhandled character set 0x%X",
-                                         charset);
-        g_simple_async_result_complete_in_idle (ctx->result);
-        modem_charset_context_free (ctx);
-        return;
-    }
-
-    command = g_strdup_printf ("+CSCS=\"%s\"", charset_str);
-    mm_at_command (G_OBJECT (self),
-                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                   command,
-                   3,
-                   (MMAtResponseProcessor)parse_modem_charset_reply,
-                   NULL,  /* response processor context */
-                   NULL,  /* reply signature */
-                   NULL,  /* cancellable */
-                   (GAsyncReadyCallback)modem_charset_ready,
-                   ctx);
-    g_free (command);
+    /* Launch sequence */
+    mm_base_modem_at_sequence (
+        MM_BASE_MODEM (self),
+        ctx->charset_commands,
+        NULL, /* response_processor_context */
+        NULL, /* response_processor_context_free */
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)modem_charset_ready,
+        ctx);
 }
 
 /*****************************************************************************/
+/* LOAD SUPPORTED CHARSETS */
 
 static MMModemCharset
 load_supported_charsets_finish (MMIfaceModem *self,
                                 GAsyncResult *res,
                                 GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    const gchar *response;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
         return MM_MODEM_CHARSET_UNKNOWN;
+    else {
+        MMModemCharset charsets = MM_MODEM_CHARSET_UNKNOWN;
 
-    return (MMModemCharset) g_variant_get_uint32 (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
-}
+        if (!mm_gsm_parse_cscs_support_response (response, &charsets)) {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Failed to parse the supported character "
+                         "sets response");
+            return MM_MODEM_CHARSET_UNKNOWN;
+        }
 
-static gboolean
-parse_load_supported_charsets_reply (MMBroadbandModem *self,
-                                     gpointer none,
-                                     const gchar *command,
-                                     const gchar *response,
-                                     const GError *error,
-                                     GVariant **result,
-                                     GError **result_error)
-{
-    MMModemCharset charsets;
-
-    if (error) {
-        *result_error = g_error_copy (error);
-        return FALSE;
+        return charsets;
     }
-
-    charsets = MM_MODEM_CHARSET_UNKNOWN;
-    if (!mm_gsm_parse_cscs_support_response (response, &charsets)) {
-        *result_error = g_error_new_literal (MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Failed to parse the supported character "
-                                             "sets response");
-        return FALSE;
-    }
-
-    *result = g_variant_new_uint32 (charsets);
-    return TRUE;
 }
 
 static void
@@ -984,26 +790,25 @@ load_supported_charsets (MMIfaceModem *self,
                          GAsyncReadyCallback callback,
                          gpointer user_data)
 {
-    mm_at_command (G_OBJECT (self),
-                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                   "+CSCS=?",
-                   3,
-                   (MMAtResponseProcessor)parse_load_supported_charsets_reply,
-                   NULL,  /* response processor context */
-                   "u",
-                   NULL,  /* cancellable */
-                   callback,
-                   user_data);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CSCS=?",
+                              3,
+                              TRUE,
+                              NULL,  /* cancellable */
+                              callback,
+                              user_data);
 }
 
 /*****************************************************************************/
+/* FLOW CONTROL */
 
 static gboolean
 modem_flow_control_finish (MMIfaceModem *self,
                            GAsyncResult *res,
                            GError **error)
 {
-    return !mm_at_sequence_finish (G_OBJECT (self), res, error);
+    /* Completely ignore errors */
+    return TRUE;
 }
 
 static void
@@ -1011,27 +816,34 @@ modem_flow_control (MMIfaceModem *self,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
-    /* By default, try to set XOFF/XON flow control, and ignore errors */
-    mm_at_command (G_OBJECT (self),
-                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                   "+IFC=1,1",
-                   3,
-                   NULL,  /* response processor */
-                   NULL,  /* response processor context */
-                   NULL,  /* result signature */
-                   NULL,  /* cancellable */
-                   callback,
-                   user_data);
+    GSimpleAsyncResult *result;
+
+    /* By default, try to set XOFF/XON flow control */
+    mm_base_modem_at_command_ignore_reply (MM_BASE_MODEM (self),
+                                           "+IFC=1,1",
+                                           3);
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_flow_control);
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
 }
 
 /*****************************************************************************/
+/* MODEM POWER UP */
 
 static gboolean
 modem_power_up_finish (MMIfaceModem *self,
                        GAsyncResult *res,
                        GError **error)
 {
-    return !mm_at_command_finish (G_OBJECT (self), res, error);
+    /* By default, errors in the power up command are ignored.
+     * Plugins wanting to treat power up errors should subclass the power up
+     * handling. */
+    return TRUE;
 }
 
 static void
@@ -1039,50 +851,33 @@ modem_power_up (MMIfaceModem *self,
                 GAsyncReadyCallback callback,
                 gpointer user_data)
 {
-    /* By default, errors in the power up command are ignored.
-     * Plugins wanting to treat power up errors should subclass the power up
-     * handling. */
-    mm_at_command (G_OBJECT (self),
-                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                   "+CFUN=1",
-                   5,
-                   NULL,  /* response processor */
-                   NULL,  /* response processor context */
-                   NULL,  /* result signature */
-                   NULL,  /* cancellable */
-                   callback,
-                   user_data);
+    GSimpleAsyncResult *result;
+
+    mm_base_modem_at_command_ignore_reply (MM_BASE_MODEM (self),
+                                           "+CFUN=1",
+                                           5);
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_flow_control);
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
 }
 
 /*****************************************************************************/
+/* MODEM INITIALIZATION */
 
 static gboolean
 modem_init_finish (MMIfaceModem *self,
                    GAsyncResult *res,
                    GError **error)
 {
-    return !mm_at_sequence_finish (G_OBJECT (self), res, error);
+    return !mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
 }
 
-static gboolean
-parse_init_response (MMBroadbandModem *self,
-                     gpointer none,
-                     const gchar *command,
-                     const gchar *response,
-                     const GError *error,
-                     GVariant **variant,
-                     GError **result_error)
-{
-    /* Errors in the mandatory init commands will abort the whole modem
-     * initialization process */
-    if (error)
-        *result_error = g_error_copy (error);
-
-    /* Return FALSE so that we keep on with the next steps in the sequence */
-    return FALSE;
-}
-
-static const MMAtCommand modem_init_sequence[] = {
+static const MMBaseModemAtCommand modem_init_sequence[] = {
     /* Send the init command twice; some devices (Nokia N900) appear to take a
      * few commands before responding correctly.  Instead of penalizing them for
      * being stupid the first time by failing to enable the device, just
@@ -1090,21 +885,21 @@ static const MMAtCommand modem_init_sequence[] = {
 
      * TODO: only send init command 2nd time if 1st time failed?
      */
-    { "Z E0 V1", 3, NULL },
-    { "Z E0 V1", 3, (MMAtResponseProcessor)parse_init_response },
+    { "Z E0 V1", 3, FALSE, NULL },
+    { "Z E0 V1", 3, FALSE, mm_base_modem_response_processor_no_result_continue },
 
     /* Ensure echo is off after the init command; some modems ignore the
      * E0 when it's in the same line as ATZ (Option GIO322).
      */
-    { "E0",      3, NULL },
+    { "E0",      3, FALSE, NULL },
 
     /* Some phones (like Blackberries) don't support +CMEE=1, so make it
      * optional.  It completely violates 3GPP TS 27.007 (9.1) but what can we do...
      */
-    { "+CMEE=1", 3, NULL },
+    { "+CMEE=1", 3, FALSE, NULL },
 
     /* Additional OPTIONAL initialization */
-    { "X4 &C1",  3, NULL },
+    { "X4 &C1",  3, FALSE, NULL },
 
     { NULL }
 };
@@ -1114,15 +909,13 @@ modem_init (MMIfaceModem *self,
             GAsyncReadyCallback callback,
             gpointer user_data)
 {
-    mm_at_sequence (G_OBJECT (self),
-                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                    (MMAtCommand *)modem_init_sequence,
-                    NULL,  /* response processor context */
-                    FALSE, /* free sequence */
-                    NULL,  /* result signature */
-                    NULL,  /* cancellable */
-                    callback,
-                    user_data);
+    mm_base_modem_at_sequence (MM_BASE_MODEM (self),
+                               modem_init_sequence,
+                               NULL,  /* response_processor_context */
+                               NULL,  /* response_processor_context_free */
+                               NULL,  /* cancellable */
+                               callback,
+                               user_data);
 }
 
 /*****************************************************************************/
@@ -1133,23 +926,15 @@ load_imei_finish (MMIfaceModem3gpp *self,
                   GAsyncResult *res,
                   GError **error)
 {
-    GVariant *result;
     gchar *imei;
 
-    result = mm_at_sequence_finish (G_OBJECT (self), res, error);
-    if (!result)
+    imei = g_strdup (mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error));
+    if (!imei)
         return NULL;
 
-    imei = g_variant_dup_string (result, NULL);
     mm_dbg ("loaded IMEI: %s", imei);
-    g_variant_unref (result);
     return imei;
 }
-
-static const MMAtCommand imei_commands[] = {
-    { "+CGSN",  3, (MMAtResponseProcessor)common_parse_string_reply },
-    { NULL }
-};
 
 static void
 load_imei (MMIfaceModem3gpp *self,
@@ -1157,15 +942,13 @@ load_imei (MMIfaceModem3gpp *self,
            gpointer user_data)
 {
     mm_dbg ("loading IMEI...");
-    mm_at_sequence (G_OBJECT (self),
-                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                    (MMAtCommand *)imei_commands,
-                    NULL, /* response_processor_context */
-                    FALSE,
-                    "s",
-                    NULL, /* TODO: cancellable */
-                    callback,
-                    user_data);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CGSN",
+                              3,
+                              TRUE,
+                              NULL, /* cancellable */
+                              callback,
+                              user_data);
 }
 
 /*****************************************************************************/
@@ -1176,26 +959,19 @@ load_operator_code_finish (MMIfaceModem3gpp *self,
                            GAsyncResult *res,
                            GError **error)
 {
-    GVariant *result;
+    const gchar *result;
     gchar *operator_code;
 
-    result = mm_at_sequence_finish (G_OBJECT (self), res, error);
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
     if (!result)
         return NULL;
 
-    operator_code = mm_3gpp_parse_operator (g_variant_get_string (result, NULL),
-                                            MM_MODEM_CHARSET_UNKNOWN);
+    operator_code = mm_3gpp_parse_operator (result, MM_MODEM_CHARSET_UNKNOWN);
     if (operator_code)
         mm_dbg ("loaded Operator Code: %s", operator_code);
 
-    g_variant_unref (result);
     return operator_code;
 }
-
-static const MMAtCommand operator_code_commands[] = {
-    { "+COPS=3,2;+COPS?",  3, (MMAtResponseProcessor)common_parse_string_reply },
-    { NULL }
-};
 
 static void
 load_operator_code (MMIfaceModem3gpp *self,
@@ -1203,15 +979,14 @@ load_operator_code (MMIfaceModem3gpp *self,
                     gpointer user_data)
 {
     mm_dbg ("loading Operator Code...");
-    mm_at_sequence (G_OBJECT (self),
-                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                    (MMAtCommand *)operator_code_commands,
-                    NULL, /* response_processor_context */
-                    FALSE,
-                    "s",
-                    NULL, /* TODO: cancellable */
-                    callback,
-                    user_data);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+COPS=3,2;+COPS?",
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              callback,
+                              user_data);
 }
 
 /*****************************************************************************/
@@ -1222,26 +997,19 @@ load_operator_name_finish (MMIfaceModem3gpp *self,
                            GAsyncResult *res,
                            GError **error)
 {
-    GVariant *result;
+    const gchar *result;
     gchar *operator_name;
 
-    result = mm_at_sequence_finish (G_OBJECT (self), res, error);
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
     if (!result)
         return NULL;
 
-    operator_name = mm_3gpp_parse_operator (g_variant_get_string (result, NULL),
-                                            MM_MODEM_CHARSET_UNKNOWN);
+    operator_name = mm_3gpp_parse_operator (result, MM_MODEM_CHARSET_UNKNOWN);
     if (operator_name)
         mm_dbg ("loaded Operator Name: %s", operator_name);
 
-    g_variant_unref (result);
     return operator_name;
 }
-
-static const MMAtCommand operator_name_commands[] = {
-    { "+COPS=3,0;+COPS?",  3, (MMAtResponseProcessor)common_parse_string_reply },
-    { NULL }
-};
 
 static void
 load_operator_name (MMIfaceModem3gpp *self,
@@ -1249,15 +1017,14 @@ load_operator_name (MMIfaceModem3gpp *self,
                     gpointer user_data)
 {
     mm_dbg ("loading Operator Name...");
-    mm_at_sequence (G_OBJECT (self),
-                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                    (MMAtCommand *)operator_name_commands,
-                    NULL, /* response_processor_context */
-                    FALSE,
-                    "s",
-                    NULL, /* TODO: cancellable */
-                    callback,
-                    user_data);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+COPS=3,0;+COPS?",
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              callback,
+                              user_data);
 }
 
 /*****************************************************************************/
@@ -1455,17 +1222,13 @@ scan_networks_finish (MMIfaceModem3gpp *self,
                       GAsyncResult *res,
                       GError **error)
 {
-    GVariant *reply;
-    GList *info_list;
+    const gchar *result;
 
-    reply = mm_at_command_finish (G_OBJECT (self), res, error);
-    if (!reply)
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!result)
         return NULL;
 
-    info_list = mm_3gpp_parse_scan_response (g_variant_get_string (reply, NULL),
-                                             error);
-    g_variant_unref (reply);
-    return info_list;
+    return mm_3gpp_parse_scan_response (result, error);
 }
 
 static void
@@ -1473,20 +1236,13 @@ scan_networks (MMIfaceModem3gpp *self,
                GAsyncReadyCallback callback,
                gpointer user_data)
 {
-    /* It is mandatory to have a callback here right now, otherwise we may leak
-     * the info list */
-    g_assert (callback != NULL);
-
-    mm_at_command (G_OBJECT (self),
-                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                   "+COPS=?",
-                   120,
-                   (MMAtResponseProcessor)common_parse_string_reply,
-                   NULL, /* response processor context */
-                   "s", /* reply signature */
-                   NULL, /* cancellable */
-                   callback,
-                   user_data);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+COPS=?",
+                              120,
+                              FALSE,
+                              NULL, /* cancellable */
+                              callback,
+                              user_data);
 }
 
 /*****************************************************************************/
@@ -1628,7 +1384,7 @@ register_in_network_ready (MMBroadbandModem *self,
 {
     GError *error = NULL;
 
-    mm_at_command_finish (G_OBJECT (self), res, &error);
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
 
     /* If the registration timed out (and thus pending_reg_info will be NULL)
      * and the modem eventually got around to sending the response for the
@@ -1699,20 +1455,20 @@ register_in_network (MMIfaceModem3gpp *self,
         mm_dbg ("Not launching any new network selection request");
 
     if (command) {
-        mm_at_command (G_OBJECT (self),
-                       mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                       command,
-                       120,
-                       (MMAtResponseProcessor)common_parse_no_reply,
-                       NULL, /* response processor context */
-                       NULL, /* reply signature */
-                       NULL, /* cancellable */
-                       (GAsyncReadyCallback)register_in_network_ready,
-                       result);
-    } else
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  command,
+                                  120,
+                                  FALSE,
+                                  NULL, /* cancellable */
+                                  (GAsyncReadyCallback)register_in_network_ready,
+                                  result);
+    } else {
         /* Just rely on the unsolicited registration, periodic registration
          * checks or the timeout. */
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_simple_async_result_complete_in_idle (result);
         g_object_unref (result);
+    }
 }
 
 /*****************************************************************************/
@@ -1739,14 +1495,10 @@ registration_status_check_ready (MMBroadbandModem *self,
                                  GAsyncResult *res,
                                  GSimpleAsyncResult *operation_result)
 {
-    GVariant *response_variant;
-    const gchar *response = NULL;
+    const gchar *response;
     GError *error = NULL;
 
-    response_variant = mm_at_command_finish (G_OBJECT (self), res, &error);
-    if (response_variant)
-        response = g_variant_get_string (response_variant, NULL);
-
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!response) {
         g_assert (error != NULL);
         g_simple_async_result_take_error (operation_result, error);
@@ -1823,8 +1575,6 @@ registration_status_check_ready (MMBroadbandModem *self,
         }
     }
 
-    if (response_variant)
-        g_variant_unref (response_variant);
     g_simple_async_result_complete (operation_result);
     g_object_unref (operation_result);
 }
@@ -1842,16 +1592,13 @@ run_cs_registration_check (MMIfaceModem3gpp *self,
                                         run_cs_registration_check);
 
     /* Check current CS-registration state. */
-    mm_at_command (G_OBJECT (self),
-                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                   "+CREG?",
-                   10,
-                   (MMAtResponseProcessor)common_parse_string_reply,
-                   NULL, /* response processor context */
-                   "s",  /* raw reply */
-                   NULL, /* cancellable */
-                   (GAsyncReadyCallback)registration_status_check_ready,
-                   result);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CREG?",
+                              10,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)registration_status_check_ready,
+                              result);
 }
 
 static void
@@ -1867,20 +1614,31 @@ run_ps_registration_check (MMIfaceModem3gpp *self,
                                         run_ps_registration_check);
 
     /* Check current PS-registration state. */
-    mm_at_command (G_OBJECT (self),
-                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                   "+CGREG?",
-                   10,
-                   (MMAtResponseProcessor)common_parse_string_reply,
-                   NULL, /* response processor context */
-                   "s",  /* raw reply */
-                   NULL, /* cancellable */
-                   (GAsyncReadyCallback)registration_status_check_ready,
-                   result);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CGREG?",
+                              10,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)registration_status_check_ready,
+                              result);
 }
 
 /*****************************************************************************/
 /* CS and PS Registrations cleanup (3GPP) */
+
+typedef struct {
+    GSimpleAsyncResult *result;
+    gchar *command;
+    gboolean secondary_done;
+} CleanupRegistrationContext;
+
+static void
+cleanup_registration_context_free (CleanupRegistrationContext *ctx)
+{
+    g_object_unref (ctx->result);
+    g_free (ctx->command);
+    g_free (ctx);
+}
 
 static gboolean
 cleanup_cs_registration_finish (MMIfaceModem3gpp *self,
@@ -1898,57 +1656,45 @@ cleanup_ps_registration_finish (MMIfaceModem3gpp *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
-static gboolean
-parse_reg_cleanup_reply (MMBroadbandModem *self,
-                         gpointer none,
-                         const gchar *command,
-                         const gchar *response,
-                         const GError *error,
-                         GVariant **result,
-                         GError **result_error)
-{
-    /* Ignore errors, just set as reply the command used */
-    *result = g_variant_new_string (command);
-    return TRUE;
-}
-
 static void
 cleanup_registration_sequence_ready (MMBroadbandModem *self,
                                      GAsyncResult *res,
-                                     GSimpleAsyncResult *operation_result)
+                                     CleanupRegistrationContext *ctx)
 {
-    MMAtSerialPort *secondary;
     GError *error = NULL;
-    GVariant *reply;
 
-    reply = mm_at_command_finish (G_OBJECT (self), res, &error);
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
-        g_simple_async_result_take_error (operation_result, error);
-        g_simple_async_result_complete (operation_result);
-        g_object_unref (operation_result);
+        g_simple_async_result_take_error (ctx->result, error);
+        g_simple_async_result_complete (ctx->result);
+        cleanup_registration_context_free (ctx);
         return;
     }
 
-    secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
-    if (secondary) {
-        /* Now use the same registration setup in secondary port, if any */
-        mm_at_command (G_OBJECT (self),
-                       secondary,
-                       g_variant_get_string (reply, NULL),
-                       3,
-                       NULL, /* response processor */
-                       NULL, /* response processor context */
-                       NULL, /* result signature */
-                       NULL, /* cancellable */
-                       NULL, /* NO callback, just queue the command and forget */
-                       NULL); /* user data */
+    if (!ctx->secondary_done) {
+        MMAtSerialPort *secondary;
+
+        secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+        if (secondary) {
+            /* Now use the same registration setup in secondary port, if any */
+            ctx->secondary_done = TRUE;
+            mm_base_modem_at_command_in_port (
+                MM_BASE_MODEM (self),
+                secondary,
+                ctx->command,
+                10,
+                FALSE,
+                NULL, /* cancellable */
+                (GAsyncReadyCallback)cleanup_registration_sequence_ready,
+                ctx);
+            return;
+        }
     }
 
     /* We're done */
-    g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
-    g_variant_unref (reply);
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    g_simple_async_result_complete (ctx->result);
+    cleanup_registration_context_free (ctx);
 }
 
 static void
@@ -1956,22 +1702,24 @@ cleanup_cs_registration (MMIfaceModem3gpp *self,
                          GAsyncReadyCallback callback,
                          gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    CleanupRegistrationContext *ctx;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        cleanup_cs_registration);
-    mm_at_command (G_OBJECT (self),
-                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                   "+CREG=0",
-                   3,
-                   (MMAtResponseProcessor)parse_reg_cleanup_reply,
-                   NULL,  /* response processor context */
-                   "s",   /* The cleanup command */
-                   NULL,  /* cancellable */
-                   (GAsyncReadyCallback)cleanup_registration_sequence_ready,
-                   result);
+    ctx = g_new0 (CleanupRegistrationContext, 1);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             cleanup_cs_registration);
+    ctx->command = g_strdup ("+CREG=0");
+
+    mm_base_modem_at_command_in_port (
+        MM_BASE_MODEM (self),
+        mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+        ctx->command,
+        10,
+        FALSE,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)cleanup_registration_sequence_ready,
+        ctx);
 }
 
 static void
@@ -1979,26 +1727,40 @@ cleanup_ps_registration (MMIfaceModem3gpp *self,
                        GAsyncReadyCallback callback,
                        gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    CleanupRegistrationContext *ctx;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        cleanup_ps_registration);
-    mm_at_command (G_OBJECT (self),
-                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                   "+CGREG=0",
-                   3,
-                   (MMAtResponseProcessor)parse_reg_cleanup_reply,
-                   NULL,  /* response processor context */
-                   "s",   /* The cleanup command */
-                   NULL,  /* cancellable */
-                   (GAsyncReadyCallback)cleanup_registration_sequence_ready,
-                   result);
+    ctx = g_new0 (CleanupRegistrationContext, 1);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             cleanup_cs_registration);
+    ctx->command = g_strdup ("+CGREG=0");
+
+    mm_base_modem_at_command_in_port (
+        MM_BASE_MODEM (self),
+        mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+        ctx->command,
+        10,
+        FALSE,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)cleanup_registration_sequence_ready,
+        ctx);
 }
 
 /*****************************************************************************/
 /* CS and PS Registrations (3GPP) */
+
+typedef struct {
+    GSimpleAsyncResult *result;
+    gboolean secondary_done;
+} SetupRegistrationContext;
+
+static void
+setup_registration_context_free (SetupRegistrationContext *ctx)
+{
+    g_object_unref (ctx->result);
+    g_free (ctx);
+}
 
 static gboolean
 setup_cs_registration_finish (MMIfaceModem3gpp *self,
@@ -2017,7 +1779,7 @@ setup_ps_registration_finish (MMIfaceModem3gpp *self,
 }
 
 static gboolean
-parse_reg_setup_reply (MMBroadbandModem *self,
+parse_reg_setup_reply (MMBaseModem *self,
                        gpointer none,
                        const gchar *command,
                        const gchar *response,
@@ -2029,63 +1791,78 @@ parse_reg_setup_reply (MMBroadbandModem *self,
     if (error)
         return FALSE;
 
+    /* Set COMMAND as result! */
     *result = g_variant_new_string (command);
     return TRUE;
 }
 
-static const MMAtCommand cs_registration_sequence[] = {
+static const MMBaseModemAtCommand cs_registration_sequence[] = {
     /* Enable unsolicited registration notifications in CS network, with location */
-    { "+CREG=2", 3, (MMAtResponseProcessor)parse_reg_setup_reply },
+    { "+CREG=2", 3, FALSE, parse_reg_setup_reply },
     /* Enable unsolicited registration notifications in CS network, without location */
-    { "+CREG=1", 3, (MMAtResponseProcessor)parse_reg_setup_reply },
+    { "+CREG=1", 3, FALSE, parse_reg_setup_reply },
     { NULL }
 };
 
-static const MMAtCommand ps_registration_sequence[] = {
+static const MMBaseModemAtCommand ps_registration_sequence[] = {
     /* Enable unsolicited registration notifications in PS network, with location */
-    { "+CGREG=2", 3, (MMAtResponseProcessor)parse_reg_setup_reply },
+    { "+CGREG=2", 3, FALSE, parse_reg_setup_reply },
     /* Enable unsolicited registration notifications in PS network, without location */
-    { "+CGREG=1", 3, (MMAtResponseProcessor)parse_reg_setup_reply },
+    { "+CGREG=1", 3, FALSE, parse_reg_setup_reply },
     { NULL }
 };
 
 static void
 setup_registration_sequence_ready (MMBroadbandModem *self,
                                    GAsyncResult *res,
-                                   GSimpleAsyncResult *operation_result)
+                                   SetupRegistrationContext *ctx)
 {
-    MMAtSerialPort *secondary;
     GError *error = NULL;
-    GVariant *reply;
 
-    reply = mm_at_sequence_finish (G_OBJECT (self), res, &error);
-    if (error) {
-        g_simple_async_result_take_error (operation_result, error);
-        g_simple_async_result_complete (operation_result);
-        g_object_unref (operation_result);
-        return;
-    }
+    if (ctx->secondary_done) {
+        mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+        if (error) {
+            g_simple_async_result_take_error (ctx->result, error);
+            g_simple_async_result_complete (ctx->result);
+            setup_registration_context_free (ctx);
+            return;
+        }
+        /* success */
+    } else {
+        GVariant *command;
+        MMAtSerialPort *secondary;
 
-    secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
-    if (secondary) {
-        /* Now use the same registration setup in secondary port, if any */
-        mm_at_command (G_OBJECT (self),
-                       secondary,
-                       g_variant_get_string (reply, NULL),
-                       3,
-                       NULL, /* response processor */
-                       NULL, /* response processor context */
-                       NULL, /* result signature */
-                       NULL, /* cancellable */
-                       NULL, /* NO callback, just queue the command and forget */
-                       NULL); /* user data */
+        command = mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, &error);
+        if (!command) {
+            g_assert (error != NULL);
+            g_simple_async_result_take_error (ctx->result, error);
+            g_simple_async_result_complete (ctx->result);
+            setup_registration_context_free (ctx);
+            return;
+        }
+
+        secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+        if (secondary) {
+            /* Now use the same registration setup in secondary port, if any */
+            ctx->secondary_done = TRUE;
+            mm_base_modem_at_command_in_port (
+                MM_BASE_MODEM (self),
+                mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                g_variant_get_string (command, NULL),
+                3,
+                FALSE,
+                NULL,  /* cancellable */
+                (GAsyncReadyCallback)setup_registration_sequence_ready,
+                ctx);
+            return;
+        }
+        /* success */
     }
 
     /* We're done */
-    g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
-    g_variant_unref (reply);
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    g_simple_async_result_complete (ctx->result);
+    setup_registration_context_free (ctx);
 }
 
 static void
@@ -2093,21 +1870,22 @@ setup_cs_registration (MMIfaceModem3gpp *self,
                        GAsyncReadyCallback callback,
                        gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    SetupRegistrationContext *ctx;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        setup_cs_registration);
-    mm_at_sequence (G_OBJECT (self),
-                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                    (MMAtCommand *)cs_registration_sequence,
-                    NULL,  /* response processor context */
-                    FALSE, /* free sequence */
-                    "s",   /* The command which worked */
-                    NULL,  /* cancellable */
-                    (GAsyncReadyCallback)setup_registration_sequence_ready,
-                    result);
+    ctx = g_new0 (SetupRegistrationContext, 1);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             setup_cs_registration);
+    mm_base_modem_at_sequence_in_port (
+        MM_BASE_MODEM (self),
+        mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+        cs_registration_sequence,
+        NULL,  /* response processor context */
+        NULL,  /* response processor context free */
+        NULL,  /* cancellable */
+        (GAsyncReadyCallback)setup_registration_sequence_ready,
+        ctx);
 }
 
 static void
@@ -2115,21 +1893,22 @@ setup_ps_registration (MMIfaceModem3gpp *self,
                        GAsyncReadyCallback callback,
                        gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    SetupRegistrationContext *ctx;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        setup_ps_registration);
-    mm_at_sequence (G_OBJECT (self),
-                    mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                    (MMAtCommand *)ps_registration_sequence,
-                    NULL,  /* response processor context */
-                    FALSE, /* free sequence */
-                    "s",   /* The command which worked */
-                    NULL,  /* cancellable */
-                    (GAsyncReadyCallback)setup_registration_sequence_ready,
-                    result);
+    ctx = g_new0 (SetupRegistrationContext, 1);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             setup_ps_registration);
+    mm_base_modem_at_sequence_in_port (
+        MM_BASE_MODEM (self),
+        mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+        ps_registration_sequence,
+        NULL,  /* response processor context */
+        NULL,  /* response processor context free */
+        NULL,  /* cancellable */
+        (GAsyncReadyCallback)setup_registration_sequence_ready,
+        ctx);
 }
 
 /*****************************************************************************/
@@ -2532,9 +2311,17 @@ initialize_step (InitializeContext *ctx)
         }
         ctx->close_port = TRUE;
         /* Try to disable echo */
-        mm_at_serial_port_queue_command (ctx->port, "E0", 3, NULL, NULL);
+        mm_base_modem_at_command_in_port_ignore_reply (
+            MM_BASE_MODEM (ctx->self),
+            ctx->port,
+            "E0",
+            3);
         /* Try to get extended errors */
-        mm_at_serial_port_queue_command (ctx->port, "+CMEE=1", 2, NULL, NULL);
+        mm_base_modem_at_command_in_port_ignore_reply (
+            MM_BASE_MODEM (ctx->self),
+            ctx->port,
+            "+CMEE=1",
+            3);
         /* Fall down to next step */
         ctx->step++;
     }

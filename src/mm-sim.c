@@ -30,8 +30,8 @@
 #include <mm-marshal.h>
 
 #include "mm-iface-modem.h"
-#include "mm-at.h"
 #include "mm-sim.h"
+#include "mm-base-modem-at.h"
 #include "mm-base-modem.h"
 #include "mm-utils.h"
 #include "mm-log.h"
@@ -64,19 +64,17 @@ struct _MMSimPrivate {
     gchar *path;
 };
 
+/*****************************************************************************/
+
 typedef struct {
     MMSim *self;
     GDBusMethodInvocation *invocation;
-    MMAtSerialPort *port;
     GError *save_error;
 } DbusCallContext;
 
 static void
-dbus_call_context_free (DbusCallContext *ctx,
-                        gboolean close_port)
+dbus_call_context_free (DbusCallContext *ctx)
 {
-    if (close_port)
-        mm_serial_port_close (MM_SERIAL_PORT (ctx->port));
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
     if (ctx->save_error)
@@ -86,77 +84,31 @@ dbus_call_context_free (DbusCallContext *ctx,
 
 static DbusCallContext *
 dbus_call_context_new (MMSim *self,
-                       GDBusMethodInvocation *invocation,
-                       GError **error)
+                       GDBusMethodInvocation *invocation)
 {
     DbusCallContext *ctx;
 
     ctx = g_new0 (DbusCallContext, 1);
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
-    ctx->port = mm_base_modem_get_port_primary (self->priv->modem);
-
-    if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->port), error)) {
-        dbus_call_context_free (ctx, FALSE);
-        return NULL;
-    }
-
     return ctx;
 }
 
-static gboolean
-common_parse_no_reply (MMSim *self,
-                       gpointer none,
-                       const gchar *command,
-                       const gchar *response,
-                       const GError *error,
-                       GVariant **result,
-                       GError **result_error)
-{
-    if (error) {
-        *result_error = g_error_copy (error);
-        return FALSE;
-    }
-
-    *result = NULL;
-    return TRUE;
-}
-
-static gboolean
-common_parse_string_reply (MMSim *self,
-                           gpointer none,
-                           const gchar *command,
-                           const gchar *response,
-                           const GError *error,
-                           GVariant **result,
-                           GError **result_error)
-{
-    if (error) {
-        *result_error = g_error_copy (error);
-        return FALSE;
-    }
-
-    *result = g_variant_new_string (response);;
-    return TRUE;
-}
-
+#undef NO_REPLY_READY_FN
 #define NO_REPLY_READY_FN(NAME)                                         \
     static void                                                         \
-    handle_##NAME##_ready (MMSim *self,                                 \
+    handle_##NAME##_ready (MMBaseModem *modem,                          \
                            GAsyncResult *res,                           \
                            DbusCallContext *ctx)                        \
     {                                                                   \
         GError *error = NULL;                                           \
-        GVariant *reply;                                                \
                                                                         \
-        reply = mm_at_command_finish (G_OBJECT (self), res, &error);    \
-        g_assert (reply == NULL);                                       \
-                                                                        \
+        mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error); \
         if (error)                                                      \
             g_dbus_method_invocation_take_error (ctx->invocation, error); \
         else                                                            \
-            mm_gdbus_sim_complete_##NAME (MM_GDBUS_SIM (self), ctx->invocation); \
-        dbus_call_context_free (ctx, TRUE);                             \
+            mm_gdbus_sim_complete_##NAME (MM_GDBUS_SIM (ctx->self), ctx->invocation); \
+        dbus_call_context_free (ctx);                                   \
     }
 
 /*****************************************************************************/
@@ -171,28 +123,18 @@ handle_change_pin (MMSim *self,
                    const gchar *arg_new_pin)
 {
     gchar *command;
-    DbusCallContext *ctx;
-    GError *error = NULL;
-
-    ctx = dbus_call_context_new (self, invocation, &error);
-    if (!ctx) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
-        return TRUE;
-    }
 
     command = g_strdup_printf ("+CPWD=\"SC\",\"%s\",\"%s\"",
                                arg_old_pin,
                                arg_new_pin);
-    mm_at_command (G_OBJECT (self),
-                   ctx->port,
-                   command,
-                   3,
-                   (MMAtResponseProcessor)common_parse_no_reply,
-                   NULL, /* response_processor_context */
-                   NULL, /* result_signature */
-                   NULL, /* TODO: cancellable */
-                   (GAsyncReadyCallback)handle_change_pin_ready,
-                   ctx);
+    mm_base_modem_at_command (MM_BASE_MODEM (self->priv->modem),
+                              command,
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)handle_change_pin_ready,
+                              dbus_call_context_new (self,
+                                                     invocation));
     g_free (command);
     return TRUE;
 }
@@ -209,28 +151,18 @@ handle_enable_pin (MMSim *self,
                    gboolean arg_enabled)
 {
     gchar *command;
-    DbusCallContext *ctx;
-    GError *error = NULL;
-
-    ctx = dbus_call_context_new (self, invocation, &error);
-    if (!ctx) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
-        return TRUE;
-    }
 
     command = g_strdup_printf ("+CLCK=\"SC\",%d,\"%s\"",
                                arg_enabled ? 1 : 0,
                                arg_pin);
-    mm_at_command (G_OBJECT (self),
-                   ctx->port,
-                   command,
-                   3,
-                   (MMAtResponseProcessor)common_parse_no_reply,
-                   NULL, /* response_processor_context */
-                   NULL, /* result_signature */
-                   NULL, /* TODO: cancellable */
-                   (GAsyncReadyCallback)handle_enable_pin_ready,
-                   ctx);
+    mm_base_modem_at_command (MM_BASE_MODEM (self->priv->modem),
+                              command,
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)handle_enable_pin_ready,
+                              dbus_call_context_new (self,
+                                                     invocation));
     g_free (command);
     return TRUE;
 }
@@ -313,21 +245,20 @@ unlock_check_ready (MMIfaceModem *modem,
             g_warn_if_reached ();
     }
 
-    dbus_call_context_free (ctx, TRUE);
+    dbus_call_context_free (ctx);
 }
 
 static void
-handle_send_pin_puk_ready (MMSim *self,
+handle_send_pin_puk_ready (MMBaseModem *modem,
                            GAsyncResult *res,
                            DbusCallContext *ctx)
 {
-    GVariant *reply;
-
-    reply = mm_at_command_finish (G_OBJECT (self), res, &ctx->save_error);
-    g_assert (reply == NULL);
+    mm_base_modem_at_command_finish (modem,
+                                     res,
+                                     &ctx->save_error);
 
     /* Once pin/puk has been sent, recheck lock */
-    mm_iface_modem_unlock_check (MM_IFACE_MODEM (self->priv->modem),
+    mm_iface_modem_unlock_check (MM_IFACE_MODEM (modem),
                                  (GAsyncReadyCallback)unlock_check_ready,
                                  ctx);
 }
@@ -338,26 +269,16 @@ handle_send_pin (MMSim *self,
                  const gchar *arg_pin)
 {
     gchar *command;
-    DbusCallContext *ctx;
-    GError *error = NULL;
-
-    ctx = dbus_call_context_new (self, invocation, &error);
-    if (!ctx) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
-        return TRUE;
-    }
 
     command = g_strdup_printf ("+CPIN=\"%s\"", arg_pin);
-    mm_at_command (G_OBJECT (self),
-                   ctx->port,
-                   command,
-                   3,
-                   (MMAtResponseProcessor)common_parse_no_reply,
-                   NULL, /* response_processor_context */
-                   NULL, /* result_signature */
-                   NULL, /* TODO: cancellable */
-                   (GAsyncReadyCallback)handle_send_pin_puk_ready,
-                   ctx);
+    mm_base_modem_at_command (MM_BASE_MODEM (self->priv->modem),
+                              command,
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)handle_send_pin_puk_ready,
+                              dbus_call_context_new (self,
+                                                     invocation));
     g_free (command);
     return TRUE;
 }
@@ -369,28 +290,18 @@ handle_send_puk (MMSim *self,
                  const gchar *arg_pin)
 {
     gchar *command;
-    DbusCallContext *ctx;
-    GError *error = NULL;
-
-    ctx = dbus_call_context_new (self, invocation, &error);
-    if (!ctx) {
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
-        return TRUE;
-    }
 
     command = g_strdup_printf ("+CPIN=\"%s\",\"%s\"",
                                arg_puk,
                                arg_pin);
-    mm_at_command (G_OBJECT (self),
-                   ctx->port,
-                   command,
-                   3,
-                   (MMAtResponseProcessor)common_parse_no_reply,
-                   NULL, /* response_processor_context */
-                   NULL, /* result_signature */
-                   NULL, /* TODO: cancellable */
-                   (GAsyncReadyCallback)handle_send_pin_puk_ready,
-                   ctx);
+    mm_base_modem_at_command (MM_BASE_MODEM (self->priv->modem),
+                              command,
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)handle_send_pin_puk_ready,
+                              dbus_call_context_new (self,
+                                                     invocation));
     g_free (command);
     return TRUE;
 }
@@ -438,16 +349,35 @@ mm_sim_unexport (MMSim *self)
 }
 
 /*****************************************************************************/
+
+#undef STR_REPLY_READY_FN
+#define STR_REPLY_READY_FN(NAME)                                        \
+    static void                                                         \
+    NAME##_command_ready (MMBaseModem *modem,                           \
+                          GAsyncResult *res,                            \
+                          GSimpleAsyncResult *operation_result)         \
+    {                                                                   \
+        GError *error = NULL;                                           \
+        const gchar *response;                                          \
+                                                                        \
+        response = mm_base_modem_at_command_finish (modem, res, &error); \
+        if (error)                                                      \
+            g_simple_async_result_take_error (operation_result, error); \
+        else                                                            \
+            g_simple_async_result_set_op_res_gpointer (operation_result, \
+                                                       (gpointer)response, \
+                                                       NULL);           \
+                                                                        \
+        g_simple_async_result_complete (operation_result);              \
+        g_object_unref (operation_result);                              \
+    }
+
+/*****************************************************************************/
 /* SIM IDENTIFIER */
 
-static gboolean
-parse_iccid (MMSim *self,
-             gpointer none,
-             const gchar *command,
-             const gchar *response,
-             const GError *error,
-             GVariant **result,
-             GError **result_error)
+static gchar *
+parse_iccid (const gchar *response,
+             GError **error)
 {
     gchar buf[21];
     gchar swapped[21];
@@ -455,11 +385,6 @@ parse_iccid (MMSim *self,
     gint sw1;
     gint sw2;
     gboolean success = FALSE;
-
-    if (error) {
-        *result_error = g_error_copy (error);
-        return FALSE;
-    }
 
     memset (buf, 0, sizeof (buf));
     str = mm_strip_tag (response, "+CRSM:");
@@ -472,10 +397,11 @@ parse_iccid (MMSim *self,
     }
 
     if (!success) {
-        *result_error = g_error_new_literal (MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Could not parse the CRSM response");
-        return FALSE;
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Could not parse the CRSM response");
+        return NULL;
     }
 
     if ((sw1 == 0x90 && sw2 == 0x00) ||
@@ -501,28 +427,31 @@ parse_iccid (MMSim *self,
             }
 
             /* Invalid character */
-            *result_error = g_error_new (MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "CRSM ICCID response contained invalid character '%c'",
-                                         buf[len]);
-            return FALSE;
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "CRSM ICCID response contained invalid character '%c'",
+                         buf[len]);
+            return NULL;
         }
 
         /* BCD encoded ICCIDs are 20 digits long */
         if (len != 20) {
-            *result_error = g_error_new (MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Invalid +CRSM ICCID response size (was %zd, expected 20)",
-                                         len);
-            return FALSE;
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Invalid +CRSM ICCID response size (was %zd, expected 20)",
+                         len);
+            return NULL;
         }
 
         /* Ensure if there's an 'F' that it's second-to-last */
         if ((f_pos >= 0) && (f_pos != len - 2)) {
-            *result_error = g_error_new_literal (MM_CORE_ERROR,
-                                                 MM_CORE_ERROR_FAILED,
-                                                 "Invalid +CRSM ICCID length (unexpected F)");
-            return FALSE;
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Invalid +CRSM ICCID length (unexpected F)");
+            return NULL;
         }
 
         /* Swap digits in the EFiccid response to get the actual ICCID, each
@@ -540,14 +469,15 @@ parse_iccid (MMSim *self,
         if (swapped[len - 1] == 'F')
             swapped[len - 1] = 0;
 
-        *result = g_variant_new_string (swapped);
-        return TRUE;
+
+        return g_strdup (swapped);
     } else {
-        *result_error = g_error_new (MM_CORE_ERROR,
-                                     MM_CORE_ERROR_FAILED,
-                                     "SIM failed to handle CRSM request (sw1 %d sw2 %d)",
-                                     sw1, sw2);
-        return FALSE;
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "SIM failed to handle CRSM request (sw1 %d sw2 %d)",
+                     sw1, sw2);
+        return NULL;
     }
 }
 
@@ -556,18 +486,22 @@ load_sim_identifier_finish (MMSim *self,
                             GAsyncResult *res,
                             GError **error)
 {
-    GVariant *result;
+    const gchar *result;
     gchar *sim_identifier;
 
-    result = mm_at_command_finish (G_OBJECT (self), res, error);
-    if (!result)
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+    result = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+
+    sim_identifier = parse_iccid (result, error);
+    if (!sim_identifier)
         return NULL;
 
-    sim_identifier = g_variant_dup_string (result, NULL);
     mm_dbg ("loaded SIM identifier: %s", sim_identifier);
-    g_variant_unref (result);
     return sim_identifier;
 }
+
+STR_REPLY_READY_FN (load_sim_identifier)
 
 static void
 load_sim_identifier (MMSim *self,
@@ -577,16 +511,17 @@ load_sim_identifier (MMSim *self,
     mm_dbg ("loading SIM identifier...");
 
     /* READ BINARY of EFiccid (ICC Identification) ETSI TS 102.221 section 13.2 */
-    mm_at_command (G_OBJECT (self),
-                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self->priv->modem)),
-                   "+CRSM=176,12258,0,0,10",
-                   20,
-                   (MMAtResponseProcessor)parse_iccid,
-                   NULL, /* response_processor_context */
-                   "s",
-                   NULL, /*TODO: cancellable */
-                   callback,
-                   user_data);
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self->priv->modem),
+        "+CRSM=176,12258,0,0,10",
+        20,
+        FALSE,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)load_sim_identifier_command_ready,
+        g_simple_async_result_new (G_OBJECT (self),
+                                   callback,
+                                   user_data,
+                                   load_sim_identifier));
 }
 
 /*****************************************************************************/
@@ -597,18 +532,17 @@ load_imsi_finish (MMSim *self,
                   GAsyncResult *res,
                   GError **error)
 {
-    GVariant *result;
     gchar *imsi;
 
-    result = mm_at_command_finish (G_OBJECT (self), res, error);
-    if (!result)
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
+    imsi = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
 
-    imsi = g_variant_dup_string (result, NULL);
     mm_dbg ("loaded IMSI: %s", imsi);
-    g_variant_unref (result);
     return imsi;
 }
+
+STR_REPLY_READY_FN (load_imsi)
 
 static void
 load_imsi (MMSim *self,
@@ -617,39 +551,30 @@ load_imsi (MMSim *self,
 {
     mm_dbg ("loading IMSI...");
 
-    mm_at_command (G_OBJECT (self),
-                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self->priv->modem)),
-                   "+CIMI",
-                   3,
-                   (MMAtResponseProcessor)common_parse_string_reply,
-                   NULL, /* response_processor_context */
-                   "s",
-                   NULL, /*TODO: cancellable */
-                   callback,
-                   user_data);
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self->priv->modem),
+        "+CIMI",
+        3,
+        TRUE,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)load_imsi_command_ready,
+        g_simple_async_result_new (G_OBJECT (self),
+                                   callback,
+                                   user_data,
+                                   load_imsi));
 }
 
 /*****************************************************************************/
 /* Operator ID */
 
-static gboolean
-parse_mnc_length (MMSim *self,
-                  gpointer none,
-                  const gchar *command,
-                  const gchar *response,
-                  const GError *error,
-                  GVariant **result,
-                  GError **result_error)
+static guint
+parse_mnc_length (const gchar *response,
+                  GError **error)
 {
     gint sw1;
     gint sw2;
     gboolean success = FALSE;
     gchar hex[51];
-
-    if (error) {
-        *result_error = g_error_copy (error);
-        return FALSE;
-    }
 
     memset (hex, 0, sizeof (hex));
     if (sscanf (response, "+CRSM:%d,%d,\"%50c\"", &sw1, &sw2, (char *) &hex) == 3)
@@ -661,10 +586,11 @@ parse_mnc_length (MMSim *self,
     }
 
     if (!success) {
-        *result_error = g_error_new_literal (MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Could not parse the CRSM response");
-        return FALSE;
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Could not parse the CRSM response");
+        return 0;
     }
 
     if ((sw1 == 0x90 && sw2 == 0x00) ||
@@ -687,35 +613,37 @@ parse_mnc_length (MMSim *self,
         /* Convert hex string to binary */
         bin = utils_hexstr2bin (hex, &buflen);
         if (!bin || buflen < 4) {
-            *result_error = g_error_new (MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "SIM returned malformed response '%s'",
-                                         hex);
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "SIM returned malformed response '%s'",
+                         hex);
             g_free (bin);
-            return FALSE;
+            return 0;
         }
 
         /* MNC length is byte 4 of this SIM file */
         mnc_len = bin[3] & 0xFF;
         if (mnc_len == 2 || mnc_len == 3) {
-            *result = g_variant_new_uint32 (mnc_len);
             g_free (bin);
-            return TRUE;
+            return mnc_len;
         }
 
-        *result_error = g_error_new (MM_CORE_ERROR,
-                                     MM_CORE_ERROR_FAILED,
-                                     "SIM returned invalid MNC length %d (should be either 2 or 3)",
-                                     mnc_len);
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "SIM returned invalid MNC length %d (should be either 2 or 3)",
+                     mnc_len);
         g_free (bin);
-        return FALSE;
+        return 0;
     }
 
-    *result_error = g_error_new (MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "SIM failed to handle CRSM request (sw1 %d sw2 %d)",
-                                 sw1, sw2);
-    return FALSE;
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "SIM failed to handle CRSM request (sw1 %d sw2 %d)",
+                 sw1, sw2);
+    return 0;
 }
 
 static gchar *
@@ -723,17 +651,17 @@ load_operator_identifier_finish (MMSim *self,
                                  GAsyncResult *res,
                                  GError **error)
 {
-    GVariant *result;
-    gchar *operator_id;
+    GError *inner_error = NULL;
     const gchar *imsi;
+    const gchar *result;
+    guint mnc_length;
 
-    result = mm_at_command_finish (G_OBJECT (self), res, error);
-    if (!result)
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
+    result = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
 
     imsi = mm_gdbus_sim_get_imsi (MM_GDBUS_SIM (self));
     if (!imsi) {
-        g_variant_unref (result);
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
@@ -741,12 +669,17 @@ load_operator_identifier_finish (MMSim *self,
         return NULL;
     }
 
+    mnc_length = parse_mnc_length (result, &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return NULL;
+    }
+
     /* Build Operator ID */
-    operator_id = g_strndup (imsi,
-                             3 + g_variant_get_uint32 (result));
-    g_variant_unref (result);
-    return operator_id;
+    return g_strndup (imsi, 3 + mnc_length);
 }
+
+STR_REPLY_READY_FN (load_operator_identifier)
 
 static void
 load_operator_identifier (MMSim *self,
@@ -756,39 +689,30 @@ load_operator_identifier (MMSim *self,
     mm_dbg ("loading Operator ID...");
 
     /* READ BINARY of EFad (Administrative Data) ETSI 51.011 section 10.3.18 */
-    mm_at_command (G_OBJECT (self),
-                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self->priv->modem)),
-                   "+CRSM=176,28589,0,0,4",
-                   3,
-                   (MMAtResponseProcessor)parse_mnc_length,
-                   NULL, /* response_processor_context */
-                   "u", /* mnc length */
-                   NULL, /*TODO: cancellable */
-                   callback,
-                   user_data);
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self->priv->modem),
+        "+CRSM=176,28589,0,0,4",
+        3,
+        FALSE,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)load_operator_identifier_command_ready,
+        g_simple_async_result_new (G_OBJECT (self),
+                                   callback,
+                                   user_data,
+                                   load_operator_identifier));
 }
 
 /*****************************************************************************/
 /* Operator Name (Service Provider Name) */
 
-static gboolean
-parse_spn (MMSim *self,
-           gpointer none,
-           const gchar *command,
-           const gchar *response,
-           const GError *error,
-           GVariant **result,
-           GError **result_error)
+static gchar *
+parse_spn (const gchar *response,
+           GError **error)
 {
     gint sw1;
     gint sw2;
     gboolean success = FALSE;
     gchar hex[51];
-
-    if (error) {
-        *result_error = g_error_copy (error);
-        return FALSE;
-    }
 
     memset (hex, 0, sizeof (hex));
     if (sscanf (response, "+CRSM:%d,%d,\"%50c\"", &sw1, &sw2, (char *) &hex) == 3)
@@ -800,10 +724,11 @@ parse_spn (MMSim *self,
     }
 
     if (!success) {
-        *result_error = g_error_new_literal (MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Could not parse the CRSM response");
-        return FALSE;
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Could not parse the CRSM response");
+        return NULL;
     }
 
     if ((sw1 == 0x90 && sw2 == 0x00) ||
@@ -826,11 +751,12 @@ parse_spn (MMSim *self,
         /* Convert hex string to binary */
         bin = utils_hexstr2bin (hex, &buflen);
         if (!bin) {
-            *result_error = g_error_new (MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "SIM returned malformed response '%s'",
-                                         hex);
-            return FALSE;
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "SIM returned malformed response '%s'",
+                         hex);
+            return NULL;
         }
 
         /* Remove the FF filler at the end */
@@ -839,17 +765,16 @@ parse_spn (MMSim *self,
 
         /* First byte is metadata; remainder is GSM-7 unpacked into octets; convert to UTF8 */
         utf8 = (gchar *)mm_charset_gsm_unpacked_to_utf8 ((guint8 *)bin + 1, buflen - 1);
-        *result = g_variant_new_string (utf8);
-        g_free (utf8);
         g_free (bin);
-        return TRUE;
+        return utf8;
     }
 
-    *result_error = g_error_new (MM_CORE_ERROR,
-                                 MM_CORE_ERROR_FAILED,
-                                 "SIM failed to handle CRSM request (sw1 %d sw2 %d)",
-                                 sw1, sw2);
-    return FALSE;
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "SIM failed to handle CRSM request (sw1 %d sw2 %d)",
+                 sw1, sw2);
+    return NULL;
 }
 
 static gchar *
@@ -857,17 +782,16 @@ load_operator_name_finish (MMSim *self,
                            GAsyncResult *res,
                            GError **error)
 {
-    GVariant *result;
-    gchar *operator_name;
+    const gchar *result;
 
-    result = mm_at_command_finish (G_OBJECT (self), res, error);
-    if (!result)
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
+    result = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
 
-    operator_name = g_variant_dup_string (result, NULL);
-    g_variant_unref (result);
-    return operator_name;
+    return parse_spn (result, error);
 }
+
+STR_REPLY_READY_FN (load_operator_name)
 
 static void
 load_operator_name (MMSim *self,
@@ -877,16 +801,17 @@ load_operator_name (MMSim *self,
     mm_dbg ("loading Operator Name...");
 
     /* READ BINARY of EFspn (Service Provider Name) ETSI 51.011 section 10.3.11 */
-    mm_at_command (G_OBJECT (self),
-                   mm_base_modem_get_port_primary (MM_BASE_MODEM (self->priv->modem)),
-                   "+CRSM=176,28486,0,0,17",
-                   3,
-                   (MMAtResponseProcessor)parse_spn,
-                   NULL, /* response_processor_context */
-                   "s", /* spn */
-                   NULL, /*TODO: cancellable */
-                   callback,
-                   user_data);
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self->priv->modem),
+        "+CRSM=176,28486,0,0,17",
+        3,
+        FALSE,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)load_operator_name_command_ready,
+        g_simple_async_result_new (G_OBJECT (self),
+                                   callback,
+                                   user_data,
+                                   load_operator_name));
 }
 
 /*****************************************************************************/
@@ -976,6 +901,7 @@ load_sim_identifier_ready (MMSim *self,
     interface_initialization_step (ctx);
 }
 
+#undef STR_REPLY_READY_FN
 #define STR_REPLY_READY_FN(NAME,DISPLAY)                                \
     static void                                                         \
     load_##NAME##_ready (MMSim *self,                                   \
@@ -1301,4 +1227,3 @@ mm_sim_class_init (MMSimClass *klass)
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_MODEM, properties[PROP_MODEM]);
 }
-

@@ -1584,7 +1584,7 @@ initialization_context_complete_and_free (InitializationContext *ctx)
         gchar *val;                                                     \
                                                                         \
         val = MM_IFACE_MODEM_GET_INTERFACE (self)->load_##NAME##_finish (self, res, &error); \
-        mm_gdbus_modem_set_##NAME (ctx->skeleton, val); \
+        mm_gdbus_modem_set_##NAME (ctx->skeleton, val);                 \
         g_free (val);                                                   \
                                                                         \
         if (error) {                                                    \
