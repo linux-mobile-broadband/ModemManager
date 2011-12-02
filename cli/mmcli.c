@@ -41,10 +41,15 @@ static GMainLoop *loop;
 static GCancellable *cancellable;
 
 /* Context */
+static gboolean verbose_flag;
 static gboolean version_flag;
 static gboolean async_flag;
 
 static GOptionEntry main_entries[] = {
+    { "verbose", 'v', 0, G_OPTION_ARG_NONE, &verbose_flag,
+      "Run action with verbose logs",
+      NULL
+    },
     { "version", 'V', 0, G_OPTION_ARG_NONE, &version_flag,
       "Print version",
       NULL
@@ -75,6 +80,44 @@ signals_handler (int signum)
                     "cancelling the main loop...");
         g_main_loop_quit (loop);
     }
+}
+
+static void
+log_handler (const gchar *log_domain,
+             GLogLevelFlags log_level,
+             const gchar *message,
+             gpointer user_data)
+{
+    const gchar *log_level_str;
+	time_t now;
+	gchar time_str[64];
+	struct tm    *local_time;
+
+	now = time ((time_t *) NULL);
+	local_time = localtime (&now);
+	strftime (time_str, 64, "%d %b %Y, %H:%M:%S", local_time);
+
+	switch (log_level) {
+	case G_LOG_LEVEL_WARNING:
+		log_level_str = "-Warning **";
+		break;
+
+	case G_LOG_LEVEL_CRITICAL:
+    case G_LOG_FLAG_FATAL:
+	case G_LOG_LEVEL_ERROR:
+		log_level_str = "-Error **";
+		break;
+
+	case G_LOG_LEVEL_DEBUG:
+		log_level_str = "[Debug]";
+		break;
+
+    default:
+		log_level_str = "";
+		break;
+    }
+
+    g_print ("[%s] %s %s\n", time_str, log_level_str, message);
 }
 
 static void
@@ -124,6 +167,9 @@ main (gint argc, gchar **argv)
 
     if (version_flag)
         print_version_and_exit ();
+
+    if (verbose_flag)
+        g_log_set_handler (G_LOG_DOMAIN, G_LOG_LEVEL_MASK, log_handler, NULL);
 
     /* Setup signals */
     signal (SIGINT, signals_handler);
@@ -190,4 +236,3 @@ main (gint argc, gchar **argv)
 
     return EXIT_SUCCESS;
 }
-
