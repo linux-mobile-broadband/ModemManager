@@ -39,13 +39,15 @@ typedef struct _MMBearerPrivate MMBearerPrivate;
 #define MM_BEARER_CONNECTION     "bearer-connection"
 #define MM_BEARER_MODEM          "bearer-modem"
 #define MM_BEARER_CAPABILITY     "bearer-capability"
-
 /* same names as the ones used in DBus properties */
 #define MM_BEARER_CONNECTION_APN      "apn"
 #define MM_BEARER_CONNECTION_IP_TYPE  "ip-type"
 #define MM_BEARER_CONNECTION_USER     "user"
 #define MM_BEARER_CONNECTION_PASSWORD "password"
 #define MM_BEARER_CONNECTION_NUMBER   "number"
+
+/* Prefix for all bearer object paths */
+#define MM_DBUS_BEARER_PREFIX MM_DBUS_PATH "/Bearers/"
 
 struct _MMBearer {
     MmGdbusBearerSkeleton parent;
@@ -62,5 +64,7 @@ MMBearer *mm_bearer_new (MMBaseModem *modem,
                          GVariant *properties,
                          MMModemCapability capability,
                          GError **error);
+
+const gchar *mm_bearer_get_path (MMBearer *bearer);
 
 #endif /* MM_BEARER_H */

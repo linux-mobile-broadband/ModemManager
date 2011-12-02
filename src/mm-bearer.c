@@ -125,7 +125,22 @@ mm_bearer_export (MMBearer *self)
 static void
 mm_bearer_unexport (MMBearer *self)
 {
-    g_dbus_interface_skeleton_unexport (G_DBUS_INTERFACE_SKELETON (self));
+    const gchar *path;
+
+    path = g_dbus_interface_skeleton_get_object_path (G_DBUS_INTERFACE_SKELETON (self));
+    /* Only unexport if currently exported */
+    if (path) {
+        mm_dbg ("Removing from DBus bearer at '%s'", path);
+        g_dbus_interface_skeleton_unexport (G_DBUS_INTERFACE_SKELETON (self));
+    }
+}
+
+/*****************************************************************************/
+
+const gchar *
+mm_bearer_get_path (MMBearer *self)
+{
+    return self->priv->path;
 }
 
 /*****************************************************************************/
@@ -221,7 +236,7 @@ mm_bearer_new (MMBaseModem *modem,
     g_assert_cmpuint (mm_count_bits_set (capability), ==, 1);
 
     /* Build the unique path for the Bearer, and create the object */
-    path = g_strdup_printf (MM_DBUS_PATH"/Bearers/%d", id++);
+    path = g_strdup_printf (MM_DBUS_BEARER_PREFIX "%d", id++);
     bearer = g_object_new  (MM_TYPE_BEARER,
                             MM_BEARER_PATH,       path,
                             MM_BEARER_MODEM,      modem,
@@ -273,13 +288,12 @@ set_property (GObject *object,
         if (self->priv->modem)
             g_object_unref (self->priv->modem);
         self->priv->modem = g_value_dup_object (value);
-        if (self->priv->modem) {
+        if (self->priv->modem)
             /* Bind the modem's connection (which is set when it is exported,
              * and unset when unexported) to the BEARER's connection */
             g_object_bind_property (self->priv->modem, MM_BASE_MODEM_CONNECTION,
                                     self, MM_BEARER_CONNECTION,
-                                    G_BINDING_DEFAULT);
-        }
+                                    G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
         break;
     case PROP_CAPABILITY:
         self->priv->capability = g_value_get_flags (value);
@@ -382,8 +396,10 @@ dispose (GObject *object)
 {
     MMBearer *self = MM_BEARER (object);
 
-    if (self->priv->connection)
+    if (self->priv->connection) {
+        mm_bearer_unexport (self);
         g_clear_object (&self->priv->connection);
+    }
 
     if (self->priv->modem)
         g_clear_object (&self->priv->modem);
