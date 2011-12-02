@@ -1098,11 +1098,10 @@ mm_iface_modem_3gpp_initialize (MMIfaceModem3gpp *self,
         /* Bind our RegistrationState property */
         g_object_bind_property (self, MM_IFACE_MODEM_3GPP_REGISTRATION_STATE,
                                 skeleton, "registration-state",
-                                G_BINDING_DEFAULT);
+                                G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
 
         g_object_set (self,
                       MM_IFACE_MODEM_3GPP_DBUS_SKELETON, skeleton,
-                      MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN,
                       NULL);
     }
 
