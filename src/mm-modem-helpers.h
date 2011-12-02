@@ -92,4 +92,6 @@ gint        cind_response_get_max       (CindResponse *r);
 
 GByteArray *mm_parse_cind_query_response(const char *reply, GError **error);
 
+guint mm_count_bits_set (gulong number);
+
 #endif  /* MM_MODEM_HELPERS_H */

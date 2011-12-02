@@ -1441,3 +1441,13 @@ done:
 
     return array;
 }
+
+guint
+mm_count_bits_set (gulong number)
+{
+    guint c;
+
+    for (c = 0; number; c++)
+        number &= number - 1;
+    return c;
+}
