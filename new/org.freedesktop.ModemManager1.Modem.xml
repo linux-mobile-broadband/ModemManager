@@ -76,7 +76,7 @@
         applicable to CDMA2000 Packet Data Session bearers.
     -->
     <method name="CreateBearer">
-      <arg name="properties" type="a{sv}" direction="in"  />
+      <arg name="properties" type="a{ss}" direction="in"  />
       <arg name="path"       type="o"     direction="out" />
     </method>
 
