@@ -1171,6 +1171,16 @@ mm_sim_init (MMSim *self)
 }
 
 static void
+finalize (GObject *object)
+{
+    MMSim *self = MM_SIM (object);
+
+    g_free (self->priv->path);
+
+    G_OBJECT_CLASS (mm_sim_parent_class)->finalize (object);
+}
+
+static void
 dispose (GObject *object)
 {
     MMSim *self = MM_SIM (object);
@@ -1201,6 +1211,7 @@ mm_sim_class_init (MMSimClass *klass)
     /* Virtual methods */
     object_class->get_property = get_property;
     object_class->set_property = set_property;
+    object_class->finalize = finalize;
     object_class->dispose = dispose;
 
     properties[PROP_CONNECTION] =
