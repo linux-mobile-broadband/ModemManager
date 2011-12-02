@@ -29,6 +29,7 @@
 #include "mm-broadband-modem.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-bearer.h"
 #include "mm-sim.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
@@ -64,6 +65,7 @@ struct _MMBroadbandModemPrivate {
     MMModemState modem_state;
     MMModemCapability modem_current_capabilities;
     MMModem3gppRegistrationState modem_3gpp_registration_state;
+    GList *modem_bearers;
 
     /* Modem helpers */
     MMModemCharset current_charset;
@@ -76,6 +78,177 @@ struct _MMBroadbandModemPrivate {
     guint pending_reg_id;
     GSimpleAsyncResult *pending_reg_request;
 };
+
+/*****************************************************************************/
+/* CREATE BEARER */
+
+static gchar *
+modem_create_bearer_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    GObject *bearer;
+    gchar *bearer_path = NULL;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    g_object_get (bearer,
+                  MM_BEARER_PATH, &bearer_path,
+                  NULL);
+
+    mm_dbg ("New bearer created at DBus path '%s'", bearer_path);
+    return bearer_path;
+}
+
+static void
+modem_create_bearer (MMIfaceModem *self,
+                     GVariant *properties,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    MMBroadbandModem *broadband = MM_BROADBAND_MODEM (self);
+    GSimpleAsyncResult *result;
+    MMBearer *bearer;
+    GError *error = NULL;
+
+    /* TODO: We'll need to guess the capability of the bearer, based on the
+     * current capabilities that we handle, and the specific allowed modes
+     * configured in the modem. Use GSM_UMTS for testing now */
+    bearer = mm_bearer_new (MM_BASE_MODEM (self),
+                            properties,
+                            MM_MODEM_CAPABILITY_GSM_UMTS,
+                            &error);
+    if (!bearer) {
+        g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
+                                                   callback,
+                                                   user_data,
+                                                   error);
+        return;
+    }
+
+    /* Store the bearer */
+    broadband->priv->modem_bearers = g_list_prepend (broadband->priv->modem_bearers,
+                                                     bearer);
+
+    /* Set a new ref to the bearer object as result */
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_create_bearer);
+    g_simple_async_result_set_op_res_gpointer (result,
+                                               g_object_ref (bearer),
+                                               (GDestroyNotify)g_object_unref);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
+/* DELETE BEARER */
+
+static gboolean
+modem_delete_bearer_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+modem_delete_bearer (MMIfaceModem *self,
+                     const gchar *path,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    MMBroadbandModem *broadband = MM_BROADBAND_MODEM (self);
+    GList *l;
+
+    if (!g_str_has_prefix (path, MM_DBUS_BEARER_PREFIX)) {
+        g_simple_async_report_error_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_INVALID_ARGS,
+            "Cannot delete bearer: invalid path '%s'",
+            path);
+        return;
+    }
+
+    for (l = broadband->priv->modem_bearers; l; l = g_list_next (l)) {
+        if (g_str_equal (path, mm_bearer_get_path (MM_BEARER (l->data)))) {
+            GSimpleAsyncResult *result;
+
+            g_object_unref (l->data);
+            broadband->priv->modem_bearers =
+                g_list_delete_link (broadband->priv->modem_bearers, l);
+
+            /* Complete successfully  */
+            mm_dbg ("Bearer at '%s' deleted", path);
+            result = g_simple_async_result_new (G_OBJECT (self),
+                                                callback,
+                                                user_data,
+                                                modem_delete_bearer);
+            g_simple_async_result_set_op_res_gboolean (result, TRUE);
+            g_simple_async_result_complete_in_idle (result);
+            g_object_unref (result);
+            return;
+        }
+    }
+
+    g_simple_async_report_error_in_idle (
+        G_OBJECT (self),
+        callback,
+        user_data,
+        MM_CORE_ERROR,
+        MM_CORE_ERROR_INVALID_ARGS,
+        "Cannot delete bearer: path '%s' not found",
+        path);
+}
+
+/*****************************************************************************/
+/* LIST BEARERS */
+
+static GStrv
+modem_list_bearers_finish (MMIfaceModem *self,
+                           GAsyncResult *res,
+                           GError **error)
+{
+    MMBroadbandModem *broadband = MM_BROADBAND_MODEM (self);
+    GStrv path_list = NULL;
+    GList *l;
+    guint i;
+
+    path_list = g_new0 (gchar *,
+                        1 + g_list_length (broadband->priv->modem_bearers));
+
+    for (i = 0, l = broadband->priv->modem_bearers; l; l = g_list_next (l)) {
+        path_list[i++] = g_strdup (mm_bearer_get_path (MM_BEARER (l->data)));
+    }
+
+    return path_list;
+}
+
+static void
+modem_list_bearers (MMIfaceModem *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+
+    GSimpleAsyncResult *result;
+
+    /* Complete successfully, we'll build the result in finish()  */
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_list_bearers);
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+
 
 /*****************************************************************************/
 /* CAPABILITIES */
@@ -2534,6 +2707,10 @@ dispose (GObject *object)
     if (self->priv->modem_sim)
         g_clear_object (&self->priv->modem_sim);
 
+    g_list_foreach (self->priv->modem_bearers, (GFunc)g_object_unref, NULL);
+    g_list_free (self->priv->modem_bearers);
+    self->priv->modem_bearers = NULL;
+
     G_OBJECT_CLASS (mm_broadband_modem_parent_class)->dispose (object);
 }
 
@@ -2565,6 +2742,12 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_charsets_finish = load_supported_charsets_finish;
     iface->modem_charset = modem_charset;
     iface->modem_charset_finish = modem_charset_finish;
+    iface->create_bearer = modem_create_bearer;
+    iface->create_bearer_finish = modem_create_bearer_finish;
+    iface->delete_bearer = modem_delete_bearer;
+    iface->delete_bearer_finish = modem_delete_bearer_finish;
+    iface->list_bearers = modem_list_bearers;
+    iface->list_bearers_finish = modem_list_bearers_finish;
 }
 
 static void
