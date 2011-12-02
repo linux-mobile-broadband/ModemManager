@@ -584,6 +584,8 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
         exit (EXIT_FAILURE);
     }
 
+    /* Initialize context */
+    ctx = g_new0 (Context, 1);
     ctx->modem = mmcli_get_modem_sync (connection, modem_str);
 
     /* Request to get info from modem? */
