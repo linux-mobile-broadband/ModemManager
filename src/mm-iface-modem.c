@@ -1690,17 +1690,9 @@ sim_new_ready (GAsyncInitable *initable,
                  error ? error->message : "Unknown error");
         g_clear_error (&error);
     } else {
-        gchar *path = NULL;
-
-        g_object_get (sim,
-                      MM_SIM_PATH, &path,
-                      NULL);
-        mm_gdbus_modem_set_sim (MM_GDBUS_MODEM (ctx->skeleton),
-                                path);
         g_object_bind_property (sim, MM_SIM_PATH,
                                 ctx->skeleton, "sim",
-                                G_BINDING_DEFAULT);
-        g_free (path);
+                                G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
 
         g_object_set (ctx->self,
                       MM_IFACE_MODEM_SIM, sim,
@@ -2080,14 +2072,12 @@ mm_iface_modem_initialize (MMIfaceModem *self,
                            gpointer user_data)
 {
     MmGdbusModem *skeleton = NULL;
-    MMModemState modem_state = MM_MODEM_STATE_UNKNOWN;
 
     g_return_if_fail (MM_IS_IFACE_MODEM (self));
 
     /* Did we already create it? */
     g_object_get (self,
                   MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
-                  MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
     if (!skeleton) {
         skeleton = mm_gdbus_modem_skeleton_new ();
@@ -2118,15 +2108,13 @@ mm_iface_modem_initialize (MMIfaceModem *self,
         /* Bind our State property */
         g_object_bind_property (self, MM_IFACE_MODEM_STATE,
                                 skeleton, "state",
-                                G_BINDING_DEFAULT);
+                                G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
         /* Bind our Capabilities property */
         g_object_bind_property (self, MM_IFACE_MODEM_CURRENT_CAPABILITIES,
                                 skeleton, "current-capabilities",
-                                G_BINDING_DEFAULT);
+                                G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
 
         g_object_set (self,
-                      MM_IFACE_MODEM_STATE, modem_state,
-                      MM_IFACE_MODEM_CURRENT_CAPABILITIES, MM_MODEM_CAPABILITY_NONE,
                       MM_IFACE_MODEM_DBUS_SKELETON, skeleton,
                       NULL);
     }
