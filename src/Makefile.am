@@ -110,6 +110,8 @@ modem_manager_SOURCES = \
 	mm-plugin-manager.h \
 	mm-sim.h \
 	mm-sim.c \
+	mm-bearer.h \
+	mm-bearer.c \
 	mm-base-modem-at.h \
 	mm-base-modem-at.c \
 	mm-base-modem.h \
