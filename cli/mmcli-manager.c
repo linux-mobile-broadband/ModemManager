@@ -179,18 +179,29 @@ scan_devices_ready (MMManager    *manager,
 }
 
 static void
-device_added (GDBusObjectManager *manager,
-              GDBusObject        *object)
+print_modem_short_info (MMModem *modem)
 {
-    g_print ("Added modem [TODO: Print path]\n");
+    g_print ("\t%s [%s] %s\n",
+             mm_modem_get_path (modem),
+             mm_modem_get_manufacturer (modem),
+             mm_modem_get_model (modem));
+}
+
+static void
+device_added (MMManager *manager,
+              MMModem   *modem)
+{
+    g_print ("Added modem:\n");
+    print_modem_short_info (modem);
     fflush (stdout);
 }
 
 static void
-device_removed (GDBusObjectManager *manager,
-                GDBusObject        *object)
+device_removed (MMManager *manager,
+                MMModem   *modem)
 {
-    g_print ("Removed modem [TODO: Print path]\n");
+    g_print ("Removed modem:\n");
+    print_modem_short_info (modem);
     fflush (stdout);
 }
 
@@ -209,14 +220,12 @@ list_current_modems (MMManager *manager)
 
         g_print ("Found %u modems:\n", g_list_length (modems));
         for (l = modems; l; l = g_list_next (l)) {
-            MMModem *modem = MM_MODEM (l->data);
-
-            g_print ("\t%s\n",
-                     mm_modem_get_path (modem));
+            print_modem_short_info (MM_MODEM (l->data));
         }
         g_list_foreach (modems, (GFunc)g_object_unref, NULL);
         g_list_free (modems);
     }
+    g_print ("\n");
 }
 
 static void

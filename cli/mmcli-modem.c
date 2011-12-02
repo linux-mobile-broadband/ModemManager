@@ -515,6 +515,7 @@ get_modem_ready (GObject      *source,
 
     /* Request to enable the modem? */
     if (enable_flag) {
+        g_debug ("Asynchronously enabling modem...");
         mm_modem_enable (ctx->modem,
                          ctx->cancellable,
                          (GAsyncReadyCallback)enable_ready,
@@ -524,6 +525,7 @@ get_modem_ready (GObject      *source,
 
     /* Request to disable the modem? */
     if (disable_flag) {
+        g_debug ("Asynchronously disabling modem...");
         mm_modem_disable (ctx->modem,
                           ctx->cancellable,
                           (GAsyncReadyCallback)disable_ready,
@@ -533,6 +535,7 @@ get_modem_ready (GObject      *source,
 
     /* Request to reset the modem? */
     if (reset_flag) {
+        g_debug ("Asynchronously reseting modem...");
         mm_modem_reset (ctx->modem,
                         ctx->cancellable,
                         (GAsyncReadyCallback)reset_ready,
@@ -542,6 +545,7 @@ get_modem_ready (GObject      *source,
 
     /* Request to reset the modem to factory state? */
     if (factory_reset_str) {
+        g_debug ("Asynchronously factory-reseting modem...");
         mm_modem_factory_reset (ctx->modem,
                                 factory_reset_str,
                                 ctx->cancellable,
@@ -612,6 +616,7 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
     if (enable_flag) {
         gboolean result;
 
+        g_debug ("Synchronously enabling modem...");
         result = mm_modem_enable_sync (ctx->modem, NULL, &error);
         enable_process_reply (result, error);
         return;
@@ -621,6 +626,7 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
     if (disable_flag) {
         gboolean result;
 
+        g_debug ("Synchronously disabling modem...");
         result = mm_modem_disable_sync (ctx->modem, NULL, &error);
         disable_process_reply (result, error);
         return;
@@ -630,6 +636,7 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
     if (reset_flag) {
         gboolean result;
 
+        g_debug ("Synchronously reseting modem...");
         result = mm_modem_reset_sync (ctx->modem, NULL, &error);
         reset_process_reply (result, error);
         return;
@@ -639,6 +646,7 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
     if (factory_reset_str) {
         gboolean result;
 
+        g_debug ("Synchronously factory-reseting modem...");
         result = mm_modem_factory_reset_sync (ctx->modem,
                                               factory_reset_str,
                                               NULL,

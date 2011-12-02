@@ -130,11 +130,11 @@ find_modem (MMManager *manager,
     g_list_free (modems);
 
     if (!found) {
-        g_printerr ("error: couldn't find the Modem at '%s'\n", modem_path);
+        g_printerr ("error: couldn't find modem at '%s'\n", modem_path);
         exit (EXIT_FAILURE);
     }
 
-    g_debug ("Modem found at '%s'", modem_path);
+    g_debug ("Modem found at '%s'\n", modem_path);
 
     return found;
 }
