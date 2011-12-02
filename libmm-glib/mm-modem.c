@@ -732,7 +732,7 @@ mm_modem_get_allowed_bands (MMModem *self)
     {                                                                   \
         GError *error = NULL;                                           \
                                                                         \
-        if (mm_gdbus_modem_call_##NAME##_finish (                       \
+        if (!mm_gdbus_modem_call_##NAME##_finish (                      \
                 modem_iface_proxy,                                      \
                 res,                                                    \
                 &error))                                                \
@@ -1304,4 +1304,3 @@ mm_modem_get_sim_sync (MMModem *self,
                 cancellable,
                 error));
 }
-
