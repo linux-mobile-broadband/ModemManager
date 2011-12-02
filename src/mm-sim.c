@@ -1128,7 +1128,7 @@ set_property (GObject *object,
              * and unset when unexported) to the SIM's connection */
             g_object_bind_property (self->priv->modem, MM_BASE_MODEM_CONNECTION,
                                     self, MM_SIM_CONNECTION,
-                                    G_BINDING_DEFAULT);
+                                    G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
         }
         break;
     default:
