@@ -1185,8 +1185,12 @@ dispose (GObject *object)
 {
     MMSim *self = MM_SIM (object);
 
-    if (self->priv->connection)
+    if (self->priv->connection) {
+        /* If we arrived here with a valid connection, make sure we unexport
+         * the object */
+        mm_sim_unexport (self);
         g_clear_object (&self->priv->connection);
+    }
 
     if (self->priv->modem)
         g_clear_object (&self->priv->modem);
