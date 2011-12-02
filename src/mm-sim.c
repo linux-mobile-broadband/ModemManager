@@ -345,7 +345,9 @@ mm_sim_export (MMSim *self)
 static void
 mm_sim_unexport (MMSim *self)
 {
-    g_dbus_interface_skeleton_unexport (G_DBUS_INTERFACE_SKELETON (self));
+    /* Only unexport if currently exported */
+    if (g_dbus_interface_skeleton_get_object_path (G_DBUS_INTERFACE_SKELETON (self)))
+        g_dbus_interface_skeleton_unexport (G_DBUS_INTERFACE_SKELETON (self));
 }
 
 /*****************************************************************************/
