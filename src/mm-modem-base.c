@@ -480,9 +480,10 @@ info_item_done (MMCallbackInfo *info,
                 const char *tag2,
                 const char *desc)
 {
-    const char *p = response->str;
+    const char *p;
 
     if (!error) {
+        p = response->str;
         if (tag)
             p = mm_strip_tag (p, tag);
         if (tag2)

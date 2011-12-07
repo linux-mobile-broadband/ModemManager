@@ -70,12 +70,13 @@ custom_init_response_cb (MMPluginBaseSupportsTask *task,
                          guint32 *out_level,
                          gpointer user_data)
 {
-    const char *p = response->str;
+    const char *p;
 
     if (error)
         return tries <= 4 ? TRUE : FALSE;
 
     /* Note the lack of a ':' on the GMR; the X200 doesn't send one */
+    g_assert (response);
     p = mm_strip_tag (response->str, "AT+GMR");
     if (*p != 'L') {
         /* X200 modems have a GMR firmware revision that starts with 'L', and
