@@ -730,7 +730,9 @@ enap_poll_response (MMAtSerialPort *port,
 
     count = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "mbm-enap-poll-count"));
 
-    if (sscanf (response->str, "*ENAP: %d", &state) == 1 && state == 1) {
+    if (   response
+        && sscanf (response->str, "*ENAP: %d", &state) == 1
+        && state == 1) {
         /* Success!  Connected... */
         mm_generic_gsm_connect_complete (MM_GENERIC_GSM (info->modem), NULL, info);
         return;

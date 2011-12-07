@@ -988,7 +988,6 @@ get_signal_quality_done (MMAtSerialPort *port,
 {
     MMGenericCdmaPrivate *priv;
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    char *reply = response->str;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
@@ -1008,6 +1007,7 @@ get_signal_quality_done (MMAtSerialPort *port,
             return;
         }
     } else {
+        const char *reply = response->str;
         int quality, ber;
 
         /* Got valid reply */
@@ -1273,7 +1273,7 @@ serving_system_done (MMAtSerialPort *port,
                      gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    char *reply = response->str;
+    char *reply;
     int class = 0, sid = 99999, num;
     unsigned char band = 'Z';
     gboolean success = FALSE;
@@ -1288,6 +1288,7 @@ serving_system_done (MMAtSerialPort *port,
         goto out;
     }
 
+    reply = response->str;
     if (strstr (reply, "+CSS: "))
         reply += 6;
 

@@ -350,7 +350,7 @@ pin_check_done (MMAtSerialPort *port,
             info->error = g_error_new (MM_MODEM_ERROR,
                                        MM_MODEM_ERROR_GENERAL,
                                        "Could not parse PIN request response '%s'",
-                                       response->str);
+                                       response ? response->str : "(unknown)");
         }
     }
 
