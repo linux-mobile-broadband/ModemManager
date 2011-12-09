@@ -60,7 +60,7 @@ const gchar       *mm_modem_get_plugin               (MMModem *self);
 gchar             *mm_modem_dup_plugin               (MMModem *self);
 const gchar       *mm_modem_get_equipment_identifier (MMModem *self);
 gchar             *mm_modem_dup_equipment_identifier (MMModem *self);
-guint              mm_modem_get_unlock_required      (MMModem *self);
+MMModemLock        mm_modem_get_unlock_required      (MMModem *self);
 guint              mm_modem_get_unlock_retries       (MMModem *self);
 MMModemState       mm_modem_get_state                (MMModem *self);
 MMModemAccessTech  mm_modem_get_access_technology    (MMModem *self);
@@ -184,6 +184,8 @@ MMSim *mm_modem_get_sim_finish (MMModem *self,
 MMSim *mm_modem_get_sim_sync   (MMModem *self,
                                 GCancellable *cancellable,
                                 GError **error);
+
+gchar *mm_modem_get_capabilities_string (MMModemCapability caps);
 
 G_END_DECLS
 

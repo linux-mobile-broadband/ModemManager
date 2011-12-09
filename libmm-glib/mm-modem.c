@@ -22,6 +22,8 @@
 
 #include <gio/gio.h>
 
+#include <mm-common-helpers.h>
+
 #include "mm-modem.h"
 
 /**
@@ -1219,4 +1221,18 @@ mm_modem_get_sim_sync (MMModem *self,
                 sim_path,
                 cancellable,
                 error));
+}
+
+/**
+ * mm_modem_get_capabilities_string:
+ * @caps: Bitmask of #MMModemCapability flags.
+ *
+ * Build a string with a list of capabilities.
+ *
+ * Returns: (transfer full): A string specifying the capabilities given in @caps. The returned value should be freed with g_free().
+ */
+gchar *
+mm_modem_get_capabilities_string (MMModemCapability caps)
+{
+    return mm_common_get_capabilities_string (caps);
 }
