@@ -404,6 +404,7 @@ serial_probe_at_parse_response (MMAtSerialPort *port,
                              "(%s) error while probing AT features: %s",
                              self->priv->name,
                              result_error->message));
+            g_error_free (result_error);
             return;
         }
 
