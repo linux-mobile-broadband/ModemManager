@@ -144,6 +144,24 @@ mmcli_async_operation_done (void)
     g_main_loop_quit (loop);
 }
 
+void
+mmcli_force_async_operation (void)
+{
+    if (!async_flag) {
+        g_debug ("Forcing request to be run asynchronously");
+        async_flag = TRUE;
+    }
+}
+
+void
+mmcli_force_sync_operation (void)
+{
+    if (async_flag) {
+        g_debug ("Ignoring request to run asynchronously");
+        async_flag = FALSE;
+    }
+}
+
 gint
 main (gint argc, gchar **argv)
 {
@@ -184,12 +202,9 @@ main (gint argc, gchar **argv)
         exit (EXIT_FAILURE);
     }
 
-    /* Setup context for asynchronous operations */
-    if (async_flag) {
-        g_debug ("Running asynchronous operations...");
-        loop = g_main_loop_new (NULL, FALSE);
-        cancellable = g_cancellable_new ();
-    }
+    /* Create requirements for async options */
+    cancellable = g_cancellable_new ();
+    loop = g_main_loop_new (NULL, FALSE);
 
     /* Manager options? */
     if (mmcli_manager_options_enabled ()) {
@@ -219,12 +234,8 @@ main (gint argc, gchar **argv)
     }
 
     /* Run loop only in async operations */
-    if (async_flag) {
+    if (async_flag)
         g_main_loop_run (loop);
-        if (cancellable)
-            g_object_unref (cancellable);
-        g_main_loop_unref (loop);
-    }
 
     if (mmcli_manager_options_enabled ()) {
         mmcli_manager_shutdown ();
@@ -232,6 +243,8 @@ main (gint argc, gchar **argv)
         mmcli_modem_shutdown ();
     }
 
+    g_object_unref (cancellable);
+    g_main_loop_unref (loop);
     g_object_unref (connection);
 
     return EXIT_SUCCESS;

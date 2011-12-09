@@ -98,6 +98,9 @@ mmcli_manager_options_enabled (void)
         exit (EXIT_FAILURE);
     }
 
+    if (monitor_modems_flag)
+        mmcli_force_async_operation ();
+
     return !!n_actions;
 }
 

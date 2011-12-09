@@ -24,7 +24,9 @@
 #define __MMCLI_H__
 
 /* Common */
-void          mmcli_async_operation_done (void);
+void          mmcli_async_operation_done  (void);
+void          mmcli_force_async_operation (void);
+void          mmcli_force_sync_operation  (void);
 
 /* Manager group */
 GOptionGroup *mmcli_manager_get_option_group (void);

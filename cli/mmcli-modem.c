@@ -115,6 +115,12 @@ mmcli_modem_options_enabled (void)
         exit (EXIT_FAILURE);
     }
 
+    if (monitor_state_flag)
+        mmcli_force_async_operation ();
+
+    if (info_flag)
+        mmcli_force_sync_operation ();
+
     return !!n_actions;
 }
 
@@ -436,16 +442,8 @@ get_modem_ready (GObject      *source,
     ctx->object = mmcli_get_modem_finish (result);
     ctx->modem = mm_object_get_modem (ctx->object);
 
-    /* Request to get info from modem? */
-    if (info_flag) {
-        /* TODO */
-
-        /* mm_modem_get_info_async (ctxt.modem, */
-        /*                          cancellable, */
-        /*                          (GAsyncReadyCallback)get_info_ready, */
-        /*                          NULL); */
-        return;
-    }
+    if (info_flag)
+        g_assert_not_reached ();
 
     /* Request to monitor modems? */
     if (monitor_state_flag) {
@@ -530,10 +528,8 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
 {
     GError *error = NULL;
 
-    if (monitor_state_flag) {
-        g_printerr ("error: monitoring state cannot be done synchronously\n");
-        exit (EXIT_FAILURE);
-    }
+    if (monitor_state_flag)
+        g_assert_not_reached ();
 
     /* Initialize context */
     ctx = g_new0 (Context, 1);
