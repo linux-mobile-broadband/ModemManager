@@ -30,12 +30,14 @@
 
 G_BEGIN_DECLS
 
-typedef MmGdbusObject    MMModem;
-#define MM_TYPE_MODEM(o) MM_GDBUS_TYPE_OBJECT (o)
-#define MM_MODEM(o)      MM_GDBUS_OBJECT(o)
-#define MM_IS_MODEM(o)   MM_GDBUS_IS_OBJECT(o)
+typedef MmGdbusModem     MMModem;
+#define MM_TYPE_MODEM(o) MM_GDBUS_TYPE_MODEM (o)
+#define MM_MODEM(o)      MM_GDBUS_MODEM(o)
+#define MM_IS_MODEM(o)   MM_GDBUS_IS_MODEM(o)
 
-const gchar       *mm_modem_get_path                 (MMModem *self);
+const gchar *mm_modem_get_path (MMModem *self);
+gchar       *mm_modem_dup_path (MMModem *self);
+
 const gchar       *mm_modem_get_sim_path             (MMModem *self);
 gchar             *mm_modem_dup_sim_path             (MMModem *self);
 MMModemCapability  mm_modem_get_modem_capabilities   (MMModem *self);

@@ -28,16 +28,38 @@
  * mm_modem_get_path:
  * @self: A #MMModem.
  *
- * Gets the DBus path of the #MMModem object.
+ * Gets the DBus path of the #MMObject which implements this interface.
  *
- * Returns: (transfer none): The DBus path of the #MMModem object.
+ * Returns: (transfer none): The DBus path of the #MMObject object.
  */
 const gchar *
 mm_modem_get_path (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
+    g_return_val_if_fail (G_IS_DBUS_PROXY (self), NULL);
 
-    return g_dbus_object_get_object_path (G_DBUS_OBJECT (self));
+    return g_dbus_proxy_get_object_path (G_DBUS_PROXY (self));
+}
+
+/**
+ * mm_modem_dup_path:
+ * @self: A #MMModem.
+ *
+ * Gets a copy of the DBus path of the #MMObject object which implements this interface.
+ *
+ * Returns: (transfer full): The DBus path of the #MMObject. The returned value should be freed with g_free().
+ */
+gchar *
+mm_modem_dup_path (MMModem *self)
+{
+    gchar *value;
+
+    g_return_val_if_fail (G_IS_DBUS_PROXY (self), NULL);
+
+    g_object_get (G_OBJECT (self),
+                  "g-object-path", &value,
+                  NULL);
+
+    return value;
 }
 
 /**
@@ -53,10 +75,9 @@ mm_modem_get_path (MMModem *self)
 const gchar *
 mm_modem_get_sim_path (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return (mm_gdbus_modem_get_sim (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return mm_gdbus_modem_get_sim (self);
 }
 
 /**
@@ -70,15 +91,9 @@ mm_modem_get_sim_path (MMModem *self)
 gchar *
 mm_modem_dup_sim_path (MMModem *self)
 {
-    gchar *sim_path;
-    MmGdbusModem *modem;
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
-
-    modem = mm_gdbus_object_get_modem (MM_GDBUS_OBJECT (self));
-    sim_path = mm_gdbus_modem_dup_sim (modem);
-    g_object_unref (modem);
-    return sim_path;
+    return mm_gdbus_modem_dup_sim (self);
 }
 
 /**
@@ -96,10 +111,9 @@ mm_modem_dup_sim_path (MMModem *self)
 MMModemCapability
 mm_modem_get_modem_capabilities (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), MM_MODEM_CAPABILITY_NONE);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), MM_MODEM_CAPABILITY_NONE);
 
-    return (mm_gdbus_modem_get_modem_capabilities (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return (MMModemCapability) mm_gdbus_modem_get_modem_capabilities (self);
 }
 
 /**
@@ -114,10 +128,9 @@ mm_modem_get_modem_capabilities (MMModem *self)
 MMModemCapability
 mm_modem_get_current_capabilities (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), MM_MODEM_CAPABILITY_NONE);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), MM_MODEM_CAPABILITY_NONE);
 
-    return (mm_gdbus_modem_get_current_capabilities (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return mm_gdbus_modem_get_current_capabilities (self);
 }
 
 /**
@@ -138,10 +151,9 @@ mm_modem_get_current_capabilities (MMModem *self)
 guint
 mm_modem_get_max_bearers (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), 0);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), 0);
 
-    return (mm_gdbus_modem_get_max_bearers (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return mm_gdbus_modem_get_max_bearers (self);
 }
 
 /**
@@ -159,10 +171,9 @@ mm_modem_get_max_bearers (MMModem *self)
 guint
 mm_modem_get_max_active_bearers (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), 0);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), 0);
 
-    return (mm_gdbus_modem_get_max_active_bearers (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return mm_gdbus_modem_get_max_active_bearers (self);
 }
 
 /**
@@ -178,10 +189,9 @@ mm_modem_get_max_active_bearers (MMModem *self)
 const gchar *
 mm_modem_get_manufacturer (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return (mm_gdbus_modem_get_manufacturer (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return mm_gdbus_modem_get_manufacturer (self);
 }
 
 /**
@@ -195,15 +205,9 @@ mm_modem_get_manufacturer (MMModem *self)
 gchar *
 mm_modem_dup_manufacturer (MMModem *self)
 {
-    gchar *manufacturer;
-    MmGdbusModem *modem;
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
-
-    modem = mm_gdbus_object_get_modem (MM_GDBUS_OBJECT (self));
-    manufacturer = mm_gdbus_modem_dup_manufacturer (modem);
-    g_object_unref (modem);
-    return manufacturer;
+    return mm_gdbus_modem_dup_manufacturer (self);
 }
 
 /**
@@ -219,10 +223,9 @@ mm_modem_dup_manufacturer (MMModem *self)
 const gchar *
 mm_modem_get_model (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return (mm_gdbus_modem_get_model (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return mm_gdbus_modem_get_model (self);
 }
 
 /**
@@ -236,15 +239,9 @@ mm_modem_get_model (MMModem *self)
 gchar *
 mm_modem_dup_model (MMModem *self)
 {
-    gchar *model;
-    MmGdbusModem *modem;
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
-
-    modem = mm_gdbus_object_get_modem (MM_GDBUS_OBJECT (self));
-    model = mm_gdbus_modem_dup_model (modem);
-    g_object_unref (modem);
-    return model;
+    return mm_gdbus_modem_dup_model (self);
 }
 
 /**
@@ -260,10 +257,9 @@ mm_modem_dup_model (MMModem *self)
 const gchar *
 mm_modem_get_revision (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return (mm_gdbus_modem_get_revision (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return mm_gdbus_modem_get_revision (self);
 }
 
 /**
@@ -277,15 +273,9 @@ mm_modem_get_revision (MMModem *self)
 gchar *
 mm_modem_dup_revision (MMModem *self)
 {
-    gchar *revision;
-    MmGdbusModem *modem;
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
-
-    modem = mm_gdbus_object_get_modem (MM_GDBUS_OBJECT (self));
-    revision = mm_gdbus_modem_dup_revision (modem);
-    g_object_unref (modem);
-    return revision;
+    return mm_gdbus_modem_dup_revision (self);
 }
 
 /**
@@ -310,10 +300,9 @@ mm_modem_dup_revision (MMModem *self)
 const gchar *
 mm_modem_get_device_identifier (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return (mm_gdbus_modem_get_device_identifier (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return mm_gdbus_modem_get_device_identifier (self);
 }
 
 /**
@@ -336,15 +325,9 @@ mm_modem_get_device_identifier (MMModem *self)
 gchar *
 mm_modem_dup_device_identifier (MMModem *self)
 {
-    gchar *device_identifier;
-    MmGdbusModem *modem;
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
-
-    modem = mm_gdbus_object_get_modem (MM_GDBUS_OBJECT (self));
-    device_identifier = mm_gdbus_modem_dup_device_identifier (modem);
-    g_object_unref (modem);
-    return device_identifier;
+    return mm_gdbus_modem_dup_device_identifier (self);
 }
 
 /**
@@ -361,10 +344,9 @@ mm_modem_dup_device_identifier (MMModem *self)
 const gchar *
 mm_modem_get_device (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return (mm_gdbus_modem_get_device (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return mm_gdbus_modem_get_device (self);
 }
 
 /**
@@ -379,15 +361,9 @@ mm_modem_get_device (MMModem *self)
 gchar *
 mm_modem_dup_device (MMModem *self)
 {
-    gchar *device;
-    MmGdbusModem *modem;
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
-
-    modem = mm_gdbus_object_get_modem (MM_GDBUS_OBJECT (self));
-    device = mm_gdbus_modem_dup_device (modem);
-    g_object_unref (modem);
-    return device;
+    return mm_gdbus_modem_dup_device (self);
 }
 
 /**
@@ -404,10 +380,9 @@ mm_modem_dup_device (MMModem *self)
 const gchar *
 mm_modem_get_driver (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return (mm_gdbus_modem_get_driver (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return mm_gdbus_modem_get_driver (self);
 }
 
 /**
@@ -422,15 +397,9 @@ mm_modem_get_driver (MMModem *self)
 gchar *
 mm_modem_dup_driver (MMModem *self)
 {
-    gchar *driver;
-    MmGdbusModem *modem;
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
-
-    modem = mm_gdbus_object_get_modem (MM_GDBUS_OBJECT (self));
-    driver = mm_gdbus_modem_dup_driver (modem);
-    g_object_unref (modem);
-    return driver;
+    return mm_gdbus_modem_dup_driver (self);
 }
 
 /**
@@ -446,10 +415,9 @@ mm_modem_dup_driver (MMModem *self)
 const gchar *
 mm_modem_get_plugin (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return (mm_gdbus_modem_get_plugin (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return mm_gdbus_modem_get_plugin (self);
 }
 
 /**
@@ -463,15 +431,9 @@ mm_modem_get_plugin (MMModem *self)
 gchar *
 mm_modem_dup_plugin (MMModem *self)
 {
-    gchar *plugin;
-    MmGdbusModem *modem;
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
-
-    modem = mm_gdbus_object_get_modem (MM_GDBUS_OBJECT (self));
-    plugin = mm_gdbus_modem_dup_plugin (modem);
-    g_object_unref (modem);
-    return plugin;
+    return mm_gdbus_modem_dup_plugin (self);
 }
 
 /**
@@ -490,10 +452,9 @@ mm_modem_dup_plugin (MMModem *self)
 const gchar *
 mm_modem_get_equipment_identifier (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return (mm_gdbus_modem_get_equipment_identifier (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return mm_gdbus_modem_get_equipment_identifier (self);
 }
 
 /**
@@ -510,15 +471,9 @@ mm_modem_get_equipment_identifier (MMModem *self)
 gchar *
 mm_modem_dup_equipment_identifier (MMModem *self)
 {
-    gchar *equipment_identifier;
-    MmGdbusModem *modem;
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
-
-    modem = mm_gdbus_object_get_modem (MM_GDBUS_OBJECT (self));
-    equipment_identifier = mm_gdbus_modem_dup_equipment_identifier (modem);
-    g_object_unref (modem);
-    return equipment_identifier;
+    return mm_gdbus_modem_dup_equipment_identifier (self);
 }
 
 /**
@@ -532,10 +487,9 @@ mm_modem_dup_equipment_identifier (MMModem *self)
 MMModemLock
 mm_modem_get_unlock_required (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), MM_MODEM_LOCK_UNKNOWN);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), MM_MODEM_LOCK_UNKNOWN);
 
-    return (mm_gdbus_modem_get_unlock_required (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return (MMModemLock) mm_gdbus_modem_get_unlock_required (self);
 }
 
 /**
@@ -551,10 +505,9 @@ mm_modem_get_unlock_required (MMModem *self)
 guint
 mm_modem_get_unlock_retries (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), 0);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), 0);
 
-    return (mm_gdbus_modem_get_unlock_retries (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return mm_gdbus_modem_get_unlock_retries (self);
 }
 
 /**
@@ -568,10 +521,9 @@ mm_modem_get_unlock_retries (MMModem *self)
 MMModemState
 mm_modem_get_state (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), MM_MODEM_STATE_UNKNOWN);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), MM_MODEM_STATE_UNKNOWN);
 
-    return (mm_gdbus_modem_get_state (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return (MMModemState) mm_gdbus_modem_get_state (self);
 }
 
 /**
@@ -586,10 +538,9 @@ mm_modem_get_state (MMModem *self)
 MMModemAccessTech
 mm_modem_get_access_technology (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), MM_MODEM_ACCESS_TECH_UNKNOWN);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), MM_MODEM_ACCESS_TECH_UNKNOWN);
 
-    return (mm_gdbus_modem_get_access_technology (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return (MMModemAccessTech) mm_gdbus_modem_get_access_technology (self);
 }
 
 /**
@@ -612,10 +563,9 @@ mm_modem_get_signal_quality (MMModem *self,
     gboolean is_recent = FALSE;
     guint quality = 0;
 
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), 0);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), 0);
 
-    variant = (mm_gdbus_modem_get_signal_quality (
-                   mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    variant = mm_gdbus_modem_get_signal_quality (self);
     if (variant) {
         g_variant_get (variant,
                        "(ub)",
@@ -641,10 +591,9 @@ mm_modem_get_signal_quality (MMModem *self,
 MMModemMode
 mm_modem_get_supported_modes (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), MM_MODEM_MODE_NONE);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), MM_MODEM_MODE_NONE);
 
-    return (mm_gdbus_modem_get_supported_modes (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return (MMModemMode) mm_gdbus_modem_get_supported_modes (self);
 }
 
 /**
@@ -661,10 +610,9 @@ mm_modem_get_supported_modes (MMModem *self)
 MMModemMode
 mm_modem_get_allowed_modes (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), MM_MODEM_MODE_NONE);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), MM_MODEM_MODE_NONE);
 
-    return (mm_gdbus_modem_get_allowed_modes (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return (MMModemMode) mm_gdbus_modem_get_allowed_modes (self);
 }
 
 /**
@@ -679,10 +627,9 @@ mm_modem_get_allowed_modes (MMModem *self)
 MMModemMode
 mm_modem_get_preferred_mode (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), MM_MODEM_MODE_NONE);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), MM_MODEM_MODE_NONE);
 
-    return (mm_gdbus_modem_get_preferred_mode (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return (MMModemMode) mm_gdbus_modem_get_preferred_mode (self);
 }
 
 /**
@@ -698,10 +645,9 @@ mm_modem_get_preferred_mode (MMModem *self)
 MMModemBand
 mm_modem_get_supported_bands (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), MM_MODEM_MODE_NONE);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), MM_MODEM_MODE_NONE);
 
-    return (mm_gdbus_modem_get_supported_bands (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return (MMModemBand) mm_gdbus_modem_get_supported_bands (self);
 }
 
 /**
@@ -718,61 +664,10 @@ mm_modem_get_supported_bands (MMModem *self)
 MMModemBand
 mm_modem_get_allowed_bands (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), MM_MODEM_MODE_NONE);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), MM_MODEM_MODE_NONE);
 
-    return (mm_gdbus_modem_get_allowed_bands (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self))));
+    return (MMModemBand) mm_gdbus_modem_get_allowed_bands (self);
 }
-
-#define BOOL_REPLY_READY_FN(NAME)                                       \
-    static void                                                         \
-    common_##NAME##_ready (MmGdbusModem *modem_iface_proxy,             \
-                           GAsyncResult *res,                           \
-                           GSimpleAsyncResult *simple)                  \
-    {                                                                   \
-        GError *error = NULL;                                           \
-                                                                        \
-        if (!mm_gdbus_modem_call_##NAME##_finish (                      \
-                modem_iface_proxy,                                      \
-                res,                                                    \
-                &error))                                                \
-            g_simple_async_result_take_error (simple, error);           \
-        else                                                            \
-            g_simple_async_result_set_op_res_gboolean (simple, TRUE);   \
-                                                                        \
-        /* balance ref count */                                         \
-        g_object_unref (modem_iface_proxy);                             \
-        g_simple_async_result_complete (simple);                        \
-        g_object_unref (simple);                                        \
-    }
-
-#define BOOL_REPLY_FINISH_FN(NAME)                                      \
-    gboolean                                                            \
-    mm_modem_##NAME##_finish (MMModem *self,                            \
-                              GAsyncResult *res,                        \
-                              GError **error)                           \
-    {                                                                   \
-        g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), FALSE);        \
-                                                                        \
-        if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error)) \
-            return FALSE;                                               \
-                                                                        \
-        return g_simple_async_result_get_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res)); \
-    }
-
-BOOL_REPLY_READY_FN  (enable)
-
-/**
- * mm_modem_enable_finish:
- * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_enable().
- * @error: Return location for error or %NULL.
- *
- * Finishes an operation started with mm_modem_enable().
- *
- * Returns: (skip): %TRUE if the modem was properly enabled, %FALSE if @error is set.
- */
-BOOL_REPLY_FINISH_FN (enable)
 
 /**
  * mm_modem_enable:
@@ -796,20 +691,33 @@ mm_modem_enable (MMModem *self,
                  GAsyncReadyCallback callback,
                  gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    g_return_if_fail (MM_GDBUS_IS_MODEM (self));
 
-    g_return_if_fail (MM_GDBUS_IS_OBJECT (self));
+    mm_gdbus_modem_call_enable (self,
+                                TRUE,
+                                cancellable,
+                                callback,
+                                user_data);
+}
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_modem_enable);
-    mm_gdbus_modem_call_enable (
-        mm_gdbus_object_get_modem (MM_GDBUS_OBJECT (self)), /* unref later */
-        TRUE,
-        cancellable,
-        (GAsyncReadyCallback)common_enable_ready,
-        result);
+/**
+ * mm_modem_enable_finish:
+ * @self: A #MMModem.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_enable().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_enable().
+ *
+ * Returns: (skip): %TRUE if the modem was properly enabled, %FALSE if @error is set.
+ */
+gboolean
+mm_modem_enable_finish (MMModem *self,
+                        GAsyncResult *res,
+                        GError **error)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
+
+    return mm_gdbus_modem_call_enable_finish (self, res, error);
 }
 
 /**
@@ -832,45 +740,13 @@ mm_modem_enable_sync (MMModem *self,
                       GCancellable *cancellable,
                       GError **error)
 {
-    return (mm_gdbus_modem_call_enable_sync (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self)),
-                TRUE,
-                cancellable,
-                error));
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
+
+    return mm_gdbus_modem_call_enable_sync (self,
+                                            TRUE,
+                                            cancellable,
+                                            error);
 }
-
-static void
-modem_disable_ready (MmGdbusModem *modem_iface_proxy,
-                     GAsyncResult *res,
-                     GSimpleAsyncResult *simple)
-{
-    GError *error = NULL;
-
-    if (mm_gdbus_modem_call_enable_finish (
-            modem_iface_proxy,
-            res,
-            &error))
-        g_simple_async_result_take_error (simple, error);
-    else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-
-    /* balance ref count */
-    g_object_unref (modem_iface_proxy);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
-}
-
-/**
- * mm_modem_disable_finish:
- * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_disable().
- * @error: Return location for error or %NULL.
- *
- * Finishes an operation started with mm_modem_disable().
- *
- * Returns: (skip): %TRUE if the modem was properly disabled, %FALSE if @error is set.
- */
-BOOL_REPLY_FINISH_FN (disable)
 
 /**
  * mm_modem_disable:
@@ -893,20 +769,33 @@ mm_modem_disable (MMModem *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    g_return_if_fail (MM_GDBUS_IS_MODEM (self));
 
-    g_return_if_fail (MM_GDBUS_IS_OBJECT (self));
+    mm_gdbus_modem_call_enable (self,
+                                FALSE,
+                                cancellable,
+                                callback,
+                                user_data);
+}
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_modem_disable);
-    mm_gdbus_modem_call_enable (
-        mm_gdbus_object_get_modem (MM_GDBUS_OBJECT (self)), /* unref later */
-        FALSE,
-        cancellable,
-        (GAsyncReadyCallback)modem_disable_ready,
-        result);
+/**
+ * mm_modem_disable_finish:
+ * @self: A #MMModem.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_disable().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_disable().
+ *
+ * Returns: (skip): %TRUE if the modem was properly disabled, %FALSE if @error is set.
+ */
+gboolean
+mm_modem_disable_finish (MMModem *self,
+                         GAsyncResult *res,
+                         GError **error)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
+
+    return mm_gdbus_modem_call_enable_finish (self, res, error);
 }
 
 /**
@@ -928,38 +817,34 @@ mm_modem_disable_sync (MMModem *self,
                       GCancellable *cancellable,
                       GError **error)
 {
-    return (mm_gdbus_modem_call_enable_sync (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self)),
-                FALSE,
-                cancellable,
-                error));
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
+
+    return mm_gdbus_modem_call_enable_sync (self,
+                                            FALSE,
+                                            cancellable,
+                                            error);
 }
 
-static void
-create_bearer_ready (MmGdbusModem *modem_iface_proxy,
-                     GAsyncResult *res,
-                     GSimpleAsyncResult *simple)
-{
-    GError *error = NULL;
-    gchar *path = NULL;
-
-    if (mm_gdbus_modem_call_create_bearer_finish (
-            modem_iface_proxy,
-            &path,
-            res,
-            &error)) {
-        g_simple_async_result_take_error (simple, error);
-        g_free (path);
-    }
-    else
-        g_simple_async_result_set_op_res_gpointer (simple, path, NULL);
-
-    /* balance ref count */
-    g_object_unref (modem_iface_proxy);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
-}
-
+/**
+ * mm_modem_create_bearer:
+ * @self: A #MMModem.
+ * @properties: A dictionary with signature a{ss} with the properties to be used when creating the bearer.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously creates a new packet data bearer in the #MMModem.
+ *
+ * This request may fail if the modem does not support additional bearers,
+ * if too many bearers are already defined, or if @properties are invalid.
+ *
+ * See <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem.CreateBearer">CreateBearer</link> to check which properties may be passed.
+ *
+ * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
+ * You can then call mm_modem_create_bearer_finish() to get the result of the operation.
+ *
+ * See mm_modem_create_bearer_sync() for the synchronous, blocking version of this method.
+ */
 void
 mm_modem_create_bearer (MMModem *self,
                         GVariant *properties,
@@ -967,43 +852,60 @@ mm_modem_create_bearer (MMModem *self,
                         GAsyncReadyCallback callback,
                         gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    g_return_if_fail (MM_GDBUS_IS_MODEM (self));
 
-    g_return_if_fail (MM_GDBUS_IS_OBJECT (self));
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_modem_create_bearer);
-    mm_gdbus_modem_call_create_bearer (
-        mm_gdbus_object_get_modem (MM_GDBUS_OBJECT (self)), /* unref later */
-        properties,
-        cancellable,
-        (GAsyncReadyCallback)create_bearer_ready,
-        result);
+    mm_gdbus_modem_call_create_bearer (self,
+                                       properties,
+                                       cancellable,
+                                       callback,
+                                       user_data);
 }
 
+/**
+ * mm_modem_create_bearer_finish:
+ * @self: A #MMModem.
+ * @out_path: (out): Return location for the object path of the newly created bearer, or %NULL to ignore.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_create_bearer().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_create_bearer().
+ *
+ * Returns: (skip): %TRUE if the bearer was created, %FALSE if @error is set.
+ */
 gboolean
 mm_modem_create_bearer_finish (MMModem *self,
                                gchar **out_path,
                                GAsyncResult *res,
                                GError **error)
 {
-    gchar *path;
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
 
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), FALSE);
-
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return FALSE;
-
-    path = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-    if (!out_path)
-        g_free (path);
-    else
-        *out_path = path;
-    return TRUE;
+    return mm_gdbus_modem_call_create_bearer_finish (self,
+                                                     out_path,
+                                                     res,
+                                                     error);
 }
 
+/**
+ * mm_modem_create_bearer_sync:
+ * @self: A #MMModem.
+ * @properties: A dictionary with signature a{ss} with the properties to be used when creating the bearer.
+ * @out_path: (out): Return location for the object path of the newly created bearer, or %NULL to ignore.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously creates a new packet data bearer in the #MMModem.
+ *
+ * This request may fail if the modem does not support additional bearers,
+ * if too many bearers are already defined, or if @properties are invalid.
+ *
+ * See <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem.CreateBearer">CreateBearer</link> to check which properties may be passed.
+ *
+ * The calling thread is blocked until a reply is received. See mm_modem_create_bearer()
+ * for the asynchronous version of this method.
+ *
+ * Returns: (skip): %TRUE if the bearer was created, %FALSE if @error is set.
+ */
 gboolean
 mm_modem_create_bearer_sync (MMModem *self,
                              GVariant *properties,
@@ -1011,16 +913,14 @@ mm_modem_create_bearer_sync (MMModem *self,
                              GCancellable *cancellable,
                              GError **error)
 {
-    return (mm_gdbus_modem_call_create_bearer_sync (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self)),
-                properties,
-                out_path,
-                cancellable,
-                error));
-}
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
 
-BOOL_REPLY_READY_FN  (delete_bearer)
-BOOL_REPLY_FINISH_FN (delete_bearer)
+    return mm_gdbus_modem_call_create_bearer_sync (self,
+                                                   properties,
+                                                   out_path,
+                                                   cancellable,
+                                                   error);
+}
 
 void
 mm_modem_delete_bearer (MMModem *self,
@@ -1029,20 +929,25 @@ mm_modem_delete_bearer (MMModem *self,
                         GAsyncReadyCallback callback,
                         gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    g_return_if_fail (MM_GDBUS_IS_MODEM (self));
 
-    g_return_if_fail (MM_GDBUS_IS_OBJECT (self));
+    mm_gdbus_modem_call_delete_bearer (self,
+                                       bearer,
+                                       cancellable,
+                                       callback,
+                                       user_data);
+}
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_modem_delete_bearer);
-    mm_gdbus_modem_call_delete_bearer (
-        mm_gdbus_object_get_modem (MM_GDBUS_OBJECT (self)), /* unref later */
-        bearer,
-        cancellable,
-        (GAsyncReadyCallback)common_delete_bearer_ready,
-        result);
+gboolean
+mm_modem_delete_bearer_finish (MMModem *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
+
+    return mm_gdbus_modem_call_delete_bearer_finish (self,
+                                                     res,
+                                                     error);
 }
 
 gboolean
@@ -1051,15 +956,13 @@ mm_modem_delete_bearer_sync (MMModem *self,
                              GCancellable *cancellable,
                              GError **error)
 {
-    return (mm_gdbus_modem_call_delete_bearer_sync (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self)),
-                bearer,
-                cancellable,
-                error));
-}
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
 
-BOOL_REPLY_READY_FN  (reset)
-BOOL_REPLY_FINISH_FN (reset)
+    return mm_gdbus_modem_call_delete_bearer_sync (self,
+                                                   bearer,
+                                                   cancellable,
+                                                   error);
+}
 
 void
 mm_modem_reset (MMModem *self,
@@ -1067,19 +970,24 @@ mm_modem_reset (MMModem *self,
                 GAsyncReadyCallback callback,
                 gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    g_return_if_fail (MM_GDBUS_IS_MODEM (self));
 
-    g_return_if_fail (MM_GDBUS_IS_OBJECT (self));
+    mm_gdbus_modem_call_reset (self,
+                               cancellable,
+                               callback,
+                               user_data);
+}
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_modem_reset);
-    mm_gdbus_modem_call_reset (
-        mm_gdbus_object_get_modem (MM_GDBUS_OBJECT (self)), /* unref later */
-        cancellable,
-        (GAsyncReadyCallback)common_reset_ready,
-        result);
+gboolean
+mm_modem_reset_finish (MMModem *self,
+                       GAsyncResult *res,
+                       GError **error)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
+
+    return mm_gdbus_modem_call_reset_finish (self,
+                                             res,
+                                             error);
 }
 
 gboolean
@@ -1087,14 +995,12 @@ mm_modem_reset_sync (MMModem *self,
                      GCancellable *cancellable,
                      GError **error)
 {
-    return (mm_gdbus_modem_call_reset_sync (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self)),
-                cancellable,
-                error));
-}
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
 
-BOOL_REPLY_READY_FN  (factory_reset)
-BOOL_REPLY_FINISH_FN (factory_reset)
+    return mm_gdbus_modem_call_reset_sync (self,
+                                           cancellable,
+                                           error);
+}
 
 void
 mm_modem_factory_reset (MMModem *self,
@@ -1103,20 +1009,25 @@ mm_modem_factory_reset (MMModem *self,
                         GAsyncReadyCallback callback,
                         gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    g_return_if_fail (MM_GDBUS_IS_MODEM (self));
 
-    g_return_if_fail (MM_GDBUS_IS_OBJECT (self));
+    mm_gdbus_modem_call_factory_reset (self,
+                                       code,
+                                       cancellable,
+                                       callback,
+                                       user_data);
+}
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_modem_factory_reset);
-    mm_gdbus_modem_call_factory_reset (
-        mm_gdbus_object_get_modem (MM_GDBUS_OBJECT (self)), /* unref later */
-        code,
-        cancellable,
-        (GAsyncReadyCallback)common_factory_reset_ready,
-        result);
+gboolean
+mm_modem_factory_reset_finish (MMModem *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
+
+    return mm_gdbus_modem_call_factory_reset_finish (self,
+                                                     res,
+                                                     error);
 }
 
 gboolean
@@ -1125,15 +1036,25 @@ mm_modem_factory_reset_sync (MMModem *self,
                              GCancellable *cancellable,
                              GError **error)
 {
-    return (mm_gdbus_modem_call_factory_reset_sync (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self)),
-                code,
-                cancellable,
-                error));
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
+
+    return mm_gdbus_modem_call_factory_reset_sync (self,
+                                                   code,
+                                                   cancellable,
+                                                   error);
 }
 
-BOOL_REPLY_READY_FN  (set_allowed_modes)
-BOOL_REPLY_FINISH_FN (set_allowed_modes)
+gboolean
+mm_modem_set_allowed_modes_finish (MMModem *self,
+                                   GAsyncResult *res,
+                                   GError **error)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
+
+    return mm_gdbus_modem_call_set_allowed_modes_finish (self,
+                                                         res,
+                                                         error);
+}
 
 void
 mm_modem_set_allowed_modes (MMModem *self,
@@ -1143,21 +1064,14 @@ mm_modem_set_allowed_modes (MMModem *self,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    g_return_if_fail (MM_GDBUS_IS_MODEM (self));
 
-    g_return_if_fail (MM_GDBUS_IS_OBJECT (self));
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_modem_set_allowed_modes);
-    mm_gdbus_modem_call_set_allowed_modes (
-        mm_gdbus_object_get_modem (MM_GDBUS_OBJECT (self)), /* unref later */
-        modes,
-        preferred,
-        cancellable,
-        (GAsyncReadyCallback)common_set_allowed_modes_ready,
-        result);
+    mm_gdbus_modem_call_set_allowed_modes (self,
+                                           modes,
+                                           preferred,
+                                           cancellable,
+                                           callback,
+                                           user_data);
 }
 
 gboolean
@@ -1167,16 +1081,26 @@ mm_modem_set_allowed_modes_sync (MMModem *self,
                                  GCancellable *cancellable,
                                  GError **error)
 {
-    return (mm_gdbus_modem_call_set_allowed_modes_sync (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self)),
-                modes,
-                preferred,
-                cancellable,
-                error));
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
+
+    return mm_gdbus_modem_call_set_allowed_modes_sync (self,
+                                                       modes,
+                                                       preferred,
+                                                       cancellable,
+                                                       error);
 }
 
-BOOL_REPLY_READY_FN  (set_allowed_bands)
-BOOL_REPLY_FINISH_FN (set_allowed_bands)
+gboolean
+mm_modem_set_allowed_bands_finish (MMModem *self,
+                                   GAsyncResult *res,
+                                   GError **error)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
+
+    return mm_gdbus_modem_call_set_allowed_bands_finish (self,
+                                                         res,
+                                                         error);
+}
 
 void
 mm_modem_set_allowed_bands (MMModem *self,
@@ -1185,20 +1109,13 @@ mm_modem_set_allowed_bands (MMModem *self,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    g_return_if_fail (MM_GDBUS_IS_MODEM (self));
 
-    g_return_if_fail (MM_GDBUS_IS_OBJECT (self));
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_modem_set_allowed_bands);
-    mm_gdbus_modem_call_set_allowed_bands (
-        mm_gdbus_object_get_modem (MM_GDBUS_OBJECT (self)), /* unref later */
-        bands,
-        cancellable,
-        (GAsyncReadyCallback)common_set_allowed_bands_ready,
-        result);
+    mm_gdbus_modem_call_set_allowed_bands (self,
+                                           bands,
+                                           cancellable,
+                                           callback,
+                                           user_data);
 }
 
 gboolean
@@ -1207,11 +1124,12 @@ mm_modem_set_allowed_bands_sync (MMModem *self,
                                  GCancellable *cancellable,
                                  GError **error)
 {
-    return (mm_gdbus_modem_call_set_allowed_bands_sync (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self)),
-                bands,
-                cancellable,
-                error));
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
+
+    return mm_gdbus_modem_call_set_allowed_bands_sync (self,
+                                                       bands,
+                                                       cancellable,
+                                                       error);
 }
 
 static void
@@ -1241,7 +1159,7 @@ mm_modem_get_sim (MMModem *self,
     GSimpleAsyncResult *result;
     const gchar *sim_path;
 
-    g_return_if_fail (MM_GDBUS_IS_OBJECT (self));
+    g_return_if_fail (MM_GDBUS_IS_MODEM (self));
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
@@ -1257,9 +1175,8 @@ mm_modem_get_sim (MMModem *self,
     }
 
     mm_gdbus_sim_proxy_new (
-        g_dbus_object_proxy_get_connection (
-            G_DBUS_OBJECT_PROXY (
-                mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self)))),
+        g_dbus_proxy_get_connection (
+            G_DBUS_PROXY (self)),
         G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
         MM_DBUS_SERVICE,
         sim_path,
@@ -1273,7 +1190,7 @@ mm_modem_get_sim_finish (MMModem *self,
                          GAsyncResult *res,
                          GError **error)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
@@ -1288,16 +1205,15 @@ mm_modem_get_sim_sync (MMModem *self,
 {
     const gchar *sim_path;
 
-    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (self), NULL);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
     sim_path = mm_modem_get_sim_path (self);
     if (!sim_path)
         return NULL;
 
     return (mm_gdbus_sim_proxy_new_sync (
-                g_dbus_object_proxy_get_connection (
-                    G_DBUS_OBJECT_PROXY (
-                        mm_gdbus_object_peek_modem (MM_GDBUS_OBJECT (self)))),
+                g_dbus_proxy_get_connection (
+                    G_DBUS_PROXY (self)),
                 G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
                 MM_DBUS_SERVICE,
                 sim_path,

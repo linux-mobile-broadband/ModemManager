@@ -17,17 +17,34 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.
  *
- * Copyright (C) 2011 Google, Inc.
+ * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
  */
 
-#ifndef _LIBMM_GLIB_H_
-#define _LIBMM_GLIB_H_
+#ifndef _MM_OBJECT_H_
+#define _MM_OBJECT_H_
 
 #include <ModemManager.h>
-#include <mm-errors-types.h>
-#include <mm-enums-types.h>
+#include <mm-gdbus-modem.h>
 
-#include <mm-manager.h>
-#include <mm-object.h>
+#include "mm-modem.h"
+#include "mm-modem-3gpp.h"
 
-#endif /* _LIBMM_GLIB_H_ */
+G_BEGIN_DECLS
+
+typedef MmGdbusObject     MMObject;
+#define MM_TYPE_OBJECT(o) MM_GDBUS_TYPE_OBJECT (o)
+#define MM_OBJECT(o)      MM_GDBUS_OBJECT(o)
+#define MM_IS_OBJECT(o)   MM_GDBUS_IS_OBJECT(o)
+
+const gchar *mm_object_get_path (MMObject *self);
+gchar       *mm_object_dup_path (MMObject *self);
+
+MMModem         *mm_object_get_modem            (MMObject *object);
+MMModem3gpp     *mm_object_get_modem_3gpp       (MMObject *object);
+
+MMModem         *mm_object_peek_modem           (MMObject *object);
+MMModem3gpp     *mm_object_peek_modem_3gpp      (MMObject *object);
+
+G_END_DECLS
+
+#endif /* _MM_OBJECT_H_ */

@@ -13,8 +13,12 @@ libmm_glib_la_SOURCES = \
 	libmm-glib.h \
 	mm-manager.h \
 	mm-manager.c \
+	mm-object.h \
+	mm-object.c \
 	mm-modem.h \
 	mm-modem.c \
+	mm-modem-3gpp.h \
+	mm-modem-3gpp.c \
 	mm-sim.h \
 	mm-sim.c
 
