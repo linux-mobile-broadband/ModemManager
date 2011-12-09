@@ -38,5 +38,6 @@ MMObject *mmcli_get_modem_sync   (GDBusConnection *connection,
 
 const gchar *mmcli_get_state_string        (MMModemState state);
 const gchar *mmcli_get_state_reason_string (MMModemStateChangeReason reason);
+const gchar *mmcli_get_lock_string         (MMModemLock lock);
 
 #endif /* _MMCLI_COMMON_H_ */

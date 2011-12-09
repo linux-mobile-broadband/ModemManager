@@ -265,3 +265,16 @@ mmcli_get_state_reason_string (MMModemStateChangeReason reason)
     g_warn_if_reached ();
     return NULL;
 }
+
+const gchar *
+mmcli_get_lock_string (MMModemLock lock)
+{
+    static GEnumClass *enum_class = NULL;
+    GEnumValue *value;
+
+    if (!enum_class)
+        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_LOCK));
+
+    value = g_enum_get_value (enum_class, lock);
+    return value->value_nick;
+}

@@ -145,172 +145,141 @@ mmcli_modem_shutdown (void)
     context_free (ctx);
 }
 
-/* static gchar * */
-/* prefix_newlines (const gchar *prefix, */
-/*                  const gchar *str) */
-/* { */
-/*     GString *prefixed_string = NULL; */
-/*     const gchar *line_start = str; */
-/*     const gchar *line_end; */
+static void
+cancelled (GCancellable *cancellable)
+{
+    mmcli_async_operation_done ();
+}
 
-/*     while ((line_end = strchr (line_start, '\n'))) { */
-/*         gssize line_length; */
+static gchar *
+prefix_newlines (const gchar *prefix,
+                 const gchar *str)
+{
+    GString *prefixed_string = NULL;
+    const gchar *line_start = str;
+    const gchar *line_end;
 
-/*         line_length = line_end - line_start; */
-/*         if (line_start[line_length - 1] == '\r') */
-/*             line_length--; */
+    while ((line_end = strchr (line_start, '\n'))) {
+        gssize line_length;
 
-/*         if (line_length > 0) { */
-/*             if (prefixed_string) { */
-/*                 /\* If not the first line, add the prefix *\/ */
-/*                 g_string_append_printf (prefixed_string, */
-/*                                         "\n%s", prefix); */
-/*             } else { */
-/*                 prefixed_string = g_string_new (""); */
-/*             } */
+        line_length = line_end - line_start;
+        if (line_start[line_length - 1] == '\r')
+            line_length--;
 
-/*             g_string_append_len (prefixed_string, */
-/*                                  line_start, */
-/*                                  line_length); */
-/*         } */
+        if (line_length > 0) {
+            if (prefixed_string) {
+                /* If not the first line, add the prefix */
+                g_string_append_printf (prefixed_string,
+                                        "\n%s", prefix);
+            } else {
+                prefixed_string = g_string_new ("");
+            }
 
-/*         line_start = line_end + 1; */
-/*     } */
+            g_string_append_len (prefixed_string,
+                                 line_start,
+                                 line_length);
+        }
 
-/*     return (prefixed_string ? */
-/*             g_string_free (prefixed_string, FALSE) : */
-/*             NULL); */
-/* } */
+        line_start = line_end + 1;
+    }
 
-/* static void */
-/* get_info_process_reply (gboolean      result, */
-/*                         const GError *error, */
-/*                         const gchar  *manufacturer, */
-/*                         const gchar  *model, */
-/*                         const gchar  *revision) */
-/* { */
-/*     gchar *prefixed_revision; */
-/*     gchar *master_device; */
-/*     gchar *device; */
-/*     gchar *device_id; */
-/*     gchar *equipment_id; */
-/*     gchar *driver; */
-/*     gchar *plugin; */
-/*     MMModemType type; */
-/*     gboolean enabled; */
-/*     gchar *unlock_required; */
-/*     guint32 unlock_retries; */
-/*     gchar *unlock; */
-/*     MMModemIpMethod ip_method; */
-/*     MMModemState state; */
+    return (prefixed_string ?
+            g_string_free (prefixed_string, FALSE) :
+            NULL);
+}
 
-/*     if (!result) { */
-/*         g_printerr ("couldn't get info from modem: '%s'\n", */
-/*                     error ? error->message : "unknown error"); */
-/*         exit (EXIT_FAILURE); */
-/*     } */
+static void
+print_modem_info (void)
+{
+    GError *error = NULL;
+    MMSim *sim;
+    MMModemLock unlock_required;
+    gchar *prefixed_revision;
+    gchar *unlock;
 
-/*     /\* Get additional info from properties *\/ */
-/*     master_device = mm_modem_get_master_device (ctxt.modem); */
-/*     device = mm_modem_get_device (ctxt.modem); */
-/*     device_id = mm_modem_get_device_identifier (ctxt.modem); */
-/*     equipment_id = mm_modem_get_equipment_identifier (ctxt.modem); */
-/*     driver = mm_modem_get_driver (ctxt.modem); */
-/*     plugin = mm_modem_get_plugin (ctxt.modem); */
-/*     type = mm_modem_get_modem_type (ctxt.modem); */
-/*     enabled = mm_modem_get_enabled (ctxt.modem); */
-/*     unlock_required = mm_modem_get_unlock_required (ctxt.modem); */
-/*     unlock_retries = mm_modem_get_unlock_retries (ctxt.modem); */
-/*     ip_method = mm_modem_get_ip_method (ctxt.modem); */
-/*     state = mm_modem_get_state (ctxt.modem); */
+    /* Not the best thing to do, as we may be doing _get() calls twice, but
+     * easiest to maintain */
+#define VALIDATE(str) (str ? str : "unknown")
 
-/*     /\* Strings with mixed properties *\/ */
-/*     unlock = (unlock_required ? */
-/*               g_strdup_printf ("%s (%u retries)", */
-/*                                unlock_required, */
-/*                                unlock_retries) : */
-/*               g_strdup ("not required")); */
+    /* Strings with mixed properties */
+    unlock_required = mm_modem_get_unlock_required (ctx->modem);
+    switch (unlock_required) {
+    case MM_MODEM_LOCK_NONE:
+        unlock = g_strdup ("not required");
+        break;
+    case MM_MODEM_LOCK_UNKNOWN:
+        unlock = g_strdup ("unknown");
+        break;
+    default:
+        unlock = g_strdup_printf ("%s (%u retries)",
+                                  mmcli_get_lock_string (unlock_required),
+                                  mm_modem_get_unlock_retries (ctx->modem));
+        break;
+    }
 
-/*     /\* Rework possible multiline strings *\/ */
-/*     prefixed_revision = prefix_newlines ("           |                 ", */
-/*                                          revision); */
+    /* Rework possible multiline strings */
+    prefixed_revision = prefix_newlines ("           |                 ",
+                                         mm_modem_get_revision (ctx->modem));
 
-/*     g_print ("\n" */
-/*              "%s\n" */
-/*              "  -------------------------\n" */
-/*              "  Hardware |  manufacturer: '%s'\n" */
-/*              "           |         model: '%s'\n" */
-/*              "           |      revision: '%s'\n" */
-/*              "           |          type: '%s'\n" */
-/*              "  -------------------------\n" */
-/*              "  System   | master device: '%s'\n" */
-/*              "           |        device: '%s'\n" */
-/*              "           |     device id: '%s'\n" */
-/*              "           |  equipment id: '%s'\n" */
-/*              "           |        driver: '%s'\n" */
-/*              "           |        plugin: '%s'\n" */
-/*              "  -------------------------\n" */
-/*              "  Status   |       enabled: '%s'\n" */
-/*              "           |        unlock: '%s'\n" */
-/*              "           |     IP method: '%s'\n" */
-/*              "           |         state: '%s'\n" */
-/*              "\n", */
-/*              ctxt.modem_str, */
-/*              manufacturer, */
-/*              model, */
-/*              prefixed_revision ? prefixed_revision : revision, */
-/*              get_modem_type_string (type), */
-/*              master_device, */
-/*              device, */
-/*              device_id, */
-/*              equipment_id, */
-/*              driver, */
-/*              plugin, */
-/*              enabled ? "yes" : "no", */
-/*              unlock, */
-/*              get_ip_method_string (ip_method), */
-/*              get_state_string (state)); */
+    /* Global IDs */
+    g_print ("\n"
+             "%s (device id '%s')\n",
+             VALIDATE (mm_modem_get_path (ctx->modem)),
+             VALIDATE (mm_modem_get_device_identifier (ctx->modem)));
 
-/*     g_free (prefixed_revision); */
-/*     g_free (master_device); */
-/*     g_free (device); */
-/*     g_free (device_id); */
-/*     g_free (equipment_id); */
-/*     g_free (driver); */
-/*     g_free (plugin); */
-/*     g_free (unlock_required); */
-/*     g_free (unlock); */
-/* } */
+    /* Hardware related stuff */
+    g_print ("  -------------------------\n"
+             "  Hardware |   manufacturer: '%s'\n"
+             "           |          model: '%s'\n"
+             "           |       revision: '%s'\n"
+             "           |   capabilities: '%s'\n"
+             "           |   equipment id: '%s'\n",
+             VALIDATE (mm_modem_get_manufacturer (ctx->modem)),
+             VALIDATE (mm_modem_get_model (ctx->modem)),
+             VALIDATE (prefixed_revision),
+             VALIDATE (mm_modem_get_capabilities_string (mm_modem_get_modem_capabilities (ctx->modem))),
+             VALIDATE (mm_modem_get_equipment_identifier (ctx->modem)));
 
-/* static void */
-/* get_info_ready (MMModem      *modem, */
-/*                 GAsyncResult *result, */
-/*                 gpointer      nothing) */
-/* { */
-/*     gboolean operation_result; */
-/*     gchar *manufacturer = NULL; */
-/*     gchar *model = NULL; */
-/*     gchar *revision = NULL; */
-/*     GError *error = NULL; */
+    /* System related stuff */
+    g_print ("  -------------------------\n"
+             "  System   |         device: '%s'\n"
+             "           |         driver: '%s'\n"
+             "           |         plugin: '%s'\n",
+             VALIDATE (mm_modem_get_device (ctx->modem)),
+             VALIDATE (mm_modem_get_driver (ctx->modem)),
+             VALIDATE (mm_modem_get_plugin (ctx->modem)));
 
-/*     operation_result = mm_modem_get_info_finish (modem, */
-/*                                                  result, */
-/*                                                  &manufacturer, */
-/*                                                  &model, */
-/*                                                  &revision, */
-/*                                                  &error); */
-/*     get_info_process_reply (operation_result, */
-/*                             error, */
-/*                             manufacturer, */
-/*                             model, */
-/*                             revision); */
+    /* Status related stuff */
+    g_print ("  -------------------------\n"
+             "  Status   |         unlock: '%s'\n"
+             "           |          state: '%s'\n",
+             VALIDATE (unlock),
+             VALIDATE (mmcli_get_state_string (mm_modem_get_state (ctx->modem))));
 
-/*     g_free (manufacturer); */
-/*     g_free (model); */
-/*     g_free (revision); */
+    /* SIM related stuff */
+    sim = mm_modem_get_sim_sync (ctx->modem, NULL, &error);
+    if (error) {
+        g_warning ("Couldn't get SIM: '%s'", error->message);
+        g_error_free (error);
+    }
+    if (sim) {
+        g_print ("  -------------------------\n"
+                 "  SIM      |          imsi : '%s'\n"
+                 "           |            id : '%s'\n"
+                 "           |   operator id : '%s'\n"
+                 "           | operator name : '%s'\n",
+                 VALIDATE (mm_sim_get_imsi (sim)),
+                 VALIDATE (mm_sim_get_identifier (sim)),
+                 VALIDATE (mm_sim_get_operator_identifier (sim)),
+                 VALIDATE (mm_sim_get_operator_name (sim)));
+        g_object_unref (sim);
+    }
 
-/*     mmcli_async_operation_done (); */
-/* } */
+    g_print ("\n");
+
+    g_free (prefixed_revision);
+    g_free (unlock);
+}
 
 static void
 enable_process_reply (gboolean      result,
@@ -459,6 +428,11 @@ get_modem_ready (GObject      *source,
                  mm_object_get_path (ctx->object),
                  mmcli_get_state_string (current));
 
+        /* If we get cancelled, operation done */
+        g_cancellable_connect (ctx->cancellable,
+                               G_CALLBACK (cancelled),
+                               NULL,
+                               NULL);
         return;
     }
 
@@ -538,27 +512,8 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
 
     /* Request to get info from modem? */
     if (info_flag) {
-        /* TODO */
-
-        /* gboolean result; */
-        /* gchar *manufacturer = NULL; */
-        /* gchar *model = NULL; */
-        /* gchar *revision = NULL; */
-
-        /* result = mm_modem_get_info (ctxt.modem, */
-        /*                             &manufacturer, */
-        /*                             &model, */
-        /*                             &revision, */
-        /*                             &error); */
-        /* get_info_process_reply (result, */
-        /*                         error, */
-        /*                         manufacturer, */
-        /*                         model, */
-        /*                         revision); */
-
-        /* g_free (manufacturer); */
-        /* g_free (model); */
-        /* g_free (revision); */
+        g_debug ("Printing modem info...");
+        print_modem_info ();
         return;
     }
 
