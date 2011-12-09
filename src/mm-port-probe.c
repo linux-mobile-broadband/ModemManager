@@ -115,7 +115,6 @@ port_probe_run_task_free (PortProbeRunTask *task)
 
 static void
 port_probe_run_task_complete (PortProbeRunTask *task,
-                              gboolean complete_in_idle,
                               gboolean result,
                               GError *error)
 {
@@ -131,10 +130,8 @@ port_probe_run_task_complete (PortProbeRunTask *task,
     else
         g_simple_async_result_set_op_res_gboolean (task->result, result);
 
-    if (complete_in_idle)
-        g_simple_async_result_complete_in_idle (task->result);
-    else
-        g_simple_async_result_complete (task->result);
+    /* Always complete in idle */
+    g_simple_async_result_complete_in_idle (task->result);
 }
 
 static gboolean
@@ -150,7 +147,6 @@ port_probe_run_is_cancelled (MMPortProbe *self)
     if (g_cancellable_is_cancelled (task->cancellable)) {
         port_probe_run_task_complete (
             task,
-            TRUE, /* in idle */
             FALSE,
             g_error_new (MM_CORE_ERROR,
                          MM_CORE_ERROR_CANCELLED,
@@ -236,7 +232,6 @@ serial_probe_qcdm (MMPortProbe *self)
         port_probe_run_task_complete (
             task,
             FALSE,
-            FALSE,
             g_error_new (MM_CORE_ERROR,
                          MM_CORE_ERROR_FAILED,
                          "(%s) Couldn't create QCDM port",
@@ -248,7 +243,6 @@ serial_probe_qcdm (MMPortProbe *self)
     if (!mm_serial_port_open (task->serial, &error)) {
         port_probe_run_task_complete (
             task,
-            FALSE,
             FALSE,
             g_error_new (MM_SERIAL_ERROR,
                          MM_SERIAL_ERROR_OPEN_FAILED,
@@ -266,7 +260,6 @@ serial_probe_qcdm (MMPortProbe *self)
         g_byte_array_free (verinfo, TRUE);
         port_probe_run_task_complete (
             task,
-            FALSE,
             FALSE,
             g_error_new (MM_SERIAL_ERROR,
                          MM_SERIAL_ERROR_OPEN_FAILED,
@@ -398,7 +391,6 @@ serial_probe_at_parse_response (MMAtSerialPort *port,
             port_probe_run_task_complete (
                 task,
                 FALSE,
-                FALSE,
                 g_error_new (MM_CORE_ERROR,
                              MM_CORE_ERROR_UNSUPPORTED,
                              "(%s) error while probing AT features: %s",
@@ -513,7 +505,7 @@ serial_probe_schedule (MMPortProbe *self)
     }
 
     /* All done! Finish asynchronously */
-    port_probe_run_task_complete (task, TRUE, TRUE, NULL);
+    port_probe_run_task_complete (task, TRUE, NULL);
 }
 
 static void
@@ -555,7 +547,7 @@ serial_buffer_full (MMSerialPort *serial,
     if (   (buffer->len >= sizeof (zerobuf))
         && (memcmp (buffer->data, zerobuf, sizeof (zerobuf)) == 0)) {
         mm_serial_port_close (serial);
-        port_probe_run_task_complete (task, FALSE, FALSE, NULL);
+        port_probe_run_task_complete (task, FALSE, NULL);
         return;
     }
 
@@ -576,7 +568,7 @@ serial_buffer_full (MMSerialPort *serial,
             if (!memcmp (&buffer->data[i], *iter, iter_len)) {
                 /* Immediately close the port and complete probing */
                 mm_serial_port_close (serial);
-                port_probe_run_task_complete (task, FALSE, FALSE, NULL);
+                port_probe_run_task_complete (task, FALSE, NULL);
                 return;
             }
         }
@@ -602,7 +594,6 @@ serial_open_at (MMPortProbe *self)
         if (!task->serial) {
             port_probe_run_task_complete (
                 task,
-                FALSE,
                 FALSE,
                 g_error_new (MM_CORE_ERROR,
                              MM_CORE_ERROR_FAILED,
@@ -631,7 +622,6 @@ serial_open_at (MMPortProbe *self)
             port_probe_run_task_complete (
                 task,
                 FALSE,
-                FALSE,
                 g_error_new (MM_CORE_ERROR,
                              MM_CORE_ERROR_FAILED,
                              "(%s) failed to open port after 4 tries",
@@ -646,7 +636,6 @@ serial_open_at (MMPortProbe *self)
         } else {
             port_probe_run_task_complete (
                 task,
-                FALSE,
                 FALSE,
                 g_error_new (MM_SERIAL_ERROR,
                              MM_SERIAL_ERROR_OPEN_FAILED,
@@ -749,10 +738,7 @@ mm_port_probe_run (MMPortProbe *self,
 
     /* All requested probings already available? If so, we're done */
     if (!task->flags) {
-        port_probe_run_task_complete (task,
-                                      TRUE, /* in idle */
-                                      TRUE,
-                                      NULL);
+        port_probe_run_task_complete (task, TRUE, NULL);
         return;
     }
 
