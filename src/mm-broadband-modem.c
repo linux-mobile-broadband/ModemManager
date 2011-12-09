@@ -24,6 +24,7 @@
 #include <ModemManager.h>
 #include <mm-errors-types.h>
 #include <mm-enums-types.h>
+#include <mm-common-helpers.h>
 
 #include "mm-base-modem-at.h"
 #include "mm-broadband-modem.h"
@@ -357,37 +358,6 @@ parse_caps_cgmm (MMBaseModem *self,
     return FALSE;
 }
 
-static gchar *
-create_capabilities_string (MMModemCapability caps)
-{
-	GFlagsClass *flags_class;
-    GString *str;
-    MMModemCapability it;
-    gboolean first = TRUE;
-
-    str = g_string_new ("");
-    flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_MODEM_CAPABILITY));
-
-    for (it = MM_MODEM_CAPABILITY_POTS; /* first */
-         it <= MM_MODEM_CAPABILITY_LTE_ADVANCED; /* last */
-         it = it << 1) {
-        if (caps & it) {
-            GFlagsValue *value;
-
-            value = g_flags_get_first_value (flags_class, it);
-            g_string_append_printf (str, "%s%s",
-                                    first ? "" : ", ",
-                                    value->value_nick);
-
-            if (first)
-                first = FALSE;
-        }
-    }
-    g_type_class_unref (flags_class);
-
-    return g_string_free (str, FALSE);
-}
-
 static MMModemCapability
 load_current_capabilities_finish (MMIfaceModem *self,
                                   GAsyncResult *res,
@@ -402,7 +372,7 @@ load_current_capabilities_finish (MMIfaceModem *self,
         return MM_MODEM_CAPABILITY_NONE;
 
     caps = (MMModemCapability)g_variant_get_uint32 (result);
-    caps_str = create_capabilities_string (caps);
+    caps_str = mm_common_get_capabilities_string (caps);
     mm_dbg ("loaded current capabilities: %s", caps_str);
     g_free (caps_str);
     return caps;

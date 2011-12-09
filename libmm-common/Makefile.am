@@ -143,7 +143,9 @@ $(mm_gdbus_bearer_generated): $(top_srcdir)/new/org.freedesktop.ModemManager1.Be
 libmm_common_la_SOURCES = \
 	$(GENERATED_H) \
 	$(GENERATED_C) \
-	mm-errors-quarks.c
+	mm-errors-quarks.c \
+	mm-common-helpers.h \
+	mm-common-helpers.c
 
 libmm_common_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
