@@ -43,15 +43,14 @@ grab_port (MMPluginBase *base,
     const gchar *name, *subsys, *driver;
     guint16 vendor = 0, product = 0;
 
+    /* The Cinterion plugin cannot do anything with non-AT ports */
+    if (!mm_port_probe_is_at (probe)) {
+        g_set_error (error, 0, 0, "Ignoring non-AT port");
+        return NULL;
+    }
+
     subsys = mm_port_probe_get_port_subsys (probe);
     name = mm_port_probe_get_port_name (probe);
-
-    /* /\* The generic plugin cannot do anything with non-AT ports *\/ */
-    /* if (!mm_port_probe_is_at (probe)) { */
-    /*     g_set_error (error, 0, 0, "Ignoring non-AT port"); */
-    /*     return NULL; */
-    /* } */
-
     driver = mm_port_probe_get_port_driver (probe);
 
     /* Try to get Product IDs from udev. Note that it is not an error
