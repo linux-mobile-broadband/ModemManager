@@ -104,8 +104,7 @@
     <!--
         OperatorCode:
 
-        Current operator code of the operator to which the mobile is currently
-        registered.
+        Code of the operator to which the mobile is currently registered.
 
         Returned in the format <literal>"MCCMNC"</literal>, where
         <literal>MCC</literal> is the three-digit ITU E.212 Mobile Country Code
@@ -121,8 +120,7 @@
     <!--
         OperatorName:
 
-        Current operator name of the operator to which the mobile is
-        currently registered.
+        Name of the operator to which the mobile is currently registered.
 
         If the operator name is not known or the mobile is not
         registered to a mobile network, this property will be a zero-length
