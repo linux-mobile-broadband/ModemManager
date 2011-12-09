@@ -1051,14 +1051,7 @@ modem_init_finish (MMIfaceModem *self,
 }
 
 static const MMBaseModemAtCommand modem_init_sequence[] = {
-    /* Send the init command twice; some devices (Nokia N900) appear to take a
-     * few commands before responding correctly.  Instead of penalizing them for
-     * being stupid the first time by failing to enable the device, just
-     * try again.
-
-     * TODO: only send init command 2nd time if 1st time failed?
-     */
-    { "Z E0 V1", 3, FALSE, NULL },
+    /* Init command */
     { "Z E0 V1", 3, FALSE, mm_base_modem_response_processor_no_result_continue },
 
     /* Ensure echo is off after the init command; some modems ignore the
