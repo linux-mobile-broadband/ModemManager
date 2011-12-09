@@ -36,6 +36,7 @@
 /* Context */
 typedef struct {
     GCancellable *cancellable;
+    MMObject *object;
     MMModem *modem;
 } Context;
 static Context *ctx;
@@ -127,6 +128,8 @@ context_free (Context *ctx)
         g_object_unref (ctx->cancellable);
     if (ctx->modem)
         g_object_unref (ctx->modem);
+    if (ctx->object)
+        g_object_unref (ctx->object);
     g_free (ctx);
 }
 
@@ -171,52 +174,6 @@ mmcli_modem_shutdown (void)
 /*     return (prefixed_string ? */
 /*             g_string_free (prefixed_string, FALSE) : */
 /*             NULL); */
-/* } */
-
-/* static const gchar * */
-/* get_state_string (MMModemState state) */
-/* { */
-/*     switch (state) { */
-/*     case MM_MODEM_STATE_UNKNOWN: */
-/*         return "Unknown"; */
-/*     case MM_MODEM_STATE_DISABLED: */
-/*         return "Disabled"; */
-/*     case MM_MODEM_STATE_DISABLING: */
-/*         return "Disabling"; */
-/*     case MM_MODEM_STATE_ENABLING: */
-/*         return "Enabling"; */
-/*     case MM_MODEM_STATE_ENABLED: */
-/*         return "Enabled"; */
-/*     case MM_MODEM_STATE_SEARCHING: */
-/*         return "Searching"; */
-/*     case MM_MODEM_STATE_REGISTERED: */
-/*         return "Registered"; */
-/*     case MM_MODEM_STATE_DISCONNECTING: */
-/*         return "Disconnecting"; */
-/*     case MM_MODEM_STATE_CONNECTING: */
-/*         return "Connecting"; */
-/*     case MM_MODEM_STATE_CONNECTED: */
-/*         return "Connected"; */
-/*     } */
-
-/*     g_warn_if_reached (); */
-/*     return NULL; */
-/* } */
-
-/* static const gchar * */
-/* get_state_reason_string (MMModemStateReason reason) */
-/* { */
-/*     switch (reason) { */
-/*     case MM_MODEM_STATE_REASON_NONE: */
-/*         return "None or unknown"; */
-/*     case MM_MODEM_STATE_REASON_USER_REQUESTED: */
-/*         return "User request"; */
-/*     case MM_MODEM_STATE_REASON_SUSPEND: */
-/*         return "Suspend"; */
-/*     } */
-
-/*     g_warn_if_reached (); */
-/*     return NULL; */
 /* } */
 
 /* static void */
@@ -370,9 +327,7 @@ enable_ready (MMModem      *modem,
     gboolean operation_result;
     GError *error = NULL;
 
-    operation_result = mm_modem_enable_finish (modem,
-                                               result,
-                                               &error);
+    operation_result = mm_modem_enable_finish (modem, result, &error);
     enable_process_reply (operation_result, error);
 
     mmcli_async_operation_done ();
@@ -399,9 +354,7 @@ disable_ready (MMModem      *modem,
     gboolean operation_result;
     GError *error = NULL;
 
-    operation_result = mm_modem_disable_finish (modem,
-                                                result,
-                                                &error);
+    operation_result = mm_modem_disable_finish (modem, result, &error);
     disable_process_reply (operation_result, error);
 
     mmcli_async_operation_done ();
@@ -428,9 +381,7 @@ reset_ready (MMModem      *modem,
     gboolean operation_result;
     GError *error = NULL;
 
-    operation_result = mm_modem_reset_finish (modem,
-                                              result,
-                                              &error);
+    operation_result = mm_modem_reset_finish (modem, result, &error);
     reset_process_reply (operation_result, error);
 
     mmcli_async_operation_done ();
@@ -457,33 +408,33 @@ factory_reset_ready (MMModem      *modem,
     gboolean operation_result;
     GError *error = NULL;
 
-    operation_result = mm_modem_factory_reset_finish (modem,
-                                                      result,
-                                                      &error);
+    operation_result = mm_modem_factory_reset_finish (modem, result, &error);
     factory_reset_process_reply (operation_result, error);
 
     mmcli_async_operation_done ();
 }
 
-/* static void */
-/* state_changed (MMModem            *modem, */
-/*                MMModemState        old_state, */
-/*                MMModemState        new_state, */
-/*                MMModemStateReason  reason) */
-/* { */
-/*     g_print ("State changed: '%s' --> '%s' (Reason: %s)\n", */
-/*              get_state_string (old_state), */
-/*              get_state_string (new_state), */
-/*              get_state_reason_string (reason)); */
-/*     fflush (stdout); */
-/* } */
+static void
+state_changed (MMObject                 *modem,
+               MMModemState              old_state,
+               MMModemState              new_state,
+               MMModemStateChangeReason  reason)
+{
+    g_print ("\t%s: State changed, '%s' --> '%s' (Reason: %s)\n",
+             mm_object_get_path (modem),
+             mmcli_get_state_string (old_state),
+             mmcli_get_state_string (new_state),
+             mmcli_get_state_reason_string (reason));
+    fflush (stdout);
+}
 
 static void
 get_modem_ready (GObject      *source,
                  GAsyncResult *result,
                  gpointer      none)
 {
-    ctx->modem = mmcli_get_modem_finish (result);
+    ctx->object = mmcli_get_modem_finish (result);
+    ctx->modem = mm_object_get_modem (ctx->object);
 
     /* Request to get info from modem? */
     if (info_flag) {
@@ -498,17 +449,17 @@ get_modem_ready (GObject      *source,
 
     /* Request to monitor modems? */
     if (monitor_state_flag) {
-        /* TODO */
+        MMModemState current;
 
-        /* MMModemState current; */
+        g_signal_connect (ctx->modem,
+                          "state-changed",
+                          G_CALLBACK (state_changed),
+                          NULL);
 
-        /* g_signal_connect (ctxt.modem, */
-        /*                   "state-changed", */
-        /*                   G_CALLBACK (state_changed), */
-        /*                   NULL); */
-
-        /* current = mm_modem_get_state (ctxt.modem); */
-        /* g_print ("Initial state: '%s'\n", get_state_string (current)); */
+        current = mm_modem_get_state (ctx->modem);
+        g_print ("\t%s: Initial state, '%s'\n",
+                 mm_object_get_path (ctx->object),
+                 mmcli_get_state_string (current));
 
         return;
     }
@@ -586,7 +537,8 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
 
     /* Initialize context */
     ctx = g_new0 (Context, 1);
-    ctx->modem = mmcli_get_modem_sync (connection, modem_str);
+    ctx->object = mmcli_get_modem_sync (connection, modem_str);
+    ctx->modem = mm_object_get_modem (ctx->object);
 
     /* Request to get info from modem? */
     if (info_flag) {

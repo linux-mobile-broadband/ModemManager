@@ -20,6 +20,8 @@
 
 #include <stdlib.h>
 
+#include <libmm-glib.h>
+
 #include "mmcli-common.h"
 
 static void
@@ -108,20 +110,19 @@ mmcli_get_manager_sync (GDBusConnection *connection)
 
 #define MODEM_PATH_TAG "modem-path-tag"
 
-static MMModem *
+static MMObject *
 find_modem (MMManager *manager,
             const gchar *modem_path)
 {
     GList *modems;
     GList *l;
-    MMModem *found = NULL;
+    MMObject *found = NULL;
 
     modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (manager));
     for (l = modems; l; l = g_list_next (l)) {
-        MMModem *modem = MM_MODEM (l->data);
+        MMObject *modem = MM_OBJECT (l->data);
 
-        if (g_str_equal (mm_modem_get_path (modem),
-                         modem_path)) {
+        if (g_str_equal (mm_object_get_path (modem), modem_path)) {
             found = g_object_ref (modem);
             break;
         }
@@ -173,7 +174,7 @@ get_manager_ready (GDBusConnection *connection,
                    GSimpleAsyncResult *simple)
 {
     MMManager *manager;
-    MMModem *found;
+    MMObject *found;
     const gchar *modem_path;
 
     manager = mmcli_get_manager_finish (res);
@@ -186,7 +187,7 @@ get_manager_ready (GDBusConnection *connection,
     g_object_unref (simple);
 }
 
-MMModem *
+MMObject *
 mmcli_get_modem_finish (GAsyncResult *res)
 {
     return g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
@@ -218,12 +219,12 @@ mmcli_get_modem (GDBusConnection *connection,
                        result);
 }
 
-MMModem *
+MMObject *
 mmcli_get_modem_sync (GDBusConnection *connection,
                       const gchar *modem_str)
 {
     MMManager *manager;
-    MMModem *found;
+    MMObject *found;
     gchar *modem_path;
 
     manager = mmcli_get_manager_sync (connection);
@@ -234,4 +235,33 @@ mmcli_get_modem_sync (GDBusConnection *connection,
     g_free (modem_path);
 
     return found;
+}
+
+const gchar *
+mmcli_get_state_string (MMModemState state)
+{
+    static GEnumClass *enum_class = NULL;
+    GEnumValue *value;
+
+    if (!enum_class)
+        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_STATE));
+
+    value = g_enum_get_value (enum_class, state);
+    return value->value_nick;
+}
+
+const gchar *
+mmcli_get_state_reason_string (MMModemStateChangeReason reason)
+{
+    switch (reason) {
+    case MM_MODEM_STATE_CHANGE_REASON_UNKNOWN:
+        return "None or unknown";
+    case MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED:
+        return "User request";
+    case MM_MODEM_STATE_CHANGE_REASON_SUSPEND:
+        return "Suspend";
+    }
+
+    g_warn_if_reached ();
+    return NULL;
 }

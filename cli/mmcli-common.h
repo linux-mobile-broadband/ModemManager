@@ -27,13 +27,16 @@ MMManager *mmcli_get_manager_finish (GAsyncResult *res);
 MMManager *mmcli_get_manager_sync   (GDBusConnection *connection);
 
 
-void     mmcli_get_modem        (GDBusConnection *connection,
-                                 const gchar *modem_str,
-                                 GCancellable *cancellable,
-                                 GAsyncReadyCallback callback,
-                                 gpointer user_data);
-MMModem *mmcli_get_modem_finish (GAsyncResult *res);
-MMModem *mmcli_get_modem_sync   (GDBusConnection *connection,
-                                 const gchar *modem_str);
+void     mmcli_get_modem         (GDBusConnection *connection,
+                                  const gchar *modem_str,
+                                  GCancellable *cancellable,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data);
+MMObject *mmcli_get_modem_finish (GAsyncResult *res);
+MMObject *mmcli_get_modem_sync   (GDBusConnection *connection,
+                                  const gchar *modem_str);
+
+const gchar *mmcli_get_state_string        (MMModemState state);
+const gchar *mmcli_get_state_reason_string (MMModemStateChangeReason reason);
 
 #endif /* _MMCLI_COMMON_H_ */
