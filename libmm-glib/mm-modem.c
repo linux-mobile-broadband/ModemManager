@@ -24,6 +24,7 @@
 
 #include <mm-common-helpers.h>
 
+#include "mm-helpers.h"
 #include "mm-modem.h"
 
 /**
@@ -39,7 +40,8 @@ mm_modem_get_path (MMModem *self)
 {
     g_return_val_if_fail (G_IS_DBUS_PROXY (self), NULL);
 
-    return g_dbus_proxy_get_object_path (G_DBUS_PROXY (self));
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        g_dbus_proxy_get_object_path (G_DBUS_PROXY (self)));
 }
 
 /**
@@ -61,7 +63,7 @@ mm_modem_dup_path (MMModem *self)
                   "g-object-path", &value,
                   NULL);
 
-    return value;
+    RETURN_NON_EMPTY_STRING (value);
 }
 
 /**
@@ -79,7 +81,7 @@ mm_modem_get_sim_path (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return mm_gdbus_modem_get_sim (self);
+    RETURN_NON_EMPTY_CONSTANT_STRING (mm_gdbus_modem_get_sim (self));
 }
 
 /**
@@ -95,7 +97,8 @@ mm_modem_dup_sim_path (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return mm_gdbus_modem_dup_sim (self);
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_modem_dup_sim (self));
 }
 
 /**
@@ -193,7 +196,8 @@ mm_modem_get_manufacturer (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return mm_gdbus_modem_get_manufacturer (self);
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_modem_get_manufacturer (self));
 }
 
 /**
@@ -209,7 +213,8 @@ mm_modem_dup_manufacturer (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return mm_gdbus_modem_dup_manufacturer (self);
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_modem_dup_manufacturer (self));
 }
 
 /**
@@ -227,7 +232,8 @@ mm_modem_get_model (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return mm_gdbus_modem_get_model (self);
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_modem_get_model (self));
 }
 
 /**
@@ -243,7 +249,8 @@ mm_modem_dup_model (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return mm_gdbus_modem_dup_model (self);
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_modem_dup_model (self));
 }
 
 /**
@@ -261,7 +268,8 @@ mm_modem_get_revision (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return mm_gdbus_modem_get_revision (self);
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_modem_get_revision (self));
 }
 
 /**
@@ -277,7 +285,8 @@ mm_modem_dup_revision (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return mm_gdbus_modem_dup_revision (self);
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_modem_dup_revision (self));
 }
 
 /**
@@ -304,7 +313,8 @@ mm_modem_get_device_identifier (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return mm_gdbus_modem_get_device_identifier (self);
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_modem_get_device_identifier (self));
 }
 
 /**
@@ -329,7 +339,8 @@ mm_modem_dup_device_identifier (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return mm_gdbus_modem_dup_device_identifier (self);
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_modem_dup_device_identifier (self));
 }
 
 /**
@@ -348,7 +359,8 @@ mm_modem_get_device (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return mm_gdbus_modem_get_device (self);
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_modem_get_device (self));
 }
 
 /**
@@ -365,7 +377,8 @@ mm_modem_dup_device (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return mm_gdbus_modem_dup_device (self);
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_modem_dup_device (self));
 }
 
 /**
@@ -384,7 +397,8 @@ mm_modem_get_driver (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return mm_gdbus_modem_get_driver (self);
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_modem_get_driver (self));
 }
 
 /**
@@ -401,7 +415,8 @@ mm_modem_dup_driver (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return mm_gdbus_modem_dup_driver (self);
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_modem_dup_driver (self));
 }
 
 /**
@@ -419,7 +434,8 @@ mm_modem_get_plugin (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return mm_gdbus_modem_get_plugin (self);
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_modem_get_plugin (self));
 }
 
 /**
@@ -435,7 +451,8 @@ mm_modem_dup_plugin (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return mm_gdbus_modem_dup_plugin (self);
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_modem_dup_plugin (self));
 }
 
 /**
@@ -456,7 +473,8 @@ mm_modem_get_equipment_identifier (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return mm_gdbus_modem_get_equipment_identifier (self);
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_modem_get_equipment_identifier (self));
 }
 
 /**
@@ -475,7 +493,8 @@ mm_modem_dup_equipment_identifier (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    return mm_gdbus_modem_dup_equipment_identifier (self);
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_modem_dup_equipment_identifier (self));
 }
 
 /**

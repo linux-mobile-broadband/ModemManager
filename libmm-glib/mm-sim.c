@@ -20,6 +20,7 @@
  * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
  */
 
+#include "mm-helpers.h"
 #include "mm-sim.h"
 
 /**
@@ -76,7 +77,8 @@ mm_sim_get_identifier (MMSim *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_SIM (self), NULL);
 
-    return mm_gdbus_sim_get_sim_identifier (self);
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_sim_get_sim_identifier (self));
 }
 
 /**
@@ -92,7 +94,8 @@ mm_sim_dup_identifier (MMSim *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_SIM (self), NULL);
 
-    return mm_gdbus_sim_dup_sim_identifier (self);
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_sim_dup_sim_identifier (self));
 }
 
 /**
@@ -110,7 +113,8 @@ mm_sim_get_imsi (MMSim *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_SIM (self), NULL);
 
-    return mm_gdbus_sim_get_imsi (self);
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_sim_get_imsi (self));
 }
 
 /**
@@ -126,7 +130,8 @@ mm_sim_dup_imsi (MMSim *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_SIM (self), NULL);
 
-    return mm_gdbus_sim_dup_imsi (self);
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_sim_dup_imsi (self));
 }
 
 /**
@@ -144,7 +149,8 @@ mm_sim_get_operator_identifier (MMSim *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_SIM (self), NULL);
 
-    return mm_gdbus_sim_get_operator_identifier (self);
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_sim_get_operator_identifier (self));
 }
 
 /**
@@ -160,7 +166,8 @@ mm_sim_dup_operator_identifier (MMSim *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_SIM (self), NULL);
 
-    return mm_gdbus_sim_dup_operator_identifier (self);
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_sim_dup_operator_identifier (self));
 }
 
 /**
@@ -178,7 +185,8 @@ mm_sim_get_operator_name (MMSim *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_SIM (self), NULL);
 
-    return mm_gdbus_sim_get_operator_name (self);
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_sim_get_operator_name (self));
 }
 
 /**
@@ -194,7 +202,8 @@ mm_sim_dup_operator_name (MMSim *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_SIM (self), NULL);
 
-    return mm_gdbus_sim_dup_operator_name (self);
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_sim_dup_operator_name (self));
 }
 
 /**

@@ -11,6 +11,7 @@ libmm_glib_la_CPPFLAGS = \
 
 libmm_glib_la_SOURCES = \
 	libmm-glib.h \
+	mm-helpers.h \
 	mm-manager.h \
 	mm-manager.c \
 	mm-object.h \

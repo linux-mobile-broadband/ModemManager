@@ -22,6 +22,7 @@
 
 #include <gio/gio.h>
 
+#include "mm-helpers.h"
 #include "mm-modem-3gpp.h"
 
 /**
@@ -37,7 +38,8 @@ mm_modem_3gpp_get_path (MMModem3gpp *self)
 {
     g_return_val_if_fail (G_IS_DBUS_PROXY (self), NULL);
 
-    return g_dbus_proxy_get_object_path (G_DBUS_PROXY (self));
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        g_dbus_proxy_get_object_path (G_DBUS_PROXY (self)));
 }
 
 /**
@@ -58,8 +60,7 @@ mm_modem_3gpp_dup_path (MMModem3gpp *self)
     g_object_get (G_OBJECT (self),
                   "g-object-path", &value,
                   NULL);
-
-    return value;
+    RETURN_NON_EMPTY_STRING (value);
 }
 
 /**
@@ -78,7 +79,8 @@ mm_modem_3gpp_get_imei (MMModem3gpp *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM3GPP (self), NULL);
 
-    return mm_gdbus_modem3gpp_get_imei (self);
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_modem3gpp_get_imei (self));
 }
 
 /**
@@ -95,7 +97,8 @@ mm_modem_3gpp_dup_imei (MMModem3gpp *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM3GPP (self), NULL);
 
-    return mm_gdbus_modem3gpp_dup_imei (self);
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_modem3gpp_dup_imei (self));
 }
 
 /**
@@ -123,7 +126,8 @@ mm_modem_3gpp_get_operator_code (MMModem3gpp *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM3GPP (self), NULL);
 
-    return mm_gdbus_modem3gpp_get_operator_code (self);
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_modem3gpp_get_operator_code (self));
 }
 
 /**
@@ -145,7 +149,8 @@ mm_modem_3gpp_dup_operator_code (MMModem3gpp *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM3GPP (self), NULL);
 
-    return mm_gdbus_modem3gpp_dup_operator_code (self);
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_modem3gpp_dup_operator_code (self));
 }
 
 /**
@@ -164,7 +169,8 @@ mm_modem_3gpp_get_operator_name (MMModem3gpp *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM3GPP (self), NULL);
 
-    return mm_gdbus_modem3gpp_get_operator_name (self);
+    RETURN_NON_EMPTY_CONSTANT_STRING (
+        mm_gdbus_modem3gpp_get_operator_name (self));
 }
 
 /**
@@ -181,7 +187,8 @@ mm_modem_3gpp_dup_operator_name (MMModem3gpp *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM3GPP (self), NULL);
 
-    return mm_gdbus_modem3gpp_dup_operator_name (self);
+    RETURN_NON_EMPTY_STRING (
+        mm_gdbus_modem3gpp_dup_operator_name (self));
 }
 
 /**
