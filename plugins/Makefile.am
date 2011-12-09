@@ -33,7 +33,8 @@ PLUGIN_COMMON_LINKER_FLAGS = \
 
 pkglib_LTLIBRARIES = \
 	libmm-plugin-generic.la \
-	libmm-plugin-cinterion.la
+	libmm-plugin-cinterion.la \
+	libmm-plugin-nokia.la
 
 #pkglib_LTLIBRARIES = \
 #	libmm-plugin-generic.la \
@@ -155,16 +156,16 @@ libmm_plugin_generic_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 #	mm-modem-novatel-cdma.h
 #libmm_plugin_novatel_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 #libmm_plugin_novatel_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-#
-## Nokia
-#libmm_plugin_nokia_la_SOURCES = \
-#	mm-plugin-nokia.c \
-#	mm-plugin-nokia.h \
-#	mm-modem-nokia.c \
-#	mm-modem-nokia.h
-#libmm_plugin_nokia_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-#libmm_plugin_nokia_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-#
+
+# Nokia
+libmm_plugin_nokia_la_SOURCES = \
+	mm-plugin-nokia.c \
+	mm-plugin-nokia.h \
+	mm-broadband-modem-nokia.c \
+	mm-broadband-modem-nokia.h
+libmm_plugin_nokia_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_nokia_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
 ## Zte
 #libmm_plugin_zte_la_SOURCES = \
 #	mm-plugin-zte.c \

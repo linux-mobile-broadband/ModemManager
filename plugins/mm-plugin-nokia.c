@@ -11,197 +11,145 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2011 Red Hat, Inc.
+ * Copyright (C) 2011 Google, Inc.
  */
 
 #include <string.h>
 #include <gmodule.h>
+
+#include <mm-errors-types.h>
+
 #include "mm-plugin-nokia.h"
-#include "mm-modem-nokia.h"
-#include "mm-generic-cdma.h"
+#include "mm-broadband-modem-nokia.h"
 
 G_DEFINE_TYPE (MMPluginNokia, mm_plugin_nokia, MM_TYPE_PLUGIN_BASE)
 
 int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
 int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
-{
-    return MM_PLUGIN (g_object_new (MM_TYPE_PLUGIN_NOKIA,
-                                    MM_PLUGIN_BASE_NAME, "Nokia",
-                                    NULL));
-}
-
 /*****************************************************************************/
+/* CUSTOM INIT */
 
-#define CAP_CDMA (MM_PLUGIN_BASE_PORT_CAP_IS707_A | \
-                  MM_PLUGIN_BASE_PORT_CAP_IS707_P | \
-                  MM_PLUGIN_BASE_PORT_CAP_IS856 | \
-                  MM_PLUGIN_BASE_PORT_CAP_IS856_A)
-
-static guint32
-get_level_for_capabilities (guint32 capabilities)
+static gboolean
+parse_init_last (const gchar *response,
+                 const GError *error,
+                 GValue *result,
+                 GError **result_error)
 {
-    if (capabilities & MM_PLUGIN_BASE_PORT_CAP_GSM)
-        return 10;
-    if (capabilities & CAP_CDMA)
-        return 10;
-    return 0;
-}
+    if (error) {
+        *result_error = g_error_copy (error);
+        return FALSE;
+    }
 
-static void
-probe_result (MMPluginBase *base,
-              MMPluginBaseSupportsTask *task,
-              guint32 capabilities,
-              gpointer user_data)
-{
-    mm_plugin_base_supports_task_complete (task, get_level_for_capabilities (capabilities));
+    /* Otherwise, done. And also report that it's an AT port. */
+    g_value_init (result, G_TYPE_BOOLEAN);
+    g_value_set_boolean (result, TRUE);
+    return TRUE;
 }
 
 static gboolean
-custom_init_response_cb (MMPluginBaseSupportsTask *task,
-                         GString *response,
-                         GError *error,
-                         guint32 tries,
-                         gboolean *out_stop,
-                         guint32 *out_level,
-                         gpointer user_data)
+parse_init (const gchar *response,
+            const GError *error,
+            GValue *result,
+            GError **result_error)
 {
-    if (error)
-        return tries <= 4 ? TRUE : FALSE;
-
-    /* No error, assume success */
-    return FALSE;
-}
-
-static MMPluginSupportsResult
-supports_port (MMPluginBase *base,
-               MMModem *existing,
-               MMPluginBaseSupportsTask *task)
-{
-    GUdevDevice *port;
-    const char *subsys, *name;
-    guint16 vendor = 0;
-
-    /* Can't do anything with non-serial ports */
-    port = mm_plugin_base_supports_task_get_port (task);
-    if (strcmp (g_udev_device_get_subsystem (port), "tty"))
-        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
-
-    subsys = g_udev_device_get_subsystem (port);
-    name = g_udev_device_get_name (port);
-
-    if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, NULL))
-        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
-
-    if (vendor != 0x0421)
-        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
-
-    /* Check if a previous probing was already launched in this port */
-    if (mm_plugin_base_supports_task_propagate_cached (task)) {
-        guint32 level;
-
-        /* A previous probing was already done, use its results */
-        level = get_level_for_capabilities (mm_plugin_base_supports_task_get_probed_capabilities (task));
-        if (level) {
-            mm_plugin_base_supports_task_complete (task, level);
-            return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
-        }
-        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
+    if (error) {
+        /* On timeout, request to retry */
+        if (g_error_matches (error,
+                             MM_SERIAL_ERROR,
+                             MM_SERIAL_ERROR_RESPONSE_TIMEOUT))
+            return FALSE; /* Retry */
     }
 
-    mm_plugin_base_supports_task_add_custom_init_command (task,
-                                                          "ATE1 E0",
-                                                          3,
-                                                          custom_init_response_cb,
-                                                          NULL);
-
-    /* Otherwise kick off a probe */
-    if (mm_plugin_base_probe_port (base, task, 100000, NULL))
-        return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
-
-    return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
+    /* Otherwise, done. And also report that it's an AT port. */
+    g_value_init (result, G_TYPE_BOOLEAN);
+    g_value_set_boolean (result, TRUE);
+    return TRUE;
 }
 
-static MMModem *
+static const MMPortProbeAtCommand custom_init[] = {
+    { "ATE1 E0", parse_init },
+    { "ATE1 E0", parse_init },
+    { "ATE1 E0", parse_init_last },
+    { NULL }
+};
+
+/*****************************************************************************/
+
+static MMBaseModem *
 grab_port (MMPluginBase *base,
-           MMModem *existing,
-           MMPluginBaseSupportsTask *task,
+           MMBaseModem *existing,
+           MMPortProbe *probe,
            GError **error)
 {
-    GUdevDevice *port = NULL;
-    MMModem *modem = NULL;
-    const char *name, *subsys, *devfile, *sysfs_path;
-    guint32 caps;
+    MMBaseModem *modem = NULL;
+    const gchar *name, *subsys, *driver;
     guint16 vendor = 0, product = 0;
-    MMPortType ptype;
-    MMAtPortFlags pflags = MM_AT_PORT_FLAG_NONE;
 
-    port = mm_plugin_base_supports_task_get_port (task);
-    g_assert (port);
-
-    devfile = g_udev_device_get_device_file (port);
-    if (!devfile) {
-        g_set_error (error, 0, 0, "Could not get port's sysfs file.");
+    /* The Nokia plugin cannot do anything with non-AT ports */
+    if (!mm_port_probe_is_at (probe)) {
+        g_set_error (error, 0, 0, "Ignoring non-AT port");
         return NULL;
     }
 
-    subsys = g_udev_device_get_subsystem (port);
-    name = g_udev_device_get_name (port);
+    subsys = mm_port_probe_get_port_subsys (probe);
+    name = mm_port_probe_get_port_name (probe);
+    driver = mm_port_probe_get_port_driver (probe);
 
     if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product)) {
         g_set_error (error, 0, 0, "Could not get modem product ID.");
         return NULL;
     }
 
-    /* Look for port type hints */
-    if (g_udev_device_get_property_as_boolean (port, "ID_MM_NOKIA_PORT_TYPE_MODEM"))
-        pflags = MM_AT_PORT_FLAG_PRIMARY;
-    else if (g_udev_device_get_property_as_boolean (port, "ID_MM_NOKIA_PORT_TYPE_AUX"))
-        pflags = MM_AT_PORT_FLAG_SECONDARY;
+    /* TODO: */
+    /* /\* Look for port type hints *\/ */
+    /* if (g_udev_device_get_property_as_boolean (port, "ID_MM_NOKIA_PORT_TYPE_MODEM")) */
+    /*     ptype = MM_PORT_TYPE_PRIMARY; */
+    /* else if (g_udev_device_get_property_as_boolean (port, "ID_MM_NOKIA_PORT_TYPE_AUX")) */
+    /*     ptype = MM_PORT_TYPE_SECONDARY; */
 
-    caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
-    sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
-    ptype = mm_plugin_base_probed_capabilities_to_port_type (caps);
-    if (!existing) {
-        if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
-            modem = mm_modem_nokia_new (sysfs_path,
-                                        mm_plugin_base_supports_task_get_driver (task),
-                                        mm_plugin_get_name (MM_PLUGIN (base)),
-                                        vendor,
-                                        product);
-        } else if (caps & CAP_CDMA) {
-            modem = mm_generic_cdma_new (sysfs_path,
-                                         mm_plugin_base_supports_task_get_driver (task),
-                                         mm_plugin_get_name (MM_PLUGIN (base)),
-                                         !!(caps & MM_PLUGIN_BASE_PORT_CAP_IS856),
-                                         !!(caps & MM_PLUGIN_BASE_PORT_CAP_IS856_A),
-                                         vendor,
-                                         product);
-        }
+    /* If this is the first port being grabbed, create a new modem object */
+    if (!existing)
+        modem = MM_BASE_MODEM (mm_broadband_modem_nokia_new (mm_port_probe_get_port_physdev (probe),
+                                                             driver,
+                                                             mm_plugin_get_name (MM_PLUGIN (base)),
+                                                             vendor,
+                                                             product));
 
-        if (modem) {
-            if (!mm_modem_grab_port (modem, subsys, name, ptype, pflags, NULL, error)) {
-                g_object_unref (modem);
-                return NULL;
-            }
-        }
-    } else if (get_level_for_capabilities (caps)) {
-        modem = existing;
-        if (!mm_modem_grab_port (modem, subsys, name, ptype, pflags, NULL, error))
-            return NULL;
+    if (!mm_base_modem_grab_port (existing ? existing : modem,
+                                  subsys,
+                                  name,
+                                  MM_PORT_TYPE_UNKNOWN)) {
+        if (modem)
+            g_object_unref (modem);
+        return NULL;
     }
 
-    return modem;
+    return existing ? existing : modem;
 }
 
 /*****************************************************************************/
 
+G_MODULE_EXPORT MMPlugin *
+mm_plugin_create (void)
+{
+    static const gchar *subsystems[] = { "tty", NULL };
+    static const guint16 vendor_ids[] = { 0x0421, 0 };
+
+    return MM_PLUGIN (
+        g_object_new (MM_TYPE_PLUGIN_NOKIA,
+                      MM_PLUGIN_BASE_NAME, "Nokia",
+                      MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS, subsystems,
+                      MM_PLUGIN_BASE_ALLOWED_VENDOR_IDS, vendor_ids,
+                      MM_PLUGIN_BASE_CUSTOM_INIT, custom_init,
+                      MM_PLUGIN_BASE_ALLOWED_AT, TRUE,
+                      NULL));
+}
+
 static void
 mm_plugin_nokia_init (MMPluginNokia *self)
 {
-    g_signal_connect (self, "probe-result", G_CALLBACK (probe_result), NULL);
 }
 
 static void
@@ -209,6 +157,5 @@ mm_plugin_nokia_class_init (MMPluginNokiaClass *klass)
 {
     MMPluginBaseClass *pb_class = MM_PLUGIN_BASE_CLASS (klass);
 
-    pb_class->supports_port = supports_port;
     pb_class->grab_port = grab_port;
 }
