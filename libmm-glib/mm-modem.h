@@ -94,20 +94,37 @@ gboolean mm_modem_disable_sync   (MMModem *self,
                                   GCancellable *cancellable,
                                   GError **error);
 
+void     mm_modem_list_bearers        (MMModem *self,
+                                       GCancellable *cancellable,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data);
+gchar  **mm_modem_list_bearers_finish (MMModem *self,
+                                       GAsyncResult *res,
+                                       GError **error);
+gchar  **mm_modem_list_bearers_sync   (MMModem *self,
+                                       GCancellable *cancellable,
+                                       GError **error);
+
+#define MM_BEARER_PROPERTY_APN      "apn"
+#define MM_BEARER_PROPERTY_IP_TYPE  "ip-type"
+#define MM_BEARER_PROPERTY_USER     "user"
+#define MM_BEARER_PROPERTY_PASSWORD "password"
+#define MM_BEARER_PROPERTY_NUMBER   "number"
+
 void     mm_modem_create_bearer        (MMModem *self,
-                                        GVariant *arg_properties,
                                         GCancellable *cancellable,
                                         GAsyncReadyCallback callback,
-                                        gpointer user_data);
-gboolean mm_modem_create_bearer_finish (MMModem *self,
-                                        gchar **out_path,
+                                        gpointer user_data,
+                                        const gchar *first_property_name,
+                                        ...);
+gchar   *mm_modem_create_bearer_finish (MMModem *self,
                                         GAsyncResult *res,
                                         GError **error);
-gboolean mm_modem_create_bearer_sync   (MMModem *self,
-                                        GVariant *arg_properties,
-                                        gchar **out_path,
+gchar   *mm_modem_create_bearer_sync   (MMModem *self,
                                         GCancellable *cancellable,
-                                        GError **error);
+                                        GError **error,
+                                        const gchar *first_property_name,
+                                        ...);
 
 void     mm_modem_delete_bearer        (MMModem *self,
                                         const gchar *bearer,

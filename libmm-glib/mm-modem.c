@@ -847,12 +847,133 @@ mm_modem_disable_sync (MMModem *self,
 }
 
 /**
- * mm_modem_create_bearer:
+ * mm_modem_list_bearers:
  * @self: A #MMModem.
- * @properties: A dictionary with signature a{ss} with the properties to be used when creating the bearer.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
  * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously lists the packet data bearers in the #MMModem.
+ *
+ * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
+ * You can then call mm_modem_list_bearers_finish() to get the result of the operation.
+ *
+ * See mm_modem_list_bearers_sync() for the synchronous, blocking version of this method.
+ */
+void
+mm_modem_list_bearers (MMModem *self,
+                       GCancellable *cancellable,
+                       GAsyncReadyCallback callback,
+                       gpointer user_data)
+{
+    g_return_if_fail (MM_GDBUS_IS_MODEM (self));
+
+    mm_gdbus_modem_call_list_bearers (self,
+                                      cancellable,
+                                      callback,
+                                      user_data);
+}
+
+/**
+ * mm_modem_list_bearers_finish:
+ * @self: A #MMModem.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_list_bearers().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_list_bearers().
+ *
+ * Returns: (transfer-full): The list of bearer object paths, or %NULL if either none found or if @error is set.
+ */
+gchar **
+mm_modem_list_bearers_finish (MMModem *self,
+                              GAsyncResult *res,
+                              GError **error)
+{
+    gchar **list;
+
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
+
+    if (!mm_gdbus_modem_call_list_bearers_finish (self,
+                                                  &list,
+                                                  res,
+                                                  error))
+        return NULL;
+
+    /* Only non-empty lists are returned */
+    if (list && list[0])
+        return list;
+
+    g_strfreev (list);
+    return NULL;
+}
+
+/**
+ * mm_modem_list_bearers_sync:
+ * @self: A #MMModem.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * Synchronously lists the packet data bearers in the #MMModem.
+ *
+ * The calling thread is blocked until a reply is received. See mm_modem_list_bearers()
+ * for the asynchronous version of this method.
+ *
+ * Returns: (transfer-full): The list of bearer object paths, or %NULL if either none found or if @error is set.
+ */
+gchar **
+mm_modem_list_bearers_sync (MMModem *self,
+                            GCancellable *cancellable,
+                            GError **error)
+{
+    gchar **list;
+
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
+
+    if (!mm_gdbus_modem_call_list_bearers_sync (self,
+                                                &list,
+                                                cancellable,
+                                                error))
+        return NULL;
+
+    /* Only non-empty lists are returned */
+    if (list && list[0])
+        return list;
+
+    g_strfreev (list);
+    return NULL;
+}
+
+static GVariant *
+create_bearer_build_properties (const gchar *first_property_name,
+                                va_list var_args)
+{
+    const gchar *key;
+    GVariantBuilder builder;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{ss}"));
+
+    key = first_property_name;
+    while (key) {
+        const gchar *value;
+
+        /* If a key with NULL value is given, just ignore it. */
+        value = va_arg (var_args, gchar *);
+        if (value)
+            g_variant_builder_add (&builder, "{ss}", key, value);
+
+        key = va_arg (var_args, gchar *);
+    }
+    return g_variant_builder_end (&builder);
+}
+
+/**
+ * mm_modem_create_bearer:
+ * @self: A #MMModem.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ * @first_property_name: Name of the first property to set.
+ * @...: Value for the first property, followed optionally by more name/value pairs, followed by %NULL.
  *
  * Asynchronously creates a new packet data bearer in the #MMModem.
  *
@@ -868,52 +989,65 @@ mm_modem_disable_sync (MMModem *self,
  */
 void
 mm_modem_create_bearer (MMModem *self,
-                        GVariant *properties,
                         GCancellable *cancellable,
                         GAsyncReadyCallback callback,
-                        gpointer user_data)
+                        gpointer user_data,
+                        const gchar *first_property_name,
+                        ...)
 {
+    va_list va_args;
+    GVariant *properties;
+
     g_return_if_fail (MM_GDBUS_IS_MODEM (self));
+
+    va_start (va_args, first_property_name);
+    properties = create_bearer_build_properties (first_property_name, va_args);
 
     mm_gdbus_modem_call_create_bearer (self,
                                        properties,
                                        cancellable,
                                        callback,
                                        user_data);
+
+    g_variant_unref (properties);
+    va_end (va_args);
 }
 
 /**
  * mm_modem_create_bearer_finish:
  * @self: A #MMModem.
- * @out_path: (out): Return location for the object path of the newly created bearer, or %NULL to ignore.
  * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_create_bearer().
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with mm_modem_create_bearer().
  *
- * Returns: (skip): %TRUE if the bearer was created, %FALSE if @error is set.
+ * Returns: (transfer-full): Path of the newly created bearer, or %NULL if @error is set.
  */
-gboolean
+gchar *
 mm_modem_create_bearer_finish (MMModem *self,
-                               gchar **out_path,
                                GAsyncResult *res,
                                GError **error)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
+    gchar *out_path = NULL;
 
-    return mm_gdbus_modem_call_create_bearer_finish (self,
-                                                     out_path,
-                                                     res,
-                                                     error);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
+
+    if (!mm_gdbus_modem_call_create_bearer_finish (self,
+                                                   &out_path,
+                                                   res,
+                                                   error))
+        return NULL;
+
+    return out_path;
 }
 
 /**
  * mm_modem_create_bearer_sync:
  * @self: A #MMModem.
- * @properties: A dictionary with signature a{ss} with the properties to be used when creating the bearer.
- * @out_path: (out): Return location for the object path of the newly created bearer, or %NULL to ignore.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
+ * @first_property_name: Name of the first property to set.
+ * @...: Value for the first property, followed optionally by more name/value pairs, followed by %NULL.
  *
  * Synchronously creates a new packet data bearer in the #MMModem.
  *
@@ -925,24 +1059,51 @@ mm_modem_create_bearer_finish (MMModem *self,
  * The calling thread is blocked until a reply is received. See mm_modem_create_bearer()
  * for the asynchronous version of this method.
  *
- * Returns: (skip): %TRUE if the bearer was created, %FALSE if @error is set.
+ * Returns: (transfer-full): Path of the newly created bearer, or %NULL if @error is set.
  */
-gboolean
+gchar *
 mm_modem_create_bearer_sync (MMModem *self,
-                             GVariant *properties,
-                             gchar **out_path,
                              GCancellable *cancellable,
-                             GError **error)
+                             GError **error,
+                             const gchar *first_property_name,
+                             ...)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
+    va_list va_args;
+    GVariant *properties;
+    gchar *out_path = NULL;
 
-    return mm_gdbus_modem_call_create_bearer_sync (self,
-                                                   properties,
-                                                   out_path,
-                                                   cancellable,
-                                                   error);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
+
+    va_start (va_args, first_property_name);
+    properties = create_bearer_build_properties (first_property_name, va_args);
+
+    mm_gdbus_modem_call_create_bearer_sync (self,
+                                            properties,
+                                            &out_path,
+                                            cancellable,
+                                            error);
+
+    g_variant_unref (properties);
+    va_end (va_args);
+
+    return out_path;
 }
 
+/**
+ * mm_modem_delete_bearer:
+ * @self: A #MMModem.
+ * @bearer: Path of the bearer to delete.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * Asynchronously deletes a given bearer from the #MMModem.
+ *
+ * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
+ * You can then call mm_modem_delete_bearer_finish() to get the result of the operation.
+ *
+ * See mm_modem_delete_bearer_sync() for the synchronous, blocking version of this method.
+ */
 void
 mm_modem_delete_bearer (MMModem *self,
                         const gchar *bearer,
@@ -959,6 +1120,16 @@ mm_modem_delete_bearer (MMModem *self,
                                        user_data);
 }
 
+/**
+ * mm_modem_delete_bearer_finish:
+ * @self: A #MMModem.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_delete_bearer().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_delete_bearer().
+ *
+ * Returns: (skip): %TRUE if the bearer was deleted, %FALSE if @error is set.
+ */
 gboolean
 mm_modem_delete_bearer_finish (MMModem *self,
                                GAsyncResult *res,
@@ -971,6 +1142,20 @@ mm_modem_delete_bearer_finish (MMModem *self,
                                                      error);
 }
 
+/**
+ * mm_modem_delete_bearer_sync:
+ * @self: A #MMModem.
+ * @bearer: Path of the bearer to delete.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+
+ * Synchronously deletes a given bearer from the #MMModem.
+ *
+ * The calling thread is blocked until a reply is received. See mm_modem_delete_bearer()
+ * for the asynchronous version of this method.
+ *
+ * Returns: (skip): %TRUE if the bearer was deleted, %FALSE if @error is set.
+ */
 gboolean
 mm_modem_delete_bearer_sync (MMModem *self,
                              const gchar *bearer,
