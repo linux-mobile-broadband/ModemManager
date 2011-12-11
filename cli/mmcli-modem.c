@@ -49,6 +49,9 @@ static gboolean enable_flag;
 static gboolean disable_flag;
 static gboolean reset_flag;
 static gchar *factory_reset_str;
+static gboolean list_bearers_flag;
+static gchar *create_bearer_str;
+static gchar *delete_bearer_str;
 
 static GOptionEntry entries[] = {
     { "modem", 'm', 0, G_OPTION_ARG_STRING, &modem_str,
@@ -79,6 +82,18 @@ static GOptionEntry entries[] = {
       "Reset a given modem to its factory state",
       "[CODE]"
     },
+    { "list-bearers", 0, 0, G_OPTION_ARG_NONE, &list_bearers_flag,
+      "List packet data bearers available in a given modem",
+      NULL
+    },
+    { "create-bearer", 0, 0, G_OPTION_ARG_STRING, &create_bearer_str,
+      "Create a new packet data bearer in a given modem",
+      "[\"key=value,...\"]"
+    },
+    { "delete-bearer", 0, 0, G_OPTION_ARG_STRING, &delete_bearer_str,
+      "Delete a data bearer from a given modem",
+      "[PATH]"
+    },
     { NULL }
 };
 
@@ -108,6 +123,9 @@ mmcli_modem_options_enabled (void)
                  enable_flag +
                  disable_flag +
                  reset_flag +
+                 list_bearers_flag +
+                 !!create_bearer_str +
+                 !!delete_bearer_str +
                  !!factory_reset_str);
 
     if (n_actions > 1) {
@@ -390,6 +408,154 @@ factory_reset_ready (MMModem      *modem,
 }
 
 static void
+list_bearers_process_reply (gchar        **result,
+                            const GError  *error)
+{
+    if (error) {
+        g_printerr ("error: couldn't list bearers: '%s'\n",
+                    error->message);
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("\n");
+    if (!result || !result[0]) {
+        g_print ("No bearers were found\n");
+    } else {
+        guint i;
+
+        /* Count number of items */
+        for (i = 0; result[i]; i++)
+            ;
+        g_print ("Found %u bearers:\n", i);
+
+        for (i = 0; result[i]; i++) {
+            g_print ("\t%s\n", result[i]);
+        }
+    }
+    g_strfreev (result);
+}
+
+static void
+list_bearers_ready (MMModem      *modem,
+                    GAsyncResult *result,
+                    gpointer      nothing)
+{
+    gchar **operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_list_bearers_finish (modem, result, &error);
+    list_bearers_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
+create_bearer_process_reply (gchar        *result,
+                             const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't create new bearer: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully created new bearer in modem: '%s'\n", result);
+    g_free (result);
+}
+
+static void
+create_bearer_ready (MMModem      *modem,
+                     GAsyncResult *result,
+                     gpointer      nothing)
+{
+    gchar *operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_create_bearer_finish (modem, result, &error);
+    create_bearer_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
+create_bearer_parse_known_input (const gchar  *input,
+                                 gchar       **apn,
+                                 gchar       **ip_type,
+                                 gchar       **user,
+                                 gchar       **password,
+                                 gchar       **number)
+{
+    gchar **words;
+    gchar *key;
+    gchar *value;
+    guint i;
+
+    /* Expecting input as:
+     * key1=value1,key2=value2,... */
+
+    words = g_strsplit_set (input, ",= ", -1);
+    if (!words)
+        return;
+
+    i = 0;
+    key = words[i];
+    while (key) {
+        value = words[++i];
+        if (!value) {
+            g_printerr ("error: invalid properties string, no value for key '%s'\n", key);
+            exit (EXIT_FAILURE);
+        }
+
+        if (g_str_equal (key, MM_BEARER_PROPERTY_APN))
+            *apn = value;
+        else if (g_str_equal (key, MM_BEARER_PROPERTY_IP_TYPE))
+            *ip_type = value;
+        else if (g_str_equal (key, MM_BEARER_PROPERTY_USER))
+            *user = value;
+        else if (g_str_equal (key, MM_BEARER_PROPERTY_PASSWORD))
+            *password = value;
+        else if (g_str_equal (key, MM_BEARER_PROPERTY_NUMBER))
+            *number = value;
+        else {
+            g_printerr ("error: invalid key '%s' in properties string", key);
+            g_free (value);
+        }
+
+        g_free (key);
+        key = words[++i];
+    }
+
+    g_free (words);
+}
+
+static void
+delete_bearer_process_reply (gboolean      result,
+                             const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't delete bearer: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully deleted bearer from modem\n");
+}
+
+static void
+delete_bearer_ready (MMModem      *modem,
+                     GAsyncResult *result,
+                     gpointer      nothing)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_delete_bearer_finish (modem, result, &error);
+    delete_bearer_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
 state_changed (MMObject                 *modem,
                MMModemState              old_state,
                MMModemState              new_state,
@@ -477,6 +643,61 @@ get_modem_ready (GObject      *source,
         return;
     }
 
+    /* Request to list bearers? */
+    if (list_bearers_flag) {
+        g_debug ("Asynchronously listing bearers in modem...");
+        mm_modem_list_bearers (ctx->modem,
+                               ctx->cancellable,
+                               (GAsyncReadyCallback)list_bearers_ready,
+                               NULL);
+        return;
+    }
+
+    /* Request to create a new bearer? */
+    if (create_bearer_str) {
+        gchar *apn = NULL;
+        gchar *ip_type = NULL;
+        gchar *user = NULL;
+        gchar *password = NULL;
+        gchar *number = NULL;
+
+        create_bearer_parse_known_input (create_bearer_str,
+                                         &apn,
+                                         &ip_type,
+                                         &user,
+                                         &password,
+                                         &number);
+
+        g_debug ("Asynchronously creating new bearer in modem...");
+        mm_modem_create_bearer (ctx->modem,
+                                ctx->cancellable,
+                                (GAsyncReadyCallback)create_bearer_ready,
+                                NULL,
+                                MM_BEARER_PROPERTY_APN,      apn,
+                                MM_BEARER_PROPERTY_IP_TYPE,  ip_type,
+                                MM_BEARER_PROPERTY_USER,     user,
+                                MM_BEARER_PROPERTY_PASSWORD, password,
+                                MM_BEARER_PROPERTY_NUMBER,   number,
+                                NULL);
+
+        g_free (apn);
+        g_free (ip_type);
+        g_free (user);
+        g_free (password);
+        g_free (number);
+        return;
+    }
+
+    /* Request to delete a given bearer? */
+    if (delete_bearer_str) {
+        mm_modem_delete_bearer (ctx->modem,
+                                delete_bearer_str,
+                                ctx->cancellable,
+                                (GAsyncReadyCallback)delete_bearer_ready,
+                                NULL);
+        return;
+    }
+
     g_warn_if_reached ();
 }
 
@@ -557,6 +778,66 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
                                               NULL,
                                               &error);
         factory_reset_process_reply (result, error);
+        return;
+    }
+
+    /* Request to list the bearers? */
+    if (list_bearers_flag) {
+        gchar **result;
+
+        g_debug ("Synchronously listing bearers...");
+        result = mm_modem_list_bearers_sync (ctx->modem, NULL, &error);
+        list_bearers_process_reply (result, error);
+        return;
+    }
+
+    /* Request to create a new bearer? */
+    if (create_bearer_str) {
+        gchar *apn = NULL;
+        gchar *ip_type = NULL;
+        gchar *user = NULL;
+        gchar *password = NULL;
+        gchar *number = NULL;
+        gchar *result;
+
+        create_bearer_parse_known_input (create_bearer_str,
+                                         &apn,
+                                         &ip_type,
+                                         &user,
+                                         &password,
+                                         &number);
+
+        g_debug ("Synchronously creating new bearer in modem...");
+        result = mm_modem_create_bearer_sync (ctx->modem,
+                                              NULL,
+                                              &error,
+                                              MM_BEARER_PROPERTY_APN,      apn,
+                                              MM_BEARER_PROPERTY_IP_TYPE,  ip_type,
+                                              MM_BEARER_PROPERTY_USER,     user,
+                                              MM_BEARER_PROPERTY_PASSWORD, password,
+                                              MM_BEARER_PROPERTY_NUMBER,   number,
+                                              NULL);
+
+        g_free (apn);
+        g_free (ip_type);
+        g_free (user);
+        g_free (password);
+        g_free (number);
+
+        create_bearer_process_reply (result, error);
+        return;
+    }
+
+    /* Request to delete a given bearer? */
+    if (delete_bearer_str) {
+        gboolean result;
+
+        result = mm_modem_delete_bearer_sync (ctx->modem,
+                                              delete_bearer_str,
+                                              NULL,
+                                              &error);
+
+        delete_bearer_process_reply (result, error);
         return;
     }
 
