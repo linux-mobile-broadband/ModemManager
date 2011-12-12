@@ -21,6 +21,7 @@
 
 #include "mm-charsets.h"
 #include "mm-at-serial-port.h"
+#include "mm-bearer.h"
 
 #define MM_TYPE_IFACE_MODEM            (mm_iface_modem_get_type ())
 #define MM_IFACE_MODEM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM, MMIfaceModem))
@@ -31,6 +32,7 @@
 #define MM_IFACE_MODEM_CURRENT_CAPABILITIES "iface-modem-current-capabilities"
 #define MM_IFACE_MODEM_STATE                "iface-modem-state"
 #define MM_IFACE_MODEM_SIM                  "iface-modem-sim"
+#define MM_IFACE_MODEM_BEARER_LIST          "iface-modem-bearer-list"
 
 typedef struct _MMIfaceModem MMIfaceModem;
 
@@ -52,22 +54,6 @@ struct _MMIfaceModem {
     MMModemCapability (*load_current_capabilities_finish) (MMIfaceModem *self,
                                                            GAsyncResult *res,
                                                            GError **error);
-
-    /* Loading of the MaxBearers property */
-    void (*load_max_bearers) (MMIfaceModem *self,
-                              GAsyncReadyCallback callback,
-                              gpointer user_data);
-    guint (*load_max_bearers_finish) (MMIfaceModem *self,
-                                      GAsyncResult *res,
-                                      GError **error);
-
-    /* Loading of the MaxActiveBearers property */
-    void (*load_max_active_bearers) (MMIfaceModem *self,
-                                     GAsyncReadyCallback callback,
-                                     gpointer user_data);
-    guint (*load_max_active_bearers_finish) (MMIfaceModem *self,
-                                             GAsyncResult *res,
-                                             GError **error);
 
     /* Loading of the Manufacturer property */
     void (*load_manufacturer) (MMIfaceModem *self,
@@ -249,27 +235,9 @@ struct _MMIfaceModem {
                            GVariant *properties,
                            GAsyncReadyCallback callback,
                            gpointer user_data);
-    gchar * (*create_bearer_finish) (MMIfaceModem *self,
-                                     GAsyncResult *res,
-                                     GError **error);
-
-    /* List bearers */
-    void (*list_bearers) (MMIfaceModem *self,
-                          GAsyncReadyCallback callback,
-                          gpointer user_data);
-    GStrv (*list_bearers_finish) (MMIfaceModem *self,
-                                  GAsyncResult *res,
-                                  GError **error);
-
-    /* Delete bearer */
-    void (*delete_bearer) (MMIfaceModem *self,
-                           const gchar *path,
-                           GAsyncReadyCallback callback,
-                           gpointer user_data);
-    gboolean (*delete_bearer_finish) (MMIfaceModem *self,
-                                      GAsyncResult *res,
-                                      GError **error);
-
+    MMBearer * (*create_bearer_finish) (MMIfaceModem *self,
+                                        GAsyncResult *res,
+                                        GError **error);
 };
 
 GType mm_iface_modem_get_type (void);

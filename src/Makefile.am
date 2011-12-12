@@ -112,6 +112,8 @@ modem_manager_SOURCES = \
 	mm-sim.c \
 	mm-bearer.h \
 	mm-bearer.c \
+	mm-bearer-list.h \
+	mm-bearer-list.c \
 	mm-base-modem-at.h \
 	mm-base-modem-at.c \
 	mm-base-modem.h \

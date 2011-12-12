@@ -24,6 +24,7 @@
 #include "mm-iface-modem.h"
 #include "mm-base-modem.h"
 #include "mm-sim.h"
+#include "mm-bearer-list.h"
 #include "mm-log.h"
 
 typedef struct _InitializationContext InitializationContext;
@@ -71,20 +72,29 @@ handle_create_bearer_ready (MMIfaceModem *self,
                             GAsyncResult *res,
                             DbusCallContext *ctx)
 {
-    gchar *path;
+    MMBearer *bearer;
     GError *error = NULL;
 
-    path = MM_IFACE_MODEM_GET_INTERFACE (self)->create_bearer_finish (self,
-                                                                      res,
-                                                                      &error);
+    bearer = MM_IFACE_MODEM_GET_INTERFACE (self)->create_bearer_finish (self,
+                                                                        res,
+                                                                        &error);
     if (error)
-        g_dbus_method_invocation_take_error (ctx->invocation,
-                                             error);
-    else
-        mm_gdbus_modem_complete_create_bearer (ctx->skeleton,
-                                               ctx->invocation,
-                                               path);
-    g_free (path);
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else {
+        MMBearerList *list = NULL;
+
+        g_object_get (self,
+                      MM_IFACE_MODEM_BEARER_LIST, &list,
+                      NULL);
+
+        if (!mm_bearer_list_add_bearer (list, bearer, &error))
+            g_dbus_method_invocation_take_error (ctx->invocation, error);
+        else
+            mm_gdbus_modem_complete_create_bearer (ctx->skeleton,
+                                                   ctx->invocation,
+                                                   mm_bearer_get_path (bearer));
+        g_object_unref (bearer);
+    }
     dbus_call_context_free (ctx);
 }
 
@@ -94,35 +104,34 @@ handle_create_bearer (MmGdbusModem *skeleton,
                       GVariant *arg_properties,
                       MMIfaceModem *self)
 {
-    MM_IFACE_MODEM_GET_INTERFACE (self)->create_bearer (
-        self,
-        arg_properties,
-        (GAsyncReadyCallback)handle_create_bearer_ready,
-        dbus_call_context_new (skeleton,
-                               invocation,
-                               self));
+    MMBearerList *list = NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_BEARER_LIST, &list,
+                  NULL);
+
+    if (mm_bearer_list_get_count (list) == mm_bearer_list_get_max (list)) {
+        g_dbus_method_invocation_return_error (
+            invocation,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_TOO_MANY,
+            "Cannot add new bearer: already reached maximum (%u)",
+            mm_bearer_list_get_count (list));
+    } else {
+        MM_IFACE_MODEM_GET_INTERFACE (self)->create_bearer (
+            self,
+            arg_properties,
+            (GAsyncReadyCallback)handle_create_bearer_ready,
+            dbus_call_context_new (skeleton,
+                                   invocation,
+                                   self));
+    }
+
+    g_object_unref (list);
     return TRUE;
 }
 
 /*****************************************************************************/
-
-static void
-handle_delete_bearer_ready (MMIfaceModem *self,
-                            GAsyncResult *res,
-                            DbusCallContext *ctx)
-{
-    GError *error = NULL;
-
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->delete_bearer_finish (self,
-                                                                    res,
-                                                                    &error))
-        g_dbus_method_invocation_take_error (ctx->invocation,
-                                             error);
-    else
-        mm_gdbus_modem_complete_delete_bearer (ctx->skeleton,
-                                               ctx->invocation);
-    dbus_call_context_free (ctx);
-}
 
 static gboolean
 handle_delete_bearer (MmGdbusModem *skeleton,
@@ -130,51 +139,43 @@ handle_delete_bearer (MmGdbusModem *skeleton,
                       const gchar *arg_bearer,
                       MMIfaceModem *self)
 {
-    MM_IFACE_MODEM_GET_INTERFACE (self)->delete_bearer (
-        self,
-        arg_bearer,
-        (GAsyncReadyCallback)handle_delete_bearer_ready,
-        dbus_call_context_new (skeleton,
-                               invocation,
-                               self));
+    MMBearerList *list = NULL;
+    GError *error = NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_BEARER_LIST, &list,
+                  NULL);
+
+    if (!mm_bearer_list_delete_bearer (list, arg_bearer, &error))
+        g_dbus_method_invocation_take_error (invocation, error);
+    else
+        mm_gdbus_modem_complete_delete_bearer (skeleton, invocation);
+
+    g_object_unref (list);
     return TRUE;
 }
 
 /*****************************************************************************/
-
-static void
-handle_list_bearers_ready (MMIfaceModem *self,
-                           GAsyncResult *res,
-                           DbusCallContext *ctx)
-{
-    GStrv path_list;
-    GError *error = NULL;
-
-    path_list = MM_IFACE_MODEM_GET_INTERFACE (self)->list_bearers_finish (self,
-                                                                          res,
-                                                                          &error);
-    if (error)
-        g_dbus_method_invocation_take_error (ctx->invocation,
-                                             error);
-    else
-        mm_gdbus_modem_complete_list_bearers (ctx->skeleton,
-                                              ctx->invocation,
-                                              (const gchar *const *)path_list);
-    g_strfreev (path_list);
-    dbus_call_context_free (ctx);
-}
 
 static gboolean
 handle_list_bearers (MmGdbusModem *skeleton,
                      GDBusMethodInvocation *invocation,
                      MMIfaceModem *self)
 {
-    MM_IFACE_MODEM_GET_INTERFACE (self)->list_bearers (
-        self,
-        (GAsyncReadyCallback)handle_list_bearers_ready,
-        dbus_call_context_new (skeleton,
-                               invocation,
-                               self));
+    GStrv paths;
+    MMBearerList *list = NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_BEARER_LIST, &list,
+                  NULL);
+
+    paths = mm_bearer_list_get_paths (list);
+    mm_gdbus_modem_complete_list_bearers (skeleton,
+                                          invocation,
+                                          (const gchar *const *)paths);
+
+    g_strfreev (paths);
+    g_object_unref (list);
     return TRUE;
 }
 
@@ -1514,8 +1515,7 @@ typedef enum {
     INITIALIZATION_STEP_FIRST,
     INITIALIZATION_STEP_CURRENT_CAPABILITIES,
     INITIALIZATION_STEP_MODEM_CAPABILITIES,
-    INITIALIZATION_STEP_MAX_BEARERS,
-    INITIALIZATION_STEP_MAX_ACTIVE_BEARERS,
+    INITIALIZATION_STEP_BEARERS,
     INITIALIZATION_STEP_MANUFACTURER,
     INITIALIZATION_STEP_MODEL,
     INITIALIZATION_STEP_REVISION,
@@ -1645,8 +1645,6 @@ load_current_capabilities_ready (MMIfaceModem *self,
 }
 
 UINT_REPLY_READY_FN (modem_capabilities, "Modem Capabilities")
-UINT_REPLY_READY_FN (max_bearers, "Max Bearers")
-UINT_REPLY_READY_FN (max_active_bearers, "Max Active Bearers")
 STR_REPLY_READY_FN (manufacturer, "Manufacturer")
 STR_REPLY_READY_FN (model, "Model")
 STR_REPLY_READY_FN (revision, "Revision")
@@ -1799,44 +1797,38 @@ interface_initialization_step (InitializationContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case INITIALIZATION_STEP_MAX_BEARERS:
-        /* Max bearers value is meant to be loaded only once during the whole
-         * lifetime of the modem. Therefore, if we already have them loaded,
-         * don't try to load them again. */
-        if (mm_gdbus_modem_get_max_bearers (ctx->skeleton) == 0 &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_max_bearers &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_max_bearers_finish) {
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_max_bearers (
-                ctx->self,
-                (GAsyncReadyCallback)load_max_bearers_ready,
-                ctx);
-            return;
-        }
-        /* Default to one bearer */
-        mm_gdbus_modem_set_max_bearers (ctx->skeleton, 1);
-        /* Fall down to next step */
-        ctx->step++;
+    case INITIALIZATION_STEP_BEARERS: {
+        MMBearerList *list = NULL;
 
-    case INITIALIZATION_STEP_MAX_ACTIVE_BEARERS:
-        /* Max active bearers value is meant to be loaded only once during the
-         * whole lifetime of the modem. Therefore, if we already have them
-         * loaded, don't try to load them again. */
-        if (mm_gdbus_modem_get_max_active_bearers (ctx->skeleton) == 0 &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_max_active_bearers &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_max_active_bearers_finish) {
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_max_active_bearers (
-                ctx->self,
-                (GAsyncReadyCallback)load_max_active_bearers_ready,
-                ctx);
-            return;
+        /* Bearers setup is meant to be loaded only once during the whole
+         * lifetime of the modem. The list may have been created by the object
+         * implementing the interface; if so use it. */
+        g_object_get (ctx->self,
+                      MM_IFACE_MODEM_BEARER_LIST, &list,
+                      NULL);
+
+        if (!list) {
+            list = mm_bearer_list_new (1, 1);
+
+            /* Create new default list */
+            g_object_set (ctx->self,
+                          MM_IFACE_MODEM_BEARER_LIST, list,
+                          NULL);
         }
-       /* If no specific way of getting max active bearers, assume they are
-        * equal to the absolute max bearers */
-        mm_gdbus_modem_set_max_active_bearers (
-            ctx->skeleton,
-            mm_gdbus_modem_get_max_bearers (ctx->skeleton));
+
+        if (mm_gdbus_modem_get_max_bearers (ctx->skeleton) == 0)
+            mm_gdbus_modem_set_max_bearers (
+                ctx->skeleton,
+                mm_bearer_list_get_max (list));
+        if (mm_gdbus_modem_get_max_active_bearers (ctx->skeleton) == 0)
+            mm_gdbus_modem_set_max_active_bearers (
+                ctx->skeleton,
+                mm_bearer_list_get_max_active (list));
+        g_object_unref (list);
+
         /* Fall down to next step */
         ctx->step++;
+    }
 
     case INITIALIZATION_STEP_MANUFACTURER:
         /* Manufacturer is meant to be loaded only once during the whole
@@ -2189,6 +2181,14 @@ iface_modem_init (gpointer g_iface)
                              MM_TYPE_MODEM_CAPABILITY,
                              MM_MODEM_CAPABILITY_NONE,
                              G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_object (MM_IFACE_MODEM_BEARER_LIST,
+                              "Bearer list",
+                              "List of bearers handled by the modem",
+                              MM_TYPE_BEARER_LIST,
+                              G_PARAM_READWRITE));
 
     initialized = TRUE;
 }
