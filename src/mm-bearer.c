@@ -235,14 +235,10 @@ mm_bearer_new (MMBaseModem *modem,
     /* Ensure only one capability is set */
     g_assert_cmpuint (mm_count_bits_set (capability), ==, 1);
 
-    /* Build the unique path for the Bearer, and create the object */
-    path = g_strdup_printf (MM_DBUS_BEARER_PREFIX "%d", id++);
+    /* Create the object */
     bearer = g_object_new  (MM_TYPE_BEARER,
-                            MM_BEARER_PATH,       path,
-                            MM_BEARER_MODEM,      modem,
                             MM_BEARER_CAPABILITY, capability,
                             NULL);
-    g_free (path);
 
     /* Parse and set input properties */
     if (!parse_input_properties (bearer, capability, properties, error)) {
@@ -256,6 +252,15 @@ mm_bearer_new (MMBaseModem *modem,
     mm_gdbus_bearer_set_suspended (MM_GDBUS_BEARER (bearer), FALSE);
     mm_gdbus_bearer_set_ip4_config (MM_GDBUS_BEARER (bearer), NULL);
     mm_gdbus_bearer_set_ip6_config (MM_GDBUS_BEARER (bearer), NULL);
+
+    /* Set modem and path ONLY after having checked input properties, so that
+     * we don't export invalid bearers. */
+    path = g_strdup_printf (MM_DBUS_BEARER_PREFIX "%d", id++);
+    g_object_set (bearer,
+                  MM_BEARER_PATH,  path,
+                  MM_BEARER_MODEM, modem,
+                  NULL);
+    g_free (path);
 
     return bearer;
 }
@@ -433,7 +438,7 @@ mm_bearer_class_init (MMBearerClass *klass)
                              "Path",
                              "DBus path of the Bearer",
                              NULL,
-                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+                             G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_PATH, properties[PROP_PATH]);
 
     properties[PROP_MODEM] =
