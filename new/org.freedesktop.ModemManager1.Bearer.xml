@@ -228,5 +228,12 @@
     -->
     <property name="Ip6Config" type="a{sv}" access="read" />
 
+    <!--
+        Properties:
+
+        List of properties used when creating the bearer.
+    -->
+    <property name="Properties" type="a{ss}" access="read" />
+
   </interface>
 </node>
