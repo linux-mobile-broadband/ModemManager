@@ -37,6 +37,8 @@ static const GDBusErrorEntry mm_core_error_entries[] = {
     { MM_CORE_ERROR_IN_PROGRESS,  ERROR_PREFIX "InProgress"   },
     { MM_CORE_ERROR_WRONG_STATE,  ERROR_PREFIX "WrongState"   },
     { MM_CORE_ERROR_CONNECTED,    ERROR_PREFIX "Connected"    },
+    { MM_CORE_ERROR_TOO_MANY,     ERROR_PREFIX "TooMany"      },
+    { MM_CORE_ERROR_NOT_FOUND,    ERROR_PREFIX "NotFound"     },
 };
 #undef ERROR_PREFIX
 

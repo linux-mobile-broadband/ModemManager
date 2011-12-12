@@ -37,6 +37,8 @@
  * @MM_CORE_ERROR_IN_PROGRESS: Operation is already in progress.
  * @MM_CORE_ERROR_WRONG_STATE: Operation cannot be executed in the current state.
  * @MM_CORE_ERROR_CONNECTED: Operation cannot be executed while being connected.
+ * @MM_CORE_ERROR_TOO_MANY: Too many items.
+ * @MM_CORE_ERROR_NOT_FOUND: Item not found.
  *
  * Common errors that may be reported by ModemManager.
  */
@@ -51,6 +53,8 @@ typedef enum { /*< underscore_name=mm_core_error >*/
     MM_CORE_ERROR_IN_PROGRESS  = 7,
     MM_CORE_ERROR_WRONG_STATE  = 8,
     MM_CORE_ERROR_CONNECTED    = 9,
+    MM_CORE_ERROR_TOO_MANY     = 10,
+    MM_CORE_ERROR_NOT_FOUND    = 11,
 } MMCoreError;
 
 /**
