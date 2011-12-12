@@ -219,6 +219,8 @@ parse_input_properties (MMBearer *bearer,
 
 #undef CHECK_MANDATORY_PROPERTY
 
+    /* Keep the whole list of properties in the interface */
+    mm_gdbus_bearer_set_properties (MM_GDBUS_BEARER (bearer), properties);
     return TRUE;
 }
 
