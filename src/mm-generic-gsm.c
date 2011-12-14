@@ -5777,8 +5777,15 @@ simple_status_got_signal_quality (MMModem *modem,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     GHashTable *properties;
+    gboolean error_no_network = FALSE;
 
-    if (!error) {
+    /* Treat "no network" as zero strength */
+    if (g_error_matches (error, MM_MOBILE_ERROR, MM_MOBILE_ERROR_NO_NETWORK)) {
+        error_no_network = TRUE;
+        result = 0;
+    }
+
+    if (!error || error_no_network) {
         properties = (GHashTable *) mm_callback_info_get_data (info, SS_HASH_TAG);
         g_hash_table_insert (properties, "signal_quality", simple_uint_value (result));
     } else {
