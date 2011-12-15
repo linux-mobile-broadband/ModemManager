@@ -302,9 +302,6 @@ mm_base_modem_grab_port (MMBaseModem *self,
         if (!self->priv->data || MM_IS_AT_SERIAL_PORT (self->priv->data)) {
             g_clear_object (&self->priv->data);
             self->priv->data = g_object_ref (port);
-
-            /* TODO: */
-            /* check_valid (self); */
         }
 
         mm_dbg ("(%s/%s) port grabbed by %s",
@@ -418,6 +415,19 @@ mm_base_modem_get_port_qcdm (MMBaseModem *self)
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
 
     return self->priv->qcdm;
+}
+
+MMPort *
+mm_base_modem_get_best_data_port (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
+
+    /* TODO: sometime we'll have a list of available data ports to use instead
+     * of a single one */
+
+    return (mm_port_get_connected (self->priv->data) ?
+            NULL :
+            self->priv->data);
 }
 
 gboolean
