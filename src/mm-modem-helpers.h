@@ -32,9 +32,19 @@ typedef struct {
 } MM3gppNetworkInfo;
 
 void mm_3gpp_network_info_list_free (GList *info_list);
-
 GList *mm_3gpp_parse_scan_response (const gchar *reply,
                                     GError **error);
+
+/* PDP context query results */
+typedef struct {
+    guint cid;
+    gchar *pdp_type;
+    gchar *apn;
+} MM3gppPdpContext;
+
+void mm_3gpp_pdp_context_list_free (GList *pdp_list);
+GList *mm_3gpp_parse_pdp_query_response (const gchar *reply,
+                                         GError **error);
 
 GPtrArray *mm_gsm_creg_regex_get (gboolean solicited);
 

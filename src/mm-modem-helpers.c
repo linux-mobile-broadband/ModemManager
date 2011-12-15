@@ -308,6 +308,83 @@ mm_3gpp_parse_scan_response (const gchar *reply,
 
 /*************************************************************************/
 
+static void
+mm_3gpp_pdp_context_free (MM3gppPdpContext *pdp)
+{
+    g_free (pdp->pdp_type);
+    g_free (pdp->apn);
+    g_free (pdp);
+}
+
+void
+mm_3gpp_pdp_context_list_free (GList *list)
+{
+    g_list_foreach (list, (GFunc)mm_3gpp_pdp_context_free, NULL);
+    g_list_free (list);
+}
+
+static gint
+mm_3gpp_pdp_context_cmp (MM3gppPdpContext *a,
+                         MM3gppPdpContext *b)
+{
+    return (a->cid - b->cid);
+}
+
+GList *
+mm_3gpp_parse_pdp_query_response (const gchar *reply,
+                                  GError **error)
+{
+    GError *inner_error = NULL;
+    GRegex *r;
+    GMatchInfo *match_info;
+    GList *list;
+
+    if (!reply[0])
+        /* No APNs configured, all done */
+        return NULL;
+
+    list = NULL;
+    r = g_regex_new ("\\+CGDCONT:\\s*(\\d+)\\s*,([^,\\)]*),([^,\\)]*),([^,\\)]*)",
+                     G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
+                     0, &inner_error);
+    if (r) {
+        g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, &inner_error);
+
+        while (!inner_error &&
+               g_match_info_matches (match_info)) {
+            MM3gppPdpContext *pdp;
+            gchar *cid;
+
+            pdp = g_new0 (MM3gppPdpContext, 1);
+            cid = g_match_info_fetch (match_info, 1);
+            pdp->cid = (guint)atoi (cid);
+            pdp->pdp_type = get_unquoted_scan_value (match_info, 2);
+            pdp->apn = get_unquoted_scan_value (match_info, 3);
+            g_free (cid);
+
+            list = g_list_prepend (list, pdp);
+
+            g_match_info_next (match_info, &inner_error);
+        }
+
+        g_match_info_free (match_info);
+        g_regex_unref (r);
+    }
+
+    if (inner_error) {
+        mm_3gpp_pdp_context_list_free (list);
+        g_propagate_error (error, inner_error);
+        g_prefix_error (error, "Couldn't properly parse list of PDP contexts. ");
+        return NULL;
+    }
+
+    list = g_list_sort (list, (GCompareFunc)mm_3gpp_pdp_context_cmp);
+
+    return list;
+}
+
+/*************************************************************************/
+
 /* +CREG: <stat>                      (GSM 07.07 CREG=1 unsolicited) */
 #define CREG1 "\\+(CREG|CGREG):\\s*0*([0-9])"
 

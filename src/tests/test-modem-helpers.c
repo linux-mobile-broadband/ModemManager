@@ -1177,6 +1177,57 @@ test_cind_response_moto_v3m (void *f, gpointer d)
     test_cind_results ("Motorola V3m", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
+static void
+test_cgdcont_results (const gchar *desc,
+                      const gchar *reply,
+                      MM3gppPdpContext *expected_results,
+                      guint32 expected_results_len)
+{
+    GList *l;
+    GError *error = NULL;
+    GList *results;
+
+    g_print ("\nTesting %s +CGDCONT response...\n", desc);
+
+    results = mm_3gpp_parse_pdp_query_response (reply, &error);
+    g_assert (results);
+    g_assert_no_error (error);
+    g_assert_cmpuint (g_list_length (results), ==, expected_results_len);
+
+    for (l = results; l; l = g_list_next (l)) {
+        MM3gppPdpContext *pdp = l->data;
+        gboolean found = FALSE;
+        guint i;
+
+        for (i = 0; !found && i < expected_results_len; i++) {
+            MM3gppPdpContext *expected;
+
+            expected = &expected_results[i];
+            if (pdp->cid == expected->cid) {
+                found = TRUE;
+
+                g_assert_cmpstr (pdp->pdp_type, ==, expected->pdp_type);
+                g_assert_cmpstr (pdp->apn, ==, expected->apn);
+            }
+        }
+
+        g_assert (found == TRUE);
+    }
+
+    mm_3gpp_pdp_context_list_free (results);
+}
+
+static void
+test_cgdcont_response_nokia (void *f, gpointer d)
+{
+    const gchar *reply = "+CGDCONT: 1,\"IP\",,,0,0";
+    static MM3gppPdpContext expected[] = {
+        { 1, "IP", "" }
+    };
+
+    test_cgdcont_results ("Nokia", reply, &expected[0], G_N_ELEMENTS (expected));
+}
+
 static TestData *
 test_data_new (void)
 {
@@ -1296,6 +1347,8 @@ int main (int argc, char **argv)
         g_test_suite_add (suite, TESTCASE (test_devid_item, (gconstpointer) item));
         item++;
     }
+
+	g_test_suite_add (suite, TESTCASE (test_cgdcont_response_nokia, NULL));
 
     result = g_test_run ();
 
