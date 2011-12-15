@@ -65,4 +65,10 @@ gboolean mm_bearer_list_delete_bearer (MMBearerList *self,
                                        const gchar *path,
                                        GError **error);
 
+typedef void (*MMBearerListForeachFunc) (MMBearer *bearer,
+                                         gpointer user_data);
+void mm_bearer_list_foreach (MMBearerList *self,
+                             MMBearerListForeachFunc func,
+                             gpointer user_data);
+
 #endif /* MM_BEARER_LIST_H */
