@@ -43,6 +43,7 @@ enum {
     PROP_PATH,
     PROP_CONNECTION,
     PROP_MODEM,
+    PROP_CONNECTION_ALLOWED,
     PROP_LAST
 };
 
@@ -55,6 +56,8 @@ struct _MMBearerPrivate {
     MMBaseModem *modem;
     /* The path where the BEARER object is exported */
     gchar *path;
+    /* Flag to specify whether the bearer can be connected */
+    gboolean connection_allowed;
 };
 
 /*****************************************************************************/
@@ -176,7 +179,18 @@ mm_bearer_get_path (MMBearer *self)
     return self->priv->path;
 }
 
-/*****************************************************************************/
+void
+mm_bearer_set_connection_allowed (MMBearer *self)
+{
+    self->priv->connection_allowed = TRUE;
+}
+
+void
+mm_bearer_set_connection_forbidden (MMBearer *self)
+{
+    self->priv->connection_allowed = FALSE;
+    /* TODO: possibly, force disconnection */
+}
 
 void
 mm_bearer_expose_properties (MMBearer *bearer,
@@ -207,6 +221,8 @@ mm_bearer_expose_properties (MMBearer *bearer,
     mm_gdbus_bearer_set_properties (MM_GDBUS_BEARER (bearer),
                                     g_variant_builder_end (&builder));
 }
+
+/*****************************************************************************/
 
 static void
 set_property (GObject *object,
@@ -243,6 +259,9 @@ set_property (GObject *object,
                                     self, MM_BEARER_CONNECTION,
                                     G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
         break;
+    case PROP_CONNECTION_ALLOWED:
+        self->priv->connection_allowed = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -266,6 +285,9 @@ get_property (GObject *object,
         break;
     case PROP_MODEM:
         g_value_set_object (value, self->priv->modem);
+        break;
+    case PROP_CONNECTION_ALLOWED:
+        g_value_set_boolean (value, self->priv->connection_allowed);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -352,4 +374,12 @@ mm_bearer_class_init (MMBearerClass *klass)
                              MM_TYPE_BASE_MODEM,
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_MODEM, properties[PROP_MODEM]);
+
+    properties[PROP_CONNECTION_ALLOWED] =
+        g_param_spec_boolean (MM_BEARER_CONNECTION_ALLOWED,
+                              "Connection allowed",
+                              "Flag to specify whether the bearer is allowed to get connected",
+                              FALSE,
+                              G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_CONNECTION_ALLOWED, properties[PROP_CONNECTION_ALLOWED]);
 }

@@ -35,9 +35,10 @@ typedef struct _MMBearer MMBearer;
 typedef struct _MMBearerClass MMBearerClass;
 typedef struct _MMBearerPrivate MMBearerPrivate;
 
-#define MM_BEARER_PATH           "bearer-path"
-#define MM_BEARER_CONNECTION     "bearer-connection"
-#define MM_BEARER_MODEM          "bearer-modem"
+#define MM_BEARER_PATH               "bearer-path"
+#define MM_BEARER_CONNECTION         "bearer-connection"
+#define MM_BEARER_MODEM              "bearer-modem"
+#define MM_BEARER_CONNECTION_ALLOWED "bearer-connection-allowed"
 
 /* Prefix for all bearer object paths */
 #define MM_DBUS_BEARER_PREFIX MM_DBUS_PATH "/Bearers"
@@ -75,5 +76,8 @@ const gchar *mm_bearer_get_path (MMBearer *bearer);
 void mm_bearer_expose_properties (MMBearer *bearer,
                                   const gchar *first_property_name,
                                   ...);
+
+void mm_bearer_set_connection_allowed   (MMBearer *bearer);
+void mm_bearer_set_connection_forbidden (MMBearer *bearer);
 
 #endif /* MM_BEARER_H */
