@@ -30,7 +30,7 @@
 #include "mm-broadband-modem.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
-#include "mm-bearer.h"
+#include "mm-bearer-3gpp.h"
 #include "mm-bearer-list.h"
 #include "mm-sim.h"
 #include "mm-log.h"
@@ -113,11 +113,10 @@ modem_create_bearer (MMIfaceModem *self,
 
     /* TODO: We'll need to guess the capability of the bearer, based on the
      * current capabilities that we handle, and the specific allowed modes
-     * configured in the modem. Use GSM_UMTS for testing now */
-    bearer = mm_bearer_new (MM_BASE_MODEM (self),
-                            properties,
-                            MM_MODEM_CAPABILITY_GSM_UMTS,
-                            &error);
+     * configured in the modem. Use 3GPP for testing now */
+    bearer = mm_bearer_3gpp_new_from_properties (MM_BASE_MODEM (self),
+                                                 properties,
+                                                 &error);
     if (!bearer) {
         g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
                                                    callback,
@@ -2309,6 +2308,7 @@ initialize_finish (MMBaseModem *self,
                                             &error)) {                  \
             g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (ctx->result), error); \
             initialize_context_complete_and_free (ctx);                 \
+            return;                                                     \
         }                                                               \
                                                                         \
         /* Go on to next step */                                        \
