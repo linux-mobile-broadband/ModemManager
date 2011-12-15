@@ -83,6 +83,15 @@ handle_connect (MMBearer *self,
                 GDBusMethodInvocation *invocation,
                 const gchar *number)
 {
+    if (!self->priv->connection_allowed) {
+        g_dbus_method_invocation_return_error (
+            invocation,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_WRONG_STATE,
+            "Not allowed to connect bearer");
+        return TRUE;
+    }
+
     if (MM_BEARER_GET_CLASS (self)->connect != NULL &&
         MM_BEARER_GET_CLASS (self)->connect_finish != NULL) {
         MM_BEARER_GET_CLASS (self)->connect (
@@ -182,12 +191,20 @@ mm_bearer_get_path (MMBearer *self)
 void
 mm_bearer_set_connection_allowed (MMBearer *self)
 {
+    if (self->priv->connection_allowed)
+        return;
+
+    mm_dbg ("Connection in bearer '%s' is allowed", self->priv->path);
     self->priv->connection_allowed = TRUE;
 }
 
 void
 mm_bearer_set_connection_forbidden (MMBearer *self)
 {
+    if (!self->priv->connection_allowed)
+        return;
+
+    mm_dbg ("Connection in bearer '%s' is forbidden", self->priv->path);
     self->priv->connection_allowed = FALSE;
     /* TODO: possibly, force disconnection */
 }
