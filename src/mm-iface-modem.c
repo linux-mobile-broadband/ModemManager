@@ -806,6 +806,23 @@ unlock_check_ready (MMIfaceModem *self,
                                                                              res,
                                                                              &error);
     if (error) {
+        /* Treat several SIM related errors as critical and abort the checks
+         * TODO: do this only after the retries? */
+        if (g_error_matches (error,
+                             MM_MOBILE_EQUIPMENT_ERROR,
+                             MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED) ||
+            g_error_matches (error,
+                             MM_MOBILE_EQUIPMENT_ERROR,
+                             MM_MOBILE_EQUIPMENT_ERROR_SIM_FAILURE) ||
+            g_error_matches (error,
+                             MM_MOBILE_EQUIPMENT_ERROR,
+                             MM_MOBILE_EQUIPMENT_ERROR_SIM_WRONG)) {
+            g_simple_async_result_take_error (ctx->result, error);
+            g_simple_async_result_complete (ctx->result);
+            unlock_check_context_free (ctx);
+            return;
+        }
+
         /* Retry up to 3 times */
         if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE &&
             ++ctx->pin_check_tries < 3) {
@@ -1663,8 +1680,11 @@ load_unlock_required_ready (MMIfaceModem *self,
     /* NOTE: we already propagated the lock state, no need to do it again */
     mm_iface_modem_unlock_check_finish (self, res, &error);
     if (error) {
+        /* FATAL */
         mm_warn ("couldn't load unlock required status: '%s'", error->message);
-        g_error_free (error);
+        g_simple_async_result_take_error (ctx->result, error);
+        initialization_context_complete_and_free (ctx);
+        return;
     }
 
     /* Go on to next step */
