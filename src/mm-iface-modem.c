@@ -1550,8 +1550,6 @@ struct _InitializationContext {
     MMIfaceModem *self;
     MMAtSerialPort *port;
     InitializationStep step;
-    guint pin_check_tries;
-    guint pin_check_timeout_id;
     GSimpleAsyncResult *result;
     MmGdbusModem *skeleton;
 };
