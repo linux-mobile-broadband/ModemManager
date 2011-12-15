@@ -85,6 +85,8 @@ struct _MMBroadbandModemPrivate {
 /*****************************************************************************/
 /* CREATE BEARER */
 
+static MMModem3gppRegistrationState get_consolidated_reg_state (MMBroadbandModem *self);
+
 static MMBearer *
 modem_create_bearer_finish (MMIfaceModem *self,
                             GAsyncResult *res,
@@ -114,15 +116,30 @@ modem_create_bearer (MMIfaceModem *self,
     /* TODO: We'll need to guess the capability of the bearer, based on the
      * current capabilities that we handle, and the specific allowed modes
      * configured in the modem. Use 3GPP for testing now */
-    bearer = mm_bearer_3gpp_new_from_properties (MM_BASE_MODEM (self),
-                                                 properties,
-                                                 &error);
-    if (!bearer) {
-        g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
-                                                   callback,
-                                                   user_data,
-                                                   error);
-        return;
+
+    /* New 3GPP bearer */
+    {
+        MMModem3gppRegistrationState state;
+
+        bearer = mm_bearer_3gpp_new_from_properties (MM_BASE_MODEM (self),
+                                                     properties,
+                                                     &error);
+        if (!bearer) {
+            g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
+                                                       callback,
+                                                       user_data,
+                                                       error);
+            return;
+        }
+
+        /* Based on our current 3GPP registration state, allow or forbid
+         * connections */
+        state = get_consolidated_reg_state (MM_BROADBAND_MODEM (self));
+        if (state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+            state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
+            mm_bearer_set_connection_allowed (bearer);
+        else
+            mm_bearer_set_connection_forbidden (bearer);
     }
 
     /* Set a new ref to the bearer object as result */
@@ -1118,8 +1135,22 @@ reg_state_changed (MMAtSerialPort *port,
         self->priv->reg_cs = state;
 
     /* Report new registration state */
-    mm_iface_modem_3gpp_update_registration_state (MM_IFACE_MODEM_3GPP (self),
-                                                   get_consolidated_reg_state (self));
+    state = get_consolidated_reg_state (self);
+    mm_iface_modem_3gpp_update_registration_state (MM_IFACE_MODEM_3GPP (self), state);
+
+    /* Allow or forbid connection in 3GPP bearers, based on the new
+     * registration state.
+     *
+     * TODO: don't allow bearers to get connected if roaming forbidden */
+    if (state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+        state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
+        mm_bearer_list_foreach (self->priv->modem_bearer_list,
+                                (MMBearerListForeachFunc)mm_bearer_set_connection_allowed,
+                                NULL);
+    else
+        mm_bearer_list_foreach (self->priv->modem_bearer_list,
+                                (MMBearerListForeachFunc)mm_bearer_set_connection_forbidden,
+                                NULL);
 
     /* If registration is finished (either registered or failed) but the
      * registration query hasn't completed yet, just remove the timeout and
