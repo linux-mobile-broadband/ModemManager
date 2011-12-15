@@ -161,9 +161,11 @@ static void
 check_export_modem (MMManager *self,
                     MMBaseModem *modem)
 {
+    static guint32 id = 0;
     const gchar *modem_physdev;
     const gchar *name;
     const gchar *subsys;
+    gchar *path;
 
     /* A modem is only exported to D-Bus when both of the following are true:
      *
@@ -192,27 +194,35 @@ check_export_modem (MMManager *self,
         return;
     }
 
-    /* No outstanding port tasks, so if the modem is valid we can export it */
-    if (mm_base_modem_get_valid (modem)) {
-        gchar *path;
-        static guint32 id = 0;
-
-        path = g_strdup_printf (MM_DBUS_PATH"/Modems/%d", id++);
-        g_object_set (modem,
-                      "g-object-path", path,
-                      MM_BASE_MODEM_CONNECTION, self->priv->connection,
-                      NULL);
-        g_dbus_object_manager_server_export (self->priv->object_manager,
-                                             G_DBUS_OBJECT_SKELETON (modem));
-        mm_dbg ("Exported modem '%s' at path '%s'", modem_physdev, path);
-        g_free (path);
-
-        /* Once connected, dump additional debug info about the modem */
-        debug_modem_info (self, modem);
+    /* If modem not yet valid, don't export it */
+    if (!mm_base_modem_get_valid (modem)) {
+        mm_dbg ("Not exporting invalid modem '%s'", modem_physdev);
         return;
     }
 
-    mm_dbg ("Not exporting invalid modem '%s'", modem_physdev);
+    /* Don't export already exported modems */
+    g_object_get (modem,
+                  "g-object-path", &path,
+                  NULL);
+    if (path) {
+        g_free (path);
+        mm_dbg ("Modem '%s' already exported", modem_physdev);
+        return;
+    }
+
+    /* No outstanding port tasks, so if the modem is valid we can export it */
+    path = g_strdup_printf (MM_DBUS_PATH"/Modems/%d", id++);
+    g_object_set (modem,
+                  "g-object-path", path,
+                  MM_BASE_MODEM_CONNECTION, self->priv->connection,
+                  NULL);
+    g_dbus_object_manager_server_export (self->priv->object_manager,
+                                         G_DBUS_OBJECT_SKELETON (modem));
+    mm_dbg ("Exported modem '%s' at path '%s'", modem_physdev, path);
+    g_free (path);
+
+    /* Once connected, dump additional debug info about the modem */
+    debug_modem_info (self, modem);
 }
 
 static void
