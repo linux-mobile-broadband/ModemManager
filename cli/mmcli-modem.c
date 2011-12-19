@@ -43,7 +43,7 @@ static Context *ctx;
 
 /* Options */
 static gchar *modem_str;
-static gboolean info_flag;
+static gboolean info_flag; /* set when no action found */
 static gboolean monitor_state_flag;
 static gboolean enable_flag;
 static gboolean disable_flag;
@@ -55,11 +55,7 @@ static gchar *delete_bearer_str;
 
 static GOptionEntry entries[] = {
     { "modem", 'm', 0, G_OPTION_ARG_STRING, &modem_str,
-      "Specify modem by path or index",
-      NULL
-    },
-    { "info", 'i', 0, G_OPTION_ARG_NONE, &info_flag,
-      "Get information of a given modem",
+      "Specify modem by path or index. Shows modem information if no action specified.",
       NULL
     },
     { "monitor-state", 'w', 0, G_OPTION_ARG_NONE, &monitor_state_flag,
@@ -118,8 +114,7 @@ mmcli_modem_options_enabled (void)
 {
     guint n_actions;
 
-    n_actions = (info_flag +
-                 monitor_state_flag +
+    n_actions = (monitor_state_flag +
                  enable_flag +
                  disable_flag +
                  reset_flag +
@@ -127,6 +122,12 @@ mmcli_modem_options_enabled (void)
                  !!create_bearer_str +
                  !!delete_bearer_str +
                  !!factory_reset_str);
+
+    if (n_actions == 0 && modem_str) {
+        /* default to info */
+        info_flag = TRUE;
+        n_actions++;
+    }
 
     if (n_actions > 1) {
         g_printerr ("error: too many modem actions requested\n");

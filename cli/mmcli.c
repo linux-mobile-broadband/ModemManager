@@ -220,7 +220,10 @@ main (gint argc, gchar **argv)
         else
             mmcli_manager_run_synchronous (connection);
     }
-    /* Modem options? */
+    /* Modem options?
+     * NOTE: let this check be always the last one, as other groups also need
+     * having a modem specified, and therefore if -m is set, modem options
+     * are always enabled. */
     else if (mmcli_modem_options_enabled ()) {
         if (async_flag)
             mmcli_modem_run_asynchronous (connection, cancellable);
