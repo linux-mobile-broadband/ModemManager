@@ -1,6 +1,4 @@
 /*** BEGIN file-header ***/
-#include "ModemManager-errors.h"
-#include "mm-errors-types.h"
 
 /*** END file-header ***/
 
@@ -9,9 +7,6 @@
 /*** END file-production ***/
 
 /*** BEGIN value-header ***/
-
-/* @enum_name@_quark() implemented in mm-errors-quarks.c */
-
 GType
 @enum_name@_get_type (void)
 {

@@ -35,25 +35,31 @@ GENERATED_DOC = \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml
 
 # Enum types
-mm-enums-types.h: $(top_srcdir)/include/ModemManager-enums.h $(top_srcdir)/build-aux/mm-enums-types.h.template
+mm-enums-types.h: Makefile.am $(top_srcdir)/include/ModemManager-enums.h $(top_srcdir)/build-aux/mm-enums-template.h
 	$(AM_V_GEN) glib-mkenums \
-		--template $(top_srcdir)/build-aux/mm-enums-types.h.template \
+		--fhead "#ifndef __MM_ENUMS_TYPES_H__\n#define __MM_ENUMS_TYPES_H__\n" \
+		--template $(top_srcdir)/build-aux/mm-enums-template.h \
+		--ftail "#endif /* __MM_ENUMS_TYPES_H__ */\n" \
 		$(top_srcdir)/include/ModemManager-enums.h > $@
 
-mm-enums-types.c: $(top_srcdir)/include/ModemManager-enums.h $(top_srcdir)/build-aux/mm-enums-types.c.template mm-enums-types.h
+mm-enums-types.c: Makefile.am $(top_srcdir)/include/ModemManager-enums.h $(top_srcdir)/build-aux/mm-enums-template.c mm-enums-types.h
 	$(AM_V_GEN) glib-mkenums \
-		--template $(top_srcdir)/build-aux/mm-enums-types.c.template \
+		--fhead "#include <ModemManager-enums.h>\n#include \"mm-enums-types.h\"\n" \
+		--template $(top_srcdir)/build-aux/mm-enums-template.c \
 		$(top_srcdir)/include/ModemManager-enums.h > $@
 
 # Error types
-mm-errors-types.h: $(top_srcdir)/include/ModemManager-errors.h $(top_srcdir)/build-aux/mm-errors-types.h.template
+mm-errors-types.h: Makefile.am $(top_srcdir)/include/ModemManager-errors.h $(top_srcdir)/build-aux/mm-errors-template.h
 	$(AM_V_GEN) glib-mkenums \
-		--template $(top_srcdir)/build-aux/mm-errors-types.h.template \
+		--fhead "#ifndef __MM_ERRORS_TYPES_H__\n#define __MM_ERRORS_TYPES_H__\n" \
+		--template $(top_srcdir)/build-aux/mm-errors-template.h \
+		--ftail "#endif /* __MM_ERRORS_TYPES_H__ */\n" \
 		$(top_srcdir)/include/ModemManager-errors.h > $@
 
-mm-errors-types.c: $(top_srcdir)/include/ModemManager-errors.h $(top_srcdir)/build-aux/mm-errors-types.c.template mm-errors-types.h
+mm-errors-types.c: Makefile.am $(top_srcdir)/include/ModemManager-errors.h $(top_srcdir)/build-aux/mm-errors-template.c mm-errors-types.h
 	$(AM_V_GEN) glib-mkenums \
-		--template $(top_srcdir)/build-aux/mm-errors-types.c.template \
+		--fhead "#include <ModemManager-errors.h>\n#include \"mm-errors-types.h\"\n" \
+		--template $(top_srcdir)/build-aux/mm-errors-template.h \
 		$(top_srcdir)/include/ModemManager-errors.h > $@
 
 # Manager interface

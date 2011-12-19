@@ -1,6 +1,4 @@
 /*** BEGIN file-header ***/
-#ifndef __MM_ENUMS_TYPES_H__
-#define __MM_ENUMS_TYPES_H__
 
 #include <glib-object.h>
 
@@ -13,12 +11,13 @@ G_BEGIN_DECLS
 /*** END file-production ***/
 
 /*** BEGIN value-header ***/
-GType @enum_name@_get_type (void) G_GNUC_CONST;
+GQuark @enum_name@_quark    (void); /* implemented in mm-errors-quarks.c */
+GType  @enum_name@_get_type (void) G_GNUC_CONST;
+#define @ENUMNAME@ (@enum_name@_quark ())
 #define @ENUMPREFIX@TYPE_@ENUMSHORT@ (@enum_name@_get_type ())
 /*** END value-header ***/
 
 /*** BEGIN file-tail ***/
 G_END_DECLS
 
-#endif /* __MM_ENUMS_TYPES_H__ */
 /*** END file-tail ***/
