@@ -21,7 +21,9 @@ libmm_glib_la_SOURCES = \
 	mm-modem-3gpp.h \
 	mm-modem-3gpp.c \
 	mm-sim.h \
-	mm-sim.c
+	mm-sim.c \
+	mm-bearer.h \
+	mm-bearer.c
 
 libmm_glib_la_LIBADD = \
 	$(top_builddir)/libmm-common/libmm-common.la \
