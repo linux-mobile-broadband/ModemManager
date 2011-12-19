@@ -238,6 +238,19 @@ mmcli_get_modem_sync (GDBusConnection *connection,
 }
 
 const gchar *
+mmcli_get_bearer_ip_method_string (MMBearerIpMethod method)
+{
+    static GEnumClass *enum_class = NULL;
+    GEnumValue *value;
+
+    if (!enum_class)
+        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_BEARER_IP_METHOD));
+
+    value = g_enum_get_value (enum_class, method);
+    return value->value_nick;
+}
+
+const gchar *
 mmcli_get_state_string (MMModemState state)
 {
     static GEnumClass *enum_class = NULL;

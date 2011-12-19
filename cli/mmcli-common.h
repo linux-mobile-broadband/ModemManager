@@ -36,8 +36,9 @@ MMObject *mmcli_get_modem_finish (GAsyncResult *res);
 MMObject *mmcli_get_modem_sync   (GDBusConnection *connection,
                                   const gchar *modem_str);
 
-const gchar *mmcli_get_state_string        (MMModemState state);
-const gchar *mmcli_get_state_reason_string (MMModemStateChangeReason reason);
-const gchar *mmcli_get_lock_string         (MMModemLock lock);
+const gchar *mmcli_get_bearer_ip_method_string (MMBearerIpMethod method);
+const gchar *mmcli_get_state_string            (MMModemState state);
+const gchar *mmcli_get_state_reason_string     (MMModemStateChangeReason reason);
+const gchar *mmcli_get_lock_string             (MMModemLock lock);
 
 #endif /* _MMCLI_COMMON_H_ */
