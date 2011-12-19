@@ -35,6 +35,7 @@
 
 /* Context */
 typedef struct {
+    MMManager *manager;
     GCancellable *cancellable;
     MMObject *object;
     MMModem *modem;
@@ -155,6 +156,8 @@ context_free (Context *ctx)
         g_object_unref (ctx->modem);
     if (ctx->object)
         g_object_unref (ctx->object);
+    if (ctx->manager)
+        g_object_unref (ctx->manager);
     g_free (ctx);
 }
 
@@ -635,13 +638,13 @@ delete_bearer_ready (MMModem      *modem,
 }
 
 static void
-state_changed (MMObject                 *modem,
+state_changed (MMModem                  *modem,
                MMModemState              old_state,
                MMModemState              new_state,
                MMModemStateChangeReason  reason)
 {
     g_print ("\t%s: State changed, '%s' --> '%s' (Reason: %s)\n",
-             mm_object_get_path (modem),
+             mm_modem_get_path (modem),
              mmcli_get_state_string (old_state),
              mmcli_get_state_string (new_state),
              mmcli_get_state_reason_string (reason));
@@ -653,7 +656,7 @@ get_modem_ready (GObject      *source,
                  GAsyncResult *result,
                  gpointer      none)
 {
-    ctx->object = mmcli_get_modem_finish (result);
+    ctx->object = mmcli_get_modem_finish (result, &ctx->manager);
     ctx->modem = mm_object_get_modem (ctx->object);
 
     if (info_flag)
@@ -807,7 +810,7 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
 
     /* Initialize context */
     ctx = g_new0 (Context, 1);
-    ctx->object = mmcli_get_modem_sync (connection, modem_str);
+    ctx->object = mmcli_get_modem_sync (connection, modem_str, &ctx->manager);
     ctx->modem = mm_object_get_modem (ctx->object);
 
     /* Request to get info from modem? */

@@ -35,6 +35,8 @@
 
 /* Context */
 typedef struct {
+    MMManager *manager;
+    MMObject *object;
     GCancellable *cancellable;
     MMBearer *bearer;
 } Context;
@@ -119,6 +121,10 @@ context_free (Context *ctx)
         g_object_unref (ctx->cancellable);
     if (ctx->bearer)
         g_object_unref (ctx->bearer);
+    if (ctx->object)
+        g_object_unref (ctx->object);
+    if (ctx->manager)
+        g_object_unref (ctx->manager);
     g_free (ctx);
 }
 
@@ -264,7 +270,9 @@ get_bearer_ready (GObject      *source,
                   GAsyncResult *result,
                   gpointer      none)
 {
-    ctx->bearer = mmcli_get_bearer_finish (result);
+    ctx->bearer = mmcli_get_bearer_finish (result,
+                                           &ctx->manager,
+                                           &ctx->object);
 
     if (info_flag)
         g_assert_not_reached ();
@@ -317,7 +325,10 @@ mmcli_bearer_run_synchronous (GDBusConnection *connection)
 
     /* Initialize context */
     ctx = g_new0 (Context, 1);
-    ctx->bearer = mmcli_get_bearer_sync (connection, bearer_str);
+    ctx->bearer = mmcli_get_bearer_sync (connection,
+                                         bearer_str,
+                                         &ctx->manager,
+                                         &ctx->object);
 
     /* Request to get info from bearer? */
     if (info_flag) {
