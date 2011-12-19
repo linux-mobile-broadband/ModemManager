@@ -15,11 +15,9 @@ mmcli_SOURCES = \
 	mmcli-common.h \
 	mmcli-common.c \
 	mmcli-manager.c \
-	mmcli-modem.c
+	mmcli-modem.c \
+	mmcli-bearer.c
 
 mmcli_LDADD = \
 	$(MMCLI_LIBS) \
 	$(top_builddir)/libmm-glib/libmm-glib.la
-
-
-

@@ -44,4 +44,12 @@ void          mmcli_modem_run_asynchronous   (GDBusConnection *connection,
 void          mmcli_modem_run_synchronous    (GDBusConnection *connection);
 void          mmcli_modem_shutdown           (void);
 
+/* Bearer group */
+GOptionGroup *mmcli_bearer_get_option_group   (void);
+gboolean      mmcli_bearer_options_enabled    (void);
+void          mmcli_bearer_run_asynchronous   (GDBusConnection *connection,
+                                              GCancellable    *cancellable);
+void          mmcli_bearer_run_synchronous    (GDBusConnection *connection);
+void          mmcli_bearer_shutdown           (void);
+
 #endif /* __MMCLI_H__ */
