@@ -92,12 +92,28 @@ connect_context_complete_and_free (ConnectContext *ctx)
 
         g_simple_async_result_take_error (ctx->result, ctx->error);
     } else {
+        GVariant *ip_config;
+        GVariantBuilder builder;
+        MMBearerIpMethod ip_method;
+
         /* Port is connected; update the state */
         mm_port_set_connected (ctx->data, TRUE);
         mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (ctx->bearer),
                                        TRUE);
         mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (ctx->bearer),
                                        mm_port_get_device (ctx->data));
+
+        /* If serial port, set PPP method */
+        ip_method = (MM_IS_AT_SERIAL_PORT (ctx->data) ?
+                     MM_BEARER_IP_METHOD_PPP :
+                     MM_BEARER_IP_METHOD_DHCP);
+
+        g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
+        g_variant_builder_add (&builder, "{sv}", "method", g_variant_new_uint32 (ip_method));
+        ip_config = g_variant_builder_end (&builder);
+        mm_gdbus_bearer_set_ip4_config (MM_GDBUS_BEARER (ctx->bearer), ip_config);
+        mm_gdbus_bearer_set_ip6_config (MM_GDBUS_BEARER (ctx->bearer), ip_config);
+
         /* Keep data port and CID around while connected */
         MM_BEARER_3GPP (ctx->bearer)->priv->cid = ctx->cid;
         MM_BEARER_3GPP (ctx->bearer)->priv->port = g_object_ref (ctx->data);
@@ -521,6 +537,8 @@ disconnect_context_complete_and_free (DisconnectContext *ctx)
         mm_port_set_connected (ctx->data, FALSE);
         mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (ctx->bearer), FALSE);
         mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (ctx->bearer), NULL);
+        mm_gdbus_bearer_set_ip4_config (MM_GDBUS_BEARER (ctx->bearer), NULL);
+        mm_gdbus_bearer_set_ip6_config (MM_GDBUS_BEARER (ctx->bearer), NULL);
         /* Clear data port and CID */
         MM_BEARER_3GPP (ctx->bearer)->priv->cid = 0;
         g_clear_object (&(MM_BEARER_3GPP (ctx->bearer)->priv->port));
