@@ -27,6 +27,7 @@
 #include <mm-gdbus-modem.h>
 
 #include "mm-sim.h"
+#include "mm-bearer.h"
 
 G_BEGIN_DECLS
 
@@ -111,20 +112,20 @@ gchar  **mm_modem_list_bearers_sync   (MMModem *self,
 #define MM_BEARER_PROPERTY_PASSWORD "password"
 #define MM_BEARER_PROPERTY_NUMBER   "number"
 
-void     mm_modem_create_bearer        (MMModem *self,
-                                        GCancellable *cancellable,
-                                        GAsyncReadyCallback callback,
-                                        gpointer user_data,
-                                        const gchar *first_property_name,
-                                        ...);
-gchar   *mm_modem_create_bearer_finish (MMModem *self,
-                                        GAsyncResult *res,
-                                        GError **error);
-gchar   *mm_modem_create_bearer_sync   (MMModem *self,
-                                        GCancellable *cancellable,
-                                        GError **error,
-                                        const gchar *first_property_name,
-                                        ...);
+void     mm_modem_create_bearer         (MMModem *self,
+                                         GCancellable *cancellable,
+                                         GAsyncReadyCallback callback,
+                                         gpointer user_data,
+                                         const gchar *first_property_name,
+                                         ...);
+MMBearer *mm_modem_create_bearer_finish (MMModem *self,
+                                         GAsyncResult *res,
+                                         GError **error);
+MMBearer *mm_modem_create_bearer_sync   (MMModem *self,
+                                         GCancellable *cancellable,
+                                         GError **error,
+                                         const gchar *first_property_name,
+                                         ...);
 
 void     mm_modem_delete_bearer        (MMModem *self,
                                         const gchar *bearer,

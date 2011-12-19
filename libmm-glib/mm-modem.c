@@ -943,6 +943,21 @@ mm_modem_list_bearers_sync (MMModem *self,
     return NULL;
 }
 
+typedef struct {
+    GSimpleAsyncResult *result;
+    GCancellable *cancellable;
+} CreateBearerContext;
+
+static void
+create_bearer_context_complete_and_free (CreateBearerContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    if (ctx->cancellable)
+        g_object_unref (ctx->cancellable);
+    g_slice_free (CreateBearerContext, ctx);
+}
+
 static GVariant *
 create_bearer_build_properties (const gchar *first_property_name,
                                 va_list var_args)
@@ -963,7 +978,79 @@ create_bearer_build_properties (const gchar *first_property_name,
 
         key = va_arg (var_args, gchar *);
     }
-    return g_variant_builder_end (&builder);
+    return g_variant_ref_sink (g_variant_builder_end (&builder));
+}
+
+/**
+ * mm_modem_create_bearer_finish:
+ * @self: A #MMModem.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_create_bearer().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_create_bearer().
+ *
+ * Returns: (transfer-full): A newly created #MMBearer, or %NULL if @error is set.
+ */
+MMBearer *
+mm_modem_create_bearer_finish (MMModem *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return g_object_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+modem_new_bearer_ready (GDBusConnection *connection,
+                        GAsyncResult *res,
+                        CreateBearerContext *ctx)
+{
+    GError *error = NULL;
+    MMBearer *bearer;
+
+    bearer = mm_gdbus_bearer_proxy_new_finish (res, &error);
+    if (error)
+        g_simple_async_result_take_error (ctx->result, error);
+    else
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                   bearer,
+                                                   (GDestroyNotify)g_object_unref);
+
+    create_bearer_context_complete_and_free (ctx);
+}
+
+static void
+modem_create_bearer_ready (MMModem *self,
+                           GAsyncResult *res,
+                           CreateBearerContext *ctx)
+{
+    GError *error = NULL;
+    gchar *bearer_path = NULL;
+
+    if (!mm_gdbus_modem_call_create_bearer_finish (self,
+                                                   &bearer_path,
+                                                   res,
+                                                   &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        create_bearer_context_complete_and_free (ctx);
+        g_free (bearer_path);
+        return;
+    }
+
+    mm_gdbus_bearer_proxy_new (
+        g_dbus_proxy_get_connection (
+            G_DBUS_PROXY (self)),
+        G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+        MM_DBUS_SERVICE,
+        bearer_path,
+        ctx->cancellable,
+        (GAsyncReadyCallback)modem_new_bearer_ready,
+        ctx);
+    g_free (bearer_path);
 }
 
 /**
@@ -995,50 +1082,31 @@ mm_modem_create_bearer (MMModem *self,
                         const gchar *first_property_name,
                         ...)
 {
+    CreateBearerContext *ctx;
     va_list va_args;
     GVariant *properties;
 
     g_return_if_fail (MM_GDBUS_IS_MODEM (self));
 
+    ctx = g_slice_new0 (CreateBearerContext);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_modem_create_bearer);
+    if (cancellable)
+        ctx->cancellable = g_object_ref (cancellable);
+
     va_start (va_args, first_property_name);
     properties = create_bearer_build_properties (first_property_name, va_args);
-
-    mm_gdbus_modem_call_create_bearer (self,
-                                       properties,
-                                       cancellable,
-                                       callback,
-                                       user_data);
+    mm_gdbus_modem_call_create_bearer (
+        self,
+        properties,
+        cancellable,
+        (GAsyncReadyCallback)modem_create_bearer_ready,
+        ctx);
 
     g_variant_unref (properties);
     va_end (va_args);
-}
-
-/**
- * mm_modem_create_bearer_finish:
- * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_create_bearer().
- * @error: Return location for error or %NULL.
- *
- * Finishes an operation started with mm_modem_create_bearer().
- *
- * Returns: (transfer-full): Path of the newly created bearer, or %NULL if @error is set.
- */
-gchar *
-mm_modem_create_bearer_finish (MMModem *self,
-                               GAsyncResult *res,
-                               GError **error)
-{
-    gchar *out_path = NULL;
-
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
-
-    if (!mm_gdbus_modem_call_create_bearer_finish (self,
-                                                   &out_path,
-                                                   res,
-                                                   error))
-        return NULL;
-
-    return out_path;
 }
 
 /**
@@ -1059,18 +1127,19 @@ mm_modem_create_bearer_finish (MMModem *self,
  * The calling thread is blocked until a reply is received. See mm_modem_create_bearer()
  * for the asynchronous version of this method.
  *
- * Returns: (transfer-full): Path of the newly created bearer, or %NULL if @error is set.
+ * Returns: (transfer-full): A newly created #MMBearer, or %NULL if @error is set.
  */
-gchar *
+MMBearer *
 mm_modem_create_bearer_sync (MMModem *self,
                              GCancellable *cancellable,
                              GError **error,
                              const gchar *first_property_name,
                              ...)
 {
+    MMBearer *bearer = NULL;
+    gchar *bearer_path = NULL;
     va_list va_args;
     GVariant *properties;
-    gchar *out_path = NULL;
 
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
@@ -1079,14 +1148,25 @@ mm_modem_create_bearer_sync (MMModem *self,
 
     mm_gdbus_modem_call_create_bearer_sync (self,
                                             properties,
-                                            &out_path,
+                                            &bearer_path,
                                             cancellable,
                                             error);
+    if (bearer_path) {
+        bearer = mm_gdbus_bearer_proxy_new_sync (
+            g_dbus_proxy_get_connection (
+                G_DBUS_PROXY (self)),
+            G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+            MM_DBUS_SERVICE,
+            bearer_path,
+            cancellable,
+            error);
+        g_free (bearer_path);
+    }
 
     g_variant_unref (properties);
     va_end (va_args);
 
-    return out_path;
+    return bearer;
 }
 
 /**
@@ -1350,7 +1430,9 @@ modem_get_sim_ready (GDBusConnection *connection,
     if (error)
         g_simple_async_result_take_error (simple, error);
     else
-        g_simple_async_result_set_op_res_gpointer (simple, sim, NULL);
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   sim,
+                                                   (GDestroyNotify)g_object_unref);
 
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
@@ -1401,7 +1483,7 @@ mm_modem_get_sim_finish (MMModem *self,
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
 
-    return g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return g_object_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
 }
 
 MMSim *
