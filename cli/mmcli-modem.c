@@ -207,6 +207,83 @@ prefix_newlines (const gchar *prefix,
 }
 
 static void
+print_bearer_info (MMBearer *bearer)
+{
+    const MMBearerIpConfig *ipv4_config;
+    const MMBearerIpConfig *ipv6_config;
+
+    ipv4_config = mm_bearer_get_ipv4_config (bearer);
+    ipv6_config = mm_bearer_get_ipv6_config (bearer);
+
+    /* Not the best thing to do, as we may be doing _get() calls twice, but
+     * easiest to maintain */
+#undef VALIDATE
+#define VALIDATE(str) (str ? str : "unknown")
+
+    g_print ("Bearer '%s'\n",
+             mm_bearer_get_path (bearer));
+    g_print ("  -------------------------\n"
+             "  Status             |   connected: '%s'\n"
+             "                     |   suspended: '%s'\n"
+             "                     |   interface: '%s'\n",
+             mm_bearer_get_connected (bearer) ? "yes" : "no",
+             mm_bearer_get_suspended (bearer) ? "yes" : "no",
+             VALIDATE (mm_bearer_get_interface (bearer)));
+
+    /* IPv4 */
+    g_print ("  -------------------------\n"
+             "  IPv4 configuration |   method: '%s'\n",
+             (ipv4_config ?
+              mmcli_get_bearer_ip_method_string (mm_bearer_ip_config_get_method (ipv4_config)) :
+              "none"));
+    if (ipv4_config &&
+        mm_bearer_ip_config_get_method (ipv4_config) == MM_BEARER_IP_METHOD_STATIC) {
+        const gchar **dns;
+        guint i;
+
+        dns = mm_bearer_ip_config_get_dns (ipv4_config);
+        g_print ("                   |  address: '%s'\n"
+                 "                   |   prefix: '%u'\n"
+                 "                   |  gateway: '%s'\n"
+                 "                   |      DNS: '%s'",
+                 VALIDATE (mm_bearer_ip_config_get_address (ipv4_config)),
+                 mm_bearer_ip_config_get_prefix (ipv4_config),
+                 VALIDATE (mm_bearer_ip_config_get_gateway (ipv4_config)),
+                 VALIDATE (dns[0]));
+        /* Additional DNS addresses */
+        for (i = 1; dns[i]; i++)
+            g_print (", '%s'", dns[i]);
+        g_print ("\n");
+    }
+
+    /* IPv6 */
+    g_print ("  -------------------------\n"
+             "  IPv6 configuration |   method: '%s'\n",
+             (ipv6_config ?
+              mmcli_get_bearer_ip_method_string (mm_bearer_ip_config_get_method (ipv6_config)) :
+              "none"));
+    if (ipv6_config &&
+        mm_bearer_ip_config_get_method (ipv6_config) == MM_BEARER_IP_METHOD_STATIC) {
+        const gchar **dns;
+        guint i;
+
+        dns = mm_bearer_ip_config_get_dns (ipv6_config);
+        g_print ("                   |  address: '%s'\n"
+                 "                   |   prefix: '%u'\n"
+                 "                   |  gateway: '%s'\n"
+                 "                   |      DNS: '%s'",
+                 VALIDATE(mm_bearer_ip_config_get_address (ipv6_config)),
+                 mm_bearer_ip_config_get_prefix (ipv6_config),
+                 VALIDATE(mm_bearer_ip_config_get_gateway (ipv6_config)),
+                 VALIDATE(dns[0]));
+        /* Additional DNS addresses */
+        for (i = 1; dns[i]; i++)
+            g_print (", '%s'", dns[i]);
+        g_print ("\n");
+    }
+}
+
+static void
 print_modem_info (void)
 {
     GError *error = NULL;
@@ -217,6 +294,7 @@ print_modem_info (void)
 
     /* Not the best thing to do, as we may be doing _get() calls twice, but
      * easiest to maintain */
+#undef VALIDATE
 #define VALIDATE(str) (str ? str : "unknown")
 
     /* Strings with mixed properties */
@@ -292,7 +370,6 @@ print_modem_info (void)
                  VALIDATE (mm_sim_get_operator_name (sim)));
         g_object_unref (sim);
     }
-
     g_print ("\n");
 
     g_free (prefixed_revision);
@@ -408,8 +485,8 @@ factory_reset_ready (MMModem      *modem,
 }
 
 static void
-list_bearers_process_reply (gchar        **result,
-                            const GError  *error)
+list_bearers_process_reply (GList        *result,
+                            const GError *error)
 {
     if (error) {
         g_printerr ("error: couldn't list bearers: '%s'\n",
@@ -418,21 +495,21 @@ list_bearers_process_reply (gchar        **result,
     }
 
     g_print ("\n");
-    if (!result || !result[0]) {
+    if (!result) {
         g_print ("No bearers were found\n");
     } else {
-        guint i;
+        GList *l;
 
-        /* Count number of items */
-        for (i = 0; result[i]; i++)
-            ;
-        g_print ("Found %u bearers:\n", i);
+        g_print ("Found %u bearers:\n", g_list_length (result));
+        for (l = result; l; l = g_list_next (l)) {
+            MMBearer *bearer = MM_BEARER (l->data);
 
-        for (i = 0; result[i]; i++) {
-            g_print ("\t%s\n", result[i]);
+            g_print ("\n");
+            print_bearer_info (bearer);
+            g_object_unref (bearer);
         }
+        g_list_free (result);
     }
-    g_strfreev (result);
 }
 
 static void
@@ -440,7 +517,7 @@ list_bearers_ready (MMModem      *modem,
                     GAsyncResult *result,
                     gpointer      nothing)
 {
-    gchar **operation_result;
+    GList *operation_result;
     GError *error = NULL;
 
     operation_result = mm_modem_list_bearers_finish (modem, result, &error);
@@ -450,17 +527,18 @@ list_bearers_ready (MMModem      *modem,
 }
 
 static void
-create_bearer_process_reply (gchar        *result,
+create_bearer_process_reply (MMBearer     *bearer,
                              const GError *error)
 {
-    if (!result) {
+    if (!bearer) {
         g_printerr ("error: couldn't create new bearer: '%s'\n",
                     error ? error->message : "unknown error");
         exit (EXIT_FAILURE);
     }
 
-    g_print ("successfully created new bearer in modem: '%s'\n", result);
-    g_free (result);
+    g_print ("Successfully created new bearer in modem:\n");
+    print_bearer_info (bearer);
+    g_object_unref (bearer);
 }
 
 static void
@@ -468,11 +546,11 @@ create_bearer_ready (MMModem      *modem,
                      GAsyncResult *result,
                      gpointer      nothing)
 {
-    gchar *operation_result;
+    MMBearer *bearer;
     GError *error = NULL;
 
-    operation_result = mm_modem_create_bearer_finish (modem, result, &error);
-    create_bearer_process_reply (operation_result, error);
+    bearer = mm_modem_create_bearer_finish (modem, result, &error);
+    create_bearer_process_reply (bearer, error);
 
     mmcli_async_operation_done ();
 }
@@ -783,7 +861,7 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
 
     /* Request to list the bearers? */
     if (list_bearers_flag) {
-        gchar **result;
+        GList *result;
 
         g_debug ("Synchronously listing bearers...");
         result = mm_modem_list_bearers_sync (ctx->modem, NULL, &error);
@@ -798,7 +876,7 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
         gchar *user = NULL;
         gchar *password = NULL;
         gchar *number = NULL;
-        gchar *result;
+        MMBearer *bearer;
 
         create_bearer_parse_known_input (create_bearer_str,
                                          &apn,
@@ -808,7 +886,7 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
                                          &number);
 
         g_debug ("Synchronously creating new bearer in modem...");
-        result = mm_modem_create_bearer_sync (ctx->modem,
+        bearer = mm_modem_create_bearer_sync (ctx->modem,
                                               NULL,
                                               &error,
                                               MM_BEARER_PROPERTY_APN,      apn,
@@ -824,7 +902,7 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
         g_free (password);
         g_free (number);
 
-        create_bearer_process_reply (result, error);
+        create_bearer_process_reply (bearer, error);
         return;
     }
 
