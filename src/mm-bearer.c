@@ -25,6 +25,7 @@
 #include <ModemManager.h>
 #include <libmm-common.h>
 
+#include "mm-private-enums-types.h"
 #include "mm-iface-modem.h"
 #include "mm-bearer.h"
 #include "mm-base-modem-at.h"
@@ -41,6 +42,7 @@ enum {
     PROP_CONNECTION,
     PROP_MODEM,
     PROP_CONNECTION_ALLOWED,
+    PROP_STATUS,
     PROP_LAST
 };
 
@@ -55,6 +57,8 @@ struct _MMBearerPrivate {
     gchar *path;
     /* Flag to specify whether the bearer can be connected */
     gboolean connection_allowed;
+    /* Status of this bearer */
+    MMBearerStatus status;
 };
 
 /*****************************************************************************/
@@ -67,11 +71,18 @@ handle_connect_ready (MMBearer *self,
 {
     GError *error = NULL;
 
-    if (!MM_BEARER_GET_CLASS (self)->connect_finish (self, res, &error))
+    if (!MM_BEARER_GET_CLASS (self)->connect_finish (self, res, &error)) {
+        mm_dbg ("Couldn't connect bearer '%s'", self->priv->path);
+        self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
         g_dbus_method_invocation_take_error (invocation, error);
-    else
+    }
+    else {
+        mm_dbg ("Connected bearer '%s'", self->priv->path);
+        self->priv->status = MM_BEARER_STATUS_CONNECTED;
         mm_gdbus_bearer_complete_connect (MM_GDBUS_BEARER (self), invocation);
+    }
 
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
     g_object_unref (invocation);
 }
 
@@ -91,6 +102,10 @@ handle_connect (MMBearer *self,
 
     if (MM_BEARER_GET_CLASS (self)->connect != NULL &&
         MM_BEARER_GET_CLASS (self)->connect_finish != NULL) {
+        /* Connecting! */
+        mm_dbg ("Connecting bearer '%s'", self->priv->path);
+        self->priv->status = MM_BEARER_STATUS_CONNECTING;
+        g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
         MM_BEARER_GET_CLASS (self)->connect (
             self,
             number,
@@ -112,11 +127,18 @@ handle_disconnect_ready (MMBearer *self,
 {
     GError *error = NULL;
 
-    if (!MM_BEARER_GET_CLASS (self)->disconnect_finish (self, res, &error))
+    if (!MM_BEARER_GET_CLASS (self)->disconnect_finish (self, res, &error)) {
+        mm_dbg ("Couldn't disconnect bearer '%s'", self->priv->path);
+        self->priv->status = MM_BEARER_STATUS_CONNECTED;
         g_dbus_method_invocation_take_error (invocation, error);
-    else
+    }
+    else {
+        mm_dbg ("Disconnected bearer '%s'", self->priv->path);
+        self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
         mm_gdbus_bearer_complete_disconnect (MM_GDBUS_BEARER (self), invocation);
+    }
 
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
     g_object_unref (invocation);
 }
 
@@ -126,6 +148,10 @@ handle_disconnect (MMBearer *self,
 {
     if (MM_BEARER_GET_CLASS (self)->disconnect != NULL &&
         MM_BEARER_GET_CLASS (self)->disconnect_finish != NULL) {
+        /* Disconnecting! */
+        mm_dbg ("Disconnecting bearer '%s'", self->priv->path);
+        self->priv->status = MM_BEARER_STATUS_DISCONNECTING;
+        g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
         MM_BEARER_GET_CLASS (self)->disconnect (
             self,
             (GAsyncReadyCallback)handle_disconnect_ready,
@@ -178,6 +204,12 @@ mm_bearer_unexport (MMBearer *self)
 }
 
 /*****************************************************************************/
+
+MMBearerStatus
+mm_bearer_get_status (MMBearer *self)
+{
+    return self->priv->status;
+}
 
 const gchar *
 mm_bearer_get_path (MMBearer *self)
@@ -276,6 +308,9 @@ set_property (GObject *object,
     case PROP_CONNECTION_ALLOWED:
         self->priv->connection_allowed = g_value_get_boolean (value);
         break;
+    case PROP_STATUS:
+        self->priv->status = g_value_get_enum (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -303,6 +338,9 @@ get_property (GObject *object,
     case PROP_CONNECTION_ALLOWED:
         g_value_set_boolean (value, self->priv->connection_allowed);
         break;
+    case PROP_STATUS:
+        g_value_set_enum (value, self->priv->status);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -316,6 +354,7 @@ mm_bearer_init (MMBearer *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
                                               MM_TYPE_BEARER,
                                               MMBearerPrivate);
+    self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
 
     /* Set defaults */
     mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (self), NULL);
@@ -396,4 +435,13 @@ mm_bearer_class_init (MMBearerClass *klass)
                               FALSE,
                               G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_CONNECTION_ALLOWED, properties[PROP_CONNECTION_ALLOWED]);
+
+    properties[PROP_STATUS] =
+        g_param_spec_enum (MM_BEARER_STATUS,
+                           "Bearer status",
+                           "Status of the bearer",
+                           MM_TYPE_BEARER_STATUS,
+                           MM_BEARER_STATUS_DISCONNECTED,
+                           G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_STATUS, properties[PROP_STATUS]);
 }

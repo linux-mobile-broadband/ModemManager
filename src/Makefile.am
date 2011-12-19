@@ -53,6 +53,22 @@ libserial_la_SOURCES = \
 	mm-qcdm-serial-port.c \
 	mm-qcdm-serial-port.h
 
+# Daemon specific enum types
+WITH_ENUMS = mm-bearer.h
+
+mm-private-enums-types.h: Makefile.am $(WITH_ENUMS) $(top_srcdir)/build-aux/mm-enums-template.h
+	$(AM_V_GEN) glib-mkenums \
+		--fhead "#ifndef __MM_PRIVATE_ENUMS_TYPES_H__\n#define __MM_PRIVATE_ENUMS_TYPES_H__\n" \
+		--template $(top_srcdir)/build-aux/mm-enums-template.h \
+		--ftail "#endif /* __MM_PRIVATE_ENUMS_TYPES_H__ */\n" \
+		$(WITH_ENUMS) > $@
+
+mm-private-enums-types.c: Makefile.am $(top_srcdir)/include/ModemManager-enums.h $(top_srcdir)/build-aux/mm-enums-template.c mm-private-enums-types.h
+	$(AM_V_GEN) glib-mkenums \
+		--fhead "#include \"mm-bearer.h\"\n#include \"mm-private-enums-types.h\"" \
+		--template $(top_srcdir)/build-aux/mm-enums-template.c \
+		$(WITH_ENUMS) > $@
+
 sbin_PROGRAMS = modem-manager
 
 modem_manager_CPPFLAGS = \
@@ -101,6 +117,8 @@ modem_manager_SOURCES = \
 	main.c \
 	mm-log.c \
 	mm-log.h \
+	mm-private-enums-types.h \
+	mm-private-enums-types.c \
 	mm-callback-info.c \
 	mm-callback-info.h \
 	$(auth_sources) \

@@ -117,3 +117,5 @@ m4/xsize.m4
 
 TAGS
 ABOUT-NLS
+/src/mm-private-enums-types.c
+/src/mm-private-enums-types.h
