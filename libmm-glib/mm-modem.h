@@ -99,10 +99,10 @@ void     mm_modem_list_bearers        (MMModem *self,
                                        GCancellable *cancellable,
                                        GAsyncReadyCallback callback,
                                        gpointer user_data);
-gchar  **mm_modem_list_bearers_finish (MMModem *self,
+GList   *mm_modem_list_bearers_finish (MMModem *self,
                                        GAsyncResult *res,
                                        GError **error);
-gchar  **mm_modem_list_bearers_sync   (MMModem *self,
+GList   *mm_modem_list_bearers_sync   (MMModem *self,
                                        GCancellable *cancellable,
                                        GError **error);
 

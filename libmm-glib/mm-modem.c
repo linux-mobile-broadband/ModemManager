@@ -846,6 +846,140 @@ mm_modem_disable_sync (MMModem *self,
                                             error);
 }
 
+typedef struct {
+    MMModem *self;
+    GSimpleAsyncResult *result;
+    GCancellable *cancellable;
+    gchar **bearer_paths;
+    GList *bearer_objects;
+    guint i;
+} ListBearersContext;
+
+static void
+bearer_object_list_free (GList *list)
+{
+    g_list_foreach (list, (GFunc)g_object_unref, NULL);
+    g_list_free (list);
+}
+
+static void
+list_bearers_context_complete_and_free (ListBearersContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+
+    g_strfreev (ctx->bearer_paths);
+    bearer_object_list_free (ctx->bearer_objects);
+    g_object_unref (ctx->result);
+    if (ctx->cancellable)
+        g_object_unref (ctx->cancellable);
+    g_object_ref (ctx->self);
+    g_slice_free (ListBearersContext, ctx);
+}
+
+/**
+ * mm_modem_list_bearers_finish:
+ * @self: A #MMModem.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_list_bearers().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_modem_list_bearers().
+ *
+ * Returns: (transfer-full): The list of #MMBearer objects, or %NULL if either none found or if @error is set.
+ */
+GList *
+mm_modem_list_bearers_finish (MMModem *self,
+                              GAsyncResult *res,
+                              GError **error)
+{
+    GList *list;
+
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    list = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+
+    /* The list we got, including the objects within, is owned by the async result;
+     * so we'll make sure we return a new list */
+    g_list_foreach (list, (GFunc)g_object_ref, NULL);
+    return g_list_copy (list);
+}
+
+static void
+modem_list_bearers_build_object_ready (GDBusConnection *connection,
+                                       GAsyncResult *res,
+                                       ListBearersContext *ctx)
+{
+    MMBearer *bearer;
+    GError *error = NULL;
+
+    bearer = mm_gdbus_bearer_proxy_new_finish (res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        list_bearers_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Keep the object */
+    ctx->bearer_objects = g_list_prepend (ctx->bearer_objects, bearer);
+
+    /* If no more bearers, just end here. */
+    if (!ctx->bearer_paths[++ctx->i]) {
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                   ctx->bearer_objects,
+                                                   (GDestroyNotify)bearer_object_list_free);
+        ctx->bearer_objects = NULL;
+        list_bearers_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Keep on creating next object */
+    mm_gdbus_bearer_proxy_new (
+        g_dbus_proxy_get_connection (
+            G_DBUS_PROXY (ctx->self)),
+        G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+        MM_DBUS_SERVICE,
+        ctx->bearer_paths[ctx->i],
+        ctx->cancellable,
+        (GAsyncReadyCallback)modem_list_bearers_build_object_ready,
+        ctx);
+}
+
+static void
+modem_list_bearers_ready (MMModem *self,
+                          GAsyncResult *res,
+                          ListBearersContext *ctx)
+{
+    GError *error = NULL;
+
+    mm_gdbus_modem_call_list_bearers_finish (self, &ctx->bearer_paths, res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        list_bearers_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* If no bearers, just end here. */
+    if (!ctx->bearer_paths || !ctx->bearer_paths[0]) {
+        g_simple_async_result_set_op_res_gpointer (ctx->result, NULL, NULL);
+        list_bearers_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Got list of paths. If at least one found, start creating objects for each */
+    ctx->i = 0;
+    mm_gdbus_bearer_proxy_new (
+        g_dbus_proxy_get_connection (
+            G_DBUS_PROXY (self)),
+        G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+        MM_DBUS_SERVICE,
+        ctx->bearer_paths[ctx->i],
+        ctx->cancellable,
+        (GAsyncReadyCallback)modem_list_bearers_build_object_ready,
+        ctx);
+}
+
 /**
  * mm_modem_list_bearers:
  * @self: A #MMModem.
@@ -866,45 +1000,23 @@ mm_modem_list_bearers (MMModem *self,
                        GAsyncReadyCallback callback,
                        gpointer user_data)
 {
+    ListBearersContext *ctx;
+
     g_return_if_fail (MM_GDBUS_IS_MODEM (self));
+
+    ctx = g_slice_new0 (ListBearersContext);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_modem_list_bearers);
+    if (cancellable)
+        ctx->cancellable = g_object_ref (cancellable);
 
     mm_gdbus_modem_call_list_bearers (self,
                                       cancellable,
-                                      callback,
-                                      user_data);
-}
-
-/**
- * mm_modem_list_bearers_finish:
- * @self: A #MMModem.
- * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_modem_list_bearers().
- * @error: Return location for error or %NULL.
- *
- * Finishes an operation started with mm_modem_list_bearers().
- *
- * Returns: (transfer-full): The list of bearer object paths, or %NULL if either none found or if @error is set.
- */
-gchar **
-mm_modem_list_bearers_finish (MMModem *self,
-                              GAsyncResult *res,
-                              GError **error)
-{
-    gchar **list;
-
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
-
-    if (!mm_gdbus_modem_call_list_bearers_finish (self,
-                                                  &list,
-                                                  res,
-                                                  error))
-        return NULL;
-
-    /* Only non-empty lists are returned */
-    if (list && list[0])
-        return list;
-
-    g_strfreev (list);
-    return NULL;
+                                      (GAsyncReadyCallback)modem_list_bearers_ready,
+                                      ctx);
 }
 
 /**
@@ -918,29 +1030,53 @@ mm_modem_list_bearers_finish (MMModem *self,
  * The calling thread is blocked until a reply is received. See mm_modem_list_bearers()
  * for the asynchronous version of this method.
  *
- * Returns: (transfer-full): The list of bearer object paths, or %NULL if either none found or if @error is set.
+ * Returns: (transfer-full): The list of #MMBearer objects, or %NULL if either none found or if @error is set.
  */
-gchar **
+GList *
 mm_modem_list_bearers_sync (MMModem *self,
                             GCancellable *cancellable,
                             GError **error)
 {
-    gchar **list;
+    GList *bearer_objects = NULL;
+    gchar **bearer_paths = NULL;
+    guint i;
 
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
 
     if (!mm_gdbus_modem_call_list_bearers_sync (self,
-                                                &list,
+                                                &bearer_paths,
                                                 cancellable,
                                                 error))
         return NULL;
 
     /* Only non-empty lists are returned */
-    if (list && list[0])
-        return list;
+    if (!bearer_paths)
+        return NULL;
 
-    g_strfreev (list);
-    return NULL;
+    for (i = 0; bearer_paths[i]; i++) {
+        MMBearer *bearer;
+
+        bearer = mm_gdbus_bearer_proxy_new_sync (
+            g_dbus_proxy_get_connection (
+                G_DBUS_PROXY (self)),
+            G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+            MM_DBUS_SERVICE,
+            bearer_paths[i],
+            cancellable,
+            error);
+
+        if (!bearer) {
+            bearer_object_list_free (bearer_objects);
+            g_strfreev (bearer_paths);
+            return NULL;
+        }
+
+        /* Keep the object */
+        bearer_objects = g_list_prepend (bearer_objects, bearer);
+    }
+
+    g_strfreev (bearer_paths);
+    return bearer_objects;
 }
 
 typedef struct {
