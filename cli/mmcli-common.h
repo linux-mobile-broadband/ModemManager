@@ -36,6 +36,15 @@ MMObject *mmcli_get_modem_finish (GAsyncResult *res);
 MMObject *mmcli_get_modem_sync   (GDBusConnection *connection,
                                   const gchar *modem_str);
 
+void      mmcli_get_bearer        (GDBusConnection *connection,
+                                   const gchar *bearer_path,
+                                   GCancellable *cancellable,
+                                   GAsyncReadyCallback callback,
+                                   gpointer user_data);
+MMBearer *mmcli_get_bearer_finish (GAsyncResult *res);
+MMBearer *mmcli_get_bearer_sync   (GDBusConnection *connection,
+                                   const gchar *bearer_path);
+
 const gchar *mmcli_get_bearer_ip_method_string (MMBearerIpMethod method);
 const gchar *mmcli_get_state_string            (MMModemState state);
 const gchar *mmcli_get_state_reason_string     (MMModemStateChangeReason reason);

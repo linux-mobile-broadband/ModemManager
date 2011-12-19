@@ -237,6 +237,202 @@ mmcli_get_modem_sync (GDBusConnection *connection,
     return found;
 }
 
+static MMBearer *
+find_bearer_in_list (GList *list,
+                     const gchar *bearer_path)
+{
+    GList *l;
+
+    for (l = list; l; l = g_list_next (l)) {
+        MMBearer *bearer = MM_BEARER (l->data);
+
+        if (g_str_equal (mm_bearer_get_path (bearer), bearer_path)) {
+            g_debug ("Bearer found at '%s'\n", bearer_path);
+            return g_object_ref (bearer);
+        }
+    }
+
+    g_printerr ("error: couldn't find bearer at '%s'\n", bearer_path);
+    exit (EXIT_FAILURE);
+    return NULL;
+}
+
+typedef struct {
+    GSimpleAsyncResult *result;
+    GCancellable *cancellable;
+    gchar *bearer_path;
+    MMManager *manager;
+    GList *modems;
+    MMObject *current;
+} GetBearerContext;
+
+static void
+get_bearer_context_complete_and_free (GetBearerContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    if (ctx->current)
+        g_object_unref (ctx->current);
+    if (ctx->cancellable)
+        g_object_unref (ctx->cancellable);
+    if (ctx->manager)
+        g_object_unref (ctx->manager);
+    g_list_foreach (ctx->modems, (GFunc)g_object_unref, NULL);
+    g_list_free (ctx->modems);
+    g_free (ctx->bearer_path);
+    g_object_unref (ctx->result);
+}
+
+MMBearer *
+mmcli_get_bearer_finish (GAsyncResult *res)
+{
+    return g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+}
+
+static void look_for_bearer_in_modem (GetBearerContext *ctx);
+
+static void
+list_bearers_ready (MMModem *modem,
+                    GAsyncResult *res,
+                    GetBearerContext *ctx)
+{
+    GList *bearers;
+    MMBearer *bearer;
+    GError *error = NULL;
+
+    bearers = mm_modem_list_bearers_finish (modem, res, &error);
+    if (error) {
+        g_printerr ("error: couldn't list bearers at '%s': '%s'\n",
+                    mm_modem_get_path (modem),
+                    error->message);
+        exit (EXIT_FAILURE);
+    }
+
+    bearer = find_bearer_in_list (bearers, ctx->bearer_path);
+    g_list_foreach (bearers, (GFunc)g_object_unref, NULL);
+    g_list_free (bearers);
+
+    /* Found! */
+    if (bearer) {
+        g_simple_async_result_set_op_res_gpointer (ctx->result, bearer, (GDestroyNotify)g_object_unref);
+        get_bearer_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Not found, try with next modem */
+    look_for_bearer_in_modem (ctx);
+}
+
+static void
+look_for_bearer_in_modem (GetBearerContext *ctx)
+{
+    MMModem *modem;
+
+    if (!ctx->modems) {
+        g_printerr ("error: couldn't find bearer at '%s': 'not found in any modem'\n",
+                    ctx->bearer_path);
+        exit (EXIT_FAILURE);
+    }
+
+    /* Loop looking for the bearer in each modem found */
+    ctx->current = MM_OBJECT (ctx->modems->data);
+    ctx->modems = g_list_delete_link (ctx->modems, ctx->modems);
+    g_debug ("Looking for bearer '%s' in modem '%s'...",
+             ctx->bearer_path,
+             mm_object_get_path (ctx->current));
+
+    modem = mm_object_get_modem (ctx->current);
+    mm_modem_list_bearers (modem,
+                           ctx->cancellable,
+                           (GAsyncReadyCallback)list_bearers_ready,
+                           ctx);
+    g_object_unref (modem);
+}
+
+static void
+get_bearer_manager_ready (GDBusConnection *connection,
+                          GAsyncResult *res,
+                          GetBearerContext *ctx)
+{
+    ctx->manager = mmcli_get_manager_finish (res);
+    ctx->modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (ctx->manager));
+    if (!ctx->modems) {
+        g_printerr ("error: couldn't find bearer at '%s': 'no modems found'\n",
+                    ctx->bearer_path);
+        exit (EXIT_FAILURE);
+    }
+
+    look_for_bearer_in_modem (ctx);
+}
+
+void
+mmcli_get_bearer (GDBusConnection *connection,
+                  const gchar *bearer_path,
+                  GCancellable *cancellable,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    GetBearerContext *ctx;
+
+    ctx = g_new0 (GetBearerContext, 1);
+    ctx->bearer_path = g_strdup (bearer_path);
+    if (cancellable)
+        ctx->cancellable = g_object_ref (cancellable);
+    ctx->result = g_simple_async_result_new (G_OBJECT (connection),
+                                             callback,
+                                             user_data,
+                                             mmcli_get_modem);
+    mmcli_get_manager (connection,
+                       cancellable,
+                       (GAsyncReadyCallback)get_bearer_manager_ready,
+                       ctx);
+}
+
+MMBearer *
+mmcli_get_bearer_sync (GDBusConnection *connection,
+                       const gchar *bearer_path)
+{
+    MMManager *manager;
+    GList *modems;
+    GList *l;
+    MMBearer *found = NULL;
+
+    manager = mmcli_get_manager_sync (connection);
+    modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (manager));
+    if (!modems) {
+        g_printerr ("error: couldn't find bearer at '%s': 'no modems found'\n",
+                    bearer_path);
+        exit (EXIT_FAILURE);
+    }
+
+    for (l = modems; !found && l; l = g_list_next (l)) {
+        GError *error = NULL;
+        MMObject *object;
+        MMModem *modem;
+        GList *bearers;
+
+        object = MM_OBJECT (l->data);
+        modem = mm_object_get_modem (object);
+        bearers = mm_modem_list_bearers_sync (modem, NULL, &error);
+        if (error) {
+            g_printerr ("error: couldn't list bearers at '%s': '%s'\n",
+                        mm_modem_get_path (modem),
+                        error->message);
+            exit (EXIT_FAILURE);
+        }
+
+        found = find_bearer_in_list (bearers, bearer_path);
+        g_list_foreach (bearers, (GFunc)g_object_unref, NULL);
+        g_list_free (bearers);
+        g_object_unref (modem);
+    }
+
+    g_list_foreach (modems, (GFunc)g_object_unref, NULL);
+    g_list_free (modems);
+    g_object_unref (manager);
+
+    return found;
+}
+
 const gchar *
 mmcli_get_bearer_ip_method_string (MMBearerIpMethod method)
 {
