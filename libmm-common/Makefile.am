@@ -1,5 +1,5 @@
 
-noinst_LTLIBRARIES = libmm-common.la
+lib_LTLIBRARIES = libmm-common.la
 
 GENERATED_H = \
 	mm-enums-types.h \
@@ -146,18 +146,33 @@ $(mm_gdbus_bearer_generated): $(top_srcdir)/new/org.freedesktop.ModemManager1.Be
 		$< \
 		$(NULL)
 
+includedir = @includedir@/libmm-common
+include_HEADERS = \
+	mm-errors-types.h \
+	mm-enums-types.h \
+	mm-common-helpers.h \
+	mm-gdbus-manager.h \
+	mm-gdbus-modem.h \
+	mm-gdbus-bearer.h \
+	mm-gdbus-sim.h \
+	libmm-common.h
+
 libmm_common_la_SOURCES = \
 	$(GENERATED_H) \
 	$(GENERATED_C) \
 	mm-errors-quarks.c \
 	mm-common-helpers.h \
-	mm-common-helpers.c
+	mm-common-helpers.c \
+	libmm-common.h
 
 libmm_common_la_CPPFLAGS = \
-	$(MM_CFLAGS) \
+	$(LIBMM_COMMON_CFLAGS) \
 	-I$(top_srcdir)/include \
 	-Wno-unused-function \
 	-Wno-float-equal \
 	-Wno-shadow
+
+libmm_common_la_LIBADD = \
+	$(LIBMM_COMMON_LIBS)
 
 CLEANFILES = $(GENERATED_H) $(GENERATED_C) $(GENERATED_DOC)

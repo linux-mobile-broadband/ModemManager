@@ -20,4 +20,5 @@ mmcli_SOURCES = \
 
 mmcli_LDADD = \
 	$(MMCLI_LIBS) \
+	$(top_builddir)/libmm-common/libmm-common.la \
 	$(top_builddir)/libmm-glib/libmm-glib.la
