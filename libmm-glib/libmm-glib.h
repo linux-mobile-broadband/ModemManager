@@ -23,10 +23,13 @@
 #ifndef _LIBMM_GLIB_H_
 #define _LIBMM_GLIB_H_
 
+/* ModemManager generic headers */
 #include <ModemManager.h>
-#include <mm-errors-types.h>
-#include <mm-enums-types.h>
 
+/* libmm-common specific headers */
+#include <libmm-common.h>
+
+/* libmm-glib headers */
 #include <mm-manager.h>
 #include <mm-object.h>
 

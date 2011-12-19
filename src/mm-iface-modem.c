@@ -15,11 +15,7 @@
 
 
 #include <ModemManager.h>
-
-#include <mm-gdbus-modem.h>
-#include <mm-gdbus-sim.h>
-#include <mm-enums-types.h>
-#include <mm-errors-types.h>
+#include <libmm-common.h>
 
 #include "mm-iface-modem.h"
 #include "mm-base-modem.h"

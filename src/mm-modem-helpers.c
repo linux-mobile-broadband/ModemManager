@@ -24,8 +24,7 @@
 #include <errno.h>
 
 #include <ModemManager.h>
-#include <mm-errors-types.h>
-#include <mm-enums-types.h>
+#include <libmm-common.h>
 
 #include "mm-modem-helpers.h"
 #include "mm-log.h"

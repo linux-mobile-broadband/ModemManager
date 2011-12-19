@@ -23,10 +23,7 @@
 #include <ctype.h>
 
 #include <ModemManager.h>
-
-#include <mm-enums-types.h>
-#include <mm-errors-types.h>
-#include <mm-gdbus-bearer.h>
+#include <libmm-common.h>
 
 #include "mm-iface-modem.h"
 #include "mm-bearer.h"

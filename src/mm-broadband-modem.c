@@ -22,9 +22,7 @@
 #include <string.h>
 
 #include <ModemManager.h>
-#include <mm-errors-types.h>
-#include <mm-enums-types.h>
-#include <mm-common-helpers.h>
+#include <libmm-common.h>
 
 #include "mm-base-modem-at.h"
 #include "mm-broadband-modem.h"

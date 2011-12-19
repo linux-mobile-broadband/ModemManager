@@ -23,9 +23,7 @@
 #include <ctype.h>
 
 #include <ModemManager.h>
-
-#include <mm-enums-types.h>
-#include <mm-errors-types.h>
+#include <libmm-common.h>
 
 #include "mm-bearer-3gpp.h"
 #include "mm-base-modem-at.h"

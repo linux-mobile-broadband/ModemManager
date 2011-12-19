@@ -23,9 +23,7 @@
 #include <ctype.h>
 
 #include <ModemManager.h>
-
-#include <mm-enums-types.h>
-#include <mm-errors-types.h>
+#include <libmm-common.h>
 
 #include "mm-bearer-list.h"
 #include "mm-utils.h"
