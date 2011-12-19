@@ -243,7 +243,8 @@ main (gint argc, gchar **argv)
         mmcli_modem_shutdown ();
     }
 
-    g_object_unref (cancellable);
+    if (cancellable)
+        g_object_unref (cancellable);
     g_main_loop_unref (loop);
     g_object_unref (connection);
 
