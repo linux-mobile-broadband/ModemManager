@@ -615,11 +615,121 @@ periodic_registration_check_enable (MMIfaceModem3gpp *self)
 
 /*****************************************************************************/
 
+typedef struct {
+    GSimpleAsyncResult *result;
+    GList *bearers;
+    MMBearer3gpp *current;
+} Disconnect3gppBearersContext;
+
+static void
+disconnect_3gpp_bearers_context_complete_and_free (Disconnect3gppBearersContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+
+    if (ctx->current)
+        g_object_unref (ctx->current);
+    g_list_foreach (ctx->bearers, (GFunc)g_object_unref, NULL);
+    g_list_free (ctx->bearers);
+    g_object_unref (ctx->result);
+    g_free (ctx);
+}
+
+static gboolean
+disconnect_3gpp_bearers_finish (MMIfaceModem3gpp *self,
+                                GAsyncResult *res,
+                                GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void disconnect_next_bearer (Disconnect3gppBearersContext *ctx);
+
+static void
+disconnect_next_bearer_ready (MMBearer *bearer,
+                              GAsyncResult *res,
+                              Disconnect3gppBearersContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_bearer_disconnect_finish (bearer, res, &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        disconnect_3gpp_bearers_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Go on with the next one */
+    disconnect_next_bearer (ctx);
+}
+
+static void
+disconnect_next_bearer (Disconnect3gppBearersContext *ctx)
+{
+    if (ctx->current)
+        g_object_unref (ctx->current);
+
+    if (!ctx->bearers) {
+        /* All done */
+        ctx->current = NULL;
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        disconnect_3gpp_bearers_context_complete_and_free (ctx);
+        return;
+    }
+
+    ctx->current = MM_BEARER_3GPP (ctx->bearers->data);
+    ctx->bearers = g_list_delete_link (ctx->bearers, ctx->bearers);
+
+    mm_bearer_disconnect (MM_BEARER (ctx->current),
+                          (GAsyncReadyCallback)disconnect_next_bearer_ready,
+                          ctx);
+}
+
+static void
+find_3gpp_bearer (MMBearer *bearer,
+                  GList **list)
+{
+    if (MM_IS_BEARER_3GPP (bearer))
+        *list = g_list_prepend (*list, g_object_ref (bearer));
+}
+
+static void
+disconnect_3gpp_bearers (MMIfaceModem3gpp *self,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data)
+{
+    Disconnect3gppBearersContext *ctx;
+    MMBearerList *bearer_list = NULL;
+
+    ctx = g_new0 (Disconnect3gppBearersContext, 1);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             disconnect_3gpp_bearers);
+    g_object_get (self,
+                  MM_IFACE_MODEM_BEARER_LIST, &bearer_list,
+                  NULL);
+
+    if (bearer_list) {
+        mm_bearer_list_foreach (bearer_list,
+                                (MMBearerListForeachFunc)find_3gpp_bearer,
+                                &(ctx->bearers));
+        g_object_unref (bearer_list);
+        disconnect_next_bearer (ctx);
+        return;
+    }
+
+    /* No bearer list, we're done. */
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    disconnect_3gpp_bearers_context_complete_and_free (ctx);
+}
+
+/*****************************************************************************/
+
 typedef struct _DisablingContext DisablingContext;
 static void interface_disabling_step (DisablingContext *ctx);
 
 typedef enum {
     DISABLING_STEP_FIRST,
+    DISABLING_STEP_DISCONNECT_BEARERS,
     DISABLING_STEP_CLEANUP_PS_REGISTRATION,
     DISABLING_STEP_CLEANUP_CS_REGISTRATION,
     DISABLING_STEP_CLEANUP_UNSOLICITED_REGISTRATION,
@@ -676,6 +786,24 @@ mm_iface_modem_3gpp_disable_finish (MMIfaceModem3gpp *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
+static void
+disconnect_3gpp_bearers_ready (MMIfaceModem3gpp *self,
+                               GAsyncResult *res,
+                               DisablingContext *ctx)
+{
+    GError *error = NULL;
+
+    disconnect_3gpp_bearers_finish (self, res, &error);
+    if (error) {
+        mm_dbg ("Couldn't disconnect 3GPP bearers: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_disabling_step (ctx);
+}
+
 #undef VOID_REPLY_READY_FN
 #define VOID_REPLY_READY_FN(NAME,DISPLAY)                               \
     static void                                                         \
@@ -710,6 +838,12 @@ interface_disabling_step (DisablingContext *ctx)
     case DISABLING_STEP_FIRST:
         /* Fall down to next step */
         ctx->step++;
+
+    case DISABLING_STEP_DISCONNECT_BEARERS:
+        disconnect_3gpp_bearers (ctx->self,
+                                 (GAsyncReadyCallback)disconnect_3gpp_bearers_ready,
+                                 ctx);
+        return;
 
     case DISABLING_STEP_CLEANUP_PS_REGISTRATION:
         if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->cleanup_ps_registration &&
