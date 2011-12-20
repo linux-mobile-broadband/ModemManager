@@ -37,6 +37,7 @@ enum {
     PROP_0,
     PROP_APN,
     PROP_IP_TYPE,
+    PROP_ALLOW_ROAMING,
     PROP_LAST
 };
 
@@ -47,6 +48,8 @@ struct _MMBearer3gppPrivate {
     gchar *apn;
     /* IP type of the PDP context */
     gchar *ip_type;
+    /* Flag to allow/forbid connections while roaming */
+    gboolean allow_roaming;
 
     /* Data port used when modem is connected */
     MMPort *port;
@@ -769,24 +772,35 @@ mm_bearer_3gpp_new_from_properties (MMBaseModem *modem,
 {
     GVariantIter iter;
     const gchar *key;
-    const gchar *value;
+    GVariant *value;
     gchar *apn = NULL;
     gchar *ip_type = NULL;
+    gboolean allow_roaming = FALSE;
+    gboolean allow_roaming_found = FALSE;
 
     mm_dbg ("Creating 3GPP bearer with properties...");
     g_variant_iter_init (&iter, properties);
-    while (g_variant_iter_loop (&iter, "{ss}", &key, &value)) {
-        mm_dbg ("  Property '%s', value '%s'", key, value);
+    while (g_variant_iter_loop (&iter, "{sv}", &key, &value)) {
         if (g_str_equal (key, "apn")) {
             if (apn)
-                mm_warn ("Duplicate 'apn' property found, ignoring value '%s'", value);
+                mm_warn ("Duplicate 'apn' property found, ignoring value '%s'",
+                         g_variant_get_string (value, NULL));
             else
-                apn = g_strdup (value);
+                apn = g_variant_dup_string (value, NULL);
         } else if (g_str_equal (key, "ip-type")) {
             if (ip_type)
-                mm_warn ("Duplicate 'ip-type' property found, ignoring value '%s'", value);
+                mm_warn ("Duplicate 'ip-type' property found, ignoring value '%s'",
+                         g_variant_get_string (value, NULL));
             else
-                ip_type = g_strdup (value);
+                ip_type = g_variant_dup_string (value, NULL);
+        } else if (g_str_equal (key, "allow-roaming")) {
+            if (allow_roaming_found)
+                mm_warn ("Duplicate 'allow-roaming' property found, ignoring value '%s'",
+                         g_variant_get_string (value, NULL));
+            else {
+                allow_roaming_found = TRUE;
+                allow_roaming = g_variant_get_boolean (value);
+            }
         }
         else
             mm_dbg ("Ignoring property '%s' in 3GPP bearer", key);
@@ -804,13 +818,15 @@ mm_bearer_3gpp_new_from_properties (MMBaseModem *modem,
 
     return mm_bearer_3gpp_new (modem,
                                apn,
-                               ip_type);
+                               ip_type,
+                               allow_roaming);
 }
 
 MMBearer *
 mm_bearer_3gpp_new (MMBaseModem *modem,
                     const gchar *apn,
-                    const gchar *ip_type)
+                    const gchar *ip_type,
+                    gboolean allow_roaming)
 {
     static guint id = 0;
     MMBearer3gpp *bearer;
@@ -818,14 +834,16 @@ mm_bearer_3gpp_new (MMBaseModem *modem,
 
     /* Create the object */
     bearer = g_object_new (MM_TYPE_BEARER_3GPP,
-                           MM_BEARER_3GPP_APN,     apn,
-                           MM_BEARER_3GPP_IP_TYPE, ip_type,
+                           MM_BEARER_3GPP_APN,           apn,
+                           MM_BEARER_3GPP_IP_TYPE,       ip_type,
+                           MM_BEARER_3GPP_ALLOW_ROAMING, allow_roaming,
                            NULL);
 
     /* Build dict with all properties */
     mm_bearer_expose_properties (MM_BEARER (bearer),
-                                 "apn",     apn,
-                                 "ip-type", ip_type,
+                                 "apn",           apn,
+                                 "ip-type",       ip_type,
+                                 "allow-roaming", allow_roaming,
                                  NULL);
 
     /* Set modem and path ONLY after having checked input properties, so that
@@ -857,6 +875,9 @@ set_property (GObject *object,
         g_free (self->priv->ip_type);
         self->priv->ip_type = g_value_dup_string (value);
         break;
+    case PROP_ALLOW_ROAMING:
+        self->priv->allow_roaming = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -878,6 +899,9 @@ get_property (GObject *object,
     case PROP_IP_TYPE:
         g_value_set_string (value, self->priv->ip_type);
         break;
+    case PROP_ALLOW_ROAMING:
+        g_value_set_boolean (value, self->priv->allow_roaming);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -891,6 +915,7 @@ mm_bearer_3gpp_init (MMBearer3gpp *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
                                               MM_TYPE_BEARER_3GPP,
                                               MMBearer3gppPrivate);
+    self->priv->allow_roaming = TRUE;
 }
 
 static void
@@ -936,4 +961,12 @@ mm_bearer_3gpp_class_init (MMBearer3gppClass *klass)
                              NULL,
                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
     g_object_class_install_property (object_class, PROP_IP_TYPE, properties[PROP_IP_TYPE]);
+
+    properties[PROP_ALLOW_ROAMING] =
+        g_param_spec_boolean (MM_BEARER_3GPP_ALLOW_ROAMING,
+                              "Allow roaming",
+                              "Whether connections are allowed when roaming",
+                              TRUE,
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_ALLOW_ROAMING, properties[PROP_ALLOW_ROAMING]);
 }

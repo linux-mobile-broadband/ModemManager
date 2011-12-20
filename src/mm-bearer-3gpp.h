@@ -31,9 +31,10 @@
 #define MM_IS_BEARER_3GPP_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_BEARER_3GPP))
 #define MM_BEARER_3GPP_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_BEARER_3GPP, MMBearer3gppClass))
 
-#define MM_BEARER_3GPP_CID      "bearer-3gpp-cid"
-#define MM_BEARER_3GPP_APN      "bearer-3gpp-apn"
-#define MM_BEARER_3GPP_IP_TYPE  "bearer-3gpp-ip-type"
+#define MM_BEARER_3GPP_CID           "bearer-3gpp-cid"
+#define MM_BEARER_3GPP_APN           "bearer-3gpp-apn"
+#define MM_BEARER_3GPP_IP_TYPE       "bearer-3gpp-ip-type"
+#define MM_BEARER_3GPP_ALLOW_ROAMING "bearer-3gpp-allow-roaming"
 
 /* Prefix for all 3GPP bearer object paths */
 #define MM_DBUS_BEARER_3GPP_PREFIX MM_DBUS_BEARER_PREFIX "/3GPP"
@@ -55,7 +56,8 @@ GType mm_bearer_3gpp_get_type (void);
 
 MMBearer *mm_bearer_3gpp_new (MMBaseModem *modem,
                               const gchar *apn,
-                              const gchar *ip_type);
+                              const gchar *ip_type,
+                              gboolean allow_roaming);
 MMBearer *mm_bearer_3gpp_new_from_properties (MMBaseModem *modem,
                                               GVariant *properties,
                                               GError **error);

@@ -472,15 +472,22 @@ mm_bearer_expose_properties (MMBearer *bearer,
 
     va_start (va_args, first_property_name);
 
-    g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{ss}"));
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
     key = first_property_name;
     while (key) {
-        const gchar *value;
+        if (g_str_equal (key, "allow-roaming")) {
+            gboolean value;
 
-        /* If a key with NULL value is given, just ignore it. */
-        value = va_arg (va_args, gchar *);
-        if (value)
-            g_variant_builder_add (&builder, "{ss}", key, value);
+            value = va_arg (va_args, gboolean);
+            g_variant_builder_add (&builder, "{sv}", key, g_variant_new_boolean (value));
+        } else {
+            const gchar *value;
+
+            /* If a key with NULL value is given, just ignore it. */
+            value = va_arg (va_args, gchar *);
+            if (value)
+                g_variant_builder_add (&builder, "{sv}", key, g_variant_new_string (value));
+        }
 
         key = va_arg (va_args, gchar *);
     }

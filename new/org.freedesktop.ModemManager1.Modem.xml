@@ -60,15 +60,17 @@
         Allowed properties are:
         <variablelist>
         <varlistentry><term><literal>"apn"</literal></term>
-          <listitem><para>Access Point Name. Required in 3GPP.</para></listitem></varlistentry>
+          <listitem><para>Access Point Name, given as a string value (signature <literal>"s"</literal>). Required in 3GPP.</para></listitem></varlistentry>
         <varlistentry><term><literal>"ip-type"</literal></term>
-          <listitem><para>Addressing type, one of <literal>"IPV4"</literal>, <literal>"IPV4V6"</literal>, or <literal>"IPV6"</literal>. Optional in 3GPP and CDMA.</para></listitem></varlistentry>
+          <listitem><para>Addressing type, given as a string value (signature <literal>"s"</literal>). One of <literal>"IPV4"</literal>, <literal>"IPV4V6"</literal>, or <literal>"IPV6"</literal>. Optional in 3GPP and CDMA.</para></listitem></varlistentry>
         <varlistentry><term><literal>"user"</literal></term>
-          <listitem><para>User name (if any) required by the network. Optional in 3GPP.</para></listitem></varlistentry>
+          <listitem><para>User name (if any) required by the network, given as a string value (signature <literal>"s"</literal>). Optional in 3GPP.</para></listitem></varlistentry>
         <varlistentry><term><literal>"password"</literal></term>
-          <listitem><para>Password (if any) required by the network. Optional in 3GPP.</para></listitem></varlistentry>
+          <listitem><para>Password (if any) required by the network, given as a string value (signature <literal>"s"</literal>). Optional in 3GPP.</para></listitem></varlistentry>
+        <varlistentry><term><literal>"allow-roaming"</literal></term>
+          <listitem><para>Flag to tell whether connection is allowed during roaming, given as a boolean value (signature <literal>"b"</literal>). Optional in 3GPP.</para></listitem></varlistentry>
         <varlistentry><term><literal>"number"</literal></term>
-          <listitem><para>Telephone number to dial. Required in POTS.</para></listitem></varlistentry>
+          <listitem><para>Telephone number to dial, given as a string value (signature <literal>"s"</literal>). Required in POTS.</para></listitem></varlistentry>
         </variablelist>
 
         Some properties are only applicable to a bearer of certain access
@@ -76,7 +78,7 @@
         applicable to CDMA2000 Packet Data Session bearers.
     -->
     <method name="CreateBearer">
-      <arg name="properties" type="a{ss}" direction="in"  />
+      <arg name="properties" type="a{sv}" direction="in"  />
       <arg name="path"       type="o"     direction="out" />
     </method>
 
