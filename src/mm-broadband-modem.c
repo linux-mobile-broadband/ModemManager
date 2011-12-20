@@ -1114,13 +1114,13 @@ reg_state_changed (MMAtSerialPort *port,
     gboolean cgreg = FALSE;
     GError *error = NULL;
 
-    if (!mm_gsm_parse_creg_response (match_info,
-                                     &state,
-                                     &lac,
-                                     &cell_id,
-                                     &act,
-                                     &cgreg,
-                                     &error)) {
+    if (!mm_3gpp_parse_creg_response (match_info,
+                                      &state,
+                                      &lac,
+                                      &cell_id,
+                                      &act,
+                                      &cgreg,
+                                      &error)) {
         mm_warn ("error parsing unsolicited registration: %s",
                  error && error->message ? error->message : "(unknown)");
         g_clear_error (&error);
@@ -1172,7 +1172,7 @@ setup_unsolicited_registration (MMIfaceModem3gpp *self,
     ports[1] = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
 
     /* Set up CREG unsolicited message handlers in both ports */
-    array = mm_gsm_creg_regex_get (FALSE);
+    array = mm_3gpp_creg_regex_get (FALSE);
     for (i = 0; i < 2; i++) {
         if (ports[i]) {
             guint j;
@@ -1187,7 +1187,7 @@ setup_unsolicited_registration (MMIfaceModem3gpp *self,
             }
         }
     }
-    mm_gsm_creg_regex_destroy (array);
+    mm_3gpp_creg_regex_destroy (array);
 
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
     g_simple_async_result_complete_in_idle (result);
@@ -1229,7 +1229,7 @@ cleanup_unsolicited_registration (MMIfaceModem3gpp *self,
     ports[1] = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
 
     /* Set up CREG unsolicited message handlers in both ports */
-    array = mm_gsm_creg_regex_get (FALSE);
+    array = mm_3gpp_creg_regex_get (FALSE);
     for (i = 0; i < 2; i++) {
         if (ports[i]) {
             guint j;
@@ -1244,7 +1244,7 @@ cleanup_unsolicited_registration (MMIfaceModem3gpp *self,
             }
         }
     }
-    mm_gsm_creg_regex_destroy (array);
+    mm_3gpp_creg_regex_destroy (array);
 
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
     g_simple_async_result_complete_in_idle (result);
@@ -1576,13 +1576,13 @@ registration_status_check_ready (MMBroadbandModem *self,
             gulong lac = 0;
             gulong cid = 0;
 
-            parsed = mm_gsm_parse_creg_response (match_info,
-                                                 &state,
-                                                 &lac,
-                                                 &cid,
-                                                 &act,
-                                                 &cgreg,
-                                                 &inner_error);
+            parsed = mm_3gpp_parse_creg_response (match_info,
+                                                  &state,
+                                                  &lac,
+                                                  &cid,
+                                                  &act,
+                                                  &cgreg,
+                                                  &inner_error);
             g_match_info_free (match_info);
 
             if (!parsed) {
@@ -2547,7 +2547,7 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv->modem_state = MM_MODEM_STATE_UNKNOWN;
     self->priv->modem_current_capabilities = MM_MODEM_CAPABILITY_NONE;
     self->priv->modem_3gpp_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-    self->priv->reg_regex = mm_gsm_creg_regex_get (TRUE);
+    self->priv->reg_regex = mm_3gpp_creg_regex_get (TRUE);
     self->priv->reg_cs = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     self->priv->reg_ps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     self->priv->current_charset = MM_MODEM_CHARSET_UNKNOWN;
@@ -2559,7 +2559,7 @@ finalize (GObject *object)
     MMBroadbandModem *self = MM_BROADBAND_MODEM (object);
 
     if (self->priv->reg_regex)
-        mm_gsm_creg_regex_destroy (self->priv->reg_regex);
+        mm_3gpp_creg_regex_destroy (self->priv->reg_regex);
 
     G_OBJECT_CLASS (mm_broadband_modem_parent_class)->finalize (object);
 }

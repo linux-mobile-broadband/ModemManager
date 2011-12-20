@@ -235,7 +235,7 @@ mm_base_modem_grab_port (MMBaseModem *self,
                                                    mm_serial_parser_v1_destroy);
 
             /* Set up CREG unsolicited message handlers, with NULL callbacks */
-            array = mm_gsm_creg_regex_get (FALSE);
+            array = mm_3gpp_creg_regex_get (FALSE);
             for (i = 0; i < array->len; i++) {
                 mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port),
                                                                (GRegex *)g_ptr_array_index (array, i),
@@ -243,7 +243,7 @@ mm_base_modem_grab_port (MMBaseModem *self,
                                                                NULL,
                                                                NULL);
             }
-            mm_gsm_creg_regex_destroy (array);
+            mm_3gpp_creg_regex_destroy (array);
 
             /* { */
             /*     regex = g_regex_new ("\\r\\n\\+CIEV: (\\d+),(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL); */

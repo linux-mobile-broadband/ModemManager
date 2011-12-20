@@ -46,17 +46,15 @@ void mm_3gpp_pdp_context_list_free (GList *pdp_list);
 GList *mm_3gpp_parse_pdp_query_response (const gchar *reply,
                                          GError **error);
 
-GPtrArray *mm_gsm_creg_regex_get (gboolean solicited);
-
-void mm_gsm_creg_regex_destroy (GPtrArray *array);
-
-gboolean mm_gsm_parse_creg_response (GMatchInfo *info,
-                                     MMModem3gppRegistrationState *out_reg_state,
-                                     gulong *out_lac,
-                                     gulong *out_ci,
-                                     MMModemAccessTech *out_act,
-                                     gboolean *out_cgreg,
-                                     GError **error);
+GPtrArray *mm_3gpp_creg_regex_get (gboolean solicited);
+void mm_3gpp_creg_regex_destroy (GPtrArray *array);
+gboolean mm_3gpp_parse_creg_response (GMatchInfo *info,
+                                      MMModem3gppRegistrationState *out_reg_state,
+                                      gulong *out_lac,
+                                      gulong *out_ci,
+                                      MMModemAccessTech *out_act,
+                                      gboolean *out_cgreg,
+                                      GError **error);
 
 const char *mm_strip_tag (const char *str, const char *cmd);
 

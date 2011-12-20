@@ -410,7 +410,7 @@ mm_3gpp_parse_pdp_query_response (const gchar *reply,
 #define CREG8 "\\+(CREG|CGREG):\\s*(\\d{1})\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*(\\d{1,2})\\s*,\\s*([^,\\s]*)"
 
 GPtrArray *
-mm_gsm_creg_regex_get (gboolean solicited)
+mm_3gpp_creg_regex_get (gboolean solicited)
 {
     GPtrArray *array = g_ptr_array_sized_new (7);
     GRegex *regex;
@@ -483,7 +483,7 @@ mm_gsm_creg_regex_get (gboolean solicited)
 }
 
 void
-mm_gsm_creg_regex_destroy (GPtrArray *array)
+mm_3gpp_creg_regex_destroy (GPtrArray *array)
 {
     g_ptr_array_foreach (array, (GFunc) g_regex_unref, NULL);
     g_ptr_array_free (array, TRUE);
@@ -531,13 +531,13 @@ item_is_lac_not_stat (GMatchInfo *info, guint32 item)
 }
 
 gboolean
-mm_gsm_parse_creg_response (GMatchInfo *info,
-                            MMModem3gppRegistrationState *out_reg_state,
-                            gulong *out_lac,
-                            gulong *out_ci,
-                            MMModemAccessTech *out_act,
-                            gboolean *out_cgreg,
-                            GError **error)
+mm_3gpp_parse_creg_response (GMatchInfo *info,
+                             MMModem3gppRegistrationState *out_reg_state,
+                             gulong *out_lac,
+                             gulong *out_ci,
+                             MMModemAccessTech *out_act,
+                             gboolean *out_cgreg,
+                             GError **error)
 {
     gboolean success = FALSE, foo;
     gint n_matches, act = -1;

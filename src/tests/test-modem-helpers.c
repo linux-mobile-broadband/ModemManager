@@ -495,7 +495,7 @@ test_creg_match (const char *test,
     g_assert (info != NULL);
     g_assert_cmpuint (regex_num, ==, result->regex_num);
 
-    success = mm_gsm_parse_creg_response (info, &state, &lac, &ci, &access_tech, &cgreg, &error);
+    success = mm_3gpp_parse_creg_response (info, &state, &lac, &ci, &access_tech, &cgreg, &error);
     g_assert (success);
     g_assert_no_error (error);
     g_assert_cmpuint (state, ==, result->state);
@@ -1234,16 +1234,16 @@ test_data_new (void)
     TestData *data;
 
     data = g_malloc0 (sizeof (TestData));
-    data->solicited_creg = mm_gsm_creg_regex_get (TRUE);
-    data->unsolicited_creg = mm_gsm_creg_regex_get (FALSE);
+    data->solicited_creg = mm_3gpp_creg_regex_get (TRUE);
+    data->unsolicited_creg = mm_3gpp_creg_regex_get (FALSE);
     return data;
 }
 
 static void
 test_data_free (TestData *data)
 {
-    mm_gsm_creg_regex_destroy (data->solicited_creg);
-    mm_gsm_creg_regex_destroy (data->unsolicited_creg);
+    mm_3gpp_creg_regex_destroy (data->solicited_creg);
+    mm_3gpp_creg_regex_destroy (data->unsolicited_creg);
     g_free (data);
 }
 
