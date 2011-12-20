@@ -91,4 +91,11 @@ void mm_bearer_set_connection_forbidden (MMBearer *bearer);
 
 MMBearerStatus mm_bearer_get_status (MMBearer *bearer);
 
+void     mm_bearer_disconnect        (MMBearer *self,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data);
+gboolean mm_bearer_disconnect_finish (MMBearer *self,
+                                      GAsyncResult *res,
+                                      GError **error);
+
 #endif /* MM_BEARER_H */

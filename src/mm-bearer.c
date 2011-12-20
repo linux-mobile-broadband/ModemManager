@@ -210,25 +210,61 @@ handle_disconnect_ready (MMBearer *self,
 {
     GError *error = NULL;
 
+    if (!mm_bearer_disconnect_finish (self, res, &error))
+        g_dbus_method_invocation_take_error (invocation, error);
+    else
+        mm_gdbus_bearer_complete_disconnect (MM_GDBUS_BEARER (self), invocation);
+    g_object_unref (invocation);
+}
+
+static gboolean
+handle_disconnect (MMBearer *self,
+                   GDBusMethodInvocation *invocation)
+{
+    mm_bearer_disconnect (self,
+                          (GAsyncReadyCallback)handle_disconnect_ready,
+                          g_object_ref (invocation));
+    return TRUE;
+}
+
+/*****************************************************************************/
+
+gboolean
+mm_bearer_disconnect_finish (MMBearer *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+disconnect_ready (MMBearer *self,
+                  GAsyncResult *res,
+                  GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
     if (!MM_BEARER_GET_CLASS (self)->disconnect_finish (self, res, &error)) {
         mm_dbg ("Couldn't disconnect bearer '%s'", self->priv->path);
         self->priv->status = MM_BEARER_STATUS_CONNECTED;
-        g_dbus_method_invocation_take_error (invocation, error);
+        g_simple_async_result_take_error (simple, error);
     }
     else {
         mm_dbg ("Disconnected bearer '%s'", self->priv->path);
         self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
-        mm_gdbus_bearer_complete_disconnect (MM_GDBUS_BEARER (self), invocation);
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     }
 
     g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
-    g_object_unref (invocation);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
 }
 
 static void
 status_changed_complete_disconnect (MMBearer *self,
                                     GParamSpec *pspec,
-                                    GDBusMethodInvocation *invocation)
+                                    GSimpleAsyncResult *simple)
 {
     /* We may get other states here before DISCONNECTED, like DISCONNECTING or
      * even CONNECTED. */
@@ -237,34 +273,48 @@ status_changed_complete_disconnect (MMBearer *self,
 
     mm_dbg ("Disconnected bearer '%s' after cancelling previous connect request",
             self->priv->path);
-    mm_gdbus_bearer_complete_disconnect (MM_GDBUS_BEARER (self), invocation);
-
     g_signal_handler_disconnect (self,
                                  self->priv->disconnect_signal_handler);
     self->priv->disconnect_signal_handler = 0;
+
+    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
 }
 
-static gboolean
-handle_disconnect (MMBearer *self,
-                   GDBusMethodInvocation *invocation)
+void
+mm_bearer_disconnect (MMBearer *self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
 {
+    GSimpleAsyncResult *simple;
+
     g_assert (MM_BEARER_GET_CLASS (self)->disconnect != NULL);
     g_assert (MM_BEARER_GET_CLASS (self)->disconnect_finish != NULL);
 
+    simple = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        mm_bearer_disconnect);
+
     /* If already disconnected, done */
     if (self->priv->status == MM_BEARER_STATUS_DISCONNECTED) {
-        mm_gdbus_bearer_complete_disconnect (MM_GDBUS_BEARER (self), invocation);
-        return TRUE;
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+        g_simple_async_result_complete_in_idle (simple);
+        g_object_unref (simple);
+        return;
     }
 
     /* If already disconnecting, return error, don't allow a second request. */
     if (self->priv->status == MM_BEARER_STATUS_DISCONNECTING) {
-        g_dbus_method_invocation_return_error (
-            invocation,
+        g_simple_async_result_set_error (
+            simple,
             MM_CORE_ERROR,
             MM_CORE_ERROR_IN_PROGRESS,
             "Bearer already being disconnected");
-        return TRUE;
+        g_simple_async_result_complete_in_idle (simple);
+        g_object_unref (simple);
+        return;
     }
 
     mm_dbg ("Disconnecting bearer '%s'", self->priv->path);
@@ -281,9 +331,9 @@ handle_disconnect (MMBearer *self,
             g_signal_connect (self,
                               "notify::" MM_BEARER_STATUS,
                               (GCallback)status_changed_complete_disconnect,
-                              g_object_ref (invocation));
+                              simple); /* takes ownership */
 
-        return TRUE;
+        return;
     }
 
     /* Disconnecting! */
@@ -291,9 +341,8 @@ handle_disconnect (MMBearer *self,
     g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
     MM_BEARER_GET_CLASS (self)->disconnect (
         self,
-        (GAsyncReadyCallback)handle_disconnect_ready,
-        g_object_ref (invocation));
-    return TRUE;
+        (GAsyncReadyCallback)disconnect_ready,
+        simple); /* takes ownership */
 }
 
 /*****************************************************************************/
