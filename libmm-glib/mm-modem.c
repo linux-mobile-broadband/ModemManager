@@ -1658,3 +1658,17 @@ mm_modem_get_capabilities_string (MMModemCapability caps)
 {
     return mm_common_get_capabilities_string (caps);
 }
+
+/**
+ * mm_modem_get_access_technologies_string:
+ * @access_tech: Bitmask of #MMModemAccessTechnology flags.
+ *
+ * Build a string with a list of access technologies.
+ *
+ * Returns: (transfer full): A string specifying the access technologies given in @access_tech. The returned value should be freed with g_free().
+ */
+gchar *
+mm_modem_get_access_technologies_string (MMModemAccessTechnology access_tech)
+{
+    return mm_common_get_access_technologies_string (access_tech);
+}

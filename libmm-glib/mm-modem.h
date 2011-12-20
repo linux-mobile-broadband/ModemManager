@@ -204,6 +204,7 @@ MMSim *mm_modem_get_sim_sync   (MMModem *self,
                                 GError **error);
 
 gchar *mm_modem_get_capabilities_string (MMModemCapability caps);
+gchar *mm_modem_get_access_technologies_string (MMModemAccessTechnology access_tech);
 
 G_END_DECLS
 
