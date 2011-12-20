@@ -580,18 +580,18 @@ periodic_registration_check (MMIfaceModem3gpp *self)
     return TRUE;
 }
 
-/* static void */
-/* periodic_registration_check_disable (MMIfaceModem3gpp *self) */
-/* { */
-/*     guint timeout_source; */
+static void
+periodic_registration_check_disable (MMIfaceModem3gpp *self)
+{
+    guint timeout_source;
 
-/*     timeout_source = GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (self), check_enabled)); */
-/*     if (timeout_source) { */
-/*         g_source_remove (timeout_source); */
-/*         g_object_set_qdata (G_OBJECT (self), check_enabled, GUINT_TO_POINTER (FALSE)); */
-/*         mm_dbg ("Periodic registration checks disabled"); */
-/*     } */
-/* } */
+    timeout_source = GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (self), check_enabled));
+    if (timeout_source) {
+        g_source_remove (timeout_source);
+        g_object_set_qdata (G_OBJECT (self), check_enabled, GUINT_TO_POINTER (FALSE));
+        mm_dbg ("Periodic registration checks disabled");
+    }
+}
 
 static void
 periodic_registration_check_enable (MMIfaceModem3gpp *self)
@@ -730,6 +730,7 @@ static void interface_disabling_step (DisablingContext *ctx);
 typedef enum {
     DISABLING_STEP_FIRST,
     DISABLING_STEP_DISCONNECT_BEARERS,
+    DISABLING_STEP_PERIODIC_REGISTRATION_CHECKS,
     DISABLING_STEP_CLEANUP_PS_REGISTRATION,
     DISABLING_STEP_CLEANUP_CS_REGISTRATION,
     DISABLING_STEP_CLEANUP_UNSOLICITED_REGISTRATION,
@@ -844,6 +845,11 @@ interface_disabling_step (DisablingContext *ctx)
                                  (GAsyncReadyCallback)disconnect_3gpp_bearers_ready,
                                  ctx);
         return;
+
+    case DISABLING_STEP_PERIODIC_REGISTRATION_CHECKS:
+        periodic_registration_check_disable (ctx->self);
+        /* Fall down to next step */
+        ctx->step++;
 
     case DISABLING_STEP_CLEANUP_PS_REGISTRATION:
         if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->cleanup_ps_registration &&
