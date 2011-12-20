@@ -106,11 +106,12 @@ GList   *mm_modem_list_bearers_sync   (MMModem *self,
                                        GCancellable *cancellable,
                                        GError **error);
 
-#define MM_BEARER_PROPERTY_APN      "apn"
-#define MM_BEARER_PROPERTY_IP_TYPE  "ip-type"
-#define MM_BEARER_PROPERTY_USER     "user"
-#define MM_BEARER_PROPERTY_PASSWORD "password"
-#define MM_BEARER_PROPERTY_NUMBER   "number"
+#define MM_BEARER_PROPERTY_APN           "apn"           /* string  */
+#define MM_BEARER_PROPERTY_IP_TYPE       "ip-type"       /* string  */
+#define MM_BEARER_PROPERTY_ALLOW_ROAMING "allow-roaming" /* boolean */
+#define MM_BEARER_PROPERTY_USER          "user"          /* string  */
+#define MM_BEARER_PROPERTY_PASSWORD      "password"      /* string  */
+#define MM_BEARER_PROPERTY_NUMBER        "number"        /* string  */
 
 void     mm_modem_create_bearer         (MMModem *self,
                                          GCancellable *cancellable,
