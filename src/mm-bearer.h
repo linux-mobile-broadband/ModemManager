@@ -62,6 +62,7 @@ struct _MMBearerClass {
     /* Connect this bearer */
     void (* connect) (MMBearer *bearer,
                       const gchar *number,
+                      GCancellable *cancellable,
                       GAsyncReadyCallback callback,
                       gpointer user_data);
     gboolean (* connect_finish) (MMBearer *bearer,

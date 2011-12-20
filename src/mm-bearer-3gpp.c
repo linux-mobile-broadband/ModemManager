@@ -78,6 +78,7 @@ typedef struct {
     guint max_cid;
     GSimpleAsyncResult *result;
     GError *error;
+    GCancellable *cancellable;
 } ConnectContext;
 
 static void
@@ -121,12 +122,27 @@ connect_context_complete_and_free (ConnectContext *ctx)
 
     g_simple_async_result_complete_in_idle (ctx->result);
 
+    g_object_unref (ctx->cancellable);
     g_object_unref (ctx->data);
     g_object_unref (ctx->primary);
     g_object_unref (ctx->bearer);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->result);
     g_free (ctx);
+}
+
+static gboolean
+connect_context_set_error_if_cancelled (ConnectContext *ctx,
+                                        GError **error)
+{
+    if (!g_cancellable_is_cancelled (ctx->cancellable))
+        return FALSE;
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_CANCELLED,
+                 "Connection setup operation has been cancelled");
+    return TRUE;
 }
 
 static gboolean
@@ -143,6 +159,12 @@ connect_report_ready (MMBaseModem *modem,
                       ConnectContext *ctx)
 {
     const gchar *result;
+
+    /* If cancelled, complete */
+    if (connect_context_set_error_if_cancelled (ctx, &ctx->error)) {
+        connect_context_complete_and_free (ctx);
+        return;
+    }
 
     result = mm_base_modem_at_command_finish (modem, res, NULL);
     if (result &&
@@ -166,6 +188,9 @@ connect_ready (MMBaseModem *modem,
                GAsyncResult *res,
                ConnectContext *ctx)
 {
+    /* DO NOT check for cancellable here. If we got here without errors, the
+     * bearer is really connected and therefore we need to reflect that in
+     * the state machine. */
     mm_base_modem_at_command_finish (modem, res, &(ctx->error));
     if (ctx->error) {
         /* Try to get more information why it failed */
@@ -191,6 +216,12 @@ initialize_pdp_context_ready (MMBaseModem *self,
                               ConnectContext *ctx)
 {
     gchar *command;
+
+    /* If cancelled, complete */
+    if (connect_context_set_error_if_cancelled (ctx, &ctx->error)) {
+        connect_context_complete_and_free (ctx);
+        return;
+    }
 
     mm_base_modem_at_command_finish (self, res, &(ctx->error));
     if (ctx->error) {
@@ -230,6 +261,14 @@ find_cid_ready (MMBaseModem *self,
         return;
     }
 
+    /* If cancelled, complete. Normally, we would get the cancellation error
+     * already when finishing the sequence, but we may still get cancelled
+     * between last command result parsing in the sequence and the ready(). */
+    if (connect_context_set_error_if_cancelled (ctx, &ctx->error)) {
+        connect_context_complete_and_free (ctx);
+        return;
+    }
+
     /* Initialize PDP context with our APN */
     ctx->cid = g_variant_get_uint32 (result);
     command = g_strdup_printf ("+CGDCONT=%u,\"IP\",\"%s\"",
@@ -260,6 +299,10 @@ parse_cid_range (MMBaseModem *self,
     GRegex *r;
     GMatchInfo *match_info;
     guint cid = 0;
+
+    /* If cancelled, set result error */
+    if (connect_context_set_error_if_cancelled (ctx, result_error))
+        return FALSE;
 
     if (error) {
         mm_dbg ("Unexpected +CGDCONT error: '%s'", error->message);
@@ -341,6 +384,10 @@ parse_pdp_list (MMBaseModem *self,
     GList *l;
     guint cid;
 
+    /* If cancelled, set result error */
+    if (connect_context_set_error_if_cancelled (ctx, result_error))
+        return FALSE;
+
     ctx->max_cid = 0;
 
     /* Some Android phones don't support querying existing PDP contexts,
@@ -408,6 +455,7 @@ static const MMBaseModemAtCommand find_cid_sequence[] = {
 static void
 connect (MMBearer *self,
          const gchar *number,
+         GCancellable *cancellable,
          GAsyncReadyCallback callback,
          gpointer user_data)
 {
@@ -489,6 +537,12 @@ connect (MMBearer *self,
     ctx->data = g_object_ref (data);
     ctx->bearer = g_object_ref (self);
     ctx->modem = modem;
+
+    /* NOTE:
+     * We don't currently support cancelling AT commands, so we'll just check
+     * whether the operation is to be cancelled at each step. */
+    ctx->cancellable = g_object_ref (cancellable);
+
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,

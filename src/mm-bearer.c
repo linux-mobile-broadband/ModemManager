@@ -59,10 +59,35 @@ struct _MMBearerPrivate {
     gboolean connection_allowed;
     /* Status of this bearer */
     MMBearerStatus status;
+
+    /* Cancellable for connect() */
+    GCancellable *connect_cancellable;
+    /* handler id for the disconnect + cancel connect request */
+    gulong disconnect_signal_handler;
 };
 
 /*****************************************************************************/
 /* CONNECT */
+
+static void
+disconnect_after_cancel_ready (MMBearer *self,
+                               GAsyncResult *res)
+{
+    GError *error = NULL;
+
+    if (!MM_BEARER_GET_CLASS (self)->disconnect_finish (self, res, &error)) {
+        mm_warn ("Error disconnecting bearer '%s': '%s'. "
+                 "Will assume disconnected anyway.",
+                 self->priv->path,
+                 error->message);
+        g_error_free (error);
+    }
+    else
+        mm_dbg ("Disconnected bearer '%s'", self->priv->path);
+
+    self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
+}
 
 static void
 handle_connect_ready (MMBearer *self,
@@ -70,19 +95,49 @@ handle_connect_ready (MMBearer *self,
                       GDBusMethodInvocation *invocation)
 {
     GError *error = NULL;
+    gboolean launch_disconnect = FALSE;
 
+    /* NOTE: connect() implementations *MUST* handle cancellations themselves */
     if (!MM_BEARER_GET_CLASS (self)->connect_finish (self, res, &error)) {
-        mm_dbg ("Couldn't connect bearer '%s'", self->priv->path);
-        self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
+        mm_dbg ("Couldn't connect bearer '%s': '%s'",
+                self->priv->path,
+                error->message);
+        if (g_error_matches (error,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_CANCELLED)) {
+            /* Will launch disconnection */
+            launch_disconnect = TRUE;
+        } else {
+            self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
+            g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
+        }
         g_dbus_method_invocation_take_error (invocation, error);
+    }
+    else if (g_cancellable_is_cancelled (self->priv->connect_cancellable)) {
+        mm_dbg ("Connected bearer '%s', but need to disconnect", self->priv->path);
+        g_dbus_method_invocation_return_error (
+            invocation,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_CANCELLED,
+            "Bearer got connected, but had to disconnect after cancellation request");
+            launch_disconnect = TRUE;
     }
     else {
         mm_dbg ("Connected bearer '%s'", self->priv->path);
         self->priv->status = MM_BEARER_STATUS_CONNECTED;
+        g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
         mm_gdbus_bearer_complete_connect (MM_GDBUS_BEARER (self), invocation);
     }
 
-    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
+    if (launch_disconnect) {
+        self->priv->status = MM_BEARER_STATUS_DISCONNECTING;
+        g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
+        MM_BEARER_GET_CLASS (self)->disconnect (
+            self,
+            (GAsyncReadyCallback)disconnect_after_cancel_ready,
+            NULL);
+    }
+
     g_object_unref (invocation);
 }
 
@@ -91,6 +146,10 @@ handle_connect (MMBearer *self,
                 GDBusMethodInvocation *invocation,
                 const gchar *number)
 {
+    g_assert (MM_BEARER_GET_CLASS (self)->connect != NULL);
+    g_assert (MM_BEARER_GET_CLASS (self)->connect_finish != NULL);
+
+    /* Bearer may not be allowed to connect yet */
     if (!self->priv->connection_allowed) {
         g_dbus_method_invocation_return_error (
             invocation,
@@ -100,21 +159,45 @@ handle_connect (MMBearer *self,
         return TRUE;
     }
 
-    if (MM_BEARER_GET_CLASS (self)->connect != NULL &&
-        MM_BEARER_GET_CLASS (self)->connect_finish != NULL) {
-        /* Connecting! */
-        mm_dbg ("Connecting bearer '%s'", self->priv->path);
-        self->priv->status = MM_BEARER_STATUS_CONNECTING;
-        g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
-        MM_BEARER_GET_CLASS (self)->connect (
-            self,
-            number,
-            (GAsyncReadyCallback)handle_connect_ready,
-            g_object_ref (invocation));
+    /* If already connected, done */
+    if (self->priv->status == MM_BEARER_STATUS_CONNECTED) {
+        mm_gdbus_bearer_complete_connect (MM_GDBUS_BEARER (self), invocation);
         return TRUE;
     }
 
-    return FALSE;
+    /* If already connecting, return error, don't allow a second request. */
+    if (self->priv->status == MM_BEARER_STATUS_CONNECTING) {
+        g_dbus_method_invocation_return_error (
+            invocation,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_IN_PROGRESS,
+            "Bearer already being connected");
+        return TRUE;
+    }
+
+    /* If currently disconnecting, return error, previous operation should
+     * finish before allowing to connect again. */
+    if (self->priv->status == MM_BEARER_STATUS_DISCONNECTING) {
+        g_dbus_method_invocation_return_error (
+            invocation,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_FAILED,
+            "Bearer currently being disconnected");
+        return TRUE;
+    }
+
+    /* Connecting! */
+    mm_dbg ("Connecting bearer '%s'", self->priv->path);
+    self->priv->connect_cancellable = g_cancellable_new ();
+    self->priv->status = MM_BEARER_STATUS_CONNECTING;
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
+    MM_BEARER_GET_CLASS (self)->connect (
+        self,
+        number,
+        self->priv->connect_cancellable,
+        (GAsyncReadyCallback)handle_connect_ready,
+        g_object_ref (invocation));
+    return TRUE;
 }
 
 /*****************************************************************************/
@@ -142,24 +225,75 @@ handle_disconnect_ready (MMBearer *self,
     g_object_unref (invocation);
 }
 
+static void
+status_changed_complete_disconnect (MMBearer *self,
+                                    GParamSpec *pspec,
+                                    GDBusMethodInvocation *invocation)
+{
+    /* We may get other states here before DISCONNECTED, like DISCONNECTING or
+     * even CONNECTED. */
+    if (self->priv->status != MM_BEARER_STATUS_DISCONNECTED)
+        return;
+
+    mm_dbg ("Disconnected bearer '%s' after cancelling previous connect request",
+            self->priv->path);
+    mm_gdbus_bearer_complete_disconnect (MM_GDBUS_BEARER (self), invocation);
+
+    g_signal_handler_disconnect (self,
+                                 self->priv->disconnect_signal_handler);
+    self->priv->disconnect_signal_handler = 0;
+}
+
 static gboolean
 handle_disconnect (MMBearer *self,
                    GDBusMethodInvocation *invocation)
 {
-    if (MM_BEARER_GET_CLASS (self)->disconnect != NULL &&
-        MM_BEARER_GET_CLASS (self)->disconnect_finish != NULL) {
-        /* Disconnecting! */
-        mm_dbg ("Disconnecting bearer '%s'", self->priv->path);
-        self->priv->status = MM_BEARER_STATUS_DISCONNECTING;
-        g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
-        MM_BEARER_GET_CLASS (self)->disconnect (
-            self,
-            (GAsyncReadyCallback)handle_disconnect_ready,
-            g_object_ref (invocation));
+    g_assert (MM_BEARER_GET_CLASS (self)->disconnect != NULL);
+    g_assert (MM_BEARER_GET_CLASS (self)->disconnect_finish != NULL);
+
+    /* If already disconnected, done */
+    if (self->priv->status == MM_BEARER_STATUS_DISCONNECTED) {
+        mm_gdbus_bearer_complete_disconnect (MM_GDBUS_BEARER (self), invocation);
         return TRUE;
     }
 
-    return FALSE;
+    /* If already disconnecting, return error, don't allow a second request. */
+    if (self->priv->status == MM_BEARER_STATUS_DISCONNECTING) {
+        g_dbus_method_invocation_return_error (
+            invocation,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_IN_PROGRESS,
+            "Bearer already being disconnected");
+        return TRUE;
+    }
+
+    mm_dbg ("Disconnecting bearer '%s'", self->priv->path);
+
+    /* If currently connecting, try to cancel that operation, and wait to get
+     * disconnected. */
+    if (self->priv->status == MM_BEARER_STATUS_CONNECTING) {
+        /* We MUST ensure that we get to DISCONNECTED */
+        g_cancellable_cancel (self->priv->connect_cancellable);
+        /* Note that we only allow to remove disconnected bearers, so should
+         * be safe to assume that we'll get the signal handler called properly
+         */
+        self->priv->disconnect_signal_handler =
+            g_signal_connect (self,
+                              "notify::" MM_BEARER_STATUS,
+                              (GCallback)status_changed_complete_disconnect,
+                              g_object_ref (invocation));
+
+        return TRUE;
+    }
+
+    /* Disconnecting! */
+    self->priv->status = MM_BEARER_STATUS_DISCONNECTING;
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
+    MM_BEARER_GET_CLASS (self)->disconnect (
+        self,
+        (GAsyncReadyCallback)handle_disconnect_ready,
+        g_object_ref (invocation));
+    return TRUE;
 }
 
 /*****************************************************************************/
@@ -227,6 +361,26 @@ mm_bearer_set_connection_allowed (MMBearer *self)
     self->priv->connection_allowed = TRUE;
 }
 
+static void
+disconnect_after_forbidden_ready (MMBearer *self,
+                                  GAsyncResult *res)
+{
+    GError *error = NULL;
+
+    if (!MM_BEARER_GET_CLASS (self)->disconnect_finish (self, res, &error)) {
+        mm_warn ("Error disconnecting bearer '%s': '%s'. "
+                 "Will assume disconnected anyway.",
+                 self->priv->path,
+                 error->message);
+        g_error_free (error);
+    }
+    else
+        mm_dbg ("Disconnected bearer '%s'", self->priv->path);
+
+    self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
+}
+
 void
 mm_bearer_set_connection_forbidden (MMBearer *self)
 {
@@ -235,7 +389,27 @@ mm_bearer_set_connection_forbidden (MMBearer *self)
 
     mm_dbg ("Connection in bearer '%s' is forbidden", self->priv->path);
     self->priv->connection_allowed = FALSE;
-    /* TODO: possibly, force disconnection */
+
+    if (self->priv->status == MM_BEARER_STATUS_DISCONNECTING ||
+        self->priv->status == MM_BEARER_STATUS_DISCONNECTED) {
+        return;
+    }
+
+    mm_dbg ("Disconnecting bearer '%s'", self->priv->path);
+
+    /* If currently connecting, try to cancel that operation. */
+    if (self->priv->status == MM_BEARER_STATUS_CONNECTING) {
+        g_cancellable_cancel (self->priv->connect_cancellable);
+        return;
+    }
+
+    /* Disconnecting! */
+    self->priv->status = MM_BEARER_STATUS_DISCONNECTING;
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
+    MM_BEARER_GET_CLASS (self)->disconnect (
+        self,
+        (GAsyncReadyCallback)disconnect_after_forbidden_ready,
+        NULL);
 }
 
 void
