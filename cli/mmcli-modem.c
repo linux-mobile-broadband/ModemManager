@@ -505,6 +505,7 @@ static void
 create_bearer_parse_known_input (const gchar  *input,
                                  gchar       **apn,
                                  gchar       **ip_type,
+                                 gboolean     *allow_roaming,
                                  gchar       **user,
                                  gchar       **password,
                                  gchar       **number)
@@ -515,7 +516,8 @@ create_bearer_parse_known_input (const gchar  *input,
     guint i;
 
     /* Expecting input as:
-     * key1=value1,key2=value2,... */
+     *   key1=string,key2=true,key3=false...
+     * */
 
     words = g_strsplit_set (input, ",= ", -1);
     if (!words)
@@ -534,6 +536,18 @@ create_bearer_parse_known_input (const gchar  *input,
             *apn = value;
         else if (g_str_equal (key, MM_BEARER_PROPERTY_IP_TYPE))
             *ip_type = value;
+        else if (g_str_equal (key, MM_BEARER_PROPERTY_ALLOW_ROAMING)) {
+            if (g_ascii_strcasecmp (value, "true") ||
+                g_str_equal (value, "1")) {
+                *allow_roaming = TRUE;
+            } else if (g_ascii_strcasecmp (value, "false") ||
+                g_str_equal (value, "0")) {
+                *allow_roaming = FALSE;
+            } else
+                g_printerr ("error: invalid value '%s' for boolean property '%s'",
+                            value, key);
+            g_free (value);
+        }
         else if (g_str_equal (key, MM_BEARER_PROPERTY_USER))
             *user = value;
         else if (g_str_equal (key, MM_BEARER_PROPERTY_PASSWORD))
@@ -684,10 +698,12 @@ get_modem_ready (GObject      *source,
         gchar *user = NULL;
         gchar *password = NULL;
         gchar *number = NULL;
+        gboolean allow_roaming = TRUE;
 
         create_bearer_parse_known_input (create_bearer_str,
                                          &apn,
                                          &ip_type,
+                                         &allow_roaming,
                                          &user,
                                          &password,
                                          &number);
@@ -697,11 +713,12 @@ get_modem_ready (GObject      *source,
                                 ctx->cancellable,
                                 (GAsyncReadyCallback)create_bearer_ready,
                                 NULL,
-                                MM_BEARER_PROPERTY_APN,      apn,
-                                MM_BEARER_PROPERTY_IP_TYPE,  ip_type,
-                                MM_BEARER_PROPERTY_USER,     user,
-                                MM_BEARER_PROPERTY_PASSWORD, password,
-                                MM_BEARER_PROPERTY_NUMBER,   number,
+                                MM_BEARER_PROPERTY_APN,           apn,
+                                MM_BEARER_PROPERTY_IP_TYPE,       ip_type,
+                                MM_BEARER_PROPERTY_USER,          user,
+                                MM_BEARER_PROPERTY_PASSWORD,      password,
+                                MM_BEARER_PROPERTY_NUMBER,        number,
+                                MM_BEARER_PROPERTY_ALLOW_ROAMING, allow_roaming,
                                 NULL);
 
         g_free (apn);
@@ -822,25 +839,29 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
         gchar *user = NULL;
         gchar *password = NULL;
         gchar *number = NULL;
+        gboolean allow_roaming = TRUE;
         MMBearer *bearer;
 
         create_bearer_parse_known_input (create_bearer_str,
                                          &apn,
                                          &ip_type,
+                                         &allow_roaming,
                                          &user,
                                          &password,
                                          &number);
 
         g_debug ("Synchronously creating new bearer in modem...");
-        bearer = mm_modem_create_bearer_sync (ctx->modem,
-                                              NULL,
-                                              &error,
-                                              MM_BEARER_PROPERTY_APN,      apn,
-                                              MM_BEARER_PROPERTY_IP_TYPE,  ip_type,
-                                              MM_BEARER_PROPERTY_USER,     user,
-                                              MM_BEARER_PROPERTY_PASSWORD, password,
-                                              MM_BEARER_PROPERTY_NUMBER,   number,
-                                              NULL);
+        bearer = mm_modem_create_bearer_sync (
+            ctx->modem,
+            NULL,
+            &error,
+            MM_BEARER_PROPERTY_APN,           apn,
+            MM_BEARER_PROPERTY_IP_TYPE,       ip_type,
+            MM_BEARER_PROPERTY_USER,          user,
+            MM_BEARER_PROPERTY_PASSWORD,      password,
+            MM_BEARER_PROPERTY_NUMBER,        number,
+            MM_BEARER_PROPERTY_ALLOW_ROAMING, allow_roaming,
+            NULL);
 
         g_free (apn);
         g_free (ip_type);
