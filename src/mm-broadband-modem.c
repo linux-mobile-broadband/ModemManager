@@ -83,61 +83,6 @@ struct _MMBroadbandModemPrivate {
 /*****************************************************************************/
 /* CREATE BEARER */
 
-typedef struct {
-    MMBearer *self;
-    guint others_connected;
-} CountConnectedContext;
-
-static void
-bearer_list_count_connected (MMBearer *bearer,
-                             CountConnectedContext *ctx)
-{
-    /* We can safely compare pointers here */
-    if (bearer != ctx->self &&
-        mm_bearer_get_status (bearer) == MM_BEARER_STATUS_CONNECTED) {
-        ctx->others_connected++;
-    }
-}
-
-static void
-bearer_status_changed (MMBearer *bearer,
-                       GParamSpec *pspec,
-                       MMBroadbandModem *self)
-{
-    CountConnectedContext ctx;
-    MMModemState new_state;
-
-    ctx.self = bearer;
-    ctx.others_connected = 0;
-
-    /* We now count how many *other* bearers are connected */
-    mm_bearer_list_foreach (self->priv->modem_bearer_list,
-                            (MMBearerListForeachFunc)bearer_list_count_connected,
-                            &ctx);
-
-    /* If no other bearers are connected, change modem state */
-    if (!ctx.others_connected) {
-        switch (mm_bearer_get_status (bearer)) {
-        case MM_BEARER_STATUS_CONNECTED:
-            new_state = MM_MODEM_STATE_CONNECTED;
-            break;
-        case MM_BEARER_STATUS_CONNECTING:
-            new_state = MM_MODEM_STATE_CONNECTING;
-            break;
-        case MM_BEARER_STATUS_DISCONNECTING:
-            new_state = MM_MODEM_STATE_DISCONNECTING;
-            break;
-        case MM_BEARER_STATUS_DISCONNECTED:
-            new_state = MM_MODEM_STATE_REGISTERED;
-            break;
-        }
-
-        mm_iface_modem_update_state (MM_IFACE_MODEM (self),
-                                     new_state,
-                                     MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
-    }
-}
-
 static MMModem3gppRegistrationState get_consolidated_reg_state (MMBroadbandModem *self);
 
 static MMBearer *
@@ -193,12 +138,6 @@ modem_create_bearer (MMIfaceModem *self,
             mm_bearer_set_connection_allowed (bearer);
         else
             mm_bearer_set_connection_forbidden (bearer);
-
-        /* We want to get reported about bearer status changes */
-        g_signal_connect (bearer,
-                          "notify::bearer-status",
-                          (GCallback)bearer_status_changed,
-                          self);
     }
 
     /* Set a new ref to the bearer object as result */

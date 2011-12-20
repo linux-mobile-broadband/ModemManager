@@ -63,6 +63,66 @@ dbus_call_context_new (MmGdbusModem *skeleton,
 
 /*****************************************************************************/
 
+typedef struct {
+    MMBearer *self;
+    guint others_connected;
+} CountOthersConnectedContext;
+
+static void
+bearer_list_count_others_connected (MMBearer *bearer,
+                                    CountOthersConnectedContext *ctx)
+{
+    /* We can safely compare pointers here */
+    if (bearer != ctx->self &&
+        mm_bearer_get_status (bearer) == MM_BEARER_STATUS_CONNECTED) {
+        ctx->others_connected++;
+    }
+}
+
+static void
+bearer_status_changed (MMBearer *bearer,
+                       GParamSpec *pspec,
+                       MMIfaceModem *self)
+{
+    CountOthersConnectedContext ctx;
+    MMModemState new_state;
+    MMBearerList *list = NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_BEARER_LIST, &list,
+                  NULL);
+
+    ctx.self = bearer;
+    ctx.others_connected = 0;
+
+    /* We now count how many *other* bearers are connected */
+    mm_bearer_list_foreach (list,
+                            (MMBearerListForeachFunc)bearer_list_count_others_connected,
+                            &ctx);
+
+    /* If no other bearers are connected, change modem state */
+    if (!ctx.others_connected) {
+        switch (mm_bearer_get_status (bearer)) {
+        case MM_BEARER_STATUS_CONNECTED:
+            new_state = MM_MODEM_STATE_CONNECTED;
+            break;
+        case MM_BEARER_STATUS_CONNECTING:
+            new_state = MM_MODEM_STATE_CONNECTING;
+            break;
+        case MM_BEARER_STATUS_DISCONNECTING:
+            new_state = MM_MODEM_STATE_DISCONNECTING;
+            break;
+        case MM_BEARER_STATUS_DISCONNECTED:
+            new_state = MM_MODEM_STATE_REGISTERED;
+            break;
+        }
+
+        mm_iface_modem_update_state (self,
+                                     new_state,
+                                     MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
+    }
+}
+
 static void
 handle_create_bearer_ready (MMIfaceModem *self,
                             GAsyncResult *res,
@@ -85,10 +145,18 @@ handle_create_bearer_ready (MMIfaceModem *self,
 
         if (!mm_bearer_list_add_bearer (list, bearer, &error))
             g_dbus_method_invocation_take_error (ctx->invocation, error);
-        else
+        else {
+            /* If bearer properly created and added to the list, follow its
+             * status */
+            g_signal_connect (bearer,
+                              "notify::"  MM_BEARER_STATUS,
+                              (GCallback)bearer_status_changed,
+                              self);
+
             mm_gdbus_modem_complete_create_bearer (ctx->skeleton,
                                                    ctx->invocation,
                                                    mm_bearer_get_path (bearer));
+        }
         g_object_unref (bearer);
     }
     dbus_call_context_free (ctx);
@@ -182,7 +250,7 @@ bearer_list_count_connected (MMBearer *bearer,
                              guint *count)
 {
     if (mm_bearer_get_status (bearer) == MM_BEARER_STATUS_CONNECTED)
-        *count++;
+        (*count)++;
 }
 
 void
