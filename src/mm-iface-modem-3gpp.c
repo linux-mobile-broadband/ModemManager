@@ -412,6 +412,7 @@ STR_REPLY_READY_FN (operator_name, "Operator Name")
 static void
 set_bearer_3gpp_connection_allowed (MMBearer *bearer)
 {
+    /* TODO: don't allow bearers to get connected if roaming forbidden */
     if (MM_IS_BEARER_3GPP (bearer))
         mm_bearer_set_connection_allowed (bearer);
 }
