@@ -211,80 +211,10 @@ prefix_newlines (const gchar *prefix,
 }
 
 static void
-print_bearer_info (MMBearer *bearer)
+print_bearer_short_info (MMBearer *bearer)
 {
-    const MMBearerIpConfig *ipv4_config;
-    const MMBearerIpConfig *ipv6_config;
-
-    ipv4_config = mm_bearer_get_ipv4_config (bearer);
-    ipv6_config = mm_bearer_get_ipv6_config (bearer);
-
-    /* Not the best thing to do, as we may be doing _get() calls twice, but
-     * easiest to maintain */
-#undef VALIDATE
-#define VALIDATE(str) (str ? str : "unknown")
-
-    g_print ("Bearer '%s'\n",
+    g_print ("\t%s\n",
              mm_bearer_get_path (bearer));
-    g_print ("  -------------------------\n"
-             "  Status             |   connected: '%s'\n"
-             "                     |   suspended: '%s'\n"
-             "                     |   interface: '%s'\n",
-             mm_bearer_get_connected (bearer) ? "yes" : "no",
-             mm_bearer_get_suspended (bearer) ? "yes" : "no",
-             VALIDATE (mm_bearer_get_interface (bearer)));
-
-    /* IPv4 */
-    g_print ("  -------------------------\n"
-             "  IPv4 configuration |   method: '%s'\n",
-             (ipv4_config ?
-              mmcli_get_bearer_ip_method_string (mm_bearer_ip_config_get_method (ipv4_config)) :
-              "none"));
-    if (ipv4_config &&
-        mm_bearer_ip_config_get_method (ipv4_config) == MM_BEARER_IP_METHOD_STATIC) {
-        const gchar **dns;
-        guint i;
-
-        dns = mm_bearer_ip_config_get_dns (ipv4_config);
-        g_print ("                   |  address: '%s'\n"
-                 "                   |   prefix: '%u'\n"
-                 "                   |  gateway: '%s'\n"
-                 "                   |      DNS: '%s'",
-                 VALIDATE (mm_bearer_ip_config_get_address (ipv4_config)),
-                 mm_bearer_ip_config_get_prefix (ipv4_config),
-                 VALIDATE (mm_bearer_ip_config_get_gateway (ipv4_config)),
-                 VALIDATE (dns[0]));
-        /* Additional DNS addresses */
-        for (i = 1; dns[i]; i++)
-            g_print (", '%s'", dns[i]);
-        g_print ("\n");
-    }
-
-    /* IPv6 */
-    g_print ("  -------------------------\n"
-             "  IPv6 configuration |   method: '%s'\n",
-             (ipv6_config ?
-              mmcli_get_bearer_ip_method_string (mm_bearer_ip_config_get_method (ipv6_config)) :
-              "none"));
-    if (ipv6_config &&
-        mm_bearer_ip_config_get_method (ipv6_config) == MM_BEARER_IP_METHOD_STATIC) {
-        const gchar **dns;
-        guint i;
-
-        dns = mm_bearer_ip_config_get_dns (ipv6_config);
-        g_print ("                   |  address: '%s'\n"
-                 "                   |   prefix: '%u'\n"
-                 "                   |  gateway: '%s'\n"
-                 "                   |      DNS: '%s'",
-                 VALIDATE(mm_bearer_ip_config_get_address (ipv6_config)),
-                 mm_bearer_ip_config_get_prefix (ipv6_config),
-                 VALIDATE(mm_bearer_ip_config_get_gateway (ipv6_config)),
-                 VALIDATE(dns[0]));
-        /* Additional DNS addresses */
-        for (i = 1; dns[i]; i++)
-            g_print (", '%s'", dns[i]);
-        g_print ("\n");
-    }
 }
 
 static void
@@ -521,7 +451,7 @@ list_bearers_process_reply (GList        *result,
             MMBearer *bearer = MM_BEARER (l->data);
 
             g_print ("\n");
-            print_bearer_info (bearer);
+            print_bearer_short_info (bearer);
             g_object_unref (bearer);
         }
         g_list_free (result);
@@ -553,7 +483,7 @@ create_bearer_process_reply (MMBearer     *bearer,
     }
 
     g_print ("Successfully created new bearer in modem:\n");
-    print_bearer_info (bearer);
+    print_bearer_short_info (bearer);
     g_object_unref (bearer);
 }
 
