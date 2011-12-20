@@ -557,11 +557,11 @@ mm_modem_get_state (MMModem *self)
  * Returns: A ##MMModemAccessTech value.
  */
 MMModemAccessTech
-mm_modem_get_access_technology (MMModem *self)
+mm_modem_get_access_technologies (MMModem *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), MM_MODEM_ACCESS_TECH_UNKNOWN);
 
-    return (MMModemAccessTech) mm_gdbus_modem_get_access_technology (self);
+    return (MMModemAccessTech) mm_gdbus_modem_get_access_technologies (self);
 }
 
 /**

@@ -2202,7 +2202,7 @@ mm_iface_modem_initialize (MMIfaceModem *self,
         mm_gdbus_modem_set_equipment_identifier (skeleton, NULL);
         mm_gdbus_modem_set_unlock_required (skeleton, MM_MODEM_LOCK_UNKNOWN);
         mm_gdbus_modem_set_unlock_retries (skeleton, 0);
-        mm_gdbus_modem_set_access_technology (skeleton, MM_MODEM_ACCESS_TECH_UNKNOWN);
+        mm_gdbus_modem_set_access_technologies (skeleton, MM_MODEM_ACCESS_TECH_UNKNOWN);
         mm_gdbus_modem_set_signal_quality (skeleton, g_variant_new ("(ub)", 0, FALSE));
         mm_gdbus_modem_set_supported_modes (skeleton, MM_MODEM_MODE_NONE);
         mm_gdbus_modem_set_allowed_modes (skeleton, MM_MODEM_MODE_ANY);

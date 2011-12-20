@@ -324,17 +324,17 @@
     <property name="State" type="u" access="read" />
 
     <!--
-        AccessTechnology:
+        AccessTechnologies:
 
-        The current network access technology used by the device to communicate
-        with the network, given as a
-        <link linkend="MMModemAccessTech">MMModemAccessTech</link> value.
+        Bitmask of <link linkend="MMModemAccessTech">MMModemAccessTech</link> values,
+        specifying the current network access technologies used by the device to communicate
+        with the network.
 
         If the device's access technology cannot be determined,
         <link linkend="MM-MODEM-ACCESS-TECH-UNKNOWN:CAPS"><constant>MM_MODEM_ACCESS_TECH_UNKNOWN</constant></link>
         will be reported.
     -->
-    <property name="AccessTechnology" type="u" access="read" />
+    <property name="AccessTechnologies" type="u" access="read" />
 
     <!--
         SignalQuality:
