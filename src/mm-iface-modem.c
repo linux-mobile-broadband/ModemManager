@@ -177,6 +177,14 @@ handle_list_bearers (MmGdbusModem *skeleton,
 
 /*****************************************************************************/
 
+static void
+bearer_list_count_connected (MMBearer *bearer,
+                             guint *count)
+{
+    if (mm_bearer_get_status (bearer) == MM_BEARER_STATUS_CONNECTED)
+        *count++;
+}
+
 void
 mm_iface_modem_update_state (MMIfaceModem *self,
                              MMModemState new_state,
@@ -184,13 +192,31 @@ mm_iface_modem_update_state (MMIfaceModem *self,
 {
     MMModemState old_state = MM_MODEM_STATE_UNKNOWN;
     MmGdbusModem *skeleton = NULL;
+    MMBearerList *bearer_list = NULL;
 
-    /* Did we already create it? */
     g_object_get (self,
                   MM_IFACE_MODEM_STATE, &old_state,
                   MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                  MM_IFACE_MODEM_BEARER_LIST, &bearer_list,
                   NULL);
 
+    /* While connected we don't want registration status changes to change
+     * the modem's state away from CONNECTED. */
+    if ((new_state == MM_MODEM_STATE_SEARCHING ||
+         new_state == MM_MODEM_STATE_REGISTERED) &&
+        bearer_list &&
+        old_state > MM_MODEM_STATE_REGISTERED) {
+        guint connected = 0;
+
+        mm_bearer_list_foreach (bearer_list,
+                                (MMBearerListForeachFunc)bearer_list_count_connected,
+                                &connected);
+        if (connected > 0)
+            /* Don't update state */
+            new_state = old_state;
+    }
+
+    /* Update state only if different */
     if (new_state != old_state) {
         GEnumClass *enum_class;
         GEnumValue *new_value;
@@ -224,6 +250,11 @@ mm_iface_modem_update_state (MMIfaceModem *self,
                                            new_state,
                                            reason);
     }
+
+    if (skeleton)
+        g_object_unref (skeleton);
+    if (bearer_list)
+        g_object_unref (bearer_list);
 }
 
 /*****************************************************************************/

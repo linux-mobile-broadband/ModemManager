@@ -440,10 +440,6 @@ mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
                       NULL);
 
         /* TODO:
-         * While connected we don't want registration status changes to change
-         * the modem's state away from CONNECTED.
-         *
-         * TODO:
          * If we're connected and we're not supposed to roam, but the device
          * just roamed, disconnect the connection to avoid charging the user
          * loads of money.
