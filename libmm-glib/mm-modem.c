@@ -554,14 +554,14 @@ mm_modem_get_state (MMModem *self)
  * Gets the current network access technology used by the #MMModem to communicate
  * with the network.
  *
- * Returns: A ##MMModemAccessTech value.
+ * Returns: A ##MMModemAccessTechnology value.
  */
-MMModemAccessTech
+MMModemAccessTechnology
 mm_modem_get_access_technologies (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), MM_MODEM_ACCESS_TECH_UNKNOWN);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
 
-    return (MMModemAccessTech) mm_gdbus_modem_get_access_technologies (self);
+    return (MMModemAccessTechnology) mm_gdbus_modem_get_access_technologies (self);
 }
 
 /**

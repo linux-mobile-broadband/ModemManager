@@ -1110,7 +1110,7 @@ reg_state_changed (MMAtSerialPort *port,
 {
     MMModem3gppRegistrationState state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     gulong lac = 0, cell_id = 0;
-    MMModemAccessTech act = MM_MODEM_ACCESS_TECH_UNKNOWN;
+    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     gboolean cgreg = FALSE;
     GError *error = NULL;
 
@@ -1572,7 +1572,7 @@ registration_status_check_ready (MMBroadbandModem *self,
             gboolean parsed;
             gboolean cgreg = FALSE;
             MMModem3gppRegistrationState state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-            MMModemAccessTech act = MM_MODEM_ACCESS_TECH_UNKNOWN;
+            MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
             gulong lac = 0;
             gulong cid = 0;
 

@@ -28,7 +28,7 @@ typedef struct {
     gchar *operator_long;
     gchar *operator_short;
     gchar *operator_code; /* mandatory */
-    MMModemAccessTech access_tech;
+    MMModemAccessTechnology access_tech;
 } MM3gppNetworkInfo;
 
 void mm_3gpp_network_info_list_free (GList *info_list);
@@ -52,7 +52,7 @@ gboolean mm_3gpp_parse_creg_response (GMatchInfo *info,
                                       MMModem3gppRegistrationState *out_reg_state,
                                       gulong *out_lac,
                                       gulong *out_ci,
-                                      MMModemAccessTech *out_act,
+                                      MMModemAccessTechnology *out_act,
                                       gboolean *out_cgreg,
                                       GError **error);
 

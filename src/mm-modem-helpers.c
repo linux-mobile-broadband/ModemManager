@@ -61,29 +61,29 @@ mm_3gpp_network_info_list_free (GList *info_list)
     g_list_free (info_list);
 }
 
-static MMModemAccessTech
+static MMModemAccessTechnology
 get_mm_access_tech_from_etsi_access_tech (guint act)
 {
     /* See ETSI TS 27.007 */
     switch (act) {
     case 0:
-        return MM_MODEM_ACCESS_TECH_GSM;
+        return MM_MODEM_ACCESS_TECHNOLOGY_GSM;
     case 1:
-        return MM_MODEM_ACCESS_TECH_GSM_COMPACT;
+        return MM_MODEM_ACCESS_TECHNOLOGY_GSM_COMPACT;
     case 2:
-        return MM_MODEM_ACCESS_TECH_UMTS;
+        return MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
     case 3:
-        return MM_MODEM_ACCESS_TECH_EDGE;
+        return MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
     case 4:
-        return MM_MODEM_ACCESS_TECH_HSDPA;
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
     case 5:
-        return MM_MODEM_ACCESS_TECH_HSUPA;
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
     case 6:
-        return MM_MODEM_ACCESS_TECH_HSPA;
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSPA;
     case 7:
-        return MM_MODEM_ACCESS_TECH_LTE;
+        return MM_MODEM_ACCESS_TECHNOLOGY_LTE;
     default:
-        return MM_MODEM_ACCESS_TECH_UNKNOWN;
+        return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     }
 }
 
@@ -129,7 +129,7 @@ parse_network_status (const gchar *str)
     return (MMModem3gppNetworkAvailability) (str[0] - '0');
 }
 
-static MMModemAccessTech
+static MMModemAccessTechnology
 parse_access_tech (const gchar *str)
 {
     /* Recognized access technologies are between '0' and '7' inclusive... */
@@ -138,7 +138,7 @@ parse_access_tech (const gchar *str)
         str[0] < '0' ||
         str[0] > '7') {
         mm_warn ("Cannot parse access tech: '%s'", str);
-        return MM_MODEM_ACCESS_TECH_UNKNOWN;
+        return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
     }
 
     return get_mm_access_tech_from_etsi_access_tech (str[0] - '0');
@@ -227,7 +227,7 @@ mm_3gpp_parse_scan_response (const gchar *reply,
     }
 
     network_availability_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_3GPP_NETWORK_AVAILABILITY));
-    access_tech_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_ACCESS_TECH));
+    access_tech_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_ACCESS_TECHNOLOGY));
 
     /* Parse the results */
     while (g_match_info_matches (match_info)) {
@@ -252,7 +252,7 @@ mm_3gpp_parse_scan_response (const gchar *reply,
                NULL);
         info->access_tech = (tmp ?
                              parse_access_tech (tmp) :
-                             MM_MODEM_ACCESS_TECH_GSM);
+                             MM_MODEM_ACCESS_TECHNOLOGY_GSM);
         g_free (tmp);
 
         /* If the operator number isn't valid (ie, at least 5 digits),
@@ -535,7 +535,7 @@ mm_3gpp_parse_creg_response (GMatchInfo *info,
                              MMModem3gppRegistrationState *out_reg_state,
                              gulong *out_lac,
                              gulong *out_ci,
-                             MMModemAccessTech *out_act,
+                             MMModemAccessTechnology *out_act,
                              gboolean *out_cgreg,
                              GError **error)
 {

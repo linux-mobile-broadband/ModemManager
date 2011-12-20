@@ -72,9 +72,9 @@
               <literal>"31026"</literal> or <literal>"310260"</literal>.
             </listitem>
           </varlistentry>
-          <varlistentry><term><literal>"access-tech"</literal></term>
+          <varlistentry><term><literal>"access-technology"</literal></term>
             <listitem>
-              A <link linkend="MMModemAccessTech">MMModemAccessTech</link> value
+              A <link linkend="MMModemAccessTechnology">MMModemAccessTechnology</link> value
               representing the generic access technology used by this mobile network,
               given as an unsigned integer (signature <literal>"u"</literal>).
             </listitem>

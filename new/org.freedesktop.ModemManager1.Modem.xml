@@ -326,12 +326,12 @@
     <!--
         AccessTechnologies:
 
-        Bitmask of <link linkend="MMModemAccessTech">MMModemAccessTech</link> values,
+        Bitmask of <link linkend="MMModemAccessTechnology">MMModemAccessTechnology</link> values,
         specifying the current network access technologies used by the device to communicate
         with the network.
 
         If the device's access technology cannot be determined,
-        <link linkend="MM-MODEM-ACCESS-TECH-UNKNOWN:CAPS"><constant>MM_MODEM_ACCESS_TECH_UNKNOWN</constant></link>
+        <link linkend="MM-MODEM-ACCESS-TECHNOLOGY-UNKNOWN:CAPS"><constant>MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN</constant></link>
         will be reported.
     -->
     <property name="AccessTechnologies" type="u" access="read" />

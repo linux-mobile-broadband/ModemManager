@@ -170,7 +170,7 @@ scan_networks_build_result (GList *info_list)
         g_variant_builder_add (&builder, "{sv}",
                                "status", g_variant_new_uint32 (info->status));
         g_variant_builder_add (&builder, "{sv}",
-                               "access-tech", g_variant_new_uint32 (info->access_tech));
+                               "access-technology", g_variant_new_uint32 (info->access_tech));
         if (info->operator_long)
             g_variant_builder_add (&builder, "{sv}",
                                    "operator-long", g_variant_new_string (info->operator_long));

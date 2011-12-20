@@ -6,7 +6,7 @@ MMModem3gppFacility
 MMModem3gppNetworkAvailability
 MMModem3gppRegistrationState
 MMModem3gppUssdSessionState
-MMModemAccessTech
+MMModemAccessTechnology
 MMModemBand
 MMModemCapability
 MMModemCdmaActivationError
