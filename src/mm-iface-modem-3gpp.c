@@ -18,6 +18,8 @@
 
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-bearer-3gpp.h"
+#include "mm-bearer-list.h"
 #include "mm-base-modem.h"
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
@@ -407,6 +409,56 @@ mm_iface_modem_3gpp_run_all_registration_checks (MMIfaceModem3gpp *self,
 STR_REPLY_READY_FN (operator_code, "Operator Code")
 STR_REPLY_READY_FN (operator_name, "Operator Name")
 
+static void
+set_bearer_3gpp_connection_allowed (MMBearer *bearer)
+{
+    if (MM_IS_BEARER_3GPP (bearer))
+        mm_bearer_set_connection_allowed (bearer);
+}
+
+static void
+bearer_3gpp_connection_allowed (MMIfaceModem3gpp *self)
+{
+    MMBearerList *bearer_list = NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_BEARER_LIST, &bearer_list,
+                  NULL);
+    if (!bearer_list)
+        return;
+
+    /* Once registered, allow 3GPP bearers to get connected */
+    mm_bearer_list_foreach (bearer_list,
+                            (MMBearerListForeachFunc)set_bearer_3gpp_connection_allowed,
+                            NULL);
+    g_object_unref (bearer_list);
+}
+
+static void
+set_bearer_3gpp_connection_forbidden (MMBearer *bearer)
+{
+    if (MM_IS_BEARER_3GPP (bearer))
+        mm_bearer_set_connection_forbidden (bearer);
+}
+
+static void
+bearer_3gpp_connection_forbidden (MMIfaceModem3gpp *self)
+{
+    MMBearerList *bearer_list = NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_BEARER_LIST, &bearer_list,
+                  NULL);
+    if (!bearer_list)
+        return;
+
+    /* Ensure all 3GPP bearers get disconnected and set connection forbidden */
+    mm_bearer_list_foreach (bearer_list,
+                            (MMBearerListForeachFunc)set_bearer_3gpp_connection_forbidden,
+                            NULL);
+    g_object_unref (bearer_list);
+}
+
 void
 mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
                                                MMModem3gppRegistrationState new_state)
@@ -447,6 +499,9 @@ mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
         switch (new_state) {
         case MM_MODEM_3GPP_REGISTRATION_STATE_HOME:
         case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING:
+            /* Allow connection in 3GPP bearers */
+            bearer_3gpp_connection_allowed (self);
+
             /* Launch operator code update */
             if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_code &&
                 MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_code_finish)
@@ -470,6 +525,7 @@ mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
                                          MM_MODEM_STATE_REASON_NONE);
             break;
         case MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING:
+            bearer_3gpp_connection_forbidden (self);
             mm_iface_modem_update_state (MM_IFACE_MODEM (self),
                                          MM_MODEM_STATE_SEARCHING,
                                          MM_MODEM_STATE_REASON_NONE);
@@ -477,6 +533,7 @@ mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
         case MM_MODEM_3GPP_REGISTRATION_STATE_IDLE:
         case MM_MODEM_3GPP_REGISTRATION_STATE_DENIED:
         case MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN:
+            bearer_3gpp_connection_forbidden (self);
             mm_iface_modem_update_state (MM_IFACE_MODEM (self),
                                          MM_MODEM_STATE_ENABLED,
                                          MM_MODEM_STATE_REASON_NONE);
