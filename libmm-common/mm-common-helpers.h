@@ -20,5 +20,6 @@
 #define MM_COMMON_HELPERS_H
 
 gchar *mm_common_get_capabilities_string (MMModemCapability caps);
+gchar *mm_common_get_access_technologies_string (MMModemAccessTechnology access_tech);
 
 #endif /* MM_COMMON_HELPERS_H */

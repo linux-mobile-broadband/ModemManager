@@ -296,4 +296,9 @@ void mm_iface_modem_update_state (MMIfaceModem *self,
                                   MMModemState new_state,
                                   MMModemStateReason reason);
 
+/* Allow reporting new access tech */
+void mm_iface_modem_update_access_tech (MMIfaceModem *self,
+                                        MMModemAccessTechnology access_tech,
+                                        guint32 mask);
+
 #endif /* MM_IFACE_MODEM_H */

@@ -1134,7 +1134,9 @@ reg_state_changed (MMAtSerialPort *port,
 
     /* Report new registration state */
     state = get_consolidated_reg_state (self);
-    mm_iface_modem_3gpp_update_registration_state (MM_IFACE_MODEM_3GPP (self), state);
+    mm_iface_modem_3gpp_update_registration_state (MM_IFACE_MODEM_3GPP (self),
+                                                   state,
+                                                   act);
 
     /* If registration is finished (either registered or failed) but the
      * registration query hasn't completed yet, just remove the timeout and
@@ -1337,7 +1339,8 @@ register_in_network_timed_out (MMBroadbandModem *self)
 
     /* Report IDLE registration state */
     mm_iface_modem_3gpp_update_registration_state (MM_IFACE_MODEM_3GPP (self),
-                                                   MM_MODEM_3GPP_REGISTRATION_STATE_IDLE);
+                                                   MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
+                                                   MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
 
     g_simple_async_result_take_error (
         self->priv->pending_reg_request,
@@ -1602,10 +1605,10 @@ registration_status_check_ready (MMBroadbandModem *self,
 
                 /* Report new registration state */
                 mm_iface_modem_3gpp_update_registration_state (MM_IFACE_MODEM_3GPP (self),
-                                                               get_consolidated_reg_state (self));
+                                                               get_consolidated_reg_state (self),
+                                                               act);
 
                 /* TODO: report LAC/CI location */
-                /* TODO: report access technology, if available */
 
                 g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
             }

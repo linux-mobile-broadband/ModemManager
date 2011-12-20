@@ -245,6 +245,43 @@ handle_list_bearers (MmGdbusModem *skeleton,
 
 /*****************************************************************************/
 
+void
+mm_iface_modem_update_access_tech (MMIfaceModem *self,
+                                   MMModemAccessTechnology new_access_tech,
+                                   guint32 mask)
+{
+    MmGdbusModem *skeleton = NULL;
+    MMModemAccessTechnology access_tech;
+    gchar *old_access_tech_string;
+    gchar *new_access_tech_string;
+    const gchar *dbus_path;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    access_tech = mm_gdbus_modem_get_access_technologies (skeleton);
+    old_access_tech_string = mm_common_get_access_technologies_string (access_tech);
+
+    /* Clear the flags to be set */
+    access_tech &= ~mask;
+    /* And set our new flags */
+    access_tech |= new_access_tech;
+    mm_gdbus_modem_set_access_technologies (skeleton, access_tech);
+
+    /* Log */
+    new_access_tech_string = mm_common_get_access_technologies_string (access_tech);
+    dbus_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (self));
+    mm_info ("Modem %s: access technology changed (%s -> %s)",
+             dbus_path,
+             old_access_tech_string,
+             new_access_tech_string);
+    g_free (old_access_tech_string);
+    g_free (new_access_tech_string);
+}
+
+/*****************************************************************************/
+
 static void
 bearer_list_count_connected (MMBearer *bearer,
                              guint *count)

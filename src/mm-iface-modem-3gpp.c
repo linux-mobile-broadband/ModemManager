@@ -460,9 +460,22 @@ bearer_3gpp_connection_forbidden (MMIfaceModem3gpp *self)
     g_object_unref (bearer_list);
 }
 
+#define ALL_3GPP_ACCESS_TECHNOLOGIES_MASK         \
+    (MM_MODEM_ACCESS_TECHNOLOGY_GSM |             \
+     MM_MODEM_ACCESS_TECHNOLOGY_GSM_COMPACT |     \
+     MM_MODEM_ACCESS_TECHNOLOGY_GPRS |            \
+     MM_MODEM_ACCESS_TECHNOLOGY_EDGE |            \
+     MM_MODEM_ACCESS_TECHNOLOGY_UMTS |            \
+     MM_MODEM_ACCESS_TECHNOLOGY_HSDPA |           \
+     MM_MODEM_ACCESS_TECHNOLOGY_HSUPA |           \
+     MM_MODEM_ACCESS_TECHNOLOGY_HSPA |            \
+     MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS |       \
+     MM_MODEM_ACCESS_TECHNOLOGY_LTE)
+
 void
 mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
-                                               MMModem3gppRegistrationState new_state)
+                                               MMModem3gppRegistrationState new_state,
+                                               MMModemAccessTechnology access_tech)
 {
     MMModem3gppRegistrationState old_state;
 
@@ -519,13 +532,19 @@ mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
                     NULL);
 
             /* TODO: Update signal quality */
-            /* TODO: Update access technology */
+
+            mm_iface_modem_update_access_tech (MM_IFACE_MODEM (self),
+                                               access_tech,
+                                               ALL_3GPP_ACCESS_TECHNOLOGIES_MASK);
 
             mm_iface_modem_update_state (MM_IFACE_MODEM (self),
                                          MM_MODEM_STATE_REGISTERED,
                                          MM_MODEM_STATE_REASON_NONE);
             break;
         case MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING:
+            mm_iface_modem_update_access_tech (MM_IFACE_MODEM (self),
+                                               0,
+                                               ALL_3GPP_ACCESS_TECHNOLOGIES_MASK);
             bearer_3gpp_connection_forbidden (self);
             mm_iface_modem_update_state (MM_IFACE_MODEM (self),
                                          MM_MODEM_STATE_SEARCHING,
@@ -534,6 +553,9 @@ mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
         case MM_MODEM_3GPP_REGISTRATION_STATE_IDLE:
         case MM_MODEM_3GPP_REGISTRATION_STATE_DENIED:
         case MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN:
+            mm_iface_modem_update_access_tech (MM_IFACE_MODEM (self),
+                                               0,
+                                               ALL_3GPP_ACCESS_TECHNOLOGIES_MASK);
             bearer_3gpp_connection_forbidden (self);
             mm_iface_modem_update_state (MM_IFACE_MODEM (self),
                                          MM_MODEM_STATE_ENABLED,
