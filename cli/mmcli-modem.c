@@ -295,6 +295,8 @@ print_modem_info (void)
     MMModemLock unlock_required;
     gchar *prefixed_revision;
     gchar *unlock;
+    gchar *capabilities_string;
+    gchar *access_technologies_string;
 
     /* Not the best thing to do, as we may be doing _get() calls twice, but
      * easiest to maintain */
@@ -317,6 +319,12 @@ print_modem_info (void)
         break;
     }
 
+    /* Strings in heap */
+    capabilities_string = mm_modem_get_capabilities_string (
+        mm_modem_get_modem_capabilities (ctx->modem));
+    access_technologies_string = mm_modem_get_access_technologies_string (
+        mm_modem_get_access_technologies (ctx->modem));
+
     /* Rework possible multiline strings */
     prefixed_revision = prefix_newlines ("           |                 ",
                                          mm_modem_get_revision (ctx->modem));
@@ -337,7 +345,7 @@ print_modem_info (void)
              VALIDATE (mm_modem_get_manufacturer (ctx->modem)),
              VALIDATE (mm_modem_get_model (ctx->modem)),
              VALIDATE (prefixed_revision),
-             VALIDATE (mm_modem_get_capabilities_string (mm_modem_get_modem_capabilities (ctx->modem))),
+             VALIDATE (capabilities_string),
              VALIDATE (mm_modem_get_equipment_identifier (ctx->modem)));
 
     /* System related stuff */
@@ -352,9 +360,11 @@ print_modem_info (void)
     /* Status related stuff */
     g_print ("  -------------------------\n"
              "  Status   |         unlock: '%s'\n"
-             "           |          state: '%s'\n",
+             "           |          state: '%s'\n"
+             "           |    access tech: '%s'\n",
              VALIDATE (unlock),
-             VALIDATE (mmcli_get_state_string (mm_modem_get_state (ctx->modem))));
+             VALIDATE (mmcli_get_state_string (mm_modem_get_state (ctx->modem))),
+             VALIDATE (access_technologies_string));
 
     /* SIM related stuff */
     sim = mm_modem_get_sim_sync (ctx->modem, NULL, &error);
@@ -376,6 +386,8 @@ print_modem_info (void)
     }
     g_print ("\n");
 
+    g_free (access_technologies_string);
+    g_free (capabilities_string);
     g_free (prefixed_revision);
     g_free (unlock);
 }
