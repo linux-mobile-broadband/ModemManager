@@ -185,6 +185,8 @@ main (gint argc, gchar **argv)
 	g_option_context_add_group (context,
 	                            mmcli_modem_3gpp_get_option_group ());
 	g_option_context_add_group (context,
+	                            mmcli_sim_get_option_group ());
+	g_option_context_add_group (context,
 	                            mmcli_bearer_get_option_group ());
     g_option_context_add_main_entries (context, main_entries, NULL);
     g_option_context_parse (context, &argc, &argv, NULL);
@@ -227,6 +229,13 @@ main (gint argc, gchar **argv)
         else
             mmcli_manager_run_synchronous (connection);
     }
+    /* Sim options? */
+    else if (mmcli_sim_options_enabled ()) {
+        if (async_flag)
+            mmcli_sim_run_asynchronous (connection, cancellable);
+        else
+            mmcli_sim_run_synchronous (connection);
+    }
     /* Bearer options? */
     else if (mmcli_bearer_options_enabled ()) {
         if (async_flag)
@@ -267,7 +276,9 @@ main (gint argc, gchar **argv)
         mmcli_modem_shutdown ();
     } else if (mmcli_modem_3gpp_options_enabled ()) {
         mmcli_modem_3gpp_shutdown ();
-    }  else if (mmcli_bearer_options_enabled ()) {
+    }  else if (mmcli_sim_options_enabled ()) {
+        mmcli_sim_shutdown ();
+    } else if (mmcli_bearer_options_enabled ()) {
         mmcli_bearer_shutdown ();
     }
 

@@ -60,4 +60,12 @@ void          mmcli_bearer_run_asynchronous   (GDBusConnection *connection,
 void          mmcli_bearer_run_synchronous    (GDBusConnection *connection);
 void          mmcli_bearer_shutdown           (void);
 
+/* SIM group */
+GOptionGroup *mmcli_sim_get_option_group   (void);
+gboolean      mmcli_sim_options_enabled    (void);
+void          mmcli_sim_run_asynchronous   (GDBusConnection *connection,
+                                            GCancellable    *cancellable);
+void          mmcli_sim_run_synchronous    (GDBusConnection *connection);
+void          mmcli_sim_shutdown           (void);
+
 #endif /* __MMCLI_H__ */

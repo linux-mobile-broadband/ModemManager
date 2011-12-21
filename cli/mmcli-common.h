@@ -51,6 +51,19 @@ MMBearer *mmcli_get_bearer_sync   (GDBusConnection *connection,
                                    MMManager **manager,
                                    MMObject **object);
 
+void   mmcli_get_sim        (GDBusConnection *connection,
+                             const gchar *sim_path,
+                             GCancellable *cancellable,
+                             GAsyncReadyCallback callback,
+                             gpointer user_data);
+MMSim *mmcli_get_sim_finish (GAsyncResult *res,
+                             MMManager **manager,
+                             MMObject **object);
+MMSim *mmcli_get_sim_sync   (GDBusConnection *connection,
+                             const gchar *sim_path,
+                             MMManager **manager,
+                             MMObject **object);
+
 const gchar *mmcli_get_bearer_ip_method_string          (MMBearerIpMethod method);
 const gchar *mmcli_get_state_string                     (MMModemState state);
 const gchar *mmcli_get_state_reason_string              (MMModemStateChangeReason reason);
@@ -61,5 +74,6 @@ const gchar *mmcli_get_3gpp_registration_state_string (MMModem3gppRegistrationSt
 GOptionGroup *mmcli_get_common_option_group (void);
 const gchar  *mmcli_get_common_modem_string (void);
 const gchar  *mmcli_get_common_bearer_string (void);
+const gchar  *mmcli_get_common_sim_string (void);
 
 #endif /* _MMCLI_COMMON_H_ */

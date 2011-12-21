@@ -223,8 +223,6 @@ print_bearer_short_info (MMBearer *bearer)
 static void
 print_modem_info (void)
 {
-    GError *error = NULL;
-    MMSim *sim;
     MMModemLock unlock_required;
     gchar *prefixed_revision;
     gchar *unlock;
@@ -233,8 +231,10 @@ print_modem_info (void)
 
     /* Not the best thing to do, as we may be doing _get() calls twice, but
      * easiest to maintain */
-#undef VALIDATE
-#define VALIDATE(str) (str ? str : "unknown")
+#undef VALIDATE_UNKNOWN
+#define VALIDATE_UNKNOWN(str) (str ? str : "unknown")
+#undef VALIDATE_NONE
+#define VALIDATE_NONE(str) (str ? str : "none")
 
     /* Strings with mixed properties */
     unlock_required = mm_modem_get_unlock_required (ctx->modem);
@@ -265,8 +265,8 @@ print_modem_info (void)
     /* Global IDs */
     g_print ("\n"
              "%s (device id '%s')\n",
-             VALIDATE (mm_modem_get_path (ctx->modem)),
-             VALIDATE (mm_modem_get_device_identifier (ctx->modem)));
+             VALIDATE_UNKNOWN (mm_modem_get_path (ctx->modem)),
+             VALIDATE_UNKNOWN (mm_modem_get_device_identifier (ctx->modem)));
 
     /* Hardware related stuff */
     g_print ("  -------------------------\n"
@@ -275,29 +275,29 @@ print_modem_info (void)
              "           |       revision: '%s'\n"
              "           |   capabilities: '%s'\n"
              "           |   equipment id: '%s'\n",
-             VALIDATE (mm_modem_get_manufacturer (ctx->modem)),
-             VALIDATE (mm_modem_get_model (ctx->modem)),
-             VALIDATE (prefixed_revision),
-             VALIDATE (capabilities_string),
-             VALIDATE (mm_modem_get_equipment_identifier (ctx->modem)));
+             VALIDATE_UNKNOWN (mm_modem_get_manufacturer (ctx->modem)),
+             VALIDATE_UNKNOWN (mm_modem_get_model (ctx->modem)),
+             VALIDATE_UNKNOWN (prefixed_revision),
+             VALIDATE_UNKNOWN (capabilities_string),
+             VALIDATE_UNKNOWN (mm_modem_get_equipment_identifier (ctx->modem)));
 
     /* System related stuff */
     g_print ("  -------------------------\n"
              "  System   |         device: '%s'\n"
              "           |         driver: '%s'\n"
              "           |         plugin: '%s'\n",
-             VALIDATE (mm_modem_get_device (ctx->modem)),
-             VALIDATE (mm_modem_get_driver (ctx->modem)),
-             VALIDATE (mm_modem_get_plugin (ctx->modem)));
+             VALIDATE_UNKNOWN (mm_modem_get_device (ctx->modem)),
+             VALIDATE_UNKNOWN (mm_modem_get_driver (ctx->modem)),
+             VALIDATE_UNKNOWN (mm_modem_get_plugin (ctx->modem)));
 
     /* Status related stuff */
     g_print ("  -------------------------\n"
              "  Status   |         unlock: '%s'\n"
              "           |          state: '%s'\n"
              "           |    access tech: '%s'\n",
-             VALIDATE (unlock),
-             VALIDATE (mmcli_get_state_string (mm_modem_get_state (ctx->modem))),
-             VALIDATE (access_technologies_string));
+             VALIDATE_UNKNOWN (unlock),
+             VALIDATE_UNKNOWN (mmcli_get_state_string (mm_modem_get_state (ctx->modem))),
+             VALIDATE_UNKNOWN (access_technologies_string));
 
     /* If available, 3GPP related stuff */
     if (ctx->modem_3gpp) {
@@ -306,31 +306,17 @@ print_modem_info (void)
                  "           |    operator id: '%s'\n"
                  "           |  operator name: '%s'\n"
                  "           |   registration: '%s'\n",
-                 VALIDATE (mm_modem_3gpp_get_imei (ctx->modem_3gpp)),
-                 VALIDATE (mm_modem_3gpp_get_operator_code (ctx->modem_3gpp)),
-                 VALIDATE (mm_modem_3gpp_get_operator_name (ctx->modem_3gpp)),
+                 VALIDATE_UNKNOWN (mm_modem_3gpp_get_imei (ctx->modem_3gpp)),
+                 VALIDATE_UNKNOWN (mm_modem_3gpp_get_operator_code (ctx->modem_3gpp)),
+                 VALIDATE_UNKNOWN (mm_modem_3gpp_get_operator_name (ctx->modem_3gpp)),
                  mmcli_get_3gpp_registration_state_string (
                      mm_modem_3gpp_get_registration_state ((ctx->modem_3gpp))));
     }
 
-    /* SIM related stuff */
-    sim = mm_modem_get_sim_sync (ctx->modem, NULL, &error);
-    if (error) {
-        g_warning ("Couldn't get SIM: '%s'", error->message);
-        g_error_free (error);
-    }
-    if (sim) {
-        g_print ("  -------------------------\n"
-                 "  SIM      |          imsi : '%s'\n"
-                 "           |            id : '%s'\n"
-                 "           |   operator id : '%s'\n"
-                 "           | operator name : '%s'\n",
-                 VALIDATE (mm_sim_get_imsi (sim)),
-                 VALIDATE (mm_sim_get_identifier (sim)),
-                 VALIDATE (mm_sim_get_operator_identifier (sim)),
-                 VALIDATE (mm_sim_get_operator_name (sim)));
-        g_object_unref (sim);
-    }
+    /* SIM */
+    g_print ("  -------------------------\n"
+             "  SIM      |           path: '%s'\n",
+             VALIDATE_NONE (mm_modem_get_sim_path (ctx->modem)));
     g_print ("\n");
 
     g_free (access_technologies_string);

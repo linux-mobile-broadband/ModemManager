@@ -268,26 +268,6 @@ mmcli_get_modem_sync (GDBusConnection *connection,
     return found;
 }
 
-static MMBearer *
-find_bearer_in_list (GList *list,
-                     const gchar *bearer_path)
-{
-    GList *l;
-
-    for (l = list; l; l = g_list_next (l)) {
-        MMBearer *bearer = MM_BEARER (l->data);
-
-        if (g_str_equal (mm_bearer_get_path (bearer), bearer_path)) {
-            g_debug ("Bearer found at '%s'\n", bearer_path);
-            return g_object_ref (bearer);
-        }
-    }
-
-    g_printerr ("error: couldn't find bearer at '%s'\n", bearer_path);
-    exit (EXIT_FAILURE);
-    return NULL;
-}
-
 typedef struct {
     GSimpleAsyncResult *result;
     GCancellable *cancellable;
@@ -339,6 +319,26 @@ mmcli_get_bearer_finish (GAsyncResult *res,
 }
 
 static void look_for_bearer_in_modem (GetBearerContext *ctx);
+
+static MMBearer *
+find_bearer_in_list (GList *list,
+                     const gchar *bearer_path)
+{
+    GList *l;
+
+    for (l = list; l; l = g_list_next (l)) {
+        MMBearer *bearer = MM_BEARER (l->data);
+
+        if (g_str_equal (mm_bearer_get_path (bearer), bearer_path)) {
+            g_debug ("Bearer found at '%s'\n", bearer_path);
+            return g_object_ref (bearer);
+        }
+    }
+
+    g_printerr ("error: couldn't find bearer at '%s'\n", bearer_path);
+    exit (EXIT_FAILURE);
+    return NULL;
+}
 
 static void
 list_bearers_ready (MMModem *modem,
@@ -495,6 +495,202 @@ mmcli_get_bearer_sync (GDBusConnection *connection,
     return found;
 }
 
+typedef struct {
+    GSimpleAsyncResult *result;
+    GCancellable *cancellable;
+    gchar *sim_path;
+    MMManager *manager;
+    MMObject *modem;
+    MMSim *sim;
+} GetSimContext;
+
+static void
+get_sim_context_free (GetSimContext *ctx)
+{
+    if (ctx->modem)
+        g_object_unref (ctx->modem);
+    if (ctx->cancellable)
+        g_object_unref (ctx->cancellable);
+    if (ctx->manager)
+        g_object_unref (ctx->manager);
+    if (ctx->sim)
+        g_object_unref (ctx->sim);
+    g_free (ctx->sim_path);
+    g_free (ctx);
+}
+
+static void
+get_sim_context_complete (GetSimContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    ctx->result = NULL;
+}
+
+MMSim *
+mmcli_get_sim_finish (GAsyncResult *res,
+                      MMManager **o_manager,
+                      MMObject **o_object)
+{
+    GetSimContext *ctx;
+
+    ctx = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    if (o_manager)
+        *o_manager = g_object_ref (ctx->manager);
+    if (o_object)
+        *o_object = g_object_ref (ctx->modem);
+    return g_object_ref (ctx->sim);
+}
+
+static void
+get_sim_ready (MMModem *modem,
+               GAsyncResult *res,
+               GetSimContext *ctx)
+{
+    GError *error = NULL;
+
+    ctx->sim = mm_modem_get_sim_finish (modem, res, &error);
+    if (error) {
+        g_printerr ("error: couldn't get sim '%s' at '%s': '%s'\n",
+                    ctx->sim_path,
+                    mm_modem_get_path (modem),
+                    error->message);
+        exit (EXIT_FAILURE);
+    }
+
+    g_simple_async_result_set_op_res_gpointer (
+        ctx->result,
+        ctx,
+        (GDestroyNotify)get_sim_context_free);
+    get_sim_context_complete (ctx);
+}
+
+static void
+get_sim_manager_ready (GDBusConnection *connection,
+                       GAsyncResult *res,
+                       GetSimContext *ctx)
+{
+    GList *l;
+    GList *modems;
+
+    ctx->manager = mmcli_get_manager_finish (res);
+
+    modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (ctx->manager));
+    if (!modems) {
+        g_printerr ("error: couldn't find sim at '%s': 'no modems found'\n",
+                    ctx->sim_path);
+        exit (EXIT_FAILURE);
+    }
+
+    for (l = modems; l; l = g_list_next (l)) {
+        MMObject *object;
+        MMModem *modem;
+
+        object = MM_OBJECT (l->data);
+        modem = mm_object_get_modem (object);
+        if (g_str_equal (ctx->sim_path, mm_modem_get_sim_path (modem))) {
+            ctx->modem  = g_object_ref (object);
+            mm_modem_get_sim (modem,
+                              ctx->cancellable,
+                              (GAsyncReadyCallback)get_sim_ready,
+                              ctx);
+            break;
+        }
+        g_object_unref (modem);
+    }
+
+    if (!ctx->modem) {
+        g_printerr ("error: couldn't find sim at '%s'\n",
+                    ctx->sim_path);
+        exit (EXIT_FAILURE);
+    }
+
+    g_list_foreach (modems, (GFunc)g_object_unref, NULL);
+    g_list_free (modems);
+}
+
+void
+mmcli_get_sim (GDBusConnection *connection,
+                  const gchar *sim_path,
+                  GCancellable *cancellable,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    GetSimContext *ctx;
+
+    ctx = g_new0 (GetSimContext, 1);
+    ctx->sim_path = g_strdup (sim_path);
+    if (cancellable)
+        ctx->cancellable = g_object_ref (cancellable);
+    ctx->result = g_simple_async_result_new (G_OBJECT (connection),
+                                             callback,
+                                             user_data,
+                                             mmcli_get_modem);
+    mmcli_get_manager (connection,
+                       cancellable,
+                       (GAsyncReadyCallback)get_sim_manager_ready,
+                       ctx);
+}
+
+MMSim *
+mmcli_get_sim_sync (GDBusConnection *connection,
+                    const gchar *sim_path,
+                    MMManager **o_manager,
+                    MMObject **o_object)
+{
+    MMManager *manager;
+    GList *modems;
+    GList *l;
+    MMSim *found = NULL;
+
+    manager = mmcli_get_manager_sync (connection);
+    modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (manager));
+    if (!modems) {
+        g_printerr ("error: couldn't find sim at '%s': 'no modems found'\n",
+                    sim_path);
+        exit (EXIT_FAILURE);
+    }
+
+    for (l = modems; !found && l; l = g_list_next (l)) {
+        GError *error = NULL;
+        MMObject *object;
+        MMModem *modem;
+
+        object = MM_OBJECT (l->data);
+        modem = mm_object_get_modem (object);
+        if (g_str_equal (sim_path, mm_modem_get_sim_path (modem))) {
+            found = mm_modem_get_sim_sync (modem, NULL, &error);
+            if (error) {
+                g_printerr ("error: couldn't get sim '%s' in modem '%s': '%s'\n",
+                            sim_path,
+                            mm_modem_get_path (modem),
+                            error->message);
+                exit (EXIT_FAILURE);
+            }
+
+            if (o_object)
+                *o_object = g_object_ref (object);
+        }
+
+        g_object_unref (modem);
+    }
+
+    if (!found) {
+        g_printerr ("error: couldn't find sim at '%s'\n", sim_path);
+        exit (EXIT_FAILURE);
+    }
+
+    g_list_foreach (modems, (GFunc)g_object_unref, NULL);
+    g_list_free (modems);
+
+    if (o_manager)
+        *o_manager = manager;
+    else
+        g_object_unref (manager);
+
+    return found;
+}
+
 const gchar *
 mmcli_get_bearer_ip_method_string (MMBearerIpMethod method)
 {
@@ -579,6 +775,7 @@ mmcli_get_3gpp_registration_state_string (MMModem3gppRegistrationState state)
 /* Common options */
 static gchar *modem_str;
 static gchar *bearer_str;
+static gchar *sim_str;
 
 static GOptionEntry entries[] = {
     { "modem", 'm', 0, G_OPTION_ARG_STRING, &modem_str,
@@ -587,6 +784,10 @@ static GOptionEntry entries[] = {
     },
     { "bearer", 'b', 0, G_OPTION_ARG_STRING, &bearer_str,
       "Specify bearer by path. Shows bearer information if no action specified.",
+      "[PATH]"
+    },
+    { "sim", 's', 0, G_OPTION_ARG_STRING, &sim_str,
+      "Specify SIM by path. Shows SIM information if no action specified.",
       "[PATH]"
     },
     { NULL }
@@ -618,4 +819,10 @@ const gchar *
 mmcli_get_common_bearer_string (void)
 {
     return bearer_str;
+}
+
+const gchar *
+mmcli_get_common_sim_string (void)
+{
+    return sim_str;
 }
