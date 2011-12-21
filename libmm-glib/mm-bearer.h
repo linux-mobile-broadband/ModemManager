@@ -30,13 +30,9 @@ G_BEGIN_DECLS
 
 /**
  * MMBearerIpConfig:
- * @method: a #MMBearerIpMethod.
- * @address: IP address, only if @method is #MM_BEARER_IP_METHOD_STATIC.
- * @prefix: Numeric CIDR network prefix, only if @method is #MM_BEARER_IP_METHOD_STATIC.
- * @dns: Array of DNS server IP addresses, only if @method is #MM_BEARER_IP_METHOD_STATIC.
- * @gateway: IP address of the default gateway, only if @method is #MM_BEARER_IP_METHOD_STATIC.
  *
- * Addressing details for assignment to the data interface
+ * Addressing details for assignment to the data interface.
+ * This is an opaque struct.
  */
 typedef struct _MMBearerIpConfig MMBearerIpConfig;
 

@@ -235,42 +235,28 @@ create_ip_config_struct (GVariant *variant)
     g_variant_iter_init (&iter, variant);
     while (g_variant_iter_loop (&iter, "{sv}", &key, &value)) {
         if (g_str_equal (key, "method")) {
-            if (c->method)
-                g_warning ("Duplicate 'method' key found in Bearer IP configuration");
-            else
-                c->method = (MMBearerIpMethod) g_variant_get_uint32 (value);
+            g_warn_if_fail (c->method == 0);
+            c->method = (MMBearerIpMethod) g_variant_get_uint32 (value);
         } else if (g_str_equal (key, "address")) {
-            if (c->address)
-                g_warning ("Duplicate 'address' key found in Bearer IP configuration");
-            else
-                c->address = g_variant_dup_string (value, NULL);
+            g_warn_if_fail (c->address == NULL);
+            c->address = g_variant_dup_string (value, NULL);
         } else if (g_str_equal (key, "prefix")) {
-            if (c->prefix)
-                g_warning ("Duplicate 'prefix' key found in Bearer IP configuration");
-            else
-                c->prefix = g_variant_get_uint32 (value);
+            g_warn_if_fail (c->prefix == 0);
+            c->prefix = g_variant_get_uint32 (value);
         } else if (g_str_equal (key, "dns1")) {
-            if (c->dns[0])
-                g_warning ("Duplicate 'dns1' key found in Bearer IP configuration");
-            else
-                c->dns[0] = g_variant_dup_string (value, NULL);
+            g_warn_if_fail (c->dns[0] == NULL);
+            c->dns[0] = g_variant_dup_string (value, NULL);
         } else if (g_str_equal (key, "dns2")) {
-            if (c->dns[1])
-                g_warning ("Duplicate 'dns2' key found in Bearer IP configuration");
-            else
-                c->dns[1] = g_variant_dup_string (value, NULL);
+            g_warn_if_fail (c->dns[1] == NULL);
+            c->dns[1] = g_variant_dup_string (value, NULL);
         } else if (g_str_equal (key, "dns3")) {
-            if (c->dns[2])
-                g_warning ("Duplicate 'dns3' key found in Bearer IP configuration");
-            else
-                c->dns[2] = g_variant_dup_string (value, NULL);
+            g_warn_if_fail (c->dns[2] == NULL);
+            c->dns[2] = g_variant_dup_string (value, NULL);
         } else if (g_str_equal (key, "gateway")) {
-            if (c->gateway)
-                g_warning ("Duplicate 'gateway' key found in Bearer IP configuration");
-            else
-                c->gateway = g_variant_dup_string (value, NULL);
+            g_warn_if_fail (c->gateway == NULL);
+            c->gateway = g_variant_dup_string (value, NULL);
         } else
-            g_warning ("Invalid property '%s' found in Bearer IP configuration", key);
+            g_warning ("Unexpected property '%s' found in Bearer IP configuration", key);
     }
 
     /* If no method is set, don't build the config struct */
