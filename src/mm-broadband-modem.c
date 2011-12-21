@@ -2092,17 +2092,60 @@ disable (MMBaseModem *self,
          GAsyncReadyCallback callback,
          gpointer user_data)
 {
-    DisablingContext *ctx;
+    GSimpleAsyncResult *result;
 
-    ctx = g_new0 (DisablingContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             disable);
-    ctx->step = DISABLING_STEP_FIRST;
+    result = g_simple_async_result_new (G_OBJECT (self), callback, user_data, disable);
 
-    disabling_step (ctx);
+    /* Check state before launching modem disabling */
+    switch (MM_BROADBAND_MODEM (self)->priv->modem_state) {
+    case MM_MODEM_STATE_UNKNOWN:
+        /* We should never have a UNKNOWN->DISABLED transition requested by
+         * the user. */
+        g_assert_not_reached ();
+        break;
+
+    case MM_MODEM_STATE_LOCKED:
+    case MM_MODEM_STATE_DISABLED:
+        /* Just return success, don't relaunch enabling */
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        break;
+
+    case MM_MODEM_STATE_DISABLING:
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_WRONG_STATE,
+                                         "Cannot disable modem: "
+                                         "already being disabled");
+        break;
+
+    case MM_MODEM_STATE_ENABLING:
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_WRONG_STATE,
+                                         "Cannot disable modem: "
+                                         "currently being enabled");
+        break;
+
+    case MM_MODEM_STATE_ENABLED:
+    case MM_MODEM_STATE_SEARCHING:
+    case MM_MODEM_STATE_REGISTERED:
+    case MM_MODEM_STATE_DISCONNECTING:
+    case MM_MODEM_STATE_CONNECTING:
+    case MM_MODEM_STATE_CONNECTED: {
+        DisablingContext *ctx;
+
+        ctx = g_new0 (DisablingContext, 1);
+        ctx->self = g_object_ref (self);
+        ctx->result = result;
+        ctx->step = DISABLING_STEP_FIRST;
+
+        disabling_step (ctx);
+        return;
+    }
+    }
+
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
 }
 
 /*****************************************************************************/
@@ -2249,17 +2292,64 @@ enable (MMBaseModem *self,
         GAsyncReadyCallback callback,
         gpointer user_data)
 {
-    EnablingContext *ctx;
+    GSimpleAsyncResult *result;
 
-    ctx = g_new0 (EnablingContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             enable);
-    ctx->step = ENABLING_STEP_FIRST;
+    result = g_simple_async_result_new (G_OBJECT (self), callback, user_data, enable);
 
-    enabling_step (ctx);
+    /* Check state before launching modem enabling */
+    switch (MM_BROADBAND_MODEM (self)->priv->modem_state) {
+    case MM_MODEM_STATE_UNKNOWN:
+        /* We should never have a UNKNOWN->ENABLED transition */
+        g_assert_not_reached ();
+        break;
+
+    case MM_MODEM_STATE_LOCKED:
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_WRONG_STATE,
+                                         "Cannot enable modem: device locked");
+        break;
+
+    case MM_MODEM_STATE_DISABLED: {
+        EnablingContext *ctx;
+
+        ctx = g_new0 (EnablingContext, 1);
+        ctx->self = g_object_ref (self);
+        ctx->result = result;
+        ctx->step = ENABLING_STEP_FIRST;
+        enabling_step (ctx);
+        return;
+    }
+
+    case MM_MODEM_STATE_DISABLING:
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_WRONG_STATE,
+                                         "Cannot enable modem: "
+                                         "currently being disabled");
+        break;
+
+    case MM_MODEM_STATE_ENABLING:
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_WRONG_STATE,
+                                         "Cannot enable modem: "
+                                         "already being enabled");
+        break;
+
+    case MM_MODEM_STATE_ENABLED:
+    case MM_MODEM_STATE_SEARCHING:
+    case MM_MODEM_STATE_REGISTERED:
+    case MM_MODEM_STATE_DISCONNECTING:
+    case MM_MODEM_STATE_CONNECTING:
+    case MM_MODEM_STATE_CONNECTED:
+        /* Just return success, don't relaunch enabling */
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        break;
+    }
+
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
 }
 
 /*****************************************************************************/

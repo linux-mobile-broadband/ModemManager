@@ -383,117 +383,6 @@ enable_disable_ready (MMIfaceModem *self,
 }
 
 static gboolean
-run_enable (MMIfaceModem *self,
-            MmGdbusModem *skeleton,
-            MMModemState modem_state,
-            GDBusMethodInvocation *invocation)
-{
-    switch (modem_state) {
-    case MM_MODEM_STATE_UNKNOWN:
-        /* We should never have a UNKNOWN->ENABLED transition */
-        g_assert_not_reached ();
-        break;
-
-    case MM_MODEM_STATE_LOCKED:
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot enable modem: device locked");
-        break;
-
-    case MM_MODEM_STATE_DISABLED:
-        MM_BASE_MODEM_GET_CLASS (self)->enable (MM_BASE_MODEM (self),
-                                                NULL, /* cancellable */
-                                                (GAsyncReadyCallback)enable_disable_ready,
-                                                dbus_call_context_new (skeleton,
-                                                                       invocation,
-                                                                       self));
-        break;
-
-    case MM_MODEM_STATE_DISABLING:
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot enable modem: "
-                                               "currently being disabled");
-        break;
-
-    case MM_MODEM_STATE_ENABLING:
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot enable modem: "
-                                               "already being enabled");
-        break;
-
-    case MM_MODEM_STATE_ENABLED:
-    case MM_MODEM_STATE_SEARCHING:
-    case MM_MODEM_STATE_REGISTERED:
-    case MM_MODEM_STATE_DISCONNECTING:
-    case MM_MODEM_STATE_CONNECTING:
-    case MM_MODEM_STATE_CONNECTED:
-        /* Just return success, don't relaunch enabling */
-        mm_gdbus_modem_complete_enable (skeleton, invocation);
-        break;
-    }
-
-    return TRUE;
-}
-
-static gboolean
-run_disable (MMIfaceModem *self,
-             MmGdbusModem *skeleton,
-             MMModemState modem_state,
-             GDBusMethodInvocation *invocation)
-{
-    switch (modem_state) {
-    case MM_MODEM_STATE_UNKNOWN:
-        /* We should never have a UNKNOWN->DISABLED transition requested by
-         * the user. */
-        g_assert_not_reached ();
-        break;
-
-    case MM_MODEM_STATE_LOCKED:
-    case MM_MODEM_STATE_DISABLED:
-        /* Just return success, don't relaunch enabling */
-        mm_gdbus_modem_complete_enable (skeleton, invocation);
-        break;
-
-    case MM_MODEM_STATE_DISABLING:
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot disable modem: "
-                                               "already being disabled");
-        break;
-
-    case MM_MODEM_STATE_ENABLING:
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot disable modem: "
-                                               "currently being enabled");
-        break;
-
-    case MM_MODEM_STATE_ENABLED:
-    case MM_MODEM_STATE_SEARCHING:
-    case MM_MODEM_STATE_REGISTERED:
-    case MM_MODEM_STATE_DISCONNECTING:
-    case MM_MODEM_STATE_CONNECTING:
-    case MM_MODEM_STATE_CONNECTED:
-        MM_BASE_MODEM_GET_CLASS (self)->disable (MM_BASE_MODEM (self),
-                                                 NULL, /* cancellable */
-                                                 (GAsyncReadyCallback)enable_disable_ready,
-                                                 dbus_call_context_new (skeleton,
-                                                                        invocation,
-                                                                        self));
-        break;
-    }
-
-    return TRUE;
-}
-
-static gboolean
 handle_enable (MmGdbusModem *skeleton,
                GDBusMethodInvocation *invocation,
                gboolean arg_enable,
@@ -509,9 +398,21 @@ handle_enable (MmGdbusModem *skeleton,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
 
-    return (arg_enable ?
-            run_enable (self, skeleton, modem_state, invocation) :
-            run_disable (self, skeleton, modem_state, invocation));
+    if (arg_enable)
+        MM_BASE_MODEM_GET_CLASS (self)->enable (MM_BASE_MODEM (self),
+                                                NULL, /* cancellable */
+                                                (GAsyncReadyCallback)enable_disable_ready,
+                                                dbus_call_context_new (skeleton,
+                                                                       invocation,
+                                                                       self));
+    else
+        MM_BASE_MODEM_GET_CLASS (self)->disable (MM_BASE_MODEM (self),
+                                                 NULL, /* cancellable */
+                                                 (GAsyncReadyCallback)enable_disable_ready,
+                                                 dbus_call_context_new (skeleton,
+                                                                        invocation,
+                                                                        self));
+    return TRUE;
 }
 
 /*****************************************************************************/
