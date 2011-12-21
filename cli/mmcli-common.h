@@ -56,6 +56,7 @@ const gchar *mmcli_get_state_string                     (MMModemState state);
 const gchar *mmcli_get_state_reason_string              (MMModemStateChangeReason reason);
 const gchar *mmcli_get_lock_string                      (MMModemLock lock);
 const gchar *mmcli_get_3gpp_network_availability_string (MMModem3gppNetworkAvailability availability);
+const gchar *mmcli_get_3gpp_registration_state_string (MMModem3gppRegistrationState state);
 
 GOptionGroup *mmcli_get_common_option_group (void);
 const gchar  *mmcli_get_common_modem_string (void);

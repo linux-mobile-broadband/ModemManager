@@ -39,6 +39,7 @@ typedef struct {
     GCancellable *cancellable;
     MMObject *object;
     MMModem *modem;
+    MMModem3gpp *modem_3gpp;
 } Context;
 static Context *ctx;
 
@@ -154,6 +155,8 @@ context_free (Context *ctx)
         g_object_unref (ctx->cancellable);
     if (ctx->modem)
         g_object_unref (ctx->modem);
+    if (ctx->modem_3gpp)
+        g_object_unref (ctx->modem_3gpp);
     if (ctx->object)
         g_object_unref (ctx->object);
     if (ctx->manager)
@@ -295,6 +298,20 @@ print_modem_info (void)
              VALIDATE (unlock),
              VALIDATE (mmcli_get_state_string (mm_modem_get_state (ctx->modem))),
              VALIDATE (access_technologies_string));
+
+    /* If available, 3GPP related stuff */
+    if (ctx->modem_3gpp) {
+        g_print ("  -------------------------\n"
+                 "  3GPP     |           imei: '%s'\n"
+                 "           |    operator id: '%s'\n"
+                 "           |  operator name: '%s'\n"
+                 "           |   registration: '%s'\n",
+                 VALIDATE (mm_modem_3gpp_get_imei (ctx->modem_3gpp)),
+                 VALIDATE (mm_modem_3gpp_get_operator_code (ctx->modem_3gpp)),
+                 VALIDATE (mm_modem_3gpp_get_operator_name (ctx->modem_3gpp)),
+                 mmcli_get_3gpp_registration_state_string (
+                     mm_modem_3gpp_get_registration_state ((ctx->modem_3gpp))));
+    }
 
     /* SIM related stuff */
     sim = mm_modem_get_sim_sync (ctx->modem, NULL, &error);
@@ -620,6 +637,7 @@ get_modem_ready (GObject      *source,
 {
     ctx->object = mmcli_get_modem_finish (result, &ctx->manager);
     ctx->modem = mm_object_get_modem (ctx->object);
+    ctx->modem_3gpp = mm_object_get_modem_3gpp (ctx->object);
 
     if (info_flag)
         g_assert_not_reached ();
@@ -779,6 +797,7 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
                                         mmcli_get_common_modem_string (),
                                         &ctx->manager);
     ctx->modem = mm_object_get_modem (ctx->object);
+    ctx->modem_3gpp = mm_object_get_modem_3gpp (ctx->object);
 
     /* Request to get info from modem? */
     if (info_flag) {

@@ -563,6 +563,19 @@ mmcli_get_3gpp_network_availability_string (MMModem3gppNetworkAvailability avail
     return value->value_nick;
 }
 
+const gchar *
+mmcli_get_3gpp_registration_state_string (MMModem3gppRegistrationState state)
+{
+    static GEnumClass *enum_class = NULL;
+    GEnumValue *value;
+
+    if (!enum_class)
+        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_3GPP_REGISTRATION_STATE));
+
+    value = g_enum_get_value (enum_class, state);
+    return value->value_nick;
+}
+
 /* Common options */
 static gchar *modem_str;
 static gchar *bearer_str;
