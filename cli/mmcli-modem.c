@@ -532,29 +532,35 @@ create_bearer_parse_known_input (const gchar  *input,
             exit (EXIT_FAILURE);
         }
 
-        if (g_str_equal (key, MM_BEARER_PROPERTY_APN))
+        if (g_str_equal (key, MM_BEARER_PROPERTY_APN)) {
+            g_debug ("APN: %s", value);
             *apn = value;
-        else if (g_str_equal (key, MM_BEARER_PROPERTY_IP_TYPE))
+        } else if (g_str_equal (key, MM_BEARER_PROPERTY_IP_TYPE)) {
+            g_debug ("IP type: %s", value);
             *ip_type = value;
-        else if (g_str_equal (key, MM_BEARER_PROPERTY_ALLOW_ROAMING)) {
-            if (g_ascii_strcasecmp (value, "true") ||
+        } else if (g_str_equal (key, MM_BEARER_PROPERTY_ALLOW_ROAMING)) {
+            if (!g_ascii_strcasecmp (value, "true") ||
                 g_str_equal (value, "1")) {
+                g_debug ("Roaming: allowed");
                 *allow_roaming = TRUE;
-            } else if (g_ascii_strcasecmp (value, "false") ||
+            } else if (!g_ascii_strcasecmp (value, "false") ||
                 g_str_equal (value, "0")) {
+                g_debug ("Roaming: forbidden");
                 *allow_roaming = FALSE;
             } else
                 g_printerr ("error: invalid value '%s' for boolean property '%s'",
                             value, key);
             g_free (value);
-        }
-        else if (g_str_equal (key, MM_BEARER_PROPERTY_USER))
+        } else if (g_str_equal (key, MM_BEARER_PROPERTY_USER)) {
+            g_debug ("User: %s", value);
             *user = value;
-        else if (g_str_equal (key, MM_BEARER_PROPERTY_PASSWORD))
+        } else if (g_str_equal (key, MM_BEARER_PROPERTY_PASSWORD)) {
+            g_debug ("Password: %s", value);
             *password = value;
-        else if (g_str_equal (key, MM_BEARER_PROPERTY_NUMBER))
+        } else if (g_str_equal (key, MM_BEARER_PROPERTY_NUMBER)) {
+            g_debug ("Number: %s", value);
             *number = value;
-        else {
+        } else {
             g_printerr ("error: invalid key '%s' in properties string", key);
             g_free (value);
         }
