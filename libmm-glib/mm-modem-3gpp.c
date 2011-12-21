@@ -266,6 +266,112 @@ mm_modem_3gpp_register_sync (MMModem3gpp *self,
                                                   error);
 }
 
+struct _MMModem3gppNetwork {
+    MMModem3gppNetworkAvailability availability;
+    gchar *operator_long;
+    gchar *operator_short;
+    gchar *operator_code;
+    MMModemAccessTechnology access_technology;
+};
+
+void
+mm_modem_3gpp_network_free (MMModem3gppNetwork *network)
+{
+    if (!network)
+        return;
+
+    g_free (network->operator_long);
+    g_free (network->operator_short);
+    g_free (network->operator_code);
+    g_slice_free (MMModem3gppNetwork, network);
+}
+
+MMModem3gppNetworkAvailability
+mm_modem_3gpp_network_get_availability (const MMModem3gppNetwork *network)
+{
+    g_return_val_if_fail (network != NULL, MM_MODEM_3GPP_NETWORK_AVAILABILITY_UNKNOWN);
+
+    return network->availability;
+}
+
+const gchar *
+mm_modem_3gpp_network_get_operator_long (const MMModem3gppNetwork *network)
+{
+    g_return_val_if_fail (network != NULL, NULL);
+
+    return network->operator_long;
+}
+
+const gchar *
+mm_modem_3gpp_network_get_operator_short (const MMModem3gppNetwork *network)
+{
+    g_return_val_if_fail (network != NULL, NULL);
+
+    return network->operator_short;
+}
+
+const gchar *
+mm_modem_3gpp_network_get_operator_code (const MMModem3gppNetwork *network)
+{
+    g_return_val_if_fail (network != NULL, NULL);
+
+    return network->operator_code;
+}
+
+MMModemAccessTechnology
+mm_modem_3gpp_network_get_access_technology (const MMModem3gppNetwork *network)
+{
+    g_return_val_if_fail (network != NULL, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+
+    return network->access_technology;
+}
+
+static GList *
+create_networks_list (GVariant *variant)
+{
+    GList *list = NULL;
+    GVariantIter dict_iter;
+    GVariant *dict;
+
+    /* Input is aa{sv} */
+    g_variant_iter_init (&dict_iter, variant);
+    while ((dict = g_variant_iter_next_value (&dict_iter))) {
+        GVariantIter iter;
+        gchar *key;
+        GVariant *value;
+        MMModem3gppNetwork *network;
+
+        network = g_slice_new0 (MMModem3gppNetwork);
+
+        g_variant_iter_init (&iter, dict);
+        while (g_variant_iter_next (&iter, "{sv}", &key, &value)) {
+            if (g_str_equal (key, "status")) {
+                network->availability = (MMModem3gppNetworkAvailability)g_variant_get_uint32 (value);
+            } else if (g_str_equal (key, "operator-long")) {
+                g_warn_if_fail (network->operator_long == NULL);
+                network->operator_long = g_variant_dup_string (value, NULL);
+            } else if (g_str_equal (key, "operator-short")) {
+                g_warn_if_fail (network->operator_short == NULL);
+                network->operator_short = g_variant_dup_string (value, NULL);
+            } else if (g_str_equal (key, "operator-code")) {
+                g_warn_if_fail (network->operator_code == NULL);
+                network->operator_code = g_variant_dup_string (value, NULL);
+            }  else if (g_str_equal (key, "access-technology")) {
+                network->access_technology = (MMModemAccessTechnology)g_variant_get_uint32 (value);
+            } else
+                g_warning ("Unexpected property '%s' found in Network info", key);
+
+            g_free (key);
+            g_variant_unref (value);
+        }
+
+        list = g_list_prepend (list, network);
+        g_variant_unref (dict);
+    }
+
+    return list;
+}
+
 void
 mm_modem_3gpp_scan (MMModem3gpp *self,
                     GCancellable *cancellable,
@@ -280,30 +386,38 @@ mm_modem_3gpp_scan (MMModem3gpp *self,
                                   user_data);
 }
 
-gboolean
+GList *
 mm_modem_3gpp_scan_finish (MMModem3gpp *self,
-                           GVariant **results,
                            GAsyncResult *res,
                            GError **error)
 {
+    GVariant *result = NULL;
+
     g_return_val_if_fail (MM_GDBUS_IS_MODEM3GPP (self), FALSE);
 
-    return mm_gdbus_modem3gpp_call_scan_finish (self,
-                                                results,
-                                                res,
-                                                error);
+    if (!mm_gdbus_modem3gpp_call_scan_finish (self,
+                                              &result,
+                                              res,
+                                              error))
+        return NULL;
+
+    return create_networks_list (result);
 }
 
-gboolean
+GList *
 mm_modem_3gpp_scan_sync (MMModem3gpp *self,
-                         GVariant **results,
                          GCancellable *cancellable,
                          GError **error)
 {
+    GVariant *result = NULL;
+
     g_return_val_if_fail (MM_GDBUS_IS_MODEM3GPP (self), FALSE);
 
-    return mm_gdbus_modem3gpp_call_scan_sync (self,
-                                              results,
-                                              cancellable,
-                                              error);
+    if (!mm_gdbus_modem3gpp_call_scan_sync (self,
+                                            &result,
+                                            cancellable,
+                                            error))
+        return NULL;
+
+    return create_networks_list (result);
 }

@@ -28,6 +28,8 @@
 
 G_BEGIN_DECLS
 
+typedef struct _MMModem3gppNetwork MMModem3gppNetwork;
+
 typedef MmGdbusModem3gpp      MMModem3gpp;
 #define MM_TYPE_MODEM_3GPP(o) MM_GDBUS_TYPE_MODEM3GPP (o)
 #define MM_MODEM_3GPP(o)      MM_GDBUS_MODEM3GPP(o)
@@ -59,18 +61,23 @@ gboolean mm_modem_3gpp_register_sync   (MMModem3gpp *self,
                                         GCancellable *cancellable,
                                         GError **error);
 
-void     mm_modem_3gpp_scan        (MMModem3gpp *self,
-                                    GCancellable *cancellable,
-                                    GAsyncReadyCallback callback,
-                                    gpointer user_data);
-gboolean mm_modem_3gpp_scan_finish (MMModem3gpp *self,
-                                    GVariant **results,
-                                    GAsyncResult *res,
-                                    GError **error);
-gboolean mm_modem_3gpp_scan_sync   (MMModem3gpp *self,
-                                    GVariant **results,
-                                    GCancellable *cancellable,
-                                    GError **error);
+MMModem3gppNetworkAvailability  mm_modem_3gpp_network_get_availability      (const MMModem3gppNetwork *network);
+const gchar                    *mm_modem_3gpp_network_get_operator_long     (const MMModem3gppNetwork *network);
+const gchar                    *mm_modem_3gpp_network_get_operator_short    (const MMModem3gppNetwork *network);
+const gchar                    *mm_modem_3gpp_network_get_operator_code     (const MMModem3gppNetwork *network);
+MMModemAccessTechnology         mm_modem_3gpp_network_get_access_technology (const MMModem3gppNetwork *network);
+void                            mm_modem_3gpp_network_free                  (MMModem3gppNetwork *network);
+
+void   mm_modem_3gpp_scan        (MMModem3gpp *self,
+                                  GCancellable *cancellable,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data);
+GList *mm_modem_3gpp_scan_finish (MMModem3gpp *self,
+                                  GAsyncResult *res,
+                                  GError **error);
+GList *mm_modem_3gpp_scan_sync   (MMModem3gpp *self,
+                                  GCancellable *cancellable,
+                                  GError **error);
 
 G_END_DECLS
 
