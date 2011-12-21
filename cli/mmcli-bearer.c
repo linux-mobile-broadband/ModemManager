@@ -43,17 +43,12 @@ typedef struct {
 static Context *ctx;
 
 /* Options */
-static gchar *bearer_str;
 static gboolean info_flag; /* set when no action found */
 static gchar *connect_with_number_str;
 static gboolean connect_flag;
 static gboolean disconnect_flag;
 
 static GOptionEntry entries[] = {
-    { "bearer", 'b', 0, G_OPTION_ARG_STRING, &bearer_str,
-      "Specify bearer by path. Shows bearer information if no action specified.",
-      NULL
-    },
     { "connect", 'c', 0, G_OPTION_ARG_NONE, &connect_flag,
       "Connect a given bearer using the default number, if any.",
       NULL
@@ -94,7 +89,7 @@ mmcli_bearer_options_enabled (void)
                  connect_flag +
                  disconnect_flag);
 
-    if (n_actions == 0 && bearer_str) {
+    if (n_actions == 0 && mmcli_get_common_bearer_string ()) {
         /* default to info */
         info_flag = TRUE;
         n_actions++;
@@ -330,7 +325,7 @@ mmcli_bearer_run_asynchronous (GDBusConnection *connection,
 
     /* Get proper bearer */
     mmcli_get_bearer (connection,
-                      bearer_str,
+                      mmcli_get_common_bearer_string (),
                       cancellable,
                       (GAsyncReadyCallback)get_bearer_ready,
                       NULL);
@@ -344,7 +339,7 @@ mmcli_bearer_run_synchronous (GDBusConnection *connection)
     /* Initialize context */
     ctx = g_new0 (Context, 1);
     ctx->bearer = mmcli_get_bearer_sync (connection,
-                                         bearer_str,
+                                         mmcli_get_common_bearer_string (),
                                          &ctx->manager,
                                          &ctx->object);
 

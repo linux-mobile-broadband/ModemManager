@@ -549,3 +549,47 @@ mmcli_get_lock_string (MMModemLock lock)
     value = g_enum_get_value (enum_class, lock);
     return value->value_nick;
 }
+
+/* Common options */
+static gchar *modem_str;
+static gchar *bearer_str;
+
+static GOptionEntry entries[] = {
+    { "modem", 'm', 0, G_OPTION_ARG_STRING, &modem_str,
+      "Specify modem by path or index. Shows modem information if no action specified.",
+      "[PATH|INDEX]"
+    },
+    { "bearer", 'b', 0, G_OPTION_ARG_STRING, &bearer_str,
+      "Specify bearer by path. Shows bearer information if no action specified.",
+      "[PATH]"
+    },
+    { NULL }
+};
+
+GOptionGroup *
+mmcli_get_common_option_group (void)
+{
+	GOptionGroup *group;
+
+	/* Status options */
+	group = g_option_group_new ("common",
+	                            "Common options",
+	                            "Show common options",
+	                            NULL,
+	                            NULL);
+	g_option_group_add_entries (group, entries);
+
+	return group;
+}
+
+const gchar *
+mmcli_get_common_modem_string (void)
+{
+    return modem_str;
+}
+
+const gchar *
+mmcli_get_common_bearer_string (void)
+{
+    return bearer_str;
+}

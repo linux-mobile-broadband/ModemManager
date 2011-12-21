@@ -56,4 +56,8 @@ const gchar *mmcli_get_state_string            (MMModemState state);
 const gchar *mmcli_get_state_reason_string     (MMModemStateChangeReason reason);
 const gchar *mmcli_get_lock_string             (MMModemLock lock);
 
+GOptionGroup *mmcli_get_common_option_group (void);
+const gchar  *mmcli_get_common_modem_string (void);
+const gchar  *mmcli_get_common_bearer_string (void);
+
 #endif /* _MMCLI_COMMON_H_ */

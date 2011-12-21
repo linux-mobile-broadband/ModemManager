@@ -43,7 +43,6 @@ typedef struct {
 static Context *ctx;
 
 /* Options */
-static gchar *modem_str;
 static gboolean info_flag; /* set when no action found */
 static gboolean monitor_state_flag;
 static gboolean enable_flag;
@@ -55,10 +54,6 @@ static gchar *create_bearer_str;
 static gchar *delete_bearer_str;
 
 static GOptionEntry entries[] = {
-    { "modem", 'm', 0, G_OPTION_ARG_STRING, &modem_str,
-      "Specify modem by path or index. Shows modem information if no action specified.",
-      NULL
-    },
     { "monitor-state", 'w', 0, G_OPTION_ARG_NONE, &monitor_state_flag,
       "Monitor state of a given modem",
       NULL
@@ -124,7 +119,7 @@ mmcli_modem_options_enabled (void)
                  !!delete_bearer_str +
                  !!factory_reset_str);
 
-    if (n_actions == 0 && modem_str) {
+    if (n_actions == 0 && mmcli_get_common_modem_string ()) {
         /* default to info */
         info_flag = TRUE;
         n_actions++;
@@ -759,7 +754,7 @@ mmcli_modem_run_asynchronous (GDBusConnection *connection,
 
     /* Get proper modem */
     mmcli_get_modem  (connection,
-                      modem_str,
+                      mmcli_get_common_modem_string (),
                       cancellable,
                       (GAsyncReadyCallback)get_modem_ready,
                       NULL);
@@ -775,7 +770,9 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
 
     /* Initialize context */
     ctx = g_new0 (Context, 1);
-    ctx->object = mmcli_get_modem_sync (connection, modem_str, &ctx->manager);
+    ctx->object = mmcli_get_modem_sync (connection,
+                                        mmcli_get_common_modem_string (),
+                                        &ctx->manager);
     ctx->modem = mm_object_get_modem (ctx->object);
 
     /* Request to get info from modem? */

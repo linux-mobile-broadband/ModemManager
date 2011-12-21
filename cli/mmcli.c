@@ -32,6 +32,7 @@
 #include <libmm-glib.h>
 
 #include "mmcli.h"
+#include "mmcli-common.h"
 
 #define PROGRAM_NAME    "mmcli"
 #define PROGRAM_VERSION PACKAGE_VERSION
@@ -177,6 +178,8 @@ main (gint argc, gchar **argv)
     context = g_option_context_new ("- Control and monitor the ModemManager");
 	g_option_context_add_group (context,
 	                            mmcli_manager_get_option_group ());
+    g_option_context_add_group (context,
+                                mmcli_get_common_option_group ());
 	g_option_context_add_group (context,
 	                            mmcli_modem_get_option_group ());
 	g_option_context_add_group (context,
