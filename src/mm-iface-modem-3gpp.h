@@ -142,6 +142,12 @@ struct _MMIfaceModem3gpp {
     GList * (*scan_networks_finish) (MMIfaceModem3gpp *self,
                                      GAsyncResult *res,
                                      GError **error);
+
+    /* Create 3GPP bearer */
+    MMBearer * (* create_3gpp_bearer) (MMBaseModem *modem,
+                                       const gchar *apn,
+                                       const gchar *ip_type,
+                                       gboolean allow_roaming);
 };
 
 GType mm_iface_modem_3gpp_get_type (void);
@@ -189,5 +195,14 @@ void mm_iface_modem_3gpp_run_all_registration_checks (MMIfaceModem3gpp *self,
 gboolean mm_iface_modem_3gpp_run_all_registration_checks_finish (MMIfaceModem3gpp *self,
                                                                  GAsyncResult *res,
                                                                  GError **error);
+
+/* Create new 3GPP bearer */
+MMBearer *mm_iface_modem_3gpp_create_bearer (MMIfaceModem3gpp *self,
+                                             const gchar *apn,
+                                             const gchar *ip_type,
+                                             gboolean allow_roaming);
+MMBearer *mm_iface_modem_3gpp_create_bearer_from_properties (MMIfaceModem3gpp *self,
+                                                             GVariant *properties,
+                                                             GError **error);
 
 #endif /* MM_IFACE_MODEM_3GPP_H */

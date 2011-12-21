@@ -276,6 +276,97 @@ handle_scan (MmGdbusModem3gpp *skeleton,
 
 /*****************************************************************************/
 
+/* Create new 3GPP bearer */
+MMBearer *
+mm_iface_modem_3gpp_create_bearer (MMIfaceModem3gpp *self,
+                                   const gchar *apn,
+                                   const gchar *ip_type,
+                                   gboolean allow_roaming)
+{
+    MMModem3gppRegistrationState current_state;
+    MMBearer3gpp *bearer;
+
+    g_assert (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->create_3gpp_bearer != NULL);
+
+    /* Create new 3GPP bearer using the method set in the interface, so that
+     * plugins can subclass it and implement their own. */
+    bearer = MM_BEARER_3GPP (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->
+                             create_3gpp_bearer (MM_BASE_MODEM (self),
+                                                 apn,
+                                                 ip_type,
+                                                 allow_roaming));
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, &current_state,
+                  NULL);
+
+    /* Don't allow bearer to get connected if roaming forbidden */
+    if (current_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+        (current_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING &&
+         mm_bearer_3gpp_get_allow_roaming (bearer)))
+        mm_bearer_set_connection_allowed (MM_BEARER (bearer));
+    else
+        mm_bearer_set_connection_forbidden (MM_BEARER (bearer));
+
+    return MM_BEARER (bearer);
+}
+
+MMBearer *
+mm_iface_modem_3gpp_create_bearer_from_properties (MMIfaceModem3gpp *self,
+                                                   GVariant *properties,
+                                                   GError **error)
+{
+    GVariantIter iter;
+    const gchar *key;
+    GVariant *value;
+    gchar *apn = NULL;
+    gchar *ip_type = NULL;
+    gboolean allow_roaming = FALSE;
+    gboolean allow_roaming_found = FALSE;
+
+    mm_dbg ("Creating 3GPP bearer with properties...");
+    g_variant_iter_init (&iter, properties);
+    while (g_variant_iter_loop (&iter, "{sv}", &key, &value)) {
+        if (g_str_equal (key, "apn")) {
+            if (apn)
+                mm_warn ("Duplicate 'apn' property found, ignoring value '%s'",
+                         g_variant_get_string (value, NULL));
+            else
+                apn = g_variant_dup_string (value, NULL);
+        } else if (g_str_equal (key, "ip-type")) {
+            if (ip_type)
+                mm_warn ("Duplicate 'ip-type' property found, ignoring value '%s'",
+                         g_variant_get_string (value, NULL));
+            else
+                ip_type = g_variant_dup_string (value, NULL);
+        } else if (g_str_equal (key, "allow-roaming")) {
+            if (allow_roaming_found)
+                mm_warn ("Duplicate 'allow-roaming' property found, ignoring value '%s'",
+                         g_variant_get_string (value, NULL));
+            else {
+                allow_roaming_found = TRUE;
+                allow_roaming = g_variant_get_boolean (value);
+            }
+        }
+        else
+            mm_dbg ("Ignoring property '%s' in 3GPP bearer", key);
+    }
+
+    /* Check mandatory properties */
+    if (!apn) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_INVALID_ARGS,
+                     "Invalid input properties: 3GPP bearer requires 'apn'");
+        g_free (ip_type);
+        return NULL;
+    }
+
+    return mm_iface_modem_3gpp_create_bearer (self, apn, ip_type, allow_roaming);
+}
+
+/*****************************************************************************/
+
 typedef struct {
     GSimpleAsyncResult *result;
     gboolean cs_done;
@@ -410,15 +501,19 @@ STR_REPLY_READY_FN (operator_code, "Operator Code")
 STR_REPLY_READY_FN (operator_name, "Operator Name")
 
 static void
-set_bearer_3gpp_connection_allowed (MMBearer *bearer)
+set_bearer_3gpp_connection_allowed (MMBearer *bearer,
+                                    const gboolean *roaming_network)
 {
-    /* TODO: don't allow bearers to get connected if roaming forbidden */
-    if (MM_IS_BEARER_3GPP (bearer))
+    /* Don't allow bearer to get connected if roaming forbidden */
+    if (MM_IS_BEARER_3GPP (bearer) &&
+        (!*roaming_network ||
+         mm_bearer_3gpp_get_allow_roaming (MM_BEARER_3GPP (bearer))))
         mm_bearer_set_connection_allowed (bearer);
 }
 
 static void
-bearer_3gpp_connection_allowed (MMIfaceModem3gpp *self)
+bearer_3gpp_connection_allowed (MMIfaceModem3gpp *self,
+                                gboolean roaming_network)
 {
     MMBearerList *bearer_list = NULL;
 
@@ -431,7 +526,7 @@ bearer_3gpp_connection_allowed (MMIfaceModem3gpp *self)
     /* Once registered, allow 3GPP bearers to get connected */
     mm_bearer_list_foreach (bearer_list,
                             (MMBearerListForeachFunc)set_bearer_3gpp_connection_allowed,
-                            NULL);
+                            &roaming_network);
     g_object_unref (bearer_list);
 }
 
@@ -505,16 +600,13 @@ mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
                       MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, new_state,
                       NULL);
 
-        /* TODO:
-         * If we're connected and we're not supposed to roam, but the device
-         * just roamed, disconnect the connection to avoid charging the user
-         * loads of money.
-         */
         switch (new_state) {
         case MM_MODEM_3GPP_REGISTRATION_STATE_HOME:
         case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING:
             /* Allow connection in 3GPP bearers */
-            bearer_3gpp_connection_allowed (self);
+            bearer_3gpp_connection_allowed (
+                self,
+                new_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING);
 
             /* Launch operator code update */
             if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_code &&
@@ -541,15 +633,8 @@ mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
                                          MM_MODEM_STATE_REGISTERED,
                                          MM_MODEM_STATE_REASON_NONE);
             break;
+
         case MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING:
-            mm_iface_modem_update_access_tech (MM_IFACE_MODEM (self),
-                                               0,
-                                               ALL_3GPP_ACCESS_TECHNOLOGIES_MASK);
-            bearer_3gpp_connection_forbidden (self);
-            mm_iface_modem_update_state (MM_IFACE_MODEM (self),
-                                         MM_MODEM_STATE_SEARCHING,
-                                         MM_MODEM_STATE_REASON_NONE);
-            break;
         case MM_MODEM_3GPP_REGISTRATION_STATE_IDLE:
         case MM_MODEM_3GPP_REGISTRATION_STATE_DENIED:
         case MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN:
@@ -557,9 +642,12 @@ mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
                                                0,
                                                ALL_3GPP_ACCESS_TECHNOLOGIES_MASK);
             bearer_3gpp_connection_forbidden (self);
-            mm_iface_modem_update_state (MM_IFACE_MODEM (self),
-                                         MM_MODEM_STATE_ENABLED,
-                                         MM_MODEM_STATE_REASON_NONE);
+            mm_iface_modem_update_state (
+                MM_IFACE_MODEM (self),
+                (new_state == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING ?
+                 MM_MODEM_STATE_SEARCHING :
+                 MM_MODEM_STATE_ENABLED),
+                MM_MODEM_STATE_REASON_NONE);
             break;
         }
     }

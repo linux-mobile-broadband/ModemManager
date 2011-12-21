@@ -108,7 +108,7 @@ modem_create_bearer (MMIfaceModem *self,
                      gpointer user_data)
 {
     GSimpleAsyncResult *result;
-    MMBearer *bearer;
+    MMBearer *bearer = NULL;
     GError *error = NULL;
 
     /* TODO: We'll need to guess the capability of the bearer, based on the
@@ -116,28 +116,23 @@ modem_create_bearer (MMIfaceModem *self,
      * configured in the modem. Use 3GPP for testing now */
 
     /* New 3GPP bearer */
-    {
-        MMModem3gppRegistrationState state;
+    if (MM_BROADBAND_MODEM (self)->priv->modem_3gpp_dbus_skeleton) {
+        bearer = mm_iface_modem_3gpp_create_bearer_from_properties (MM_IFACE_MODEM_3GPP (self),
+                                                                    properties,
+                                                                    &error);
+    } else {
+        g_set_error (&error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_UNSUPPORTED,
+                     "Cannot create bearer in modem of unknown type");
+    }
 
-        bearer = mm_bearer_3gpp_new_from_properties (MM_BASE_MODEM (self),
-                                                     properties,
-                                                     &error);
-        if (!bearer) {
-            g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
-                                                       callback,
-                                                       user_data,
-                                                       error);
+    if (!bearer) {
+        g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
+                                                   callback,
+                                                   user_data,
+                                                   error);
             return;
-        }
-
-        /* Based on our current 3GPP registration state, allow or forbid
-         * connections */
-        state = get_consolidated_reg_state (MM_BROADBAND_MODEM (self));
-        if (state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
-            state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
-            mm_bearer_set_connection_allowed (bearer);
-        else
-            mm_bearer_set_connection_forbidden (bearer);
     }
 
     /* Set a new ref to the bearer object as result */
@@ -2649,6 +2644,7 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->register_in_network_finish = register_in_network_finish;
     iface->scan_networks = scan_networks;
     iface->scan_networks_finish = scan_networks_finish;
+    iface->create_3gpp_bearer = mm_bearer_3gpp_new;
 }
 
 static void

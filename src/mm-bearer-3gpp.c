@@ -786,63 +786,6 @@ disconnect (MMBearer *self,
 /*****************************************************************************/
 
 MMBearer *
-mm_bearer_3gpp_new_from_properties (MMBaseModem *modem,
-                                    GVariant *properties,
-                                    GError **error)
-{
-    GVariantIter iter;
-    const gchar *key;
-    GVariant *value;
-    gchar *apn = NULL;
-    gchar *ip_type = NULL;
-    gboolean allow_roaming = FALSE;
-    gboolean allow_roaming_found = FALSE;
-
-    mm_dbg ("Creating 3GPP bearer with properties...");
-    g_variant_iter_init (&iter, properties);
-    while (g_variant_iter_loop (&iter, "{sv}", &key, &value)) {
-        if (g_str_equal (key, "apn")) {
-            if (apn)
-                mm_warn ("Duplicate 'apn' property found, ignoring value '%s'",
-                         g_variant_get_string (value, NULL));
-            else
-                apn = g_variant_dup_string (value, NULL);
-        } else if (g_str_equal (key, "ip-type")) {
-            if (ip_type)
-                mm_warn ("Duplicate 'ip-type' property found, ignoring value '%s'",
-                         g_variant_get_string (value, NULL));
-            else
-                ip_type = g_variant_dup_string (value, NULL);
-        } else if (g_str_equal (key, "allow-roaming")) {
-            if (allow_roaming_found)
-                mm_warn ("Duplicate 'allow-roaming' property found, ignoring value '%s'",
-                         g_variant_get_string (value, NULL));
-            else {
-                allow_roaming_found = TRUE;
-                allow_roaming = g_variant_get_boolean (value);
-            }
-        }
-        else
-            mm_dbg ("Ignoring property '%s' in 3GPP bearer", key);
-    }
-
-    /* Check mandatory properties */
-    if (!apn) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_INVALID_ARGS,
-                     "Invalid input properties: 3GPP bearer requires 'apn'");
-        g_free (ip_type);
-        return NULL;
-    }
-
-    return mm_bearer_3gpp_new (modem,
-                               apn,
-                               ip_type,
-                               allow_roaming);
-}
-
-MMBearer *
 mm_bearer_3gpp_new (MMBaseModem *modem,
                     const gchar *apn,
                     const gchar *ip_type,

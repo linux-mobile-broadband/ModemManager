@@ -54,13 +54,11 @@ struct _MMBearer3gppClass {
 
 GType mm_bearer_3gpp_get_type (void);
 
+/* Default 3GPP bearer creation implementation */
 MMBearer *mm_bearer_3gpp_new (MMBaseModem *modem,
                               const gchar *apn,
                               const gchar *ip_type,
                               gboolean allow_roaming);
-MMBearer *mm_bearer_3gpp_new_from_properties (MMBaseModem *modem,
-                                              GVariant *properties,
-                                              GError **error);
 
 const gchar *mm_bearer_3gpp_get_apn           (MMBearer3gpp *self);
 const gchar *mm_bearer_3gpp_get_ip_type       (MMBearer3gpp *self);
