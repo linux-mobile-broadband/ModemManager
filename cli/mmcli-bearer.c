@@ -139,14 +139,18 @@ print_bearer_info (MMBearer *bearer)
 {
     const MMBearerIpConfig *ipv4_config;
     const MMBearerIpConfig *ipv6_config;
+    const MMBearerProperties *properties;
 
     ipv4_config = mm_bearer_get_ipv4_config (bearer);
     ipv6_config = mm_bearer_get_ipv6_config (bearer);
+    properties = mm_bearer_get_properties (bearer);
 
     /* Not the best thing to do, as we may be doing _get() calls twice, but
      * easiest to maintain */
-#undef VALIDATE
-#define VALIDATE(str) (str ? str : "unknown")
+#undef VALIDATE_UNKNOWN
+#define VALIDATE_UNKNOWN(str) (str ? str : "unknown")
+#undef VALIDATE_NONE
+#define VALIDATE_NONE(str) (str ? str : "none")
 
     g_print ("Bearer '%s'\n",
              mm_bearer_get_path (bearer));
@@ -156,7 +160,21 @@ print_bearer_info (MMBearer *bearer)
              "                     |   interface: '%s'\n",
              mm_bearer_get_connected (bearer) ? "yes" : "no",
              mm_bearer_get_suspended (bearer) ? "yes" : "no",
-             VALIDATE (mm_bearer_get_interface (bearer)));
+             VALIDATE_UNKNOWN (mm_bearer_get_interface (bearer)));
+
+    g_print ("  -------------------------\n"
+             "  Properties         |         apn: '%s'\n"
+             "                     |     roaming: '%s'\n"
+             "                     |     IP type: '%s'\n"
+             "                     |        user: '%s'\n"
+             "                     |    password: '%s'\n"
+             "                     |      number: '%s'\n",
+             VALIDATE_NONE (mm_bearer_properties_get_apn (properties)),
+             mm_bearer_properties_get_allow_roaming (properties) ? "allowed" : "forbidden",
+             VALIDATE_NONE (mm_bearer_properties_get_ip_type (properties)),
+             VALIDATE_NONE (mm_bearer_properties_get_user (properties)),
+             VALIDATE_NONE (mm_bearer_properties_get_password (properties)),
+             VALIDATE_NONE (mm_bearer_properties_get_number (properties)));
 
     /* IPv4 */
     g_print ("  -------------------------\n"
@@ -174,10 +192,10 @@ print_bearer_info (MMBearer *bearer)
                  "                   |   prefix: '%u'\n"
                  "                   |  gateway: '%s'\n"
                  "                   |      DNS: '%s'",
-                 VALIDATE (mm_bearer_ip_config_get_address (ipv4_config)),
+                 VALIDATE_UNKNOWN (mm_bearer_ip_config_get_address (ipv4_config)),
                  mm_bearer_ip_config_get_prefix (ipv4_config),
-                 VALIDATE (mm_bearer_ip_config_get_gateway (ipv4_config)),
-                 VALIDATE (dns[0]));
+                 VALIDATE_UNKNOWN (mm_bearer_ip_config_get_gateway (ipv4_config)),
+                 VALIDATE_UNKNOWN (dns[0]));
         /* Additional DNS addresses */
         for (i = 1; dns[i]; i++)
             g_print (", '%s'", dns[i]);
@@ -200,10 +218,10 @@ print_bearer_info (MMBearer *bearer)
                  "                   |   prefix: '%u'\n"
                  "                   |  gateway: '%s'\n"
                  "                   |      DNS: '%s'",
-                 VALIDATE(mm_bearer_ip_config_get_address (ipv6_config)),
+                 VALIDATE_UNKNOWN(mm_bearer_ip_config_get_address (ipv6_config)),
                  mm_bearer_ip_config_get_prefix (ipv6_config),
-                 VALIDATE(mm_bearer_ip_config_get_gateway (ipv6_config)),
-                 VALIDATE(dns[0]));
+                 VALIDATE_UNKNOWN(mm_bearer_ip_config_get_gateway (ipv6_config)),
+                 VALIDATE_UNKNOWN(dns[0]));
         /* Additional DNS addresses */
         for (i = 1; dns[i]; i++)
             g_print (", '%s'", dns[i]);
