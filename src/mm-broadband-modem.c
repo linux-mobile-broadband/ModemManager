@@ -2573,6 +2573,11 @@ dispose (GObject *object)
         g_clear_object (&self->priv->modem_dbus_skeleton);
     }
 
+    if (self->priv->modem_3gpp_dbus_skeleton) {
+        mm_iface_modem_3gpp_shutdown (MM_IFACE_MODEM_3GPP (object));
+        g_clear_object (&self->priv->modem_3gpp_dbus_skeleton);
+    }
+
     if (self->priv->modem_sim)
         g_clear_object (&self->priv->modem_sim);
 
