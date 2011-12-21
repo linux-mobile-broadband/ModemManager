@@ -62,4 +62,8 @@ MMBearer *mm_bearer_3gpp_new_from_properties (MMBaseModem *modem,
                                               GVariant *properties,
                                               GError **error);
 
+const gchar *mm_bearer_3gpp_get_apn           (MMBearer3gpp *self);
+const gchar *mm_bearer_3gpp_get_ip_type       (MMBearer3gpp *self);
+gboolean     mm_bearer_3gpp_get_allow_roaming (MMBearer3gpp *self);
+
 #endif /* MM_BEARER_3GPP_H */

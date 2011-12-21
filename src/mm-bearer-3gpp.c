@@ -58,6 +58,26 @@ struct _MMBearer3gppPrivate {
 };
 
 /*****************************************************************************/
+
+const gchar *
+mm_bearer_3gpp_get_apn (MMBearer3gpp *self)
+{
+    return self->priv->apn;
+}
+
+const gchar *
+mm_bearer_3gpp_get_ip_type (MMBearer3gpp *self)
+{
+    return self->priv->ip_type;
+}
+
+gboolean
+mm_bearer_3gpp_get_allow_roaming (MMBearer3gpp *self)
+{
+    return self->priv->allow_roaming;
+}
+
+/*****************************************************************************/
 /* CONNECT
  *
  * Connection procedure of a 3GPP bearer involves several steps:
