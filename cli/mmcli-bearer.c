@@ -83,7 +83,11 @@ mmcli_bearer_get_option_group (void)
 gboolean
 mmcli_bearer_options_enabled (void)
 {
-    guint n_actions;
+    static guint n_actions = 0;
+    static gboolean checked = FALSE;
+
+    if (checked)
+        return !!n_actions;
 
     n_actions = (!!connect_with_number_str +
                  connect_flag +
@@ -103,6 +107,7 @@ mmcli_bearer_options_enabled (void)
     if (info_flag)
         mmcli_force_sync_operation ();
 
+    checked = TRUE;
     return !!n_actions;
 }
 

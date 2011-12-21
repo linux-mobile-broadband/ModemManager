@@ -86,7 +86,11 @@ mmcli_manager_get_option_group (void)
 gboolean
 mmcli_manager_options_enabled (void)
 {
-    guint n_actions;
+    static guint n_actions = 0;
+    static gboolean checked = FALSE;
+
+    if (checked)
+        return !!n_actions;
 
     n_actions = (list_modems_flag +
                  monitor_modems_flag +
@@ -101,6 +105,7 @@ mmcli_manager_options_enabled (void)
     if (monitor_modems_flag)
         mmcli_force_async_operation ();
 
+    checked = TRUE;
     return !!n_actions;
 }
 
