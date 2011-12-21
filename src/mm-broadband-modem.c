@@ -28,6 +28,7 @@
 #include "mm-broadband-modem.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-simple.h"
 #include "mm-bearer-3gpp.h"
 #include "mm-bearer-list.h"
 #include "mm-sim.h"
@@ -42,15 +43,18 @@
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_simple_init (MMIfaceModemSimple *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModem, mm_broadband_modem, MM_TYPE_BASE_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIMPLE, iface_modem_simple_init));
 
 enum {
     PROP_0,
     PROP_MODEM_DBUS_SKELETON,
     PROP_MODEM_3GPP_DBUS_SKELETON,
+    PROP_MODEM_SIMPLE_DBUS_SKELETON,
     PROP_MODEM_SIM,
     PROP_MODEM_BEARER_LIST,
     PROP_MODEM_STATE,
@@ -62,6 +66,7 @@ enum {
 struct _MMBroadbandModemPrivate {
     GObject *modem_dbus_skeleton;
     GObject *modem_3gpp_dbus_skeleton;
+    GObject *modem_simple_dbus_skeleton;
     MMSim *modem_sim;
     MMBearerList *modem_bearer_list;
     MMModemState modem_state;
@@ -2411,6 +2416,7 @@ initialize_step (InitializeContext *ctx)
         ctx->step++;
 
     case INITIALIZE_STEP_IFACE_SIMPLE:
+        mm_iface_modem_simple_initialize (MM_IFACE_MODEM_SIMPLE (ctx->self));
         /* Fall down to next step */
         ctx->step++;
 
@@ -2478,6 +2484,9 @@ set_property (GObject *object,
     case PROP_MODEM_3GPP_DBUS_SKELETON:
         self->priv->modem_3gpp_dbus_skeleton = g_value_dup_object (value);
         break;
+    case PROP_MODEM_SIMPLE_DBUS_SKELETON:
+        self->priv->modem_simple_dbus_skeleton = g_value_dup_object (value);
+        break;
     case PROP_MODEM_SIM:
         self->priv->modem_sim = g_value_dup_object (value);
         break;
@@ -2513,6 +2522,9 @@ get_property (GObject *object,
         break;
     case PROP_MODEM_3GPP_DBUS_SKELETON:
         g_value_set_object (value, self->priv->modem_3gpp_dbus_skeleton);
+        break;
+    case PROP_MODEM_SIMPLE_DBUS_SKELETON:
+        g_value_set_object (value, self->priv->modem_simple_dbus_skeleton);
         break;
     case PROP_MODEM_SIM:
         g_value_set_object (value, self->priv->modem_sim);
@@ -2576,6 +2588,11 @@ dispose (GObject *object)
     if (self->priv->modem_3gpp_dbus_skeleton) {
         mm_iface_modem_3gpp_shutdown (MM_IFACE_MODEM_3GPP (object));
         g_clear_object (&self->priv->modem_3gpp_dbus_skeleton);
+    }
+
+    if (self->priv->modem_simple_dbus_skeleton) {
+        mm_iface_modem_simple_shutdown (MM_IFACE_MODEM_SIMPLE (object));
+        g_clear_object (&self->priv->modem_simple_dbus_skeleton);
     }
 
     if (self->priv->modem_sim)
@@ -2653,6 +2670,11 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 }
 
 static void
+iface_modem_simple_init (MMIfaceModemSimple *iface)
+{
+}
+
+static void
 mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
@@ -2680,6 +2702,10 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_3GPP_DBUS_SKELETON,
                                       MM_IFACE_MODEM_3GPP_DBUS_SKELETON);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_SIMPLE_DBUS_SKELETON,
+                                      MM_IFACE_MODEM_SIMPLE_DBUS_SKELETON);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_SIM,
