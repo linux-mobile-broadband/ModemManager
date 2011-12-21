@@ -153,7 +153,7 @@ mm_3gpp_parse_scan_response (const gchar *reply,
     GMatchInfo *match_info;
     gboolean umts_format = TRUE;
     GEnumClass *network_availability_class;
-    GEnumClass *access_tech_class;
+    GFlagsClass *access_tech_class;
     GError *inner_error = NULL;
 
     g_return_val_if_fail (reply != NULL, NULL);
@@ -227,7 +227,7 @@ mm_3gpp_parse_scan_response (const gchar *reply,
     }
 
     network_availability_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_3GPP_NETWORK_AVAILABILITY));
-    access_tech_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_ACCESS_TECHNOLOGY));
+    access_tech_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_MODEM_ACCESS_TECHNOLOGY));
 
     /* Parse the results */
     while (g_match_info_matches (match_info)) {
@@ -274,12 +274,12 @@ mm_3gpp_parse_scan_response (const gchar *reply,
 
         if (valid) {
             GEnumValue *network_availability;
-            GEnumValue *access_tech;
+            GFlagsValue *access_tech;
 
             network_availability = g_enum_get_value (network_availability_class,
                                                      info->status);
-            access_tech = g_enum_get_value (access_tech_class,
-                                            info->access_tech);
+            access_tech = g_flags_get_first_value (access_tech_class,
+                                                   info->access_tech);
 
             mm_dbg ("Found network '%s' ('%s','%s'); availability: %s, access tech: %s",
                     info->operator_code,
