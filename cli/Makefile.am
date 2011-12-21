@@ -16,6 +16,7 @@ mmcli_SOURCES = \
 	mmcli-common.c \
 	mmcli-manager.c \
 	mmcli-modem.c \
+	mmcli-modem-3gpp.c \
 	mmcli-bearer.c
 
 mmcli_LDADD = \

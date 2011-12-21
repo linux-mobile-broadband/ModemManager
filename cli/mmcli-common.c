@@ -550,6 +550,19 @@ mmcli_get_lock_string (MMModemLock lock)
     return value->value_nick;
 }
 
+const gchar *
+mmcli_get_3gpp_network_availability_string (MMModem3gppNetworkAvailability availability)
+{
+    static GEnumClass *enum_class = NULL;
+    GEnumValue *value;
+
+    if (!enum_class)
+        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_3GPP_NETWORK_AVAILABILITY));
+
+    value = g_enum_get_value (enum_class, availability);
+    return value->value_nick;
+}
+
 /* Common options */
 static gchar *modem_str;
 static gchar *bearer_str;
