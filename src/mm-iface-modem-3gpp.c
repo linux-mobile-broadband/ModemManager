@@ -55,10 +55,52 @@ dbus_call_context_new (MmGdbusModem3gpp *skeleton,
 
 /*****************************************************************************/
 
+gboolean
+mm_iface_modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
+                                                GAsyncResult *res,
+                                                GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
 static void
 register_in_network_ready (MMIfaceModem3gpp *self,
                            GAsyncResult *res,
-                           DbusCallContext *ctx)
+                           GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network_finish (self, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+void
+mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
+                                         const gchar *operator_id,
+                                         GAsyncReadyCallback callback,
+                                         gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        mm_iface_modem_3gpp_register_in_network);
+    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network (
+        self,
+        operator_id,
+        (GAsyncReadyCallback)register_in_network_ready,
+        result);
+}
+
+static void
+handle_register_ready (MMIfaceModem3gpp *self,
+                       GAsyncResult *res,
+                       DbusCallContext *ctx)
 {
     GError *error = NULL;
 
@@ -76,7 +118,7 @@ register_in_network_ready (MMIfaceModem3gpp *self,
 static gboolean
 handle_register (MmGdbusModem3gpp *skeleton,
                  GDBusMethodInvocation *invocation,
-                 const gchar *arg_network_id,
+                 const gchar *network_id,
                  MMIfaceModem3gpp *self)
 {
     MMModemState modem_state;
@@ -105,13 +147,12 @@ handle_register (MmGdbusModem3gpp *skeleton,
     case MM_MODEM_STATE_ENABLED:
     case MM_MODEM_STATE_SEARCHING:
     case MM_MODEM_STATE_REGISTERED:
-        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network (
-            self,
-            arg_network_id,
-            (GAsyncReadyCallback)register_in_network_ready,
-            dbus_call_context_new (skeleton,
-                                   invocation,
-                                   self));
+        mm_iface_modem_3gpp_register_in_network (self,
+                                                 network_id,
+                                                 (GAsyncReadyCallback)handle_register_ready,
+                                                 dbus_call_context_new (skeleton,
+                                                                        invocation,
+                                                                        self));
         break;
 
     case MM_MODEM_STATE_DISABLING:

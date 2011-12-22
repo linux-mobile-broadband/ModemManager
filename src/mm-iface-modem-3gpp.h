@@ -205,4 +205,13 @@ MMBearer *mm_iface_modem_3gpp_create_bearer_from_properties (MMIfaceModem3gpp *s
                                                              GVariant *properties,
                                                              GError **error);
 
+/* Allow registering in the network */
+gboolean mm_iface_modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
+                                                         GAsyncResult *res,
+                                                         GError **error);
+void     mm_iface_modem_3gpp_register_in_network        (MMIfaceModem3gpp *self,
+                                                         const gchar *operator_id,
+                                                         GAsyncReadyCallback callback,
+                                                         gpointer user_data);
+
 #endif /* MM_IFACE_MODEM_3GPP_H */
