@@ -36,11 +36,6 @@
 #include "mm-modem-helpers.h"
 #include "mm-error-helpers.h"
 
-#define MM_MODEM_CAPABILITY_3GPP        \
-    (MM_MODEM_CAPABILITY_GSM_UMTS |     \
-     MM_MODEM_CAPABILITY_LTE |          \
-     MM_MODEM_CAPABILITY_LTE_ADVANCED)
-
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 static void iface_modem_simple_init (MMIfaceModemSimple *iface);
@@ -2466,7 +2461,7 @@ initialize_step (InitializeContext *ctx)
         return;
 
     case INITIALIZE_STEP_IFACE_3GPP:
-        if (ctx->self->priv->modem_current_capabilities & MM_MODEM_CAPABILITY_3GPP) {
+        if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self))) {
             /* Initialize the Modem interface */
             mm_iface_modem_3gpp_initialize (MM_IFACE_MODEM_3GPP (ctx->self),
                                             ctx->port,
