@@ -18,38 +18,369 @@
 #include <ModemManager.h>
 #include <libmm-common.h>
 
+#include "mm-sim.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-simple.h"
 #include "mm-log.h"
 
-/* typedef struct { */
-/*     MmGdbusModemSimple *skeleton; */
-/*     GDBusMethodInvocation *invocation; */
-/*     MMIfaceModemSimple *self; */
-/* } DbusCallContext; */
+/*****************************************************************************/
 
-/* static void */
-/* dbus_call_context_free (DbusCallContext *ctx) */
-/* { */
-/*     g_object_unref (ctx->skeleton); */
-/*     g_object_unref (ctx->invocation); */
-/*     g_object_unref (ctx->self); */
-/*     g_free (ctx); */
-/* } */
+typedef enum {
+    CONNECTION_STEP_FIRST,
+    CONNECTION_STEP_UNLOCK_CHECK,
+    CONNECTION_STEP_ENABLE,
+    CONNECTION_STEP_ALLOWED_MODE,
+    CONNECTION_STEP_REGISTER,
+    CONNECTION_STEP_BEARER,
+    CONNECTION_STEP_CONNECT,
+    CONNECTION_STEP_LAST
+} ConnectionStep;
 
-/* static DbusCallContext * */
-/* dbus_call_context_new (MmGdbusModemSimple *skeleton, */
-/*                        GDBusMethodInvocation *invocation, */
-/*                        MMIfaceModemSimple *self) */
-/* { */
-/*     DbusCallContext *ctx; */
+typedef struct {
+    MmGdbusModemSimple *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModemSimple *self;
+    ConnectionStep step;
 
-/*     ctx = g_new (DbusCallContext, 1); */
-/*     ctx->skeleton = g_object_ref (skeleton); */
-/*     ctx->invocation = g_object_ref (invocation); */
-/*     ctx->self = g_object_ref (self); */
-/*     return ctx; */
-/* } */
+    /* Expected input properties */
+    gchar *pin;
+    gchar *operator_id;
+    MMModemBand allowed_bands;
+    MMModemMode allowed_modes;
+    MMModemMode preferred_mode;
+    gchar *apn;
+    gchar *ip_type;
+    gchar *number;
+    gboolean allow_roaming;
+
+    /* Results to set */
+    gchar *bearer;
+} ConnectionContext;
+
+static void
+connection_context_free (ConnectionContext *ctx)
+{
+    g_free (ctx->bearer);
+    g_free (ctx->pin);
+    g_free (ctx->operator_id);
+    g_free (ctx->apn);
+    g_free (ctx->ip_type);
+    g_free (ctx->number);
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static void
+connection_properties_parse (GVariant *properties,
+                             ConnectionContext *ctx)
+{
+    GVariantIter iter;
+    const gchar *key;
+    GVariant *value;
+
+    /* Set defaults */
+    ctx->pin = NULL;
+    ctx->operator_id = NULL;
+    ctx->allowed_bands = MM_MODEM_BAND_ANY;
+    ctx->allowed_modes = MM_MODEM_MODE_ANY;
+    ctx->preferred_mode = MM_MODEM_MODE_NONE;
+    ctx->apn = NULL;
+    ctx->ip_type = NULL;
+    ctx->number = NULL;
+    ctx->allow_roaming = TRUE;
+
+    g_variant_iter_init (&iter, properties);
+    while (g_variant_iter_loop (&iter, "{sv}", &key, &value)) {
+        if (g_str_equal (key, "pin")) {
+            g_warn_if_fail (ctx->pin == NULL);
+            ctx->pin = g_variant_dup_string (value, NULL);
+        } else if (g_str_equal (key, "operator-id")) {
+            g_warn_if_fail (ctx->operator_id == NULL);
+            ctx->operator_id = g_variant_dup_string (value, NULL);
+        } else if (g_str_equal (key, "allowed-bands")) {
+            ctx->allowed_bands = g_variant_get_uint64 (value);
+        } else if (g_str_equal (key, "allowed-modes")) {
+            ctx->allowed_modes = g_variant_get_uint32 (value);
+        } else if (g_str_equal (key, "preferred-mode")) {
+            ctx->preferred_mode = g_variant_get_uint32 (value);
+        } else if (g_str_equal (key, "apn")) {
+            g_warn_if_fail (ctx->apn == NULL);
+            ctx->apn = g_variant_dup_string (value, NULL);
+        } else if (g_str_equal (key, "ip-type")) {
+            g_warn_if_fail (ctx->ip_type == NULL);
+            ctx->ip_type = g_variant_dup_string (value, NULL);
+        } else if (g_str_equal (key, "number")) {
+            g_warn_if_fail (ctx->number == NULL);
+            ctx->number = g_variant_dup_string (value, NULL);
+        } else if (g_str_equal (key, "allow-roaming")) {
+            ctx->allow_roaming = g_variant_get_boolean (value);
+        } else
+            mm_warn ("Ignoring unexpected property '%s'", key);
+    }
+}
+
+static void connection_step (ConnectionContext *ctx);
+
+static void
+register_in_network_ready (MMIfaceModem3gpp *self,
+                           GAsyncResult *res,
+                           ConnectionContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_iface_modem_3gpp_register_in_network_finish (
+            MM_IFACE_MODEM_3GPP (self), res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        connection_context_free (ctx);
+        return;
+    }
+
+    /* Registered now! */
+    ctx->step++;
+    connection_step (ctx);
+}
+
+static void
+set_allowed_modes_ready (MMBaseModem *self,
+                         GAsyncResult *res,
+                         ConnectionContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_iface_modem_set_allowed_modes_finish (MM_IFACE_MODEM (self), res, &error)) {
+        /* If setting allowed modes is unsupported, keep on */
+        if (!g_error_matches (error,
+                              MM_CORE_ERROR,
+                              MM_CORE_ERROR_UNSUPPORTED)) {
+            g_dbus_method_invocation_take_error (ctx->invocation, error);
+            connection_context_free (ctx);
+            return;
+        }
+    }
+
+    /* Allowed modes set... almost there! */
+    ctx->step++;
+    connection_step (ctx);
+}
+
+static void
+enable_ready (MMBaseModem *self,
+              GAsyncResult *res,
+              ConnectionContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_BASE_MODEM_GET_CLASS (self)->enable_finish (MM_BASE_MODEM (self), res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        connection_context_free (ctx);
+        return;
+    }
+
+    /* Enabling done!, keep on!!! */
+    ctx->step++;
+    connection_step (ctx);
+}
+
+static void
+send_pin_ready (MMSim *sim,
+                GAsyncResult *res,
+                ConnectionContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_sim_send_pin_finish (sim, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        connection_context_free (ctx);
+        return;
+    }
+
+    /* Sent pin and unlocked, cool. */
+    ctx->step++;
+    connection_step (ctx);
+}
+
+static void
+unlock_check_ready (MMIfaceModem *self,
+                    GAsyncResult *res,
+                    ConnectionContext *ctx)
+{
+    GError *error = NULL;
+    MMModemLock lock;
+    MMSim *sim;
+
+    lock = mm_iface_modem_unlock_check_finish (self, res, &error);
+    if (error) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        connection_context_free (ctx);
+        return;
+    }
+
+    /* If we are already unlocked, go on to next step */
+    if (lock == MM_MODEM_LOCK_NONE) {
+        ctx->step++;
+        connection_step (ctx);
+        return;
+    }
+
+    /* During simple connect we are only allowed to use SIM PIN */
+    if (lock != MM_MODEM_LOCK_SIM_PIN ||
+        !ctx->pin) {
+        GEnumClass *enum_class;
+        GEnumValue *value;
+
+        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_LOCK));
+        value = g_enum_get_value (enum_class, lock);
+        g_dbus_method_invocation_return_error (
+            ctx->invocation,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_UNAUTHORIZED,
+            "Modem is locked with '%s' code; cannot unlock it",
+            value->value_nick);
+        g_type_class_unref (enum_class);
+        connection_context_free (ctx);
+        return;
+    }
+
+    /* Try to unlock the modem providing the PIN */
+    sim = NULL;
+    g_object_get (ctx->self,
+                  MM_IFACE_MODEM_SIM, &sim,
+                  NULL);
+    if (!sim) {
+        g_dbus_method_invocation_return_error (
+            ctx->invocation,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_FAILED,
+            "Cannot unlock modem, couldn't get access to the SIM");
+        connection_context_free (ctx);
+        return;
+    }
+
+    mm_sim_send_pin (sim,
+                     ctx->pin,
+                     NULL,
+                     (GAsyncReadyCallback)send_pin_ready,
+                     ctx);
+    g_object_unref (sim);
+}
+
+static void
+connection_step (ConnectionContext *ctx)
+{
+    switch (ctx->step) {
+    case CONNECTION_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case CONNECTION_STEP_UNLOCK_CHECK:
+        mm_info ("Simple connect state (%d/%d): Unlock check",
+                 ctx->step, CONNECTION_STEP_LAST);
+        mm_iface_modem_unlock_check (MM_IFACE_MODEM (ctx->self),
+                                     (GAsyncReadyCallback)unlock_check_ready,
+                                     ctx);
+        return;
+
+    case CONNECTION_STEP_ENABLE:
+        mm_info ("Simple connect state (%d/%d): Enable",
+                 ctx->step, CONNECTION_STEP_LAST);
+        MM_BASE_MODEM_GET_CLASS (ctx->self)->enable (MM_BASE_MODEM (ctx->self),
+                                                     NULL, /* cancellable */
+                                                     (GAsyncReadyCallback)enable_ready,
+                                                     ctx);
+        return;
+
+    case CONNECTION_STEP_ALLOWED_MODE:
+        mm_info ("Simple connect state (%d/%d): Allowed mode",
+                 ctx->step, CONNECTION_STEP_LAST);
+        mm_iface_modem_set_allowed_modes (MM_IFACE_MODEM (ctx->self),
+                                          ctx->allowed_modes,
+                                          ctx->preferred_mode,
+                                          (GAsyncReadyCallback)set_allowed_modes_ready,
+                                          ctx);
+        return;
+
+    case CONNECTION_STEP_REGISTER:
+        mm_info ("Simple connect state (%d/%d): Register",
+                 ctx->step, CONNECTION_STEP_LAST);
+        if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self))) {
+            mm_iface_modem_3gpp_register_in_network (
+                MM_IFACE_MODEM_3GPP (ctx->self),
+                ctx->operator_id,
+                (GAsyncReadyCallback)register_in_network_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case CONNECTION_STEP_BEARER:
+        mm_info ("Simple connect state (%d/%d): Bearer",
+                 ctx->step, CONNECTION_STEP_LAST);
+        /* Fall down to next step */
+        ctx->step++;
+
+    case CONNECTION_STEP_CONNECT:
+        mm_info ("Simple connect state (%d/%d): Connect",
+                 ctx->step, CONNECTION_STEP_LAST);
+        /* Fall down to next step */
+        ctx->step++;
+
+    case CONNECTION_STEP_LAST:
+        mm_info ("Simple connect state (%d/%d): All done",
+                 ctx->step, CONNECTION_STEP_LAST);
+        /* All done, yey! */
+        mm_gdbus_modem_simple_complete_connect (ctx->skeleton,
+                                                ctx->invocation,
+                                                ctx->bearer);
+        connection_context_free (ctx);
+        return;
+    }
+
+    g_assert_not_reached ();
+}
+
+static gboolean
+handle_connect (MmGdbusModemSimple *skeleton,
+                GDBusMethodInvocation *invocation,
+                GVariant *properties,
+                MMIfaceModemSimple *self)
+{
+    ConnectionContext *ctx;
+
+    ctx = g_new0 (ConnectionContext, 1);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+    ctx->step = CONNECTION_STEP_FIRST;
+    connection_properties_parse (properties, ctx);
+
+    /* Start */
+    connection_step (ctx);
+
+    return TRUE;
+}
+
+/*****************************************************************************/
+
+static gboolean
+handle_disconnect (MmGdbusModemSimple *object,
+                   GDBusMethodInvocation *invocation,
+                   const gchar *bearer)
+{
+    return FALSE;
+}
+
+/*****************************************************************************/
+
+static gboolean
+handle_get_status (MmGdbusModemSimple *object,
+                   GDBusMethodInvocation *invocation)
+{
+    return FALSE;
+}
 
 /*****************************************************************************/
 
@@ -70,6 +401,20 @@ mm_iface_modem_simple_initialize (MMIfaceModemSimple *self)
         g_object_set (self,
                       MM_IFACE_MODEM_SIMPLE_DBUS_SKELETON, skeleton,
                       NULL);
+
+        /* Handle method invocations */
+        g_signal_connect (skeleton,
+                          "handle-connect",
+                          G_CALLBACK (handle_connect),
+                          self);
+        g_signal_connect (skeleton,
+                          "handle-disconnect",
+                          G_CALLBACK (handle_disconnect),
+                          self);
+        g_signal_connect (skeleton,
+                          "handle-get-status",
+                          G_CALLBACK (handle_get_status),
+                          self);
 
         /* Finally, export the new interface */
         mm_gdbus_object_skeleton_set_modem_simple (MM_GDBUS_OBJECT_SKELETON (self),
