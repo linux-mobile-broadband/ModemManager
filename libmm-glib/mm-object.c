@@ -93,6 +93,22 @@ mm_object_get_modem_3gpp (MMObject *object)
 }
 
 /**
+ * mm_object_get_modem_simple:
+ * @object: A #MMObject.
+ *
+ * Gets the #MMModemSimple instance for the D-Bus interface <link linkend="gdbus-interface-org-freedesktop-ModemManager1-Modem-Modemsimple.top_of_page">org.freedesktop.ModemManager1.Modem.Modemsimple</link> on @object, if any.
+ *
+ * Returns: (transfer full): A #MMModemSimple that must be freed with g_object_unref() or %NULL if @object does not implement the interface.
+ */
+MMModemSimple *
+mm_object_get_modem_simple (MMObject *object)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (object), NULL);
+
+    return mm_gdbus_object_get_modem_simple (object);
+}
+
+/**
  * mm_object_peek_modem: (skip)
  * @object: A #MMObject.
  *
@@ -126,4 +142,22 @@ mm_object_peek_modem_3gpp (MMObject *object)
     g_return_val_if_fail (MM_GDBUS_IS_OBJECT (object), NULL);
 
     return mm_gdbus_object_peek_modem3gpp (object);
+}
+
+/**
+ * mm_object_peek_modem_simple: (skip)
+ * @object: A #MMObject.
+ *
+ * Like mm_object_get_modem_simple() but doesn't increase the reference count on the returned object.
+ *
+ * <warning>It is not safe to use the returned object if you are on another thread than the one where the #MMManager is running.</warning>
+ *
+ * Returns: (transfer none): A #MMModemSimple or %NULL if @object does not implement the interface. Do not free the returned object, it is owned by @object.
+ */
+MMModemSimple *
+mm_object_peek_modem_simple (MMObject *object)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (object), NULL);
+
+    return mm_gdbus_object_peek_modem_simple (object);
 }

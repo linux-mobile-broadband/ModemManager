@@ -28,6 +28,7 @@
 
 #include "mm-modem.h"
 #include "mm-modem-3gpp.h"
+#include "mm-modem-simple.h"
 
 G_BEGIN_DECLS
 
@@ -41,9 +42,11 @@ gchar       *mm_object_dup_path (MMObject *self);
 
 MMModem         *mm_object_get_modem            (MMObject *object);
 MMModem3gpp     *mm_object_get_modem_3gpp       (MMObject *object);
+MMModemSimple   *mm_object_get_modem_simple     (MMObject *object);
 
 MMModem         *mm_object_peek_modem           (MMObject *object);
 MMModem3gpp     *mm_object_peek_modem_3gpp      (MMObject *object);
+MMModemSimple   *mm_object_peek_modem_simple    (MMObject *object);
 
 G_END_DECLS
 
