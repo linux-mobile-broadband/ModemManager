@@ -23,9 +23,6 @@
         Connect:
         @properties: Dictionary of properties needed to get the modem connected.
         @bearer: On successful connect, returns the object path of the connected packet data bearer used for the connection attempt.
-        @interface: The operating system name for the network data interface that provides packet data using this bearer. Connection managers must configure this interface using the given IP configuration returned by bearer activation.
-        @ip4config: If the bearer was configured for IPv4 addressing, upon successful connect this argument contains the addressing details for assignment to the data interface. See <link linkend="gdbus-property-org-freedesktop-ModemManager1-Bearer.Ip4Config">Ip4Config</link>.
-        @ip6config: If the bearer was configured for IPv6 addressing, upon successful connect this argument contains the addressing details for assignment to the data interface. See <link linkend="gdbus-property-org-freedesktop-ModemManager1-Bearer.Ip6Config">Ip6Config</link>.
 
         Do everything needed to connect the modem using the given properties.
 
@@ -49,7 +46,7 @@
               SIM-PIN unlock code, given as a string value (signature <literal>"s"</literal>).
             </listitem>
           </varlistentry>
-          <varlistentry><term><literal>"network-id"</literal></term>
+          <varlistentry><term><literal>"operator-id"</literal></term>
             <listitem>
               ETSI MCC-MNC of a network to force registration with,
               given as a string value (signature <literal>"s"</literal>).
@@ -95,9 +92,9 @@
               given as a string value (signature <literal>"s"</literal>).
             </listitem>
           </varlistentry>
-          <varlistentry><term><literal>"home-only"</literal></term>
+          <varlistentry><term><literal>"allow-roaming"</literal></term>
             <listitem>
-              %TRUE to allow only connections to home networks,
+              %FALSE to allow only connections to home networks,
               given as a boolean value (signature <literal>"b"</literal>).
             </listitem>
           </varlistentry>
@@ -106,9 +103,6 @@
     <method name="Connect">
       <arg name="properties" type="a{sv}" direction="in"  />
       <arg name="bearer"     type="o"     direction="out" />
-      <arg name="interface"  type="s"     direction="out" />
-      <arg name="ip4config"  type="a{sv}" direction="out" />
-      <arg name="ip6config"  type="a{sv}" direction="out" />
     </method>
 
     <!--
