@@ -17,6 +17,7 @@
 #include <ModemManager.h>
 #include <libmm-common.h>
 
+#include "mm-modem-helpers.h"
 #include "mm-iface-modem.h"
 #include "mm-base-modem.h"
 #include "mm-sim.h"
@@ -563,18 +564,70 @@ handle_factory_reset (MmGdbusModem *skeleton,
 
 /*****************************************************************************/
 
+gboolean
+mm_iface_modem_set_allowed_bands_finish (MMIfaceModem *self,
+                                         GAsyncResult *res,
+                                         GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
 static void
 set_allowed_bands_ready (MMIfaceModem *self,
                          GAsyncResult *res,
-                         DbusCallContext *ctx)
+                         GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_bands_finish (self, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+void
+mm_iface_modem_set_allowed_bands (MMIfaceModem *self,
+                                  MMModemBand bands,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    /* If setting allowed bands is not implemented, report an error */
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_bands ||
+        !MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_bands_finish) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_UNSUPPORTED,
+                                             "Setting allowed bands not supported");
+        return;
+    }
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        mm_iface_modem_set_allowed_bands);
+    MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_bands (self,
+                                                            bands,
+                                                            (GAsyncReadyCallback)set_allowed_bands_ready,
+                                                            result);
+}
+
+static void
+handle_set_allowed_bands_ready (MMIfaceModem *self,
+                                GAsyncResult *res,
+                                DbusCallContext *ctx)
 {
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_bands_finish (self,
                                                                         res,
                                                                         &error))
-        g_dbus_method_invocation_take_error (ctx->invocation,
-                                             error);
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem_complete_set_allowed_bands (ctx->skeleton,
                                                    ctx->invocation);
@@ -584,22 +637,11 @@ set_allowed_bands_ready (MMIfaceModem *self,
 static gboolean
 handle_set_allowed_bands (MmGdbusModem *skeleton,
                           GDBusMethodInvocation *invocation,
-                          guint64 arg_bands,
+                          guint64 bands,
                           MMIfaceModem *self)
 {
-    MMModemState modem_state;
+    MMModemState modem_state = MM_MODEM_STATE_UNKNOWN;
 
-    /* If setting allowed bands is not implemented, report an error */
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_bands ||
-        !MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_bands_finish) {
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Setting allowed bands not supported");
-        return TRUE;
-    }
-
-    modem_state = MM_MODEM_STATE_UNKNOWN;
     g_object_get (self,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
@@ -610,7 +652,7 @@ handle_set_allowed_bands (MmGdbusModem *skeleton,
         g_dbus_method_invocation_return_error (invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot reset the modem to factory defaults: "
+                                               "Cannot set allowed bands: "
                                                "not initialized/unlocked yet");
         break;
 
@@ -623,12 +665,12 @@ handle_set_allowed_bands (MmGdbusModem *skeleton,
     case MM_MODEM_STATE_DISCONNECTING:
     case MM_MODEM_STATE_CONNECTING:
     case MM_MODEM_STATE_CONNECTED:
-        MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_bands (self,
-                                                                arg_bands,
-                                                                (GAsyncReadyCallback)set_allowed_bands_ready,
-                                                                dbus_call_context_new (skeleton,
-                                                                                       invocation,
-                                                                                       self));
+        mm_iface_modem_set_allowed_bands (self,
+                                          bands,
+                                          (GAsyncReadyCallback)handle_set_allowed_bands_ready,
+                                          dbus_call_context_new (skeleton,
+                                                                 invocation,
+                                                                 self));
         break;
     }
 
@@ -636,19 +678,72 @@ handle_set_allowed_bands (MmGdbusModem *skeleton,
 }
 
 /*****************************************************************************/
+/* ALLOWED MODES */
+
+gboolean
+mm_iface_modem_set_allowed_modes_finish (MMIfaceModem *self,
+                                         GAsyncResult *res,
+                                         GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
 
 static void
 set_allowed_modes_ready (MMIfaceModem *self,
                          GAsyncResult *res,
-                         DbusCallContext *ctx)
+                         GSimpleAsyncResult *simple)
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_modes_finish (self,
-                                                                        res,
-                                                                        &error))
-        g_dbus_method_invocation_take_error (ctx->invocation,
-                                             error);
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_modes_finish (self, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+void
+mm_iface_modem_set_allowed_modes (MMIfaceModem *self,
+                                  MMModemMode allowed,
+                                  MMModemMode preferred,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    /* If setting allowed modes is not implemented, report an error */
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_modes ||
+        !MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_modes_finish) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_UNSUPPORTED,
+                                             "Setting allowed modes not supported");
+        return;
+    }
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        mm_iface_modem_set_allowed_modes);
+    MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_modes (self,
+                                                            allowed,
+                                                            preferred,
+                                                            (GAsyncReadyCallback)set_allowed_modes_ready,
+                                                            result);
+}
+
+static void
+handle_set_allowed_modes_ready (MMIfaceModem *self,
+                                GAsyncResult *res,
+                                DbusCallContext *ctx)
+{
+    GError *error = NULL;
+
+    if (mm_iface_modem_set_allowed_modes_finish (self, res, &error))
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem_complete_set_allowed_modes (ctx->skeleton,
                                                    ctx->invocation);
@@ -658,24 +753,12 @@ set_allowed_modes_ready (MMIfaceModem *self,
 static gboolean
 handle_set_allowed_modes (MmGdbusModem *skeleton,
                           GDBusMethodInvocation *invocation,
-                          guint arg_modes,
-                          guint arg_preferred,
+                          guint modes,
+                          guint preferred,
                           MMIfaceModem *self)
 {
-    MMModemState modem_state;
+    MMModemState modem_state = MM_MODEM_STATE_UNKNOWN;
 
-    /* If setting allowed modes is not implemented, report an error */
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_modes ||
-        !MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_modes_finish) {
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Setting allowed modes not supported");
-        return TRUE;
-
-    }
-
-    modem_state = MM_MODEM_STATE_UNKNOWN;
     g_object_get (self,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
@@ -686,7 +769,7 @@ handle_set_allowed_modes (MmGdbusModem *skeleton,
         g_dbus_method_invocation_return_error (invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot reset the modem to factory defaults: "
+                                               "Cannot set allowed modes: "
                                                "not initialized/unlocked yet");
         break;
 
@@ -699,13 +782,13 @@ handle_set_allowed_modes (MmGdbusModem *skeleton,
     case MM_MODEM_STATE_DISCONNECTING:
     case MM_MODEM_STATE_CONNECTING:
     case MM_MODEM_STATE_CONNECTED:
-        MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_modes (self,
-                                                                arg_modes,
-                                                                arg_preferred,
-                                                                (GAsyncReadyCallback)set_allowed_modes_ready,
-                                                                dbus_call_context_new (skeleton,
-                                                                                       invocation,
-                                                                                       self));
+        mm_iface_modem_set_allowed_modes (self,
+                                          modes,
+                                          preferred,
+                                          (GAsyncReadyCallback)handle_set_allowed_modes_ready,
+                                          dbus_call_context_new (skeleton,
+                                                                 invocation,
+                                                                 self));
         break;
     }
 
@@ -2187,6 +2270,19 @@ mm_iface_modem_shutdown (MMIfaceModem *self)
                   NULL);
 }
 
+/*****************************************************************************/
+
+gboolean
+mm_iface_modem_is_3gpp (MMIfaceModem *self)
+{
+    MMModemCapability capabilities = MM_MODEM_CAPABILITY_NONE;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_CURRENT_CAPABILITIES, &capabilities,
+                  NULL);
+
+    return (capabilities & MM_MODEM_CAPABILITY_3GPP);
+}
 
 /*****************************************************************************/
 

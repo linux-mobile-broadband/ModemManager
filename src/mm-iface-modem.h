@@ -242,6 +242,9 @@ struct _MMIfaceModem {
 
 GType mm_iface_modem_get_type (void);
 
+/* Check whether this modem has 3GPP capabilities */
+gboolean mm_iface_modem_is_3gpp (MMIfaceModem *self);
+
 /* Initialize Modem interface (async) */
 void     mm_iface_modem_initialize        (MMIfaceModem *self,
                                            MMAtSerialPort *port,
@@ -300,5 +303,24 @@ void mm_iface_modem_update_state (MMIfaceModem *self,
 void mm_iface_modem_update_access_tech (MMIfaceModem *self,
                                         MMModemAccessTechnology access_tech,
                                         guint32 mask);
+
+/* Allow setting allowed modes */
+void     mm_iface_modem_set_allowed_modes        (MMIfaceModem *self,
+                                                  MMModemMode allowed,
+                                                  MMModemMode preferred,
+                                                  GAsyncReadyCallback callback,
+                                                  gpointer user_data);
+gboolean mm_iface_modem_set_allowed_modes_finish (MMIfaceModem *self,
+                                                  GAsyncResult *res,
+                                                  GError **error);
+
+/* Allow setting allowed bands */
+void     mm_iface_modem_set_allowed_bands        (MMIfaceModem *self,
+                                                  MMModemBand bands,
+                                                  GAsyncReadyCallback callback,
+                                                  gpointer user_data);
+gboolean mm_iface_modem_set_allowed_bands_finish (MMIfaceModem *self,
+                                                  GAsyncResult *res,
+                                                  GError **error);
 
 #endif /* MM_IFACE_MODEM_H */
