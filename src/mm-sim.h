@@ -66,5 +66,13 @@ gboolean mm_sim_initialize_finish (MMSim *self,
                                    GAsyncResult *result,
                                    GError **error);
 
-#endif /* MM_SIM_H */
+void     mm_sim_send_pin        (MMSim *self,
+                                 const gchar *pin,
+                                 const gchar *puk,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data);
+gboolean mm_sim_send_pin_finish (MMSim *self,
+                                 GAsyncResult *res,
+                                 GError **error);
 
+#endif /* MM_SIM_H */

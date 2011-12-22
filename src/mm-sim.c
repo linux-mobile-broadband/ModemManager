@@ -65,7 +65,6 @@ struct _MMSimPrivate {
 typedef struct {
     MMSim *self;
     GDBusMethodInvocation *invocation;
-    GError *save_error;
 } DbusCallContext;
 
 static void
@@ -73,8 +72,6 @@ dbus_call_context_free (DbusCallContext *ctx)
 {
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
-    if (ctx->save_error)
-        g_error_free (ctx->save_error);
     g_free (ctx);
 }
 
@@ -166,6 +163,22 @@ handle_enable_pin (MMSim *self,
 /*****************************************************************************/
 /* SEND PIN/PUK */
 
+typedef struct {
+    MMSim *self;
+    GSimpleAsyncResult *result;
+    GError *save_error;
+} SendPinPukContext;
+
+static void
+send_pin_puk_context_complete_and_free (SendPinPukContext *ctx)
+{
+    if (ctx->save_error)
+        g_error_free (ctx->save_error);
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+}
+
 static GError *
 error_for_unlock_check (MMModemLock lock)
 {
@@ -208,10 +221,18 @@ error_for_unlock_check (MMModemLock lock)
     return error;
 }
 
+gboolean
+mm_sim_send_pin_finish (MMSim *self,
+                        GAsyncResult *res,
+                        GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
 static void
 unlock_check_ready (MMIfaceModem *modem,
                     GAsyncResult *res,
-                    DbusCallContext *ctx)
+                    SendPinPukContext *ctx)
 {
     GError *error = NULL;
     MMModemLock lock;
@@ -224,34 +245,27 @@ unlock_check_ready (MMIfaceModem *modem,
          *   - Otherwise, build our own error from the lock code.
          */
         if (ctx->save_error) {
-            g_dbus_method_invocation_return_gerror (ctx->invocation, ctx->save_error);
+            g_simple_async_result_take_error (ctx->result, ctx->save_error);
+            ctx->save_error = NULL;
             g_clear_error (&error);
         }
         else if (error)
-            g_dbus_method_invocation_take_error (ctx->invocation, error);
+            g_simple_async_result_take_error (ctx->result, error);
         else
-            g_dbus_method_invocation_take_error (ctx->invocation,
-                                                 error_for_unlock_check (lock));
-    } else {
-        if (g_str_equal (g_dbus_method_invocation_get_method_name (ctx->invocation), "SendPin"))
-            mm_gdbus_sim_complete_send_pin (MM_GDBUS_SIM (ctx->self), ctx->invocation);
-        else if (g_str_equal (g_dbus_method_invocation_get_method_name (ctx->invocation), "SendPuk"))
-            mm_gdbus_sim_complete_send_puk (MM_GDBUS_SIM (ctx->self), ctx->invocation);
-        else
-            g_warn_if_reached ();
-    }
+            g_simple_async_result_take_error (ctx->result,
+                                              error_for_unlock_check (lock));
+    } else
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
 
-    dbus_call_context_free (ctx);
+    send_pin_puk_context_complete_and_free (ctx);
 }
 
 static void
-handle_send_pin_puk_ready (MMBaseModem *modem,
+send_pin_puk_ready (MMBaseModem *modem,
                            GAsyncResult *res,
-                           DbusCallContext *ctx)
+                           SendPinPukContext *ctx)
 {
-    mm_base_modem_at_command_finish (modem,
-                                     res,
-                                     &ctx->save_error);
+    mm_base_modem_at_command_finish (modem, res, &ctx->save_error);
 
     /* Once pin/puk has been sent, recheck lock */
     mm_iface_modem_unlock_check (MM_IFACE_MODEM (modem),
@@ -259,46 +273,99 @@ handle_send_pin_puk_ready (MMBaseModem *modem,
                                  ctx);
 }
 
-static gboolean
-handle_send_pin (MMSim *self,
-                 GDBusMethodInvocation *invocation,
-                 const gchar *arg_pin)
+void
+mm_sim_send_pin (MMSim *self,
+                 const gchar *pin,
+                 const gchar *puk,
+                 GAsyncReadyCallback callback,
+                 gpointer user_data)
 {
+    SendPinPukContext *ctx;
     gchar *command;
 
-    command = g_strdup_printf ("+CPIN=\"%s\"", arg_pin);
+    ctx = g_new0 (SendPinPukContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_sim_send_pin);
+
+    command = (puk ?
+               g_strdup_printf ("+CPIN=\"%s\",\"%s\"", puk, pin) :
+               g_strdup_printf ("+CPIN=\"%s\"", pin));
+
     mm_base_modem_at_command (MM_BASE_MODEM (self->priv->modem),
                               command,
                               3,
                               FALSE,
                               NULL, /* cancellable */
-                              (GAsyncReadyCallback)handle_send_pin_puk_ready,
-                              dbus_call_context_new (self,
-                                                     invocation));
+                              (GAsyncReadyCallback)send_pin_puk_ready,
+                              ctx);
     g_free (command);
+}
+
+/*****************************************************************************/
+/* SEND PIN */
+
+static void
+handle_send_pin_ready (MMSim *self,
+                       GAsyncResult *res,
+                       DbusCallContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_sim_send_pin_finish (self, res, &error))
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else
+        mm_gdbus_sim_complete_send_pin (MM_GDBUS_SIM (self), ctx->invocation);
+
+    dbus_call_context_free (ctx);
+}
+
+static gboolean
+handle_send_pin (MMSim *self,
+                 GDBusMethodInvocation *invocation,
+                 const gchar *pin)
+{
+    mm_sim_send_pin (self,
+                     pin,
+                     NULL,
+                     (GAsyncReadyCallback)handle_send_pin_ready,
+                     dbus_call_context_new (self,
+                                            invocation));
     return TRUE;
+}
+
+/*****************************************************************************/
+/* SEND PUK */
+
+static void
+handle_send_puk_ready (MMSim *self,
+                       GAsyncResult *res,
+                       DbusCallContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_sim_send_pin_finish (self, res, &error))
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else
+        mm_gdbus_sim_complete_send_puk (MM_GDBUS_SIM (self), ctx->invocation);
+
+    dbus_call_context_free (ctx);
 }
 
 static gboolean
 handle_send_puk (MMSim *self,
                  GDBusMethodInvocation *invocation,
-                 const gchar *arg_puk,
-                 const gchar *arg_pin)
+                 const gchar *puk,
+                 const gchar *pin)
 {
-    gchar *command;
-
-    command = g_strdup_printf ("+CPIN=\"%s\",\"%s\"",
-                               arg_puk,
-                               arg_pin);
-    mm_base_modem_at_command (MM_BASE_MODEM (self->priv->modem),
-                              command,
-                              3,
-                              FALSE,
-                              NULL, /* cancellable */
-                              (GAsyncReadyCallback)handle_send_pin_puk_ready,
-                              dbus_call_context_new (self,
-                                                     invocation));
-    g_free (command);
+    mm_sim_send_pin (self,
+                     pin,
+                     puk,
+                     (GAsyncReadyCallback)handle_send_puk_ready,
+                     dbus_call_context_new (self,
+                                            invocation));
     return TRUE;
 }
 
