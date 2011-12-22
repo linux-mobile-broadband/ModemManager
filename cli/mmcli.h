@@ -52,6 +52,14 @@ void          mmcli_modem_3gpp_run_asynchronous   (GDBusConnection *connection,
 void          mmcli_modem_3gpp_run_synchronous    (GDBusConnection *connection);
 void          mmcli_modem_3gpp_shutdown           (void);
 
+/* Simple group */
+GOptionGroup *mmcli_modem_simple_get_option_group   (void);
+gboolean      mmcli_modem_simple_options_enabled    (void);
+void          mmcli_modem_simple_run_asynchronous   (GDBusConnection *connection,
+                                                     GCancellable    *cancellable);
+void          mmcli_modem_simple_run_synchronous    (GDBusConnection *connection);
+void          mmcli_modem_simple_shutdown           (void);
+
 /* Bearer group */
 GOptionGroup *mmcli_bearer_get_option_group   (void);
 gboolean      mmcli_bearer_options_enabled    (void);

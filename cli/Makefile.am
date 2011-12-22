@@ -17,6 +17,7 @@ mmcli_SOURCES = \
 	mmcli-manager.c \
 	mmcli-modem.c \
 	mmcli-modem-3gpp.c \
+	mmcli-modem-simple.c \
 	mmcli-bearer.c \
 	mmcli-sim.c
 
