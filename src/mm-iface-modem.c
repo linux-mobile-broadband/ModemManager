@@ -252,33 +252,40 @@ mm_iface_modem_update_access_tech (MMIfaceModem *self,
                                    guint32 mask)
 {
     MmGdbusModem *skeleton = NULL;
-    MMModemAccessTechnology access_tech;
-    gchar *old_access_tech_string;
-    gchar *new_access_tech_string;
-    const gchar *dbus_path;
+    MMModemAccessTechnology old_access_tech;
+    MMModemAccessTechnology built_access_tech;
 
     g_object_get (self,
                   MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
                   NULL);
 
-    access_tech = mm_gdbus_modem_get_access_technologies (skeleton);
-    old_access_tech_string = mm_common_get_access_technologies_string (access_tech);
+    old_access_tech = mm_gdbus_modem_get_access_technologies (skeleton);
 
-    /* Clear the flags to be set */
-    access_tech &= ~mask;
-    /* And set our new flags */
-    access_tech |= new_access_tech;
-    mm_gdbus_modem_set_access_technologies (skeleton, access_tech);
+    /* Build the new access tech */
+    built_access_tech = old_access_tech;
+    built_access_tech &= ~mask;
+    built_access_tech |= new_access_tech;
 
-    /* Log */
-    new_access_tech_string = mm_common_get_access_technologies_string (access_tech);
-    dbus_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (self));
-    mm_info ("Modem %s: access technology changed (%s -> %s)",
-             dbus_path,
-             old_access_tech_string,
-             new_access_tech_string);
-    g_free (old_access_tech_string);
-    g_free (new_access_tech_string);
+    if (built_access_tech != old_access_tech) {
+        gchar *old_access_tech_string;
+        gchar *new_access_tech_string;
+        const gchar *dbus_path;
+
+        mm_gdbus_modem_set_access_technologies (skeleton, built_access_tech);
+
+        /* Log */
+        old_access_tech_string = mm_common_get_access_technologies_string (old_access_tech);
+        new_access_tech_string = mm_common_get_access_technologies_string (built_access_tech);
+        dbus_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (self));
+        mm_info ("Modem %s: access technology changed (%s -> %s)",
+                 dbus_path,
+                 old_access_tech_string,
+                 new_access_tech_string);
+        g_free (old_access_tech_string);
+        g_free (new_access_tech_string);
+    }
+
+    g_object_unref (skeleton);
 }
 
 /*****************************************************************************/
