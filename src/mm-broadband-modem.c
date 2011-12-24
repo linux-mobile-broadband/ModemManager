@@ -1713,6 +1713,16 @@ cleanup_registration_sequence_ready (MMBroadbandModem *self,
         }
     }
 
+    /* Update registration state(s) */
+    if (g_str_has_prefix (ctx->command, "+CREG"))
+        self->priv->reg_cs = MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
+    else
+        self->priv->reg_ps = MM_MODEM_3GPP_REGISTRATION_STATE_IDLE;
+
+    mm_iface_modem_3gpp_update_registration_state (MM_IFACE_MODEM_3GPP (self),
+                                                   get_consolidated_reg_state (self),
+                                                   MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+
     /* We're done */
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     g_simple_async_result_complete (ctx->result);
