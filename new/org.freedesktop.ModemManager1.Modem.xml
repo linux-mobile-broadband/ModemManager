@@ -135,13 +135,13 @@
 
     <!--
         SetAllowedBands:
-        @bands: Bitmask of <link linkend="MMModemBand">MMModemBand</link> values, to specify all the bands allowed in the modem.
+        @bands: List of <link linkend="MMModemBand">MMModemBand</link> values, to specify all the bands allowed in the modem.
 
         Set the radio frequency and technology bands the device is currently
         allowed to use when connecting to a network.
     -->
     <method name="SetAllowedBands">
-      <arg name="bands" type="t" direction="in" />
+      <arg name="bands" type="au" direction="in" />
     </method>
 
     <!--
@@ -392,7 +392,7 @@
     <!--
         SupportedBands:
 
-        Bitmask of <link linkend="MMModemBand">MMModemBand</link> values,
+        List of <link linkend="MMModemBand">MMModemBand</link> values,
         specifying the radio frequency and technology bands supported by the
         device.
 
@@ -400,12 +400,12 @@
         <link linkend="MM-MODEM-BAND-ANY:CAPS"><constant>MM_MODEM_BAND_ANY</constant></link>
         mode will be returned.
     -->
-    <property name="SupportedBands" type="t" access="read" />
+    <property name="SupportedBands" type="au" access="read" />
 
     <!--
         AllowedBands:
 
-        Bitmask of <link linkend="MMModemBand">MMModemBand</link> values,
+        List of <link linkend="MMModemBand">MMModemBand</link> values,
         specifying the radio frequency and technology bands the device is
         currently allowed to use when connecting to a network.
 
@@ -415,7 +415,7 @@
         <link linkend="MM-MODEM-BAND-ANY:CAPS"><constant>MM_MODEM_BAND_ANY</constant></link>
         mode is supported.
     -->
-    <property name="AllowedBands" type="t" access="read" />
+    <property name="AllowedBands" type="au" access="read" />
 
   </interface>
 </node>

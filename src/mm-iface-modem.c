@@ -594,13 +594,48 @@ set_allowed_bands_ready (MMIfaceModem *self,
     g_object_unref (simple);
 }
 
+static gboolean
+validate_allowed_bands (GArray *bands_array,
+                        GError **error)
+{
+    /* When the array has more than one element, there MUST NOT include ANY or
+     * UNKNOWN */
+    if (bands_array->len > 1) {
+        guint i;
+
+        for (i = 0; i < bands_array->len; i++) {
+            MMModemBand band;
+
+            band = g_array_index (bands_array, MMModemBand, i);
+            if (band == MM_MODEM_BAND_UNKNOWN ||
+                band == MM_MODEM_BAND_ANY) {
+                 GEnumClass *enum_class;
+                 GEnumValue *value;
+
+                 enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_BAND));
+                 value = g_enum_get_value (enum_class, band);
+                 g_set_error (error,
+                              MM_CORE_ERROR,
+                              MM_CORE_ERROR_INVALID_ARGS,
+                              "Wrong list of bands: "
+                              "'%s' should have been the only element in the list",
+                              value->value_nick);
+                 g_type_class_unref (enum_class);
+                 return FALSE;
+            }
+        }
+    }
+    return TRUE;
+}
+
 void
 mm_iface_modem_set_allowed_bands (MMIfaceModem *self,
-                                  MMModemBand bands,
+                                  GArray *bands_array,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data)
 {
     GSimpleAsyncResult *result;
+    GError *error = NULL;
 
     /* If setting allowed bands is not implemented, report an error */
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_bands ||
@@ -614,12 +649,21 @@ mm_iface_modem_set_allowed_bands (MMIfaceModem *self,
         return;
     }
 
+    /* Validate input list of bands */
+    if (!validate_allowed_bands (bands_array, &error)) {
+        g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
+                                                   callback,
+                                                   user_data,
+                                                   error);
+        return;
+    }
+
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
                                         mm_iface_modem_set_allowed_bands);
     MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_bands (self,
-                                                            bands,
+                                                            bands_array,
                                                             (GAsyncReadyCallback)set_allowed_bands_ready,
                                                             result);
 }
@@ -644,7 +688,7 @@ handle_set_allowed_bands_ready (MMIfaceModem *self,
 static gboolean
 handle_set_allowed_bands (MmGdbusModem *skeleton,
                           GDBusMethodInvocation *invocation,
-                          guint64 bands,
+                          GVariant *bands_variant,
                           MMIfaceModem *self)
 {
     MMModemState modem_state = MM_MODEM_STATE_UNKNOWN;
@@ -671,14 +715,19 @@ handle_set_allowed_bands (MmGdbusModem *skeleton,
     case MM_MODEM_STATE_REGISTERED:
     case MM_MODEM_STATE_DISCONNECTING:
     case MM_MODEM_STATE_CONNECTING:
-    case MM_MODEM_STATE_CONNECTED:
+    case MM_MODEM_STATE_CONNECTED: {
+        GArray *bands_array;
+
+        bands_array = mm_common_bands_variant_to_garray (bands_variant);
         mm_iface_modem_set_allowed_bands (self,
-                                          bands,
+                                          bands_array,
                                           (GAsyncReadyCallback)handle_set_allowed_bands_ready,
                                           dbus_call_context_new (skeleton,
                                                                  invocation,
                                                                  self));
+        g_array_unref (bands_array);
         break;
+      }
     }
 
     return TRUE;
@@ -1789,7 +1838,34 @@ STR_REPLY_READY_FN (revision, "Revision")
 STR_REPLY_READY_FN (equipment_identifier, "Equipment Identifier")
 STR_REPLY_READY_FN (device_identifier, "Device Identifier")
 UINT_REPLY_READY_FN (supported_modes, "Supported Modes")
-UINT_REPLY_READY_FN (supported_bands, "Supported Bands")
+
+static void
+load_supported_bands_ready (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            InitializationContext *ctx)
+{
+    GError *error = NULL;
+    GArray *bands_array;
+
+    bands_array = MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_bands_finish (self, res, &error);
+
+    /* We have the property in the interface bound to the property in the
+     * skeleton. */
+    g_object_set (self,
+                  MM_IFACE_MODEM_CURRENT_CAPABILITIES,
+                  mm_common_bands_garray_to_variant (bands_array),
+                  NULL);
+    g_array_unref (bands_array);
+
+    if (error) {
+        mm_warn ("couldn't load Supported Bands: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
 
 static void
 load_unlock_required_ready (MMIfaceModem *self,
@@ -2198,6 +2274,28 @@ mm_iface_modem_initialize_finish (MMIfaceModem *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
+static GVariant *
+build_bands_unknown (void)
+{
+    GVariantBuilder builder;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("au"));
+    g_variant_builder_add_value (&builder,
+                                 g_variant_new_uint32 (MM_MODEM_BAND_UNKNOWN));
+    return g_variant_builder_end (&builder);
+}
+
+static GVariant *
+build_bands_any (void)
+{
+    GVariantBuilder builder;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("au"));
+    g_variant_builder_add_value (&builder,
+                                 g_variant_new_uint32 (MM_MODEM_BAND_ANY));
+    return g_variant_builder_end (&builder);
+}
+
 void
 mm_iface_modem_initialize (MMIfaceModem *self,
                            MMAtSerialPort *port,
@@ -2235,8 +2333,8 @@ mm_iface_modem_initialize (MMIfaceModem *self,
         mm_gdbus_modem_set_supported_modes (skeleton, MM_MODEM_MODE_NONE);
         mm_gdbus_modem_set_allowed_modes (skeleton, MM_MODEM_MODE_ANY);
         mm_gdbus_modem_set_preferred_mode (skeleton, MM_MODEM_MODE_NONE);
-        mm_gdbus_modem_set_supported_bands (skeleton, MM_MODEM_BAND_UNKNOWN);
-        mm_gdbus_modem_set_allowed_bands (skeleton, MM_MODEM_BAND_ANY);
+        mm_gdbus_modem_set_supported_bands (skeleton, build_bands_unknown ());
+        mm_gdbus_modem_set_allowed_bands (skeleton, build_bands_any ());
 
         /* Bind our State property */
         g_object_bind_property (self, MM_IFACE_MODEM_STATE,

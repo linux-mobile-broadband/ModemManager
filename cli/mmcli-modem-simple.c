@@ -147,7 +147,7 @@ connect_ready (MMModemSimple  *modem_simple,
 typedef struct {
     gchar       *pin;
     gchar       *operator_id;
-    MMModemBand  allowed_bands;
+    GArray      *allowed_bands;
     MMModemMode  allowed_modes;
     MMModemMode  preferred_mode;
     gchar       *apn;
@@ -171,6 +171,7 @@ string_get_boolean (const gchar *value)
 static void
 simple_connect_properties_shutdown (SimpleConnectProperties *properties)
 {
+    g_array_unref (properties->allowed_bands);
     g_free (properties->pin);
     g_free (properties->operator_id);
     g_free (properties->apn);
@@ -190,9 +191,10 @@ simple_connect_properties_init (const gchar  *input,
     /* Some defaults... */
     memset (properties, 0, sizeof (*properties));
     properties->allow_roaming = TRUE;
-    properties->allowed_bands = MM_MODEM_BAND_ANY;
     properties->allowed_modes = MM_MODEM_MODE_ANY;
     properties->preferred_mode = MM_MODEM_MODE_NONE;
+    properties->allowed_bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 1);
+    ((MMModemBand *)properties->allowed_bands)[0] = MM_MODEM_BAND_ANY;
 
     /* Expecting input as:
      *   key1=string,key2=true,key3=false...

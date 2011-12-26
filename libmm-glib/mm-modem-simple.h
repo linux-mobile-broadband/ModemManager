@@ -40,7 +40,7 @@ gchar       *mm_modem_simple_dup_path (MMModemSimple *self);
 
 #define MM_SIMPLE_PROPERTY_PIN            "pin"            /* string  */
 #define MM_SIMPLE_PROPERTY_OPERATOR_ID    "operator-id"    /* string  */
-#define MM_SIMPLE_PROPERTY_ALLOWED_BANDS  "allowed-bands"  /* MMModemBand */
+#define MM_SIMPLE_PROPERTY_ALLOWED_BANDS  "allowed-bands"  /* GArray of MMModemBand */
 #define MM_SIMPLE_PROPERTY_ALLOWED_MODES  "allowed-modes"  /* MMModemMode */
 #define MM_SIMPLE_PROPERTY_PREFERRED_MODE "preferred-mode" /* MMModemMode */
 #define MM_SIMPLE_PROPERTY_APN            "apn"            /* string */

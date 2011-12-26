@@ -22,4 +22,9 @@
 gchar *mm_common_get_capabilities_string (MMModemCapability caps);
 gchar *mm_common_get_access_technologies_string (MMModemAccessTechnology access_tech);
 
+GArray   *mm_common_bands_variant_to_garray (GVariant *variant);
+GVariant *mm_common_bands_array_to_variant  (const MMModemBand *bands,
+                                             guint n_bands);
+GVariant *mm_common_bands_garray_to_variant (GArray *array);
+
 #endif /* MM_COMMON_HELPERS_H */

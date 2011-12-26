@@ -70,8 +70,12 @@ guint              mm_modem_get_signal_quality       (MMModem *self,
 MMModemMode        mm_modem_get_supported_modes      (MMModem *self);
 MMModemMode        mm_modem_get_allowed_modes        (MMModem *self);
 MMModemMode        mm_modem_get_preferred_mode       (MMModem *self);
-MMModemBand        mm_modem_get_supported_bands      (MMModem *self);
-MMModemBand        mm_modem_get_allowed_bands        (MMModem *self);
+void               mm_modem_get_supported_bands      (MMModem *self,
+                                                      MMModemBand **bands,
+                                                      guint *n_bands);
+void               mm_modem_get_allowed_bands        (MMModem *self,
+                                                      MMModemBand **bands,
+                                                      guint *n_bands);
 
 void     mm_modem_enable        (MMModem *self,
                                  GCancellable *cancellable,
@@ -181,7 +185,8 @@ gboolean mm_modem_set_allowed_modes_sync   (MMModem *self,
                                             GError **error);
 
 void     mm_modem_set_allowed_bands        (MMModem *self,
-                                            MMModemBand bands,
+                                            const MMModemBand *bands,
+                                            guint n_bands,
                                             GCancellable *cancellable,
                                             GAsyncReadyCallback callback,
                                             gpointer user_data);
@@ -189,7 +194,8 @@ gboolean mm_modem_set_allowed_bands_finish (MMModem *self,
                                             GAsyncResult *res,
                                             GError **error);
 gboolean mm_modem_set_allowed_bands_sync   (MMModem *self,
-                                            MMModemBand bands,
+                                            const MMModemBand *bands,
+                                            guint n_bands,
                                             GCancellable *cancellable,
                                             GError **error);
 

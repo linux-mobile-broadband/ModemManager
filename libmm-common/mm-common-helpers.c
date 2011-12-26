@@ -87,3 +87,44 @@ mm_common_get_access_technologies_string (MMModemAccessTechnology access_tech)
 
     return g_string_free (str, FALSE);
 }
+
+GArray *
+mm_common_bands_variant_to_garray (GVariant *variant)
+{
+    GArray *array;
+    GVariantIter iter;
+    guint32 band = MM_MODEM_BAND_UNKNOWN;
+
+    g_variant_iter_init (&iter, variant);
+    array = g_array_sized_new (FALSE,
+                               FALSE,
+                               sizeof (MMModemBand),
+                               g_variant_iter_n_children (&iter));
+    while (g_variant_iter_loop (&iter, "u", &band))
+        g_array_append_val (array, band);
+
+    return array;
+}
+
+GVariant *
+mm_common_bands_array_to_variant (const MMModemBand *bands,
+                                  guint n_bands)
+{
+    GVariantBuilder builder;
+    guint i;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("au"));
+    for (i = 0; i < n_bands; i++) {
+        g_variant_builder_add_value (&builder,
+                                     g_variant_new_uint32 ((guint32)bands[i]));
+    }
+
+    return g_variant_builder_end (&builder);
+}
+
+GVariant *
+mm_common_bands_garray_to_variant (GArray *array)
+{
+    return mm_common_bands_array_to_variant ((const MMModemBand *)array->data,
+                                             array->len);
+}

@@ -656,38 +656,54 @@ mm_modem_get_preferred_mode (MMModem *self)
 /**
  * mm_modem_get_supported_bands:
  * @self: A #MMModem.
+ * @bands: (out): Return location for the array of #MMModemBand values.
+ * @n_bands: (out): Return location for the number of values in @bands.
  *
  * Gets the list of radio frequency and technology bands supported by the #MMModem.
  *
- * For POTS devices, only #MM_MODEM_BAND_ANY will be returned.
- *
- * Returns: A bitmask of #MMModemBand values.
+ * For POTS devices, only #MM_MODEM_BAND_ANY will be returned in @bands.
  */
-MMModemBand
-mm_modem_get_supported_bands (MMModem *self)
+void
+mm_modem_get_supported_bands (MMModem *self,
+                              MMModemBand **bands,
+                              guint *n_bands)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), MM_MODEM_MODE_NONE);
+    GArray *array;
 
-    return (MMModemBand) mm_gdbus_modem_get_supported_bands (self);
+    g_return_if_fail (MM_GDBUS_IS_MODEM (self));
+    g_return_if_fail (bands != NULL);
+    g_return_if_fail (n_bands != NULL);
+
+    array = mm_common_bands_variant_to_garray (mm_gdbus_modem_get_supported_bands (self));
+    *n_bands = array->len;
+    *bands = (MMModemBand *)g_array_free (array, FALSE);
 }
 
 /**
  * mm_modem_get_allowed_bands:
  * @self: A #MMModem.
+ * @bands: (out): Return location for the array of #MMModemBand values.
+ * @n_bands: (out): Return location for the number of values in @bands.
  *
  * Gets the list of radio frequency and technology bands the #MMModem is currently
  * allowed to use when connecting to a network.
  *
  * For POTS devices, only the #MM_MODEM_BAND_ANY band is supported.
- *
- * Returns: A bitmask of #MMModemBand values.
  */
-MMModemBand
-mm_modem_get_allowed_bands (MMModem *self)
+void
+mm_modem_get_allowed_bands (MMModem *self,
+                            MMModemBand **bands,
+                            guint *n_bands)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), MM_MODEM_MODE_NONE);
+    GArray *array;
 
-    return (MMModemBand) mm_gdbus_modem_get_allowed_bands (self);
+    g_return_if_fail (MM_GDBUS_IS_MODEM (self));
+    g_return_if_fail (bands != NULL);
+    g_return_if_fail (n_bands != NULL);
+
+    array = mm_common_bands_variant_to_garray (mm_gdbus_modem_get_allowed_bands (self));
+    *n_bands = array->len;
+    *bands = (MMModemBand *)g_array_free (array, FALSE);
 }
 
 /**
@@ -1533,7 +1549,8 @@ mm_modem_set_allowed_bands_finish (MMModem *self,
 
 void
 mm_modem_set_allowed_bands (MMModem *self,
-                            MMModemBand bands,
+                            const MMModemBand *bands,
+                            guint n_bands,
                             GCancellable *cancellable,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
@@ -1541,7 +1558,7 @@ mm_modem_set_allowed_bands (MMModem *self,
     g_return_if_fail (MM_GDBUS_IS_MODEM (self));
 
     mm_gdbus_modem_call_set_allowed_bands (self,
-                                           bands,
+                                           mm_common_bands_array_to_variant (bands, n_bands),
                                            cancellable,
                                            callback,
                                            user_data);
@@ -1549,16 +1566,18 @@ mm_modem_set_allowed_bands (MMModem *self,
 
 gboolean
 mm_modem_set_allowed_bands_sync (MMModem *self,
-                                 MMModemBand bands,
+                                 const MMModemBand *bands,
+                                 guint n_bands,
                                  GCancellable *cancellable,
                                  GError **error)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
 
-    return mm_gdbus_modem_call_set_allowed_bands_sync (self,
-                                                       bands,
-                                                       cancellable,
-                                                       error);
+    return (mm_gdbus_modem_call_set_allowed_bands_sync (
+                self,
+                mm_common_bands_array_to_variant (bands, n_bands),
+                cancellable,
+                error));
 }
 
 static void

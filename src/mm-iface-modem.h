@@ -123,9 +123,9 @@ struct _MMIfaceModem {
     void (*load_supported_bands) (MMIfaceModem *self,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data);
-    MMModemBand (*load_supported_bands_finish) (MMIfaceModem *self,
-                                                GAsyncResult *res,
-                                                GError **error);
+    GArray * (*load_supported_bands_finish) (MMIfaceModem *self,
+                                             GAsyncResult *res,
+                                             GError **error);
 
     /* Loading of the SignalQuality property */
     void  (*load_signal_quality) (MMIfaceModem *self,
@@ -155,7 +155,7 @@ struct _MMIfaceModem {
 
     /* Asynchronous allowed band setting operation */
     void (*set_allowed_bands) (MMIfaceModem *self,
-                               MMModemBand bands,
+                               GArray *bands_array,
                                GAsyncReadyCallback callback,
                                gpointer user_data);
     gboolean (*set_allowed_bands_finish) (MMIfaceModem *self,
@@ -316,7 +316,7 @@ gboolean mm_iface_modem_set_allowed_modes_finish (MMIfaceModem *self,
 
 /* Allow setting allowed bands */
 void     mm_iface_modem_set_allowed_bands        (MMIfaceModem *self,
-                                                  MMModemBand bands,
+                                                  GArray *bands_array,
                                                   GAsyncReadyCallback callback,
                                                   gpointer user_data);
 gboolean mm_iface_modem_set_allowed_bands_finish (MMIfaceModem *self,

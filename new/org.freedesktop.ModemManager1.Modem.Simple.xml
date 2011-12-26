@@ -54,9 +54,9 @@
           </varlistentry>
           <varlistentry><term><literal>"allowed-bands"</literal></term>
             <listitem>
-              Bitmask of <link linkend="MMModemBand">MMModemBand</link> values,
-              to specify all the bands allowed in the modem, given as a 64bit
-              unsigned integer value (signature <literal>"t"</literal>).
+              List of <link linkend="MMModemBand">MMModemBand</link> values,
+              to specify all the bands allowed in the modem, given as a list of
+              unsigned integer values (signature <literal>"au"</literal>).
             </listitem>
           </varlistentry>
           <varlistentry><term><literal>"allowed-modes"</literal></term>
@@ -153,9 +153,9 @@
           </varlistentry>
           <varlistentry><term><literal>"bands"</literal></term>
             <listitem>
-              Bitmask of <link linkend="MMModemBand">MMModemBand</link> values,
-              given only when registerd, as a 64bit
-              unsigned integer value (signature <literal>"t"</literal>).
+              List of <link linkend="MMModemBand">MMModemBand</link> values,
+              given only when registered, as a list of
+              unsigned integer value (signature <literal>"au"</literal>).
             </listitem>
           </varlistentry>
           <varlistentry><term><literal>"access-technology"</literal></term>
