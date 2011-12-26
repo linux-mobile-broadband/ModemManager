@@ -168,6 +168,44 @@ mm_common_get_bands_string (const MMModemBand *bands,
     return g_string_free (str, FALSE);
 }
 
+MMModemMode
+mm_common_get_modes_from_string (const gchar *str)
+{
+    MMModemMode modes;
+    gchar **mode_strings;
+	GFlagsClass *flags_class;
+
+    modes = MM_MODEM_MODE_NONE;
+
+    flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_MODEM_MODE));
+    mode_strings = g_strsplit (str, "|", -1);
+
+    if (mode_strings) {
+        guint i;
+
+        for (i = 0; mode_strings[i]; i++) {
+            guint j;
+            gboolean found = FALSE;
+
+            for (j = 0; flags_class->values[j].value_nick; j++) {
+                if (g_str_equal (mode_strings[i], flags_class->values[j].value_nick)) {
+                    modes |= flags_class->values[j].value;
+                    found = TRUE;
+                    break;
+                }
+            }
+
+            if (!found)
+                g_warning ("Couldn't match '%s' with a valid MMModemMode value",
+                           mode_strings[i]);
+        }
+    }
+
+    g_type_class_unref (flags_class);
+    g_strfreev (mode_strings);
+    return modes;
+}
+
 void
 mm_common_get_bands_from_string (const gchar *str,
                                  MMModemBand **bands,

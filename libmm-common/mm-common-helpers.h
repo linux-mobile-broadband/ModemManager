@@ -25,6 +25,7 @@ gchar *mm_common_get_modes_string (MMModemMode mode);
 gchar *mm_common_get_bands_string (const MMModemBand *bands,
                                    guint n_bands);
 
+MMModemMode mm_common_get_modes_from_string (const gchar *str);
 void        mm_common_get_bands_from_string (const gchar *str,
                                              MMModemBand **bands,
                                              guint *n_bands);
