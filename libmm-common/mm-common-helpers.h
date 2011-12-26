@@ -24,6 +24,10 @@ gchar *mm_common_get_access_technologies_string (MMModemAccessTechnology access_
 gchar *mm_common_get_bands_string (const MMModemBand *bands,
                                    guint n_bands);
 
+void        mm_common_get_bands_from_string (const gchar *str,
+                                             MMModemBand **bands,
+                                             guint *n_bands);
+
 GArray   *mm_common_bands_variant_to_garray (GVariant *variant);
 GVariant *mm_common_bands_array_to_variant  (const MMModemBand *bands,
                                              guint n_bands);

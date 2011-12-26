@@ -128,6 +128,55 @@ mm_common_get_bands_string (const MMModemBand *bands,
     return g_string_free (str, FALSE);
 }
 
+void
+mm_common_get_bands_from_string (const gchar *str,
+                                 MMModemBand **bands,
+                                 guint *n_bands)
+{
+    GArray *array;
+    gchar **band_strings;
+	GEnumClass *enum_class;
+
+    array = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
+
+    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_BAND));
+    band_strings = g_strsplit (str, "|", -1);
+
+    if (band_strings) {
+        guint i;
+
+        for (i = 0; band_strings[i]; i++) {
+            guint j;
+            gboolean found = FALSE;
+
+            for (j = 0; enum_class->values[j].value_nick; j++) {
+                if (g_str_equal (band_strings[i], enum_class->values[j].value_nick)) {
+                    g_array_append_val (array, enum_class->values[j].value);
+                    found = TRUE;
+                    break;
+                }
+            }
+
+            if (!found)
+                g_warning ("Couldn't match '%s' with a valid MMModemBand value",
+                           band_strings[i]);
+        }
+    }
+
+    if (!array->len) {
+        GEnumValue *value;
+
+        value = g_enum_get_value (enum_class, MM_MODEM_BAND_UNKNOWN);
+        g_array_append_val (array, value->value);
+    }
+
+    g_type_class_unref (enum_class);
+    g_strfreev (band_strings);
+
+    *n_bands = array->len;
+    *bands = (MMModemBand *)g_array_free (array, FALSE);
+}
+
 GArray *
 mm_common_bands_variant_to_garray (GVariant *variant)
 {
