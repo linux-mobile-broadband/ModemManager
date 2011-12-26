@@ -144,112 +144,6 @@ connect_ready (MMModemSimple  *modem_simple,
     mmcli_async_operation_done ();
 }
 
-typedef struct {
-    gchar       *pin;
-    gchar       *operator_id;
-    GArray      *allowed_bands;
-    MMModemMode  allowed_modes;
-    MMModemMode  preferred_mode;
-    gchar       *apn;
-    gchar       *ip_type;
-    gboolean     allow_roaming;
-    gchar       *number;
-} SimpleConnectProperties;
-
-static gboolean
-string_get_boolean (const gchar *value)
-{
-    if (!g_ascii_strcasecmp (value, "true") || g_str_equal (value, "1"))
-        return TRUE;
-
-    if (g_ascii_strcasecmp (value, "false") && g_str_equal (value, "0"))
-        g_printerr ("error: value '%s' is not boolean", value);
-
-    return FALSE;
-}
-
-static void
-simple_connect_properties_shutdown (SimpleConnectProperties *properties)
-{
-    g_array_unref (properties->allowed_bands);
-    g_free (properties->pin);
-    g_free (properties->operator_id);
-    g_free (properties->apn);
-    g_free (properties->ip_type);
-    g_free (properties->number);
-}
-
-static void
-simple_connect_properties_init (const gchar  *input,
-                                SimpleConnectProperties *properties)
-{
-    gchar **words;
-    gchar *key;
-    gchar *value;
-    guint i;
-
-    /* Some defaults... */
-    memset (properties, 0, sizeof (*properties));
-    properties->allow_roaming = TRUE;
-    properties->allowed_modes = MM_MODEM_MODE_ANY;
-    properties->preferred_mode = MM_MODEM_MODE_NONE;
-    properties->allowed_bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 1);
-    ((MMModemBand *)properties->allowed_bands)[0] = MM_MODEM_BAND_ANY;
-
-    /* Expecting input as:
-     *   key1=string,key2=true,key3=false...
-     * */
-
-    words = g_strsplit_set (input, ",= ", -1);
-    if (!words)
-        return;
-
-    i = 0;
-    key = words[i];
-    while (key) {
-        value = words[++i];
-        if (!value) {
-            g_printerr ("error: invalid properties string, no value for key '%s'\n", key);
-            exit (EXIT_FAILURE);
-        }
-
-        if (g_str_equal (key, MM_SIMPLE_PROPERTY_PIN)) {
-            g_debug ("PIN: %s", value);
-            properties->pin = value;
-        } else if (g_str_equal (key, MM_SIMPLE_PROPERTY_OPERATOR_ID)) {
-            g_debug ("Operator ID: %s", value);
-            properties->operator_id = value;
-        } else if (g_str_equal (key, MM_SIMPLE_PROPERTY_APN)) {
-            g_debug ("APN: %s", value);
-            properties->apn = value;
-        } else if (g_str_equal (key, MM_SIMPLE_PROPERTY_IP_TYPE)) {
-            g_debug ("IP type: %s", value);
-            properties->ip_type = value;
-        } else if (g_str_equal (key, MM_SIMPLE_PROPERTY_ALLOW_ROAMING)) {
-            g_debug ("Allow Roaming: %s", value);
-            properties->allow_roaming = string_get_boolean (value);
-            g_free (value);
-        } else if (g_str_equal (key, MM_SIMPLE_PROPERTY_NUMBER)) {
-            g_debug ("Number: %s", value);
-            properties->number = value;
-        } else if (g_str_equal (key, MM_SIMPLE_PROPERTY_ALLOWED_BANDS)) {
-            g_warning ("Allowed bands: Not supported in the CLI yet");
-        } else if (g_str_equal (key, MM_SIMPLE_PROPERTY_ALLOWED_MODES)) {
-            g_warning ("Allowed modes: Not supported in the CLI yet");
-        } else if (g_str_equal (key, MM_SIMPLE_PROPERTY_PREFERRED_MODE)) {
-            g_warning ("Preferred mode: Not supported in the CLI yet");
-        } else {
-            g_printerr ("error: invalid key '%s' in properties string\n", key);
-            g_free (value);
-        }
-
-        g_free (key);
-        key = words[++i];
-    }
-
-    g_free (words);
-}
-
 static void
 get_modem_ready (GObject      *source,
                  GAsyncResult *result,
@@ -260,25 +154,23 @@ get_modem_ready (GObject      *source,
 
     /* Request to connect the modem? */
     if (connect_str) {
-        SimpleConnectProperties properties;
+        GError *error = NULL;
+        MMModemSimpleConnectProperties *properties;
 
-        simple_connect_properties_init (connect_str, &properties);
         g_debug ("Asynchronously connecting the modem...");
+
+        properties = mm_modem_simple_connect_properties_new_from_string (connect_str, &error);
+        if (!properties) {
+            g_printerr ("Error parsing connect string: '%s'", error->message);
+            exit (EXIT_FAILURE);
+        }
+
         mm_modem_simple_connect (ctx->modem_simple,
+                                 properties,
                                  ctx->cancellable,
                                  (GAsyncReadyCallback)connect_ready,
-                                 NULL,
-                                 MM_SIMPLE_PROPERTY_PIN,            properties.pin,
-                                 MM_SIMPLE_PROPERTY_OPERATOR_ID,    properties.operator_id,
-                                 MM_SIMPLE_PROPERTY_ALLOWED_BANDS,  properties.allowed_bands,
-                                 MM_SIMPLE_PROPERTY_ALLOWED_MODES,  properties.allowed_modes,
-                                 MM_SIMPLE_PROPERTY_PREFERRED_MODE, properties.preferred_mode,
-                                 MM_SIMPLE_PROPERTY_APN,            properties.apn,
-                                 MM_SIMPLE_PROPERTY_IP_TYPE,        properties.ip_type,
-                                 MM_SIMPLE_PROPERTY_NUMBER,         properties.number,
-                                 MM_SIMPLE_PROPERTY_ALLOW_ROAMING,  properties.allow_roaming,
                                  NULL);
-        simple_connect_properties_shutdown (&properties);
+        g_object_unref (properties);
         return;
     }
 
