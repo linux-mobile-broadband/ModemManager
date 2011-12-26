@@ -27,6 +27,7 @@
 #include <mm-gdbus-modem.h>
 
 #include "mm-bearer.h"
+#include "mm-modem-simple-connect-properties.h"
 
 G_BEGIN_DECLS
 
@@ -38,30 +39,18 @@ typedef MmGdbusModemSimple      MMModemSimple;
 const gchar *mm_modem_simple_get_path (MMModemSimple *self);
 gchar       *mm_modem_simple_dup_path (MMModemSimple *self);
 
-#define MM_SIMPLE_PROPERTY_PIN            "pin"            /* string  */
-#define MM_SIMPLE_PROPERTY_OPERATOR_ID    "operator-id"    /* string  */
-#define MM_SIMPLE_PROPERTY_ALLOWED_BANDS  "allowed-bands"  /* GArray of MMModemBand */
-#define MM_SIMPLE_PROPERTY_ALLOWED_MODES  "allowed-modes"  /* MMModemMode */
-#define MM_SIMPLE_PROPERTY_PREFERRED_MODE "preferred-mode" /* MMModemMode */
-#define MM_SIMPLE_PROPERTY_APN            "apn"            /* string */
-#define MM_SIMPLE_PROPERTY_IP_TYPE        "ip-type"        /* string  */
-#define MM_SIMPLE_PROPERTY_NUMBER         "number"         /* string  */
-#define MM_SIMPLE_PROPERTY_ALLOW_ROAMING  "allow-roaming"  /* boolean */
-
 void      mm_modem_simple_connect        (MMModemSimple *self,
+                                          MMModemSimpleConnectProperties *properties,
                                           GCancellable *cancellable,
                                           GAsyncReadyCallback callback,
-                                          gpointer user_data,
-                                          const gchar *first_property_name,
-                                          ...);
+                                          gpointer user_data);
 MMBearer *mm_modem_simple_connect_finish (MMModemSimple *self,
                                           GAsyncResult *res,
                                           GError **error);
 MMBearer *mm_modem_simple_connect_sync   (MMModemSimple *self,
+                                          MMModemSimpleConnectProperties *properties,
                                           GCancellable *cancellable,
-                                          GError **error,
-                                          const gchar *first_property_name,
-                                          ...);
+                                          GError **error);
 
 /* void   mm_modem_simple_disconnect        (MMModemSimple *self, */
 /*                                           GCancellable *cancellable, */

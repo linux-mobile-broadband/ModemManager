@@ -78,56 +78,6 @@ connect_context_complete_and_free (ConnectContext *ctx)
     g_slice_free (ConnectContext, ctx);
 }
 
-static GVariant *
-connect_build_properties (const gchar *first_property_name,
-                          va_list var_args)
-{
-    const gchar *key;
-    GVariantBuilder builder;
-
-    g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
-
-    key = first_property_name;
-    while (key) {
-        if (g_str_equal (key, MM_SIMPLE_PROPERTY_PIN) ||
-            g_str_equal (key, MM_SIMPLE_PROPERTY_OPERATOR_ID) ||
-            g_str_equal (key, MM_SIMPLE_PROPERTY_APN) ||
-            g_str_equal (key, MM_SIMPLE_PROPERTY_IP_TYPE) ||
-            g_str_equal (key, MM_SIMPLE_PROPERTY_NUMBER)) {
-            const gchar *value;
-
-            /* If a key with NULL value is given, just ignore it. */
-            value = va_arg (var_args, gchar *);
-            if (value)
-                g_variant_builder_add (&builder, "{sv}", key, g_variant_new_string (value));
-        } else if (g_str_equal (key, MM_SIMPLE_PROPERTY_ALLOW_ROAMING)) {
-            gboolean value;
-
-            value = va_arg (var_args, gboolean);
-            g_variant_builder_add (&builder, "{sv}", key, g_variant_new_boolean (value));
-        } else if (g_str_equal (key, MM_SIMPLE_PROPERTY_ALLOWED_BANDS)) {
-            guint64 value;
-
-            value = va_arg (var_args, guint64);
-            g_variant_builder_add (&builder, "{sv}", key, g_variant_new_uint64 (value));
-        } else if (g_str_equal (key, MM_SIMPLE_PROPERTY_ALLOWED_MODES) ||
-                   g_str_equal (key, MM_SIMPLE_PROPERTY_PREFERRED_MODE)) {
-            guint32 value;
-
-            value = va_arg (var_args, guint32);
-            g_variant_builder_add (&builder, "{sv}", key, g_variant_new_uint32 (value));
-        } else {
-            g_warning ("Unexpected key '%s'", key);
-            /* ignore value */
-            va_arg (var_args, gpointer);
-        }
-
-        key = va_arg (var_args, gchar *);
-    }
-
-    return g_variant_ref_sink (g_variant_builder_end (&builder));
-}
-
 MMBearer *
 mm_modem_simple_connect_finish (MMModemSimple *self,
                                 GAsyncResult *res,
@@ -190,15 +140,13 @@ simple_connect_ready (MMModemSimple *self,
 
 void
 mm_modem_simple_connect (MMModemSimple *self,
+                         MMModemSimpleConnectProperties *properties,
                          GCancellable *cancellable,
                          GAsyncReadyCallback callback,
-                         gpointer user_data,
-                         const gchar *first_property_name,
-                         ...)
+                         gpointer user_data)
 {
     ConnectContext *ctx;
-    va_list va_args;
-    GVariant *properties;
+    GVariant *variant;
 
     g_return_if_fail (MM_GDBUS_IS_MODEM_SIMPLE (self));
 
@@ -210,39 +158,34 @@ mm_modem_simple_connect (MMModemSimple *self,
     if (cancellable)
         ctx->cancellable = g_object_ref (cancellable);
 
-
-    va_start (va_args, first_property_name);
-    properties = connect_build_properties (first_property_name, va_args);
+    variant = mm_common_connect_properties_get_dictionary (
+        MM_COMMON_CONNECT_PROPERTIES (properties));
     mm_gdbus_modem_simple_call_connect (
         self,
-        properties,
+        variant,
         cancellable,
         (GAsyncReadyCallback)simple_connect_ready,
         ctx);
 
-    g_variant_unref (properties);
-    va_end (va_args);
+    g_variant_unref (variant);
 }
 
 MMBearer *
 mm_modem_simple_connect_sync (MMModemSimple *self,
+                              MMModemSimpleConnectProperties *properties,
                               GCancellable *cancellable,
-                              GError **error,
-                              const gchar *first_property_name,
-                              ...)
+                              GError **error)
 {
     MMBearer *bearer = NULL;
     gchar *bearer_path = NULL;
-    va_list va_args;
-    GVariant *properties;
+    GVariant *variant;
 
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    va_start (va_args, first_property_name);
-    properties = connect_build_properties (first_property_name, va_args);
-
+    variant = mm_common_connect_properties_get_dictionary (
+        MM_COMMON_CONNECT_PROPERTIES (properties));
     mm_gdbus_modem_simple_call_connect_sync (self,
-                                             properties,
+                                             variant,
                                              &bearer_path,
                                              cancellable,
                                              error);
@@ -258,8 +201,7 @@ mm_modem_simple_connect_sync (MMModemSimple *self,
         g_free (bearer_path);
     }
 
-    g_variant_unref (properties);
-    va_end (va_args);
+    g_variant_unref (variant);
 
     return bearer;
 }

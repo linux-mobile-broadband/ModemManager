@@ -50,7 +50,9 @@ data/org.freedesktop.ModemManager1.policy
 
 include/ModemManager-names.h
 
-libmm-common/*.[ch]
+libmm-common/mm-gdbus-*.[ch]
+libmm-common/mm-enums-types.[ch]
+libmm-common/mm-errors-types.[ch]
 libmm-common/*.xml
 
 po/Makefile.in.in

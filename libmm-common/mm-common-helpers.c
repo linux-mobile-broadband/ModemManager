@@ -15,7 +15,10 @@
 
 #include <gio/gio.h>
 
+#include <ModemManager.h>
+
 #include "mm-enums-types.h"
+#include "mm-errors-types.h"
 #include "mm-common-helpers.h"
 
 gchar *
@@ -169,8 +172,10 @@ mm_common_get_bands_string (const MMModemBand *bands,
 }
 
 MMModemMode
-mm_common_get_modes_from_string (const gchar *str)
+mm_common_get_modes_from_string (const gchar *str,
+                                 GError **error)
 {
+    GError *inner_error = NULL;
     MMModemMode modes;
     gchar **mode_strings;
 	GFlagsClass *flags_class;
@@ -195,10 +200,20 @@ mm_common_get_modes_from_string (const gchar *str)
                 }
             }
 
-            if (!found)
-                g_warning ("Couldn't match '%s' with a valid MMModemMode value",
-                           mode_strings[i]);
+            if (!found) {
+                inner_error = g_error_new (
+                    MM_CORE_ERROR,
+                    MM_CORE_ERROR_INVALID_ARGS,
+                    "Couldn't match '%s' with a valid MMModemMode value",
+                    mode_strings[i]);
+                break;
+            }
         }
+    }
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        modes = MM_MODEM_MODE_NONE;
     }
 
     g_type_class_unref (flags_class);
@@ -209,8 +224,10 @@ mm_common_get_modes_from_string (const gchar *str)
 void
 mm_common_get_bands_from_string (const gchar *str,
                                  MMModemBand **bands,
-                                 guint *n_bands)
+                                 guint *n_bands,
+                                 GError **error)
 {
+    GError *inner_error = NULL;
     GArray *array;
     gchar **band_strings;
 	GEnumClass *enum_class;
@@ -235,24 +252,35 @@ mm_common_get_bands_from_string (const gchar *str,
                 }
             }
 
-            if (!found)
-                g_warning ("Couldn't match '%s' with a valid MMModemBand value",
-                           band_strings[i]);
+            if (!found) {
+                inner_error = g_error_new (MM_CORE_ERROR,
+                                           MM_CORE_ERROR_INVALID_ARGS,
+                                           "Couldn't match '%s' with a valid MMModemBand value",
+                                           band_strings[i]);
+                break;
+            }
         }
     }
 
-    if (!array->len) {
-        GEnumValue *value;
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        g_array_free (array, TRUE);
+        *n_bands = 0;
+        *bands = NULL;
+    } else {
+        if (!array->len) {
+            GEnumValue *value;
 
-        value = g_enum_get_value (enum_class, MM_MODEM_BAND_UNKNOWN);
-        g_array_append_val (array, value->value);
+            value = g_enum_get_value (enum_class, MM_MODEM_BAND_UNKNOWN);
+            g_array_append_val (array, value->value);
+        }
+
+        *n_bands = array->len;
+        *bands = (MMModemBand *)g_array_free (array, FALSE);
     }
 
     g_type_class_unref (enum_class);
     g_strfreev (band_strings);
-
-    *n_bands = array->len;
-    *bands = (MMModemBand *)g_array_free (array, FALSE);
 }
 
 GArray *
@@ -294,4 +322,20 @@ mm_common_bands_garray_to_variant (GArray *array)
 {
     return mm_common_bands_array_to_variant ((const MMModemBand *)array->data,
                                              array->len);
+}
+
+gboolean
+mm_common_get_boolean_from_string (const gchar *value,
+                                   GError **error)
+{
+    if (!g_ascii_strcasecmp (value, "true") || g_str_equal (value, "1"))
+        return TRUE;
+
+    if (g_ascii_strcasecmp (value, "false") && g_str_equal (value, "0"))
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_INVALID_ARGS,
+                     "Cannot get boolean from string '%s'", value);
+
+    return FALSE;
 }
