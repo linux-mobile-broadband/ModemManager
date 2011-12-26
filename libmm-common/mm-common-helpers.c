@@ -88,6 +88,38 @@ mm_common_get_access_technologies_string (MMModemAccessTechnology access_tech)
     return g_string_free (str, FALSE);
 }
 
+gchar *
+mm_common_get_bands_string (const MMModemBand *bands,
+                            guint n_bands)
+{
+	GEnumClass *enum_class;
+    gboolean first = TRUE;
+    GString *str;
+    guint i;
+
+    str = g_string_new ("");
+    if (n_bands == 0) {
+        g_string_append (str, "none");
+        return g_string_free (str, FALSE);
+    }
+
+    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_BAND));
+    for (i = 0; i < n_bands; i++) {
+        GEnumValue *value;
+
+        value = g_enum_get_value (enum_class, bands[i]);
+        g_string_append_printf (str, "%s%s",
+                                first ? "" : ", ",
+                                value->value_nick);
+
+        if (first)
+            first = FALSE;
+    }
+    g_type_class_unref (enum_class);
+
+    return g_string_free (str, FALSE);
+}
+
 GArray *
 mm_common_bands_variant_to_garray (GVariant *variant)
 {

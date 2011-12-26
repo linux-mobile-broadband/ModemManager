@@ -1698,3 +1698,19 @@ mm_modem_get_access_technologies_string (MMModemAccessTechnology access_tech)
 {
     return mm_common_get_access_technologies_string (access_tech);
 }
+
+/**
+ * mm_modem_get_bands_string:
+ * @bands: List of #MMModemBand values.
+ * @n_bands: Number of values in @bands.
+ *
+ * Build a string with a list of bands.
+ *
+ * Returns: (transfer full): A string specifying the band names given in @bands. The returned value should be freed with g_free().
+ */
+gchar *
+mm_modem_get_bands_string (const MMModemBand *bands,
+                           guint n_bands)
+{
+    return mm_common_get_bands_string (bands, n_bands);
+}
