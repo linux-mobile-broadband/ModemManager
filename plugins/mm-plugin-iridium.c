@@ -89,6 +89,17 @@ check_vendor_iridium (MMPluginBaseSupportsTask *task)
         if (strstr (probed_vendor_strdown, "iridium")) {
             mm_dbg ("Iridium RS232 modem detected");
             probed_vendor_correct = TRUE;
+        } else if (strstr (probed_vendor_strdown, "motorola")) {
+            const gchar *probed_product;
+            gchar *probed_product_strdown;
+
+            probed_product = mm_plugin_base_supports_task_get_probed_product (task);
+            probed_product_strdown = g_utf8_strdown (probed_product, -1);
+            if (strstr (probed_product_strdown, "satellite")) {
+                mm_dbg ("Motorola/Iridium RS232 modem detected");
+                probed_vendor_correct = TRUE;
+            }
+            g_free (probed_product_strdown);
         }
 
         g_free (probed_vendor_strdown);
