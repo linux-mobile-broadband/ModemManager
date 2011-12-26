@@ -281,8 +281,6 @@ main (gint argc, gchar **argv)
 
     if (mmcli_manager_options_enabled ()) {
         mmcli_manager_shutdown ();
-    } else if (mmcli_modem_options_enabled ()) {
-        mmcli_modem_shutdown ();
     } else if (mmcli_modem_3gpp_options_enabled ()) {
         mmcli_modem_3gpp_shutdown ();
     } else if (mmcli_modem_simple_options_enabled ()) {
@@ -291,6 +289,8 @@ main (gint argc, gchar **argv)
         mmcli_sim_shutdown ();
     } else if (mmcli_bearer_options_enabled ()) {
         mmcli_bearer_shutdown ();
+    } else if (mmcli_modem_options_enabled ()) {
+        mmcli_modem_shutdown ();
     }
 
     if (cancellable)
