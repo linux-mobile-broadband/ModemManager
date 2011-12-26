@@ -23,25 +23,33 @@ mm_common_get_capabilities_string (MMModemCapability caps)
 {
 	GFlagsClass *flags_class;
     GString *str;
-    MMModemCapability it;
-    gboolean first = TRUE;
 
     str = g_string_new ("");
     flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_MODEM_CAPABILITY));
 
-    for (it = MM_MODEM_CAPABILITY_POTS; /* first */
-         it <= MM_MODEM_CAPABILITY_LTE_ADVANCED; /* last */
-         it = it << 1) {
-        if (caps & it) {
-            GFlagsValue *value;
+    if (caps == MM_MODEM_CAPABILITY_NONE) {
+        GFlagsValue *value;
 
-            value = g_flags_get_first_value (flags_class, it);
-            g_string_append_printf (str, "%s%s",
-                                    first ? "" : ", ",
-                                    value->value_nick);
+        value = g_flags_get_first_value (flags_class, caps);
+        g_string_append (str, value->value_nick);
+    } else {
+        MMModemCapability it;
+        gboolean first = TRUE;
 
-            if (first)
-                first = FALSE;
+        for (it = MM_MODEM_CAPABILITY_POTS; /* first */
+             it <= MM_MODEM_CAPABILITY_LTE_ADVANCED; /* last */
+             it = it << 1) {
+            if (caps & it) {
+                GFlagsValue *value;
+
+                value = g_flags_get_first_value (flags_class, it);
+                g_string_append_printf (str, "%s%s",
+                                        first ? "" : ", ",
+                                        value->value_nick);
+
+                if (first)
+                    first = FALSE;
+            }
         }
     }
     g_type_class_unref (flags_class);
