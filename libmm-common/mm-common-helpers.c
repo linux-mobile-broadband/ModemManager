@@ -97,6 +97,46 @@ mm_common_get_access_technologies_string (MMModemAccessTechnology access_tech)
 }
 
 gchar *
+mm_common_get_modes_string (MMModemMode mode)
+{
+	GFlagsClass *flags_class;
+    GString *str;
+
+    str = g_string_new ("");
+    flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_MODEM_MODE));
+
+    if (mode == MM_MODEM_MODE_NONE ||
+        mode == MM_MODEM_MODE_ANY) {
+        GFlagsValue *value;
+
+        value = g_flags_get_first_value (flags_class, mode);
+        g_string_append (str, value->value_nick);
+    } else {
+        MMModemMode it;
+        gboolean first = TRUE;
+
+        for (it = MM_MODEM_MODE_1G; /* first */
+             it <= MM_MODEM_MODE_4G; /* last */
+             it = it << 1) {
+            if (mode & it) {
+                GFlagsValue *value;
+
+                value = g_flags_get_first_value (flags_class, it);
+                g_string_append_printf (str, "%s%s",
+                                        first ? "" : ", ",
+                                        value->value_nick);
+
+                if (first)
+                    first = FALSE;
+            }
+        }
+    }
+    g_type_class_unref (flags_class);
+
+    return g_string_free (str, FALSE);
+}
+
+gchar *
 mm_common_get_bands_string (const MMModemBand *bands,
                             guint n_bands)
 {

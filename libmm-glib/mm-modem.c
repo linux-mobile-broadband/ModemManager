@@ -1700,6 +1700,20 @@ mm_modem_get_access_technologies_string (MMModemAccessTechnology access_tech)
 }
 
 /**
+ * mm_modem_get_modes_string:
+ * @mode: Bitmask of #MMModemMode flags.
+ *
+ * Build a string with a list of modes.
+ *
+ * Returns: (transfer full): A string specifying the modes given in @mode. The returned value should be freed with g_free().
+ */
+gchar *
+mm_modem_get_modes_string (MMModemMode mode)
+{
+    return mm_common_get_modes_string (mode);
+}
+
+/**
  * mm_modem_get_bands_string:
  * @bands: List of #MMModemBand values.
  * @n_bands: Number of values in @bands.
