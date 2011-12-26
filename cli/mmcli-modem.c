@@ -228,6 +228,10 @@ print_modem_info (void)
     gchar *unlock;
     gchar *capabilities_string;
     gchar *access_technologies_string;
+    gchar *supported_bands_string;
+    gchar *allowed_bands_string;
+    MMModemBand *bands = NULL;
+    guint n_bands = 0;
 
     /* Not the best thing to do, as we may be doing _get() calls twice, but
      * easiest to maintain */
@@ -257,6 +261,16 @@ print_modem_info (void)
         mm_modem_get_modem_capabilities (ctx->modem));
     access_technologies_string = mm_modem_get_access_technologies_string (
         mm_modem_get_access_technologies (ctx->modem));
+    mm_modem_get_allowed_bands (ctx->modem,
+                                &bands,
+                                &n_bands);
+    allowed_bands_string = mm_modem_get_bands_string (bands, n_bands);
+    g_free (bands);
+    mm_modem_get_supported_bands (ctx->modem,
+                                  &bands,
+                                  &n_bands);
+    supported_bands_string = mm_modem_get_bands_string (bands, n_bands);
+    g_free (bands);
 
     /* Rework possible multiline strings */
     prefixed_revision = prefix_newlines ("           |                 ",
@@ -299,6 +313,13 @@ print_modem_info (void)
              VALIDATE_UNKNOWN (mmcli_get_state_string (mm_modem_get_state (ctx->modem))),
              VALIDATE_UNKNOWN (access_technologies_string));
 
+    /* Band related stuff */
+    g_print ("  -------------------------\n"
+             "  Bands    |      supported: '%s'\n"
+             "           |        allowed: '%s'\n",
+             VALIDATE_UNKNOWN (supported_bands_string),
+             VALIDATE_UNKNOWN (allowed_bands_string));
+
     /* If available, 3GPP related stuff */
     if (ctx->modem_3gpp) {
         g_print ("  -------------------------\n"
@@ -319,6 +340,8 @@ print_modem_info (void)
              VALIDATE_NONE (mm_modem_get_sim_path (ctx->modem)));
     g_print ("\n");
 
+    g_free (allowed_bands_string);
+    g_free (supported_bands_string);
     g_free (access_technologies_string);
     g_free (capabilities_string);
     g_free (prefixed_revision);
