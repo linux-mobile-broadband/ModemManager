@@ -44,11 +44,16 @@ static Context *ctx;
 
 /* Options */
 static gchar *connect_str;
+static gboolean disconnect_flag;
 
 static GOptionEntry entries[] = {
     { "simple-connect", 0, 0, G_OPTION_ARG_STRING, &connect_str,
       "Run full connection sequence.",
       "[\"key=value,...\"]"
+    },
+    { "simple-disconnect", 0, 0, G_OPTION_ARG_NONE, &disconnect_flag,
+      "Disconnect all connected bearers.",
+      NULL
     },
     { NULL }
 };
@@ -77,7 +82,8 @@ mmcli_modem_simple_options_enabled (void)
     if (checked)
         return !!n_actions;
 
-    n_actions = (!!connect_str);
+    n_actions = (!!connect_str +
+                 disconnect_flag);
 
     if (n_actions > 1) {
         g_printerr ("error: too many Simple actions requested\n");
@@ -145,6 +151,33 @@ connect_ready (MMModemSimple  *modem_simple,
 }
 
 static void
+disconnect_process_reply (gboolean result,
+                          const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't disconnect all bearers in the modem: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully disconnected all bearers in the modem\n");
+}
+
+static void
+disconnect_ready (MMModemSimple  *modem_simple,
+                  GAsyncResult *result,
+                  gpointer      nothing)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_simple_disconnect_finish (modem_simple, result, &error);
+    disconnect_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
 get_modem_ready (GObject      *source,
                  GAsyncResult *result,
                  gpointer      none)
@@ -174,6 +207,18 @@ get_modem_ready (GObject      *source,
         return;
     }
 
+    /* Request to disconnect all bearers in the modem? */
+    if (disconnect_flag) {
+        g_debug ("Asynchronously disconnecting all bearers in the modem...");
+
+        mm_modem_simple_disconnect (ctx->modem_simple,
+                                    NULL,
+                                    ctx->cancellable,
+                                    (GAsyncReadyCallback)disconnect_ready,
+                                    NULL);
+        return;
+    }
+
     g_warn_if_reached ();
 }
 
@@ -197,7 +242,7 @@ mmcli_modem_simple_run_asynchronous (GDBusConnection *connection,
 void
 mmcli_modem_simple_run_synchronous (GDBusConnection *connection)
 {
-    /* GError *error = NULL; */
+    GError *error = NULL;
 
     /* Initialize context */
     ctx = g_new0 (Context, 1);
@@ -208,6 +253,20 @@ mmcli_modem_simple_run_synchronous (GDBusConnection *connection)
 
     if (connect_str)
         g_assert_not_reached ();
+
+    /* Request to disconnect all bearers in the modem? */
+    if (disconnect_flag) {
+        gboolean result;
+
+        g_debug ("Asynchronously disconnecting all bearers in the modem...");
+
+        result = mm_modem_simple_disconnect_sync (ctx->modem_simple,
+                                                  NULL,
+                                                  NULL,
+                                                  &error);
+        disconnect_process_reply (result, error);
+        return;
+    }
 
     g_warn_if_reached ();
 }
