@@ -52,16 +52,18 @@ MMBearer *mm_modem_simple_connect_sync   (MMModemSimple *self,
                                           GCancellable *cancellable,
                                           GError **error);
 
-/* void   mm_modem_simple_disconnect        (MMModemSimple *self, */
-/*                                           GCancellable *cancellable, */
-/*                                           GAsyncReadyCallback callback, */
-/*                                           gpointer user_data); */
-/* GList *mm_modem_simple_disconnect_finish (MMModemSimple *self, */
-/*                                           GAsyncResult *res, */
-/*                                           GError **error); */
-/* GList *mm_modem_simple_disconnect_sync   (MMModemSimple *self, */
-/*                                           GCancellable *cancellable, */
-/*                                           GError **error); */
+void     mm_modem_simple_disconnect        (MMModemSimple *self,
+                                            const gchar *bearer_path,
+                                            GCancellable *cancellable,
+                                            GAsyncReadyCallback callback,
+                                            gpointer user_data);
+gboolean mm_modem_simple_disconnect_finish (MMModemSimple *self,
+                                            GAsyncResult *res,
+                                            GError **error);
+gboolean mm_modem_simple_disconnect_sync   (MMModemSimple *self,
+                                            const gchar *bearer_path,
+                                            GCancellable *cancellable,
+                                            GError **error);
 
 G_END_DECLS
 

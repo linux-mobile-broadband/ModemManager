@@ -180,7 +180,7 @@ mm_modem_simple_connect_sync (MMModemSimple *self,
     gchar *bearer_path = NULL;
     GVariant *variant;
 
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM_SIMPLE (self), NULL);
 
     variant = mm_common_connect_properties_get_dictionary (
         MM_COMMON_CONNECT_PROPERTIES (properties));
@@ -204,4 +204,44 @@ mm_modem_simple_connect_sync (MMModemSimple *self,
     g_variant_unref (variant);
 
     return bearer;
+}
+
+void
+mm_modem_simple_disconnect (MMModemSimple *self,
+                            const gchar *bearer_path,
+                            GCancellable *cancellable,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
+{
+    g_return_if_fail (MM_GDBUS_IS_MODEM_SIMPLE (self));
+
+    mm_gdbus_modem_simple_call_disconnect (self,
+                                           bearer_path ? bearer_path : "/",
+                                           cancellable,
+                                           callback,
+                                           user_data);
+}
+
+gboolean
+mm_modem_simple_disconnect_finish (MMModemSimple *self,
+                                   GAsyncResult *res,
+                                   GError **error)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM_SIMPLE (self), FALSE);
+
+    return mm_gdbus_modem_simple_call_disconnect_finish (self, res, error);
+}
+
+gboolean
+mm_modem_simple_disconnect_sync (MMModemSimple *self,
+                                 const gchar *bearer_path,
+                                 GCancellable *cancellable,
+                                 GError **error)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM_SIMPLE (self), FALSE);
+
+    return mm_gdbus_modem_simple_call_disconnect_sync (self,
+                                                       bearer_path ? bearer_path : "/",
+                                                       cancellable,
+                                                       error);
 }
