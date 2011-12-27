@@ -129,6 +129,19 @@ mm_bearer_list_delete_bearer (MMBearerList *self,
     return FALSE;
 }
 
+void
+mm_bearer_list_delete_all_bearers (MMBearerList *self)
+{
+    if (!self->priv->bearers)
+        return;
+
+    g_list_foreach (self->priv->bearers,
+                    (GFunc)g_object_unref,
+                    NULL);
+    g_list_free (self->priv->bearers);
+    self->priv->bearers = NULL;
+}
+
 GStrv
 mm_bearer_list_get_paths (MMBearerList *self)
 {
@@ -228,11 +241,7 @@ dispose (GObject *object)
 {
     MMBearerList *self = MM_BEARER_LIST (object);
 
-    if (self->priv->bearers) {
-        g_list_foreach (self->priv->bearers, (GFunc)g_object_unref, NULL);
-        g_list_free (self->priv->bearers);
-        self->priv->bearers = NULL;
-    }
+    mm_bearer_list_delete_all_bearers (self);
 
     G_OBJECT_CLASS (mm_bearer_list_parent_class)->dispose (object);
 }
