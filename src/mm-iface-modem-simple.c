@@ -18,6 +18,7 @@
 #include <ModemManager.h>
 #include <libmm-common.h>
 
+#include "mm-bearer-list.h"
 #include "mm-sim.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
@@ -373,12 +374,122 @@ handle_connect (MmGdbusModemSimple *skeleton,
 
 /*****************************************************************************/
 
-static gboolean
-handle_disconnect (MmGdbusModemSimple *object,
-                   GDBusMethodInvocation *invocation,
-                   const gchar *bearer)
+typedef struct {
+    MMIfaceModemSimple *self;
+    MmGdbusModemSimple *skeleton;
+    GDBusMethodInvocation *invocation;
+    gchar *bearer_path;
+    GList *bearers;
+    MMBearer *current;
+} DisconnectionContext;
+
+static void
+disconnection_context_free (DisconnectionContext *ctx)
 {
-    return FALSE;
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_free (ctx->bearer_path);
+    if (ctx->current)
+        g_object_unref (ctx->current);
+    if (ctx->bearers) {
+        g_list_foreach (ctx->bearers, (GFunc)g_object_unref, NULL);
+        g_list_free (ctx->bearers);
+    }
+    g_free (ctx);
+}
+
+static void disconnect_next_bearer (DisconnectionContext *ctx);
+
+static void
+disconnect_ready (MMBearer *bearer,
+                  GAsyncResult *res,
+                  DisconnectionContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_bearer_disconnect_finish (bearer, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        disconnection_context_free (ctx);
+        return;
+    }
+
+    disconnect_next_bearer (ctx);
+}
+
+static void
+disconnect_next_bearer (DisconnectionContext *ctx)
+{
+    if (ctx->current)
+        g_clear_object (&ctx->current);
+
+    /* No more bearers? all done! */
+    if (!ctx->bearers) {
+        mm_gdbus_modem_simple_complete_disconnect (ctx->skeleton,
+                                                   ctx->invocation);
+        disconnection_context_free (ctx);
+        return;
+    }
+
+    ctx->current = MM_BEARER (ctx->bearers->data);
+    ctx->bearers = g_list_delete_link (ctx->bearers, ctx->bearers);
+
+    mm_bearer_disconnect (ctx->current,
+                          (GAsyncReadyCallback)disconnect_ready,
+                          ctx);
+}
+
+static void
+build_connected_bearer_list (MMBearer *bearer,
+                             DisconnectionContext *ctx)
+{
+    if (!ctx->bearer_path ||
+        g_str_equal (ctx->bearer_path, mm_bearer_get_path (bearer)))
+        ctx->bearers = g_list_prepend (ctx->bearers, g_object_ref (bearer));
+}
+
+static gboolean
+handle_disconnect (MmGdbusModemSimple *skeleton,
+                   GDBusMethodInvocation *invocation,
+                   const gchar *bearer_path,
+                   MMIfaceModemSimple *self)
+{
+    MMBearerList *list = NULL;
+    DisconnectionContext *ctx;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_BEARER_LIST, &list,
+                  NULL);
+
+    ctx = g_new0 (DisconnectionContext, 1);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->self = g_object_ref (self);
+    ctx->invocation = g_object_ref (invocation);
+
+    if (bearer_path &&
+        bearer_path[0] == '/' &&
+        bearer_path[1]) {
+        ctx->bearer_path = g_strdup (ctx->bearer_path);
+    }
+
+    mm_bearer_list_foreach (list,
+                            (MMBearerListForeachFunc)build_connected_bearer_list,
+                            ctx);
+
+    if (ctx->bearer_path &&
+        !ctx->bearers) {
+        g_dbus_method_invocation_return_error (
+            invocation,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_INVALID_ARGS,
+            "Couldn't disconnect bearer '%s': not found",
+            ctx->bearer_path);
+        disconnection_context_free (ctx);
+        return TRUE;
+    }
+
+    disconnect_next_bearer (ctx);
+    return TRUE;
 }
 
 /*****************************************************************************/
