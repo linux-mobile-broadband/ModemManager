@@ -47,7 +47,7 @@ typedef struct {
     MMCommonConnectProperties *properties;
 
     /* Results to set */
-    gchar *bearer;
+    MMBearer *bearer;
 } ConnectionContext;
 
 static void
@@ -57,10 +57,49 @@ connection_context_free (ConnectionContext *ctx)
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
+    if (ctx->bearer)
+        g_object_unref (ctx->bearer);
     g_free (ctx);
 }
 
 static void connection_step (ConnectionContext *ctx);
+
+static void
+connect_bearer_ready (MMBearer *bearer,
+                      GAsyncResult *res,
+                      ConnectionContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_bearer_connect_finish (bearer, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        connection_context_free (ctx);
+        return;
+    }
+
+    /* Bearer connected.... all done!!!!! */
+    ctx->step++;
+    connection_step (ctx);
+}
+
+static void
+create_bearer_ready (MMIfaceModem *self,
+                     GAsyncResult *res,
+                     ConnectionContext *ctx)
+{
+    GError *error = NULL;
+
+    ctx->bearer = mm_iface_modem_create_bearer_finish (self, res, &error);
+    if (!ctx->bearer) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        connection_context_free (ctx);
+        return;
+    }
+
+    /* Bearer available! */
+    ctx->step++;
+    connection_step (ctx);
+}
 
 static void
 register_in_network_ready (MMIfaceModem3gpp *self,
@@ -262,17 +301,32 @@ connection_step (ConnectionContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case CONNECTION_STEP_BEARER:
+    case CONNECTION_STEP_BEARER: {
+        MMCommonBearerProperties *bearer_properties;
+
         mm_info ("Simple connect state (%d/%d): Bearer",
                  ctx->step, CONNECTION_STEP_LAST);
-        /* Fall down to next step */
-        ctx->step++;
+
+        bearer_properties = (mm_common_connect_properties_get_bearer_properties (
+                                 ctx->properties));
+        mm_iface_modem_create_bearer (
+            MM_IFACE_MODEM (ctx->self),
+            TRUE, /* Try to force bearer creation */
+            bearer_properties,
+            (GAsyncReadyCallback)create_bearer_ready,
+            ctx);
+        g_object_unref (bearer_properties);
+        return;
+    }
 
     case CONNECTION_STEP_CONNECT:
         mm_info ("Simple connect state (%d/%d): Connect",
                  ctx->step, CONNECTION_STEP_LAST);
-        /* Fall down to next step */
-        ctx->step++;
+        mm_bearer_connect (ctx->bearer,
+                           NULL, /* no number given */
+                           (GAsyncReadyCallback)connect_bearer_ready,
+                           ctx);
+        return;
 
     case CONNECTION_STEP_LAST:
         mm_info ("Simple connect state (%d/%d): All done",
@@ -280,7 +334,7 @@ connection_step (ConnectionContext *ctx)
         /* All done, yey! */
         mm_gdbus_modem_simple_complete_connect (ctx->skeleton,
                                                 ctx->invocation,
-                                                ctx->bearer);
+                                                mm_bearer_get_path (ctx->bearer));
         connection_context_free (ctx);
         return;
     }
