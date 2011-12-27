@@ -1110,36 +1110,6 @@ create_bearer_context_complete_and_free (CreateBearerContext *ctx)
     g_slice_free (CreateBearerContext, ctx);
 }
 
-static GVariant *
-create_bearer_build_properties (const gchar *first_property_name,
-                                va_list var_args)
-{
-    const gchar *key;
-    GVariantBuilder builder;
-
-    g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
-
-    key = first_property_name;
-    while (key) {
-        if (g_str_equal (key, MM_BEARER_PROPERTY_ALLOW_ROAMING)) {
-            gboolean value;
-
-            value = va_arg (var_args, gboolean);
-            g_variant_builder_add (&builder, "{sv}", key, g_variant_new_boolean (value));
-        } else {
-            const gchar *value;
-
-            /* If a key with NULL value is given, just ignore it. */
-            value = va_arg (var_args, gchar *);
-            if (value)
-                g_variant_builder_add (&builder, "{sv}", key, g_variant_new_string (value));
-        }
-
-        key = va_arg (var_args, gchar *);
-    }
-    return g_variant_ref_sink (g_variant_builder_end (&builder));
-}
-
 /**
  * mm_modem_create_bearer_finish:
  * @self: A #MMModem.
@@ -1215,11 +1185,10 @@ modem_create_bearer_ready (MMModem *self,
 /**
  * mm_modem_create_bearer:
  * @self: A #MMModem.
+ * @properties: A ##MMBearerProperties object with the properties to use.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
  * @user_data: User data to pass to @callback.
- * @first_property_name: Name of the first property to set.
- * @...: Value for the first property, followed optionally by more name/value pairs, followed by %NULL.
  *
  * Asynchronously creates a new packet data bearer in the #MMModem.
  *
@@ -1235,15 +1204,13 @@ modem_create_bearer_ready (MMModem *self,
  */
 void
 mm_modem_create_bearer (MMModem *self,
+                        MMBearerProperties *properties,
                         GCancellable *cancellable,
                         GAsyncReadyCallback callback,
-                        gpointer user_data,
-                        const gchar *first_property_name,
-                        ...)
+                        gpointer user_data)
 {
     CreateBearerContext *ctx;
-    va_list va_args;
-    GVariant *properties;
+    GVariant *dictionary;
 
     g_return_if_fail (MM_GDBUS_IS_MODEM (self));
 
@@ -1255,26 +1222,24 @@ mm_modem_create_bearer (MMModem *self,
     if (cancellable)
         ctx->cancellable = g_object_ref (cancellable);
 
-    va_start (va_args, first_property_name);
-    properties = create_bearer_build_properties (first_property_name, va_args);
+    dictionary = (mm_common_bearer_properties_get_dictionary (
+                      MM_COMMON_BEARER_PROPERTIES (properties)));
     mm_gdbus_modem_call_create_bearer (
         self,
-        properties,
+        dictionary,
         cancellable,
         (GAsyncReadyCallback)modem_create_bearer_ready,
         ctx);
 
-    g_variant_unref (properties);
-    va_end (va_args);
+    g_variant_unref (dictionary);
 }
 
 /**
  * mm_modem_create_bearer_sync:
  * @self: A #MMModem.
+ * @properties: A ##MMBearerProperties object with the properties to use.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
- * @first_property_name: Name of the first property to set.
- * @...: Value for the first property, followed optionally by more name/value pairs, followed by %NULL.
  *
  * Synchronously creates a new packet data bearer in the #MMModem.
  *
@@ -1290,23 +1255,20 @@ mm_modem_create_bearer (MMModem *self,
  */
 MMBearer *
 mm_modem_create_bearer_sync (MMModem *self,
+                             MMBearerProperties *properties,
                              GCancellable *cancellable,
-                             GError **error,
-                             const gchar *first_property_name,
-                             ...)
+                             GError **error)
 {
     MMBearer *bearer = NULL;
     gchar *bearer_path = NULL;
-    va_list va_args;
-    GVariant *properties;
+    GVariant *dictionary;
 
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    va_start (va_args, first_property_name);
-    properties = create_bearer_build_properties (first_property_name, va_args);
-
+    dictionary = (mm_common_bearer_properties_get_dictionary (
+                      MM_COMMON_BEARER_PROPERTIES (properties)));
     mm_gdbus_modem_call_create_bearer_sync (self,
-                                            properties,
+                                            dictionary,
                                             &bearer_path,
                                             cancellable,
                                             error);
@@ -1322,8 +1284,7 @@ mm_modem_create_bearer_sync (MMModem *self,
         g_free (bearer_path);
     }
 
-    g_variant_unref (properties);
-    va_end (va_args);
+    g_variant_unref (dictionary);
 
     return bearer;
 }

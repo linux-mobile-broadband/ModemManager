@@ -26,6 +26,8 @@ libmm_glib_la_SOURCES = \
 	mm-modem-simple.c \
 	mm-sim.h \
 	mm-sim.c \
+	mm-bearer-properties.h \
+	mm-bearer-properties.c \
 	mm-bearer.h \
 	mm-bearer.c
 

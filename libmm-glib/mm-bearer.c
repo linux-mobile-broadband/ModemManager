@@ -373,176 +373,21 @@ mm_bearer_dup_ipv6_config (MMBearer *self)
     return config;
 }
 
-struct _MMBearerProperties {
-    gchar *apn;
-    gchar *ip_type;
-    gboolean allow_roaming;
-    gchar *user;
-    gchar *password;
-    gchar *number;
-};
-
-void
-mm_bearer_properties_free (MMBearerProperties *properties)
-{
-    if (!properties)
-        return;
-
-    g_free (properties->apn);
-    g_free (properties->ip_type);
-    g_free (properties->user);
-    g_free (properties->password);
-    g_free (properties->number);
-    g_slice_free (MMBearerProperties, properties);
-}
-
-static MMBearerProperties *
-create_properties_struct (GVariant *variant)
-{
-    GVariantIter iter;
-    const gchar *key;
-    GVariant *value;
-    MMBearerProperties *c;
-
-    c = g_slice_new0 (MMBearerProperties);
-
-    g_variant_iter_init (&iter, variant);
-    while (g_variant_iter_loop (&iter, "{sv}", &key, &value)) {
-        if (g_str_equal (key, MM_BEARER_PROPERTY_APN)) {
-            g_warn_if_fail (c->apn == NULL);
-            c->apn = g_variant_dup_string (value, NULL);
-        } else if (g_str_equal (key, MM_BEARER_PROPERTY_IP_TYPE)) {
-            g_warn_if_fail (c->ip_type == NULL);
-            c->ip_type = g_variant_dup_string (value, NULL);
-        } else if (g_str_equal (key, MM_BEARER_PROPERTY_ALLOW_ROAMING)) {
-            c->allow_roaming = g_variant_get_boolean (value);
-        } else if (g_str_equal (key, MM_BEARER_PROPERTY_USER)) {
-            g_warn_if_fail (c->user == NULL);
-            c->user = g_variant_dup_string (value, NULL);
-        } else if (g_str_equal (key, MM_BEARER_PROPERTY_PASSWORD)) {
-            g_warn_if_fail (c->password == NULL);
-            c->password = g_variant_dup_string (value, NULL);
-        } else if (g_str_equal (key, MM_BEARER_PROPERTY_NUMBER)) {
-            g_warn_if_fail (c->number == NULL);
-            c->number = g_variant_dup_string (value, NULL);
-        } else
-            g_warning ("Unexpected property '%s' found in Bearer properties", key);
-    }
-
-    return c;
-}
-
-const gchar *
-mm_bearer_properties_get_apn (const MMBearerProperties *properties)
-{
-    return properties->apn;
-}
-
-gchar *
-mm_bearer_properties_dup_apn (const MMBearerProperties *properties)
-{
-    return g_strdup (properties->apn);
-}
-
-const gchar *
-mm_bearer_properties_get_ip_type (const MMBearerProperties *properties)
-{
-    return properties->ip_type;
-}
-
-gchar *
-mm_bearer_properties_dup_ip_type (const MMBearerProperties *properties)
-{
-    return g_strdup (properties->ip_type);
-}
-
-const gchar *
-mm_bearer_properties_get_user (const MMBearerProperties *properties)
-{
-    return properties->user;
-}
-
-gchar *
-mm_bearer_properties_dup_user (const MMBearerProperties *properties)
-{
-    return g_strdup (properties->user);
-}
-
-const gchar *
-mm_bearer_properties_get_password (const MMBearerProperties *properties)
-{
-    return properties->password;
-}
-
-gchar *
-mm_bearer_properties_dup_password (const MMBearerProperties *properties)
-{
-    return g_strdup (properties->password);
-}
-
-const gchar *
-mm_bearer_properties_get_number (const MMBearerProperties *properties)
-{
-    return properties->number;
-}
-
-gchar *
-mm_bearer_properties_dup_number (const MMBearerProperties *properties)
-{
-    return g_strdup (properties->number);
-}
-
-gboolean
-mm_bearer_properties_get_allow_roaming (const MMBearerProperties *properties)
-{
-    return properties->allow_roaming;
-}
-
-#define MM_BEARER_PROPERTIES_DATA "bearer-properties"
-
-static void
-properties_changed (MMBearer *self)
-{
-    g_object_set_data (G_OBJECT (self), MM_BEARER_PROPERTIES_DATA, NULL);
-}
-
-const MMBearerProperties *
+MMBearerProperties *
 mm_bearer_get_properties (MMBearer *self)
 {
+    GError *error = NULL;
     MMBearerProperties *properties;
 
     g_return_val_if_fail (MM_IS_BEARER (self), NULL);
 
-    properties = g_object_get_data (G_OBJECT (self),
-                                    MM_BEARER_PROPERTIES_DATA);
+    properties = (mm_common_bearer_properties_new_from_dictionary (
+                      mm_gdbus_bearer_get_properties (MM_GDBUS_BEARER (self)),
+                      &error));
     if (!properties) {
-        properties = create_properties_struct (
-            mm_gdbus_bearer_get_properties (MM_GDBUS_BEARER (self)));
-
-        g_object_set_data_full (G_OBJECT (self),
-                                MM_BEARER_PROPERTIES_DATA,
-                                properties,
-                                (GDestroyNotify)mm_bearer_properties_free);
-        g_signal_connect (self,
-                          "notify::properties",
-                          G_CALLBACK (properties_changed),
-                          NULL);
+        g_warning ("Couldn't create properties: '%s'", error->message);
+        g_error_free (error);
     }
-
-    return properties;
-}
-
-MMBearerProperties *
-mm_bearer_dup_properties (MMBearer *self)
-{
-    MMBearerProperties *properties;
-    GVariant *variant;
-
-    g_return_val_if_fail (MM_IS_BEARER (self), NULL);
-
-    variant = mm_gdbus_bearer_dup_properties (MM_GDBUS_BEARER (self));
-    properties = create_properties_struct (variant);
-    g_variant_unref (variant);
 
     return properties;
 }

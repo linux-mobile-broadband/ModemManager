@@ -24,10 +24,11 @@
 #define _MM_MODEM_H_
 
 #include <ModemManager.h>
-#include <mm-gdbus-modem.h>
+#include <libmm-common.h>
 
 #include "mm-sim.h"
 #include "mm-bearer.h"
+#include "mm-bearer-properties.h"
 
 G_BEGIN_DECLS
 
@@ -110,27 +111,18 @@ GList   *mm_modem_list_bearers_sync   (MMModem *self,
                                        GCancellable *cancellable,
                                        GError **error);
 
-#define MM_BEARER_PROPERTY_APN           "apn"           /* string  */
-#define MM_BEARER_PROPERTY_IP_TYPE       "ip-type"       /* string  */
-#define MM_BEARER_PROPERTY_ALLOW_ROAMING "allow-roaming" /* boolean */
-#define MM_BEARER_PROPERTY_USER          "user"          /* string  */
-#define MM_BEARER_PROPERTY_PASSWORD      "password"      /* string  */
-#define MM_BEARER_PROPERTY_NUMBER        "number"        /* string  */
-
 void     mm_modem_create_bearer         (MMModem *self,
+                                         MMBearerProperties *properties,
                                          GCancellable *cancellable,
                                          GAsyncReadyCallback callback,
-                                         gpointer user_data,
-                                         const gchar *first_property_name,
-                                         ...);
+                                         gpointer user_data);
 MMBearer *mm_modem_create_bearer_finish (MMModem *self,
                                          GAsyncResult *res,
                                          GError **error);
 MMBearer *mm_modem_create_bearer_sync   (MMModem *self,
+                                         MMBearerProperties *properties,
                                          GCancellable *cancellable,
-                                         GError **error,
-                                         const gchar *first_property_name,
-                                         ...);
+                                         GError **error);
 
 void     mm_modem_delete_bearer        (MMModem *self,
                                         const gchar *bearer,

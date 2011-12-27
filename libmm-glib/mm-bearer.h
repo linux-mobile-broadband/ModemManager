@@ -24,7 +24,9 @@
 #define _MM_BEARER_H_
 
 #include <ModemManager.h>
-#include <mm-gdbus-bearer.h>
+#include <libmm-common.h>
+
+#include "mm-bearer-properties.h"
 
 G_BEGIN_DECLS
 
@@ -35,14 +37,6 @@ G_BEGIN_DECLS
  * This is an opaque struct.
  */
 typedef struct _MMBearerIpConfig MMBearerIpConfig;
-
-/**
- * MMBearerProperties:
- *
- * Addressing details for assignment to the data interface.
- * This is an opaque struct.
- */
-typedef struct _MMBearerProperties MMBearerProperties;
 
 typedef MmGdbusBearer     MMBearer;
 #define MM_TYPE_BEARER(o) MM_GDBUS_TYPE_BEARER (o)
@@ -80,21 +74,7 @@ gboolean mm_bearer_disconnect_sync   (MMBearer *self,
                                       GCancellable *cancellable,
                                       GError **error);
 
-const MMBearerProperties *mm_bearer_get_properties (MMBearer *self);
-MMBearerProperties       *mm_bearer_dup_properties (MMBearer *self);
-
-const gchar *mm_bearer_properties_get_apn           (const MMBearerProperties *properties);
-gchar       *mm_bearer_properties_dup_apn           (const MMBearerProperties *properties);
-const gchar *mm_bearer_properties_get_ip_type       (const MMBearerProperties *properties);
-gchar       *mm_bearer_properties_dup_ip_type       (const MMBearerProperties *properties);
-const gchar *mm_bearer_properties_get_user          (const MMBearerProperties *properties);
-gchar       *mm_bearer_properties_dup_user          (const MMBearerProperties *properties);
-const gchar *mm_bearer_properties_get_password      (const MMBearerProperties *properties);
-gchar       *mm_bearer_properties_dup_password      (const MMBearerProperties *properties);
-const gchar *mm_bearer_properties_get_number        (const MMBearerProperties *properties);
-gchar       *mm_bearer_properties_dup_number        (const MMBearerProperties *properties);
-gboolean     mm_bearer_properties_get_allow_roaming (const MMBearerProperties *properties);
-void         mm_bearer_properties_free              (MMBearerProperties *properties);
+MMBearerProperties *mm_bearer_get_properties (MMBearer *self);
 
 const MMBearerIpConfig *mm_bearer_get_ipv4_config (MMBearer *self);
 MMBearerIpConfig       *mm_bearer_dup_ipv4_config (MMBearer *self);

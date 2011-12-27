@@ -27,6 +27,7 @@
 #include "mm-enums-types.h"
 #include "mm-common-helpers.h"
 #include "mm-common-connect-properties.h"
+#include "mm-common-bearer-properties.h"
 #include "mm-gdbus-manager.h"
 #include "mm-gdbus-modem.h"
 #include "mm-gdbus-bearer.h"
