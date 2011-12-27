@@ -44,15 +44,7 @@ typedef struct {
     ConnectionStep step;
 
     /* Expected input properties */
-    gchar *pin;
-    gchar *operator_id;
-    MMModemBand allowed_bands;
-    MMModemMode allowed_modes;
-    MMModemMode preferred_mode;
-    gchar *apn;
-    gchar *ip_type;
-    gchar *number;
-    gboolean allow_roaming;
+    MMCommonConnectProperties *properties;
 
     /* Results to set */
     gchar *bearer;
@@ -61,65 +53,11 @@ typedef struct {
 static void
 connection_context_free (ConnectionContext *ctx)
 {
-    g_free (ctx->bearer);
-    g_free (ctx->pin);
-    g_free (ctx->operator_id);
-    g_free (ctx->apn);
-    g_free (ctx->ip_type);
-    g_free (ctx->number);
+    g_object_unref (ctx->properties);
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
     g_free (ctx);
-}
-
-static void
-connection_properties_parse (GVariant *properties,
-                             ConnectionContext *ctx)
-{
-    GVariantIter iter;
-    const gchar *key;
-    GVariant *value;
-
-    /* Set defaults */
-    ctx->pin = NULL;
-    ctx->operator_id = NULL;
-    ctx->allowed_bands = MM_MODEM_BAND_ANY;
-    ctx->allowed_modes = MM_MODEM_MODE_ANY;
-    ctx->preferred_mode = MM_MODEM_MODE_NONE;
-    ctx->apn = NULL;
-    ctx->ip_type = NULL;
-    ctx->number = NULL;
-    ctx->allow_roaming = TRUE;
-
-    g_variant_iter_init (&iter, properties);
-    while (g_variant_iter_loop (&iter, "{sv}", &key, &value)) {
-        if (g_str_equal (key, "pin")) {
-            g_warn_if_fail (ctx->pin == NULL);
-            ctx->pin = g_variant_dup_string (value, NULL);
-        } else if (g_str_equal (key, "operator-id")) {
-            g_warn_if_fail (ctx->operator_id == NULL);
-            ctx->operator_id = g_variant_dup_string (value, NULL);
-        } else if (g_str_equal (key, "allowed-bands")) {
-            ctx->allowed_bands = g_variant_get_uint64 (value);
-        } else if (g_str_equal (key, "allowed-modes")) {
-            ctx->allowed_modes = g_variant_get_uint32 (value);
-        } else if (g_str_equal (key, "preferred-mode")) {
-            ctx->preferred_mode = g_variant_get_uint32 (value);
-        } else if (g_str_equal (key, "apn")) {
-            g_warn_if_fail (ctx->apn == NULL);
-            ctx->apn = g_variant_dup_string (value, NULL);
-        } else if (g_str_equal (key, "ip-type")) {
-            g_warn_if_fail (ctx->ip_type == NULL);
-            ctx->ip_type = g_variant_dup_string (value, NULL);
-        } else if (g_str_equal (key, "number")) {
-            g_warn_if_fail (ctx->number == NULL);
-            ctx->number = g_variant_dup_string (value, NULL);
-        } else if (g_str_equal (key, "allow-roaming")) {
-            ctx->allow_roaming = g_variant_get_boolean (value);
-        } else
-            mm_warn ("Ignoring unexpected property '%s'", key);
-    }
 }
 
 static void connection_step (ConnectionContext *ctx);
@@ -227,7 +165,7 @@ unlock_check_ready (MMIfaceModem *self,
 
     /* During simple connect we are only allowed to use SIM PIN */
     if (lock != MM_MODEM_LOCK_SIM_PIN ||
-        !ctx->pin) {
+        !mm_common_connect_properties_get_pin (ctx->properties)) {
         GEnumClass *enum_class;
         GEnumValue *value;
 
@@ -260,7 +198,7 @@ unlock_check_ready (MMIfaceModem *self,
     }
 
     mm_sim_send_pin (sim,
-                     ctx->pin,
+                     mm_common_connect_properties_get_pin (ctx->properties),
                      NULL,
                      (GAsyncReadyCallback)send_pin_ready,
                      ctx);
@@ -292,15 +230,23 @@ connection_step (ConnectionContext *ctx)
                                                      ctx);
         return;
 
-    case CONNECTION_STEP_ALLOWED_MODE:
+    case CONNECTION_STEP_ALLOWED_MODE: {
+        MMModemMode allowed_modes = MM_MODEM_MODE_ANY;
+        MMModemMode preferred_mode = MM_MODEM_MODE_NONE;
+
         mm_info ("Simple connect state (%d/%d): Allowed mode",
                  ctx->step, CONNECTION_STEP_LAST);
+
+        mm_common_connect_properties_get_allowed_modes (ctx->properties,
+                                                        &allowed_modes,
+                                                        &preferred_mode);
         mm_iface_modem_set_allowed_modes (MM_IFACE_MODEM (ctx->self),
-                                          ctx->allowed_modes,
-                                          ctx->preferred_mode,
+                                          allowed_modes,
+                                          preferred_mode,
                                           (GAsyncReadyCallback)set_allowed_modes_ready,
                                           ctx);
         return;
+    }
 
     case CONNECTION_STEP_REGISTER:
         mm_info ("Simple connect state (%d/%d): Register",
@@ -308,7 +254,7 @@ connection_step (ConnectionContext *ctx)
         if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self))) {
             mm_iface_modem_3gpp_register_in_network (
                 MM_IFACE_MODEM_3GPP (ctx->self),
-                ctx->operator_id,
+                mm_common_connect_properties_get_operator_id (ctx->properties),
                 (GAsyncReadyCallback)register_in_network_ready,
                 ctx);
             return;
@@ -345,17 +291,25 @@ connection_step (ConnectionContext *ctx)
 static gboolean
 handle_connect (MmGdbusModemSimple *skeleton,
                 GDBusMethodInvocation *invocation,
-                GVariant *properties,
+                GVariant *dictionary,
                 MMIfaceModemSimple *self)
 {
+    GError *error = NULL;
+    MMCommonConnectProperties *properties;
     ConnectionContext *ctx;
+
+    properties = mm_common_connect_properties_new_from_dictionary (dictionary, &error);
+    if (!properties) {
+        g_dbus_method_invocation_take_error (invocation, error);
+        return TRUE;
+    }
 
     ctx = g_new0 (ConnectionContext, 1);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
     ctx->step = CONNECTION_STEP_FIRST;
-    connection_properties_parse (properties, ctx);
+    ctx->properties = properties;
 
     /* Start */
     connection_step (ctx);
