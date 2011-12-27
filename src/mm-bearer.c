@@ -69,6 +69,14 @@ struct _MMBearerPrivate {
 /*****************************************************************************/
 /* CONNECT */
 
+gboolean
+mm_bearer_connect_finish (MMBearer *self,
+                          GAsyncResult *res,
+                          GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
 static void
 disconnect_after_cancel_ready (MMBearer *self,
                                GAsyncResult *res)
@@ -90,9 +98,9 @@ disconnect_after_cancel_ready (MMBearer *self,
 }
 
 static void
-handle_connect_ready (MMBearer *self,
-                      GAsyncResult *res,
-                      GDBusMethodInvocation *invocation)
+connect_ready (MMBearer *self,
+               GAsyncResult *res,
+               GSimpleAsyncResult *simple)
 {
     GError *error = NULL;
     gboolean launch_disconnect = FALSE;
@@ -111,12 +119,12 @@ handle_connect_ready (MMBearer *self,
             self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
             g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
         }
-        g_dbus_method_invocation_take_error (invocation, error);
+        g_simple_async_result_take_error (simple, error);
     }
     else if (g_cancellable_is_cancelled (self->priv->connect_cancellable)) {
         mm_dbg ("Connected bearer '%s', but need to disconnect", self->priv->path);
-        g_dbus_method_invocation_return_error (
-            invocation,
+        g_simple_async_result_set_error (
+            simple,
             MM_CORE_ERROR,
             MM_CORE_ERROR_CANCELLED,
             "Bearer got connected, but had to disconnect after cancellation request");
@@ -126,7 +134,7 @@ handle_connect_ready (MMBearer *self,
         mm_dbg ("Connected bearer '%s'", self->priv->path);
         self->priv->status = MM_BEARER_STATUS_CONNECTED;
         g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
-        mm_gdbus_bearer_complete_connect (MM_GDBUS_BEARER (self), invocation);
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     }
 
     if (launch_disconnect) {
@@ -138,14 +146,18 @@ handle_connect_ready (MMBearer *self,
             NULL);
     }
 
-    g_object_unref (invocation);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
 }
 
-static gboolean
-handle_connect (MMBearer *self,
-                GDBusMethodInvocation *invocation,
-                const gchar *number)
+void
+mm_bearer_connect (MMBearer *self,
+                   const gchar *number,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
 {
+    GSimpleAsyncResult *result;
+
     g_assert (MM_BEARER_GET_CLASS (self)->connect != NULL);
     g_assert (MM_BEARER_GET_CLASS (self)->connect_finish != NULL);
 
@@ -157,42 +169,55 @@ handle_connect (MMBearer *self,
         enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_BEARER_CONNECTION_FORBIDDEN_REASON));
         value = g_enum_get_value (enum_class, self->priv->connection_forbidden_reason);
 
-        g_dbus_method_invocation_return_error (
-            invocation,
+        g_simple_async_report_error_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
             MM_CORE_ERROR,
             MM_CORE_ERROR_UNAUTHORIZED,
             "Not allowed to connect bearer: %s",
             value->value_nick);
 
         g_type_class_unref (enum_class);
-        return TRUE;
-    }
-
-    /* If already connected, done */
-    if (self->priv->status == MM_BEARER_STATUS_CONNECTED) {
-        mm_gdbus_bearer_complete_connect (MM_GDBUS_BEARER (self), invocation);
-        return TRUE;
+        return;
     }
 
     /* If already connecting, return error, don't allow a second request. */
     if (self->priv->status == MM_BEARER_STATUS_CONNECTING) {
-        g_dbus_method_invocation_return_error (
-            invocation,
+        g_simple_async_report_error_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
             MM_CORE_ERROR,
             MM_CORE_ERROR_IN_PROGRESS,
             "Bearer already being connected");
-        return TRUE;
+        return;
     }
 
     /* If currently disconnecting, return error, previous operation should
      * finish before allowing to connect again. */
     if (self->priv->status == MM_BEARER_STATUS_DISCONNECTING) {
-        g_dbus_method_invocation_return_error (
-            invocation,
+        g_simple_async_report_error_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
             MM_CORE_ERROR,
             MM_CORE_ERROR_FAILED,
             "Bearer currently being disconnected");
-        return TRUE;
+        return;
+    }
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        mm_bearer_connect);
+
+    /* If already connected, done */
+    if (self->priv->status == MM_BEARER_STATUS_CONNECTED) {
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
     }
 
     /* Connecting! */
@@ -204,8 +229,34 @@ handle_connect (MMBearer *self,
         self,
         number,
         self->priv->connect_cancellable,
-        (GAsyncReadyCallback)handle_connect_ready,
-        g_object_ref (invocation));
+        (GAsyncReadyCallback)connect_ready,
+        result);
+}
+
+static void
+handle_connect_ready (MMBearer *self,
+                      GAsyncResult *res,
+                      GDBusMethodInvocation *invocation)
+{
+    GError *error = NULL;
+
+    if (!mm_bearer_connect_finish (self, res, &error))
+        g_dbus_method_invocation_take_error (invocation, error);
+    else
+        mm_gdbus_bearer_complete_connect (MM_GDBUS_BEARER (self), invocation);
+
+    g_object_unref (invocation);
+}
+
+static gboolean
+handle_connect (MMBearer *self,
+                GDBusMethodInvocation *invocation,
+                const gchar *number)
+{
+    mm_bearer_connect (self,
+                       number,
+                       (GAsyncReadyCallback)handle_connect_ready,
+                       g_object_ref (invocation));
     return TRUE;
 }
 
