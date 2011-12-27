@@ -325,31 +325,39 @@ mm_iface_modem_3gpp_create_bearer (MMIfaceModem3gpp *self,
                                    gboolean allow_roaming)
 {
     MMModem3gppRegistrationState current_state;
-    MMBearer3gpp *bearer;
+    MMBearer *bearer;
 
     g_assert (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->create_3gpp_bearer != NULL);
 
     /* Create new 3GPP bearer using the method set in the interface, so that
      * plugins can subclass it and implement their own. */
-    bearer = MM_BEARER_3GPP (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->
-                             create_3gpp_bearer (MM_BASE_MODEM (self),
-                                                 apn,
-                                                 ip_type,
-                                                 allow_roaming));
+    bearer = MM_BEARER (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->
+                        create_3gpp_bearer (MM_BASE_MODEM (self),
+                                            apn,
+                                            ip_type,
+                                            allow_roaming));
 
     g_object_get (self,
                   MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, &current_state,
                   NULL);
 
     /* Don't allow bearer to get connected if roaming forbidden */
-    if (current_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
-        (current_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING &&
-         mm_bearer_3gpp_get_allow_roaming (bearer)))
-        mm_bearer_set_connection_allowed (MM_BEARER (bearer));
+    if (current_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME)
+        mm_bearer_set_connection_allowed (bearer);
+    else if (current_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
+        if (mm_bearer_3gpp_get_allow_roaming (MM_BEARER_3GPP (bearer)))
+            mm_bearer_set_connection_allowed (bearer);
+        else
+            mm_bearer_set_connection_forbidden (
+                bearer,
+                MM_BEARER_CONNECTION_FORBIDDEN_REASON_ROAMING);
+    }
     else
-        mm_bearer_set_connection_forbidden (MM_BEARER (bearer));
+        mm_bearer_set_connection_forbidden (
+            bearer,
+            MM_BEARER_CONNECTION_FORBIDDEN_REASON_UNREGISTERED);
 
-    return MM_BEARER (bearer);
+    return bearer;
 }
 
 MMBearer *
@@ -546,10 +554,14 @@ set_bearer_3gpp_connection_allowed (MMBearer *bearer,
                                     const gboolean *roaming_network)
 {
     /* Don't allow bearer to get connected if roaming forbidden */
-    if (MM_IS_BEARER_3GPP (bearer) &&
-        (!*roaming_network ||
-         mm_bearer_3gpp_get_allow_roaming (MM_BEARER_3GPP (bearer))))
-        mm_bearer_set_connection_allowed (bearer);
+    if (MM_IS_BEARER_3GPP (bearer)) {
+        if (!*roaming_network ||
+            mm_bearer_3gpp_get_allow_roaming (MM_BEARER_3GPP (bearer)))
+            mm_bearer_set_connection_allowed (bearer);
+        else
+            mm_bearer_set_connection_forbidden (bearer,
+                                                MM_BEARER_CONNECTION_FORBIDDEN_REASON_ROAMING);
+    }
 }
 
 static void
@@ -575,7 +587,9 @@ static void
 set_bearer_3gpp_connection_forbidden (MMBearer *bearer)
 {
     if (MM_IS_BEARER_3GPP (bearer))
-        mm_bearer_set_connection_forbidden (bearer);
+        mm_bearer_set_connection_forbidden (
+            bearer,
+            MM_BEARER_CONNECTION_FORBIDDEN_REASON_UNREGISTERED);
 }
 
 static void

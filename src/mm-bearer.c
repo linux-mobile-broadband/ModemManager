@@ -41,7 +41,7 @@ enum {
     PROP_PATH,
     PROP_CONNECTION,
     PROP_MODEM,
-    PROP_CONNECTION_ALLOWED,
+    PROP_CONNECTION_FORBIDDEN_REASON,
     PROP_STATUS,
     PROP_LAST
 };
@@ -55,8 +55,8 @@ struct _MMBearerPrivate {
     MMBaseModem *modem;
     /* The path where the BEARER object is exported */
     gchar *path;
-    /* Flag to specify whether the bearer can be connected */
-    gboolean connection_allowed;
+    /* Reason for not allowing connection */
+    MMBearerConnectionForbiddenReason connection_forbidden_reason;
     /* Status of this bearer */
     MMBearerStatus status;
 
@@ -150,12 +150,21 @@ handle_connect (MMBearer *self,
     g_assert (MM_BEARER_GET_CLASS (self)->connect_finish != NULL);
 
     /* Bearer may not be allowed to connect yet */
-    if (!self->priv->connection_allowed) {
+    if (self->priv->connection_forbidden_reason != MM_BEARER_CONNECTION_FORBIDDEN_REASON_NONE) {
+        GEnumClass *enum_class;
+        GEnumValue *value;
+
+        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_BEARER_CONNECTION_FORBIDDEN_REASON));
+        value = g_enum_get_value (enum_class, self->priv->connection_forbidden_reason);
+
         g_dbus_method_invocation_return_error (
             invocation,
             MM_CORE_ERROR,
-            MM_CORE_ERROR_WRONG_STATE,
-            "Not allowed to connect bearer");
+            MM_CORE_ERROR_UNAUTHORIZED,
+            "Not allowed to connect bearer: %s",
+            value->value_nick);
+
+        g_type_class_unref (enum_class);
         return TRUE;
     }
 
@@ -403,11 +412,11 @@ mm_bearer_get_path (MMBearer *self)
 void
 mm_bearer_set_connection_allowed (MMBearer *self)
 {
-    if (self->priv->connection_allowed)
+    if (self->priv->connection_forbidden_reason == MM_BEARER_CONNECTION_FORBIDDEN_REASON_NONE)
         return;
 
     mm_dbg ("Connection in bearer '%s' is allowed", self->priv->path);
-    self->priv->connection_allowed = TRUE;
+    self->priv->connection_forbidden_reason = MM_BEARER_CONNECTION_FORBIDDEN_REASON_NONE;
 }
 
 static void
@@ -431,13 +440,21 @@ disconnect_after_forbidden_ready (MMBearer *self,
 }
 
 void
-mm_bearer_set_connection_forbidden (MMBearer *self)
+mm_bearer_set_connection_forbidden (MMBearer *self,
+                                    MMBearerConnectionForbiddenReason reason)
 {
-    if (!self->priv->connection_allowed)
-        return;
+    GEnumClass *enum_class;
+    GEnumValue *value;
 
-    mm_dbg ("Connection in bearer '%s' is forbidden", self->priv->path);
-    self->priv->connection_allowed = FALSE;
+    g_assert (reason != MM_BEARER_CONNECTION_FORBIDDEN_REASON_NONE);
+
+    self->priv->connection_forbidden_reason = reason;
+    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_BEARER_CONNECTION_FORBIDDEN_REASON));
+    value = g_enum_get_value (enum_class, self->priv->connection_forbidden_reason);
+    mm_dbg ("Connection in bearer '%s' is forbidden: '%s'",
+            self->priv->path,
+            value->value_nick);
+    g_type_class_unref (enum_class);
 
     if (self->priv->status == MM_BEARER_STATUS_DISCONNECTING ||
         self->priv->status == MM_BEARER_STATUS_DISCONNECTED) {
@@ -535,8 +552,8 @@ set_property (GObject *object,
                                     self, MM_BEARER_CONNECTION,
                                     G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
         break;
-    case PROP_CONNECTION_ALLOWED:
-        self->priv->connection_allowed = g_value_get_boolean (value);
+    case PROP_CONNECTION_FORBIDDEN_REASON:
+        self->priv->connection_forbidden_reason = g_value_get_enum (value);
         break;
     case PROP_STATUS:
         self->priv->status = g_value_get_enum (value);
@@ -565,8 +582,8 @@ get_property (GObject *object,
     case PROP_MODEM:
         g_value_set_object (value, self->priv->modem);
         break;
-    case PROP_CONNECTION_ALLOWED:
-        g_value_set_boolean (value, self->priv->connection_allowed);
+    case PROP_CONNECTION_FORBIDDEN_REASON:
+        g_value_set_enum (value, self->priv->connection_forbidden_reason);
         break;
     case PROP_STATUS:
         g_value_set_enum (value, self->priv->status);
@@ -585,6 +602,7 @@ mm_bearer_init (MMBearer *self)
                                               MM_TYPE_BEARER,
                                               MMBearerPrivate);
     self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
+    self->priv->connection_forbidden_reason = MM_BEARER_CONNECTION_FORBIDDEN_REASON_UNREGISTERED;
 
     /* Set defaults */
     mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (self), NULL);
@@ -658,13 +676,14 @@ mm_bearer_class_init (MMBearerClass *klass)
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_MODEM, properties[PROP_MODEM]);
 
-    properties[PROP_CONNECTION_ALLOWED] =
-        g_param_spec_boolean (MM_BEARER_CONNECTION_ALLOWED,
-                              "Connection allowed",
-                              "Flag to specify whether the bearer is allowed to get connected",
-                              FALSE,
-                              G_PARAM_READWRITE);
-    g_object_class_install_property (object_class, PROP_CONNECTION_ALLOWED, properties[PROP_CONNECTION_ALLOWED]);
+    properties[PROP_CONNECTION_FORBIDDEN_REASON] =
+        g_param_spec_enum (MM_BEARER_CONNECTION_FORBIDDEN_REASON,
+                           "Connection forbidden reason",
+                           "Reason to specify why the connection in the bearer is forbidden",
+                           MM_TYPE_BEARER_CONNECTION_FORBIDDEN_REASON,
+                           MM_BEARER_CONNECTION_FORBIDDEN_REASON_UNREGISTERED,
+                           G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_CONNECTION_FORBIDDEN_REASON, properties[PROP_CONNECTION_FORBIDDEN_REASON]);
 
     properties[PROP_STATUS] =
         g_param_spec_enum (MM_BEARER_STATUS,
