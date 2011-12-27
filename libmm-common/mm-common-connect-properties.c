@@ -26,12 +26,6 @@ G_DEFINE_TYPE (MMCommonConnectProperties, mm_common_connect_properties, G_TYPE_O
 #define PROPERTY_ALLOWED_BANDS   "allowed-bands"
 #define PROPERTY_ALLOWED_MODES   "allowed-modes"
 #define PROPERTY_PREFERRED_MODE  "preferred-mode"
-#define PROPERTY_APN             "apn"
-#define PROPERTY_USER            "user"
-#define PROPERTY_PASSWORD        "password"
-#define PROPERTY_IP_TYPE         "ip-type"
-#define PROPERTY_NUMBER          "number"
-#define PROPERTY_ALLOW_ROAMING   "allow-roaming"
 
 struct _MMCommonConnectPropertiesPrivate {
     /* PIN */
@@ -45,19 +39,8 @@ struct _MMCommonConnectPropertiesPrivate {
     gboolean allowed_modes_set;
     MMModemMode allowed_modes;
     MMModemMode preferred_mode;
-    /* APN */
-    gchar *apn;
-    /* User */
-    gchar *user;
-    /* Password */
-    gchar *password;
-    /* IP type */
-    gchar *ip_type;
-    /* Number */
-    gchar *number;
-    /* Roaming allowance */
-    gboolean allow_roaming_set;
-    gboolean allow_roaming;
+    /* Bearer properties */
+    MMCommonBearerProperties *bearer_properties;
 };
 
 /*****************************************************************************/
@@ -105,56 +88,62 @@ void
 mm_common_connect_properties_set_apn (MMCommonConnectProperties *self,
                                       const gchar *apn)
 {
-    g_free (self->priv->apn);
-    self->priv->apn = g_strdup (apn);
+    mm_common_bearer_properties_set_apn (self->priv->bearer_properties,
+                                         apn);
 }
 
 void
 mm_common_connect_properties_set_user (MMCommonConnectProperties *self,
                                        const gchar *user)
 {
-    g_free (self->priv->user);
-    self->priv->user = g_strdup (user);
+    mm_common_bearer_properties_set_user (self->priv->bearer_properties,
+                                          user);
 }
 
 void
 mm_common_connect_properties_set_password (MMCommonConnectProperties *self,
                                            const gchar *password)
 {
-    g_free (self->priv->password);
-    self->priv->password = g_strdup (password);
+    mm_common_bearer_properties_set_password (self->priv->bearer_properties,
+                                              password);
 }
 
 void
 mm_common_connect_properties_set_ip_type (MMCommonConnectProperties *self,
                                           const gchar *ip_type)
 {
-    g_free (self->priv->ip_type);
-    self->priv->ip_type = g_strdup (ip_type);
+    mm_common_bearer_properties_set_ip_type (self->priv->bearer_properties,
+                                             ip_type);
 }
 
 void
 mm_common_connect_properties_set_allow_roaming (MMCommonConnectProperties *self,
                                                 gboolean allow_roaming)
 {
-    self->priv->allow_roaming = allow_roaming;
-    self->priv->allow_roaming_set = TRUE;
+    mm_common_bearer_properties_set_allow_roaming (self->priv->bearer_properties,
+                                                   allow_roaming);
 }
 
 void
 mm_common_connect_properties_set_number (MMCommonConnectProperties *self,
                                          const gchar *number)
 {
-    g_free (self->priv->number);
-    self->priv->number = g_strdup (number);
+    mm_common_bearer_properties_set_number (self->priv->bearer_properties,
+                                            number);
 }
 
 /*****************************************************************************/
 
+MMCommonBearerProperties *
+mm_common_connect_properties_get_bearer_properties (MMCommonConnectProperties *self)
+{
+    return g_object_ref (self->priv->bearer_properties);
+}
+
 const gchar *
 mm_common_connect_properties_get_pin (MMCommonConnectProperties *self)
 {
-    return self->priv->apn;
+    return self->priv->pin;
 }
 
 const gchar *
@@ -184,37 +173,37 @@ mm_common_connect_properties_get_allowed_modes (MMCommonConnectProperties *self,
 const gchar *
 mm_common_connect_properties_get_apn (MMCommonConnectProperties *self)
 {
-    return self->priv->apn;
+    return mm_common_bearer_properties_get_apn (self->priv->bearer_properties);
 }
 
 const gchar *
 mm_common_connect_properties_get_user (MMCommonConnectProperties *self)
 {
-    return self->priv->user;
+    return mm_common_bearer_properties_get_user (self->priv->bearer_properties);
 }
 
 const gchar *
 mm_common_connect_properties_get_password (MMCommonConnectProperties *self)
 {
-    return self->priv->password;
+    return mm_common_bearer_properties_get_password (self->priv->bearer_properties);
 }
 
 const gchar *
 mm_common_connect_properties_get_ip_type (MMCommonConnectProperties *self)
 {
-    return self->priv->ip_type;
+    return mm_common_bearer_properties_get_ip_type (self->priv->bearer_properties);
 }
 
 gboolean
 mm_common_connect_properties_get_allow_roaming (MMCommonConnectProperties *self)
 {
-    return self->priv->allow_roaming;
+    return mm_common_bearer_properties_get_allow_roaming (self->priv->bearer_properties);
 }
 
 const gchar *
 mm_common_connect_properties_get_number (MMCommonConnectProperties *self)
 {
-    return self->priv->number;
+    return mm_common_bearer_properties_get_number (self->priv->bearer_properties);
 }
 
 /*****************************************************************************/
@@ -223,6 +212,10 @@ GVariant *
 mm_common_connect_properties_get_dictionary (MMCommonConnectProperties *self)
 {
     GVariantBuilder builder;
+    GVariantIter iter;
+    gchar *key;
+    GVariant *value;
+    GVariant *bearer_properties_dictionary;
 
     /* We do allow NULL */
     if (!self)
@@ -260,41 +253,18 @@ mm_common_connect_properties_get_dictionary (MMCommonConnectProperties *self)
                                g_variant_new_uint32 (self->priv->preferred_mode));
     }
 
-    if (self->priv->apn)
+    /* Merge dictionaries */
+    bearer_properties_dictionary = mm_common_bearer_properties_get_dictionary (self->priv->bearer_properties);
+    g_variant_iter_init (&iter, bearer_properties_dictionary);
+    while (g_variant_iter_next (&iter, "{sv}", &key, &value)) {
         g_variant_builder_add (&builder,
                                "{sv}",
-                               PROPERTY_APN,
-                               g_variant_new_string (self->priv->apn));
-
-    if (self->priv->user)
-        g_variant_builder_add (&builder,
-                               "{sv}",
-                               PROPERTY_USER,
-                               g_variant_new_string (self->priv->user));
-
-    if (self->priv->password)
-        g_variant_builder_add (&builder,
-                               "{sv}",
-                               PROPERTY_PASSWORD,
-                               g_variant_new_string (self->priv->password));
-
-    if (self->priv->ip_type)
-        g_variant_builder_add (&builder,
-                               "{sv}",
-                               PROPERTY_IP_TYPE,
-                               g_variant_new_string (self->priv->ip_type));
-
-    if (self->priv->number)
-        g_variant_builder_add (&builder,
-                               "{sv}",
-                               PROPERTY_NUMBER,
-                               g_variant_new_string (self->priv->number));
-
-    if (self->priv->allow_roaming_set)
-        g_variant_builder_add (&builder,
-                               "{sv}",
-                               PROPERTY_ALLOW_ROAMING,
-                               g_variant_new_boolean (self->priv->allow_roaming));
+                               key,
+                               value);
+        g_variant_unref (value);
+        g_free (key);
+    }
+    g_variant_unref (bearer_properties_dictionary);
 
     return g_variant_ref_sink (g_variant_builder_end (&builder));
 }
@@ -337,44 +307,33 @@ mm_common_connect_properties_new_from_string (const gchar *str,
             break;
         }
 
-        if (g_str_equal (key, PROPERTY_PIN))
-            mm_common_connect_properties_set_pin (properties, value);
-        else if (g_str_equal (key, PROPERTY_OPERATOR_ID))
-            mm_common_connect_properties_set_operator_id (properties, value);
-        else if (g_str_equal (key, PROPERTY_APN))
-            mm_common_connect_properties_set_apn (properties, value);
-        else if (g_str_equal (key, PROPERTY_USER))
-            mm_common_connect_properties_set_user (properties, value);
-        else if (g_str_equal (key, PROPERTY_PASSWORD))
-            mm_common_connect_properties_set_password (properties, value);
-        else if (g_str_equal (key, PROPERTY_IP_TYPE))
-            mm_common_connect_properties_set_ip_type (properties, value);
-        else if (g_str_equal (key, PROPERTY_ALLOW_ROAMING)) {
-            gboolean allow_roaming;
+        /* First, check if we can consume this as bearer properties */
+        if (!mm_common_bearer_properties_consume_string (properties->priv->bearer_properties,
+                                                         key, value,
+                                                         NULL)) {
+            if (g_str_equal (key, PROPERTY_PIN))
+                mm_common_connect_properties_set_pin (properties, value);
+            else if (g_str_equal (key, PROPERTY_OPERATOR_ID))
+                mm_common_connect_properties_set_operator_id (properties, value);
+            else if (g_str_equal (key, PROPERTY_ALLOWED_BANDS)) {
+                MMModemBand *bands = NULL;
+                guint n_bands = 0;
 
-            allow_roaming = mm_common_get_boolean_from_string (value, &inner_error);
-            if (!inner_error)
-                mm_common_connect_properties_set_allow_roaming (properties, allow_roaming);
-        } else if (g_str_equal (key, PROPERTY_NUMBER))
-            mm_common_connect_properties_set_number (properties, value);
-        else if (g_str_equal (key, PROPERTY_ALLOWED_BANDS)) {
-            MMModemBand *bands = NULL;
-            guint n_bands = 0;
-
-            mm_common_get_bands_from_string (value, &bands, &n_bands, &inner_error);
-            if (!inner_error)
-                mm_common_connect_properties_set_allowed_bands (properties, bands, n_bands);
-            g_free (bands);
-        } else if (g_str_equal (key, PROPERTY_ALLOWED_MODES)) {
-            allowed_modes_str = value;
-        } else if (g_str_equal (key, PROPERTY_PREFERRED_MODE)) {
-            preferred_mode_str = value;
-        } else {
-            inner_error = g_error_new (MM_CORE_ERROR,
-                                       MM_CORE_ERROR_INVALID_ARGS,
-                                       "Invalid properties string, unexpected key '%s'",
-                                       key);
-            break;
+                mm_common_get_bands_from_string (value, &bands, &n_bands, &inner_error);
+                if (!inner_error)
+                    mm_common_connect_properties_set_allowed_bands (properties, bands, n_bands);
+                g_free (bands);
+            } else if (g_str_equal (key, PROPERTY_ALLOWED_MODES)) {
+                allowed_modes_str = value;
+            } else if (g_str_equal (key, PROPERTY_PREFERRED_MODE)) {
+                preferred_mode_str = value;
+            } else {
+                inner_error = g_error_new (MM_CORE_ERROR,
+                                           MM_CORE_ERROR_INVALID_ARGS,
+                                           "Invalid properties string, unexpected key '%s'",
+                                           key);
+                break;
+            }
         }
 
         key = words[++i];
@@ -438,57 +397,39 @@ mm_common_connect_properties_new_from_dictionary (GVariant *dictionary,
     g_variant_iter_init (&iter, dictionary);
     while (!inner_error &&
            g_variant_iter_next (&iter, "{sv}", &key, &value)) {
-        if (g_str_equal (key, PROPERTY_PIN))
-            mm_common_connect_properties_set_pin (
-                properties,
-                g_variant_get_string (value, NULL));
-        else if (g_str_equal (key, PROPERTY_OPERATOR_ID))
-            mm_common_connect_properties_set_operator_id (
-                properties,
-                g_variant_get_string (value, NULL));
-        else if (g_str_equal (key, PROPERTY_ALLOWED_BANDS)) {
-            GArray *array;
 
-            array = mm_common_bands_variant_to_garray (value);
-            mm_common_connect_properties_set_allowed_bands (
-                properties,
-                (MMModemBand *)array->data,
-                array->len);
-            g_array_unref (array);
-        } else if (g_str_equal (key, PROPERTY_ALLOWED_MODES))
-            allowed_modes_variant = g_variant_ref (value);
-        else if (g_str_equal (key, PROPERTY_PREFERRED_MODE))
-            preferred_mode_variant = g_variant_ref (value);
-        else if (g_str_equal (key, PROPERTY_APN))
-            mm_common_connect_properties_set_apn (
-                properties,
-                g_variant_get_string (value, NULL));
-        else if (g_str_equal (key, PROPERTY_USER))
-            mm_common_connect_properties_set_user (
-                properties,
-                g_variant_get_string (value, NULL));
-        else if (g_str_equal (key, PROPERTY_PASSWORD))
-            mm_common_connect_properties_set_password (
-                properties,
-                g_variant_get_string (value, NULL));
-        else if (g_str_equal (key, PROPERTY_IP_TYPE))
-            mm_common_connect_properties_set_ip_type (
-                properties,
-                g_variant_get_string (value, NULL));
-        else if (g_str_equal (key, PROPERTY_NUMBER))
-            mm_common_connect_properties_set_number (
-                properties,
-                g_variant_get_string (value, NULL));
-        else if (g_str_equal (key, PROPERTY_ALLOW_ROAMING))
-            mm_common_connect_properties_set_allow_roaming (
-                properties,
-                g_variant_get_boolean (value));
-        else {
-            /* Set inner error, will stop the loop */
-            inner_error = g_error_new (MM_CORE_ERROR,
-                                       MM_CORE_ERROR_INVALID_ARGS,
-                                       "Invalid properties dictionary, unexpected key '%s'",
-                                       key);
+        /* First, check if we can consume this as bearer properties */
+        if (!mm_common_bearer_properties_consume_variant (properties->priv->bearer_properties,
+                                                          key, value,
+                                                          NULL)) {
+            if (g_str_equal (key, PROPERTY_PIN))
+                mm_common_connect_properties_set_pin (
+                    properties,
+                    g_variant_get_string (value, NULL));
+            else if (g_str_equal (key, PROPERTY_OPERATOR_ID))
+                mm_common_connect_properties_set_operator_id (
+                    properties,
+                    g_variant_get_string (value, NULL));
+            else if (g_str_equal (key, PROPERTY_ALLOWED_BANDS)) {
+                GArray *array;
+
+                array = mm_common_bands_variant_to_garray (value);
+                mm_common_connect_properties_set_allowed_bands (
+                    properties,
+                    (MMModemBand *)array->data,
+                    array->len);
+                g_array_unref (array);
+            } else if (g_str_equal (key, PROPERTY_ALLOWED_MODES))
+                allowed_modes_variant = g_variant_ref (value);
+            else if (g_str_equal (key, PROPERTY_PREFERRED_MODE))
+                preferred_mode_variant = g_variant_ref (value);
+            else {
+                /* Set inner error, will stop the loop */
+                inner_error = g_error_new (MM_CORE_ERROR,
+                                           MM_CORE_ERROR_INVALID_ARGS,
+                                           "Invalid properties dictionary, unexpected key '%s'",
+                                           key);
+            }
         }
 
         g_free (key);
@@ -544,7 +485,7 @@ mm_common_connect_properties_init (MMCommonConnectProperties *self)
                                               MMCommonConnectPropertiesPrivate);
 
     /* Some defaults */
-    self->priv->allow_roaming = TRUE;
+    self->priv->bearer_properties = mm_common_bearer_properties_new ();
     self->priv->allowed_modes = MM_MODEM_MODE_ANY;
     self->priv->preferred_mode = MM_MODEM_MODE_NONE;
     self->priv->allowed_bands = g_new (MMModemBand, 1);
@@ -560,11 +501,7 @@ finalize (GObject *object)
     g_free (self->priv->pin);
     g_free (self->priv->operator_id);
     g_free (self->priv->allowed_bands);
-    g_free (self->priv->apn);
-    g_free (self->priv->user);
-    g_free (self->priv->password);
-    g_free (self->priv->ip_type);
-    g_free (self->priv->number);
+    g_object_unref (self->priv->bearer_properties);
 
     G_OBJECT_CLASS (mm_common_connect_properties_parent_class)->finalize (object);
 }

@@ -186,6 +186,44 @@ mm_common_bearer_properties_get_dictionary (MMCommonBearerProperties *self)
 
 /*****************************************************************************/
 
+gboolean
+mm_common_bearer_properties_consume_string (MMCommonBearerProperties *self,
+                                            const gchar *key,
+                                            const gchar *value,
+                                            GError **error)
+{
+    if (g_str_equal (key, PROPERTY_APN))
+        mm_common_bearer_properties_set_apn (self, value);
+    else if (g_str_equal (key, PROPERTY_USER))
+        mm_common_bearer_properties_set_user (self, value);
+    else if (g_str_equal (key, PROPERTY_PASSWORD))
+        mm_common_bearer_properties_set_password (self, value);
+    else if (g_str_equal (key, PROPERTY_IP_TYPE))
+        mm_common_bearer_properties_set_ip_type (self, value);
+    else if (g_str_equal (key, PROPERTY_ALLOW_ROAMING)) {
+        GError *inner_error = NULL;
+        gboolean allow_roaming;
+
+        allow_roaming = mm_common_get_boolean_from_string (value, &inner_error);
+        if (inner_error) {
+            g_propagate_error (error, inner_error);
+            return FALSE;
+        }
+        mm_common_bearer_properties_set_allow_roaming (self, allow_roaming);
+    } else if (g_str_equal (key, PROPERTY_NUMBER))
+        mm_common_bearer_properties_set_number (self, value);
+    else {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_INVALID_ARGS,
+                     "Invalid properties string, unexpected key '%s'",
+                     key);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 MMCommonBearerProperties *
 mm_common_bearer_properties_new_from_string (const gchar *str,
                                              GError **error)
@@ -220,29 +258,11 @@ mm_common_bearer_properties_new_from_string (const gchar *str,
             break;
         }
 
-        if (g_str_equal (key, PROPERTY_APN))
-            mm_common_bearer_properties_set_apn (properties, value);
-        else if (g_str_equal (key, PROPERTY_USER))
-            mm_common_bearer_properties_set_user (properties, value);
-        else if (g_str_equal (key, PROPERTY_PASSWORD))
-            mm_common_bearer_properties_set_password (properties, value);
-        else if (g_str_equal (key, PROPERTY_IP_TYPE))
-            mm_common_bearer_properties_set_ip_type (properties, value);
-        else if (g_str_equal (key, PROPERTY_ALLOW_ROAMING)) {
-            gboolean allow_roaming;
-
-            allow_roaming = mm_common_get_boolean_from_string (value, &inner_error);
-            if (!inner_error)
-                mm_common_bearer_properties_set_allow_roaming (properties, allow_roaming);
-        } else if (g_str_equal (key, PROPERTY_NUMBER))
-            mm_common_bearer_properties_set_number (properties, value);
-        else {
-            inner_error = g_error_new (MM_CORE_ERROR,
-                                       MM_CORE_ERROR_INVALID_ARGS,
-                                       "Invalid properties string, unexpected key '%s'",
-                                       key);
+        if (!mm_common_bearer_properties_consume_string (properties,
+                                                         key,
+                                                         value,
+                                                         &inner_error))
             break;
-        }
 
         key = words[++i];
     }
@@ -259,6 +279,49 @@ mm_common_bearer_properties_new_from_string (const gchar *str,
 }
 
 /*****************************************************************************/
+
+gboolean
+mm_common_bearer_properties_consume_variant (MMCommonBearerProperties *properties,
+                                             const gchar *key,
+                                             GVariant *value,
+                                             GError **error)
+{
+    if (g_str_equal (key, PROPERTY_APN))
+        mm_common_bearer_properties_set_apn (
+            properties,
+            g_variant_get_string (value, NULL));
+    else if (g_str_equal (key, PROPERTY_USER))
+        mm_common_bearer_properties_set_user (
+            properties,
+            g_variant_get_string (value, NULL));
+    else if (g_str_equal (key, PROPERTY_PASSWORD))
+        mm_common_bearer_properties_set_password (
+            properties,
+            g_variant_get_string (value, NULL));
+    else if (g_str_equal (key, PROPERTY_IP_TYPE))
+        mm_common_bearer_properties_set_ip_type (
+            properties,
+            g_variant_get_string (value, NULL));
+    else if (g_str_equal (key, PROPERTY_NUMBER))
+        mm_common_bearer_properties_set_number (
+            properties,
+            g_variant_get_string (value, NULL));
+    else if (g_str_equal (key, PROPERTY_ALLOW_ROAMING))
+        mm_common_bearer_properties_set_allow_roaming (
+            properties,
+            g_variant_get_boolean (value));
+    else {
+        /* Set error */
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_INVALID_ARGS,
+                     "Invalid properties dictionary, unexpected key '%s'",
+                     key);
+        return FALSE;
+    }
+
+    return TRUE;
+}
 
 MMCommonBearerProperties *
 mm_common_bearer_properties_new_from_dictionary (GVariant *dictionary,
@@ -277,38 +340,10 @@ mm_common_bearer_properties_new_from_dictionary (GVariant *dictionary,
     g_variant_iter_init (&iter, dictionary);
     while (!inner_error &&
            g_variant_iter_next (&iter, "{sv}", &key, &value)) {
-        if (g_str_equal (key, PROPERTY_APN))
-            mm_common_bearer_properties_set_apn (
-                properties,
-                g_variant_get_string (value, NULL));
-        else if (g_str_equal (key, PROPERTY_USER))
-            mm_common_bearer_properties_set_user (
-                properties,
-                g_variant_get_string (value, NULL));
-        else if (g_str_equal (key, PROPERTY_PASSWORD))
-            mm_common_bearer_properties_set_password (
-                properties,
-                g_variant_get_string (value, NULL));
-        else if (g_str_equal (key, PROPERTY_IP_TYPE))
-            mm_common_bearer_properties_set_ip_type (
-                properties,
-                g_variant_get_string (value, NULL));
-        else if (g_str_equal (key, PROPERTY_NUMBER))
-            mm_common_bearer_properties_set_number (
-                properties,
-                g_variant_get_string (value, NULL));
-        else if (g_str_equal (key, PROPERTY_ALLOW_ROAMING))
-            mm_common_bearer_properties_set_allow_roaming (
-                properties,
-                g_variant_get_boolean (value));
-        else {
-            /* Set inner error, will stop the loop */
-            inner_error = g_error_new (MM_CORE_ERROR,
-                                       MM_CORE_ERROR_INVALID_ARGS,
-                                       "Invalid properties dictionary, unexpected key '%s'",
-                                       key);
-        }
-
+        mm_common_bearer_properties_consume_variant (properties,
+                                                     key,
+                                                     value,
+                                                     &inner_error);
         g_free (key);
         g_variant_unref (value);
     }

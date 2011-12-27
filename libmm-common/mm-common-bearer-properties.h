@@ -83,6 +83,16 @@ gboolean mm_common_bearer_properties_get_allow_roaming (
 const gchar *mm_common_bearer_properties_get_number (
     MMCommonBearerProperties *properties);
 
+gboolean mm_common_bearer_properties_consume_string (MMCommonBearerProperties *self,
+                                                     const gchar *key,
+                                                     const gchar *value,
+                                                     GError **error);
+
+gboolean mm_common_bearer_properties_consume_variant (MMCommonBearerProperties *self,
+                                                      const gchar *key,
+                                                      GVariant *value,
+                                                      GError **error);
+
 GVariant *mm_common_bearer_properties_get_dictionary (MMCommonBearerProperties *self);
 
 G_END_DECLS
