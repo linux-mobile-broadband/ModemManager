@@ -124,19 +124,19 @@ bearer_status_changed (MMBearer *bearer,
     }
 }
 
-gchar *
+MMBearer *
 mm_iface_modem_create_bearer_finish (MMIfaceModem *self,
                                      GAsyncResult *res,
                                      GError **error)
 {
-    const gchar *path;
+    MMBearer *bearer;
 
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
 
-    path = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
 
-    return g_strdup (path);
+    return g_object_ref (bearer);
 }
 
 static void
@@ -168,11 +168,9 @@ create_bearer_ready (MMIfaceModem *self,
                               "notify::"  MM_BEARER_STATUS,
                               (GCallback)bearer_status_changed,
                               self);
-            /* It is safe to set the static path here because we're not completing
-             * in idle */
             g_simple_async_result_set_op_res_gpointer (simple,
-                                                       (gchar *)mm_bearer_get_path (bearer),
-                                                       NULL);
+                                                       g_object_ref (bearer),
+                                                       g_object_unref);
         }
         g_object_unref (bearer);
         g_object_unref (list);
@@ -184,6 +182,7 @@ create_bearer_ready (MMIfaceModem *self,
 
 void
 mm_iface_modem_create_bearer (MMIfaceModem *self,
+                              gboolean force,
                               MMCommonBearerProperties *properties,
                               GAsyncReadyCallback callback,
                               gpointer user_data)
@@ -195,25 +194,32 @@ mm_iface_modem_create_bearer (MMIfaceModem *self,
                   NULL);
 
     if (mm_bearer_list_get_count (list) == mm_bearer_list_get_max (list)) {
-        g_simple_async_report_error_in_idle (
-            G_OBJECT (self),
-            callback,
-            user_data,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_TOO_MANY,
-            "Cannot add new bearer: already reached maximum (%u)",
-            mm_bearer_list_get_count (list));
-    } else {
-        MM_IFACE_MODEM_GET_INTERFACE (self)->create_bearer (
-            self,
-            properties,
-            (GAsyncReadyCallback)create_bearer_ready,
-            g_simple_async_result_new (G_OBJECT (self),
-                                       callback,
-                                       user_data,
-                                       mm_iface_modem_create_bearer));
+        if (!force) {
+            g_simple_async_report_error_in_idle (
+                G_OBJECT (self),
+                callback,
+                user_data,
+                MM_CORE_ERROR,
+                MM_CORE_ERROR_TOO_MANY,
+                "Cannot add new bearer: already reached maximum (%u)",
+                mm_bearer_list_get_count (list));
+            g_object_unref (list);
+            return;
+        }
+
+        /* We are told to force the creation of the new bearer.
+         * We'll remove all existing bearers, and then go on creating the new one */
+        mm_bearer_list_delete_all_bearers (list);
     }
 
+    MM_IFACE_MODEM_GET_INTERFACE (self)->create_bearer (
+        self,
+        properties,
+        (GAsyncReadyCallback)create_bearer_ready,
+        g_simple_async_result_new (G_OBJECT (self),
+                                   callback,
+                                   user_data,
+                                   mm_iface_modem_create_bearer));
     g_object_unref (list);
 }
 
@@ -222,17 +228,17 @@ handle_create_bearer_ready (MMIfaceModem *self,
                             GAsyncResult *res,
                             DbusCallContext *ctx)
 {
-    gchar *bearer_path;
+    MMBearer *bearer;
     GError *error = NULL;
 
-    bearer_path = mm_iface_modem_create_bearer_finish (self, res, &error);
-    if (!bearer_path)
+    bearer = mm_iface_modem_create_bearer_finish (self, res, &error);
+    if (!bearer)
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         mm_gdbus_modem_complete_create_bearer (ctx->skeleton,
                                                ctx->invocation,
-                                               bearer_path);
-        g_free (bearer_path);
+                                               mm_bearer_get_path (bearer));
+        g_object_unref (bearer);
     }
     dbus_call_context_free (ctx);
 }
@@ -252,6 +258,7 @@ handle_create_bearer (MmGdbusModem *skeleton,
     } else {
         mm_iface_modem_create_bearer (
             self,
+            FALSE, /* don't force when request comes from DBus */
             properties,
             (GAsyncReadyCallback)handle_create_bearer_ready,
             dbus_call_context_new (skeleton,

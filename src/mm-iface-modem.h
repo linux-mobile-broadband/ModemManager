@@ -324,12 +324,13 @@ gboolean mm_iface_modem_set_allowed_bands_finish (MMIfaceModem *self,
                                                   GError **error);
 
 /* Allow creating bearers */
-void     mm_iface_modem_create_bearer        (MMIfaceModem *self,
-                                              MMCommonBearerProperties *properties,
-                                              GAsyncReadyCallback callback,
-                                              gpointer user_data);
-gchar   *mm_iface_modem_create_bearer_finish (MMIfaceModem *self,
-                                              GAsyncResult *res,
-                                              GError **error);
+void     mm_iface_modem_create_bearer         (MMIfaceModem *self,
+                                               gboolean force,
+                                               MMCommonBearerProperties *properties,
+                                               GAsyncReadyCallback callback,
+                                               gpointer user_data);
+MMBearer *mm_iface_modem_create_bearer_finish (MMIfaceModem *self,
+                                               GAsyncResult *res,
+                                               GError **error);
 
 #endif /* MM_IFACE_MODEM_H */
