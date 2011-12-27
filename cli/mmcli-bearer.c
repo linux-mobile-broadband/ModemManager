@@ -139,7 +139,7 @@ print_bearer_info (MMBearer *bearer)
 {
     const MMBearerIpConfig *ipv4_config;
     const MMBearerIpConfig *ipv6_config;
-    const MMBearerProperties *properties;
+    MMBearerProperties *properties;
 
     ipv4_config = mm_bearer_get_ipv4_config (bearer);
     ipv6_config = mm_bearer_get_ipv6_config (bearer);
@@ -162,19 +162,22 @@ print_bearer_info (MMBearer *bearer)
              mm_bearer_get_suspended (bearer) ? "yes" : "no",
              VALIDATE_UNKNOWN (mm_bearer_get_interface (bearer)));
 
-    g_print ("  -------------------------\n"
-             "  Properties         |         apn: '%s'\n"
-             "                     |     roaming: '%s'\n"
-             "                     |     IP type: '%s'\n"
-             "                     |        user: '%s'\n"
-             "                     |    password: '%s'\n"
-             "                     |      number: '%s'\n",
-             VALIDATE_NONE (mm_bearer_properties_get_apn (properties)),
-             mm_bearer_properties_get_allow_roaming (properties) ? "allowed" : "forbidden",
-             VALIDATE_NONE (mm_bearer_properties_get_ip_type (properties)),
-             VALIDATE_NONE (mm_bearer_properties_get_user (properties)),
-             VALIDATE_NONE (mm_bearer_properties_get_password (properties)),
-             VALIDATE_NONE (mm_bearer_properties_get_number (properties)));
+    if (properties) {
+        g_print ("  -------------------------\n"
+                 "  Properties         |         apn: '%s'\n"
+                 "                     |     roaming: '%s'\n"
+                 "                     |     IP type: '%s'\n"
+                 "                     |        user: '%s'\n"
+                 "                     |    password: '%s'\n"
+                 "                     |      number: '%s'\n",
+                 VALIDATE_NONE (mm_bearer_properties_get_apn (properties)),
+                 mm_bearer_properties_get_allow_roaming (properties) ? "allowed" : "forbidden",
+                 VALIDATE_NONE (mm_bearer_properties_get_ip_type (properties)),
+                 VALIDATE_NONE (mm_bearer_properties_get_user (properties)),
+                 VALIDATE_NONE (mm_bearer_properties_get_password (properties)),
+                 VALIDATE_NONE (mm_bearer_properties_get_number (properties)));
+        g_object_unref (properties);
+    }
 
     /* IPv4 */
     g_print ("  -------------------------\n"
