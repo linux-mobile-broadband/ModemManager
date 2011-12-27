@@ -480,39 +480,15 @@ mm_bearer_set_connection_forbidden (MMBearer *self,
 
 void
 mm_bearer_expose_properties (MMBearer *bearer,
-                             const gchar *first_property_name,
-                             ...)
+                             MMCommonBearerProperties *properties)
 {
-    va_list va_args;
-    const gchar *key;
-    GVariantBuilder builder;
-
-    va_start (va_args, first_property_name);
-
-    g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
-    key = first_property_name;
-    while (key) {
-        if (g_str_equal (key, "allow-roaming")) {
-            gboolean value;
-
-            value = va_arg (va_args, gboolean);
-            g_variant_builder_add (&builder, "{sv}", key, g_variant_new_boolean (value));
-        } else {
-            const gchar *value;
-
-            /* If a key with NULL value is given, just ignore it. */
-            value = va_arg (va_args, gchar *);
-            if (value)
-                g_variant_builder_add (&builder, "{sv}", key, g_variant_new_string (value));
-        }
-
-        key = va_arg (va_args, gchar *);
-    }
-    va_end (va_args);
+    GVariant *dictionary;
 
     /* Keep the whole list of properties in the interface */
+    dictionary = mm_common_bearer_properties_get_dictionary (properties);
     mm_gdbus_bearer_set_properties (MM_GDBUS_BEARER (bearer),
-                                    g_variant_builder_end (&builder));
+                                    dictionary);
+    g_variant_unref (dictionary);
 }
 
 /*****************************************************************************/

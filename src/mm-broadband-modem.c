@@ -102,7 +102,7 @@ modem_create_bearer_finish (MMIfaceModem *self,
 
 static void
 modem_create_bearer (MMIfaceModem *self,
-                     GVariant *properties,
+                     MMCommonBearerProperties *properties,
                      GAsyncReadyCallback callback,
                      gpointer user_data)
 {
@@ -116,9 +116,9 @@ modem_create_bearer (MMIfaceModem *self,
 
     /* New 3GPP bearer */
     if (MM_BROADBAND_MODEM (self)->priv->modem_3gpp_dbus_skeleton) {
-        bearer = mm_iface_modem_3gpp_create_bearer_from_properties (MM_IFACE_MODEM_3GPP (self),
-                                                                    properties,
-                                                                    &error);
+        bearer = mm_iface_modem_3gpp_create_bearer (MM_IFACE_MODEM_3GPP (self),
+                                                    properties,
+                                                    &error);
     } else {
         g_set_error (&error,
                      MM_CORE_ERROR,
@@ -133,6 +133,9 @@ modem_create_bearer (MMIfaceModem *self,
                                                    error);
             return;
     }
+
+    /* Expose all properties used during creation */
+    mm_bearer_expose_properties (bearer, properties);
 
     /* Set a new ref to the bearer object as result */
     result = g_simple_async_result_new (G_OBJECT (self),

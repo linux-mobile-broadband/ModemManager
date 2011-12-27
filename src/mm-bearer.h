@@ -21,7 +21,8 @@
 #include <glib.h>
 #include <glib-object.h>
 
-#include <mm-gdbus-bearer.h>
+#include <libmm-common.h>
+
 #include "mm-base-modem.h"
 
 #define MM_TYPE_BEARER            (mm_bearer_get_type ())
@@ -89,8 +90,7 @@ GType mm_bearer_get_type (void);
 const gchar *mm_bearer_get_path (MMBearer *bearer);
 
 void mm_bearer_expose_properties (MMBearer *bearer,
-                                  const gchar *first_property_name,
-                                  ...);
+                                  MMCommonBearerProperties *properties);
 
 void mm_bearer_set_connection_allowed   (MMBearer *bearer);
 void mm_bearer_set_connection_forbidden (MMBearer *bearer,

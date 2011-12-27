@@ -787,27 +787,28 @@ disconnect (MMBearer *self,
 
 MMBearer *
 mm_bearer_3gpp_new (MMBaseModem *modem,
-                    const gchar *apn,
-                    const gchar *ip_type,
-                    gboolean allow_roaming)
+                    MMCommonBearerProperties *properties,
+                    GError **error)
 {
     static guint id = 0;
     MMBearer3gpp *bearer;
     gchar *path;
 
+    /* Check mandatory properties */
+    if (!mm_common_bearer_properties_get_apn (properties)) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_INVALID_ARGS,
+                     "Invalid input properties: 3GPP bearer requires 'apn'");
+        return NULL;
+    }
+
     /* Create the object */
     bearer = g_object_new (MM_TYPE_BEARER_3GPP,
-                           MM_BEARER_3GPP_APN,           apn,
-                           MM_BEARER_3GPP_IP_TYPE,       ip_type,
-                           MM_BEARER_3GPP_ALLOW_ROAMING, allow_roaming,
+                           MM_BEARER_3GPP_APN, mm_common_bearer_properties_get_apn (properties),
+                           MM_BEARER_3GPP_IP_TYPE, mm_common_bearer_properties_get_ip_type (properties),
+                           MM_BEARER_3GPP_ALLOW_ROAMING, mm_common_bearer_properties_get_allow_roaming (properties),
                            NULL);
-
-    /* Build dict with all properties */
-    mm_bearer_expose_properties (MM_BEARER (bearer),
-                                 "apn",           apn,
-                                 "ip-type",       ip_type,
-                                 "allow-roaming", allow_roaming,
-                                 NULL);
 
     /* Set modem and path ONLY after having checked input properties, so that
      * we don't export invalid bearers. */

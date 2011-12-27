@@ -19,6 +19,8 @@
 #include <glib-object.h>
 #include <gio/gio.h>
 
+#include <libmm-common.h>
+
 #include "mm-at-serial-port.h"
 
 #define MM_TYPE_IFACE_MODEM_3GPP               (mm_iface_modem_3gpp_get_type ())
@@ -145,9 +147,8 @@ struct _MMIfaceModem3gpp {
 
     /* Create 3GPP bearer */
     MMBearer * (* create_3gpp_bearer) (MMBaseModem *modem,
-                                       const gchar *apn,
-                                       const gchar *ip_type,
-                                       gboolean allow_roaming);
+                                       MMCommonBearerProperties *properties,
+                                       GError **error);
 };
 
 GType mm_iface_modem_3gpp_get_type (void);
@@ -198,12 +199,8 @@ gboolean mm_iface_modem_3gpp_run_all_registration_checks_finish (MMIfaceModem3gp
 
 /* Create new 3GPP bearer */
 MMBearer *mm_iface_modem_3gpp_create_bearer (MMIfaceModem3gpp *self,
-                                             const gchar *apn,
-                                             const gchar *ip_type,
-                                             gboolean allow_roaming);
-MMBearer *mm_iface_modem_3gpp_create_bearer_from_properties (MMIfaceModem3gpp *self,
-                                                             GVariant *properties,
-                                                             GError **error);
+                                             MMCommonBearerProperties *properties,
+                                             GError **error);
 
 /* Allow registering in the network */
 gboolean mm_iface_modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
