@@ -211,4 +211,8 @@ void     mm_iface_modem_3gpp_register_in_network        (MMIfaceModem3gpp *self,
                                                          GAsyncReadyCallback callback,
                                                          gpointer user_data);
 
+/* Bind properties for simple GetStatus() */
+void mm_iface_modem_3gpp_bind_simple_status (MMIfaceModem3gpp *self,
+                                             MMCommonSimpleProperties *status);
+
 #endif /* MM_IFACE_MODEM_3GPP_H */

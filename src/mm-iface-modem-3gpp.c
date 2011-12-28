@@ -24,6 +24,35 @@
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 
+/*****************************************************************************/
+
+void
+mm_iface_modem_3gpp_bind_simple_status (MMIfaceModem3gpp *self,
+                                        MMCommonSimpleProperties *status)
+{
+    MmGdbusModem3gpp *skeleton;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    g_object_bind_property (skeleton, "registration-state",
+                            status, MM_COMMON_SIMPLE_PROPERTY_3GPP_REGISTRATION_STATE,
+                            G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
+
+    g_object_bind_property (skeleton, "operator-code",
+                            status, MM_COMMON_SIMPLE_PROPERTY_3GPP_OPERATOR_CODE,
+                            G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
+
+    g_object_bind_property (skeleton, "operator-name",
+                            status, MM_COMMON_SIMPLE_PROPERTY_3GPP_OPERATOR_NAME,
+                            G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
+
+    g_object_unref (skeleton);
+}
+
+/*****************************************************************************/
+
 typedef struct {
     MmGdbusModem3gpp *skeleton;
     GDBusMethodInvocation *invocation;
