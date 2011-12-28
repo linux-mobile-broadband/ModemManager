@@ -33,6 +33,39 @@ static void interface_enabling_step (EnablingContext *ctx);
 typedef struct _DisablingContext DisablingContext;
 static void interface_disabling_step (DisablingContext *ctx);
 
+/*****************************************************************************/
+
+void
+mm_iface_modem_bind_simple_status (MMIfaceModem *self,
+                                   MMCommonSimpleProperties *status)
+{
+    MmGdbusModem *skeleton;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    g_object_bind_property (skeleton, "state",
+                            status, MM_COMMON_SIMPLE_PROPERTY_STATE,
+                            G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
+
+    g_object_bind_property (skeleton, "signal-quality",
+                            status, MM_COMMON_SIMPLE_PROPERTY_SIGNAL_QUALITY,
+                            G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
+
+    g_object_bind_property (skeleton, "allowed-bands",
+                            status, MM_COMMON_SIMPLE_PROPERTY_BANDS,
+                            G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
+
+    g_object_bind_property (skeleton, "access-technologies",
+                            status, MM_COMMON_SIMPLE_PROPERTY_ACCESS_TECHNOLOGIES,
+                            G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
+
+    g_object_unref (skeleton);
+}
+
+/*****************************************************************************/
+
 typedef struct {
     MmGdbusModem *skeleton;
     GDBusMethodInvocation *invocation;
@@ -1202,13 +1235,13 @@ signal_quality_check_ready (MMIfaceModem *self,
     else {
         GVariant *result;
 
-        result = g_variant_new ("(ub)", quality, is_recent);
+        result = g_variant_ref_sink (g_variant_new ("(ub)", quality, is_recent));
         /* Set operation result */
         g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                    g_variant_ref (result),
                                                    (GDestroyNotify)g_variant_unref);
         /* Set the property value in the DBus skeleton */
-        mm_gdbus_modem_set_signal_quality (ctx->skeleton, g_variant_ref (result));
+        mm_gdbus_modem_set_signal_quality (ctx->skeleton, result);
         g_variant_unref (result);
     }
     g_simple_async_result_complete (ctx->result);
@@ -1923,13 +1956,13 @@ load_supported_bands_ready (MMIfaceModem *self,
 
     bands_array = MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_bands_finish (self, res, &error);
 
-    /* We have the property in the interface bound to the property in the
-     * skeleton. */
-    g_object_set (self,
-                  MM_IFACE_MODEM_CURRENT_CAPABILITIES,
-                  mm_common_bands_garray_to_variant (bands_array),
-                  NULL);
-    g_array_unref (bands_array);
+    if (bands_array) {
+        mm_gdbus_modem_set_supported_bands (ctx->skeleton,
+                                            mm_common_bands_garray_to_variant (bands_array));
+        mm_gdbus_modem_set_allowed_bands (ctx->skeleton,
+                                          mm_common_bands_garray_to_variant (bands_array));
+        g_array_unref (bands_array);
+    }
 
     if (error) {
         mm_warn ("couldn't load Supported Bands: '%s'", error->message);
@@ -2272,21 +2305,36 @@ interface_initialization_step (InitializationContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case INITIALIZATION_STEP_SUPPORTED_BANDS:
+    case INITIALIZATION_STEP_SUPPORTED_BANDS: {
+        GArray *supported_bands;
+
+        supported_bands = (mm_common_bands_variant_to_garray (
+                               mm_gdbus_modem_get_supported_bands (ctx->skeleton)));
+
         /* Supported bands are meant to be loaded only once during the whole
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
-        if (mm_gdbus_modem_get_supported_bands (ctx->skeleton) == MM_MODEM_BAND_UNKNOWN &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_bands &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_bands_finish) {
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_bands (
-                ctx->self,
-                (GAsyncReadyCallback)load_supported_bands_ready,
-                ctx);
-            return;
+        if (supported_bands->len == 0 ||
+            g_array_index (supported_bands, MMModemBand, 0)  == MM_MODEM_BAND_UNKNOWN) {
+            if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_bands &&
+                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_bands_finish) {
+                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_bands (
+                    ctx->self,
+                    (GAsyncReadyCallback)load_supported_bands_ready,
+                    ctx);
+                g_array_unref (supported_bands);
+                return;
+            }
+
+            /* Loading supported bands not implemented, default to ANY */
+            mm_gdbus_modem_set_supported_bands (ctx->skeleton, mm_common_build_bands_any ());
+            mm_gdbus_modem_set_allowed_bands (ctx->skeleton, mm_common_build_bands_any ());
         }
+        g_array_unref (supported_bands);
+
         /* Fall down to next step */
         ctx->step++;
+    }
 
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
@@ -2348,28 +2396,6 @@ mm_iface_modem_initialize_finish (MMIfaceModem *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
-static GVariant *
-build_bands_unknown (void)
-{
-    GVariantBuilder builder;
-
-    g_variant_builder_init (&builder, G_VARIANT_TYPE ("au"));
-    g_variant_builder_add_value (&builder,
-                                 g_variant_new_uint32 (MM_MODEM_BAND_UNKNOWN));
-    return g_variant_builder_end (&builder);
-}
-
-static GVariant *
-build_bands_any (void)
-{
-    GVariantBuilder builder;
-
-    g_variant_builder_init (&builder, G_VARIANT_TYPE ("au"));
-    g_variant_builder_add_value (&builder,
-                                 g_variant_new_uint32 (MM_MODEM_BAND_ANY));
-    return g_variant_builder_end (&builder);
-}
-
 void
 mm_iface_modem_initialize (MMIfaceModem *self,
                            MMAtSerialPort *port,
@@ -2407,8 +2433,8 @@ mm_iface_modem_initialize (MMIfaceModem *self,
         mm_gdbus_modem_set_supported_modes (skeleton, MM_MODEM_MODE_NONE);
         mm_gdbus_modem_set_allowed_modes (skeleton, MM_MODEM_MODE_ANY);
         mm_gdbus_modem_set_preferred_mode (skeleton, MM_MODEM_MODE_NONE);
-        mm_gdbus_modem_set_supported_bands (skeleton, build_bands_unknown ());
-        mm_gdbus_modem_set_allowed_bands (skeleton, build_bands_any ());
+        mm_gdbus_modem_set_supported_bands (skeleton, mm_common_build_bands_unknown ());
+        mm_gdbus_modem_set_allowed_bands (skeleton, mm_common_build_bands_unknown ());
 
         /* Bind our State property */
         g_object_bind_property (self, MM_IFACE_MODEM_STATE,
