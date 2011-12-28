@@ -169,6 +169,70 @@ mm_common_simple_properties_get_dictionary (MMCommonSimpleProperties *self)
 /*****************************************************************************/
 
 MMCommonSimpleProperties *
+mm_common_simple_properties_new_from_dictionary (GVariant *dictionary,
+                                                 GError **error)
+{
+    GError *inner_error = NULL;
+    GVariantIter iter;
+    gchar *key;
+    GVariant *value;
+    MMCommonSimpleProperties *properties;
+
+    properties = mm_common_simple_properties_new ();
+    if (!dictionary)
+        return properties;
+
+    g_variant_iter_init (&iter, dictionary);
+    while (!inner_error &&
+           g_variant_iter_next (&iter, "{sv}", &key, &value)) {
+        /* Note: we could do a more efficient matching by checking the variant type
+         * and just g_object_set()-ing they specific 'key' and value, but we do want
+         * to check which input keys we receive, in order to propagate the error.
+         */
+        if (g_str_equal (key, MM_COMMON_SIMPLE_PROPERTY_STATE) ||
+            g_str_equal (key, MM_COMMON_SIMPLE_PROPERTY_ACCESS_TECHNOLOGIES) ||
+            g_str_equal (key, MM_COMMON_SIMPLE_PROPERTY_3GPP_REGISTRATION_STATE)) {
+            /* uint properties */
+            g_object_set (properties,
+                          key, g_variant_get_uint32 (value),
+                          NULL);
+        } else if (g_str_equal (key, MM_COMMON_SIMPLE_PROPERTY_3GPP_OPERATOR_CODE) ||
+                   g_str_equal (key, MM_COMMON_SIMPLE_PROPERTY_3GPP_OPERATOR_NAME)) {
+            /* string properties */
+            g_object_set (properties,
+                          key, g_variant_get_string (value, NULL),
+                          NULL);
+        } else if (g_str_equal (key, MM_COMMON_SIMPLE_PROPERTY_BANDS) ||
+                   g_str_equal (key, MM_COMMON_SIMPLE_PROPERTY_SIGNAL_QUALITY)) {
+            /* remaining complex types, as variant */
+            g_object_set (properties,
+                          key, value,
+                          NULL);
+        } else {
+            /* Set inner error, will stop the loop */
+            inner_error = g_error_new (MM_CORE_ERROR,
+                                       MM_CORE_ERROR_INVALID_ARGS,
+                                       "Invalid properties dictionary, unexpected key '%s'",
+                                       key);
+        }
+
+        g_free (key);
+        g_variant_unref (value);
+    }
+
+    /* If error, destroy the object */
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        g_object_unref (properties);
+        properties = NULL;
+    }
+
+    return properties;
+}
+
+/*****************************************************************************/
+
+MMCommonSimpleProperties *
 mm_common_simple_properties_new (void)
 {
     return (MM_COMMON_SIMPLE_PROPERTIES (

@@ -52,6 +52,9 @@ struct _MMCommonSimplePropertiesClass {
 GType mm_common_simple_properties_get_type (void);
 
 MMCommonSimpleProperties *mm_common_simple_properties_new (void);
+MMCommonSimpleProperties *mm_common_simple_properties_new_from_dictionary (
+    GVariant *dictionary,
+    GError **error);
 
 MMModemState                  mm_common_simple_properties_get_state               (MMCommonSimpleProperties *self);
 guint32                       mm_common_simple_properties_get_signal_quality      (MMCommonSimpleProperties *self,
