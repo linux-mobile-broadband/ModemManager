@@ -37,13 +37,13 @@ libmm_glib_la_LIBADD = \
 
 includedir = @includedir@/libmm-glib
 include_HEADERS = \
-	${top_builddir}/libmm-common/mm-enums-types.h \
-	${top_builddir}/libmm-common/mm-errors-types.h \
-	${top_builddir}/libmm-common/mm-gdbus-manager.h \
-	${top_builddir}/libmm-common/mm-gdbus-sim.h \
-	${top_builddir}/libmm-common/mm-gdbus-modem.h \
-	${top_builddir}/libmm-common/mm-gdbus-sms.h \
-	${top_builddir}/libmm-common/mm-gdbus-bearer.h \
 	libmm-glib.h \
 	mm-manager.h \
-	mm-modem.h
+	mm-object.h \
+	mm-modem.h \
+	mm-modem-3gpp.h \
+	mm-modem-simple-connect-properties.h \
+	mm-modem-simple.h \
+	mm-sim.h \
+	mm-bearer-properties.h \
+	mm-bearer.h
