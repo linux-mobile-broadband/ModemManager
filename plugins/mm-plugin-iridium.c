@@ -158,6 +158,7 @@ supports_port (MMPluginBase *base,
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
 
     /* Completed! */
+    cached = mm_plugin_base_supports_task_get_probed_capabilities (task);
     mm_plugin_base_supports_task_complete (task, get_level_for_capabilities (cached));
     return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
 }
