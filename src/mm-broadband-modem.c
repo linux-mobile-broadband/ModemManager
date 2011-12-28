@@ -59,6 +59,12 @@ enum {
     PROP_LAST
 };
 
+typedef enum {
+    SIGNAL_QUALITY_METHOD_UNKNOWN,
+    SIGNAL_QUALITY_METHOD_CSQ,
+    SIGNAL_QUALITY_METHOD_CIND
+} SignalQualityMethod;
+
 struct _MMBroadbandModemPrivate {
     GObject *modem_dbus_skeleton;
     GObject *modem_3gpp_dbus_skeleton;
@@ -72,6 +78,8 @@ struct _MMBroadbandModemPrivate {
 
     /* Modem helpers */
     MMModemCharset current_charset;
+    SignalQualityMethod signal_quality_method;
+    guint cind_indicator_signal_quality;
 
     /* 3GPP registration helpers */
     GPtrArray *reg_regex;
@@ -645,6 +653,114 @@ load_unlock_required (MMIfaceModem *self,
                               NULL, /* cancellable */
                               callback,
                               user_data);
+}
+
+
+/*****************************************************************************/
+/* SIGNAL QUALITY */
+
+static guint
+load_signal_quality_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return 0;
+
+    return GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
+                                 G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+load_signal_quality_csf_ready (MMBroadbandModem *self,
+                               GAsyncResult *res,
+                               GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    const gchar *result;
+
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    if (result &&
+        !strncmp (result, "+CSQ: ", 6)) {
+        /* Got valid reply */
+        int quality;
+        int ber;
+
+        if (sscanf (result + 6, "%d, %d", &quality, &ber)) {
+            /* 99 means unknown */
+            if (quality == 99) {
+                g_simple_async_result_take_error (
+                    simple,
+                    mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NO_NETWORK));
+            } else {
+                /* Normalize the quality */
+                quality = CLAMP (quality, 0, 31) * 100 / 31;
+                g_simple_async_result_set_op_res_gpointer (simple,
+                                                           GUINT_TO_POINTER (quality),
+                                                           NULL);
+            }
+
+            g_simple_async_result_complete (simple);
+            g_object_unref (simple);
+            return;
+        }
+    }
+
+    g_simple_async_result_set_error (simple,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Could not parse signal quality results");
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+load_signal_quality_csf (MMBroadbandModem *self,
+                         GSimpleAsyncResult *result)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CSQ",
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)load_signal_quality_csf_ready,
+                              result);
+}
+
+static void
+load_signal_quality (MMIfaceModem *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    MM_BROADBAND_MODEM (self)->priv->signal_quality_method = SIGNAL_QUALITY_METHOD_CSQ;
+
+    mm_dbg ("loading signal quality...");
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_signal_quality);
+
+    switch (MM_BROADBAND_MODEM (self)->priv->signal_quality_method) {
+    case SIGNAL_QUALITY_METHOD_UNKNOWN:
+        /* Check if CIND supported */
+        return;
+    case SIGNAL_QUALITY_METHOD_CSQ:
+        load_signal_quality_csf (MM_BROADBAND_MODEM (self), result);
+        return;
+    case SIGNAL_QUALITY_METHOD_CIND:
+        return;
+    }
+
+    g_assert_not_reached ();
 }
 
 /*****************************************************************************/
@@ -2661,6 +2777,7 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv->reg_cs = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     self->priv->reg_ps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     self->priv->current_charset = MM_MODEM_CHARSET_UNKNOWN;
+    self->priv->signal_quality_method = SIGNAL_QUALITY_METHOD_UNKNOWN;
 }
 
 static void
@@ -2723,6 +2840,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_device_identifier_finish = load_device_identifier_finish;
     iface->load_unlock_required = load_unlock_required;
     iface->load_unlock_required_finish = load_unlock_required_finish;
+    iface->load_signal_quality = load_signal_quality;
+    iface->load_signal_quality_finish = load_signal_quality_finish;
 
     iface->modem_init = modem_init;
     iface->modem_init_finish = modem_init_finish;
