@@ -3513,7 +3513,7 @@ generic_reg_status_done (MMCallbackInfo *info,
 
     if (error)
         local = g_error_copy (error);
-    else if (strlen (response->str)) {
+    else if (response && strlen (response->str)) {
         /* Unsolicited registration status handlers will usually process the
          * response for us, but just in case they don't, do that here.
          */
@@ -3558,7 +3558,10 @@ static void
 get_registration_status (MMAtSerialPort *port, MMCallbackInfo *info)
 {
     mm_at_serial_port_queue_command (port, "+CREG?", 10, get_cs_reg_status_done, info);
-    mm_at_serial_port_queue_command (port, "+CGREG?", 10, get_ps_reg_status_done, info);
+    if (ps_network_supported (MM_GENERIC_GSM (info->modem)))
+        mm_at_serial_port_queue_command (port, "+CGREG?", 10, get_ps_reg_status_done, info);
+    else
+        generic_reg_status_done (info, NULL, NULL, PS_ERROR_TAG, PS_DONE_TAG);
 }
 
 static void
