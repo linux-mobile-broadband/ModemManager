@@ -735,13 +735,126 @@ load_signal_quality_csf (MMBroadbandModem *self,
 }
 
 static void
+load_signal_quality_cind_ready (MMBroadbandModem *self,
+                                GAsyncResult *res,
+                                GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    const gchar *result;
+    GByteArray *indicators;
+
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!error)
+        indicators = mm_parse_cind_query_response (result, &error);
+
+    if (error) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    if (indicators->len >= self->priv->cind_indicator_signal_quality) {
+        guint quality;
+        quality = g_array_index (indicators, guint8, self->priv->cind_indicator_signal_quality);
+        quality = CLAMP (quality, 0, 5) * 20;
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   GUINT_TO_POINTER (quality),
+                                                   NULL);
+
+        g_byte_array_free (indicators, TRUE);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    g_simple_async_result_set_error (simple,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Could not parse CIND signal quality results "
+                                     "signal index (%u) outside received range (0-%u)",
+                                     self->priv->cind_indicator_signal_quality,
+                                     indicators->len);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+load_signal_quality_cind (MMBroadbandModem *self,
+                          GSimpleAsyncResult *result)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CIND?",
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)load_signal_quality_cind_ready,
+                              result);
+}
+
+static void
+check_cind_supported_ready (MMBroadbandModem *self,
+                            GAsyncResult *res,
+                            GSimpleAsyncResult *simple)
+{
+    GHashTable *indicators = NULL;
+    GError *error = NULL;
+    const gchar *result;
+
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error)
+        g_error_free (error);
+    else
+        indicators = mm_parse_cind_test_response (result, NULL);
+
+    if (indicators) {
+        CindResponse *r;
+
+        r = g_hash_table_lookup (indicators, "signal");
+        if (r) {
+            self->priv->cind_indicator_signal_quality = cind_response_get_index (r);
+            self->priv->signal_quality_method = SIGNAL_QUALITY_METHOD_CSQ;
+            load_signal_quality_cind (self, simple);
+        }
+
+        /* TODO: also handle roam/service indicators */
+        /* r = g_hash_table_lookup (indicators, "roam"); */
+        /* if (r) */
+        /*     priv->roam_ind = cind_response_get_index (r); */
+        /* r = g_hash_table_lookup (indicators, "service"); */
+        /* if (r) */
+        /*     priv->service_ind = cind_response_get_index (r); */
+
+        /* TODO: Enable CMER in the primary and secondary ports */
+        g_hash_table_destroy (indicators);
+        return;
+    }
+
+    /* CIND won't be supported, default to CSQ */
+    self->priv->signal_quality_method = SIGNAL_QUALITY_METHOD_CSQ;
+    load_signal_quality_csf (self, simple);
+}
+
+static void
+check_cind_supported (MMBroadbandModem *self,
+                      GSimpleAsyncResult *result)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CIND=?",
+                              3,
+                              TRUE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)check_cind_supported_ready,
+                              result);
+}
+
+
+static void
 load_signal_quality (MMIfaceModem *self,
                      GAsyncReadyCallback callback,
                      gpointer user_data)
 {
     GSimpleAsyncResult *result;
-
-    MM_BROADBAND_MODEM (self)->priv->signal_quality_method = SIGNAL_QUALITY_METHOD_CSQ;
 
     mm_dbg ("loading signal quality...");
     result = g_simple_async_result_new (G_OBJECT (self),
@@ -751,16 +864,15 @@ load_signal_quality (MMIfaceModem *self,
 
     switch (MM_BROADBAND_MODEM (self)->priv->signal_quality_method) {
     case SIGNAL_QUALITY_METHOD_UNKNOWN:
-        /* Check if CIND supported */
-        return;
+        check_cind_supported (MM_BROADBAND_MODEM (self), result);
+        break;
     case SIGNAL_QUALITY_METHOD_CSQ:
         load_signal_quality_csf (MM_BROADBAND_MODEM (self), result);
-        return;
+        break;
     case SIGNAL_QUALITY_METHOD_CIND:
-        return;
+        load_signal_quality_cind (MM_BROADBAND_MODEM (self), result);
+        break;
     }
-
-    g_assert_not_reached ();
 }
 
 /*****************************************************************************/
