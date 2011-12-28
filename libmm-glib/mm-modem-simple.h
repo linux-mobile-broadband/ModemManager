@@ -28,6 +28,7 @@
 
 #include "mm-bearer.h"
 #include "mm-modem-simple-connect-properties.h"
+#include "mm-modem-simple-status-properties.h"
 
 G_BEGIN_DECLS
 
@@ -65,6 +66,16 @@ gboolean mm_modem_simple_disconnect_sync   (MMModemSimple *self,
                                             GCancellable *cancellable,
                                             GError **error);
 
+void                           mm_modem_simple_get_status        (MMModemSimple *self,
+                                                                  GCancellable *cancellable,
+                                                                  GAsyncReadyCallback callback,
+                                                                  gpointer user_data);
+MMModemSimpleStatusProperties *mm_modem_simple_get_status_finish (MMModemSimple *self,
+                                                                  GAsyncResult *res,
+                                                                  GError **error);
+MMModemSimpleStatusProperties *mm_modem_simple_get_status_sync   (MMModemSimple *self,
+                                                                  GCancellable *cancellable,
+                                                                  GError **error);
 G_END_DECLS
 
 #endif /* _MM_MODEM_SIMPLE_H_ */
