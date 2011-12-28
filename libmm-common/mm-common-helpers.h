@@ -34,9 +34,14 @@ void        mm_common_get_bands_from_string (const gchar *str,
 gboolean    mm_common_get_boolean_from_string (const gchar *value,
                                                GError **error);
 
-GArray   *mm_common_bands_variant_to_garray (GVariant *variant);
-GVariant *mm_common_bands_array_to_variant  (const MMModemBand *bands,
-                                             guint n_bands);
-GVariant *mm_common_bands_garray_to_variant (GArray *array);
+GArray      *mm_common_bands_variant_to_garray (GVariant *variant);
+MMModemBand *mm_common_bands_variant_to_array  (GVariant *variant,
+                                                guint *n_bands);
+GVariant    *mm_common_bands_array_to_variant  (const MMModemBand *bands,
+                                                guint n_bands);
+GVariant    *mm_common_bands_garray_to_variant (GArray *array);
+
+GVariant    *mm_common_build_bands_any     (void);
+GVariant    *mm_common_build_bands_unknown (void);
 
 #endif /* MM_COMMON_HELPERS_H */

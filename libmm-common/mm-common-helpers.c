@@ -286,42 +286,74 @@ mm_common_get_bands_from_string (const gchar *str,
 GArray *
 mm_common_bands_variant_to_garray (GVariant *variant)
 {
-    GArray *array;
-    GVariantIter iter;
-    guint32 band = MM_MODEM_BAND_UNKNOWN;
+    GArray *array = NULL;
 
-    g_variant_iter_init (&iter, variant);
-    array = g_array_sized_new (FALSE,
-                               FALSE,
-                               sizeof (MMModemBand),
-                               g_variant_iter_n_children (&iter));
-    while (g_variant_iter_loop (&iter, "u", &band))
+    if (variant) {
+        GVariantIter iter;
+        guint n;
+
+        g_variant_iter_init (&iter, variant);
+        n = g_variant_iter_n_children (&iter);
+
+        if (n > 0) {
+            guint32 band;
+
+            array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), n);
+            while (g_variant_iter_loop (&iter, "u", &band))
+                g_array_append_val (array, band);
+        }
+    }
+
+    /* If nothing set, fallback to default */
+    if (!array) {
+        guint32 band = MM_MODEM_BAND_UNKNOWN;
+
+        array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 1);
         g_array_append_val (array, band);
+    }
 
     return array;
+}
+
+MMModemBand *
+mm_common_bands_variant_to_array (GVariant *variant,
+                                  guint *n_bands)
+{
+    GArray *array;
+
+    array = mm_common_bands_variant_to_garray (variant);
+    if (n_bands)
+        *n_bands = array->len;
+    return (MMModemBand *) g_array_free (array, FALSE);
 }
 
 GVariant *
 mm_common_bands_array_to_variant (const MMModemBand *bands,
                                   guint n_bands)
 {
-    GVariantBuilder builder;
-    guint i;
+    if (n_bands > 0) {
+        GVariantBuilder builder;
+        guint i;
 
-    g_variant_builder_init (&builder, G_VARIANT_TYPE ("au"));
-    for (i = 0; i < n_bands; i++) {
-        g_variant_builder_add_value (&builder,
-                                     g_variant_new_uint32 ((guint32)bands[i]));
+        g_variant_builder_init (&builder, G_VARIANT_TYPE ("au"));
+
+        for (i = 0; i < n_bands; i++)
+            g_variant_builder_add_value (&builder,
+                                         g_variant_new_uint32 ((guint32)bands[i]));
+        return g_variant_builder_end (&builder);
     }
 
-    return g_variant_builder_end (&builder);
+    return mm_common_build_bands_unknown ();
 }
 
 GVariant *
 mm_common_bands_garray_to_variant (GArray *array)
 {
-    return mm_common_bands_array_to_variant ((const MMModemBand *)array->data,
-                                             array->len);
+    if (array)
+        return mm_common_bands_array_to_variant ((const MMModemBand *)array->data,
+                                                 array->len);
+
+    return mm_common_bands_array_to_variant (NULL, 0);
 }
 
 gboolean
@@ -338,4 +370,26 @@ mm_common_get_boolean_from_string (const gchar *value,
                      "Cannot get boolean from string '%s'", value);
 
     return FALSE;
+}
+
+GVariant *
+mm_common_build_bands_unknown (void)
+{
+    GVariantBuilder builder;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("au"));
+    g_variant_builder_add_value (&builder,
+                                 g_variant_new_uint32 (MM_MODEM_BAND_UNKNOWN));
+    return g_variant_builder_end (&builder);
+}
+
+GVariant *
+mm_common_build_bands_any (void)
+{
+    GVariantBuilder builder;
+
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("au"));
+    g_variant_builder_add_value (&builder,
+                                 g_variant_new_uint32 (MM_MODEM_BAND_ANY));
+    return g_variant_builder_end (&builder);
 }
