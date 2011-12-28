@@ -139,15 +139,23 @@
               (signature <literal>"u"</literal>).
             </listitem>
           </varlistentry>
+          <varlistentry><term><literal>"registration-state"</literal></term>
+            <listitem>
+              A <link linkend="MMModem3gppRegistrationState">MMModem3gppRegistrationState</link> value
+              specifying the state of the registration,given only when registered
+              in a 3GPP network, as an unsigned integer value (signature
+              <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
           <varlistentry><term><literal>"operator-code"</literal></term>
             <listitem>
-              Operator <literal>MCC-MNC</literal>, given only when registered,
-              as a string value (signature <literal>"s"</literal>).
+              Operator <literal>MCC-MNC</literal>, given only when registered
+              in a 3GPP network, as a string value (signature <literal>"s"</literal>).
             </listitem>
           </varlistentry>
           <varlistentry><term><literal>"operator-name"</literal></term>
             <listitem>
-              Operator name, given only when registered,
+              Operator name, given only when registered in a 3GPP network,
               as a string value (signature <literal>"s"</literal>).
             </listitem>
           </varlistentry>
@@ -155,7 +163,7 @@
             <listitem>
               List of <link linkend="MMModemBand">MMModemBand</link> values,
               given only when registered, as a list of
-              unsigned integer value (signature <literal>"au"</literal>).
+              unsigned integer values (signature <literal>"au"</literal>).
             </listitem>
           </varlistentry>
           <varlistentry><term><literal>"access-technology"</literal></term>
@@ -166,12 +174,6 @@
             </listitem>
           </varlistentry>
         </variablelist>
-
-        FIXME:
-            Either convert this to properties (which duplicate properties
-            of the base modem object already) or expand the returned property
-            list to include "registration" and add a StatusChanged signal so
-            clients can monitor changes without having to poll.
     -->
     <method name="GetStatus">
       <arg name="properties" type="a{sv}" direction="out" />
