@@ -383,6 +383,16 @@ get_signal_quality (MMModemGsmNetwork *modem,
 
     info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
 
+    /* If modem is not registered, don't even bother trying to get signal
+     * quality */
+    if (mm_modem_get_state (MM_MODEM (modem)) < MM_MODEM_STATE_REGISTERED) {
+        mm_dbg ("Not getting signal quality, not registered yet");
+        mm_generic_gsm_update_signal_quality (MM_GENERIC_GSM (info->modem), 0);
+        mm_callback_info_set_result (info, GUINT_TO_POINTER (0), NULL);
+        mm_callback_info_schedule (info);
+        return;
+    }
+
     /* The iridium modem may have a huge delay to get signal quality if we pass
      * AT+CSQ, so we'll default to use AT+CSQF, which is a fast version that
      * returns right away the last signal quality value retrieved */
