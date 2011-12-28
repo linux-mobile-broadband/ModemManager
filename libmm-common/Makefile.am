@@ -151,6 +151,7 @@ include_HEADERS = \
 	mm-errors-types.h \
 	mm-enums-types.h \
 	mm-common-helpers.h \
+	mm-common-simple-properties.h \
 	mm-common-connect-properties.h \
 	mm-common-bearer-properties.h \
 	mm-gdbus-manager.h \
@@ -165,6 +166,8 @@ libmm_common_la_SOURCES = \
 	mm-errors-quarks.c \
 	mm-common-helpers.h \
 	mm-common-helpers.c \
+	mm-common-simple-properties.h \
+	mm-common-simple-properties.c \
 	mm-common-connect-properties.h \
 	mm-common-connect-properties.c \
 	mm-common-bearer-properties.h \
