@@ -45,6 +45,7 @@ static Context *ctx;
 /* Options */
 static gchar *connect_str;
 static gboolean disconnect_flag;
+static gboolean status_flag;
 
 static GOptionEntry entries[] = {
     { "simple-connect", 0, 0, G_OPTION_ARG_STRING, &connect_str,
@@ -53,6 +54,10 @@ static GOptionEntry entries[] = {
     },
     { "simple-disconnect", 0, 0, G_OPTION_ARG_NONE, &disconnect_flag,
       "Disconnect all connected bearers.",
+      NULL
+    },
+    { "simple-status", 0, 0, G_OPTION_ARG_NONE, &status_flag,
+      "Show compilation of status properties.",
       NULL
     },
     { NULL }
@@ -83,7 +88,8 @@ mmcli_modem_simple_options_enabled (void)
         return !!n_actions;
 
     n_actions = (!!connect_str +
-                 disconnect_flag);
+                 disconnect_flag +
+                 status_flag);
 
     if (n_actions > 1) {
         g_printerr ("error: too many Simple actions requested\n");
@@ -178,6 +184,86 @@ disconnect_ready (MMModemSimple  *modem_simple,
 }
 
 static void
+status_process_reply (MMModemSimpleStatusProperties *result,
+                      const GError *error)
+{
+    MMModemState state;
+
+    if (!result) {
+        g_printerr ("error: couldn't get status from the modem: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    /* Not the best thing to do, as we may be doing _get() calls twice, but
+     * easiest to maintain */
+#undef VALIDATE_UNKNOWN
+#define VALIDATE_UNKNOWN(str) (str ? str : "unknown")
+
+    g_print ("\n"
+             "%s\n",
+             VALIDATE_UNKNOWN (mm_modem_simple_get_path (ctx->modem_simple)));
+
+    state = mm_modem_simple_status_properties_get_state (result);
+
+
+    g_print ("  -------------------------\n"
+             "  Status |          state: '%s'\n",
+             mmcli_get_state_string (state));
+
+    if (state >= MM_MODEM_STATE_REGISTERED) {
+        const MMModemBand *bands = NULL;
+        guint n_bands = 0;
+        gchar *bands_str;
+        gchar *access_tech_str;
+        guint signal_quality;
+        gboolean signal_quality_recent = FALSE;
+
+        signal_quality = (mm_modem_simple_status_properties_get_signal_quality (
+                              result,
+                              &signal_quality_recent));
+        mm_modem_simple_status_properties_get_bands (result, &bands, &n_bands);
+        bands_str = mm_modem_get_bands_string (bands, n_bands);
+        access_tech_str = (mm_modem_get_access_technologies_string (
+                               mm_modem_simple_status_properties_get_access_technologies (result)));
+
+        g_print ("         | signal quality: '%u' (%s)\n"
+                 "         |          bands: '%s'\n"
+                 "         |    access tech: '%s'\n"
+                 "         |   registration: '%s'\n"
+                 "         |  operator code: '%s'\n"
+                 "         |  operator name: '%s'\n",
+                 signal_quality, signal_quality_recent ? "recent" : "cached",
+                 VALIDATE_UNKNOWN (bands_str),
+                 VALIDATE_UNKNOWN (access_tech_str),
+                 mmcli_get_3gpp_registration_state_string (
+                     mm_modem_simple_status_properties_get_registration_state (result)),
+                 VALIDATE_UNKNOWN (mm_modem_simple_status_properties_get_operator_code (result)),
+                 VALIDATE_UNKNOWN (mm_modem_simple_status_properties_get_operator_name (result)));
+
+        g_free (access_tech_str);
+        g_free (bands_str);
+    }
+
+    g_print ("\n");
+    g_object_unref (result);
+}
+
+static void
+status_ready (MMModemSimple  *modem_simple,
+              GAsyncResult *result,
+              gpointer      nothing)
+{
+    MMModemSimpleStatusProperties *operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_simple_get_status_finish (modem_simple, result, &error);
+    status_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
 get_modem_ready (GObject      *source,
                  GAsyncResult *result,
                  gpointer      none)
@@ -215,6 +301,17 @@ get_modem_ready (GObject      *source,
                                     NULL,
                                     ctx->cancellable,
                                     (GAsyncReadyCallback)disconnect_ready,
+                                    NULL);
+        return;
+    }
+
+    /* Request to get status from the modem? */
+    if (status_flag) {
+        g_debug ("Asynchronously getting status from the modem...");
+
+        mm_modem_simple_get_status (ctx->modem_simple,
+                                    ctx->cancellable,
+                                    (GAsyncReadyCallback)status_ready,
                                     NULL);
         return;
     }
@@ -258,13 +355,26 @@ mmcli_modem_simple_run_synchronous (GDBusConnection *connection)
     if (disconnect_flag) {
         gboolean result;
 
-        g_debug ("Asynchronously disconnecting all bearers in the modem...");
+        g_debug ("Synchronously disconnecting all bearers in the modem...");
 
         result = mm_modem_simple_disconnect_sync (ctx->modem_simple,
                                                   NULL,
                                                   NULL,
                                                   &error);
         disconnect_process_reply (result, error);
+        return;
+    }
+
+    /* Request to get status from the modem? */
+    if (status_flag) {
+        MMModemSimpleStatusProperties *result;
+
+        g_debug ("Synchronously getting status from the modem...");
+
+        result = mm_modem_simple_get_status_sync (ctx->modem_simple,
+                                                  NULL,
+                                                  &error);
+        status_process_reply (result, error);
         return;
     }
 
