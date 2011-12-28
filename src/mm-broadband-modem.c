@@ -55,6 +55,7 @@ enum {
     PROP_MODEM_STATE,
     PROP_MODEM_CURRENT_CAPABILITIES,
     PROP_MODEM_3GPP_REGISTRATION_STATE,
+    PROP_MODEM_SIMPLE_STATUS,
     PROP_LAST
 };
 
@@ -67,6 +68,7 @@ struct _MMBroadbandModemPrivate {
     MMModemState modem_state;
     MMModemCapability modem_current_capabilities;
     MMModem3gppRegistrationState modem_3gpp_registration_state;
+    MMCommonSimpleProperties *modem_simple_status;
 
     /* Modem helpers */
     MMModemCharset current_charset;
@@ -2414,6 +2416,10 @@ initialize_finish (MMBaseModem *self,
             return;                                                     \
         }                                                               \
                                                                         \
+        /* bind simple properties */                                    \
+        mm_##NAME##_bind_simple_status (TYPE (self),                    \
+                                        self->priv->modem_simple_status); \
+                                                                        \
         /* Go on to next step */                                        \
         ctx->step++;                                                    \
         initialize_step (ctx);                                          \
@@ -2428,6 +2434,9 @@ initialize_step (InitializeContext *ctx)
     switch (ctx->step) {
     case INITIALIZE_STEP_FIRST: {
         GError *error = NULL;
+
+        if (!ctx->self->priv->modem_simple_status)
+            ctx->self->priv->modem_simple_status = mm_common_simple_properties_new ();
 
         /* Open and send first commands to the serial port */
         if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->port), &error)) {
@@ -2587,6 +2596,9 @@ set_property (GObject *object,
     case PROP_MODEM_3GPP_REGISTRATION_STATE:
         self->priv->modem_3gpp_registration_state = g_value_get_enum (value);
         break;
+    case PROP_MODEM_SIMPLE_STATUS:
+        self->priv->modem_simple_status = g_value_dup_object (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -2625,6 +2637,9 @@ get_property (GObject *object,
         break;
     case PROP_MODEM_3GPP_REGISTRATION_STATE:
         g_value_set_enum (value, self->priv->modem_3gpp_registration_state);
+        break;
+    case PROP_MODEM_SIMPLE_STATUS:
+        g_value_set_object (value, self->priv->modem_simple_status);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -2685,6 +2700,8 @@ dispose (GObject *object)
 
     if (self->priv->modem_bearer_list)
         g_clear_object (&self->priv->modem_bearer_list);
+
+    g_clear_object (&self->priv->modem_simple_status);
 
     G_OBJECT_CLASS (mm_broadband_modem_parent_class)->dispose (object);
 }
@@ -2811,4 +2828,9 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_3GPP_REGISTRATION_STATE,
                                       MM_IFACE_MODEM_3GPP_REGISTRATION_STATE);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_SIMPLE_STATUS,
+                                      MM_IFACE_MODEM_SIMPLE_STATUS);
+
 }
