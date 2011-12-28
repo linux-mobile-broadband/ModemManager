@@ -397,6 +397,210 @@ mm_iface_modem_update_access_tech (MMIfaceModem *self,
 
 /*****************************************************************************/
 
+#define SIGNAL_QUALITY_RECENT_TIMEOUT_SEC 60
+#define SIGNAL_QUALITY_RECENT_TAG "signal-quality-recent-tag"
+static GQuark signal_quality_recent;
+
+static gboolean
+expire_signal_quality (MMIfaceModem *self)
+{
+    GVariant *old;
+    guint signal_quality = 0;
+    gboolean recent = FALSE;
+    MmGdbusModem *skeleton = NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    old = mm_gdbus_modem_get_signal_quality (skeleton);
+    g_variant_get (old,
+                   "(ub)",
+                   &signal_quality,
+                   &recent);
+
+    /* If value is already not recent, we're done */
+    if (recent) {
+        mm_dbg ("Signal quality value not updated in %us, "
+                "marking as not being recent",
+                SIGNAL_QUALITY_RECENT_TIMEOUT_SEC);
+        mm_gdbus_modem_set_signal_quality (skeleton,
+                                           g_variant_new ("(ub)",
+                                                          signal_quality,
+                                                          FALSE));
+    }
+
+    g_object_set_qdata (G_OBJECT (self),
+                        signal_quality_recent,
+                        GUINT_TO_POINTER (0));
+    return FALSE;
+}
+
+static void
+update_signal_quality (MMIfaceModem *self,
+                       guint signal_quality,
+                       gboolean expire)
+{
+    guint timeout_source;
+    MmGdbusModem *skeleton = NULL;
+    const gchar *dbus_path;
+
+    if (G_UNLIKELY (!signal_quality_recent))
+        signal_quality_recent = (g_quark_from_static_string (
+                                     SIGNAL_QUALITY_RECENT_TAG));
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    /* Note: we always set the new value, even if the signal quality level
+     * is the same, in order to provide an up to date 'recent' flag.
+     * The only exception being if 'expire' is FALSE; in that case we assume
+     * the value won't expire and therefore can be considered obsolete
+     * already. */
+    mm_gdbus_modem_set_signal_quality (skeleton,
+                                       g_variant_new ("(ub)",
+                                                      signal_quality,
+                                                      expire));
+
+    dbus_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (self));
+    mm_info ("Modem %s: signal quality updated (%u)",
+             dbus_path,
+             signal_quality);
+
+    /* Setup timeout to clear the 'recent' flag */
+    timeout_source = GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (self),
+                                                           signal_quality_recent));
+    /* Remove any previous expiration refresh timeout */
+    if (timeout_source)
+        g_source_remove (timeout_source);
+
+    /* If we got a new expirable value, setup new timeout */
+    if (expire) {
+        timeout_source = g_timeout_add_seconds (SIGNAL_QUALITY_RECENT_TIMEOUT_SEC,
+                                                (GSourceFunc)expire_signal_quality,
+                                                self);
+        g_object_set_qdata (G_OBJECT (self),
+                            signal_quality_recent,
+                            GUINT_TO_POINTER (timeout_source));
+    }
+
+    g_object_unref (skeleton);
+}
+
+void
+mm_iface_modem_update_signal_quality (MMIfaceModem *self,
+                                      guint signal_quality)
+{
+    update_signal_quality (self, signal_quality, TRUE);
+}
+
+/*****************************************************************************/
+
+#define SIGNAL_QUALITY_CHECK_TIMEOUT_SEC 30
+#define PERIODIC_SIGNAL_QUALITY_CHECK_ENABLED_TAG "signal-quality-check-timeout-enabled-tag"
+#define PERIODIC_SIGNAL_QUALITY_CHECK_RUNNING_TAG "signal-quality-check-timeout-running-tag"
+static GQuark signal_quality_check_enabled;
+static GQuark signal_quality_check_running;
+
+static void
+signal_quality_check_ready (MMIfaceModem *self,
+                            GAsyncResult *res)
+{
+    GError *error = NULL;
+    guint signal_quality;
+
+    signal_quality = MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality_finish (self,
+                                                                                      res,
+                                                                                      &error);
+    if (error) {
+        mm_dbg ("Couldn't refresh signal quality: '%s'", error->message);
+        g_error_free (error);
+    } else
+        update_signal_quality (self, signal_quality, TRUE);
+
+    /* Remove the running tag */
+    g_object_set_qdata (G_OBJECT (self),
+                        signal_quality_check_running,
+                        GUINT_TO_POINTER (FALSE));
+}
+
+static gboolean
+periodic_signal_quality_check (MMIfaceModem *self)
+{
+    /* Only launch a new one if not one running already */
+    if (!GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (self),
+                                               signal_quality_check_running))) {
+        g_object_set_qdata (G_OBJECT (self),
+                            signal_quality_check_running,
+                            GUINT_TO_POINTER (TRUE));
+
+        MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality (
+            self,
+            (GAsyncReadyCallback)signal_quality_check_ready,
+            NULL);
+    }
+
+    return TRUE;
+}
+
+static void
+periodic_signal_quality_check_disable (MMIfaceModem *self)
+{
+    guint timeout_source;
+
+    timeout_source = GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (self),
+                                                           signal_quality_check_enabled));
+    if (timeout_source) {
+        g_source_remove (timeout_source);
+        g_object_set_qdata (G_OBJECT (self),
+                            signal_quality_check_enabled,
+                            GUINT_TO_POINTER (FALSE));
+
+        /* Clear the current value */
+        update_signal_quality (self, 0, FALSE);
+
+        mm_dbg ("Periodic signal quality checks disabled");
+    }
+}
+
+static void
+periodic_signal_quality_check_enable (MMIfaceModem *self)
+{
+    guint timeout_source;
+
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality ||
+        !MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality_finish) {
+        /* If loading signal quality not supported, don't even bother setting up
+         * a timeout */
+        return;
+    }
+
+    if (G_UNLIKELY (!signal_quality_check_enabled))
+        signal_quality_check_enabled = (g_quark_from_static_string (
+                                            PERIODIC_SIGNAL_QUALITY_CHECK_ENABLED_TAG));
+    if (G_UNLIKELY (!signal_quality_check_running))
+        signal_quality_check_running = (g_quark_from_static_string (
+                                            PERIODIC_SIGNAL_QUALITY_CHECK_RUNNING_TAG));
+
+    timeout_source = GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (self),
+                                                           signal_quality_check_enabled));
+    if (!timeout_source) {
+        mm_dbg ("Periodic signal quality checks enabled");
+        timeout_source = g_timeout_add_seconds (SIGNAL_QUALITY_CHECK_TIMEOUT_SEC,
+                                                (GSourceFunc)periodic_signal_quality_check,
+                                                self);
+        g_object_set_qdata (G_OBJECT (self),
+                            signal_quality_check_enabled,
+                            GUINT_TO_POINTER (timeout_source));
+
+        /* Get first signal quality value */
+        periodic_signal_quality_check (self);
+    }
+}
+
+/*****************************************************************************/
+
 static void
 bearer_list_count_connected (MMBearer *bearer,
                              guint *count)
@@ -469,6 +673,19 @@ mm_iface_modem_update_state (MMIfaceModem *self,
                                            old_state,
                                            new_state,
                                            reason);
+
+        /* If we go to registered state (from unregistered), setup signal
+         * quality retrieval */
+        if (new_state == MM_MODEM_STATE_REGISTERED &&
+            old_state < MM_MODEM_STATE_REGISTERED) {
+            periodic_signal_quality_check_enable (self);
+        }
+        /* If we go from a registered/connected state to unregistered,
+         * cleanup signal quality retrieval */
+        else if (old_state >= MM_MODEM_STATE_REGISTERED &&
+                 new_state < MM_MODEM_STATE_REGISTERED) {
+            periodic_signal_quality_check_disable (self);
+        }
     }
 
     if (skeleton)
@@ -1157,130 +1374,8 @@ mm_iface_modem_unlock_check (MMIfaceModem *self,
 
 /*****************************************************************************/
 
-typedef struct _SignalQualityCheckContext SignalQualityCheckContext;
-struct _SignalQualityCheckContext {
-    MMIfaceModem *self;
-    MMAtSerialPort *port;
-    GSimpleAsyncResult *result;
-    MmGdbusModem *skeleton;
-};
-
-static SignalQualityCheckContext *
-signal_quality_check_context_new (MMIfaceModem *self,
-                                  GAsyncReadyCallback callback,
-                                  gpointer user_data)
-{
-    SignalQualityCheckContext *ctx;
-
-    ctx = g_new0 (SignalQualityCheckContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->port = g_object_ref (mm_base_modem_get_port_primary (MM_BASE_MODEM (self)));
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             signal_quality_check_context_new);
-    g_object_get (ctx->self,
-                  MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
-                  NULL);
-    g_assert (ctx->skeleton != NULL);
-    return ctx;
-}
-
-static void
-signal_quality_check_context_free (SignalQualityCheckContext *ctx)
-{
-    g_object_unref (ctx->self);
-    g_object_unref (ctx->port);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->skeleton);
-    g_free (ctx);
-}
-
-guint
-mm_iface_modem_signal_quality_check_finish (MMIfaceModem *self,
-                                            GAsyncResult *res,
-                                            gboolean *recent,
-                                            GError **error)
-{
-    guint quality = 0;
-    gboolean is_recent = FALSE;
-
-    if (!g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error)) {
-        GVariant *result;
-
-        result = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-        g_variant_get (result, "(ub)", &quality, &is_recent);
-    }
-
-    if (recent)
-        *recent = is_recent;
-    return quality;
-}
-
-static void
-signal_quality_check_ready (MMIfaceModem *self,
-                            GAsyncResult *res,
-                            SignalQualityCheckContext *ctx)
-{
-    GError *error = NULL;
-    guint quality;
-    gboolean is_recent;
-
-    quality = MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality_finish (self,
-                                                                               res,
-                                                                               &is_recent,
-                                                                               &error);
-    if (error)
-        g_simple_async_result_take_error (ctx->result, error);
-    else {
-        GVariant *result;
-
-        result = g_variant_ref_sink (g_variant_new ("(ub)", quality, is_recent));
-        /* Set operation result */
-        g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                   g_variant_ref (result),
-                                                   (GDestroyNotify)g_variant_unref);
-        /* Set the property value in the DBus skeleton */
-        mm_gdbus_modem_set_signal_quality (ctx->skeleton, result);
-        g_variant_unref (result);
-    }
-    g_simple_async_result_complete (ctx->result);
-    signal_quality_check_context_free (ctx);
-}
-
-void
-mm_iface_modem_signal_quality_check (MMIfaceModem *self,
-                                     GAsyncReadyCallback callback,
-                                     gpointer user_data)
-{
-    SignalQualityCheckContext *ctx;
-
-    ctx = signal_quality_check_context_new (self,
-                                            callback,
-                                            user_data);
-
-    if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_signal_quality &&
-        MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_signal_quality_finish) {
-        MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_signal_quality (
-            ctx->self,
-            (GAsyncReadyCallback)signal_quality_check_ready,
-            ctx);
-        return;
-    }
-
-    /* Cannot load signal quality... set operation result */
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               g_variant_new ("(ub)", 0, FALSE),
-                                               (GDestroyNotify)g_variant_unref);
-    g_simple_async_result_complete_in_idle (ctx->result);
-    signal_quality_check_context_free (ctx);
-}
-
-/*****************************************************************************/
-
 typedef enum {
     DISABLING_STEP_FIRST,
-    /* DISABLING_STEP_FLASH_PORT, */
     DISABLING_STEP_MODEM_POWER_DOWN,
     DISABLING_STEP_CLOSE_PORT,
     DISABLING_STEP_LAST
@@ -1377,24 +1472,6 @@ mm_iface_modem_disable_finish (MMIfaceModem *self,
 
 VOID_REPLY_READY_FN (modem_power_down)
 
-/* static void */
-/* interface_disabling_flash_done (MMSerialPort *port, */
-/*                                 GError *error, */
-/*                                 gpointer user_data) */
-/* { */
-/*     DisablingContext *ctx = user_data; */
-
-/*     if (error) { */
-/*         g_simple_async_result_set_from_error (ctx->result, error); */
-/*         disabling_context_complete_and_free (ctx); */
-/*         return; */
-/*     } */
-
-/*     /\* Go on to next step *\/ */
-/*     ctx->step++; */
-/*     interface_disabling_step (ctx); */
-/* } */
-
 static void
 interface_disabling_step (DisablingContext *ctx)
 {
@@ -1402,19 +1479,6 @@ interface_disabling_step (DisablingContext *ctx)
     case DISABLING_STEP_FIRST:
         /* Fall down to next step */
         ctx->step++;
-
-    /* case DISABLING_STEP_FLASH_PORT: */
-    /*     /\* If primary port connected, flash port *\/ */
-    /*     if (mm_port_get_connected (MM_PORT (ctx->primary))) { */
-    /*         mm_serial_port_flash (MM_SERIAL_PORT (ctx->primary), */
-    /*                               100, */
-    /*                               TRUE, */
-    /*                               interface_disabling_flash_done, */
-    /*                               ctx); */
-    /*         return; */
-    /*     } */
-    /*     /\* Fall down to next step *\/ */
-    /*     ctx->step++; */
 
     case DISABLING_STEP_MODEM_POWER_DOWN:
         /* CFUN=0 is dangerous and often will shoot devices in the head (that's

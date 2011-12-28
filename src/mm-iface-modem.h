@@ -133,7 +133,6 @@ struct _MMIfaceModem {
                                   gpointer user_data);
     guint (*load_signal_quality_finish) (MMIfaceModem *self,
                                          GAsyncResult *res,
-                                         gboolean *recent,
                                          GError **error);
 
     /* Asynchronous reset operation */
@@ -303,6 +302,10 @@ void mm_iface_modem_update_state (MMIfaceModem *self,
 void mm_iface_modem_update_access_tech (MMIfaceModem *self,
                                         MMModemAccessTechnology access_tech,
                                         guint32 mask);
+
+/* Allow updating signal quality */
+void mm_iface_modem_update_signal_quality (MMIfaceModem *self,
+                                           guint signal_quality);
 
 /* Allow setting allowed modes */
 void     mm_iface_modem_set_allowed_modes        (MMIfaceModem *self,
