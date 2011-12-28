@@ -18,6 +18,7 @@
 #include <ModemManager.h>
 #include <libmm-common.h>
 
+#include "mm-common-simple-properties.h"
 #include "mm-bearer-list.h"
 #include "mm-sim.h"
 #include "mm-iface-modem.h"
@@ -495,10 +496,23 @@ handle_disconnect (MmGdbusModemSimple *skeleton,
 /*****************************************************************************/
 
 static gboolean
-handle_get_status (MmGdbusModemSimple *object,
-                   GDBusMethodInvocation *invocation)
+handle_get_status (MmGdbusModemSimple *skeleton,
+                   GDBusMethodInvocation *invocation,
+                   MMIfaceModemSimple *self)
 {
-    return FALSE;
+    MMCommonSimpleProperties *properties = NULL;
+    GVariant *dictionary;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_SIMPLE_STATUS, &properties,
+                  NULL);
+
+    dictionary = mm_common_simple_properties_get_dictionary (properties);
+    mm_gdbus_modem_simple_complete_get_status (skeleton, invocation, dictionary);
+    g_variant_unref (dictionary);
+
+    g_object_unref (properties);
+    return TRUE;
 }
 
 /*****************************************************************************/
@@ -571,6 +585,14 @@ iface_modem_simple_init (gpointer g_iface)
                               "Simple DBus skeleton",
                               "DBus skeleton for the Simple interface",
                               MM_GDBUS_TYPE_MODEM_SIMPLE_SKELETON,
+                              G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_object (MM_IFACE_MODEM_SIMPLE_STATUS,
+                              "Simple status",
+                              "Compilation of status values",
+                              MM_TYPE_COMMON_SIMPLE_PROPERTIES,
                               G_PARAM_READWRITE));
 
     initialized = TRUE;

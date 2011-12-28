@@ -24,7 +24,8 @@
 #define MM_IS_IFACE_MODEM_SIMPLE(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_SIMPLE))
 #define MM_IFACE_MODEM_SIMPLE_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_SIMPLE, MMIfaceModemSimple))
 
-#define MM_IFACE_MODEM_SIMPLE_DBUS_SKELETON        "iface-modem-simple-dbus-skeleton"
+#define MM_IFACE_MODEM_SIMPLE_DBUS_SKELETON "iface-modem-simple-dbus-skeleton"
+#define MM_IFACE_MODEM_SIMPLE_STATUS        "iface-modem-simple-status"
 
 typedef struct _MMIfaceModemSimple MMIfaceModemSimple;
 
