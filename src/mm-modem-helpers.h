@@ -62,6 +62,8 @@ gboolean mm_3gpp_parse_creg_response (GMatchInfo *info,
                                       gboolean *out_cgreg,
                                       GError **error);
 
+GRegex *mm_3gpp_ciev_regex_get (void);
+
 const char *mm_strip_tag (const char *str, const char *cmd);
 
 gboolean mm_cdma_parse_spservice_response (const char *reply,
