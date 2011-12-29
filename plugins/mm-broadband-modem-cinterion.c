@@ -198,7 +198,7 @@ modem_after_power_up (MMIfaceModem *self,
 /* FLOW CONTROL */
 
 static gboolean
-modem_flow_control_finish (MMIfaceModem *self,
+setup_flow_control_finish (MMIfaceModem *self,
                            GAsyncResult *res,
                            GError **error)
 {
@@ -206,7 +206,7 @@ modem_flow_control_finish (MMIfaceModem *self,
 }
 
 static void
-modem_flow_control_ready (MMBroadbandModemCinterion *self,
+setup_flow_control_ready (MMBroadbandModemCinterion *self,
                           GAsyncResult *res,
                           GSimpleAsyncResult *operation_result)
 {
@@ -224,7 +224,7 @@ modem_flow_control_ready (MMBroadbandModemCinterion *self,
 }
 
 static void
-modem_flow_control (MMIfaceModem *self,
+setup_flow_control (MMIfaceModem *self,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
@@ -233,7 +233,7 @@ modem_flow_control (MMIfaceModem *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        modem_flow_control);
+                                        setup_flow_control);
 
     /* We need to enable RTS/CTS so that CYCLIC SLEEP mode works */
     mm_base_modem_at_command (MM_BASE_MODEM (self),
@@ -241,7 +241,7 @@ modem_flow_control (MMIfaceModem *self,
                               3,
                               FALSE,
                               NULL, /* cancellable */
-                              (GAsyncReadyCallback)modem_flow_control_ready,
+                              (GAsyncReadyCallback)setup_flow_control_ready,
                               result);
 }
 
@@ -285,8 +285,8 @@ finalize (GObject *object)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
-    iface->modem_flow_control = modem_flow_control;
-    iface->modem_flow_control_finish = modem_flow_control_finish;
+    iface->setup_flow_control = setup_flow_control;
+    iface->setup_flow_control_finish = setup_flow_control_finish;
     iface->modem_after_power_up = modem_after_power_up;
     iface->modem_after_power_up_finish = modem_after_power_up_finish;
     iface->modem_power_down = modem_power_down;

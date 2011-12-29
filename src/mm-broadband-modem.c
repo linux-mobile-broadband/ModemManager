@@ -1074,7 +1074,7 @@ load_supported_charsets (MMIfaceModem *self,
 /* FLOW CONTROL */
 
 static gboolean
-modem_flow_control_finish (MMIfaceModem *self,
+setup_flow_control_finish (MMIfaceModem *self,
                            GAsyncResult *res,
                            GError **error)
 {
@@ -1083,7 +1083,7 @@ modem_flow_control_finish (MMIfaceModem *self,
 }
 
 static void
-modem_flow_control (MMIfaceModem *self,
+setup_flow_control (MMIfaceModem *self,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
@@ -1097,7 +1097,7 @@ modem_flow_control (MMIfaceModem *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        modem_flow_control);
+                                        setup_flow_control);
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
@@ -1131,7 +1131,7 @@ modem_power_up (MMIfaceModem *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        modem_flow_control);
+                                        setup_flow_control);
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
@@ -2959,8 +2959,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_init_finish = modem_init_finish;
     iface->modem_power_up = modem_power_up;
     iface->modem_power_up_finish = modem_power_up_finish;
-    iface->modem_flow_control = modem_flow_control;
-    iface->modem_flow_control_finish = modem_flow_control_finish;
+    iface->setup_flow_control = setup_flow_control;
+    iface->setup_flow_control_finish = setup_flow_control_finish;
     iface->load_supported_charsets = load_supported_charsets;
     iface->load_supported_charsets_finish = load_supported_charsets_finish;
     iface->modem_charset = modem_charset;

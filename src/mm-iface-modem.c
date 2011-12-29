@@ -1646,7 +1646,7 @@ mm_iface_modem_enable_finish (MMIfaceModem *self,
 VOID_REPLY_READY_FN (modem_init);
 VOID_REPLY_READY_FN (modem_power_up);
 VOID_REPLY_READY_FN (modem_after_power_up);
-VOID_REPLY_READY_FN (modem_flow_control);
+VOID_REPLY_READY_FN (setup_flow_control);
 
 static void
 load_supported_charsets_ready (MMIfaceModem *self,
@@ -1783,11 +1783,11 @@ interface_enabling_step (EnablingContext *ctx)
         ctx->step++;
 
     case ENABLING_STEP_FLOW_CONTROL:
-        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_flow_control &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_flow_control_finish) {
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_flow_control (
+        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->setup_flow_control &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->setup_flow_control_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->setup_flow_control (
                 ctx->self,
-                (GAsyncReadyCallback)modem_flow_control_ready,
+                (GAsyncReadyCallback)setup_flow_control_ready,
                 ctx);
             return;
         }
