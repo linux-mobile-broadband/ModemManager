@@ -403,8 +403,21 @@ mm_iface_modem_update_access_tech (MMIfaceModem *self,
 /*****************************************************************************/
 
 #define SIGNAL_QUALITY_RECENT_TIMEOUT_SEC 60
-#define SIGNAL_QUALITY_RECENT_TAG "signal-quality-recent-tag"
-static GQuark signal_quality_recent;
+#define SIGNAL_QUALITY_UPDATE_CONTEXT_TAG "signal-quality-update-context-tag"
+static GQuark signal_quality_update_context_quark;
+
+typedef struct {
+    time_t last_update;
+    guint recent_timeout_source;
+} SignalQualityUpdateContext;
+
+static void
+signal_quality_update_context_free (SignalQualityUpdateContext *ctx)
+{
+    if (ctx->recent_timeout_source)
+        g_source_remove (ctx->recent_timeout_source);
+    g_free (ctx);
+}
 
 static gboolean
 expire_signal_quality (MMIfaceModem *self)
@@ -413,6 +426,7 @@ expire_signal_quality (MMIfaceModem *self)
     guint signal_quality = 0;
     gboolean recent = FALSE;
     MmGdbusModem *skeleton = NULL;
+    SignalQualityUpdateContext *ctx;
 
     g_object_get (self,
                   MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
@@ -435,9 +449,11 @@ expire_signal_quality (MMIfaceModem *self)
                                                           FALSE));
     }
 
-    g_object_set_qdata (G_OBJECT (self),
-                        signal_quality_recent,
-                        GUINT_TO_POINTER (0));
+    g_object_unref (skeleton);
+
+    /* Remove source id */
+    ctx = g_object_get_qdata (G_OBJECT (self), signal_quality_update_context_quark);
+    ctx->recent_timeout_source = 0;
     return FALSE;
 }
 
@@ -446,13 +462,26 @@ update_signal_quality (MMIfaceModem *self,
                        guint signal_quality,
                        gboolean expire)
 {
-    guint timeout_source;
+    SignalQualityUpdateContext *ctx;
     MmGdbusModem *skeleton = NULL;
     const gchar *dbus_path;
 
-    if (G_UNLIKELY (!signal_quality_recent))
-        signal_quality_recent = (g_quark_from_static_string (
-                                     SIGNAL_QUALITY_RECENT_TAG));
+    if (G_UNLIKELY (!signal_quality_update_context_quark)) {
+        signal_quality_update_context_quark = (g_quark_from_static_string (
+                                                   SIGNAL_QUALITY_UPDATE_CONTEXT_TAG));
+
+        /* Create context and keep it as object data */
+        ctx = g_new0 (SignalQualityUpdateContext, 1);
+        g_object_set_qdata_full (
+            G_OBJECT (self),
+            signal_quality_update_context_quark,
+            ctx,
+            (GDestroyNotify)signal_quality_update_context_free);
+    } else
+        ctx = g_object_get_qdata (G_OBJECT (self), signal_quality_update_context_quark);
+
+    /* Keep current timestamp */
+    ctx->last_update = time (NULL);
 
     g_object_get (self,
                   MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
@@ -473,22 +502,18 @@ update_signal_quality (MMIfaceModem *self,
              dbus_path,
              signal_quality);
 
-    /* Setup timeout to clear the 'recent' flag */
-    timeout_source = GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (self),
-                                                           signal_quality_recent));
     /* Remove any previous expiration refresh timeout */
-    if (timeout_source)
-        g_source_remove (timeout_source);
+    if (ctx->recent_timeout_source) {
+        g_source_remove (ctx->recent_timeout_source);
+        ctx->recent_timeout_source = 0;
+    }
 
     /* If we got a new expirable value, setup new timeout */
-    if (expire) {
-        timeout_source = g_timeout_add_seconds (SIGNAL_QUALITY_RECENT_TIMEOUT_SEC,
-                                                (GSourceFunc)expire_signal_quality,
-                                                self);
-        g_object_set_qdata (G_OBJECT (self),
-                            signal_quality_recent,
-                            GUINT_TO_POINTER (timeout_source));
-    }
+    if (expire)
+        ctx->recent_timeout_source = (g_timeout_add_seconds (
+                                          SIGNAL_QUALITY_RECENT_TIMEOUT_SEC,
+                                          (GSourceFunc)expire_signal_quality,
+                                          self));
 
     g_object_unref (skeleton);
 }
@@ -503,10 +528,21 @@ mm_iface_modem_update_signal_quality (MMIfaceModem *self,
 /*****************************************************************************/
 
 #define SIGNAL_QUALITY_CHECK_TIMEOUT_SEC 30
-#define PERIODIC_SIGNAL_QUALITY_CHECK_ENABLED_TAG "signal-quality-check-timeout-enabled-tag"
-#define PERIODIC_SIGNAL_QUALITY_CHECK_RUNNING_TAG "signal-quality-check-timeout-running-tag"
-static GQuark signal_quality_check_enabled;
-static GQuark signal_quality_check_running;
+#define SIGNAL_QUALITY_CHECK_CONTEXT_TAG "signal-quality-check-context-tag"
+static GQuark signal_quality_check_context_quark;
+
+typedef struct {
+    guint timeout_source;
+    gboolean running;
+} SignalQualityCheckContext;
+
+static void
+signal_quality_check_context_free (SignalQualityCheckContext *ctx)
+{
+    if (ctx->timeout_source)
+        g_source_remove (ctx->timeout_source);
+    g_free (ctx);
+}
 
 static void
 signal_quality_check_ready (MMIfaceModem *self,
@@ -514,6 +550,7 @@ signal_quality_check_ready (MMIfaceModem *self,
 {
     GError *error = NULL;
     guint signal_quality;
+    SignalQualityCheckContext *ctx;
 
     signal_quality = MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality_finish (self,
                                                                                       res,
@@ -525,21 +562,19 @@ signal_quality_check_ready (MMIfaceModem *self,
         update_signal_quality (self, signal_quality, TRUE);
 
     /* Remove the running tag */
-    g_object_set_qdata (G_OBJECT (self),
-                        signal_quality_check_running,
-                        GUINT_TO_POINTER (FALSE));
+    ctx = g_object_get_qdata (G_OBJECT (self), signal_quality_check_context_quark);
+    ctx->running = FALSE;
 }
 
 static gboolean
 periodic_signal_quality_check (MMIfaceModem *self)
 {
-    /* Only launch a new one if not one running already */
-    if (!GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (self),
-                                               signal_quality_check_running))) {
-        g_object_set_qdata (G_OBJECT (self),
-                            signal_quality_check_running,
-                            GUINT_TO_POINTER (TRUE));
+    SignalQualityCheckContext *ctx;
 
+    ctx = g_object_get_qdata (G_OBJECT (self), signal_quality_check_context_quark);
+
+    if (!ctx->running) {
+        ctx->running = TRUE;
         MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality (
             self,
             (GAsyncReadyCallback)signal_quality_check_ready,
@@ -552,27 +587,25 @@ periodic_signal_quality_check (MMIfaceModem *self)
 static void
 periodic_signal_quality_check_disable (MMIfaceModem *self)
 {
-    guint timeout_source;
+    if (G_UNLIKELY (!signal_quality_check_context_quark))
+        signal_quality_check_context_quark = (g_quark_from_static_string (
+                                                  SIGNAL_QUALITY_CHECK_CONTEXT_TAG));
 
-    timeout_source = GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (self),
-                                                           signal_quality_check_enabled));
-    if (timeout_source) {
-        g_source_remove (timeout_source);
-        g_object_set_qdata (G_OBJECT (self),
-                            signal_quality_check_enabled,
-                            GUINT_TO_POINTER (FALSE));
+    /* Clear signal quality */
+    update_signal_quality (self, 0, FALSE);
 
-        /* Clear the current value */
-        update_signal_quality (self, 0, FALSE);
+    /* Overwriting the data will free the previous context */
+    g_object_set_qdata (G_OBJECT (self),
+                        signal_quality_check_context_quark,
+                        NULL);
 
-        mm_dbg ("Periodic signal quality checks disabled");
-    }
+    mm_dbg ("Periodic signal quality checks disabled");
 }
 
 static void
 periodic_signal_quality_check_enable (MMIfaceModem *self)
 {
-    guint timeout_source;
+    SignalQualityCheckContext *ctx;
 
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality ||
         !MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality_finish) {
@@ -581,27 +614,31 @@ periodic_signal_quality_check_enable (MMIfaceModem *self)
         return;
     }
 
-    if (G_UNLIKELY (!signal_quality_check_enabled))
-        signal_quality_check_enabled = (g_quark_from_static_string (
-                                            PERIODIC_SIGNAL_QUALITY_CHECK_ENABLED_TAG));
-    if (G_UNLIKELY (!signal_quality_check_running))
-        signal_quality_check_running = (g_quark_from_static_string (
-                                            PERIODIC_SIGNAL_QUALITY_CHECK_RUNNING_TAG));
+    if (G_UNLIKELY (!signal_quality_check_context_quark))
+        signal_quality_check_context_quark = (g_quark_from_static_string (
+                                                  SIGNAL_QUALITY_CHECK_CONTEXT_TAG));
 
-    timeout_source = GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (self),
-                                                           signal_quality_check_enabled));
-    if (!timeout_source) {
-        mm_dbg ("Periodic signal quality checks enabled");
-        timeout_source = g_timeout_add_seconds (SIGNAL_QUALITY_CHECK_TIMEOUT_SEC,
-                                                (GSourceFunc)periodic_signal_quality_check,
-                                                self);
-        g_object_set_qdata (G_OBJECT (self),
-                            signal_quality_check_enabled,
-                            GUINT_TO_POINTER (timeout_source));
+    ctx = g_object_get_qdata (G_OBJECT (self), signal_quality_check_context_quark);
 
-        /* Get first signal quality value */
+    /* If context is already there, we're already enabled */
+    if (ctx) {
         periodic_signal_quality_check (self);
+        return;
     }
+
+    /* Create context and keep it as object data */
+    mm_dbg ("Periodic signal quality checks enabled");
+    ctx = g_new0 (SignalQualityCheckContext, 1);
+    ctx->timeout_source = g_timeout_add_seconds (SIGNAL_QUALITY_CHECK_TIMEOUT_SEC,
+                                                 (GSourceFunc)periodic_signal_quality_check,
+                                                 self);
+    g_object_set_qdata_full (G_OBJECT (self),
+                             signal_quality_check_context_quark,
+                             ctx,
+                             (GDestroyNotify)signal_quality_check_context_free);
+
+    /* Get first signal quality value */
+    periodic_signal_quality_check (self);
 }
 
 /*****************************************************************************/
