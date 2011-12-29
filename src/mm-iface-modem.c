@@ -419,6 +419,20 @@ signal_quality_update_context_free (SignalQualityUpdateContext *ctx)
     g_free (ctx);
 }
 
+static time_t
+get_last_signal_quality_update_time (MMIfaceModem *self)
+{
+    SignalQualityUpdateContext *ctx;
+
+    if (G_UNLIKELY (!signal_quality_update_context_quark))
+        signal_quality_update_context_quark = (g_quark_from_static_string (
+                                                   SIGNAL_QUALITY_UPDATE_CONTEXT_TAG));
+
+    ctx = g_object_get_qdata (G_OBJECT (self), signal_quality_update_context_quark);
+
+    return (ctx ? ctx->last_update : 0);
+}
+
 static gboolean
 expire_signal_quality (MMIfaceModem *self)
 {
@@ -573,7 +587,10 @@ periodic_signal_quality_check (MMIfaceModem *self)
 
     ctx = g_object_get_qdata (G_OBJECT (self), signal_quality_check_context_quark);
 
-    if (!ctx->running) {
+    /* Only launch a new one if not one running already OR if the last one run
+     * was more than 15s ago. */
+    if (!ctx->running ||
+        (time (NULL) - get_last_signal_quality_update_time (self) > 15)) {
         ctx->running = TRUE;
         MM_IFACE_MODEM_GET_INTERFACE (self)->load_signal_quality (
             self,
