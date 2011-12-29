@@ -891,11 +891,46 @@ setup_indicators (MMIfaceModem *self,
 /*****************************************************************************/
 /* ENABLE/DISABLE UNSOLICITED EVENTS */
 
+static void
+ciev_received (MMAtSerialPort *port,
+               GMatchInfo *info,
+               MMBroadbandModem *self)
+{
+    gint ind = 0;
+    gchar *str;
+
+    str = g_match_info_fetch (info, 1);
+    if (str) {
+        ind = atoi (str);
+        g_free (str);
+    }
+
+    /* Handle signal quality change indication */
+    if (ind == self->priv->cind_indicator_signal_quality) {
+        str = g_match_info_fetch (info, 2);
+        if (str) {
+            gint quality = 0;
+
+            quality = atoi (str);
+            if (quality > 0)
+                mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self),
+                                                      (guint) (quality * 20));
+            g_free (str);
+        }
+    }
+
+    /* FIXME: handle roaming and service indicators.
+     * ... wait, arent these already handle by unsolicited CREG responses? */
+}
+
 typedef struct {
     MMBroadbandModem *self;
     gchar *command;
+    gboolean enable;
     GSimpleAsyncResult *result;
+    gboolean cmer_primary_done;
     gboolean cmer_secondary_done;
+    GRegex *ciev_regex;
 } UnsolicitedEventsContext;
 
 static void
@@ -904,6 +939,7 @@ unsolicited_events_context_complete_and_free (UnsolicitedEventsContext *ctx)
     g_simple_async_result_complete (ctx->result);
     g_object_unref (ctx->result);
     g_object_unref (ctx->self);
+    g_regex_unref (ctx->ciev_regex);
     g_free (ctx->command);
     g_free (ctx);
 }
@@ -916,12 +952,7 @@ unsolicited_events_finish (MMIfaceModem *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
-static void enable_unsolicited_events (MMIfaceModem *self,
-                                       GAsyncReadyCallback callback,
-                                       gpointer user_data);
-static void disable_unsolicited_events (MMIfaceModem *self,
-                                        GAsyncReadyCallback callback,
-                                        gpointer user_data);
+static void unsolicited_events (UnsolicitedEventsContext *ctx);
 
 static void
 unsolicited_events_ready (MMBroadbandModem *self,
@@ -929,27 +960,60 @@ unsolicited_events_ready (MMBroadbandModem *self,
                           UnsolicitedEventsContext *ctx)
 {
     GError *error = NULL;
-    MMAtSerialPort *secondary;
 
     mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (error) {
-        mm_dbg ("Couldn't %s event reporting: '%s'",
-                (g_simple_async_result_get_source_tag (ctx->result) == enable_unsolicited_events ?
-                 "enable" : "disable"),
-                error->message);
-        g_error_free (error);
-        /* Consider this operation complete, ignoring errors */
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        unsolicited_events_context_complete_and_free (ctx);
+    if (!error) {
+        /* Run on next port, if any */
+        unsolicited_events (ctx);
         return;
     }
 
-    /* Run CMER in the secondary port */
-    secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
-    if (secondary && !ctx->cmer_secondary_done) {
+    mm_dbg ("Couldn't %s event reporting: '%s'",
+            ctx->enable ? "enable" : "disable",
+            error->message);
+    g_error_free (error);
+    /* Consider this operation complete, ignoring errors */
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    unsolicited_events_context_complete_and_free (ctx);
+}
+
+static void
+unsolicited_events (UnsolicitedEventsContext *ctx)
+{
+    MMAtSerialPort *port = NULL;
+
+    if (!ctx->ciev_regex)
+        ctx->ciev_regex = mm_3gpp_ciev_regex_get ();
+
+    if (!ctx->cmer_primary_done) {
+        ctx->cmer_primary_done = TRUE;
+        port = mm_base_modem_get_port_primary (MM_BASE_MODEM (ctx->self));
+    } else if (!ctx->cmer_secondary_done) {
         ctx->cmer_secondary_done = TRUE;
-        mm_base_modem_at_command_in_port (MM_BASE_MODEM (self),
-                                          secondary,
+        port = mm_base_modem_get_port_secondary (MM_BASE_MODEM (ctx->self));
+    }
+
+    /* Enable unsolicited events in given port */
+    if (port) {
+        if (ctx->enable)
+            /* When enabling, setup unsolicited CIEV event handler */
+            mm_at_serial_port_add_unsolicited_msg_handler (
+                port,
+                ctx->ciev_regex,
+                (MMAtSerialUnsolicitedMsgFn) ciev_received,
+                ctx->self,
+                NULL);
+        else
+            /* When disabling, remove unsolicited CIEV event handler */
+            mm_at_serial_port_add_unsolicited_msg_handler (
+                port,
+                ctx->ciev_regex,
+                NULL,
+                NULL,
+                NULL);
+
+        mm_base_modem_at_command_in_port (MM_BASE_MODEM (ctx->self),
+                                          port,
                                           ctx->command,
                                           3,
                                           FALSE,
@@ -959,27 +1023,9 @@ unsolicited_events_ready (MMBroadbandModem *self,
         return;
     }
 
-    /* Fully done now */
+    /* If no more ports, we're fully done now */
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     unsolicited_events_context_complete_and_free (ctx);
-}
-
-static void
-unsolicited_events (MMIfaceModem *self,
-                    UnsolicitedEventsContext *ctx)
-{
-    MMAtSerialPort *primary;
-
-    /* Enable unsolicited events in primary port */
-    primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (ctx->self));
-    mm_base_modem_at_command_in_port (MM_BASE_MODEM (ctx->self),
-                                      primary,
-                                      ctx->command,
-                                      3,
-                                      FALSE,
-                                      NULL, /* cancellable */
-                                      (GAsyncReadyCallback)unsolicited_events_ready,
-                                      ctx);
 }
 
 static void
@@ -991,13 +1037,14 @@ enable_unsolicited_events (MMIfaceModem *self,
 
     ctx = g_new0 (UnsolicitedEventsContext, 1);
     ctx->self = g_object_ref (self);
+    ctx->enable = TRUE;
     ctx->command = g_strdup ("+CMER=3,0,0,1");
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
                                              enable_unsolicited_events);
 
-    unsolicited_events (self, ctx);
+    unsolicited_events (ctx);
 }
 
 static void
@@ -1015,7 +1062,7 @@ disable_unsolicited_events (MMIfaceModem *self,
                                              user_data,
                                              disable_unsolicited_events);
 
-    unsolicited_events (self, ctx);
+    unsolicited_events (ctx);
 }
 
 /*****************************************************************************/
