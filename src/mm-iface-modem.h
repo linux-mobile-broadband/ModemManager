@@ -213,11 +213,11 @@ struct _MMIfaceModem {
                                                       GError **error);
 
     /* Asynchronous charset setting setup */
-    void (*modem_charset) (MMIfaceModem *self,
+    void (*setup_charset) (MMIfaceModem *self,
                            MMModemCharset charset,
                            GAsyncReadyCallback callback,
                            gpointer user_data);
-    gboolean (*modem_charset_finish) (MMIfaceModem *self,
+    gboolean (*setup_charset_finish) (MMIfaceModem *self,
                                       GAsyncResult *res,
                                       GError **error);
 

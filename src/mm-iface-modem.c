@@ -1542,7 +1542,7 @@ typedef enum {
     ENABLING_STEP_MODEM_AFTER_POWER_UP,
     ENABLING_STEP_FLOW_CONTROL,
     ENABLING_STEP_SUPPORTED_CHARSETS,
-    ENABLING_STEP_MODEM_CHARSET,
+    ENABLING_STEP_CHARSET,
     ENABLING_STEP_LAST
 } EnablingStep;
 
@@ -1668,13 +1668,13 @@ load_supported_charsets_ready (MMIfaceModem *self,
 }
 
 static void
-modem_charset_ready (MMIfaceModem *self,
+setup_charset_ready (MMIfaceModem *self,
                      GAsyncResult *res,
                      EnablingContext *ctx)
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->modem_charset_finish (self, res, &error)) {
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->setup_charset_finish (self, res, &error)) {
         mm_dbg ("couldn't set charset '%s': '%s'",
                 mm_modem_charset_to_string (*ctx->current_charset),
                 error->message);
@@ -1806,11 +1806,11 @@ interface_enabling_step (EnablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case ENABLING_STEP_MODEM_CHARSET:
+    case ENABLING_STEP_CHARSET:
         /* Only try to set charsets if we were able to load supported ones */
         if (ctx->supported_charsets > 0 &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_charset &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_charset_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->setup_charset &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->setup_charset_finish) {
             gboolean next_to_try = FALSE;
 
             while (!next_to_try) {
@@ -1829,10 +1829,10 @@ interface_enabling_step (EnablingContext *ctx)
             }
 
             if (next_to_try) {
-                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->modem_charset (
+                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->setup_charset (
                     ctx->self,
                     *ctx->current_charset,
-                    (GAsyncReadyCallback)modem_charset_ready,
+                    (GAsyncReadyCallback)setup_charset_ready,
                     ctx);
                 return;
             }

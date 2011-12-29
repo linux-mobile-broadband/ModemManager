@@ -886,10 +886,10 @@ typedef struct {
      *  Second without.
      *  + last NUL */
     MMBaseModemAtCommand charset_commands[3];
-} ModemCharsetContext;
+} SetupCharsetContext;
 
 static void
-modem_charset_context_free (ModemCharsetContext *ctx)
+setup_charset_context_free (SetupCharsetContext *ctx)
 {
     g_object_unref (ctx->result);
     g_free (ctx->charset_commands[0].command);
@@ -898,7 +898,7 @@ modem_charset_context_free (ModemCharsetContext *ctx)
 }
 
 static gboolean
-modem_charset_finish (MMIfaceModem *self,
+setup_charset_finish (MMIfaceModem *self,
                       GAsyncResult *res,
                       GError **error)
 {
@@ -911,7 +911,7 @@ modem_charset_finish (MMIfaceModem *self,
 static void
 current_charset_ready (MMBroadbandModem *self,
                        GAsyncResult *res,
-                       ModemCharsetContext *ctx)
+                       SetupCharsetContext *ctx)
 {
     GError *error = NULL;
     const gchar *response;
@@ -945,13 +945,13 @@ current_charset_ready (MMBroadbandModem *self,
     }
 
     g_simple_async_result_complete (ctx->result);
-    modem_charset_context_free (ctx);
+    setup_charset_context_free (ctx);
 }
 
 static void
-modem_charset_ready (MMBroadbandModem *self,
+setup_charset_ready (MMBroadbandModem *self,
                      GAsyncResult *res,
-                     ModemCharsetContext *ctx)
+                     SetupCharsetContext *ctx)
 {
     GError *error = NULL;
 
@@ -959,7 +959,7 @@ modem_charset_ready (MMBroadbandModem *self,
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         g_simple_async_result_complete (ctx->result);
-        modem_charset_context_free (ctx);
+        setup_charset_context_free (ctx);
         return;
     }
 
@@ -974,12 +974,12 @@ modem_charset_ready (MMBroadbandModem *self,
 }
 
 static void
-modem_charset (MMIfaceModem *self,
+setup_charset (MMIfaceModem *self,
                MMModemCharset charset,
                GAsyncReadyCallback callback,
                gpointer user_data)
 {
-    ModemCharsetContext *ctx;
+    SetupCharsetContext *ctx;
     const gchar *charset_str;
 
     /* Build charset string to use */
@@ -996,11 +996,11 @@ modem_charset (MMIfaceModem *self,
     }
 
     /* Setup context, including commands to try */
-    ctx = g_new0 (ModemCharsetContext, 1);
+    ctx = g_new0 (SetupCharsetContext, 1);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             modem_charset);
+                                             setup_charset);
     ctx->charset = charset;
     /* First try, with quotes */
     ctx->charset_commands[0].command = g_strdup_printf ("+CSCS=\"%s\"", charset_str);
@@ -1023,7 +1023,7 @@ modem_charset (MMIfaceModem *self,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
         NULL, /* cancellable */
-        (GAsyncReadyCallback)modem_charset_ready,
+        (GAsyncReadyCallback)setup_charset_ready,
         ctx);
 }
 
@@ -2963,8 +2963,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->setup_flow_control_finish = setup_flow_control_finish;
     iface->load_supported_charsets = load_supported_charsets;
     iface->load_supported_charsets_finish = load_supported_charsets_finish;
-    iface->modem_charset = modem_charset;
-    iface->modem_charset_finish = modem_charset_finish;
+    iface->setup_charset = setup_charset;
+    iface->setup_charset_finish = setup_charset_finish;
     iface->create_bearer = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
 }
