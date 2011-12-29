@@ -222,6 +222,7 @@ mm_base_modem_grab_port (MMBaseModem *self,
             if (!self->priv->qcdm)
                 self->priv->qcdm = g_object_ref (port);
         } else {
+            GRegex *regex;
             GPtrArray *array;
             int i;
 
@@ -245,10 +246,14 @@ mm_base_modem_grab_port (MMBaseModem *self,
             }
             mm_3gpp_creg_regex_destroy (array);
 
-            /* { */
-            /*     regex = g_regex_new ("\\r\\n\\+CIEV: (\\d+),(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL); */
-            /*     mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, ciev_received, self, NULL); */
-            /*     g_regex_unref (regex); */
+            /* Set up CIEV unsolicited message handler, with NULL callback */
+            regex = mm_3gpp_ciev_regex_get ();
+            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port),
+                                                           regex,
+                                                           NULL,
+                                                           NULL,
+                                                           NULL);
+            g_regex_unref (regex);
 
             /*     regex = g_regex_new ("\\r\\n\\+CMTI: \"(\\S+)\",(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL); */
             /*     mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, cmti_received, self, NULL); */
