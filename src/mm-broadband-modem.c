@@ -59,11 +59,9 @@ enum {
     PROP_LAST
 };
 
-typedef enum {
-    SIGNAL_QUALITY_METHOD_UNKNOWN,
-    SIGNAL_QUALITY_METHOD_CSQ,
-    SIGNAL_QUALITY_METHOD_CIND
-} SignalQualityMethod;
+/* When CIND is supported, invalid indicators are marked with this value */
+#define CIND_INDICATOR_INVALID 255
+#define CIND_INDICATOR_IS_VALID(u) (u != CIND_INDICATOR_INVALID)
 
 struct _MMBroadbandModemPrivate {
     GObject *modem_dbus_skeleton;
@@ -78,8 +76,10 @@ struct _MMBroadbandModemPrivate {
 
     /* Modem helpers */
     MMModemCharset current_charset;
-    SignalQualityMethod signal_quality_method;
+    gboolean cind_supported;
+    guint cind_indicator_roaming;
     guint cind_indicator_signal_quality;
+    guint cind_indicator_service;
 
     /* 3GPP registration helpers */
     GPtrArray *reg_regex;
@@ -793,63 +793,6 @@ load_signal_quality_cind (MMBroadbandModem *self,
 }
 
 static void
-check_cind_supported_ready (MMBroadbandModem *self,
-                            GAsyncResult *res,
-                            GSimpleAsyncResult *simple)
-{
-    GHashTable *indicators = NULL;
-    GError *error = NULL;
-    const gchar *result;
-
-    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (error)
-        g_error_free (error);
-    else
-        indicators = mm_parse_cind_test_response (result, NULL);
-
-    if (indicators) {
-        CindResponse *r;
-
-        r = g_hash_table_lookup (indicators, "signal");
-        if (r) {
-            self->priv->cind_indicator_signal_quality = cind_response_get_index (r);
-            self->priv->signal_quality_method = SIGNAL_QUALITY_METHOD_CSQ;
-            load_signal_quality_cind (self, simple);
-        }
-
-        /* TODO: also handle roam/service indicators */
-        /* r = g_hash_table_lookup (indicators, "roam"); */
-        /* if (r) */
-        /*     priv->roam_ind = cind_response_get_index (r); */
-        /* r = g_hash_table_lookup (indicators, "service"); */
-        /* if (r) */
-        /*     priv->service_ind = cind_response_get_index (r); */
-
-        /* TODO: Enable CMER in the primary and secondary ports */
-        g_hash_table_destroy (indicators);
-        return;
-    }
-
-    /* CIND won't be supported, default to CSQ */
-    self->priv->signal_quality_method = SIGNAL_QUALITY_METHOD_CSQ;
-    load_signal_quality_csf (self, simple);
-}
-
-static void
-check_cind_supported (MMBroadbandModem *self,
-                      GSimpleAsyncResult *result)
-{
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+CIND=?",
-                              3,
-                              TRUE,
-                              NULL, /* cancellable */
-                              (GAsyncReadyCallback)check_cind_supported_ready,
-                              result);
-}
-
-
-static void
 load_signal_quality (MMIfaceModem *self,
                      GAsyncReadyCallback callback,
                      gpointer user_data)
@@ -862,17 +805,217 @@ load_signal_quality (MMIfaceModem *self,
                                         user_data,
                                         load_signal_quality);
 
-    switch (MM_BROADBAND_MODEM (self)->priv->signal_quality_method) {
-    case SIGNAL_QUALITY_METHOD_UNKNOWN:
-        check_cind_supported (MM_BROADBAND_MODEM (self), result);
-        break;
-    case SIGNAL_QUALITY_METHOD_CSQ:
-        load_signal_quality_csf (MM_BROADBAND_MODEM (self), result);
-        break;
-    case SIGNAL_QUALITY_METHOD_CIND:
+    if (MM_BROADBAND_MODEM (self)->priv->cind_supported)
         load_signal_quality_cind (MM_BROADBAND_MODEM (self), result);
-        break;
+    else
+        load_signal_quality_csf (MM_BROADBAND_MODEM (self), result);
+}
+
+/*****************************************************************************/
+/* SETTING UP INDICATORS */
+
+static gboolean
+setup_indicators_finish (MMIfaceModem *self,
+                         GAsyncResult *res,
+                         GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+setup_indicators_ready (MMBroadbandModem *self,
+                        GAsyncResult *res,
+                        GSimpleAsyncResult *simple)
+{
+    GHashTable *indicators = NULL;
+    GError *error = NULL;
+    const gchar *result;
+    CindResponse *r;
+
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error ||
+        !(indicators = mm_parse_cind_test_response (result, &error))) {
+        /* quit with error */
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
     }
+
+    /* Mark CIND as being supported and find the proper indexes for the
+     * indicators. */
+    self->priv->cind_supported = TRUE;
+
+#define FIND_INDEX(indicator_str,var_suffix) do {                       \
+        r = g_hash_table_lookup (indicators, indicator_str);            \
+        self->priv->cind_indicator_##var_suffix = (r ?                  \
+                                                   cind_response_get_index (r) : \
+                                                   CIND_INDICATOR_INVALID); \
+    } while (0)
+
+    FIND_INDEX ("signal", signal_quality);
+    FIND_INDEX ("roam", roaming);
+    FIND_INDEX ("service", service);
+
+#undef FIND_INDEX
+
+    g_hash_table_destroy (indicators);
+
+    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+setup_indicators (MMIfaceModem *self,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        setup_indicators);
+
+    /* Load supported indicators */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CIND=?",
+                              3,
+                              TRUE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)setup_indicators_ready,
+                              result);
+}
+
+/*****************************************************************************/
+/* ENABLE/DISABLE UNSOLICITED EVENTS */
+
+typedef struct {
+    MMBroadbandModem *self;
+    gchar *command;
+    GSimpleAsyncResult *result;
+    gboolean cmer_secondary_done;
+} UnsolicitedEventsContext;
+
+static void
+unsolicited_events_context_complete_and_free (UnsolicitedEventsContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx->command);
+    g_free (ctx);
+}
+
+static gboolean
+unsolicited_events_finish (MMIfaceModem *self,
+                           GAsyncResult *res,
+                           GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void enable_unsolicited_events (MMIfaceModem *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data);
+static void disable_unsolicited_events (MMIfaceModem *self,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data);
+
+static void
+unsolicited_events_ready (MMBroadbandModem *self,
+                          GAsyncResult *res,
+                          UnsolicitedEventsContext *ctx)
+{
+    GError *error = NULL;
+    MMAtSerialPort *secondary;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        mm_dbg ("Couldn't %s event reporting: '%s'",
+                (g_simple_async_result_get_source_tag (ctx->result) == enable_unsolicited_events ?
+                 "enable" : "disable"),
+                error->message);
+        g_error_free (error);
+        /* Consider this operation complete, ignoring errors */
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        unsolicited_events_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Run CMER in the secondary port */
+    secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+    if (secondary && !ctx->cmer_secondary_done) {
+        ctx->cmer_secondary_done = TRUE;
+        mm_base_modem_at_command_in_port (MM_BASE_MODEM (self),
+                                          secondary,
+                                          ctx->command,
+                                          3,
+                                          FALSE,
+                                          NULL, /* cancellable */
+                                          (GAsyncReadyCallback)unsolicited_events_ready,
+                                          ctx);
+        return;
+    }
+
+    /* Fully done now */
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    unsolicited_events_context_complete_and_free (ctx);
+}
+
+static void
+unsolicited_events (MMIfaceModem *self,
+                    UnsolicitedEventsContext *ctx)
+{
+    MMAtSerialPort *primary;
+
+    /* Enable unsolicited events in primary port */
+    primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (ctx->self));
+    mm_base_modem_at_command_in_port (MM_BASE_MODEM (ctx->self),
+                                      primary,
+                                      ctx->command,
+                                      3,
+                                      FALSE,
+                                      NULL, /* cancellable */
+                                      (GAsyncReadyCallback)unsolicited_events_ready,
+                                      ctx);
+}
+
+static void
+enable_unsolicited_events (MMIfaceModem *self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    UnsolicitedEventsContext *ctx;
+
+    ctx = g_new0 (UnsolicitedEventsContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->command = g_strdup ("+CMER=3,0,0,1");
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             enable_unsolicited_events);
+
+    unsolicited_events (self, ctx);
+}
+
+static void
+disable_unsolicited_events (MMIfaceModem *self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    UnsolicitedEventsContext *ctx;
+
+    ctx = g_new0 (UnsolicitedEventsContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->command = g_strdup ("+CMER=0");
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             disable_unsolicited_events);
+
+    unsolicited_events (self, ctx);
 }
 
 /*****************************************************************************/
@@ -2889,7 +3032,6 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv->reg_cs = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     self->priv->reg_ps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     self->priv->current_charset = MM_MODEM_CHARSET_UNKNOWN;
-    self->priv->signal_quality_method = SIGNAL_QUALITY_METHOD_UNKNOWN;
 }
 
 static void
@@ -2965,6 +3107,12 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_charsets_finish = load_supported_charsets_finish;
     iface->setup_charset = setup_charset;
     iface->setup_charset_finish = setup_charset_finish;
+    iface->enable_unsolicited_events = enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = unsolicited_events_finish;
+    iface->disable_unsolicited_events = disable_unsolicited_events;
+    iface->disable_unsolicited_events_finish = unsolicited_events_finish;
+    iface->setup_indicators = setup_indicators;
+    iface->setup_indicators_finish = setup_indicators_finish;
     iface->create_bearer = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
 }
