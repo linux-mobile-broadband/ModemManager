@@ -53,6 +53,8 @@ static gchar *factory_reset_str;
 static gboolean list_bearers_flag;
 static gchar *create_bearer_str;
 static gchar *delete_bearer_str;
+static gchar *set_allowed_modes_str;
+static gchar *set_preferred_mode_str;
 
 static GOptionEntry entries[] = {
     { "monitor-state", 'w', 0, G_OPTION_ARG_NONE, &monitor_state_flag,
@@ -86,6 +88,14 @@ static GOptionEntry entries[] = {
     { "delete-bearer", 0, 0, G_OPTION_ARG_STRING, &delete_bearer_str,
       "Delete a data bearer from a given modem",
       "[PATH]"
+    },
+    { "set-allowed-modes", 0, 0, G_OPTION_ARG_STRING, &set_allowed_modes_str,
+      "Set allowed modes in a given modem.",
+      "[MODE1|MODE2...]"
+    },
+    { "set-preferred-mode", 0, 0, G_OPTION_ARG_STRING, &set_preferred_mode_str,
+      "Set preferred mode in a given modem (Must give allowed modes with --set-allowed-modes)",
+      "[MODE]"
     },
     { NULL }
 };
@@ -122,12 +132,22 @@ mmcli_modem_options_enabled (void)
                  list_bearers_flag +
                  !!create_bearer_str +
                  !!delete_bearer_str +
-                 !!factory_reset_str);
+                 !!factory_reset_str +
+                 !!set_allowed_modes_str +
+                 !!set_preferred_mode_str);
 
     if (n_actions == 0 && mmcli_get_common_modem_string ()) {
         /* default to info */
         info_flag = TRUE;
         n_actions++;
+    }
+
+    if (set_preferred_mode_str) {
+        if (!set_allowed_modes_str) {
+            g_printerr ("error: setting preferred mode requires list of allowed modes\n");
+            exit (EXIT_FAILURE);
+        }
+        n_actions--;
     }
 
     if (n_actions > 1) {
@@ -228,6 +248,9 @@ print_modem_info (void)
     gchar *unlock;
     gchar *capabilities_string;
     gchar *access_technologies_string;
+    gchar *supported_modes_string;
+    gchar *allowed_modes_string;
+    gchar *preferred_mode_string;
     gchar *supported_bands_string;
     gchar *allowed_bands_string;
     MMModemBand *bands = NULL;
@@ -271,9 +294,15 @@ print_modem_info (void)
                                   &n_bands);
     supported_bands_string = mm_modem_get_bands_string (bands, n_bands);
     g_free (bands);
+    allowed_modes_string = mm_modem_get_modes_string (
+        mm_modem_get_allowed_modes (ctx->modem));
+    preferred_mode_string = mm_modem_get_modes_string (
+        mm_modem_get_preferred_mode (ctx->modem));
+    supported_modes_string = mm_modem_get_modes_string (
+        mm_modem_get_supported_modes (ctx->modem));
 
     /* Rework possible multiline strings */
-    prefixed_revision = prefix_newlines ("           |                 ",
+    prefixed_revision = prefix_newlines ("           |                  ",
                                          mm_modem_get_revision (ctx->modem));
 
     /* Global IDs */
@@ -313,6 +342,15 @@ print_modem_info (void)
              VALIDATE_UNKNOWN (mmcli_get_state_string (mm_modem_get_state (ctx->modem))),
              VALIDATE_UNKNOWN (access_technologies_string));
 
+    /* Modes */
+    g_print ("  -------------------------\n"
+             "  Modes    |      supported: '%s'\n"
+             "           |        allowed: '%s'\n"
+             "           |      preferred: '%s'\n",
+             VALIDATE_UNKNOWN (supported_modes_string),
+             VALIDATE_UNKNOWN (allowed_modes_string),
+             VALIDATE_UNKNOWN (preferred_mode_string));
+
     /* Band related stuff */
     g_print ("  -------------------------\n"
              "  Bands    |      supported: '%s'\n"
@@ -345,6 +383,9 @@ print_modem_info (void)
     g_free (access_technologies_string);
     g_free (capabilities_string);
     g_free (prefixed_revision);
+    g_free (allowed_modes_string);
+    g_free (preferred_mode_string);
+    g_free (supported_modes_string);
     g_free (unlock);
 }
 
@@ -555,6 +596,57 @@ delete_bearer_ready (MMModem      *modem,
 }
 
 static void
+set_allowed_modes_process_reply (gboolean      result,
+                                 const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't set allowed modes: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully set allowed modes in the modem\n");
+}
+
+static void
+set_allowed_modes_ready (MMModem      *modem,
+                         GAsyncResult *result,
+                         gpointer      nothing)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_set_allowed_modes_finish (modem, result, &error);
+    set_allowed_modes_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
+parse_modes (MMModemMode *allowed,
+             MMModemMode *preferred)
+{
+    GError *error = NULL;
+
+    *allowed = mm_common_get_modes_from_string (set_allowed_modes_str, &error);
+    if (error) {
+        g_printerr ("error: couldn't parse list of allowed modes: '%s'\n",
+                    error->message);
+        exit (EXIT_FAILURE);
+    }
+
+    *preferred = (set_preferred_mode_str ?
+                  mm_common_get_modes_from_string (set_preferred_mode_str, &error) :
+                  MM_MODEM_MODE_NONE);
+    if (error) {
+        g_printerr ("error: couldn't parse preferred mode: '%s'\n",
+                    error->message);
+        exit (EXIT_FAILURE);
+    }
+}
+
+
+static void
 state_changed (MMModem                  *modem,
                MMModemState              old_state,
                MMModemState              new_state,
@@ -681,6 +773,21 @@ get_modem_ready (GObject      *source,
                                 ctx->cancellable,
                                 (GAsyncReadyCallback)delete_bearer_ready,
                                 NULL);
+        return;
+    }
+
+    /* Request to set allowed modes in a given modem? */
+    if (set_allowed_modes_str) {
+        MMModemMode allowed;
+        MMModemMode preferred;
+
+        parse_modes (&allowed, &preferred);
+        mm_modem_set_allowed_modes (ctx->modem,
+                                    allowed,
+                                    preferred,
+                                    ctx->cancellable,
+                                    (GAsyncReadyCallback)set_allowed_modes_ready,
+                                    NULL);
         return;
     }
 
@@ -813,6 +920,23 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
                                               &error);
 
         delete_bearer_process_reply (result, error);
+        return;
+    }
+
+    /* Request to set allowed modes in a given modem? */
+    if (set_allowed_modes_str) {
+        MMModemMode allowed;
+        MMModemMode preferred;
+        gboolean result;
+
+        parse_modes (&allowed, &preferred);
+        result = mm_modem_set_allowed_modes_sync (ctx->modem,
+                                                  allowed,
+                                                  preferred,
+                                                  NULL,
+                                                  &error);
+
+        set_allowed_modes_process_reply (result, error);
         return;
     }
 
