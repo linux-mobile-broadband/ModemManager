@@ -655,6 +655,59 @@ load_unlock_required (MMIfaceModem *self,
                               user_data);
 }
 
+/*****************************************************************************/
+/* SUPPORTED MODES */
+
+static MMModemMode
+load_supported_modes_finish (MMIfaceModem *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return 0;
+
+    return (MMModemMode)GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
+                                              G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+load_supported_modes (MMIfaceModem *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    MMBroadbandModem *broadband = MM_BROADBAND_MODEM (self);
+    GSimpleAsyncResult *result;
+    MMModemMode mode;
+
+    mm_dbg ("loading supported modes...");
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_supported_modes);
+
+    mode = MM_MODEM_MODE_NONE;
+
+    /* If the modem has +GSM caps, assume it does CS, 2G and 3G */
+    if (broadband->priv->modem_current_capabilities & MM_MODEM_CAPABILITY_GSM_UMTS) {
+        mode |= (MM_MODEM_MODE_CS | MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+    }
+    /* If the modem has CDMA caps, assume it does 3G */
+    else if (broadband->priv->modem_current_capabilities & MM_MODEM_CAPABILITY_CDMA_EVDO) {
+        mode |= MM_MODEM_MODE_3G;
+    }
+
+    /* If the modem has LTE caps, it does 4G */
+    if (broadband->priv->modem_current_capabilities & MM_MODEM_CAPABILITY_LTE ||
+        broadband->priv->modem_current_capabilities & MM_MODEM_CAPABILITY_LTE_ADVANCED) {
+        mode |= MM_MODEM_MODE_4G;
+    }
+
+    g_simple_async_result_set_op_res_gpointer (result,
+                                               GUINT_TO_POINTER (mode),
+                                               NULL);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
 
 /*****************************************************************************/
 /* SIGNAL QUALITY */
@@ -3141,6 +3194,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_device_identifier_finish = load_device_identifier_finish;
     iface->load_unlock_required = load_unlock_required;
     iface->load_unlock_required_finish = load_unlock_required_finish;
+    iface->load_supported_modes = load_supported_modes;
+    iface->load_supported_modes_finish = load_supported_modes_finish;
     iface->load_signal_quality = load_signal_quality;
     iface->load_signal_quality_finish = load_signal_quality_finish;
 
