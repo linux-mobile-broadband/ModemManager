@@ -424,6 +424,7 @@ mm_serial_parser_v1_destroy (gpointer data)
     g_regex_unref (parser->regex_ok);
     g_regex_unref (parser->regex_connect);
     g_regex_unref (parser->regex_cme_error);
+    g_regex_unref (parser->regex_cms_error);
     g_regex_unref (parser->regex_cme_error_str);
     g_regex_unref (parser->regex_ezx_error);
     g_regex_unref (parser->regex_unknown_error);
