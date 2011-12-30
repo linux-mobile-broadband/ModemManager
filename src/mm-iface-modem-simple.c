@@ -32,7 +32,8 @@ typedef enum {
     CONNECTION_STEP_FIRST,
     CONNECTION_STEP_UNLOCK_CHECK,
     CONNECTION_STEP_ENABLE,
-    CONNECTION_STEP_ALLOWED_MODE,
+    CONNECTION_STEP_ALLOWED_MODES,
+    CONNECTION_STEP_ALLOWED_BANDS,
     CONNECTION_STEP_REGISTER,
     CONNECTION_STEP_BEARER,
     CONNECTION_STEP_CONNECT,
@@ -141,6 +142,29 @@ set_allowed_modes_ready (MMBaseModem *self,
     }
 
     /* Allowed modes set... almost there! */
+    ctx->step++;
+    connection_step (ctx);
+}
+
+static void
+set_allowed_bands_ready (MMBaseModem *self,
+                         GAsyncResult *res,
+                         ConnectionContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_iface_modem_set_allowed_bands_finish (MM_IFACE_MODEM (self), res, &error)) {
+        /* If setting allowed bands is unsupported, keep on */
+        if (!g_error_matches (error,
+                              MM_CORE_ERROR,
+                              MM_CORE_ERROR_UNSUPPORTED)) {
+            g_dbus_method_invocation_take_error (ctx->invocation, error);
+            connection_context_free (ctx);
+            return;
+        }
+    }
+
+    /* Allowed bands set... almost there! */
     ctx->step++;
     connection_step (ctx);
 }
@@ -271,7 +295,7 @@ connection_step (ConnectionContext *ctx)
                                                      ctx);
         return;
 
-    case CONNECTION_STEP_ALLOWED_MODE: {
+    case CONNECTION_STEP_ALLOWED_MODES: {
         MMModemMode allowed_modes = MM_MODEM_MODE_ANY;
         MMModemMode preferred_mode = MM_MODEM_MODE_NONE;
 
@@ -286,6 +310,31 @@ connection_step (ConnectionContext *ctx)
                                           preferred_mode,
                                           (GAsyncReadyCallback)set_allowed_modes_ready,
                                           ctx);
+        return;
+    }
+
+    case CONNECTION_STEP_ALLOWED_BANDS: {
+        GArray *array;
+        const MMModemBand *allowed_bands = NULL;
+        guint n_allowed_bands = 0;
+        guint i;
+
+        mm_info ("Simple connect state (%d/%d): Allowed bands",
+                 ctx->step, CONNECTION_STEP_LAST);
+
+        mm_common_connect_properties_get_allowed_bands (ctx->properties,
+                                                        &allowed_bands,
+                                                        &n_allowed_bands);
+
+        array = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), n_allowed_bands);
+        for (i = 0; i < n_allowed_bands; i++)
+            g_array_insert_val (array, i, allowed_bands[i]);
+
+        mm_iface_modem_set_allowed_bands (MM_IFACE_MODEM (ctx->self),
+                                          array,
+                                          (GAsyncReadyCallback)set_allowed_bands_ready,
+                                          ctx);
+        g_array_unref (array);
         return;
     }
 
