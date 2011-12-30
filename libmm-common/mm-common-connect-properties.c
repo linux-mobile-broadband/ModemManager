@@ -15,8 +15,8 @@
 
 #include <string.h>
 
-#include <libmm-common.h>
-
+#include "mm-errors-types.h"
+#include "mm-common-helpers.h"
 #include "mm-common-connect-properties.h"
 
 G_DEFINE_TYPE (MMCommonConnectProperties, mm_common_connect_properties, G_TYPE_OBJECT);

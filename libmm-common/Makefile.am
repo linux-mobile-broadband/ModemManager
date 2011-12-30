@@ -146,6 +146,13 @@ $(mm_gdbus_bearer_generated): $(top_srcdir)/new/org.freedesktop.ModemManager1.Be
 		$< \
 		$(NULL)
 
+# Additional dependency rules
+mm-common-helpers.c: mm-errors-types.h mm-enums-types.h
+mm-common-simple-properties.c: mm-errors-types.h mm-enums-types.h
+mm-common-connect-properties.c: mm-errors-types.h
+mm-common-bearer-properties.c: mm-errors-types.h
+mm-errors-quarks.c: mm-errors-types.h
+
 includedir = @includedir@/libmm-common
 include_HEADERS = \
 	mm-errors-types.h \

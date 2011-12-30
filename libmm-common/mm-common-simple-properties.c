@@ -15,8 +15,9 @@
 
 #include <string.h>
 
-#include <libmm-common.h>
-
+#include "mm-enums-types.h"
+#include "mm-errors-types.h"
+#include "mm-common-helpers.h"
 #include "mm-common-simple-properties.h"
 
 G_DEFINE_TYPE (MMCommonSimpleProperties, mm_common_simple_properties, G_TYPE_OBJECT);

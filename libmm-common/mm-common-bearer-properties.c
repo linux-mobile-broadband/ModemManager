@@ -15,8 +15,8 @@
 
 #include <string.h>
 
-#include <libmm-common.h>
-
+#include "mm-errors-types.h"
+#include "mm-common-helpers.h"
 #include "mm-common-bearer-properties.h"
 
 G_DEFINE_TYPE (MMCommonBearerProperties, mm_common_bearer_properties, G_TYPE_OBJECT);
