@@ -736,6 +736,10 @@ mm_port_probe_run (MMPortProbe *self,
         }
     }
 
+    /* Store as current task. We need to keep it internally, as it will be
+     * freed during _finish() when the operation is completed. */
+    self->priv->task = task;
+
     /* All requested probings already available? If so, we're done */
     if (!task->flags) {
         port_probe_run_task_complete (task, TRUE, NULL);
@@ -744,9 +748,6 @@ mm_port_probe_run (MMPortProbe *self,
 
     /* Setup internal cancellable */
     task->cancellable = g_cancellable_new ();
-
-    /* Store as current task */
-    self->priv->task = task;
 
     /* If any AT-specific probing requested, require generic AT check before */
     if (task->flags & (MM_PORT_PROBE_AT_VENDOR |
