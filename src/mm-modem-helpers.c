@@ -394,6 +394,7 @@ mm_gsm_parse_creg_response (GMatchInfo *info,
     str = g_match_info_fetch (info, 1);
     if (str && strstr (str, "CGREG"))
         *out_cgreg = TRUE;
+    g_free (str);
 
     /* Normally the number of matches could be used to determine what each
      * item is, but we have overlap in one case.
