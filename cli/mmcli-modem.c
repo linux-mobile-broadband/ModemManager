@@ -55,6 +55,7 @@ static gchar *create_bearer_str;
 static gchar *delete_bearer_str;
 static gchar *set_allowed_modes_str;
 static gchar *set_preferred_mode_str;
+static gchar *set_allowed_bands_str;
 
 static GOptionEntry entries[] = {
     { "monitor-state", 'w', 0, G_OPTION_ARG_NONE, &monitor_state_flag,
@@ -92,6 +93,10 @@ static GOptionEntry entries[] = {
     { "set-allowed-modes", 0, 0, G_OPTION_ARG_STRING, &set_allowed_modes_str,
       "Set allowed modes in a given modem.",
       "[MODE1|MODE2...]"
+    },
+    { "set-allowed-bands", 0, 0, G_OPTION_ARG_STRING, &set_allowed_bands_str,
+      "Set allowed bands in a given modem.",
+      "[BAND1|BAND2...]"
     },
     { "set-preferred-mode", 0, 0, G_OPTION_ARG_STRING, &set_preferred_mode_str,
       "Set preferred mode in a given modem (Must give allowed modes with --set-allowed-modes)",
@@ -134,7 +139,8 @@ mmcli_modem_options_enabled (void)
                  !!delete_bearer_str +
                  !!factory_reset_str +
                  !!set_allowed_modes_str +
-                 !!set_preferred_mode_str);
+                 !!set_preferred_mode_str +
+                 !!set_allowed_bands_str);
 
     if (n_actions == 0 && mmcli_get_common_modem_string ()) {
         /* default to info */
@@ -645,6 +651,50 @@ parse_modes (MMModemMode *allowed,
     }
 }
 
+static void
+set_allowed_bands_process_reply (gboolean      result,
+                                 const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't set allowed bands: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully set allowed bands in the modem\n");
+}
+
+static void
+set_allowed_bands_ready (MMModem      *modem,
+                         GAsyncResult *result,
+                         gpointer      nothing)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_set_allowed_bands_finish (modem, result, &error);
+    set_allowed_bands_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
+parse_bands (MMModemBand **allowed,
+             guint *n_allowed)
+{
+    GError *error = NULL;
+
+    mm_common_get_bands_from_string (set_allowed_bands_str,
+                                     allowed,
+                                     n_allowed,
+                                     &error);
+    if (error) {
+        g_printerr ("error: couldn't parse list of allowed bands: '%s'\n",
+                    error->message);
+        exit (EXIT_FAILURE);
+    }
+}
+
 
 static void
 state_changed (MMModem                  *modem,
@@ -788,6 +838,22 @@ get_modem_ready (GObject      *source,
                                     ctx->cancellable,
                                     (GAsyncReadyCallback)set_allowed_modes_ready,
                                     NULL);
+        return;
+    }
+
+    /* Request to set allowed bands in a given modem? */
+    if (set_allowed_bands_str) {
+        MMModemBand *allowed;
+        guint n_allowed;
+
+        parse_bands (&allowed, &n_allowed);
+        mm_modem_set_allowed_bands (ctx->modem,
+                                    allowed,
+                                    n_allowed,
+                                    ctx->cancellable,
+                                    (GAsyncReadyCallback)set_allowed_bands_ready,
+                                    NULL);
+        g_free (allowed);
         return;
     }
 
@@ -937,6 +1003,23 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
                                                   &error);
 
         set_allowed_modes_process_reply (result, error);
+        return;
+    }
+
+    /* Request to set allowed bands in a given modem? */
+    if (set_allowed_bands_str) {
+        gboolean result;
+        MMModemBand *allowed;
+        guint n_allowed;
+
+        parse_bands (&allowed, &n_allowed);
+        result = mm_modem_set_allowed_bands_sync (ctx->modem,
+                                                  allowed,
+                                                  n_allowed,
+                                                  NULL,
+                                                  &error);
+        g_free (allowed);
+        set_allowed_bands_process_reply (result, error);
         return;
     }
 
