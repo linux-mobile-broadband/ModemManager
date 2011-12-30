@@ -261,6 +261,7 @@ mm_base_modem_at_sequence_in_port (MMBaseModem *self,
                                              mm_base_modem_at_sequence_in_port);
     ctx->current = ctx->sequence = sequence;
     ctx->response_processor_context = response_processor_context;
+    ctx->response_processor_context_free = response_processor_context_free;
 
     /* Go on with the first one in the sequence */
     mm_at_serial_port_queue_command (
