@@ -2340,7 +2340,31 @@ STR_REPLY_READY_FN (model, "Model")
 STR_REPLY_READY_FN (revision, "Revision")
 STR_REPLY_READY_FN (equipment_identifier, "Equipment Identifier")
 STR_REPLY_READY_FN (device_identifier, "Device Identifier")
-UINT_REPLY_READY_FN (supported_modes, "Supported Modes")
+
+static void
+load_supported_modes_ready (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            InitializationContext *ctx)
+{
+    GError *error = NULL;
+    MMModemMode modes;
+
+    modes = MM_IFACE_MODEM_GET_INTERFACE (self)->load_supported_modes_finish (self, res, &error);
+
+    if (modes != MM_MODEM_MODE_NONE) {
+        mm_gdbus_modem_set_supported_modes (ctx->skeleton, modes);
+        mm_gdbus_modem_set_allowed_modes (ctx->skeleton, modes);
+    }
+
+    if (error) {
+        mm_warn ("couldn't load Supported Modes: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
 
 static void
 load_supported_bands_ready (MMIfaceModem *self,
@@ -2686,12 +2710,13 @@ interface_initialization_step (InitializationContext *ctx)
     }
 
     case INITIALIZATION_STEP_SUPPORTED_MODES:
+        g_assert (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes != NULL);
+        g_assert (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes_finish != NULL);
+
         /* Supported modes are meant to be loaded only once during the whole
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
-        if (mm_gdbus_modem_get_supported_modes (ctx->skeleton) == MM_MODEM_MODE_NONE &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes &&
-            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes_finish) {
+        if (mm_gdbus_modem_get_supported_modes (ctx->skeleton) == MM_MODEM_MODE_NONE) {
             MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes (
                 ctx->self,
                 (GAsyncReadyCallback)load_supported_modes_ready,
@@ -2827,7 +2852,7 @@ mm_iface_modem_initialize (MMIfaceModem *self,
         mm_gdbus_modem_set_access_technologies (skeleton, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
         mm_gdbus_modem_set_signal_quality (skeleton, g_variant_new ("(ub)", 0, FALSE));
         mm_gdbus_modem_set_supported_modes (skeleton, MM_MODEM_MODE_NONE);
-        mm_gdbus_modem_set_allowed_modes (skeleton, MM_MODEM_MODE_ANY);
+        mm_gdbus_modem_set_allowed_modes (skeleton, MM_MODEM_MODE_NONE);
         mm_gdbus_modem_set_preferred_mode (skeleton, MM_MODEM_MODE_NONE);
         mm_gdbus_modem_set_supported_bands (skeleton, mm_common_build_bands_unknown ());
         mm_gdbus_modem_set_allowed_bands (skeleton, mm_common_build_bands_unknown ());
