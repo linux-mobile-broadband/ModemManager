@@ -1029,8 +1029,10 @@ mm_create_device_identifier (guint vid,
     if (manf)
         g_string_append (devid, manf);
 
-    if (!strlen (devid->str))
+    if (!strlen (devid->str)) {
+        g_string_free (devid, TRUE);
         return NULL;
+    }
 
     p = devid->str;
     msg = g_string_sized_new (strlen (devid->str) + 17);
@@ -1062,6 +1064,7 @@ mm_create_device_identifier (guint vid,
     mm_dbg ("Device ID source '%s'", msg->str);
     mm_dbg ("Device ID '%s'", ret);
     g_string_free (msg, TRUE);
+    g_string_free (devid, TRUE);
 
     return ret;
 }
