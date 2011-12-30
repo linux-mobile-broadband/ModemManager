@@ -415,6 +415,14 @@ mm_sim_unexport (MMSim *self)
 
 /*****************************************************************************/
 
+const gchar *
+mm_sim_get_path (MMSim *self)
+{
+    return self->priv->path;
+}
+
+/*****************************************************************************/
+
 #undef STR_REPLY_READY_FN
 #define STR_REPLY_READY_FN(NAME)                                        \
     static void                                                         \

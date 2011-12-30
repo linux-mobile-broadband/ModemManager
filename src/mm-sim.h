@@ -75,4 +75,6 @@ gboolean mm_sim_send_pin_finish (MMSim *self,
                                  GAsyncResult *res,
                                  GError **error);
 
+const gchar *mm_sim_get_path (MMSim *sim);
+
 #endif /* MM_SIM_H */
