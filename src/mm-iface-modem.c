@@ -953,6 +953,25 @@ handle_factory_reset (MmGdbusModem *skeleton,
 }
 
 /*****************************************************************************/
+/* ALLOWED BANDS */
+
+typedef struct {
+    MMIfaceModem *self;
+    MmGdbusModem *skeleton;
+    GSimpleAsyncResult *result;
+    GArray *allowed_bands_array;
+} SetAllowedBandsContext;
+
+static void
+set_allowed_bands_context_complete_and_free (SetAllowedBandsContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_object_unref (ctx->skeleton);
+    g_array_unref (ctx->allowed_bands_array);
+    g_free (ctx);
+}
 
 gboolean
 mm_iface_modem_set_allowed_bands_finish (MMIfaceModem *self,
@@ -965,31 +984,35 @@ mm_iface_modem_set_allowed_bands_finish (MMIfaceModem *self,
 static void
 set_allowed_bands_ready (MMIfaceModem *self,
                          GAsyncResult *res,
-                         GSimpleAsyncResult *simple)
+                         SetAllowedBandsContext *ctx)
 {
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_bands_finish (self, res, &error))
-        g_simple_async_result_take_error (simple, error);
-    else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_simple_async_result_take_error (ctx->result, error);
+    else {
+        mm_gdbus_modem_set_allowed_bands (ctx->skeleton,
+                                          mm_common_bands_garray_to_variant (ctx->allowed_bands_array));
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    }
+
+    set_allowed_bands_context_complete_and_free (ctx);
 }
 
 static gboolean
-validate_allowed_bands (GArray *bands_array,
+validate_allowed_bands (const GArray *supported_bands_array,
+                        const GArray *allowed_bands_array,
                         GError **error)
 {
     /* When the array has more than one element, there MUST NOT include ANY or
      * UNKNOWN */
-    if (bands_array->len > 1) {
+    if (allowed_bands_array->len > 1) {
         guint i;
 
-        for (i = 0; i < bands_array->len; i++) {
+        for (i = 0; i < allowed_bands_array->len; i++) {
             MMModemBand band;
 
-            band = g_array_index (bands_array, MMModemBand, i);
+            band = g_array_index (allowed_bands_array, MMModemBand, i);
             if (band == MM_MODEM_BAND_UNKNOWN ||
                 band == MM_MODEM_BAND_ANY) {
                  GEnumClass *enum_class;
@@ -1006,6 +1029,39 @@ validate_allowed_bands (GArray *bands_array,
                  g_type_class_unref (enum_class);
                  return FALSE;
             }
+
+            if (supported_bands_array->len > 1 ||
+                g_array_index (supported_bands_array, MMModemBand, 0) != MM_MODEM_BAND_ANY) {
+                gboolean found = FALSE;
+                guint j;
+
+                /* The band given in allowed MUST be available in supported */
+                for (j = 0; !found && j < supported_bands_array->len; j++) {
+                    if (band == g_array_index (supported_bands_array, MMModemBand, j))
+                        found = TRUE;
+                }
+
+                if (!found) {
+                    GEnumClass *enum_class;
+                    GEnumValue *value;
+                    gchar *supported_bands_str;
+
+                    supported_bands_str = (mm_common_get_bands_string (
+                                               (const MMModemBand *)supported_bands_array->data,
+                                               supported_bands_array->len));
+                    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_BAND));
+                    value = g_enum_get_value (enum_class, band);
+                    g_set_error (error,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_INVALID_ARGS,
+                                 "Given allowed band (%s) is not supported (%s)",
+                                 value->value_nick,
+                                 supported_bands_str);
+                    g_type_class_unref (enum_class);
+                    g_free (supported_bands_str);
+                    return FALSE;
+                }
+            }
         }
     }
     return TRUE;
@@ -1017,7 +1073,8 @@ mm_iface_modem_set_allowed_bands (MMIfaceModem *self,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    SetAllowedBandsContext *ctx;
+    GArray *supported_bands_array;
     GError *error = NULL;
 
     /* If setting allowed bands is not implemented, report an error */
@@ -1032,23 +1089,39 @@ mm_iface_modem_set_allowed_bands (MMIfaceModem *self,
         return;
     }
 
+    /* Setup context */
+    ctx = g_new0 (SetAllowedBandsContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_set_allowed_bands);
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
+                  NULL);
+    ctx->allowed_bands_array = g_array_ref (bands_array);
+
+    /* Get list of supported bands */
+    supported_bands_array = (mm_common_bands_variant_to_garray (
+                                 mm_gdbus_modem_get_supported_bands (ctx->skeleton)));
+
     /* Validate input list of bands */
-    if (!validate_allowed_bands (bands_array, &error)) {
-        g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
-                                                   callback,
-                                                   user_data,
-                                                   error);
+    if (!validate_allowed_bands (supported_bands_array,
+                                 ctx->allowed_bands_array,
+                                 &error)) {
+        g_array_unref (supported_bands_array);
+        g_simple_async_result_take_error (ctx->result, error);
+        set_allowed_bands_context_complete_and_free (ctx);
         return;
     }
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_iface_modem_set_allowed_bands);
-    MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_bands (self,
-                                                            bands_array,
-                                                            (GAsyncReadyCallback)set_allowed_bands_ready,
-                                                            result);
+    MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_bands (
+        self,
+        bands_array,
+        (GAsyncReadyCallback)set_allowed_bands_ready,
+        ctx);
+
+    g_array_unref (supported_bands_array);
 }
 
 static void
@@ -1058,9 +1131,7 @@ handle_set_allowed_bands_ready (MMIfaceModem *self,
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_bands_finish (self,
-                                                                        res,
-                                                                        &error))
+    if (!mm_iface_modem_set_allowed_bands_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem_complete_set_allowed_bands (ctx->skeleton,
