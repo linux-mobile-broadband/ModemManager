@@ -196,7 +196,7 @@ mm_common_get_modes_from_string (const gchar *str,
             gboolean found = FALSE;
 
             for (j = 0; flags_class->values[j].value_nick; j++) {
-                if (g_str_equal (mode_strings[i], flags_class->values[j].value_nick)) {
+                if (!g_ascii_strcasecmp (mode_strings[i], flags_class->values[j].value_nick)) {
                     modes |= flags_class->values[j].value;
                     found = TRUE;
                     break;
@@ -248,7 +248,7 @@ mm_common_get_bands_from_string (const gchar *str,
             gboolean found = FALSE;
 
             for (j = 0; enum_class->values[j].value_nick; j++) {
-                if (g_str_equal (band_strings[i], enum_class->values[j].value_nick)) {
+                if (!g_ascii_strcasecmp (band_strings[i], enum_class->values[j].value_nick)) {
                     g_array_append_val (array, enum_class->values[j].value);
                     found = TRUE;
                     break;
