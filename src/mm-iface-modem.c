@@ -1119,6 +1119,24 @@ handle_set_allowed_bands (MmGdbusModem *skeleton,
 /*****************************************************************************/
 /* ALLOWED MODES */
 
+typedef struct {
+    MMIfaceModem *self;
+    MmGdbusModem *skeleton;
+    GSimpleAsyncResult *result;
+    MMModemMode allowed;
+    MMModemMode preferred;
+} SetAllowedModesContext;
+
+static void
+set_allowed_modes_context_complete_and_free (SetAllowedModesContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_object_unref (ctx->skeleton);
+    g_free (ctx);
+}
+
 gboolean
 mm_iface_modem_set_allowed_modes_finish (MMIfaceModem *self,
                                          GAsyncResult *res,
@@ -1130,16 +1148,19 @@ mm_iface_modem_set_allowed_modes_finish (MMIfaceModem *self,
 static void
 set_allowed_modes_ready (MMIfaceModem *self,
                          GAsyncResult *res,
-                         GSimpleAsyncResult *simple)
+                         SetAllowedModesContext *ctx)
 {
     GError *error = NULL;
 
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_modes_finish (self, res, &error))
-        g_simple_async_result_take_error (simple, error);
-    else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+        g_simple_async_result_take_error (ctx->result, error);
+    else {
+        mm_gdbus_modem_set_allowed_modes (ctx->skeleton, ctx->allowed);
+        mm_gdbus_modem_set_preferred_mode (ctx->skeleton, ctx->preferred);
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    }
+
+    set_allowed_modes_context_complete_and_free (ctx);
 }
 
 void
@@ -1149,7 +1170,9 @@ mm_iface_modem_set_allowed_modes (MMIfaceModem *self,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    SetAllowedModesContext *ctx;
+    MMModemMode supported;
+    MMModemMode not_supported;
 
     /* If setting allowed modes is not implemented, report an error */
     if (!MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_modes ||
@@ -1163,15 +1186,71 @@ mm_iface_modem_set_allowed_modes (MMIfaceModem *self,
         return;
     }
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_iface_modem_set_allowed_modes);
+    /* Setup context */
+    ctx = g_new0 (SetAllowedModesContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_iface_modem_set_allowed_modes);
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
+                  NULL);
+    ctx->allowed = allowed;
+    ctx->preferred = preferred;
+
+    /* Get list of supported modes */
+    supported = mm_gdbus_modem_get_supported_modes (ctx->skeleton);
+
+    /* Check if any of the modes being allowed is not supported */
+    not_supported = ((supported ^ allowed) & allowed);
+
+    /* Ensure allowed is a subset of supported */
+    if (not_supported) {
+        gchar *not_supported_str;
+        gchar *supported_str;
+
+        not_supported_str = mm_common_get_modes_string (not_supported);
+        supported_str = mm_common_get_modes_string (supported);
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_UNSUPPORTED,
+                                         "Some of the allowed modes (%s) are not "
+                                         "supported (%s)",
+                                         not_supported_str,
+                                         supported_str);
+        g_free (supported_str);
+        g_free (not_supported_str);
+
+        set_allowed_modes_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Ensure preferred, if given, is a subset of allowed */
+    if ((allowed ^ preferred) & preferred) {
+        gchar *preferred_str;
+        gchar *allowed_str;
+
+        preferred_str = mm_common_get_modes_string (preferred);
+        allowed_str = mm_common_get_modes_string (allowed);
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_UNSUPPORTED,
+                                         "Preferred mode (%s) is not allowed (%s)",
+                                         preferred_str,
+                                         allowed_str);
+        g_free (preferred_str);
+        g_free (allowed_str);
+
+        set_allowed_modes_context_complete_and_free (ctx);
+        return;
+    }
+
     MM_IFACE_MODEM_GET_INTERFACE (self)->set_allowed_modes (self,
                                                             allowed,
                                                             preferred,
                                                             (GAsyncReadyCallback)set_allowed_modes_ready,
-                                                            result);
+                                                            ctx);
 }
 
 static void
@@ -1181,7 +1260,7 @@ handle_set_allowed_modes_ready (MMIfaceModem *self,
 {
     GError *error = NULL;
 
-    if (mm_iface_modem_set_allowed_modes_finish (self, res, &error))
+    if (!mm_iface_modem_set_allowed_modes_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem_complete_set_allowed_modes (ctx->skeleton,
