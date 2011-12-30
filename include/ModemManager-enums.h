@@ -39,11 +39,11 @@
  */
 typedef enum { /*< underscore_name=mm_modem_capability >*/
     MM_MODEM_CAPABILITY_NONE         = 0,
-    MM_MODEM_CAPABILITY_POTS         = 1 << 1,
-    MM_MODEM_CAPABILITY_CDMA_EVDO    = 1 << 2,
-    MM_MODEM_CAPABILITY_GSM_UMTS     = 1 << 3,
-    MM_MODEM_CAPABILITY_LTE          = 1 << 4,
-    MM_MODEM_CAPABILITY_LTE_ADVANCED = 1 << 5,
+    MM_MODEM_CAPABILITY_POTS         = 1 << 0,
+    MM_MODEM_CAPABILITY_CDMA_EVDO    = 1 << 1,
+    MM_MODEM_CAPABILITY_GSM_UMTS     = 1 << 2,
+    MM_MODEM_CAPABILITY_LTE          = 1 << 3,
+    MM_MODEM_CAPABILITY_LTE_ADVANCED = 1 << 4,
 } MMModemCapability;
 
 /**
@@ -156,21 +156,21 @@ typedef enum { /*< underscore_name=mm_modem_state_change_reason >*/
  */
 typedef enum { /*< underscore_name=mm_modem_access_technology >*/
     MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN     = 0,
-    MM_MODEM_ACCESS_TECHNOLOGY_POTS        = 1 << 1,
-    MM_MODEM_ACCESS_TECHNOLOGY_GSM         = 1 << 2,
-    MM_MODEM_ACCESS_TECHNOLOGY_GSM_COMPACT = 1 << 3,
-    MM_MODEM_ACCESS_TECHNOLOGY_GPRS        = 1 << 4,
-    MM_MODEM_ACCESS_TECHNOLOGY_EDGE        = 1 << 5,
-    MM_MODEM_ACCESS_TECHNOLOGY_UMTS        = 1 << 6,
-    MM_MODEM_ACCESS_TECHNOLOGY_HSDPA       = 1 << 7,
-    MM_MODEM_ACCESS_TECHNOLOGY_HSUPA       = 1 << 8,
-    MM_MODEM_ACCESS_TECHNOLOGY_HSPA        = 1 << 9,
-    MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS   = 1 << 10,
-    MM_MODEM_ACCESS_TECHNOLOGY_1XRTT       = 1 << 11,
-    MM_MODEM_ACCESS_TECHNOLOGY_EVDO0       = 1 << 12,
-    MM_MODEM_ACCESS_TECHNOLOGY_EVDOA       = 1 << 13,
-    MM_MODEM_ACCESS_TECHNOLOGY_EVDOB       = 1 << 14,
-    MM_MODEM_ACCESS_TECHNOLOGY_LTE         = 1 << 15,
+    MM_MODEM_ACCESS_TECHNOLOGY_POTS        = 1 << 0,
+    MM_MODEM_ACCESS_TECHNOLOGY_GSM         = 1 << 1,
+    MM_MODEM_ACCESS_TECHNOLOGY_GSM_COMPACT = 1 << 2,
+    MM_MODEM_ACCESS_TECHNOLOGY_GPRS        = 1 << 3,
+    MM_MODEM_ACCESS_TECHNOLOGY_EDGE        = 1 << 4,
+    MM_MODEM_ACCESS_TECHNOLOGY_UMTS        = 1 << 5,
+    MM_MODEM_ACCESS_TECHNOLOGY_HSDPA       = 1 << 6,
+    MM_MODEM_ACCESS_TECHNOLOGY_HSUPA       = 1 << 7,
+    MM_MODEM_ACCESS_TECHNOLOGY_HSPA        = 1 << 8,
+    MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS   = 1 << 9,
+    MM_MODEM_ACCESS_TECHNOLOGY_1XRTT       = 1 << 10,
+    MM_MODEM_ACCESS_TECHNOLOGY_EVDO0       = 1 << 11,
+    MM_MODEM_ACCESS_TECHNOLOGY_EVDOA       = 1 << 12,
+    MM_MODEM_ACCESS_TECHNOLOGY_EVDOB       = 1 << 13,
+    MM_MODEM_ACCESS_TECHNOLOGY_LTE         = 1 << 14,
 } MMModemAccessTechnology;
 
 /**
@@ -187,7 +187,7 @@ typedef enum { /*< underscore_name=mm_modem_access_technology >*/
  */
 typedef enum { /*< underscore_name=mm_modem_mode >*/
     MM_MODEM_MODE_NONE = 0,
-    MM_MODEM_MODE_1G   = 1 << 0,
+    MM_MODEM_MODE_CS   = 1 << 0,
     MM_MODEM_MODE_2G   = 1 << 1,
     MM_MODEM_MODE_3G   = 1 << 2,
     MM_MODEM_MODE_4G   = 1 << 3,
