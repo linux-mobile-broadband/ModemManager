@@ -160,6 +160,65 @@ modem_create_bearer (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* CREATE SIM */
+
+static MMModem3gppRegistrationState get_consolidated_reg_state (MMBroadbandModem *self);
+
+static MMSim *
+modem_create_sim_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+    return (g_object_ref (g_simple_async_result_get_op_res_gpointer (
+                              G_SIMPLE_ASYNC_RESULT (res))));
+}
+
+static void
+modem_create_sim_ready (GAsyncInitable *initable,
+                        GAsyncResult *res,
+                        GSimpleAsyncResult *simple)
+{
+    MMSim *sim;
+    GError *error = NULL;
+
+    sim = mm_sim_new_finish (initable, res, &error);
+    if (!sim)
+        g_simple_async_result_take_error (simple, error);
+    else {
+        mm_dbg ("New SIM created at DBus path '%s'",
+                mm_sim_get_path (sim));
+        g_simple_async_result_set_op_res_gpointer (
+            simple,
+            sim,
+            (GDestroyNotify)g_object_unref);
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_create_sim (MMIfaceModem *self,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_create_sim);
+
+    /* New generic SIM */
+    mm_sim_new (MM_BASE_MODEM (self),
+                NULL, /* cancellable */
+                (GAsyncReadyCallback)modem_create_sim_ready,
+                result);
+}
+
+/*****************************************************************************/
 /* CAPABILITIES */
 
 typedef struct {
@@ -3215,6 +3274,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->disable_unsolicited_events_finish = unsolicited_events_finish;
     iface->setup_indicators = setup_indicators;
     iface->setup_indicators_finish = setup_indicators_finish;
+    iface->create_sim = modem_create_sim;
+    iface->create_sim_finish = modem_create_sim_finish;
     iface->create_bearer = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
 }
