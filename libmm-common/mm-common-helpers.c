@@ -118,7 +118,7 @@ mm_common_get_modes_string (MMModemMode mode)
         MMModemMode it;
         gboolean first = TRUE;
 
-        for (it = MM_MODEM_MODE_1G; /* first */
+        for (it = MM_MODEM_MODE_CS; /* first */
              it <= MM_MODEM_MODE_4G; /* last */
              it = it << 1) {
             if (mode & it) {

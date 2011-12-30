@@ -176,7 +176,7 @@ typedef enum { /*< underscore_name=mm_modem_access_technology >*/
 /**
  * MMModemMode:
  * @MM_MODEM_MODE_NONE: None.
- * @MM_MODEM_MODE_1G: CSD, GSM.
+ * @MM_MODEM_MODE_CS: CSD, GSM, and other circuit-switched technologies.
  * @MM_MODEM_MODE_2G: GPRS, EDGE.
  * @MM_MODEM_MODE_3G: UMTS, HSxPA.
  * @MM_MODEM_MODE_4G: LTE.
