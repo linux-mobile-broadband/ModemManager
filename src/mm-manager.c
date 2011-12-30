@@ -372,6 +372,7 @@ grab_port (MMManager *manager,
                  g_udev_device_get_name (device),
                  error ? error->code : -1,
                  (error && error->message) ? error->message : "(unknown)");
+        g_clear_error (&error);
 
         if (existing)
             check_export_modem (manager, existing);
