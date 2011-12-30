@@ -2426,21 +2426,24 @@ sim_new_ready (GAsyncInitable *initable,
     MMSim *sim;
     GError *error = NULL;
 
-    sim = mm_sim_new_finish (initable, res, &error);
+    sim = MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->create_sim_finish (ctx->self, res, &error);
     if (!sim) {
+        /* FATAL */
         mm_warn ("couldn't create SIM: '%s'",
                  error ? error->message : "Unknown error");
-        g_clear_error (&error);
-    } else {
-        g_object_bind_property (sim, MM_SIM_PATH,
-                                ctx->skeleton, "sim",
-                                G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
-
-        g_object_set (ctx->self,
-                      MM_IFACE_MODEM_SIM, sim,
-                      NULL);
-        g_object_unref (sim);
+        g_simple_async_result_take_error (ctx->result, error);
+        initialization_context_complete_and_free (ctx);
+        return;
     }
+
+    g_object_bind_property (sim, MM_SIM_PATH,
+                            ctx->skeleton, "sim",
+                            G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
+
+    g_object_set (ctx->self,
+                  MM_IFACE_MODEM_SIM, sim,
+                  NULL);
+    g_object_unref (sim);
 
     /* Go on to next step */
     ctx->step++;
@@ -2685,29 +2688,33 @@ interface_initialization_step (InitializationContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case INITIALIZATION_STEP_SIM: {
-        MMSim *sim = NULL;
+    case INITIALIZATION_STEP_SIM:
+        /* If the modem doesn't need any SIM, skip */
+        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->create_sim &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->create_sim_finish) {
+            MMSim *sim = NULL;
 
-        g_object_get (ctx->self,
-                      MM_IFACE_MODEM_SIM, &sim,
-                      NULL);
-        if (!sim) {
-            mm_sim_new (MM_BASE_MODEM (ctx->self),
-                        NULL, /* TODO: cancellable */
-                        (GAsyncReadyCallback)sim_new_ready,
-                        ctx);
+            g_object_get (ctx->self,
+                          MM_IFACE_MODEM_SIM, &sim,
+                          NULL);
+            if (!sim) {
+                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->create_sim (
+                    MM_IFACE_MODEM (ctx->self),
+                    (GAsyncReadyCallback)sim_new_ready,
+                    ctx);
+                return;
+            }
+
+            /* If already available the sim object, relaunch initialization.
+             * This will try to load any missing property value that couldn't be
+             * retrieved before due to having the SIM locked. */
+            mm_sim_initialize (sim,
+                               NULL, /* TODO: cancellable */
+                               (GAsyncReadyCallback)sim_reinit_ready,
+                               ctx);
+            g_object_unref (sim);
             return;
         }
-
-        /* If already available the sim object, relaunch initialization.
-         * This will try to load any missing property value that couldn't be
-         * retrieved before due to having the SIM locked. */
-        mm_sim_initialize (sim,
-                           NULL, /* TODO: cancellable */
-                           (GAsyncReadyCallback)sim_reinit_ready,
-                           ctx);
-        return;
-    }
 
     case INITIALIZATION_STEP_SUPPORTED_MODES:
         g_assert (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_supported_modes != NULL);
