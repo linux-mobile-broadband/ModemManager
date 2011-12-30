@@ -123,11 +123,14 @@ mm_common_get_modes_string (MMModemMode mode)
              it = it << 1) {
             if (mode & it) {
                 GFlagsValue *value;
+                gchar *up;
 
                 value = g_flags_get_first_value (flags_class, it);
+                up = g_ascii_strup (value->value_nick, -1);
                 g_string_append_printf (str, "%s%s",
                                         first ? "" : ", ",
-                                        value->value_nick);
+                                        up);
+                g_free (up);
 
                 if (first)
                     first = FALSE;
