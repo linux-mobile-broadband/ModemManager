@@ -24,19 +24,18 @@
 #include "mm-bearer-list.h"
 #include "mm-log.h"
 
-#define INDICATORS_CHECKED_TAG           "indicators-checked-tag"
-#define UNSOLICITED_EVENTS_SUPPORTED_TAG "unsolicited-events-supported-tag"
-static GQuark indicators_checked;
-static GQuark unsolicited_events_supported;
+#define SIGNAL_QUALITY_RECENT_TIMEOUT_SEC 60
+#define SIGNAL_QUALITY_CHECK_TIMEOUT_SEC 30
 
-typedef struct _InitializationContext InitializationContext;
-static void interface_initialization_step (InitializationContext *ctx);
+#define INDICATORS_CHECKED_TAG             "indicators-checked-tag"
+#define UNSOLICITED_EVENTS_SUPPORTED_TAG   "unsolicited-events-supported-tag"
+#define SIGNAL_QUALITY_UPDATE_CONTEXT_TAG  "signal-quality-update-context-tag"
+#define SIGNAL_QUALITY_CHECK_CONTEXT_TAG   "signal-quality-check-context-tag"
 
-typedef struct _EnablingContext EnablingContext;
-static void interface_enabling_step (EnablingContext *ctx);
-
-typedef struct _DisablingContext DisablingContext;
-static void interface_disabling_step (DisablingContext *ctx);
+static GQuark indicators_checked_quark;
+static GQuark unsolicited_events_supported_quark;
+static GQuark signal_quality_update_context_quark;
+static GQuark signal_quality_check_context_quark;
 
 /*****************************************************************************/
 
@@ -402,10 +401,6 @@ mm_iface_modem_update_access_tech (MMIfaceModem *self,
 
 /*****************************************************************************/
 
-#define SIGNAL_QUALITY_RECENT_TIMEOUT_SEC 60
-#define SIGNAL_QUALITY_UPDATE_CONTEXT_TAG "signal-quality-update-context-tag"
-static GQuark signal_quality_update_context_quark;
-
 typedef struct {
     time_t last_update;
     guint recent_timeout_source;
@@ -540,10 +535,6 @@ mm_iface_modem_update_signal_quality (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-
-#define SIGNAL_QUALITY_CHECK_TIMEOUT_SEC 30
-#define SIGNAL_QUALITY_CHECK_CONTEXT_TAG "signal-quality-check-context-tag"
-static GQuark signal_quality_check_context_quark;
 
 typedef struct {
     guint timeout_source;
@@ -1582,6 +1573,10 @@ mm_iface_modem_unlock_check (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* MODEM DISABLING */
+
+typedef struct _DisablingContext DisablingContext;
+static void interface_disabling_step (DisablingContext *ctx);
 
 typedef enum {
     DISABLING_STEP_FIRST,
@@ -1692,13 +1687,13 @@ interface_disabling_step (DisablingContext *ctx)
         ctx->step++;
 
     case DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS:
-        if (G_UNLIKELY (!unsolicited_events_supported))
-            unsolicited_events_supported = (g_quark_from_static_string (
-                                                UNSOLICITED_EVENTS_SUPPORTED_TAG));
+        if (G_UNLIKELY (!unsolicited_events_supported_quark))
+            unsolicited_events_supported_quark = (g_quark_from_static_string (
+                                                      UNSOLICITED_EVENTS_SUPPORTED_TAG));
 
         /* Only try to disable if supported */
         if (GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (ctx->self),
-                                                  unsolicited_events_supported))) {
+                                                  unsolicited_events_supported_quark))) {
             if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->disable_unsolicited_events &&
                 MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->disable_unsolicited_events_finish) {
                 MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->disable_unsolicited_events (
@@ -1763,6 +1758,10 @@ mm_iface_modem_disable (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* MODEM ENABLING */
+
+typedef struct _EnablingContext EnablingContext;
+static void interface_enabling_step (EnablingContext *ctx);
 
 typedef enum {
     ENABLING_STEP_FIRST,
@@ -1903,7 +1902,7 @@ setup_indicators_ready (MMIfaceModem *self,
 
     /* Indicators setup, so assume we support unsolicited events */
     g_object_set_qdata (G_OBJECT (self),
-                        unsolicited_events_supported,
+                        unsolicited_events_supported_quark,
                         GUINT_TO_POINTER (TRUE));
 
     /* Go on to next step */
@@ -1926,7 +1925,7 @@ enable_unsolicited_events_ready (MMIfaceModem *self,
 
         /* Reset support flag */
         g_object_set_qdata (G_OBJECT (self),
-                            unsolicited_events_supported,
+                            unsolicited_events_supported_quark,
                             GUINT_TO_POINTER (FALSE));
     }
 
@@ -2008,12 +2007,12 @@ interface_enabling_step (EnablingContext *ctx)
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
         /* Setup quarks if we didn't do it before */
-        if (G_UNLIKELY (!indicators_checked))
-            indicators_checked = (g_quark_from_static_string (
-                                      INDICATORS_CHECKED_TAG));
-        if (G_UNLIKELY (!unsolicited_events_supported))
-            unsolicited_events_supported = (g_quark_from_static_string (
-                                                UNSOLICITED_EVENTS_SUPPORTED_TAG));
+        if (G_UNLIKELY (!indicators_checked_quark))
+            indicators_checked_quark = (g_quark_from_static_string (
+                                            INDICATORS_CHECKED_TAG));
+        if (G_UNLIKELY (!unsolicited_events_supported_quark))
+            unsolicited_events_supported_quark = (g_quark_from_static_string (
+                                                      UNSOLICITED_EVENTS_SUPPORTED_TAG));
         /* Fall down to next step */
         ctx->step++;
 
@@ -2143,14 +2142,14 @@ interface_enabling_step (EnablingContext *ctx)
 
     case ENABLING_STEP_SETUP_INDICATORS:
         if (!GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (ctx->self),
-                                                   indicators_checked))) {
+                                                   indicators_checked_quark))) {
             /* Set the checked flag so that we don't run it again */
             g_object_set_qdata (G_OBJECT (ctx->self),
-                                indicators_checked,
+                                indicators_checked_quark,
                                 GUINT_TO_POINTER (TRUE));
             /* Initially, assume we don't support unsolicited events */
             g_object_set_qdata (G_OBJECT (ctx->self),
-                                unsolicited_events_supported,
+                                unsolicited_events_supported_quark,
                                 GUINT_TO_POINTER (FALSE));
             if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->setup_indicators &&
                 MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->setup_indicators_finish) {
@@ -2166,7 +2165,7 @@ interface_enabling_step (EnablingContext *ctx)
 
     case ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS:
         if (!GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (ctx->self),
-                                                   unsolicited_events_supported))) {
+                                                   unsolicited_events_supported_quark))) {
             if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->enable_unsolicited_events &&
                 MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->enable_unsolicited_events_finish) {
                 MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->enable_unsolicited_events (
@@ -2202,6 +2201,10 @@ mm_iface_modem_enable (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* MODEM INITIALIZATION */
+
+typedef struct _InitializationContext InitializationContext;
+static void interface_initialization_step (InitializationContext *ctx);
 
 typedef enum {
     INITIALIZATION_STEP_FIRST,
