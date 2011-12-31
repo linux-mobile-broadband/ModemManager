@@ -1795,19 +1795,8 @@ reg_state_changed (MMAtSerialPort *port,
                                                    state,
                                                    act);
 
-    /* /\* If registration is finished (either registered or failed) but the */
-    /*  * registration query hasn't completed yet, just remove the timeout and */
-    /*  * let the registration query complete by itself. */
-    /*  *\/ */
-    /* clear_previous_registration_request (self, FALSE); */
-
     /* TODO: report LAC/CI location */
     /* update_lac_ci (self, lac, cell_id, cgreg ? 1 : 0); */
-
-    /* Report access technology, if available */
-    /* Only update access technology if it appeared in the CREG/CGREG response */
-    /* if (act != -1) */
-    /*     mm_generic_gsm_update_access_technology (self, etsi_act_to_mm_act (act)); */
 }
 
 static void
@@ -1875,9 +1864,6 @@ cleanup_unsolicited_registration (MMIfaceModem3gpp *self,
     guint i;
 
     mm_dbg ("cleaning up unsolicited registration messages handling");
-
-    /* /\* Cancel any ongoing registration request *\/ */
-    /* clear_previous_registration_request (MM_BROADBAND_MODEM (self), TRUE); */
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
