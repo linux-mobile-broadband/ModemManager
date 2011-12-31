@@ -528,10 +528,17 @@ load_equipment_identifier (MMIfaceModem *self,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
+    const MMBaseModemAtCommand *commands = equipment_identifiers;
+
     mm_dbg ("loading equipment identifier...");
+
+    /* On CDMA-only (non-3GPP) modems, just try +GSN */
+    if (mm_iface_modem_is_cdma_only (self))
+        commands++;
+
     mm_base_modem_at_sequence (
         MM_BASE_MODEM (self),
-        equipment_identifiers,
+        commands,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
         NULL, /* cancellable */
