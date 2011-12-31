@@ -266,8 +266,8 @@ print_modem_info (void)
      * easiest to maintain */
 #undef VALIDATE_UNKNOWN
 #define VALIDATE_UNKNOWN(str) (str ? str : "unknown")
-#undef VALIDATE_NONE
-#define VALIDATE_NONE(str) (str ? str : "none")
+#undef VALIDATE_PATH
+#define VALIDATE_PATH(str) ((str && !g_str_equal (str, "/")) ? str : "none")
 
     /* Strings with mixed properties */
     unlock_required = mm_modem_get_unlock_required (ctx->modem);
@@ -381,7 +381,7 @@ print_modem_info (void)
     /* SIM */
     g_print ("  -------------------------\n"
              "  SIM      |           path: '%s'\n",
-             VALIDATE_NONE (mm_modem_get_sim_path (ctx->modem)));
+             VALIDATE_PATH (mm_modem_get_sim_path (ctx->modem)));
     g_print ("\n");
 
     g_free (allowed_bands_string);
