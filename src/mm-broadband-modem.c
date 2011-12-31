@@ -1341,6 +1341,10 @@ setup_charset (MMIfaceModem *self,
     SetupCharsetContext *ctx;
     const gchar *charset_str;
 
+    /* NOTE: we already notified that CDMA-only modems couldn't load supported
+     * charsets, so we'll never get here in such a case */
+    g_assert (mm_iface_modem_is_cdma_only (self) == FALSE);
+
     /* Build charset string to use */
     charset_str = mm_modem_charset_to_string (charset);
     if (!charset_str) {
@@ -1394,25 +1398,37 @@ load_supported_charsets_finish (MMIfaceModem *self,
                                 GAsyncResult *res,
                                 GError **error)
 {
-    const gchar *response;
-
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
-    if (!response)
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return MM_MODEM_CHARSET_UNKNOWN;
-    else {
-        MMModemCharset charsets = MM_MODEM_CHARSET_UNKNOWN;
 
-        if (!mm_gsm_parse_cscs_support_response (response, &charsets)) {
-            g_set_error (error,
-                         MM_CORE_ERROR,
-                         MM_CORE_ERROR_FAILED,
-                         "Failed to parse the supported character "
-                         "sets response");
-            return MM_MODEM_CHARSET_UNKNOWN;
-        }
+    return GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
 
-        return charsets;
-    }
+static void
+load_supported_charsets_ready (MMBaseModem *self,
+                               GAsyncResult *res,
+                               GSimpleAsyncResult *simple)
+{
+    MMModemCharset charsets = MM_MODEM_CHARSET_UNKNOWN;
+    const gchar *response;
+    GError *error = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else if (!mm_gsm_parse_cscs_support_response (response, &charsets))
+        g_simple_async_result_set_error (
+            simple,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_FAILED,
+            "Failed to parse the supported character "
+            "sets response");
+    else
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   GUINT_TO_POINTER (charsets),
+                                                   NULL);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
 }
 
 static void
@@ -1420,13 +1436,31 @@ load_supported_charsets (MMIfaceModem *self,
                          GAsyncReadyCallback callback,
                          gpointer user_data)
 {
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_supported_charsets);
+
+    /* CDMA-only modems don't need this */
+    if (mm_iface_modem_is_cdma_only (self)) {
+        mm_dbg ("Skipping supported charset loading in CDMA-only modem...");
+        g_simple_async_result_set_op_res_gpointer (result,
+                                                   GUINT_TO_POINTER (MM_MODEM_CHARSET_UNKNOWN),
+                                                   NULL);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CSCS=?",
                               3,
                               TRUE,
                               NULL,  /* cancellable */
-                              callback,
-                              user_data);
+                              (GAsyncReadyCallback)load_supported_charsets_ready,
+                              result);
 }
 
 /*****************************************************************************/
@@ -1483,9 +1517,13 @@ modem_power_up (MMIfaceModem *self,
 {
     GSimpleAsyncResult *result;
 
-    mm_base_modem_at_command_ignore_reply (MM_BASE_MODEM (self),
-                                           "+CFUN=1",
-                                           5);
+    /* CDMA-only modems don't need this */
+    if (mm_iface_modem_is_cdma_only (self))
+        mm_dbg ("Skipping Power-up in CDMA-only modem...");
+    else
+        mm_base_modem_at_command_ignore_reply (MM_BASE_MODEM (self),
+                                               "+CFUN=1",
+                                               5);
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
