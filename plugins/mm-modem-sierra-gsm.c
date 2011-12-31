@@ -26,12 +26,15 @@
 #include "mm-callback-info.h"
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
+#include "mm-modem-icera.h"
 
 static void modem_init (MMModem *modem_class);
+static void modem_icera_init (MMModemIcera *icera_class);
 static void modem_simple_init (MMModemSimple *class);
 
 G_DEFINE_TYPE_EXTENDED (MMModemSierraGsm, mm_modem_sierra_gsm, MM_TYPE_GENERIC_GSM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_ICERA, modem_icera_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_SIMPLE, modem_simple_init))
 
 #define MM_MODEM_SIERRA_GSM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_SIERRA_GSM, MMModemSierraGsmPrivate))
@@ -41,6 +44,8 @@ typedef struct {
     gboolean has_net;
     char *username;
     char *password;
+    gboolean is_icera;
+    MMModemIceraPrivate *icera;
 } MMModemSierraGsmPrivate;
 
 MMModem *
@@ -50,17 +55,23 @@ mm_modem_sierra_gsm_new (const char *device,
                          guint32 vendor,
                          guint32 product)
 {
+    MMModem *modem;
+
     g_return_val_if_fail (device != NULL, NULL);
     g_return_val_if_fail (driver != NULL, NULL);
     g_return_val_if_fail (plugin != NULL, NULL);
 
-    return MM_MODEM (g_object_new (MM_TYPE_MODEM_SIERRA_GSM,
-                                   MM_MODEM_MASTER_DEVICE, device,
-                                   MM_MODEM_DRIVER, driver,
-                                   MM_MODEM_PLUGIN, plugin,
-                                   MM_MODEM_HW_VID, vendor,
-                                   MM_MODEM_HW_PID, product,
-                                   NULL));
+    modem = (MMModem *) g_object_new (MM_TYPE_MODEM_SIERRA_GSM,
+                                      MM_MODEM_MASTER_DEVICE, device,
+                                      MM_MODEM_DRIVER, driver,
+                                      MM_MODEM_PLUGIN, plugin,
+                                      MM_MODEM_HW_VID, vendor,
+                                      MM_MODEM_HW_PID, product,
+                                      NULL);
+    if (modem)
+        MM_MODEM_SIERRA_GSM_GET_PRIVATE (modem)->icera = mm_modem_icera_init_private ();
+
+    return modem;
 }
 
 /*****************************************************************************/
@@ -140,8 +151,14 @@ get_allowed_mode (MMGenericGsm *gsm,
                   MMModemUIntFn callback,
                   gpointer user_data)
 {
+    MMModemSierraGsm *self = MM_MODEM_SIERRA_GSM (gsm);
     MMCallbackInfo *info;
     MMAtSerialPort *primary;
+
+    if (MM_MODEM_SIERRA_GSM_GET_PRIVATE (self)->is_icera) {
+        mm_modem_icera_get_allowed_mode (MM_MODEM_ICERA (self), callback, user_data);
+        return;
+    }
 
     info = mm_callback_info_uint_new (MM_MODEM (gsm), callback, user_data);
 
@@ -182,10 +199,16 @@ set_allowed_mode (MMGenericGsm *gsm,
                   MMModemFn callback,
                   gpointer user_data)
 {
+    MMModemSierraGsm *self = MM_MODEM_SIERRA_GSM (gsm);
     MMCallbackInfo *info;
     MMAtSerialPort *primary;
     char *command;
     int idx = 0;
+
+    if (MM_MODEM_SIERRA_GSM_GET_PRIVATE (self)->is_icera) {
+        mm_modem_icera_set_allowed_mode (MM_MODEM_ICERA (self), mode, callback, user_data);
+        return;
+    }
 
     info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
 
@@ -254,8 +277,14 @@ get_access_technology (MMGenericGsm *modem,
                        MMModemUIntFn callback,
                        gpointer user_data)
 {
+    MMModemSierraGsm *self = MM_MODEM_SIERRA_GSM (modem);
     MMAtSerialPort *port;
     MMCallbackInfo *info;
+
+    if (MM_MODEM_SIERRA_GSM_GET_PRIVATE (self)->is_icera) {
+        mm_modem_icera_get_access_technology (MM_MODEM_ICERA (self), callback, user_data);
+        return;
+    }
 
     info = mm_callback_info_uint_new (MM_MODEM (modem), callback, user_data);
 
@@ -356,6 +385,28 @@ error:
 /*    Modem class override functions                                         */
 /*****************************************************************************/
 
+static void
+icera_check_cb (MMModem *modem,
+                guint32 result,
+                GError *error,
+                gpointer user_data)
+{
+    if (!error) {
+        MMModemSierraGsm *self = MM_MODEM_SIERRA_GSM (user_data);
+        MMModemSierraGsmPrivate *priv = MM_MODEM_SIERRA_GSM_GET_PRIVATE (self);
+
+        if (result) {
+            priv->is_icera = TRUE;
+            g_object_set (G_OBJECT (modem),
+                          MM_MODEM_IP_METHOD, MM_MODEM_IP_METHOD_STATIC,
+                          NULL);
+
+            /* Turn on unsolicited network state messages */
+            mm_modem_icera_change_unsolicited_messages (MM_MODEM_ICERA (modem), TRUE);
+        }
+    }
+}
+
 static gboolean
 sierra_enabled (gpointer user_data)
 {
@@ -368,6 +419,8 @@ sierra_enabled (gpointer user_data)
         modem = MM_GENERIC_GSM (info->modem);
         priv = MM_MODEM_SIERRA_GSM_GET_PRIVATE (modem);
         priv->enable_wait_id = 0;
+        mm_modem_icera_is_icera (MM_MODEM_ICERA (modem), icera_check_cb, MM_MODEM_SIERRA_GSM (modem));
+
         MM_GENERIC_GSM_CLASS (mm_modem_sierra_gsm_parent_class)->do_enable_power_up_done (modem, NULL, NULL, info);
     }
     return FALSE;
@@ -483,6 +536,9 @@ grab_port (MMModem *modem,
             regex = g_regex_new ("\\r\\n\\+PACSP0\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
             mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
             g_regex_unref (regex);
+
+            /* Add Icera-specific handlers */
+            mm_modem_icera_register_unsolicted_handlers (MM_MODEM_ICERA (gsm), MM_AT_SERIAL_PORT (port));
         } else if (mm_port_get_subsys (port) == MM_PORT_SUBSYS_NET) {
             MM_MODEM_SIERRA_GSM_GET_PRIVATE (gsm)->has_net = TRUE;
             g_object_set (G_OBJECT (gsm), MM_MODEM_IP_METHOD, MM_MODEM_IP_METHOD_DHCP, NULL);
@@ -615,6 +671,11 @@ do_connect (MMModem *modem,
     MMCallbackInfo *info;
     MMAtSerialPort *port;
 
+    if (MM_MODEM_SIERRA_GSM_GET_PRIVATE (modem)->is_icera) {
+        mm_modem_icera_do_connect (MM_MODEM_ICERA (modem), number, callback, user_data);
+        return;
+    }
+
     mm_modem_set_state (modem, MM_MODEM_STATE_CONNECTING, MM_MODEM_STATE_REASON_NONE);
 
     info = mm_callback_info_new (modem, callback, user_data);
@@ -634,6 +695,21 @@ do_connect (MMModem *modem,
 }
 
 static void
+get_ip4_config (MMModem *modem,
+                MMModemIp4Fn callback,
+                gpointer user_data)
+{
+    MMModem *parent_iface;
+
+    if (MM_MODEM_SIERRA_GSM_GET_PRIVATE (modem)->is_icera) {
+        mm_modem_icera_get_ip4_config (MM_MODEM_ICERA (modem), callback, user_data);
+    } else {
+        parent_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (modem));
+        parent_iface->get_ip4_config (modem, callback, user_data);
+    }
+}
+
+static void
 clear_user_pass (MMModemSierraGsm *self)
 {
     MMModemSierraGsmPrivate *priv = MM_MODEM_SIERRA_GSM_GET_PRIVATE (self);
@@ -650,9 +726,17 @@ do_disconnect (MMGenericGsm *gsm,
                MMModemFn callback,
                gpointer user_data)
 {
-    clear_user_pass (MM_MODEM_SIERRA_GSM (gsm));
+    MMModemSierraGsm *self = MM_MODEM_SIERRA_GSM (gsm);
+    MMModemSierraGsmPrivate *priv = MM_MODEM_SIERRA_GSM_GET_PRIVATE (self);
 
-    if (MM_MODEM_SIERRA_GSM_GET_PRIVATE (gsm)->has_net) {
+    if (priv->is_icera) {
+        mm_modem_icera_do_disconnect (gsm, cid, callback, user_data);
+        return;
+    }
+
+    clear_user_pass (self);
+
+    if (priv->has_net) {
         MMAtSerialPort *primary;
         char *command;
 
@@ -666,6 +750,68 @@ do_disconnect (MMGenericGsm *gsm,
     }
 
     MM_GENERIC_GSM_CLASS (mm_modem_sierra_gsm_parent_class)->do_disconnect (gsm, cid, callback, user_data);
+}
+
+
+/*****************************************************************************/
+
+static void
+disable_unsolicited_done (MMAtSerialPort *port,
+                          GString *response,
+                          GError *error,
+                          gpointer user_data)
+
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    /* Ignore all errors */
+    mm_callback_info_schedule (info);
+}
+
+static void
+invoke_call_parent_disable_fn (MMCallbackInfo *info)
+{
+    /* Note: we won't call the parent disable if info->modem is no longer
+     * valid. The invoke is called always once the info gets scheduled, which
+     * may happen during removed modem detection. */
+    if (info->modem) {
+        MMModem *parent_modem_iface;
+
+        parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (info->modem));
+        parent_modem_iface->disable (info->modem, (MMModemFn)info->callback, info->user_data);
+    }
+}
+
+static void
+do_disable (MMModem *modem,
+            MMModemFn callback,
+            gpointer user_data)
+{
+    MMModemSierraGsmPrivate *priv = MM_MODEM_SIERRA_GSM_GET_PRIVATE (modem);
+    MMAtSerialPort *primary;
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new_full (modem,
+                                      invoke_call_parent_disable_fn,
+                                      (GCallback)callback,
+                                      user_data);
+
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+
+    /* Turn off unsolicited responses */
+    if (priv->is_icera) {
+        mm_modem_icera_cleanup (MM_MODEM_ICERA (modem));
+        mm_modem_icera_change_unsolicited_messages (MM_MODEM_ICERA (modem), FALSE);
+    }
+
+    /* Random command to ensure unsolicited message disable completes */
+    mm_at_serial_port_queue_command (primary, "E0", 5, disable_unsolicited_done, info);
 }
 
 /*****************************************************************************/
@@ -701,12 +847,24 @@ simple_connect (MMModemSimple *simple,
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMModemSimple *parent_iface;
 
-    clear_user_pass (MM_MODEM_SIERRA_GSM (simple));
-    priv->username = simple_dup_string_property (properties, "username", &info->error);
-    priv->password = simple_dup_string_property (properties, "password", &info->error);
+    if (priv->is_icera) {
+        mm_modem_icera_simple_connect (MM_MODEM_ICERA (simple), properties);
+    } else {
+        clear_user_pass (MM_MODEM_SIERRA_GSM (simple));
+        priv->username = simple_dup_string_property (properties, "username", &info->error);
+        priv->password = simple_dup_string_property (properties, "password", &info->error);
+    }
 
     parent_iface = g_type_interface_peek_parent (MM_MODEM_SIMPLE_GET_INTERFACE (simple));
     parent_iface->connect (MM_MODEM_SIMPLE (simple), properties, callback, info);
+}
+
+/*****************************************************************************/
+
+static MMModemIceraPrivate *
+get_icera_private (MMModemIcera *icera)
+{
+    return MM_MODEM_SIERRA_GSM_GET_PRIVATE (icera)->icera;
 }
 
 /*****************************************************************************/
@@ -716,6 +874,14 @@ modem_init (MMModem *modem_class)
 {
     modem_class->grab_port = grab_port;
     modem_class->connect = do_connect;
+    modem_class->disable = do_disable;
+    modem_class->get_ip4_config = get_ip4_config;
+}
+
+static void
+modem_icera_init (MMModemIcera *icera)
+{
+    icera->get_private = get_icera_private;
 }
 
 static void
@@ -732,12 +898,15 @@ mm_modem_sierra_gsm_init (MMModemSierraGsm *self)
 static void
 dispose (GObject *object)
 {
-    MMModemSierraGsmPrivate *priv = MM_MODEM_SIERRA_GSM_GET_PRIVATE (object);
+    MMModemSierraGsm *self = MM_MODEM_SIERRA_GSM (object);
+    MMModemSierraGsmPrivate *priv = MM_MODEM_SIERRA_GSM_GET_PRIVATE (self);
 
     if (priv->enable_wait_id)
         g_source_remove (priv->enable_wait_id);
 
-    clear_user_pass (MM_MODEM_SIERRA_GSM (object));
+    mm_modem_icera_dispose_private (MM_MODEM_ICERA (self));
+
+    clear_user_pass (self);
 }
 
 static void

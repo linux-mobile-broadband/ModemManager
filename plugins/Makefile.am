@@ -189,6 +189,9 @@ libmm_plugin_sierra_la_LDFLAGS = \
 	-module \
 	-avoid-version
 
+libmm_plugin_sierra_la_LIBADD = \
+	$(builddir)/libicera-utils.la
+
 # Wavecom (Sierra Airlink)
 
 libmm_plugin_wavecom_la_SOURCES = \
