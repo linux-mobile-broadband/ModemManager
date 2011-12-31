@@ -169,10 +169,13 @@ modem_create_sim_finish (MMIfaceModem *self,
                             GAsyncResult *res,
                             GError **error)
 {
+    MMSim *sim;
+
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
-    return (g_object_ref (g_simple_async_result_get_op_res_gpointer (
-                              G_SIMPLE_ASYNC_RESULT (res))));
+
+    sim = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    return (sim ? g_object_ref (sim) : NULL);
 }
 
 static void
@@ -210,6 +213,15 @@ modem_create_sim (MMIfaceModem *self,
                                         callback,
                                         user_data,
                                         modem_create_sim);
+
+    /* CDMA-only modems don't need this */
+    if (mm_iface_modem_is_cdma_only (self)) {
+        mm_dbg ("Skipping SIM creation in CDMA-only modem...");
+        g_simple_async_result_set_op_res_gpointer (result, NULL, NULL);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
 
     /* New generic SIM */
     mm_sim_new (MM_BASE_MODEM (self),
