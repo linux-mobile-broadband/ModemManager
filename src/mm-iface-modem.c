@@ -2917,6 +2917,42 @@ mm_iface_modem_is_3gpp (MMIfaceModem *self)
     return (capabilities & MM_MODEM_CAPABILITY_3GPP);
 }
 
+gboolean
+mm_iface_modem_is_cdma (MMIfaceModem *self)
+{
+    MMModemCapability capabilities = MM_MODEM_CAPABILITY_NONE;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_CURRENT_CAPABILITIES, &capabilities,
+                  NULL);
+
+    return (capabilities & MM_MODEM_CAPABILITY_CDMA_EVDO);
+}
+
+gboolean
+mm_iface_modem_is_cdma_only (MMIfaceModem *self)
+{
+    MMModemCapability capabilities = MM_MODEM_CAPABILITY_NONE;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_CURRENT_CAPABILITIES, &capabilities,
+                  NULL);
+
+    return (capabilities == MM_MODEM_CAPABILITY_CDMA_EVDO);
+}
+
+gboolean
+mm_iface_modem_is_3gpp_only (MMIfaceModem *self)
+{
+    MMModemCapability capabilities = MM_MODEM_CAPABILITY_NONE;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_CURRENT_CAPABILITIES, &capabilities,
+                  NULL);
+
+    return ((MM_MODEM_CAPABILITY_3GPP ^ capabilities) & capabilities);
+}
+
 /*****************************************************************************/
 
 static void
