@@ -125,7 +125,7 @@ modem_create_bearer (MMIfaceModem *self,
      * configured in the modem. Use 3GPP for testing now */
 
     /* New 3GPP bearer */
-    if (MM_BROADBAND_MODEM (self)->priv->modem_3gpp_dbus_skeleton) {
+    if (mm_iface_modem_is_3gpp (self)) {
         bearer = mm_iface_modem_3gpp_create_bearer (MM_IFACE_MODEM_3GPP (self),
                                                     properties,
                                                     &error);
