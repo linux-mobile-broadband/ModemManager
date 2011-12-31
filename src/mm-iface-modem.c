@@ -2485,23 +2485,25 @@ sim_new_ready (GAsyncInitable *initable,
     GError *error = NULL;
 
     sim = MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->create_sim_finish (ctx->self, res, &error);
-    if (!sim) {
-        /* FATAL */
-        mm_warn ("couldn't create SIM: '%s'",
-                 error ? error->message : "Unknown error");
+    if (error) {
+        mm_warn ("couldn't create SIM: '%s'", error->message);
         g_simple_async_result_take_error (ctx->result, error);
         initialization_context_complete_and_free (ctx);
         return;
     }
 
-    g_object_bind_property (sim, MM_SIM_PATH,
-                            ctx->skeleton, "sim",
-                            G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
+    /* We may get error with !sim, when the implementation doesn't want to
+     * handle any (e.g. CDMA) */
+    if (sim) {
+        g_object_bind_property (sim, MM_SIM_PATH,
+                                ctx->skeleton, "sim",
+                                G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
 
-    g_object_set (ctx->self,
-                  MM_IFACE_MODEM_SIM, sim,
-                  NULL);
-    g_object_unref (sim);
+        g_object_set (ctx->self,
+                      MM_IFACE_MODEM_SIM, sim,
+                      NULL);
+        g_object_unref (sim);
+    }
 
     /* Go on to next step */
     ctx->step++;
