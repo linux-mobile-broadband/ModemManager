@@ -52,9 +52,10 @@ grab_port (MMPluginBase *base,
     subsys = mm_port_probe_get_port_subsys (probe);
     name = mm_port_probe_get_port_name (probe);
 
-    /* The generic plugin cannot do anything with non-AT ports */
-    if (!mm_port_probe_is_at (probe)) {
-        g_set_error (error, 0, 0, "Ignoring non-AT port");
+    /* The generic plugin cannot do anything with non-AT and non-QCDM ports */
+    if (!mm_port_probe_is_at (probe) &&
+        !mm_port_probe_is_qcdm (probe)) {
+        g_set_error (error, 0, 0, "Ignoring non-AT/non-QCDM ports");
         return NULL;
     }
 
@@ -91,7 +92,9 @@ grab_port (MMPluginBase *base,
     if (!mm_base_modem_grab_port (existing ? existing : modem,
                                   subsys,
                                   name,
-                                  MM_PORT_TYPE_UNKNOWN)) {
+                                  (mm_port_probe_is_qcdm (probe) ?
+                                   MM_PORT_TYPE_QCDM :
+                                   MM_PORT_TYPE_UNKNOWN))) {
         if (modem)
             g_object_unref (modem);
         return NULL;
@@ -112,6 +115,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_BASE_NAME, MM_PLUGIN_GENERIC_NAME,
                       MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS, subsystems,
                       MM_PLUGIN_BASE_ALLOWED_AT, TRUE,
+                      MM_PLUGIN_BASE_ALLOWED_QCDM, TRUE,
                       NULL));
 }
 
@@ -127,4 +131,3 @@ mm_plugin_generic_class_init (MMPluginGenericClass *klass)
 
     pb_class->grab_port = grab_port;
 }
-
