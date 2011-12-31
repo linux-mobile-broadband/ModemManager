@@ -222,30 +222,6 @@ struct _MMIfaceModem {
                                       GAsyncResult *res,
                                       GError **error);
 
-    /* Asynchronous setup of indicators */
-    void (*setup_indicators) (MMIfaceModem *self,
-                              GAsyncReadyCallback callback,
-                              gpointer user_data);
-    gboolean (*setup_indicators_finish) (MMIfaceModem *self,
-                                         GAsyncResult *res,
-                                         GError **error);
-
-    /* Asynchronous enabling of unsolicited events */
-    void (*enable_unsolicited_events) (MMIfaceModem *self,
-                                       GAsyncReadyCallback callback,
-                                       gpointer user_data);
-    gboolean (*enable_unsolicited_events_finish) (MMIfaceModem *self,
-                                                  GAsyncResult *res,
-                                                  GError **error);
-
-    /* Asynchronous disabling of unsolicited events */
-    void (*disable_unsolicited_events) (MMIfaceModem *self,
-                                        GAsyncReadyCallback callback,
-                                        gpointer user_data);
-    gboolean (*disable_unsolicited_events_finish) (MMIfaceModem *self,
-                                                   GAsyncResult *res,
-                                                   GError **error);
-
     /* Asynchronous modem power-down operation */
     void (*modem_power_down) (MMIfaceModem *self,
                               GAsyncReadyCallback callback,

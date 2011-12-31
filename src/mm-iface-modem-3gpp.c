@@ -24,6 +24,12 @@
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 
+#define INDICATORS_CHECKED_TAG             "indicators-checked-tag"
+#define UNSOLICITED_EVENTS_SUPPORTED_TAG   "unsolicited-events-supported-tag"
+
+static GQuark indicators_checked_quark;
+static GQuark unsolicited_events_supported_quark;
+
 /*****************************************************************************/
 
 void
@@ -900,6 +906,7 @@ typedef enum {
     DISABLING_STEP_CLEANUP_PS_REGISTRATION,
     DISABLING_STEP_CLEANUP_CS_REGISTRATION,
     DISABLING_STEP_CLEANUP_UNSOLICITED_REGISTRATION,
+    DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS,
     DISABLING_STEP_LAST
 } DisablingStep;
 
@@ -997,6 +1004,8 @@ VOID_REPLY_READY_FN (cleanup_ps_registration,
                      "cleanup PS registration")
 VOID_REPLY_READY_FN (cleanup_cs_registration,
                      "cleanup CS registration")
+VOID_REPLY_READY_FN (disable_unsolicited_events,
+                     "disable unsolicited events")
 
 static void
 interface_disabling_step (DisablingContext *ctx)
@@ -1053,6 +1062,26 @@ interface_disabling_step (DisablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
+    case DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS:
+        if (G_UNLIKELY (!unsolicited_events_supported_quark))
+            unsolicited_events_supported_quark = (g_quark_from_static_string (
+                                                      UNSOLICITED_EVENTS_SUPPORTED_TAG));
+
+        /* Only try to disable if supported */
+        if (GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (ctx->self),
+                                                  unsolicited_events_supported_quark))) {
+            if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->disable_unsolicited_events &&
+                MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->disable_unsolicited_events_finish) {
+                MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->disable_unsolicited_events (
+                    ctx->self,
+                    (GAsyncReadyCallback)disable_unsolicited_events_ready,
+                    ctx);
+                return;
+            }
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
     case DISABLING_STEP_LAST:
         /* We are done without errors! */
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
@@ -1080,6 +1109,8 @@ static void interface_enabling_step (EnablingContext *ctx);
 
 typedef enum {
     ENABLING_STEP_FIRST,
+    ENABLING_STEP_SETUP_INDICATORS,
+    ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS,
     ENABLING_STEP_SETUP_UNSOLICITED_REGISTRATION,
     ENABLING_STEP_SETUP_CS_REGISTRATION,
     ENABLING_STEP_SETUP_PS_REGISTRATION,
@@ -1159,6 +1190,60 @@ mm_iface_modem_3gpp_enable_finish (MMIfaceModem3gpp *self,
     }
 
 static void
+setup_indicators_ready (MMIfaceModem3gpp *self,
+                        GAsyncResult *res,
+                        EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->setup_indicators_finish (self, res, &error);
+    if (error) {
+        /* This error shouldn't be treated as critical */
+        mm_dbg ("Indicator control setup failed: '%s'", error->message);
+        g_error_free (error);
+
+        /* If we get an error setting up indicators, don't even bother trying to
+         * enable unsolicited events. */
+        ctx->step = ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS + 1;
+        interface_enabling_step (ctx);
+        return;
+    }
+
+    /* Indicators setup, so assume we support unsolicited events */
+    g_object_set_qdata (G_OBJECT (self),
+                        unsolicited_events_supported_quark,
+                        GUINT_TO_POINTER (TRUE));
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_enabling_step (ctx);
+}
+
+static void
+enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
+                                 GAsyncResult *res,
+                                 EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->enable_unsolicited_events_finish (self, res, &error);
+    if (error) {
+        /* This error shouldn't be treated as critical */
+        mm_dbg ("Enabling unsolicited events failed: '%s'", error->message);
+        g_error_free (error);
+
+        /* Reset support flag */
+        g_object_set_qdata (G_OBJECT (self),
+                            unsolicited_events_supported_quark,
+                            GUINT_TO_POINTER (FALSE));
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_enabling_step (ctx);
+}
+
+static void
 setup_cs_registration_ready (MMIfaceModem3gpp *self,
                              GAsyncResult *res,
                              EnablingContext *ctx)
@@ -1226,6 +1311,51 @@ interface_enabling_step (EnablingContext *ctx)
 {
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
+        /* Setup quarks if we didn't do it before */
+        if (G_UNLIKELY (!indicators_checked_quark))
+            indicators_checked_quark = (g_quark_from_static_string (
+                                            INDICATORS_CHECKED_TAG));
+        if (G_UNLIKELY (!unsolicited_events_supported_quark))
+            unsolicited_events_supported_quark = (g_quark_from_static_string (
+                                                      UNSOLICITED_EVENTS_SUPPORTED_TAG));
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_SETUP_INDICATORS:
+        if (!GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (ctx->self),
+                                                   indicators_checked_quark))) {
+            /* Set the checked flag so that we don't run it again */
+            g_object_set_qdata (G_OBJECT (ctx->self),
+                                indicators_checked_quark,
+                                GUINT_TO_POINTER (TRUE));
+            /* Initially, assume we don't support unsolicited events */
+            g_object_set_qdata (G_OBJECT (ctx->self),
+                                unsolicited_events_supported_quark,
+                                GUINT_TO_POINTER (FALSE));
+            if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_indicators &&
+                MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_indicators_finish) {
+                MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_indicators (
+                    ctx->self,
+                    (GAsyncReadyCallback)setup_indicators_ready,
+                    ctx);
+                return;
+            }
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS:
+        if (!GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (ctx->self),
+                                                   unsolicited_events_supported_quark))) {
+            if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->enable_unsolicited_events &&
+                MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->enable_unsolicited_events_finish) {
+                MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->enable_unsolicited_events (
+                    ctx->self,
+                    (GAsyncReadyCallback)enable_unsolicited_events_ready,
+                    ctx);
+                return;
+            }
+        }
         /* Fall down to next step */
         ctx->step++;
 

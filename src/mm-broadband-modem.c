@@ -984,7 +984,7 @@ load_signal_quality (MMIfaceModem *self,
 /* SETTING UP INDICATORS */
 
 static gboolean
-setup_indicators_finish (MMIfaceModem *self,
+setup_indicators_finish (MMIfaceModem3gpp *self,
                          GAsyncResult *res,
                          GError **error)
 {
@@ -1036,7 +1036,7 @@ setup_indicators_ready (MMBroadbandModem *self,
 }
 
 static void
-setup_indicators (MMIfaceModem *self,
+setup_indicators (MMIfaceModem3gpp *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
 {
@@ -1114,7 +1114,7 @@ unsolicited_events_context_complete_and_free (UnsolicitedEventsContext *ctx)
 }
 
 static gboolean
-unsolicited_events_finish (MMIfaceModem *self,
+unsolicited_events_finish (MMIfaceModem3gpp *self,
                            GAsyncResult *res,
                            GError **error)
 {
@@ -1198,7 +1198,7 @@ unsolicited_events (UnsolicitedEventsContext *ctx)
 }
 
 static void
-enable_unsolicited_events (MMIfaceModem *self,
+enable_unsolicited_events (MMIfaceModem3gpp *self,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
@@ -1217,9 +1217,9 @@ enable_unsolicited_events (MMIfaceModem *self,
 }
 
 static void
-disable_unsolicited_events (MMIfaceModem *self,
-                           GAsyncReadyCallback callback,
-                           gpointer user_data)
+disable_unsolicited_events (MMIfaceModem3gpp *self,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
 {
     UnsolicitedEventsContext *ctx;
 
@@ -3351,14 +3351,6 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_charsets_finish = load_supported_charsets_finish;
     iface->setup_charset = setup_charset;
     iface->setup_charset_finish = setup_charset_finish;
-    iface->setup_indicators = setup_indicators;
-    iface->setup_indicators_finish = setup_indicators_finish;
-    iface->enable_unsolicited_events = enable_unsolicited_events;
-    iface->enable_unsolicited_events_finish = unsolicited_events_finish;
-
-    /* Disabling steps */
-    iface->disable_unsolicited_events = disable_unsolicited_events;
-    iface->disable_unsolicited_events_finish = unsolicited_events_finish;
 
     /* Additional actions */
     iface->load_signal_quality = load_signal_quality;
@@ -3375,6 +3367,10 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->load_imei_finish = load_imei_finish;
 
     /* Enabling steps */
+    iface->setup_indicators = setup_indicators;
+    iface->setup_indicators_finish = setup_indicators_finish;
+    iface->enable_unsolicited_events = enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = unsolicited_events_finish;
     iface->setup_unsolicited_registration = setup_unsolicited_registration;
     iface->setup_unsolicited_registration_finish = setup_unsolicited_registration_finish;
     iface->setup_cs_registration = setup_cs_registration;
@@ -3383,6 +3379,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->setup_ps_registration_finish = setup_ps_registration_finish;
 
     /* Disabling steps */
+    iface->disable_unsolicited_events = disable_unsolicited_events;
+    iface->disable_unsolicited_events_finish = unsolicited_events_finish;
     iface->cleanup_unsolicited_registration = cleanup_unsolicited_registration;
     iface->cleanup_unsolicited_registration_finish = cleanup_unsolicited_registration_finish;
     iface->cleanup_cs_registration = cleanup_cs_registration;

@@ -44,6 +44,30 @@ struct _MMIfaceModem3gpp {
                                  GAsyncResult *res,
                                  GError **error);
 
+    /* Asynchronous setup of indicators */
+    void (*setup_indicators) (MMIfaceModem3gpp *self,
+                              GAsyncReadyCallback callback,
+                              gpointer user_data);
+    gboolean (*setup_indicators_finish) (MMIfaceModem3gpp *self,
+                                         GAsyncResult *res,
+                                         GError **error);
+
+    /* Asynchronous enabling of unsolicited events */
+    void (*enable_unsolicited_events) (MMIfaceModem3gpp *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data);
+    gboolean (*enable_unsolicited_events_finish) (MMIfaceModem3gpp *self,
+                                                  GAsyncResult *res,
+                                                  GError **error);
+
+    /* Asynchronous disabling of unsolicited events */
+    void (*disable_unsolicited_events) (MMIfaceModem3gpp *self,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data);
+    gboolean (*disable_unsolicited_events_finish) (MMIfaceModem3gpp *self,
+                                                   GAsyncResult *res,
+                                                   GError **error);
+
     /* Setup unsolicited registration messages */
     void (* setup_unsolicited_registration) (MMIfaceModem3gpp *self,
                                              GAsyncReadyCallback callback,
