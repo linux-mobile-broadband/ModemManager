@@ -3284,6 +3284,7 @@ dispose (GObject *object)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    /* Initialization steps */
     iface->load_current_capabilities = load_current_capabilities;
     iface->load_current_capabilities_finish = load_current_capabilities_finish;
     iface->load_manufacturer = load_manufacturer;
@@ -3298,11 +3299,12 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_device_identifier_finish = load_device_identifier_finish;
     iface->load_unlock_required = load_unlock_required;
     iface->load_unlock_required_finish = load_unlock_required_finish;
+    iface->create_sim = modem_create_sim;
+    iface->create_sim_finish = modem_create_sim_finish;
     iface->load_supported_modes = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;
-    iface->load_signal_quality = load_signal_quality;
-    iface->load_signal_quality_finish = load_signal_quality_finish;
 
+    /* Enabling steps */
     iface->modem_init = modem_init;
     iface->modem_init_finish = modem_init_finish;
     iface->modem_power_up = modem_power_up;
@@ -3313,14 +3315,18 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_charsets_finish = load_supported_charsets_finish;
     iface->setup_charset = setup_charset;
     iface->setup_charset_finish = setup_charset_finish;
-    iface->enable_unsolicited_events = enable_unsolicited_events;
-    iface->enable_unsolicited_events_finish = unsolicited_events_finish;
-    iface->disable_unsolicited_events = disable_unsolicited_events;
-    iface->disable_unsolicited_events_finish = unsolicited_events_finish;
     iface->setup_indicators = setup_indicators;
     iface->setup_indicators_finish = setup_indicators_finish;
-    iface->create_sim = modem_create_sim;
-    iface->create_sim_finish = modem_create_sim_finish;
+    iface->enable_unsolicited_events = enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = unsolicited_events_finish;
+
+    /* Disabling steps */
+    iface->disable_unsolicited_events = disable_unsolicited_events;
+    iface->disable_unsolicited_events_finish = unsolicited_events_finish;
+
+    /* Additional actions */
+    iface->load_signal_quality = load_signal_quality;
+    iface->load_signal_quality_finish = load_signal_quality_finish;
     iface->create_bearer = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
 }
@@ -3328,27 +3334,33 @@ iface_modem_init (MMIfaceModem *iface)
 static void
 iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 {
+    /* Initialization steps */
     iface->load_imei = load_imei;
     iface->load_imei_finish = load_imei_finish;
+
+    /* Enabling steps */
+    iface->setup_unsolicited_registration = setup_unsolicited_registration;
+    iface->setup_unsolicited_registration_finish = setup_unsolicited_registration_finish;
+    iface->setup_cs_registration = setup_cs_registration;
+    iface->setup_cs_registration_finish = setup_cs_registration_finish;
+    iface->setup_ps_registration = setup_ps_registration;
+    iface->setup_ps_registration_finish = setup_ps_registration_finish;
+
+    /* Disabling steps */
+    iface->cleanup_unsolicited_registration = cleanup_unsolicited_registration;
+    iface->cleanup_unsolicited_registration_finish = cleanup_unsolicited_registration_finish;
+    iface->cleanup_cs_registration = cleanup_cs_registration;
+    iface->cleanup_cs_registration_finish = cleanup_cs_registration_finish;
+    iface->cleanup_ps_registration = cleanup_ps_registration;
+    iface->cleanup_ps_registration_finish = cleanup_ps_registration_finish;
+
+    /* Additional actions */
     iface->load_operator_code = load_operator_code;
     iface->load_operator_code_finish = load_operator_code_finish;
     iface->load_operator_name = load_operator_name;
     iface->load_operator_name_finish = load_operator_name_finish;
-
-    iface->setup_unsolicited_registration = setup_unsolicited_registration;
-    iface->setup_unsolicited_registration_finish = setup_unsolicited_registration_finish;
-    iface->cleanup_unsolicited_registration = cleanup_unsolicited_registration;
-    iface->cleanup_unsolicited_registration_finish = cleanup_unsolicited_registration_finish;
-    iface->setup_cs_registration = setup_cs_registration;
-    iface->setup_cs_registration_finish = setup_cs_registration_finish;
-    iface->cleanup_cs_registration = cleanup_cs_registration;
-    iface->cleanup_cs_registration_finish = cleanup_cs_registration_finish;
     iface->run_cs_registration_check = run_cs_registration_check;
     iface->run_cs_registration_check_finish = run_cs_registration_check_finish;
-    iface->setup_ps_registration = setup_ps_registration;
-    iface->setup_ps_registration_finish = setup_ps_registration_finish;
-    iface->cleanup_ps_registration = cleanup_ps_registration;
-    iface->cleanup_ps_registration_finish = cleanup_ps_registration_finish;
     iface->run_ps_registration_check = run_ps_registration_check;
     iface->run_ps_registration_check_finish = run_ps_registration_check_finish;
     iface->register_in_network = register_in_network;
