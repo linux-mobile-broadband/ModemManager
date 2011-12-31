@@ -1582,13 +1582,15 @@ typedef enum {
     DISABLING_STEP_FIRST,
     DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS,
     DISABLING_STEP_MODEM_POWER_DOWN,
-    DISABLING_STEP_CLOSE_PORT,
+    DISABLING_STEP_CLOSE_PORTS,
     DISABLING_STEP_LAST
 } DisablingStep;
 
 struct _DisablingContext {
     MMIfaceModem *self;
     MMAtSerialPort *primary;
+    MMAtSerialPort *secondary;
+    MMQcdmSerialPort *qcdm;
     DisablingStep step;
     MMModemState previous_state;
     gboolean disabled;
@@ -1606,6 +1608,12 @@ disabling_context_new (MMIfaceModem *self,
     ctx = g_new0 (DisablingContext, 1);
     ctx->self = g_object_ref (self);
     ctx->primary = g_object_ref (mm_base_modem_get_port_primary (MM_BASE_MODEM (self)));
+    ctx->secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+    if (ctx->secondary)
+        g_object_ref (ctx->secondary);
+    ctx->qcdm = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
+    if (ctx->qcdm)
+        g_object_ref (ctx->qcdm);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -1641,6 +1649,10 @@ disabling_context_complete_and_free (DisablingContext *ctx)
 
     g_object_unref (ctx->self);
     g_object_unref (ctx->primary);
+    if (ctx->secondary)
+        g_object_unref (ctx->secondary);
+    if (ctx->qcdm)
+        g_object_unref (ctx->qcdm);
     g_object_unref (ctx->result);
     g_object_unref (ctx->skeleton);
     g_free (ctx);
@@ -1725,7 +1737,7 @@ interface_disabling_step (DisablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case DISABLING_STEP_CLOSE_PORT:
+    case DISABLING_STEP_CLOSE_PORTS:
         /* While the modem is enabled ports are kept open, so we need to close
          * them when the modem gets disabled. As this (should) be the last
          * closing in order to get it really closed (open count = 1), it should
@@ -1733,6 +1745,10 @@ interface_disabling_step (DisablingContext *ctx)
          */
         if (mm_serial_port_is_open (MM_SERIAL_PORT (ctx->primary)))
             mm_serial_port_close (MM_SERIAL_PORT (ctx->primary));
+        if (ctx->secondary && mm_serial_port_is_open (MM_SERIAL_PORT (ctx->secondary)))
+            mm_serial_port_close (MM_SERIAL_PORT (ctx->secondary));
+        if (ctx->qcdm && mm_serial_port_is_open (MM_SERIAL_PORT (ctx->qcdm)))
+            mm_serial_port_close (MM_SERIAL_PORT (ctx->qcdm));
         /* Fall down to next step */
         ctx->step++;
 
@@ -1765,7 +1781,7 @@ static void interface_enabling_step (EnablingContext *ctx);
 
 typedef enum {
     ENABLING_STEP_FIRST,
-    ENABLING_STEP_OPEN_PORT,
+    ENABLING_STEP_OPEN_PORTS,
     ENABLING_STEP_FLASH_PORT,
     ENABLING_STEP_MODEM_INIT,
     ENABLING_STEP_MODEM_POWER_UP,
@@ -1782,6 +1798,10 @@ struct _EnablingContext {
     MMIfaceModem *self;
     MMAtSerialPort *primary;
     gboolean primary_open;
+    MMAtSerialPort *secondary;
+    gboolean secondary_open;
+    MMQcdmSerialPort *qcdm;
+    gboolean qcdm_open;
     EnablingStep step;
     MMModemCharset supported_charsets;
     const MMModemCharset *current_charset;
@@ -1800,6 +1820,12 @@ enabling_context_new (MMIfaceModem *self,
     ctx = g_new0 (EnablingContext, 1);
     ctx->self = g_object_ref (self);
     ctx->primary = g_object_ref (mm_base_modem_get_port_primary (MM_BASE_MODEM (self)));
+    ctx->secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+    if (ctx->secondary)
+        g_object_ref (ctx->secondary);
+    ctx->qcdm = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
+    if (ctx->qcdm)
+        g_object_ref (ctx->qcdm);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -1834,13 +1860,21 @@ enabling_context_complete_and_free (EnablingContext *ctx)
              MM_MODEM_STATE_DISABLED :
              MM_MODEM_STATE_LOCKED),
             MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
-        /* Close the port if enabling failed */
+        /* Close the ports if enabling failed */
         if (ctx->primary_open)
             mm_serial_port_close_force (MM_SERIAL_PORT (ctx->primary));
+        if (ctx->secondary_open)
+            mm_serial_port_close_force (MM_SERIAL_PORT (ctx->secondary));
+        if (ctx->qcdm_open)
+            mm_serial_port_close_force (MM_SERIAL_PORT (ctx->qcdm));
     }
 
     g_object_unref (ctx->self);
     g_object_unref (ctx->primary);
+    if (ctx->secondary)
+        g_object_unref (ctx->secondary);
+    if (ctx->qcdm)
+        g_object_unref (ctx->qcdm);
     g_object_unref (ctx->result);
     g_object_unref (ctx->skeleton);
     g_free (ctx);
@@ -2016,16 +2050,37 @@ interface_enabling_step (EnablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case ENABLING_STEP_OPEN_PORT: {
+    case ENABLING_STEP_OPEN_PORTS: {
         GError *error = NULL;
 
-        /* Open port */
+        /* Open primary port */
         if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->primary), &error)) {
             g_simple_async_result_take_error (ctx->result, error);
             enabling_context_complete_and_free (ctx);
             return;
         }
         ctx->primary_open = TRUE;
+
+        /* If there is a secondary AT port, open it */
+        if (ctx->secondary) {
+            if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->secondary), &error)) {
+                g_simple_async_result_take_error (ctx->result, error);
+                enabling_context_complete_and_free (ctx);
+                return;
+            }
+            ctx->secondary_open = TRUE;
+        }
+
+        /* If there is a qcdm AT port, open it */
+        if (ctx->qcdm) {
+            if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->qcdm), &error)) {
+                g_simple_async_result_take_error (ctx->result, error);
+                enabling_context_complete_and_free (ctx);
+                return;
+            }
+            ctx->qcdm_open = TRUE;
+        }
+
         /* Fall down to next step */
         ctx->step++;
     }
