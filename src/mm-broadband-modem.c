@@ -1047,6 +1047,15 @@ setup_indicators (MMIfaceModem *self,
                                         user_data,
                                         setup_indicators);
 
+    /* CDMA-only modems don't need this */
+    if (mm_iface_modem_is_cdma_only (self)) {
+        mm_dbg ("Skipping indicators setup in CDMA-only modem...");
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
     /* Load supported indicators */
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CIND=?",
@@ -1202,16 +1211,28 @@ enable_unsolicited_events (MMIfaceModem *self,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
+    GSimpleAsyncResult *result;
     UnsolicitedEventsContext *ctx;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        enable_unsolicited_events);
+
+    /* CDMA-only modems don't need this */
+    if (mm_iface_modem_is_cdma_only (self)) {
+        mm_dbg ("Skipping unsolicited events enabling in CDMA-only modem...");
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
 
     ctx = g_new0 (UnsolicitedEventsContext, 1);
     ctx->self = g_object_ref (self);
     ctx->enable = TRUE;
     ctx->command = g_strdup ("+CMER=3,0,0,1");
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             enable_unsolicited_events);
+    ctx->result = result;
 
     unsolicited_events (ctx);
 }
@@ -1221,15 +1242,27 @@ disable_unsolicited_events (MMIfaceModem *self,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
+    GSimpleAsyncResult *result;
     UnsolicitedEventsContext *ctx;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        disable_unsolicited_events);
+
+    /* CDMA-only modems don't need this */
+    if (mm_iface_modem_is_cdma_only (self)) {
+        mm_dbg ("Skipping unsolicited events disabling in CDMA-only modem...");
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
 
     ctx = g_new0 (UnsolicitedEventsContext, 1);
     ctx->self = g_object_ref (self);
     ctx->command = g_strdup ("+CMER=0");
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             disable_unsolicited_events);
+    ctx->result = result;
 
     unsolicited_events (ctx);
 }
