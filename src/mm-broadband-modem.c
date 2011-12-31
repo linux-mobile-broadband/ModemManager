@@ -674,12 +674,29 @@ load_unlock_required_finish (MMIfaceModem *self,
                              GAsyncResult *res,
                              GError **error)
 {
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_LOCK_UNKNOWN;
+
+    return (MMModemLock) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+load_unlock_required_ready (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GSimpleAsyncResult *simple)
+{
+
     MMModemLock lock = MM_MODEM_LOCK_UNKNOWN;
     const gchar *result;
+    GError *error = NULL;
 
-    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
-    if (!result)
-        return lock;
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
 
     if (result &&
         strstr (result, "+CPIN: ")) {
@@ -702,7 +719,11 @@ load_unlock_required_finish (MMIfaceModem *self,
         }
     }
 
-    return lock;
+    g_simple_async_result_set_op_res_gpointer (simple,
+                                               GUINT_TO_POINTER (lock),
+                                               NULL);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
 }
 
 static void
@@ -710,15 +731,32 @@ load_unlock_required (MMIfaceModem *self,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
-    mm_dbg ("checking if unlock required...");
+    GSimpleAsyncResult *result;
 
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_unlock_required);
+
+    /* CDMA-only modems don't need this */
+    if (mm_iface_modem_is_cdma_only (self)) {
+        mm_dbg ("Skipping unlock check in CDMA-only modem...");
+        g_simple_async_result_set_op_res_gpointer (result,
+                                                   GUINT_TO_POINTER (MM_MODEM_LOCK_NONE),
+                                                   NULL);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    mm_dbg ("checking if unlock required...");
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CPIN?",
                               3,
                               FALSE,
                               NULL, /* cancellable */
-                              callback,
-                              user_data);
+                              (GAsyncReadyCallback)load_unlock_required_ready,
+                              result);
 }
 
 /*****************************************************************************/
