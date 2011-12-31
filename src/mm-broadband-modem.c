@@ -841,14 +841,15 @@ load_signal_quality_finish (MMIfaceModem *self,
 }
 
 static void
-load_signal_quality_csf_ready (MMBroadbandModem *self,
+load_signal_quality_csq_ready (MMBroadbandModem *self,
                                GAsyncResult *res,
                                GSimpleAsyncResult *simple)
 {
     GError *error = NULL;
-    const gchar *result;
+    GVariant *result;
+    const gchar *result_str;
 
-    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    result = mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, &error);
     if (error) {
         g_simple_async_result_take_error (simple, error);
         g_simple_async_result_complete (simple);
@@ -856,13 +857,14 @@ load_signal_quality_csf_ready (MMBroadbandModem *self,
         return;
     }
 
-    if (result &&
-        !strncmp (result, "+CSQ: ", 6)) {
+    result_str = g_variant_get_string (result, NULL);
+    if (result_str &&
+        !strncmp (result_str, "+CSQ: ", 6)) {
         /* Got valid reply */
         int quality;
         int ber;
 
-        if (sscanf (result + 6, "%d, %d", &quality, &ber)) {
+        if (sscanf (result_str + 6, "%d, %d", &quality, &ber)) {
             /* 99 means unknown */
             if (quality == 99) {
                 g_simple_async_result_take_error (
@@ -890,17 +892,28 @@ load_signal_quality_csf_ready (MMBroadbandModem *self,
     g_object_unref (simple);
 }
 
+/* Some modems want +CSQ, others want +CSQ?, and some of both types
+ * will return ERROR if they don't get the command they want.  So
+ * try the other command if the first one fails.
+ */
+static const MMBaseModemAtCommand signal_quality_csq[] = {
+    { "+CSQ",  3, TRUE, mm_base_modem_response_processor_string },
+    { "+CSQ?", 3, TRUE, mm_base_modem_response_processor_string },
+    { NULL }
+};
+
 static void
-load_signal_quality_csf (MMBroadbandModem *self,
+load_signal_quality_csq (MMBroadbandModem *self,
                          GSimpleAsyncResult *result)
 {
-    mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+CSQ",
-                              3,
-                              FALSE,
-                              NULL, /* cancellable */
-                              (GAsyncReadyCallback)load_signal_quality_csf_ready,
-                              result);
+    mm_base_modem_at_sequence (
+        MM_BASE_MODEM (self),
+        signal_quality_csq,
+        NULL, /* response_processor_context */
+        NULL, /* response_processor_context_free */
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)load_signal_quality_csq_ready,
+        result);
 }
 
 static void
@@ -977,7 +990,7 @@ load_signal_quality (MMIfaceModem *self,
     if (MM_BROADBAND_MODEM (self)->priv->cind_supported)
         load_signal_quality_cind (MM_BROADBAND_MODEM (self), result);
     else
-        load_signal_quality_csf (MM_BROADBAND_MODEM (self), result);
+        load_signal_quality_csq (MM_BROADBAND_MODEM (self), result);
 }
 
 /*****************************************************************************/
