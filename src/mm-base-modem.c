@@ -435,6 +435,32 @@ mm_base_modem_get_best_data_port (MMBaseModem *self)
             self->priv->data);
 }
 
+MMAtSerialPort *
+mm_base_modem_get_best_at_port (MMBaseModem *self,
+                                GError **error)
+{
+    MMAtSerialPort *port;
+
+    /* Decide which port to use */
+    port = mm_base_modem_get_port_primary (self);
+    g_assert (port);
+    if (mm_port_get_connected (MM_PORT (port))) {
+        /* If primary port is connected, check if we can get the secondary
+         * port */
+        port = mm_base_modem_get_port_secondary (self);
+        if (!port) {
+            /* If we don't have a secondary port, we need to halt the AT
+             * operation */
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_CONNECTED,
+                         "No port available to run command");
+        }
+    }
+
+    return port;
+}
+
 gboolean
 mm_base_modem_auth_request (MMBaseModem *self,
                             const gchar *authorization,

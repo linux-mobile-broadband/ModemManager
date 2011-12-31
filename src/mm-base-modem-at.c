@@ -21,32 +21,6 @@
 #include "mm-base-modem-at.h"
 #include "mm-errors-types.h"
 
-static MMAtSerialPort *
-base_modem_at_get_best_port (MMBaseModem *self,
-                             GError **error)
-{
-    MMAtSerialPort *port;
-
-    /* Decide which port to use */
-    port = mm_base_modem_get_port_primary (self);
-    g_assert (port);
-    if (mm_port_get_connected (MM_PORT (port))) {
-        /* If primary port is connected, check if we can get the secondary
-         * port */
-        port = mm_base_modem_get_port_secondary (self);
-        if (!port) {
-            /* If we don't have a secondary port, we need to halt the AT
-             * operation */
-            g_set_error (error,
-                         MM_CORE_ERROR,
-                         MM_CORE_ERROR_CONNECTED,
-                         "No AT port available to run command");
-        }
-    }
-
-    return port;
-}
-
 static gboolean
 abort_async_if_port_unusable (MMBaseModem *self,
                               MMAtSerialPort *port,
@@ -298,7 +272,7 @@ mm_base_modem_at_sequence (MMBaseModem *self,
     GError *error = NULL;
 
     /* No port given, so we'll try to guess which is best */
-    port = base_modem_at_get_best_port (self, &error);
+    port = mm_base_modem_get_best_at_port (self, &error);
     if (!port) {
         g_assert (error != NULL);
         g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
@@ -504,7 +478,7 @@ mm_base_modem_at_command (MMBaseModem *self,
     GError *error = NULL;
 
     /* No port given, so we'll try to guess which is best */
-    port = base_modem_at_get_best_port (self, &error);
+    port = mm_base_modem_get_best_at_port (self, &error);
     if (!port) {
         g_assert (error != NULL);
         g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
@@ -553,7 +527,7 @@ mm_base_modem_at_command_ignore_reply (MMBaseModem *self,
     MMAtSerialPort *port;
 
     /* No port given, so we'll try to guess which is best */
-    port = base_modem_at_get_best_port (self, NULL);
+    port = mm_base_modem_get_best_at_port (self, NULL);
     if (!port)
         /* No valid port, and we ignore replies, so just exit. */
         return;
