@@ -474,10 +474,12 @@ update_signal_quality (MMIfaceModem *self,
     MmGdbusModem *skeleton = NULL;
     const gchar *dbus_path;
 
-    if (G_UNLIKELY (!signal_quality_update_context_quark)) {
+    if (G_UNLIKELY (!signal_quality_update_context_quark))
         signal_quality_update_context_quark = (g_quark_from_static_string (
                                                    SIGNAL_QUALITY_UPDATE_CONTEXT_TAG));
 
+    ctx = g_object_get_qdata (G_OBJECT (self), signal_quality_update_context_quark);
+    if (!ctx) {
         /* Create context and keep it as object data */
         ctx = g_new0 (SignalQualityUpdateContext, 1);
         g_object_set_qdata_full (
@@ -485,8 +487,7 @@ update_signal_quality (MMIfaceModem *self,
             signal_quality_update_context_quark,
             ctx,
             (GDestroyNotify)signal_quality_update_context_free);
-    } else
-        ctx = g_object_get_qdata (G_OBJECT (self), signal_quality_update_context_quark);
+    }
 
     /* Keep current timestamp */
     ctx->last_update = time (NULL);
