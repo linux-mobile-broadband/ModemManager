@@ -21,21 +21,18 @@
 #include <string.h>
 
 #include "com.h"
-#include "error.h"
+#include "errors.h"
 
-gboolean
-qcdm_port_setup (int fd, GError **error)
+int
+qcdm_port_setup (int fd)
 {
     struct termios stbuf;
-
-    g_type_init ();
 
     errno = 0;
     memset (&stbuf, 0, sizeof (stbuf));
     if (tcgetattr (fd, &stbuf) != 0) {
-        g_set_error (error,
-                     QCDM_SERIAL_ERROR, QCDM_SERIAL_CONFIG_FAILED,
-                     "tcgetattr() error: %d", errno);
+        qcdm_err (0, "tcgetattr() error: %d", errno);
+        return -QCDM_ERROR_SERIAL_CONFIG_FAILED;
     }
 
     stbuf.c_cflag &= ~(CBAUD | CSIZE | CSTOPB | CLOCAL | PARENB);
@@ -50,12 +47,10 @@ qcdm_port_setup (int fd, GError **error)
 
     errno = 0;
     if (tcsetattr (fd, TCSANOW, &stbuf) < 0) {
-        g_set_error (error,
-                     QCDM_SERIAL_ERROR, QCDM_SERIAL_CONFIG_FAILED,
-                     "tcsetattr() error: %d", errno);
-        return FALSE;
+        qcdm_err (0, "tcgetattr() error: %d", errno);
+        return -QCDM_ERROR_SERIAL_CONFIG_FAILED;
     }
 
-    return TRUE;
+    return QCDM_SUCCESS;
 }
 

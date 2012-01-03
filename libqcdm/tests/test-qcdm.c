@@ -93,6 +93,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_result_string, NULL));
     g_test_suite_add (suite, TESTCASE (test_result_uint32, NULL));
     g_test_suite_add (suite, TESTCASE (test_result_uint8, NULL));
+    g_test_suite_add (suite, TESTCASE (test_result_uint8_array, NULL));
 
     /* Live tests */
     if (port) {

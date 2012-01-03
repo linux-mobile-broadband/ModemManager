@@ -23,6 +23,7 @@
 #include <string.h>
 
 #include "utils.h"
+#include "errors.h"
 
 /* QCDM protocol frames are pseudo Async HDLC frames which end with a 3-byte
  * trailer.  This trailer consists of the 16-bit CRC of the frame plus an ending
@@ -32,7 +33,7 @@
  */
 
 /* Table of CRCs for each possible byte, with a generator polynomial of 0x8408 */
-const guint16 crc_table[256] = {
+const u_int16_t crc_table[256] = {
     0x0000, 0x1189, 0x2312, 0x329b, 0x4624, 0x57ad, 0x6536, 0x74bf,
     0x8c48, 0x9dc1, 0xaf5a, 0xbed3, 0xca6c, 0xdbe5, 0xe97e, 0xf8f7,
     0x1081, 0x0108, 0x3393, 0x221a, 0x56a5, 0x472c, 0x75b7, 0x643e,
@@ -68,10 +69,10 @@ const guint16 crc_table[256] = {
 };
 
 /* Calculate the CRC for a buffer using a seed of 0xffff */
-guint16
-crc16 (const char *buffer, gsize len)
+u_int16_t
+crc16 (const char *buffer, size_t len)
 {
-    guint16 crc = 0xffff;
+    u_int16_t crc = 0xffff;
 
     while (len--)
             crc = crc_table[(crc ^ *buffer++) & 0xff] ^ (crc >> 8);
@@ -84,20 +85,20 @@ crc16 (const char *buffer, gsize len)
 /* Performs DM escaping on inbuf putting the result into outbuf, and returns
  * the final length of the buffer.
  */
-gsize
+size_t
 dm_escape (const char *inbuf,
-           gsize inbuf_len,
+           size_t inbuf_len,
            char *outbuf,
-           gsize outbuf_len)
+           size_t outbuf_len)
 {
     const char *src = inbuf;
     char *dst = outbuf;
     size_t i = inbuf_len;
 
-    g_return_val_if_fail (inbuf != NULL, 0);
-    g_return_val_if_fail (inbuf_len > 0, 0);
-    g_return_val_if_fail (outbuf != NULL, 0);
-    g_return_val_if_fail (outbuf_len > inbuf_len, 0);
+    qcdm_return_val_if_fail (inbuf != NULL, 0);
+    qcdm_return_val_if_fail (inbuf_len > 0, 0);
+    qcdm_return_val_if_fail (outbuf != NULL, 0);
+    qcdm_return_val_if_fail (outbuf_len > inbuf_len, 0);
 
     /* Since escaping potentially doubles the # of bytes, short-circuit the
      * length check if destination buffer is clearly large enough.  Note the
@@ -136,18 +137,18 @@ dm_escape (const char *inbuf,
     return (dst - outbuf);
 }
 
-gsize
+size_t
 dm_unescape (const char *inbuf,
-             gsize inbuf_len,
+             size_t inbuf_len,
              char *outbuf,
-             gsize outbuf_len,
-             gboolean *escaping)
+             size_t outbuf_len,
+             qcdmbool *escaping)
 {
     size_t i, outsize;
 
-    g_return_val_if_fail (inbuf_len > 0, 0);
-    g_return_val_if_fail (outbuf_len >= inbuf_len, 0);
-    g_return_val_if_fail (escaping != NULL, 0);
+    qcdm_return_val_if_fail (inbuf_len > 0, 0);
+    qcdm_return_val_if_fail (outbuf_len >= inbuf_len, 0);
+    qcdm_return_val_if_fail (escaping != NULL, 0);
 
     for (i = 0, outsize = 0; i < inbuf_len; i++) {
         if (*escaping) {
@@ -179,20 +180,20 @@ dm_unescape (const char *inbuf,
  *
  * Returns: size of the encapsulated QCDM command writted to @outbuf.
  **/
-gsize
+size_t
 dm_encapsulate_buffer (char *inbuf,
-                       gsize cmd_len,
-                       gsize inbuf_len,
+                       size_t cmd_len,
+                       size_t inbuf_len,
                        char *outbuf,
-                       gsize outbuf_len)
+                       size_t outbuf_len)
 {
-    guint16 crc;
-    gsize escaped_len;
+    u_int16_t crc;
+    size_t escaped_len;
 
-    g_return_val_if_fail (inbuf != NULL, 0);
-    g_return_val_if_fail (cmd_len >= 1, 0);
-    g_return_val_if_fail (inbuf_len >= cmd_len + 2, 0); /* space for CRC */
-    g_return_val_if_fail (outbuf != NULL, 0);
+    qcdm_return_val_if_fail (inbuf != NULL, 0);
+    qcdm_return_val_if_fail (cmd_len >= 1, 0);
+    qcdm_return_val_if_fail (inbuf_len >= cmd_len + 2, 0); /* space for CRC */
+    qcdm_return_val_if_fail (outbuf != NULL, 0);
 
     /* Add the CRC */
     crc = crc16 (inbuf, cmd_len);
@@ -200,7 +201,7 @@ dm_encapsulate_buffer (char *inbuf,
     inbuf[cmd_len++] = (crc >> 8) & 0xFF;
 
     escaped_len = dm_escape (inbuf, cmd_len, outbuf, outbuf_len);
-    g_return_val_if_fail (outbuf_len > escaped_len, 0);
+    qcdm_return_val_if_fail (outbuf_len > escaped_len, 0);
     outbuf[escaped_len++] = DIAG_CONTROL_CHAR;
 
     return escaped_len;
@@ -230,25 +231,25 @@ dm_encapsulate_buffer (char *inbuf,
  *  all cases the caller should advance the buffer by the number of bytes
  *  returned in @out_used before calling this function again.
  **/
-gboolean
+qcdmbool
 dm_decapsulate_buffer (const char *inbuf,
-                       gsize inbuf_len,
+                       size_t inbuf_len,
                        char *outbuf,
-                       gsize outbuf_len,
-                       gsize *out_decap_len,
-                       gsize *out_used,
-                       gboolean *out_need_more)
+                       size_t outbuf_len,
+                       size_t *out_decap_len,
+                       size_t *out_used,
+                       qcdmbool *out_need_more)
 {
-    gboolean escaping = FALSE;
-    gsize i, pkt_len = 0, unesc_len;
-    guint16 crc, pkt_crc;
+    qcdmbool escaping = FALSE;
+    size_t i, pkt_len = 0, unesc_len;
+    u_int16_t crc, pkt_crc;
 
-    g_return_val_if_fail (inbuf != NULL, FALSE);
-    g_return_val_if_fail (outbuf != NULL, FALSE);
-    g_return_val_if_fail (outbuf_len > 0, FALSE);
-    g_return_val_if_fail (out_decap_len != NULL, FALSE);
-    g_return_val_if_fail (out_used != NULL, FALSE);
-    g_return_val_if_fail (out_need_more != NULL, FALSE);
+    qcdm_return_val_if_fail (inbuf != NULL, FALSE);
+    qcdm_return_val_if_fail (outbuf != NULL, FALSE);
+    qcdm_return_val_if_fail (outbuf_len > 0, FALSE);
+    qcdm_return_val_if_fail (out_decap_len != NULL, FALSE);
+    qcdm_return_val_if_fail (out_used != NULL, FALSE);
+    qcdm_return_val_if_fail (out_need_more != NULL, FALSE);
 
     *out_decap_len = 0;
     *out_used = 0;

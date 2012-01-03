@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 /*
- * Copyright (C) 2010 Red Hat, Inc.
+ * Copyright (C) 2011 Red Hat, Inc.
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of version 2 of the GNU General Public
@@ -18,34 +18,31 @@
 #ifndef LIBQCDM_RESULT_PRIVATE_H
 #define LIBQCDM_RESULT_PRIVATE_H
 
-#include <glib.h>
-#include <glib-object.h>
 #include "result.h"
 
-QCDMResult *qcdm_result_new (void);
+QcdmResult *qcdm_result_new (void);
 
-/* For these functions, 'key' *must* be a constant, not allocated and freed */
-
-void qcdm_result_add_string (QCDMResult *result,
+void qcdm_result_add_string (QcdmResult *result,
                              const char *key,
                              const char *str);
 
-void qcdm_result_add_uint8  (QCDMResult *result,
+void qcdm_result_add_u8     (QcdmResult *result,
                              const char *key,
-                             guint8 num);
+                             u_int8_t num);
 
-void qcdm_result_add_uint32 (QCDMResult *result,
+void qcdm_result_add_u8_array (QcdmResult *result,
+                               const char *key,
+                               const u_int8_t *array,
+                               size_t array_len);
+
+int qcdm_result_get_u8_array  (QcdmResult *result,
+                               const char *key,
+                               const u_int8_t **out_val,
+                               size_t *out_len);
+
+void qcdm_result_add_u32    (QcdmResult *result,
                              const char *key,
-                             guint32 num);
-
-void qcdm_result_add_boxed  (QCDMResult *result,
-                             const char *key,
-                             GType btype,
-                             gpointer boxed);
-
-gboolean qcdm_result_get_boxed (QCDMResult *result,
-                                const char *key,
-                                gpointer *out_val);
+                             u_int32_t num);
 
 #endif  /* LIBQCDM_RESULT_PRIVATE_H */
 

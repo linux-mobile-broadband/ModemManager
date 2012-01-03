@@ -110,7 +110,7 @@ test_escape_unescape (void *f, void *data)
     char escaped[512];
     char unescaped[512];
     gsize len, unlen;
-    gboolean escaping = FALSE;
+    qcdmbool escaping = FALSE;
 
     /* Ensure that escaping data that needs escaping, and then unescaping it,
      * produces the exact same data as was originally escaped.

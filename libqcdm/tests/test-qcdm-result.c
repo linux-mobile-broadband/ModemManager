@@ -29,7 +29,7 @@ test_result_string (void *f, void *data)
 {
     const char *str = "foobarblahblahblah";
     const char *tmp = NULL;
-    QCDMResult *result;
+    QcdmResult *result;
 
     result = qcdm_result_new ();
     qcdm_result_add_string (result, TEST_TAG, str);
@@ -46,13 +46,13 @@ test_result_uint32 (void *f, void *data)
 {
     guint32 num = 0xDEADBEEF;
     guint32 tmp = 0;
-    QCDMResult *result;
+    QcdmResult *result;
 
     result = qcdm_result_new ();
-    qcdm_result_add_uint32 (result, TEST_TAG, num);
+    qcdm_result_add_u32 (result, TEST_TAG, num);
 
-    qcdm_result_get_uint32 (result, TEST_TAG, &tmp);
-    g_assert (tmp == num);
+    qcdm_result_get_u32 (result, TEST_TAG, &tmp);
+    g_assert_cmpint (tmp, ==, num);
 }
 
 void
@@ -60,12 +60,28 @@ test_result_uint8 (void *f, void *data)
 {
     guint8 num = 0x1E;
     guint8 tmp = 0;
-    QCDMResult *result;
+    QcdmResult *result;
 
     result = qcdm_result_new ();
-    qcdm_result_add_uint8 (result, TEST_TAG, num);
+    qcdm_result_add_u8 (result, TEST_TAG, num);
 
-    qcdm_result_get_uint8 (result, TEST_TAG, &tmp);
+    qcdm_result_get_u8 (result, TEST_TAG, &tmp);
     g_assert (tmp == num);
+}
+
+void
+test_result_uint8_array (void *f, void *data)
+{
+    u_int8_t array[] = { 0, 1, 255, 32, 128, 127 };
+    const u_int8_t *tmp = NULL;
+    size_t tmp_len = 0;
+    QcdmResult *result;
+
+    result = qcdm_result_new ();
+    qcdm_result_add_u8_array (result, TEST_TAG, array, sizeof (array));
+
+    qcdm_result_get_u8_array (result, TEST_TAG, &tmp, &tmp_len);
+    g_assert_cmpint (tmp_len, ==, sizeof (array));
+    g_assert_cmpint (memcmp (tmp, array, tmp_len), ==, 0);
 }
 

@@ -18,8 +18,8 @@
 #ifndef LIBQCDM_COM_H
 #define LIBQCDM_COM_H
 
-#include <glib.h>
+#include "utils.h"
 
-gboolean qcdm_port_setup (int fd, GError **error);
+int qcdm_port_setup (int fd);
 
 #endif  /* LIBQCDM_COM_H */

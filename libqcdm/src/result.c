@@ -16,233 +16,359 @@
  */
 
 #include <string.h>
-#include <glib.h>
+#include <stdlib.h>
 
 #include "result.h"
 #include "result-private.h"
-#include "error.h"
+#include "errors.h"
 
-struct QCDMResult {
-    guint32 refcount;
-    GHashTable *hash;
+/*********************************************************/
+
+typedef struct Val Val;
+
+typedef enum {
+    VAL_TYPE_NONE = 0,
+    VAL_TYPE_STRING = 1,
+    VAL_TYPE_U8 = 2,
+    VAL_TYPE_U32 = 3,
+    VAL_TYPE_U8_ARRAY = 4,
+} ValType;
+
+struct Val {
+    char *key;
+    ValType type;
+    union {
+        char *s;
+        u_int8_t u8;
+        u_int32_t u32;
+        u_int8_t *u8_array;
+    } u;
+    u_int32_t array_len;
+    Val *next;
 };
 
-
 static void
-gvalue_destroy (gpointer data)
+val_free (Val *v)
 {
-    GValue *value = (GValue *) data;
-
-    g_value_unset (value);
-    g_slice_free (GValue, value);
+    if (v->type == VAL_TYPE_STRING) {
+        if (v->u.s)
+            free (v->u.s);
+    } else if (v->type == VAL_TYPE_U8_ARRAY) {
+        if (v->u.u8_array);
+            free (v->u.u8_array);
+    }
+    free (v->key);
+    memset (v, 0, sizeof (*v));
+    free (v);
 }
 
-QCDMResult *
+static Val *
+val_new_string (const char *key, const char *value)
+{
+    Val *v;
+
+    qcdm_return_val_if_fail (key != NULL, NULL);
+    qcdm_return_val_if_fail (key[0] != '\0', NULL);
+    qcdm_return_val_if_fail (value != NULL, NULL);
+
+    v = calloc (sizeof (Val), 1);
+    if (v == NULL)
+        return NULL;
+
+    v->key = strdup (key);
+    v->type = VAL_TYPE_STRING;
+    v->u.s = strdup (value);
+    return v;
+}
+
+static Val *
+val_new_u8 (const char *key, u_int8_t u)
+{
+    Val *v;
+
+    qcdm_return_val_if_fail (key != NULL, NULL);
+    qcdm_return_val_if_fail (key[0] != '\0', NULL);
+
+    v = calloc (sizeof (Val), 1);
+    if (v == NULL)
+        return NULL;
+
+    v->key = strdup (key);
+    v->type = VAL_TYPE_U8;
+    v->u.u8 = u;
+    return v;
+}
+
+static Val *
+val_new_u8_array (const char *key, const u_int8_t *array, size_t array_len)
+{
+    Val *v;
+
+    qcdm_return_val_if_fail (key != NULL, NULL);
+    qcdm_return_val_if_fail (key[0] != '\0', NULL);
+    qcdm_return_val_if_fail (array != NULL, NULL);
+    qcdm_return_val_if_fail (array_len > 0, NULL);
+
+    v = calloc (sizeof (Val), 1);
+    if (v == NULL)
+        return NULL;
+
+    v->key = strdup (key);
+    v->type = VAL_TYPE_U8_ARRAY;
+    v->u.u8_array = malloc (array_len);
+    if (v->u.u8_array == NULL) {
+        val_free (v);
+        return NULL;
+    }
+    memcpy (v->u.u8_array, array, array_len);
+    v->array_len = array_len;
+
+    return v;
+}
+
+static Val *
+val_new_u32 (const char *key, u_int32_t u)
+{
+    Val *v;
+
+    qcdm_return_val_if_fail (key != NULL, NULL);
+    qcdm_return_val_if_fail (key[0] != '\0', NULL);
+
+    v = calloc (sizeof (Val), 1);
+    if (v == NULL)
+        return NULL;
+
+    v->key = strdup (key);
+    v->type = VAL_TYPE_U32;
+    v->u.u32 = u;
+    return v;
+}
+
+/*********************************************************/
+
+struct QcdmResult {
+    u_int32_t refcount;
+    Val *first;
+};
+
+QcdmResult *
 qcdm_result_new (void)
 {
-    QCDMResult *result;
+    QcdmResult *r;
 
-    g_type_init ();
-
-    result = g_malloc0 (sizeof (QCDMResult));
-    result->hash = g_hash_table_new_full (g_str_hash, g_str_equal,
-                                          NULL, gvalue_destroy);
-    result->refcount = 1;
-    return result;
+    r = calloc (sizeof (QcdmResult), 1);
+    if (r)
+        r->refcount = 1;
+    return r;
 }
 
-QCDMResult *
-qcdm_result_ref (QCDMResult *result)
+QcdmResult *
+qcdm_result_ref (QcdmResult *r)
 {
-    g_return_val_if_fail (result != NULL, NULL);
-    g_return_val_if_fail (result->refcount > 0, NULL);
+    qcdm_return_val_if_fail (r != NULL, NULL);
+    qcdm_return_val_if_fail (r->refcount > 0, NULL);
 
-    result->refcount++;
-    return result;
+    r->refcount++;
+    return r;
 }
 
-void
-qcdm_result_unref (QCDMResult *result)
+static void
+qcdm_result_free (QcdmResult *r)
 {
-    g_return_if_fail (result != NULL);
-    g_return_if_fail (result->refcount > 0);
+    Val *v, *n;
 
-    result->refcount--;
-    if (result->refcount == 0) {
-        g_hash_table_destroy (result->hash);
-        memset (result, 0, sizeof (QCDMResult));
-        g_free (result);
+    v = r->first;
+    while (v) {
+        n = v->next;
+        val_free (v);
+        v = n;
     }
+    memset (r, 0, sizeof (*r));
+    free (r);
 }
 
 void
-qcdm_result_add_string (QCDMResult *result,
-                        const char *key,
-                        const char *str)
+qcdm_result_unref (QcdmResult *r)
 {
-    GValue *val;
+    qcdm_return_if_fail (r != NULL);
+    qcdm_return_if_fail (r->refcount > 0);
 
-    g_return_if_fail (result != NULL);
-    g_return_if_fail (result->refcount > 0);
-    g_return_if_fail (key != NULL);
-    g_return_if_fail (str != NULL);
-
-    val = g_slice_new0 (GValue);
-    g_value_init (val, G_TYPE_STRING);
-    g_value_set_string (val, str);
-
-    g_hash_table_insert (result->hash, (gpointer) key, val);
+    r->refcount--;
+    if (r->refcount == 0)
+        qcdm_result_free (r);
 }
 
-gboolean
-qcdm_result_get_string (QCDMResult *result,
-                        const char *key,
-                        const char **out_val)
+static Val *
+find_val (QcdmResult *r, const char *key, ValType expected_type)
 {
-    GValue *val;
+    Val *v, *n;
 
-    g_return_val_if_fail (result != NULL, FALSE);
-    g_return_val_if_fail (result->refcount > 0, FALSE);
-    g_return_val_if_fail (key != NULL, FALSE);
-    g_return_val_if_fail (out_val != NULL, FALSE);
-    g_return_val_if_fail (*out_val == NULL, FALSE);
-
-    val = g_hash_table_lookup (result->hash, key);
-    if (!val)
-        return FALSE;
-
-    g_warn_if_fail (G_VALUE_HOLDS_STRING (val));
-    if (!G_VALUE_HOLDS_STRING (val))
-        return FALSE;
-
-    *out_val = g_value_get_string (val);
-    return TRUE;
+    v = r->first;
+    while (v) {
+        n = v->next;
+        if (strcmp (v->key, key) == 0) {
+            /* Check type */
+            qcdm_return_val_if_fail (v->type == expected_type, NULL);
+            return v;
+        }
+        v = n;
+    }
+    return NULL;
 }
 
 void
-qcdm_result_add_uint8 (QCDMResult *result,
-                        const char *key,
-                        guint8 num)
-{
-    GValue *val;
-
-    g_return_if_fail (result != NULL);
-    g_return_if_fail (result->refcount > 0);
-    g_return_if_fail (key != NULL);
-
-    val = g_slice_new0 (GValue);
-    g_value_init (val, G_TYPE_UCHAR);
-    g_value_set_uchar (val, (unsigned char) num);
-
-    g_hash_table_insert (result->hash, (gpointer) key, val);
-}
-
-gboolean
-qcdm_result_get_uint8  (QCDMResult *result,
-                        const char *key,
-                        guint8 *out_val)
-{
-    GValue *val;
-
-    g_return_val_if_fail (result != NULL, FALSE);
-    g_return_val_if_fail (result->refcount > 0, FALSE);
-    g_return_val_if_fail (key != NULL, FALSE);
-    g_return_val_if_fail (out_val != NULL, FALSE);
-
-    val = g_hash_table_lookup (result->hash, key);
-    if (!val)
-        return FALSE;
-
-    g_warn_if_fail (G_VALUE_HOLDS_UCHAR (val));
-    if (!G_VALUE_HOLDS_UCHAR (val))
-        return FALSE;
-
-    *out_val = (guint8) g_value_get_uchar (val);
-    return TRUE;
-}
-
-void
-qcdm_result_add_uint32 (QCDMResult *result,
-                        const char *key,
-                        guint32 num)
-{
-    GValue *val;
-
-    g_return_if_fail (result != NULL);
-    g_return_if_fail (result->refcount > 0);
-    g_return_if_fail (key != NULL);
-
-    val = g_slice_new0 (GValue);
-    g_value_init (val, G_TYPE_UINT);
-    g_value_set_uint (val, num);
-
-    g_hash_table_insert (result->hash, (gpointer) key, val);
-}
-
-gboolean
-qcdm_result_get_uint32 (QCDMResult *result,
-                        const char *key,
-                        guint32 *out_val)
-{
-    GValue *val;
-
-    g_return_val_if_fail (result != NULL, FALSE);
-    g_return_val_if_fail (result->refcount > 0, FALSE);
-    g_return_val_if_fail (key != NULL, FALSE);
-    g_return_val_if_fail (out_val != NULL, FALSE);
-
-    val = g_hash_table_lookup (result->hash, key);
-    if (!val)
-        return FALSE;
-
-    g_warn_if_fail (G_VALUE_HOLDS_UINT (val));
-    if (!G_VALUE_HOLDS_UINT (val))
-        return FALSE;
-
-    *out_val = (guint32) g_value_get_uint (val);
-    return TRUE;
-}
-
-void
-qcdm_result_add_boxed (QCDMResult *result,
+qcdm_result_add_string (QcdmResult *r,
                        const char *key,
-                       GType btype,
-                       gpointer boxed)
+                       const char *str)
 {
-    GValue *val;
+    Val *v;
 
-    g_return_if_fail (result != NULL);
-    g_return_if_fail (result->refcount > 0);
-    g_return_if_fail (key != NULL);
+    qcdm_return_if_fail (r != NULL);
+    qcdm_return_if_fail (r->refcount > 0);
+    qcdm_return_if_fail (key != NULL);
+    qcdm_return_if_fail (str != NULL);
 
-    val = g_slice_new0 (GValue);
-    g_value_init (val, btype);
-    g_value_set_static_boxed (val, boxed);
-
-    g_hash_table_insert (result->hash, (gpointer) key, val);
+    v = val_new_string (key, str);
+    qcdm_return_if_fail (v != NULL);
+    v->next = r->first;
+    r->first = v;
 }
 
-gboolean
-qcdm_result_get_boxed (QCDMResult *result,
+int
+qcdm_result_get_string (QcdmResult *r,
                        const char *key,
-                       gpointer *out_val)
+                       const char **out_val)
 {
-    GValue *val;
+    Val *v;
 
-    g_return_val_if_fail (result != NULL, FALSE);
-    g_return_val_if_fail (result->refcount > 0, FALSE);
-    g_return_val_if_fail (key != NULL, FALSE);
-    g_return_val_if_fail (out_val != NULL, FALSE);
+    qcdm_return_val_if_fail (r != NULL, -QCDM_ERROR_INVALID_ARGUMENTS);
+    qcdm_return_val_if_fail (r->refcount > 0, -QCDM_ERROR_INVALID_ARGUMENTS);
+    qcdm_return_val_if_fail (key != NULL, -QCDM_ERROR_INVALID_ARGUMENTS);
+    qcdm_return_val_if_fail (out_val != NULL, -QCDM_ERROR_INVALID_ARGUMENTS);
+    qcdm_return_val_if_fail (*out_val == NULL, -QCDM_ERROR_INVALID_ARGUMENTS);
 
-    val = g_hash_table_lookup (result->hash, key);
-    if (!val)
-        return FALSE;
+    v = find_val (r, key, VAL_TYPE_STRING);
+    if (v == NULL)
+        return -QCDM_ERROR_VALUE_NOT_FOUND;
 
-    g_warn_if_fail (G_VALUE_HOLDS_BOXED (val));
-    if (!G_VALUE_HOLDS_BOXED (val))
-        return FALSE;
+    *out_val = v->u.s;
+    return 0;
+}
 
-    *out_val = g_value_get_boxed (val);
-    return TRUE;
+void
+qcdm_result_add_u8 (QcdmResult *r,
+                   const char *key,
+                   u_int8_t num)
+{
+    Val *v;
+
+    qcdm_return_if_fail (r != NULL);
+    qcdm_return_if_fail (r->refcount > 0);
+    qcdm_return_if_fail (key != NULL);
+
+    v = val_new_u8 (key, num);
+    qcdm_return_if_fail (v != NULL);
+    v->next = r->first;
+    r->first = v;
+}
+
+int
+qcdm_result_get_u8  (QcdmResult *r,
+                    const char *key,
+                    u_int8_t *out_val)
+{
+    Val *v;
+
+    qcdm_return_val_if_fail (r != NULL, -QCDM_ERROR_INVALID_ARGUMENTS);
+    qcdm_return_val_if_fail (r->refcount > 0, -QCDM_ERROR_INVALID_ARGUMENTS);
+    qcdm_return_val_if_fail (key != NULL, -QCDM_ERROR_INVALID_ARGUMENTS);
+    qcdm_return_val_if_fail (out_val != NULL, -QCDM_ERROR_INVALID_ARGUMENTS);
+
+    v = find_val (r, key, VAL_TYPE_U8);
+    if (v == NULL)
+        return -QCDM_ERROR_VALUE_NOT_FOUND;
+
+    *out_val = v->u.u8;
+    return 0;
+}
+
+void
+qcdm_result_add_u8_array (QcdmResult *r,
+                          const char *key,
+                          const u_int8_t *array,
+                          size_t array_len)
+{
+    Val *v;
+
+    qcdm_return_if_fail (r != NULL);
+    qcdm_return_if_fail (r->refcount > 0);
+    qcdm_return_if_fail (key != NULL);
+    qcdm_return_if_fail (array != NULL);
+    qcdm_return_if_fail (array_len >= 0);
+
+    v = val_new_u8_array (key, array, array_len);
+    qcdm_return_if_fail (v != NULL);
+    v->next = r->first;
+    r->first = v;
+}
+
+int
+qcdm_result_get_u8_array (QcdmResult *r,
+                          const char *key,
+                          const u_int8_t **out_val,
+                          size_t *out_len)
+{
+    Val *v;
+
+    qcdm_return_val_if_fail (r != NULL, -QCDM_ERROR_INVALID_ARGUMENTS);
+    qcdm_return_val_if_fail (r->refcount > 0, -QCDM_ERROR_INVALID_ARGUMENTS);
+    qcdm_return_val_if_fail (key != NULL, -QCDM_ERROR_INVALID_ARGUMENTS);
+    qcdm_return_val_if_fail (out_val != NULL, -QCDM_ERROR_INVALID_ARGUMENTS);
+    qcdm_return_val_if_fail (out_len != NULL, -QCDM_ERROR_INVALID_ARGUMENTS);
+
+    v = find_val (r, key, VAL_TYPE_U8_ARRAY);
+    if (v == NULL)
+        return -QCDM_ERROR_VALUE_NOT_FOUND;
+
+    *out_val = v->u.u8_array;
+    *out_len = v->array_len;
+    return 0;
+}
+
+void
+qcdm_result_add_u32 (QcdmResult *r,
+                    const char *key,
+                    u_int32_t num)
+{
+    Val *v;
+
+    qcdm_return_if_fail (r != NULL);
+    qcdm_return_if_fail (r->refcount > 0);
+    qcdm_return_if_fail (key != NULL);
+
+    v = val_new_u32 (key, num);
+    qcdm_return_if_fail (v != NULL);
+    v->next = r->first;
+    r->first = v;
+}
+
+int
+qcdm_result_get_u32 (QcdmResult *r,
+                    const char *key,
+                    u_int32_t *out_val)
+{
+    Val *v;
+
+    qcdm_return_val_if_fail (r != NULL, -QCDM_ERROR_INVALID_ARGUMENTS);
+    qcdm_return_val_if_fail (r->refcount > 0, -QCDM_ERROR_INVALID_ARGUMENTS);
+    qcdm_return_val_if_fail (key != NULL, -QCDM_ERROR_INVALID_ARGUMENTS);
+    qcdm_return_val_if_fail (out_val != NULL, -QCDM_ERROR_INVALID_ARGUMENTS);
+
+    v = find_val (r, key, VAL_TYPE_U32);
+    if (v == NULL)
+        return -QCDM_ERROR_VALUE_NOT_FOUND;
+
+    *out_val = v->u.u32;
+    return 0;
 }
 
