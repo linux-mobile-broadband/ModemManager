@@ -1730,6 +1730,15 @@ mm_iface_modem_3gpp_initialize (MMIfaceModem3gpp *self,
         g_object_set (self,
                       MM_IFACE_MODEM_3GPP_DBUS_SKELETON, skeleton,
                       NULL);
+
+        /* If the modem is *only* LTE, we assume that CS network is not
+         * supported */
+        if (mm_iface_modem_is_3gpp_lte_only (MM_IFACE_MODEM (self))) {
+            mm_dbg ("Modem is LTE-only, assuming CS network is not supported");
+            g_object_set (self,
+                          MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED, FALSE,
+                          NULL);
+        }
     }
 
     /* Perform async initialization here */
