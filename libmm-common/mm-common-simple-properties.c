@@ -342,6 +342,7 @@ finalize (GObject *object)
 {
     MMCommonSimpleProperties *self = MM_COMMON_SIMPLE_PROPERTIES (object);
 
+    g_variant_unref (self->priv->signal_quality);
     g_variant_unref (self->priv->bands);
     if (self->priv->bands_array)
         g_array_unref (self->priv->bands_array);
