@@ -3319,21 +3319,27 @@ set_property (GObject *object,
 
     switch (prop_id) {
     case PROP_MODEM_DBUS_SKELETON:
+        g_clear_object (&self->priv->modem_dbus_skeleton);
         self->priv->modem_dbus_skeleton = g_value_dup_object (value);
         break;
     case PROP_MODEM_3GPP_DBUS_SKELETON:
+        g_clear_object (&self->priv->modem_3gpp_dbus_skeleton);
         self->priv->modem_3gpp_dbus_skeleton = g_value_dup_object (value);
         break;
     case PROP_MODEM_CDMA_DBUS_SKELETON:
+        g_clear_object (&self->priv->modem_cdma_dbus_skeleton);
         self->priv->modem_cdma_dbus_skeleton = g_value_dup_object (value);
         break;
     case PROP_MODEM_SIMPLE_DBUS_SKELETON:
+        g_clear_object (&self->priv->modem_simple_dbus_skeleton);
         self->priv->modem_simple_dbus_skeleton = g_value_dup_object (value);
         break;
     case PROP_MODEM_SIM:
+        g_clear_object (&self->priv->modem_sim);
         self->priv->modem_sim = g_value_dup_object (value);
         break;
     case PROP_MODEM_BEARER_LIST:
+        g_clear_object (&self->priv->modem_bearer_list);
         self->priv->modem_bearer_list = g_value_dup_object (value);
         break;
     case PROP_MODEM_STATE:
@@ -3352,6 +3358,7 @@ set_property (GObject *object,
         self->priv->modem_3gpp_ps_network_supported = g_value_get_boolean (value);
         break;
     case PROP_MODEM_SIMPLE_STATUS:
+        g_clear_object (&self->priv->modem_simple_status);
         self->priv->modem_simple_status = g_value_dup_object (value);
         break;
     default:
@@ -3444,7 +3451,6 @@ dispose (GObject *object)
     MMBroadbandModem *self = MM_BROADBAND_MODEM (object);
 
     if (self->priv->modem_dbus_skeleton) {
-        /* TODO: Cancel initialization/enabling/disabling, whatever */
         mm_iface_modem_shutdown (MM_IFACE_MODEM (object));
         g_clear_object (&self->priv->modem_dbus_skeleton);
     }
@@ -3464,12 +3470,8 @@ dispose (GObject *object)
         g_clear_object (&self->priv->modem_simple_dbus_skeleton);
     }
 
-    if (self->priv->modem_sim)
-        g_clear_object (&self->priv->modem_sim);
-
-    if (self->priv->modem_bearer_list)
-        g_clear_object (&self->priv->modem_bearer_list);
-
+    g_clear_object (&self->priv->modem_sim);
+    g_clear_object (&self->priv->modem_bearer_list);
     g_clear_object (&self->priv->modem_simple_status);
 
     G_OBJECT_CLASS (mm_broadband_modem_parent_class)->dispose (object);
