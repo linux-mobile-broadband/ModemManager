@@ -715,21 +715,23 @@ get_registration_state_context (MMIfaceModem3gpp *self)
 {
     RegistrationStateContext *ctx;
 
-    if (G_UNLIKELY (!registration_state_context_quark)) {
+    if (G_UNLIKELY (!registration_state_context_quark))
         registration_state_context_quark =  (g_quark_from_static_string (
                                                  REGISTRATION_STATE_CONTEXT_TAG));
+
+    ctx = g_object_get_qdata (G_OBJECT (self), registration_state_context_quark);
+    if (!ctx) {
         /* Create context and keep it as object data */
         ctx = g_new0 (RegistrationStateContext, 1);
+        ctx->cs = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+        ctx->ps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+
         g_object_set_qdata_full (
             G_OBJECT (self),
             registration_state_context_quark,
             ctx,
             (GDestroyNotify)g_free);
-
-        ctx->cs = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-        ctx->ps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
-    } else
-        ctx = g_object_get_qdata (G_OBJECT (self), registration_state_context_quark);
+    }
 
     return ctx;
 }
