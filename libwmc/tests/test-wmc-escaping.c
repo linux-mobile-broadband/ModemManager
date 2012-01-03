@@ -76,7 +76,7 @@ void
 test_escape1 (void *f, void *data)
 {
     char escaped[1024];
-    gsize len;
+    size_t len;
 
     /* Ensure that escaping in general works */
     len = hdlc_escape (data1, sizeof (data1), FALSE, escaped, sizeof (escaped));
@@ -96,7 +96,7 @@ void
 test_escape2 (void *f, void *data)
 {
     char escaped[1024];
-    gsize len;
+    size_t len;
 
     /* Ensure that escaping data that doesn't need escaping works */
     len = hdlc_escape (data2, sizeof (data2), FALSE, escaped, sizeof (escaped));
@@ -119,7 +119,7 @@ void
 test_escape_ctrl (void *f, void *data)
 {
     char escaped[1024];
-    gsize len;
+    size_t len;
 
     len = hdlc_escape (data_ctrl_src, sizeof (data_ctrl_src), TRUE, escaped, sizeof (escaped));
     g_assert (len == sizeof (data_ctrl_expected));
@@ -131,8 +131,8 @@ test_escape_unescape (void *f, void *data)
 {
     char escaped[512];
     char unescaped[512];
-    gsize len, unlen;
-    gboolean escaping = FALSE;
+    size_t len, unlen;
+    wmcbool escaping = FALSE;
 
     /* Ensure that escaping data that needs escaping, and then unescaping it,
      * produces the exact same data as was originally escaped.
@@ -149,8 +149,8 @@ test_escape_unescape_ctrl (void *f, void *data)
 {
     char escaped[512];
     char unescaped[512];
-    gsize len, unlen;
-    gboolean escaping = FALSE;
+    size_t len, unlen;
+    wmcbool escaping = FALSE;
 
     /* Ensure that escaping data that needs escaping, and then unescaping it,
      * produces the exact same data as was originally escaped.

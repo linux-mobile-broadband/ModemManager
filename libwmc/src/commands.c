@@ -27,7 +27,7 @@
 /**********************************************************************/
 
 static int
-check_command (const char *buf, gsize len, u_int8_t cmd, size_t min_len)
+check_command (const char *buf, size_t len, u_int8_t cmd, size_t min_len)
 {
     if (len < 1) {
         wmc_err (0, "Zero-length response");
@@ -95,9 +95,9 @@ wmc_cmd_init_new (char *buf, size_t buflen, int wmc2)
 }
 
 WmcResult *
-wmc_cmd_init_result (const char *buf, gsize buflen, int wmc2)
+wmc_cmd_init_result (const char *buf, size_t buflen, int wmc2)
 {
-    g_return_val_if_fail (buf != NULL, NULL);
+    wmc_return_val_if_fail (buf != NULL, NULL);
 
     if (wmc2) {
         if (check_command (buf, buflen, WMC_CMD_INIT, sizeof (WmcCmdInit2Rsp)) < 0)
@@ -127,14 +127,14 @@ wmc_cmd_device_info_new (char *buf, size_t buflen)
 }
 
 WmcResult *
-wmc_cmd_device_info_result (const char *buf, gsize buflen)
+wmc_cmd_device_info_result (const char *buf, size_t buflen)
 {
     WmcResult *r = NULL;
     WmcCmdDeviceInfoRsp *rsp = (WmcCmdDeviceInfoRsp *) buf;
     WmcCmdDeviceInfo2Rsp *rsp2 = (WmcCmdDeviceInfo2Rsp *) buf;
     char tmp[65];
 
-    g_return_val_if_fail (buf != NULL, NULL);
+    wmc_return_val_if_fail (buf != NULL, NULL);
 
     if (check_command (buf, buflen, WMC_CMD_DEVICE_INFO, sizeof (WmcCmdDeviceInfo2Rsp)) < 0) {
         rsp2 = NULL;
@@ -146,50 +146,50 @@ wmc_cmd_device_info_result (const char *buf, gsize buflen)
 
     /* Manf */
     memset (tmp, 0, sizeof (tmp));
-    g_assert (sizeof (rsp->manf) <= sizeof (tmp));
+    wmc_assert (sizeof (rsp->manf) <= sizeof (tmp));
     memcpy (tmp, rsp->manf, sizeof (rsp->manf));
     wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_MANUFACTURER, tmp);
 
     /* Model */
     memset (tmp, 0, sizeof (tmp));
-    g_assert (sizeof (rsp->model) <= sizeof (tmp));
+    wmc_assert (sizeof (rsp->model) <= sizeof (tmp));
     memcpy (tmp, rsp->model, sizeof (rsp->model));
     wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_MODEL, tmp);
 
     /* Firmware revision */
     memset (tmp, 0, sizeof (tmp));
-    g_assert (sizeof (rsp->fwrev) <= sizeof (tmp));
+    wmc_assert (sizeof (rsp->fwrev) <= sizeof (tmp));
     memcpy (tmp, rsp->fwrev, sizeof (rsp->fwrev));
     wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_FW_REVISION, tmp);
 
     /* Hardware revision */
     memset (tmp, 0, sizeof (tmp));
-    g_assert (sizeof (rsp->hwrev) <= sizeof (tmp));
+    wmc_assert (sizeof (rsp->hwrev) <= sizeof (tmp));
     memcpy (tmp, rsp->hwrev, sizeof (rsp->hwrev));
     wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_HW_REVISION, tmp);
 
     if (rsp2) {
         /* IMEI */
         memset (tmp, 0, sizeof (tmp));
-        g_assert (sizeof (rsp2->imei) <= sizeof (tmp));
+        wmc_assert (sizeof (rsp2->imei) <= sizeof (tmp));
         memcpy (tmp, rsp2->imei, sizeof (rsp2->imei));
         wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_IMEI, tmp);
 
         /* IMSI */
         memset (tmp, 0, sizeof (tmp));
-        g_assert (sizeof (rsp2->iccid) <= sizeof (tmp));
+        wmc_assert (sizeof (rsp2->iccid) <= sizeof (tmp));
         memcpy (tmp, rsp2->iccid, sizeof (rsp2->iccid));
         wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_ICCID, tmp);
 
         /* MCC */
         memset (tmp, 0, sizeof (tmp));
-        g_assert (sizeof (rsp2->mcc) <= sizeof (tmp));
+        wmc_assert (sizeof (rsp2->mcc) <= sizeof (tmp));
         memcpy (tmp, rsp2->mcc, sizeof (rsp2->mcc));
         wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_MCC, tmp);
 
         /* MNC */
         memset (tmp, 0, sizeof (tmp));
-        g_assert (sizeof (rsp2->mnc) <= sizeof (tmp));
+        wmc_assert (sizeof (rsp2->mnc) <= sizeof (tmp));
         memcpy (tmp, rsp2->mnc, sizeof (rsp2->mnc));
         wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_MNC, tmp);
     }
@@ -221,14 +221,14 @@ sanitize_dbm (u_int8_t in_dbm)
 }
 
 WmcResult *
-wmc_cmd_status_result (const char *buf, gsize buflen)
+wmc_cmd_status_result (const char *buf, size_t buflen)
 {
     WmcResult *r = NULL;
     WmcCmdStatusRsp *rsp = (WmcCmdStatusRsp *) buf;
     WmcCmdStatus2Rsp *rsp2 = (WmcCmdStatus2Rsp *) buf;
     char tmp[65];
 
-    g_return_val_if_fail (buf != NULL, NULL);
+    wmc_return_val_if_fail (buf != NULL, NULL);
 
     if (check_command (buf, buflen, WMC_CMD_STATUS, sizeof (WmcCmdStatus2Rsp)) < 0) {
         rsp2 = NULL;
@@ -247,12 +247,12 @@ wmc_cmd_status_result (const char *buf, gsize buflen)
         memset (tmp, 0, sizeof (tmp));
         if (sanitize_dbm (rsp2->lte_dbm)) {
             /* LTE operator name */
-            g_assert (sizeof (rsp2->lte_opname) <= sizeof (tmp));
+            wmc_assert (sizeof (rsp2->lte_opname) <= sizeof (tmp));
             memcpy (tmp, rsp2->lte_opname, sizeof (rsp2->lte_opname));
             wmc_result_add_string (r, WMC_CMD_STATUS_ITEM_OPNAME, tmp);
         } else if (sanitize_dbm (rsp2->hdr_dbm) || sanitize_dbm (rsp2->cdma1x_dbm)) {
             /* CDMA2000 operator name */
-            g_assert (sizeof (rsp2->cdma_opname) <= sizeof (tmp));
+            wmc_assert (sizeof (rsp2->cdma_opname) <= sizeof (tmp));
             memcpy (tmp, rsp2->cdma_opname, sizeof (rsp2->cdma_opname));
             wmc_result_add_string (r, WMC_CMD_STATUS_ITEM_OPNAME, tmp);
         }

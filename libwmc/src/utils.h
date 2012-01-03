@@ -18,63 +18,71 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include <glib.h>
+#include <sys/types.h>
+
+typedef u_int8_t wmcbool;
+#ifndef TRUE
+#define TRUE ((u_int8_t) 1)
+#endif
+#ifndef FALSE
+#define FALSE ((u_int8_t) 0)
+#endif
 
 #define DIAG_CONTROL_CHAR 0x7E
 #define DIAG_TRAILER_LEN  3
 
 /* Utility and testcase functions */
 
-guint16 crc16 (const char *buffer, gsize len, guint16 seed);
+u_int16_t crc16 (const char *buffer, size_t len, u_int16_t seed);
 
-gsize hdlc_escape (const char *inbuf,
-                   gsize inbuf_len,
-                   gboolean escape_all_ctrl,
-                   char *outbuf,
-                   gsize outbuf_len);
+size_t hdlc_escape (const char *inbuf,
+                    size_t inbuf_len,
+                    wmcbool escape_all_ctrl,
+                    char *outbuf,
+                    size_t outbuf_len);
 
-gsize hdlc_unescape (const char *inbuf,
-                     gsize inbuf_len,
-                     char *outbuf,
-                     gsize outbuf_len,
-                     gboolean *escaping);
+size_t hdlc_unescape (const char *inbuf,
+                      size_t inbuf_len,
+                      char *outbuf,
+                      size_t outbuf_len,
+                      wmcbool *escaping);
 
-gsize hdlc_encapsulate_buffer (char *inbuf,
-                               gsize cmd_len,
-                               gsize inbuf_len,
-                               guint16 crc_seed,
-                               gboolean add_trailer,
-                               gboolean escape_all_ctrl,
-                               char *outbuf,
-                               gsize outbuf_len);
+size_t hdlc_encapsulate_buffer (char *inbuf,
+                                size_t cmd_len,
+                                size_t inbuf_len,
+                                u_int16_t crc_seed,
+                                wmcbool add_trailer,
+                                wmcbool escape_all_ctrl,
+                                char *outbuf,
+                                size_t outbuf_len);
 
-gboolean hdlc_decapsulate_buffer (const char *inbuf,
-                                  gsize inbuf_len,
-                                  gboolean check_known_crc,
-                                  guint16 known_crc,
-                                  char *outbuf,
-                                  gsize outbuf_len,
-                                  gsize *out_decap_len,
-                                  gsize *out_used,
-                                  gboolean *out_need_more);
+wmcbool hdlc_decapsulate_buffer (const char *inbuf,
+                                 size_t inbuf_len,
+                                 wmcbool check_known_crc,
+                                 u_int16_t known_crc,
+                                 char *outbuf,
+                                 size_t outbuf_len,
+                                 size_t *out_decap_len,
+                                 size_t *out_used,
+                                 wmcbool *out_need_more);
 
 /* Functions for actual communication */
 
-gsize wmc_encapsulate (char *inbuf,
-                       gsize cmd_len,
-                       gsize inbuf_len,
-                       char *outbuf,
-                       gsize outbuf_len,
-                       gboolean uml290);
+size_t wmc_encapsulate (char *inbuf,
+                        size_t cmd_len,
+                        size_t inbuf_len,
+                        char *outbuf,
+                        size_t outbuf_len,
+                        wmcbool uml290);
 
-gboolean wmc_decapsulate (const char *inbuf,
-                          gsize inbuf_len,
-                          char *outbuf,
-                          gsize outbuf_len,
-                          gsize *out_decap_len,
-                          gsize *out_used,
-                          gboolean *out_need_more,
-                          gboolean uml290);
+wmcbool wmc_decapsulate (const char *inbuf,
+                         size_t inbuf_len,
+                         char *outbuf,
+                         size_t outbuf_len,
+                         size_t *out_decap_len,
+                         size_t *out_used,
+                         wmcbool *out_need_more,
+                         wmcbool uml290);
 
 #endif  /* UTILS_H */
 

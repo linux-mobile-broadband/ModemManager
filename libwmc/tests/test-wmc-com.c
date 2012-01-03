@@ -36,12 +36,12 @@ typedef struct {
     char *port;
     int fd;
     struct termios old_t;
-    gboolean debug;
-    gboolean uml290;
+    wmcbool debug;
+    wmcbool uml290;
 } TestComData;
 
 gpointer
-test_com_setup (const char *port, gboolean uml290, gboolean debug)
+test_com_setup (const char *port, wmcbool uml290, wmcbool debug)
 {
 	TestComData *d;
 	int ret;
@@ -93,10 +93,10 @@ test_com_teardown (gpointer user_data)
 }
 
 static void
-print_buf (const char *detail, const char *buf, gsize len)
+print_buf (const char *detail, const char *buf, size_t len)
 {
     int i = 0;
-    gboolean newline = FALSE;
+    wmcbool newline = FALSE;
 
     g_print ("%s (%zu)  ", detail, len);
     for (i = 0; i < len; i++) {
@@ -112,15 +112,15 @@ print_buf (const char *detail, const char *buf, gsize len)
         g_print ("\n");
 }
 
-static gboolean
+static wmcbool
 send_command (TestComData *d,
               char *inbuf,
-              gsize inbuf_len,
-              gsize cmd_len)
+              size_t inbuf_len,
+              size_t cmd_len)
 {
     int status;
     int eagain_count = 1000;
-    gsize i = 0, sendlen;
+    size_t i = 0, sendlen;
     char sendbuf[600];
 
     /* Encapsulate the data for the device */
@@ -152,8 +152,8 @@ send_command (TestComData *d,
     return TRUE;
 }
 
-static gsize
-wait_reply (TestComData *d, char *buf, gsize len)
+static size_t
+wait_reply (TestComData *d, char *buf, size_t len)
 {
     fd_set in;
     int result;
@@ -161,7 +161,7 @@ wait_reply (TestComData *d, char *buf, gsize len)
     char readbuf[1024];
     ssize_t bytes_read;
     int total = 0, retries = 0;
-    gsize decap_len = 0;
+    size_t decap_len = 0;
 
     FD_ZERO (&in);
     FD_SET (d->fd, &in);
@@ -182,8 +182,8 @@ wait_reply (TestComData *d, char *buf, gsize len)
             retries++;
             continue;
         } else if (bytes_read == 1) {
-            gboolean more = FALSE, success;
-            gsize used = 0;
+            wmcbool more = FALSE, success;
+            size_t used = 0;
 
             total++;
             decap_len = 0;
@@ -229,11 +229,11 @@ void
 test_com_init (void *f, void *data)
 {
     TestComData *d = data;
-    gboolean success;
+    wmcbool success;
     char buf[512];
     gint len;
     WmcResult *result;
-    gsize reply_len;
+    size_t reply_len;
 
     len = wmc_cmd_init_new (buf, sizeof (buf), d->uml290);
     g_assert (len == 16);
@@ -256,12 +256,12 @@ void
 test_com_device_info (void *f, void *data)
 {
     TestComData *d = data;
-    gboolean success;
+    wmcbool success;
     char buf[1024];
     const char *str, *str2;
     gint len;
     WmcResult *result;
-    gsize reply_len;
+    size_t reply_len;
 
     len = wmc_cmd_device_info_new (buf, sizeof (buf));
     g_assert (len == 2);
@@ -318,13 +318,13 @@ void
 test_com_status (void *f, void *data)
 {
     TestComData *d = data;
-    gboolean success;
+    wmcbool success;
     char buf[1024];
     const char *str;
     u_int8_t dbm;
     gint len;
     WmcResult *result;
-    gsize reply_len;
+    size_t reply_len;
 
     len = wmc_cmd_status_new (buf, sizeof (buf));
     g_assert (len == 2);

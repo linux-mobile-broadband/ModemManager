@@ -106,7 +106,7 @@ val_new_u32 (const char *key, u_int32_t u)
         return NULL;
 
     v->key = strdup (key);
-    v->type = VAL_TYPE_U8;
+    v->type = VAL_TYPE_U32;
     v->u.u32 = u;
     return v;
 }

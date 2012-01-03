@@ -23,6 +23,7 @@
 #include <string.h>
 
 #include "utils.h"
+#include "errors.h"
 
 /* QCDM protocol frames are pseudo Async HDLC frames which end with a 3-byte
  * trailer.  This trailer consists of the 16-bit CRC of the frame plus an ending
@@ -32,7 +33,7 @@
  */
 
 /* Table of CRCs for each possible byte, with a generator polynomial of 0x8408 */
-const guint16 crc_table[256] = {
+const u_int16_t crc_table[256] = {
     0x0000, 0x1189, 0x2312, 0x329b, 0x4624, 0x57ad, 0x6536, 0x74bf,
     0x8c48, 0x9dc1, 0xaf5a, 0xbed3, 0xca6c, 0xdbe5, 0xe97e, 0xf8f7,
     0x1081, 0x0108, 0x3393, 0x221a, 0x56a5, 0x472c, 0x75b7, 0x643e,
@@ -68,10 +69,10 @@ const guint16 crc_table[256] = {
 };
 
 /* Calculate the CRC for a buffer using a seed of 0xffff */
-guint16
-crc16 (const char *buffer, gsize len, guint16 seed)
+u_int16_t
+crc16 (const char *buffer, size_t len, u_int16_t seed)
 {
-    guint16 crc = seed ? seed : 0xFFFF;
+    u_int16_t crc = seed ? seed : 0xFFFF;
 
     while (len--)
             crc = crc_table[(crc ^ *buffer++) & 0xff] ^ (crc >> 8);
@@ -84,21 +85,21 @@ crc16 (const char *buffer, gsize len, guint16 seed)
 /* Performs DM escaping on inbuf putting the result into outbuf, and returns
  * the final length of the buffer.
  */
-gsize
+size_t
 hdlc_escape (const char *inbuf,
-             gsize inbuf_len,
-             gboolean escape_all_ctrl,
+             size_t inbuf_len,
+             wmcbool escape_all_ctrl,
              char *outbuf,
-             gsize outbuf_len)
+             size_t outbuf_len)
 {
     const char *src = inbuf;
     char *dst = outbuf;
     size_t i = inbuf_len;
 
-    g_return_val_if_fail (inbuf != NULL, 0);
-    g_return_val_if_fail (inbuf_len > 0, 0);
-    g_return_val_if_fail (outbuf != NULL, 0);
-    g_return_val_if_fail (outbuf_len > inbuf_len, 0);
+    wmc_return_val_if_fail (inbuf != NULL, 0);
+    wmc_return_val_if_fail (inbuf_len > 0, 0);
+    wmc_return_val_if_fail (outbuf != NULL, 0);
+    wmc_return_val_if_fail (outbuf_len > inbuf_len, 0);
 
     /* Since escaping potentially doubles the # of bytes, short-circuit the
      * length check if destination buffer is clearly large enough.  Note the
@@ -128,7 +129,7 @@ hdlc_escape (const char *inbuf,
     src = inbuf;
     i = inbuf_len;
     while (i--) {
-        guint8 byte = (guint8) *src++;
+        u_int8_t byte = (u_int8_t) *src++;
 
         if (   byte == DIAG_CONTROL_CHAR
             || byte == DIAG_ESC_CHAR
@@ -142,18 +143,18 @@ hdlc_escape (const char *inbuf,
     return (dst - outbuf);
 }
 
-gsize
+size_t
 hdlc_unescape (const char *inbuf,
-               gsize inbuf_len,
+               size_t inbuf_len,
                char *outbuf,
-               gsize outbuf_len,
-               gboolean *escaping)
+               size_t outbuf_len,
+               wmcbool *escaping)
 {
     size_t i, outsize;
 
-    g_return_val_if_fail (inbuf_len > 0, 0);
-    g_return_val_if_fail (outbuf_len >= inbuf_len, 0);
-    g_return_val_if_fail (escaping != NULL, 0);
+    wmc_return_val_if_fail (inbuf_len > 0, 0);
+    wmc_return_val_if_fail (outbuf_len >= inbuf_len, 0);
+    wmc_return_val_if_fail (escaping != NULL, 0);
 
     for (i = 0, outsize = 0; i < inbuf_len; i++) {
         if (*escaping) {
@@ -189,23 +190,23 @@ hdlc_unescape (const char *inbuf,
  *
  * Returns: size of the encapsulated data writted to @outbuf.
  **/
-gsize
+size_t
 hdlc_encapsulate_buffer (char *inbuf,
-                         gsize cmd_len,
-                         gsize inbuf_len,
-                         guint16 crc_seed,
-                         gboolean add_trailer,
-                         gboolean escape_all_ctrl,
+                         size_t cmd_len,
+                         size_t inbuf_len,
+                         u_int16_t crc_seed,
+                         wmcbool add_trailer,
+                         wmcbool escape_all_ctrl,
                          char *outbuf,
-                         gsize outbuf_len)
+                         size_t outbuf_len)
 {
-    guint16 crc;
-    gsize escaped_len;
+    u_int16_t crc;
+    size_t escaped_len;
 
-    g_return_val_if_fail (inbuf != NULL, 0);
-    g_return_val_if_fail (cmd_len >= 1, 0);
-    g_return_val_if_fail (inbuf_len >= cmd_len + 2, 0); /* space for CRC */
-    g_return_val_if_fail (outbuf != NULL, 0);
+    wmc_return_val_if_fail (inbuf != NULL, 0);
+    wmc_return_val_if_fail (cmd_len >= 1, 0);
+    wmc_return_val_if_fail (inbuf_len >= cmd_len + 2, 0); /* space for CRC */
+    wmc_return_val_if_fail (outbuf != NULL, 0);
 
     /* Add the CRC */
     crc = crc16 (inbuf, cmd_len, crc_seed ? crc_seed : 0xFFFF);
@@ -213,7 +214,7 @@ hdlc_encapsulate_buffer (char *inbuf,
     inbuf[cmd_len++] = (crc >> 8) & 0xFF;
 
     escaped_len = hdlc_escape (inbuf, cmd_len, escape_all_ctrl, outbuf, outbuf_len);
-    g_return_val_if_fail (outbuf_len > escaped_len, 0);
+    wmc_return_val_if_fail (outbuf_len > escaped_len, 0);
 
     if (add_trailer)
         outbuf[escaped_len++] = DIAG_CONTROL_CHAR;
@@ -236,25 +237,25 @@ hdlc_encapsulate_buffer (char *inbuf,
  *
  * Returns: size of the encapsulated data writted to @outbuf.
  */
-static gsize
+static size_t
 uml290_wmc_encapsulate (char *inbuf,
-                        gsize cmd_len,
-                        gsize inbuf_len,
+                        size_t cmd_len,
+                        size_t inbuf_len,
                         char *outbuf,
-                        gsize outbuf_len)
+                        size_t outbuf_len)
 {
-    gsize encap_len;
-    gsize estimated_out_len;
+    size_t encap_len;
+    size_t estimated_out_len;
 
-    g_return_val_if_fail (inbuf != NULL, 0);
-    g_return_val_if_fail (cmd_len >= 1, 0);
-    g_return_val_if_fail (inbuf_len >= cmd_len + 2, 0); /* space for CRC */
-    g_return_val_if_fail (outbuf != NULL, 0);
+    wmc_return_val_if_fail (inbuf != NULL, 0);
+    wmc_return_val_if_fail (cmd_len >= 1, 0);
+    wmc_return_val_if_fail (inbuf_len >= cmd_len + 2, 0); /* space for CRC */
+    wmc_return_val_if_fail (outbuf != NULL, 0);
 
     estimated_out_len = cmd_len + strlen (AT_WMC_PREFIX);
     estimated_out_len += 3;  /* CRC + trailer */
     estimated_out_len += cmd_len * 1.3;  /* escaping */
-    g_return_val_if_fail (outbuf_len > estimated_out_len, 0);
+    wmc_return_val_if_fail (outbuf_len > estimated_out_len, 0);
 
     memcpy (outbuf, AT_WMC_PREFIX, strlen (AT_WMC_PREFIX));
 
@@ -283,18 +284,18 @@ uml290_wmc_encapsulate (char *inbuf,
  *
  * Returns: size of the encapsulated data writted to @outbuf.
  */
-gsize
+size_t
 wmc_encapsulate (char *inbuf,
-                 gsize cmd_len,
-                 gsize inbuf_len,
+                 size_t cmd_len,
+                 size_t inbuf_len,
                  char *outbuf,
-                 gsize outbuf_len,
-                 gboolean uml290)
+                 size_t outbuf_len,
+                 wmcbool uml290)
 {
-    g_return_val_if_fail (inbuf != NULL, 0);
-    g_return_val_if_fail (cmd_len >= 1, 0);
-    g_return_val_if_fail (inbuf_len >= cmd_len + 3, 0); /* space for CRC + trailer */
-    g_return_val_if_fail (outbuf != NULL, 0);
+    wmc_return_val_if_fail (inbuf != NULL, 0);
+    wmc_return_val_if_fail (cmd_len >= 1, 0);
+    wmc_return_val_if_fail (inbuf_len >= cmd_len + 3, 0); /* space for CRC + trailer */
+    wmc_return_val_if_fail (outbuf != NULL, 0);
 
     if (uml290)
         return uml290_wmc_encapsulate (inbuf, cmd_len, inbuf_len, outbuf, outbuf_len);
@@ -333,27 +334,27 @@ wmc_encapsulate (char *inbuf,
  *  all cases the caller should advance the buffer by the number of bytes
  *  returned in @out_used before calling this function again.
  **/
-gboolean
+wmcbool
 hdlc_decapsulate_buffer (const char *inbuf,
-                         gsize inbuf_len,
-                         gboolean check_known_crc,
-                         guint16 known_crc,
+                         size_t inbuf_len,
+                         wmcbool check_known_crc,
+                         u_int16_t known_crc,
                          char *outbuf,
-                         gsize outbuf_len,
-                         gsize *out_decap_len,
-                         gsize *out_used,
-                         gboolean *out_need_more)
+                         size_t outbuf_len,
+                         size_t *out_decap_len,
+                         size_t *out_used,
+                         wmcbool *out_need_more)
 {
-    gboolean escaping = FALSE;
-    gsize i, pkt_len = 0, unesc_len;
-    guint16 crc, pkt_crc;
+    wmcbool escaping = FALSE;
+    size_t i, pkt_len = 0, unesc_len;
+    u_int16_t crc, pkt_crc;
 
-    g_return_val_if_fail (inbuf != NULL, FALSE);
-    g_return_val_if_fail (outbuf != NULL, FALSE);
-    g_return_val_if_fail (outbuf_len > 0, FALSE);
-    g_return_val_if_fail (out_decap_len != NULL, FALSE);
-    g_return_val_if_fail (out_used != NULL, FALSE);
-    g_return_val_if_fail (out_need_more != NULL, FALSE);
+    wmc_return_val_if_fail (inbuf != NULL, FALSE);
+    wmc_return_val_if_fail (outbuf != NULL, FALSE);
+    wmc_return_val_if_fail (outbuf_len > 0, FALSE);
+    wmc_return_val_if_fail (out_decap_len != NULL, FALSE);
+    wmc_return_val_if_fail (out_used != NULL, FALSE);
+    wmc_return_val_if_fail (out_need_more != NULL, FALSE);
 
     *out_decap_len = 0;
     *out_used = 0;
@@ -441,15 +442,15 @@ hdlc_decapsulate_buffer (const char *inbuf,
  *  all cases the caller should advance the buffer by the number of bytes
  *  returned in @out_used before calling this function again.
  **/
-gboolean
+wmcbool
 wmc_decapsulate (const char *inbuf,
-                 gsize inbuf_len,
+                 size_t inbuf_len,
                  char *outbuf,
-                 gsize outbuf_len,
-                 gsize *out_decap_len,
-                 gsize *out_used,
-                 gboolean *out_need_more,
-                 gboolean uml290)
+                 size_t outbuf_len,
+                 size_t *out_decap_len,
+                 size_t *out_used,
+                 wmcbool *out_need_more,
+                 wmcbool uml290)
 {
     return hdlc_decapsulate_buffer (inbuf, inbuf_len,
                                     uml290, uml290 ? 0x3030 : 0,

@@ -46,11 +46,11 @@ static const char decap_inbuf[] = {
 void
 test_utils_decapsulate_basic_buffer (void *f, void *data)
 {
-    gboolean success;
+    wmcbool success;
     char outbuf[512];
-    gsize decap_len = 0;
-    gsize used = 0;
-    gboolean more = FALSE;
+    size_t decap_len = 0;
+    size_t used = 0;
+    wmcbool more = FALSE;
 
     success = hdlc_decapsulate_buffer (decap_inbuf, sizeof (decap_inbuf),
                                        FALSE, 0, outbuf, sizeof (outbuf),
@@ -71,7 +71,7 @@ test_utils_encapsulate_basic_buffer (void *f, void *data)
 {
     char cmdbuf[10];
     char outbuf[512];
-    gsize encap_len = 0;
+    size_t encap_len = 0;
 
     cmdbuf[0] = 0x4B;   /* DIAG_CMD_SUBSYS */
     cmdbuf[1] = 0x05;   /* DIAG_SUBSYS_HDR */
@@ -93,11 +93,11 @@ static const char cns_inbuf[] = {
 void
 test_utils_decapsulate_sierra_cns (void *f, void *data)
 {
-    gboolean success;
+    wmcbool success;
     char outbuf[512];
-    gsize decap_len = 0;
-    gsize used = 0;
-    gboolean more = FALSE;
+    size_t decap_len = 0;
+    size_t used = 0;
+    wmcbool more = FALSE;
 
     success = hdlc_decapsulate_buffer (cns_inbuf, sizeof (cns_inbuf),
                                        FALSE, 0, outbuf, sizeof (outbuf),
@@ -123,7 +123,7 @@ test_utils_encapsulate_uml290_wmc1 (void *f, void *data)
 {
     char inbuf[512];
     char outbuf[512];
-    gsize encap_len = 0;
+    size_t encap_len = 0;
 
     memcpy (inbuf, uml290_encap_src, sizeof (uml290_encap_src));
     encap_len = wmc_encapsulate (inbuf, sizeof (uml290_encap_src),
@@ -167,11 +167,11 @@ static const char uml290_expected[] = {
 void
 test_utils_decapsulate_uml290_wmc1 (void *f, void *data)
 {
-    gboolean success;
+    wmcbool success;
     char outbuf[512];
-    gsize decap_len = 0;
-    gsize used = 0;
-    gboolean more = FALSE;
+    size_t decap_len = 0;
+    size_t used = 0;
+    wmcbool more = FALSE;
 
     success = hdlc_decapsulate_buffer (uml290_src, sizeof (uml290_src),
                                        TRUE, 0x3030, outbuf, sizeof (outbuf),
@@ -205,11 +205,11 @@ static const char pc5740_expected[] = {
 void
 test_utils_decapsulate_pc5740_wmc1 (void *f, void *data)
 {
-    gboolean success;
+    wmcbool success;
     char outbuf[512];
-    gsize decap_len = 0;
-    gsize used = 0;
-    gboolean more = FALSE;
+    size_t decap_len = 0;
+    size_t used = 0;
+    wmcbool more = FALSE;
 
     success = hdlc_decapsulate_buffer (pc5740_src, sizeof (pc5740_src),
                                        FALSE, 0, outbuf, sizeof (outbuf),
