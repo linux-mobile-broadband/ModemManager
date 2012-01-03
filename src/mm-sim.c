@@ -1182,8 +1182,7 @@ set_property (GObject *object,
         self->priv->path = g_value_dup_string (value);
         break;
     case PROP_CONNECTION:
-        if (self->priv->connection)
-            g_object_unref (self->priv->connection);
+        g_clear_object (&self->priv->connection);
         self->priv->connection = g_value_dup_object (value);
 
         /* Export when we get a DBus connection */
@@ -1193,8 +1192,7 @@ set_property (GObject *object,
             mm_sim_unexport (self);
         break;
     case PROP_MODEM:
-        if (self->priv->modem)
-            g_object_unref (self->priv->modem);
+        g_clear_object (&self->priv->modem);
         self->priv->modem = g_value_dup_object (value);
         if (self->priv->modem) {
             /* Bind the modem's connection (which is set when it is exported,
@@ -1265,8 +1263,7 @@ dispose (GObject *object)
         g_clear_object (&self->priv->connection);
     }
 
-    if (self->priv->modem)
-        g_clear_object (&self->priv->modem);
+    g_clear_object (&self->priv->modem);
 
     G_OBJECT_CLASS (mm_sim_parent_class)->dispose (object);
 }
