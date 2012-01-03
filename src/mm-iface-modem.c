@@ -2851,6 +2851,18 @@ mm_iface_modem_is_3gpp (MMIfaceModem *self)
 }
 
 gboolean
+mm_iface_modem_is_3gpp_lte (MMIfaceModem *self)
+{
+    MMModemCapability capabilities = MM_MODEM_CAPABILITY_NONE;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_CURRENT_CAPABILITIES, &capabilities,
+                  NULL);
+
+    return (capabilities & MM_MODEM_CAPABILITY_3GPP_LTE);
+}
+
+gboolean
 mm_iface_modem_is_cdma (MMIfaceModem *self)
 {
     MMModemCapability capabilities = MM_MODEM_CAPABILITY_NONE;
@@ -2863,18 +2875,6 @@ mm_iface_modem_is_cdma (MMIfaceModem *self)
 }
 
 gboolean
-mm_iface_modem_is_cdma_only (MMIfaceModem *self)
-{
-    MMModemCapability capabilities = MM_MODEM_CAPABILITY_NONE;
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_CURRENT_CAPABILITIES, &capabilities,
-                  NULL);
-
-    return (capabilities == MM_MODEM_CAPABILITY_CDMA_EVDO);
-}
-
-gboolean
 mm_iface_modem_is_3gpp_only (MMIfaceModem *self)
 {
     MMModemCapability capabilities = MM_MODEM_CAPABILITY_NONE;
@@ -2884,6 +2884,30 @@ mm_iface_modem_is_3gpp_only (MMIfaceModem *self)
                   NULL);
 
     return ((MM_MODEM_CAPABILITY_3GPP ^ capabilities) & capabilities);
+}
+
+gboolean
+mm_iface_modem_is_3gpp_lte_only (MMIfaceModem *self)
+{
+    MMModemCapability capabilities = MM_MODEM_CAPABILITY_NONE;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_CURRENT_CAPABILITIES, &capabilities,
+                  NULL);
+
+    return ((MM_MODEM_CAPABILITY_3GPP_LTE ^ capabilities) & capabilities);
+}
+
+gboolean
+mm_iface_modem_is_cdma_only (MMIfaceModem *self)
+{
+    MMModemCapability capabilities = MM_MODEM_CAPABILITY_NONE;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_CURRENT_CAPABILITIES, &capabilities,
+                  NULL);
+
+    return (capabilities == MM_MODEM_CAPABILITY_CDMA_EVDO);
 }
 
 /*****************************************************************************/

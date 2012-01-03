@@ -253,6 +253,8 @@ GType mm_iface_modem_get_type (void);
 /* Check whether this modem has 3GPP capabilities */
 gboolean mm_iface_modem_is_3gpp (MMIfaceModem *self);
 gboolean mm_iface_modem_is_3gpp_only (MMIfaceModem *self);
+gboolean mm_iface_modem_is_3gpp_lte (MMIfaceModem *self);
+gboolean mm_iface_modem_is_3gpp_lte_only (MMIfaceModem *self);
 
 /* Check whether this modem has CDMA capabilities */
 gboolean mm_iface_modem_is_cdma (MMIfaceModem *self);

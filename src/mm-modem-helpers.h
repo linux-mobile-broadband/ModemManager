@@ -22,11 +22,13 @@
 #include "mm-modem-cdma.h"
 #include "mm-charsets.h"
 
-#define MM_MODEM_CAPABILITY_3GPP        \
-    (MM_MODEM_CAPABILITY_GSM_UMTS |     \
-     MM_MODEM_CAPABILITY_LTE |          \
+#define MM_MODEM_CAPABILITY_3GPP_LTE    \
+    (MM_MODEM_CAPABILITY_LTE |          \
      MM_MODEM_CAPABILITY_LTE_ADVANCED)
 
+#define MM_MODEM_CAPABILITY_3GPP        \
+    (MM_MODEM_CAPABILITY_GSM_UMTS |     \
+     MM_MODEM_CAPABILITY_3GPP_LTE)
 
 /* Network scan results expected */
 typedef struct {
