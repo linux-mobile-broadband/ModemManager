@@ -207,11 +207,13 @@ void mm_iface_modem_3gpp_shutdown (MMIfaceModem3gpp *self);
 
 /* Objects implementing this interface can report new registration states.
  * This may happen when handling unsolicited registration messages, or when
- * the interface asks to run registration state checks.
- * Returns FALSE if registration process is still ongoing. */
-void mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
-                                                    MMModem3gppRegistrationState new_state,
-                                                    MMModemAccessTechnology access_tech);
+ * the interface asks to run registration state checks. */
+void mm_iface_modem_3gpp_update_cs_registration_state (MMIfaceModem3gpp *self,
+                                                       MMModem3gppRegistrationState state,
+                                                       MMModemAccessTechnology access_tech);
+void mm_iface_modem_3gpp_update_ps_registration_state (MMIfaceModem3gpp *self,
+                                                       MMModem3gppRegistrationState state,
+                                                       MMModemAccessTechnology access_tech);
 
 /* Run all registration checks */
 void mm_iface_modem_3gpp_run_all_registration_checks (MMIfaceModem3gpp *self,

@@ -26,9 +26,11 @@
 
 #define INDICATORS_CHECKED_TAG             "indicators-checked-tag"
 #define UNSOLICITED_EVENTS_SUPPORTED_TAG   "unsolicited-events-supported-tag"
+#define REGISTRATION_STATE_CONTEXT_TAG    "registration-state-context-tag"
 
 static GQuark indicators_checked_quark;
 static GQuark unsolicited_events_supported_quark;
+static GQuark registration_state_context_quark;
 
 /*****************************************************************************/
 
@@ -603,10 +605,10 @@ bearer_3gpp_connection_forbidden (MMIfaceModem3gpp *self)
      MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS |       \
      MM_MODEM_ACCESS_TECHNOLOGY_LTE)
 
-void
-mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
-                                               MMModem3gppRegistrationState new_state,
-                                               MMModemAccessTechnology access_tech)
+static void
+update_registration_state (MMIfaceModem3gpp *self,
+                           MMModem3gppRegistrationState new_state,
+                           MMModemAccessTechnology access_tech)
 {
     MMModem3gppRegistrationState old_state;
 
@@ -687,6 +689,84 @@ mm_iface_modem_3gpp_update_registration_state (MMIfaceModem3gpp *self,
             break;
         }
     }
+}
+
+typedef struct {
+    MMModem3gppRegistrationState cs;
+    MMModem3gppRegistrationState ps;
+} RegistrationStateContext;
+
+static RegistrationStateContext *
+get_registration_state_context (MMIfaceModem3gpp *self)
+{
+    RegistrationStateContext *ctx;
+
+    if (G_UNLIKELY (!registration_state_context_quark)) {
+        registration_state_context_quark =  (g_quark_from_static_string (
+                                                 REGISTRATION_STATE_CONTEXT_TAG));
+        /* Create context and keep it as object data */
+        ctx = g_new0 (RegistrationStateContext, 1);
+        g_object_set_qdata_full (
+            G_OBJECT (self),
+            registration_state_context_quark,
+            ctx,
+            (GDestroyNotify)g_free);
+
+        ctx->cs = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+        ctx->ps = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    } else
+        ctx = g_object_get_qdata (G_OBJECT (self), registration_state_context_quark);
+
+    return ctx;
+}
+
+static MMModem3gppRegistrationState
+get_consolidated_reg_state (RegistrationStateContext *ctx)
+{
+    /* Some devices (Blackberries for example) will respond to +CGREG, but
+     * return ERROR for +CREG, probably because their firmware is just stupid.
+     * So here we prefer the +CREG response, but if we never got a successful
+     * +CREG response, we'll take +CGREG instead.
+     */
+    if (ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+        ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
+        return ctx->cs;
+
+    if (ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+        ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
+        return ctx->ps;
+
+    if (ctx->cs == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING)
+        return ctx->cs;
+
+    if (ctx->ps == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING)
+        return ctx->ps;
+
+    return ctx->cs;
+}
+
+void
+mm_iface_modem_3gpp_update_cs_registration_state (MMIfaceModem3gpp *self,
+                                                  MMModem3gppRegistrationState state,
+                                                  MMModemAccessTechnology access_tech)
+{
+    RegistrationStateContext *ctx;
+
+    ctx = get_registration_state_context (self);
+    ctx->cs = state;
+    update_registration_state (self, get_consolidated_reg_state (ctx), access_tech);
+}
+
+void
+mm_iface_modem_3gpp_update_ps_registration_state (MMIfaceModem3gpp *self,
+                                                  MMModem3gppRegistrationState state,
+                                                  MMModemAccessTechnology access_tech)
+{
+    RegistrationStateContext *ctx;
+
+    ctx = get_registration_state_context (self);
+    ctx->ps = state;
+    update_registration_state (self, get_consolidated_reg_state (ctx), access_tech);
 }
 
 /*****************************************************************************/
