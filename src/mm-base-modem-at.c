@@ -78,12 +78,11 @@ at_sequence_context_free (AtSequenceContext *ctx)
 {
     mm_serial_port_close (MM_SERIAL_PORT (ctx->port));
     g_object_unref (ctx->port);
+    g_object_unref (ctx->self);
 
     if (ctx->response_processor_context &&
         ctx->response_processor_context_free)
         ctx->response_processor_context_free (ctx->response_processor_context);
-    if (ctx->self)
-        g_object_unref (ctx->self);
     if (ctx->cancellable)
         g_object_unref (ctx->cancellable);
     if (ctx->result)
@@ -361,13 +360,12 @@ typedef struct {
 static void
 at_command_context_free (AtCommandContext *ctx)
 {
-    if (ctx->self)
-        g_object_unref (ctx->self);
     if (ctx->cancellable)
         g_object_unref (ctx->cancellable);
     mm_serial_port_close (MM_SERIAL_PORT (ctx->port));
     g_object_unref (ctx->port);
     g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
     g_free (ctx);
 }
 
