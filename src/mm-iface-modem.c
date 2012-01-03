@@ -155,6 +155,8 @@ bearer_status_changed (MMBearer *bearer,
                                      new_state,
                                      MM_MODEM_STATE_CHANGE_REASON_USER_REQUESTED);
     }
+
+    g_object_unref (list);
 }
 
 MMBearer *
