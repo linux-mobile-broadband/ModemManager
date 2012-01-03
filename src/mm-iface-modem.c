@@ -119,7 +119,6 @@ bearer_status_changed (MMBearer *bearer,
                        MMIfaceModem *self)
 {
     CountOthersConnectedContext ctx;
-    MMModemState new_state;
     MMBearerList *list = NULL;
 
     g_object_get (self,
@@ -136,6 +135,8 @@ bearer_status_changed (MMBearer *bearer,
 
     /* If no other bearers are connected, change modem state */
     if (!ctx.others_connected) {
+        MMModemState new_state = MM_MODEM_STATE_UNKNOWN;
+
         switch (mm_bearer_get_status (bearer)) {
         case MM_BEARER_STATUS_CONNECTED:
             new_state = MM_MODEM_STATE_CONNECTED;
