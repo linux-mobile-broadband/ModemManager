@@ -18,6 +18,8 @@
 #ifndef LIBQCDM_NV_ITEMS_H
 #define LIBQCDM_NV_ITEMS_H
 
+#include <sys/types.h>
+
 enum {
     DIAG_NV_MODE_PREF    = 10,   /* Mode preference: 1x, HDR, auto */
     DIAG_NV_DIR_NUMBER   = 178,  /* Mobile Directory Number (MDN) */
@@ -40,15 +42,15 @@ enum {
 
 /* DIAG_NV_MODE_PREF */
 struct DMNVItemModePref {
-    guint8 profile;
-    guint8 mode_pref;
+    u_int8_t profile;
+    u_int8_t mode_pref;
 } __attribute__ ((packed));
 typedef struct DMNVItemModePref DMNVItemModePref;
 
 /* DIAG_NV_DIR_NUMBER */
 struct DMNVItemMdn {
-  guint8 profile; 
-  guint8 mdn[10]; 
+  u_int8_t profile;
+  u_int8_t mdn[10];
 } __attribute__ ((packed));
 typedef struct DMNVItemMdn DMNVItemMdn;
 
@@ -61,8 +63,8 @@ enum {
 
 /* DIAG_NV_ROAM_PREF */
 struct DMNVItemRoamPref {
-    guint8 profile;
-    guint8 roam_pref;
+    u_int8_t profile;
+    u_int8_t roam_pref;
 } __attribute__ ((packed));
 typedef struct DMNVItemRoamPref DMNVItemRoamPref;
 
@@ -75,7 +77,7 @@ enum {
 
 /* DIAG_NV_HDR_REV_PREF */
 struct DMNVItemHdrRevPref {
-    guint8 rev_pref;
+    u_int8_t rev_pref;
 } __attribute__ ((packed));
 typedef struct DMNVItemHdrRevPref DMNVItemHdrRevPref;
 

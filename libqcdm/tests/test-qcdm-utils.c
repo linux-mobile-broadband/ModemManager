@@ -50,7 +50,7 @@ test_utils_decapsulate_buffer (void *f, void *data)
     char outbuf[512];
     gsize decap_len = 0;
     gsize used = 0;
-    gboolean more = FALSE;
+    qcdmbool more = FALSE;
 
     success = dm_decapsulate_buffer (decap_inbuf, sizeof (decap_inbuf),
                                      outbuf, sizeof (outbuf),
@@ -96,7 +96,7 @@ test_utils_decapsulate_sierra_cns (void *f, void *data)
     char outbuf[512];
     gsize decap_len = 0;
     gsize used = 0;
-    gboolean more = FALSE;
+    qcdmbool more = FALSE;
 
     success = dm_decapsulate_buffer (cns_inbuf, sizeof (cns_inbuf),
                                      outbuf, sizeof (outbuf),

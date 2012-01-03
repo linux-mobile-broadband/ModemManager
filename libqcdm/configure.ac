@@ -23,16 +23,15 @@ AC_PROG_LIBTOOL
 dnl Define _GNU_SOURCE for various things like strcasestr()
 AC_GNU_SOURCE
 
-PKG_CHECK_MODULES(MM, glib-2.0 >= 2.18)
-
 dnl
 dnl Tests
 dnl
-AC_ARG_WITH(tests, AS_HELP_STRING([--with-tests], [Build ModemManager tests]))
+AC_ARG_WITH(tests, AS_HELP_STRING([--with-tests], [Build libqcdm tests]))
 AM_CONDITIONAL(WITH_TESTS, test "x$with_tests" = "xyes")
 case $with_tests in
     yes)
         with_tests=yes
+        PKG_CHECK_MODULES(MM, glib-2.0 >= 2.18)
         ;;
     *)
         with_tests=no

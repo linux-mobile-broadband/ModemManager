@@ -18,8 +18,7 @@
 #ifndef LIBQCDM_COMMANDS_H
 #define LIBQCDM_COMMANDS_H
 
-#include <glib.h>
-
+#include "utils.h"
 #include "result.h"
 
 /**********************************************************************/
@@ -75,25 +74,21 @@ enum {
 #define QCDM_CMD_VERSION_INFO_ITEM_RELEASE_TIME "release-time"
 #define QCDM_CMD_VERSION_INFO_ITEM_MODEL "model"
 
-gsize       qcdm_cmd_version_info_new    (char *buf,
-                                          gsize len,
-                                          GError **error);
+size_t      qcdm_cmd_version_info_new    (char *buf, size_t len);
 
-QCDMResult *qcdm_cmd_version_info_result (const char *buf,
-                                          gsize len,
-                                          GError **error);
+QcdmResult *qcdm_cmd_version_info_result (const char *buf,
+                                          size_t len,
+                                          int *out_error);
 
 /**********************************************************************/
 
 #define QCDM_CMD_ESN_ITEM_ESN "esn"
 
-gsize       qcdm_cmd_esn_new    (char *buf,
-                                 gsize len,
-                                 GError **error);
+size_t      qcdm_cmd_esn_new    (char *buf, size_t len);
 
-QCDMResult *qcdm_cmd_esn_result (const char *buf,
-                                 gsize len,
-                                 GError **error);
+QcdmResult *qcdm_cmd_esn_result (const char *buf,
+                                 size_t len,
+                                 int *out_error);
 
 /**********************************************************************/
 
@@ -127,13 +122,11 @@ enum {
 #define QCDM_CMD_CDMA_STATUS_ITEM_SID             "sid"
 #define QCDM_CMD_CDMA_STATUS_ITEM_NID             "nid"
 
-gsize       qcdm_cmd_cdma_status_new    (char *buf,
-                                         gsize len,
-                                         GError **error);
+size_t      qcdm_cmd_cdma_status_new    (char *buf, size_t len);
 
-QCDMResult *qcdm_cmd_cdma_status_result (const char *buf,
-                                         gsize len,
-                                         GError **error);
+QcdmResult *qcdm_cmd_cdma_status_result (const char *buf,
+                                         size_t len,
+                                         int *out_error);
 
 /**********************************************************************/
 
@@ -145,13 +138,11 @@ QCDMResult *qcdm_cmd_cdma_status_result (const char *buf,
 #define QCDM_CMD_SW_VERSION_ITEM_COMP_DATE "comp-date"
 #define QCDM_CMD_SW_VERSION_ITEM_COMP_TIME "comp-time"
 
-gsize       qcdm_cmd_sw_version_new    (char *buf,
-                                        gsize len,
-                                        GError **error);
+size_t      qcdm_cmd_sw_version_new    (char *buf, size_t len);
 
-QCDMResult *qcdm_cmd_sw_version_result (const char *buf,
-                                        gsize len,
-                                        GError **error);
+QcdmResult *qcdm_cmd_sw_version_result (const char *buf,
+                                        size_t len,
+                                        int *out_error);
 
 /**********************************************************************/
 
@@ -193,13 +184,11 @@ enum {
 /* The protocol revision currently in-use.  One of QCDM_STATUS_SNAPSHOT_STATE_* */
 #define QCDM_CMD_STATUS_SNAPSHOT_ITEM_STATE              "state"
 
-gsize       qcdm_cmd_status_snapshot_new    (char *buf,
-                                             gsize len,
-                                             GError **error);
+size_t      qcdm_cmd_status_snapshot_new    (char *buf, size_t len);
 
-QCDMResult *qcdm_cmd_status_snapshot_result (const char *buf,
-                                             gsize len,
-                                             GError **error);
+QcdmResult *qcdm_cmd_status_snapshot_result (const char *buf,
+                                             size_t len,
+                                             int *out_error);
 
 /**********************************************************************/
 
@@ -210,23 +199,21 @@ enum {
     QCDM_CMD_PILOT_SETS_TYPE_NEIGHBOR = 3,
 };
 
-gsize       qcdm_cmd_pilot_sets_new    (char *buf,
-                                        gsize len,
-                                        GError **error);
+size_t      qcdm_cmd_pilot_sets_new    (char *buf, size_t len);
 
-QCDMResult *qcdm_cmd_pilot_sets_result (const char *buf,
-                                        gsize len,
-                                        GError **error);
+QcdmResult *qcdm_cmd_pilot_sets_result (const char *buf,
+                                        size_t len,
+                                        int *out_error);
 
-gboolean    qcdm_cmd_pilot_sets_result_get_num   (QCDMResult *result,
-                                                  guint32 set_type,
-                                                  guint32 *out_num);
+qcdmbool    qcdm_cmd_pilot_sets_result_get_num   (QcdmResult *result,
+                                                  u_int32_t set_type,
+                                                  u_int32_t *out_num);
 
-gboolean    qcdm_cmd_pilot_sets_result_get_pilot (QCDMResult *result,
-                                                  guint32 set_type,
-                                                  guint32 num,
-                                                  guint32 *out_pn_offset,
-                                                  guint32 *out_ecio,
+qcdmbool    qcdm_cmd_pilot_sets_result_get_pilot (QcdmResult *result,
+                                                  u_int32_t set_type,
+                                                  u_int32_t num,
+                                                  u_int32_t *out_pn_offset,
+                                                  u_int32_t *out_ecio,
                                                   float *out_db);
 
 /**********************************************************************/
@@ -234,14 +221,11 @@ gboolean    qcdm_cmd_pilot_sets_result_get_pilot (QCDMResult *result,
 #define QCDM_CMD_NV_GET_MDN_ITEM_PROFILE "profile"
 #define QCDM_CMD_NV_GET_MDN_ITEM_MDN "mdn"
 
-gsize       qcdm_cmd_nv_get_mdn_new    (char *buf,
-                                        gsize len,
-                                        guint8 profile,
-                                        GError **error);
+size_t      qcdm_cmd_nv_get_mdn_new    (char *buf, size_t len, u_int8_t profile);
 
-QCDMResult *qcdm_cmd_nv_get_mdn_result (const char *buf,
-                                        gsize len,
-                                        GError **error);
+QcdmResult *qcdm_cmd_nv_get_mdn_result (const char *buf,
+                                        size_t len,
+                                        int *out_error);
 
 /**********************************************************************/
 
@@ -255,24 +239,22 @@ enum {
 #define QCDM_CMD_NV_GET_ROAM_PREF_ITEM_PROFILE   "profile"
 #define QCDM_CMD_NV_GET_ROAM_PREF_ITEM_ROAM_PREF "roam-pref"
 
-gsize       qcdm_cmd_nv_get_roam_pref_new    (char *buf,
-                                              gsize len,
-                                              guint8 profile,
-                                              GError **error);
+size_t      qcdm_cmd_nv_get_roam_pref_new    (char *buf,
+                                              size_t len,
+                                              u_int8_t profile);
 
-QCDMResult *qcdm_cmd_nv_get_roam_pref_result (const char *buf,
-                                              gsize len,
-                                              GError **error);
+QcdmResult *qcdm_cmd_nv_get_roam_pref_result (const char *buf,
+                                              size_t len,
+                                              int *out_error);
 
-gsize       qcdm_cmd_nv_set_roam_pref_new    (char *buf,
-                                              gsize len,
-                                              guint8 profile,
-                                              guint8 roam_pref,
-                                              GError **error);
+size_t      qcdm_cmd_nv_set_roam_pref_new    (char *buf,
+                                              size_t len,
+                                              u_int8_t profile,
+                                              u_int8_t roam_pref);
 
-QCDMResult *qcdm_cmd_nv_set_roam_pref_result (const char *buf,
-                                              gsize len,
-                                              GError **error);
+QcdmResult *qcdm_cmd_nv_set_roam_pref_result (const char *buf,
+                                              size_t len,
+                                              int *out_error);
 
 /**********************************************************************/
 
@@ -286,24 +268,22 @@ enum {
 #define QCDM_CMD_NV_GET_MODE_PREF_ITEM_PROFILE   "profile"
 #define QCDM_CMD_NV_GET_MODE_PREF_ITEM_MODE_PREF "mode-pref"
 
-gsize       qcdm_cmd_nv_get_mode_pref_new    (char *buf,
-                                              gsize len,
-                                              guint8 profile,
-                                              GError **error);
+size_t      qcdm_cmd_nv_get_mode_pref_new    (char *buf,
+                                              size_t len,
+                                              u_int8_t profile);
 
-QCDMResult *qcdm_cmd_nv_get_mode_pref_result (const char *buf,
-                                              gsize len,
-                                              GError **error);
+QcdmResult *qcdm_cmd_nv_get_mode_pref_result (const char *buf,
+                                              size_t len,
+                                              int *out_error);
 
-gsize       qcdm_cmd_nv_set_mode_pref_new    (char *buf,
-                                              gsize len,
-                                              guint8 profile,
-                                              guint8 mode_pref,
-                                              GError **error);
+size_t      qcdm_cmd_nv_set_mode_pref_new    (char *buf,
+                                              size_t len,
+                                              u_int8_t profile,
+                                              u_int8_t mode_pref);
 
-QCDMResult *qcdm_cmd_nv_set_mode_pref_result (const char *buf,
-                                              gsize len,
-                                              GError **error);
+QcdmResult *qcdm_cmd_nv_set_mode_pref_result (const char *buf,
+                                              size_t len,
+                                              int *out_error);
 
 /**********************************************************************/
 
@@ -316,22 +296,19 @@ enum {
 
 #define QCDM_CMD_NV_GET_HDR_REV_PREF_ITEM_REV_PREF "rev-pref"
 
-gsize       qcdm_cmd_nv_get_hdr_rev_pref_new    (char *buf,
-                                                 gsize len,
-                                                 GError **error);
+size_t      qcdm_cmd_nv_get_hdr_rev_pref_new    (char *buf, size_t len);
 
-QCDMResult *qcdm_cmd_nv_get_hdr_rev_pref_result (const char *buf,
-                                                 gsize len,
-                                                 GError **error);
+QcdmResult *qcdm_cmd_nv_get_hdr_rev_pref_result (const char *buf,
+                                                 size_t len,
+                                                 int *out_error);
 
-gsize       qcdm_cmd_nv_set_hdr_rev_pref_new    (char *buf,
-                                                 gsize len,
-                                                 guint8 rev_pref,
-                                                 GError **error);
+size_t      qcdm_cmd_nv_set_hdr_rev_pref_new    (char *buf,
+                                                 size_t len,
+                                                 u_int8_t rev_pref);
 
-QCDMResult *qcdm_cmd_nv_set_hdr_rev_pref_result (const char *buf,
-                                                 gsize len,
-                                                 GError **error);
+QcdmResult *qcdm_cmd_nv_set_hdr_rev_pref_result (const char *buf,
+                                                 size_t len,
+                                                 int *out_error);
 
 /**********************************************************************/
 
@@ -391,13 +368,11 @@ enum {
 #define QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_HYBRID_PREF            "hybrid-pref"
 #define QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_NETWORK_SELECTION_PREF "network-selection-pref"
 
-gsize       qcdm_cmd_cm_subsys_state_info_new    (char *buf,
-                                                  gsize len,
-                                                  GError **error);
+size_t      qcdm_cmd_cm_subsys_state_info_new    (char *buf, size_t len);
 
-QCDMResult *qcdm_cmd_cm_subsys_state_info_result (const char *buf,
-                                                  gsize len,
-                                                  GError **error);
+QcdmResult *qcdm_cmd_cm_subsys_state_info_result (const char *buf,
+                                                  size_t len,
+                                                  int *out_error);
 
 /**********************************************************************/
 
@@ -476,55 +451,49 @@ enum {
 #define QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_OVERHEAD_MSG_STATE "overhead-msg-state"
 #define QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_HDR_HYBRID_MODE    "hdr-hybrid-mode"
 
-gsize       qcdm_cmd_hdr_subsys_state_info_new    (char *buf,
-                                                   gsize len,
-                                                   GError **error);
+size_t      qcdm_cmd_hdr_subsys_state_info_new    (char *buf, size_t len);
 
-QCDMResult *qcdm_cmd_hdr_subsys_state_info_result (const char *buf,
-                                                   gsize len,
-                                                   GError **error);
+QcdmResult *qcdm_cmd_hdr_subsys_state_info_result (const char *buf,
+                                                   size_t len,
+                                                   int *out_error);
 
 /**********************************************************************/
 
 /* Max # of log items this device supports */
 #define QCDM_CMD_EXT_LOGMASK_ITEM_MAX_ITEMS   "max-items"
 
-gsize       qcdm_cmd_ext_logmask_new    (char *buf,
-                                         gsize len,
-                                         GSList *items,
-                                         guint16 maxlog,
-                                         GError **error);
+size_t      qcdm_cmd_ext_logmask_new    (char *buf,
+                                         size_t len,
+                                         u_int32_t items[], /* terminated by 0 */
+                                         u_int16_t maxlog);
 
-QCDMResult *qcdm_cmd_ext_logmask_result (const char *buf,
-                                         gsize len,
-                                         GError **error);
+QcdmResult *qcdm_cmd_ext_logmask_result (const char *buf,
+                                         size_t len,
+                                         int *out_error);
 
 /* Returns TRUE if 'item' is set in the log mask */
-gboolean    qcmd_cmd_ext_logmask_result_get_item (QCDMResult *result,
-                                                  guint16 item);
+qcdmbool    qcmd_cmd_ext_logmask_result_get_item (QcdmResult *result,
+                                                  u_int16_t item);
 
 /**********************************************************************/
 
-gsize       qcdm_cmd_event_report_new    (char *buf,
-                                          gsize len,
-                                          gboolean start,
-                                          GError **error);
+size_t      qcdm_cmd_event_report_new    (char *buf,
+                                          size_t len,
+                                          qcdmbool start);
 
-QCDMResult *qcdm_cmd_event_report_result (const char *buf,
-                                          gsize len,
-                                          GError **error);
+QcdmResult *qcdm_cmd_event_report_result (const char *buf,
+                                          size_t len,
+                                          int *out_error);
 
 /**********************************************************************/
 
 #define QCDM_CMD_ZTE_SUBSYS_STATUS_ITEM_SIGNAL_INDICATOR    "signal-indicator"
 
-gsize       qcdm_cmd_zte_subsys_status_new    (char *buf,
-                                               gsize len,
-                                               GError **error);
+size_t      qcdm_cmd_zte_subsys_status_new    (char *buf, size_t len);
 
-QCDMResult *qcdm_cmd_zte_subsys_status_result (const char *buf,
-                                               gsize len,
-                                               GError **error);
+QcdmResult *qcdm_cmd_zte_subsys_status_result (const char *buf,
+                                               size_t len,
+                                               int *out_error);
 
 /**********************************************************************/
 
@@ -547,14 +516,13 @@ enum {
     QCDM_NW_CHIPSET_6800 = 2,
 };
 
-gsize       qcdm_cmd_nw_subsys_modem_snapshot_cdma_new    (char *buf,
-                                                           gsize len,
-                                                           guint8 chipset,
-                                                           GError **error);
+size_t      qcdm_cmd_nw_subsys_modem_snapshot_cdma_new    (char *buf,
+                                                           size_t len,
+                                                           u_int8_t chipset);
 
-QCDMResult *qcdm_cmd_nw_subsys_modem_snapshot_cdma_result (const char *buf,
-                                                           gsize len,
-                                                           GError **error);
+QcdmResult *qcdm_cmd_nw_subsys_modem_snapshot_cdma_result (const char *buf,
+                                                           size_t len,
+                                                           int *out_error);
 
 /**********************************************************************/
 

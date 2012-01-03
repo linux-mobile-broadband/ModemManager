@@ -21,6 +21,7 @@
 void test_result_string (void *f, void *data);
 void test_result_uint32 (void *f, void *data);
 void test_result_uint8 (void *f, void *data);
+void test_result_uint8_array (void *f, void *data);
 
 #endif  /* TEST_QCDM_RESULT_H */
 

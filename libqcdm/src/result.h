@@ -18,25 +18,25 @@
 #ifndef LIBQCDM_RESULT_H
 #define LIBQCDM_RESULT_H
 
-#include <glib.h>
+#include <sys/types.h>
 
-typedef struct QCDMResult QCDMResult;
+typedef struct QcdmResult QcdmResult;
 
-gboolean qcdm_result_get_string (QCDMResult *result,
-                                 const char *key,
-                                 const char **out_val);
+int qcdm_result_get_string (QcdmResult *r,
+                            const char *key,
+                            const char **out_val);
 
-gboolean qcdm_result_get_uint8  (QCDMResult *result,
-                                 const char *key,
-                                 guint8 *out_val);
+int qcdm_result_get_u8     (QcdmResult *r,
+                            const char *key,
+                            u_int8_t *out_val);
 
-gboolean qcdm_result_get_uint32 (QCDMResult *result,
-                                 const char *key,
-                                 guint32 *out_val);
+int qcdm_result_get_u32    (QcdmResult *r,
+                            const char *key,
+                            u_int32_t *out_val);
 
-QCDMResult *qcdm_result_ref     (QCDMResult *result);
+QcdmResult *qcdm_result_ref    (QcdmResult *r);
 
-void        qcdm_result_unref   (QCDMResult *result);
+void       qcdm_result_unref   (QcdmResult *r);
 
 #endif  /* LIBQCDM_RESULT_H */
 
