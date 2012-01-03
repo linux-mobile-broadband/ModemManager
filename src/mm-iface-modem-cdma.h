@@ -35,6 +35,14 @@ typedef struct _MMIfaceModemCdma MMIfaceModemCdma;
 struct _MMIfaceModemCdma {
     GTypeInterface g_iface;
 
+    /* Loading of the MEID property */
+    void (*load_meid) (MMIfaceModemCdma *self,
+                       GAsyncReadyCallback callback,
+                       gpointer user_data);
+    gchar * (*load_meid_finish) (MMIfaceModemCdma *self,
+                                 GAsyncResult *res,
+                                 GError **error);
+
     /* OTA activation */
     void (* activate) (MMIfaceModemCdma *self,
                        const gchar *carrier,

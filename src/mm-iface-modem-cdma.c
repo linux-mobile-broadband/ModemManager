@@ -541,6 +541,7 @@ static void interface_initialization_step (InitializationContext *ctx);
 
 typedef enum {
     INITIALIZATION_STEP_FIRST,
+    INITIALIZATION_STEP_MEID,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -587,10 +588,48 @@ initialization_context_complete_and_free (InitializationContext *ctx)
 }
 
 static void
+load_meid_ready (MMIfaceModemCdma *self,
+                 GAsyncResult *res,
+                 InitializationContext *ctx)
+{
+    GError *error = NULL;
+    gchar *meid;
+
+    meid = MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->load_meid_finish (self, res, &error);
+    mm_gdbus_modem_cdma_set_meid (ctx->skeleton, meid);
+    g_free (meid);
+
+    if (error) {
+        mm_warn ("couldn't load MEID: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
+
+static void
 interface_initialization_step (InitializationContext *ctx)
 {
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_MEID:
+        /* MEID value is meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have it loaded,
+         * don't try to load it again. */
+        if (!mm_gdbus_modem_cdma_get_meid (ctx->skeleton) &&
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->load_meid &&
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->load_meid_finish) {
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->load_meid (
+                ctx->self,
+                (GAsyncReadyCallback)load_meid_ready,
+                ctx);
+            return;
+        }
         /* Fall down to next step */
         ctx->step++;
 
