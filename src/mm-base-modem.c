@@ -646,6 +646,10 @@ finalize (GObject *object)
 
     mm_auth_provider_cancel_for_owner (self->priv->authp, object);
 
+    mm_dbg ("Modem (%s) '%s' completely disposed",
+            self->priv->plugin,
+            self->priv->device);
+
     g_free (self->priv->device);
     g_free (self->priv->driver);
     g_free (self->priv->plugin);
