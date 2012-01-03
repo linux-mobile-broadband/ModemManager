@@ -591,8 +591,7 @@ set_property (GObject *object,
         self->priv->product_id = g_value_get_uint (value);
         break;
     case PROP_CONNECTION:
-        if (self->priv->connection)
-            g_object_unref (self->priv->connection);
+        g_clear_object (&self->priv->connection);
         self->priv->connection = g_value_dup_object (value);
         break;
     default:
