@@ -389,6 +389,8 @@ typedef enum { /*< underscore_name=mm_modem_cdma_activation_state >*/
  * @MM_MODEM_CDMA_ACTIVATION_ERROR_NO_SIGNAL: No signal available.
  * @MM_MODEM_CDMA_ACTIVATION_ERROR_TIMED_OUT: Activation timed out.
  * @MM_MODEM_CDMA_ACTIVATION_ERROR_START_FAILED: API call for initial activation failed.
+ *
+ * CDMA Activation errors.
  */
 typedef enum { /*< underscore_name=mm_modem_cdma_activation_error >*/
     MM_MODEM_CDMA_ACTIVATION_ERROR_NONE                           = 0,
