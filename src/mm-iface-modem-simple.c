@@ -525,6 +525,7 @@ handle_disconnect (MmGdbusModemSimple *skeleton,
     mm_bearer_list_foreach (list,
                             (MMBearerListForeachFunc)build_connected_bearer_list,
                             ctx);
+    g_object_unref (list);
 
     if (ctx->bearer_path &&
         !ctx->bearers) {
