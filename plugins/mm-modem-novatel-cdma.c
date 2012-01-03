@@ -181,7 +181,7 @@ get_signal_quality (MMModemCdma *modem,
 /*****************************************************************************/
 
 static void
-parse_modem_snapshot (MMCallbackInfo *info, QCDMResult *result)
+parse_modem_snapshot (MMCallbackInfo *info, QcdmResult *result)
 {
     MMModemCdmaRegistrationState evdo_state, cdma1x_state, new_state;
     guint8 eri = 0;
@@ -193,7 +193,7 @@ parse_modem_snapshot (MMCallbackInfo *info, QCDMResult *result)
     cdma1x_state = mm_generic_cdma_query_reg_state_get_callback_1x_state (info);
 
     /* Roaming? */
-    if (qcdm_result_get_uint8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_ERI, &eri)) {
+    if (qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_ERI, &eri)) {
         char *str;
         gboolean roaming = FALSE;
 
@@ -216,7 +216,7 @@ reg_nwsnap_6500_cb (MMQcdmSerialPort *port,
                     gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
-    QCDMResult *result;
+    QcdmResult *result;
 
     if (!error) {
         result = qcdm_cmd_nw_subsys_modem_snapshot_cdma_result ((const char *) response->data, response->len, NULL);
@@ -235,20 +235,18 @@ reg_nwsnap_6800_cb (MMQcdmSerialPort *port,
                     gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
-    QCDMResult *result;
+    QcdmResult *result;
     GByteArray *nwsnap;
 
     if (error)
         goto done;
 
     /* Parse the response */
-    result = qcdm_cmd_nw_subsys_modem_snapshot_cdma_result ((const char *) response->data, response->len, &info->error);
+    result = qcdm_cmd_nw_subsys_modem_snapshot_cdma_result ((const char *) response->data, response->len, NULL);
     if (!result) {
-        g_clear_error (&info->error);
-
         /* Try for MSM6500 */
         nwsnap = g_byte_array_sized_new (25);
-        nwsnap->len = qcdm_cmd_nw_subsys_modem_snapshot_cdma_new ((char *) nwsnap->data, 25, QCDM_NW_CHIPSET_6500, NULL);
+        nwsnap->len = qcdm_cmd_nw_subsys_modem_snapshot_cdma_new ((char *) nwsnap->data, 25, QCDM_NW_CHIPSET_6500);
         g_assert (nwsnap->len);
         mm_qcdm_serial_port_queue_command (port, nwsnap, 3, reg_nwsnap_6500_cb, info);
         return;
@@ -282,7 +280,7 @@ query_registration_state (MMGenericCdma *cdma,
 
     /* Try MSM6800 first since newer cards use that */
     nwsnap = g_byte_array_sized_new (25);
-    nwsnap->len = qcdm_cmd_nw_subsys_modem_snapshot_cdma_new ((char *) nwsnap->data, 25, QCDM_NW_CHIPSET_6800, NULL);
+    nwsnap->len = qcdm_cmd_nw_subsys_modem_snapshot_cdma_new ((char *) nwsnap->data, 25, QCDM_NW_CHIPSET_6800);
     g_assert (nwsnap->len);
     mm_qcdm_serial_port_queue_command (port, nwsnap, 3, reg_nwsnap_6800_cb, info);
 }

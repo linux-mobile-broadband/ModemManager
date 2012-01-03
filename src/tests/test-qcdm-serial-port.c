@@ -31,6 +31,7 @@
 #include "libqcdm/src/commands.h"
 #include "libqcdm/src/utils.h"
 #include "libqcdm/src/com.h"
+#include "libqcdm/src/errors.h"
 #include "mm-log.h"
 
 typedef struct {
@@ -135,8 +136,9 @@ server_wait_request (int fd, char *buf, gsize len)
             retries++;
             continue;
         } else if (bytes_read == 1) {
-            gboolean more = FALSE, success;
+            gboolean success;
             gsize used = 0;
+            qcdmbool more = FALSE;
 
             total++;
             decap_len = 0;
@@ -187,17 +189,14 @@ qcdm_verinfo_expect_success_cb (MMQcdmSerialPort *port,
 static void
 qcdm_request_verinfo (MMQcdmSerialPort *port, VerInfoCb cb, GMainLoop *loop)
 {
-    GError *error = NULL;
     GByteArray *verinfo;
     gint len;
 
     /* Build up the probe command */
     verinfo = g_byte_array_sized_new (50);
-    len = qcdm_cmd_version_info_new ((char *) verinfo->data, 50, &error);
-    if (len <= 0) {
+    len = qcdm_cmd_version_info_new ((char *) verinfo->data, 50);
+    if (len <= 0)
         g_byte_array_free (verinfo, TRUE);
-        g_assert_no_error (error);
-    }
     verinfo->len = len;
 
     mm_qcdm_serial_port_queue_command (port, verinfo, 3, cb, loop);
@@ -400,9 +399,7 @@ test_pty_create (gpointer user_data)
 {
     TestData *d = user_data;
 	struct termios stbuf;
-    int ret;
-    GError *error = NULL;
-    gboolean success;
+    int ret, err;
 
     ret = openpty (&d->master, &d->slave, NULL, NULL, NULL);
     g_assert (ret == 0);
@@ -417,9 +414,8 @@ test_pty_create (gpointer user_data)
     fcntl (d->slave, F_SETFL, O_NONBLOCK);
 
     fcntl (d->master, F_SETFL, O_NONBLOCK);
-    success = qcdm_port_setup (d->master, &error);
-    g_assert_no_error (error);
-    g_assert (success);
+    err = qcdm_port_setup (d->master);
+    g_assert_cmpint (err, ==, QCDM_SUCCESS);
 }
 
 static void
