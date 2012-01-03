@@ -62,6 +62,8 @@ enum {
     PROP_MODEM_STATE,
     PROP_MODEM_CURRENT_CAPABILITIES,
     PROP_MODEM_3GPP_REGISTRATION_STATE,
+    PROP_MODEM_3GPP_CS_NETWORK_SUPPORTED,
+    PROP_MODEM_3GPP_PS_NETWORK_SUPPORTED,
     PROP_MODEM_SIMPLE_STATUS,
     PROP_LAST
 };
@@ -80,6 +82,8 @@ struct _MMBroadbandModemPrivate {
     MMModemState modem_state;
     MMModemCapability modem_current_capabilities;
     MMModem3gppRegistrationState modem_3gpp_registration_state;
+    gboolean modem_3gpp_cs_network_supported;
+    gboolean modem_3gpp_ps_network_supported;
     MMCommonSimpleProperties *modem_simple_status;
 
     /* Modem helpers */
@@ -3341,6 +3345,12 @@ set_property (GObject *object,
     case PROP_MODEM_3GPP_REGISTRATION_STATE:
         self->priv->modem_3gpp_registration_state = g_value_get_enum (value);
         break;
+    case PROP_MODEM_3GPP_CS_NETWORK_SUPPORTED:
+        self->priv->modem_3gpp_cs_network_supported = g_value_get_boolean (value);
+        break;
+    case PROP_MODEM_3GPP_PS_NETWORK_SUPPORTED:
+        self->priv->modem_3gpp_ps_network_supported = g_value_get_boolean (value);
+        break;
     case PROP_MODEM_SIMPLE_STATUS:
         self->priv->modem_simple_status = g_value_dup_object (value);
         break;
@@ -3386,6 +3396,12 @@ get_property (GObject *object,
     case PROP_MODEM_3GPP_REGISTRATION_STATE:
         g_value_set_enum (value, self->priv->modem_3gpp_registration_state);
         break;
+    case PROP_MODEM_3GPP_CS_NETWORK_SUPPORTED:
+        g_value_set_boolean (value, self->priv->modem_3gpp_cs_network_supported);
+        break;
+    case PROP_MODEM_3GPP_PS_NETWORK_SUPPORTED:
+        g_value_set_boolean (value, self->priv->modem_3gpp_ps_network_supported);
+        break;
     case PROP_MODEM_SIMPLE_STATUS:
         g_value_set_object (value, self->priv->modem_simple_status);
         break;
@@ -3407,6 +3423,8 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv->modem_3gpp_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     self->priv->reg_regex = mm_3gpp_creg_regex_get (TRUE);
     self->priv->current_charset = MM_MODEM_CHARSET_UNKNOWN;
+    self->priv->modem_3gpp_cs_network_supported = TRUE;
+    self->priv->modem_3gpp_ps_network_supported = TRUE;
 }
 
 static void
@@ -3610,6 +3628,14 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_3GPP_REGISTRATION_STATE,
                                       MM_IFACE_MODEM_3GPP_REGISTRATION_STATE);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_3GPP_CS_NETWORK_SUPPORTED,
+                                      MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_3GPP_PS_NETWORK_SUPPORTED,
+                                      MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_SIMPLE_STATUS,

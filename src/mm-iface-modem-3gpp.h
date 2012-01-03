@@ -30,6 +30,8 @@
 
 #define MM_IFACE_MODEM_3GPP_DBUS_SKELETON        "iface-modem-3gpp-dbus-skeleton"
 #define MM_IFACE_MODEM_3GPP_REGISTRATION_STATE   "iface-modem-3gpp-registration-state"
+#define MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED "iface-modem-3gpp-ps-network-supported"
+#define MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED "iface-modem-3gpp-cs-network-supported"
 
 typedef struct _MMIfaceModem3gpp MMIfaceModem3gpp;
 

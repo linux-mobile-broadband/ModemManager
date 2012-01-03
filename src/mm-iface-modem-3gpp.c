@@ -401,6 +401,8 @@ mm_iface_modem_3gpp_create_bearer (MMIfaceModem3gpp *self,
 
 typedef struct {
     GSimpleAsyncResult *result;
+    gboolean cs_supported;
+    gboolean ps_supported;
     gboolean cs_done;
     GError *cs_reg_error;
     GError *ps_reg_error;
@@ -448,7 +450,8 @@ run_cs_registration_check_ready (MMIfaceModem3gpp *self,
 {
     MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_cs_registration_check_finish (self, res, &ctx->cs_reg_error);
 
-    if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_ps_registration_check &&
+    if (ctx->ps_supported &&
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_ps_registration_check &&
         MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_ps_registration_check_finish) {
         ctx->cs_done = TRUE;
         MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_ps_registration_check (
@@ -479,7 +482,17 @@ mm_iface_modem_3gpp_run_all_registration_checks (MMIfaceModem3gpp *self,
                                              user_data,
                                              mm_iface_modem_3gpp_run_all_registration_checks);
 
-    if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_cs_registration_check &&
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED, &ctx->ps_supported,
+                  MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED, &ctx->cs_supported,
+                  NULL);
+
+    mm_dbg ("Running registration checks (CS: '%s', PS: '%s')",
+            ctx->cs_supported ? "yes" : "no",
+            ctx->ps_supported ? "yes" : "no");
+
+    if (ctx->cs_supported &&
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_cs_registration_check &&
         MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_cs_registration_check_finish) {
         MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_cs_registration_check (
             self,
@@ -488,7 +501,8 @@ mm_iface_modem_3gpp_run_all_registration_checks (MMIfaceModem3gpp *self,
         return;
     }
 
-    if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_ps_registration_check &&
+    if (ctx->ps_supported &&
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_ps_registration_check &&
         MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_ps_registration_check_finish) {
         MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->run_ps_registration_check (
             self,
@@ -751,6 +765,14 @@ mm_iface_modem_3gpp_update_cs_registration_state (MMIfaceModem3gpp *self,
                                                   MMModemAccessTechnology access_tech)
 {
     RegistrationStateContext *ctx;
+    gboolean supported = FALSE;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED, &supported,
+                  NULL);
+
+    if (!supported)
+        return;
 
     ctx = get_registration_state_context (self);
     ctx->cs = state;
@@ -763,6 +785,14 @@ mm_iface_modem_3gpp_update_ps_registration_state (MMIfaceModem3gpp *self,
                                                   MMModemAccessTechnology access_tech)
 {
     RegistrationStateContext *ctx;
+    gboolean supported = FALSE;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED, &supported,
+                  NULL);
+
+    if (!supported)
+        return;
 
     ctx = get_registration_state_context (self);
     ctx->ps = state;
@@ -1106,8 +1136,15 @@ interface_disabling_step (DisablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case DISABLING_STEP_CLEANUP_PS_REGISTRATION:
-        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->cleanup_ps_registration &&
+    case DISABLING_STEP_CLEANUP_PS_REGISTRATION: {
+        gboolean ps_supported = FALSE;
+
+        g_object_get (ctx->self,
+                      MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED, &ps_supported,
+                      NULL);
+
+        if (ps_supported &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->cleanup_ps_registration &&
             MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->cleanup_ps_registration_finish) {
             MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->cleanup_ps_registration (
                 ctx->self,
@@ -1117,9 +1154,17 @@ interface_disabling_step (DisablingContext *ctx)
         }
         /* Fall down to next step */
         ctx->step++;
+    }
 
-    case DISABLING_STEP_CLEANUP_CS_REGISTRATION:
-        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->cleanup_cs_registration &&
+    case DISABLING_STEP_CLEANUP_CS_REGISTRATION: {
+        gboolean cs_supported = FALSE;
+
+        g_object_get (ctx->self,
+                      MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED, &cs_supported,
+                      NULL);
+
+        if (cs_supported &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->cleanup_cs_registration &&
             MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->cleanup_cs_registration_finish) {
             MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->cleanup_cs_registration (
                 ctx->self,
@@ -1129,6 +1174,7 @@ interface_disabling_step (DisablingContext *ctx)
         }
         /* Fall down to next step */
         ctx->step++;
+    }
 
     case DISABLING_STEP_CLEANUP_UNSOLICITED_REGISTRATION:
         if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->cleanup_unsolicited_registration &&
@@ -1451,8 +1497,15 @@ interface_enabling_step (EnablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case ENABLING_STEP_SETUP_CS_REGISTRATION:
-        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_cs_registration &&
+    case ENABLING_STEP_SETUP_CS_REGISTRATION: {
+        gboolean cs_supported = FALSE;
+
+        g_object_get (ctx->self,
+                      MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED, &cs_supported,
+                      NULL);
+
+        if (cs_supported &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_cs_registration &&
             MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_cs_registration_finish) {
             MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_cs_registration (
                 ctx->self,
@@ -1462,9 +1515,17 @@ interface_enabling_step (EnablingContext *ctx)
         }
         /* Fall down to next step */
         ctx->step++;
+    }
 
-    case ENABLING_STEP_SETUP_PS_REGISTRATION:
-        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_ps_registration &&
+    case ENABLING_STEP_SETUP_PS_REGISTRATION: {
+        gboolean ps_supported = FALSE;
+
+        g_object_get (ctx->self,
+                      MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED, &ps_supported,
+                      NULL);
+
+        if (ps_supported &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_ps_registration &&
             MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_ps_registration_finish) {
             MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_ps_registration (
                 ctx->self,
@@ -1474,7 +1535,7 @@ interface_enabling_step (EnablingContext *ctx)
         }
         /* Fall down to next step */
         ctx->step++;
-
+    }
     case ENABLING_STEP_RUN_ALL_REGISTRATION_CHECKS:
         mm_iface_modem_3gpp_run_all_registration_checks (
             ctx->self,
@@ -1719,6 +1780,22 @@ iface_modem_3gpp_init (gpointer g_iface)
                             MM_TYPE_MODEM_3GPP_REGISTRATION_STATE,
                             MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN,
                             G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_boolean (MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED,
+                               "CS network supported",
+                               "Whether the modem works in the CS network",
+                               TRUE,
+                               G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_boolean (MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED,
+                               "PS network supported",
+                               "Whether the modem works in the PS network",
+                               TRUE,
+                               G_PARAM_READWRITE));
 
     initialized = TRUE;
 }
