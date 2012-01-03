@@ -30,6 +30,7 @@
 #include "mm-serial-parsers.h"
 #include "mm-modem-helpers.h"
 #include "libqcdm/src/commands.h"
+#include "libqcdm/src/errors.h"
 #include "mm-log.h"
 
 #define MM_GENERIC_CDMA_PREV_STATE_TAG "prev-state"
@@ -1047,9 +1048,10 @@ qcdm_pilot_sets_cb (MMQcdmSerialPort *port,
 {
     MMCallbackInfo *info = user_data;
     MMGenericCdmaPrivate *priv;
-    QCDMResult *result;
+    QcdmResult *result;
     guint32 num = 0, quality = 0, i;
     float best_db = -28;
+    int err = QCDM_SUCCESS;
 
     if (error) {
         info->error = g_error_copy (error);
@@ -1059,9 +1061,12 @@ qcdm_pilot_sets_cb (MMQcdmSerialPort *port,
     priv = MM_GENERIC_CDMA_GET_PRIVATE (info->modem);
 
     /* Parse the response */
-    result = qcdm_cmd_pilot_sets_result ((const char *) response->data, response->len, &info->error);
-    if (!result)
+    result = qcdm_cmd_pilot_sets_result ((const char *) response->data, response->len, &err);
+    if (!result) {
+        g_set_error (&info->error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                     "Failed to parse pilot sets command result: %d", err);
         goto done;
+    }
 
     qcdm_cmd_pilot_sets_result_get_num (result, QCDM_CMD_PILOT_SETS_TYPE_ACTIVE, &num);
     for (i = 0; i < num; i++) {
@@ -1128,7 +1133,7 @@ get_signal_quality (MMModemCdma *modem,
 
         /* Use CDMA1x pilot EC/IO if we can */
         pilot_sets = g_byte_array_sized_new (25);
-        pilot_sets->len = qcdm_cmd_pilot_sets_new ((char *) pilot_sets->data, 25, NULL);
+        pilot_sets->len = qcdm_cmd_pilot_sets_new ((char *) pilot_sets->data, 25);
         g_assert (pilot_sets->len);
         mm_qcdm_serial_port_queue_command (priv->qcdm, pilot_sets, 3, qcdm_pilot_sets_cb, info);
     }
@@ -1400,19 +1405,23 @@ cdma_status_cb (MMQcdmSerialPort *port,
                 gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
-    QCDMResult *result;
+    QcdmResult *result;
     guint32 sid, rxstate;
+    int err = QCDM_SUCCESS;
 
     if (error)
         goto error;
 
     /* Parse the response */
-    result = qcdm_cmd_cdma_status_result ((const char *) response->data, response->len, &info->error);
-    if (!result)
+    result = qcdm_cmd_cdma_status_result ((const char *) response->data, response->len, &err);
+    if (!result) {
+        g_set_error (&info->error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                     "Failed to parse cdma status command result: %d", err);
         goto error;
+    }
 
-    qcdm_result_get_uint32 (result, QCDM_CMD_CDMA_STATUS_ITEM_RX_STATE, &rxstate);
-    qcdm_result_get_uint32 (result, QCDM_CMD_CDMA_STATUS_ITEM_SID, &sid);
+    qcdm_result_get_u32 (result, QCDM_CMD_CDMA_STATUS_ITEM_RX_STATE, &rxstate);
+    qcdm_result_get_u32 (result, QCDM_CMD_CDMA_STATUS_ITEM_SID, &sid);
     qcdm_result_unref (result);
 
     if (rxstate == QCDM_CMD_CDMA_STATUS_RX_STATE_ENTERING_CDMA)
@@ -1449,7 +1458,7 @@ get_serving_system (MMModemCdma *modem,
         GByteArray *cdma_status;
 
         cdma_status = g_byte_array_sized_new (25);
-        cdma_status->len = qcdm_cmd_cdma_status_new ((char *) cdma_status->data, 25, NULL);
+        cdma_status->len = qcdm_cmd_cdma_status_new ((char *) cdma_status->data, 25);
         g_assert (cdma_status->len);
         mm_qcdm_serial_port_queue_command (priv->qcdm, cdma_status, 3, cdma_status_cb, info);
     } else
@@ -1827,7 +1836,7 @@ reg_hdrstate_cb (MMQcdmSerialPort *port,
                  gpointer user_data)
 {
     MMCallbackInfo *info = user_data;
-    QCDMResult *result = NULL;
+    QcdmResult *result = NULL;
     guint32 sysmode;
     MMModemCdmaRegistrationState cdma_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     MMModemCdmaRegistrationState evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
@@ -1848,9 +1857,9 @@ reg_hdrstate_cb (MMQcdmSerialPort *port,
         guint8 almp_state = QCDM_CMD_HDR_SUBSYS_STATE_INFO_ALMP_STATE_INACTIVE;
         guint8 hybrid_mode = 0;
 
-        if (   qcdm_result_get_uint8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_SESSION_STATE, &session_state)
-            && qcdm_result_get_uint8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_ALMP_STATE, &almp_state)
-            && qcdm_result_get_uint8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_HDR_HYBRID_MODE, &hybrid_mode)) {
+        if (   qcdm_result_get_u8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_SESSION_STATE, &session_state)
+            && qcdm_result_get_u8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_ALMP_STATE, &almp_state)
+            && qcdm_result_get_u8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_HDR_HYBRID_MODE, &hybrid_mode)) {
 
             /* EVDO state is registered if the HDR subsystem is registered, and
              * we're in hybrid mode, and the Call Manager system mode is
@@ -1919,31 +1928,32 @@ reg_cmstate_cb (MMQcdmSerialPort *port,
 {
     MMCallbackInfo *info = user_data;
     MMAtSerialPort *at_port = NULL;
-    QCDMResult *result = NULL;
+    QcdmResult *result = NULL;
     guint32 opmode = 0, sysmode = 0;
-    GError *qcdm_error = NULL;
+    int err = QCDM_SUCCESS;
 
     /* Parse the response */
     if (!error)
-        result = qcdm_cmd_cm_subsys_state_info_result ((const char *) response->data, response->len, &qcdm_error);
+        result = qcdm_cmd_cm_subsys_state_info_result ((const char *) response->data, response->len, &err);
 
     if (!result) {
         /* If there was some error, fall back to use +CAD like we did before QCDM */
         if (info->modem)
             at_port = mm_generic_cdma_get_best_at_port (MM_GENERIC_CDMA (info->modem), &info->error);
-        else
-            info->error = g_error_copy (qcdm_error);
+        else {
+            g_set_error (&info->error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                         "Failed to parse CM subsys state info command result: %d", err);
+        }
 
         if (at_port)
             mm_at_serial_port_queue_command (at_port, "+CAD?", 3, get_analog_digital_done, info);
         else
             mm_callback_info_schedule (info);
-        g_clear_error (&qcdm_error);
         return;
     }
 
-    qcdm_result_get_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_OPERATING_MODE, &opmode);
-    qcdm_result_get_uint32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_SYSTEM_MODE, &sysmode);
+    qcdm_result_get_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_OPERATING_MODE, &opmode);
+    qcdm_result_get_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_SYSTEM_MODE, &sysmode);
     qcdm_result_unref (result);
 
     if (opmode == QCDM_CMD_CM_SUBSYS_STATE_INFO_OPERATING_MODE_ONLINE) {
@@ -1953,7 +1963,7 @@ reg_cmstate_cb (MMQcdmSerialPort *port,
 
         /* Get HDR subsystem state */
         hdrstate = g_byte_array_sized_new (25);
-        hdrstate->len = qcdm_cmd_hdr_subsys_state_info_new ((char *) hdrstate->data, 25, NULL);
+        hdrstate->len = qcdm_cmd_hdr_subsys_state_info_new ((char *) hdrstate->data, 25);
         g_assert (hdrstate->len);
         mm_qcdm_serial_port_queue_command (port, hdrstate, 3, reg_hdrstate_cb, info);
     } else {
@@ -1998,7 +2008,7 @@ get_registration_state (MMModemCdma *modem,
         GByteArray *cmstate;
 
         cmstate = g_byte_array_sized_new (25);
-        cmstate->len = qcdm_cmd_cm_subsys_state_info_new ((char *) cmstate->data, 25, NULL);
+        cmstate->len = qcdm_cmd_cm_subsys_state_info_new ((char *) cmstate->data, 25);
         g_assert (cmstate->len);
         mm_qcdm_serial_port_queue_command (priv->qcdm, cmstate, 3, reg_cmstate_cb, info);
     } else

@@ -23,6 +23,7 @@
 #include "mm-errors.h"
 #include "libqcdm/src/com.h"
 #include "libqcdm/src/utils.h"
+#include "libqcdm/src/errors.h"
 #include "mm-log.h"
 
 G_DEFINE_TYPE (MMQcdmSerialPort, mm_qcdm_serial_port, MM_TYPE_SERIAL_PORT)
@@ -81,7 +82,8 @@ handle_response (MMSerialPort *port,
     GError *dm_error = NULL;
     gsize used = 0;
     gsize start = 0;
-    gboolean success = FALSE, more = FALSE;
+    gboolean success = FALSE;
+    qcdmbool more = FALSE;
     gsize unescaped_len = 0;
 
     if (error)
@@ -200,7 +202,15 @@ debug_log (MMSerialPort *port, const char *prefix, const char *buf, gsize len)
 static gboolean
 config_fd (MMSerialPort *port, int fd, GError **error)
 {
-    return qcdm_port_setup (fd, error);
+    int err;
+
+    err = qcdm_port_setup (fd);
+    if (err != QCDM_SUCCESS) {
+        g_set_error (error, MM_SERIAL_ERROR, MM_SERIAL_ERROR_OPEN_FAILED,
+                     "Failed to open QCDM port: %d", err);
+        return FALSE;
+    }
+    return TRUE;
 }
 
 /*****************************************************************************/

@@ -36,6 +36,7 @@
 #include "mm-utils.h"
 #include "libqcdm/src/commands.h"
 #include "libqcdm/src/utils.h"
+#include "libqcdm/src/errors.h"
 #include "mm-log.h"
 
 static void plugin_init (MMPlugin *plugin_class);
@@ -497,8 +498,8 @@ qcdm_verinfo_cb (MMQcdmSerialPort *port,
 {
     MMPluginBaseSupportsTask *task;
     MMPluginBaseSupportsTaskPrivate *priv;
-    QCDMResult *result;
-    GError *dm_error = NULL;
+    QcdmResult *result;
+    int err = QCDM_SUCCESS;
 
     /* Just the initial poke; ignore it */
     if (!user_data)
@@ -513,13 +514,10 @@ qcdm_verinfo_cb (MMQcdmSerialPort *port,
     }
 
     /* Parse the response */
-    result = qcdm_cmd_version_info_result ((const char *) response->data, response->len, &dm_error);
+    result = qcdm_cmd_version_info_result ((const char *) response->data, response->len, &err);
     if (!result) {
-        g_warning ("(%s) failed to parse QCDM version info command result: (%d) %s.",
-                   g_udev_device_get_name (priv->port),
-                   dm_error ? dm_error->code : -1,
-                   dm_error && dm_error->message ? dm_error->message : "(unknown)");
-        g_clear_error (&dm_error);
+        g_warning ("(%s) failed to parse QCDM version info command result: %d",
+                   g_udev_device_get_name (priv->port), err);
         goto done;
     }
 
@@ -569,14 +567,10 @@ try_qcdm_probe (MMPluginBaseSupportsTask *task)
 
     /* Build up the probe command */
     verinfo = g_byte_array_sized_new (50);
-    len = qcdm_cmd_version_info_new ((char *) verinfo->data, 50, &error);
+    len = qcdm_cmd_version_info_new ((char *) verinfo->data, 50);
     if (len <= 0) {
         g_byte_array_free (verinfo, TRUE);
-        g_warning ("(%s) failed to create QCDM version info command: (%d) %s.",
-                   name,
-                   error ? error->code : -1,
-                   error && error->message ? error->message : "(unknown)");
-        g_clear_error (&error);
+        g_warning ("(%s) failed to create QCDM version info command", name);
         probe_complete (task);
         return;
     }
