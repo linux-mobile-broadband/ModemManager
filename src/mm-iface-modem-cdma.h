@@ -43,6 +43,14 @@ struct _MMIfaceModemCdma {
                                  GAsyncResult *res,
                                  GError **error);
 
+    /* Loading of the ESN property */
+    void (*load_esn) (MMIfaceModemCdma *self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data);
+    gchar * (*load_esn_finish) (MMIfaceModemCdma *self,
+                                GAsyncResult *res,
+                                GError **error);
+
     /* OTA activation */
     void (* activate) (MMIfaceModemCdma *self,
                        const gchar *carrier,

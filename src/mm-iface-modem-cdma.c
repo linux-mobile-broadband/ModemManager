@@ -542,6 +542,7 @@ static void interface_initialization_step (InitializationContext *ctx);
 typedef enum {
     INITIALIZATION_STEP_FIRST,
     INITIALIZATION_STEP_MEID,
+    INITIALIZATION_STEP_ESN,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -587,27 +588,32 @@ initialization_context_complete_and_free (InitializationContext *ctx)
     g_free (ctx);
 }
 
-static void
-load_meid_ready (MMIfaceModemCdma *self,
-                 GAsyncResult *res,
-                 InitializationContext *ctx)
-{
-    GError *error = NULL;
-    gchar *meid;
-
-    meid = MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->load_meid_finish (self, res, &error);
-    mm_gdbus_modem_cdma_set_meid (ctx->skeleton, meid);
-    g_free (meid);
-
-    if (error) {
-        mm_warn ("couldn't load MEID: '%s'", error->message);
-        g_error_free (error);
+#undef STR_REPLY_READY_FN
+#define STR_REPLY_READY_FN(NAME,DISPLAY)                                \
+    static void                                                         \
+    load_##NAME##_ready (MMIfaceModemCdma *self,                        \
+                         GAsyncResult *res,                             \
+                         InitializationContext *ctx)                    \
+    {                                                                   \
+        GError *error = NULL;                                           \
+        gchar *val;                                                     \
+                                                                        \
+        val = MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->load_##NAME##_finish (self, res, &error); \
+        mm_gdbus_modem_cdma_set_##NAME (ctx->skeleton, val);            \
+        g_free (val);                                                   \
+                                                                        \
+        if (error) {                                                    \
+            mm_warn ("couldn't load %s: '%s'", DISPLAY, error->message); \
+            g_error_free (error);                                       \
+        }                                                               \
+                                                                        \
+        /* Go on to next step */                                        \
+        ctx->step++;                                                    \
+        interface_initialization_step (ctx);                            \
     }
 
-    /* Go on to next step */
-    ctx->step++;
-    interface_initialization_step (ctx);
-}
+STR_REPLY_READY_FN (meid, "MEID")
+STR_REPLY_READY_FN (esn, "ESN")
 
 static void
 interface_initialization_step (InitializationContext *ctx)
@@ -627,6 +633,22 @@ interface_initialization_step (InitializationContext *ctx)
             MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->load_meid (
                 ctx->self,
                 (GAsyncReadyCallback)load_meid_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_ESN:
+        /* ESN value is meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have it loaded,
+         * don't try to load it again. */
+        if (!mm_gdbus_modem_cdma_get_esn (ctx->skeleton) &&
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->load_esn &&
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->load_esn_finish) {
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->load_esn (
+                ctx->self,
+                (GAsyncReadyCallback)load_esn_ready,
                 ctx);
             return;
         }
