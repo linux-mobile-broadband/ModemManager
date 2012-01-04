@@ -2968,6 +2968,332 @@ get_call_manager_state (MMIfaceModemCdma *self,
 }
 
 /*****************************************************************************/
+/* Serving System (CDMA) */
+
+typedef struct {
+    guint sid;
+    guint class;
+    guint band;
+} Cdma1xServingSystemResults;
+
+typedef struct {
+    MMBroadbandModem *self;
+    GSimpleAsyncResult *result;
+    MMQcdmSerialPort *qcdm;
+} Cdma1xServingSystemContext;
+
+static void
+cdma1x_serving_system_context_complete_and_free (Cdma1xServingSystemContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    if (ctx->qcdm)
+        g_object_unref (ctx->qcdm);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+get_cdma1x_serving_system_finish (MMIfaceModemCdma *self,
+                                  GAsyncResult *res,
+                                  guint *class,
+                                  guint *band,
+                                  guint *sid,
+                                  GError **error)
+{
+    Cdma1xServingSystemResults *results;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    results = (Cdma1xServingSystemResults *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    *sid = results->sid;
+    *class = results->class;
+    *band = results->band;
+    return TRUE;
+}
+
+static void
+get_cdma1x_serving_system_at_ready (MMIfaceModemCdma *self,
+                                    GAsyncResult *res,
+                                    Cdma1xServingSystemContext *ctx)
+{
+    GError *error = NULL;
+    const gchar *result;
+    gint class = 0;
+    gint sid = MM_MODEM_CDMA_SID_UNKNOWN;
+    gint num;
+    guchar band = 'Z';
+    gboolean class_ok = FALSE;
+    gboolean band_ok = FALSE;
+    gboolean success = FALSE;
+    Cdma1xServingSystemResults *results;
+
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        cdma1x_serving_system_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Strip any leading command tag and spaces */
+    result = mm_strip_tag (result, "+CSS:");
+    num = sscanf (result, "? , %d", &sid);
+    if (num == 1) {
+        /* UTStarcom and Huawei modems that use IS-707-A format; note that
+         * this format obviously doesn't have other indicators like band and
+         * class and thus SID 0 will be reported as "no service" (see below).
+         */
+        class = 0;
+        band = 'Z';
+        success = TRUE;
+    } else {
+        GRegex *r;
+        GMatchInfo *match_info;
+
+        /* Format is "<band_class>,<band>,<sid>" */
+        r = g_regex_new ("\\s*([^,]*?)\\s*,\\s*([^,]*?)\\s*,\\s*(\\d+)", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        if (!r) {
+            g_simple_async_result_set_error (
+                ctx->result,
+                MM_CORE_ERROR,
+                MM_CORE_ERROR_FAILED,
+                "Could not parse Serving System results (regex creation failed).");
+            cdma1x_serving_system_context_complete_and_free (ctx);
+            return;
+        }
+
+        g_regex_match (r, result, 0, &match_info);
+        if (g_match_info_get_match_count (match_info) >= 3) {
+            gint override_class = 0;
+            gchar *str;
+
+            /* band class */
+            str = g_match_info_fetch (match_info, 1);
+            class = mm_cdma_normalize_class (str);
+            g_free (str);
+
+            /* band */
+            str = g_match_info_fetch (match_info, 2);
+            band = mm_cdma_normalize_band (str, &override_class);
+            if (override_class)
+                class = override_class;
+            g_free (str);
+
+            /* sid */
+            str = g_match_info_fetch (match_info, 3);
+            sid = mm_cdma_convert_sid (str);
+            g_free (str);
+
+            success = TRUE;
+        }
+
+        g_match_info_free (match_info);
+        g_regex_unref (r);
+    }
+
+    if (!success) {
+        g_simple_async_result_set_error (
+            ctx->result,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_FAILED,
+            "Could not parse Serving System results");
+        cdma1x_serving_system_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Normalize the SID */
+    if (sid < 0 || sid > 32767)
+        sid = MM_MODEM_CDMA_SID_UNKNOWN;
+
+    if (class == 1 || class == 2)
+        class_ok = TRUE;
+    if (band != 'Z')
+        band_ok = TRUE;
+
+    /* Return 'no service' if none of the elements of the +CSS response
+     * indicate that the modem has service.  Note that this allows SID 0
+     * when at least one of the other elements indicates service.
+     * Normally we'd treat SID 0 as 'no service' but some modems
+     * (Sierra 5725) sometimes return SID 0 even when registered.
+     */
+    if (sid == 0 && !class_ok && !band_ok)
+        sid = MM_MODEM_CDMA_SID_UNKNOWN;
+
+    /* 99999 means unknown/no service */
+    results = g_new0 (Cdma1xServingSystemResults, 1);
+    results->sid = sid;
+    if (sid != MM_MODEM_CDMA_SID_UNKNOWN) {
+        results->band = band;
+        results->class = class;
+    }
+
+    g_simple_async_result_set_op_res_gpointer (ctx->result, results, (GDestroyNotify)g_free);
+    cdma1x_serving_system_context_complete_and_free (ctx);
+}
+
+static void
+get_cdma1x_serving_system_qcdm_ready (MMQcdmSerialPort *port,
+                                      GByteArray *response,
+                                      GError *error,
+                                      Cdma1xServingSystemContext *ctx)
+{
+    Cdma1xServingSystemResults *results;
+    QcdmResult *result;
+    guint32 sid = 0;
+    guint32 rxstate = 0;
+    gint err = QCDM_SUCCESS;
+
+    if (error ||
+        (result = qcdm_cmd_cdma_status_result ((const gchar *) response->data,
+                                               response->len,
+                                               &err)) == NULL) {
+        if (err != QCDM_SUCCESS)
+            mm_dbg ("Failed to parse cdma status command result: %d", err);
+        /* If there was some error, fall back to use +CSS like we did before QCDM */
+        mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
+                                  "+CSS?",
+                                  3,
+                                  FALSE,
+                                  NULL, /* cancellable */
+                                  (GAsyncReadyCallback)get_cdma1x_serving_system_at_ready,
+                                  ctx);
+        return;
+    }
+
+    qcdm_result_get_u32 (result, QCDM_CMD_CDMA_STATUS_ITEM_RX_STATE, &rxstate);
+    qcdm_result_get_u32 (result, QCDM_CMD_CDMA_STATUS_ITEM_SID, &sid);
+    qcdm_result_unref (result);
+
+    /* 99999 means unknown/no service */
+    if (rxstate == QCDM_CMD_CDMA_STATUS_RX_STATE_ENTERING_CDMA)
+        sid = MM_MODEM_CDMA_SID_UNKNOWN;
+
+    results = g_new0 (Cdma1xServingSystemResults, 1);
+    results->sid = sid;
+    if (sid != MM_MODEM_CDMA_SID_UNKNOWN) {
+        results->band = 'Z';
+        results->class = 0;
+    }
+
+    g_simple_async_result_set_op_res_gpointer (ctx->result, results, (GDestroyNotify)g_free);
+    cdma1x_serving_system_context_complete_and_free (ctx);
+}
+
+static void
+get_cdma1x_serving_system (MMIfaceModemCdma *self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    Cdma1xServingSystemContext *ctx;
+
+    /* Setup context */
+    ctx = g_new0 (Cdma1xServingSystemContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             get_cdma1x_serving_system);
+    ctx->qcdm = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
+
+    if (ctx->qcdm) {
+        GByteArray *cdma_status;
+
+        g_object_ref (ctx->qcdm);
+
+        /* Setup command */
+        cdma_status = g_byte_array_sized_new (25);
+        cdma_status->len = qcdm_cmd_cdma_status_new ((char *) cdma_status->data, 25);
+        g_assert (cdma_status->len);
+        mm_qcdm_serial_port_queue_command (ctx->qcdm,
+                                           cdma_status,
+                                           3,
+                                           (MMQcdmSerialResponseFn)get_cdma1x_serving_system_qcdm_ready,
+                                           ctx);
+        return;
+    }
+
+    /* Try with AT if we don't have QCDM */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CSS?",
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)get_cdma1x_serving_system_at_ready,
+                              ctx);
+}
+
+/*****************************************************************************/
+/* Service status, analog/digital check (CDMA) */
+
+static gboolean
+get_service_status_finish (MMIfaceModemCdma *self,
+                           GAsyncResult *res,
+                           gboolean *has_cdma_service,
+                           GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    *has_cdma_service = g_simple_async_result_get_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res));
+    return TRUE;
+}
+
+static void
+get_service_status_ready (MMIfaceModemCdma *self,
+                          GAsyncResult *res,
+                          GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    const gchar *result;
+
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else {
+        gulong int_cad;
+
+        /* Strip any leading command tag and spaces */
+        result = mm_strip_tag (result, "+CAD:");
+        errno = 0;
+        int_cad = strtol (result, NULL, 10);
+        if ((errno == EINVAL) || (errno == ERANGE))
+            g_simple_async_result_set_error (simple,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Failed to parse +CAD response '%s'",
+                                             result);
+        else
+            /* 1 == CDMA service */
+            g_simple_async_result_set_op_res_gboolean (simple, (int_cad == 1));
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+get_service_status (MMIfaceModemCdma *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        get_service_status);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CAD?",
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)get_service_status_ready,
+                              result);
+}
+
+/*****************************************************************************/
 
 typedef enum {
     DISABLING_STEP_FIRST,
@@ -3898,6 +4224,10 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
     iface->get_call_manager_state_finish = get_call_manager_state_finish;
     iface->get_hdr_state = get_hdr_state;
     iface->get_hdr_state_finish = get_hdr_state_finish;
+    iface->get_service_status = get_service_status;
+    iface->get_service_status_finish = get_service_status_finish;
+    iface->get_cdma1x_serving_system = get_cdma1x_serving_system;
+    iface->get_cdma1x_serving_system_finish = get_cdma1x_serving_system_finish;
 }
 
 static void

@@ -628,8 +628,16 @@ registration_check_step (RunAllRegistrationChecksContext *ctx)
         ctx->step++;
 
     case REGISTRATION_CHECK_STEP_AT_CDMA1X_SERVING_SYSTEM:
-        /* Plugins may fully disable querying the serving system, for example if
-         * they already know that AT+CSS? will return undesired errors. */
+        /* Now that we have some sort of service, check if the the device is
+         * registered on the network.
+         */
+
+        /* Some devices key the AT+CSS? response off the 1X state, but if the
+         * device has EVDO service but no 1X service, then reading AT+CSS? will
+         * error out too early.  Let subclasses that know that their AT+CSS?
+         * response is wrong in this case handle more specific registration
+         * themselves; if they do, they'll set these callbacks to NULL..
+         */
         if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_cdma1x_serving_system &&
             MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_cdma1x_serving_system_finish) {
             MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_cdma1x_serving_system (
