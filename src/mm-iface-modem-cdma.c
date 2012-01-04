@@ -889,6 +889,7 @@ static void interface_enabling_step (EnablingContext *ctx);
 
 typedef enum {
     ENABLING_STEP_FIRST,
+    ENABLING_STEP_RUN_ALL_REGISTRATION_CHECKS,
     ENABLING_STEP_LAST
 } EnablingStep;
 
@@ -943,12 +944,38 @@ mm_iface_modem_cdma_enable_finish (MMIfaceModemCdma *self,
 }
 
 static void
+run_all_registration_checks_ready (MMIfaceModemCdma *self,
+                                   GAsyncResult *res,
+                                   EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_iface_modem_cdma_run_all_registration_checks_finish (self,
+                                                                 res,
+                                                                 &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        enabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_enabling_step (ctx);
+}
+
+static void
 interface_enabling_step (EnablingContext *ctx)
 {
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
         /* Fall down to next step */
         ctx->step++;
+
+    case ENABLING_STEP_RUN_ALL_REGISTRATION_CHECKS:
+        mm_iface_modem_cdma_run_all_registration_checks (ctx->self,
+                                                         (GAsyncReadyCallback)run_all_registration_checks_ready,
+                                                         ctx);
+        return;
 
     case ENABLING_STEP_LAST:
         /* We are done without errors! */
