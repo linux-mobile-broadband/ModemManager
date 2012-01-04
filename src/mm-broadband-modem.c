@@ -2674,6 +2674,39 @@ setup_ps_registration (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* ESN (CDMA) */
+
+static gchar *
+load_esn_finish (MMIfaceModemCdma *self,
+                 GAsyncResult *res,
+                 GError **error)
+{
+    gchar *esn;
+
+    esn = g_strdup (mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error));
+    if (!esn)
+        return NULL;
+
+    mm_dbg ("loaded ESN: %s", esn);
+    return esn;
+}
+
+static void
+load_esn (MMIfaceModemCdma *self,
+          GAsyncReadyCallback callback,
+          gpointer user_data)
+{
+    mm_dbg ("loading ESN...");
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+GSN",
+                              3,
+                              TRUE,
+                              NULL, /* cancellable */
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 
 typedef enum {
     DISABLING_STEP_FIRST,
@@ -3567,6 +3600,9 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 static void
 iface_modem_cdma_init (MMIfaceModemCdma *iface)
 {
+    /* Initialization steps */
+    iface->load_esn = load_esn;
+    iface->load_esn_finish = load_esn_finish;
 }
 
 static void
