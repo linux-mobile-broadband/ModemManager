@@ -1529,6 +1529,74 @@ done:
     return array;
 }
 
+gint
+mm_cdma_normalize_class (const gchar *orig_class)
+{
+    gchar class;
+
+    g_return_val_if_fail (orig_class != NULL, '0');
+
+    class = toupper (orig_class[0]);
+
+    /* Cellular (850MHz) */
+    if (class == '1' || class == 'C')
+        return 1;
+    /* PCS (1900MHz) */
+    if (class == '2' || class == 'P')
+        return 2;
+
+    /* Unknown/not registered */
+    return 0;
+}
+
+gchar
+mm_cdma_normalize_band (const gchar *long_band,
+                        gint *out_class)
+{
+    gchar band;
+
+    g_return_val_if_fail (long_band != NULL, 'Z');
+
+    /* There are two response formats for the band; one includes the band
+     * class and the other doesn't.  For modems that include the band class
+     * (ex Novatel S720) you'll see "Px" or "Cx" depending on whether the modem
+     * is registered on a PCS/1900 (P) or Cellular/850 (C) system.
+     */
+    band = toupper (long_band[0]);
+
+    /* Possible band class in first position; return it */
+    if (band == 'C' || band == 'P') {
+        gchar tmp[2] = { band, '\0' };
+
+        *out_class = mm_cdma_normalize_class (tmp);
+        band = toupper (long_band[1]);
+    }
+
+    /* normalize to A - F, and Z */
+    if (band >= 'A' && band <= 'F')
+        return band;
+
+    /* Unknown/not registered */
+    return 'Z';
+}
+
+gint
+mm_cdma_convert_sid (const gchar *sid)
+{
+    glong tmp_sid;
+
+    g_return_val_if_fail (sid != NULL, MM_MODEM_CDMA_SID_UNKNOWN);
+
+    errno = 0;
+    tmp_sid = strtol (sid, NULL, 10);
+    if ((errno == EINVAL) || (errno == ERANGE))
+        return MM_MODEM_CDMA_SID_UNKNOWN;
+    else if (tmp_sid < G_MININT || tmp_sid > G_MAXINT)
+        return MM_MODEM_CDMA_SID_UNKNOWN;
+
+    return (gint) tmp_sid;
+}
+
 guint
 mm_count_bits_set (gulong number)
 {

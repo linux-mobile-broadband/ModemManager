@@ -110,6 +110,14 @@ gint        cind_response_get_max       (CindResponse *r);
 
 GByteArray *mm_parse_cind_query_response(const char *reply, GError **error);
 
+#define MM_MODEM_CDMA_SID_UNKNOWN 99999
+#define MM_MODEM_CDMA_NID_UNKNOWN 99999
+
+gint  mm_cdma_normalize_class (const gchar *orig_class);
+gchar mm_cdma_normalize_band  (const gchar *long_band,
+                               gint *out_class);
+gint  mm_cdma_convert_sid     (const gchar *sid);
+
 guint mm_count_bits_set (gulong number);
 
 #endif  /* MM_MODEM_HELPERS_H */

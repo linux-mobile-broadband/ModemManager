@@ -1174,8 +1174,8 @@ mm_iface_modem_cdma_initialize (MMIfaceModemCdma *self,
         /* Set all initial property defaults */
         mm_gdbus_modem_cdma_set_meid (skeleton, NULL);
         mm_gdbus_modem_cdma_set_esn (skeleton, NULL);
-        mm_gdbus_modem_cdma_set_sid (skeleton, MM_IFACE_MODEM_CDMA_SID_UNKNOWN);
-        mm_gdbus_modem_cdma_set_nid (skeleton, MM_IFACE_MODEM_CDMA_NID_UNKNOWN);
+        mm_gdbus_modem_cdma_set_sid (skeleton, MM_MODEM_CDMA_SID_UNKNOWN);
+        mm_gdbus_modem_cdma_set_nid (skeleton, MM_MODEM_CDMA_NID_UNKNOWN);
 
         /* Bind our Registration State properties */
         g_object_bind_property (self, MM_IFACE_MODEM_CDMA_CDMA1X_REGISTRATION_STATE,

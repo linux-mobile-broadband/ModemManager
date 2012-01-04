@@ -34,9 +34,6 @@
 #define MM_IFACE_MODEM_CDMA_EVDO_NETWORK_SUPPORTED    "iface-modem-cdma-evdo-network-supported"
 #define MM_IFACE_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED  "iface-modem-cdma-cdma1x-network-supported"
 
-#define MM_IFACE_MODEM_CDMA_SID_UNKNOWN 99999
-#define MM_IFACE_MODEM_CDMA_NID_UNKNOWN 99999
-
 typedef struct _MMIfaceModemCdma MMIfaceModemCdma;
 
 struct _MMIfaceModemCdma {
