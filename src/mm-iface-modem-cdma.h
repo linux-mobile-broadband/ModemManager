@@ -28,7 +28,14 @@
 #define MM_IS_IFACE_MODEM_CDMA(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_CDMA))
 #define MM_IFACE_MODEM_CDMA_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_CDMA, MMIfaceModemCdma))
 
-#define MM_IFACE_MODEM_CDMA_DBUS_SKELETON        "iface-modem-cdma-dbus-skeleton"
+#define MM_IFACE_MODEM_CDMA_DBUS_SKELETON             "iface-modem-cdma-dbus-skeleton"
+#define MM_IFACE_MODEM_CDMA_CDMA1X_REGISTRATION_STATE "iface-modem-cdma-cdma1x-registration-state"
+#define MM_IFACE_MODEM_CDMA_EVDO_REGISTRATION_STATE   "iface-modem-cdma-evdo-registration-state"
+#define MM_IFACE_MODEM_CDMA_EVDO_NETWORK_SUPPORTED    "iface-modem-cdma-evdo-network-supported"
+#define MM_IFACE_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED  "iface-modem-cdma-cdma1x-network-supported"
+
+#define MM_IFACE_MODEM_CDMA_SID_UNKNOWN 99999
+#define MM_IFACE_MODEM_CDMA_NID_UNKNOWN 99999
 
 typedef struct _MMIfaceModemCdma MMIfaceModemCdma;
 
@@ -68,6 +75,47 @@ struct _MMIfaceModemCdma {
     gboolean (* activate_manual_finish) (MMIfaceModemCdma *self,
                                          GAsyncResult *res,
                                          GError **error);
+
+    /* Get call manager state */
+    void (* get_call_manager_state) (MMIfaceModemCdma *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data);
+    gboolean (* get_call_manager_state_finish) (MMIfaceModemCdma *self,
+                                                GAsyncResult *res,
+                                                guint *operating_mode,
+                                                guint *system_mode,
+                                                GError **error);
+
+    /* Get HDR state */
+    void (* get_hdr_state) (MMIfaceModemCdma *self,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data);
+    gboolean (* get_hdr_state_finish) (MMIfaceModemCdma *self,
+                                       GAsyncResult *res,
+                                       guint8 *hybrid_mode,
+                                       guint8 *session_state,
+                                       guint8 *almp_state,
+                                       GError **error);
+
+    /* Get service status */
+    void (* get_service_status) (MMIfaceModemCdma *self,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data);
+    gboolean (* get_service_status_finish) (MMIfaceModemCdma *self,
+                                            GAsyncResult *res,
+                                            gboolean *has_cdma_service,
+                                            GError **error);
+
+    /* Get CDMA1x serving system */
+    void (* get_cdma1x_serving_system) (MMIfaceModemCdma *self,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data);
+    gboolean (* get_cdma1x_serving_system_finish) (MMIfaceModemCdma *self,
+                                                   GAsyncResult *res,
+                                                   guint *class,
+                                                   guint *band,
+                                                   guint *sid,
+                                                   GError **error);
 };
 
 GType mm_iface_modem_cdma_get_type (void);
@@ -117,6 +165,20 @@ void     mm_iface_modem_cdma_activate_manual        (MMIfaceModemCdma *self,
                                                      GVariant *properties,
                                                      GAsyncReadyCallback callback,
                                                      gpointer user_data);
+
+/* Objects implementing this interface can report new registration states. */
+void mm_iface_modem_cdma_update_cdma1x_registration_state (MMIfaceModemCdma *self,
+                                                           MMModemCdmaRegistrationState state);
+void mm_iface_modem_cdma_update_evdo_registration_state (MMIfaceModemCdma *self,
+                                                         MMModemCdmaRegistrationState state);
+
+/* Run all registration checks */
+void     mm_iface_modem_cdma_run_all_registration_checks        (MMIfaceModemCdma *self,
+                                                                 GAsyncReadyCallback callback,
+                                                                 gpointer user_data);
+gboolean mm_iface_modem_cdma_run_all_registration_checks_finish (MMIfaceModemCdma *self,
+                                                                 GAsyncResult *res,
+                                                                 GError **error);
 
 /* Bind properties for simple GetStatus() */
 void mm_iface_modem_cdma_bind_simple_status (MMIfaceModemCdma *self,
