@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
 #include <string.h>
 
 #include <ModemManager.h>
@@ -64,6 +65,10 @@ enum {
     PROP_MODEM_3GPP_REGISTRATION_STATE,
     PROP_MODEM_3GPP_CS_NETWORK_SUPPORTED,
     PROP_MODEM_3GPP_PS_NETWORK_SUPPORTED,
+    PROP_MODEM_CDMA_CDMA1X_REGISTRATION_STATE,
+    PROP_MODEM_CDMA_EVDO_REGISTRATION_STATE,
+    PROP_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED,
+    PROP_MODEM_CDMA_EVDO_NETWORK_SUPPORTED,
     PROP_MODEM_SIMPLE_STATUS,
     PROP_LAST
 };
@@ -84,6 +89,10 @@ struct _MMBroadbandModemPrivate {
     MMModem3gppRegistrationState modem_3gpp_registration_state;
     gboolean modem_3gpp_cs_network_supported;
     gboolean modem_3gpp_ps_network_supported;
+    MMModemCdmaRegistrationState modem_cdma_cdma1x_registration_state;
+    MMModemCdmaRegistrationState modem_cdma_evdo_registration_state;
+    gboolean modem_cdma_cdma1x_network_supported;
+    gboolean modem_cdma_evdo_network_supported;
     MMCommonSimpleProperties *modem_simple_status;
 
     /* Modem helpers */
@@ -2707,6 +2716,258 @@ load_esn (MMIfaceModemCdma *self,
 }
 
 /*****************************************************************************/
+/* HDR state (CDMA) */
+
+typedef struct {
+    guint8 hybrid_mode;
+    guint8 session_state;
+    guint8 almp_state;
+} HdrStateResults;
+
+typedef struct {
+    MMBroadbandModem *self;
+    GSimpleAsyncResult *result;
+    MMQcdmSerialPort *qcdm;
+} HdrStateContext;
+
+static void
+hdr_state_context_complete_and_free (HdrStateContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->qcdm);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+get_hdr_state_finish (MMIfaceModemCdma *self,
+                      GAsyncResult *res,
+                      guint8 *hybrid_mode,
+                      guint8 *session_state,
+                      guint8 *almp_state,
+                      GError **error)
+{
+    HdrStateResults *results;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    results = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    *hybrid_mode = results->hybrid_mode;
+    *session_state = results->session_state;
+    *almp_state = results->almp_state;
+    return TRUE;
+}
+
+static void
+get_hdr_state_ready (MMQcdmSerialPort *port,
+                     GByteArray *response,
+                     GError *error,
+                     HdrStateContext *ctx)
+{
+    QcdmResult *result;
+    HdrStateResults *results;
+    gint err = QCDM_SUCCESS;
+
+    if (error) {
+        g_simple_async_result_set_from_error (ctx->result, error);
+        hdr_state_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Parse the response */
+    result = qcdm_cmd_hdr_subsys_state_info_result ((const gchar *) response->data,
+                                                    response->len,
+                                                    &err);
+    if (!result) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Failed to parse HDR subsys state info command result: %d",
+                                         err);
+        hdr_state_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Build results */
+    results = g_new0 (HdrStateResults, 1);
+    qcdm_result_get_u8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_HDR_HYBRID_MODE, &results->hybrid_mode);
+    results->session_state = QCDM_CMD_HDR_SUBSYS_STATE_INFO_SESSION_STATE_CLOSED;
+    qcdm_result_get_u8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_SESSION_STATE, &results->session_state);
+    results->almp_state = QCDM_CMD_HDR_SUBSYS_STATE_INFO_ALMP_STATE_INACTIVE;
+    qcdm_result_get_u8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_ALMP_STATE, &results->almp_state);
+    qcdm_result_unref (result);
+
+    g_simple_async_result_set_op_res_gpointer (ctx->result, results, (GDestroyNotify)g_free);
+    hdr_state_context_complete_and_free (ctx);
+}
+
+static void
+get_hdr_state (MMIfaceModemCdma *self,
+               GAsyncReadyCallback callback,
+               gpointer user_data)
+{
+    MMQcdmSerialPort *qcdm;
+    HdrStateContext *ctx;
+    GByteArray *hdrstate;
+
+    qcdm = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
+    if (!qcdm) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_UNSUPPORTED,
+                                             "Cannot get HDR state without a QCDM port");
+        return;
+    }
+
+    /* Setup context */
+    ctx = g_new0 (HdrStateContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             get_hdr_state);
+    ctx->qcdm = g_object_ref (qcdm);
+
+    /* Setup command */
+    hdrstate = g_byte_array_sized_new (25);
+    hdrstate->len = qcdm_cmd_hdr_subsys_state_info_new ((gchar *) hdrstate->data, 25);
+    g_assert (hdrstate->len);
+
+    mm_qcdm_serial_port_queue_command (ctx->qcdm,
+                                       hdrstate,
+                                       3,
+                                       (MMQcdmSerialResponseFn)get_hdr_state_ready,
+                                       ctx);
+}
+
+/*****************************************************************************/
+/* Call Manager state (CDMA) */
+
+typedef struct {
+    guint system_mode;
+    guint operating_mode;
+} CallManagerStateResults;
+
+typedef struct {
+    MMBroadbandModem *self;
+    GSimpleAsyncResult *result;
+    MMQcdmSerialPort *qcdm;
+} CallManagerStateContext;
+
+static void
+call_manager_state_context_complete_and_free (CallManagerStateContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->qcdm);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+get_call_manager_state_finish (MMIfaceModemCdma *self,
+                               GAsyncResult *res,
+                               guint *system_mode,
+                               guint *operating_mode,
+                               GError **error)
+{
+    CallManagerStateResults *results;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    results = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    *system_mode = results->system_mode;
+    *operating_mode = results->operating_mode;
+    return TRUE;
+}
+
+static void
+get_call_manager_state_ready (MMQcdmSerialPort *port,
+                              GByteArray *response,
+                              GError *error,
+                              CallManagerStateContext *ctx)
+{
+    QcdmResult *result;
+    CallManagerStateResults *results;
+    gint err = QCDM_SUCCESS;
+
+    if (error) {
+        g_simple_async_result_set_from_error (ctx->result, error);
+        call_manager_state_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Parse the response */
+    result = qcdm_cmd_cm_subsys_state_info_result ((const gchar *) response->data,
+                                                   response->len,
+                                                   &err);
+    if (!result) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Failed to parse CM subsys state info command result: %d",
+                                         err);
+        call_manager_state_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Build results */
+    results = g_new0 (CallManagerStateResults, 1);
+    qcdm_result_get_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_OPERATING_MODE, &results->operating_mode);
+    qcdm_result_get_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_SYSTEM_MODE, &results->system_mode);
+    qcdm_result_unref (result);
+
+    g_simple_async_result_set_op_res_gpointer (ctx->result, results, (GDestroyNotify)g_free);
+    call_manager_state_context_complete_and_free (ctx);
+}
+
+static void
+get_call_manager_state (MMIfaceModemCdma *self,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
+{
+    MMQcdmSerialPort *qcdm;
+    CallManagerStateContext *ctx;
+    GByteArray *cmstate;
+
+    qcdm = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
+    if (!qcdm) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_UNSUPPORTED,
+                                             "Cannot get call manager state without a QCDM port");
+        return;
+    }
+
+    /* Setup context */
+    ctx = g_new0 (CallManagerStateContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             get_call_manager_state);
+    ctx->qcdm = g_object_ref (qcdm);
+
+    /* Setup command */
+    cmstate = g_byte_array_sized_new (25);
+    cmstate->len = qcdm_cmd_cm_subsys_state_info_new ((gchar *) cmstate->data, 25);
+    g_assert (cmstate->len);
+
+    mm_qcdm_serial_port_queue_command (ctx->qcdm,
+                                       cmstate,
+                                       3,
+                                       (MMQcdmSerialResponseFn)get_call_manager_state_ready,
+                                       ctx);
+}
+
+/*****************************************************************************/
 
 typedef enum {
     DISABLING_STEP_FIRST,
@@ -3390,6 +3651,18 @@ set_property (GObject *object,
     case PROP_MODEM_3GPP_PS_NETWORK_SUPPORTED:
         self->priv->modem_3gpp_ps_network_supported = g_value_get_boolean (value);
         break;
+    case PROP_MODEM_CDMA_CDMA1X_REGISTRATION_STATE:
+        self->priv->modem_cdma_cdma1x_registration_state = g_value_get_enum (value);
+        break;
+    case PROP_MODEM_CDMA_EVDO_REGISTRATION_STATE:
+        self->priv->modem_cdma_evdo_registration_state = g_value_get_enum (value);
+        break;
+    case PROP_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED:
+        self->priv->modem_cdma_cdma1x_network_supported = g_value_get_boolean (value);
+        break;
+    case PROP_MODEM_CDMA_EVDO_NETWORK_SUPPORTED:
+        self->priv->modem_cdma_evdo_network_supported = g_value_get_boolean (value);
+        break;
     case PROP_MODEM_SIMPLE_STATUS:
         g_clear_object (&self->priv->modem_simple_status);
         self->priv->modem_simple_status = g_value_dup_object (value);
@@ -3442,6 +3715,18 @@ get_property (GObject *object,
     case PROP_MODEM_3GPP_PS_NETWORK_SUPPORTED:
         g_value_set_boolean (value, self->priv->modem_3gpp_ps_network_supported);
         break;
+    case PROP_MODEM_CDMA_CDMA1X_REGISTRATION_STATE:
+        g_value_set_enum (value, self->priv->modem_cdma_cdma1x_registration_state);
+        break;
+    case PROP_MODEM_CDMA_EVDO_REGISTRATION_STATE:
+        g_value_set_enum (value, self->priv->modem_cdma_evdo_registration_state);
+        break;
+    case PROP_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED:
+        g_value_set_boolean (value, self->priv->modem_cdma_cdma1x_network_supported);
+        break;
+    case PROP_MODEM_CDMA_EVDO_NETWORK_SUPPORTED:
+        g_value_set_boolean (value, self->priv->modem_cdma_evdo_network_supported);
+        break;
     case PROP_MODEM_SIMPLE_STATUS:
         g_value_set_object (value, self->priv->modem_simple_status);
         break;
@@ -3460,11 +3745,15 @@ mm_broadband_modem_init (MMBroadbandModem *self)
                                               MMBroadbandModemPrivate);
     self->priv->modem_state = MM_MODEM_STATE_UNKNOWN;
     self->priv->modem_current_capabilities = MM_MODEM_CAPABILITY_NONE;
-    self->priv->modem_3gpp_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     self->priv->reg_regex = mm_3gpp_creg_regex_get (TRUE);
     self->priv->current_charset = MM_MODEM_CHARSET_UNKNOWN;
+    self->priv->modem_3gpp_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     self->priv->modem_3gpp_cs_network_supported = TRUE;
     self->priv->modem_3gpp_ps_network_supported = TRUE;
+    self->priv->modem_cdma_cdma1x_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+    self->priv->modem_cdma_evdo_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+    self->priv->modem_cdma_cdma1x_network_supported = TRUE;
+    self->priv->modem_cdma_evdo_network_supported = TRUE;
 }
 
 static void
@@ -3603,6 +3892,12 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
     /* Initialization steps */
     iface->load_esn = load_esn;
     iface->load_esn_finish = load_esn_finish;
+
+    /* Additional actions */
+    iface->get_call_manager_state = get_call_manager_state;
+    iface->get_call_manager_state_finish = get_call_manager_state_finish;
+    iface->get_hdr_state = get_hdr_state;
+    iface->get_hdr_state_finish = get_hdr_state_finish;
 }
 
 static void
@@ -3674,6 +3969,22 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_3GPP_PS_NETWORK_SUPPORTED,
                                       MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_CDMA_CDMA1X_REGISTRATION_STATE,
+                                      MM_IFACE_MODEM_CDMA_CDMA1X_REGISTRATION_STATE);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_CDMA_EVDO_REGISTRATION_STATE,
+                                      MM_IFACE_MODEM_CDMA_EVDO_REGISTRATION_STATE);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED,
+                                      MM_IFACE_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_CDMA_EVDO_NETWORK_SUPPORTED,
+                                      MM_IFACE_MODEM_CDMA_EVDO_NETWORK_SUPPORTED);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_SIMPLE_STATUS,
