@@ -874,8 +874,7 @@ typedef struct {
 static void
 bearer_object_list_free (GList *list)
 {
-    g_list_foreach (list, (GFunc)g_object_unref, NULL);
-    g_list_free (list);
+    g_list_free_full (list, (GDestroyNotify) g_object_unref);
 }
 
 static void
