@@ -135,10 +135,7 @@ mm_bearer_list_delete_all_bearers (MMBearerList *self)
     if (!self->priv->bearers)
         return;
 
-    g_list_foreach (self->priv->bearers,
-                    (GFunc)g_object_unref,
-                    NULL);
-    g_list_free (self->priv->bearers);
+    g_list_free_full (self->priv->bearers, (GDestroyNotify) g_object_unref);
     self->priv->bearers = NULL;
 }
 

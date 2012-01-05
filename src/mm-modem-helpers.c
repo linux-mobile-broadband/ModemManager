@@ -57,8 +57,7 @@ mm_3gpp_network_info_free (MM3gppNetworkInfo *info)
 void
 mm_3gpp_network_info_list_free (GList *info_list)
 {
-    g_list_foreach (info_list, (GFunc)mm_3gpp_network_info_free, NULL);
-    g_list_free (info_list);
+    g_list_free_full (info_list, (GDestroyNotify) mm_3gpp_network_info_free);
 }
 
 static MMModemAccessTechnology
@@ -318,8 +317,7 @@ mm_3gpp_pdp_context_free (MM3gppPdpContext *pdp)
 void
 mm_3gpp_pdp_context_list_free (GList *list)
 {
-    g_list_foreach (list, (GFunc)mm_3gpp_pdp_context_free, NULL);
-    g_list_free (list);
+    g_list_free_full (list, (GDestroyNotify) mm_3gpp_pdp_context_free);
 }
 
 static gint

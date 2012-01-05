@@ -916,8 +916,7 @@ disconnect_3gpp_bearers_context_complete_and_free (Disconnect3gppBearersContext 
 
     if (ctx->current)
         g_object_unref (ctx->current);
-    g_list_foreach (ctx->bearers, (GFunc)g_object_unref, NULL);
-    g_list_free (ctx->bearers);
+    g_list_free_full (ctx->bearers, (GDestroyNotify) g_object_unref);
     g_object_unref (ctx->result);
     g_free (ctx);
 }
