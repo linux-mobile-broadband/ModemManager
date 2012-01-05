@@ -559,18 +559,13 @@ supports_port (MMPlugin *plugin,
     gboolean need_product_probing;
     guint32 probe_run_flags;
 
+    /* Setup key */
+    key = get_key (subsys, name);
+
     async_result = g_simple_async_result_new (G_OBJECT (self),
                                               callback,
                                               user_data,
                                               supports_port);
-
-    /* Lookup current probes, there shouldn't be any */
-    key = get_key (subsys, name);
-    probe = g_hash_table_lookup (priv->tasks, key);
-    if (probe) {
-        g_warn_if_reached ();
-        goto out;
-    }
 
     /* Get port device */
     if (!(port = g_udev_client_query_by_subsystem_and_name (priv->client,
@@ -616,11 +611,25 @@ supports_port (MMPlugin *plugin,
         goto out;
     }
 
+    /* Need to launch new probing */
+
+    /* Lookup current probes, there shouldn't be any (unless for net devices) */
+    probe = g_hash_table_lookup (priv->tasks, key);
+    if (!probe)
+        probe = mm_port_probe_cache_get (port, physdev_path, driver);
+    g_assert (probe);
+
     /* Before launching any probing, check if the port is a net device (which
      * cannot be probed).
      * TODO: With the new defer-until-suggested we probably don't need the modem
      * object being passed down here just for this. */
     if (g_str_equal (subsys, "net")) {
+        /* Keep track of the probe object, which is considered finished */
+        if (!g_hash_table_lookup (priv->tasks, key))
+            g_hash_table_insert (priv->tasks,
+                                 g_strdup (key),
+                                 g_object_ref (probe));
+
         /* If we already have a existing modem, then mark it as supported.
          * Otherwise, just defer a bit */
         g_simple_async_result_set_op_res_gpointer (
@@ -633,10 +642,6 @@ supports_port (MMPlugin *plugin,
         goto out;
     }
 
-    /* Need to launch new probing */
-    probe = mm_port_probe_cache_get (port, physdev_path, driver);
-    g_assert (probe);
-
     /* Build flags depending on what probing needed */
     probe_run_flags = 0;
     if (priv->at)
@@ -647,7 +652,6 @@ supports_port (MMPlugin *plugin,
         probe_run_flags |= MM_PORT_PROBE_AT_PRODUCT;
     if (priv->qcdm)
         probe_run_flags |= MM_PORT_PROBE_QCDM;
-
     g_assert (probe_run_flags != 0);
 
     /* Setup async call context */
