@@ -492,8 +492,8 @@ test_com_read_roam_pref (void *f, void *data)
 
     g_print ("\n");
 
-    success = qcdm_result_get_u8 (result, QCDM_CMD_NV_GET_ROAM_PREF_ITEM_ROAM_PREF, &pref);
-    g_assert (success);
+    err = qcdm_result_get_u8 (result, QCDM_CMD_NV_GET_ROAM_PREF_ITEM_ROAM_PREF, &pref);
+    g_assert_cmpint (err, ==, QCDM_SUCCESS);
 
     switch (pref) {
     case QCDM_CMD_NV_ROAM_PREF_ITEM_ROAM_PREF_HOME_ONLY:
@@ -545,18 +545,33 @@ test_com_read_mode_pref (void *f, void *data)
 
     g_print ("\n");
 
-    success = qcdm_result_get_u8 (result, QCDM_CMD_NV_GET_MODE_PREF_ITEM_MODE_PREF, &pref);
-    g_assert (success);
+    err = qcdm_result_get_u8 (result, QCDM_CMD_NV_GET_MODE_PREF_ITEM_MODE_PREF, &pref);
+    g_assert_cmpint (err, ==, QCDM_SUCCESS);
 
     switch (pref) {
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_DIGITAL:
+        msg = "digital";
+        break;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_DIGITAL_ONLY:
+        msg = "digital only";
+        break;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_AUTO:
+        msg = "automatic";
+        break;
     case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_1X_ONLY:
-        msg = "1X only";
+        msg = "CDMA 1x only";
         break;
     case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_HDR_ONLY:
         msg = "HDR only";
         break;
-    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_AUTO:
-        msg = "automatic";
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_1X_HDR_ONLY:
+        msg = "CDMA 1x and HDR only";
+        break;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_LTE_ONLY:
+        msg = "LTE only";
+        break;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_1X_HDR_LTE_ONLY:
+        msg = "CDMA 1x, HDR, and LTE only";
         break;
     default:
         msg = "unknown";
@@ -599,8 +614,8 @@ test_com_read_hdr_rev_pref (void *f, void *data)
 
     g_print ("\n");
 
-    success = qcdm_result_get_u8 (result, QCDM_CMD_NV_GET_HDR_REV_PREF_ITEM_REV_PREF, &pref);
-    g_assert (success);
+    err = qcdm_result_get_u8 (result, QCDM_CMD_NV_GET_HDR_REV_PREF_ITEM_REV_PREF, &pref);
+    g_assert_cmpint (err, ==, QCDM_SUCCESS);
 
     switch (pref) {
     case QCDM_CMD_NV_HDR_REV_PREF_ITEM_REV_PREF_0:
