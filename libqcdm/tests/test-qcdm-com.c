@@ -539,8 +539,11 @@ test_com_read_mode_pref (void *f, void *data)
     /* Parse the response into a result structure */
     result = qcdm_cmd_nv_get_mode_pref_result (buf, reply_len, &err);
     if (!result) {
-        g_assert (err == -QCDM_ERROR_NVCMD_FAILED || err == -QCDM_ERROR_RESPONSE_BAD_PARAMETER);
-        return;
+        if (   err == -QCDM_ERROR_NVCMD_FAILED
+            || err == -QCDM_ERROR_RESPONSE_BAD_PARAMETER
+            || err == -QCDM_ERROR_NV_ERROR_INACTIVE)
+            return;
+        g_assert_cmpint (err, ==, QCDM_SUCCESS);
     }
 
     g_print ("\n");
@@ -608,8 +611,11 @@ test_com_read_hdr_rev_pref (void *f, void *data)
     /* Parse the response into a result structure */
     result = qcdm_cmd_nv_get_hdr_rev_pref_result (buf, reply_len, &err);
     if (!result) {
-        g_assert (err == -QCDM_ERROR_NVCMD_FAILED || err == -QCDM_ERROR_RESPONSE_BAD_PARAMETER);
-        return;
+        if (   err == -QCDM_ERROR_NVCMD_FAILED
+            || err == -QCDM_ERROR_RESPONSE_BAD_PARAMETER
+            || err == -QCDM_ERROR_NV_ERROR_INACTIVE)
+            return;
+        g_assert_cmpint (err, ==, QCDM_SUCCESS);
     }
 
     g_print ("\n");

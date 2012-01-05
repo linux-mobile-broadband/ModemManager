@@ -203,6 +203,31 @@ check_command (const char *buf, size_t len, u_int8_t cmd, size_t min_len, int *o
     return TRUE;
 }
 
+static int
+nv_status_to_qcdm_error (u_int16_t status)
+{
+    switch (status) {
+    case DIAG_NV_STATUS_OK:
+        return QCDM_SUCCESS;
+    case DIAG_NV_STATUS_BUSY:
+        return -QCDM_ERROR_NV_ERROR_BUSY;
+    case DIAG_NV_STATUS_BAD_COMMAND:
+        return -QCDM_ERROR_NV_ERROR_BAD_COMMAND;
+    case DIAG_NV_STATUS_MEMORY_FULL:
+        return -QCDM_ERROR_NV_ERROR_MEMORY_FULL;
+    case DIAG_NV_STATUS_FAILED:
+        return -QCDM_ERROR_NV_ERROR_FAILED;
+    case DIAG_NV_STATUS_INACTIVE:
+        return -QCDM_ERROR_NV_ERROR_INACTIVE;
+    case DIAG_NV_STATUS_BAD_PARAMETER:
+        return -QCDM_ERROR_NV_ERROR_BAD_PARAMETER;
+    case DIAG_NV_STATUS_READ_ONLY:
+        return -QCDM_ERROR_NV_ERROR_READ_ONLY;
+    default:
+        return -QCDM_ERROR_NVCMD_FAILED;
+    }
+}
+
 static qcdmbool
 check_nv_cmd (DMCmdNVReadWrite *cmd, u_int16_t nv_item, int *out_error)
 {
@@ -213,10 +238,9 @@ check_nv_cmd (DMCmdNVReadWrite *cmd, u_int16_t nv_item, int *out_error)
 
     /* NV read/write have a status byte at the end */
     if (cmd->status != 0) {
-        qcdm_err (0, "The NV operation failed (status 0x%X).",
-                  le16toh (cmd->status));
+        qcdm_err (0, "The NV operation failed (status 0x%X).", le16toh (cmd->status));
         if (out_error)
-            *out_error = -QCDM_ERROR_NVCMD_FAILED;
+            *out_error = nv_status_to_qcdm_error (le16toh (cmd->status));
         return FALSE;
     }
 

@@ -20,6 +20,18 @@
 
 #include <sys/types.h>
 
+/* NV read/write status codes */
+typedef enum {
+    DIAG_NV_STATUS_OK = 0,
+    DIAG_NV_STATUS_BUSY = 1,
+    DIAG_NV_STATUS_BAD_COMMAND = 2,
+    DIAG_NV_STATUS_MEMORY_FULL = 3,
+    DIAG_NV_STATUS_FAILED = 4,
+    DIAG_NV_STATUS_INACTIVE = 5,          /* NV location not active */
+    DIAG_NV_STATUS_BAD_PARAMETER = 6,
+    DIAG_NV_STATUS_READ_ONLY = 7,         /* NV location is read-only */
+} DMNVStatus;
+
 enum {
     DIAG_NV_MODE_PREF    = 10,   /* Mode preference: 1x, HDR, auto */
     DIAG_NV_DIR_NUMBER   = 178,  /* Mobile Directory Number (MDN) */
