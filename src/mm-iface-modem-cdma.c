@@ -367,6 +367,7 @@ static void registration_check_step (RunAllRegistrationChecksContext *ctx);
 
 typedef enum {
     REGISTRATION_CHECK_STEP_FIRST,
+    REGISTRATION_CHECK_STEP_SETUP_REGISTRATION_CHECKS,
 
     REGISTRATION_CHECK_STEP_QCDM_CALL_MANAGER_STATE,
     REGISTRATION_CHECK_STEP_QCDM_HDR_STATE,
@@ -388,6 +389,12 @@ struct _RunAllRegistrationChecksContext {
     MMModemCdmaRegistrationState evdo_state;
     gboolean cdma1x_supported;
     gboolean evdo_supported;
+
+    gboolean skip_qcdm_call_manager_step;
+    gboolean skip_qcdm_hdr_step;
+    gboolean skip_at_cdma_service_status_step;
+    gboolean skip_at_cdma1x_serving_system_step;
+    gboolean skip_detailed_registration_state;
 
     guint call_manager_system_mode;
     guint call_manager_operating_mode;
@@ -416,6 +423,33 @@ mm_iface_modem_cdma_run_all_registration_checks_finish (MMIfaceModemCdma *self,
                                                         GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+setup_registration_checks_ready (MMIfaceModemCdma *self,
+                                 GAsyncResult *res,
+                                 RunAllRegistrationChecksContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->setup_registration_checks_finish (
+            self,
+            res,
+            &ctx->skip_qcdm_call_manager_step,
+            &ctx->skip_qcdm_hdr_step,
+            &ctx->skip_at_cdma_service_status_step,
+            &ctx->skip_at_cdma1x_serving_system_step,
+            &ctx->skip_detailed_registration_state,
+            &error)) {
+        /* Make it fatal */
+        g_simple_async_result_take_error (ctx->result, error);
+        run_all_registration_checks_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    registration_check_step (ctx);
 }
 
 static void
@@ -555,10 +589,17 @@ get_cdma1x_serving_system_ready (MMIfaceModemCdma *self,
             &ctx->cdma1x_band,
             &ctx->cdma1x_sid,
             &error)) {
-        mm_warn ("Could not get serving system: %s", error->message);
-        g_simple_async_result_take_error (ctx->result, error);
-        run_all_registration_checks_context_complete_and_free (ctx);
-        return;
+        /* Treat as fatal all errors except for no-network */
+        if (!g_error_matches (error,
+                              MM_MOBILE_EQUIPMENT_ERROR,
+                              MM_MOBILE_EQUIPMENT_ERROR_NO_NETWORK)) {
+            mm_warn ("Could not get serving system: %s", error->message);
+            g_simple_async_result_take_error (ctx->result, error);
+            run_all_registration_checks_context_complete_and_free (ctx);
+            return;
+        }
+
+        ctx->cdma1x_sid = MM_MODEM_CDMA_SID_UNKNOWN;
     }
 
     /* TODO: not sure why we also take class/band here */
@@ -619,35 +660,58 @@ registration_check_step (RunAllRegistrationChecksContext *ctx)
 {
     switch (ctx->step) {
     case REGISTRATION_CHECK_STEP_FIRST:
-        /* If QCDM-based checks available start with those first. Otherwise start
-         * with AT-based checks directly. */
-        if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_call_manager_state ||
-            !MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_call_manager_state_finish ||
-            !MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_hdr_state ||
-            !MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_hdr_state_finish) {
-            /* Fallback to AT-based check */
-            ctx->step = REGISTRATION_CHECK_STEP_AT_CDMA_SERVICE_STATUS;
-            registration_check_step (ctx);
+        /* Fall down to next step */
+        ctx->step++;
+
+    case REGISTRATION_CHECK_STEP_SETUP_REGISTRATION_CHECKS:
+        /* Allow implementations to run an initial setup check. This setup allows
+         * to specify which of the next steps will be completely skipped. Useful
+         * when implementations have a best get_detailed_registration_state()
+         * so that they just need that to be run. */
+        if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->setup_registration_checks &&
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->setup_registration_checks_finish) {
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->setup_registration_checks (
+                ctx->self,
+                (GAsyncReadyCallback)setup_registration_checks_ready,
+                ctx);
             return;
         }
         /* Fall down to next step */
         ctx->step++;
 
     case REGISTRATION_CHECK_STEP_QCDM_CALL_MANAGER_STATE:
-        /* Start by trying to get the call manager state. */
-        MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_call_manager_state (
-            ctx->self,
-            (GAsyncReadyCallback)get_call_manager_state_ready,
-            ctx);
+        mm_dbg ("Starting QCDM-based registration checks");
+        if (!ctx->skip_qcdm_call_manager_step &&
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_call_manager_state &&
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_call_manager_state_finish) {
+            /* Start by trying to get the call manager state. */
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_call_manager_state (
+                ctx->self,
+                (GAsyncReadyCallback)get_call_manager_state_ready,
+                ctx);
             return;
+        }
+        /* Fallback to AT-based check */
+        mm_dbg ("  Skipping all QCDM-based checks and falling back to AT-based checks");
+        ctx->step = REGISTRATION_CHECK_STEP_AT_CDMA_SERVICE_STATUS;
+        registration_check_step (ctx);
+        return;
 
     case REGISTRATION_CHECK_STEP_QCDM_HDR_STATE:
-        /* Get HDR state. */
-        MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_hdr_state (
-            ctx->self,
-            (GAsyncReadyCallback)get_hdr_state_ready,
-            ctx);
-        return;
+        if (ctx->evdo_supported &&
+            !ctx->skip_qcdm_hdr_step &&
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_hdr_state &&
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_hdr_state_finish) {
+            /* Get HDR (EVDO) state. */
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_hdr_state (
+                ctx->self,
+                (GAsyncReadyCallback)get_hdr_state_ready,
+                ctx);
+            return;
+        }
+        mm_dbg ("  Skipping HDR check");
+        /* Fall down to next step */
+        ctx->step++;
 
     case REGISTRATION_CHECK_STEP_QCDM_LAST:
         /* When we get all QCDM results, parse them */
@@ -655,9 +719,12 @@ registration_check_step (RunAllRegistrationChecksContext *ctx)
         return;
 
     case REGISTRATION_CHECK_STEP_AT_CDMA_SERVICE_STATUS:
+        mm_dbg ("Starting AT-based registration checks");
+
         /* If we don't have means to get service status, just assume we do have
          * CDMA service and keep on */
-        if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_service_status &&
+        if (!ctx->skip_at_cdma_service_status_step &&
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_service_status &&
             MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_service_status_finish) {
             MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_service_status (
                 ctx->self,
@@ -665,7 +732,7 @@ registration_check_step (RunAllRegistrationChecksContext *ctx)
                 ctx);
             return;
         }
-
+        mm_dbg ("  Skipping CDMA service status check, assuming with service");
         /* Fall down to next step */
         ctx->step++;
 
@@ -680,7 +747,8 @@ registration_check_step (RunAllRegistrationChecksContext *ctx)
          * response is wrong in this case handle more specific registration
          * themselves; if they do, they'll set these callbacks to NULL..
          */
-        if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_cdma1x_serving_system &&
+        if (!ctx->skip_at_cdma1x_serving_system_step &&
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_cdma1x_serving_system &&
             MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_cdma1x_serving_system_finish) {
             MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_cdma1x_serving_system (
                 ctx->self,
@@ -688,6 +756,7 @@ registration_check_step (RunAllRegistrationChecksContext *ctx)
                 ctx);
             return;
         }
+        mm_dbg ("  Skipping CDMA1x Serving System check");
         /* Fall down to next step */
         ctx->step++;
 
@@ -697,9 +766,11 @@ registration_check_step (RunAllRegistrationChecksContext *ctx)
         return;
 
     case REGISTRATION_CHECK_STEP_DETAILED_REGISTRATION_STATE:
+        mm_dbg ("Starting detailed registration state check");
         /* We let classes implementing this interface to look for more detailed
          * registration info. */
-        if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_detailed_registration_state &&
+        if (!ctx->skip_detailed_registration_state &&
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_detailed_registration_state &&
             MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_detailed_registration_state_finish) {
             /* We pass the CDMA1x/EVDO registration states we got up to now.
              * If the implementation can't improve the detail, it can either
@@ -713,12 +784,13 @@ registration_check_step (RunAllRegistrationChecksContext *ctx)
                 ctx);
             return;
         }
-
+        mm_dbg ("  Skipping detailed registration state check");
         /* Fall down to next step */
         ctx->step++;
 
     case REGISTRATION_CHECK_STEP_LAST:
         /* We are done without errors! */
+        mm_dbg ("All CDMA registration state checks done");
         mm_iface_modem_cdma_update_cdma1x_registration_state (ctx->self,
                                                               ctx->cdma1x_state,
                                                               ctx->cdma1x_sid);

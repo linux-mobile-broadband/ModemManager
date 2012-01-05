@@ -73,6 +73,19 @@ struct _MMIfaceModemCdma {
                                          GAsyncResult *res,
                                          GError **error);
 
+    /* Setup registration checks */
+    void (* setup_registration_checks) (MMIfaceModemCdma *self,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data);
+    gboolean (* setup_registration_checks_finish) (MMIfaceModemCdma *self,
+                                                   GAsyncResult *res,
+                                                   gboolean *skip_qcdm_call_manager_step,
+                                                   gboolean *skip_qcdm_hdr_step,
+                                                   gboolean *skip_at_cdma_service_status_step,
+                                                   gboolean *skip_at_cdma1x_serving_system_step,
+                                                   gboolean *skip_detailed_registration_state,
+                                                   GError **error);
+
     /* Get call manager state */
     void (* get_call_manager_state) (MMIfaceModemCdma *self,
                                      GAsyncReadyCallback callback,
