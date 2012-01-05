@@ -27,9 +27,11 @@
 #define SIGNAL_QUALITY_RECENT_TIMEOUT_SEC 60
 #define SIGNAL_QUALITY_CHECK_TIMEOUT_SEC 30
 
+#define STATE_UPDATE_CONTEXT_TAG           "state-update-context-tag"
 #define SIGNAL_QUALITY_UPDATE_CONTEXT_TAG  "signal-quality-update-context-tag"
 #define SIGNAL_QUALITY_CHECK_CONTEXT_TAG   "signal-quality-check-context-tag"
 
+static GQuark state_update_context_quark;
 static GQuark signal_quality_update_context_quark;
 static GQuark signal_quality_check_context_quark;
 
@@ -742,6 +744,114 @@ mm_iface_modem_update_state (MMIfaceModem *self,
         g_object_unref (skeleton);
     if (bearer_list)
         g_object_unref (bearer_list);
+}
+
+/*****************************************************************************/
+
+typedef struct {
+    gchar *subsystem;
+    MMModemState state;
+} SubsystemState;
+
+static void
+subsystem_state_array_free (GArray *array)
+{
+    guint i;
+
+    for (i = 0; i < array->len; i++) {
+        SubsystemState *s;
+
+        s = &g_array_index (array, SubsystemState, i);
+        g_free (s->subsystem);
+    }
+
+    g_array_free (array, TRUE);
+}
+
+static MMModemState
+get_consolidated_state (MMIfaceModem *self,
+                        const gchar *subsystem,
+                        MMModemState subsystem_state)
+{
+    guint i;
+    GArray *subsystem_states;
+    MMModemState consolidated;
+
+    /* Reported subsystem states will be REGISTRATION-related. This means
+     * that we would only expect a subset of the states being reported for
+     * the subystem. Warn if we get others */
+    g_warn_if_fail (subsystem_state == MM_MODEM_STATE_ENABLED ||
+                    subsystem_state == MM_MODEM_STATE_SEARCHING ||
+                    subsystem_state == MM_MODEM_STATE_REGISTERED);
+
+    if (G_UNLIKELY (!state_update_context_quark))
+        state_update_context_quark = (g_quark_from_static_string (
+                                          STATE_UPDATE_CONTEXT_TAG));
+
+    subsystem_states = g_object_get_qdata (G_OBJECT (self),
+                                           state_update_context_quark);
+    if (!subsystem_states) {
+        subsystem_states = g_array_sized_new (FALSE,
+                                              FALSE,
+                                              sizeof (SubsystemState),
+                                              2);
+        g_object_set_qdata_full (G_OBJECT (self),
+                                 state_update_context_quark,
+                                 subsystem_states,
+                                 (GDestroyNotify)subsystem_state_array_free);
+    }
+
+    /* Store new subsystem state */
+    for (i = 0; i < subsystem_states->len; i++) {
+        SubsystemState *s;
+
+        s = &g_array_index (subsystem_states, SubsystemState, i);
+        if (g_str_equal (s->subsystem, subsystem)) {
+            s->state = subsystem_state;
+            break;
+        }
+    }
+
+    /* If not found, insert new element */
+    if (i == subsystem_states->len) {
+        SubsystemState s;
+
+        mm_dbg ("Will start keeping track of state for subsystem '%s'",
+                subsystem);
+        s.subsystem = g_strdup (subsystem);
+        s.state = subsystem_state;
+        g_array_append_val (subsystem_states, s);
+    }
+
+    /* Build consolidated state, expected fixes are:
+     *  - Enabled (meaning unregistered) --> Searching|Registered
+     *  - Searching --> Registered
+     */
+    consolidated = MM_MODEM_STATE_UNKNOWN;
+    for (i = 0; i < subsystem_states->len; i++) {
+        SubsystemState *s;
+
+        s = &g_array_index (subsystem_states, SubsystemState, i);
+        if (s->state > consolidated)
+            consolidated = s->state;
+    }
+
+    return consolidated;
+}
+
+void
+mm_iface_modem_update_subsystem_state (MMIfaceModem *self,
+                                       const gchar *subsystem,
+                                       MMModemState new_state,
+                                       MMModemStateReason reason)
+{
+    MMModemState consolidated;
+
+    /* We may have different subsystems being handled (e.g. 3GPP and CDMA), and
+     * the registration status value is unique, so if we get subsystem-specific
+     * state updates, we'll need to merge all to get a consolidated one. */
+    consolidated = get_consolidated_state (self, subsystem, new_state);
+    mm_iface_modem_update_state (self, consolidated, reason);
 }
 
 /*****************************************************************************/

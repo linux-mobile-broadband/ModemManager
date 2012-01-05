@@ -310,6 +310,10 @@ guint mm_iface_modem_signal_quality_check_finish (MMIfaceModem *self,
                                                   GError **error);
 
 /* Allow reporting new modem state */
+void mm_iface_modem_update_subsystem_state (MMIfaceModem *self,
+                                            const gchar *subsystem,
+                                            MMModemState new_state,
+                                            MMModemStateReason reason);
 void mm_iface_modem_update_state (MMIfaceModem *self,
                                   MMModemState new_state,
                                   MMModemStateReason reason);
