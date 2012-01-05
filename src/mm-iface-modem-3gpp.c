@@ -24,13 +24,19 @@
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 
-#define INDICATORS_CHECKED_TAG             "indicators-checked-tag"
-#define UNSOLICITED_EVENTS_SUPPORTED_TAG   "unsolicited-events-supported-tag"
-#define REGISTRATION_STATE_CONTEXT_TAG    "registration-state-context-tag"
+#define REGISTRATION_CHECK_TIMEOUT_SEC 30
+
+#define SUBSYSTEM_3GPP "3gpp"
+
+#define INDICATORS_CHECKED_TAG            "3gpp-indicators-checked-tag"
+#define UNSOLICITED_EVENTS_SUPPORTED_TAG  "3gpp-unsolicited-events-supported-tag"
+#define REGISTRATION_STATE_CONTEXT_TAG    "3gpp-registration-state-context-tag"
+#define REGISTRATION_CHECK_CONTEXT_TAG    "3gpp-registration-check-context-tag"
 
 static GQuark indicators_checked_quark;
 static GQuark unsolicited_events_supported_quark;
 static GQuark registration_state_context_quark;
+static GQuark registration_check_context_quark;
 
 /*****************************************************************************/
 
@@ -681,9 +687,10 @@ update_registration_state (MMIfaceModem3gpp *self,
                                                access_tech,
                                                ALL_3GPP_ACCESS_TECHNOLOGIES_MASK);
 
-            mm_iface_modem_update_state (MM_IFACE_MODEM (self),
-                                         MM_MODEM_STATE_REGISTERED,
-                                         MM_MODEM_STATE_REASON_NONE);
+            mm_iface_modem_update_subsystem_state (MM_IFACE_MODEM (self),
+                                                   SUBSYSTEM_3GPP,
+                                                   MM_MODEM_STATE_REGISTERED,
+                                                   MM_MODEM_STATE_REASON_NONE);
             break;
 
         case MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING:
@@ -694,8 +701,9 @@ update_registration_state (MMIfaceModem3gpp *self,
                                                0,
                                                ALL_3GPP_ACCESS_TECHNOLOGIES_MASK);
             bearer_3gpp_connection_forbidden (self);
-            mm_iface_modem_update_state (
+            mm_iface_modem_update_subsystem_state (
                 MM_IFACE_MODEM (self),
+                SUBSYSTEM_3GPP,
                 (new_state == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING ?
                  MM_MODEM_STATE_SEARCHING :
                  MM_MODEM_STATE_ENABLED),
@@ -803,10 +811,6 @@ mm_iface_modem_3gpp_update_ps_registration_state (MMIfaceModem3gpp *self,
 
 /*****************************************************************************/
 
-#define REGISTRATION_CHECK_TIMEOUT_SEC 30
-#define REGISTRATION_CHECK_CONTEXT_TAG "registration-check-context-tag"
-static GQuark registration_check_context_quark;
-
 typedef struct {
     guint timeout_source;
     gboolean running;
@@ -829,7 +833,7 @@ periodic_registration_checks_ready (MMIfaceModem3gpp *self,
 
     mm_iface_modem_3gpp_run_all_registration_checks_finish (self, res, &error);
     if (error) {
-        mm_dbg ("Couldn't refresh registration status: '%s'", error->message);
+        mm_dbg ("Couldn't refresh 3GPP registration status: '%s'", error->message);
         g_error_free (error);
     }
 
@@ -867,7 +871,7 @@ periodic_registration_check_disable (MMIfaceModem3gpp *self)
                         registration_check_context_quark,
                         NULL);
 
-    mm_dbg ("Periodic registration checks disabled");
+    mm_dbg ("Periodic 3GPP registration checks disabled");
 }
 
 static void
@@ -886,7 +890,7 @@ periodic_registration_check_enable (MMIfaceModem3gpp *self)
         return;
 
     /* Create context and keep it as object data */
-    mm_dbg ("Periodic registration checks enabled");
+    mm_dbg ("Periodic 3GPP registration checks enabled");
     ctx = g_new0 (RegistrationCheckContext, 1);
     ctx->timeout_source = g_timeout_add_seconds (REGISTRATION_CHECK_TIMEOUT_SEC,
                                                  (GSourceFunc)periodic_registration_check,
