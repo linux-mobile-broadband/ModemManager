@@ -129,8 +129,7 @@ find_modem (MMManager *manager,
             break;
         }
     }
-    g_list_foreach (modems, (GFunc)g_object_unref, NULL);
-    g_list_free (modems);
+    g_list_free_full (modems, (GDestroyNotify) g_object_unref);
 
     if (!found) {
         g_printerr ("error: couldn't find modem at '%s'\n", modem_path);
@@ -289,8 +288,7 @@ get_bearer_context_free (GetBearerContext *ctx)
         g_object_unref (ctx->manager);
     if (ctx->bearer)
         g_object_unref (ctx->bearer);
-    g_list_foreach (ctx->modems, (GFunc)g_object_unref, NULL);
-    g_list_free (ctx->modems);
+    g_list_free_full (ctx->modems, (GDestroyNotify) g_object_unref);
     g_free (ctx->bearer_path);
     g_free (ctx);
 }
@@ -357,8 +355,7 @@ list_bearers_ready (MMModem *modem,
     }
 
     ctx->bearer = find_bearer_in_list (bearers, ctx->bearer_path);
-    g_list_foreach (bearers, (GFunc)g_object_unref, NULL);
-    g_list_free (bearers);
+    g_list_free_full (bearers, (GDestroyNotify) g_object_unref);
 
     /* Found! */
     if (ctx->bearer) {
@@ -475,8 +472,7 @@ mmcli_get_bearer_sync (GDBusConnection *connection,
         }
 
         found = find_bearer_in_list (bearers, bearer_path);
-        g_list_foreach (bearers, (GFunc)g_object_unref, NULL);
-        g_list_free (bearers);
+        g_list_free_full (bearers, (GDestroyNotify) g_object_unref);
 
         if (o_object)
             *o_object = g_object_ref (object);
@@ -484,8 +480,7 @@ mmcli_get_bearer_sync (GDBusConnection *connection,
         g_object_unref (modem);
     }
 
-    g_list_foreach (modems, (GFunc)g_object_unref, NULL);
-    g_list_free (modems);
+    g_list_free_full (modems, (GDestroyNotify) g_object_unref);
 
     if (o_manager)
         *o_manager = manager;
@@ -605,8 +600,7 @@ get_sim_manager_ready (GDBusConnection *connection,
         exit (EXIT_FAILURE);
     }
 
-    g_list_foreach (modems, (GFunc)g_object_unref, NULL);
-    g_list_free (modems);
+    g_list_free_full (modems, (GDestroyNotify) g_object_unref);
 }
 
 void
@@ -680,8 +674,7 @@ mmcli_get_sim_sync (GDBusConnection *connection,
         exit (EXIT_FAILURE);
     }
 
-    g_list_foreach (modems, (GFunc)g_object_unref, NULL);
-    g_list_free (modems);
+    g_list_free_full (modems, (GDestroyNotify) g_object_unref);
 
     if (o_manager)
         *o_manager = manager;

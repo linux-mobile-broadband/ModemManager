@@ -170,8 +170,7 @@ scan_process_reply (GList *result,
         for (l = result; l; l = g_list_next (l)) {
             print_network_info ((MMModem3gppNetwork *)(l->data));
         }
-        g_list_foreach (result, (GFunc)mm_modem_3gpp_network_free, NULL);
-        g_list_free (result);
+        g_list_free_full (result, (GDestroyNotify) mm_modem_3gpp_network_free);
     }
     g_print ("\n");
 }

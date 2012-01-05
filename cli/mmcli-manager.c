@@ -230,8 +230,7 @@ list_current_modems (MMManager *manager)
         for (l = modems; l; l = g_list_next (l)) {
             print_modem_short_info (MM_OBJECT (l->data));
         }
-        g_list_foreach (modems, (GFunc)g_object_unref, NULL);
-        g_list_free (modems);
+        g_list_free_full (modems, (GDestroyNotify) g_object_unref);
     }
     g_print ("\n");
 }
