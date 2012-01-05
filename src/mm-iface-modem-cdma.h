@@ -113,6 +113,18 @@ struct _MMIfaceModemCdma {
                                                    guint *band,
                                                    guint *sid,
                                                    GError **error);
+
+    /* Get detailed registration state */
+    void (* get_detailed_registration_state) (MMIfaceModemCdma *self,
+                                              MMModemCdmaRegistrationState cdma1x_state,
+                                              MMModemCdmaRegistrationState evdo_state,
+                                              GAsyncReadyCallback callback,
+                                              gpointer user_data);
+    gboolean (* get_detailed_registration_state_finish) (MMIfaceModemCdma *self,
+                                                         GAsyncResult *res,
+                                                         MMModemCdmaRegistrationState *detailed_cdma1x_state,
+                                                         MMModemCdmaRegistrationState *detailed_evdo_state,
+                                                         GError **error);
 };
 
 GType mm_iface_modem_cdma_get_type (void);
@@ -165,7 +177,8 @@ void     mm_iface_modem_cdma_activate_manual        (MMIfaceModemCdma *self,
 
 /* Objects implementing this interface can report new registration states. */
 void mm_iface_modem_cdma_update_cdma1x_registration_state (MMIfaceModemCdma *self,
-                                                           MMModemCdmaRegistrationState state);
+                                                           MMModemCdmaRegistrationState state,
+                                                           guint sid);
 void mm_iface_modem_cdma_update_evdo_registration_state (MMIfaceModemCdma *self,
                                                          MMModemCdmaRegistrationState state);
 

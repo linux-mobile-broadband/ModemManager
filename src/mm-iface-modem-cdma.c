@@ -376,7 +376,7 @@ typedef enum {
     REGISTRATION_CHECK_STEP_AT_CDMA1X_SERVING_SYSTEM,
     REGISTRATION_CHECK_STEP_AT_LAST,
 
-    REGISTRATION_CHECK_STEP_SPECIFIC_STATE,
+    REGISTRATION_CHECK_STEP_DETAILED_REGISTRATION_STATE,
     REGISTRATION_CHECK_STEP_LAST,
 } RegistrationCheckStep;
 
@@ -486,9 +486,9 @@ parse_qcdm_results (RunAllRegistrationChecksContext *ctx)
     case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_CDMA:
         ctx->cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
         if (   ctx->hdr_hybrid_mode
-               && ctx->hdr_session_state == QCDM_CMD_HDR_SUBSYS_STATE_INFO_SESSION_STATE_OPEN
-               && (   ctx->hdr_almp_state == QCDM_CMD_HDR_SUBSYS_STATE_INFO_ALMP_STATE_IDLE
-                      || ctx->hdr_almp_state == QCDM_CMD_HDR_SUBSYS_STATE_INFO_ALMP_STATE_CONNECTED))
+            && ctx->hdr_session_state == QCDM_CMD_HDR_SUBSYS_STATE_INFO_SESSION_STATE_OPEN
+            && (   ctx->hdr_almp_state == QCDM_CMD_HDR_SUBSYS_STATE_INFO_ALMP_STATE_IDLE
+                || ctx->hdr_almp_state == QCDM_CMD_HDR_SUBSYS_STATE_INFO_ALMP_STATE_CONNECTED))
             ctx->evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
         break;
     case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_HDR:
@@ -503,8 +503,8 @@ parse_qcdm_results (RunAllRegistrationChecksContext *ctx)
 
     if (ctx->cdma1x_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN ||
         ctx->evdo_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
-        /* Jump to get specific registration state */
-        ctx->step = REGISTRATION_CHECK_STEP_SPECIFIC_STATE;
+        /* Jump to get detailed registration state */
+        ctx->step = REGISTRATION_CHECK_STEP_DETAILED_REGISTRATION_STATE;
     else
         /* If no CDMA service, just finish checks */
         ctx->step = REGISTRATION_CHECK_STEP_LAST;
@@ -530,11 +530,11 @@ get_service_status_ready (MMIfaceModemCdma *self,
         return;
     }
 
-    if (!has_service)
+    if (!has_service) {
         /* There is no CDMA service at all, end registration checks */
-        /* If no CDMA service, just finish checks */
+        mm_dbg ("No CDMA service found");
         ctx->step = REGISTRATION_CHECK_STEP_LAST;
-    else
+    } else
         /* If we do have service, go on to next step */
         ctx->step++;
 
@@ -561,14 +561,56 @@ get_cdma1x_serving_system_ready (MMIfaceModemCdma *self,
         return;
     }
 
-    /* 99999 means unknown/no service */
-    if (ctx->cdma1x_sid == 99999)
-        /* There is no CDMA service, end registration checks */
-        ctx->step = REGISTRATION_CHECK_STEP_LAST;
-    else
-        /* Go on to next step */
-        ctx->step++;
+    /* TODO: not sure why we also take class/band here */
 
+    /* Go on to next step */
+    ctx->step++;
+    registration_check_step (ctx);
+}
+
+static void
+parse_at_results (RunAllRegistrationChecksContext *ctx)
+{
+    /* 99999 means unknown/no service */
+    if (ctx->cdma1x_sid == MM_MODEM_CDMA_SID_UNKNOWN) {
+        /* Not registered in CDMA network, end registration checks */
+        mm_dbg ("Not registered in any CDMA network");
+        ctx->step = REGISTRATION_CHECK_STEP_LAST;
+    } else {
+        /* We're registered on the CDMA 1x network (at least) */
+        ctx->cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED;
+        /* Jump to get detailed registration state */
+        ctx->step = REGISTRATION_CHECK_STEP_DETAILED_REGISTRATION_STATE;
+    }
+
+    registration_check_step (ctx);
+}
+
+static void
+get_detailed_registration_state_ready (MMIfaceModemCdma *self,
+                                       GAsyncResult *res,
+                                       RunAllRegistrationChecksContext *ctx)
+{
+    GError *error = NULL;
+    MMModemCdmaRegistrationState detailed_cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+    MMModemCdmaRegistrationState detailed_evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+
+    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->get_detailed_registration_state_finish (
+            self,
+            res,
+            &detailed_cdma1x_state,
+            &detailed_evdo_state,
+            &error)) {
+        /* This error is NOT fatal. If we get an error here, we'll just fallback
+         * to the non-detailed values we already got. */
+        mm_dbg ("Could not get more detailed registration state: %s", error->message);
+    } else {
+        ctx->cdma1x_state = detailed_cdma1x_state;
+        ctx->evdo_state = detailed_evdo_state;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
     registration_check_step (ctx);
 }
 
@@ -650,15 +692,39 @@ registration_check_step (RunAllRegistrationChecksContext *ctx)
         ctx->step++;
 
     case REGISTRATION_CHECK_STEP_AT_LAST:
-        /* Fall down to next step */
-        ctx->step++;
+        /* When we get all AT results, parse them */
+        parse_at_results (ctx);
+        return;
 
-    case REGISTRATION_CHECK_STEP_SPECIFIC_STATE:
+    case REGISTRATION_CHECK_STEP_DETAILED_REGISTRATION_STATE:
+        /* We let classes implementing this interface to look for more detailed
+         * registration info. */
+        if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_detailed_registration_state &&
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_detailed_registration_state_finish) {
+            /* We pass the CDMA1x/EVDO registration states we got up to now.
+             * If the implementation can't improve the detail, it can either
+             * must return the values it already got as input, or issue an error,
+             * and we'll assume it couldn't get any better value. */
+            MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_detailed_registration_state (
+                ctx->self,
+                ctx->cdma1x_state,
+                ctx->evdo_state,
+                (GAsyncReadyCallback)get_detailed_registration_state_ready,
+                ctx);
+            return;
+        }
+
         /* Fall down to next step */
         ctx->step++;
 
     case REGISTRATION_CHECK_STEP_LAST:
         /* We are done without errors! */
+        mm_iface_modem_cdma_update_cdma1x_registration_state (ctx->self,
+                                                              ctx->cdma1x_state,
+                                                              ctx->cdma1x_sid);
+        mm_iface_modem_cdma_update_evdo_registration_state (ctx->self,
+                                                            ctx->evdo_state);
+
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         run_all_registration_checks_context_complete_and_free (ctx);
         return;
@@ -760,7 +826,8 @@ mm_iface_modem_cdma_update_evdo_registration_state (MMIfaceModemCdma *self,
 
 void
 mm_iface_modem_cdma_update_cdma1x_registration_state (MMIfaceModemCdma *self,
-                                                      MMModemCdmaRegistrationState state)
+                                                      MMModemCdmaRegistrationState state,
+                                                      guint sid)
 {
     MmGdbusModemCdma *skeleton = NULL;
     gboolean supported = FALSE;
@@ -781,6 +848,7 @@ mm_iface_modem_cdma_update_cdma1x_registration_state (MMIfaceModemCdma *self,
         case MM_MODEM_CDMA_REGISTRATION_STATE_REGISTERED:
         case MM_MODEM_CDMA_REGISTRATION_STATE_HOME:
         case MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING:
+            mm_gdbus_modem_cdma_set_sid (skeleton, sid);
             mm_iface_modem_update_state (MM_IFACE_MODEM (self),
                                          MM_MODEM_STATE_REGISTERED,
                                          MM_MODEM_STATE_REASON_NONE);
@@ -789,6 +857,8 @@ mm_iface_modem_cdma_update_cdma1x_registration_state (MMIfaceModemCdma *self,
                                                ALL_CDMA_CDMA1X_ACCESS_TECHNOLOGIES_MASK);
             break;
         case MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN:
+            if (mm_gdbus_modem_cdma_get_sid (skeleton) != MM_MODEM_CDMA_SID_UNKNOWN)
+                mm_gdbus_modem_cdma_set_sid (skeleton, MM_MODEM_CDMA_SID_UNKNOWN);
             mm_iface_modem_update_state (MM_IFACE_MODEM (self),
                                          MM_MODEM_STATE_DISABLED,
                                          MM_MODEM_STATE_REASON_NONE);
