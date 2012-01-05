@@ -271,6 +271,30 @@ supports_port_ready_cb (MMPlugin *plugin,
                                                  (GSourceFunc)find_port_support_idle,
                                                  info);
         break;
+
+    case MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED:
+        /* We were told to defer until getting a suggested plugin, and we already
+         * got one here, so we're done. */
+        if (info->suggested_plugin) {
+            mm_dbg ("(%s): (%s) support check finished, got suggested",
+                    mm_plugin_get_name (MM_PLUGIN (info->suggested_plugin)),
+                    info->name);
+            info->best_plugin = info->suggested_plugin;
+            info->current = NULL;
+
+            /* Schedule checking support, which will end the operation */
+            info->source_id = g_idle_add ((GSourceFunc)find_port_support_idle,
+                                          info);
+        } else {
+            mm_dbg ("(%s): (%s) deferring support check until result suggested",
+                    mm_plugin_get_name (MM_PLUGIN (info->current->data)),
+                    info->name);
+            /* Schedule checking support */
+            info->source_id = g_timeout_add_seconds (SUPPORTS_DEFER_TIMEOUT_SECS,
+                                                     (GSourceFunc)find_port_support_idle,
+                                                     info);
+        }
+        break;
     }
 }
 
@@ -673,4 +697,3 @@ mm_plugin_manager_class_init (MMPluginManagerClass *manager_class)
     /* Virtual methods */
     object_class->finalize = finalize;
 }
-

@@ -617,15 +617,18 @@ supports_port (MMPlugin *plugin,
     }
 
     /* Before launching any probing, check if the port is a net device (which
-     * cannot be probed). */
+     * cannot be probed).
+     * TODO: With the new defer-until-suggested we probably don't need the modem
+     * object being passed down here just for this. */
     if (g_str_equal (subsys, "net")) {
         /* If we already have a existing modem, then mark it as supported.
          * Otherwise, just defer a bit */
-        g_simple_async_result_set_op_res_gpointer (async_result,
-                                                   GUINT_TO_POINTER ((existing ?
-                                                                      MM_PLUGIN_SUPPORTS_PORT_SUPPORTED :
-                                                                      MM_PLUGIN_SUPPORTS_PORT_DEFER)),
-                                                   NULL);
+        g_simple_async_result_set_op_res_gpointer (
+            async_result,
+            GUINT_TO_POINTER ((existing ?
+                               MM_PLUGIN_SUPPORTS_PORT_SUPPORTED :
+                               MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED)),
+            NULL);
         g_simple_async_result_complete_in_idle (async_result);
         goto out;
     }

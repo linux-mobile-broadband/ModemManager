@@ -50,6 +50,7 @@ typedef void (*MMSupportsPortResultFunc) (MMPlugin *plugin,
 typedef enum {
     MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED = 0x0,
     MM_PLUGIN_SUPPORTS_PORT_DEFER,
+    MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED,
     MM_PLUGIN_SUPPORTS_PORT_SUPPORTED
 } MMPluginSupportsResult;
 
@@ -137,4 +138,3 @@ MMBaseModem *mm_plugin_grab_port    (MMPlugin *plugin,
                                      GError **error);
 
 #endif /* MM_PLUGIN_H */
-
