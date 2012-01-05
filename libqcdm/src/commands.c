@@ -792,11 +792,19 @@ qcdm_cmd_nv_set_roam_pref_result (const char *buf, size_t len, int *out_error)
 static qcdmbool
 mode_pref_validate (u_int8_t dm)
 {
-    if (   dm == DIAG_NV_MODE_PREF_1X_ONLY
-        || dm == DIAG_NV_MODE_PREF_HDR_ONLY
-        || dm == DIAG_NV_MODE_PREF_AUTO)
+    switch (dm) {
+    case DIAG_NV_MODE_PREF_DIGITAL:
+    case DIAG_NV_MODE_PREF_DIGITAL_ONLY:
+    case DIAG_NV_MODE_PREF_AUTO:
+    case DIAG_NV_MODE_PREF_1X_ONLY:
+    case DIAG_NV_MODE_PREF_HDR_ONLY:
+    case DIAG_NV_MODE_PREF_1X_HDR_ONLY:
+    case DIAG_NV_MODE_PREF_LTE_ONLY:
+    case DIAG_NV_MODE_PREF_1X_HDR_LTE_ONLY:
         return TRUE;
-    return FALSE;
+    default:
+        return FALSE;
+    }
 }
 
 size_t
