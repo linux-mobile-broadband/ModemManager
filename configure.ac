@@ -51,13 +51,13 @@ AC_SUBST(GETTEXT_PACKAGE)
 AC_DEFINE_UNQUOTED(GETTEXT_PACKAGE,"$GETTEXT_PACKAGE", [Gettext package])
 
 PKG_CHECK_MODULES(LIBMM_COMMON,
-                  glib-2.0 >= 2.30
+                  glib-2.0 >= 2.30.2
                   gobject-2.0
                   gio-2.0
                   gio-unix-2.0)
 PKG_CHECK_MODULES(MM,
                   dbus-glib-1 >= 0.86
-                  glib-2.0 >= 2.30
+                  glib-2.0 >= 2.30.2
                   gmodule-2.0
                   gobject-2.0
                   gio-2.0
@@ -66,14 +66,14 @@ AC_SUBST(MM_CFLAGS)
 AC_SUBST(MM_LIBS)
 
 PKG_CHECK_MODULES(LIBMM,
-                  glib-2.0 >= 2.30
+                  glib-2.0 >= 2.30.2
                   gobject-2.0
                   gio-2.0)
 AC_SUBST(LIBMM_CFLAGS)
 AC_SUBST(LIBMM_LIBS)
 
 PKG_CHECK_MODULES(MMCLI,
-                  glib-2.0 >= 2.30
+                  glib-2.0 >= 2.30.2
                   gobject-2.0
                   gio-2.0)
 AC_SUBST(MMCLI_CFLAGS)
