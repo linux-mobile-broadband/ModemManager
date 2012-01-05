@@ -3311,6 +3311,180 @@ get_service_status (MMIfaceModemCdma *self,
 }
 
 /*****************************************************************************/
+/*****************************************************************************/
+/* Setup registration checks (CDMA) */
+
+typedef struct {
+    gboolean skip_qcdm_call_manager_step;
+    gboolean skip_qcdm_hdr_step;
+    gboolean skip_at_cdma_service_status_step;
+    gboolean skip_at_cdma1x_serving_system_step;
+    gboolean skip_detailed_registration_state;
+} SetupRegistrationChecksResults;
+
+typedef struct {
+    MMBroadbandModem *self;
+    GSimpleAsyncResult *result;
+    GError *error;
+    gboolean has_qcdm_port;
+    gboolean has_sprint_commands;
+} SetupRegistrationChecksContext;
+
+static void
+setup_registration_checks_context_complete_and_free (SetupRegistrationChecksContext *ctx)
+{
+    if (ctx->error)
+        g_simple_async_result_take_error (ctx->result, ctx->error);
+    else {
+        SetupRegistrationChecksResults *results;
+
+        results = g_new0 (SetupRegistrationChecksResults, 1);
+
+        /* Skip QCDM steps if no QCDM port */
+        if (!ctx->has_qcdm_port) {
+            mm_dbg ("Will skip all QCDM-based registration checks");
+            results->skip_qcdm_call_manager_step = TRUE;
+            results->skip_qcdm_hdr_step = TRUE;
+        }
+
+        if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_detailed_registration_state ==
+            get_detailed_registration_state) {
+            /* Skip CDMA1x Serving System check if we have Sprint specific
+             * commands AND if the default detailed registration checker
+             * is the generic one. Implementations knowing that their
+             * CSS response is undesired, should either setup NULL callbacks
+             * for the specific step, or subclass this setup and return
+             * FALSE themselves. */
+            if (ctx->has_sprint_commands) {
+                mm_dbg ("Will skip CDMA1x Serving System check, "
+                        "we do have Sprint commands");
+                results->skip_at_cdma1x_serving_system_step = TRUE;
+            } else {
+                /* If there aren't Sprint specific commands, and the detailed
+                 * registration state getter wasn't subclassed, skip the step */
+                mm_dbg ("Will skip generic detailed registration check, we "
+                        "don't have Sprint commands");
+                results->skip_detailed_registration_state = TRUE;
+            }
+        }
+
+        g_simple_async_result_set_op_res_gpointer (ctx->result, results, g_free);
+    }
+
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+setup_registration_checks_finish (MMIfaceModemCdma *self,
+                                  GAsyncResult *res,
+                                  gboolean *skip_qcdm_call_manager_step,
+                                  gboolean *skip_qcdm_hdr_step,
+                                  gboolean *skip_at_cdma_service_status_step,
+                                  gboolean *skip_at_cdma1x_serving_system_step,
+                                  gboolean *skip_detailed_registration_state,
+                                  GError **error)
+{
+    SetupRegistrationChecksResults *results;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    results = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    *skip_qcdm_call_manager_step = results->skip_qcdm_call_manager_step;
+    *skip_qcdm_hdr_step = results->skip_qcdm_hdr_step;
+    *skip_at_cdma_service_status_step = results->skip_at_cdma_service_status_step;
+    *skip_at_cdma1x_serving_system_step = results->skip_at_cdma1x_serving_system_step;
+    *skip_detailed_registration_state = results->skip_detailed_registration_state;
+    return TRUE;
+}
+
+static void
+speri_check_ready (MMIfaceModemCdma *self,
+                   GAsyncResult *res,
+                   SetupRegistrationChecksContext *ctx)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error)
+        g_error_free (error);
+    else
+        /* We DO have SPERI */
+        ctx->self->priv->has_speri = TRUE;
+
+    /* All done */
+    ctx->self->priv->checked_sprint_support = TRUE;
+    setup_registration_checks_context_complete_and_free (ctx);
+}
+
+static void
+spservice_check_ready (MMIfaceModemCdma *self,
+                       GAsyncResult *res,
+                       SetupRegistrationChecksContext *ctx)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        g_error_free (error);
+        ctx->self->priv->checked_sprint_support = TRUE;
+        setup_registration_checks_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* We DO have SPSERVICE, look for SPERI */
+    ctx->has_sprint_commands = TRUE;
+    ctx->self->priv->has_spservice = TRUE;
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "$SPERI?",
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)speri_check_ready,
+                              ctx);
+}
+
+static void
+setup_registration_checks (MMIfaceModemCdma *self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    SetupRegistrationChecksContext *ctx;
+
+    ctx = g_new0 (SetupRegistrationChecksContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             setup_registration_checks);
+
+    /* Check if we have a QCDM port */
+    if (!mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self)))
+        ctx->has_qcdm_port = FALSE;
+
+    /* If we have cached results of Sprint command checking, use them */
+    if (ctx->self->priv->checked_sprint_support) {
+        ctx->has_sprint_commands = ctx->self->priv->has_spservice;
+
+        /* Completes in idle */
+        setup_registration_checks_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Otherwise, launch Sprint command checks. */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+SPSERVICE?",
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)spservice_check_ready,
+                              ctx);
+}
+
+/*****************************************************************************/
 
 typedef enum {
     DISABLING_STEP_FIRST,
@@ -4236,7 +4410,9 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
     iface->load_esn = load_esn;
     iface->load_esn_finish = load_esn_finish;
 
-    /* Additional actions */
+    /* Registration check steps */
+    iface->setup_registration_checks = setup_registration_checks;
+    iface->setup_registration_checks_finish = setup_registration_checks_finish;
     iface->get_call_manager_state = get_call_manager_state;
     iface->get_call_manager_state_finish = get_call_manager_state_finish;
     iface->get_hdr_state = get_hdr_state;
