@@ -24,9 +24,15 @@
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 
+#define REGISTRATION_CHECK_TIMEOUT_SEC 30
 
 #define SUBSYSTEM_CDMA1X "cdma1x"
 #define SUBSYSTEM_EVDO "evdo"
+
+#define REGISTRATION_CHECK_CONTEXT_TAG    "cdma-registration-check-context-tag"
+
+static GQuark registration_check_context_quark;
+
 /*****************************************************************************/
 
 void
@@ -953,11 +959,104 @@ mm_iface_modem_cdma_update_cdma1x_registration_state (MMIfaceModemCdma *self,
 
 /*****************************************************************************/
 
+typedef struct {
+    guint timeout_source;
+    gboolean running;
+} RegistrationCheckContext;
+
+static void
+registration_check_context_free (RegistrationCheckContext *ctx)
+{
+    if (ctx->timeout_source)
+        g_source_remove (ctx->timeout_source);
+    g_free (ctx);
+}
+
+static void
+periodic_registration_checks_ready (MMIfaceModemCdma *self,
+                                    GAsyncResult *res)
+{
+    RegistrationCheckContext *ctx;
+    GError *error = NULL;
+
+    mm_iface_modem_cdma_run_all_registration_checks_finish (self, res, &error);
+    if (error) {
+        mm_dbg ("Couldn't refresh CDMA registration status: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Remove the running tag */
+    ctx = g_object_get_qdata (G_OBJECT (self), registration_check_context_quark);
+    ctx->running = FALSE;
+}
+
+static gboolean
+periodic_registration_check (MMIfaceModemCdma *self)
+{
+    RegistrationCheckContext *ctx;
+
+    /* Only launch a new one if not one running already */
+    ctx = g_object_get_qdata (G_OBJECT (self), registration_check_context_quark);
+    if (!ctx->running) {
+        ctx->running = TRUE;
+        mm_iface_modem_cdma_run_all_registration_checks (
+            self,
+            (GAsyncReadyCallback)periodic_registration_checks_ready,
+            NULL);
+    }
+    return TRUE;
+}
+
+static void
+periodic_registration_check_disable (MMIfaceModemCdma *self)
+{
+    if (G_UNLIKELY (!registration_check_context_quark))
+        registration_check_context_quark = (g_quark_from_static_string (
+                                                REGISTRATION_CHECK_CONTEXT_TAG));
+
+    /* Overwriting the data will free the previous context */
+    g_object_set_qdata (G_OBJECT (self),
+                        registration_check_context_quark,
+                        NULL);
+
+    mm_dbg ("Periodic CDMA registration checks disabled");
+}
+
+static void
+periodic_registration_check_enable (MMIfaceModemCdma *self)
+{
+    RegistrationCheckContext *ctx;
+
+    if (G_UNLIKELY (!registration_check_context_quark))
+        registration_check_context_quark = (g_quark_from_static_string (
+                                                REGISTRATION_CHECK_CONTEXT_TAG));
+
+    ctx = g_object_get_qdata (G_OBJECT (self), registration_check_context_quark);
+
+    /* If context is already there, we're already enabled */
+    if (ctx)
+        return;
+
+    /* Create context and keep it as object data */
+    mm_dbg ("Periodic CDMA registration checks enabled");
+    ctx = g_new0 (RegistrationCheckContext, 1);
+    ctx->timeout_source = g_timeout_add_seconds (REGISTRATION_CHECK_TIMEOUT_SEC,
+                                                 (GSourceFunc)periodic_registration_check,
+                                                 self);
+    g_object_set_qdata_full (G_OBJECT (self),
+                             registration_check_context_quark,
+                             ctx,
+                             (GDestroyNotify)registration_check_context_free);
+}
+
+/*****************************************************************************/
+
 typedef struct _DisablingContext DisablingContext;
 static void interface_disabling_step (DisablingContext *ctx);
 
 typedef enum {
     DISABLING_STEP_FIRST,
+    DISABLING_STEP_PERIODIC_REGISTRATION_CHECKS,
     DISABLING_STEP_LAST
 } DisablingStep;
 
@@ -1019,6 +1118,11 @@ interface_disabling_step (DisablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
+    case DISABLING_STEP_PERIODIC_REGISTRATION_CHECKS:
+        periodic_registration_check_disable (ctx->self);
+        /* Fall down to next step */
+        ctx->step++;
+
     case DISABLING_STEP_LAST:
         /* We are done without errors! */
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
@@ -1047,6 +1151,7 @@ static void interface_enabling_step (EnablingContext *ctx);
 typedef enum {
     ENABLING_STEP_FIRST,
     ENABLING_STEP_RUN_ALL_REGISTRATION_CHECKS,
+    ENABLING_STEP_PERIODIC_REGISTRATION_CHECKS,
     ENABLING_STEP_LAST
 } EnablingStep;
 
@@ -1133,6 +1238,11 @@ interface_enabling_step (EnablingContext *ctx)
                                                          (GAsyncReadyCallback)run_all_registration_checks_ready,
                                                          ctx);
         return;
+
+    case ENABLING_STEP_PERIODIC_REGISTRATION_CHECKS:
+        periodic_registration_check_enable (ctx->self);
+        /* Fall down to next step */
+        ctx->step++;
 
     case ENABLING_STEP_LAST:
         /* We are done without errors! */
