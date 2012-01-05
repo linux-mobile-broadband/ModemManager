@@ -909,6 +909,31 @@ test_com_pilot_sets (void *f, void *data)
     qcdm_result_unref (result);
 }
 
+static const char *
+operating_mode_to_string (guint32 mode)
+{
+    switch (mode) {
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_OPERATING_MODE_POWER_OFF:
+        return "powering off";
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_OPERATING_MODE_FIELD_TEST_MODE:
+        return "field test mode";
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_OPERATING_MODE_OFFLINE:
+        return "offline";
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_OPERATING_MODE_OFFLINE_AMPS:
+        return "online (AMPS)";
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_OPERATING_MODE_OFFLINE_CDMA:
+        return "online (CDMA)";
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_OPERATING_MODE_ONLINE:
+        return "online";
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_OPERATING_MODE_LOW_POWER_MODE:
+        return "low power mode";
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_OPERATING_MODE_RESET:
+        return "reset";
+    default:
+        return "unknown";
+    }
+}
+
 void
 test_com_cm_subsys_state_info (void *f, void *data)
 {
@@ -945,15 +970,7 @@ test_com_cm_subsys_state_info (void *f, void *data)
     n32 = 0;
     detail = NULL;
     qcdm_result_get_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_OPERATING_MODE, &n32);
-    switch (n32) {
-    case QCDM_CMD_CM_SUBSYS_STATE_INFO_OPERATING_MODE_ONLINE:
-        detail = "online";
-        break;
-    default:
-        detail = "unknown";
-        break;
-    }
-    g_message ("%s: Operating Mode: %u (%s)", __func__, n32, detail);
+    g_message ("%s: Operating Mode: %u (%s)", __func__, n32, operating_mode_to_string (n32));
 
     n32 = 0;
     detail = NULL;

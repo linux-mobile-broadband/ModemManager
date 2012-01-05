@@ -294,6 +294,17 @@ struct DMCmdSwVersionRsp {
 } __attribute__ ((packed));
 typedef struct DMCmdSwVersionRsp DMCmdSwVersionRsp;
 
+typedef enum {
+    DM_OPER_MODE_POWER_OFF = 0,
+    DM_OPER_MODE_FIELD_TEST_MODE = 1,
+    DM_OPER_MODE_OFFLINE = 2,
+    DM_OPER_MODE_OFFLINE_AMPS = 3,
+    DM_OPER_MODE_OFFLINE_CDMA = 4,
+    DM_OPER_MODE_ONLINE = 5,
+    DM_OPER_MODE_LOW_POWER_MODE = 6,
+    DM_OPER_MODE_RESETTING = 7,
+} DMOperMode;
+
 /* DIAG_CMD_STATUS_SNAPSHOT */
 struct DMCmdStatusSnapshotRsp {
     u_int8_t code;
