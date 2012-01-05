@@ -2995,6 +2995,16 @@ cdma1x_serving_system_context_complete_and_free (Cdma1xServingSystemContext *ctx
     g_free (ctx);
 }
 
+static GError *
+cdma1x_serving_system_no_service_error (void)
+{
+    /* NOTE: update get_cdma1x_serving_system_ready() in mm-iface-modem-cdma.c
+     * if this error changes */
+    return g_error_new_literal (MM_MOBILE_EQUIPMENT_ERROR,
+                                MM_MOBILE_EQUIPMENT_ERROR_NO_NETWORK,
+                                "No CDMA service");
+}
+
 static gboolean
 get_cdma1x_serving_system_finish (MMIfaceModemCdma *self,
                                   GAsyncResult *res,
@@ -3123,12 +3133,17 @@ get_cdma1x_serving_system_at_ready (MMIfaceModemCdma *self,
         sid = MM_MODEM_CDMA_SID_UNKNOWN;
 
     /* 99999 means unknown/no service */
+    if (sid == MM_MODEM_CDMA_SID_UNKNOWN) {
+        g_simple_async_result_take_error (ctx->result,
+                                          cdma1x_serving_system_no_service_error ());
+        cdma1x_serving_system_context_complete_and_free (ctx);
+        return;
+    }
+
     results = g_new0 (Cdma1xServingSystemResults, 1);
     results->sid = sid;
-    if (sid != MM_MODEM_CDMA_SID_UNKNOWN) {
-        results->band = band;
-        results->class = class;
-    }
+    results->band = band;
+    results->class = class;
 
     g_simple_async_result_set_op_res_gpointer (ctx->result, results, (GDestroyNotify)g_free);
     cdma1x_serving_system_context_complete_and_free (ctx);
