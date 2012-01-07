@@ -173,40 +173,43 @@ typedef struct {
     GSimpleAsyncResult *result;
     GCancellable *cancellable;
     gchar *modem_path;
-    MMManager *manager;
-    MMObject *object;
 } GetModemContext;
 
+typedef struct {
+    MMManager *manager;
+    MMObject *object;
+} GetModemResults;
+
 static void
-get_modem_context_free (GetModemContext *ctx)
+get_modem_results_free (GetModemResults *results)
 {
-    if (ctx->cancellable)
-        g_object_unref (ctx->cancellable);
-    if (ctx->manager)
-        g_object_unref (ctx->manager);
-    g_free (ctx->modem_path);
-    g_free (ctx);
+    g_object_unref (results->manager);
+    g_object_unref (results->object);
+    g_free (results);
 }
 
 static void
-get_modem_context_complete (GetModemContext *ctx)
+get_modem_context_complete_and_free (GetModemContext *ctx)
 {
     g_simple_async_result_complete (ctx->result);
     g_object_unref (ctx->result);
-    ctx->result = NULL;
+    if (ctx->cancellable)
+        g_object_unref (ctx->cancellable);
+    g_free (ctx->modem_path);
+    g_free (ctx);
 }
 
 MMObject *
 mmcli_get_modem_finish (GAsyncResult *res,
                         MMManager **o_manager)
 {
-    GetModemContext *ctx;
+    GetModemResults *results;
 
-    ctx = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    results = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
     if (o_manager)
-        *o_manager = g_object_ref (ctx->manager);
+        *o_manager = g_object_ref (results->manager);
 
-    return g_object_ref (ctx->object);
+    return g_object_ref (results->object);
 }
 
 static void
@@ -214,13 +217,19 @@ get_manager_ready (GDBusConnection *connection,
                    GAsyncResult *res,
                    GetModemContext *ctx)
 {
-    ctx->manager = mmcli_get_manager_finish (res);
-    ctx->object = find_modem (ctx->manager, ctx->modem_path);
+    GetModemResults *results;
+
+    results = g_new (GetModemResults, 1);
+    results->manager = mmcli_get_manager_finish (res);
+    results->object = find_modem (results->manager, ctx->modem_path);
+
+    /* Set operation results */
     g_simple_async_result_set_op_res_gpointer (
         ctx->result,
-        ctx,
-        (GDestroyNotify)get_modem_context_free);
-    get_modem_context_complete (ctx);
+        results,
+        (GDestroyNotify)get_modem_results_free);
+
+    get_modem_context_complete_and_free (ctx);
 }
 
 void
