@@ -415,6 +415,7 @@ struct _RunAllRegistrationChecksContext {
     guint cdma1x_class;
     guint cdma1x_band;
     guint cdma1x_sid;
+    guint cdma1x_nid;
 };
 
 static void
@@ -597,6 +598,7 @@ get_cdma1x_serving_system_ready (MMIfaceModemCdma *self,
             &ctx->cdma1x_class,
             &ctx->cdma1x_band,
             &ctx->cdma1x_sid,
+            &ctx->cdma1x_nid,
             &error)) {
         /* Treat as fatal all errors except for no-network */
         if (!g_error_matches (error,
@@ -609,6 +611,7 @@ get_cdma1x_serving_system_ready (MMIfaceModemCdma *self,
         }
 
         ctx->cdma1x_sid = MM_MODEM_CDMA_SID_UNKNOWN;
+        ctx->cdma1x_nid = MM_MODEM_CDMA_NID_UNKNOWN;
     }
 
     /* TODO: not sure why we also take class/band here */
@@ -622,7 +625,8 @@ static void
 parse_at_results (RunAllRegistrationChecksContext *ctx)
 {
     /* 99999 means unknown/no service */
-    if (ctx->cdma1x_sid == MM_MODEM_CDMA_SID_UNKNOWN) {
+    if (ctx->cdma1x_sid == MM_MODEM_CDMA_SID_UNKNOWN &&
+        ctx->cdma1x_nid == MM_MODEM_CDMA_NID_UNKNOWN) {
         /* Not registered in CDMA network, end registration checks */
         mm_dbg ("Not registered in any CDMA network");
         ctx->step = REGISTRATION_CHECK_STEP_LAST;
@@ -802,7 +806,8 @@ registration_check_step (RunAllRegistrationChecksContext *ctx)
         mm_dbg ("All CDMA registration state checks done");
         mm_iface_modem_cdma_update_cdma1x_registration_state (ctx->self,
                                                               ctx->cdma1x_state,
-                                                              ctx->cdma1x_sid);
+                                                              ctx->cdma1x_sid,
+                                                              ctx->cdma1x_nid);
         mm_iface_modem_cdma_update_evdo_registration_state (ctx->self,
                                                             ctx->evdo_state);
 
@@ -910,7 +915,8 @@ mm_iface_modem_cdma_update_evdo_registration_state (MMIfaceModemCdma *self,
 void
 mm_iface_modem_cdma_update_cdma1x_registration_state (MMIfaceModemCdma *self,
                                                       MMModemCdmaRegistrationState state,
-                                                      guint sid)
+                                                      guint sid,
+                                                      guint nid)
 {
     MmGdbusModemCdma *skeleton = NULL;
     gboolean supported = FALSE;
@@ -932,6 +938,7 @@ mm_iface_modem_cdma_update_cdma1x_registration_state (MMIfaceModemCdma *self,
         case MM_MODEM_CDMA_REGISTRATION_STATE_HOME:
         case MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING:
             mm_gdbus_modem_cdma_set_sid (skeleton, sid);
+            mm_gdbus_modem_cdma_set_nid (skeleton, nid);
             mm_iface_modem_update_subsystem_state (MM_IFACE_MODEM (self),
                                                    SUBSYSTEM_CDMA1X,
                                                    MM_MODEM_STATE_REGISTERED,
@@ -943,6 +950,9 @@ mm_iface_modem_cdma_update_cdma1x_registration_state (MMIfaceModemCdma *self,
         case MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN:
             if (mm_gdbus_modem_cdma_get_sid (skeleton) != MM_MODEM_CDMA_SID_UNKNOWN)
                 mm_gdbus_modem_cdma_set_sid (skeleton, MM_MODEM_CDMA_SID_UNKNOWN);
+            if (mm_gdbus_modem_cdma_get_nid (skeleton) != MM_MODEM_CDMA_NID_UNKNOWN)
+                mm_gdbus_modem_cdma_set_nid (skeleton, MM_MODEM_CDMA_NID_UNKNOWN);
+
             mm_iface_modem_update_subsystem_state (MM_IFACE_MODEM (self),
                                                    SUBSYSTEM_CDMA1X,
                                                    MM_MODEM_STATE_ENABLED,

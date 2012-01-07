@@ -2979,6 +2979,7 @@ get_call_manager_state (MMIfaceModemCdma *self,
 
 typedef struct {
     guint sid;
+    guint nid;
     guint class;
     guint band;
 } Cdma1xServingSystemResults;
@@ -3016,6 +3017,7 @@ get_cdma1x_serving_system_finish (MMIfaceModemCdma *self,
                                   guint *class,
                                   guint *band,
                                   guint *sid,
+                                  guint *nid,
                                   GError **error)
 {
     Cdma1xServingSystemResults *results;
@@ -3025,6 +3027,7 @@ get_cdma1x_serving_system_finish (MMIfaceModemCdma *self,
 
     results = (Cdma1xServingSystemResults *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
     *sid = results->sid;
+    *nid = results->nid;
     *class = results->class;
     *band = results->band;
     return TRUE;
@@ -3149,6 +3152,8 @@ get_cdma1x_serving_system_at_ready (MMIfaceModemCdma *self,
     results->sid = sid;
     results->band = band;
     results->class = class;
+    /* No means to get NID with AT commands right now */
+    results->nid = MM_MODEM_CDMA_NID_UNKNOWN;
 
     g_simple_async_result_set_op_res_gpointer (ctx->result, results, (GDestroyNotify)g_free);
     cdma1x_serving_system_context_complete_and_free (ctx);
@@ -3162,7 +3167,8 @@ get_cdma1x_serving_system_qcdm_ready (MMQcdmSerialPort *port,
 {
     Cdma1xServingSystemResults *results;
     QcdmResult *result;
-    guint32 sid = 0;
+    guint32 sid = MM_MODEM_CDMA_SID_UNKNOWN;
+    guint32 nid = MM_MODEM_CDMA_NID_UNKNOWN;
     guint32 rxstate = 0;
     gint err = QCDM_SUCCESS;
 
@@ -3185,14 +3191,18 @@ get_cdma1x_serving_system_qcdm_ready (MMQcdmSerialPort *port,
 
     qcdm_result_get_u32 (result, QCDM_CMD_CDMA_STATUS_ITEM_RX_STATE, &rxstate);
     qcdm_result_get_u32 (result, QCDM_CMD_CDMA_STATUS_ITEM_SID, &sid);
+    qcdm_result_get_u32 (result, QCDM_CMD_CDMA_STATUS_ITEM_NID, &nid);
     qcdm_result_unref (result);
 
     /* 99999 means unknown/no service */
-    if (rxstate == QCDM_CMD_CDMA_STATUS_RX_STATE_ENTERING_CDMA)
+    if (rxstate == QCDM_CMD_CDMA_STATUS_RX_STATE_ENTERING_CDMA) {
         sid = MM_MODEM_CDMA_SID_UNKNOWN;
+        nid = MM_MODEM_CDMA_NID_UNKNOWN;
+    }
 
     results = g_new0 (Cdma1xServingSystemResults, 1);
     results->sid = sid;
+    results->nid = nid;
     if (sid != MM_MODEM_CDMA_SID_UNKNOWN) {
         results->band = 'Z';
         results->class = 0;

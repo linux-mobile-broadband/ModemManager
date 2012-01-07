@@ -125,6 +125,7 @@ struct _MMIfaceModemCdma {
                                                    guint *class,
                                                    guint *band,
                                                    guint *sid,
+                                                   guint *nid,
                                                    GError **error);
 
     /* Get detailed registration state */
@@ -191,7 +192,8 @@ void     mm_iface_modem_cdma_activate_manual        (MMIfaceModemCdma *self,
 /* Objects implementing this interface can report new registration states. */
 void mm_iface_modem_cdma_update_cdma1x_registration_state (MMIfaceModemCdma *self,
                                                            MMModemCdmaRegistrationState state,
-                                                           guint sid);
+                                                           guint sid,
+                                                           guint nid);
 void mm_iface_modem_cdma_update_evdo_registration_state (MMIfaceModemCdma *self,
                                                          MMModemCdmaRegistrationState state);
 
