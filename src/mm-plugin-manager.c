@@ -69,6 +69,7 @@ typedef struct {
     MMPlugin *suggested_plugin;
     GSList *current;
     guint source_id;
+    gboolean defer_until_suggested;
     /* Output context */
     MMPlugin *best_plugin;
 } SupportsInfo;
@@ -176,7 +177,64 @@ suggest_supports_info_result (MMPluginManager *self,
                     mm_plugin_get_name (suggested_plugin),
                     info->name);
             info->suggested_plugin = suggested_plugin;
+
+            /* If we got a task deferred until a suggestion comes,
+             * complete it */
+            if (info->defer_until_suggested) {
+                mm_dbg ("(%s): (%s) deferred task completed, got suggested plugin",
+                        mm_plugin_get_name (suggested_plugin),
+                        info->name);
+                /* Schedule checking support, which will end the operation */
+                info->best_plugin = info->suggested_plugin;
+                info->current = NULL;
+                info->source_id = g_idle_add ((GSourceFunc)find_port_support_idle,
+                                              info);
+            }
         }
+    }
+}
+
+static void
+cancel_all_deferred_supports_info (MMPluginManager *self,
+                                   const gchar *physdev_path)
+{
+    gboolean abort_cancel = FALSE;
+    SupportsInfoList *list;
+    GSList *l;
+
+    list = g_hash_table_lookup (self->priv->supports,
+                                physdev_path);
+
+    if (!list)
+        return;
+
+    /* Look for support infos on the same physical path.
+     * We need to look for tasks being deferred until suggested and count
+     * them. */
+    for (l = list->info_list;
+         l && !abort_cancel;
+         l = g_slist_next (l)) {
+        SupportsInfo *info = l->data;
+
+        if (!info->defer_until_suggested)
+            abort_cancel = TRUE;
+    }
+
+    if (abort_cancel)
+        return;
+
+    /* If all remaining tasks were deferred until suggested, we need to
+     * cancel them completely */
+
+    for (l = list->info_list; l; l = g_slist_next (l)) {
+        SupportsInfo *info = l->data;
+
+        mm_dbg ("(%s) deferred task aborted, no suggested plugin set",
+                info->name);
+        /* Schedule checking support, which will end the operation */
+        info->current = NULL;
+        info->best_plugin = NULL;
+        info->source_id = g_idle_add ((GSourceFunc)find_port_support_idle, info);
     }
 }
 
@@ -273,27 +331,12 @@ supports_port_ready_cb (MMPlugin *plugin,
         break;
 
     case MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED:
-        /* We were told to defer until getting a suggested plugin, and we already
-         * got one here, so we're done. */
-        if (info->suggested_plugin) {
-            mm_dbg ("(%s): (%s) support check finished, got suggested",
-                    mm_plugin_get_name (MM_PLUGIN (info->suggested_plugin)),
-                    info->name);
-            info->best_plugin = info->suggested_plugin;
-            info->current = NULL;
-
-            /* Schedule checking support, which will end the operation */
-            info->source_id = g_idle_add ((GSourceFunc)find_port_support_idle,
-                                          info);
-        } else {
-            mm_dbg ("(%s): (%s) deferring support check until result suggested",
-                    mm_plugin_get_name (MM_PLUGIN (info->current->data)),
-                    info->name);
-            /* Schedule checking support */
-            info->source_id = g_timeout_add_seconds (SUPPORTS_DEFER_TIMEOUT_SECS,
-                                                     (GSourceFunc)find_port_support_idle,
-                                                     info);
-        }
+        /* We are deferred until a suggested plugin is given. If last supports task
+         * of a given device is finished without finding a best plugin, this task
+         * will get finished reporting unsupported. */
+        mm_dbg ("(%s) deferring support check until result suggested",
+                info->name);
+        info->defer_until_suggested = TRUE;
         break;
     }
 }
@@ -305,14 +348,17 @@ find_port_support_idle (SupportsInfo *info)
 
     /* Already checked all plugins? */
     if (!info->current) {
-        /* Report best plugin in asynchronous result (could be none)
-         * Note: plugins are not expected to be removed while these
-         * operations are ongoing, so no issue if we don't ref/unref
-         * them. */
-        g_simple_async_result_set_op_res_gpointer (
-            info->result,
-            info->best_plugin,
-            NULL);
+        /* Report best plugin in asynchronous result (could be none) */
+        if (info->best_plugin)
+            g_simple_async_result_set_op_res_gpointer (
+                info->result,
+                g_object_ref (info->best_plugin),
+                (GDestroyNotify)g_object_unref);
+        else
+            g_simple_async_result_set_op_res_gpointer (
+                info->result,
+                NULL,
+                NULL);
 
         /* We are only giving the plugin as result, so we can now safely remove
          * the supports info from the manager. Always untrack the supports info
@@ -321,13 +367,16 @@ find_port_support_idle (SupportsInfo *info)
 
         /* We are reporting a best plugin found to a port. We can now
          * 'suggest' this same plugin to other ports of the same device. */
-        if (info->best_plugin) {
+        if (info->best_plugin)
             suggest_supports_info_result (info->self,
                                           info->physdev_path,
                                           info->best_plugin);
-        }
+        /* If ending without a best plugin, we need to cancel all probing tasks
+         * that got deferred until suggested. */
+        else
+            cancel_all_deferred_supports_info (info->self,
+                                               info->physdev_path);
 
-        /* The asynchronous operation is always completed here */
         g_simple_async_result_complete (info->result);
 
         supports_info_free (info);
