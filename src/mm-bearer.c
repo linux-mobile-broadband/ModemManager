@@ -565,16 +565,21 @@ set_property (GObject *object,
     case PROP_PATH:
         g_free (self->priv->path);
         self->priv->path = g_value_dup_string (value);
+
+        /* Export when we get a DBus connection AND we have a path */
+        if (self->priv->path &&
+            self->priv->connection)
+            mm_bearer_export (self);
         break;
     case PROP_CONNECTION:
         g_clear_object (&self->priv->connection);
         self->priv->connection = g_value_dup_object (value);
 
-        /* Export when we get a DBus connection */
-        if (self->priv->connection)
-            mm_bearer_export (self);
-        else
+        /* Export when we get a DBus connection AND we have a path */
+        if (!self->priv->connection)
             mm_bearer_unexport (self);
+        else if (self->priv->path)
+            mm_bearer_export (self);
         break;
     case PROP_MODEM:
         g_clear_object (&self->priv->modem);
