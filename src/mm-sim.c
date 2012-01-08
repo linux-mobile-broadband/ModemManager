@@ -940,11 +940,7 @@ initable_init_finish (GAsyncInitable  *initable,
                       GAsyncResult    *result,
                       GError         **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result),
-                                               error))
-        return FALSE;
-
-    return TRUE;
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result), error);
 }
 
 static void
