@@ -53,6 +53,9 @@ struct _MMBearer3gppClass {
 
 GType mm_bearer_3gpp_get_type (void);
 
+/* Getter for an unique 3GPP Bearer path */
+gchar *mm_bearer_3gpp_new_unique_path (void);
+
 /* Default 3GPP bearer creation implementation */
 void mm_bearer_3gpp_new (MMIfaceModem3gpp *modem,
                          MMCommonBearerProperties *properties,

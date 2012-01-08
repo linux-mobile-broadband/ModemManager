@@ -776,6 +776,14 @@ disconnect (MMBearer *self,
 
 /*****************************************************************************/
 
+gchar *
+mm_bearer_3gpp_new_unique_path (void)
+{
+    static guint id = 0;
+
+    return g_strdup_printf (MM_DBUS_BEARER_3GPP_PREFIX "/%d", id++);
+}
+
 MMBearer *
 mm_bearer_3gpp_new_finish (MMIfaceModem3gpp *modem,
                            GAsyncResult *res,
@@ -794,7 +802,6 @@ mm_bearer_3gpp_new (MMIfaceModem3gpp *modem,
                     gpointer user_data)
 {
     GSimpleAsyncResult *result;
-    static guint id = 0;
     MMBearer3gpp *bearer;
     gchar *path;
 
@@ -824,7 +831,7 @@ mm_bearer_3gpp_new (MMIfaceModem3gpp *modem,
 
     /* Set modem and path ONLY after having checked input properties, so that
      * we don't export invalid bearers. */
-    path = g_strdup_printf (MM_DBUS_BEARER_3GPP_PREFIX "/%d", id++);
+    path = mm_bearer_3gpp_new_unique_path ();
     g_object_set (bearer,
                   MM_BEARER_PATH,  path,
                   MM_BEARER_MODEM, modem,
