@@ -59,10 +59,10 @@ gchar *mm_bearer_3gpp_new_unique_path (void);
 /* Default 3GPP bearer creation implementation */
 void mm_bearer_3gpp_new (MMIfaceModem3gpp *modem,
                          MMCommonBearerProperties *properties,
+                         GCancellable *cancellable,
                          GAsyncReadyCallback callback,
                          gpointer user_data);
-MMBearer *mm_bearer_3gpp_new_finish (MMIfaceModem3gpp *modem,
-                                     GAsyncResult *res,
+MMBearer *mm_bearer_3gpp_new_finish (GAsyncResult *res,
                                      GError **error);
 
 const gchar *mm_bearer_3gpp_get_apn           (MMBearer3gpp *self);

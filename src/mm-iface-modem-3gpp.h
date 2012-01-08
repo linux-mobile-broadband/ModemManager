@@ -171,14 +171,14 @@ struct _MMIfaceModem3gpp {
                                      GAsyncResult *res,
                                      GError **error);
 
-    /* Create 3GPP bearer */
-    void (* create_3gpp_bearer) (MMIfaceModem3gpp *self,
-                                 MMCommonBearerProperties *properties,
-                                 GAsyncReadyCallback callback,
-                                 gpointer user_data);
-    MMBearer * (* create_3gpp_bearer_finish) (MMIfaceModem3gpp *self,
-                                              GAsyncResult *res,
-                                              GError **error);
+    /* New 3GPP bearer */
+    void (* bearer_new) (MMIfaceModem3gpp *self,
+                         MMCommonBearerProperties *properties,
+                         GCancellable *cancellable,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data);
+    MMBearer * (* bearer_new_finish) (GAsyncResult *res,
+                                      GError **error);
 };
 
 GType mm_iface_modem_3gpp_get_type (void);

@@ -4660,8 +4660,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->register_in_network_finish = register_in_network_finish;
     iface->scan_networks = scan_networks;
     iface->scan_networks_finish = scan_networks_finish;
-    iface->create_3gpp_bearer = mm_bearer_3gpp_new;
-    iface->create_3gpp_bearer_finish = mm_bearer_3gpp_new_finish;
+    iface->bearer_new = mm_bearer_3gpp_new;
+    iface->bearer_new_finish = mm_bearer_3gpp_new_finish;
 }
 
 static void

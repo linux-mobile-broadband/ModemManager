@@ -369,10 +369,10 @@ mm_iface_modem_3gpp_create_bearer_finish (MMIfaceModem3gpp *self,
     MMModem3gppRegistrationState current_state;
     MMBearer *bearer;
 
-    g_assert (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->create_3gpp_bearer_finish != NULL);
-    bearer = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->create_3gpp_bearer_finish (self,
-                                                                                  res,
-                                                                                  error);
+    g_assert (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->bearer_new_finish != NULL);
+    bearer = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->bearer_new_finish (res,
+                                                                          error);
+
     if (!bearer)
         return NULL;
 
@@ -405,11 +405,12 @@ mm_iface_modem_3gpp_create_bearer (MMIfaceModem3gpp *self,
                                    GAsyncReadyCallback callback,
                                    gpointer user_data)
 {
-    g_assert (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->create_3gpp_bearer != NULL);
-    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->create_3gpp_bearer (self,
-                                                                  properties,
-                                                                  callback,
-                                                                  user_data);
+    g_assert (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->bearer_new != NULL);
+    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->bearer_new (self,
+                                                          properties,
+                                                          NULL,
+                                                          callback,
+                                                          user_data);
 }
 
 /*****************************************************************************/
