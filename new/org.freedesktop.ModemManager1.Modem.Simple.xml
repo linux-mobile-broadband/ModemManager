@@ -98,6 +98,13 @@
               given as a boolean value (signature <literal>"b"</literal>).
             </listitem>
           </varlistentry>
+          <varlistentry><term><literal>"rm-protocol"</literal></term>
+            <listitem>
+              For CDMA devices, the protocol of the Rm interface, given as a
+              <link linkend="MMModemCdmaRmProtocol">MMModemCdmaRmProtocol</link>
+              value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
         </variablelist>
     -->
     <method name="Connect">

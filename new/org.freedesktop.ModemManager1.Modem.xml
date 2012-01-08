@@ -69,6 +69,8 @@
           <listitem><para>Password (if any) required by the network, given as a string value (signature <literal>"s"</literal>). Optional in 3GPP.</para></listitem></varlistentry>
         <varlistentry><term><literal>"allow-roaming"</literal></term>
           <listitem><para>Flag to tell whether connection is allowed during roaming, given as a boolean value (signature <literal>"b"</literal>). Optional in 3GPP.</para></listitem></varlistentry>
+        <varlistentry><term><literal>"rm-protocol"</literal></term>
+          <listitem><para>Protocol of the Rm interface, given as a <link linkend="MMModemCdmaRmProtocol">MMModemCdmaRmProtocol</link> value (signature <literal>"u"</literal>). Optional in CDMA.</para></listitem></varlistentry>
         <varlistentry><term><literal>"number"</literal></term>
           <listitem><para>Telephone number to dial, given as a string value (signature <literal>"s"</literal>). Required in POTS.</para></listitem></varlistentry>
         </variablelist>
