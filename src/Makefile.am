@@ -161,3 +161,6 @@ modem_manager_SOURCES = \
 	mm-plugin-base.c \
 	mm-plugin-base.h
 
+CLEANFILES = \
+	mm-private-enums-types.h \
+	mm-private-enums-types.c
