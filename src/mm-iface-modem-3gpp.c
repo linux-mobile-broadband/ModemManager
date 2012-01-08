@@ -359,24 +359,20 @@ handle_scan (MmGdbusModem3gpp *skeleton,
 }
 
 /*****************************************************************************/
-
 /* Create new 3GPP bearer */
+
 MMBearer *
-mm_iface_modem_3gpp_create_bearer (MMIfaceModem3gpp *self,
-                                   MMCommonBearerProperties *properties,
-                                   GError **error)
+mm_iface_modem_3gpp_create_bearer_finish (MMIfaceModem3gpp *self,
+                                          GAsyncResult *res,
+                                          GError **error)
 {
     MMModem3gppRegistrationState current_state;
     MMBearer *bearer;
 
-    g_assert (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->create_3gpp_bearer != NULL);
-
-    /* Create new 3GPP bearer using the method set in the interface, so that
-     * plugins can subclass it and implement their own. */
-    bearer = MM_BEARER (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->create_3gpp_bearer (
-                            MM_BASE_MODEM (self),
-                            properties,
-                            error));
+    g_assert (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->create_3gpp_bearer_finish != NULL);
+    bearer = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->create_3gpp_bearer_finish (self,
+                                                                                  res,
+                                                                                  error);
     if (!bearer)
         return NULL;
 
@@ -401,6 +397,19 @@ mm_iface_modem_3gpp_create_bearer (MMIfaceModem3gpp *self,
             MM_BEARER_CONNECTION_FORBIDDEN_REASON_UNREGISTERED);
 
     return bearer;
+}
+
+void
+mm_iface_modem_3gpp_create_bearer (MMIfaceModem3gpp *self,
+                                   MMCommonBearerProperties *properties,
+                                   GAsyncReadyCallback callback,
+                                   gpointer user_data)
+{
+    g_assert (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->create_3gpp_bearer != NULL);
+    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->create_3gpp_bearer (self,
+                                                                  properties,
+                                                                  callback,
+                                                                  user_data);
 }
 
 /*****************************************************************************/

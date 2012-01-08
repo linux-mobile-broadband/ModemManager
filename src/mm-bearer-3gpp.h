@@ -22,7 +22,7 @@
 #include <glib-object.h>
 
 #include "mm-bearer.h"
-#include "mm-base-modem.h"
+#include "mm-iface-modem-3gpp.h"
 
 #define MM_TYPE_BEARER_3GPP            (mm_bearer_3gpp_get_type ())
 #define MM_BEARER_3GPP(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_BEARER_3GPP, MMBearer3gpp))
@@ -54,9 +54,13 @@ struct _MMBearer3gppClass {
 GType mm_bearer_3gpp_get_type (void);
 
 /* Default 3GPP bearer creation implementation */
-MMBearer *mm_bearer_3gpp_new (MMBaseModem *modem,
-                              MMCommonBearerProperties *properties,
-                              GError **error);
+void mm_bearer_3gpp_new (MMIfaceModem3gpp *modem,
+                         MMCommonBearerProperties *properties,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data);
+MMBearer *mm_bearer_3gpp_new_finish (MMIfaceModem3gpp *modem,
+                                     GAsyncResult *res,
+                                     GError **error);
 
 const gchar *mm_bearer_3gpp_get_apn           (MMBearer3gpp *self);
 const gchar *mm_bearer_3gpp_get_ip_type       (MMBearer3gpp *self);

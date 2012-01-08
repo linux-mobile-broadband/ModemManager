@@ -777,21 +777,42 @@ disconnect (MMBearer *self,
 /*****************************************************************************/
 
 MMBearer *
-mm_bearer_3gpp_new (MMBaseModem *modem,
-                    MMCommonBearerProperties *properties,
-                    GError **error)
+mm_bearer_3gpp_new_finish (MMIfaceModem3gpp *modem,
+                           GAsyncResult *res,
+                           GError **error)
 {
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return MM_BEARER (g_object_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res))));
+}
+
+void
+mm_bearer_3gpp_new (MMIfaceModem3gpp *modem,
+                    MMCommonBearerProperties *properties,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    GSimpleAsyncResult *result;
     static guint id = 0;
     MMBearer3gpp *bearer;
     gchar *path;
 
+    result = g_simple_async_result_new (G_OBJECT (modem),
+                                        callback,
+                                        user_data,
+                                        mm_bearer_3gpp_new);
+
     /* Check mandatory properties */
     if (!mm_common_bearer_properties_get_apn (properties)) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_INVALID_ARGS,
-                     "Invalid input properties: 3GPP bearer requires 'apn'");
-        return NULL;
+        g_simple_async_result_set_error (
+            result,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_INVALID_ARGS,
+            "Invalid input properties: 3GPP bearer requires 'apn'");
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
     }
 
     /* Create the object */
@@ -810,7 +831,11 @@ mm_bearer_3gpp_new (MMBaseModem *modem,
                   NULL);
     g_free (path);
 
-    return MM_BEARER (bearer);
+    g_simple_async_result_set_op_res_gpointer (result,
+                                               bearer,
+                                               (GDestroyNotify)g_object_unref);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
 }
 
 static void

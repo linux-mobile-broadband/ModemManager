@@ -172,9 +172,13 @@ struct _MMIfaceModem3gpp {
                                      GError **error);
 
     /* Create 3GPP bearer */
-    MMBearer * (* create_3gpp_bearer) (MMBaseModem *modem,
-                                       MMCommonBearerProperties *properties,
-                                       GError **error);
+    void (* create_3gpp_bearer) (MMIfaceModem3gpp *self,
+                                 MMCommonBearerProperties *properties,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data);
+    MMBearer * (* create_3gpp_bearer_finish) (MMIfaceModem3gpp *self,
+                                              GAsyncResult *res,
+                                              GError **error);
 };
 
 GType mm_iface_modem_3gpp_get_type (void);
@@ -226,9 +230,13 @@ gboolean mm_iface_modem_3gpp_run_all_registration_checks_finish (MMIfaceModem3gp
                                                                  GError **error);
 
 /* Create new 3GPP bearer */
-MMBearer *mm_iface_modem_3gpp_create_bearer (MMIfaceModem3gpp *self,
-                                             MMCommonBearerProperties *properties,
-                                             GError **error);
+void mm_iface_modem_3gpp_create_bearer (MMIfaceModem3gpp *self,
+                                        MMCommonBearerProperties *properties,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data);
+MMBearer *mm_iface_modem_3gpp_create_bearer_finish (MMIfaceModem3gpp *self,
+                                                    GAsyncResult *res,
+                                                    GError **error);
 
 /* Allow registering in the network */
 gboolean mm_iface_modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,

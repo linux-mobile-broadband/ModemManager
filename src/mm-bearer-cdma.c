@@ -95,13 +95,31 @@ disconnect (MMBearer *self,
 /*****************************************************************************/
 
 MMBearer *
-mm_bearer_cdma_new (MMBaseModem *modem,
-                    MMCommonBearerProperties *properties,
-                    GError **error)
+mm_bearer_cdma_new_finish (MMIfaceModemCdma *modem,
+                           GAsyncResult *res,
+                           GError **error)
 {
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return MM_BEARER (g_object_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res))));
+}
+
+void
+mm_bearer_cdma_new (MMIfaceModemCdma *modem,
+                    MMCommonBearerProperties *properties,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    GSimpleAsyncResult *result;
     static guint id = 0;
     MMBearerCdma *bearer;
     gchar *path;
+
+    result = g_simple_async_result_new (G_OBJECT (modem),
+                                        callback,
+                                        user_data,
+                                        mm_bearer_cdma_new);
 
     /* Create the object */
     bearer = g_object_new (MM_TYPE_BEARER_CDMA,
@@ -118,7 +136,11 @@ mm_bearer_cdma_new (MMBaseModem *modem,
                   NULL);
     g_free (path);
 
-    return MM_BEARER (bearer);
+    g_simple_async_result_set_op_res_gpointer (result,
+                                               bearer,
+                                               (GDestroyNotify)g_object_unref);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
 }
 
 static void

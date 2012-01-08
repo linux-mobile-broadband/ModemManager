@@ -22,7 +22,7 @@
 #include <glib-object.h>
 
 #include "mm-bearer.h"
-#include "mm-base-modem.h"
+#include "mm-iface-modem-cdma.h"
 
 #define MM_TYPE_BEARER_CDMA            (mm_bearer_cdma_get_type ())
 #define MM_BEARER_CDMA(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_BEARER_CDMA, MMBearerCdma))
@@ -52,9 +52,13 @@ struct _MMBearerCdmaClass {
 GType mm_bearer_cdma_get_type (void);
 
 /* Default CDMA bearer creation implementation */
-MMBearer *mm_bearer_cdma_new (MMBaseModem *modem,
-                              MMCommonBearerProperties *properties,
-                              GError **error);
+void mm_bearer_cdma_new (MMIfaceModemCdma *modem,
+                         MMCommonBearerProperties *properties,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data);
+MMBearer *mm_bearer_cdma_new_finish (MMIfaceModemCdma *modem,
+                                     GAsyncResult *res,
+                                     GError **error);
 
 guint mm_bearer_cdma_get_rm_protocol (MMBearerCdma *self);
 

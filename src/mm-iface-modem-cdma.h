@@ -141,9 +141,13 @@ struct _MMIfaceModemCdma {
                                                          GError **error);
 
     /* Create CDMA bearer */
-    MMBearer * (* create_cdma_bearer) (MMBaseModem *modem,
-                                       MMCommonBearerProperties *properties,
-                                       GError **error);
+    void (* create_cdma_bearer) (MMIfaceModemCdma *self,
+                                 MMCommonBearerProperties *properties,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data);
+    MMBearer * (* create_cdma_bearer_finish) (MMIfaceModemCdma *self,
+                                              GAsyncResult *res,
+                                              GError **error);
 };
 
 GType mm_iface_modem_cdma_get_type (void);
@@ -211,9 +215,13 @@ gboolean mm_iface_modem_cdma_run_all_registration_checks_finish (MMIfaceModemCdm
                                                                  GError **error);
 
 /* Create new CDMA bearer */
-MMBearer *mm_iface_modem_cdma_create_bearer (MMIfaceModemCdma *self,
-                                             MMCommonBearerProperties *properties,
-                                             GError **error);
+void mm_iface_modem_cdma_create_bearer (MMIfaceModemCdma *self,
+                                        MMCommonBearerProperties *properties,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data);
+MMBearer *mm_iface_modem_cdma_create_bearer_finish (MMIfaceModemCdma *self,
+                                                    GAsyncResult *res,
+                                                    GError **error);
 
 /* Bind properties for simple GetStatus() */
 void mm_iface_modem_cdma_bind_simple_status (MMIfaceModemCdma *self,
