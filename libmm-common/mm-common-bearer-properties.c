@@ -27,6 +27,7 @@ G_DEFINE_TYPE (MMCommonBearerProperties, mm_common_bearer_properties, G_TYPE_OBJ
 #define PROPERTY_IP_TYPE         "ip-type"
 #define PROPERTY_NUMBER          "number"
 #define PROPERTY_ALLOW_ROAMING   "allow-roaming"
+#define PROPERTY_RM_PROTOCOL     "rm-protocol"
 
 struct _MMCommonBearerPropertiesPrivate {
     /* APN */
@@ -42,6 +43,8 @@ struct _MMCommonBearerPropertiesPrivate {
     /* Roaming allowance */
     gboolean allow_roaming_set;
     gboolean allow_roaming;
+    /* Protocol of the Rm interface */
+    MMModemCdmaRmProtocol rm_protocol;
 };
 
 /*****************************************************************************/
@@ -94,6 +97,13 @@ mm_common_bearer_properties_set_number (MMCommonBearerProperties *self,
     self->priv->number = g_strdup (number);
 }
 
+void
+mm_common_bearer_properties_set_rm_protocol (MMCommonBearerProperties *self,
+                                             MMModemCdmaRmProtocol protocol)
+{
+    self->priv->rm_protocol = protocol;
+}
+
 /*****************************************************************************/
 
 const gchar *
@@ -130,6 +140,12 @@ const gchar *
 mm_common_bearer_properties_get_number (MMCommonBearerProperties *self)
 {
     return self->priv->number;
+}
+
+MMModemCdmaRmProtocol
+mm_common_bearer_properties_get_rm_protocol (MMCommonBearerProperties *self)
+{
+    return self->priv->rm_protocol;
 }
 
 /*****************************************************************************/
@@ -181,6 +197,12 @@ mm_common_bearer_properties_get_dictionary (MMCommonBearerProperties *self)
                                PROPERTY_ALLOW_ROAMING,
                                g_variant_new_boolean (self->priv->allow_roaming));
 
+    if (self->priv->rm_protocol)
+        g_variant_builder_add (&builder,
+                               "{sv}",
+                               PROPERTY_RM_PROTOCOL,
+                               g_variant_new_uint32 (self->priv->rm_protocol));
+
     return g_variant_ref_sink (g_variant_builder_end (&builder));
 }
 
@@ -212,7 +234,17 @@ mm_common_bearer_properties_consume_string (MMCommonBearerProperties *self,
         mm_common_bearer_properties_set_allow_roaming (self, allow_roaming);
     } else if (g_str_equal (key, PROPERTY_NUMBER))
         mm_common_bearer_properties_set_number (self, value);
-    else {
+    else if (g_str_equal (key, PROPERTY_RM_PROTOCOL)) {
+        GError *inner_error = NULL;
+        MMModemCdmaRmProtocol protocol;
+
+        protocol = mm_common_get_rm_protocol_from_string (value, &inner_error);
+        if (inner_error) {
+            g_propagate_error (error, inner_error);
+            return FALSE;
+        }
+        mm_common_bearer_properties_set_rm_protocol (self, protocol);
+    } else {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_INVALID_ARGS,
@@ -376,6 +408,7 @@ mm_common_bearer_properties_init (MMCommonBearerProperties *self)
 
     /* Some defaults */
     self->priv->allow_roaming = TRUE;
+    self->priv->rm_protocol = MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
 }
 
 static void

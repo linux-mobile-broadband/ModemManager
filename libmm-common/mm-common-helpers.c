@@ -375,6 +375,29 @@ mm_common_get_boolean_from_string (const gchar *value,
     return FALSE;
 }
 
+MMModemCdmaRmProtocol
+mm_common_get_rm_protocol_from_string (const gchar *str,
+                                       GError **error)
+{
+	GEnumClass *enum_class;
+    guint i;
+
+    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_CDMA_RM_PROTOCOL));
+
+
+    for (i = 0; enum_class->values[i].value_nick; i++) {
+        if (!g_ascii_strcasecmp (str, enum_class->values[i].value_nick))
+            return enum_class->values[i].value;
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_INVALID_ARGS,
+                 "Couldn't match '%s' with a valid MMModemCdmaRmProtocol value",
+                 str);
+    return MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
+}
+
 GVariant *
 mm_common_build_bands_unknown (void)
 {

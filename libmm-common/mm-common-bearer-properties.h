@@ -69,6 +69,9 @@ void mm_common_bearer_properties_set_allow_roaming (
 void mm_common_bearer_properties_set_number (
     MMCommonBearerProperties *properties,
     const gchar *number);
+void mm_common_bearer_properties_set_rm_protocol (
+    MMCommonBearerProperties *properties,
+    MMModemCdmaRmProtocol protocol);
 
 const gchar *mm_common_bearer_properties_get_apn (
     MMCommonBearerProperties *properties);
@@ -81,6 +84,8 @@ const gchar *mm_common_bearer_properties_get_ip_type (
 gboolean mm_common_bearer_properties_get_allow_roaming (
     MMCommonBearerProperties *properties);
 const gchar *mm_common_bearer_properties_get_number (
+    MMCommonBearerProperties *properties);
+MMModemCdmaRmProtocol mm_common_bearer_properties_get_rm_protocol (
     MMCommonBearerProperties *properties);
 
 gboolean mm_common_bearer_properties_consume_string (MMCommonBearerProperties *self,

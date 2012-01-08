@@ -25,14 +25,16 @@ gchar *mm_common_get_modes_string (MMModemMode mode);
 gchar *mm_common_get_bands_string (const MMModemBand *bands,
                                    guint n_bands);
 
-MMModemMode mm_common_get_modes_from_string (const gchar *str,
-                                             GError **error);
-void        mm_common_get_bands_from_string (const gchar *str,
-                                             MMModemBand **bands,
-                                             guint *n_bands,
-                                             GError **error);
-gboolean    mm_common_get_boolean_from_string (const gchar *value,
-                                               GError **error);
+MMModemMode           mm_common_get_modes_from_string       (const gchar *str,
+                                                             GError **error);
+void                  mm_common_get_bands_from_string       (const gchar *str,
+                                                             MMModemBand **bands,
+                                                             guint *n_bands,
+                                                             GError **error);
+gboolean              mm_common_get_boolean_from_string     (const gchar *value,
+                                                             GError **error);
+MMModemCdmaRmProtocol mm_common_get_rm_protocol_from_string (const gchar *str,
+                                                             GError **error);
 
 GArray      *mm_common_bands_variant_to_garray (GVariant *variant);
 MMModemBand *mm_common_bands_variant_to_array  (GVariant *variant,
