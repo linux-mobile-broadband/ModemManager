@@ -51,6 +51,9 @@ void mm_bearer_properties_set_allow_roaming (
 void mm_bearer_properties_set_number (
     MMBearerProperties *properties,
     const gchar *number);
+void mm_bearer_properties_set_rm_protocol (
+    MMBearerProperties *properties,
+    MMModemCdmaRmProtocol protocol);
 
 const gchar *mm_bearer_properties_get_apn (
     MMBearerProperties *properties);
@@ -73,6 +76,8 @@ gboolean mm_bearer_properties_get_allow_roaming (
 const gchar *mm_bearer_properties_get_number (
     MMBearerProperties *properties);
 gchar *mm_bearer_properties_dup_number (
+    MMBearerProperties *properties);
+MMModemCdmaRmProtocol mm_bearer_properties_get_rm_protocol (
     MMBearerProperties *properties);
 
 G_END_DECLS

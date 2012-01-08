@@ -69,6 +69,15 @@ mm_bearer_properties_set_number (MMBearerProperties *self,
     mm_common_bearer_properties_set_number (self, number);
 }
 
+void
+mm_bearer_properties_set_rm_protocol (MMBearerProperties *self,
+                                      MMModemCdmaRmProtocol protocol)
+{
+    g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
+
+    mm_common_bearer_properties_set_rm_protocol (self, protocol);
+}
+
 const gchar *
 mm_bearer_properties_get_apn (MMBearerProperties *self)
 {
@@ -155,6 +164,14 @@ mm_bearer_properties_dup_number (MMBearerProperties *self)
     g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
 
     return g_strdup (mm_common_bearer_properties_get_number (self));
+}
+
+MMModemCdmaRmProtocol
+mm_bearer_properties_get_rm_protocol (MMBearerProperties *self)
+{
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN);
+
+    return mm_common_bearer_properties_get_rm_protocol (self);
 }
 
 /*****************************************************************************/
