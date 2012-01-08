@@ -32,6 +32,7 @@
 #include "mm-iface-modem-cdma.h"
 #include "mm-iface-modem-simple.h"
 #include "mm-bearer-3gpp.h"
+#include "mm-bearer-cdma.h"
 #include "mm-bearer-list.h"
 #include "mm-sim.h"
 #include "mm-log.h"
@@ -142,20 +143,39 @@ modem_create_bearer (MMIfaceModem *self,
     MMBearer *bearer = NULL;
     GError *error = NULL;
 
-    /* TODO: We'll need to guess the capability of the bearer, based on the
-     * current capabilities that we handle, and the specific allowed modes
-     * configured in the modem. Use 3GPP for testing now */
-
-    /* New 3GPP bearer */
-    if (mm_iface_modem_is_3gpp (self)) {
+    /* On 3GPP-only modems, new 3GPP bearer */
+    if (mm_iface_modem_is_3gpp_only (self)) {
+        mm_dbg ("Creating 3GPP Bearer in 3GPP-only modem");
         bearer = mm_iface_modem_3gpp_create_bearer (MM_IFACE_MODEM_3GPP (self),
                                                     properties,
                                                     &error);
-    } else {
+    }
+    /* On CDMA-only modems, new CDMA bearer */
+    else if (mm_iface_modem_is_cdma_only (self)) {
+        mm_dbg ("Creating CDMA Bearer in CDMA-only modem");
+        bearer = mm_iface_modem_cdma_create_bearer (MM_IFACE_MODEM_CDMA (self),
+                                                    properties,
+                                                    &error);
+    }
+    /* On mixed LTE and CDMA modems, we'll default to building a 3GPP bearer.
+     * Plugins supporting mixed LTE+CDMA modems can override this and provide
+     * their own specific and detailed logic. */
+    else if (mm_iface_modem_is_cdma (self) &&
+             mm_iface_modem_is_3gpp_lte (self)) {
+        mm_dbg ("Creating 3GPP Bearer in mixed CDMA+LTE modem");
+        bearer = mm_iface_modem_3gpp_create_bearer (MM_IFACE_MODEM_3GPP (self),
+                                                    properties,
+                                                    &error);
+    }
+    else {
         g_set_error (&error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_UNSUPPORTED,
-                     "Cannot create bearer in modem of unknown type");
+                     "Cannot create bearer in modem of unknown type. "
+                     "CDMA: %s, 3GPP: %s (LTE: %s)",
+                     mm_iface_modem_is_cdma (self) ? "yes" : "no",
+                     mm_iface_modem_is_3gpp (self) ? "yes" : "no",
+                     mm_iface_modem_is_3gpp_lte (self) ? "yes" : "no");
     }
 
     if (!bearer) {
@@ -4632,6 +4652,9 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
     iface->get_cdma1x_serving_system_finish = get_cdma1x_serving_system_finish;
     iface->get_detailed_registration_state = get_detailed_registration_state;
     iface->get_detailed_registration_state_finish = get_detailed_registration_state_finish;
+
+    /* Additional actions */
+    iface->create_cdma_bearer = mm_bearer_cdma_new;
 }
 
 static void
