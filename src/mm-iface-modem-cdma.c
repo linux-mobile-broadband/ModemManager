@@ -371,6 +371,55 @@ handle_activate_manual (MmGdbusModemCdma *skeleton,
 
 /*****************************************************************************/
 
+/* Create new CDMA bearer */
+MMBearer *
+mm_iface_modem_cdma_create_bearer (MMIfaceModemCdma *self,
+                                   MMCommonBearerProperties *properties,
+                                   GError **error)
+{
+    MMModemCdmaRegistrationState cdma1x_current_state;
+    MMModemCdmaRegistrationState evdo_current_state;
+    MMBearer *bearer;
+
+    g_assert (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->create_cdma_bearer != NULL);
+
+    /* Create new CDMA bearer using the method set in the interface, so that
+     * plugins can subclass it and implement their own. */
+    bearer = MM_BEARER (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->create_cdma_bearer (
+                            MM_BASE_MODEM (self),
+                            properties,
+                            error));
+    if (!bearer)
+        return NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_CDMA_CDMA1X_REGISTRATION_STATE, &cdma1x_current_state,
+                  MM_IFACE_MODEM_CDMA_EVDO_REGISTRATION_STATE, &evdo_current_state,
+                  NULL);
+
+    if (cdma1x_current_state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING ||
+        evdo_current_state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING) {
+        /* Don't allow bearer to get connected if roaming forbidden */
+        if (mm_bearer_get_allow_roaming (bearer))
+            mm_bearer_set_connection_allowed (bearer);
+        else
+            mm_bearer_set_connection_forbidden (
+                bearer,
+                MM_BEARER_CONNECTION_FORBIDDEN_REASON_ROAMING);
+    }
+    else if (cdma1x_current_state == MM_MODEM_CDMA_REGISTRATION_STATE_HOME ||
+             evdo_current_state == MM_MODEM_CDMA_REGISTRATION_STATE_HOME)
+        mm_bearer_set_connection_allowed (bearer);
+    else
+        mm_bearer_set_connection_forbidden (
+            bearer,
+            MM_BEARER_CONNECTION_FORBIDDEN_REASON_UNREGISTERED);
+
+    return bearer;
+}
+
+/*****************************************************************************/
+
 typedef struct _RunAllRegistrationChecksContext RunAllRegistrationChecksContext;
 static void registration_check_step (RunAllRegistrationChecksContext *ctx);
 
