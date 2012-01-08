@@ -43,6 +43,7 @@ enum {
     PROP_MODEM,
     PROP_CONNECTION_FORBIDDEN_REASON,
     PROP_STATUS,
+    PROP_ALLOW_ROAMING,
     PROP_LAST
 };
 
@@ -59,6 +60,8 @@ struct _MMBearerPrivate {
     MMBearerConnectionForbiddenReason connection_forbidden_reason;
     /* Status of this bearer */
     MMBearerStatus status;
+    /* Flag to allow/forbid connections while roaming */
+    gboolean allow_roaming;
 
     /* Cancellable for connect() */
     GCancellable *connect_cancellable;
@@ -454,6 +457,12 @@ mm_bearer_get_status (MMBearer *self)
     return self->priv->status;
 }
 
+gboolean
+mm_bearer_get_allow_roaming (MMBearer *self)
+{
+    return self->priv->allow_roaming;
+}
+
 const gchar *
 mm_bearer_get_path (MMBearer *self)
 {
@@ -583,6 +592,9 @@ set_property (GObject *object,
     case PROP_STATUS:
         self->priv->status = g_value_get_enum (value);
         break;
+    case PROP_ALLOW_ROAMING:
+        self->priv->allow_roaming = g_value_get_boolean (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -613,6 +625,9 @@ get_property (GObject *object,
     case PROP_STATUS:
         g_value_set_enum (value, self->priv->status);
         break;
+    case PROP_ALLOW_ROAMING:
+        g_value_set_boolean (value, self->priv->allow_roaming);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -627,6 +642,7 @@ mm_bearer_init (MMBearer *self)
                                               MM_TYPE_BEARER,
                                               MMBearerPrivate);
     self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
+    self->priv->allow_roaming = TRUE;
     self->priv->connection_forbidden_reason = MM_BEARER_CONNECTION_FORBIDDEN_REASON_UNREGISTERED;
 
     /* Set defaults */
@@ -718,4 +734,12 @@ mm_bearer_class_init (MMBearerClass *klass)
                            MM_BEARER_STATUS_DISCONNECTED,
                            G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_STATUS, properties[PROP_STATUS]);
+
+    properties[PROP_ALLOW_ROAMING] =
+        g_param_spec_boolean (MM_BEARER_ALLOW_ROAMING,
+                              "Allow roaming",
+                              "Whether connections are allowed when roaming",
+                              TRUE,
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_ALLOW_ROAMING, properties[PROP_ALLOW_ROAMING]);
 }

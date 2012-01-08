@@ -388,7 +388,7 @@ mm_iface_modem_3gpp_create_bearer (MMIfaceModem3gpp *self,
     if (current_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME)
         mm_bearer_set_connection_allowed (bearer);
     else if (current_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
-        if (mm_bearer_3gpp_get_allow_roaming (MM_BEARER_3GPP (bearer)))
+        if (mm_bearer_get_allow_roaming (bearer))
             mm_bearer_set_connection_allowed (bearer);
         else
             mm_bearer_set_connection_forbidden (
@@ -559,7 +559,7 @@ set_bearer_3gpp_connection_allowed (MMBearer *bearer,
     /* Don't allow bearer to get connected if roaming forbidden */
     if (MM_IS_BEARER_3GPP (bearer)) {
         if (!*roaming_network ||
-            mm_bearer_3gpp_get_allow_roaming (MM_BEARER_3GPP (bearer)))
+            mm_bearer_get_allow_roaming (bearer))
             mm_bearer_set_connection_allowed (bearer);
         else
             mm_bearer_set_connection_forbidden (bearer,

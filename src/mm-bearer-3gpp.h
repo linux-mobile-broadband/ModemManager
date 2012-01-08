@@ -34,7 +34,6 @@
 #define MM_BEARER_3GPP_CID           "bearer-3gpp-cid"
 #define MM_BEARER_3GPP_APN           "bearer-3gpp-apn"
 #define MM_BEARER_3GPP_IP_TYPE       "bearer-3gpp-ip-type"
-#define MM_BEARER_3GPP_ALLOW_ROAMING "bearer-3gpp-allow-roaming"
 
 /* Prefix for all 3GPP bearer object paths */
 #define MM_DBUS_BEARER_3GPP_PREFIX MM_DBUS_BEARER_PREFIX "/3GPP"
@@ -61,6 +60,5 @@ MMBearer *mm_bearer_3gpp_new (MMBaseModem *modem,
 
 const gchar *mm_bearer_3gpp_get_apn           (MMBearer3gpp *self);
 const gchar *mm_bearer_3gpp_get_ip_type       (MMBearer3gpp *self);
-gboolean     mm_bearer_3gpp_get_allow_roaming (MMBearer3gpp *self);
 
 #endif /* MM_BEARER_3GPP_H */

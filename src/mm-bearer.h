@@ -41,6 +41,7 @@ typedef struct _MMBearerPrivate MMBearerPrivate;
 #define MM_BEARER_MODEM                       "bearer-modem"
 #define MM_BEARER_CONNECTION_FORBIDDEN_REASON "bearer-connection-forbidden-reason"
 #define MM_BEARER_STATUS                      "bearer-status"
+#define MM_BEARER_ALLOW_ROAMING               "bearer-allow-roaming"
 
 /* Prefix for all bearer object paths */
 #define MM_DBUS_BEARER_PREFIX MM_DBUS_PATH "/Bearers"
@@ -97,6 +98,8 @@ void mm_bearer_set_connection_forbidden (MMBearer *bearer,
                                          MMBearerConnectionForbiddenReason reason);
 
 MMBearerStatus mm_bearer_get_status (MMBearer *bearer);
+
+gboolean mm_bearer_get_allow_roaming (MMBearer *self);
 
 void     mm_bearer_connect        (MMBearer *self,
                                    const gchar *number,
