@@ -132,6 +132,8 @@ modem_manager_SOURCES = \
 	mm-bearer.c \
 	mm-bearer-3gpp.h \
 	mm-bearer-3gpp.c \
+	mm-bearer-cdma.h \
+	mm-bearer-cdma.c \
 	mm-bearer-list.h \
 	mm-bearer-list.c \
 	mm-base-modem-at.h \
