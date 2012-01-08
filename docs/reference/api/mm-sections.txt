@@ -12,6 +12,7 @@ MMModemCapability
 MMModemCdmaActivationError
 MMModemCdmaActivationState
 MMModemCdmaRegistrationState
+MMModemCdmaRmProtocol
 MMModemContactsStorage
 MMModemLocationSource
 MMModemLock

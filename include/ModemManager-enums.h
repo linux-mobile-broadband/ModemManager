@@ -406,6 +406,26 @@ typedef enum { /*< underscore_name=mm_modem_cdma_activation_error >*/
 } MMModemCdmaActivationError;
 
 /**
+ * MMModemCdmaRmProtocol:
+ * @MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN: Unknown protocol.
+ * @MM_MODEM_CDMA_RM_PROTOCOL_ASYNC: Asynchronous data or fax.
+ * @MM_MODEM_CDMA_RM_PROTOCOL_PACKET_RELAY: Packet data service, Relay Layer Rm interface.
+ * @MM_MODEM_CDMA_RM_PROTOCOL_PACKET_NETWORK_PPP: Packet data service, Network Layer Rm interface, PPP.
+ * @MM_MODEM_CDMA_RM_PROTOCOL_PACKET_NETWORK_SLIP: Packet data service, Network Layer Rm interface, SLIP.
+ * @MM_MODEM_CDMA_RM_PROTOCOL_STU_III: STU-III service.
+ *
+ * Protocol of the Rm interface in modems with CDMA capabilities.
+ */
+typedef enum { /*< underscore_name=mm_modem_cdma_rm_protocol >*/
+    MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN             = 0,
+    MM_MODEM_CDMA_RM_PROTOCOL_ASYNC               = 1,
+    MM_MODEM_CDMA_RM_PROTOCOL_PACKET_RELAY        = 2,
+    MM_MODEM_CDMA_RM_PROTOCOL_PACKET_NETWORK_PPP  = 3,
+    MM_MODEM_CDMA_RM_PROTOCOL_PACKET_NETWORK_SLIP = 4,
+    MM_MODEM_CDMA_RM_PROTOCOL_STU_III             = 5,
+} MMModemCdmaRmProtocol;
+
+/**
  * MMModem3gppRegistrationState:
  * @MM_MODEM_3GPP_REGISTRATION_STATE_IDLE: Not registered, not searching for new operator to register.
  * @MM_MODEM_3GPP_REGISTRATION_STATE_HOME: Registered on home network.
