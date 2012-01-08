@@ -33,8 +33,6 @@
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 
-typedef struct _InitAsyncContext InitAsyncContext;
-static void interface_initialization_step (InitAsyncContext *ctx);
 static void async_initable_iface_init     (GAsyncInitableIface *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMSim, mm_sim, MM_GDBUS_TYPE_SIM_SKELETON, 0,
@@ -889,6 +887,8 @@ load_operator_name (MMSim *self,
 
 /*****************************************************************************/
 
+typedef struct _InitAsyncContext InitAsyncContext;
+static void interface_initialization_step (InitAsyncContext *ctx);
 
 typedef enum {
     INITIALIZATION_STEP_FIRST,
@@ -926,7 +926,13 @@ mm_sim_new_finish (GAsyncInitable *initable,
                    GAsyncResult  *res,
                    GError       **error)
 {
-    return MM_SIM (g_async_initable_new_finish (initable, res, error));
+    GObject *sim;
+
+    sim = g_async_initable_new_finish (initable, res, error);
+    if (!sim)
+        return NULL;
+
+    return MM_SIM (sim);
 }
 
 static gboolean
