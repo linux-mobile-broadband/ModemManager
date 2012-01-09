@@ -46,6 +46,7 @@ typedef gboolean (* MMBaseModemAtResponseProcessor) (MMBaseModem *self,
                                                      gpointer response_processor_context,
                                                      const gchar *command,
                                                      const gchar *response,
+                                                     gboolean last_command,
                                                      const GError *error,
                                                      GVariant **result,
                                                      GError **result_error);
@@ -95,6 +96,7 @@ gboolean mm_base_modem_response_processor_string (MMBaseModem *self,
                                                   gpointer none,
                                                   const gchar *command,
                                                   const gchar *response,
+                                                  gboolean last_command,
                                                   const GError *error,
                                                   GVariant **result,
                                                   GError **result_error);
@@ -103,6 +105,7 @@ gboolean mm_base_modem_response_processor_no_result (MMBaseModem *self,
                                                      gpointer none,
                                                      const gchar *command,
                                                      const gchar *response,
+                                                     gboolean last_command,
                                                      const GError *error,
                                                      GVariant **result,
                                                      GError **result_error);
@@ -111,10 +114,10 @@ gboolean mm_base_modem_response_processor_no_result_continue (MMBaseModem *self,
                                                               gpointer none,
                                                               const gchar *command,
                                                               const gchar *response,
+                                                              gboolean last_command,
                                                               const GError *error,
                                                               GVariant **result,
                                                               GError **result_error);
-
 
 /* Single AT command, returning the whole response string */
 void mm_base_modem_at_command (MMBaseModem *self,

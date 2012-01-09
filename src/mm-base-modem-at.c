@@ -140,12 +140,15 @@ at_sequence_parse_response (MMAtSerialPort *port,
         /* No need to process response, go on to next command */
         continue_sequence = TRUE;
     else {
+        const MMBaseModemAtCommand *next = ctx->current + 1;
+
         /* Response processor will tell us if we need to keep on the sequence */
         continue_sequence = !ctx->current->response_processor (
             ctx->self,
             ctx->response_processor_context,
             ctx->current->command,
             response->str,
+            next->command ? FALSE : TRUE,  /* Last command in sequence? */
             error,
             &result,
             &result_error);
@@ -300,6 +303,7 @@ mm_base_modem_response_processor_string (MMBaseModem *self,
                                          gpointer none,
                                          const gchar *command,
                                          const gchar *response,
+                                         gboolean last_command,
                                          const GError *error,
                                          GVariant **result,
                                          GError **result_error)
@@ -318,6 +322,7 @@ mm_base_modem_response_processor_no_result (MMBaseModem *self,
                                             gpointer none,
                                             const gchar *command,
                                             const gchar *response,
+                                            gboolean last_command,
                                             const GError *error,
                                             GVariant **result,
                                             GError **result_error)
@@ -336,6 +341,7 @@ mm_base_modem_response_processor_no_result_continue (MMBaseModem *self,
                                                      gpointer none,
                                                      const gchar *command,
                                                      const gchar *response,
+                                                     gboolean last_command,
                                                      const GError *error,
                                                      GVariant **result,
                                                      GError **result_error)

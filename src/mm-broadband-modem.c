@@ -331,6 +331,7 @@ parse_caps_gcap (MMBaseModem *self,
                  gpointer none,
                  const gchar *command,
                  const gchar *response,
+                 gboolean last_command,
                  const GError *error,
                  GVariant **variant,
                  GError **result_error)
@@ -363,6 +364,7 @@ parse_caps_cpin (MMBaseModem *self,
                  gpointer none,
                  const gchar *command,
                  const gchar *response,
+                 gboolean last_command,
                  const GError *error,
                  GVariant **result,
                  GError **result_error)
@@ -395,10 +397,12 @@ parse_caps_cgmm (MMBaseModem *self,
                  gpointer none,
                  const gchar *command,
                  const gchar *response,
+                 gboolean last_command,
                  const GError *error,
                  GVariant **result,
                  GError **result_error)
 {
+    /* This check detects some really old Motorola GPRS dongles and phones */
     if (strstr (response, "GSM900") ||
         strstr (response, "GSM1800") ||
         strstr (response, "GSM1900") ||
@@ -2612,6 +2616,7 @@ parse_reg_setup_reply (MMBaseModem *self,
                        gpointer none,
                        const gchar *command,
                        const gchar *response,
+                       gboolean last_command,
                        const GError *error,
                        GVariant **result,
                        GError **result_error)
