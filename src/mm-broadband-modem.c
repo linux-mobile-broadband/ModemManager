@@ -115,6 +115,30 @@ struct _MMBroadbandModemPrivate {
 };
 
 /*****************************************************************************/
+
+static gboolean
+response_processor_string_ignore_at_errors (MMBaseModem *self,
+                                            gpointer none,
+                                            const gchar *command,
+                                            const gchar *response,
+                                            gboolean last_command,
+                                            const GError *error,
+                                            GVariant **result,
+                                            GError **result_error)
+{
+    if (error) {
+        /* Ignore AT errors (ie, ERROR or CMx ERROR) */
+        if (error->domain != MM_MOBILE_EQUIPMENT_ERROR || last_command)
+            *result_error = g_error_copy (error);
+
+        return FALSE;
+    }
+
+    *result = g_variant_new_string (response);
+    return TRUE;
+}
+
+/*****************************************************************************/
 /* CREATE BEARER */
 
 static MMBearer *
@@ -481,8 +505,8 @@ load_manufacturer_finish (MMIfaceModem *self,
 }
 
 static const MMBaseModemAtCommand manufacturers[] = {
-    { "+CGMI",  3, TRUE, mm_base_modem_response_processor_string },
-    { "+GMI",   3, TRUE, mm_base_modem_response_processor_string },
+    { "+CGMI",  3, TRUE, response_processor_string_ignore_at_errors },
+    { "+GMI",   3, TRUE, response_processor_string_ignore_at_errors },
     { NULL }
 };
 
@@ -523,8 +547,8 @@ load_model_finish (MMIfaceModem *self,
 }
 
 static const MMBaseModemAtCommand models[] = {
-    { "+CGMM",  3, TRUE, mm_base_modem_response_processor_string },
-    { "+GMM",   3, TRUE, mm_base_modem_response_processor_string },
+    { "+CGMM",  3, TRUE, response_processor_string_ignore_at_errors },
+    { "+GMM",   3, TRUE, response_processor_string_ignore_at_errors },
     { NULL }
 };
 
@@ -565,8 +589,8 @@ load_revision_finish (MMIfaceModem *self,
 }
 
 static const MMBaseModemAtCommand revisions[] = {
-    { "+CGMR",  3, TRUE, mm_base_modem_response_processor_string },
-    { "+GMR",   3, TRUE, mm_base_modem_response_processor_string },
+    { "+CGMR",  3, TRUE, response_processor_string_ignore_at_errors },
+    { "+GMR",   3, TRUE, response_processor_string_ignore_at_errors },
     { NULL }
 };
 
@@ -607,8 +631,8 @@ load_equipment_identifier_finish (MMIfaceModem *self,
 }
 
 static const MMBaseModemAtCommand equipment_identifiers[] = {
-    { "+CGSN",  3, TRUE, mm_base_modem_response_processor_string },
-    { "+GSN",   3, TRUE, mm_base_modem_response_processor_string },
+    { "+CGSN",  3, TRUE, response_processor_string_ignore_at_errors },
+    { "+GSN",   3, TRUE, response_processor_string_ignore_at_errors },
     { NULL }
 };
 
@@ -988,8 +1012,8 @@ load_signal_quality_csq_ready (MMBroadbandModem *self,
  * try the other command if the first one fails.
  */
 static const MMBaseModemAtCommand signal_quality_csq[] = {
-    { "+CSQ",  3, TRUE, mm_base_modem_response_processor_string },
-    { "+CSQ?", 3, TRUE, mm_base_modem_response_processor_string },
+    { "+CSQ",  3, TRUE, response_processor_string_ignore_at_errors },
+    { "+CSQ?", 3, TRUE, response_processor_string_ignore_at_errors },
     { NULL }
 };
 
