@@ -3751,8 +3751,7 @@ setup_registration_checks (MMIfaceModemCdma *self,
                                              setup_registration_checks);
 
     /* Check if we have a QCDM port */
-    if (!mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self)))
-        ctx->has_qcdm_port = FALSE;
+    ctx->has_qcdm_port = !!mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
 
     /* If we have cached results of Sprint command checking, use them */
     if (ctx->self->priv->checked_sprint_support) {
