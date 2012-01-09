@@ -31,7 +31,11 @@
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 
-G_DEFINE_TYPE (MMBearerCdma, mm_bearer_cdma, MM_TYPE_BEARER);
+static void async_initable_iface_init (GAsyncInitableIface *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMBearerCdma, mm_bearer_cdma, MM_TYPE_BEARER, 0,
+                        G_IMPLEMENT_INTERFACE (G_TYPE_ASYNC_INITABLE,
+                                               async_initable_iface_init));
 
 enum {
     PROP_0,
@@ -104,14 +108,123 @@ mm_bearer_cdma_new_unique_path (void)
 
 /*****************************************************************************/
 
+typedef struct _InitAsyncContext InitAsyncContext;
+static void interface_initialization_step (InitAsyncContext *ctx);
+
+typedef enum {
+    INITIALIZATION_STEP_FIRST,
+    INITIALIZATION_STEP_LAST
+} InitializationStep;
+
+struct _InitAsyncContext {
+    GSimpleAsyncResult *result;
+    GCancellable *cancellable;
+    MMBearerCdma *self;
+    MMBaseModem *modem;
+    InitializationStep step;
+    MMAtSerialPort *port;
+};
+
+static void
+init_async_context_free (InitAsyncContext *ctx,
+                         gboolean close_port)
+{
+    if (close_port)
+        mm_serial_port_close (MM_SERIAL_PORT (ctx->port));
+    g_object_unref (ctx->self);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->result);
+    if (ctx->cancellable)
+        g_object_unref (ctx->cancellable);
+    g_free (ctx);
+}
+
 MMBearer *
 mm_bearer_cdma_new_finish (GAsyncResult *res,
                            GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+    gchar *path;
+    GObject *bearer;
+    GObject *source;
+
+    source = g_async_result_get_source_object (res);
+    bearer = g_async_initable_new_finish (G_ASYNC_INITABLE (source), res, error);
+    g_object_unref (source);
+
+    if (!bearer)
         return NULL;
 
-    return MM_BEARER (g_object_ref (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res))));
+    /* Set path ONLY after having created and initialized the object, so that we
+     * don't export invalid bearers. */
+    path = mm_bearer_cdma_new_unique_path ();
+    g_object_set (bearer,
+                  MM_BEARER_PATH, path,
+                  NULL);
+    g_free (path);
+
+    return MM_BEARER (bearer);
+}
+
+static gboolean
+initable_init_finish (GAsyncInitable  *initable,
+                      GAsyncResult    *result,
+                      GError         **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result), error);
+}
+
+static void
+interface_initialization_step (InitAsyncContext *ctx)
+{
+    switch (ctx->step) {
+    case INITIALIZATION_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_LAST:
+        /* We are done without errors! */
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        g_simple_async_result_complete_in_idle (ctx->result);
+        init_async_context_free (ctx, TRUE);
+        return;
+    }
+
+    g_assert_not_reached ();
+}
+
+static void
+initable_init_async (GAsyncInitable *initable,
+                     int io_priority,
+                     GCancellable *cancellable,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    InitAsyncContext *ctx;
+    GError *error = NULL;
+
+    ctx = g_new0 (InitAsyncContext, 1);
+    ctx->self = g_object_ref (initable);
+    ctx->result = g_simple_async_result_new (G_OBJECT (initable),
+                                             callback,
+                                             user_data,
+                                             initable_init_async);
+    ctx->cancellable = (cancellable ?
+                        g_object_ref (cancellable) :
+                        NULL);
+
+    g_object_get (initable,
+                  MM_BEARER_MODEM, &ctx->modem,
+                  NULL);
+
+    ctx->port = mm_base_modem_get_port_primary (ctx->modem);
+    if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->port), &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        g_simple_async_result_complete_in_idle (ctx->result);
+        init_async_context_free (ctx, FALSE);
+        return;
+    }
+
+    interface_initialization_step (ctx);
 }
 
 void
@@ -121,36 +234,19 @@ mm_bearer_cdma_new (MMIfaceModemCdma *modem,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {
-    GSimpleAsyncResult *result;
-    MMBearerCdma *bearer;
-    gchar *path;
-
-    result = g_simple_async_result_new (G_OBJECT (modem),
-                                        callback,
-                                        user_data,
-                                        mm_bearer_cdma_new);
-
-    /* Create the object */
-    bearer = g_object_new (MM_TYPE_BEARER_CDMA,
-                           MM_BEARER_CDMA_RM_PROTOCOL, mm_common_bearer_properties_get_rm_protocol (properties),
-                           MM_BEARER_ALLOW_ROAMING, mm_common_bearer_properties_get_allow_roaming (properties),
-                           NULL);
-
-    /* Set modem and path ONLY after having checked input properties, so that
-     * we don't export invalid bearers. */
-    path = mm_bearer_cdma_new_unique_path ();
-    g_object_set (bearer,
-                  MM_BEARER_PATH,  path,
-                  MM_BEARER_MODEM, modem,
-                  NULL);
-    g_free (path);
-
-    g_simple_async_result_set_op_res_gpointer (result,
-                                               bearer,
-                                               (GDestroyNotify)g_object_unref);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    g_async_initable_new_async (
+        MM_TYPE_BEARER_CDMA,
+        G_PRIORITY_DEFAULT,
+        cancellable,
+        callback,
+        user_data,
+        MM_BEARER_MODEM, modem,
+        MM_BEARER_CDMA_RM_PROTOCOL, mm_common_bearer_properties_get_rm_protocol (properties),
+        MM_BEARER_ALLOW_ROAMING, mm_common_bearer_properties_get_allow_roaming (properties),
+        NULL);
 }
+
+/*****************************************************************************/
 
 static void
 set_property (GObject *object,
@@ -196,6 +292,13 @@ mm_bearer_cdma_init (MMBearerCdma *self)
                                               MM_TYPE_BEARER_CDMA,
                                               MMBearerCdmaPrivate);
     self->priv->rm_protocol = MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
+}
+
+static void
+async_initable_iface_init (GAsyncInitableIface *iface)
+{
+    iface->init_async = initable_init_async;
+    iface->init_finish = initable_init_finish;
 }
 
 static void
