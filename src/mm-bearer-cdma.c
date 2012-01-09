@@ -105,8 +105,7 @@ mm_bearer_cdma_new_unique_path (void)
 /*****************************************************************************/
 
 MMBearer *
-mm_bearer_cdma_new_finish (MMIfaceModemCdma *modem,
-                           GAsyncResult *res,
+mm_bearer_cdma_new_finish (GAsyncResult *res,
                            GError **error)
 {
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
@@ -118,6 +117,7 @@ mm_bearer_cdma_new_finish (MMIfaceModemCdma *modem,
 void
 mm_bearer_cdma_new (MMIfaceModemCdma *modem,
                     MMCommonBearerProperties *properties,
+                    GCancellable *cancellable,
                     GAsyncReadyCallback callback,
                     gpointer user_data)
 {

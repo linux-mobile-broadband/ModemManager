@@ -140,14 +140,14 @@ struct _MMIfaceModemCdma {
                                                          MMModemCdmaRegistrationState *detailed_evdo_state,
                                                          GError **error);
 
-    /* Create CDMA bearer */
-    void (* create_cdma_bearer) (MMIfaceModemCdma *self,
-                                 MMCommonBearerProperties *properties,
-                                 GAsyncReadyCallback callback,
-                                 gpointer user_data);
-    MMBearer * (* create_cdma_bearer_finish) (MMIfaceModemCdma *self,
-                                              GAsyncResult *res,
-                                              GError **error);
+    /* New CDMA bearer */
+    void (* bearer_new) (MMIfaceModemCdma *self,
+                         MMCommonBearerProperties *properties,
+                         GCancellable *cancellable,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data);
+    MMBearer * (* bearer_new_finish) (GAsyncResult *res,
+                                      GError **error);
 };
 
 GType mm_iface_modem_cdma_get_type (void);

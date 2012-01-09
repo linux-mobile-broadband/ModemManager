@@ -4686,8 +4686,8 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
     iface->get_detailed_registration_state_finish = get_detailed_registration_state_finish;
 
     /* Additional actions */
-    iface->create_cdma_bearer = mm_bearer_cdma_new;
-    iface->create_cdma_bearer_finish = mm_bearer_cdma_new_finish;
+    iface->bearer_new = mm_bearer_cdma_new;
+    iface->bearer_new_finish = mm_bearer_cdma_new_finish;
 }
 
 static void

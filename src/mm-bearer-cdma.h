@@ -57,10 +57,10 @@ gchar *mm_bearer_cdma_new_unique_path (void);
 /* Default CDMA bearer creation implementation */
 void mm_bearer_cdma_new (MMIfaceModemCdma *modem,
                          MMCommonBearerProperties *properties,
+                         GCancellable *cancellable,
                          GAsyncReadyCallback callback,
                          gpointer user_data);
-MMBearer *mm_bearer_cdma_new_finish (MMIfaceModemCdma *modem,
-                                     GAsyncResult *res,
+MMBearer *mm_bearer_cdma_new_finish (GAsyncResult *res,
                                      GError **error);
 
 guint mm_bearer_cdma_get_rm_protocol (MMBearerCdma *self);

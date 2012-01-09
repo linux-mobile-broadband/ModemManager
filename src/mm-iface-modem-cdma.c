@@ -381,13 +381,12 @@ mm_iface_modem_cdma_create_bearer_finish (MMIfaceModemCdma *self,
     MMModemCdmaRegistrationState evdo_current_state;
     MMBearer *bearer;
 
-    g_assert (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->create_cdma_bearer_finish != NULL);
-    bearer = MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->create_cdma_bearer_finish (self,
-                                                                                  res,
-                                                                                  error);
+    g_assert (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->bearer_new_finish != NULL);
+    bearer = MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->bearer_new_finish (res,
+                                                                          error);
+
     if (!bearer)
         return NULL;
-
 
     g_object_get (self,
                   MM_IFACE_MODEM_CDMA_CDMA1X_REGISTRATION_STATE, &cdma1x_current_state,
@@ -421,11 +420,12 @@ mm_iface_modem_cdma_create_bearer (MMIfaceModemCdma *self,
                                    GAsyncReadyCallback callback,
                                    gpointer user_data)
 {
-    g_assert (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->create_cdma_bearer != NULL);
-    MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->create_cdma_bearer (self,
-                                                                  properties,
-                                                                  callback,
-                                                                  user_data);
+    g_assert (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->bearer_new != NULL);
+    MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->bearer_new (self,
+                                                          properties,
+                                                          NULL,
+                                                          callback,
+                                                          user_data);
 }
 
 /*****************************************************************************/
