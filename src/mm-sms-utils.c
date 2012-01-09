@@ -23,6 +23,7 @@
 #include "mm-utils.h"
 #include "mm-sms-utils.h"
 #include "mm-log.h"
+#include "dbus/dbus-glib.h"
 
 #define SMS_TP_MTI_MASK               0x03
 #define  SMS_TP_MTI_SMS_DELIVER       0x00
@@ -204,24 +205,10 @@ sms_decode_text (const guint8 *text, int len, SmsEncoding encoding, int bit_offs
         g_free (unpacked);
     } else if (encoding == MM_SMS_ENCODING_UCS2)
         utf8 = g_convert ((char *) text, len, "UTF8", "UCS-2BE", NULL, NULL, NULL);
-    else if (encoding == MM_SMS_ENCODING_8BIT) {
-        /* DBus requires UTF-8 strings, so we have some sanitizing to do */
-        char *p;
-        int i;
-        utf8 = g_malloc0 (4*len+1); /* Worst case: Every byte becomes "\xFF" */
-        p = utf8;
-        for (i = 0 ; i < len ; i++) {
-            if (isascii (text[i]) && text[i] != '\0')
-                *p++ = text[i];
-            else {
-                sprintf(p, "\\x%02x", text[i]);
-                p += 4;
-            }
-        }
-        *p = '\0';
-    }
-    else
+    else {
+        g_warn_if_reached ();
         utf8 = g_strdup ("");
+    }
 
     return utf8;
 }
@@ -259,18 +246,31 @@ simple_string_value (const char *str)
     return val;
 }
 
+static GValue *
+byte_array_value (const GByteArray *array)
+{
+    GValue *val;
+
+    val = g_slice_new0 (GValue);
+    g_value_init (val, DBUS_TYPE_G_UCHAR_ARRAY);
+    g_value_set_boxed (val, array);
+
+    return val;
+}
+
 GHashTable *
 sms_parse_pdu (const char *hexpdu, GError **error)
 {
     GHashTable *properties;
     gsize pdu_len;
     guint8 *pdu;
-    int smsc_addr_num_octets, variable_length_items, msg_start_offset,
+    guint smsc_addr_num_octets, variable_length_items, msg_start_offset,
             sender_addr_num_digits, sender_addr_num_octets,
             tp_pid_offset, tp_dcs_offset, user_data_offset, user_data_len,
             user_data_len_offset, bit_offset;
     char *smsc_addr, *sender_addr, *sc_timestamp, *msg_text;
     SmsEncoding user_data_encoding;
+    GByteArray *pdu_data;
 
     /* Convert PDU from hex to binary */
     pdu = (guint8 *) utils_hexstr2bin (hexpdu, &pdu_len);
@@ -426,11 +426,28 @@ sms_parse_pdu (const char *hexpdu, GError **error)
             user_data_len -= udhl;
     }
 
-    msg_text = sms_decode_text (&pdu[user_data_offset], user_data_len,
-                                user_data_encoding, bit_offset);
-    g_hash_table_insert (properties, "text",
-                         simple_string_value (msg_text));
+    if (   user_data_encoding == MM_SMS_ENCODING_8BIT
+        || user_data_encoding == MM_SMS_ENCODING_UNKNOWN) {
+        /* 8-bit encoding is usually binary data, and we have no idea what
+         * actual encoding the data is in so we can't convert it.
+         */
+        msg_text = g_strdup ("");
+    } else {
+        /* Otherwise if it's 7-bit or UCS2 we can decode it */
+        msg_text = sms_decode_text (&pdu[user_data_offset], user_data_len,
+                                    user_data_encoding, bit_offset);
+        g_warn_if_fail (msg_text != NULL);
+    }
+    g_hash_table_insert (properties, "text", simple_string_value (msg_text));
     g_free (msg_text);
+
+    /* Add the raw PDU data */
+    pdu_data = g_byte_array_sized_new (user_data_len);
+    g_byte_array_append (pdu_data, &pdu[user_data_offset], user_data_len);
+    g_hash_table_insert (properties, "data", byte_array_value (pdu_data));
+    g_byte_array_free (pdu_data, TRUE);
+    g_hash_table_insert (properties, "data-coding-scheme",
+                         simple_uint_value (pdu[tp_dcs_offset] & 0xFF));
 
     if (pdu[tp_dcs_offset] & SMS_DCS_CLASS_VALID)
         g_hash_table_insert (properties, "class",

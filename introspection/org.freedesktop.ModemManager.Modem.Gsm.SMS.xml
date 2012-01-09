@@ -31,7 +31,9 @@
           A dictionary containing SMS properties of the SMS specified by the given index.  This dictionary may contain the following key/value pairs:
 
           number   : string - Phone number (mandatory)
-          text     : string - SMS text (mandatory)
+          text     : string - SMS text (mandatory, empty if data cannot be decoded)
+          data     : byte array - SMS user data (TP-UD) (mandatory)
+          data-coding-scheme: uint (0..255) - SMS user data coding scheme (TP-DCS) (mandatory)
           smsc     : string - SMS service center number (optional)
           validity : uint (0..255) - Specifies when the SMS expires in SMSC (optional)
           class    : uint (0..3) - Message importance and location (optional)

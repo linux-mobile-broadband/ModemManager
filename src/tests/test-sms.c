@@ -20,6 +20,7 @@
 
 #include "mm-sms-utils.h"
 #include "mm-utils.h"
+#include "dbus/dbus-glib.h"
 
 
 #define TEST_ENTRY_EQ(hash, key, expectvalue) do { \
@@ -28,6 +29,27 @@
   g_assert(value); \
   g_assert(G_VALUE_HOLDS_STRING(value)); \
   g_assert_cmpstr(g_value_get_string(value), ==, (expectvalue)); \
+  } while (0)
+
+#define TEST_UINT_ENTRY_EQ(hash, key, expectvalue) do { \
+  GValue *value;                          \
+  value = g_hash_table_lookup((hash), (key)); \
+  g_assert(value); \
+  g_assert(G_VALUE_HOLDS_UINT(value)); \
+  g_assert_cmpint(g_value_get_uint(value), ==, (expectvalue)); \
+  } while (0)
+
+#define TEST_ARRAY_ENTRY_EQ(hash, key, expectvalue) do { \
+  GValue *value; \
+  GByteArray *tmp; \
+  guint32 i; \
+  value = g_hash_table_lookup((hash), (key)); \
+  g_assert(value); \
+  g_assert(G_VALUE_HOLDS(value, DBUS_TYPE_G_UCHAR_ARRAY)); \
+  tmp = g_value_get_boxed (value); \
+  g_assert_cmpint (tmp->len, ==, sizeof (expectvalue)); \
+  for (i = 0; i < tmp->len; i++) \
+    g_assert_cmpint (tmp->data[i], ==, expectvalue[i]); \
   } while (0)
 
 static void
@@ -217,6 +239,8 @@ test_pdu3_8bit (void *f, gpointer d)
     0xf2, 0x00, 0x04, 0x11, 0x10, 0x10, 0x21, 0x43,
     0x65, 0x00, 0x0a, 0xe8, 0x32, 0x9b, 0xfd, 0x46,
     0x97, 0xd9, 0xec, 0x37, 0xde};
+  static const guint8 expected_data[] = {
+    0xe8, 0x32, 0x9b, 0xfd, 0x46, 0x97, 0xd9, 0xec, 0x37, 0xde };
   GHashTable *sms;
   GError *error;
   char *hexpdu;
@@ -228,7 +252,9 @@ test_pdu3_8bit (void *f, gpointer d)
   TEST_ENTRY_EQ (sms, "smsc", "+12345678901");
   TEST_ENTRY_EQ (sms, "number", "+18005551212");
   TEST_ENTRY_EQ (sms, "timestamp", "110101123456+00");
-  TEST_ENTRY_EQ (sms, "text", "\xe8\x32\x9b\xfd\x46\x97\xd9\xec\x37\xde");
+  TEST_ENTRY_EQ (sms, "text", "");
+  TEST_UINT_ENTRY_EQ (sms, "data-coding-scheme", 0x04);
+  TEST_ARRAY_ENTRY_EQ (sms, "data", expected_data);
 
   g_free (hexpdu);
   g_hash_table_unref (sms);
@@ -301,6 +327,8 @@ test_pdu_dcsf_8bit (void *f, gpointer d)
     0xf2, 0x00, 0xf4, 0x11, 0x10, 0x10, 0x21, 0x43,
     0x65, 0x00, 0x0a, 0xe8, 0x32, 0x9b, 0xfd, 0x46,
     0x97, 0xd9, 0xec, 0x37, 0xde};
+  static const guint8 expected_data[] = {
+    0xe8, 0x32, 0x9b, 0xfd, 0x46, 0x97, 0xd9, 0xec, 0x37, 0xde };
   GHashTable *sms;
   GError *error;
   char *hexpdu;
@@ -312,7 +340,9 @@ test_pdu_dcsf_8bit (void *f, gpointer d)
   TEST_ENTRY_EQ (sms, "smsc", "+12345678901");
   TEST_ENTRY_EQ (sms, "number", "+18005551212");
   TEST_ENTRY_EQ (sms, "timestamp", "110101123456+00");
-  TEST_ENTRY_EQ (sms, "text", "\xe8\x32\x9b\xfd\x46\x97\xd9\xec\x37\xde");
+  TEST_ENTRY_EQ (sms, "text", "");
+  TEST_UINT_ENTRY_EQ (sms, "data-coding-scheme", 0xF4);
+  TEST_ARRAY_ENTRY_EQ (sms, "data", expected_data);
 
   g_free (hexpdu);
   g_hash_table_unref (sms);
