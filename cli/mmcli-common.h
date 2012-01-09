@@ -70,6 +70,7 @@ const gchar *mmcli_get_state_reason_string              (MMModemStateChangeReaso
 const gchar *mmcli_get_lock_string                      (MMModemLock lock);
 const gchar *mmcli_get_3gpp_network_availability_string (MMModem3gppNetworkAvailability availability);
 const gchar *mmcli_get_3gpp_registration_state_string   (MMModem3gppRegistrationState state);
+const gchar *mmcli_get_cdma_registration_state_string   (MMModemCdmaRegistrationState state);
 const gchar *mmcli_get_cdma_rm_protocol_string          (MMModemCdmaRmProtocol protocol);
 
 

@@ -775,6 +775,19 @@ mmcli_get_3gpp_registration_state_string (MMModem3gppRegistrationState state)
 }
 
 const gchar *
+mmcli_get_cdma_registration_state_string (MMModemCdmaRegistrationState state)
+{
+    static GEnumClass *enum_class = NULL;
+    GEnumValue *value;
+
+    if (!enum_class)
+        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_CDMA_REGISTRATION_STATE));
+
+    value = g_enum_get_value (enum_class, state);
+    return value->value_nick;
+}
+
+const gchar *
 mmcli_get_cdma_rm_protocol_string (MMModemCdmaRmProtocol protocol)
 {
     static GEnumClass *enum_class = NULL;
