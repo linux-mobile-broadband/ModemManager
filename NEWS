@@ -1,3 +1,20 @@
+Overview of changes in ModemManager 0.5.2
+------------------------------------------
+
+- Better detection of registration state when connecting
+- Added support for more Ericsson modems
+- Many memory leak fixes
+- Ensure Gobi devices are driven by the gobi plugin
+- Added multi-part SMS message support
+- Better handling of requests when modem is disabled
+- USSD fixes for Huawei devices
+- Added support for Nokia Internet Sticks
+- Fixed quirky response handling on some Cinterion modems
+- Fixed CREG response handling on modems that include the RAC
+- Skip sending power-up command if modem is already powered up
+- Added support for Sierra Wireless devices using Icera chips (USB305, Lightning)
+
+
 Overview of changes in ModemManager 0.5
 ----------------------------------------
 
