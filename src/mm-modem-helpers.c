@@ -1595,6 +1595,29 @@ mm_cdma_convert_sid (const gchar *sid)
     return (gint) tmp_sid;
 }
 
+guint
+mm_cdma_get_index_from_rm_protocol (MMModemCdmaRmProtocol protocol,
+                                    GError **error)
+{
+    if (protocol == MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
+        GEnumClass *enum_class;
+        GEnumValue *value;
+
+        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_CDMA_RM_PROTOCOL));
+        value = g_enum_get_value (enum_class, protocol);
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Unexpected RM protocol (%s)",
+                     value->value_nick);
+        g_type_class_unref (enum_class);
+        return 0;
+    }
+
+    /* just substracting 1 from the enum value should give us the index */
+    return (protocol - 1);
+}
+
 MMModemCdmaRmProtocol
 mm_cdma_get_rm_protocol_from_index (guint index,
                                     GError **error)

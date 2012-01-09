@@ -51,6 +51,9 @@ struct _MMBearerCdmaPrivate {
     gchar *number;
     /* Protocol of the Rm interface */
     MMModemCdmaRmProtocol rm_protocol;
+
+    /* Data port used when modem is connected */
+    MMPort *port;
 };
 
 /*****************************************************************************/
@@ -62,14 +65,217 @@ mm_bearer_cdma_get_rm_protocol (MMBearerCdma *self)
 }
 
 /*****************************************************************************/
-/* CONNECT */
+/* CONNECT
+ * Connection procedure of a CDMA bearer involves several steps:
+ * 1) Get data port from the modem. Default implementation will have only
+ *    one single possible data port, but plugins may have more.
+ * 2) If requesting specific RM, load current.
+ *  2.1) If current RM different to the requested one, set the new one.
+ * 3) Initiate call.
+ */
+
+typedef struct {
+    MMBearer *bearer;
+    MMBaseModem *modem;
+    MMAtSerialPort *primary;
+    MMPort *data;
+    GSimpleAsyncResult *result;
+    GError *error;
+    GCancellable *cancellable;
+} ConnectContext;
+
+static void
+connect_context_complete_and_free (ConnectContext *ctx)
+{
+    if (ctx->error) {
+        /* On errors, close the data port */
+        if (MM_IS_AT_SERIAL_PORT (ctx->data))
+            mm_serial_port_close (MM_SERIAL_PORT (ctx->data));
+
+        g_simple_async_result_take_error (ctx->result, ctx->error);
+    } else {
+        GVariant *ip_config;
+        GVariantBuilder builder;
+        MMBearerIpMethod ip_method;
+
+        /* Port is connected; update the state */
+        mm_port_set_connected (ctx->data, TRUE);
+        mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (ctx->bearer),
+                                       TRUE);
+        mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (ctx->bearer),
+                                       mm_port_get_device (ctx->data));
+
+        /* If serial port, set PPP method */
+        ip_method = (MM_IS_AT_SERIAL_PORT (ctx->data) ?
+                     MM_BEARER_IP_METHOD_PPP :
+                     MM_BEARER_IP_METHOD_DHCP);
+
+        g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
+        g_variant_builder_add (&builder, "{sv}", "method", g_variant_new_uint32 (ip_method));
+        ip_config = g_variant_builder_end (&builder);
+        mm_gdbus_bearer_set_ip4_config (MM_GDBUS_BEARER (ctx->bearer), ip_config);
+        mm_gdbus_bearer_set_ip6_config (MM_GDBUS_BEARER (ctx->bearer), ip_config);
+
+        /* Keep data port around while connected */
+        MM_BEARER_CDMA (ctx->bearer)->priv->port = g_object_ref (ctx->data);
+
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    }
+
+    g_simple_async_result_complete_in_idle (ctx->result);
+
+    g_object_unref (ctx->cancellable);
+    g_object_unref (ctx->data);
+    g_object_unref (ctx->primary);
+    g_object_unref (ctx->bearer);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->result);
+    g_free (ctx);
+}
+
+static gboolean
+connect_context_set_error_if_cancelled (ConnectContext *ctx,
+                                        GError **error)
+{
+    if (!g_cancellable_is_cancelled (ctx->cancellable))
+        return FALSE;
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_CANCELLED,
+                 "Connection setup operation has been cancelled");
+    return TRUE;
+}
 
 static gboolean
 connect_finish (MMBearer *self,
                 GAsyncResult *res,
                 GError **error)
 {
-    return FALSE;
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+connect_ready (MMBaseModem *modem,
+               GAsyncResult *res,
+               ConnectContext *ctx)
+{
+    /* DO NOT check for cancellable here. If we got here without errors, the
+     * bearer is really connected and therefore we need to reflect that in
+     * the state machine. */
+    mm_base_modem_at_command_finish (modem, res, &(ctx->error));
+    if (ctx->error)
+        mm_warn ("Couldn't connect: '%s'", ctx->error->message);
+    /* else... Yuhu! */
+
+    connect_context_complete_and_free (ctx);
+}
+
+static void
+connect_context_dial (ConnectContext *ctx)
+{
+    gchar *command;
+
+    command = g_strconcat ("DT", MM_BEARER_CDMA (ctx->bearer)->priv->number, NULL);
+    mm_base_modem_at_command_in_port (
+        ctx->modem,
+        ctx->primary,
+        command,
+        90,
+        FALSE,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)connect_ready,
+        ctx);
+    g_free (command);
+}
+
+static void
+set_rm_protocol_ready (MMBaseModem *self,
+                       GAsyncResult *res,
+                       ConnectContext *ctx)
+{
+     /* If cancelled, complete */
+    if (connect_context_set_error_if_cancelled (ctx, &ctx->error)) {
+        connect_context_complete_and_free (ctx);
+        return;
+    }
+
+    mm_base_modem_at_command_finish (self, res, &(ctx->error));
+    if (ctx->error) {
+        mm_warn ("Couldn't set RM protocol: '%s'", ctx->error->message);
+        connect_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Nothing else needed, go on with dialing */
+    connect_context_dial (ctx);
+}
+
+static void
+current_rm_protocol_ready (MMBaseModem *self,
+                           GAsyncResult *res,
+                           ConnectContext *ctx)
+{
+    const gchar *result;
+    guint current_index;
+    MMModemCdmaRmProtocol current_rm;
+
+    /* If cancelled, complete */
+    if (connect_context_set_error_if_cancelled (ctx, &ctx->error)) {
+        connect_context_complete_and_free (ctx);
+        return;
+    }
+
+    result = mm_base_modem_at_command_finish (self, res, &(ctx->error));
+    if (ctx->error) {
+        mm_warn ("Couldn't query current RM protocol: '%s'", ctx->error->message);
+        connect_context_complete_and_free (ctx);
+        return;
+    }
+
+    result = mm_strip_tag (result, "+CRM:");
+    current_index = (guint) atoi (result);
+    current_rm = mm_cdma_get_rm_protocol_from_index (current_index, &ctx->error);
+    if (ctx->error) {
+        mm_warn ("Couldn't parse RM protocol reply (%s): '%s'",
+                 result,
+                 ctx->error->message);
+        connect_context_complete_and_free (ctx);
+        return;
+    }
+
+    if (current_rm != MM_BEARER_CDMA (ctx->bearer)->priv->rm_protocol) {
+        guint new_index;
+        gchar *command;
+
+        mm_dbg ("Setting requested RM protocol...");
+
+        new_index = (mm_cdma_get_index_from_rm_protocol (
+                         MM_BEARER_CDMA (ctx->bearer)->priv->rm_protocol,
+                         &ctx->error));
+        if (ctx->error) {
+            mm_warn ("Cannot set RM protocol: '%s'",
+                     ctx->error->message);
+            connect_context_complete_and_free (ctx);
+            return;
+        }
+
+        command = g_strdup_printf ("+CRM=%u", new_index);
+        mm_base_modem_at_command_in_port (
+            ctx->modem,
+            ctx->primary,
+            command,
+            3,
+            FALSE,
+            NULL, /* cancellable */
+            (GAsyncReadyCallback)set_rm_protocol_ready,
+            ctx);
+        g_free (command);
+        return;
+    }
+
+    /* Nothing else needed, go on with dialing */
+    connect_context_dial (ctx);
 }
 
 static void
@@ -79,17 +285,185 @@ connect (MMBearer *self,
          GAsyncReadyCallback callback,
          gpointer user_data)
 {
+    ConnectContext *ctx;
+    MMAtSerialPort *primary;
+    MMPort *data;
+    MMBaseModem *modem = NULL;
+
+    if (MM_BEARER_CDMA (self)->priv->port) {
+        g_simple_async_report_error_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_CONNECTED,
+            "Couldn't connect: this bearer is already connected");
+        return;
+    }
+
+    g_object_get (self,
+                  MM_BEARER_MODEM, &modem,
+                  NULL);
+    g_assert (modem != NULL);
+
+    /* We will launch the ATD call in the primary port */
+    primary = mm_base_modem_get_port_primary (modem);
+    if (mm_port_get_connected (MM_PORT (primary))) {
+        g_simple_async_report_error_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_CONNECTED,
+            "Couldn't connect: primary AT port is already connected");
+        g_object_unref (modem);
+        return;
+    }
+
+    /* Look for best data port, NULL if none available. */
+    data = mm_base_modem_get_best_data_port (modem);
+    if (!data) {
+        g_simple_async_report_error_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_CONNECTED,
+            "Couldn't connect: all available data ports already connected");
+        g_object_unref (modem);
+        return;
+    }
+
+    /* If data port is AT, we need to ensure it's open during the whole
+     * connection. For the case where the primary port is used as data port,
+     * which is actually always right now, this is already ensured because the
+     * primary port is kept open as long as the modem is enabled, but anyway
+     * there's no real problem in keeping an open count here as well. */
+     if (MM_IS_AT_SERIAL_PORT (data)) {
+         GError *error = NULL;
+
+         if (!mm_serial_port_open (MM_SERIAL_PORT (data), &error)) {
+             g_prefix_error (&error, "Couldn't connect: cannot keep data port open.");
+             g_simple_async_report_take_gerror_in_idle (
+                 G_OBJECT (self),
+                 callback,
+                 user_data,
+                 error);
+             g_object_unref (modem);
+             g_object_unref (data);
+             return;
+         }
+    }
+
+    ctx = g_new0 (ConnectContext, 1);
+    ctx->primary = g_object_ref (primary);
+    ctx->data = g_object_ref (data);
+    ctx->bearer = g_object_ref (self);
+    ctx->modem = modem;
+
+    /* NOTE:
+     * We don't currently support cancelling AT commands, so we'll just check
+     * whether the operation is to be cancelled at each step. */
+    ctx->cancellable = g_object_ref (cancellable);
+
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             connect);
+
+    if (MM_BEARER_CDMA (self)->priv->rm_protocol != MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
+        /* Need to query current RM protocol */
+        mm_dbg ("Querying current RM protocol set...");
+        mm_base_modem_at_command_in_port (
+            ctx->modem,
+            ctx->primary,
+            "+CRM?",
+            3,
+            FALSE,
+            NULL, /* cancellable */
+            (GAsyncReadyCallback)current_rm_protocol_ready,
+            ctx);
+        return;
+    }
+
+    /* Nothing else needed, go on with dialing */
+    connect_context_dial (ctx);
 }
 
 /*****************************************************************************/
 /* DISCONNECT */
+
+typedef struct {
+    MMBearer *bearer;
+    MMBaseModem *modem;
+    MMAtSerialPort *primary;
+    MMPort *data;
+    GSimpleAsyncResult *result;
+    GError *error;
+} DisconnectContext;
+
+static void
+disconnect_context_complete_and_free (DisconnectContext *ctx)
+{
+    if (ctx->error) {
+        g_simple_async_result_take_error (ctx->result, ctx->error);
+    } else {
+        /* If properly disconnected, close the data port */
+        if (MM_IS_AT_SERIAL_PORT (ctx->data))
+            mm_serial_port_close (MM_SERIAL_PORT (ctx->data));
+
+        /* Port is disconnected; update the state */
+        mm_port_set_connected (ctx->data, FALSE);
+        mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (ctx->bearer), FALSE);
+        mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (ctx->bearer), NULL);
+        mm_gdbus_bearer_set_ip4_config (MM_GDBUS_BEARER (ctx->bearer), NULL);
+        mm_gdbus_bearer_set_ip6_config (MM_GDBUS_BEARER (ctx->bearer), NULL);
+        /* Clear data port */
+        g_clear_object (&(MM_BEARER_CDMA (ctx->bearer)->priv->port));
+
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    }
+
+    g_simple_async_result_complete_in_idle (ctx->result);
+
+    g_object_unref (ctx->data);
+    g_object_unref (ctx->primary);
+    g_object_unref (ctx->bearer);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->result);
+    g_free (ctx);
+}
 
 static gboolean
 disconnect_finish (MMBearer *self,
                    GAsyncResult *res,
                    GError **error)
 {
-    return FALSE;
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+primary_flash_ready (MMSerialPort *port,
+                     GError *error,
+                     DisconnectContext *ctx)
+{
+    if (error) {
+        /* Ignore "NO CARRIER" response when modem disconnects and any flash
+         * failures we might encounter. Other errors are hard errors.
+         */
+        if (!g_error_matches (error,
+                              MM_CONNECTION_ERROR,
+                              MM_CONNECTION_ERROR_NO_CARRIER) &&
+            !g_error_matches (error,
+                              MM_SERIAL_ERROR,
+                              MM_SERIAL_ERROR_FLASH_FAILED)) {
+            /* Fatal */
+            ctx->error = g_error_copy (error);
+        } else
+            mm_dbg ("Port flashing failed (not fatal): %s", error->message);
+    }
+
+    disconnect_context_complete_and_free (ctx);
 }
 
 static void
@@ -97,6 +471,40 @@ disconnect (MMBearer *self,
             GAsyncReadyCallback callback,
             gpointer user_data)
 {
+    DisconnectContext *ctx;
+    MMBaseModem *modem = NULL;
+
+    if (!MM_BEARER_CDMA (self)->priv->port) {
+        g_simple_async_report_error_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_FAILED,
+            "Couldn't disconnect: this bearer is not connected");
+        return;
+    }
+
+    g_object_get (self,
+                  MM_BEARER_MODEM, &modem,
+                  NULL);
+    g_assert (modem != NULL);
+
+    ctx = g_new0 (DisconnectContext, 1);
+    ctx->data = g_object_ref (MM_BEARER_CDMA (self)->priv->port);
+    ctx->primary = g_object_ref (mm_base_modem_get_port_primary (modem));
+    ctx->bearer = g_object_ref (self);
+    ctx->modem = modem;
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             connect);
+
+    mm_serial_port_flash (MM_SERIAL_PORT (ctx->primary),
+                          1000,
+                          TRUE,
+                          (MMSerialFlashFn)primary_flash_ready,
+                          ctx);
 }
 
 /*****************************************************************************/
