@@ -1595,6 +1595,87 @@ mm_cdma_convert_sid (const gchar *sid)
     return (gint) tmp_sid;
 }
 
+MMModemCdmaRmProtocol
+mm_cdma_get_rm_protocol_from_index (guint index,
+                                    GError **error)
+{
+    guint protocol;
+
+    /* just adding 1 from the index value should give us the enum */
+    protocol = index + 1 ;
+    if (protocol > MM_MODEM_CDMA_RM_PROTOCOL_STU_III) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Unexpected RM protocol index (%u)",
+                     index);
+        protocol = MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
+    }
+
+    return (MMModemCdmaRmProtocol)protocol;
+}
+
+gboolean
+mm_cdma_parse_crm_range_response (const gchar *reply,
+                                  MMModemCdmaRmProtocol *min,
+                                  MMModemCdmaRmProtocol *max,
+                                  GError **error)
+{
+    gboolean result = FALSE;
+    GRegex *r;
+
+
+    /* Expected reply format is:
+     *   ---> AT+CRM=?
+     *   <--- +CRM: (0-2)
+     */
+
+    r = g_regex_new ("\\+CRM:\\s*\\((\\d+)-(\\d+)\\)",
+                     G_REGEX_DOLLAR_ENDONLY | G_REGEX_RAW,
+                     0, error);
+    if (r) {
+        GMatchInfo *match_info = NULL;
+
+        if (g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, error)) {
+            gchar *aux;
+            guint min_val = 0;
+            guint max_val = 0;
+
+            aux = g_match_info_fetch (match_info, 1);
+            min_val = (guint) atoi (aux);
+            g_free (aux);
+
+            aux = g_match_info_fetch (match_info, 2);
+            max_val = (guint) atoi (aux);
+            g_free (aux);
+
+            if (min_val == 0 ||
+                max_val == 0 ||
+                min_val >= max_val) {
+                g_set_error (error,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Couldn't parse CRM range: "
+                             "Unexpected range of RM protocols (%u,%u)",
+                             min_val,
+                             max_val);
+            } else {
+                *min = mm_cdma_get_rm_protocol_from_index (min_val, error);
+                if (*min != MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
+                    *max = mm_cdma_get_rm_protocol_from_index (max_val, error);
+                    if (*max != MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN)
+                        result = TRUE;
+                }
+            }
+        }
+
+        g_match_info_free (match_info);
+        g_regex_unref (r);
+    }
+
+    return result;
+}
+
 guint
 mm_count_bits_set (gulong number)
 {

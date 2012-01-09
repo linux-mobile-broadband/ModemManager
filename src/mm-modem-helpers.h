@@ -77,6 +77,14 @@ gboolean mm_cdma_parse_eri (const char *reply,
                             guint32 *out_ind,
                             const char **out_desc);
 
+MMModemCdmaRmProtocol mm_cdma_get_rm_protocol_from_index (guint index,
+                                                          GError **error);
+
+gboolean mm_cdma_parse_crm_range_response (const gchar *reply,
+                                           MMModemCdmaRmProtocol *min,
+                                           MMModemCdmaRmProtocol *max,
+                                           GError **error);
+
 gboolean mm_gsm_parse_cscs_support_response (const char *reply,
                                              MMModemCharset *out_charsets);
 

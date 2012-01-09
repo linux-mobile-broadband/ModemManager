@@ -113,6 +113,7 @@ static void interface_initialization_step (InitAsyncContext *ctx);
 
 typedef enum {
     INITIALIZATION_STEP_FIRST,
+    INITIALIZATION_STEP_RM_PROTOCOL,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -174,10 +175,78 @@ initable_init_finish (GAsyncInitable  *initable,
 }
 
 static void
+crm_range_ready (MMBaseModem *modem,
+                 GAsyncResult *res,
+                 InitAsyncContext *ctx)
+{
+    GError *error = NULL;
+    const gchar *response;
+
+    response = mm_base_modem_at_command_finish (modem, res, &error);
+    if (error) {
+        /* We should possibly take this error as fatal. If we were told to use a
+         * specific Rm protocol, we must be able to check if it is supported. */
+        g_simple_async_result_take_error (ctx->result, error);
+    } else {
+        MMModemCdmaRmProtocol min = MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
+        MMModemCdmaRmProtocol max = MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
+
+        if (mm_cdma_parse_crm_range_response (response,
+                                              &min, &max,
+                                              &error)) {
+            GEnumClass *enum_class;
+            GEnumValue *value;
+
+            /* Check if value within the range */
+            if (ctx->self->priv->rm_protocol >= min &&
+                ctx->self->priv->rm_protocol <= max) {
+                /* Fine, go on with next step */
+                ctx->step++;
+                interface_initialization_step (ctx);
+            }
+
+            enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_CDMA_RM_PROTOCOL));
+            value = g_enum_get_value (enum_class, ctx->self->priv->rm_protocol);
+            g_assert (error == NULL);
+            error = g_error_new (MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Requested RM protocol '%s' is not supported",
+                                 value->value_nick);
+            g_type_class_unref (enum_class);
+        }
+
+        /* Failed, set as fatal as well */
+        g_simple_async_result_take_error (ctx->result, error);
+    }
+
+    g_simple_async_result_complete (ctx->result);
+    init_async_context_free (ctx, TRUE);
+}
+
+static void
 interface_initialization_step (InitAsyncContext *ctx)
 {
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_RM_PROTOCOL:
+        /* If a specific RM protocol is given, we need to check whether it is
+         * supported. */
+        if (ctx->self->priv->rm_protocol != MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
+            mm_base_modem_at_command_in_port (
+                ctx->modem,
+                ctx->port,
+                "+CRM=?",
+                3,
+                TRUE, /* getting range, so reply can be cached */
+                NULL, /* cancellable */
+                (GAsyncReadyCallback)crm_range_ready,
+                ctx);
+            return;
+        }
+
         /* Fall down to next step */
         ctx->step++;
 
