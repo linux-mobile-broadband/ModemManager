@@ -17,9 +17,7 @@
 #ifndef MM_PLUGIN_GOBI_H
 #define MM_PLUGIN_GOBI_H
 
-#include "mm-plugin.h"
 #include "mm-plugin-base.h"
-#include "mm-generic-gsm.h"
 
 #define MM_TYPE_PLUGIN_GOBI            (mm_plugin_gobi_get_type ())
 #define MM_PLUGIN_GOBI(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_GOBI, MMPluginGobi))

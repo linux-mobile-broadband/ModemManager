@@ -34,12 +34,12 @@ PLUGIN_COMMON_LINKER_FLAGS = \
 pkglib_LTLIBRARIES = \
 	libmm-plugin-generic.la \
 	libmm-plugin-cinterion.la \
-	libmm-plugin-nokia.la
+	libmm-plugin-nokia.la \
+	libmm-plugin-gobi.la
 
 #pkglib_LTLIBRARIES = \
 #	libmm-plugin-generic.la \
 #	libmm-plugin-moto-c.la \
-#	libmm-plugin-gobi.la \
 #	libmm-plugin-huawei.la \
 #	libmm-plugin-hso.la \
 #	libmm-plugin-option.la \
@@ -73,14 +73,16 @@ libmm_plugin_generic_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 #libmm_plugin_moto_c_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 #libmm_plugin_moto_c_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 #
-## Qualcomm Gobi
-#libmm_plugin_gobi_la_SOURCES = \
-#	mm-plugin-gobi.c \
-#	mm-plugin-gobi.h \
-#	mm-modem-gobi-gsm.c \
-#	mm-modem-gobi-gsm.h
-#libmm_plugin_gobi_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-#libmm_plugin_gobi_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
+# Gobi
+libmm_plugin_gobi_la_SOURCES = \
+	mm-plugin-gobi.c \
+	mm-plugin-gobi.h \
+	mm-broadband-modem-gobi.c \
+	mm-broadband-modem-gobi.h
+libmm_plugin_gobi_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_gobi_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
 #
 ## Huawei
 #libmm_plugin_huawei_la_SOURCES = \
