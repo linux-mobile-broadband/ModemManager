@@ -93,6 +93,22 @@ mm_object_get_modem_3gpp (MMObject *object)
 }
 
 /**
+ * mm_object_get_modem_cdma:
+ * @object: A #MMObject.
+ *
+ * Gets the #MMModemCdma instance for the D-Bus interface <link linkend="gdbus-interface-org-freedesktop-ModemManager1-Modem-ModemCdma.top_of_page">org.freedesktop.ModemManager1.Modem.ModemCdma</link> on @object, if any.
+ *
+ * Returns: (transfer full): A #MMModemCdma that must be freed with g_object_unref() or %NULL if @object does not implement the interface.
+ */
+MMModemCdma *
+mm_object_get_modem_cdma (MMObject *object)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (object), NULL);
+
+    return mm_gdbus_object_get_modem_cdma (object);
+}
+
+/**
  * mm_object_get_modem_simple:
  * @object: A #MMObject.
  *

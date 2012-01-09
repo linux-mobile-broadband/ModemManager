@@ -20,37 +20,34 @@
  * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
  */
 
-#ifndef _MM_OBJECT_H_
-#define _MM_OBJECT_H_
+#ifndef _MM_MODEM_CDMA_H_
+#define _MM_MODEM_CDMA_H_
 
 #include <ModemManager.h>
 #include <mm-gdbus-modem.h>
 
-#include "mm-modem.h"
-#include "mm-modem-3gpp.h"
-#include "mm-modem-cdma.h"
-#include "mm-modem-simple.h"
-
 G_BEGIN_DECLS
 
-typedef MmGdbusObject     MMObject;
-#define MM_TYPE_OBJECT(o) MM_GDBUS_TYPE_OBJECT (o)
-#define MM_OBJECT(o)      MM_GDBUS_OBJECT(o)
-#define MM_IS_OBJECT(o)   MM_GDBUS_IS_OBJECT(o)
+#define MM_MODEM_CDMA_SID_UNKNOWN 99999
+#define MM_MODEM_CDMA_NID_UNKNOWN 99999
 
-const gchar *mm_object_get_path (MMObject *self);
-gchar       *mm_object_dup_path (MMObject *self);
+typedef MmGdbusModemCdma      MMModemCdma;
+#define MM_TYPE_MODEM_CDMA(o) MM_GDBUS_TYPE_MODEM_CDMA (o)
+#define MM_MODEM_CDMA(o)      MM_GDBUS_MODEM_CDMA(o)
+#define MM_IS_MODEM_CDMA(o)   MM_GDBUS_IS_MODEM_CDMA(o)
 
-MMModem         *mm_object_get_modem            (MMObject *object);
-MMModem3gpp     *mm_object_get_modem_3gpp       (MMObject *object);
-MMModemCdma     *mm_object_get_modem_cdma       (MMObject *object);
-MMModemSimple   *mm_object_get_modem_simple     (MMObject *object);
+const gchar *mm_modem_cdma_get_path (MMModemCdma *self);
+gchar       *mm_modem_cdma_dup_path (MMModemCdma *self);
 
-MMModem         *mm_object_peek_modem           (MMObject *object);
-MMModem3gpp     *mm_object_peek_modem_3gpp      (MMObject *object);
-MMModemCdma     *mm_object_peek_modem_cdma      (MMObject *object);
-MMModemSimple   *mm_object_peek_modem_simple    (MMObject *object);
+const gchar *mm_modem_cdma_get_meid (MMModemCdma *self);
+gchar       *mm_modem_cdma_dup_meid (MMModemCdma *self);
+const gchar *mm_modem_cdma_get_esn  (MMModemCdma *self);
+gchar       *mm_modem_cdma_dup_esn  (MMModemCdma *self);
+guint        mm_modem_cdma_get_sid  (MMModemCdma *self);
+guint        mm_modem_cdma_get_nid  (MMModemCdma *self);
+MMModemCdmaRegistrationState mm_modem_cdma_get_cdma1x_registration_state (MMModemCdma *self);
+MMModemCdmaRegistrationState mm_modem_cdma_get_evdo_registration_state   (MMModemCdma *self);
 
 G_END_DECLS
 
-#endif /* _MM_OBJECT_H_ */
+#endif /* _MM_MODEM_CDMA_H_ */
