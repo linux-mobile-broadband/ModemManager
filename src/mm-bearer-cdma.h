@@ -31,6 +31,7 @@
 #define MM_IS_BEARER_CDMA_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_BEARER_CDMA))
 #define MM_BEARER_CDMA_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_BEARER_CDMA, MMBearerCdmaClass))
 
+#define MM_BEARER_CDMA_NUMBER      "bearer-cdma-number"
 #define MM_BEARER_CDMA_RM_PROTOCOL "bearer-cdma-rm-protocol"
 
 /* Prefix for all CDMA bearer object paths */

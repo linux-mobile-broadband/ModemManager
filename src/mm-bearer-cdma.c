@@ -39,6 +39,7 @@ G_DEFINE_TYPE_EXTENDED (MMBearerCdma, mm_bearer_cdma, MM_TYPE_BEARER, 0,
 
 enum {
     PROP_0,
+    PROP_NUMBER,
     PROP_RM_PROTOCOL,
     PROP_LAST
 };
@@ -46,6 +47,8 @@ enum {
 static GParamSpec *properties[PROP_LAST];
 
 struct _MMBearerCdmaPrivate {
+    /* Number to dial */
+    gchar *number;
     /* Protocol of the Rm interface */
     MMModemCdmaRmProtocol rm_protocol;
 };
@@ -310,6 +313,7 @@ mm_bearer_cdma_new (MMIfaceModemCdma *modem,
         callback,
         user_data,
         MM_BEARER_MODEM, modem,
+        MM_BEARER_CDMA_NUMBER, mm_common_bearer_properties_get_number (properties),
         MM_BEARER_CDMA_RM_PROTOCOL, mm_common_bearer_properties_get_rm_protocol (properties),
         MM_BEARER_ALLOW_ROAMING, mm_common_bearer_properties_get_allow_roaming (properties),
         NULL);
@@ -326,6 +330,10 @@ set_property (GObject *object,
     MMBearerCdma *self = MM_BEARER_CDMA (object);
 
     switch (prop_id) {
+    case PROP_NUMBER:
+        g_free (self->priv->number);
+        self->priv->number = g_value_dup_string (value);
+        break;
     case PROP_RM_PROTOCOL:
         self->priv->rm_protocol = g_value_get_enum (value);
         break;
@@ -344,6 +352,9 @@ get_property (GObject *object,
     MMBearerCdma *self = MM_BEARER_CDMA (object);
 
     switch (prop_id) {
+    case PROP_NUMBER:
+        g_value_set_string (value, self->priv->number);
+        break;
     case PROP_RM_PROTOCOL:
         g_value_set_enum (value, self->priv->rm_protocol);
         break;
@@ -385,6 +396,14 @@ mm_bearer_cdma_class_init (MMBearerCdmaClass *klass)
     bearer_class->connect_finish = connect_finish;
     bearer_class->disconnect = disconnect;
     bearer_class->disconnect_finish = disconnect_finish;
+
+    properties[PROP_NUMBER] =
+        g_param_spec_string (MM_BEARER_CDMA_NUMBER,
+                             "Number to dial",
+                             "Number to dial when launching the connection",
+                             NULL,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_NUMBER, properties[PROP_NUMBER]);
 
     properties[PROP_RM_PROTOCOL] =
         g_param_spec_enum (MM_BEARER_CDMA_RM_PROTOCOL,
