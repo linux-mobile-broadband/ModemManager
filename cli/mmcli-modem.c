@@ -40,6 +40,7 @@ typedef struct {
     MMObject *object;
     MMModem *modem;
     MMModem3gpp *modem_3gpp;
+    MMModemCdma *modem_cdma;
 } Context;
 static Context *ctx;
 
@@ -183,6 +184,8 @@ context_free (Context *ctx)
         g_object_unref (ctx->modem);
     if (ctx->modem_3gpp)
         g_object_unref (ctx->modem_3gpp);
+    if (ctx->modem_cdma)
+        g_object_unref (ctx->modem_cdma);
     if (ctx->object)
         g_object_unref (ctx->object);
     if (ctx->manager)
@@ -376,6 +379,42 @@ print_modem_info (void)
                  VALIDATE_UNKNOWN (mm_modem_3gpp_get_operator_name (ctx->modem_3gpp)),
                  mmcli_get_3gpp_registration_state_string (
                      mm_modem_3gpp_get_registration_state ((ctx->modem_3gpp))));
+    }
+
+    /* If available, CDMA related stuff */
+    if (ctx->modem_cdma) {
+        guint sid;
+        guint nid;
+        gchar *sid_str;
+        gchar *nid_str;
+
+        sid = mm_modem_cdma_get_sid (ctx->modem_cdma);
+        sid_str = (sid != MM_MODEM_CDMA_SID_UNKNOWN ?
+                   g_strdup_printf ("%u", sid) :
+                   NULL);
+        nid = mm_modem_cdma_get_nid (ctx->modem_cdma);
+        nid_str = (nid != MM_MODEM_CDMA_NID_UNKNOWN ?
+                   g_strdup_printf ("%u", nid) :
+                   NULL);
+
+        g_print ("  -------------------------\n"
+                 "  CDMA     |           meid: '%s'\n"
+                 "           |            esn: '%s'\n"
+                 "           |            sid: '%s'\n"
+                 "           |            nid: '%s'\n"
+                 "           |   registration: CDMA1x '%s'\n"
+                 "           |                 EV-DO  '%s'\n",
+                 VALIDATE_UNKNOWN (mm_modem_cdma_get_meid (ctx->modem_cdma)),
+                 VALIDATE_UNKNOWN (mm_modem_cdma_get_esn (ctx->modem_cdma)),
+                 VALIDATE_UNKNOWN (sid_str),
+                 VALIDATE_UNKNOWN (nid_str),
+                 mmcli_get_cdma_registration_state_string (
+                     mm_modem_cdma_get_cdma1x_registration_state ((ctx->modem_cdma))),
+                 mmcli_get_cdma_registration_state_string (
+                     mm_modem_cdma_get_evdo_registration_state ((ctx->modem_cdma))));
+
+        g_free (sid_str);
+        g_free (nid_str);
     }
 
     /* SIM */
@@ -718,6 +757,7 @@ get_modem_ready (GObject      *source,
     ctx->object = mmcli_get_modem_finish (result, &ctx->manager);
     ctx->modem = mm_object_get_modem (ctx->object);
     ctx->modem_3gpp = mm_object_get_modem_3gpp (ctx->object);
+    ctx->modem_cdma = mm_object_get_modem_cdma (ctx->object);
 
     if (info_flag)
         g_assert_not_reached ();
