@@ -384,9 +384,13 @@ grab_port (MMManager *manager,
              mm_base_modem_get_device (modem),
              g_udev_device_get_name (device));
 
-    /* If the modem was just created, store it */
-    if (!existing)
+    if (existing) {
+        g_assert (existing == modem);
+        check_export_modem (manager, modem);
+    } else {
+        /* If the modem was just created, store it */
         add_modem (manager, modem, plugin);
+    }
 }
 
 static GUdevDevice *
