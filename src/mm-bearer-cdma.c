@@ -94,6 +94,16 @@ disconnect (MMBearer *self,
 
 /*****************************************************************************/
 
+gchar *
+mm_bearer_cdma_new_unique_path (void)
+{
+    static guint id = 0;
+
+    return g_strdup_printf (MM_DBUS_BEARER_CDMA_PREFIX "/%d", id++);
+}
+
+/*****************************************************************************/
+
 MMBearer *
 mm_bearer_cdma_new_finish (MMIfaceModemCdma *modem,
                            GAsyncResult *res,
@@ -112,7 +122,6 @@ mm_bearer_cdma_new (MMIfaceModemCdma *modem,
                     gpointer user_data)
 {
     GSimpleAsyncResult *result;
-    static guint id = 0;
     MMBearerCdma *bearer;
     gchar *path;
 
@@ -129,7 +138,7 @@ mm_bearer_cdma_new (MMIfaceModemCdma *modem,
 
     /* Set modem and path ONLY after having checked input properties, so that
      * we don't export invalid bearers. */
-    path = g_strdup_printf (MM_DBUS_BEARER_CDMA_PREFIX "/%d", id++);
+    path = mm_bearer_cdma_new_unique_path ();
     g_object_set (bearer,
                   MM_BEARER_PATH,  path,
                   MM_BEARER_MODEM, modem,

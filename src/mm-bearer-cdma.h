@@ -51,6 +51,9 @@ struct _MMBearerCdmaClass {
 
 GType mm_bearer_cdma_get_type (void);
 
+/* Getter for an unique CDMA Bearer path */
+gchar *mm_bearer_cdma_new_unique_path (void);
+
 /* Default CDMA bearer creation implementation */
 void mm_bearer_cdma_new (MMIfaceModemCdma *modem,
                          MMCommonBearerProperties *properties,
