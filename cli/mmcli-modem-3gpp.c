@@ -44,16 +44,21 @@ static Context *ctx;
 
 /* Options */
 static gboolean scan_flag;
-static gchar *register_str;
+static gboolean register_home_flag;
+static gchar *register_in_operator_str;
 
 static GOptionEntry entries[] = {
     { "3gpp-scan", 0, 0, G_OPTION_ARG_NONE, &scan_flag,
       "Scan for available networks in a given modem.",
       NULL
     },
-    { "3gpp-register", 0, 0, G_OPTION_ARG_STRING, &register_str,
-      "Request a given modem to register in the specified network",
-      "[NETWORK]"
+    { "3gpp-register-home", 0, 0, G_OPTION_ARG_NONE, &register_home_flag,
+      "Request a given modem to register in its home network",
+      NULL
+    },
+    { "3gpp-register-in-operator", 0, 0, G_OPTION_ARG_STRING, &register_in_operator_str,
+      "Request a given modem to register in the network of the given operator",
+      "[MCCMNC]"
     },
     { NULL }
 };
@@ -83,7 +88,8 @@ mmcli_modem_3gpp_options_enabled (void)
         return !!n_actions;
 
     n_actions = (scan_flag +
-                 !!register_str);
+                 register_home_flag +
+                 !!register_in_operator_str);
 
     if (n_actions > 1) {
         g_printerr ("error: too many 3GPP actions requested\n");
@@ -235,10 +241,10 @@ get_modem_ready (GObject      *source,
     }
 
     /* Request to register the modem? */
-    if (register_str) {
+    if (register_in_operator_str || register_home_flag) {
         g_debug ("Asynchronously registering the modem...");
         mm_modem_3gpp_register (ctx->modem_3gpp,
-                                register_str,
+                                (register_in_operator_str ? register_in_operator_str : ""),
                                 ctx->cancellable,
                                 (GAsyncReadyCallback)register_ready,
                                 NULL);
@@ -281,14 +287,15 @@ mmcli_modem_3gpp_run_synchronous (GDBusConnection *connection)
         g_assert_not_reached ();
 
     /* Request to register the modem? */
-    if (register_str) {
+    if (register_in_operator_str || register_home_flag) {
         gboolean result;
 
         g_debug ("Synchronously registering the modem...");
-        result = mm_modem_3gpp_register_sync (ctx->modem_3gpp,
-                                              register_str,
-                                              NULL,
-                                              &error);
+        result = mm_modem_3gpp_register_sync (
+            ctx->modem_3gpp,
+            (register_in_operator_str ? register_in_operator_str : ""),
+            NULL,
+            &error);
         register_process_reply (result, error);
         return;
     }
