@@ -79,39 +79,47 @@ enum {
 #define CIND_INDICATOR_IS_VALID(u) (u != CIND_INDICATOR_INVALID)
 
 struct _MMBroadbandModemPrivate {
+    /*<--- Modem interface --->*/
+    /* Properties */
     GObject *modem_dbus_skeleton;
-    GObject *modem_3gpp_dbus_skeleton;
-    GObject *modem_cdma_dbus_skeleton;
-    GObject *modem_simple_dbus_skeleton;
     MMSim *modem_sim;
     MMBearerList *modem_bearer_list;
     MMModemState modem_state;
     MMModemCapability modem_current_capabilities;
+    /* Implementation helpers */
+    MMModemCharset modem_current_charset;
+    gboolean modem_cind_supported;
+    guint modem_cind_indicator_signal_quality;
+    guint modem_cind_indicator_roaming;
+    guint modem_cind_indicator_service;
+
+    /*<--- Modem 3GPP interface --->*/
+    /* Properties */
+    GObject *modem_3gpp_dbus_skeleton;
     MMModem3gppRegistrationState modem_3gpp_registration_state;
     gboolean modem_3gpp_cs_network_supported;
     gboolean modem_3gpp_ps_network_supported;
+    /* Implementation helpers */
+    GPtrArray *modem_3gpp_registration_regex;
+    gboolean modem_3gpp_manual_registration;
+    GCancellable *modem_3gpp_pending_registration_cancellable;
+
+    /*<--- Modem CDMA interface --->*/
+    /* Properties */
+    GObject *modem_cdma_dbus_skeleton;
     MMModemCdmaRegistrationState modem_cdma_cdma1x_registration_state;
     MMModemCdmaRegistrationState modem_cdma_evdo_registration_state;
     gboolean modem_cdma_cdma1x_network_supported;
     gboolean modem_cdma_evdo_network_supported;
-    MMCommonSimpleProperties *modem_simple_status;
-
-    /* Modem helpers */
-    MMModemCharset current_charset;
-    gboolean cind_supported;
-    guint cind_indicator_roaming;
-    guint cind_indicator_signal_quality;
-    guint cind_indicator_service;
-
-    /* 3GPP registration helpers */
-    GPtrArray *reg_regex;
-    gboolean manual_reg;
-    GCancellable *pending_reg_cancellable;
-
-    /* CDMA registration helpers */
+    /* Implementation helpers */
     gboolean checked_sprint_support;
     gboolean has_spservice;
     gboolean has_speri;
+
+    /*<--- Modem Simple interface --->*/
+    /* Properties */
+    GObject *modem_simple_dbus_skeleton;
+    MMCommonSimpleProperties *modem_simple_status;
 };
 
 /*****************************************************************************/
@@ -139,7 +147,7 @@ response_processor_string_ignore_at_errors (MMBaseModem *self,
 }
 
 /*****************************************************************************/
-/* CREATE BEARER */
+/* Create Bearer (Modem interface) */
 
 static MMBearer *
 modem_create_bearer_finish (MMIfaceModem *self,
@@ -257,7 +265,7 @@ modem_create_bearer (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* CREATE SIM */
+/* Create SIM (Modem inteface) */
 
 static MMSim *
 modem_create_sim_finish (MMIfaceModem *self,
@@ -326,7 +334,7 @@ modem_create_sim (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* CAPABILITIES */
+/* Capabilities loading (Modem interface) */
 
 typedef struct {
 	gchar *name;
@@ -439,9 +447,9 @@ parse_caps_cgmm (MMBaseModem *self,
 }
 
 static MMModemCapability
-load_current_capabilities_finish (MMIfaceModem *self,
-                                  GAsyncResult *res,
-                                  GError **error)
+modem_load_current_capabilities_finish (MMIfaceModem *self,
+                                        GAsyncResult *res,
+                                        GError **error)
 {
     GVariant *result;
     MMModemCapability caps;
@@ -467,9 +475,9 @@ static const MMBaseModemAtCommand capabilities[] = {
 };
 
 static void
-load_current_capabilities (MMIfaceModem *self,
-                           GAsyncReadyCallback callback,
-                           gpointer user_data)
+modem_load_current_capabilities (MMIfaceModem *self,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data)
 {
     mm_dbg ("loading current capabilities...");
 
@@ -485,12 +493,12 @@ load_current_capabilities (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* MANUFACTURER */
+/* Manufacturer loading (Modem interface) */
 
 static gchar *
-load_manufacturer_finish (MMIfaceModem *self,
-                          GAsyncResult *res,
-                          GError **error)
+modem_load_manufacturer_finish (MMIfaceModem *self,
+                                GAsyncResult *res,
+                                GError **error)
 {
     GVariant *result;
     gchar *manufacturer;
@@ -511,9 +519,9 @@ static const MMBaseModemAtCommand manufacturers[] = {
 };
 
 static void
-load_manufacturer (MMIfaceModem *self,
-                   GAsyncReadyCallback callback,
-                   gpointer user_data)
+modem_load_manufacturer (MMIfaceModem *self,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data)
 {
     mm_dbg ("loading manufacturer...");
     mm_base_modem_at_sequence (
@@ -527,12 +535,12 @@ load_manufacturer (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* MODEL */
+/* Model loading (Modem interface) */
 
 static gchar *
-load_model_finish (MMIfaceModem *self,
-                   GAsyncResult *res,
-                   GError **error)
+modem_load_model_finish (MMIfaceModem *self,
+                         GAsyncResult *res,
+                         GError **error)
 {
     GVariant *result;
     gchar *model;
@@ -553,9 +561,9 @@ static const MMBaseModemAtCommand models[] = {
 };
 
 static void
-load_model (MMIfaceModem *self,
-            GAsyncReadyCallback callback,
-            gpointer user_data)
+modem_load_model (MMIfaceModem *self,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
 {
     mm_dbg ("loading model...");
     mm_base_modem_at_sequence (
@@ -569,12 +577,12 @@ load_model (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* REVISION */
+/* Revision loading */
 
 static gchar *
-load_revision_finish (MMIfaceModem *self,
-                      GAsyncResult *res,
-                      GError **error)
+modem_load_revision_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
 {
     GVariant *result;
     gchar *revision;
@@ -595,9 +603,9 @@ static const MMBaseModemAtCommand revisions[] = {
 };
 
 static void
-load_revision (MMIfaceModem *self,
-               GAsyncReadyCallback callback,
-               gpointer user_data)
+modem_load_revision (MMIfaceModem *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
 {
     mm_dbg ("loading revision...");
     mm_base_modem_at_sequence (
@@ -611,12 +619,12 @@ load_revision (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* EQUIPMENT ID */
+/* Equipment ID loading (Modem interface) */
 
 static gchar *
-load_equipment_identifier_finish (MMIfaceModem *self,
-                                  GAsyncResult *res,
-                                  GError **error)
+modem_load_equipment_identifier_finish (MMIfaceModem *self,
+                                        GAsyncResult *res,
+                                        GError **error)
 {
     GVariant *result;
     gchar *equipment_identifier;
@@ -637,9 +645,9 @@ static const MMBaseModemAtCommand equipment_identifiers[] = {
 };
 
 static void
-load_equipment_identifier (MMIfaceModem *self,
-                           GAsyncReadyCallback callback,
-                           gpointer user_data)
+modem_load_equipment_identifier (MMIfaceModem *self,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data)
 {
     const MMBaseModemAtCommand *commands = equipment_identifiers;
 
@@ -660,7 +668,7 @@ load_equipment_identifier (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* DEVICE IDENTIFIER */
+/* Device identifier loading (Modem interface) */
 
 typedef struct {
     gchar *ati;
@@ -676,9 +684,9 @@ device_identifier_context_free (DeviceIdentifierContext *ctx)
 }
 
 static gchar *
-load_device_identifier_finish (MMIfaceModem *self,
-                               GAsyncResult *res,
-                               GError **error)
+modem_load_device_identifier_finish (MMIfaceModem *self,
+                                     GAsyncResult *res,
+                                     GError **error)
 {
     GError *inner_error = NULL;
     gpointer ctx = NULL;
@@ -737,12 +745,11 @@ static const MMBaseModemAtCommand device_identifier_steps[] = {
 };
 
 static void
-load_device_identifier (MMIfaceModem *self,
-                        GAsyncReadyCallback callback,
-                        gpointer user_data)
+modem_load_device_identifier (MMIfaceModem *self,
+                              GAsyncReadyCallback callback,
+                              gpointer user_data)
 {
     mm_dbg ("loading device identifier...");
-
     mm_base_modem_at_sequence (
         MM_BASE_MODEM (self),
         device_identifier_steps,
@@ -754,7 +761,7 @@ load_device_identifier (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* UNLOCK REQUIRED */
+/* Check if unlock required (Modem interface) */
 
 typedef struct {
     const gchar *result;
@@ -783,20 +790,21 @@ static CPinResult unlock_results[] = {
 };
 
 static MMModemLock
-load_unlock_required_finish (MMIfaceModem *self,
-                             GAsyncResult *res,
-                             GError **error)
+modem_load_unlock_required_finish (MMIfaceModem *self,
+                                   GAsyncResult *res,
+                                   GError **error)
 {
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return MM_MODEM_LOCK_UNKNOWN;
 
-    return (MMModemLock) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return (MMModemLock) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
+                                               G_SIMPLE_ASYNC_RESULT (res)));
 }
 
 static void
-load_unlock_required_ready (MMIfaceModem *self,
-                            GAsyncResult *res,
-                            GSimpleAsyncResult *simple)
+cpin_query_ready (MMIfaceModem *self,
+                  GAsyncResult *res,
+                  GSimpleAsyncResult *simple)
 {
 
     MMModemLock lock = MM_MODEM_LOCK_UNKNOWN;
@@ -840,16 +848,16 @@ load_unlock_required_ready (MMIfaceModem *self,
 }
 
 static void
-load_unlock_required (MMIfaceModem *self,
-                      GAsyncReadyCallback callback,
-                      gpointer user_data)
+modem_load_unlock_required (MMIfaceModem *self,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
 {
     GSimpleAsyncResult *result;
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        load_unlock_required);
+                                        modem_load_unlock_required);
 
     /* CDMA-only modems don't need this */
     if (mm_iface_modem_is_cdma_only (self)) {
@@ -868,29 +876,29 @@ load_unlock_required (MMIfaceModem *self,
                               3,
                               FALSE,
                               NULL, /* cancellable */
-                              (GAsyncReadyCallback)load_unlock_required_ready,
+                              (GAsyncReadyCallback)cpin_query_ready,
                               result);
 }
 
 /*****************************************************************************/
-/* SUPPORTED MODES */
+/* Supported modes loading (Modem interface) */
 
 static MMModemMode
-load_supported_modes_finish (MMIfaceModem *self,
-                             GAsyncResult *res,
-                             GError **error)
+modem_load_supported_modes_finish (MMIfaceModem *self,
+                                   GAsyncResult *res,
+                                   GError **error)
 {
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return 0;
+        return MM_MODEM_MODE_NONE;
 
     return (MMModemMode)GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
                                               G_SIMPLE_ASYNC_RESULT (res)));
 }
 
 static void
-load_supported_modes (MMIfaceModem *self,
-                     GAsyncReadyCallback callback,
-                     gpointer user_data)
+modem_load_supported_modes (MMIfaceModem *self,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
 {
     MMBroadbandModem *broadband = MM_BROADBAND_MODEM (self);
     GSimpleAsyncResult *result;
@@ -900,7 +908,7 @@ load_supported_modes (MMIfaceModem *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        load_supported_modes);
+                                        modem_load_supported_modes);
 
     mode = MM_MODEM_MODE_NONE;
 
@@ -927,16 +935,16 @@ load_supported_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* SIGNAL QUALITY */
+/* Signal quality loading (Modem interface) */
 
 typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
     MMSerialPort *port;
-} LoadSignalQualityContext;
+} SignalQualityContext;
 
 static void
-load_signal_quality_context_complete_and_free (LoadSignalQualityContext *ctx)
+signal_quality_context_complete_and_free (SignalQualityContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
@@ -947,9 +955,9 @@ load_signal_quality_context_complete_and_free (LoadSignalQualityContext *ctx)
 }
 
 static guint
-load_signal_quality_finish (MMIfaceModem *self,
-                            GAsyncResult *res,
-                            GError **error)
+modem_load_signal_quality_finish (MMIfaceModem *self,
+                                  GAsyncResult *res,
+                                  GError **error)
 {
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return 0;
@@ -959,9 +967,9 @@ load_signal_quality_finish (MMIfaceModem *self,
 }
 
 static void
-load_signal_quality_csq_ready (MMBroadbandModem *self,
-                               GAsyncResult *res,
-                               LoadSignalQualityContext *ctx)
+signal_quality_csq_ready (MMBroadbandModem *self,
+                          GAsyncResult *res,
+                          SignalQualityContext *ctx)
 {
     GError *error = NULL;
     GVariant *result;
@@ -970,7 +978,7 @@ load_signal_quality_csq_ready (MMBroadbandModem *self,
     result = mm_base_modem_at_sequence_in_port_finish (MM_BASE_MODEM (self), res, NULL, &error);
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
-        load_signal_quality_context_complete_and_free (ctx);
+        signal_quality_context_complete_and_free (ctx);
         return;
     }
 
@@ -995,7 +1003,7 @@ load_signal_quality_csq_ready (MMBroadbandModem *self,
                                                            NULL);
             }
 
-            load_signal_quality_context_complete_and_free (ctx);
+            signal_quality_context_complete_and_free (ctx);
             return;
         }
     }
@@ -1004,37 +1012,37 @@ load_signal_quality_csq_ready (MMBroadbandModem *self,
                                      MM_CORE_ERROR,
                                      MM_CORE_ERROR_FAILED,
                                      "Could not parse signal quality results");
-    load_signal_quality_context_complete_and_free (ctx);
+    signal_quality_context_complete_and_free (ctx);
 }
 
 /* Some modems want +CSQ, others want +CSQ?, and some of both types
  * will return ERROR if they don't get the command they want.  So
  * try the other command if the first one fails.
  */
-static const MMBaseModemAtCommand signal_quality_csq[] = {
+static const MMBaseModemAtCommand signal_quality_csq_sequence[] = {
     { "+CSQ",  3, TRUE, response_processor_string_ignore_at_errors },
     { "+CSQ?", 3, TRUE, response_processor_string_ignore_at_errors },
     { NULL }
 };
 
 static void
-load_signal_quality_csq (LoadSignalQualityContext *ctx)
+signal_quality_csq (SignalQualityContext *ctx)
 {
     mm_base_modem_at_sequence_in_port (
         MM_BASE_MODEM (ctx->self),
         MM_AT_SERIAL_PORT (ctx->port),
-        signal_quality_csq,
+        signal_quality_csq_sequence,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
         NULL, /* cancellable */
-        (GAsyncReadyCallback)load_signal_quality_csq_ready,
+        (GAsyncReadyCallback)signal_quality_csq_ready,
         ctx);
 }
 
 static void
-load_signal_quality_cind_ready (MMBroadbandModem *self,
-                                GAsyncResult *res,
-                                LoadSignalQualityContext *ctx)
+signal_quality_cind_ready (MMBroadbandModem *self,
+                           GAsyncResult *res,
+                           SignalQualityContext *ctx)
 {
     GError *error = NULL;
     const gchar *result;
@@ -1046,10 +1054,12 @@ load_signal_quality_cind_ready (MMBroadbandModem *self,
 
     if (error)
         g_simple_async_result_take_error (ctx->result, error);
-    else if (indicators->len >= self->priv->cind_indicator_signal_quality) {
+    else if (indicators->len >= self->priv->modem_cind_indicator_signal_quality) {
         guint quality;
 
-        quality = g_array_index (indicators, guint8, self->priv->cind_indicator_signal_quality);
+        quality = g_array_index (indicators,
+                                 guint8,
+                                 self->priv->modem_cind_indicator_signal_quality);
         quality = CLAMP (quality, 0, 5) * 20;
         g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                    GUINT_TO_POINTER (quality),
@@ -1062,14 +1072,14 @@ load_signal_quality_cind_ready (MMBroadbandModem *self,
                                          MM_CORE_ERROR_FAILED,
                                          "Could not parse CIND signal quality results "
                                          "signal index (%u) outside received range (0-%u)",
-                                         self->priv->cind_indicator_signal_quality,
+                                         self->priv->modem_cind_indicator_signal_quality,
                                          indicators->len);
 
-    load_signal_quality_context_complete_and_free (ctx);
+    signal_quality_context_complete_and_free (ctx);
 }
 
 static void
-load_signal_quality_cind (LoadSignalQualityContext *ctx)
+signal_quality_cind (SignalQualityContext *ctx)
 {
     mm_base_modem_at_command_in_port (MM_BASE_MODEM (ctx->self),
                                       MM_AT_SERIAL_PORT (ctx->port),
@@ -1077,17 +1087,16 @@ load_signal_quality_cind (LoadSignalQualityContext *ctx)
                                       3,
                                       FALSE,
                                       NULL, /* cancellable */
-                                      (GAsyncReadyCallback)load_signal_quality_cind_ready,
+                                      (GAsyncReadyCallback)signal_quality_cind_ready,
                                       ctx);
 }
 
 static void
-load_signal_quality_qcdm_ready (MMQcdmSerialPort *port,
-                                GByteArray *response,
-                                GError *error,
-                                gpointer user_data)
+signal_quality_qcdm_ready (MMQcdmSerialPort *port,
+                           GByteArray *response,
+                           GError *error,
+                           SignalQualityContext *ctx)
 {
-    LoadSignalQualityContext *ctx = user_data;
     QcdmResult *result;
     guint32 num = 0, quality = 0, i;
     gfloat best_db = -28;
@@ -1095,7 +1104,7 @@ load_signal_quality_qcdm_ready (MMQcdmSerialPort *port,
 
     if (error) {
         g_simple_async_result_set_from_error (ctx->result, error);
-        load_signal_quality_context_complete_and_free (ctx);
+        signal_quality_context_complete_and_free (ctx);
         return;
     }
 
@@ -1109,7 +1118,7 @@ load_signal_quality_qcdm_ready (MMQcdmSerialPort *port,
                                          MM_CORE_ERROR_FAILED,
                                          "Failed to parse pilot sets command result: %d",
                                          err);
-        load_signal_quality_context_complete_and_free (ctx);
+        signal_quality_context_complete_and_free (ctx);
         return;
     }
 
@@ -1143,11 +1152,11 @@ load_signal_quality_qcdm_ready (MMQcdmSerialPort *port,
     g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                GUINT_TO_POINTER (quality),
                                                NULL);
-    load_signal_quality_context_complete_and_free (ctx);
+    signal_quality_context_complete_and_free (ctx);
 }
 
 static void
-load_signal_quality_qcdm (LoadSignalQualityContext *ctx)
+signal_quality_qcdm (SignalQualityContext *ctx)
 {
     GByteArray *pilot_sets;
 
@@ -1159,35 +1168,35 @@ load_signal_quality_qcdm (LoadSignalQualityContext *ctx)
     mm_qcdm_serial_port_queue_command (MM_QCDM_SERIAL_PORT (ctx->port),
                                        pilot_sets,
                                        3,
-                                       load_signal_quality_qcdm_ready,
+                                       (MMQcdmSerialResponseFn)signal_quality_qcdm_ready,
                                        ctx);
 }
 
 static void
-load_signal_quality (MMIfaceModem *self,
-                     GAsyncReadyCallback callback,
-                     gpointer user_data)
+modem_load_signal_quality (MMIfaceModem *self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
 {
     MMSerialPort *port;
-    LoadSignalQualityContext *ctx;
+    SignalQualityContext *ctx;
     GError *error = NULL;
 
     mm_dbg ("loading signal quality...");
-    ctx = g_new0 (LoadSignalQualityContext, 1);
+    ctx = g_new0 (SignalQualityContext, 1);
     ctx->self = g_object_ref (self);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             load_signal_quality);
+                                             modem_load_signal_quality);
 
     /* Check whether we can get a non-connected AT port */
     port = (MMSerialPort *)mm_base_modem_get_best_at_port (MM_BASE_MODEM (self), &error);
     if (port) {
         ctx->port = g_object_ref (port);
-        if (MM_BROADBAND_MODEM (self)->priv->cind_supported)
-            load_signal_quality_cind (ctx);
+        if (MM_BROADBAND_MODEM (self)->priv->modem_cind_supported)
+            signal_quality_cind (ctx);
         else
-            load_signal_quality_csq (ctx);
+            signal_quality_csq (ctx);
         return;
     }
 
@@ -1196,30 +1205,30 @@ load_signal_quality (MMIfaceModem *self,
     if (port) {
         g_error_free (error);
         ctx->port = g_object_ref (port);
-        load_signal_quality_qcdm (ctx);
+        signal_quality_qcdm (ctx);
         return;
     }
 
     /* Return the error we got when getting best AT port */
     g_simple_async_result_take_error (ctx->result, error);
-    load_signal_quality_context_complete_and_free (ctx);
+    signal_quality_context_complete_and_free (ctx);
 }
 
 /*****************************************************************************/
-/* SETTING UP INDICATORS */
+/* Setting up indicators (3GPP interface) */
 
 static gboolean
-setup_indicators_finish (MMIfaceModem3gpp *self,
-                         GAsyncResult *res,
-                         GError **error)
+modem_3gpp_setup_indicators_finish (MMIfaceModem3gpp *self,
+                                    GAsyncResult *res,
+                                    GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
 static void
-setup_indicators_ready (MMBroadbandModem *self,
-                        GAsyncResult *res,
-                        GSimpleAsyncResult *simple)
+cind_format_check_ready (MMBroadbandModem *self,
+                         GAsyncResult *res,
+                         GSimpleAsyncResult *simple)
 {
     GHashTable *indicators = NULL;
     GError *error = NULL;
@@ -1238,11 +1247,11 @@ setup_indicators_ready (MMBroadbandModem *self,
 
     /* Mark CIND as being supported and find the proper indexes for the
      * indicators. */
-    self->priv->cind_supported = TRUE;
+    self->priv->modem_cind_supported = TRUE;
 
 #define FIND_INDEX(indicator_str,var_suffix) do {                       \
         r = g_hash_table_lookup (indicators, indicator_str);            \
-        self->priv->cind_indicator_##var_suffix = (r ?                  \
+        self->priv->modem_cind_indicator_##var_suffix = (r ?            \
                                                    cind_response_get_index (r) : \
                                                    CIND_INDICATOR_INVALID); \
     } while (0)
@@ -1261,16 +1270,16 @@ setup_indicators_ready (MMBroadbandModem *self,
 }
 
 static void
-setup_indicators (MMIfaceModem3gpp *self,
-                  GAsyncReadyCallback callback,
-                  gpointer user_data)
+modem_3gpp_setup_indicators (MMIfaceModem3gpp *self,
+                             GAsyncReadyCallback callback,
+                             gpointer user_data)
 {
     GSimpleAsyncResult *result;
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        setup_indicators);
+                                        modem_3gpp_setup_indicators);
 
     /* Load supported indicators */
     mm_base_modem_at_command (MM_BASE_MODEM (self),
@@ -1278,12 +1287,12 @@ setup_indicators (MMIfaceModem3gpp *self,
                               3,
                               TRUE,
                               NULL, /* cancellable */
-                              (GAsyncReadyCallback)setup_indicators_ready,
+                              (GAsyncReadyCallback)cind_format_check_ready,
                               result);
 }
 
 /*****************************************************************************/
-/* ENABLE/DISABLE UNSOLICITED EVENTS */
+/* Enabling/disabling unsolicited events (3GPP interface) */
 
 static void
 ciev_received (MMAtSerialPort *port,
@@ -1300,7 +1309,7 @@ ciev_received (MMAtSerialPort *port,
     }
 
     /* Handle signal quality change indication */
-    if (ind == self->priv->cind_indicator_signal_quality) {
+    if (ind == self->priv->modem_cind_indicator_signal_quality) {
         str = g_match_info_fetch (info, 2);
         if (str) {
             gint quality = 0;
@@ -1339,26 +1348,26 @@ unsolicited_events_context_complete_and_free (UnsolicitedEventsContext *ctx)
 }
 
 static gboolean
-unsolicited_events_finish (MMIfaceModem3gpp *self,
-                           GAsyncResult *res,
-                           GError **error)
+modem_3gpp_unsolicited_events_finish (MMIfaceModem3gpp *self,
+                                      GAsyncResult *res,
+                                      GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
-static void unsolicited_events (UnsolicitedEventsContext *ctx);
+static void run_unsolicited_events_setup (UnsolicitedEventsContext *ctx);
 
 static void
-unsolicited_events_ready (MMBroadbandModem *self,
-                          GAsyncResult *res,
-                          UnsolicitedEventsContext *ctx)
+unsolicited_events_setup_ready (MMBroadbandModem *self,
+                                GAsyncResult *res,
+                                UnsolicitedEventsContext *ctx)
 {
     GError *error = NULL;
 
     mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!error) {
         /* Run on next port, if any */
-        unsolicited_events (ctx);
+        run_unsolicited_events_setup (ctx);
         return;
     }
 
@@ -1372,7 +1381,7 @@ unsolicited_events_ready (MMBroadbandModem *self,
 }
 
 static void
-unsolicited_events (UnsolicitedEventsContext *ctx)
+run_unsolicited_events_setup (UnsolicitedEventsContext *ctx)
 {
     MMAtSerialPort *port = NULL;
 
@@ -1412,7 +1421,7 @@ unsolicited_events (UnsolicitedEventsContext *ctx)
                                           3,
                                           FALSE,
                                           NULL, /* cancellable */
-                                          (GAsyncReadyCallback)unsolicited_events_ready,
+                                          (GAsyncReadyCallback)unsolicited_events_setup_ready,
                                           ctx);
         return;
     }
@@ -1423,9 +1432,9 @@ unsolicited_events (UnsolicitedEventsContext *ctx)
 }
 
 static void
-enable_unsolicited_events (MMIfaceModem3gpp *self,
-                           GAsyncReadyCallback callback,
-                           gpointer user_data)
+modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *self,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data)
 {
     UnsolicitedEventsContext *ctx;
 
@@ -1436,15 +1445,15 @@ enable_unsolicited_events (MMIfaceModem3gpp *self,
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             enable_unsolicited_events);
+                                             modem_3gpp_enable_unsolicited_events);
 
-    unsolicited_events (ctx);
+    run_unsolicited_events_setup (ctx);
 }
 
 static void
-disable_unsolicited_events (MMIfaceModem3gpp *self,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data)
+modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
 {
     UnsolicitedEventsContext *ctx;
 
@@ -1454,13 +1463,13 @@ disable_unsolicited_events (MMIfaceModem3gpp *self,
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             disable_unsolicited_events);
+                                             modem_3gpp_disable_unsolicited_events);
 
-    unsolicited_events (ctx);
+    run_unsolicited_events_setup (ctx);
 }
 
 /*****************************************************************************/
-/* SETTING MODEM CHARSET */
+/* Setting modem charset (Modem interface) */
 
 typedef struct {
     GSimpleAsyncResult *result;
@@ -1482,9 +1491,9 @@ setup_charset_context_free (SetupCharsetContext *ctx)
 }
 
 static gboolean
-setup_charset_finish (MMIfaceModem *self,
-                      GAsyncResult *res,
-                      GError **error)
+modem_setup_charset_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
 {
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return FALSE;
@@ -1493,9 +1502,9 @@ setup_charset_finish (MMIfaceModem *self,
 }
 
 static void
-current_charset_ready (MMBroadbandModem *self,
-                       GAsyncResult *res,
-                       SetupCharsetContext *ctx)
+current_charset_query_ready (MMBroadbandModem *self,
+                             GAsyncResult *res,
+                             SetupCharsetContext *ctx)
 {
     GError *error = NULL;
     const gchar *response;
@@ -1523,7 +1532,7 @@ current_charset_ready (MMBroadbandModem *self,
         else {
             /* We'll keep track ourselves of the current charset.
              * TODO: Make this a property so that plugins can also store it. */
-            self->priv->current_charset = current;
+            self->priv->modem_current_charset = current;
             g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         }
     }
@@ -1533,9 +1542,9 @@ current_charset_ready (MMBroadbandModem *self,
 }
 
 static void
-setup_charset_ready (MMBroadbandModem *self,
-                     GAsyncResult *res,
-                     SetupCharsetContext *ctx)
+charset_change_ready (MMBroadbandModem *self,
+                      GAsyncResult *res,
+                      SetupCharsetContext *ctx)
 {
     GError *error = NULL;
 
@@ -1553,15 +1562,15 @@ setup_charset_ready (MMBroadbandModem *self,
                               3,
                               FALSE,
                               NULL, /* cancellable */
-                              (GAsyncReadyCallback)current_charset_ready,
+                              (GAsyncReadyCallback)current_charset_query_ready,
                               ctx);
 }
 
 static void
-setup_charset (MMIfaceModem *self,
-               MMModemCharset charset,
-               GAsyncReadyCallback callback,
-               gpointer user_data)
+modem_setup_charset (MMIfaceModem *self,
+                     MMModemCharset charset,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
 {
     SetupCharsetContext *ctx;
     const gchar *charset_str;
@@ -1588,7 +1597,7 @@ setup_charset (MMIfaceModem *self,
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             setup_charset);
+                                             modem_setup_charset);
     ctx->charset = charset;
     /* First try, with quotes */
     ctx->charset_commands[0].command = g_strdup_printf ("+CSCS=\"%s\"", charset_str);
@@ -1611,28 +1620,29 @@ setup_charset (MMIfaceModem *self,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
         NULL, /* cancellable */
-        (GAsyncReadyCallback)setup_charset_ready,
+        (GAsyncReadyCallback)charset_change_ready,
         ctx);
 }
 
 /*****************************************************************************/
-/* LOAD SUPPORTED CHARSETS */
+/* Loading supported charsets (Modem interface) */
 
 static MMModemCharset
-load_supported_charsets_finish (MMIfaceModem *self,
-                                GAsyncResult *res,
-                                GError **error)
+modem_load_supported_charsets_finish (MMIfaceModem *self,
+                                      GAsyncResult *res,
+                                      GError **error)
 {
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return MM_MODEM_CHARSET_UNKNOWN;
 
-    return GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    return GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
+                                 G_SIMPLE_ASYNC_RESULT (res)));
 }
 
 static void
-load_supported_charsets_ready (MMBaseModem *self,
-                               GAsyncResult *res,
-                               GSimpleAsyncResult *simple)
+cscs_format_check_ready (MMBaseModem *self,
+                         GAsyncResult *res,
+                         GSimpleAsyncResult *simple)
 {
     MMModemCharset charsets = MM_MODEM_CHARSET_UNKNOWN;
     const gchar *response;
@@ -1657,16 +1667,16 @@ load_supported_charsets_ready (MMBaseModem *self,
 }
 
 static void
-load_supported_charsets (MMIfaceModem *self,
-                         GAsyncReadyCallback callback,
-                         gpointer user_data)
+modem_load_supported_charsets (MMIfaceModem *self,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data)
 {
     GSimpleAsyncResult *result;
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        load_supported_charsets);
+                                        modem_load_supported_charsets);
 
     /* CDMA-only modems don't need this */
     if (mm_iface_modem_is_cdma_only (self)) {
@@ -1684,26 +1694,26 @@ load_supported_charsets (MMIfaceModem *self,
                               3,
                               TRUE,
                               NULL,  /* cancellable */
-                              (GAsyncReadyCallback)load_supported_charsets_ready,
+                              (GAsyncReadyCallback)cscs_format_check_ready,
                               result);
 }
 
 /*****************************************************************************/
-/* FLOW CONTROL */
+/* configuring flow control (Modem interface) */
 
 static gboolean
-setup_flow_control_finish (MMIfaceModem *self,
-                           GAsyncResult *res,
-                           GError **error)
+modem_setup_flow_control_finish (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 GError **error)
 {
     /* Completely ignore errors */
     return TRUE;
 }
 
 static void
-setup_flow_control (MMIfaceModem *self,
-                    GAsyncReadyCallback callback,
-                    gpointer user_data)
+modem_setup_flow_control (MMIfaceModem *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
 {
     GSimpleAsyncResult *result;
 
@@ -1715,14 +1725,14 @@ setup_flow_control (MMIfaceModem *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        setup_flow_control);
+                                        modem_setup_flow_control);
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
 }
 
 /*****************************************************************************/
-/* MODEM POWER UP */
+/* Powering up the modem (Modem interface) */
 
 static gboolean
 modem_power_up_finish (MMIfaceModem *self,
@@ -1753,14 +1763,14 @@ modem_power_up (MMIfaceModem *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        setup_flow_control);
+                                        modem_power_up);
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
 }
 
 /*****************************************************************************/
-/* MODEM INITIALIZATION */
+/* Initializing the modem (Modem interface) */
 
 static gboolean
 modem_init_finish (MMIfaceModem *self,
@@ -1805,12 +1815,12 @@ modem_init (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* IMEI */
+/* IMEI loading (3GPP interface) */
 
 static gchar *
-load_imei_finish (MMIfaceModem3gpp *self,
-                  GAsyncResult *res,
-                  GError **error)
+modem_3gpp_load_imei_finish (MMIfaceModem3gpp *self,
+                             GAsyncResult *res,
+                             GError **error)
 {
     gchar *imei;
 
@@ -1823,9 +1833,9 @@ load_imei_finish (MMIfaceModem3gpp *self,
 }
 
 static void
-load_imei (MMIfaceModem3gpp *self,
-           GAsyncReadyCallback callback,
-           gpointer user_data)
+modem_3gpp_load_imei (MMIfaceModem3gpp *self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
 {
     mm_dbg ("loading IMEI...");
     mm_base_modem_at_command (MM_BASE_MODEM (self),
@@ -1838,12 +1848,12 @@ load_imei (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
-/* Operator Code */
+/* Operator Code loading (3GPP interface) */
 
 static gchar *
-load_operator_code_finish (MMIfaceModem3gpp *self,
-                           GAsyncResult *res,
-                           GError **error)
+modem_3gpp_load_operator_code_finish (MMIfaceModem3gpp *self,
+                                      GAsyncResult *res,
+                                      GError **error)
 {
     const gchar *result;
     gchar *operator_code;
@@ -1860,12 +1870,11 @@ load_operator_code_finish (MMIfaceModem3gpp *self,
 }
 
 static void
-load_operator_code (MMIfaceModem3gpp *self,
-                    GAsyncReadyCallback callback,
-                    gpointer user_data)
+modem_3gpp_load_operator_code (MMIfaceModem3gpp *self,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data)
 {
     mm_dbg ("loading Operator Code...");
-
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+COPS=3,2;+COPS?",
                               3,
@@ -1876,12 +1885,12 @@ load_operator_code (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
-/* Operator Name */
+/* Operator Name loading (3GPP interface) */
 
 static gchar *
-load_operator_name_finish (MMIfaceModem3gpp *self,
-                           GAsyncResult *res,
-                           GError **error)
+modem_3gpp_load_operator_name_finish (MMIfaceModem3gpp *self,
+                                      GAsyncResult *res,
+                                      GError **error)
 {
     const gchar *result;
     gchar *operator_name;
@@ -1898,12 +1907,11 @@ load_operator_name_finish (MMIfaceModem3gpp *self,
 }
 
 static void
-load_operator_name (MMIfaceModem3gpp *self,
-                    GAsyncReadyCallback callback,
-                    gpointer user_data)
+modem_3gpp_load_operator_name (MMIfaceModem3gpp *self,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data)
 {
     mm_dbg ("loading Operator Name...");
-
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+COPS=3,0;+COPS?",
                               3,
@@ -1914,20 +1922,20 @@ load_operator_name (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
-/* Unsolicited registration messages handling (3GPP) */
+/* Unsolicited registration messages handling (3GPP interface) */
 
 static gboolean
-setup_unsolicited_registration_finish (MMIfaceModem3gpp *self,
-                                       GAsyncResult *res,
-                                       GError **error)
+modem_3gpp_setup_unsolicited_registration_finish (MMIfaceModem3gpp *self,
+                                                  GAsyncResult *res,
+                                                  GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
 static void
-reg_state_changed (MMAtSerialPort *port,
-                   GMatchInfo *match_info,
-                   MMBroadbandModem *self)
+registration_state_changed (MMAtSerialPort *port,
+                            GMatchInfo *match_info,
+                            MMBroadbandModem *self)
 {
     MMModem3gppRegistrationState state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     gulong lac = 0, cell_id = 0;
@@ -1963,9 +1971,9 @@ reg_state_changed (MMAtSerialPort *port,
 }
 
 static void
-setup_unsolicited_registration (MMIfaceModem3gpp *self,
-                                GAsyncReadyCallback callback,
-                                gpointer user_data)
+modem_3gpp_setup_unsolicited_registration (MMIfaceModem3gpp *self,
+                                           GAsyncReadyCallback callback,
+                                           gpointer user_data)
 {
     GSimpleAsyncResult *result;
     MMAtSerialPort *ports[2];
@@ -1977,7 +1985,7 @@ setup_unsolicited_registration (MMIfaceModem3gpp *self,
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        setup_unsolicited_registration);
+                                        modem_3gpp_setup_unsolicited_registration);
 
     ports[0] = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
     ports[1] = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
@@ -1992,7 +2000,7 @@ setup_unsolicited_registration (MMIfaceModem3gpp *self,
                 mm_at_serial_port_add_unsolicited_msg_handler (
                     MM_AT_SERIAL_PORT (ports[i]),
                     (GRegex *) g_ptr_array_index (array, j),
-                    (MMAtSerialUnsolicitedMsgFn) reg_state_changed,
+                    (MMAtSerialUnsolicitedMsgFn)registration_state_changed,
                     self,
                     NULL);
             }
@@ -2006,20 +2014,20 @@ setup_unsolicited_registration (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
-/* Unsolicited registration messages cleaning up (3GPP) */
+/* Unsolicited registration messages cleaning up (3GPP interface) */
 
 static gboolean
-cleanup_unsolicited_registration_finish (MMIfaceModem3gpp *self,
-                                         GAsyncResult *res,
-                                         GError **error)
+modem_3gpp_cleanup_unsolicited_registration_finish (MMIfaceModem3gpp *self,
+                                                    GAsyncResult *res,
+                                                    GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
 static void
-cleanup_unsolicited_registration (MMIfaceModem3gpp *self,
-                                  GAsyncReadyCallback callback,
-                                  gpointer user_data)
+modem_3gpp_cleanup_unsolicited_registration (MMIfaceModem3gpp *self,
+                                             GAsyncReadyCallback callback,
+                                             gpointer user_data)
 {
     GSimpleAsyncResult *result;
     MMAtSerialPort *ports[2];
@@ -2027,11 +2035,10 @@ cleanup_unsolicited_registration (MMIfaceModem3gpp *self,
     guint i;
 
     mm_dbg ("cleaning up unsolicited registration messages handling");
-
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        cleanup_unsolicited_registration);
+                                        modem_3gpp_cleanup_unsolicited_registration);
 
     ports[0] = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
     ports[1] = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
@@ -2060,12 +2067,12 @@ cleanup_unsolicited_registration (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
-/* Scan networks (3GPP) */
+/* Scan networks (3GPP interface) */
 
 static GList *
-scan_networks_finish (MMIfaceModem3gpp *self,
-                      GAsyncResult *res,
-                      GError **error)
+modem_3gpp_scan_networks_finish (MMIfaceModem3gpp *self,
+                                 GAsyncResult *res,
+                                 GError **error)
 {
     const gchar *result;
 
@@ -2077,9 +2084,9 @@ scan_networks_finish (MMIfaceModem3gpp *self,
 }
 
 static void
-scan_networks (MMIfaceModem3gpp *self,
-               GAsyncReadyCallback callback,
-               gpointer user_data)
+modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
 {
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+COPS=?",
@@ -2091,25 +2098,26 @@ scan_networks (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
-/* Register in network (3GPP) */
+/* Register in network (3GPP interface) */
 
 /* Maximum time to wait for a successful registration when polling
  * periodically */
-#define MAX_REGISTRATION_CHECK_WAIT_TIME 60
+#define MAX_3GPP_REGISTRATION_CHECK_WAIT_TIME 60
 
 typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
     GCancellable *cancellable;
     GTimer *timer;
-} RegisterInNetworkContext;
+} RegisterIn3gppNetworkContext;
 
 static void
-register_in_network_context_complete_and_free (RegisterInNetworkContext *ctx)
+register_in_3gpp_network_context_complete_and_free (RegisterIn3gppNetworkContext *ctx)
 {
     /* If our cancellable reference is still around, clear it */
-    if (ctx->self->priv->pending_reg_cancellable == ctx->cancellable) {
-        g_clear_object (&ctx->self->priv->pending_reg_cancellable);
+    if (ctx->self->priv->modem_3gpp_pending_registration_cancellable ==
+        ctx->cancellable) {
+        g_clear_object (&ctx->self->priv->modem_3gpp_pending_registration_cancellable);
     }
 
     if (ctx->timer)
@@ -2123,42 +2131,44 @@ register_in_network_context_complete_and_free (RegisterInNetworkContext *ctx)
 }
 
 static gboolean
-register_in_network_finish (MMIfaceModem3gpp *self,
-                            GAsyncResult *res,
-                            GError **error)
+modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
+                                       GAsyncResult *res,
+                                       GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
+#undef REG_IS_IDLE
 #define REG_IS_IDLE(state)                                  \
     (state != MM_MODEM_3GPP_REGISTRATION_STATE_HOME &&      \
      state != MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING && \
      state != MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING)
 
+#undef REG_IS_DONE
 #define REG_IS_DONE(state)                                  \
     (state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||      \
      state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING ||   \
      state == MM_MODEM_3GPP_REGISTRATION_STATE_DENIED)
 
-static void run_all_registration_checks_ready (MMBroadbandModem *self,
-                                               GAsyncResult *res,
-                                               RegisterInNetworkContext *ctx);
+static void run_all_3gpp_registration_checks_ready (MMBroadbandModem *self,
+                                                    GAsyncResult *res,
+                                                    RegisterIn3gppNetworkContext *ctx);
 
 static gboolean
-run_all_registration_checks_again (RegisterInNetworkContext *ctx)
+run_all_3gpp_registration_checks_again (RegisterIn3gppNetworkContext *ctx)
 {
     /* Get fresh registration state */
     mm_iface_modem_3gpp_run_all_registration_checks (
         MM_IFACE_MODEM_3GPP (ctx->self),
-        (GAsyncReadyCallback)run_all_registration_checks_ready,
+        (GAsyncReadyCallback)run_all_3gpp_registration_checks_ready,
         ctx);
     return FALSE;
 }
 
 static void
-run_all_registration_checks_ready (MMBroadbandModem *self,
-                                   GAsyncResult *res,
-                                   RegisterInNetworkContext *ctx)
+run_all_3gpp_registration_checks_ready (MMBroadbandModem *self,
+                                        GAsyncResult *res,
+                                        RegisterIn3gppNetworkContext *ctx)
 {
     GError *error = NULL;
 
@@ -2167,7 +2177,7 @@ run_all_registration_checks_ready (MMBroadbandModem *self,
                                                             &error);
 
     if (error) {
-        mm_dbg ("Registration check failed: '%s'", error->message);
+        mm_dbg ("3GPP registration check failed: '%s'", error->message);
         mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self),
                                                           MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
                                                           MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
@@ -2175,21 +2185,21 @@ run_all_registration_checks_ready (MMBroadbandModem *self,
                                                           MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
                                                           MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
         g_simple_async_result_take_error (ctx->result, error);
-        register_in_network_context_complete_and_free (ctx);
+        register_in_3gpp_network_context_complete_and_free (ctx);
         return;
     }
 
     /* If we got registered, end registration checks */
     if (REG_IS_DONE (self->priv->modem_3gpp_registration_state)) {
-        mm_dbg ("Modem is currently registered in 3GPP network");
+        mm_dbg ("Modem is currently registered in a 3GPP network");
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-        register_in_network_context_complete_and_free (ctx);
+        register_in_3gpp_network_context_complete_and_free (ctx);
         return;
     }
 
-    /* Don't spent too much time waiting to get registered */
-    if (g_timer_elapsed (ctx->timer, NULL) > MAX_REGISTRATION_CHECK_WAIT_TIME) {
-        mm_dbg ("Registration check timed out");
+    /* Don't spend too much time waiting to get registered */
+    if (g_timer_elapsed (ctx->timer, NULL) > MAX_3GPP_REGISTRATION_CHECK_WAIT_TIME) {
+        mm_dbg ("3GPP registration check timed out");
         mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self),
                                                           MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
                                                           MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
@@ -2199,7 +2209,7 @@ run_all_registration_checks_ready (MMBroadbandModem *self,
         g_simple_async_result_take_error (
             ctx->result,
             mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT));
-        register_in_network_context_complete_and_free (ctx);
+        register_in_3gpp_network_context_complete_and_free (ctx);
         return;
     }
 
@@ -2209,16 +2219,16 @@ run_all_registration_checks_ready (MMBroadbandModem *self,
      * This 3s timeout will catch results from automatic registrations as
      * well.
      */
-    mm_dbg ("Modem not yet registered... will recheck soon");
+    mm_dbg ("Modem not yet registered in a 3GPP network... will recheck soon");
     g_timeout_add_seconds (3,
-                           (GSourceFunc)run_all_registration_checks_again,
+                           (GSourceFunc)run_all_3gpp_registration_checks_again,
                            ctx);
 }
 
 static void
-register_in_network_ready (MMBroadbandModem *self,
-                           GAsyncResult *res,
-                           RegisterInNetworkContext *ctx)
+register_in_3gpp_network_ready (MMBroadbandModem *self,
+                                GAsyncResult *res,
+                                RegisterIn3gppNetworkContext *ctx)
 {
     GError *error = NULL;
 
@@ -2233,7 +2243,7 @@ register_in_network_ready (MMBroadbandModem *self,
                                                           MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
                                                           MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
         g_simple_async_result_take_error (ctx->result, error);
-        register_in_network_context_complete_and_free (ctx);
+        register_in_3gpp_network_context_complete_and_free (ctx);
         return;
     }
 
@@ -2241,53 +2251,54 @@ register_in_network_ready (MMBroadbandModem *self,
     ctx->timer = g_timer_new ();
     mm_iface_modem_3gpp_run_all_registration_checks (
         MM_IFACE_MODEM_3GPP (self),
-        (GAsyncReadyCallback)run_all_registration_checks_ready,
+        (GAsyncReadyCallback)run_all_3gpp_registration_checks_ready,
         ctx);
 }
 
 static void
-register_in_network (MMIfaceModem3gpp *self,
-                     const gchar *network_id,
-                     GAsyncReadyCallback callback,
-                     gpointer user_data)
+modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
+                                const gchar *network_id,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data)
 {
     MMBroadbandModem *broadband = MM_BROADBAND_MODEM (self);
-    RegisterInNetworkContext *ctx;
+    RegisterIn3gppNetworkContext *ctx;
     gchar *command = NULL;
 
     /* (Try to) cancel previous registration request */
-    if (broadband->priv->pending_reg_cancellable) {
-        g_cancellable_cancel (broadband->priv->pending_reg_cancellable);
-        g_clear_object (&broadband->priv->pending_reg_cancellable);
+    if (broadband->priv->modem_3gpp_pending_registration_cancellable) {
+        g_cancellable_cancel (broadband->priv->modem_3gpp_pending_registration_cancellable);
+        g_clear_object (&broadband->priv->modem_3gpp_pending_registration_cancellable);
     }
 
-    ctx = g_new0 (RegisterInNetworkContext, 1);
+    ctx = g_new0 (RegisterIn3gppNetworkContext, 1);
     ctx->self = g_object_ref (self);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             register_in_network);
+                                             modem_3gpp_register_in_network);
     ctx->cancellable = g_cancellable_new ();
 
     /* Keep an accessible reference to the cancellable, so that we can cancel
      * previous request when needed */
-    broadband->priv->pending_reg_cancellable = g_object_ref (ctx->cancellable);
+    broadband->priv->modem_3gpp_pending_registration_cancellable =
+        g_object_ref (ctx->cancellable);
 
     /* If the user sent a specific network to use, lock it in. */
     if (network_id && network_id[0]) {
         command = g_strdup_printf ("+COPS=1,2,\"%s\"", network_id);
-        broadband->priv->manual_reg = TRUE;
+        broadband->priv->modem_3gpp_manual_registration = TRUE;
     }
     /* If no specific network was given, and the modem is not registered and not
      * searching, kick it to search for a network. Also do auto registration if
      * the modem had been set to manual registration last time but now is not.
      */
     else if (REG_IS_IDLE (broadband->priv->modem_3gpp_registration_state) ||
-             broadband->priv->manual_reg) {
+             broadband->priv->modem_3gpp_manual_registration) {
         /* Note that '+COPS=0,,' (same but with commas) won't work in some Nokia
          * phones */
         command = g_strdup ("+COPS=0");
-        broadband->priv->manual_reg = FALSE;
+        broadband->priv->modem_3gpp_manual_registration = FALSE;
     }
 
     if (command) {
@@ -2299,7 +2310,7 @@ register_in_network (MMIfaceModem3gpp *self,
                                   120,
                                   FALSE,
                                   ctx->cancellable,
-                                  (GAsyncReadyCallback)register_in_network_ready,
+                                  (GAsyncReadyCallback)register_in_3gpp_network_ready,
                                   ctx);
         g_free (command);
         return;
@@ -2312,25 +2323,25 @@ register_in_network (MMIfaceModem3gpp *self,
     ctx->timer = g_timer_new ();
     mm_iface_modem_3gpp_run_all_registration_checks (
         MM_IFACE_MODEM_3GPP (self),
-        (GAsyncReadyCallback)run_all_registration_checks_ready,
+        (GAsyncReadyCallback)run_all_3gpp_registration_checks_ready,
         ctx);
 }
 
 /*****************************************************************************/
-/* CS and PS Registration checks (3GPP) */
+/* CS and PS Registration checks (3GPP interface) */
 
 static gboolean
-run_cs_registration_check_finish (MMIfaceModem3gpp *self,
-                                  GAsyncResult *res,
-                                  GError **error)
+modem_3gpp_run_cs_registration_check_finish (MMIfaceModem3gpp *self,
+                                             GAsyncResult *res,
+                                             GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
 static gboolean
-run_ps_registration_check_finish (MMIfaceModem3gpp *self,
-                                  GAsyncResult *res,
-                                  GError **error)
+modem_3gpp_run_ps_registration_check_finish (MMIfaceModem3gpp *self,
+                                             GAsyncResult *res,
+                                             GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
@@ -2359,8 +2370,11 @@ registration_status_check_ready (MMBroadbandModem *self,
         guint i;
 
         /* Try to match the response */
-        for (i = 0; i < self->priv->reg_regex->len; i++) {
-            if (g_regex_match ((GRegex *)g_ptr_array_index (self->priv->reg_regex, i),
+        for (i = 0;
+             i < self->priv->modem_3gpp_registration_regex->len;
+             i++) {
+            if (g_regex_match ((GRegex *)g_ptr_array_index (
+                                   self->priv->modem_3gpp_registration_regex, i),
                                response,
                                0,
                                &match_info))
@@ -2427,16 +2441,16 @@ registration_status_check_ready (MMBroadbandModem *self,
 }
 
 static void
-run_cs_registration_check (MMIfaceModem3gpp *self,
-                           GAsyncReadyCallback callback,
-                           gpointer user_data)
+modem_3gpp_run_cs_registration_check (MMIfaceModem3gpp *self,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data)
 {
     GSimpleAsyncResult *result;
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        run_cs_registration_check);
+                                        modem_3gpp_run_cs_registration_check);
 
     /* Check current CS-registration state. */
     mm_base_modem_at_command (MM_BASE_MODEM (self),
@@ -2449,16 +2463,16 @@ run_cs_registration_check (MMIfaceModem3gpp *self,
 }
 
 static void
-run_ps_registration_check (MMIfaceModem3gpp *self,
-                           GAsyncReadyCallback callback,
-                           gpointer user_data)
+modem_3gpp_run_ps_registration_check (MMIfaceModem3gpp *self,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data)
 {
     GSimpleAsyncResult *result;
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        run_ps_registration_check);
+                                        modem_3gpp_run_ps_registration_check);
 
     /* Check current PS-registration state. */
     mm_base_modem_at_command (MM_BASE_MODEM (self),
@@ -2471,7 +2485,7 @@ run_ps_registration_check (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
-/* CS and PS Registrations cleanup (3GPP) */
+/* CS and PS Registrations cleanup (3GPP interface) */
 
 typedef struct {
     GSimpleAsyncResult *result;
@@ -2488,17 +2502,17 @@ cleanup_registration_context_free (CleanupRegistrationContext *ctx)
 }
 
 static gboolean
-cleanup_cs_registration_finish (MMIfaceModem3gpp *self,
-                                GAsyncResult *res,
-                                GError **error)
+modem_3gpp_cleanup_cs_registration_finish (MMIfaceModem3gpp *self,
+                                           GAsyncResult *res,
+                                           GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
 static gboolean
-cleanup_ps_registration_finish (MMIfaceModem3gpp *self,
-                                GAsyncResult *res,
-                                GError **error)
+modem_3gpp_cleanup_ps_registration_finish (MMIfaceModem3gpp *self,
+                                           GAsyncResult *res,
+                                           GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
@@ -2557,9 +2571,9 @@ cleanup_registration_sequence_ready (MMBroadbandModem *self,
 }
 
 static void
-cleanup_cs_registration (MMIfaceModem3gpp *self,
-                         GAsyncReadyCallback callback,
-                         gpointer user_data)
+modem_3gpp_cleanup_cs_registration (MMIfaceModem3gpp *self,
+                                    GAsyncReadyCallback callback,
+                                    gpointer user_data)
 {
     CleanupRegistrationContext *ctx;
 
@@ -2567,7 +2581,7 @@ cleanup_cs_registration (MMIfaceModem3gpp *self,
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             cleanup_cs_registration);
+                                             modem_3gpp_cleanup_cs_registration);
     ctx->command = g_strdup ("+CREG=0");
 
     mm_base_modem_at_command_in_port (
@@ -2582,9 +2596,9 @@ cleanup_cs_registration (MMIfaceModem3gpp *self,
 }
 
 static void
-cleanup_ps_registration (MMIfaceModem3gpp *self,
-                       GAsyncReadyCallback callback,
-                       gpointer user_data)
+modem_3gpp_cleanup_ps_registration (MMIfaceModem3gpp *self,
+                                    GAsyncReadyCallback callback,
+                                    gpointer user_data)
 {
     CleanupRegistrationContext *ctx;
 
@@ -2592,7 +2606,7 @@ cleanup_ps_registration (MMIfaceModem3gpp *self,
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             cleanup_cs_registration);
+                                             modem_3gpp_cleanup_cs_registration);
     ctx->command = g_strdup ("+CGREG=0");
 
     mm_base_modem_at_command_in_port (
@@ -2607,7 +2621,7 @@ cleanup_ps_registration (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
-/* CS and PS Registrations (3GPP) */
+/* CS and PS Registrations setup (3GPP interface) */
 
 typedef struct {
     GSimpleAsyncResult *result;
@@ -2622,30 +2636,30 @@ setup_registration_context_free (SetupRegistrationContext *ctx)
 }
 
 static gboolean
-setup_cs_registration_finish (MMIfaceModem3gpp *self,
-                              GAsyncResult *res,
-                              GError **error)
+modem_3gpp_setup_cs_registration_finish (MMIfaceModem3gpp *self,
+                                         GAsyncResult *res,
+                                         GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
 static gboolean
-setup_ps_registration_finish (MMIfaceModem3gpp *self,
-                              GAsyncResult *res,
-                              GError **error)
+modem_3gpp_setup_ps_registration_finish (MMIfaceModem3gpp *self,
+                                         GAsyncResult *res,
+                                         GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
 static gboolean
-parse_reg_setup_reply (MMBaseModem *self,
-                       gpointer none,
-                       const gchar *command,
-                       const gchar *response,
-                       gboolean last_command,
-                       const GError *error,
-                       GVariant **result,
-                       GError **result_error)
+parse_registration_setup_reply (MMBaseModem *self,
+                                gpointer none,
+                                const gchar *command,
+                                const gchar *response,
+                                gboolean last_command,
+                                const GError *error,
+                                GVariant **result,
+                                GError **result_error)
 {
     /* If error, try next command */
     if (error)
@@ -2658,17 +2672,17 @@ parse_reg_setup_reply (MMBaseModem *self,
 
 static const MMBaseModemAtCommand cs_registration_sequence[] = {
     /* Enable unsolicited registration notifications in CS network, with location */
-    { "+CREG=2", 3, FALSE, parse_reg_setup_reply },
+    { "+CREG=2", 3, FALSE, parse_registration_setup_reply },
     /* Enable unsolicited registration notifications in CS network, without location */
-    { "+CREG=1", 3, FALSE, parse_reg_setup_reply },
+    { "+CREG=1", 3, FALSE, parse_registration_setup_reply },
     { NULL }
 };
 
 static const MMBaseModemAtCommand ps_registration_sequence[] = {
     /* Enable unsolicited registration notifications in PS network, with location */
-    { "+CGREG=2", 3, FALSE, parse_reg_setup_reply },
+    { "+CGREG=2", 3, FALSE, parse_registration_setup_reply },
     /* Enable unsolicited registration notifications in PS network, without location */
-    { "+CGREG=1", 3, FALSE, parse_reg_setup_reply },
+    { "+CGREG=1", 3, FALSE, parse_registration_setup_reply },
     { NULL }
 };
 
@@ -2726,9 +2740,9 @@ setup_registration_sequence_ready (MMBroadbandModem *self,
 }
 
 static void
-setup_cs_registration (MMIfaceModem3gpp *self,
-                       GAsyncReadyCallback callback,
-                       gpointer user_data)
+modem_3gpp_setup_cs_registration (MMIfaceModem3gpp *self,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
 {
     SetupRegistrationContext *ctx;
 
@@ -2736,7 +2750,7 @@ setup_cs_registration (MMIfaceModem3gpp *self,
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             setup_cs_registration);
+                                             modem_3gpp_setup_cs_registration);
     mm_base_modem_at_sequence_in_port (
         MM_BASE_MODEM (self),
         mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
@@ -2749,9 +2763,9 @@ setup_cs_registration (MMIfaceModem3gpp *self,
 }
 
 static void
-setup_ps_registration (MMIfaceModem3gpp *self,
-                       GAsyncReadyCallback callback,
-                       gpointer user_data)
+modem_3gpp_setup_ps_registration (MMIfaceModem3gpp *self,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
 {
     SetupRegistrationContext *ctx;
 
@@ -2759,7 +2773,7 @@ setup_ps_registration (MMIfaceModem3gpp *self,
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             setup_ps_registration);
+                                             modem_3gpp_setup_ps_registration);
     mm_base_modem_at_sequence_in_port (
         MM_BASE_MODEM (self),
         mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
@@ -2772,12 +2786,12 @@ setup_ps_registration (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
-/* ESN (CDMA) */
+/* ESN loading (CDMA interface) */
 
 static gchar *
-load_esn_finish (MMIfaceModemCdma *self,
-                 GAsyncResult *res,
-                 GError **error)
+modem_cdma_load_esn_finish (MMIfaceModemCdma *self,
+                            GAsyncResult *res,
+                            GError **error)
 {
     gchar *esn;
 
@@ -2790,9 +2804,9 @@ load_esn_finish (MMIfaceModemCdma *self,
 }
 
 static void
-load_esn (MMIfaceModemCdma *self,
-          GAsyncReadyCallback callback,
-          gpointer user_data)
+modem_cdma_load_esn (MMIfaceModemCdma *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
 {
     mm_dbg ("loading ESN...");
     mm_base_modem_at_command (MM_BASE_MODEM (self),
@@ -2805,7 +2819,7 @@ load_esn (MMIfaceModemCdma *self,
 }
 
 /*****************************************************************************/
-/* HDR state (CDMA) */
+/* HDR state check (CDMA interface) */
 
 typedef struct {
     guint8 hybrid_mode;
@@ -2830,12 +2844,12 @@ hdr_state_context_complete_and_free (HdrStateContext *ctx)
 }
 
 static gboolean
-get_hdr_state_finish (MMIfaceModemCdma *self,
-                      GAsyncResult *res,
-                      guint8 *hybrid_mode,
-                      guint8 *session_state,
-                      guint8 *almp_state,
-                      GError **error)
+modem_cdma_get_hdr_state_finish (MMIfaceModemCdma *self,
+                                 GAsyncResult *res,
+                                 guint8 *hybrid_mode,
+                                 guint8 *session_state,
+                                 guint8 *almp_state,
+                                 GError **error)
 {
     HdrStateResults *results;
 
@@ -2850,10 +2864,10 @@ get_hdr_state_finish (MMIfaceModemCdma *self,
 }
 
 static void
-get_hdr_state_ready (MMQcdmSerialPort *port,
-                     GByteArray *response,
-                     GError *error,
-                     HdrStateContext *ctx)
+hdr_subsys_state_info_ready (MMQcdmSerialPort *port,
+                             GByteArray *response,
+                             GError *error,
+                             HdrStateContext *ctx)
 {
     QcdmResult *result;
     HdrStateResults *results;
@@ -2893,9 +2907,9 @@ get_hdr_state_ready (MMQcdmSerialPort *port,
 }
 
 static void
-get_hdr_state (MMIfaceModemCdma *self,
-               GAsyncReadyCallback callback,
-               gpointer user_data)
+modem_cdma_get_hdr_state (MMIfaceModemCdma *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
 {
     MMQcdmSerialPort *qcdm;
     HdrStateContext *ctx;
@@ -2918,7 +2932,7 @@ get_hdr_state (MMIfaceModemCdma *self,
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             get_hdr_state);
+                                             modem_cdma_get_hdr_state);
     ctx->qcdm = g_object_ref (qcdm);
 
     /* Setup command */
@@ -2929,12 +2943,12 @@ get_hdr_state (MMIfaceModemCdma *self,
     mm_qcdm_serial_port_queue_command (ctx->qcdm,
                                        hdrstate,
                                        3,
-                                       (MMQcdmSerialResponseFn)get_hdr_state_ready,
+                                       (MMQcdmSerialResponseFn)hdr_subsys_state_info_ready,
                                        ctx);
 }
 
 /*****************************************************************************/
-/* Call Manager state (CDMA) */
+/* Call Manager state check (CDMA interface) */
 
 typedef struct {
     guint system_mode;
@@ -2958,11 +2972,11 @@ call_manager_state_context_complete_and_free (CallManagerStateContext *ctx)
 }
 
 static gboolean
-get_call_manager_state_finish (MMIfaceModemCdma *self,
-                               GAsyncResult *res,
-                               guint *system_mode,
-                               guint *operating_mode,
-                               GError **error)
+modem_cdma_get_call_manager_state_finish (MMIfaceModemCdma *self,
+                                          GAsyncResult *res,
+                                          guint *system_mode,
+                                          guint *operating_mode,
+                                          GError **error)
 {
     CallManagerStateResults *results;
 
@@ -2976,10 +2990,10 @@ get_call_manager_state_finish (MMIfaceModemCdma *self,
 }
 
 static void
-get_call_manager_state_ready (MMQcdmSerialPort *port,
-                              GByteArray *response,
-                              GError *error,
-                              CallManagerStateContext *ctx)
+cm_subsys_state_info_ready (MMQcdmSerialPort *port,
+                            GByteArray *response,
+                            GError *error,
+                            CallManagerStateContext *ctx)
 {
     QcdmResult *result;
     CallManagerStateResults *results;
@@ -3016,9 +3030,9 @@ get_call_manager_state_ready (MMQcdmSerialPort *port,
 }
 
 static void
-get_call_manager_state (MMIfaceModemCdma *self,
-                        GAsyncReadyCallback callback,
-                        gpointer user_data)
+modem_cdma_get_call_manager_state (MMIfaceModemCdma *self,
+                                   GAsyncReadyCallback callback,
+                                   gpointer user_data)
 {
     MMQcdmSerialPort *qcdm;
     CallManagerStateContext *ctx;
@@ -3041,7 +3055,7 @@ get_call_manager_state (MMIfaceModemCdma *self,
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             get_call_manager_state);
+                                             modem_cdma_get_call_manager_state);
     ctx->qcdm = g_object_ref (qcdm);
 
     /* Setup command */
@@ -3052,12 +3066,12 @@ get_call_manager_state (MMIfaceModemCdma *self,
     mm_qcdm_serial_port_queue_command (ctx->qcdm,
                                        cmstate,
                                        3,
-                                       (MMQcdmSerialResponseFn)get_call_manager_state_ready,
+                                       (MMQcdmSerialResponseFn)cm_subsys_state_info_ready,
                                        ctx);
 }
 
 /*****************************************************************************/
-/* Serving System (CDMA) */
+/* Serving System check (CDMA interface) */
 
 typedef struct {
     guint sid;
@@ -3094,13 +3108,13 @@ cdma1x_serving_system_no_service_error (void)
 }
 
 static gboolean
-get_cdma1x_serving_system_finish (MMIfaceModemCdma *self,
-                                  GAsyncResult *res,
-                                  guint *class,
-                                  guint *band,
-                                  guint *sid,
-                                  guint *nid,
-                                  GError **error)
+modem_cdma_get_cdma1x_serving_system_finish (MMIfaceModemCdma *self,
+                                             GAsyncResult *res,
+                                             guint *class,
+                                             guint *band,
+                                             guint *sid,
+                                             guint *nid,
+                                             GError **error)
 {
     Cdma1xServingSystemResults *results;
 
@@ -3116,9 +3130,9 @@ get_cdma1x_serving_system_finish (MMIfaceModemCdma *self,
 }
 
 static void
-get_cdma1x_serving_system_at_ready (MMIfaceModemCdma *self,
-                                    GAsyncResult *res,
-                                    Cdma1xServingSystemContext *ctx)
+css_query_ready (MMIfaceModemCdma *self,
+                 GAsyncResult *res,
+                 Cdma1xServingSystemContext *ctx)
 {
     GError *error = NULL;
     const gchar *result;
@@ -3242,10 +3256,10 @@ get_cdma1x_serving_system_at_ready (MMIfaceModemCdma *self,
 }
 
 static void
-get_cdma1x_serving_system_qcdm_ready (MMQcdmSerialPort *port,
-                                      GByteArray *response,
-                                      GError *error,
-                                      Cdma1xServingSystemContext *ctx)
+qcdm_cdma_status_ready (MMQcdmSerialPort *port,
+                        GByteArray *response,
+                        GError *error,
+                        Cdma1xServingSystemContext *ctx)
 {
     Cdma1xServingSystemResults *results;
     QcdmResult *result;
@@ -3266,7 +3280,7 @@ get_cdma1x_serving_system_qcdm_ready (MMQcdmSerialPort *port,
                                   3,
                                   FALSE,
                                   NULL, /* cancellable */
-                                  (GAsyncReadyCallback)get_cdma1x_serving_system_at_ready,
+                                  (GAsyncReadyCallback)css_query_ready,
                                   ctx);
         return;
     }
@@ -3295,9 +3309,9 @@ get_cdma1x_serving_system_qcdm_ready (MMQcdmSerialPort *port,
 }
 
 static void
-get_cdma1x_serving_system (MMIfaceModemCdma *self,
-                           GAsyncReadyCallback callback,
-                           gpointer user_data)
+modem_cdma_get_cdma1x_serving_system (MMIfaceModemCdma *self,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data)
 {
     Cdma1xServingSystemContext *ctx;
 
@@ -3307,7 +3321,7 @@ get_cdma1x_serving_system (MMIfaceModemCdma *self,
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             get_cdma1x_serving_system);
+                                             modem_cdma_get_cdma1x_serving_system);
     ctx->qcdm = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
 
     if (ctx->qcdm) {
@@ -3322,7 +3336,7 @@ get_cdma1x_serving_system (MMIfaceModemCdma *self,
         mm_qcdm_serial_port_queue_command (ctx->qcdm,
                                            cdma_status,
                                            3,
-                                           (MMQcdmSerialResponseFn)get_cdma1x_serving_system_qcdm_ready,
+                                           (MMQcdmSerialResponseFn)qcdm_cdma_status_ready,
                                            ctx);
         return;
     }
@@ -3333,18 +3347,18 @@ get_cdma1x_serving_system (MMIfaceModemCdma *self,
                               3,
                               FALSE,
                               NULL, /* cancellable */
-                              (GAsyncReadyCallback)get_cdma1x_serving_system_at_ready,
+                              (GAsyncReadyCallback)css_query_ready,
                               ctx);
 }
 
 /*****************************************************************************/
-/* Service status, analog/digital check (CDMA) */
+/* Service status, analog/digital check (CDMA interface) */
 
 static gboolean
-get_service_status_finish (MMIfaceModemCdma *self,
-                           GAsyncResult *res,
-                           gboolean *has_cdma_service,
-                           GError **error)
+modem_cdma_get_service_status_finish (MMIfaceModemCdma *self,
+                                      GAsyncResult *res,
+                                      gboolean *has_cdma_service,
+                                      GError **error)
 {
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return FALSE;
@@ -3354,9 +3368,9 @@ get_service_status_finish (MMIfaceModemCdma *self,
 }
 
 static void
-get_service_status_ready (MMIfaceModemCdma *self,
-                          GAsyncResult *res,
-                          GSimpleAsyncResult *simple)
+cad_query_ready (MMIfaceModemCdma *self,
+                 GAsyncResult *res,
+                 GSimpleAsyncResult *simple)
 {
     GError *error = NULL;
     const gchar *result;
@@ -3387,28 +3401,28 @@ get_service_status_ready (MMIfaceModemCdma *self,
 }
 
 static void
-get_service_status (MMIfaceModemCdma *self,
-                    GAsyncReadyCallback callback,
-                    gpointer user_data)
+modem_cdma_get_service_status (MMIfaceModemCdma *self,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data)
 {
     GSimpleAsyncResult *result;
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
-                                        get_service_status);
+                                        modem_cdma_get_service_status);
 
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               "+CAD?",
                               3,
                               FALSE,
                               NULL, /* cancellable */
-                              (GAsyncReadyCallback)get_service_status_ready,
+                              (GAsyncReadyCallback)cad_query_ready,
                               result);
 }
 
 /*****************************************************************************/
-/* Detailed registration state (CDMA) */
+/* Detailed registration state (CDMA interface) */
 typedef struct {
     MMModemCdmaRegistrationState detailed_cdma1x_state;
     MMModemCdmaRegistrationState detailed_evdo_state;
@@ -3445,11 +3459,11 @@ detailed_registration_state_context_complete_and_free (DetailedRegistrationState
 }
 
 static gboolean
-get_detailed_registration_state_finish (MMIfaceModemCdma *self,
-                                        GAsyncResult *res,
-                                        MMModemCdmaRegistrationState *detailed_cdma1x_state,
-                                        MMModemCdmaRegistrationState *detailed_evdo_state,
-                                        GError **error)
+modem_cdma_get_detailed_registration_state_finish (MMIfaceModemCdma *self,
+                                                   GAsyncResult *res,
+                                                   MMModemCdmaRegistrationState *detailed_cdma1x_state,
+                                                   MMModemCdmaRegistrationState *detailed_evdo_state,
+                                                   GError **error)
 {
     DetailedRegistrationStateResults *results;
 
@@ -3557,11 +3571,11 @@ spservice_ready (MMIfaceModemCdma *self,
 }
 
 static void
-get_detailed_registration_state (MMIfaceModemCdma *self,
-                                 MMModemCdmaRegistrationState cdma1x_state,
-                                 MMModemCdmaRegistrationState evdo_state,
-                                 GAsyncReadyCallback callback,
-                                 gpointer user_data)
+modem_cdma_get_detailed_registration_state (MMIfaceModemCdma *self,
+                                            MMModemCdmaRegistrationState cdma1x_state,
+                                            MMModemCdmaRegistrationState evdo_state,
+                                            GAsyncReadyCallback callback,
+                                            gpointer user_data)
 {
     MMAtSerialPort *port;
     GError *error = NULL;
@@ -3585,7 +3599,7 @@ get_detailed_registration_state (MMIfaceModemCdma *self,
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             get_detailed_registration_state);
+                                             modem_cdma_get_detailed_registration_state);
     ctx->port = g_object_ref (port);
     ctx->cdma1x_state = cdma1x_state;
     ctx->evdo_state = evdo_state;
@@ -3603,7 +3617,7 @@ get_detailed_registration_state (MMIfaceModemCdma *self,
 }
 
 /*****************************************************************************/
-/* Setup registration checks (CDMA) */
+/* Setup registration checks (CDMA interface) */
 
 typedef struct {
     gboolean skip_qcdm_call_manager_step;
@@ -3639,7 +3653,7 @@ setup_registration_checks_context_complete_and_free (SetupRegistrationChecksCont
         }
 
         if (MM_IFACE_MODEM_CDMA_GET_INTERFACE (ctx->self)->get_detailed_registration_state ==
-            get_detailed_registration_state) {
+            modem_cdma_get_detailed_registration_state) {
             /* Skip CDMA1x Serving System check if we have Sprint specific
              * commands AND if the default detailed registration checker
              * is the generic one. Implementations knowing that their
@@ -3669,14 +3683,14 @@ setup_registration_checks_context_complete_and_free (SetupRegistrationChecksCont
 }
 
 static gboolean
-setup_registration_checks_finish (MMIfaceModemCdma *self,
-                                  GAsyncResult *res,
-                                  gboolean *skip_qcdm_call_manager_step,
-                                  gboolean *skip_qcdm_hdr_step,
-                                  gboolean *skip_at_cdma_service_status_step,
-                                  gboolean *skip_at_cdma1x_serving_system_step,
-                                  gboolean *skip_detailed_registration_state,
-                                  GError **error)
+modem_cdma_setup_registration_checks_finish (MMIfaceModemCdma *self,
+                                             GAsyncResult *res,
+                                             gboolean *skip_qcdm_call_manager_step,
+                                             gboolean *skip_qcdm_hdr_step,
+                                             gboolean *skip_at_cdma_service_status_step,
+                                             gboolean *skip_at_cdma1x_serving_system_step,
+                                             gboolean *skip_detailed_registration_state,
+                                             GError **error)
 {
     SetupRegistrationChecksResults *results;
 
@@ -3739,9 +3753,9 @@ spservice_check_ready (MMIfaceModemCdma *self,
 }
 
 static void
-setup_registration_checks (MMIfaceModemCdma *self,
-                           GAsyncReadyCallback callback,
-                           gpointer user_data)
+modem_cdma_setup_registration_checks (MMIfaceModemCdma *self,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data)
 {
     SetupRegistrationChecksContext *ctx;
 
@@ -3750,7 +3764,7 @@ setup_registration_checks (MMIfaceModemCdma *self,
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             setup_registration_checks);
+                                             modem_cdma_setup_registration_checks);
 
     /* Check if we have a QCDM port */
     ctx->has_qcdm_port = !!mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
@@ -4552,8 +4566,8 @@ mm_broadband_modem_init (MMBroadbandModem *self)
                                               MMBroadbandModemPrivate);
     self->priv->modem_state = MM_MODEM_STATE_UNKNOWN;
     self->priv->modem_current_capabilities = MM_MODEM_CAPABILITY_NONE;
-    self->priv->reg_regex = mm_3gpp_creg_regex_get (TRUE);
-    self->priv->current_charset = MM_MODEM_CHARSET_UNKNOWN;
+    self->priv->modem_3gpp_registration_regex = mm_3gpp_creg_regex_get (TRUE);
+    self->priv->modem_current_charset = MM_MODEM_CHARSET_UNKNOWN;
     self->priv->modem_3gpp_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     self->priv->modem_3gpp_cs_network_supported = TRUE;
     self->priv->modem_3gpp_ps_network_supported = TRUE;
@@ -4568,8 +4582,8 @@ finalize (GObject *object)
 {
     MMBroadbandModem *self = MM_BROADBAND_MODEM (object);
 
-    if (self->priv->reg_regex)
-        mm_3gpp_creg_regex_destroy (self->priv->reg_regex);
+    if (self->priv->modem_3gpp_registration_regex)
+        mm_3gpp_creg_regex_destroy (self->priv->modem_3gpp_registration_regex);
 
     G_OBJECT_CLASS (mm_broadband_modem_parent_class)->finalize (object);
 }
@@ -4610,40 +4624,40 @@ static void
 iface_modem_init (MMIfaceModem *iface)
 {
     /* Initialization steps */
-    iface->load_current_capabilities = load_current_capabilities;
-    iface->load_current_capabilities_finish = load_current_capabilities_finish;
-    iface->load_manufacturer = load_manufacturer;
-    iface->load_manufacturer_finish = load_manufacturer_finish;
-    iface->load_model = load_model;
-    iface->load_model_finish = load_model_finish;
-    iface->load_revision = load_revision;
-    iface->load_revision_finish = load_revision_finish;
-    iface->load_equipment_identifier = load_equipment_identifier;
-    iface->load_equipment_identifier_finish = load_equipment_identifier_finish;
-    iface->load_device_identifier = load_device_identifier;
-    iface->load_device_identifier_finish = load_device_identifier_finish;
-    iface->load_unlock_required = load_unlock_required;
-    iface->load_unlock_required_finish = load_unlock_required_finish;
+    iface->load_current_capabilities = modem_load_current_capabilities;
+    iface->load_current_capabilities_finish = modem_load_current_capabilities_finish;
+    iface->load_manufacturer = modem_load_manufacturer;
+    iface->load_manufacturer_finish = modem_load_manufacturer_finish;
+    iface->load_model = modem_load_model;
+    iface->load_model_finish = modem_load_model_finish;
+    iface->load_revision = modem_load_revision;
+    iface->load_revision_finish = modem_load_revision_finish;
+    iface->load_equipment_identifier = modem_load_equipment_identifier;
+    iface->load_equipment_identifier_finish = modem_load_equipment_identifier_finish;
+    iface->load_device_identifier = modem_load_device_identifier;
+    iface->load_device_identifier_finish = modem_load_device_identifier_finish;
+    iface->load_unlock_required = modem_load_unlock_required;
+    iface->load_unlock_required_finish = modem_load_unlock_required_finish;
     iface->create_sim = modem_create_sim;
     iface->create_sim_finish = modem_create_sim_finish;
-    iface->load_supported_modes = load_supported_modes;
-    iface->load_supported_modes_finish = load_supported_modes_finish;
+    iface->load_supported_modes = modem_load_supported_modes;
+    iface->load_supported_modes_finish = modem_load_supported_modes_finish;
 
     /* Enabling steps */
     iface->modem_init = modem_init;
     iface->modem_init_finish = modem_init_finish;
     iface->modem_power_up = modem_power_up;
     iface->modem_power_up_finish = modem_power_up_finish;
-    iface->setup_flow_control = setup_flow_control;
-    iface->setup_flow_control_finish = setup_flow_control_finish;
-    iface->load_supported_charsets = load_supported_charsets;
-    iface->load_supported_charsets_finish = load_supported_charsets_finish;
-    iface->setup_charset = setup_charset;
-    iface->setup_charset_finish = setup_charset_finish;
+    iface->setup_flow_control = modem_setup_flow_control;
+    iface->setup_flow_control_finish = modem_setup_flow_control_finish;
+    iface->load_supported_charsets = modem_load_supported_charsets;
+    iface->load_supported_charsets_finish = modem_load_supported_charsets_finish;
+    iface->setup_charset = modem_setup_charset;
+    iface->setup_charset_finish = modem_setup_charset_finish;
 
     /* Additional actions */
-    iface->load_signal_quality = load_signal_quality;
-    iface->load_signal_quality_finish = load_signal_quality_finish;
+    iface->load_signal_quality = modem_load_signal_quality;
+    iface->load_signal_quality_finish = modem_load_signal_quality_finish;
     iface->create_bearer = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
 }
@@ -4652,44 +4666,44 @@ static void
 iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 {
     /* Initialization steps */
-    iface->load_imei = load_imei;
-    iface->load_imei_finish = load_imei_finish;
+    iface->load_imei = modem_3gpp_load_imei;
+    iface->load_imei_finish = modem_3gpp_load_imei_finish;
 
     /* Enabling steps */
-    iface->setup_indicators = setup_indicators;
-    iface->setup_indicators_finish = setup_indicators_finish;
-    iface->enable_unsolicited_events = enable_unsolicited_events;
-    iface->enable_unsolicited_events_finish = unsolicited_events_finish;
-    iface->setup_unsolicited_registration = setup_unsolicited_registration;
-    iface->setup_unsolicited_registration_finish = setup_unsolicited_registration_finish;
-    iface->setup_cs_registration = setup_cs_registration;
-    iface->setup_cs_registration_finish = setup_cs_registration_finish;
-    iface->setup_ps_registration = setup_ps_registration;
-    iface->setup_ps_registration_finish = setup_ps_registration_finish;
+    iface->setup_indicators = modem_3gpp_setup_indicators;
+    iface->setup_indicators_finish = modem_3gpp_setup_indicators_finish;
+    iface->enable_unsolicited_events = modem_3gpp_enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = modem_3gpp_unsolicited_events_finish;
+    iface->setup_unsolicited_registration = modem_3gpp_setup_unsolicited_registration;
+    iface->setup_unsolicited_registration_finish = modem_3gpp_setup_unsolicited_registration_finish;
+    iface->setup_cs_registration = modem_3gpp_setup_cs_registration;
+    iface->setup_cs_registration_finish = modem_3gpp_setup_cs_registration_finish;
+    iface->setup_ps_registration = modem_3gpp_setup_ps_registration;
+    iface->setup_ps_registration_finish = modem_3gpp_setup_ps_registration_finish;
 
     /* Disabling steps */
-    iface->disable_unsolicited_events = disable_unsolicited_events;
-    iface->disable_unsolicited_events_finish = unsolicited_events_finish;
-    iface->cleanup_unsolicited_registration = cleanup_unsolicited_registration;
-    iface->cleanup_unsolicited_registration_finish = cleanup_unsolicited_registration_finish;
-    iface->cleanup_cs_registration = cleanup_cs_registration;
-    iface->cleanup_cs_registration_finish = cleanup_cs_registration_finish;
-    iface->cleanup_ps_registration = cleanup_ps_registration;
-    iface->cleanup_ps_registration_finish = cleanup_ps_registration_finish;
+    iface->disable_unsolicited_events = modem_3gpp_disable_unsolicited_events;
+    iface->disable_unsolicited_events_finish = modem_3gpp_unsolicited_events_finish;
+    iface->cleanup_unsolicited_registration = modem_3gpp_cleanup_unsolicited_registration;
+    iface->cleanup_unsolicited_registration_finish = modem_3gpp_cleanup_unsolicited_registration_finish;
+    iface->cleanup_cs_registration = modem_3gpp_cleanup_cs_registration;
+    iface->cleanup_cs_registration_finish = modem_3gpp_cleanup_cs_registration_finish;
+    iface->cleanup_ps_registration = modem_3gpp_cleanup_ps_registration;
+    iface->cleanup_ps_registration_finish = modem_3gpp_cleanup_ps_registration_finish;
 
     /* Additional actions */
-    iface->load_operator_code = load_operator_code;
-    iface->load_operator_code_finish = load_operator_code_finish;
-    iface->load_operator_name = load_operator_name;
-    iface->load_operator_name_finish = load_operator_name_finish;
-    iface->run_cs_registration_check = run_cs_registration_check;
-    iface->run_cs_registration_check_finish = run_cs_registration_check_finish;
-    iface->run_ps_registration_check = run_ps_registration_check;
-    iface->run_ps_registration_check_finish = run_ps_registration_check_finish;
-    iface->register_in_network = register_in_network;
-    iface->register_in_network_finish = register_in_network_finish;
-    iface->scan_networks = scan_networks;
-    iface->scan_networks_finish = scan_networks_finish;
+    iface->load_operator_code = modem_3gpp_load_operator_code;
+    iface->load_operator_code_finish = modem_3gpp_load_operator_code_finish;
+    iface->load_operator_name = modem_3gpp_load_operator_name;
+    iface->load_operator_name_finish = modem_3gpp_load_operator_name_finish;
+    iface->run_cs_registration_check = modem_3gpp_run_cs_registration_check;
+    iface->run_cs_registration_check_finish = modem_3gpp_run_cs_registration_check_finish;
+    iface->run_ps_registration_check = modem_3gpp_run_ps_registration_check;
+    iface->run_ps_registration_check_finish = modem_3gpp_run_ps_registration_check_finish;
+    iface->register_in_network = modem_3gpp_register_in_network;
+    iface->register_in_network_finish = modem_3gpp_register_in_network_finish;
+    iface->scan_networks = modem_3gpp_scan_networks;
+    iface->scan_networks_finish = modem_3gpp_scan_networks_finish;
     iface->bearer_new = mm_bearer_3gpp_new;
     iface->bearer_new_finish = mm_bearer_3gpp_new_finish;
 }
@@ -4698,22 +4712,22 @@ static void
 iface_modem_cdma_init (MMIfaceModemCdma *iface)
 {
     /* Initialization steps */
-    iface->load_esn = load_esn;
-    iface->load_esn_finish = load_esn_finish;
+    iface->load_esn = modem_cdma_load_esn;
+    iface->load_esn_finish = modem_cdma_load_esn_finish;
 
     /* Registration check steps */
-    iface->setup_registration_checks = setup_registration_checks;
-    iface->setup_registration_checks_finish = setup_registration_checks_finish;
-    iface->get_call_manager_state = get_call_manager_state;
-    iface->get_call_manager_state_finish = get_call_manager_state_finish;
-    iface->get_hdr_state = get_hdr_state;
-    iface->get_hdr_state_finish = get_hdr_state_finish;
-    iface->get_service_status = get_service_status;
-    iface->get_service_status_finish = get_service_status_finish;
-    iface->get_cdma1x_serving_system = get_cdma1x_serving_system;
-    iface->get_cdma1x_serving_system_finish = get_cdma1x_serving_system_finish;
-    iface->get_detailed_registration_state = get_detailed_registration_state;
-    iface->get_detailed_registration_state_finish = get_detailed_registration_state_finish;
+    iface->setup_registration_checks = modem_cdma_setup_registration_checks;
+    iface->setup_registration_checks_finish = modem_cdma_setup_registration_checks_finish;
+    iface->get_call_manager_state = modem_cdma_get_call_manager_state;
+    iface->get_call_manager_state_finish = modem_cdma_get_call_manager_state_finish;
+    iface->get_hdr_state = modem_cdma_get_hdr_state;
+    iface->get_hdr_state_finish = modem_cdma_get_hdr_state_finish;
+    iface->get_service_status = modem_cdma_get_service_status;
+    iface->get_service_status_finish = modem_cdma_get_service_status_finish;
+    iface->get_cdma1x_serving_system = modem_cdma_get_cdma1x_serving_system;
+    iface->get_cdma1x_serving_system_finish = modem_cdma_get_cdma1x_serving_system_finish;
+    iface->get_detailed_registration_state = modem_cdma_get_detailed_registration_state;
+    iface->get_detailed_registration_state_finish = modem_cdma_get_detailed_registration_state_finish;
 
     /* Additional actions */
     iface->bearer_new = mm_bearer_cdma_new;
