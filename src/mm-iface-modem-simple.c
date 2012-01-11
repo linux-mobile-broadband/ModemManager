@@ -21,10 +21,150 @@
 #include "mm-common-simple-properties.h"
 #include "mm-bearer-list.h"
 #include "mm-sim.h"
+#include "mm-error-helpers.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-cdma.h"
 #include "mm-iface-modem-simple.h"
 #include "mm-log.h"
+
+/*****************************************************************************/
+/* Register in either a CDMA or a 3GPP network (or both) */
+
+typedef struct {
+    GSimpleAsyncResult *result;
+    MMIfaceModemSimple *self;
+    gchar *operator_id;
+    guint remaining_tries_cdma;
+    guint remaining_tries_3gpp;
+    guint max_try_time;
+} RegisterInNetworkContext;
+
+static void
+register_in_network_context_complete_and_free (RegisterInNetworkContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_free (ctx->operator_id);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+register_in_3gpp_or_cdma_network_finish (MMIfaceModemSimple *self,
+                                         GAsyncResult *res,
+                                         GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void check_next_registration (RegisterInNetworkContext *ctx);
+
+static void
+register_in_cdma_network_ready (MMIfaceModemCdma *self,
+                                GAsyncResult *res,
+                                RegisterInNetworkContext *ctx)
+{
+    ctx->remaining_tries_cdma--;
+
+    if (!mm_iface_modem_cdma_register_in_network_finish (
+            MM_IFACE_MODEM_CDMA (self), res, NULL)) {
+        /* Retry check */
+        check_next_registration (ctx);
+        return;
+    }
+
+    /* Registered we are! */
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    register_in_network_context_complete_and_free (ctx);
+}
+
+static void
+register_in_3gpp_network_ready (MMIfaceModem3gpp *self,
+                                GAsyncResult *res,
+                                RegisterInNetworkContext *ctx)
+{
+    ctx->remaining_tries_3gpp--;
+
+    if (!mm_iface_modem_3gpp_register_in_network_finish (
+            MM_IFACE_MODEM_3GPP (self), res, NULL)) {
+        /* Retry check */
+        check_next_registration (ctx);
+        return;
+    }
+
+    /* Registered we are! */
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    register_in_network_context_complete_and_free (ctx);
+}
+
+static void
+check_next_registration (RegisterInNetworkContext *ctx)
+{
+    if (ctx->remaining_tries_cdma > ctx->remaining_tries_3gpp &&
+        ctx->remaining_tries_cdma > 0) {
+        mm_iface_modem_cdma_register_in_network (
+            MM_IFACE_MODEM_CDMA (ctx->self),
+            ctx->max_try_time,
+            (GAsyncReadyCallback)register_in_cdma_network_ready,
+            ctx);
+        return;
+    }
+
+    if (ctx->remaining_tries_3gpp > 0) {
+        mm_iface_modem_3gpp_register_in_network (
+            MM_IFACE_MODEM_3GPP (ctx->self),
+            ctx->operator_id,
+            ctx->max_try_time,
+            (GAsyncReadyCallback)register_in_3gpp_network_ready,
+            ctx);
+        return;
+    }
+
+    /* No more tries of anything */
+    g_simple_async_result_take_error (
+        ctx->result,
+        mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT));
+    register_in_network_context_complete_and_free (ctx);
+}
+
+static void
+register_in_3gpp_or_cdma_network (MMIfaceModemSimple *self,
+                                  const gchar *operator_id,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
+{
+    RegisterInNetworkContext *ctx;
+
+    ctx = g_new0 (RegisterInNetworkContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->operator_id = g_strdup (operator_id);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             register_in_3gpp_or_cdma_network);
+
+    /* 3GPP-only modems... */
+    if (mm_iface_modem_is_3gpp_only (MM_IFACE_MODEM (ctx->self))) {
+        ctx->max_try_time = 60;
+        ctx->remaining_tries_cdma = 0;
+        ctx->remaining_tries_3gpp = 1;
+    }
+    /* CDMA-only modems... */
+    else if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (ctx->self))) {
+        ctx->max_try_time = 60;
+        ctx->remaining_tries_cdma = 1;
+        ctx->remaining_tries_3gpp = 0;
+    }
+    /* Mixed 3GPP(LTE)+CDMA modems... */
+    else  {
+        ctx->max_try_time = 10;
+        ctx->remaining_tries_cdma = 6;
+        ctx->remaining_tries_3gpp = 6;
+    }
+
+    check_next_registration (ctx);
+}
 
 /*****************************************************************************/
 
@@ -105,14 +245,13 @@ create_bearer_ready (MMIfaceModem *self,
 }
 
 static void
-register_in_network_ready (MMIfaceModem3gpp *self,
-                           GAsyncResult *res,
-                           ConnectionContext *ctx)
+register_in_3gpp_or_cdma_network_ready (MMIfaceModemSimple *self,
+                                        GAsyncResult *res,
+                                        ConnectionContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_iface_modem_3gpp_register_in_network_finish (
-            MM_IFACE_MODEM_3GPP (self), res, &error)) {
+    if (!register_in_3gpp_or_cdma_network_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         connection_context_free (ctx);
         return;
@@ -341,15 +480,21 @@ connection_step (ConnectionContext *ctx)
     case CONNECTION_STEP_REGISTER:
         mm_info ("Simple connect state (%d/%d): Register",
                  ctx->step, CONNECTION_STEP_LAST);
-        if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self))) {
-            mm_iface_modem_3gpp_register_in_network (
-                MM_IFACE_MODEM_3GPP (ctx->self),
+
+        if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self)) ||
+            mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->self))) {
+            /* 3GPP or CDMA registration */
+            register_in_3gpp_or_cdma_network (
+                ctx->self,
                 mm_common_connect_properties_get_operator_id (ctx->properties),
-                (GAsyncReadyCallback)register_in_network_ready,
+                (GAsyncReadyCallback)register_in_3gpp_or_cdma_network_ready,
                 ctx);
             return;
         }
-        /* Fall down to next step */
+
+        /* If not 3GPP and not CDMA, this will possibly be a POTS modem,
+         * which won't require any specific registration anywhere.
+         * So, fall down to next step */
         ctx->step++;
 
     case CONNECTION_STEP_BEARER: {
