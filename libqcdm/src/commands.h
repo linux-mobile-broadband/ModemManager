@@ -506,7 +506,7 @@ size_t qcdm_cmd_log_config_get_mask_new (char *buf,
 size_t qcdm_cmd_log_config_set_mask_new (char *buf,
                                          size_t len,
                                          u_int32_t equip_id,
-                                         u_int32_t items[]);
+                                         u_int16_t items[]);
 
 #define QCDM_CMD_LOG_CONFIG_MASK_ITEM_EQUIP_ID  "equip-id"
 

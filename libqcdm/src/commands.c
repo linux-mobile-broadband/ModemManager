@@ -1390,24 +1390,29 @@ qcdm_cmd_log_config_new (char *buf,
                          size_t len,
                          u_int32_t op,
                          u_int32_t equip_id,
-                         u_int32_t items[])
+                         u_int16_t items[])
 {
     DMCmdLogConfig *cmd;
     u_int16_t highest = 0;
     u_int32_t items_len = 0;
     size_t cmdsize = 0, cmdbufsize;
     u_int32_t i;
-    u_int32_t log_code;
+    u_int16_t log_code;
 
     qcdm_return_val_if_fail (buf != NULL, 0);
     qcdm_return_val_if_fail ((equip_id & 0xFFF0) == 0, 0);
 
     /* Find number of log items */
     if (items) {
-        while (items_len < 4095 && items[items_len])
+        while (items_len < 4095 && items[items_len]) {
+            /* Find highest log item so we can size the items mask */
+            log_code = items[items_len] & 0x0FFF;
+            if (log_code > highest)
+                highest = log_code;
             items_len++;
+        }
     }
-    cmdsize = sizeof (DMCmdLogConfig) + ((items_len + 7) / 8);
+    cmdsize = sizeof (DMCmdLogConfig) + ((highest + 7) / 8);
     cmdbufsize = cmdsize + DIAG_TRAILER_LEN;
 
     qcdm_return_val_if_fail (len >= cmdsize, 0);
@@ -1422,8 +1427,6 @@ qcdm_cmd_log_config_new (char *buf,
         for (i = 0; i < items_len; i++) {
             log_code = items[i] & 0x0FFF;  /* Strip off equip ID */
             cmd->mask[log_code / 8] |= 1 << log_code % 8;
-            if (log_code > highest)
-                highest = log_code;
         }
         cmd->num_items = htole32 (highest);
     }
@@ -1546,10 +1549,10 @@ log_config_get_set_result (const char *buf, size_t len, u_int32_t op, int *out_e
                 num_result_items++;
         }
 
-        items = malloc (num_result_items);
+        items = malloc (sizeof (*items) * num_result_items);
         for (i = 0; i < num_items; i++) {
             if (LOG_CODE_SET (rsp->u.get_set_items.mask, i))
-                items[count++] = (equipid << 12) | i;
+                items[count++] = (equipid << 12) | (i & 0x0FFF);
         }
 
         qcdm_result_add_u16_array (result, QCDM_CMD_LOG_CONFIG_MASK_ITEM_ITEMS, items, count);
@@ -1569,7 +1572,7 @@ size_t
 qcdm_cmd_log_config_set_mask_new (char *buf,
                                   size_t len,
                                   u_int32_t equip_id,
-                                  u_int32_t items[])
+                                  u_int16_t items[])
 {
     return qcdm_cmd_log_config_new (buf,
                                     len,
