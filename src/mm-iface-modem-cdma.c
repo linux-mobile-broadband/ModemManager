@@ -370,6 +370,53 @@ handle_activate_manual (MmGdbusModemCdma *skeleton,
 }
 
 /*****************************************************************************/
+/* Register in the CDMA network.
+ * Note that the registration in the CDMA network is usually automatic; so this
+ * method will really just try to ensure the modem is registered. If not
+ * registered, it will wait until it is, up to N seconds.
+ */
+
+gboolean
+mm_iface_modem_cdma_register_in_network_finish (MMIfaceModemCdma *self,
+                                                GAsyncResult *res,
+                                                GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+register_in_network_ready (MMIfaceModemCdma *self,
+                           GAsyncResult *res,
+                           GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->register_in_network_finish (self, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+void
+mm_iface_modem_cdma_register_in_network (MMIfaceModemCdma *self,
+                                         GAsyncReadyCallback callback,
+                                         gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        mm_iface_modem_cdma_register_in_network);
+    MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->register_in_network (
+        self,
+        (GAsyncReadyCallback)register_in_network_ready,
+        result);
+}
+
+/*****************************************************************************/
 /* Create new CDMA bearer */
 
 MMBearer *
@@ -903,7 +950,7 @@ mm_iface_modem_cdma_run_all_registration_checks (MMIfaceModemCdma *self,
                   MM_IFACE_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED, &ctx->cdma1x_supported,
                   NULL);
 
-    mm_dbg ("Running registration checks (CDMA1x: '%s', EVDO: '%s')",
+    mm_dbg ("Running registration checks (CDMA1x: '%s', EV-DO: '%s')",
             ctx->cdma1x_supported ? "yes" : "no",
             ctx->evdo_supported ? "yes" : "no");
 
@@ -1578,8 +1625,8 @@ iface_modem_cdma_init (gpointer g_iface)
     g_object_interface_install_property
         (g_iface,
          g_param_spec_enum (MM_IFACE_MODEM_CDMA_EVDO_REGISTRATION_STATE,
-                            "EVDO Registration State",
-                            "Registration state of the modem in the EVDO network",
+                            "EV-DO Registration State",
+                            "Registration state of the modem in the EV-DO network",
                             MM_TYPE_MODEM_CDMA_REGISTRATION_STATE,
                             MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN,
                             G_PARAM_READWRITE));
@@ -1595,8 +1642,8 @@ iface_modem_cdma_init (gpointer g_iface)
     g_object_interface_install_property
         (g_iface,
          g_param_spec_boolean (MM_IFACE_MODEM_CDMA_EVDO_NETWORK_SUPPORTED,
-                               "EVDO network supported",
-                               "Whether the modem works in the EVDO network",
+                               "EV-DO network supported",
+                               "Whether the modem works in the EV-DO network",
                                TRUE,
                                G_PARAM_READWRITE));
     initialized = TRUE;

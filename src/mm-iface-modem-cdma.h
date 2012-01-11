@@ -140,6 +140,14 @@ struct _MMIfaceModemCdma {
                                                          MMModemCdmaRegistrationState *detailed_evdo_state,
                                                          GError **error);
 
+    /* Try to register in the CDMA network */
+    void (* register_in_network) (MMIfaceModemCdma *self,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data);
+    gboolean (*register_in_network_finish) (MMIfaceModemCdma *self,
+                                            GAsyncResult *res,
+                                            GError **error);
+
     /* New CDMA bearer */
     void (* bearer_new) (MMIfaceModemCdma *self,
                          MMCommonBearerProperties *properties,
@@ -213,6 +221,14 @@ void     mm_iface_modem_cdma_run_all_registration_checks        (MMIfaceModemCdm
 gboolean mm_iface_modem_cdma_run_all_registration_checks_finish (MMIfaceModemCdma *self,
                                                                  GAsyncResult *res,
                                                                  GError **error);
+
+/* Register in network */
+void     mm_iface_modem_cdma_register_in_network        (MMIfaceModemCdma *self,
+                                                         GAsyncReadyCallback callback,
+                                                         gpointer user_data);
+gboolean mm_iface_modem_cdma_register_in_network_finish (MMIfaceModemCdma *self,
+                                                         GAsyncResult *res,
+                                                         GError **error);
 
 /* Create new CDMA bearer */
 void mm_iface_modem_cdma_create_bearer (MMIfaceModemCdma *self,
