@@ -1547,14 +1547,16 @@ log_config_get_set_result (const char *buf, size_t len, u_int32_t op, int *out_e
                 num_result_items++;
         }
 
-        items = malloc (sizeof (*items) * num_result_items);
-        for (i = 0; i < num_items; i++) {
-            if (LOG_CODE_SET (rsp->u.get_set_items.mask, i))
-                items[count++] = (equipid << 12) | (i & 0x0FFF);
-        }
+        if (num_result_items) {
+            items = malloc (sizeof (*items) * num_result_items);
+            for (i = 0; i < num_items; i++) {
+                if (LOG_CODE_SET (rsp->u.get_set_items.mask, i))
+                    items[count++] = (equipid << 12) | (i & 0x0FFF);
+            }
 
-        qcdm_result_add_u16_array (result, QCDM_CMD_LOG_CONFIG_MASK_ITEM_ITEMS, items, count);
-        free (items);
+            qcdm_result_add_u16_array (result, QCDM_CMD_LOG_CONFIG_MASK_ITEM_ITEMS, items, count);
+            free (items);
+        }
     }
 
     return result;
