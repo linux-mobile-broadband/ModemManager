@@ -34,6 +34,11 @@ int qcdm_result_get_u32    (QcdmResult *r,
                             const char *key,
                             u_int32_t *out_val);
 
+int qcdm_result_get_u16_array  (QcdmResult *result,
+                                const char *key,
+                                const u_int16_t **out_val,
+                                size_t *out_len);
+
 QcdmResult *qcdm_result_ref    (QcdmResult *r);
 
 void       qcdm_result_unref   (QcdmResult *r);

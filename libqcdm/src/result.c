@@ -32,16 +32,18 @@ typedef enum {
     VAL_TYPE_U8 = 2,
     VAL_TYPE_U32 = 3,
     VAL_TYPE_U8_ARRAY = 4,
+    VAL_TYPE_U16_ARRAY = 5,
 } ValType;
 
 struct Val {
     char *key;
-    ValType type;
+    u_int8_t type;
     union {
         char *s;
         u_int8_t u8;
         u_int32_t u32;
         u_int8_t *u8_array;
+        u_int16_t *u16_array;
     } u;
     u_int32_t array_len;
     Val *next;
@@ -56,6 +58,9 @@ val_free (Val *v)
     } else if (v->type == VAL_TYPE_U8_ARRAY) {
         if (v->u.u8_array);
             free (v->u.u8_array);
+    } else if (v->type == VAL_TYPE_U16_ARRAY) {
+        if (v->u.u16_array);
+            free (v->u.u16_array);
     }
     free (v->key);
     memset (v, 0, sizeof (*v));
@@ -141,6 +146,35 @@ val_new_u32 (const char *key, u_int32_t u)
     v->key = strdup (key);
     v->type = VAL_TYPE_U32;
     v->u.u32 = u;
+    return v;
+}
+
+static Val *
+val_new_u16_array (const char *key, const u_int16_t *array, size_t array_len)
+{
+    Val *v;
+    size_t sz;
+
+    qcdm_return_val_if_fail (key != NULL, NULL);
+    qcdm_return_val_if_fail (key[0] != '\0', NULL);
+    qcdm_return_val_if_fail (array != NULL, NULL);
+    qcdm_return_val_if_fail (array_len > 0, NULL);
+
+    v = calloc (sizeof (Val), 1);
+    if (v == NULL)
+        return NULL;
+
+    v->key = strdup (key);
+    v->type = VAL_TYPE_U16_ARRAY;
+    sz = sizeof (u_int16_t) * array_len;
+    v->u.u16_array = malloc (sz);
+    if (v->u.u16_array == NULL) {
+        val_free (v);
+        return NULL;
+    }
+    memcpy (v->u.u16_array, array, sz);
+    v->array_len = array_len;
+
     return v;
 }
 
@@ -369,6 +403,49 @@ qcdm_result_get_u32 (QcdmResult *r,
         return -QCDM_ERROR_VALUE_NOT_FOUND;
 
     *out_val = v->u.u32;
+    return 0;
+}
+
+void
+qcdm_result_add_u16_array (QcdmResult *r,
+                           const char *key,
+                           const u_int16_t *array,
+                           size_t array_len)
+{
+    Val *v;
+
+    qcdm_return_if_fail (r != NULL);
+    qcdm_return_if_fail (r->refcount > 0);
+    qcdm_return_if_fail (key != NULL);
+    qcdm_return_if_fail (array != NULL);
+    qcdm_return_if_fail (array_len >= 0);
+
+    v = val_new_u16_array (key, array, array_len);
+    qcdm_return_if_fail (v != NULL);
+    v->next = r->first;
+    r->first = v;
+}
+
+int
+qcdm_result_get_u16_array (QcdmResult *r,
+                           const char *key,
+                           const u_int16_t **out_val,
+                           size_t *out_len)
+{
+    Val *v;
+
+    qcdm_return_val_if_fail (r != NULL, -QCDM_ERROR_INVALID_ARGUMENTS);
+    qcdm_return_val_if_fail (r->refcount > 0, -QCDM_ERROR_INVALID_ARGUMENTS);
+    qcdm_return_val_if_fail (key != NULL, -QCDM_ERROR_INVALID_ARGUMENTS);
+    qcdm_return_val_if_fail (out_val != NULL, -QCDM_ERROR_INVALID_ARGUMENTS);
+    qcdm_return_val_if_fail (out_len != NULL, -QCDM_ERROR_INVALID_ARGUMENTS);
+
+    v = find_val (r, key, VAL_TYPE_U16_ARRAY);
+    if (v == NULL)
+        return -QCDM_ERROR_VALUE_NOT_FOUND;
+
+    *out_val = v->u.u16_array;
+    *out_len = v->array_len;
     return 0;
 }
 
