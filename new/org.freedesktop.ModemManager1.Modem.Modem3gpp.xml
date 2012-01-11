@@ -22,12 +22,12 @@
 
     <!--
         Register:
-        @network_id: The network ID (ie, <literal>"MCCMNC"</literal>, like <literal>"310260"</literal>) to register. An empty string can be used to register to the home network.
+        @operator_id: The operator ID (ie, <literal>"MCCMNC"</literal>, like <literal>"310260"</literal>) to register. An empty string can be used to register to the home network.
 
         Request registration with a given mobile network.
     -->
     <method name="Register">
-      <arg name="network_id" type="s" direction="in" />
+      <arg name="operator_id" type="s" direction="in" />
     </method>
 
     <!--
