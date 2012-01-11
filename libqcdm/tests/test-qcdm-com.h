@@ -51,6 +51,8 @@ void test_com_ext_logmask (void *f, void *data);
 
 void test_com_event_report (void *f, void *data);
 
+void test_com_log_config (void *f, void *data);
+
 void test_com_zte_subsys_status (void *f, void *data);
 
 void test_com_nw_subsys_modem_snapshot_cdma (void *f, void *data);

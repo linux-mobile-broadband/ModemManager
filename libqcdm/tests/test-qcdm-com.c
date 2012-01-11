@@ -1383,6 +1383,49 @@ test_com_event_report (void *f, void *data)
 }
 
 void
+test_com_log_config (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    int err = QCDM_SUCCESS;
+    char buf[520];
+    gint len;
+    QcdmResult *result;
+    gsize reply_len;
+    u_int32_t num_items = 0;
+    const u_int16_t *items = NULL;
+    size_t items_len = 0;
+    u_int32_t i;
+
+    /* Get existing mask for CDMA/EVDO equip ID */
+    len = qcdm_cmd_log_config_get_mask_new (buf, sizeof (buf), 0x01);
+    g_assert (len);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    g_print ("\n");
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_log_config_get_mask_result (buf, reply_len, &err);
+    g_assert (result);
+
+    qcdm_result_get_u32 (result, QCDM_CMD_LOG_CONFIG_MASK_ITEM_NUM_ITEMS, &num_items);
+    g_message ("%s: Num Log Items: %u (0x%X)", __func__, num_items, num_items);
+
+    qcdm_result_get_u16_array (result, QCDM_CMD_LOG_CONFIG_MASK_ITEM_ITEMS,
+                               &items, &items_len);
+    for (i = 0; i < items_len; i++)
+        g_message ("%s:    Enabled: 0x%04x", __func__, items[i]);
+
+    qcdm_result_unref (result);
+}
+
+void
 test_com_zte_subsys_status (void *f, void *data)
 {
     TestComData *d = data;

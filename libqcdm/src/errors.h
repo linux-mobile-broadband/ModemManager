@@ -52,6 +52,7 @@ enum {
     QCDM_ERROR_NV_ERROR_INACTIVE = 17,  /* NV location is not active */
     QCDM_ERROR_NV_ERROR_BAD_PARAMETER = 18,
     QCDM_ERROR_NV_ERROR_READ_ONLY = 19, /* NV location is read-only */
+    QCDM_ERROR_RESPONSE_FAILED = 20,    /* command-specific failure */
 };
 
 #define qcdm_assert assert

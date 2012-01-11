@@ -499,6 +499,35 @@ QcdmResult *qcdm_cmd_event_report_result (const char *buf,
 
 /**********************************************************************/
 
+size_t qcdm_cmd_log_config_get_mask_new (char *buf,
+                                         size_t len,
+                                         u_int32_t equip_id);
+
+size_t qcdm_cmd_log_config_set_mask_new (char *buf,
+                                         size_t len,
+                                         u_int32_t equip_id,
+                                         u_int32_t items[]);
+
+#define QCDM_CMD_LOG_CONFIG_MASK_ITEM_EQUIP_ID  "equip-id"
+
+#define QCDM_CMD_LOG_CONFIG_MASK_ITEM_NUM_ITEMS "num-items"
+
+#define QCDM_CMD_LOG_CONFIG_MASK_ITEM_ITEMS     "items"
+
+QcdmResult *qcdm_cmd_log_config_get_mask_result (const char *buf,
+                                                 size_t len,
+                                                 int *out_error);
+
+QcdmResult *qcdm_cmd_log_config_set_mask_result (const char *buf,
+                                                 size_t len,
+                                                 int *out_error);
+
+qcdmbool    qcmd_cmd_log_config_mask_result_code_set (QcdmResult *result,
+                                                      u_int32_t equipid,
+                                                      u_int16_t log_code);
+
+/**********************************************************************/
+
 #define QCDM_CMD_ZTE_SUBSYS_STATUS_ITEM_SIGNAL_INDICATOR    "signal-indicator"
 
 size_t      qcdm_cmd_zte_subsys_status_new    (char *buf, size_t len);

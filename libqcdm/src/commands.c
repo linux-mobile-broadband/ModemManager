@@ -1385,3 +1385,231 @@ qcdm_cmd_nw_subsys_modem_snapshot_cdma_result (const char *buf, size_t len, int 
 
 /**********************************************************************/
 
+static size_t
+qcdm_cmd_log_config_new (char *buf,
+                         size_t len,
+                         u_int32_t op,
+                         u_int32_t equip_id,
+                         u_int32_t items[])
+{
+    DMCmdLogConfig *cmd;
+    u_int16_t highest = 0;
+    u_int32_t items_len = 0;
+    size_t cmdsize = 0, cmdbufsize;
+    u_int32_t i;
+    u_int32_t log_code;
+
+    qcdm_return_val_if_fail (buf != NULL, 0);
+    qcdm_return_val_if_fail ((equip_id & 0xFFF0) == 0, 0);
+
+    /* Find number of log items */
+    if (items) {
+        while (items_len < 4095 && items[items_len])
+            items_len++;
+    }
+    cmdsize = sizeof (DMCmdLogConfig) + ((items_len + 7) / 8);
+    cmdbufsize = cmdsize + DIAG_TRAILER_LEN;
+
+    qcdm_return_val_if_fail (len >= cmdsize, 0);
+
+    cmd = calloc (1, cmdbufsize);
+    cmd->code = DIAG_CMD_LOG_CONFIG;
+    cmd->op = htole32 (op);
+    cmd->equipid = htole32 (equip_id);
+
+    if (items) {
+        /* Set up the bitmask of log items */
+        for (i = 0; i < items_len; i++) {
+            log_code = items[i] & 0x0FFF;  /* Strip off equip ID */
+            cmd->mask[log_code / 8] |= 1 << log_code % 8;
+            if (log_code > highest)
+                highest = log_code;
+        }
+        cmd->num_items = htole32 (highest);
+    }
+
+    return dm_encapsulate_buffer ((char *) cmd, cmdsize, cmdbufsize, buf, len);
+}
+
+size_t
+qcdm_cmd_log_config_get_mask_new (char *buf,
+                                  size_t len,
+                                  u_int32_t equip_id)
+{
+    return qcdm_cmd_log_config_new (buf,
+                                    len,
+                                    DIAG_CMD_LOG_CONFIG_OP_GET_MASK,
+                                    equip_id,
+                                    NULL);
+}
+
+static int
+check_log_config_respose (const char *buf, size_t len, u_int32_t op)
+{
+    DMCmdLogConfigRsp *rsp = (DMCmdLogConfigRsp *) buf;
+    size_t minlen = 16; /* minimum valid resposne */
+    int err;
+
+    /* Ensure size is at least enough for the command header */
+    if (len < 1) {
+        qcdm_err (0, "DIAG_CMD_LOG_CONFIG response not long enough (got %zu, "
+                  "expected at least %d).", len, 3);
+        return -QCDM_ERROR_RESPONSE_BAD_LENGTH;
+    }
+
+    if (rsp->code == DIAG_CMD_LOG_CONFIG) {
+        u_int32_t rspop;
+
+        if (len < 16) {
+            /* At least enough for code + op + result + equipid */
+            qcdm_err (0, "DIAG_CMD_LOG_CONFIG response not long enough (got %zu, "
+                      "expected at least %d).", len, 16);
+            return -QCDM_ERROR_RESPONSE_BAD_LENGTH;
+        }
+
+        rspop = le32toh (rsp->op);
+        if (rspop != op) {
+            qcdm_err (0, "DIAG_CMD_LOG_CONFIG response operation mismatch (got "
+                      "op %u, expected %u)", rspop, op);
+            return -QCDM_ERROR_RESPONSE_BAD_COMMAND;
+        }
+
+        /* check for success */
+        if (le32toh (rsp->result) != 0) {
+            qcdm_err (0, "DIAG_CMD_LOG_CONFIG response failed with result %u.",
+                      le32toh (rsp->result));
+            return -QCDM_ERROR_RESPONSE_FAILED;
+        }
+
+        switch (rspop) {
+        case DIAG_CMD_LOG_CONFIG_OP_GET_RANGE:
+            minlen += 16; /* get_range_items */
+            break;
+        case DIAG_CMD_LOG_CONFIG_OP_SET_MASK:
+        case DIAG_CMD_LOG_CONFIG_OP_GET_MASK:
+            if (len < 16) {
+                qcdm_err (0, "DIAG_CMD_LOG_CONFIG response not long enough "
+                          "(got %zu, expected at least %d).", len, 16);
+                return -QCDM_ERROR_RESPONSE_BAD_LENGTH;
+            }
+            minlen += 4;  /* num_items */
+            minlen += (le32toh (rsp->u.get_set_items.num_items) + 7) / 8;
+            break;
+        default:
+            qcdm_err (0, "Unknown DIAG_CMD_LOG_CONFIG response operation %d", rspop);
+            return -QCDM_ERROR_RESPONSE_UNEXPECTED;
+        }
+    }
+
+    if (!check_command (buf, len, DIAG_CMD_LOG_CONFIG, minlen, &err))
+        return err;
+
+    return 0;
+}
+
+#define LOG_CODE_SET(mask, code)  (mask[code / 8] & (1 << (code % 8)))
+
+static QcdmResult *
+log_config_get_set_result (const char *buf, size_t len, u_int32_t op, int *out_error)
+{
+    QcdmResult *result = NULL;
+    DMCmdLogConfigRsp *rsp = (DMCmdLogConfigRsp *) buf;
+    int err;
+    u_int32_t num_items;
+    u_int32_t equipid;
+
+    qcdm_return_val_if_fail (buf != NULL, NULL);
+
+    err = check_log_config_respose (buf, len, op);
+    if (err) {
+        if (out_error)
+            *out_error = err;
+        return NULL;
+    }
+
+    result = qcdm_result_new ();
+
+    equipid = le32toh (rsp->equipid);
+    qcdm_result_add_u32 (result, QCDM_CMD_LOG_CONFIG_MASK_ITEM_EQUIP_ID, equipid);
+
+    num_items = le32toh (rsp->u.get_set_items.num_items);
+    qcdm_result_add_u32 (result, QCDM_CMD_LOG_CONFIG_MASK_ITEM_NUM_ITEMS, num_items);
+
+    if (num_items > 0) {
+        u_int32_t i, num_result_items = 0, count = 0;
+        u_int16_t *items;
+
+        /* First pass to find out how many are actually enabled */
+        for (i = 0; i < num_items; i++) {
+            /* Check if the bit corresponding to this log item is set */
+            if (LOG_CODE_SET (rsp->u.get_set_items.mask, i))
+                num_result_items++;
+        }
+
+        items = malloc (num_result_items);
+        for (i = 0; i < num_items; i++) {
+            if (LOG_CODE_SET (rsp->u.get_set_items.mask, i))
+                items[count++] = (equipid << 12) | i;
+        }
+
+        qcdm_result_add_u16_array (result, QCDM_CMD_LOG_CONFIG_MASK_ITEM_ITEMS, items, count);
+        free (items);
+    }
+
+    return result;
+}
+
+QcdmResult *
+qcdm_cmd_log_config_get_mask_result (const char *buf, size_t len, int *out_error)
+{
+    return log_config_get_set_result (buf, len, DIAG_CMD_LOG_CONFIG_OP_GET_MASK, out_error);
+}
+
+size_t
+qcdm_cmd_log_config_set_mask_new (char *buf,
+                                  size_t len,
+                                  u_int32_t equip_id,
+                                  u_int32_t items[])
+{
+    return qcdm_cmd_log_config_new (buf,
+                                    len,
+                                    DIAG_CMD_LOG_CONFIG_OP_SET_MASK,
+                                    equip_id,
+                                    items);
+}
+
+QcdmResult *
+qcdm_cmd_log_config_set_mask_result (const char *buf, size_t len, int *out_error)
+{
+    return log_config_get_set_result (buf, len, DIAG_CMD_LOG_CONFIG_OP_SET_MASK, out_error);
+}
+
+qcdmbool
+qcmd_cmd_log_config_mask_result_code_set (QcdmResult *result,
+                                          u_int32_t equipid,
+                                          u_int16_t log_code)
+{
+    const u_int16_t *items = NULL;
+    size_t len = 0;
+    u_int32_t i, tmp;
+
+    qcdm_return_val_if_fail (result != NULL, FALSE);
+
+    if (qcdm_result_get_u32 (result, QCDM_CMD_LOG_CONFIG_MASK_ITEM_EQUIP_ID, &tmp) != 0)
+        return FALSE;
+    qcdm_return_val_if_fail (equipid != tmp, FALSE);
+
+    if (qcdm_result_get_u16_array (result,
+                                   QCDM_CMD_LOG_CONFIG_MASK_ITEM_ITEMS,
+                                   &items,
+                                   &len)) {
+        for (i = 0; i < len; i++) {
+            if ((items[i] & 0x0FFF) == (log_code & 0x0FFF))
+                return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+/**********************************************************************/
+
