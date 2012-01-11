@@ -60,7 +60,7 @@ enum {
 #define qcdm_return_if_fail(e) \
 { \
     if (!(e)) { \
-        qcdm_warn (0, "failed: ##e##\n"); \
+        qcdm_warn (0, "failed: " #e "\n"); \
         return; \
     } \
 }
@@ -68,7 +68,7 @@ enum {
 #define qcdm_return_val_if_fail(e, v) \
 { \
     if (!(e)) { \
-        qcdm_warn (0, "failed: ##e##\n"); \
+        qcdm_warn (0, "failed: " #e "\n"); \
         return v; \
     } \
 }
@@ -76,7 +76,7 @@ enum {
 #define qcdm_warn_if_fail(e) \
 { \
     if (!(e)) { \
-        qcdm_warn (0, "failed: ##e##\n"); \
+        qcdm_warn (0, "failed: " #e "\n"); \
     } \
 }
 
