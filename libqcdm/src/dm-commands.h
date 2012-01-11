@@ -111,6 +111,11 @@ enum {
     DIAG_CMD_RAM_RW            = 112, /* Calibration RAM control using DM */
     DIAG_CMD_CPU_RW            = 113, /* Calibration CPU control using DM */
     DIAG_CMD_SET_FTM_TEST_MODE = 114, /* Field (or Factory?) Test Mode */
+    DIAG_CMD_LOG_CONFIG        = 115, /* New logging config command */
+    DIAG_CMD_EXT_BUILD_ID      = 124,
+    DIAG_CMD_EXT_MESSAGE_CONFIG= 125,
+    DIAG_CMD_EVENT_GET_MASK    = 129,
+    DIAG_CMD_EVENT_SET_MASK    = 130
 };
 
 /* Subsystem IDs used with DIAG_CMD_SUBSYS; these often obsolete many of
