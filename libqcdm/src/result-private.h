@@ -40,6 +40,11 @@ int qcdm_result_get_u8_array  (QcdmResult *result,
                                const u_int8_t **out_val,
                                size_t *out_len);
 
+void qcdm_result_add_u16_array (QcdmResult *result,
+                                const char *key,
+                                const u_int16_t *array,
+                                size_t array_len);
+
 void qcdm_result_add_u32    (QcdmResult *result,
                              const char *key,
                              u_int32_t num);
