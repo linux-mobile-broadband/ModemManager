@@ -117,10 +117,15 @@ enum {
  * the original DM commands.
  */
 enum {
+    DIAG_SUBSYS_WCDMA           = 4,
     DIAG_SUBSYS_HDR             = 5,  /* High Data Rate (ie, EVDO) */
+    DIAG_SUBSYS_GSM             = 8,
+    DIAG_SUBSYS_UMTS            = 9,
+    DIAG_SUBSYS_OS              = 12,
     DIAG_SUBSYS_GPS             = 13,
-    DIAG_SUBSYS_SMS             = 14,
+    DIAG_SUBSYS_SMS             = 14, /* Wireless Messaging Service */
     DIAG_SUBSYS_CM              = 15, /* Call manager */
+    DIAG_SUBSYS_FS              = 19, /* File System (EFS2) */
     DIAG_SUBSYS_NW_CONTROL_6500 = 50, /* for Novatel Wireless MSM6500-based devices */
     DIAG_SUBSYS_ZTE             = 101, /* for ZTE EVDO devices */
     DIAG_SUBSYS_NW_CONTROL_6800 = 250 /* for Novatel Wireless MSM6800-based devices */
