@@ -613,7 +613,8 @@ test_com_read_hdr_rev_pref (void *f, void *data)
     if (!result) {
         if (   err == -QCDM_ERROR_NVCMD_FAILED
             || err == -QCDM_ERROR_RESPONSE_BAD_PARAMETER
-            || err == -QCDM_ERROR_NV_ERROR_INACTIVE)
+            || err == -QCDM_ERROR_NV_ERROR_INACTIVE
+            || err == -QCDM_ERROR_NV_ERROR_BAD_PARAMETER)
             return;
         g_assert_cmpint (err, ==, QCDM_SUCCESS);
     }
@@ -1409,7 +1410,7 @@ test_com_zte_subsys_status (void *f, void *data)
     result = qcdm_cmd_zte_subsys_status_result (buf, reply_len, &err);
     if (!result) {
         /* Obviously not all devices implement this command */
-        g_assert_cmpint (err, ==, QCDM_ERROR_RESPONSE_BAD_COMMAND);
+        g_assert_cmpint (err, ==, -QCDM_ERROR_RESPONSE_BAD_COMMAND);
         g_message ("%s: device does not implement the ZTE subsystem", __func__);
         return;
     }
@@ -1450,7 +1451,7 @@ test_com_nw_subsys_modem_snapshot_cdma (void *f, void *data)
     result = qcdm_cmd_nw_subsys_modem_snapshot_cdma_result (buf, reply_len, &err);
     if (!result) {
         /* Obviously not all devices implement this command */
-        g_assert_cmpint (err, ==, QCDM_ERROR_RESPONSE_BAD_COMMAND);
+        g_assert_cmpint (err, ==, -QCDM_ERROR_RESPONSE_BAD_COMMAND);
         return;
     }
     g_assert (result);
