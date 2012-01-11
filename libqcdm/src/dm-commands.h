@@ -462,5 +462,37 @@ struct DMCmdSubsysNwSnapshotCdma {
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysNwSnapshotCdma DMCmdSubsysNwSnapshotCdma;
 
+enum {
+    DIAG_CMD_LOG_CONFIG_OP_GET_RANGE = 0x01,
+    DIAG_CMD_LOG_CONFIG_OP_SET_MASK = 0x03,
+    DIAG_CMD_LOG_CONFIG_OP_GET_MASK = 0x04,
+};
+
+struct DMCmdLogConfig {
+    u_int8_t code;
+    u_int8_t pad[3];
+    u_int32_t op;
+    u_int32_t equipid;
+    u_int32_t num_items;
+    u_int8_t mask[0];
+} __attribute__ ((packed));
+typedef struct DMCmdLogConfig DMCmdLogConfig;
+
+struct DMCmdLogConfigRsp {
+    u_int8_t code;
+    u_int8_t pad[3];
+    u_int32_t op;
+    u_int32_t result;  /* 0 = success */
+    u_int32_t equipid;
+    union {
+        u_int32_t get_range_items[16];
+        struct {
+            u_int32_t num_items;
+            u_int8_t mask[0];
+        } get_set_items;
+    } u;
+} __attribute__ ((packed));
+typedef struct DMCmdLogConfigRsp DMCmdLogConfigRsp;
+
 #endif  /* LIBQCDM_DM_COMMANDS_H */
 
