@@ -142,6 +142,7 @@ struct _MMIfaceModemCdma {
 
     /* Try to register in the CDMA network */
     void (* register_in_network) (MMIfaceModemCdma *self,
+                                  guint max_registration_time,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data);
     gboolean (*register_in_network_finish) (MMIfaceModemCdma *self,
@@ -224,6 +225,7 @@ gboolean mm_iface_modem_cdma_run_all_registration_checks_finish (MMIfaceModemCdm
 
 /* Register in network */
 void     mm_iface_modem_cdma_register_in_network        (MMIfaceModemCdma *self,
+                                                         guint max_registration_time,
                                                          GAsyncReadyCallback callback,
                                                          gpointer user_data);
 gboolean mm_iface_modem_cdma_register_in_network_finish (MMIfaceModemCdma *self,

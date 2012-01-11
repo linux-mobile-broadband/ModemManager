@@ -3791,15 +3791,12 @@ modem_cdma_setup_registration_checks (MMIfaceModemCdma *self,
 /*****************************************************************************/
 /* Register in network (CDMA interface) */
 
-/* Maximum time to wait for a successful registration when polling
- * periodically */
-#define MAX_CDMA_REGISTRATION_CHECK_WAIT_TIME 60
-
 typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
     GCancellable *cancellable;
     GTimer *timer;
+    guint max_registration_time;
 } RegisterInCdmaNetworkContext;
 
 static void
@@ -3893,7 +3890,7 @@ run_all_cdma_registration_checks_ready (MMBroadbandModem *self,
     }
 
     /* Don't spend too much time waiting to get registered */
-    if (g_timer_elapsed (ctx->timer, NULL) > MAX_CDMA_REGISTRATION_CHECK_WAIT_TIME) {
+    if (g_timer_elapsed (ctx->timer, NULL) > ctx->max_registration_time) {
         mm_dbg ("CDMA registration check timed out");
         mm_iface_modem_cdma_update_cdma1x_registration_state (
             MM_IFACE_MODEM_CDMA (self),
@@ -3919,6 +3916,7 @@ run_all_cdma_registration_checks_ready (MMBroadbandModem *self,
 
 static void
 modem_cdma_register_in_network (MMIfaceModemCdma *self,
+                                guint max_registration_time,
                                 GAsyncReadyCallback callback,
                                 gpointer user_data)
 {
@@ -3933,6 +3931,7 @@ modem_cdma_register_in_network (MMIfaceModemCdma *self,
 
     ctx = g_new0 (RegisterInCdmaNetworkContext, 1);
     ctx->self = g_object_ref (self);
+    ctx->max_registration_time = max_registration_time;
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,

@@ -401,6 +401,7 @@ register_in_network_ready (MMIfaceModemCdma *self,
 
 void
 mm_iface_modem_cdma_register_in_network (MMIfaceModemCdma *self,
+                                         guint max_registration_time,
                                          GAsyncReadyCallback callback,
                                          gpointer user_data)
 {
@@ -412,6 +413,7 @@ mm_iface_modem_cdma_register_in_network (MMIfaceModemCdma *self,
                                         mm_iface_modem_cdma_register_in_network);
     MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->register_in_network (
         self,
+        max_registration_time,
         (GAsyncReadyCallback)register_in_network_ready,
         result);
 }
