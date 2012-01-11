@@ -1157,13 +1157,15 @@ qcdm_cmd_ext_logmask_new (char *buf,
     memset (cmd, 0, sizeof (*cmd));
     cmd->code = DIAG_CMD_EXT_LOGMASK;
 
-    for (i = 0; items[i] > 0; i++) {
-        qcdm_warn_if_fail (items[i] > 0);
-        qcdm_warn_if_fail (items[i] < 4095);
-        cmd->mask[items[i] / 8] |= 1 << items[i] % 8;
+    if (items) {
+        for (i = 0; items[i] > 0; i++) {
+            qcdm_warn_if_fail (items[i] > 0);
+            qcdm_warn_if_fail (items[i] < 4095);
+            cmd->mask[items[i] / 8] |= 1 << items[i] % 8;
 
-        if (items[i] > highest)
-            highest = items[i];
+            if (items[i] > highest)
+                highest = items[i];
+        }
     }
 
     qcdm_return_val_if_fail (highest <= maxlog, 0);
