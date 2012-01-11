@@ -1349,6 +1349,7 @@ test_com_event_report (void *f, void *data)
     gint len;
     QcdmResult *result;
     gsize reply_len;
+    guint32 i;
 
     /* Turn event reporting on */
     len = qcdm_cmd_event_report_new (buf, sizeof (buf), TRUE);
@@ -1368,8 +1369,9 @@ test_com_event_report (void *f, void *data)
 
     qcdm_result_unref (result);
 
-    /* Wait for an event */
-    reply_len = wait_reply (d, buf, sizeof (buf));
+    /* Wait for a few events */
+    for (i = 0; i < 4; i++)
+        reply_len = wait_reply (d, buf, sizeof (buf));
 
     /* Turn event reporting off */
     len = qcdm_cmd_event_report_new (buf, sizeof (buf), FALSE);
@@ -1393,9 +1395,10 @@ test_com_log_config (void *f, void *data)
     QcdmResult *result;
     gsize reply_len;
     u_int32_t num_items = 0;
-    const u_int16_t *items = NULL;
-    size_t items_len = 0;
+    const u_int16_t *items = NULL, *reread_items;
+    size_t items_len = 0, reread_len;
     u_int32_t i;
+    u_int16_t test_items[] = { 0x1004, 0x1005, 0x1006, 0x1007, 0x1008, 0x102C, 0x102E, 0 };
 
     /* Get existing mask for CDMA/EVDO equip ID */
     len = qcdm_cmd_log_config_get_mask_new (buf, sizeof (buf), 0x01);
@@ -1421,6 +1424,49 @@ test_com_log_config (void *f, void *data)
                                &items, &items_len);
     for (i = 0; i < items_len; i++)
         g_message ("%s:    Enabled: 0x%04x", __func__, items[i]);
+
+    qcdm_result_unref (result);
+
+    /* Turn on some log messages */
+    len = qcdm_cmd_log_config_set_mask_new (buf, sizeof (buf), 0x01, test_items);
+    g_assert (len);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    g_print ("\n");
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_log_config_set_mask_result (buf, reply_len, &err);
+    g_assert (result);
+
+    qcdm_result_unref (result);
+
+    /* Get the mask again so we can compare it to what we just set */
+    len = qcdm_cmd_log_config_get_mask_new (buf, sizeof (buf), 0x01);
+    g_assert (len);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    g_print ("\n");
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_log_config_get_mask_result (buf, reply_len, &err);
+    g_assert (result);
+
+    qcdm_result_get_u16_array (result, QCDM_CMD_LOG_CONFIG_MASK_ITEM_ITEMS,
+                               &reread_items, &reread_len);
+    g_assert_cmpint (reread_len, ==, (sizeof (test_items) - 1) / sizeof (test_items[0]));
+    g_assert (memcmp (reread_items, test_items, reread_len * sizeof (test_items[0])) == 0);
 
     qcdm_result_unref (result);
 }
