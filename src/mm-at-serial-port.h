@@ -80,5 +80,7 @@ void     mm_at_serial_port_queue_command_cached (MMAtSerialPort *self,
                                                  MMAtSerialResponseFn callback,
                                                  gpointer user_data);
 
-#endif /* MM_AT_SERIAL_PORT_H */
+/* Just for unit tests */
+void mm_at_serial_port_remove_echo (GByteArray *response);
 
+#endif /* MM_AT_SERIAL_PORT_H */
