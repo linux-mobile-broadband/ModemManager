@@ -2284,7 +2284,9 @@ register_in_network (MMIfaceModem3gpp *self,
      */
     else if (REG_IS_IDLE (broadband->priv->modem_3gpp_registration_state) ||
              broadband->priv->manual_reg) {
-        command = g_strdup ("+COPS=0,,");
+        /* Note that '+COPS=0,,' (same but with commas) won't work in some Nokia
+         * phones */
+        command = g_strdup ("+COPS=0");
         broadband->priv->manual_reg = FALSE;
     }
 
