@@ -868,10 +868,8 @@ qcdm_cmd_nv_get_mode_pref_result (const char *buf, size_t len, int *out_error)
 
     mode = (DMNVItemModePref *) &rsp->data[0];
 
-    if (!mode_pref_validate (mode->mode_pref)) {
-        qcdm_err (0, "Unknown mode preference 0x%X", mode->mode_pref);
-        return NULL;
-    }
+    if (!mode_pref_validate (mode->mode_pref))
+        qcdm_warn (0, "Unknown mode preference 0x%X", mode->mode_pref);
 
     result = qcdm_result_new ();
     qcdm_result_add_u8 (result, QCDM_CMD_NV_GET_MODE_PREF_ITEM_PROFILE, mode->profile);
