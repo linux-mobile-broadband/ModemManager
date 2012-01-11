@@ -2101,15 +2101,12 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
 /*****************************************************************************/
 /* Register in network (3GPP interface) */
 
-/* Maximum time to wait for a successful registration when polling
- * periodically */
-#define MAX_3GPP_REGISTRATION_CHECK_WAIT_TIME 60
-
 typedef struct {
     MMBroadbandModem *self;
     GSimpleAsyncResult *result;
     GCancellable *cancellable;
     GTimer *timer;
+    guint max_registration_time;
 } RegisterIn3gppNetworkContext;
 
 static void
@@ -2199,7 +2196,7 @@ run_all_3gpp_registration_checks_ready (MMBroadbandModem *self,
     }
 
     /* Don't spend too much time waiting to get registered */
-    if (g_timer_elapsed (ctx->timer, NULL) > MAX_3GPP_REGISTRATION_CHECK_WAIT_TIME) {
+    if (g_timer_elapsed (ctx->timer, NULL) > ctx->max_registration_time) {
         mm_dbg ("3GPP registration check timed out");
         mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self),
                                                           MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
@@ -2258,7 +2255,8 @@ register_in_3gpp_network_ready (MMBroadbandModem *self,
 
 static void
 modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
-                                const gchar *network_id,
+                                const gchar *operator_id,
+                                guint max_registration_time,
                                 GAsyncReadyCallback callback,
                                 gpointer user_data)
 {
@@ -2274,6 +2272,7 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
 
     ctx = g_new0 (RegisterIn3gppNetworkContext, 1);
     ctx->self = g_object_ref (self);
+    ctx->max_registration_time = max_registration_time;
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -2286,8 +2285,8 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
         g_object_ref (ctx->cancellable);
 
     /* If the user sent a specific network to use, lock it in. */
-    if (network_id && network_id[0]) {
-        command = g_strdup_printf ("+COPS=1,2,\"%s\"", network_id);
+    if (operator_id && operator_id[0]) {
+        command = g_strdup_printf ("+COPS=1,2,\"%s\"", operator_id);
         broadband->priv->modem_3gpp_manual_registration = TRUE;
     }
     /* If no specific network was given, and the modem is not registered and not

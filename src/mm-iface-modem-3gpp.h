@@ -140,7 +140,8 @@ struct _MMIfaceModem3gpp {
 
     /* Try to register in the network */
     void (* register_in_network) (MMIfaceModem3gpp *self,
-                                  const gchar *network_id,
+                                  const gchar *operator_id,
+                                  guint max_registration_time,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data);
     gboolean (*register_in_network_finish) (MMIfaceModem3gpp *self,
@@ -244,6 +245,7 @@ gboolean mm_iface_modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
                                                          GError **error);
 void     mm_iface_modem_3gpp_register_in_network        (MMIfaceModem3gpp *self,
                                                          const gchar *operator_id,
+                                                         guint max_registration_time,
                                                          GAsyncReadyCallback callback,
                                                          gpointer user_data);
 
