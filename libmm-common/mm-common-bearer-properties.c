@@ -393,6 +393,23 @@ mm_common_bearer_properties_new_from_dictionary (GVariant *dictionary,
 /*****************************************************************************/
 
 MMCommonBearerProperties *
+mm_common_bearer_properties_dup (MMCommonBearerProperties *orig)
+{
+    GVariant *dict;
+    MMCommonBearerProperties *copy;
+    GError *error = NULL;
+
+    dict = mm_common_bearer_properties_get_dictionary (orig);
+    copy = mm_common_bearer_properties_new_from_dictionary (dict, &error);
+    g_assert_no_error (error);
+    g_variant_unref (dict);
+
+    return copy;
+}
+
+/*****************************************************************************/
+
+MMCommonBearerProperties *
 mm_common_bearer_properties_new (void)
 {
     return (MM_COMMON_BEARER_PROPERTIES (

@@ -51,6 +51,8 @@ MMCommonBearerProperties *mm_common_bearer_properties_new_from_dictionary (
     GVariant *dictionary,
     GError **error);
 
+MMCommonBearerProperties *mm_common_bearer_properties_dup (MMCommonBearerProperties *orig);
+
 void mm_common_bearer_properties_set_apn (
     MMCommonBearerProperties *properties,
     const gchar *apn);
