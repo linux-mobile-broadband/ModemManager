@@ -45,8 +45,22 @@ mm_iface_modem_cdma_bind_simple_status (MMIfaceModemCdma *self,
                   MM_IFACE_MODEM_CDMA_DBUS_SKELETON, &skeleton,
                   NULL);
 
-    /* TODO: Bind here properties to be reported during GetStatus() in the
-     * simple interface */
+
+    g_object_bind_property (skeleton, "cdma1x-registration-state",
+                            status, MM_COMMON_SIMPLE_PROPERTY_CDMA_CDMA1X_REGISTRATION_STATE,
+                            G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
+
+    g_object_bind_property (skeleton, "sid",
+                            status, MM_COMMON_SIMPLE_PROPERTY_CDMA_SID,
+                            G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
+
+    g_object_bind_property (skeleton, "nid",
+                            status, MM_COMMON_SIMPLE_PROPERTY_CDMA_NID,
+                            G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
+
+    g_object_bind_property (skeleton, "evdo-registration-state",
+                            status, MM_COMMON_SIMPLE_PROPERTY_CDMA_EVDO_REGISTRATION_STATE,
+                            G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
 
     g_object_unref (skeleton);
 }
