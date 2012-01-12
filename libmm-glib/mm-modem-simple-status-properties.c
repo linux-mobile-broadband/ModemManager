@@ -14,6 +14,7 @@
  */
 
 #include "mm-modem-simple-status-properties.h"
+#include "mm-modem-cdma.h"
 
 MMModemState
 mm_modem_simple_status_properties_get_state (MMModemSimpleStatusProperties *self)
@@ -75,4 +76,40 @@ mm_modem_simple_status_properties_get_3gpp_operator_name (MMModemSimpleStatusPro
     g_return_val_if_fail (MM_IS_MODEM_SIMPLE_STATUS_PROPERTIES (self), NULL);
 
     return mm_common_simple_properties_get_3gpp_operator_name (self);
+}
+
+MMModemCdmaRegistrationState
+mm_modem_simple_status_properties_get_cdma_cdma1x_registration_state (MMModemSimpleStatusProperties *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_SIMPLE_STATUS_PROPERTIES (self),
+                          MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+
+    return mm_common_simple_properties_get_cdma_cdma1x_registration_state (self);
+}
+
+MMModemCdmaRegistrationState
+mm_modem_simple_status_properties_get_cdma_evdo_registration_state (MMModemSimpleStatusProperties *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_SIMPLE_STATUS_PROPERTIES (self),
+                          MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN);
+
+    return mm_common_simple_properties_get_cdma_evdo_registration_state (self);
+}
+
+guint
+mm_modem_simple_status_properties_get_cdma_sid (MMModemSimpleStatusProperties *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_SIMPLE_STATUS_PROPERTIES (self),
+                          MM_MODEM_CDMA_SID_UNKNOWN);
+
+    return mm_common_simple_properties_get_cdma_sid (self);
+}
+
+guint
+mm_modem_simple_status_properties_get_cdma_nid (MMModemSimpleStatusProperties *self)
+{
+    g_return_val_if_fail (MM_IS_MODEM_SIMPLE_STATUS_PROPERTIES (self),
+                          MM_MODEM_CDMA_NID_UNKNOWN);
+
+    return mm_common_simple_properties_get_cdma_nid (self);
 }

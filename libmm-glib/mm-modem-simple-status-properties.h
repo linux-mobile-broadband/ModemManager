@@ -40,6 +40,11 @@ MMModem3gppRegistrationState  mm_modem_simple_status_properties_get_3gpp_registr
 const gchar                  *mm_modem_simple_status_properties_get_3gpp_operator_code      (MMModemSimpleStatusProperties *self);
 const gchar                  *mm_modem_simple_status_properties_get_3gpp_operator_name      (MMModemSimpleStatusProperties *self);
 
+MMModemCdmaRegistrationState mm_modem_simple_status_properties_get_cdma_cdma1x_registration_state (MMModemSimpleStatusProperties *self);
+MMModemCdmaRegistrationState mm_modem_simple_status_properties_get_cdma_evdo_registration_state   (MMModemSimpleStatusProperties *self);
+guint                        mm_modem_simple_status_properties_get_cdma_sid                       (MMModemSimpleStatusProperties *self);
+guint                        mm_modem_simple_status_properties_get_cdma_nid                       (MMModemSimpleStatusProperties *self);
+
 G_END_DECLS
 
 #endif /* MM_MODEM_SIMPLE_STATUS_PROPERTIES_H */
