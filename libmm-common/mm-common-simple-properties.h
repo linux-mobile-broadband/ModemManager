@@ -32,9 +32,10 @@ G_BEGIN_DECLS
 #define MM_COMMON_SIMPLE_PROPERTY_SIGNAL_QUALITY          "signal-quality"
 #define MM_COMMON_SIMPLE_PROPERTY_BANDS                   "bands"
 #define MM_COMMON_SIMPLE_PROPERTY_ACCESS_TECHNOLOGIES     "access-technologies"
-#define MM_COMMON_SIMPLE_PROPERTY_3GPP_REGISTRATION_STATE "registration-state"
-#define MM_COMMON_SIMPLE_PROPERTY_3GPP_OPERATOR_CODE      "operator-code"
-#define MM_COMMON_SIMPLE_PROPERTY_3GPP_OPERATOR_NAME      "operator-name"
+
+#define MM_COMMON_SIMPLE_PROPERTY_3GPP_REGISTRATION_STATE "m3gpp-registration-state"
+#define MM_COMMON_SIMPLE_PROPERTY_3GPP_OPERATOR_CODE      "m3gpp-operator-code"
+#define MM_COMMON_SIMPLE_PROPERTY_3GPP_OPERATOR_NAME      "m3gpp-operator-name"
 
 typedef struct _MMCommonSimpleProperties MMCommonSimpleProperties;
 typedef struct _MMCommonSimplePropertiesClass MMCommonSimplePropertiesClass;

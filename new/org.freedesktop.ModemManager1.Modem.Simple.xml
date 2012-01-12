@@ -146,26 +146,6 @@
               (signature <literal>"u"</literal>).
             </listitem>
           </varlistentry>
-          <varlistentry><term><literal>"registration-state"</literal></term>
-            <listitem>
-              A <link linkend="MMModem3gppRegistrationState">MMModem3gppRegistrationState</link> value
-              specifying the state of the registration,given only when registered
-              in a 3GPP network, as an unsigned integer value (signature
-              <literal>"u"</literal>).
-            </listitem>
-          </varlistentry>
-          <varlistentry><term><literal>"operator-code"</literal></term>
-            <listitem>
-              Operator <literal>MCC-MNC</literal>, given only when registered
-              in a 3GPP network, as a string value (signature <literal>"s"</literal>).
-            </listitem>
-          </varlistentry>
-          <varlistentry><term><literal>"operator-name"</literal></term>
-            <listitem>
-              Operator name, given only when registered in a 3GPP network,
-              as a string value (signature <literal>"s"</literal>).
-            </listitem>
-          </varlistentry>
           <varlistentry><term><literal>"bands"</literal></term>
             <listitem>
               List of <link linkend="MMModemBand">MMModemBand</link> values,
@@ -178,6 +158,26 @@
               A <link linkend="MMModemAccessTechnology">MMModemAccessTechnology</link> value,
               given only when registered, as an unsigned integer value
               (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"m3gpp-registration-state"</literal></term>
+            <listitem>
+              A <link linkend="MMModem3gppRegistrationState">MMModem3gppRegistrationState</link> value
+              specifying the state of the registration, given only when registered
+              in a 3GPP network, as an unsigned integer value (signature
+              <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"m3gpp-operator-code"</literal></term>
+            <listitem>
+              Operator <literal>MCC-MNC</literal>, given only when registered
+              in a 3GPP network, as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"m3gpp-operator-name"</literal></term>
+            <listitem>
+              Operator name, given only when registered in a 3GPP network,
+              as a string value (signature <literal>"s"</literal>).
             </listitem>
           </varlistentry>
         </variablelist>
