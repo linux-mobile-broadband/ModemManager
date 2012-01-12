@@ -1469,6 +1469,10 @@ test_com_log_config (void *f, void *data)
     g_assert (memcmp (reread_items, test_items, reread_len * sizeof (test_items[0])) == 0);
 
     qcdm_result_unref (result);
+
+    /* Wait for a few log packets */
+    for (i = 0; i < 5; i++)
+        reply_len = wait_reply (d, buf, sizeof (buf));
 }
 
 void
