@@ -180,6 +180,34 @@
               as a string value (signature <literal>"s"</literal>).
             </listitem>
           </varlistentry>
+          <varlistentry><term><literal>"cdma-cdma1x-registration-state"</literal></term>
+            <listitem>
+              A <link linkend="MMModemCdmaRegistrationState">MMModemCdmaRegistrationState</link> value
+              specifying the state of the registration, given only when registered
+              in a CDMA1x network, as an unsigned integer value (signature
+              <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"cdma-evdo-registration-state"</literal></term>
+            <listitem>
+              A <link linkend="MMModemCdmaRegistrationState">MMModemCdmaRegistrationState</link> value
+              specifying the state of the registration, given only when registered
+              in a EV-DO network, as an unsigned integer value (signature
+              <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"cdma-sid"</literal></term>
+            <listitem>
+              The System Identifier of the serving network, if registered in a CDMA1x network and if known.
+              Given as an unsigned integer value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"cdma-nid"</literal></term>
+            <listitem>
+              The Network Identifier of the serving network, if registered in a CDMA1x network and if known.
+              Given as an unsigned integer value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
         </variablelist>
     -->
     <method name="GetStatus">
