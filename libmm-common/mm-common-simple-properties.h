@@ -37,6 +37,11 @@ G_BEGIN_DECLS
 #define MM_COMMON_SIMPLE_PROPERTY_3GPP_OPERATOR_CODE      "m3gpp-operator-code"
 #define MM_COMMON_SIMPLE_PROPERTY_3GPP_OPERATOR_NAME      "m3gpp-operator-name"
 
+#define MM_COMMON_SIMPLE_PROPERTY_CDMA_CDMA1X_REGISTRATION_STATE "cdma-cdma1x-registration-state"
+#define MM_COMMON_SIMPLE_PROPERTY_CDMA_EVDO_REGISTRATION_STATE   "cdma-evdo-registration-state"
+#define MM_COMMON_SIMPLE_PROPERTY_CDMA_SID                       "cdma-sid"
+#define MM_COMMON_SIMPLE_PROPERTY_CDMA_NID                       "cdma-nid"
+
 typedef struct _MMCommonSimpleProperties MMCommonSimpleProperties;
 typedef struct _MMCommonSimplePropertiesClass MMCommonSimplePropertiesClass;
 typedef struct _MMCommonSimplePropertiesPrivate MMCommonSimplePropertiesPrivate;
@@ -64,9 +69,15 @@ void                          mm_common_simple_properties_get_bands             
                                                                                    const MMModemBand **bands,
                                                                                    guint *n_bands);
 MMModemAccessTechnology       mm_common_simple_properties_get_access_technologies (MMCommonSimpleProperties *self);
+
 MMModem3gppRegistrationState  mm_common_simple_properties_get_3gpp_registration_state (MMCommonSimpleProperties *self);
 const gchar                  *mm_common_simple_properties_get_3gpp_operator_code      (MMCommonSimpleProperties *self);
 const gchar                  *mm_common_simple_properties_get_3gpp_operator_name      (MMCommonSimpleProperties *self);
+
+MMModemCdmaRegistrationState mm_common_simple_properties_get_cdma_cdma1x_registration_state (MMCommonSimpleProperties *self);
+MMModemCdmaRegistrationState mm_common_simple_properties_get_cdma_evdo_registration_state   (MMCommonSimpleProperties *self);
+guint                        mm_common_simple_properties_get_cdma_sid                       (MMCommonSimpleProperties *self);
+guint                        mm_common_simple_properties_get_cdma_nid                       (MMCommonSimpleProperties *self);
 
 GVariant *mm_common_simple_properties_get_dictionary (MMCommonSimpleProperties *self);
 

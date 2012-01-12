@@ -20,6 +20,9 @@
 #include "mm-common-helpers.h"
 #include "mm-common-simple-properties.h"
 
+#define SID_UNKNOWN 99999
+#define NID_UNKNOWN 99999
+
 G_DEFINE_TYPE (MMCommonSimpleProperties, mm_common_simple_properties, G_TYPE_OBJECT);
 
 enum {
@@ -31,6 +34,10 @@ enum {
     PROP_3GPP_REGISTRATION_STATE,
     PROP_3GPP_OPERATOR_CODE,
     PROP_3GPP_OPERATOR_NAME,
+    PROP_CDMA_CDMA1X_REGISTRATION_STATE,
+    PROP_CDMA_EVDO_REGISTRATION_STATE,
+    PROP_CDMA_SID,
+    PROP_CDMA_NID,
     PROP_LAST
 };
 
@@ -55,6 +62,16 @@ struct _MMCommonSimplePropertiesPrivate {
     gchar *modem_3gpp_operator_code;
     /* 3GPP operator name, given only when registered, signature 's' */
     gchar *modem_3gpp_operator_name;
+
+    /* <--- From the Modem CDMA interface ---> */
+    /* CDMA/CDMA1x registration state, signature 'u' */
+    MMModemCdmaRegistrationState modem_cdma_cdma1x_registration_state;
+    /* CDMA/EV-DO registration state, signature 'u' */
+    MMModemCdmaRegistrationState modem_cdma_evdo_registration_state;
+    /* SID, signature 'u' */
+    guint modem_cdma_sid;
+    /* NID, signature 'u' */
+    guint modem_cdma_nid;
 };
 
 /*****************************************************************************/
@@ -120,6 +137,30 @@ mm_common_simple_properties_get_3gpp_operator_name (MMCommonSimpleProperties *se
     return self->priv->modem_3gpp_operator_name;
 }
 
+MMModemCdmaRegistrationState
+mm_common_simple_properties_get_cdma_cdma1x_registration_state (MMCommonSimpleProperties *self)
+{
+    return self->priv->modem_cdma_cdma1x_registration_state;
+}
+
+MMModemCdmaRegistrationState
+mm_common_simple_properties_get_cdma_evdo_registration_state (MMCommonSimpleProperties *self)
+{
+    return self->priv->modem_cdma_evdo_registration_state;
+}
+
+guint
+mm_common_simple_properties_get_cdma_sid (MMCommonSimpleProperties *self)
+{
+    return self->priv->modem_cdma_sid;
+}
+
+guint
+mm_common_simple_properties_get_cdma_nid (MMCommonSimpleProperties *self)
+{
+    return self->priv->modem_cdma_nid;
+}
+
 /*****************************************************************************/
 
 GVariant *
@@ -148,6 +189,7 @@ mm_common_simple_properties_get_dictionary (MMCommonSimpleProperties *self)
                                "{sv}",
                                MM_COMMON_SIMPLE_PROPERTY_ACCESS_TECHNOLOGIES,
                                g_variant_new_uint32 (self->priv->access_technologies));
+
         g_variant_builder_add (&builder,
                                "{sv}",
                                MM_COMMON_SIMPLE_PROPERTY_3GPP_REGISTRATION_STATE,
@@ -162,6 +204,29 @@ mm_common_simple_properties_get_dictionary (MMCommonSimpleProperties *self)
                                    "{sv}",
                                    MM_COMMON_SIMPLE_PROPERTY_3GPP_OPERATOR_NAME,
                                    g_variant_new_string (self->priv->modem_3gpp_operator_name));
+
+        if (self->priv->modem_cdma_cdma1x_registration_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN) {
+            g_variant_builder_add (&builder,
+                                   "{sv}",
+                                   MM_COMMON_SIMPLE_PROPERTY_CDMA_CDMA1X_REGISTRATION_STATE,
+                                   g_variant_new_uint32 (self->priv->modem_cdma_cdma1x_registration_state));
+            if (self->priv->modem_cdma_sid  != SID_UNKNOWN)
+                g_variant_builder_add (&builder,
+                                       "{sv}",
+                                       MM_COMMON_SIMPLE_PROPERTY_CDMA_SID,
+                                       g_variant_new_uint32 (self->priv->modem_cdma_sid));
+            if (self->priv->modem_cdma_nid  != NID_UNKNOWN)
+                g_variant_builder_add (&builder,
+                                       "{sv}",
+                                       MM_COMMON_SIMPLE_PROPERTY_CDMA_NID,
+                                       g_variant_new_uint32 (self->priv->modem_cdma_nid));
+        }
+        if (self->priv->modem_cdma_evdo_registration_state != MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN)
+            g_variant_builder_add (&builder,
+                                   "{sv}",
+                                   MM_COMMON_SIMPLE_PROPERTY_CDMA_EVDO_REGISTRATION_STATE,
+                                   g_variant_new_uint32 (self->priv->modem_cdma_evdo_registration_state));
+
     }
 
     return g_variant_ref_sink (g_variant_builder_end (&builder));
@@ -192,7 +257,11 @@ mm_common_simple_properties_new_from_dictionary (GVariant *dictionary,
          */
         if (g_str_equal (key, MM_COMMON_SIMPLE_PROPERTY_STATE) ||
             g_str_equal (key, MM_COMMON_SIMPLE_PROPERTY_ACCESS_TECHNOLOGIES) ||
-            g_str_equal (key, MM_COMMON_SIMPLE_PROPERTY_3GPP_REGISTRATION_STATE)) {
+            g_str_equal (key, MM_COMMON_SIMPLE_PROPERTY_3GPP_REGISTRATION_STATE) ||
+            g_str_equal (key, MM_COMMON_SIMPLE_PROPERTY_CDMA_CDMA1X_REGISTRATION_STATE) ||
+            g_str_equal (key, MM_COMMON_SIMPLE_PROPERTY_CDMA_EVDO_REGISTRATION_STATE) ||
+            g_str_equal (key, MM_COMMON_SIMPLE_PROPERTY_CDMA_SID) ||
+            g_str_equal (key, MM_COMMON_SIMPLE_PROPERTY_CDMA_NID)) {
             /* uint properties */
             g_object_set (properties,
                           key, g_variant_get_uint32 (value),
@@ -280,6 +349,18 @@ set_property (GObject *object,
         g_free (self->priv->modem_3gpp_operator_name);
         self->priv->modem_3gpp_operator_name = g_value_dup_string (value);
         break;
+    case PROP_CDMA_CDMA1X_REGISTRATION_STATE:
+        self->priv->modem_cdma_cdma1x_registration_state = g_value_get_enum (value);
+        break;
+    case PROP_CDMA_EVDO_REGISTRATION_STATE:
+        self->priv->modem_cdma_evdo_registration_state = g_value_get_enum (value);
+        break;
+    case PROP_CDMA_SID:
+        self->priv->modem_cdma_sid = g_value_get_enum (value);
+        break;
+    case PROP_CDMA_NID:
+        self->priv->modem_cdma_nid = g_value_get_enum (value);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -316,6 +397,18 @@ get_property (GObject *object,
     case PROP_3GPP_OPERATOR_NAME:
         g_value_set_string (value, self->priv->modem_3gpp_operator_name);
         break;
+    case PROP_CDMA_CDMA1X_REGISTRATION_STATE:
+        g_value_set_enum (value, self->priv->modem_cdma_cdma1x_registration_state);
+        break;
+    case PROP_CDMA_EVDO_REGISTRATION_STATE:
+        g_value_set_enum (value, self->priv->modem_cdma_evdo_registration_state);
+        break;
+    case PROP_CDMA_SID:
+        g_value_set_enum (value, self->priv->modem_cdma_sid);
+        break;
+    case PROP_CDMA_NID:
+        g_value_set_enum (value, self->priv->modem_cdma_nid);
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -335,6 +428,10 @@ mm_common_simple_properties_init (MMCommonSimpleProperties *self)
     self->priv->modem_3gpp_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     self->priv->bands = g_variant_ref_sink (mm_common_build_bands_unknown ());
     self->priv->signal_quality = g_variant_ref_sink (g_variant_new ("(ub)", 0, 0));
+    self->priv->modem_cdma_cdma1x_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+    self->priv->modem_cdma_evdo_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
+    self->priv->modem_cdma_sid = SID_UNKNOWN;
+    self->priv->modem_cdma_nid = NID_UNKNOWN;
 }
 
 static void
@@ -424,4 +521,42 @@ mm_common_simple_properties_class_init (MMCommonSimplePropertiesClass *klass)
                              NULL,
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_3GPP_OPERATOR_NAME, properties[PROP_3GPP_OPERATOR_NAME]);
+
+    properties[PROP_CDMA_CDMA1X_REGISTRATION_STATE] =
+        g_param_spec_enum (MM_COMMON_SIMPLE_PROPERTY_CDMA_CDMA1X_REGISTRATION_STATE,
+                           "CDMA1x registration state",
+                           "Registration state in the CDMA1x network",
+                           MM_TYPE_MODEM_CDMA_REGISTRATION_STATE,
+                           MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN,
+                           G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_CDMA_CDMA1X_REGISTRATION_STATE, properties[PROP_CDMA_CDMA1X_REGISTRATION_STATE]);
+
+    properties[PROP_CDMA_EVDO_REGISTRATION_STATE] =
+        g_param_spec_enum (MM_COMMON_SIMPLE_PROPERTY_CDMA_EVDO_REGISTRATION_STATE,
+                           "EV-DO registration state",
+                           "Registration state in the EV-DO network",
+                           MM_TYPE_MODEM_CDMA_REGISTRATION_STATE,
+                           MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN,
+                           G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_CDMA_EVDO_REGISTRATION_STATE, properties[PROP_CDMA_EVDO_REGISTRATION_STATE]);
+
+    properties[PROP_CDMA_SID] =
+        g_param_spec_uint (MM_COMMON_SIMPLE_PROPERTY_CDMA_SID,
+                           "CDMA1x SID",
+                           "System Identifier of the serving CDMA1x network",
+                           0,
+                           SID_UNKNOWN,
+                           SID_UNKNOWN,
+                           G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_CDMA_SID, properties[PROP_CDMA_SID]);
+
+    properties[PROP_CDMA_NID] =
+        g_param_spec_uint (MM_COMMON_SIMPLE_PROPERTY_CDMA_NID,
+                           "CDMA1x NID",
+                           "Network Identifier of the serving CDMA1x network",
+                           0,
+                           NID_UNKNOWN,
+                           NID_UNKNOWN,
+                           G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_CDMA_NID, properties[PROP_CDMA_NID]);
 }
