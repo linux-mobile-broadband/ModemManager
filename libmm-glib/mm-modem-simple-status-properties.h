@@ -35,9 +35,10 @@ void                          mm_modem_simple_status_properties_get_bands       
                                                                                          const MMModemBand **bands,
                                                                                          guint *n_bands);
 MMModemAccessTechnology       mm_modem_simple_status_properties_get_access_technologies (MMModemSimpleStatusProperties *self);
-MMModem3gppRegistrationState  mm_modem_simple_status_properties_get_registration_state  (MMModemSimpleStatusProperties *self);
-const gchar                  *mm_modem_simple_status_properties_get_operator_code       (MMModemSimpleStatusProperties *self);
-const gchar                  *mm_modem_simple_status_properties_get_operator_name       (MMModemSimpleStatusProperties *self);
+
+MMModem3gppRegistrationState  mm_modem_simple_status_properties_get_3gpp_registration_state (MMModemSimpleStatusProperties *self);
+const gchar                  *mm_modem_simple_status_properties_get_3gpp_operator_code      (MMModemSimpleStatusProperties *self);
+const gchar                  *mm_modem_simple_status_properties_get_3gpp_operator_name      (MMModemSimpleStatusProperties *self);
 
 G_END_DECLS
 

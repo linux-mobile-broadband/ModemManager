@@ -53,7 +53,7 @@ mm_modem_simple_status_properties_get_access_technologies (MMModemSimpleStatusPr
 }
 
 MMModem3gppRegistrationState
-mm_modem_simple_status_properties_get_registration_state (MMModemSimpleStatusProperties *self)
+mm_modem_simple_status_properties_get_3gpp_registration_state (MMModemSimpleStatusProperties *self)
 {
     g_return_val_if_fail (MM_IS_MODEM_SIMPLE_STATUS_PROPERTIES (self),
                           MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
@@ -62,7 +62,7 @@ mm_modem_simple_status_properties_get_registration_state (MMModemSimpleStatusPro
 }
 
 const gchar *
-mm_modem_simple_status_properties_get_operator_code (MMModemSimpleStatusProperties *self)
+mm_modem_simple_status_properties_get_3gpp_operator_code (MMModemSimpleStatusProperties *self)
 {
     g_return_val_if_fail (MM_IS_MODEM_SIMPLE_STATUS_PROPERTIES (self), NULL);
 
@@ -70,7 +70,7 @@ mm_modem_simple_status_properties_get_operator_code (MMModemSimpleStatusProperti
 }
 
 const gchar *
-mm_modem_simple_status_properties_get_operator_name (MMModemSimpleStatusProperties *self)
+mm_modem_simple_status_properties_get_3gpp_operator_name (MMModemSimpleStatusProperties *self)
 {
     g_return_val_if_fail (MM_IS_MODEM_SIMPLE_STATUS_PROPERTIES (self), NULL);
 

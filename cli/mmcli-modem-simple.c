@@ -237,9 +237,9 @@ status_process_reply (MMModemSimpleStatusProperties *result,
                  VALIDATE_UNKNOWN (bands_str),
                  VALIDATE_UNKNOWN (access_tech_str),
                  mmcli_get_3gpp_registration_state_string (
-                     mm_modem_simple_status_properties_get_registration_state (result)),
-                 VALIDATE_UNKNOWN (mm_modem_simple_status_properties_get_operator_code (result)),
-                 VALIDATE_UNKNOWN (mm_modem_simple_status_properties_get_operator_name (result)));
+                     mm_modem_simple_status_properties_get_3gpp_registration_state (result)),
+                 VALIDATE_UNKNOWN (mm_modem_simple_status_properties_get_3gpp_operator_code (result)),
+                 VALIDATE_UNKNOWN (mm_modem_simple_status_properties_get_3gpp_operator_name (result)));
 
         g_free (access_tech_str);
         g_free (bands_str);
