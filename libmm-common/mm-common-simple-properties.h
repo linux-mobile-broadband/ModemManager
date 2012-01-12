@@ -63,9 +63,9 @@ void                          mm_common_simple_properties_get_bands             
                                                                                    const MMModemBand **bands,
                                                                                    guint *n_bands);
 MMModemAccessTechnology       mm_common_simple_properties_get_access_technologies (MMCommonSimpleProperties *self);
-MMModem3gppRegistrationState  mm_common_simple_properties_get_registration_state  (MMCommonSimpleProperties *self);
-const gchar                  *mm_common_simple_properties_get_operator_code       (MMCommonSimpleProperties *self);
-const gchar                  *mm_common_simple_properties_get_operator_name       (MMCommonSimpleProperties *self);
+MMModem3gppRegistrationState  mm_common_simple_properties_get_3gpp_registration_state (MMCommonSimpleProperties *self);
+const gchar                  *mm_common_simple_properties_get_3gpp_operator_code      (MMCommonSimpleProperties *self);
+const gchar                  *mm_common_simple_properties_get_3gpp_operator_name      (MMCommonSimpleProperties *self);
 
 GVariant *mm_common_simple_properties_get_dictionary (MMCommonSimpleProperties *self);
 

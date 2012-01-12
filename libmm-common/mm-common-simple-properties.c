@@ -50,11 +50,11 @@ struct _MMCommonSimplePropertiesPrivate {
 
     /* <--- From the Modem 3GPP interface ---> */
     /* 3GPP registration state, signature 'u' */
-    MMModem3gppRegistrationState registration_state;
+    MMModem3gppRegistrationState modem_3gpp_registration_state;
     /* 3GPP operator code, given only when registered, signature 's' */
-    gchar *operator_code;
+    gchar *modem_3gpp_operator_code;
     /* 3GPP operator name, given only when registered, signature 's' */
-    gchar *operator_name;
+    gchar *modem_3gpp_operator_name;
 };
 
 /*****************************************************************************/
@@ -103,21 +103,21 @@ mm_common_simple_properties_get_access_technologies (MMCommonSimpleProperties *s
 }
 
 MMModem3gppRegistrationState
-mm_common_simple_properties_get_registration_state (MMCommonSimpleProperties *self)
+mm_common_simple_properties_get_3gpp_registration_state (MMCommonSimpleProperties *self)
 {
-    return self->priv->registration_state;
+    return self->priv->modem_3gpp_registration_state;
 }
 
 const gchar *
-mm_common_simple_properties_get_operator_code (MMCommonSimpleProperties *self)
+mm_common_simple_properties_get_3gpp_operator_code (MMCommonSimpleProperties *self)
 {
-    return self->priv->operator_code;
+    return self->priv->modem_3gpp_operator_code;
 }
 
 const gchar *
-mm_common_simple_properties_get_operator_name (MMCommonSimpleProperties *self)
+mm_common_simple_properties_get_3gpp_operator_name (MMCommonSimpleProperties *self)
 {
-    return self->priv->operator_name;
+    return self->priv->modem_3gpp_operator_name;
 }
 
 /*****************************************************************************/
@@ -151,17 +151,17 @@ mm_common_simple_properties_get_dictionary (MMCommonSimpleProperties *self)
         g_variant_builder_add (&builder,
                                "{sv}",
                                MM_COMMON_SIMPLE_PROPERTY_3GPP_REGISTRATION_STATE,
-                               g_variant_new_uint32 (self->priv->registration_state));
-        if (self->priv->operator_code)
+                               g_variant_new_uint32 (self->priv->modem_3gpp_registration_state));
+        if (self->priv->modem_3gpp_operator_code)
             g_variant_builder_add (&builder,
                                    "{sv}",
                                    MM_COMMON_SIMPLE_PROPERTY_3GPP_OPERATOR_CODE,
-                                   g_variant_new_string (self->priv->operator_code));
-        if (self->priv->operator_name)
+                                   g_variant_new_string (self->priv->modem_3gpp_operator_code));
+        if (self->priv->modem_3gpp_operator_name)
             g_variant_builder_add (&builder,
                                    "{sv}",
                                    MM_COMMON_SIMPLE_PROPERTY_3GPP_OPERATOR_NAME,
-                                   g_variant_new_string (self->priv->operator_name));
+                                   g_variant_new_string (self->priv->modem_3gpp_operator_name));
     }
 
     return g_variant_ref_sink (g_variant_builder_end (&builder));
@@ -270,15 +270,15 @@ set_property (GObject *object,
         self->priv->access_technologies = g_value_get_flags (value);
         break;
     case PROP_3GPP_REGISTRATION_STATE:
-        self->priv->registration_state = g_value_get_enum (value);
+        self->priv->modem_3gpp_registration_state = g_value_get_enum (value);
         break;
     case PROP_3GPP_OPERATOR_CODE:
-        g_free (self->priv->operator_code);
-        self->priv->operator_code = g_value_dup_string (value);
+        g_free (self->priv->modem_3gpp_operator_code);
+        self->priv->modem_3gpp_operator_code = g_value_dup_string (value);
         break;
     case PROP_3GPP_OPERATOR_NAME:
-        g_free (self->priv->operator_name);
-        self->priv->operator_name = g_value_dup_string (value);
+        g_free (self->priv->modem_3gpp_operator_name);
+        self->priv->modem_3gpp_operator_name = g_value_dup_string (value);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -308,13 +308,13 @@ get_property (GObject *object,
         g_value_set_flags (value, self->priv->access_technologies);
         break;
     case PROP_3GPP_REGISTRATION_STATE:
-        g_value_set_enum (value, self->priv->registration_state);
+        g_value_set_enum (value, self->priv->modem_3gpp_registration_state);
         break;
     case PROP_3GPP_OPERATOR_CODE:
-        g_value_set_string (value, self->priv->operator_code);
+        g_value_set_string (value, self->priv->modem_3gpp_operator_code);
         break;
     case PROP_3GPP_OPERATOR_NAME:
-        g_value_set_string (value, self->priv->operator_name);
+        g_value_set_string (value, self->priv->modem_3gpp_operator_name);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -332,7 +332,7 @@ mm_common_simple_properties_init (MMCommonSimpleProperties *self)
     /* Some defaults */
     self->priv->state = MM_MODEM_STATE_UNKNOWN;
     self->priv->access_technologies = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
-    self->priv->registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    self->priv->modem_3gpp_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     self->priv->bands = g_variant_ref_sink (mm_common_build_bands_unknown ());
     self->priv->signal_quality = g_variant_ref_sink (g_variant_new ("(ub)", 0, 0));
 }
@@ -346,8 +346,8 @@ finalize (GObject *object)
     g_variant_unref (self->priv->bands);
     if (self->priv->bands_array)
         g_array_unref (self->priv->bands_array);
-    g_free (self->priv->operator_code);
-    g_free (self->priv->operator_name);
+    g_free (self->priv->modem_3gpp_operator_code);
+    g_free (self->priv->modem_3gpp_operator_name);
 
     G_OBJECT_CLASS (mm_common_simple_properties_parent_class)->finalize (object);
 }

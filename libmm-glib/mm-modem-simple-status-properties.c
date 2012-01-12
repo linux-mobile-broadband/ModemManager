@@ -58,7 +58,7 @@ mm_modem_simple_status_properties_get_registration_state (MMModemSimpleStatusPro
     g_return_val_if_fail (MM_IS_MODEM_SIMPLE_STATUS_PROPERTIES (self),
                           MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN);
 
-    return mm_common_simple_properties_get_registration_state (self);
+    return mm_common_simple_properties_get_3gpp_registration_state (self);
 }
 
 const gchar *
@@ -66,7 +66,7 @@ mm_modem_simple_status_properties_get_operator_code (MMModemSimpleStatusProperti
 {
     g_return_val_if_fail (MM_IS_MODEM_SIMPLE_STATUS_PROPERTIES (self), NULL);
 
-    return mm_common_simple_properties_get_operator_code (self);
+    return mm_common_simple_properties_get_3gpp_operator_code (self);
 }
 
 const gchar *
@@ -74,5 +74,5 @@ mm_modem_simple_status_properties_get_operator_name (MMModemSimpleStatusProperti
 {
     g_return_val_if_fail (MM_IS_MODEM_SIMPLE_STATUS_PROPERTIES (self), NULL);
 
-    return mm_common_simple_properties_get_operator_name (self);
+    return mm_common_simple_properties_get_3gpp_operator_name (self);
 }
