@@ -732,6 +732,7 @@ parse_ati_reply (MMBaseModem *self,
                  DeviceIdentifierContext *ctx,
                  const gchar *command,
                  const gchar *response,
+                 gboolean last_command,
                  const GError *error,
                  GVariant **result,
                  GError **result_error)
