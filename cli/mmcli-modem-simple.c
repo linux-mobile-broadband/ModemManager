@@ -218,6 +218,10 @@ status_process_reply (MMModemSimpleStatusProperties *result,
         gchar *access_tech_str;
         guint signal_quality;
         gboolean signal_quality_recent = FALSE;
+        guint sid;
+        guint nid;
+        gchar *sid_str = NULL;
+        gchar *nid_str = NULL;
 
         signal_quality = (mm_modem_simple_status_properties_get_signal_quality (
                               result,
@@ -227,20 +231,44 @@ status_process_reply (MMModemSimpleStatusProperties *result,
         access_tech_str = (mm_modem_get_access_technologies_string (
                                mm_modem_simple_status_properties_get_access_technologies (result)));
 
-        g_print ("         | signal quality: '%u' (%s)\n"
+        sid = mm_modem_simple_status_properties_get_cdma_sid (result);
+        sid_str = (sid != MM_MODEM_CDMA_SID_UNKNOWN ?
+                   g_strdup_printf ("%u", sid) :
+                   NULL);
+        nid = mm_modem_simple_status_properties_get_cdma_nid (result);
+        nid_str = (nid != MM_MODEM_CDMA_NID_UNKNOWN ?
+                   g_strdup_printf ("%u", nid) :
+                   NULL);
+
+        g_print ("  -------------------------\n"
+                 "         | signal quality: '%u' (%s)\n"
                  "         |          bands: '%s'\n"
                  "         |    access tech: '%s'\n"
-                 "         |   registration: '%s'\n"
+                 "  -------------------------\n"
+                 " 3GPP    |   registration: '%s'\n"
                  "         |  operator code: '%s'\n"
-                 "         |  operator name: '%s'\n",
+                 "         |  operator name: '%s'\n"
+                 "  -------------------------\n"
+                 "  CDMA   |            sid: '%s'\n"
+                 "         |            nid: '%s'\n"
+                 "         |   registration: CDMA1x '%s'\n"
+                 "         |                 EV-DO  '%s'\n",
                  signal_quality, signal_quality_recent ? "recent" : "cached",
                  VALIDATE_UNKNOWN (bands_str),
                  VALIDATE_UNKNOWN (access_tech_str),
                  mmcli_get_3gpp_registration_state_string (
                      mm_modem_simple_status_properties_get_3gpp_registration_state (result)),
                  VALIDATE_UNKNOWN (mm_modem_simple_status_properties_get_3gpp_operator_code (result)),
-                 VALIDATE_UNKNOWN (mm_modem_simple_status_properties_get_3gpp_operator_name (result)));
+                 VALIDATE_UNKNOWN (mm_modem_simple_status_properties_get_3gpp_operator_name (result)),
+                 VALIDATE_UNKNOWN (sid_str),
+                 VALIDATE_UNKNOWN (nid_str),
+                 mmcli_get_cdma_registration_state_string (
+                     mm_modem_simple_status_properties_get_cdma_cdma1x_registration_state (result)),
+                 mmcli_get_cdma_registration_state_string (
+                     mm_modem_simple_status_properties_get_cdma_evdo_registration_state (result)));
 
+        g_free (sid_str);
+        g_free (nid_str);
         g_free (access_tech_str);
         g_free (bands_str);
     }
