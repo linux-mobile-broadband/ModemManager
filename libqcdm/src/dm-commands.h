@@ -396,6 +396,17 @@ struct DMCmdPilotSetsRsp {
 } __attribute__ ((packed));
 typedef struct DMCmdPilotSetsRsp DMCmdPilotSetsRsp;
 
+struct DMCmdLog {
+    u_int8_t code;
+    u_int8_t more;
+    u_int16_t len;
+    u_int16_t _unknown2; /* contains same value as len */
+    u_int16_t log_code;
+    u_int64_t timestamp;
+    u_int8_t data[0];
+} __attribute__ ((packed));
+typedef struct DMCmdLog DMCmdLog;
+
 struct DMCmdExtLogMask {
     u_int8_t code;
     /* Bit number of highest '1' in 'mask'; set to 0 to get current mask. */
