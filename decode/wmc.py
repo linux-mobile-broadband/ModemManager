@@ -193,6 +193,9 @@ cmds = { 0x06: ("DEVICE_INFO", show_device_info),
        }
 
 def show(data, prefix, direction):
+    if ord(data[:1]) != 0xC8:
+        return
+
     data = data[1:]  # skip 0xC8 header
     cmdno = ord(data[:1])
     try:
