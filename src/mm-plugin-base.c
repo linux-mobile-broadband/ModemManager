@@ -37,6 +37,7 @@
 #include "mm-serial-parsers.h"
 #include "mm-marshal.h"
 #include "mm-utils.h"
+#include "mm-private-boxed-types.h"
 #include "libqcdm/src/commands.h"
 #include "libqcdm/src/utils.h"
 #include "libqcdm/src/errors.h"
@@ -61,8 +62,8 @@ typedef struct {
     /* Plugin-specific setups */
     gchar **subsystems;
     gchar **drivers;
-    const guint16 *vendor_ids;
-    const guint16 *product_ids;
+    guint16 *vendor_ids;
+    guint16 *product_ids;
     gchar **vendor_strings;
     gchar **product_strings;
     gchar **udev_tags;
@@ -780,11 +781,11 @@ set_property (GObject *object, guint prop_id,
         break;
     case PROP_ALLOWED_VENDOR_IDS:
         /* Construct only */
-        priv->vendor_ids = (const guint16 *)g_value_get_pointer (value);
+        priv->vendor_ids = g_value_dup_boxed (value);
         break;
     case PROP_ALLOWED_PRODUCT_IDS:
         /* Construct only */
-        priv->product_ids = (const guint16 *)g_value_get_pointer (value);
+        priv->product_ids = g_value_dup_boxed (value);
         break;
     case PROP_ALLOWED_VENDOR_STRINGS:
         /* Construct only */
@@ -841,10 +842,10 @@ get_property (GObject *object, guint prop_id,
         g_value_set_boxed (value, priv->drivers);
         break;
     case PROP_ALLOWED_VENDOR_IDS:
-        g_value_set_pointer (value, (gpointer)priv->vendor_ids);
+        g_value_set_boxed (value, priv->vendor_ids);
         break;
     case PROP_ALLOWED_PRODUCT_IDS:
-        g_value_set_pointer (value, (gpointer)priv->product_ids);
+        g_value_set_boxed (value, priv->product_ids);
         break;
     case PROP_ALLOWED_VENDOR_STRINGS:
         g_value_set_boxed (value, priv->vendor_strings);
@@ -930,19 +931,21 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
 
     g_object_class_install_property
         (object_class, PROP_ALLOWED_VENDOR_IDS,
-         g_param_spec_pointer (MM_PLUGIN_BASE_ALLOWED_VENDOR_IDS,
-                               "Allowed vendor IDs",
-                               "List of vendor IDs this plugin can support, "
-                               "should be an array of guint16 finished with '0'",
-                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+         g_param_spec_boxed (MM_PLUGIN_BASE_ALLOWED_VENDOR_IDS,
+                             "Allowed vendor IDs",
+                             "List of vendor IDs this plugin can support, "
+                             "should be an array of guint16 finished with '0'",
+                             MM_TYPE_UINT16_ARRAY,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property
         (object_class, PROP_ALLOWED_PRODUCT_IDS,
-         g_param_spec_pointer (MM_PLUGIN_BASE_ALLOWED_PRODUCT_IDS,
-                               "Allowed product IDs",
-                               "List of product IDs this plugin can support, "
-                               "should be an array of guint16 finished with '0'",
-                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+         g_param_spec_boxed (MM_PLUGIN_BASE_ALLOWED_PRODUCT_IDS,
+                             "Allowed product IDs",
+                             "List of product IDs this plugin can support, "
+                             "should be an array of guint16 finished with '0'",
+                             MM_TYPE_UINT16_ARRAY,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
 
     g_object_class_install_property
