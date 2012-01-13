@@ -906,7 +906,7 @@ modem_load_supported_modes (MMIfaceModem *self,
     GSimpleAsyncResult *result;
     MMModemMode mode;
 
-    mm_dbg ("loading supported modes...");
+    mm_dbg ("loading initial supported modes...");
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
@@ -914,13 +914,24 @@ modem_load_supported_modes (MMIfaceModem *self,
 
     mode = MM_MODEM_MODE_NONE;
 
-    /* If the modem has +GSM caps, assume it does CS, 2G and 3G */
+    /* If the modem has +GSM caps... */
     if (broadband->priv->modem_current_capabilities & MM_MODEM_CAPABILITY_GSM_UMTS) {
-        mode |= (MM_MODEM_MODE_CS | MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        /* There are modems which only support CS connections (e.g. Iridium) */
+        if (broadband->priv->modem_3gpp_cs_network_supported)
+            mode |= MM_MODEM_MODE_CS;
+        /* If PS supported, assume we can do both 2G and 3G, even if it may not really
+         * be true. This is the generic implementation anyway, plugins can use modem
+         * specific commands to check which technologies are supported. */
+        if (broadband->priv->modem_3gpp_ps_network_supported)
+            mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
     }
-    /* If the modem has CDMA caps, assume it does 3G */
-    else if (broadband->priv->modem_current_capabilities & MM_MODEM_CAPABILITY_CDMA_EVDO) {
-        mode |= MM_MODEM_MODE_3G;
+
+    /* If the modem has CDMA caps... */
+    if (broadband->priv->modem_current_capabilities & MM_MODEM_CAPABILITY_CDMA_EVDO) {
+        if (broadband->priv->modem_cdma_cdma1x_network_supported)
+            mode |= MM_MODEM_MODE_2G;
+        if (broadband->priv->modem_cdma_evdo_network_supported)
+            mode |= MM_MODEM_MODE_3G;
     }
 
     /* If the modem has LTE caps, it does 4G */
