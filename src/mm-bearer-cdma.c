@@ -80,6 +80,7 @@ typedef struct {
     MMAtSerialPort *primary;
     MMPort *data;
     GSimpleAsyncResult *result;
+    gchar *number;
     GError *error;
     GCancellable *cancellable;
 } ConnectContext;
@@ -124,6 +125,7 @@ connect_context_complete_and_free (ConnectContext *ctx)
 
     g_simple_async_result_complete_in_idle (ctx->result);
 
+    g_free (ctx->number);
     g_object_unref (ctx->cancellable);
     g_object_unref (ctx->data);
     g_object_unref (ctx->primary);
@@ -176,7 +178,18 @@ connect_context_dial (ConnectContext *ctx)
 {
     gchar *command;
 
-    command = g_strconcat ("DT", MM_BEARER_CDMA (ctx->bearer)->priv->number, NULL);
+    /* Decide which number to dial, in the following order:
+     *  (1) If a number given during Connect(), use it.
+     *  (2) If a number given when creating the bearer, use that one. Wait, this is quite
+     *      redundant, isn't it?
+     *  (3) Otherwise, use the default one, #777
+     */
+    if (ctx->number)
+        command = g_strconcat ("DT", ctx->number, NULL);
+    else if (MM_BEARER_CDMA (ctx->bearer)->priv->number)
+        command = g_strconcat ("DT", MM_BEARER_CDMA (ctx->bearer)->priv->number, NULL);
+    else
+        command = g_strdup ("DT#777");
     mm_base_modem_at_command_in_port (
         ctx->modem,
         ctx->primary,
@@ -359,6 +372,7 @@ connect (MMBearer *self,
     ctx->primary = g_object_ref (primary);
     ctx->data = g_object_ref (data);
     ctx->bearer = g_object_ref (self);
+    ctx->number = g_strdup (number);
     ctx->modem = modem;
 
     /* NOTE:
