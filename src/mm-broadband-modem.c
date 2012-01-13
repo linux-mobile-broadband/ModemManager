@@ -239,12 +239,12 @@ modem_create_bearer (MMIfaceModem *self,
         return;
     }
 
-    /* On mixed LTE and CDMA modems, we'll build a 3GPP bearer if 'apn' was
+    /* On mixed 3GPP and CDMA modems, we'll build a 3GPP bearer if 'apn' was
      * given, and a CDMA bearer otherwise.
-     * Plugins supporting mixed LTE+CDMA modems can override this and provide
+     * Plugins supporting mixed 3GPP+CDMA modems can override this method and provide
      * their own specific and detailed logic. */
     if (mm_iface_modem_is_cdma (self) &&
-        mm_iface_modem_is_3gpp_lte (self)) {
+        mm_iface_modem_is_3gpp (self)) {
         if (mm_common_bearer_properties_get_apn (properties)) {
             mm_dbg ("Creating 3GPP Bearer in mixed CDMA+LTE modem");
             mm_iface_modem_3gpp_create_bearer (MM_IFACE_MODEM_3GPP (self),
@@ -261,17 +261,8 @@ modem_create_bearer (MMIfaceModem *self,
         return;
     }
 
-    g_simple_async_result_set_error (
-        result,
-        MM_CORE_ERROR,
-        MM_CORE_ERROR_UNSUPPORTED,
-        "Cannot create bearer in modem of unknown type. "
-        "CDMA: %s, 3GPP: %s (LTE: %s)",
-        mm_iface_modem_is_cdma (self) ? "yes" : "no",
-        mm_iface_modem_is_3gpp (self) ? "yes" : "no",
-        mm_iface_modem_is_3gpp_lte (self) ? "yes" : "no");
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+    /* POTS modems are not expected yet. */
+    g_assert_not_reached ();
 }
 
 /*****************************************************************************/

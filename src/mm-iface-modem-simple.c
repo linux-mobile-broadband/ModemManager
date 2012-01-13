@@ -158,7 +158,7 @@ register_in_3gpp_or_cdma_network (MMIfaceModemSimple *self,
         ctx->remaining_tries_cdma = 1;
         ctx->remaining_tries_3gpp = 0;
     }
-    /* Mixed 3GPP(LTE)+CDMA modems... */
+    /* Mixed 3GPP+CDMA modems... */
     else  {
         ctx->max_try_time = 10;
         ctx->remaining_tries_cdma = 6;
@@ -301,7 +301,7 @@ create_3gpp_and_cdma_bearers (MMIfaceModemSimple *self,
     /* CDMA-only modems... */
     else if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (ctx->self)))
         ctx->create_cdma_bearer = TRUE;
-    /* Mixed CDMA+3GPP(LTE) modems */
+    /* Mixed CDMA+3GPP modems */
     else {
         /* If we have APN, we'll create both 3GPP and CDMA bearers.
          * Otherwise we'll only create a CDMA bearer. */
