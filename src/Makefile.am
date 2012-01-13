@@ -119,6 +119,8 @@ modem_manager_SOURCES = \
 	mm-log.h \
 	mm-private-enums-types.h \
 	mm-private-enums-types.c \
+	mm-private-boxed-types.h \
+	mm-private-boxed-types.c \
 	mm-callback-info.c \
 	mm-callback-info.h \
 	$(auth_sources) \
