@@ -69,7 +69,7 @@ typedef struct {
     gchar **udev_tags;
     gboolean at;
     gboolean qcdm;
-    const MMPortProbeAtCommand *custom_init;
+    MMPortProbeAtCommand *custom_init;
     guint64 send_delay;
 } MMPluginBasePrivate;
 
@@ -809,7 +809,7 @@ set_property (GObject *object, guint prop_id,
         break;
     case PROP_CUSTOM_INIT:
         /* Construct only */
-        priv->custom_init = (const MMPortProbeAtCommand *)g_value_get_pointer (value);
+        priv->custom_init = g_value_dup_boxed (value);
         break;
     case PROP_SEND_DELAY:
         /* Construct only */
@@ -863,7 +863,7 @@ get_property (GObject *object, guint prop_id,
         g_value_set_boxed (value, priv->udev_tags);
         break;
     case PROP_CUSTOM_INIT:
-        g_value_set_pointer (value, (gpointer)priv->custom_init);
+        g_value_set_boxed (value, priv->custom_init);
         break;
     case PROP_SEND_DELAY:
         g_value_set_uint64 (value, priv->send_delay);
@@ -993,12 +993,13 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
 
     g_object_class_install_property
         (object_class, PROP_CUSTOM_INIT,
-         g_param_spec_pointer (MM_PLUGIN_BASE_CUSTOM_INIT,
-                               "Custom initialization",
-                               "List of custom initializations this plugin needs, "
-                               "should be an array of MMPortProbeAtCommand structs "
-                               "finished with 'NULL'",
-                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+         g_param_spec_boxed (MM_PLUGIN_BASE_CUSTOM_INIT,
+                             "Custom initialization",
+                             "List of custom initializations this plugin needs, "
+                             "should be an array of MMPortProbeAtCommand structs "
+                             "finished with 'NULL'",
+                             MM_TYPE_POINTER_ARRAY,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property
         (object_class, PROP_SEND_DELAY,
