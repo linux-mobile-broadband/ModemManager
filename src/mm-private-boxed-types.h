@@ -23,6 +23,9 @@ G_BEGIN_DECLS
 GType mm_uint16_array_get_type (void) G_GNUC_CONST;
 #define MM_TYPE_UINT16_ARRAY (mm_uint16_array_get_type ())
 
+GType mm_pointer_array_get_type (void) G_GNUC_CONST;
+#define MM_TYPE_POINTER_ARRAY (mm_pointer_array_get_type ())
+
 G_END_DECLS
 
 #endif /* __MM_PRIVATE_BOXED_TYPES_H__ */

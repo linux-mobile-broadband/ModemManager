@@ -50,3 +50,39 @@ mm_uint16_array_get_type (void)
 
     return g_define_type_id__volatile;
 }
+
+
+static gpointer *
+pointer_array_copy (gpointer *array)
+{
+    gpointer *dup;
+    guint i;
+
+    if (!array)
+        return NULL;
+
+    /* Get NULL-terminated array size */
+    for (i = 0; array[i]; i++);
+
+    dup = g_new (gpointer, i + 1);
+    memcpy (dup, array, i * sizeof (gpointer));
+    dup[i] = NULL;
+    return dup;
+}
+
+GType
+mm_pointer_array_get_type (void)
+{
+    static volatile gsize g_define_type_id__volatile = 0;
+
+    if (g_once_init_enter (&g_define_type_id__volatile)) {
+        GType g_define_type_id =
+            g_boxed_type_register_static (g_intern_static_string ("MMPointerArray"),
+                                          (GBoxedCopyFunc) pointer_array_copy,
+                                          (GBoxedFreeFunc) g_free);
+
+        g_once_init_leave (&g_define_type_id__volatile, g_define_type_id);
+    }
+
+    return g_define_type_id__volatile;
+}
