@@ -59,13 +59,13 @@ typedef struct {
     gboolean sort_last;
 
     /* Plugin-specific setups */
-    const gchar **subsystems;
-    const gchar **drivers;
+    gchar **subsystems;
+    gchar **drivers;
     const guint16 *vendor_ids;
     const guint16 *product_ids;
-    const gchar **vendor_strings;
-    const gchar **product_strings;
-    const gchar **udev_tags;
+    gchar **vendor_strings;
+    gchar **product_strings;
+    gchar **udev_tags;
     gboolean at;
     gboolean qcdm;
     const MMPortProbeAtCommand *custom_init;
@@ -772,11 +772,11 @@ set_property (GObject *object, guint prop_id,
         break;
     case PROP_ALLOWED_SUBSYSTEMS:
         /* Construct only */
-        priv->subsystems = (const gchar **)g_value_get_pointer (value);
+        priv->subsystems = g_value_dup_boxed (value);
         break;
     case PROP_ALLOWED_DRIVERS:
         /* Construct only */
-        priv->drivers = (const gchar **)g_value_get_pointer (value);
+        priv->drivers = g_value_dup_boxed (value);
         break;
     case PROP_ALLOWED_VENDOR_IDS:
         /* Construct only */
@@ -788,15 +788,15 @@ set_property (GObject *object, guint prop_id,
         break;
     case PROP_ALLOWED_VENDOR_STRINGS:
         /* Construct only */
-        priv->vendor_strings = (const gchar **)g_value_get_pointer (value);
+        priv->vendor_strings = g_value_dup_boxed (value);
         break;
     case PROP_ALLOWED_PRODUCT_STRINGS:
         /* Construct only */
-        priv->product_strings = (const gchar **)g_value_get_pointer (value);
+        priv->product_strings = g_value_dup_boxed (value);
         break;
     case PROP_ALLOWED_UDEV_TAGS:
         /* Construct only */
-        priv->udev_tags = (const gchar **)g_value_get_pointer (value);
+        priv->udev_tags = g_value_dup_boxed (value);
         break;
     case PROP_ALLOWED_AT:
         /* Construct only */
@@ -835,10 +835,10 @@ get_property (GObject *object, guint prop_id,
         g_value_set_string (value, priv->name);
         break;
     case PROP_ALLOWED_SUBSYSTEMS:
-        g_value_set_pointer (value, (gpointer)priv->subsystems);
+        g_value_set_boxed (value, priv->subsystems);
         break;
     case PROP_ALLOWED_DRIVERS:
-        g_value_set_pointer (value, (gpointer)priv->drivers);
+        g_value_set_boxed (value, priv->drivers);
         break;
     case PROP_ALLOWED_VENDOR_IDS:
         g_value_set_pointer (value, (gpointer)priv->vendor_ids);
@@ -847,10 +847,10 @@ get_property (GObject *object, guint prop_id,
         g_value_set_pointer (value, (gpointer)priv->product_ids);
         break;
     case PROP_ALLOWED_VENDOR_STRINGS:
-        g_value_set_pointer (value, (gpointer)priv->vendor_strings);
+        g_value_set_boxed (value, priv->vendor_strings);
         break;
     case PROP_ALLOWED_PRODUCT_STRINGS:
-        g_value_set_pointer (value, (gpointer)priv->product_strings);
+        g_value_set_boxed (value, priv->product_strings);
         break;
     case PROP_ALLOWED_AT:
         g_value_set_boolean (value, priv->at);
@@ -859,7 +859,7 @@ get_property (GObject *object, guint prop_id,
         g_value_set_boolean (value, priv->qcdm);
         break;
     case PROP_ALLOWED_UDEV_TAGS:
-        g_value_set_pointer (value, (gpointer)priv->udev_tags);
+        g_value_set_boxed (value, priv->udev_tags);
         break;
     case PROP_CUSTOM_INIT:
         g_value_set_pointer (value, (gpointer)priv->custom_init);
@@ -912,19 +912,21 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
 
     g_object_class_install_property
         (object_class, PROP_ALLOWED_SUBSYSTEMS,
-         g_param_spec_pointer (MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS,
-                               "Allowed subsystems",
-                               "List of subsystems this plugin can support, "
-                               "should be an array of strings finished with 'NULL'",
-                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+         g_param_spec_boxed (MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS,
+                             "Allowed subsystems",
+                             "List of subsystems this plugin can support, "
+                             "should be an array of strings finished with 'NULL'",
+                             G_TYPE_STRV,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property
         (object_class, PROP_ALLOWED_DRIVERS,
-         g_param_spec_pointer (MM_PLUGIN_BASE_ALLOWED_DRIVERS,
-                               "Allowed drivers",
-                               "List of drivers this plugin can support, "
-                               "should be an array of strings finished with 'NULL'",
-                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+         g_param_spec_boxed (MM_PLUGIN_BASE_ALLOWED_DRIVERS,
+                             "Allowed drivers",
+                             "List of drivers this plugin can support, "
+                             "should be an array of strings finished with 'NULL'",
+                             G_TYPE_STRV,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property
         (object_class, PROP_ALLOWED_VENDOR_IDS,
@@ -945,27 +947,30 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
 
     g_object_class_install_property
         (object_class, PROP_ALLOWED_VENDOR_STRINGS,
-         g_param_spec_pointer (MM_PLUGIN_BASE_ALLOWED_VENDOR_STRINGS,
-                               "Allowed vendor strings",
-                               "List of vendor strings this plugin can support, "
-                               "should be an array of strings finished with 'NULL'",
-                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+         g_param_spec_boxed (MM_PLUGIN_BASE_ALLOWED_VENDOR_STRINGS,
+                             "Allowed vendor strings",
+                             "List of vendor strings this plugin can support, "
+                             "should be an array of strings finished with 'NULL'",
+                             G_TYPE_STRV,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property
         (object_class, PROP_ALLOWED_PRODUCT_STRINGS,
-         g_param_spec_pointer (MM_PLUGIN_BASE_ALLOWED_PRODUCT_STRINGS,
-                               "Allowed product strings",
-                               "List of product strings this plugin can support, "
-                               "should be an array of strings finished with 'NULL'",
-                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+         g_param_spec_boxed (MM_PLUGIN_BASE_ALLOWED_PRODUCT_STRINGS,
+                             "Allowed product strings",
+                             "List of product strings this plugin can support, "
+                             "should be an array of strings finished with 'NULL'",
+                             G_TYPE_STRV,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property
         (object_class, PROP_ALLOWED_UDEV_TAGS,
-         g_param_spec_pointer (MM_PLUGIN_BASE_ALLOWED_UDEV_TAGS,
-                               "Allowed Udev tags",
-                               "List of udev tags this plugin may expect, "
-                               "should be an array of strings finished with 'NULL'",
-                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+         g_param_spec_boxed (MM_PLUGIN_BASE_ALLOWED_UDEV_TAGS,
+                             "Allowed Udev tags",
+                             "List of udev tags this plugin may expect, "
+                             "should be an array of strings finished with 'NULL'",
+                             G_TYPE_STRV,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property
         (object_class, PROP_ALLOWED_AT,
