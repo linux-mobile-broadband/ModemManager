@@ -48,7 +48,7 @@ struct _MMBroadbandModemCinterionPrivate {
 };
 
 /*****************************************************************************/
-/* MODEM POWER UP */
+/* MODEM POWER DOWN */
 
 static gboolean
 modem_power_down_finish (MMIfaceModem *self,
@@ -60,6 +60,59 @@ modem_power_down_finish (MMIfaceModem *self,
 }
 
 static void
+send_sleep_mode_command (MMBroadbandModemCinterion *self,
+                         GSimpleAsyncResult *operation_result)
+{
+    if (self->priv->sleep_mode_cmd &&
+        self->priv->sleep_mode_cmd[0])
+        mm_base_modem_at_command_ignore_reply (MM_BASE_MODEM (self),
+                                               self->priv->sleep_mode_cmd,
+                                               5);
+}
+
+static void
+supported_functionality_status_query_ready (MMBroadbandModemCinterion *self,
+                                            GAsyncResult *res,
+                                            GSimpleAsyncResult *operation_result)
+{
+    const gchar *response;
+    GError *error = NULL;
+
+    g_assert (self->priv->sleep_mode_cmd == NULL);
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response) {
+        mm_warn ("Couldn't query supported functionality status: '%s'",
+                 error->message);
+        g_error_free (error);
+        self->priv->sleep_mode_cmd = g_strdup ("");
+    } else {
+        /* We need to get which power-off command to use to put the modem in low
+         * power mode (with serial port open for AT commands, but with RF switched
+         * off). According to the documentation of various Cinterion modems, some
+         * support AT+CFUN=4 (HC25) and those which don't support it can use
+         * AT+CFUN=7 (CYCLIC SLEEP mode with 2s timeout after last character
+         * received in the serial port).
+         *
+         * So, just look for '4' in the reply; if not found, look for '7', and if
+         * not found, report warning and don't use any.
+         */
+        if (strstr (response, "4") != NULL) {
+            mm_dbg ("Device supports CFUN=4 sleep mode");
+            self->priv->sleep_mode_cmd = g_strdup ("+CFUN=4");
+        } else if (strstr (response, "7") != NULL) {
+            mm_dbg ("Device supports CFUN=7 sleep mode");
+            self->priv->sleep_mode_cmd = g_strdup ("+CFUN=7");
+        } else {
+            mm_warn ("Unknown functionality mode to go into sleep mode");
+            self->priv->sleep_mode_cmd = g_strdup ("");
+        }
+    }
+
+    send_sleep_mode_command (self, operation_result);
+}
+
+static void
 modem_power_down (MMIfaceModem *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
@@ -67,133 +120,121 @@ modem_power_down (MMIfaceModem *self,
     MMBroadbandModemCinterion *cinterion = MM_BROADBAND_MODEM_CINTERION (self);
     GSimpleAsyncResult *result;
 
-    if (cinterion->priv->sleep_mode_cmd)
-        mm_base_modem_at_command_ignore_reply (MM_BASE_MODEM (self),
-                                               cinterion->priv->sleep_mode_cmd,
-                                               5);
-
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
                                         modem_power_down);
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete_in_idle (result);
-    g_object_unref (result);
+
+    /* If sleep command already decided, use it. */
+    if (cinterion->priv->sleep_mode_cmd)
+        send_sleep_mode_command (MM_BROADBAND_MODEM_CINTERION (self),
+                                 result);
+    else
+        mm_base_modem_at_command (
+            MM_BASE_MODEM (self),
+            "+CFUN=?",
+            3,
+            FALSE,
+            NULL, /* cancellable */
+            (GAsyncReadyCallback)supported_functionality_status_query_ready,
+            result);
 }
 
 /*****************************************************************************/
-/* AFTER POWER UP */
+/* SUPPORTED MODES */
 
-static gboolean
-modem_after_power_up_finish (MMIfaceModem *self,
+static MMModemMode
+load_supported_modes_finish (MMIfaceModem *self,
                              GAsyncResult *res,
                              GError **error)
 {
-    return !!mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_MODE_NONE;
+
+    return (MMModemMode) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
+                                               G_SIMPLE_ASYNC_RESULT (res)));
 }
 
-static gboolean
-parse_supported_functionality_status (MMBroadbandModemCinterion *self,
-                                      gpointer none,
-                                      const gchar *command,
-                                      const gchar *response,
-                                      gboolean last_command,
-                                      const GError *error,
-                                      GVariant **result,
-                                      GError **result_error)
+static void
+supported_networks_query_ready (MMBroadbandModemCinterion *self,
+                                GAsyncResult *res,
+                                GSimpleAsyncResult *operation_result)
 {
-    /* We need to get which power-off command to use to put the modem in low
-     * power mode (with serial port open for AT commands, but with RF switched
-     * off). According to the documentation of various Cinterion modems, some
-     * support AT+CFUN=4 (HC25) and those which don't support it can use
-     * AT+CFUN=7 (CYCLIC SLEEP mode with 2s timeout after last character
-     * received in the serial port).
-     *
-     * So, just look for '4' in the reply; if not found, look for '7', and if
-     * not found, report warning and don't use any.
-     */
-    g_free (self->priv->sleep_mode_cmd);
-    if (strstr (response, "4") != NULL) {
-        mm_dbg ("Device supports CFUN=4 sleep mode");
-        self->priv->sleep_mode_cmd = g_strdup ("+CFUN=4");
-    } else if (strstr (response, "7") != NULL) {
-        mm_dbg ("Device supports CFUN=7 sleep mode");
-        self->priv->sleep_mode_cmd = g_strdup ("+CFUN=7");
-    } else {
-        mm_warn ("Unknown functionality mode to go into sleep mode");
-        self->priv->sleep_mode_cmd = NULL;
+    const gchar *response;
+    GError *error = NULL;
+    MMModemMode mode;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response) {
+        /* Let the error be critical. */
+        g_simple_async_result_take_error (operation_result, error);
+        g_simple_async_result_complete (operation_result);
+        g_object_unref (operation_result);
+        return;
     }
 
-    /* Keep on with next command */
-    return FALSE;
-}
-
-static gboolean
-parse_supported_networks (MMBroadbandModemCinterion *self,
-                          gpointer none,
-                          const gchar *command,
-                          const gchar *response,
-                          gboolean last_command,
-                          const GError *error,
-                          GVariant **result,
-                          GError **result_error)
-{
     /* Note: Documentation says that AT+WS46=? is replied with '+WS46:' followed
      * by a list of supported network modes between parenthesis, but the EGS5
      * used to test this didn't use the 'WS46:' prefix. Also, more than one
      * numeric ID may appear in the list, that's why they are checked
-     * separately. * */
+     * separately. */
+
+    mode = MM_MODEM_MODE_NONE;
 
     if (strstr (response, "12") != NULL) {
         mm_dbg ("Device allows 2G-only network mode");
         self->priv->only_geran = TRUE;
+        mode |= MM_MODEM_MODE_2G;
     }
 
     if (strstr (response, "22") != NULL) {
         mm_dbg ("Device allows 3G-only network mode");
         self->priv->only_utran = TRUE;
+        mode |= MM_MODEM_MODE_3G;
     }
 
     if (strstr (response, "25") != NULL) {
         mm_dbg ("Device allows 2G/3G network mode");
         self->priv->both_geran_utran = TRUE;
+        mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
     }
 
     /* If no expected ID found, error */
-    if (!self->priv->only_geran &&
-        !self->priv->only_utran &&
-        !self->priv->both_geran_utran) {
-        mm_warn ("Invalid list of supported networks: '%s'", response);
-        *result_error = g_error_new (MM_CORE_ERROR,
-                                     MM_CORE_ERROR_FAILED,
-                                     "Invalid list of supported networks: '%s'",
-                                     response);
-        return FALSE;
-    }
+    if (mode == MM_MODEM_MODE_NONE)
+        g_simple_async_result_set_error (operation_result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Invalid list of supported networks: '%s'",
+                                         response);
+    else
+        g_simple_async_result_set_op_res_gpointer (operation_result,
+                                                   GUINT_TO_POINTER (mode),
+                                                   NULL);
 
-    /* Keep on with next command */
-    return FALSE;
+    g_simple_async_result_complete (operation_result);
+    g_object_unref (operation_result);
 }
 
-static const MMBaseModemAtCommand after_power_up_commands[] = {
-    { "+CFUN=?",  3, FALSE, (MMBaseModemAtResponseProcessor)parse_supported_functionality_status },
-    { "+WS46=?", 3, FALSE, (MMBaseModemAtResponseProcessor)parse_supported_networks },
-    { NULL }
-};
-
 static void
-modem_after_power_up (MMIfaceModem *self,
+load_supported_modes (MMIfaceModem *self,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
-    mm_base_modem_at_sequence (
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_supported_modes);
+
+    mm_base_modem_at_command (
         MM_BASE_MODEM (self),
-        after_power_up_commands,
-        NULL, /* response_processor_context */
-        NULL, /* response_processor_context_free */
+        "+WS46=?",
+        3,
+        FALSE,
         NULL, /* cancellable */
-        callback,
-        user_data);
+        (GAsyncReadyCallback)supported_networks_query_ready,
+        result);
 }
 
 /*****************************************************************************/
@@ -287,10 +328,10 @@ finalize (GObject *object)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    iface->load_supported_modes = load_supported_modes;
+    iface->load_supported_modes_finish = load_supported_modes_finish;
     iface->setup_flow_control = setup_flow_control;
     iface->setup_flow_control_finish = setup_flow_control_finish;
-    iface->modem_after_power_up = modem_after_power_up;
-    iface->modem_after_power_up_finish = modem_after_power_up_finish;
     iface->modem_power_down = modem_power_down;
     iface->modem_power_down_finish = modem_power_down_finish;
 }
