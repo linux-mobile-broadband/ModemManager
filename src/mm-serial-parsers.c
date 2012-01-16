@@ -82,6 +82,7 @@ remove_matches (GRegex *r, GString *string)
 typedef struct {
     GRegex *generic_response;
     GRegex *detailed_error;
+    GRegex *cms_error;
 } MMSerialParserV0;
 
 gpointer
@@ -94,6 +95,7 @@ mm_serial_parser_v0_new (void)
 
     parser->generic_response = g_regex_new ("(\\d)\\0?\\r$", flags, 0, NULL);
     parser->detailed_error = g_regex_new ("\\+CME ERROR:\\s*(\\d+)\\r\\n$", flags, 0, NULL);
+    parser->cms_error = g_regex_new ("\\+CMS ERROR:\\s*(\\d+)\\r\\n$", flags, 0, NULL);
 
     return parser;
 }
@@ -168,6 +170,21 @@ mm_serial_parser_v0_parse (gpointer data,
             local_error = mm_mobile_error_for_code (code);
         }
         g_match_info_free (match_info);
+
+        if (!found) {
+            found = g_regex_match_full (parser->cms_error, response->str, response->len, 0, 0, &match_info, NULL);
+            if (found) {
+                str = g_match_info_fetch (match_info, 1);
+                if (str) {
+                    code = atoi (str);
+                    g_free (str);
+                } else
+                    code = MM_MSG_ERROR_UNKNOWN;
+
+                local_error = mm_msg_error_for_code (code);
+            }
+            g_match_info_free (match_info);
+        }
     }
 
     if (found)
@@ -190,6 +207,7 @@ mm_serial_parser_v0_destroy (gpointer data)
 
     g_regex_unref (parser->generic_response);
     g_regex_unref (parser->detailed_error);
+    g_regex_unref (parser->cms_error);
 
     g_slice_free (MMSerialParserV0, data);
 }
@@ -203,6 +221,7 @@ typedef struct {
     GRegex *regex_cme_error;
     GRegex *regex_cms_error;
     GRegex *regex_cme_error_str;
+    GRegex *regex_cms_error_str;
     GRegex *regex_ezx_error;
     GRegex *regex_unknown_error;
     GRegex *regex_connect_failed;
@@ -222,6 +241,7 @@ mm_serial_parser_v1_new (void)
     parser->regex_cme_error = g_regex_new ("\\r\\n\\+CME ERROR:\\s*(\\d+)\\r\\n$", flags, 0, NULL);
     parser->regex_cms_error = g_regex_new ("\\r\\n\\+CMS ERROR:\\s*(\\d+)\\r\\n$", flags, 0, NULL);
     parser->regex_cme_error_str = g_regex_new ("\\r\\n\\+CME ERROR:\\s*([^\\n\\r]+)\\r\\n$", flags, 0, NULL);
+    parser->regex_cms_error_str = g_regex_new ("\\r\\n\\+CMS ERROR:\\s*([^\\n\\r]+)\\r\\n$", flags, 0, NULL);
     parser->regex_ezx_error = g_regex_new ("\\r\\n\\MODEM ERROR:\\s*(\\d+)\\r\\n$", flags, 0, NULL);
     parser->regex_unknown_error = g_regex_new ("\\r\\n(ERROR)|(COMMAND NOT SUPPORT)\\r\\n$", flags, 0, NULL);
     parser->regex_connect_failed = g_regex_new ("\\r\\n(NO CARRIER)|(BUSY)|(NO ANSWER)|(NO DIALTONE)\\r\\n$", flags, 0, NULL);
@@ -327,17 +347,13 @@ mm_serial_parser_v1_parse (gpointer data,
     g_match_info_free (match_info);
 
     /* Numeric CMS errors */
-    /* Todo
-     * One should probably add message service
-     * errors explicitly in mm-errors.h/c
-     */
     found = g_regex_match_full (parser->regex_cms_error,
                                 response->str, response->len,
                                 0, 0, &match_info, NULL);
     if (found) {
         str = g_match_info_fetch (match_info, 1);
         g_assert (str);
-        local_error = mm_mobile_error_for_code (atoi (str));
+        local_error = mm_msg_error_for_code (atoi (str));
         goto done;
     }
     g_match_info_free (match_info);
@@ -350,6 +366,18 @@ mm_serial_parser_v1_parse (gpointer data,
         str = g_match_info_fetch (match_info, 1);
         g_assert (str);
         local_error = mm_mobile_error_for_string (str);
+        goto done;
+    }
+    g_match_info_free (match_info);
+
+    /* String CMS errors */
+    found = g_regex_match_full (parser->regex_cms_error_str,
+                                response->str, response->len,
+                                0, 0, &match_info, NULL);
+    if (found) {
+        str = g_match_info_fetch (match_info, 1);
+        g_assert (str);
+        local_error = mm_msg_error_for_string (str);
         goto done;
     }
     g_match_info_free (match_info);
@@ -426,6 +454,7 @@ mm_serial_parser_v1_destroy (gpointer data)
     g_regex_unref (parser->regex_cme_error);
     g_regex_unref (parser->regex_cms_error);
     g_regex_unref (parser->regex_cme_error_str);
+    g_regex_unref (parser->regex_cms_error_str);
     g_regex_unref (parser->regex_ezx_error);
     g_regex_unref (parser->regex_unknown_error);
     g_regex_unref (parser->regex_connect_failed);
