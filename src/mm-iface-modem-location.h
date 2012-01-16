@@ -40,6 +40,22 @@ struct _MMIfaceModemLocation {
     MMModemLocationSource (*load_capabilities_finish) (MMIfaceModemLocation *self,
                                                        GAsyncResult *res,
                                                        GError **error);
+
+    /* Enable location gathering (async) */
+    void (* enable_location_gathering) (MMIfaceModemLocation *self,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data);
+    gboolean (*enable_location_gathering_finish) (MMIfaceModemLocation *self,
+                                                  GAsyncResult *res,
+                                                  GError **error);
+
+    /* Disable location gathering (async) */
+    void (* disable_location_gathering) (MMIfaceModemLocation *self,
+                                         GAsyncReadyCallback callback,
+                                         gpointer user_data);
+    gboolean (*disable_location_gathering_finish) (MMIfaceModemLocation *self,
+                                                   GAsyncResult *res,
+                                                   GError **error);
 };
 
 GType mm_iface_modem_location_get_type (void);
@@ -52,6 +68,22 @@ void     mm_iface_modem_location_initialize        (MMIfaceModemLocation *self,
 gboolean mm_iface_modem_location_initialize_finish (MMIfaceModemLocation *self,
                                                     GAsyncResult *res,
                                                     GError **error);
+
+/* Enable Location interface (async) */
+void     mm_iface_modem_location_enable        (MMIfaceModemLocation *self,
+                                                GAsyncReadyCallback callback,
+                                                gpointer user_data);
+gboolean mm_iface_modem_location_enable_finish (MMIfaceModemLocation *self,
+                                                GAsyncResult *res,
+                                                GError **error);
+
+/* Disable Location interface (async) */
+void     mm_iface_modem_location_disable        (MMIfaceModemLocation *self,
+                                                 GAsyncReadyCallback callback,
+                                                 gpointer user_data);
+gboolean mm_iface_modem_location_disable_finish (MMIfaceModemLocation *self,
+                                                 GAsyncResult *res,
+                                                 GError **error);
 
 /* Shutdown Location interface */
 void mm_iface_modem_location_shutdown (MMIfaceModemLocation *self);
