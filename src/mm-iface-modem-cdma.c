@@ -159,9 +159,7 @@ handle_activate_ready (MMIfaceModemCdma *self,
                                              error);
     else
         mm_gdbus_modem_cdma_complete_activate (ctx->skeleton,
-                                               ctx->invocation,
-                                               MM_MODEM_CDMA_ACTIVATION_ERROR_NONE
-);
+                                               ctx->invocation);
 
     dbus_call_context_free (ctx);
 }

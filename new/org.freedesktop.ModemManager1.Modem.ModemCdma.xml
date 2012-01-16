@@ -23,18 +23,13 @@
     <!--
         Activate:
         @carrier: Name of carrier.
-        @immediate_error: A <link linkend="MMModemCdmaActivationError">MMModemCdmaActivationError</link> value, which is returned for immediate errors. Delayed errors are returned via an #org.freedesktop.ModemManager1.Modem.Cdma::ActivationStateChanged signal.
 
         Provisions the modem for use with a given carrier using the modem's
         <ulink url="http://en.wikipedia.org/wiki/Over-the-air_programming">Over-The-Air (OTA)</ulink>
         activation functionality, if any.
-
-        In the event of immediate failure, returns an error value instead of
-        setting a DBus error.
     -->
     <method name="Activate">
-      <arg name="carrier"         type="s" direction="in"  />
-      <arg name="immediate_error" type="u" direction="out" />
+      <arg name="carrier" type="s" direction="in" />
     </method>
 
     <!--
