@@ -48,6 +48,19 @@ guint        mm_modem_cdma_get_nid  (MMModemCdma *self);
 MMModemCdmaRegistrationState mm_modem_cdma_get_cdma1x_registration_state (MMModemCdma *self);
 MMModemCdmaRegistrationState mm_modem_cdma_get_evdo_registration_state   (MMModemCdma *self);
 
+void     mm_modem_cdma_activate        (MMModemCdma *self,
+                                        const gchar *carrier,
+                                        GCancellable *cancellable,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data);
+gboolean mm_modem_cdma_activate_finish (MMModemCdma *self,
+                                        GAsyncResult *res,
+                                        GError **error);
+gboolean mm_modem_cdma_activate_sync   (MMModemCdma *self,
+                                        const gchar *carrier,
+                                        GCancellable *cancellable,
+                                        GError **error);
+
 G_END_DECLS
 
 #endif /* _MM_MODEM_CDMA_H_ */

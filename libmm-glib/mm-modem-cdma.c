@@ -210,3 +210,45 @@ mm_modem_cdma_get_evdo_registration_state (MMModemCdma *self)
 
     return mm_gdbus_modem_cdma_get_evdo_registration_state (self);
 }
+
+void
+mm_modem_cdma_activate (MMModemCdma *self,
+                        const gchar *carrier,
+                        GCancellable *cancellable,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
+{
+    g_return_if_fail (MM_GDBUS_IS_MODEM_CDMA (self));
+
+    mm_gdbus_modem_cdma_call_activate (self,
+                                       carrier,
+                                       cancellable,
+                                       callback,
+                                       user_data);
+}
+
+gboolean
+mm_modem_cdma_activate_finish (MMModemCdma *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM_CDMA (self), FALSE);
+
+    return mm_gdbus_modem_cdma_call_activate_finish (self,
+                                                     res,
+                                                     error);
+}
+
+gboolean
+mm_modem_cdma_activate_sync (MMModemCdma *self,
+                             const gchar *carrier,
+                             GCancellable *cancellable,
+                             GError **error)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM_CDMA (self), FALSE);
+
+    return mm_gdbus_modem_cdma_call_activate_sync (self,
+                                                   carrier,
+                                                   cancellable,
+                                                   error);
+}
