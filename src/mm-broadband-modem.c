@@ -4060,7 +4060,7 @@ disable_finish (MMBaseModem *self,
 }
 
 #undef INTERFACE_DISABLE_READY_FN
-#define INTERFACE_DISABLE_READY_FN(NAME,TYPE)                           \
+#define INTERFACE_DISABLE_READY_FN(NAME,TYPE,FATAL_ERRORS)              \
     static void                                                         \
     NAME##_disable_ready (MMBroadbandModem *self,                       \
                           GAsyncResult *result,                         \
@@ -4071,8 +4071,15 @@ disable_finish (MMBaseModem *self,
         if (!mm_##NAME##_disable_finish (TYPE (self),                   \
                                          result,                        \
                                          &error)) {                     \
-            g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (ctx->result), error); \
-            disabling_context_complete_and_free (ctx);                  \
+            if (FATAL_ERRORS) {                                         \
+                g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (ctx->result), error); \
+                disabling_context_complete_and_free (ctx);              \
+                return;                                                 \
+            }                                                           \
+                                                                        \
+            mm_dbg ("Couldn't disable interface: '%s'",                 \
+                    error->message);                                    \
+            g_error_free (error);                                       \
             return;                                                     \
         }                                                               \
                                                                         \
@@ -4081,9 +4088,10 @@ disable_finish (MMBaseModem *self,
         disabling_step (ctx);                                           \
     }
 
-INTERFACE_DISABLE_READY_FN (iface_modem, MM_IFACE_MODEM)
-INTERFACE_DISABLE_READY_FN (iface_modem_3gpp, MM_IFACE_MODEM_3GPP)
-INTERFACE_DISABLE_READY_FN (iface_modem_cdma, MM_IFACE_MODEM_CDMA)
+INTERFACE_DISABLE_READY_FN (iface_modem,          MM_IFACE_MODEM,          TRUE)
+INTERFACE_DISABLE_READY_FN (iface_modem_3gpp,     MM_IFACE_MODEM_3GPP,     TRUE)
+INTERFACE_DISABLE_READY_FN (iface_modem_cdma,     MM_IFACE_MODEM_CDMA,     TRUE)
+INTERFACE_DISABLE_READY_FN (iface_modem_location, MM_IFACE_MODEM_LOCATION, FALSE)
 
 static void
 disabling_step (DisablingContext *ctx)
@@ -4102,6 +4110,14 @@ disabling_step (DisablingContext *ctx)
         ctx->step++;
 
     case DISABLING_STEP_IFACE_LOCATION:
+        if (ctx->self->priv->modem_location_dbus_skeleton) {
+            mm_dbg ("Modem has location capabilities, disabling the Location interface...");
+            /* Disabling the Modem Location interface */
+            mm_iface_modem_location_disable (MM_IFACE_MODEM_LOCATION (ctx->self),
+                                             (GAsyncReadyCallback)iface_modem_location_disable_ready,
+                                             ctx);
+            return;
+        }
         /* Fall down to next step */
         ctx->step++;
 
@@ -4266,7 +4282,7 @@ enable_finish (MMBaseModem *self,
 }
 
 #undef INTERFACE_ENABLE_READY_FN
-#define INTERFACE_ENABLE_READY_FN(NAME,TYPE)                            \
+#define INTERFACE_ENABLE_READY_FN(NAME,TYPE,FATAL_ERRORS)               \
     static void                                                         \
     NAME##_enable_ready (MMBroadbandModem *self,                        \
                          GAsyncResult *result,                          \
@@ -4277,9 +4293,15 @@ enable_finish (MMBaseModem *self,
         if (!mm_##NAME##_enable_finish (TYPE (self),                    \
                                         result,                         \
                                         &error)) {                      \
-            g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (ctx->result), error); \
-            enabling_context_complete_and_free (ctx);                   \
-            return;                                                     \
+            if (FATAL_ERRORS) {                                         \
+                g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (ctx->result), error); \
+                enabling_context_complete_and_free (ctx);               \
+                return;                                                 \
+            }                                                           \
+                                                                        \
+            mm_dbg ("Couldn't enable interface: '%s'",                  \
+                    error->message);                                    \
+            g_error_free (error);                                       \
         }                                                               \
                                                                         \
         /* Go on to next step */                                        \
@@ -4287,9 +4309,10 @@ enable_finish (MMBaseModem *self,
         enabling_step (ctx);                                            \
     }
 
-INTERFACE_ENABLE_READY_FN (iface_modem, MM_IFACE_MODEM)
-INTERFACE_ENABLE_READY_FN (iface_modem_3gpp, MM_IFACE_MODEM_3GPP)
-INTERFACE_ENABLE_READY_FN (iface_modem_cdma, MM_IFACE_MODEM_CDMA)
+INTERFACE_ENABLE_READY_FN (iface_modem,          MM_IFACE_MODEM,          TRUE)
+INTERFACE_ENABLE_READY_FN (iface_modem_3gpp,     MM_IFACE_MODEM_3GPP,     TRUE)
+INTERFACE_ENABLE_READY_FN (iface_modem_cdma,     MM_IFACE_MODEM_CDMA,     TRUE)
+INTERFACE_ENABLE_READY_FN (iface_modem_location, MM_IFACE_MODEM_LOCATION, FALSE)
 
 static void
 enabling_step (EnablingContext *ctx)
@@ -4344,6 +4367,14 @@ enabling_step (EnablingContext *ctx)
         ctx->step++;
 
     case ENABLING_STEP_IFACE_LOCATION:
+        if (ctx->self->priv->modem_location_dbus_skeleton) {
+            mm_dbg ("Modem has location capabilities, enabling the Location interface...");
+            /* Enabling the Modem Location interface */
+            mm_iface_modem_location_enable (MM_IFACE_MODEM_LOCATION (ctx->self),
+                                            (GAsyncReadyCallback)iface_modem_location_enable_ready,
+                                            ctx);
+            return;
+        }
         /* Fall down to next step */
         ctx->step++;
 
