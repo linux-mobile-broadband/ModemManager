@@ -134,4 +134,43 @@ GType   mm_mobile_error_get_type (void);
 GError *mm_mobile_error_for_code (int error_code);
 GError *mm_mobile_error_for_string (const char *str);
 
+
+/* 3GPP TS 27.005 version 10 section 3.2.5 */
+enum {
+    /* 0 -> 127 per 3GPP TS 24.011 [6] clause E.2 */
+    /* 128 -> 255 per 3GPP TS 23.040 [3] clause 9.2.3.22 */
+    MM_MSG_ERROR_ME_FAILURE = 300,
+    MM_MSG_ERROR_SMS_SERVICE_RESERVED = 301,
+    MM_MSG_ERROR_NOT_ALLOWED = 302,
+    MM_MSG_ERROR_NOT_SUPPORTED = 303,
+    MM_MSG_ERROR_INVALID_PDU_PARAMETER = 304,
+    MM_MSG_ERROR_INVALID_TEXT_PARAMETER = 305,
+    MM_MSG_ERROR_SIM_NOT_INSERTED = 310,
+    MM_MSG_ERROR_SIM_PIN = 311,
+    MM_MSG_ERROR_PH_SIM_PIN = 312,
+    MM_MSG_ERROR_SIM_FAILURE = 313,
+    MM_MSG_ERROR_SIM_BUSY = 314,
+    MM_MSG_ERROR_SIM_WRONG = 315,
+    MM_MSG_ERROR_SIM_PUK = 316,
+    MM_MSG_ERROR_SIM_PIN2 = 317,
+    MM_MSG_ERROR_SIM_PUK2 = 318,
+    MM_MSG_ERROR_MEMORY_FAILURE = 320,
+    MM_MSG_ERROR_INVALID_INDEX = 321,
+    MM_MSG_ERROR_MEMORY_FULL = 322,
+    MM_MSG_ERROR_SMSC_ADDRESS_UNKNOWN = 330,
+    MM_MSG_ERROR_NO_NETWORK = 331,
+    MM_MSG_ERROR_NETWORK_TIMEOUT = 332,
+    MM_MSG_ERROR_NO_CNMA_ACK_EXPECTED = 340,
+    MM_MSG_ERROR_UNKNOWN = 500,
+};
+
+
+#define MM_MSG_ERROR (mm_msg_error_quark ())
+#define MM_TYPE_MSG_ERROR (mm_msg_error_get_type ())
+
+GQuark  mm_msg_error_quark    (void);
+GType   mm_msg_error_get_type (void);
+GError *mm_msg_error_for_code (int error_code);
+GError *mm_msg_error_for_string (const char *str);
+
 #endif /* MM_MODEM_ERROR_H */

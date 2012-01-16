@@ -353,3 +353,144 @@ mm_mobile_error_for_string (const char *str)
     return g_error_new_literal (MM_MOBILE_ERROR, error_code, msg);
 }
 
+/********************************************************************/
+
+GQuark
+mm_msg_error_quark (void)
+{
+    static GQuark ret = 0;
+
+    if (ret == 0)
+        ret = g_quark_from_static_string ("mm_msg_error");
+
+    return ret;
+}
+
+GType
+mm_msg_error_get_type (void)
+{
+    static GType etype = 0;
+
+    if (etype == 0) {
+        static const GEnumValue values[] = {
+            ENUM_ENTRY (MM_MSG_ERROR_ME_FAILURE,             "MeFailure"),
+            ENUM_ENTRY (MM_MSG_ERROR_SMS_SERVICE_RESERVED,   "SmsServiceReserved"),
+            ENUM_ENTRY (MM_MSG_ERROR_NOT_ALLOWED,            "OperationNotAllowed"),
+            ENUM_ENTRY (MM_MSG_ERROR_NOT_SUPPORTED,          "OperationNotSupported"),
+            ENUM_ENTRY (MM_MSG_ERROR_INVALID_PDU_PARAMETER,  "InvalidPduParameter"),
+            ENUM_ENTRY (MM_MSG_ERROR_INVALID_TEXT_PARAMETER, "InvalidTextParameter"),
+            ENUM_ENTRY (MM_MSG_ERROR_SIM_NOT_INSERTED,       "SimNotInserted"),
+            ENUM_ENTRY (MM_MSG_ERROR_SIM_PIN,                "SimPinRequired"),
+            ENUM_ENTRY (MM_MSG_ERROR_PH_SIM_PIN,             "PhSimPinRequired"),
+            ENUM_ENTRY (MM_MSG_ERROR_SIM_FAILURE,            "SimFailure"),
+            ENUM_ENTRY (MM_MSG_ERROR_SIM_BUSY,               "SimBusy"),
+            ENUM_ENTRY (MM_MSG_ERROR_SIM_WRONG,              "SimWrong"),
+            ENUM_ENTRY (MM_MSG_ERROR_SIM_PUK,                "SimPukRequired"),
+            ENUM_ENTRY (MM_MSG_ERROR_SIM_PIN2,               "SimPin2Required"),
+            ENUM_ENTRY (MM_MSG_ERROR_SIM_PUK2,               "SimPuk2Required"),
+            ENUM_ENTRY (MM_MSG_ERROR_MEMORY_FAILURE,         "MemoryFailure"),
+            ENUM_ENTRY (MM_MSG_ERROR_INVALID_INDEX,          "InvalidIndex"),
+            ENUM_ENTRY (MM_MSG_ERROR_MEMORY_FULL,            "MemoryFull"),
+            ENUM_ENTRY (MM_MSG_ERROR_SMSC_ADDRESS_UNKNOWN,   "SmscAddressUnknown"),
+            ENUM_ENTRY (MM_MSG_ERROR_NO_NETWORK,             "NoNetwork"),
+            ENUM_ENTRY (MM_MSG_ERROR_NETWORK_TIMEOUT,        "NetworkTimeout"),
+            ENUM_ENTRY (MM_MSG_ERROR_NO_CNMA_ACK_EXPECTED,   "NoCnmaAckExpected"),
+            ENUM_ENTRY (MM_MSG_ERROR_UNKNOWN,                "Unknown"),
+            { 0, 0, 0 }
+        };
+
+        etype = g_enum_register_static ("MMMsgError", values);
+    }
+
+    return etype;
+}
+
+static ErrorTable msg_errors[] = {
+    { MM_MSG_ERROR_ME_FAILURE,             "mefailure",             "ME failure" },
+    { MM_MSG_ERROR_SMS_SERVICE_RESERVED,   "smsservicereserved",    "SMS service reserved" },
+    { MM_MSG_ERROR_NOT_ALLOWED,            "operationnotallowed",   "Operation not allowed" },
+    { MM_MSG_ERROR_NOT_SUPPORTED,          "operationnotsupported", "Operation not supported" },
+    { MM_MSG_ERROR_INVALID_PDU_PARAMETER,  "invalidpduparameter",   "Invalid PDU mode parameter" },
+    { MM_MSG_ERROR_INVALID_TEXT_PARAMETER, "invalidtextparameter",  "Invalid text mode parameter" },
+    { MM_MSG_ERROR_SIM_NOT_INSERTED,       "simnotinserted",        "SIM not inserted" },
+    { MM_MSG_ERROR_SIM_PIN,                "simpinrequired",        "SIM PIN required" },
+    { MM_MSG_ERROR_PH_SIM_PIN,             "phsimpinrequired",      "PH-SIM PIN required" },
+    { MM_MSG_ERROR_SIM_FAILURE,            "simfailure",            "SIM failure" },
+    { MM_MSG_ERROR_SIM_BUSY,               "simbusy",               "SIM busy" },
+    { MM_MSG_ERROR_SIM_WRONG,              "simwrong",              "SIM wrong" },
+    { MM_MSG_ERROR_SIM_PUK,                "simpukrequired",        "SIM PUK required" },
+    { MM_MSG_ERROR_SIM_PIN2,               "simpin2required",       "SIM PIN2 required" },
+    { MM_MSG_ERROR_SIM_PUK2,               "simpuk2required",       "SIM PUK2 required" },
+    { MM_MSG_ERROR_MEMORY_FAILURE,         "memoryfailure",         "Memory failure" },
+    { MM_MSG_ERROR_INVALID_INDEX,          "invalidindex",          "Invalid index" },
+    { MM_MSG_ERROR_MEMORY_FULL,            "memoryfull",            "Memory full" },
+    { MM_MSG_ERROR_SMSC_ADDRESS_UNKNOWN,   "smscaddressunknown",    "SMSC address unknown" },
+    { MM_MSG_ERROR_NO_NETWORK,             "nonetwork",             "No network" },
+    { MM_MSG_ERROR_NETWORK_TIMEOUT,        "networktimeout",        "Network timeout" },
+    { MM_MSG_ERROR_NO_CNMA_ACK_EXPECTED,   "nocnmaackexpected",     "No CNMA acknowledgement expected" },
+    { MM_MSG_ERROR_UNKNOWN,                "unknown",               "Unknown" },
+    { -1,                                  NULL,                    NULL }
+};
+
+GError *
+mm_msg_error_for_code (int error_code)
+{
+    const char *msg = NULL;
+    const ErrorTable *ptr = &msg_errors[0];
+
+    while (ptr->code >= 0) {
+        if (ptr->code == error_code) {
+            msg = ptr->message;
+            break;
+        }
+        ptr++;
+    }
+
+    if (!msg) {
+        g_warning ("Invalid error code: %d", error_code);
+        error_code = MM_MSG_ERROR_UNKNOWN;
+        msg = "Unknown error";
+    }
+
+    return g_error_new_literal (MM_MSG_ERROR, error_code, msg);
+}
+
+#define BUF_SIZE 100
+
+GError *
+mm_msg_error_for_string (const char *str)
+{
+    int error_code = -1;
+    const ErrorTable *ptr = &msg_errors[0];
+    char buf[BUF_SIZE + 1];
+    const char *msg = NULL, *p = str;
+    int i = 0;
+
+    g_return_val_if_fail (str != NULL, NULL);
+
+    /* Normalize the error code by stripping whitespace and odd characters */
+    while (*p && i < BUF_SIZE) {
+        if (isalnum (*p))
+            buf[i++] = tolower (*p);
+        p++;
+    }
+    buf[i] = '\0';
+
+    while (ptr->code >= 0) {
+        if (!strcmp (buf, ptr->error)) {
+            error_code = ptr->code;
+            msg = ptr->message;
+            break;
+        }
+        ptr++;
+    }
+
+    if (!msg) {
+        g_warning ("Invalid error code: %d", error_code);
+        error_code = MM_MSG_ERROR_UNKNOWN;
+        msg = "Unknown error";
+    }
+
+    return g_error_new_literal (MM_MSG_ERROR, error_code, msg);
+}
+
