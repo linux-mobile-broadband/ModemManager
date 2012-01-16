@@ -1101,5 +1101,6 @@ mm_manager_class_init (MMManagerClass *manager_class)
 	dbus_g_error_domain_register (MM_MODEM_ERROR, "org.freedesktop.ModemManager.Modem", MM_TYPE_MODEM_ERROR);
     dbus_g_error_domain_register (MM_MODEM_CONNECT_ERROR, "org.freedesktop.ModemManager.Modem", MM_TYPE_MODEM_CONNECT_ERROR);
     dbus_g_error_domain_register (MM_MOBILE_ERROR, "org.freedesktop.ModemManager.Modem.Gsm", MM_TYPE_MOBILE_ERROR);
+    dbus_g_error_domain_register (MM_MSG_ERROR, "org.freedesktop.ModemManager.Modem.Gsm.SMS", MM_TYPE_MSG_ERROR);
 }
 
