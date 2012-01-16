@@ -28,9 +28,7 @@
         @signal_location: Flag to control whether the device emits signals with the new location information. This argument is ignored when disabling location information gathering.
 
         Enable or disable location information gathering. This method may
-        require the client to authenticate itself. This method may also cause
-        any necessary functionality of the mobile be be turned on, including
-        enabling the modem device itself.
+        require the client to authenticate itself.
 
         When signals are emitted, any client application (including malicious
         ones!) can listen for location updates unless D-Bus permissions restrict
@@ -249,4 +247,3 @@
 
   </interface>
 </node>
-
