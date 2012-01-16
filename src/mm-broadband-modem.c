@@ -31,6 +31,7 @@
 #include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-cdma.h"
 #include "mm-iface-modem-simple.h"
+#include "mm-iface-modem-location.h"
 #include "mm-bearer-3gpp.h"
 #include "mm-bearer-cdma.h"
 #include "mm-bearer-list.h"
@@ -46,12 +47,14 @@ static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
 static void iface_modem_simple_init (MMIfaceModemSimple *iface);
+static void iface_modem_location_init (MMIfaceModemLocation *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModem, mm_broadband_modem, MM_TYPE_BASE_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIMPLE, iface_modem_simple_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIMPLE, iface_modem_simple_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init));
 
 enum {
     PROP_0,
@@ -59,6 +62,7 @@ enum {
     PROP_MODEM_3GPP_DBUS_SKELETON,
     PROP_MODEM_CDMA_DBUS_SKELETON,
     PROP_MODEM_SIMPLE_DBUS_SKELETON,
+    PROP_MODEM_LOCATION_DBUS_SKELETON,
     PROP_MODEM_SIM,
     PROP_MODEM_BEARER_LIST,
     PROP_MODEM_STATE,
@@ -121,6 +125,11 @@ struct _MMBroadbandModemPrivate {
     /* Properties */
     GObject *modem_simple_dbus_skeleton;
     MMCommonSimpleProperties *modem_simple_status;
+
+    /*<--- Modem Location interface --->*/
+    /* Properties */
+    GObject *modem_location_dbus_skeleton;
+    GVariant *modem_location_dictionary;
 };
 
 /*****************************************************************************/
@@ -4430,7 +4439,7 @@ initialize_finish (MMBaseModem *self,
 }
 
 #undef INTERFACE_INIT_READY_FN
-#define INTERFACE_INIT_READY_FN(NAME,TYPE)                              \
+#define INTERFACE_INIT_READY_FN(NAME,TYPE,FATAL_ERRORS)                 \
     static void                                                         \
     NAME##_initialize_ready (MMBroadbandModem *self,                    \
                              GAsyncResult *result,                      \
@@ -4441,23 +4450,30 @@ initialize_finish (MMBaseModem *self,
         if (!mm_##NAME##_initialize_finish (TYPE (self),                \
                                             result,                     \
                                             &error)) {                  \
-            g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (ctx->result), error); \
-            initialize_context_complete_and_free (ctx);                 \
-            return;                                                     \
-        }                                                               \
+            if (FATAL_ERRORS) {                                         \
+                g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (ctx->result), error); \
+                initialize_context_complete_and_free (ctx);             \
+                return;                                                 \
+            }                                                           \
                                                                         \
-        /* bind simple properties */                                    \
-        mm_##NAME##_bind_simple_status (TYPE (self),                    \
-                                        self->priv->modem_simple_status); \
+            mm_dbg ("Couldn't initialize interface: '%s'",              \
+                    error->message);                                    \
+            g_error_free (error);                                       \
+        } else {                                                        \
+            /* bind simple properties */                                \
+            mm_##NAME##_bind_simple_status (TYPE (self),                \
+                                            self->priv->modem_simple_status); \
+        }                                                               \
                                                                         \
         /* Go on to next step */                                        \
         ctx->step++;                                                    \
         initialize_step (ctx);                                          \
     }
 
-INTERFACE_INIT_READY_FN (iface_modem, MM_IFACE_MODEM)
-INTERFACE_INIT_READY_FN (iface_modem_3gpp, MM_IFACE_MODEM_3GPP)
-INTERFACE_INIT_READY_FN (iface_modem_cdma, MM_IFACE_MODEM_CDMA)
+INTERFACE_INIT_READY_FN (iface_modem,          MM_IFACE_MODEM,          TRUE)
+INTERFACE_INIT_READY_FN (iface_modem_3gpp,     MM_IFACE_MODEM_3GPP,     TRUE)
+INTERFACE_INIT_READY_FN (iface_modem_cdma,     MM_IFACE_MODEM_CDMA,     TRUE)
+INTERFACE_INIT_READY_FN (iface_modem_location, MM_IFACE_MODEM_LOCATION, FALSE)
 
 static void
 initialize_step (InitializeContext *ctx)
@@ -4538,8 +4554,12 @@ initialize_step (InitializeContext *ctx)
         ctx->step++;
 
     case INITIALIZE_STEP_IFACE_LOCATION:
-        /* Fall down to next step */
-        ctx->step++;
+        /* Initialize the Location interface */
+        mm_iface_modem_location_initialize (MM_IFACE_MODEM_LOCATION (ctx->self),
+                                            ctx->port,
+                                            (GAsyncReadyCallback)iface_modem_location_initialize_ready,
+                                            ctx);
+        return;
 
     case INITIALIZE_STEP_IFACE_MESSAGING:
         /* Fall down to next step */
@@ -4624,6 +4644,10 @@ set_property (GObject *object,
         g_clear_object (&self->priv->modem_simple_dbus_skeleton);
         self->priv->modem_simple_dbus_skeleton = g_value_dup_object (value);
         break;
+    case PROP_MODEM_LOCATION_DBUS_SKELETON:
+        g_clear_object (&self->priv->modem_location_dbus_skeleton);
+        self->priv->modem_location_dbus_skeleton = g_value_dup_object (value);
+        break;
     case PROP_MODEM_SIM:
         g_clear_object (&self->priv->modem_sim);
         self->priv->modem_sim = g_value_dup_object (value);
@@ -4689,6 +4713,9 @@ get_property (GObject *object,
         break;
     case PROP_MODEM_SIMPLE_DBUS_SKELETON:
         g_value_set_object (value, self->priv->modem_simple_dbus_skeleton);
+        break;
+    case PROP_MODEM_LOCATION_DBUS_SKELETON:
+        g_value_set_object (value, self->priv->modem_location_dbus_skeleton);
         break;
     case PROP_MODEM_SIM:
         g_value_set_object (value, self->priv->modem_sim);
@@ -4781,6 +4808,11 @@ dispose (GObject *object)
     if (self->priv->modem_cdma_dbus_skeleton) {
         mm_iface_modem_cdma_shutdown (MM_IFACE_MODEM_CDMA (object));
         g_clear_object (&self->priv->modem_cdma_dbus_skeleton);
+    }
+
+    if (self->priv->modem_location_dbus_skeleton) {
+        mm_iface_modem_location_shutdown (MM_IFACE_MODEM_LOCATION (object));
+        g_clear_object (&self->priv->modem_location_dbus_skeleton);
     }
 
     if (self->priv->modem_simple_dbus_skeleton) {
@@ -4917,6 +4949,11 @@ iface_modem_simple_init (MMIfaceModemSimple *iface)
 }
 
 static void
+iface_modem_location_init (MMIfaceModemLocation *iface)
+{
+}
+
+static void
 mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
@@ -4952,6 +4989,10 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_SIMPLE_DBUS_SKELETON,
                                       MM_IFACE_MODEM_SIMPLE_DBUS_SKELETON);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_LOCATION_DBUS_SKELETON,
+                                      MM_IFACE_MODEM_LOCATION_DBUS_SKELETON);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_SIM,
