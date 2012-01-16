@@ -1,56 +1,95 @@
 <?xml version="1.0"?>
 <!DOCTYPE part PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN"
 "http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd" [
-<!ENTITY version SYSTEM "version.xml">
 ]>
-<part id="overview">
+<part id="ref-overview">
   <title>ModemManager Overview</title>
 
-  <chapter id="overview-modemmanager">
-    <title>ModemManager</title>
+  <chapter id="ref-overview-introduction">
+    <title>Introduction</title>
     <para>
       ModemManager provides a unified high level API for communicating with
       (mobile broadband) modems. While the basic commands are standardized,
       the more advanced operations (like signal quality monitoring while
       connected) varies a lot.
     </para>
-
     <formalpara>
       <title>Using</title>
       <para>
         ModemManager is a system daemon and is not meant to be used directly from
-        the command line. However, since it provides DBus API, it is possible to use
-        'dbus-send' command to control it from the terminal. There's an example
-        program (tests/mm-test.py) that demonstrates the basic API usage.
+        the command line. However, a command line client (mmcli) is provided, which
+        may be used to test the different functionality provided during plugin
+        development.
       </para>
     </formalpara>
-
     <formalpara>
       <title>Implementation</title>
       <para>
         ModemManager is a DBus system bus activated service (meaning it's started
         automatically when a request arrives). It is written in C. The devices are
-        queried from udev and automatically updated based on hardware events. There's
-        a GInterface (MMModem) that defines the modem interface and any device specific
-        implementation must implement it. There are two generic MMModem implementations
-        to support the basic operations (one for GSM, one for CDMA,) which are common
-        for all cards.
+        queried from udev and automatically updated based on hardware events. There are
+        DBus-interface specific GInterfaces, which should be implemented by any device
+        specific implementation. There is a generic MMBroadbandModem implementation that
+        provides a generic implementation of the most common operations in both GSM and
+        CDMA modems.
       </para>
     </formalpara>
-
     <formalpara>
       <title>Plugins</title>
       <para>
         Plugins are loaded on startup, and must implement the MMPlugin interface. It
         consists of a couple of methods which tell the daemon whether the plugin
-        supports a port and to create custom MMModem implementations. It most likely
+        supports a port and to create custom modem implementations. It most likely
         makes sense to derive custom modem implementations from one of the generic
-        classes and just add (or override) operations which are not standard. There's a
-        fully working plugin in the plugins/ directory for Huawei cards that can be
-        used as an example for writing new plugins. Writing new plugins is highly
-        encouraged!
+        classes and just add (or override) operations which are not standard. Writing
+        new plugins is highly encouraged!
       </para>
     </formalpara>
+  </chapter>
 
+  <chapter id="ref-overview-states">
+    <title>State machine</title>
+    <para>
+      ModemManager implements support for each Modem by controlling their
+      behaviour following the steps given in the following state machine.
+    </para>
+    <figure id="mm-modemmanager-states">
+      <title>ModemManager states</title>
+      <graphic fileref="../ModemManager-states.png" format="PNG"></graphic>
+    </figure>
+    <para>
+      The state machine of a modem can be summarized in 5 main sequences:
+      initialization, enabling, connection, disconnection and disabling.
+    </para>
+    <section>
+      <title>Initialization</title>
+      <para>
+        <!-- TODO -->
+      </para>
+    </section>
+    <section>
+      <title>Enabling</title>
+      <para>
+        <!-- TODO -->
+      </para>
+    </section>
+    <section>
+      <title>Connection</title>
+      <para>
+        <!-- TODO -->
+      </para>
+    </section>
+    <section>
+      <title>Disconnection</title>
+      <para>
+        <!-- TODO -->
+      </para>
+    </section>
+    <section>
+      <title>Disabling</title>
+      <para>
+        <!-- TODO -->
+      </para>
+    </section>
   </chapter>
 </part>

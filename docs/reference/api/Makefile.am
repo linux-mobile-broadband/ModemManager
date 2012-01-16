@@ -38,6 +38,7 @@ MKDB_OPTIONS = --output-format=xml --sgml-mode --name-space=mm
 
 # Images to copy into HTML directory
 HTML_IMAGES = \
+	ModemManager-states.png \
 	$(NULL)
 
 content_files = \
@@ -75,6 +76,8 @@ EXTRA_DIST += \
 	mm-overview.xml \
 	mm-dbus-reference.xml \
 	version.xml.in \
+	ModemManager-states.dia \
+	ModemManager-states.png \
 	$(NULL)
 
 CLEANFILES += \
