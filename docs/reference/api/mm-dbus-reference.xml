@@ -1,0 +1,179 @@
+<?xml version="1.0"?>
+<!DOCTYPE part PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN"
+"http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd" [
+]>
+<part id="ref-dbus" xmlns:xi="http://www.w3.org/2003/XInclude">
+  <title>D-Bus Reference</title>
+
+  <chapter id="ref-dbus-bus-name">
+    <title>The <literal>org.freedesktop.ModemManager1</literal> bus name</title>
+    <para>
+      The D-Bus name <literal>org.freedesktop.ModemManager1</literal>
+      on the system bus is used by the ModemManager daemon.
+    </para>
+    <para>
+      If this daemon isn't running, it will be started if D-Bus messages are
+      sent to the name.
+    </para>
+  </chapter>
+
+  <chapter id="ref-dbus-standard-interfaces">
+    <title>Standard interfaces</title>
+    <para>
+      Please refer to the
+      <ulink url="http://dbus.freedesktop.org/doc/dbus-specification.html">
+        DBus specification at <literal>freedesktop.org</literal>
+      </ulink> for more information on how to use these standard interfaces.
+    </para>
+    <section id="ref-dbus-standard-interfaces-properties">
+      <title>org.freedesktop.DBus.Properties</title>
+      <para>
+        All objects (<link linkend="ref-dbus-object-manager">Manager</link>,
+        <link linkend="ref-dbus-object-modem">Modems</link>,
+        <link linkend="ref-dbus-object-bearer">Bearers</link>,
+        <link linkend="ref-dbus-object-sim">SIMs</link>,
+        <link linkend="ref-dbus-object-sms">SMSs</link>) exported at the
+        <link linkend="ref-dbus-bus-name"><literal>org.freedesktop.ModemManager1</literal></link>
+        bus name implement the standard
+        <ulink url="http://dbus.freedesktop.org/doc/dbus-specification.html#standard-interfaces-properties">
+          <literal>org.freedesktop.DBus.Properties</literal>
+        </ulink> interface. Objects implementing this interface provide a
+        common way to query for property values and also a generic signal to
+        get notified about changes in those properties.
+      </para>
+    </section>
+    <section id="ref-dbus-standard-interfaces-introspectables">
+      <title>org.freedesktop.DBus.Introspectable</title>
+      <para>
+        All objects (<link linkend="ref-dbus-object-manager">Manager</link>,
+        <link linkend="ref-dbus-object-modem">Modems</link>,
+        <link linkend="ref-dbus-object-bearer">Bearers</link>,
+        <link linkend="ref-dbus-object-sim">SIMs</link>,
+        <link linkend="ref-dbus-object-sms">SMSs</link>) exported at the
+        <link linkend="ref-dbus-bus-name"><literal>org.freedesktop.ModemManager1</literal></link>
+        bus name implement the standard
+        <ulink url="http://dbus.freedesktop.org/doc/dbus-specification.html#standard-interfaces-introspectable">
+          <literal>org.freedesktop.DBus.Introspectable</literal>
+        </ulink> interface. Objects implementing this interface will provide an
+        XML-based description of the object and its interfaces.
+      </para>
+    </section>
+    <section id="ref-dbus-standard-interfaces-objectmanager">
+      <title>org.freedesktop.DBus.ObjectManager</title>
+      <para>
+        The <link linkend="ref-dbus-object-manager">Manager</link> object
+        exported at the
+        <link linkend="ref-dbus-bus-name"><literal>org.freedesktop.ModemManager1</literal></link>
+        bus name implements the standard
+        <ulink url="http://dbus.freedesktop.org/doc/dbus-specification.html#standard-interfaces-objectmanager">
+          <literal>org.freedesktop.DBus.ObjectManager</literal>
+        </ulink> interface. This interface, included in rev. 0.17 of the DBus
+        specification, allows a generic way to control the addition and removal
+        of Modem objects, as well as the addition and removal of interfaces in
+        the given objects.
+      </para>
+    </section>
+  </chapter>
+
+  <chapter id="ref-dbus-common-types">
+    <title>Common types</title>
+    <xi:include href="mm-enums.xml"/>
+    <xi:include href="mm-errors.xml"/>
+  </chapter>
+
+  <chapter id="ref-dbus-object-manager">
+    <title>The <literal>/org/freedesktop/ModemManager1</literal> object</title>
+    <para>
+      The ModemManager process will export an object at the well-known
+      path <literal>/org/freedesktop/ModemManager1</literal>.
+    </para>
+    <para>
+      This object, which implements the standard
+      <link linkend="ref-dbus-standard-interfaces-objectmanager"><literal>org.freedesktop.DBus.ObjectManager</literal></link>, is responsible for managing the list of
+      <link linkend="ref-dbus-object-modem">Modem</link> objects.
+    </para>
+    <para>
+      This object also controls any process-wide operation, such as the log
+      level being used by the daemon.
+    </para>
+    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.xml"/>
+  </chapter>
+
+  <chapter id="ref-dbus-object-modem">
+    <title>The <literal>/org/freedesktop/ModemManager/Modems</literal> objects</title>
+    <para>
+      Modem objects are exported in DBus with the following path base:
+      <literal>/org/freedesktop/ModemManager1/Modems/#</literal>, where
+      <literal>#</literal> indicates a unique unsigned integer which identifies
+      the object.
+    </para>
+    <para>
+      The Modem objects will export a generic
+      <link linkend="gdbus-org.freedesktop.ModemManager1.Modem">Modem interface</link>
+      which includes common features and actions applicable to most modem types.
+      This interface, among other actions, allows the management (creation,
+      listing, deletion) of
+      <link linkend="ref-dbus-object-bearer">Bearer</link> objects which can
+      then be used to request the modem to get in connected state.
+    </para>
+    <para>
+      Modem objects will also export the generic
+      <link linkend="gdbus-org.freedesktop.ModemManager1.Modem.Simple">Simple interface</link>.
+      This interface provides an easy access to the most simple and common
+      operations that may be performed with the modem, including connection and
+      disconnection. Users of the Simple interface do not need to take care of
+      getting the modem registered, and they also don't need to manage the
+      creation of bearers themselves. All the logic required to get the modem
+      connected or disconnected is handled by the Simple interface.
+    </para>
+    <para>
+      Modems with specific 3GPP and/or CDMA capabilities will export modem type
+      specific interfaces, like the
+      <link linkend="gdbus-org.freedesktop.ModemManager1.Modem.Modem3gpp">3GPP interface</link>
+      or the
+      <link linkend="gdbus-org.freedesktop.ModemManager1.Modem.ModemCdma">CDMA interface</link>.
+    </para>
+    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.xml"/>
+    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Simple.xml"/>
+    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.xml"/>
+    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml"/>
+    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.ModemCdma.xml"/>
+    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Messaging.xml"/>
+    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Location.xml"/>
+    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Firmware.xml"/>
+    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Contacts.xml"/>
+  </chapter>
+
+  <chapter id="ref-dbus-object-bearer">
+    <title>The <literal>/org/freedesktop/ModemManager/Bearers</literal> objects</title>
+    <para>
+      Bearer objects are owned and managed by specific
+      <link linkend="ref-dbus-object-modem">Modem</link> objects. A single Modem
+      may expose one or more Bearer objects, which can then be used to get the
+      modem into connected state.
+    </para>
+    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Bearer.xml"/>
+  </chapter>
+
+  <chapter id="ref-dbus-object-sim">
+    <title>The <literal>/org/freedesktop/ModemManager/SIMs</literal> objects</title>
+    <para>
+      Broadband modems usually need a SIM card to operate. Each
+      <link linkend="ref-dbus-object-modem">Modem</link> object will therefore
+      expose up to one SIM object, which allows SIM-specific actions such as PIN
+      unlocking.
+    </para>
+    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Sim.xml"/>
+  </chapter>
+
+  <chapter id="ref-dbus-object-sms">
+    <title>The <literal>/org/freedesktop/ModemManager/SMSs</literal> objects</title>
+    <para>
+      Modems implementing the
+      <link linkend="gdbus-org.freedesktop.ModemManager1.Modem.Messaging">Messaging interface</link>
+      will export one SMS object for each SMS stored in the device.
+    </para>
+    <xi:include href="../../../../libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Sms.xml"/>
+  </chapter>
+
+</part>

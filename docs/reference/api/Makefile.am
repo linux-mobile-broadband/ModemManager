@@ -45,6 +45,7 @@ content_files = \
 
 expand_content_files = \
 	mm-overview.xml \
+	mm-dbus-reference.xml \
 	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.xml \
 	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Sim.xml \
 	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Sms.xml \
@@ -72,6 +73,7 @@ endif
 
 EXTRA_DIST += \
 	mm-overview.xml \
+	mm-dbus-reference.xml \
 	version.xml.in \
 	$(NULL)
 
