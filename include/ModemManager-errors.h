@@ -261,5 +261,33 @@ typedef enum { /*< underscore_name=mm_message_error >*/
     MM_MESSAGE_ERROR_UNKNOWN                = 500
 } MMMessageError;
 
+/**
+ * MMCdmaActivationError:
+ * @MM_CDMA_ACTIVATION_ERROR_NONE: No error.
+ * @MM_CDMA_ACTIVATION_ERROR_UNKNOWN: An error occurred.
+ * @MM_CDMA_ACTIVATION_ERROR_ROAMING: Device cannot activate while roaming.
+ * @MM_CDMA_ACTIVATION_ERROR_WRONG_RADIO_INTERFACE: Device cannot activate on this network type (eg EVDO vs 1xRTT).
+ * @MM_CDMA_ACTIVATION_ERROR_COULD_NOT_CONNECT: Device could not connect to the network for activation.
+ * @MM_CDMA_ACTIVATION_ERROR_SECURITY_AUTHENTICATION_FAILED: Device could not authenticate to the network for activation.
+ * @MM_CDMA_ACTIVATION_ERROR_PROVISIONING_FAILED: Later stages of device provisioning failed.
+ * @MM_CDMA_ACTIVATION_ERROR_NO_SIGNAL: No signal available.
+ * @MM_CDMA_ACTIVATION_ERROR_TIMED_OUT: Activation timed out.
+ * @MM_CDMA_ACTIVATION_ERROR_START_FAILED: API call for initial activation failed.
+ *
+ * CDMA Activation errors.
+ */
+typedef enum { /*< underscore_name=mm_cdma_activation_error >*/
+    MM_CDMA_ACTIVATION_ERROR_NONE                           = 0,
+    MM_CDMA_ACTIVATION_ERROR_UNKNOWN                        = 1,
+    MM_CDMA_ACTIVATION_ERROR_ROAMING                        = 2,
+    MM_CDMA_ACTIVATION_ERROR_WRONG_RADIO_INTERFACE          = 3,
+    MM_CDMA_ACTIVATION_ERROR_COULD_NOT_CONNECT              = 4,
+    MM_CDMA_ACTIVATION_ERROR_SECURITY_AUTHENTICATION_FAILED = 5,
+    MM_CDMA_ACTIVATION_ERROR_PROVISIONING_FAILED            = 6,
+    MM_CDMA_ACTIVATION_ERROR_NO_SIGNAL                      = 7,
+    MM_CDMA_ACTIVATION_ERROR_TIMED_OUT                      = 8,
+    MM_CDMA_ACTIVATION_ERROR_START_FAILED                   = 9
+} MMCdmaActivationError;
+
 #endif /*  _MODEMMANAGER_ERRORS_H_ */
 

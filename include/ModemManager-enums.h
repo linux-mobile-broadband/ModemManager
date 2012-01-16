@@ -378,34 +378,6 @@ typedef enum { /*< underscore_name=mm_modem_cdma_activation_state >*/
 } MMModemCdmaActivationState;
 
 /**
- * MMModemCdmaActivationError:
- * @MM_MODEM_CDMA_ACTIVATION_ERROR_NONE: No error.
- * @MM_MODEM_CDMA_ACTIVATION_ERROR_UNKNOWN: An error occurred.
- * @MM_MODEM_CDMA_ACTIVATION_ERROR_ROAMING: Device cannot activate while roaming.
- * @MM_MODEM_CDMA_ACTIVATION_ERROR_WRONG_RADIO_INTERFACE: Device cannot activate on this network type (eg EVDO vs 1xRTT).
- * @MM_MODEM_CDMA_ACTIVATION_ERROR_COULD_NOT_CONNECT: Device could not connect to the network for activation.
- * @MM_MODEM_CDMA_ACTIVATION_ERROR_SECURITY_AUTHENTICATION_FAILED: Device could not authenticate to the network for activation.
- * @MM_MODEM_CDMA_ACTIVATION_ERROR_PROVISIONING_FAILED: Later stages of device provisioning failed.
- * @MM_MODEM_CDMA_ACTIVATION_ERROR_NO_SIGNAL: No signal available.
- * @MM_MODEM_CDMA_ACTIVATION_ERROR_TIMED_OUT: Activation timed out.
- * @MM_MODEM_CDMA_ACTIVATION_ERROR_START_FAILED: API call for initial activation failed.
- *
- * CDMA Activation errors.
- */
-typedef enum { /*< underscore_name=mm_modem_cdma_activation_error >*/
-    MM_MODEM_CDMA_ACTIVATION_ERROR_NONE                           = 0,
-    MM_MODEM_CDMA_ACTIVATION_ERROR_UNKNOWN                        = 1,
-    MM_MODEM_CDMA_ACTIVATION_ERROR_ROAMING                        = 2,
-    MM_MODEM_CDMA_ACTIVATION_ERROR_WRONG_RADIO_INTERFACE          = 3,
-    MM_MODEM_CDMA_ACTIVATION_ERROR_COULD_NOT_CONNECT              = 4,
-    MM_MODEM_CDMA_ACTIVATION_ERROR_SECURITY_AUTHENTICATION_FAILED = 5,
-    MM_MODEM_CDMA_ACTIVATION_ERROR_PROVISIONING_FAILED            = 6,
-    MM_MODEM_CDMA_ACTIVATION_ERROR_NO_SIGNAL                      = 7,
-    MM_MODEM_CDMA_ACTIVATION_ERROR_TIMED_OUT                      = 8,
-    MM_MODEM_CDMA_ACTIVATION_ERROR_START_FAILED                   = 9,
-} MMModemCdmaActivationError;
-
-/**
  * MMModemCdmaRmProtocol:
  * @MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN: Unknown protocol.
  * @MM_MODEM_CDMA_RM_PROTOCOL_ASYNC: Asynchronous data or fax.

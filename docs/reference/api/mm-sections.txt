@@ -9,7 +9,6 @@ MMModem3gppUssdSessionState
 MMModemAccessTechnology
 MMModemBand
 MMModemCapability
-MMModemCdmaActivationError
 MMModemCdmaActivationState
 MMModemCdmaRegistrationState
 MMModemCdmaRmProtocol
@@ -30,4 +29,5 @@ MMCoreError
 MMMessageError
 MMMobileEquipmentError
 MMSerialError
+MMCdmaActivationError
 </SECTION>

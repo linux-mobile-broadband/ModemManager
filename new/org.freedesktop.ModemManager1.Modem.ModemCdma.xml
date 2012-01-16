@@ -48,7 +48,7 @@
     <!--
         ActivationStateChanged:
         @activation_state: Current activation state, given as a <link linkend="MMModemCdmaActivationState">MMModemCdmaActivationState</link>.
-        @activation_error: Carrier-specific error code, given as a <link linkend="MMModemCdmaActivationError">MMModemCdmaActivationError</link>.
+        @activation_error: Carrier-specific error code, given as a <link linkend="MMCdmaActivationError">MMCdmaActivationError</link>.
         @status_changes: Properties that have changed as a result of this activation state chage, including <literal>"mdn"</literal> and <literal>"min"</literal>.
 
         The device activation state changed.
