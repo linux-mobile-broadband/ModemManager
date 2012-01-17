@@ -10,13 +10,17 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2011 Google, Inc.
+ * Copyright (C) 2011 - 2012 Google, Inc.
  */
+
+#include <stdlib.h>
+#include <string.h>
 
 #include <ModemManager.h>
 #include <libmm-common.h>
 
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-location.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-bearer-3gpp.h"
 #include "mm-bearer-list.h"
@@ -537,33 +541,91 @@ mm_iface_modem_3gpp_run_all_registration_checks (MMIfaceModem3gpp *self,
 
 /*****************************************************************************/
 
-#undef STR_REPLY_READY_FN
-#define STR_REPLY_READY_FN(NAME, DISPLAY)                               \
-    static void                                                         \
-    load_##NAME##_ready (MMIfaceModem3gpp *self,                        \
-                  GAsyncResult *res)                                    \
-    {                                                                   \
-        GError *error = NULL;                                           \
-        MmGdbusModem3gpp *skeleton = NULL;                              \
-        gchar *str;                                                     \
-                                                                        \
-        str = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_##NAME##_finish (self, res, &error); \
-        if (error) {                                                    \
-            mm_warn ("Couldn't load %s: '%s'", DISPLAY, error->message); \
-            g_error_free (error);                                       \
-            return;                                                     \
-        }                                                               \
-                                                                        \
-        g_object_get (self,                                             \
-                      MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &skeleton,     \
-                      NULL);                                            \
-        mm_gdbus_modem3gpp_set_##NAME (skeleton, str);                  \
-        g_free (str);                                                   \
-        g_object_unref (skeleton);                                      \
+static void
+load_operator_name_ready (MMIfaceModem3gpp *self,
+                          GAsyncResult *res)
+{
+    GError *error = NULL;
+    MmGdbusModem3gpp *skeleton = NULL;
+    gchar *str;
+
+    str = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_name_finish (self, res, &error);
+    if (error) {
+        mm_warn ("Couldn't load Operator Name: '%s'", error->message);
+        g_error_free (error);
+        return;
     }
 
-STR_REPLY_READY_FN (operator_code, "Operator Code")
-STR_REPLY_READY_FN (operator_name, "Operator Name")
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &skeleton,
+                  NULL);
+    mm_gdbus_modem3gpp_set_operator_name (skeleton, str);
+    g_free (str);
+    g_object_unref (skeleton);
+}
+
+static gboolean
+parse_mcc_mnc (const gchar *mccmnc,
+               guint *mcc_out,
+               guint *mnc_out)
+{
+    guint mccmnc_len;
+    gchar mcc[4] = { 0, 0, 0, 0 };
+    gchar mnc[4] = { 0, 0, 0, 0 };
+
+    mccmnc_len = strlen (mccmnc);
+    if (mccmnc_len != 5 &&
+        mccmnc_len != 6) {
+        mm_dbg ("Unexpected MCC/MNC string '%s'", mccmnc);
+        return FALSE;
+    }
+
+    memcpy (mcc, mccmnc, 3);
+    /* Not all modems report 6-digit MNCs */
+    memcpy (mnc, mccmnc + 3, 2);
+    if (mccmnc_len == 6)
+        mnc[2] = mccmnc[5];
+
+    *mcc_out = atoi (mcc);
+    *mnc_out = atoi (mnc);
+
+    return TRUE;
+}
+
+static void
+load_operator_code_ready (MMIfaceModem3gpp *self,
+                          GAsyncResult *res)
+{
+    GError *error = NULL;
+    MmGdbusModem3gpp *skeleton = NULL;
+    gchar *str;
+
+    str = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_code_finish (self, res, &error);
+    if (error) {
+        mm_warn ("Couldn't load Operator Code: '%s'", error->message);
+        g_error_free (error);
+        return;
+    }
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &skeleton,
+                  NULL);
+    mm_gdbus_modem3gpp_set_operator_code (skeleton, str);
+
+    /* If we also implement the location interface, update the 3GPP location */
+    if (MM_IS_IFACE_MODEM_LOCATION (self)) {
+        guint mcc = 0;
+        guint mnc = 0;
+
+        if (parse_mcc_mnc (str, &mcc, &mnc))
+            mm_iface_modem_location_3gpp_update_mcc_mnc (MM_IFACE_MODEM_LOCATION (self),
+                                                         mcc,
+                                                         mnc);
+    }
+
+    g_free (str);
+    g_object_unref (skeleton);
+}
 
 static void
 set_bearer_3gpp_connection_allowed (MMBearer *bearer,
@@ -641,14 +703,19 @@ bearer_3gpp_connection_forbidden (MMIfaceModem3gpp *self)
 static void
 update_registration_state (MMIfaceModem3gpp *self,
                            MMModem3gppRegistrationState new_state,
-                           MMModemAccessTechnology access_tech)
+                           MMModemAccessTechnology access_tech,
+                           gulong location_area_code,
+                           gulong cell_id)
 {
-    MMModem3gppRegistrationState old_state;
+    MMModem3gppRegistrationState old_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    MmGdbusModem3gpp *skeleton = NULL;
 
     /* Only set new state if different */
     g_object_get (self,
                   MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, &old_state,
+                  MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &skeleton,
                   NULL);
+
     if (new_state != old_state) {
         GEnumClass *enum_class;
         GEnumValue *new_value;
@@ -694,8 +761,6 @@ update_registration_state (MMIfaceModem3gpp *self,
                     (GAsyncReadyCallback)load_operator_name_ready,
                     NULL);
 
-            /* TODO: Update signal quality */
-
             mm_iface_modem_update_access_tech (MM_IFACE_MODEM (self),
                                                access_tech,
                                                ALL_3GPP_ACCESS_TECHNOLOGIES_MASK);
@@ -704,16 +769,30 @@ update_registration_state (MMIfaceModem3gpp *self,
                                                    SUBSYSTEM_3GPP,
                                                    MM_MODEM_STATE_REGISTERED,
                                                    MM_MODEM_STATE_REASON_NONE);
+
+            /* If we also implement the location interface, update the 3GPP location */
+            if (MM_IS_IFACE_MODEM_LOCATION (self))
+                mm_iface_modem_location_3gpp_update_lac_ci (MM_IFACE_MODEM_LOCATION (self),
+                                                            location_area_code,
+                                                            cell_id);
             break;
 
         case MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING:
         case MM_MODEM_3GPP_REGISTRATION_STATE_IDLE:
         case MM_MODEM_3GPP_REGISTRATION_STATE_DENIED:
         case MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN:
+            mm_gdbus_modem3gpp_set_operator_code (skeleton, NULL);
+            mm_gdbus_modem3gpp_set_operator_name (skeleton, NULL);
+
+            if (MM_IS_IFACE_MODEM_LOCATION (self))
+                mm_iface_modem_location_3gpp_clear (MM_IFACE_MODEM_LOCATION (self));
+
             mm_iface_modem_update_access_tech (MM_IFACE_MODEM (self),
                                                0,
                                                ALL_3GPP_ACCESS_TECHNOLOGIES_MASK);
+
             bearer_3gpp_connection_forbidden (self);
+
             mm_iface_modem_update_subsystem_state (
                 MM_IFACE_MODEM (self),
                 SUBSYSTEM_3GPP,
@@ -724,6 +803,8 @@ update_registration_state (MMIfaceModem3gpp *self,
             break;
         }
     }
+
+    g_object_unref (skeleton);
 }
 
 typedef struct {
@@ -785,7 +866,9 @@ get_consolidated_reg_state (RegistrationStateContext *ctx)
 void
 mm_iface_modem_3gpp_update_cs_registration_state (MMIfaceModem3gpp *self,
                                                   MMModem3gppRegistrationState state,
-                                                  MMModemAccessTechnology access_tech)
+                                                  MMModemAccessTechnology access_tech,
+                                                  gulong location_area_code,
+                                                  gulong cell_id)
 {
     RegistrationStateContext *ctx;
     gboolean supported = FALSE;
@@ -799,13 +882,19 @@ mm_iface_modem_3gpp_update_cs_registration_state (MMIfaceModem3gpp *self,
 
     ctx = get_registration_state_context (self);
     ctx->cs = state;
-    update_registration_state (self, get_consolidated_reg_state (ctx), access_tech);
+    update_registration_state (self,
+                               get_consolidated_reg_state (ctx),
+                               access_tech,
+                               location_area_code,
+                               cell_id);
 }
 
 void
 mm_iface_modem_3gpp_update_ps_registration_state (MMIfaceModem3gpp *self,
                                                   MMModem3gppRegistrationState state,
-                                                  MMModemAccessTechnology access_tech)
+                                                  MMModemAccessTechnology access_tech,
+                                                  gulong location_area_code,
+                                                  gulong cell_id)
 {
     RegistrationStateContext *ctx;
     gboolean supported = FALSE;
@@ -819,7 +908,11 @@ mm_iface_modem_3gpp_update_ps_registration_state (MMIfaceModem3gpp *self,
 
     ctx = get_registration_state_context (self);
     ctx->ps = state;
-    update_registration_state (self, get_consolidated_reg_state (ctx), access_tech);
+    update_registration_state (self,
+                               get_consolidated_reg_state (ctx),
+                               access_tech,
+                               location_area_code,
+                               cell_id);
 }
 
 /*****************************************************************************/

@@ -217,10 +217,14 @@ void mm_iface_modem_3gpp_shutdown (MMIfaceModem3gpp *self);
  * the interface asks to run registration state checks. */
 void mm_iface_modem_3gpp_update_cs_registration_state (MMIfaceModem3gpp *self,
                                                        MMModem3gppRegistrationState state,
-                                                       MMModemAccessTechnology access_tech);
+                                                       MMModemAccessTechnology access_tech,
+                                                       gulong location_area_code,
+                                                       gulong cell_id);
 void mm_iface_modem_3gpp_update_ps_registration_state (MMIfaceModem3gpp *self,
                                                        MMModem3gppRegistrationState state,
-                                                       MMModemAccessTechnology access_tech);
+                                                       MMModemAccessTechnology access_tech,
+                                                       gulong location_area_code,
+                                                       gulong cell_id);
 
 /* Run all registration checks */
 void mm_iface_modem_3gpp_run_all_registration_checks (MMIfaceModem3gpp *self,

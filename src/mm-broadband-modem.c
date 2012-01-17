@@ -11,8 +11,8 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 - 2011 Red Hat, Inc.
- * Copyright (C) 2011 Google, Inc.
+ * Copyright (C) 2009 - 2012 Red Hat, Inc.
+ * Copyright (C) 2011 - 2012 Google, Inc.
  */
 
 #include <config.h>
@@ -1982,14 +1982,15 @@ registration_state_changed (MMAtSerialPort *port,
     if (cgreg)
         mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self),
                                                           state,
-                                                          act);
+                                                          act,
+                                                          lac,
+                                                          cell_id);
     else
         mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self),
                                                           state,
-                                                          act);
-
-    /* TODO: report LAC/CI location */
-    /* update_lac_ci (self, lac, cell_id, cgreg ? 1 : 0); */
+                                                          act,
+                                                          lac,
+                                                          cell_id);
 }
 
 static void
@@ -2199,10 +2200,12 @@ run_all_3gpp_registration_checks_ready (MMBroadbandModem *self,
         mm_dbg ("3GPP registration check failed: '%s'", error->message);
         mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self),
                                                           MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
-                                                          MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+                                                          MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
+                                                          0, 0);
         mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self),
                                                           MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
-                                                          MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+                                                          MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
+                                                          0, 0);
         g_simple_async_result_take_error (ctx->result, error);
         register_in_3gpp_network_context_complete_and_free (ctx);
         return;
@@ -2221,10 +2224,12 @@ run_all_3gpp_registration_checks_ready (MMBroadbandModem *self,
         mm_dbg ("3GPP registration check timed out");
         mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self),
                                                           MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
-                                                          MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+                                                          MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
+                                                          0, 0);
         mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self),
                                                           MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
-                                                          MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+                                                          MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
+                                                          0, 0);
         g_simple_async_result_take_error (
             ctx->result,
             mm_mobile_equipment_error_for_code (MM_MOBILE_EQUIPMENT_ERROR_NETWORK_TIMEOUT));
@@ -2257,10 +2262,12 @@ register_in_3gpp_network_ready (MMBroadbandModem *self,
         /* Propagate error in COPS, if any */
         mm_iface_modem_3gpp_update_cs_registration_state (MM_IFACE_MODEM_3GPP (self),
                                                           MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
-                                                          MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+                                                          MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
+                                                          0, 0);
         mm_iface_modem_3gpp_update_ps_registration_state (MM_IFACE_MODEM_3GPP (self),
                                                           MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
-                                                          MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+                                                          MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
+                                                          0, 0);
         g_simple_async_result_take_error (ctx->result, error);
         register_in_3gpp_network_context_complete_and_free (ctx);
         return;
@@ -2443,14 +2450,16 @@ registration_status_check_ready (MMBroadbandModem *self,
                     mm_iface_modem_3gpp_update_ps_registration_state (
                         MM_IFACE_MODEM_3GPP (self),
                         state,
-                        act);
+                        act,
+                        lac,
+                        cid);
                 else
                     mm_iface_modem_3gpp_update_cs_registration_state (
                         MM_IFACE_MODEM_3GPP (self),
                         state,
-                        act);
-
-                /* TODO: report LAC/CI location */
+                        act,
+                        lac,
+                        cid);
 
                 g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
             }
@@ -2578,12 +2587,14 @@ cleanup_registration_sequence_ready (MMBroadbandModem *self,
         mm_iface_modem_3gpp_update_cs_registration_state (
             MM_IFACE_MODEM_3GPP (self),
             MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
-            MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+            MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
+            0, 0);
     else
         mm_iface_modem_3gpp_update_ps_registration_state (
             MM_IFACE_MODEM_3GPP (self),
             MM_MODEM_3GPP_REGISTRATION_STATE_IDLE,
-            MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+            MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
+            0, 0);
 
     /* We're done */
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
@@ -4008,7 +4019,7 @@ modem_location_load_capabilities (MMIfaceModemLocation *self,
                                                    NULL);
     else
         g_simple_async_result_set_op_res_gpointer (result,
-                                                   GUINT_TO_POINTER (MM_MODEM_LOCATION_SOURCE_GSM_LAC_CI),
+                                                   GUINT_TO_POINTER (MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI),
                                                    NULL);
 
     g_simple_async_result_complete_in_idle (result);
