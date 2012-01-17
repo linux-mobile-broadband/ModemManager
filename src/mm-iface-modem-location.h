@@ -88,6 +88,15 @@ gboolean mm_iface_modem_location_disable_finish (MMIfaceModemLocation *self,
 /* Shutdown Location interface */
 void mm_iface_modem_location_shutdown (MMIfaceModemLocation *self);
 
+/* Update 3GPP (LAC/CI) location */
+void mm_iface_modem_location_3gpp_clear          (MMIfaceModemLocation *self);
+void mm_iface_modem_location_3gpp_update_mcc_mnc (MMIfaceModemLocation *self,
+                                                  guint mobile_country_code,
+                                                  guint mobile_network_code);
+void mm_iface_modem_location_3gpp_update_lac_ci  (MMIfaceModemLocation *self,
+                                                  gulong location_area_code,
+                                                  gulong cell_id);
+
 /* Bind properties for simple GetStatus() */
 void mm_iface_modem_location_bind_simple_status (MMIfaceModemLocation *self,
                                                  MMCommonSimpleProperties *status);
