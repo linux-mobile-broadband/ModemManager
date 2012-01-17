@@ -161,6 +161,7 @@ include_HEADERS = \
 	mm-common-simple-properties.h \
 	mm-common-connect-properties.h \
 	mm-common-bearer-properties.h \
+	mm-common-location-3gpp.h \
 	mm-gdbus-manager.h \
 	mm-gdbus-modem.h \
 	mm-gdbus-bearer.h \
@@ -179,6 +180,8 @@ libmm_common_la_SOURCES = \
 	mm-common-connect-properties.c \
 	mm-common-bearer-properties.h \
 	mm-common-bearer-properties.c \
+	mm-common-location-3gpp.h \
+	mm-common-location-3gpp.c \
 	libmm-common.h
 
 libmm_common_la_CPPFLAGS = \
