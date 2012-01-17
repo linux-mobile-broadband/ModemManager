@@ -22,4 +22,19 @@
 
 GHashTable *sms_parse_pdu (const char *hexpdu, GError **error);
 
+guint8 *sms_create_submit_pdu (const char *number,
+                               const char *text,
+                               const char *smsc,
+                               guint validity,
+                               guint class,
+                               guint *out_pdulen,
+                               GError **error);
+
+/* For testcases only */
+guint sms_encode_address (const char *address,
+                          guint8 *buf,
+                          size_t buflen,
+                          gboolean is_smsc);
+
+
 #endif /* MM_SMS_UTILS_H */

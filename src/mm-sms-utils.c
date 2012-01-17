@@ -14,7 +14,7 @@
  */
 
 #include <ctype.h>
-#include <stdio.h>
+#include <string.h>
 
 #include <glib.h>
 
@@ -73,6 +73,93 @@ sms_semi_octets_to_bcd_string (char *dest, const guint8 *octets, int num_octets)
         *dest++ = sms_bcd_chars[(octets[i] >> 4) & 0xf];
     }
     *dest++ = '\0';
+}
+
+static gboolean
+char_to_bcd (char in, guint8 *out)
+{
+    guint32 z;
+
+    if (isdigit (in)) {
+        *out = in - 0x30;
+        return TRUE;
+    }
+
+    for (z = 10; z < 16; z++) {
+        if (in == sms_bcd_chars[z]) {
+            *out = z;
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+static gsize
+sms_string_to_bcd_semi_octets (guint8 *buf, gsize buflen, const char *string)
+{
+    guint i;
+    guint8 bcd;
+    gsize addrlen, slen;
+
+    addrlen = slen = strlen (string);
+    if (addrlen % 2)
+        addrlen++;
+    g_return_val_if_fail (buflen >= addrlen, 0);
+
+    for (i = 0; i < addrlen; i += 2) {
+        if (!char_to_bcd (string[i], &bcd))
+            return 0;
+        buf[i / 2] = bcd & 0xF;
+
+        if (i >= slen - 1) {
+            /* PDU address gets padded with 0xF if string is odd length */
+            bcd = 0xF;
+        } else if (!char_to_bcd (string[i + 1], &bcd))
+            return 0;
+        buf[i / 2] |= bcd << 4;
+    }
+    return addrlen / 2;
+}
+
+/**
+ * sms_encode_address:
+ *
+ * @address: the phone number to encode
+ * @buf: the buffer to encode @address in
+ * @buflen: the size  of @buf
+ * @is_smsc: if %TRUE encode size as number of octets of address infromation,
+ *   otherwise if %FALSE encode size as number of digits of @address
+ *
+ * Returns: the size in bytes of the data added to @buf
+ **/
+guint
+sms_encode_address (const char *address,
+                    guint8 *buf,
+                    size_t buflen,
+                    gboolean is_smsc)
+{
+    gsize len;
+
+    g_return_val_if_fail (address != NULL, 0);
+    g_return_val_if_fail (buf != NULL, 0);
+    g_return_val_if_fail (buflen >= 2, 0);
+
+    /* Handle number type & plan */
+    buf[1] = 0x80;  /* Bit 7 always 1 */
+    if (address[0] == '+') {
+        buf[1] |= SMS_NUMBER_TYPE_INTL;
+        address++;
+    }
+    buf[1] |= SMS_NUMBER_PLAN_TELEPHONE;
+
+    len = sms_string_to_bcd_semi_octets (&buf[2], buflen, address);
+
+    if (is_smsc)
+        buf[0] = len + 1;  /* addr length + size byte */
+    else
+        buf[0] = strlen (address);  /* number of digits in address */
+
+    return len ? len + 2 : 0;  /* addr length + size byte + number type/plan */
 }
 
 /* len is in semi-octets */
@@ -457,3 +544,217 @@ sms_parse_pdu (const char *hexpdu, GError **error)
 
     return properties;
 }
+
+static guint8
+validity_to_relative (guint validity)
+{
+    if (validity == 0)
+        return 167; /* 24 hours */
+
+    if (validity <= 144) {
+        /* 5 minute units up to 12 hours */
+        return validity - 1;
+    }
+
+    if (validity > 144 && validity <= 288) {
+        /* 12 hours + 30 minute units up to 1 day */
+        if (validity % 6)
+            validity += 6;  /* round up to next 30 minutes */
+        validity = MIN (validity, 288);
+        return 143 + ((validity - 144) / 6);  /* 6 = 30 minutes / 5 minutes */
+    }
+
+    if (validity > 288 && validity <= 8640) {
+        /* 2 days up to 1 month */
+        if (validity % 288)
+            validity += 288;  /* round up to next day */
+        validity = MIN (validity, 8640);
+        return 167 + ((validity - 288) / 288);  /* 288 = 1 day / 5 minutes */
+    }
+
+    /* 8640 = 30 days in 5-minute units
+     * 2016 = 7 days in 5-minute units
+     * 127008 = 63 weeks in 5-minute units
+     * 8064 = 4 weeks in 5-minute units
+     */
+    if (validity > 8640 && validity <= 127008) {
+        /* 5 weeks up to 63 weeks */
+        if (validity % 2016)
+            validity += 2016;  /* round up to next week */
+        validity = MIN (validity, 127008);
+        return 196 + ((validity - 8064) / 2016);
+    }
+
+    return 255; /* 63 weeks */
+}
+
+#define PDU_SIZE 200
+
+/**
+ * sms_create_submit_pdu:
+ *
+ * @number: the subscriber number to send this message to
+ * @text: the body of this SMS
+ * @smsc: if given, the SMSC address
+ * @validity: validity period of this SMS in 5-minute increments, or 0 for a
+ *  suitable default
+ * @class: unused
+ * @out_pdulen: on success, the size of the returned PDU in bytes
+ * @error: on error, filled with the error that occurred
+ *
+ * Constructs a single-part SMS message with the given details, preferring to
+ * use the UCS2 character set when the message will fit, otherwise falling back
+ * to the GSM character set.
+ *
+ * Returns: the constructed PDU data on success, or %NULL on error
+ **/
+guint8 *
+sms_create_submit_pdu (const char *number,
+                       const char *text,
+                       const char *smsc,
+                       guint validity,
+                       guint class,
+                       guint *out_pdulen,
+                       GError **error)
+{
+    guint8 *pdu;
+    guint len, offset = 0;
+    MMModemCharset best_cs = MM_MODEM_CHARSET_GSM;
+    guint ucs2len = 0, gsm_unsupported = 0;
+    guint textlen = 0;
+
+    g_return_val_if_fail (number != NULL, NULL);
+    g_return_val_if_fail (text != NULL, NULL);
+
+    /* FIXME: support multiple fragments */
+
+    textlen = mm_charset_get_encoded_len (text, MM_MODEM_CHARSET_GSM, &gsm_unsupported);
+    if (textlen > 160) {
+        g_set_error_literal (error,
+                             MM_MODEM_ERROR,
+                             MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                             "Cannot encode message to fit into an SMS.");
+        return NULL;
+    }
+
+    /* If there are characters that are unsupported in the GSM charset, try
+     * UCS2.  If the UCS2 encoded string is too long to fit in an SMS, then
+     * just use GSM and suck up the unconverted chars.
+     */
+    if (gsm_unsupported > 0) {
+        ucs2len = mm_charset_get_encoded_len (text, MM_MODEM_CHARSET_UCS2, NULL);
+        if (ucs2len <= 140) {
+            best_cs = MM_MODEM_CHARSET_UCS2;
+            textlen = ucs2len;
+        }
+    }
+    
+    /* Build up the PDU */
+    pdu = g_malloc0 (PDU_SIZE);
+    g_return_val_if_fail (pdu != NULL, NULL);
+
+    if (smsc) {
+        len = sms_encode_address (smsc, pdu, PDU_SIZE, TRUE);
+        if (len == 0) {
+            g_set_error (error,
+                         MM_MSG_ERROR,
+                         MM_MSG_ERROR_INVALID_PDU_PARAMETER,
+                         "Invalid SMSC address '%s'", smsc);
+            goto error;
+        }
+        offset += len;
+    } else {
+        /* No SMSC, use default */
+        pdu[offset++] = 0x00;
+    }
+
+    if (validity > 0)
+        pdu[offset] = 1 << 4; /* TP-VP present; format RELATIVE */
+    else
+        pdu[offset] = 0;      /* TP-VP not present */
+    pdu[offset++] |= 0x01;    /* TP-MTI = SMS-SUBMIT */
+
+    pdu[offset++] = 0x00;     /* TP-Message-Reference: filled by device */
+
+    len = sms_encode_address (number, &pdu[offset], PDU_SIZE - offset, FALSE);
+    if (len == 0) {
+        g_set_error (error,
+                     MM_MSG_ERROR,
+                     MM_MSG_ERROR_INVALID_PDU_PARAMETER,
+                     "Invalid send-to number '%s'", number);
+        goto error;
+    }
+    offset += len;
+
+    /* TP-PID */
+    pdu[offset++] = 0x00;
+
+    /* TP-DCS */
+    if (best_cs == MM_MODEM_CHARSET_UCS2)
+        pdu[offset++] = 0x08;
+    else
+        pdu[offset++] = 0x00;  /* GSM */
+
+    /* TP-Validity-Period: 4 days */
+    if (validity > 0)
+        pdu[offset++] = validity_to_relative (validity);
+
+    /* TP-User-Data-Length */
+    pdu[offset++] = textlen;
+
+    if (best_cs == MM_MODEM_CHARSET_GSM) {
+        guint8 *unpacked, *packed;
+        guint32 unlen = 0, packlen = 0;
+
+        unpacked = mm_charset_utf8_to_unpacked_gsm (text, &unlen);
+        if (!unpacked || unlen == 0) {
+            g_free (unpacked);
+            g_set_error_literal (error,
+                                 MM_MSG_ERROR,
+                                 MM_MSG_ERROR_INVALID_PDU_PARAMETER,
+                                 "Failed to convert message text to GSM.");
+            goto error;
+        }
+
+        packed = gsm_pack (unpacked, unlen, 0, &packlen);
+        g_free (unpacked);
+        if (!packed || packlen == 0) {
+            g_free (packed);
+            g_set_error_literal (error,
+                                 MM_MSG_ERROR,
+                                 MM_MSG_ERROR_INVALID_PDU_PARAMETER,
+                                 "Failed to pack message text to GSM.");
+            goto error;
+        }
+
+        memcpy (&pdu[offset], packed, packlen);
+        g_free (packed);
+        offset += packlen;
+    } else if (best_cs == MM_MODEM_CHARSET_UCS2) {
+        GByteArray *array;
+
+        array = g_byte_array_sized_new (textlen / 2);
+        if (!mm_modem_charset_byte_array_append (array, text, FALSE, best_cs)) {
+            g_byte_array_free (array, TRUE);
+            g_set_error_literal (error,
+                                 MM_MSG_ERROR,
+                                 MM_MSG_ERROR_INVALID_PDU_PARAMETER,
+                                 "Failed to convert message text to UCS2.");
+            goto error;
+        }
+
+        memcpy (&pdu[offset], array->data, array->len);
+        offset += array->len;
+        g_byte_array_free (array, TRUE);
+    } else
+        g_assert_not_reached ();
+
+    if (out_pdulen)
+        *out_pdulen = offset;
+    return pdu;
+
+error:
+    g_free (pdu);
+    return NULL;
+}
+
