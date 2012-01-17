@@ -300,7 +300,7 @@ typedef enum { /*< underscore_name=mm_modem_sms_state >*/
 /**
  * MMModemLocationSource:
  * @MM_MODEM_LOCATION_SOURCE_NONE: None.
- * @MM_MODEM_LOCATION_SOURCE_GSM_LAC_CI: Location Area Code and Cell ID.
+ * @MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI: Location Area Code and Cell ID.
  * @MM_MODEM_LOCATION_SOURCE_GPS_RAW: GPS location given by predefined keys.
  * @MM_MODEM_LOCATION_SOURCE_GPS_NMEA: GPS location given as NMEA traces.
  *
@@ -308,7 +308,7 @@ typedef enum { /*< underscore_name=mm_modem_sms_state >*/
  */
 typedef enum { /*< underscore_name=mm_modem_location_source >*/
     MM_MODEM_LOCATION_SOURCE_NONE       = 0,
-    MM_MODEM_LOCATION_SOURCE_GSM_LAC_CI = 1 << 0,
+    MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI = 1 << 0,
     MM_MODEM_LOCATION_SOURCE_GPS_RAW    = 1 << 1,
     MM_MODEM_LOCATION_SOURCE_GPS_NMEA   = 1 << 2,
 } MMModemLocationSource;

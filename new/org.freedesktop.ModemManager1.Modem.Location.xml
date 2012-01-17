@@ -106,7 +106,7 @@
         information:
 
         <variablelist>
-        <varlistentry><term><link linkend="MM-MODEM-LOCATION-SOURCE-GSM-LAC-CI:CAPS">MM_MODEM_LOCATION_SOURCE_GSM_LAC_CI</link></term>
+        <varlistentry><term><link linkend="MM-MODEM-LOCATION-SOURCE-3GPP-LAC-CI:CAPS">MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI</link></term>
           <listitem>
             <para>
               Devices supporting this
@@ -155,7 +155,7 @@
               If any of these four items (<literal>MCC</literal>, <literal>MNC</literal>,
               <literal>LAC</literal>, <literal>CI</literal>) is unknown or the
               mobile is not registered with a network, then the
-              <link linkend="MM-MODEM-LOCATION-SOURCE-GSM-LAC-CI:CAPS">MM_MODEM_LOCATION_SOURCE_GSM_LAC_CI</link>
+              <link linkend="MM-MODEM-LOCATION-SOURCE-3GPP-LAC-CI:CAPS">MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI</link>
               location
               information item should not be provided as a returned value from the
               <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Location.GetLocation">GetLocation()</link>
