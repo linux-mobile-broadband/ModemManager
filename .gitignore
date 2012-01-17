@@ -22,6 +22,7 @@ libtool
 .libs
 *-glue.h
 *.tar.bz2
+*.pyc
 org.freedesktop.ModemManager.service
 org.freedesktop.ModemManager.conf
 ModemManager.pc
