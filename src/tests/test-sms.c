@@ -420,7 +420,170 @@ test_pduX (void *f, gpointer d)
 }
 #endif
 
+static void
+test_encode_sms_addr_encode_smsc_intl (void *f, gpointer d)
+{
+    static const char *addr = "+19037029920";
+    static const guint8 expected[] = { 0x07, 0x91, 0x91, 0x30, 0x07, 0x92, 0x29, 0xF0 };
+    guint enclen;
+    guint8 buf[20];
 
+    enclen = sms_encode_address (addr, buf, sizeof (buf), TRUE);
+    g_assert_cmpint (enclen, ==, sizeof (expected));
+    g_assert_cmpint (memcmp (buf, expected, sizeof (expected)), ==, 0);
+}
+
+static void
+test_encode_sms_addr_encode_smsc_unknown (void *f, gpointer d)
+{
+    static const char *addr = "9037029920";
+    static const guint8 expected[] = { 0x06, 0x81, 0x09, 0x73, 0x20, 0x99, 0x02 };
+    guint enclen;
+    guint8 buf[20];
+
+    enclen = sms_encode_address (addr, buf, sizeof (buf), TRUE);
+    g_assert_cmpint (enclen, ==, sizeof (expected));
+    g_assert_cmpint (memcmp (buf, expected, sizeof (expected)), ==, 0);
+}
+
+static void
+test_encode_sms_addr_encode_intl (void *f, gpointer d)
+{
+    static const char *addr = "+19037029920";
+    static const guint8 expected[] = { 0x0B, 0x91, 0x91, 0x30, 0x07, 0x92, 0x29, 0xF0 };
+    guint enclen;
+    guint8 buf[20];
+
+    enclen = sms_encode_address (addr, buf, sizeof (buf), FALSE);
+    g_assert_cmpint (enclen, ==, sizeof (expected));
+    g_assert_cmpint (memcmp (buf, expected, sizeof (expected)), ==, 0);
+}
+
+static void
+test_encode_sms_addr_encode_unknown (void *f, gpointer d)
+{
+    static const char *addr = "9037029920";
+    static const guint8 expected[] = { 0x0A, 0x81, 0x09, 0x73, 0x20, 0x99, 0x02 };
+    guint enclen;
+    guint8 buf[20];
+
+    enclen = sms_encode_address (addr, buf, sizeof (buf), FALSE);
+    g_assert_cmpint (enclen, ==, sizeof (expected));
+    g_assert_cmpint (memcmp (buf, expected, sizeof (expected)), ==, 0);
+}
+
+static void
+test_create_pdu_ucs2_with_smsc (void *f, gpointer d)
+{
+    static const char *smsc = "+19037029920";
+    static const char *number = "+15555551234";
+    static const char *text = "Да здравствует король, детка!";
+    static const guint8 expected[] = {
+        0x07, 0x91, 0x91, 0x30, 0x07, 0x92, 0x29, 0xF0, 0x11, 0x00, 0x0B, 0x91,
+        0x51, 0x55, 0x55, 0x15, 0x32, 0xF4, 0x00, 0x08, 0x00, 0x3A, 0x04, 0x14,
+        0x04, 0x30, 0x00, 0x20, 0x04, 0x37, 0x04, 0x34, 0x04, 0x40, 0x04, 0x30,
+        0x04, 0x32, 0x04, 0x41, 0x04, 0x42, 0x04, 0x32, 0x04, 0x43, 0x04, 0x35,
+        0x04, 0x42, 0x00, 0x20, 0x04, 0x3A, 0x04, 0x3E, 0x04, 0x40, 0x04, 0x3E,
+        0x04, 0x3B, 0x04, 0x4C, 0x00, 0x2C, 0x00, 0x20, 0x04, 0x34, 0x04, 0x35,
+        0x04, 0x42, 0x04, 0x3A, 0x04, 0x30, 0x00, 0x21
+    };
+    guint8 *pdu;
+    guint len = 0;
+    GError *error = NULL;
+
+    pdu = sms_create_submit_pdu (number, text, smsc, 1, 0, &len, &error);
+    g_assert_no_error (error);
+    g_assert (pdu);
+    g_assert_cmpint (len, ==, sizeof (expected));
+    g_assert_cmpint (memcmp (pdu, expected, len), ==, 0);
+}
+
+static void
+test_create_pdu_ucs2_no_smsc (void *f, gpointer d)
+{
+    static const char *number = "+15555551234";
+    static const char *text = "Да здравствует король, детка!";
+    static const guint8 expected[] = {
+        0x00, 0x11, 0x00, 0x0B, 0x91, 0x51, 0x55, 0x55, 0x15, 0x32, 0xF4, 0x00,
+        0x08, 0x00, 0x3A, 0x04, 0x14, 0x04, 0x30, 0x00, 0x20, 0x04, 0x37, 0x04,
+        0x34, 0x04, 0x40, 0x04, 0x30, 0x04, 0x32, 0x04, 0x41, 0x04, 0x42, 0x04,
+        0x32, 0x04, 0x43, 0x04, 0x35, 0x04, 0x42, 0x00, 0x20, 0x04, 0x3A, 0x04,
+        0x3E, 0x04, 0x40, 0x04, 0x3E, 0x04, 0x3B, 0x04, 0x4C, 0x00, 0x2C, 0x00,
+        0x20, 0x04, 0x34, 0x04, 0x35, 0x04, 0x42, 0x04, 0x3A, 0x04, 0x30, 0x00,
+        0x21
+    };
+    guint8 *pdu;
+    guint len = 0;
+    GError *error = NULL;
+
+    pdu = sms_create_submit_pdu (number, text, NULL, 1, 0, &len, &error);
+    g_assert_no_error (error);
+    g_assert (pdu);
+    g_assert_cmpint (len, ==, sizeof (expected));
+    g_assert_cmpint (memcmp (pdu, expected, len), ==, 0);
+}
+
+static void
+test_create_pdu_gsm_with_smsc (void *f, gpointer d)
+{
+    static const char *smsc = "+19037029920";
+    static const char *number = "+15555551234";
+    static const char *text = "Hi there...Tue 17th Jan 2012 05:30.18 pm (GMT+1) ΔΔΔΔΔ";
+    static const guint8 expected[] = {
+        0x07, 0x91, 0x91, 0x30, 0x07, 0x92, 0x29, 0xF0, 0x11, 0x00, 0x0B, 0x91,
+        0x51, 0x55, 0x55, 0x15, 0x32, 0xF4, 0x00, 0x00, 0x00, 0x36, 0xC8, 0x34,
+        0x88, 0x8E, 0x2E, 0xCB, 0xCB, 0x2E, 0x97, 0x8B, 0x5A, 0x2F, 0x83, 0x62,
+        0x37, 0x3A, 0x1A, 0xA4, 0x0C, 0xBB, 0x41, 0x32, 0x58, 0x4C, 0x06, 0x82,
+        0xD5, 0x74, 0x33, 0x98, 0x2B, 0x86, 0x03, 0xC1, 0xDB, 0x20, 0xD4, 0xB1,
+        0x49, 0x5D, 0xC5, 0x52, 0x20, 0x08, 0x04, 0x02, 0x81, 0x00
+    };
+    guint8 *pdu;
+    guint len = 0;
+    GError *error = NULL;
+
+    pdu = sms_create_submit_pdu (number, text, smsc, 1, 0, &len, &error);
+    g_assert_no_error (error);
+    g_assert (pdu);
+    g_assert_cmpint (len, ==, sizeof (expected));
+    g_assert_cmpint (memcmp (pdu, expected, len), ==, 0);
+}
+
+static void
+test_create_pdu_gsm_no_smsc (void *f, gpointer d)
+{
+    static const char *number = "+15555551234";
+    static const char *text = "Hi there...Tue 17th Jan 2012 05:30.18 pm (GMT+1) ΔΔΔΔΔ";
+    static const guint8 expected[] = {
+        0x00, 0x11, 0x00, 0x0B, 0x91, 0x51, 0x55, 0x55, 0x15, 0x32, 0xF4, 0x00,
+        0x00, 0x00, 0x36, 0xC8, 0x34, 0x88, 0x8E, 0x2E, 0xCB, 0xCB, 0x2E, 0x97,
+        0x8B, 0x5A, 0x2F, 0x83, 0x62, 0x37, 0x3A, 0x1A, 0xA4, 0x0C, 0xBB, 0x41,
+        0x32, 0x58, 0x4C, 0x06, 0x82, 0xD5, 0x74, 0x33, 0x98, 0x2B, 0x86, 0x03,
+        0xC1, 0xDB, 0x20, 0xD4, 0xB1, 0x49, 0x5D, 0xC5, 0x52, 0x20, 0x08, 0x04,
+        0x02, 0x81, 0x00
+    };
+    guint8 *pdu;
+    guint len = 0;
+    GError *error = NULL;
+
+    pdu = sms_create_submit_pdu (number, text, NULL, 1, 0, &len, &error);
+    g_assert_no_error (error);
+    g_assert (pdu);
+    g_assert_cmpint (len, ==, sizeof (expected));
+    g_assert_cmpint (memcmp (pdu, expected, len), ==, 0);
+}
+
+#if 0
+{
+int i;
+g_print ("\n        ");
+for (i = 0; i < len; i++) {
+   g_print ("  0x%02X", pdu[i]);
+   if (((i + 1) % 12) == 0)
+      g_print ("\n        ");
+}
+g_print ("\n");
+}
+#endif
 
 #if GLIB_CHECK_VERSION(2,25,12)
 typedef GTestFixtureFunc TCFunc;
@@ -452,6 +615,16 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_pdu_dcsf_8bit, NULL));
     g_test_suite_add (suite, TESTCASE (test_pdu_insufficient_data, NULL));
     g_test_suite_add (suite, TESTCASE (test_pdu_udhi, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_encode_sms_addr_encode_smsc_intl, NULL));
+    g_test_suite_add (suite, TESTCASE (test_encode_sms_addr_encode_smsc_unknown, NULL));
+    g_test_suite_add (suite, TESTCASE (test_encode_sms_addr_encode_intl, NULL));
+    g_test_suite_add (suite, TESTCASE (test_encode_sms_addr_encode_unknown, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_create_pdu_ucs2_with_smsc, NULL));
+    g_test_suite_add (suite, TESTCASE (test_create_pdu_ucs2_no_smsc, NULL));
+    g_test_suite_add (suite, TESTCASE (test_create_pdu_gsm_with_smsc, NULL));
+    g_test_suite_add (suite, TESTCASE (test_create_pdu_gsm_no_smsc, NULL));
 
     result = g_test_run ();
 
