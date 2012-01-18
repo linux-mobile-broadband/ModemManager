@@ -284,6 +284,48 @@ test_pack_gsm7_24_chars (void *f, gpointer d)
     g_free (packed);
 }
 
+static void
+test_pack_gsm7_last_septet_alone (void *f, gpointer d)
+{
+    static const guint8 unpacked[] = {
+        0x54, 0x68, 0x69, 0x73, 0x20, 0x69, 0x73, 0x20, 0x72, 0x65, 0x61, 0x6C,
+        0x6C, 0x79, 0x20, 0x63, 0x6F, 0x6F, 0x6C, 0x20, 0x10, 0x10, 0x10, 0x10,
+        0x10
+    };
+    static const guint8 expected[] = {
+        0x54, 0x74, 0x7A, 0x0E, 0x4A, 0xCF, 0x41, 0xF2, 0x72, 0x98, 0xCD, 0xCE,
+        0x83, 0xC6, 0xEF, 0x37, 0x1B, 0x04, 0x81, 0x40, 0x20, 0x10
+    };
+    guint8 *packed;
+    guint32 packed_len = 0;
+
+    /* Tests that a 25-character unpacked string (where, when packed, the last
+     * septet will be in an octet by itself) packs correctly.
+     */
+
+    packed = gsm_pack (unpacked, sizeof (unpacked), 0, &packed_len);
+    g_assert (packed);
+    g_assert_cmpint (packed_len, ==, sizeof (expected));
+
+    g_free (packed);
+}
+
+static void
+test_pack_gsm7_7_chars_offset (void *f, gpointer d)
+{
+    static const guint8 unpacked[] = { 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x10, 0x2F };
+    static const guint8 expected[] = { 0x00, 0x5D, 0x66, 0xB3, 0xDF, 0x90, 0x17 };
+    guint8 *packed;
+    guint32 packed_len = 0;
+
+    packed = gsm_pack (unpacked, sizeof (unpacked), 5, &packed_len);
+    g_assert (packed);
+    g_assert_cmpint (packed_len, ==, sizeof (expected));
+    g_assert_cmpint (memcmp (packed, expected, packed_len), ==, 0);
+
+    g_free (packed);
+}
+
 
 #if GLIB_CHECK_VERSION(2,25,12)
 typedef GTestFixtureFunc TCFunc;
@@ -314,6 +356,9 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_pack_gsm7_7_chars, NULL));
     g_test_suite_add (suite, TESTCASE (test_pack_gsm7_all_chars, NULL));
     g_test_suite_add (suite, TESTCASE (test_pack_gsm7_24_chars, NULL));
+    g_test_suite_add (suite, TESTCASE (test_pack_gsm7_last_septet_alone, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_pack_gsm7_7_chars_offset, NULL));
 
     result = g_test_run ();
 
