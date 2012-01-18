@@ -100,7 +100,7 @@
           number   : string - Phone number (mandatory)
           text     : string - SMS text (mandatory)
           smsc     : string - SMS service center number (optional)
-          validity : uint (0..255) - Specifies when the SMS expires in SMSC (optional)
+          validity : uint (0..127008) - Specifies when the SMS expires in SMSC (units of 5 minutes) (optional)
           class    : uint (0..3) - Message importance and location (optional)
         </tp:docstring>
       </arg>
