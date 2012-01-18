@@ -600,6 +600,8 @@ validity_to_relative (guint validity)
  *  suitable default
  * @class: unused
  * @out_pdulen: on success, the size of the returned PDU in bytes
+ * @out_msgstart: on success, the byte index in the returned PDU where the
+ *  message starts (ie, skipping the SMSC length byte and address, if present)
  * @error: on error, filled with the error that occurred
  *
  * Constructs a single-part SMS message with the given details, preferring to
@@ -615,6 +617,7 @@ sms_create_submit_pdu (const char *number,
                        guint validity,
                        guint class,
                        guint *out_pdulen,
+                       guint *out_msgstart,
                        GError **error)
 {
     guint8 *pdu;
@@ -667,6 +670,9 @@ sms_create_submit_pdu (const char *number,
         /* No SMSC, use default */
         pdu[offset++] = 0x00;
     }
+
+    if (out_msgstart)
+        *out_msgstart = offset;
 
     if (validity > 0)
         pdu[offset] = 1 << 4; /* TP-VP present; format RELATIVE */

@@ -488,14 +488,15 @@ test_create_pdu_ucs2_with_smsc (void *f, gpointer d)
         0x04, 0x42, 0x04, 0x3A, 0x04, 0x30, 0x00, 0x21
     };
     guint8 *pdu;
-    guint len = 0;
+    guint len = 0, msgstart = 0;
     GError *error = NULL;
 
-    pdu = sms_create_submit_pdu (number, text, smsc, 1, 0, &len, &error);
+    pdu = sms_create_submit_pdu (number, text, smsc, 1, 0, &len, &msgstart, &error);
     g_assert_no_error (error);
     g_assert (pdu);
     g_assert_cmpint (len, ==, sizeof (expected));
     g_assert_cmpint (memcmp (pdu, expected, len), ==, 0);
+    g_assert_cmpint (msgstart, ==, 8);
 }
 
 static void
@@ -513,14 +514,15 @@ test_create_pdu_ucs2_no_smsc (void *f, gpointer d)
         0x21
     };
     guint8 *pdu;
-    guint len = 0;
+    guint len = 0, msgstart = 0;
     GError *error = NULL;
 
-    pdu = sms_create_submit_pdu (number, text, NULL, 1, 0, &len, &error);
+    pdu = sms_create_submit_pdu (number, text, NULL, 1, 0, &len, &msgstart, &error);
     g_assert_no_error (error);
     g_assert (pdu);
     g_assert_cmpint (len, ==, sizeof (expected));
     g_assert_cmpint (memcmp (pdu, expected, len), ==, 0);
+    g_assert_cmpint (msgstart, ==, 1);
 }
 
 static void
@@ -538,14 +540,15 @@ test_create_pdu_gsm_with_smsc (void *f, gpointer d)
         0x49, 0x5D, 0xC5, 0x52, 0x20, 0x08, 0x04, 0x02, 0x81, 0x00
     };
     guint8 *pdu;
-    guint len = 0;
+    guint len = 0, msgstart = 0;
     GError *error = NULL;
 
-    pdu = sms_create_submit_pdu (number, text, smsc, 1, 0, &len, &error);
+    pdu = sms_create_submit_pdu (number, text, smsc, 1, 0, &len, &msgstart, &error);
     g_assert_no_error (error);
     g_assert (pdu);
     g_assert_cmpint (len, ==, sizeof (expected));
     g_assert_cmpint (memcmp (pdu, expected, len), ==, 0);
+    g_assert_cmpint (msgstart, ==, 8);
 }
 
 static void
@@ -562,14 +565,15 @@ test_create_pdu_gsm_no_smsc (void *f, gpointer d)
         0x02, 0x81, 0x00
     };
     guint8 *pdu;
-    guint len = 0;
+    guint len = 0, msgstart = 0;
     GError *error = NULL;
 
-    pdu = sms_create_submit_pdu (number, text, NULL, 1, 0, &len, &error);
+    pdu = sms_create_submit_pdu (number, text, NULL, 1, 0, &len, &msgstart, &error);
     g_assert_no_error (error);
     g_assert (pdu);
     g_assert_cmpint (len, ==, sizeof (expected));
     g_assert_cmpint (memcmp (pdu, expected, len), ==, 0);
+    g_assert_cmpint (msgstart, ==, 1);
 }
 
 static void
@@ -584,7 +588,7 @@ test_create_pdu_gsm_3 (void *f, gpointer d)
         0x10
     };
     guint8 *pdu;
-    guint len = 0;
+    guint len = 0, msgstart = 0;
     GError *error = NULL;
 
     /* Tests that a 25-character message (where the last septet is packed into
@@ -593,11 +597,12 @@ test_create_pdu_gsm_3 (void *f, gpointer d)
      * leave off the last octet.
      */
 
-    pdu = sms_create_submit_pdu (number, text, NULL, 1, 0, &len, &error);
+    pdu = sms_create_submit_pdu (number, text, NULL, 1, 0, &len, &msgstart, &error);
     g_assert_no_error (error);
     g_assert (pdu);
     g_assert_cmpint (len, ==, sizeof (expected));
     g_assert_cmpint (memcmp (pdu, expected, len), ==, 0);
+    g_assert_cmpint (msgstart, ==, 1);
 }
 
 #if 0
