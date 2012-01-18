@@ -19,11 +19,8 @@
 #ifndef MM_COMMON_HELPERS_H
 #define MM_COMMON_HELPERS_H
 
-gchar *mm_common_get_capabilities_string (MMModemCapability caps);
-gchar *mm_common_get_access_technologies_string (MMModemAccessTechnology access_tech);
-gchar *mm_common_get_modes_string (MMModemMode mode);
-gchar *mm_common_get_bands_string (const MMModemBand *bands,
-                                   guint n_bands);
+gchar *mm_common_build_bands_string (const MMModemBand *bands,
+                                     guint n_bands);
 
 MMModemMode           mm_common_get_modes_from_string       (const gchar *str,
                                                              GError **error);

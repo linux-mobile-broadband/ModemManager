@@ -22,154 +22,25 @@
 #include "mm-common-helpers.h"
 
 gchar *
-mm_common_get_capabilities_string (MMModemCapability caps)
+mm_common_build_bands_string (const MMModemBand *bands,
+                              guint n_bands)
 {
-	GFlagsClass *flags_class;
-    GString *str;
-
-    str = g_string_new ("");
-    flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_MODEM_CAPABILITY));
-
-    if (caps == MM_MODEM_CAPABILITY_NONE) {
-        GFlagsValue *value;
-
-        value = g_flags_get_first_value (flags_class, caps);
-        g_string_append (str, value->value_nick);
-    } else {
-        MMModemCapability it;
-        gboolean first = TRUE;
-
-        for (it = MM_MODEM_CAPABILITY_POTS; /* first */
-             it <= MM_MODEM_CAPABILITY_LTE_ADVANCED; /* last */
-             it = it << 1) {
-            if (caps & it) {
-                GFlagsValue *value;
-
-                value = g_flags_get_first_value (flags_class, it);
-                g_string_append_printf (str, "%s%s",
-                                        first ? "" : ", ",
-                                        value->value_nick);
-
-                if (first)
-                    first = FALSE;
-            }
-        }
-    }
-    g_type_class_unref (flags_class);
-
-    return g_string_free (str, FALSE);
-}
-
-gchar *
-mm_common_get_access_technologies_string (MMModemAccessTechnology access_tech)
-{
-	GFlagsClass *flags_class;
-    GString *str;
-
-    str = g_string_new ("");
-    flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_MODEM_ACCESS_TECHNOLOGY));
-
-    if (access_tech == MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN) {
-        GFlagsValue *value;
-
-        value = g_flags_get_first_value (flags_class, access_tech);
-        g_string_append (str, value->value_nick);
-    } else {
-        MMModemAccessTechnology it;
-        gboolean first = TRUE;
-
-        for (it = MM_MODEM_ACCESS_TECHNOLOGY_GSM; /* first */
-             it <= MM_MODEM_ACCESS_TECHNOLOGY_LTE; /* last */
-             it = it << 1) {
-            if (access_tech & it) {
-                GFlagsValue *value;
-
-                value = g_flags_get_first_value (flags_class, it);
-                g_string_append_printf (str, "%s%s",
-                                        first ? "" : ", ",
-                                        value->value_nick);
-
-                if (first)
-                    first = FALSE;
-            }
-        }
-    }
-    g_type_class_unref (flags_class);
-
-    return g_string_free (str, FALSE);
-}
-
-gchar *
-mm_common_get_modes_string (MMModemMode mode)
-{
-	GFlagsClass *flags_class;
-    GString *str;
-
-    str = g_string_new ("");
-    flags_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_MODEM_MODE));
-
-    if (mode == MM_MODEM_MODE_NONE ||
-        mode == MM_MODEM_MODE_ANY) {
-        GFlagsValue *value;
-
-        value = g_flags_get_first_value (flags_class, mode);
-        g_string_append (str, value->value_nick);
-    } else {
-        MMModemMode it;
-        gboolean first = TRUE;
-
-        for (it = MM_MODEM_MODE_CS; /* first */
-             it <= MM_MODEM_MODE_4G; /* last */
-             it = it << 1) {
-            if (mode & it) {
-                GFlagsValue *value;
-                gchar *up;
-
-                value = g_flags_get_first_value (flags_class, it);
-                up = g_ascii_strup (value->value_nick, -1);
-                g_string_append_printf (str, "%s%s",
-                                        first ? "" : ", ",
-                                        up);
-                g_free (up);
-
-                if (first)
-                    first = FALSE;
-            }
-        }
-    }
-    g_type_class_unref (flags_class);
-
-    return g_string_free (str, FALSE);
-}
-
-gchar *
-mm_common_get_bands_string (const MMModemBand *bands,
-                            guint n_bands)
-{
-	GEnumClass *enum_class;
     gboolean first = TRUE;
     GString *str;
     guint i;
 
+    if (!bands || !n_bands)
+        return g_strdup ("none");
+
     str = g_string_new ("");
-    if (n_bands == 0) {
-        g_string_append (str, "none");
-        return g_string_free (str, FALSE);
-    }
-
-    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_BAND));
     for (i = 0; i < n_bands; i++) {
-        GEnumValue *value;
-
-        value = g_enum_get_value (enum_class, bands[i]);
         g_string_append_printf (str, "%s%s",
                                 first ? "" : ", ",
-                                value->value_nick);
+                                mm_modem_band_get_string (bands[i]));
 
         if (first)
             first = FALSE;
     }
-    g_type_class_unref (enum_class);
 
     return g_string_free (str, FALSE);
 }
