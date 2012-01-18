@@ -58,14 +58,14 @@ WITH_ENUMS = mm-bearer.h
 
 mm-private-enums-types.h: Makefile.am $(WITH_ENUMS) $(top_srcdir)/build-aux/mm-enums-template.h
 	$(AM_V_GEN) glib-mkenums \
-		--fhead "#ifndef __MM_PRIVATE_ENUMS_TYPES_H__\n#define __MM_PRIVATE_ENUMS_TYPES_H__\n" \
+		--fhead "#include \"mm-bearer.h\"\n#ifndef __MM_PRIVATE_ENUMS_TYPES_H__\n#define __MM_PRIVATE_ENUMS_TYPES_H__\n" \
 		--template $(top_srcdir)/build-aux/mm-enums-template.h \
 		--ftail "#endif /* __MM_PRIVATE_ENUMS_TYPES_H__ */\n" \
 		$(WITH_ENUMS) > $@
 
 mm-private-enums-types.c: Makefile.am $(top_srcdir)/include/ModemManager-enums.h $(top_srcdir)/build-aux/mm-enums-template.c mm-private-enums-types.h
 	$(AM_V_GEN) glib-mkenums \
-		--fhead "#include \"mm-bearer.h\"\n#include \"mm-private-enums-types.h\"" \
+		--fhead "#include \"mm-private-enums-types.h\"" \
 		--template $(top_srcdir)/build-aux/mm-enums-template.c \
 		$(WITH_ENUMS) > $@
 

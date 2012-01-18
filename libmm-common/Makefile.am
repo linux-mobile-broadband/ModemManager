@@ -37,14 +37,14 @@ GENERATED_DOC = \
 # Enum types
 mm-enums-types.h: Makefile.am $(top_srcdir)/include/ModemManager-enums.h $(top_srcdir)/build-aux/mm-enums-template.h
 	$(AM_V_GEN) glib-mkenums \
-		--fhead "#ifndef __MM_ENUMS_TYPES_H__\n#define __MM_ENUMS_TYPES_H__\n" \
+		--fhead "#include <ModemManager-enums.h>\n#ifndef __MM_ENUMS_TYPES_H__\n#define __MM_ENUMS_TYPES_H__\n" \
 		--template $(top_srcdir)/build-aux/mm-enums-template.h \
 		--ftail "#endif /* __MM_ENUMS_TYPES_H__ */\n" \
 		$(top_srcdir)/include/ModemManager-enums.h > $@
 
 mm-enums-types.c: Makefile.am $(top_srcdir)/include/ModemManager-enums.h $(top_srcdir)/build-aux/mm-enums-template.c mm-enums-types.h
 	$(AM_V_GEN) glib-mkenums \
-		--fhead "#include <ModemManager-enums.h>\n#include \"mm-enums-types.h\"\n" \
+		--fhead "#include \"mm-enums-types.h\"\n" \
 		--template $(top_srcdir)/build-aux/mm-enums-template.c \
 		$(top_srcdir)/include/ModemManager-enums.h > $@
 
