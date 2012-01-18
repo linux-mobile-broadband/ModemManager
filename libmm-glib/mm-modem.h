@@ -202,12 +202,6 @@ MMSim *mm_modem_get_sim_sync   (MMModem *self,
                                 GCancellable *cancellable,
                                 GError **error);
 
-gchar *mm_modem_get_capabilities_string (MMModemCapability caps);
-gchar *mm_modem_get_access_technologies_string (MMModemAccessTechnology access_tech);
-gchar *mm_modem_get_modes_string (MMModemMode mode);
-gchar *mm_modem_get_bands_string (const MMModemBand *bands,
-                                  guint n_bands);
-
 G_END_DECLS
 
 #endif /* _MM_MODEM_H_ */
