@@ -155,6 +155,55 @@ status_snapshot_state_to_string (guint8 state)
     return "unknown";
 }
 
+static const char *
+cm_call_state_to_string (u_int32_t state)
+{
+    switch (state) {
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_CALL_STATE_IDLE:
+        return "idle";
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_CALL_STATE_ORIGINATING:
+        return "originating";
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_CALL_STATE_ALERTING:
+        return "alerting";
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_CALL_STATE_ORIGINATION_ALERTING:
+        return "originating alerting";
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_CALL_STATE_CONVERSATION:
+        return "conversation";
+    default:
+        break;
+    }
+    return "unknown";
+}
+
+static const char *
+cm_system_mode_to_string (u_int32_t mode)
+{
+    switch (mode) {
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_NO_SERVICE:
+        return "no service";
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_AMPS:
+        return "AMPS";
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_CDMA:
+        return "CDMA";
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_GSM:
+        return "GSM";
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_HDR:
+        return "HDR/EVDO";
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_WCDMA:
+        return "WCDMA";
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_GW:
+        return "GSM/WCDMA";
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_WLAN:
+        return "WLAN";
+    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_LTE:
+        return "LTE";
+    default:
+        break;
+    }
+
+    return "unknown";
+}
+
 /************************************************************/
 
 typedef struct {
@@ -966,7 +1015,7 @@ test_com_cm_subsys_state_info (void *f, void *data)
 
     n32 = 0;
     qcdm_result_get_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_CALL_STATE, &n32);
-    g_message ("%s: Call State: %u", __func__, n32);
+    g_message ("%s: Call State: %u (%s)", __func__, n32, cm_call_state_to_string (n32));
 
     n32 = 0;
     detail = NULL;
@@ -976,30 +1025,7 @@ test_com_cm_subsys_state_info (void *f, void *data)
     n32 = 0;
     detail = NULL;
     qcdm_result_get_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_SYSTEM_MODE, &n32);
-    switch (n32) {
-    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_NO_SERVICE:
-        detail = "no service";
-        break;
-    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_AMPS:
-        detail = "AMPS";
-        break;
-    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_CDMA:
-        detail = "CDMA";
-        break;
-    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_HDR:
-        detail = "HDR/EVDO";
-        break;
-    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_WCDMA:
-        detail = "WCDMA";
-        break;
-    case QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_LTE:
-        detail = "LTE";
-        break;
-    default:
-        detail = "unknown";
-        break;
-    }
-    g_message ("%s: System Mode: %u (%s)", __func__, n32, detail);
+    g_message ("%s: System Mode: %u (%s)", __func__, n32, cm_system_mode_to_string (n32));
 
     n32 = 0;
     qcdm_result_get_u32 (result, QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_MODE_PREF, &n32);
@@ -1563,6 +1589,169 @@ test_com_nw_subsys_modem_snapshot_cdma (void *f, void *data)
 
     qcdm_result_get_u8 (result, QCDM_CMD_NW_SUBSYS_MODEM_SNAPSHOT_CDMA_ITEM_HDR_REV, &num8);
     g_message ("%s: HDR Revision: %s", __func__, hdr_rev_to_string (num8));
+
+    qcdm_result_unref (result);
+}
+
+void
+test_com_wcdma_subsys_state_info (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    int err = QCDM_SUCCESS;
+    char buf[200];
+    gint len;
+    QcdmResult *result;
+    gsize reply_len;
+    guint8 num8 = 0;
+    const char *str;
+
+    len = qcdm_cmd_wcdma_subsys_state_info_new (buf, sizeof (buf));
+    g_assert (len == 7);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    g_print ("\n");
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_wcdma_subsys_state_info_result (buf, reply_len, &err);
+    if (!result) {
+        /* Obviously not all devices implement this command */
+        g_assert_cmpint (err, ==, -QCDM_ERROR_RESPONSE_BAD_COMMAND);
+        return;
+    }
+    g_assert (result);
+
+    str = NULL;
+    qcdm_result_get_string (result, QCDM_CMD_WCDMA_SUBSYS_STATE_INFO_ITEM_IMEI, &str);
+    g_message ("%s: IMEI: %s", __func__, str);
+
+    str = NULL;
+    qcdm_result_get_string (result, QCDM_CMD_WCDMA_SUBSYS_STATE_INFO_ITEM_IMSI, &str);
+    g_message ("%s: IMSI: %s", __func__, str);
+
+    str = "unknown";
+    qcdm_result_get_u8 (result, QCDM_CMD_WCDMA_SUBSYS_STATE_INFO_ITEM_L1_STATE, &num8);
+    switch (num8) {
+    case QCDM_WCDMA_L1_STATE_IDLE:
+        str = "Idle";
+        break;
+    case QCDM_WCDMA_L1_STATE_FS:
+        str = "FS";
+        break;
+    case QCDM_WCDMA_L1_STATE_ACQ:
+        str = "ACQ";
+        break;
+    case QCDM_WCDMA_L1_STATE_BCH:
+        str = "BCH";
+        break;
+    case QCDM_WCDMA_L1_STATE_PCH:
+        str = "PCH";
+        break;
+    case QCDM_WCDMA_L1_STATE_FACH:
+        str = "FACH";
+        break;
+    case QCDM_WCDMA_L1_STATE_DCH:
+        str = "DCH";
+        break;
+    case QCDM_WCDMA_L1_STATE_DEACTIVATED:
+        str = "Deactivated";
+        break;
+    case QCDM_WCDMA_L1_STATE_PCH_SLEEP:
+        str = "PCH Sleep";
+        break;
+    case QCDM_WCDMA_L1_STATE_DEEP_SLEEP:
+        str = "Deep Sleep";
+        break;
+    case QCDM_WCDMA_L1_STATE_STOPPED:
+        str = "Stopped";
+        break;
+    case QCDM_WCDMA_L1_STATE_SUSPENDED:
+        str = "Suspended";
+        break;
+    default:
+        break;
+    }
+    g_message ("%s: L1 state: %d (%s)", __func__, num8, str);
+
+    qcdm_result_unref (result);
+}
+
+void
+test_com_gsm_subsys_state_info (void *f, void *data)
+{
+    TestComData *d = data;
+    gboolean success;
+    int err = QCDM_SUCCESS;
+    char buf[200];
+    gint len;
+    QcdmResult *result;
+    gsize reply_len;
+    const char *str;
+    u_int32_t num;
+    u_int8_t u8;
+
+    len = qcdm_cmd_gsm_subsys_state_info_new (buf, sizeof (buf));
+    g_assert (len == 7);
+
+    /* Send the command */
+    success = send_command (d, buf, len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    g_print ("\n");
+
+    /* Parse the response into a result structure */
+    result = qcdm_cmd_gsm_subsys_state_info_result (buf, reply_len, &err);
+    if (!result) {
+        /* Obviously not all devices implement this command */
+        g_assert_cmpint (err, ==, -QCDM_ERROR_RESPONSE_BAD_COMMAND);
+        return;
+    }
+    g_assert (result);
+
+    str = NULL;
+    qcdm_result_get_string (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_IMEI, &str);
+    g_message ("%s: IMEI: %s", __func__, str);
+
+    str = NULL;
+    qcdm_result_get_string (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_IMSI, &str);
+    g_message ("%s: IMSI: %s", __func__, str);
+
+    num = 0;
+    qcdm_result_get_u32 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_LAI_MCC, &num);
+    g_message ("%s: MCC: %d", __func__, num);
+
+    num = 0;
+    qcdm_result_get_u32 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_LAI_MNC, &num);
+    g_message ("%s: MNC: %d", __func__, num);
+
+    num = 0;
+    qcdm_result_get_u32 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_LAI_LAC, &num);
+    g_message ("%s: LAC: 0x%04X", __func__, num);
+
+    num = 0;
+    qcdm_result_get_u32 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CELLID, &num);
+    g_message ("%s: Cell ID: 0x%04X", __func__, num);
+
+    u8 = 0;
+    qcdm_result_get_u8 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CM_CALL_STATE, &u8);
+    g_message ("%s: CM Call State: %d (%s)", __func__, u8, cm_call_state_to_string (u8));
+
+    u8 = 0;
+    qcdm_result_get_u8 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CM_OP_MODE, &u8);
+    g_message ("%s: CM Opmode: %d (%s)", __func__, u8, operating_mode_to_string (u8));
+
+    u8 = 0;
+    qcdm_result_get_u8 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CM_SYS_MODE, &u8);
+    g_message ("%s: CM Sysmode: %d (%s)", __func__, u8, cm_system_mode_to_string (u8));
 
     qcdm_result_unref (result);
 }
