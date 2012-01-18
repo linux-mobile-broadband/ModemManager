@@ -14,7 +14,7 @@ G_BEGIN_DECLS
 GQuark @enum_name@_quark    (void); /* implemented in mm-errors-quarks.c */
 GType  @enum_name@_get_type (void) G_GNUC_CONST;
 #define @ENUMNAME@ (@enum_name@_quark ())
-#define @ENUMPREFIX@TYPE_@ENUMSHORT@ (@enum_name@_get_type ())
+#define @ENUMPREFIX@_TYPE_@ENUMSHORT@ (@enum_name@_get_type ())
 /*** END value-header ***/
 
 /*** BEGIN file-tail ***/
