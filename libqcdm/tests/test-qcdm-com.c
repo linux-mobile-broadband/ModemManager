@@ -495,8 +495,12 @@ test_com_mdn (void *f, void *data)
     /* Parse the response into a result structure */
     result = qcdm_cmd_nv_get_mdn_result (buf, reply_len, &err);
     if (!result) {
-        g_assert_cmpint (err, ==, -QCDM_ERROR_NVCMD_FAILED);
-        return;
+        if (   err == -QCDM_ERROR_NVCMD_FAILED
+            || err == -QCDM_ERROR_RESPONSE_BAD_PARAMETER
+            || err == -QCDM_ERROR_NV_ERROR_INACTIVE
+            || err == -QCDM_ERROR_NV_ERROR_BAD_PARAMETER)
+            return;
+        g_assert_cmpint (err, ==, QCDM_SUCCESS);
     }
 
     g_print ("\n");
@@ -534,8 +538,12 @@ test_com_read_roam_pref (void *f, void *data)
     /* Parse the response into a result structure */
     result = qcdm_cmd_nv_get_roam_pref_result (buf, reply_len, &err);
     if (!result) {
-        g_assert_cmpint (err, ==, -QCDM_ERROR_NVCMD_FAILED);
-        return;
+        if (   err == -QCDM_ERROR_NVCMD_FAILED
+            || err == -QCDM_ERROR_RESPONSE_BAD_PARAMETER
+            || err == -QCDM_ERROR_NV_ERROR_INACTIVE
+            || err == -QCDM_ERROR_NV_ERROR_BAD_PARAMETER)
+            return;
+        g_assert_cmpint (err, ==, QCDM_SUCCESS);
     }
     g_assert (result);
 
@@ -590,7 +598,8 @@ test_com_read_mode_pref (void *f, void *data)
     if (!result) {
         if (   err == -QCDM_ERROR_NVCMD_FAILED
             || err == -QCDM_ERROR_RESPONSE_BAD_PARAMETER
-            || err == -QCDM_ERROR_NV_ERROR_INACTIVE)
+            || err == -QCDM_ERROR_NV_ERROR_INACTIVE
+            || err == -QCDM_ERROR_NV_ERROR_BAD_PARAMETER)
             return;
         g_assert_cmpint (err, ==, QCDM_SUCCESS);
     }
@@ -718,6 +727,11 @@ test_com_status (void *f, void *data)
 
     /* Parse the response into a result structure */
     result = qcdm_cmd_cdma_status_result (buf, reply_len, &err);
+    if (!result) {
+        /* WCDMA/GSM devices don't implement this command */
+        g_assert_cmpint (err, ==, -QCDM_ERROR_RESPONSE_BAD_COMMAND);
+        return;
+    }
     g_assert (result);
 
     g_print ("\n");
@@ -878,6 +892,11 @@ test_com_status_snapshot (void *f, void *data)
 
     /* Parse the response into a result structure */
     result = qcdm_cmd_status_snapshot_result (buf, reply_len, &err);
+    if (!result) {
+        /* WCDMA/GSM devices don't implement this command */
+        g_assert_cmpint (err, ==, -QCDM_ERROR_RESPONSE_BAD_COMMAND);
+        return;
+    }
     g_assert (result);
 
     g_print ("\n");
@@ -929,6 +948,11 @@ test_com_pilot_sets (void *f, void *data)
 
     /* Parse the response into a result structure */
     result = qcdm_cmd_pilot_sets_result (buf, reply_len, &err);
+    if (!result) {
+        /* WCDMA/GSM devices don't implement this command */
+        g_assert_cmpint (err, ==, -QCDM_ERROR_RESPONSE_BAD_COMMAND);
+        return;
+    }
     g_assert (result);
 
     num = 0;
