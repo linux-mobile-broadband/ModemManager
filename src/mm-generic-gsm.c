@@ -4656,16 +4656,14 @@ sms_send (MMModemGsmSms *modem,
 
     if (priv->sms_pdu_mode) {
         guint8 *pdu;
-        guint pdulen = 0;
-        guint smsclen = 0;
+        guint pdulen = 0, msgstart = 0;
         char *hex;
 
-        pdu = sms_create_submit_pdu (number, text, smsc, validity, class, &pdulen, &info->error);
+        pdu = sms_create_submit_pdu (number, text, smsc, validity, class, &pdulen, &msgstart, &info->error);
         if (!pdu) {
             mm_callback_info_schedule (info);
             return;
         }
-        smsclen = pdu[0];
 
         hex = utils_bin2hexstr (pdu, pdulen);
         g_free (pdu);
@@ -4679,7 +4677,7 @@ sms_send (MMModemGsmSms *modem,
         }
 
         /* CMGS length is the size of the PDU without SMSC information */
-        command = g_strdup_printf ("+CMGS=%d\r%s\x1a", pdulen - smsclen, hex);
+        command = g_strdup_printf ("+CMGS=%d\r%s\x1a", pdulen - msgstart, hex);
         g_free (hex);
     } else
         command = g_strdup_printf ("+CMGS=\"%s\"\r%s\x1a", number, text);

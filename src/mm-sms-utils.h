@@ -28,6 +28,7 @@ guint8 *sms_create_submit_pdu (const char *number,
                                guint validity,
                                guint class,
                                guint *out_pdulen,
+                               guint *out_msgstart,
                                GError **error);
 
 /* For testcases only */
