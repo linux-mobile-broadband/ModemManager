@@ -343,6 +343,14 @@ enum {
     QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_LTE = 9,
 };
 
+enum {
+    QCDM_CMD_CM_SUBSYS_STATE_INFO_CALL_STATE_IDLE = 0,
+    QCDM_CMD_CM_SUBSYS_STATE_INFO_CALL_STATE_ORIGINATING = 1,
+    QCDM_CMD_CM_SUBSYS_STATE_INFO_CALL_STATE_ALERTING = 3,
+    QCDM_CMD_CM_SUBSYS_STATE_INFO_CALL_STATE_ORIGINATION_ALERTING = 4,
+    QCDM_CMD_CM_SUBSYS_STATE_INFO_CALL_STATE_CONVERSATION = 5,
+};
+
 /* Values for QCDM_CMD_CM_SUBSYS_STATE_INFO_ITEM_ROAM_PREF */
 enum {
     QCDM_CMD_CM_SUBSYS_STATE_INFO_ROAM_PREF_HOME_ONLY = 0x01,
@@ -564,6 +572,67 @@ size_t      qcdm_cmd_nw_subsys_modem_snapshot_cdma_new    (char *buf,
 QcdmResult *qcdm_cmd_nw_subsys_modem_snapshot_cdma_result (const char *buf,
                                                            size_t len,
                                                            int *out_error);
+
+/**********************************************************************/
+
+#define QCDM_CMD_WCDMA_SUBSYS_STATE_INFO_ITEM_IMEI     "imei"
+
+#define QCDM_CMD_WCDMA_SUBSYS_STATE_INFO_ITEM_IMSI     "imsi"
+
+/* Values for QCDM_CMD_WCDMA_SUBSYS_STATE_INFO_ITEM_L1_STATE */
+
+enum {
+    QCDM_WCDMA_L1_STATE_IDLE = 0,
+    QCDM_WCDMA_L1_STATE_FS = 1,
+    QCDM_WCDMA_L1_STATE_ACQ = 2,
+    QCDM_WCDMA_L1_STATE_BCH = 3,
+    QCDM_WCDMA_L1_STATE_PCH = 4,
+    QCDM_WCDMA_L1_STATE_FACH = 5,
+    QCDM_WCDMA_L1_STATE_DCH = 6,
+    QCDM_WCDMA_L1_STATE_DEACTIVATED = 7,
+    QCDM_WCDMA_L1_STATE_PCH_SLEEP = 8,
+    QCDM_WCDMA_L1_STATE_DEEP_SLEEP = 9,
+    QCDM_WCDMA_L1_STATE_STOPPED = 10,
+    QCDM_WCDMA_L1_STATE_SUSPENDED = 11,
+};
+
+/* One of QCDM_WCDMA_L1_STATE_* */
+#define QCDM_CMD_WCDMA_SUBSYS_STATE_INFO_ITEM_L1_STATE "l1-state"
+
+size_t      qcdm_cmd_wcdma_subsys_state_info_new    (char *buf, size_t len);
+
+QcdmResult *qcdm_cmd_wcdma_subsys_state_info_result (const char *buf,
+                                                     size_t len,
+                                                     int *out_error);
+
+/**********************************************************************/
+
+#define QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_IMEI     "imei"
+
+#define QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_IMSI     "imsi"
+
+#define QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_LAI_MCC  "lai-mcc"
+
+#define QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_LAI_MNC  "lai-mnc"
+
+#define QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_LAI_LAC  "lai-lac"
+
+#define QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CELLID   "cellid"
+
+/* One of QCDM_CMD_CM_SUBSYS_STATE_INFO_CALL_STATE_* */
+#define QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CM_CALL_STATE  "cm-call-state"
+
+/* One of QCDM_CMD_CM_SUBSYS_STATE_INFO_OPERATING_MODE_* */
+#define QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CM_OP_MODE     "cm-op-mode"
+
+/* One of QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_* */
+#define QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CM_SYS_MODE    "cm-sys-mode"
+
+size_t      qcdm_cmd_gsm_subsys_state_info_new    (char *buf, size_t len);
+
+QcdmResult *qcdm_cmd_gsm_subsys_state_info_result (const char *buf,
+                                                   size_t len,
+                                                   int *out_error);
 
 /**********************************************************************/
 

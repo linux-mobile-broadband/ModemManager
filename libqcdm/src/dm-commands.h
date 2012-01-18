@@ -136,11 +136,24 @@ enum {
     DIAG_SUBSYS_NW_CONTROL_6800 = 250 /* for Novatel Wireless MSM6800-based devices */
 };
 
+/* WCDMA subsystem command codes */
+enum {
+    DIAG_SUBSYS_WCDMA_CALL_START  = 12, /* Starts a call */
+    DIAG_SUBSYS_WCDMA_CALL_END    = 13, /* Ends an ongoing call */
+    DIAG_SUBSYS_WCDMA_STATE_INFO  = 15, /* Gets WCDMA state */
+};
+
 /* HDR subsystem command codes */
 enum {
     DIAG_SUBSYS_HDR_STATE_INFO  = 8, /* Gets EVDO state */
 };
 
+/* GSM subsystem command codes */
+enum {
+    DIAG_SUBSYS_GSM_STATE_INFO  = 1, /* Gets GSM state */
+};
+
+/* CM subsystem command codes */
 enum {
     DIAG_SUBSYS_CM_STATE_INFO = 0, /* Gets Call Manager state */
 };
@@ -504,6 +517,37 @@ struct DMCmdLogConfigRsp {
     } u;
 } __attribute__ ((packed));
 typedef struct DMCmdLogConfigRsp DMCmdLogConfigRsp;
+
+/* DIAG_SUBSYS_WCDMA_CALL_START command */
+struct DMCmdSubsysWcdmaCallStart {
+    DMCmdSubsysHeader hdr;
+    u_int8_t number_len;
+    u_int8_t number_digits[32];
+    u_int8_t amr_rate;  /* default to 7 */
+} __attribute__ ((packed));
+typedef struct DMCmdSubsysWcdmaCallStart DMCmdSubsysWcdmaCallStart;
+
+/* DIAG_SUBSYS_WCDMA_STATE_INFO response */
+struct DMCmdSubsysWcdmaStateInfoRsp {
+    DMCmdSubsysHeader hdr;
+    u_int8_t imei[9];
+    u_int8_t imsi[9];
+    u_int8_t l1_state;
+} __attribute__ ((packed));
+typedef struct DMCmdSubsysWcdmaStateInfoRsp DMCmdSubsysWcdmaStateInfoRsp;
+
+/* DIAG_SUBSYS_GSM_STATE_INFO response */
+struct DMCmdSubsysGsmStateInfoRsp {
+    DMCmdSubsysHeader hdr;
+    u_int8_t imei[9];
+    u_int8_t imsi[9];
+    u_int8_t lai[5];
+    u_int16_t cellid;
+    u_int8_t cm_call_state;
+    u_int8_t cm_opmode;
+    u_int8_t cm_sysmode;
+} __attribute__ ((packed));
+typedef struct DMCmdSubsysGsmStateInfoRsp DMCmdSubsysGsmStateInfoRsp;
 
 #endif  /* LIBQCDM_DM_COMMANDS_H */
 

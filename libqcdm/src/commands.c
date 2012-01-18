@@ -1616,3 +1616,152 @@ qcmd_cmd_log_config_mask_result_code_set (QcdmResult *result,
 
 /**********************************************************************/
 
+static char bcd_chars[] = "0123456789\0\0\0\0\0\0";
+
+static qcdmbool
+imxi_to_bcd_string (u_int8_t bytes[9], char *buf, size_t buflen)
+{
+    char *p;
+    u_int32_t i;
+
+    if (bytes[0] == 0)
+        return TRUE;
+
+    qcdm_return_val_if_fail (bytes[0] == 0x08, FALSE);
+    qcdm_return_val_if_fail (buf != NULL, FALSE);
+    qcdm_return_val_if_fail (buflen > bytes[0], FALSE);
+
+    p = buf;
+    for (i = 0 ; i < bytes[0]; i++) {
+        /* IMxI are 15 chars long, so the lower 4-bits of the first
+         * byte of the IMxI is skipped.  Not sure what it does.
+         */
+        if (i > 0) {
+            *p = bcd_chars[bytes[i + 1] & 0xf];
+            if (!*p)
+                return FALSE;
+            p++;
+        }
+        *p = bcd_chars[(bytes[i + 1] >> 4) & 0xf];
+        if (!*p)
+            return FALSE;
+        p++;
+    }
+    *p++ = '\0';
+    return TRUE;
+}
+
+size_t
+qcdm_cmd_wcdma_subsys_state_info_new (char *buf, size_t len)
+{
+    char cmdbuf[sizeof (DMCmdSubsysHeader) + 2];
+    DMCmdSubsysHeader *cmd = (DMCmdSubsysHeader *) &cmdbuf[0];
+
+    qcdm_return_val_if_fail (buf != NULL, 0);
+    qcdm_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->code = DIAG_CMD_SUBSYS;
+    cmd->subsys_id = DIAG_SUBSYS_WCDMA;
+    cmd->subsys_cmd = htole16 (DIAG_SUBSYS_WCDMA_STATE_INFO);
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QcdmResult *
+qcdm_cmd_wcdma_subsys_state_info_result (const char *buf, size_t len, int *out_error)
+{
+    QcdmResult *result = NULL;
+    DMCmdSubsysWcdmaStateInfoRsp *rsp = (DMCmdSubsysWcdmaStateInfoRsp *) buf;
+    char imxi[10];
+
+    qcdm_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_SUBSYS, sizeof (DMCmdSubsysWcdmaStateInfoRsp), out_error))
+        return NULL;
+
+    result = qcdm_result_new ();
+
+    qcdm_result_add_u8 (result, QCDM_CMD_WCDMA_SUBSYS_STATE_INFO_ITEM_L1_STATE, rsp->l1_state);
+
+    memset (imxi, 0, sizeof (imxi));
+    if (imxi_to_bcd_string (rsp->imei, imxi, sizeof (imxi)))
+        qcdm_result_add_string (result, QCDM_CMD_WCDMA_SUBSYS_STATE_INFO_ITEM_IMEI, imxi);
+
+    memset (imxi, 0, sizeof (imxi));
+    if (imxi_to_bcd_string (rsp->imsi, imxi, sizeof (imxi)))
+        qcdm_result_add_string (result, QCDM_CMD_WCDMA_SUBSYS_STATE_INFO_ITEM_IMSI, imxi);
+
+    return result;
+}
+
+/**********************************************************************/
+
+size_t
+qcdm_cmd_gsm_subsys_state_info_new (char *buf, size_t len)
+{
+    char cmdbuf[sizeof (DMCmdSubsysHeader) + 2];
+    DMCmdSubsysHeader *cmd = (DMCmdSubsysHeader *) &cmdbuf[0];
+
+    qcdm_return_val_if_fail (buf != NULL, 0);
+    qcdm_return_val_if_fail (len >= sizeof (*cmd) + DIAG_TRAILER_LEN, 0);
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->code = DIAG_CMD_SUBSYS;
+    cmd->subsys_id = DIAG_SUBSYS_GSM;
+    cmd->subsys_cmd = htole16 (DIAG_SUBSYS_GSM_STATE_INFO);
+
+    return dm_encapsulate_buffer (cmdbuf, sizeof (*cmd), sizeof (cmdbuf), buf, len);
+}
+
+QcdmResult *
+qcdm_cmd_gsm_subsys_state_info_result (const char *buf, size_t len, int *out_error)
+{
+    QcdmResult *result = NULL;
+    DMCmdSubsysGsmStateInfoRsp *rsp = (DMCmdSubsysGsmStateInfoRsp *) buf;
+    char imxi[10];
+    u_int32_t mcc = 0, mnc = 0;
+    u_int8_t mnc3;
+
+    qcdm_return_val_if_fail (buf != NULL, NULL);
+
+    if (!check_command (buf, len, DIAG_CMD_SUBSYS, sizeof (DMCmdSubsysGsmStateInfoRsp), out_error))
+        return NULL;
+
+    result = qcdm_result_new ();
+
+    memset (imxi, 0, sizeof (imxi));
+    if (imxi_to_bcd_string (rsp->imei, imxi, sizeof (imxi)))
+        qcdm_result_add_string (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_IMEI, imxi);
+
+    memset (imxi, 0, sizeof (imxi));
+    if (imxi_to_bcd_string (rsp->imsi, imxi, sizeof (imxi)))
+        qcdm_result_add_string (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_IMSI, imxi);
+
+    /* Quick convert BCD LAI into MCC/MNC/LAC */
+    mcc = (rsp->lai[0] & 0xF) * 100;
+    mcc += ((rsp->lai[0] >> 4) & 0xF) * 10;
+    mcc += rsp->lai[1] & 0xF;
+    qcdm_result_add_u32 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_LAI_MCC, mcc);
+
+    mnc = (rsp->lai[2] & 0XF) * 100;
+    mnc += ((rsp->lai[2] >> 4) & 0xF) * 10;
+    mnc3 = (rsp->lai[1] >> 4) & 0xF;
+    if (mnc3 != 0xF)
+        mnc += mnc3;
+    qcdm_result_add_u32 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_LAI_MNC, mnc);
+
+    qcdm_result_add_u32 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_LAI_LAC,
+                         le16toh (*(u_int16_t *)(&rsp->lai[3])));
+
+    qcdm_result_add_u32 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CELLID, le16toh (rsp->cellid));
+
+    qcdm_result_add_u8 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CM_CALL_STATE, rsp->cm_call_state);
+    qcdm_result_add_u8 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CM_OP_MODE, rsp->cm_opmode);
+    qcdm_result_add_u8 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CM_SYS_MODE, rsp->cm_sysmode);
+
+    return result;
+}
+
+/**********************************************************************/
+
