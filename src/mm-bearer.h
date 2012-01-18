@@ -88,6 +88,7 @@ struct _MMBearerClass {
 
 GType mm_bearer_get_type (void);
 
+void         mm_bearer_export   (MMBearer *self);
 const gchar *mm_bearer_get_path (MMBearer *bearer);
 
 void mm_bearer_expose_properties (MMBearer *bearer,

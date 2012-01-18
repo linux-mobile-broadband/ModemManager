@@ -70,6 +70,21 @@ struct _MMBearerPrivate {
 };
 
 /*****************************************************************************/
+
+void
+mm_bearer_export (MMBearer *self)
+{
+    static guint id = 0;
+    gchar *path;
+
+    path = g_strdup_printf (MM_DBUS_BEARER_PREFIX "/%d", id++);
+    g_object_set (self,
+                  MM_BEARER_PATH, path,
+                  NULL);
+    g_free (path);
+}
+
+/*****************************************************************************/
 /* CONNECT */
 
 gboolean
@@ -404,7 +419,7 @@ mm_bearer_disconnect (MMBearer *self,
 /*****************************************************************************/
 
 static void
-mm_bearer_export (MMBearer *self)
+mm_bearer_dbus_export (MMBearer *self)
 {
     GError *error = NULL;
 
@@ -430,7 +445,7 @@ mm_bearer_export (MMBearer *self)
 }
 
 static void
-mm_bearer_unexport (MMBearer *self)
+mm_bearer_dbus_unexport (MMBearer *self)
 {
     const gchar *path;
 
@@ -557,7 +572,7 @@ set_property (GObject *object,
         /* Export when we get a DBus connection AND we have a path */
         if (self->priv->path &&
             self->priv->connection)
-            mm_bearer_export (self);
+            mm_bearer_dbus_export (self);
         break;
     case PROP_CONNECTION:
         g_clear_object (&self->priv->connection);
@@ -565,9 +580,9 @@ set_property (GObject *object,
 
         /* Export when we get a DBus connection AND we have a path */
         if (!self->priv->connection)
-            mm_bearer_unexport (self);
+            mm_bearer_dbus_unexport (self);
         else if (self->priv->path)
-            mm_bearer_export (self);
+            mm_bearer_dbus_export (self);
         break;
     case PROP_MODEM:
         g_clear_object (&self->priv->modem);
@@ -663,7 +678,7 @@ dispose (GObject *object)
     MMBearer *self = MM_BEARER (object);
 
     if (self->priv->connection) {
-        mm_bearer_unexport (self);
+        mm_bearer_dbus_unexport (self);
         g_clear_object (&self->priv->connection);
     }
 
