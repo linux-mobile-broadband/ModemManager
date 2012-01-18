@@ -28,6 +28,10 @@ libmm_glib_la_SOURCES = \
 	mm-modem-simple-status-properties.c \
 	mm-modem-simple.h \
 	mm-modem-simple.c \
+	mm-modem-location-3gpp.h \
+	mm-modem-location-3gpp.c \
+	mm-modem-location.h \
+	mm-modem-location.c \
 	mm-sim.h \
 	mm-sim.c \
 	mm-bearer-properties.h \
