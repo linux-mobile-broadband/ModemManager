@@ -672,37 +672,33 @@ gsm_pack (const guint8 *src,
           guint8 start_offset,
           guint32 *out_packed_len)
 {
-    GByteArray *packed;
-    guint8 c, add_last = 0;
-    int i;
+    guint8 *packed;
+    guint octet = 0, lshift, plen;
+    int i = 0;
 
-    packed = g_byte_array_sized_new (src_len);
+    g_return_val_if_fail (start_offset < 8, NULL);
 
-    for (i = 0, c = 0; i < src_len; i++) {
-        guint8 bits_here, offset;
-        guint32 start_bit;
+    plen = (src_len * 7) + start_offset; /* total length in bits */
+    if (plen % 8)
+        plen += 8;
+    plen /= 8;  /* now in bytes */
 
-        start_bit = start_offset + (i * 7); /* Overall bit offset of char in buffer */
-        offset = start_bit % 8; /* Offset to start of char in this byte */
-        bits_here = offset ? (8 - offset) : 7;
+    packed = g_malloc0 (plen);
 
-        c |= (src[i] & 0x7F) << offset;
-        if (offset) {
-            /* Add this packed byte */
-            g_byte_array_append (packed, &c, 1);
-            c = add_last = 0;
+    for (i = 0, lshift = start_offset; i < src_len; i++) {
+        packed[octet] |= (src[i] & 0x7F) << lshift;
+        if (lshift > 1) {
+            /* Grab the lost bits and add to next octet */
+            g_assert (octet + 1 < plen);
+            packed[octet + 1] = (src[i] & 0x7F) >> (8 - lshift);
         }
-
-        /* Pack the rest of this char into the next byte */
-        if (bits_here != 7) {
-            c = (src[i] & 0x7F) >> bits_here;
-            add_last = 1;
-        }
+        if (lshift)
+            octet++;
+        lshift = lshift ? lshift - 1 : 7;
     }
-    if (add_last)
-        g_byte_array_append (packed, &c, 1);
 
-    *out_packed_len = packed->len;
-    return g_byte_array_free (packed, FALSE);
+    if (out_packed_len)
+        *out_packed_len = plen;
+    return packed;
 }
 
