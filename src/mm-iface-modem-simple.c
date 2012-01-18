@@ -18,7 +18,6 @@
 #include <ModemManager.h>
 #include <libmm-common.h>
 
-#include "mm-common-simple-properties.h"
 #include "mm-bearer-list.h"
 #include "mm-sim.h"
 #include "mm-error-helpers.h"

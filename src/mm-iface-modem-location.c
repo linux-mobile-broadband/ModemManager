@@ -18,7 +18,6 @@
 
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-location.h"
-#include "mm-common-location-3gpp.h"
 #include "mm-log.h"
 
 #define LOCATION_CONTEXT_TAG "location-context-tag"
