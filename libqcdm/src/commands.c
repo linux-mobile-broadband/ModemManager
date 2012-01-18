@@ -456,7 +456,7 @@ qcdm_cmd_sw_version_result (const char *buf, size_t len, int *out_error)
 {
     QcdmResult *result = NULL;
     DMCmdSwVersionRsp *rsp = (DMCmdSwVersionRsp *) buf;
-    char tmp[25];
+    char tmp[32];
 
     qcdm_return_val_if_fail (buf != NULL, NULL);
 
