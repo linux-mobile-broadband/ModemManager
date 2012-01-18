@@ -833,6 +833,7 @@ test_com_sw_version (void *f, void *data)
     gint len;
     QcdmResult *result;
     gsize reply_len;
+    const char *str;
 
     len = qcdm_cmd_sw_version_new (buf, sizeof (buf));
     g_assert (len == 4);
@@ -846,12 +847,11 @@ test_com_sw_version (void *f, void *data)
 
     /* Parse the response into a result structure */
     result = qcdm_cmd_sw_version_result (buf, reply_len, &err);
+    if (!result) {
+        g_assert_cmpint (err, ==, -QCDM_ERROR_RESPONSE_BAD_COMMAND);
+        return;
+    }
 
-    /* Recent devices don't appear to implement this command */
-    g_assert (result == NULL);
-    g_assert_cmpint (err, ==, -QCDM_ERROR_RESPONSE_BAD_COMMAND);
-
-/*
     str = NULL;
     qcdm_result_get_string (result, QCDM_CMD_SW_VERSION_ITEM_VERSION, &str);
     g_message ("%s: SW Version: %s", __func__, str);
@@ -865,7 +865,6 @@ test_com_sw_version (void *f, void *data)
     g_message ("%s: Compiled Time: %s", __func__, str);
 
     qcdm_result_unref (result);
-*/
 }
 
 void

@@ -311,9 +311,11 @@ typedef struct DMCmdStatusRsp DMCmdStatusRsp;
 /* DIAG_CMD_SW_VERSION */
 struct DMCmdSwVersionRsp {
     u_int8_t code;
-    char version[20];
+    char version[31];
     char comp_date[11];
+    u_int8_t _unknown1[2];
     char comp_time[8];
+    u_int8_t _unknown2[2];
 } __attribute__ ((packed));
 typedef struct DMCmdSwVersionRsp DMCmdSwVersionRsp;
 
