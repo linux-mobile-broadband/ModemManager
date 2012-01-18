@@ -717,20 +717,10 @@ update_registration_state (MMIfaceModem3gpp *self,
                   NULL);
 
     if (new_state != old_state) {
-        GEnumClass *enum_class;
-        GEnumValue *new_value;
-        GEnumValue *old_value;
-        const gchar *dbus_path;
-
-        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_3GPP_REGISTRATION_STATE));
-        new_value = g_enum_get_value (enum_class, new_state);
-        old_value = g_enum_get_value (enum_class, old_state);
-        dbus_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (self));
         mm_info ("Modem %s: 3GPP Registration state changed (%s -> %s)",
-                 dbus_path,
-                 old_value->value_nick,
-                 new_value->value_nick);
-        g_type_class_unref (enum_class);
+                 g_dbus_object_get_object_path (G_DBUS_OBJECT (self)),
+                 mm_modem_3gpp_registration_state_get_string (old_state),
+                 mm_modem_3gpp_registration_state_get_string (new_state));
 
         /* The property in the interface is bound to the property
          * in the skeleton, so just updating here is enough */

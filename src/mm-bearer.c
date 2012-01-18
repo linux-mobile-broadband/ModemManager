@@ -166,12 +166,6 @@ mm_bearer_connect (MMBearer *self,
 
     /* Bearer may not be allowed to connect yet */
     if (self->priv->connection_forbidden_reason != MM_BEARER_CONNECTION_FORBIDDEN_REASON_NONE) {
-        GEnumClass *enum_class;
-        GEnumValue *value;
-
-        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_BEARER_CONNECTION_FORBIDDEN_REASON));
-        value = g_enum_get_value (enum_class, self->priv->connection_forbidden_reason);
-
         g_simple_async_report_error_in_idle (
             G_OBJECT (self),
             callback,
@@ -179,9 +173,8 @@ mm_bearer_connect (MMBearer *self,
             MM_CORE_ERROR,
             MM_CORE_ERROR_UNAUTHORIZED,
             "Not allowed to connect bearer: %s",
-            value->value_nick);
-
-        g_type_class_unref (enum_class);
+            mm_bearer_connection_forbidden_reason_get_string (
+                self->priv->connection_forbidden_reason));
         return;
     }
 
@@ -503,18 +496,13 @@ void
 mm_bearer_set_connection_forbidden (MMBearer *self,
                                     MMBearerConnectionForbiddenReason reason)
 {
-    GEnumClass *enum_class;
-    GEnumValue *value;
-
     g_assert (reason != MM_BEARER_CONNECTION_FORBIDDEN_REASON_NONE);
 
     self->priv->connection_forbidden_reason = reason;
-    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_BEARER_CONNECTION_FORBIDDEN_REASON));
-    value = g_enum_get_value (enum_class, self->priv->connection_forbidden_reason);
     mm_dbg ("Connection in bearer '%s' is forbidden: '%s'",
             self->priv->path,
-            value->value_nick);
-    g_type_class_unref (enum_class);
+            mm_bearer_connection_forbidden_reason_get_string (
+                self->priv->connection_forbidden_reason));
 
     if (self->priv->status == MM_BEARER_STATUS_DISCONNECTING ||
         self->priv->status == MM_BEARER_STATUS_DISCONNECTED) {

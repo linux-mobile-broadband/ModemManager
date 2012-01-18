@@ -199,24 +199,14 @@ error_for_unlock_check (MMModemLock lock)
         MM_MOBILE_EQUIPMENT_ERROR_NETWORK_SUBSET_PIN, /* MM_MODEM_LOCK_PH_NETSUB_PIN */
         MM_MOBILE_EQUIPMENT_ERROR_NETWORK_SUBSET_PUK, /* MM_MODEM_LOCK_PH_NETSUB_PUK */
     };
-	GEnumClass *enum_class;
-    GEnumValue *enum_value;
-    GError *error;
 
     g_assert (lock >= MM_MODEM_LOCK_UNKNOWN);
     g_assert (lock <= MM_MODEM_LOCK_PH_NETSUB_PUK);
 
-    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_LOCK));
-    enum_value = g_enum_get_value (enum_class, lock);
-    error =  g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
-                          errors_for_locks[lock],
-                          "Device is locked: '%s'",
-                          enum_value->value_nick);
-
-    mm_warn ("ERROR: %s", error->message);
-
-    g_type_class_unref (enum_class);
-    return error;
+    return g_error_new (MM_MOBILE_EQUIPMENT_ERROR,
+                        errors_for_locks[lock],
+                        "Device is locked: '%s'",
+                        mm_modem_lock_get_string (lock));
 }
 
 gboolean

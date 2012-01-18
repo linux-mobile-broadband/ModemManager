@@ -683,18 +683,12 @@ unlock_check_ready (MMIfaceModem *self,
     /* During simple connect we are only allowed to use SIM PIN */
     if (lock != MM_MODEM_LOCK_SIM_PIN ||
         !mm_common_connect_properties_get_pin (ctx->properties)) {
-        GEnumClass *enum_class;
-        GEnumValue *value;
-
-        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_LOCK));
-        value = g_enum_get_value (enum_class, lock);
         g_dbus_method_invocation_return_error (
             ctx->invocation,
             MM_CORE_ERROR,
             MM_CORE_ERROR_UNAUTHORIZED,
             "Modem is locked with '%s' code; cannot unlock it",
-            value->value_nick);
-        g_type_class_unref (enum_class);
+            mm_modem_lock_get_string (lock));
         connection_context_free (ctx);
         return;
     }

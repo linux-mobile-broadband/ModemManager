@@ -619,9 +619,6 @@ crm_range_ready (MMBaseModem *modem,
         if (mm_cdma_parse_crm_range_response (response,
                                               &min, &max,
                                               &error)) {
-            GEnumClass *enum_class;
-            GEnumValue *value;
-
             /* Check if value within the range */
             if (ctx->self->priv->rm_protocol >= min &&
                 ctx->self->priv->rm_protocol <= max) {
@@ -630,14 +627,12 @@ crm_range_ready (MMBaseModem *modem,
                 interface_initialization_step (ctx);
             }
 
-            enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_CDMA_RM_PROTOCOL));
-            value = g_enum_get_value (enum_class, ctx->self->priv->rm_protocol);
             g_assert (error == NULL);
             error = g_error_new (MM_CORE_ERROR,
                                  MM_CORE_ERROR_FAILED,
                                  "Requested RM protocol '%s' is not supported",
-                                 value->value_nick);
-            g_type_class_unref (enum_class);
+                                 mm_modem_cdma_rm_protocol_get_string (
+                                     ctx->self->priv->rm_protocol));
         }
 
         /* Failed, set as fatal as well */

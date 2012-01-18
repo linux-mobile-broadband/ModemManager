@@ -370,16 +370,14 @@ mm_iface_modem_update_access_tech (MMIfaceModem *self,
     if (built_access_tech != old_access_tech) {
         gchar *old_access_tech_string;
         gchar *new_access_tech_string;
-        const gchar *dbus_path;
 
         mm_gdbus_modem_set_access_technologies (skeleton, built_access_tech);
 
         /* Log */
-        old_access_tech_string = mm_common_get_access_technologies_string (old_access_tech);
-        new_access_tech_string = mm_common_get_access_technologies_string (built_access_tech);
-        dbus_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (self));
+        old_access_tech_string = mm_modem_access_technology_build_string_from_mask (old_access_tech);
+        new_access_tech_string = mm_modem_access_technology_build_string_from_mask (built_access_tech);
         mm_info ("Modem %s: access technology changed (%s -> %s)",
-                 dbus_path,
+                 g_dbus_object_get_object_path (G_DBUS_OBJECT (self)),
                  old_access_tech_string,
                  new_access_tech_string);
         g_free (old_access_tech_string);
@@ -683,25 +681,14 @@ mm_iface_modem_update_state (MMIfaceModem *self,
 
     /* Update state only if different */
     if (new_state != old_state) {
-        GEnumClass *enum_class;
-        GEnumValue *new_value;
-        GEnumValue *old_value;
         const gchar *dbus_path;
 
-        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_STATE));
-        new_value = g_enum_get_value (enum_class, new_state);
-        old_value = g_enum_get_value (enum_class, old_state);
         dbus_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (self));
-        if (dbus_path)
-            mm_info ("Modem %s: state changed (%s -> %s)",
-                     dbus_path,
-                     old_value->value_nick,
-                     new_value->value_nick);
-        else
-            mm_info ("Modem: state changed (%s -> %s)",
-                     old_value->value_nick,
-                     new_value->value_nick);
-        g_type_class_unref (enum_class);
+        mm_info ("Modem%s%s: state changed (%s -> %s)",
+                 dbus_path ? " " : "",
+                 dbus_path ? dbus_path : "",
+                 mm_modem_state_get_string (old_state),
+                 mm_modem_state_get_string (new_state));
 
         /* The property in the interface is bound to the property
          * in the skeleton, so just updating here is enough */
@@ -1105,18 +1092,12 @@ validate_allowed_bands (const GArray *supported_bands_array,
             band = g_array_index (allowed_bands_array, MMModemBand, i);
             if (band == MM_MODEM_BAND_UNKNOWN ||
                 band == MM_MODEM_BAND_ANY) {
-                 GEnumClass *enum_class;
-                 GEnumValue *value;
-
-                 enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_BAND));
-                 value = g_enum_get_value (enum_class, band);
                  g_set_error (error,
                               MM_CORE_ERROR,
                               MM_CORE_ERROR_INVALID_ARGS,
                               "Wrong list of bands: "
                               "'%s' should have been the only element in the list",
-                              value->value_nick);
-                 g_type_class_unref (enum_class);
+                              mm_modem_band_get_string (band));
                  return FALSE;
             }
 
@@ -1132,22 +1113,17 @@ validate_allowed_bands (const GArray *supported_bands_array,
                 }
 
                 if (!found) {
-                    GEnumClass *enum_class;
-                    GEnumValue *value;
                     gchar *supported_bands_str;
 
-                    supported_bands_str = (mm_common_get_bands_string (
+                    supported_bands_str = (mm_common_build_bands_string (
                                                (const MMModemBand *)supported_bands_array->data,
                                                supported_bands_array->len));
-                    enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_BAND));
-                    value = g_enum_get_value (enum_class, band);
                     g_set_error (error,
                                  MM_CORE_ERROR,
                                  MM_CORE_ERROR_INVALID_ARGS,
                                  "Given allowed band (%s) is not supported (%s)",
-                                 value->value_nick,
+                                 mm_modem_band_get_string (band),
                                  supported_bands_str);
-                    g_type_class_unref (enum_class);
                     g_free (supported_bands_str);
                     return FALSE;
                 }
@@ -1371,8 +1347,8 @@ mm_iface_modem_set_allowed_modes (MMIfaceModem *self,
         gchar *not_supported_str;
         gchar *supported_str;
 
-        not_supported_str = mm_common_get_modes_string (not_supported);
-        supported_str = mm_common_get_modes_string (supported);
+        not_supported_str = mm_modem_mode_build_string_from_mask (not_supported);
+        supported_str = mm_modem_mode_build_string_from_mask (supported);
         g_simple_async_result_set_error (ctx->result,
                                          MM_CORE_ERROR,
                                          MM_CORE_ERROR_UNSUPPORTED,
@@ -1392,8 +1368,8 @@ mm_iface_modem_set_allowed_modes (MMIfaceModem *self,
         gchar *preferred_str;
         gchar *allowed_str;
 
-        preferred_str = mm_common_get_modes_string (preferred);
-        allowed_str = mm_common_get_modes_string (allowed);
+        preferred_str = mm_modem_mode_build_string_from_mask (preferred);
+        allowed_str = mm_modem_mode_build_string_from_mask (allowed);
         g_simple_async_result_set_error (ctx->result,
                                          MM_CORE_ERROR,
                                          MM_CORE_ERROR_UNSUPPORTED,

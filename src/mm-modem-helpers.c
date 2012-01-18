@@ -151,8 +151,6 @@ mm_3gpp_parse_scan_response (const gchar *reply,
     GList *info_list = NULL;
     GMatchInfo *match_info;
     gboolean umts_format = TRUE;
-    GEnumClass *network_availability_class;
-    GFlagsClass *access_tech_class;
     GError *inner_error = NULL;
 
     g_return_val_if_fail (reply != NULL, NULL);
@@ -225,9 +223,6 @@ mm_3gpp_parse_scan_response (const gchar *reply,
         umts_format = FALSE;
     }
 
-    network_availability_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_3GPP_NETWORK_AVAILABILITY));
-    access_tech_class = G_FLAGS_CLASS (g_type_class_ref (MM_TYPE_MODEM_ACCESS_TECHNOLOGY));
-
     /* Parse the results */
     while (g_match_info_matches (match_info)) {
         MM3gppNetworkInfo *info;
@@ -272,20 +267,16 @@ mm_3gpp_parse_scan_response (const gchar *reply,
         }
 
         if (valid) {
-            GEnumValue *network_availability;
-            GFlagsValue *access_tech;
+            gchar *access_tech_str;
 
-            network_availability = g_enum_get_value (network_availability_class,
-                                                     info->status);
-            access_tech = g_flags_get_first_value (access_tech_class,
-                                                   info->access_tech);
-
+            access_tech_str = mm_modem_access_technology_build_string_from_mask (info->access_tech);
             mm_dbg ("Found network '%s' ('%s','%s'); availability: %s, access tech: %s",
                     info->operator_code,
                     info->operator_short ? info->operator_short : "no short name",
                     info->operator_long ? info->operator_long : "no long name",
-                    network_availability->value_nick,
-                    access_tech->value_nick);
+                    mm_modem_3gpp_network_availability_get_string (info->status),
+                    access_tech_str);
+            g_free (access_tech_str);
 
             info_list = g_list_prepend (info_list, info);
         }
@@ -297,9 +288,6 @@ mm_3gpp_parse_scan_response (const gchar *reply,
 
     g_match_info_free (match_info);
     g_regex_unref (r);
-
-    g_type_class_unref (network_availability_class);
-    g_type_class_unref (access_tech_class);
 
     return info_list;
 }
@@ -1600,17 +1588,11 @@ mm_cdma_get_index_from_rm_protocol (MMModemCdmaRmProtocol protocol,
                                     GError **error)
 {
     if (protocol == MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
-        GEnumClass *enum_class;
-        GEnumValue *value;
-
-        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_CDMA_RM_PROTOCOL));
-        value = g_enum_get_value (enum_class, protocol);
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
                      "Unexpected RM protocol (%s)",
-                     value->value_nick);
-        g_type_class_unref (enum_class);
+                     mm_modem_cdma_rm_protocol_get_string (protocol));
         return 0;
     }
 

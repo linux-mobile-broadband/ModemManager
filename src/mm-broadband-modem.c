@@ -470,7 +470,7 @@ modem_load_current_capabilities_finish (MMIfaceModem *self,
         return MM_MODEM_CAPABILITY_NONE;
 
     caps = (MMModemCapability)g_variant_get_uint32 (result);
-    caps_str = mm_common_get_capabilities_string (caps);
+    caps_str = mm_modem_capability_build_string_from_mask (caps);
     mm_dbg ("loaded current capabilities: %s", caps_str);
     g_free (caps_str);
     return caps;
