@@ -151,6 +151,7 @@ mm-common-helpers.c: mm-errors-types.h mm-enums-types.h
 mm-common-simple-properties.c: mm-errors-types.h mm-enums-types.h
 mm-common-connect-properties.c: mm-errors-types.h
 mm-common-bearer-properties.c: mm-errors-types.h
+mm-common-location-3gpp.c: mm-errors-types.h
 mm-errors-quarks.c: mm-errors-types.h
 
 includedir = @includedir@/libmm-common
