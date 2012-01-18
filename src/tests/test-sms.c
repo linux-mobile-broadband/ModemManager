@@ -491,7 +491,7 @@ test_create_pdu_ucs2_with_smsc (void *f, gpointer d)
     guint len = 0, msgstart = 0;
     GError *error = NULL;
 
-    pdu = sms_create_submit_pdu (number, text, smsc, 1, 0, &len, &msgstart, &error);
+    pdu = sms_create_submit_pdu (number, text, smsc, 5, 0, &len, &msgstart, &error);
     g_assert_no_error (error);
     g_assert (pdu);
     g_assert_cmpint (len, ==, sizeof (expected));
@@ -517,7 +517,7 @@ test_create_pdu_ucs2_no_smsc (void *f, gpointer d)
     guint len = 0, msgstart = 0;
     GError *error = NULL;
 
-    pdu = sms_create_submit_pdu (number, text, NULL, 1, 0, &len, &msgstart, &error);
+    pdu = sms_create_submit_pdu (number, text, NULL, 5, 0, &len, &msgstart, &error);
     g_assert_no_error (error);
     g_assert (pdu);
     g_assert_cmpint (len, ==, sizeof (expected));
@@ -543,7 +543,7 @@ test_create_pdu_gsm_with_smsc (void *f, gpointer d)
     guint len = 0, msgstart = 0;
     GError *error = NULL;
 
-    pdu = sms_create_submit_pdu (number, text, smsc, 1, 0, &len, &msgstart, &error);
+    pdu = sms_create_submit_pdu (number, text, smsc, 5, 0, &len, &msgstart, &error);
     g_assert_no_error (error);
     g_assert (pdu);
     g_assert_cmpint (len, ==, sizeof (expected));
@@ -568,7 +568,7 @@ test_create_pdu_gsm_no_smsc (void *f, gpointer d)
     guint len = 0, msgstart = 0;
     GError *error = NULL;
 
-    pdu = sms_create_submit_pdu (number, text, NULL, 1, 0, &len, &msgstart, &error);
+    pdu = sms_create_submit_pdu (number, text, NULL, 5, 0, &len, &msgstart, &error);
     g_assert_no_error (error);
     g_assert (pdu);
     g_assert_cmpint (len, ==, sizeof (expected));
@@ -597,7 +597,29 @@ test_create_pdu_gsm_3 (void *f, gpointer d)
      * leave off the last octet.
      */
 
-    pdu = sms_create_submit_pdu (number, text, NULL, 1, 0, &len, &msgstart, &error);
+    pdu = sms_create_submit_pdu (number, text, NULL, 5, 0, &len, &msgstart, &error);
+    g_assert_no_error (error);
+    g_assert (pdu);
+    g_assert_cmpint (len, ==, sizeof (expected));
+    g_assert_cmpint (memcmp (pdu, expected, len), ==, 0);
+    g_assert_cmpint (msgstart, ==, 1);
+}
+
+static void
+test_create_pdu_gsm_no_validity (void *f, gpointer d)
+{
+    static const char *number = "+15556661234";
+    static const char *text = "This is really cool ΔΔΔΔΔ";
+    static const guint8 expected[] = {
+        0x00, 0x01, 0x00, 0x0B, 0x91, 0x51, 0x55, 0x66, 0x16, 0x32, 0xF4, 0x00,
+        0x00, 0x19, 0x54, 0x74, 0x7A, 0x0E, 0x4A, 0xCF, 0x41, 0xF2, 0x72, 0x98,
+        0xCD, 0xCE, 0x83, 0xC6, 0xEF, 0x37, 0x1B, 0x04, 0x81, 0x40, 0x20, 0x10
+    };
+    guint8 *pdu;
+    guint len = 0, msgstart = 0;
+    GError *error = NULL;
+
+    pdu = sms_create_submit_pdu (number, text, NULL, 0, 0, &len, &msgstart, &error);
     g_assert_no_error (error);
     g_assert (pdu);
     g_assert_cmpint (len, ==, sizeof (expected));
@@ -660,6 +682,7 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_create_pdu_gsm_no_smsc, NULL));
 
     g_test_suite_add (suite, TESTCASE (test_create_pdu_gsm_3, NULL));
+    g_test_suite_add (suite, TESTCASE (test_create_pdu_gsm_no_validity, NULL));
 
     result = g_test_run ();
 

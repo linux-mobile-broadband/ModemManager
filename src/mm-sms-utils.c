@@ -551,38 +551,40 @@ validity_to_relative (guint validity)
     if (validity == 0)
         return 167; /* 24 hours */
 
-    if (validity <= 144) {
+    if (validity <= 720) {
         /* 5 minute units up to 12 hours */
-        return validity - 1;
+        if (validity % 5)
+            validity += 5;
+        return (validity / 5) - 1;
     }
 
-    if (validity > 144 && validity <= 288) {
+    if (validity > 720 && validity <= 1440) {
         /* 12 hours + 30 minute units up to 1 day */
-        if (validity % 6)
-            validity += 6;  /* round up to next 30 minutes */
-        validity = MIN (validity, 288);
-        return 143 + ((validity - 144) / 6);  /* 6 = 30 minutes / 5 minutes */
+        if (validity % 30)
+            validity += 30;  /* round up to next 30 minutes */
+        validity = MIN (validity, 1440);
+        return 143 + ((validity - 720) / 30);
     }
 
-    if (validity > 288 && validity <= 8640) {
+    if (validity > 1440 && validity <= 43200) {
         /* 2 days up to 1 month */
-        if (validity % 288)
-            validity += 288;  /* round up to next day */
-        validity = MIN (validity, 8640);
-        return 167 + ((validity - 288) / 288);  /* 288 = 1 day / 5 minutes */
+        if (validity % 1440)
+            validity += 1440;  /* round up to next day */
+        validity = MIN (validity, 43200);
+        return 167 + ((validity - 1440) / 1440);
     }
 
-    /* 8640 = 30 days in 5-minute units
-     * 2016 = 7 days in 5-minute units
-     * 127008 = 63 weeks in 5-minute units
-     * 8064 = 4 weeks in 5-minute units
+    /* 43200 = 30 days in minutes
+     * 10080 = 7 days in minutes
+     * 635040 = 63 weeks in minutes
+     * 40320 = 4 weeks in minutes
      */
-    if (validity > 8640 && validity <= 127008) {
+    if (validity > 43200 && validity <= 635040) {
         /* 5 weeks up to 63 weeks */
-        if (validity % 2016)
-            validity += 2016;  /* round up to next week */
-        validity = MIN (validity, 127008);
-        return 196 + ((validity - 8064) / 2016);
+        if (validity % 10080)
+            validity += 10080;  /* round up to next week */
+        validity = MIN (validity, 635040);
+        return 196 + ((validity - 40320) / 10080);
     }
 
     return 255; /* 63 weeks */
@@ -596,7 +598,7 @@ validity_to_relative (guint validity)
  * @number: the subscriber number to send this message to
  * @text: the body of this SMS
  * @smsc: if given, the SMSC address
- * @validity: validity period of this SMS in 5-minute increments, or 0 for a
+ * @validity: minutes until the SMS should expire in the SMSC, or 0 for a
  *  suitable default
  * @class: unused
  * @out_pdulen: on success, the size of the returned PDU in bytes

@@ -35,7 +35,6 @@
           data     : byte array - SMS user data (TP-UD) (mandatory)
           data-coding-scheme: uint (0..255) - SMS user data coding scheme (TP-DCS) (mandatory)
           smsc     : string - SMS service center number (optional)
-          validity : uint (0..255) - Specifies when the SMS expires in SMSC (optional)
           class    : uint (0..3) - Message importance and location (optional)
           completed: boolean - Whether all message parts have been received or not (optional)
           index    : uint - Index of message (for Get and Delete) (optional)
@@ -83,7 +82,7 @@
           number   : string - Phone number (mandatory)
           text     : string - SMS text (mandatory)
           smsc     : string - SMS service center number (optional)
-          validity : uint (0..255) - Specifies when the SMS expires in SMSC (optional)
+          relative-validity : uint - Minutes until the SMS expires in SMSC (optional)
           class    : uint (0..3) - Message importance and location (optional)
         </tp:docstring>
       </arg>
@@ -100,7 +99,7 @@
           number   : string - Phone number (mandatory)
           text     : string - SMS text (mandatory)
           smsc     : string - SMS service center number (optional)
-          validity : uint (0..127008) - Specifies when the SMS expires in SMSC (units of 5 minutes) (optional)
+          relative-validity : uint - Minutes until the SMS expires in SMSC (optional)
           class    : uint (0..3) - Message importance and location (optional)
         </tp:docstring>
       </arg>
