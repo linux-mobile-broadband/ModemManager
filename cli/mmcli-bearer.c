@@ -177,7 +177,7 @@ print_bearer_info (MMBearer *bearer)
                  VALIDATE_NONE (mm_bearer_properties_get_user (properties)),
                  VALIDATE_NONE (mm_bearer_properties_get_password (properties)),
                  VALIDATE_NONE (mm_bearer_properties_get_number (properties)),
-                 VALIDATE_UNKNOWN (mmcli_get_cdma_rm_protocol_string (
+                 VALIDATE_UNKNOWN (mm_modem_cdma_rm_protocol_get_string (
                                        mm_bearer_properties_get_rm_protocol (properties))));
         g_object_unref (properties);
     }
@@ -186,7 +186,7 @@ print_bearer_info (MMBearer *bearer)
     g_print ("  -------------------------\n"
              "  IPv4 configuration |   method: '%s'\n",
              (ipv4_config ?
-              mmcli_get_bearer_ip_method_string (mm_bearer_ip_config_get_method (ipv4_config)) :
+              mm_bearer_ip_method_get_string (mm_bearer_ip_config_get_method (ipv4_config)) :
               "none"));
     if (ipv4_config &&
         mm_bearer_ip_config_get_method (ipv4_config) == MM_BEARER_IP_METHOD_STATIC) {
@@ -212,7 +212,7 @@ print_bearer_info (MMBearer *bearer)
     g_print ("  -------------------------\n"
              "  IPv6 configuration |   method: '%s'\n",
              (ipv6_config ?
-              mmcli_get_bearer_ip_method_string (mm_bearer_ip_config_get_method (ipv6_config)) :
+              mm_bearer_ip_method_get_string (mm_bearer_ip_config_get_method (ipv6_config)) :
               "none"));
     if (ipv6_config &&
         mm_bearer_ip_config_get_method (ipv6_config) == MM_BEARER_IP_METHOD_STATIC) {

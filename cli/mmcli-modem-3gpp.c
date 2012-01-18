@@ -139,7 +139,7 @@ print_network_info (MMModem3gppNetwork *network)
 #undef VALIDATE
 #define VALIDATE(str) (str ? str : "unknown")
 
-    access_technologies = (mm_modem_get_access_technologies_string (
+    access_technologies = (mm_modem_access_technology_build_string_from_mask (
                                mm_modem_3gpp_network_get_access_technology (network)));
 
     /* Prefer long name */
@@ -151,7 +151,7 @@ print_network_info (MMModem3gppNetwork *network)
              VALIDATE (mm_modem_3gpp_network_get_operator_code (network)),
              VALIDATE (name),
              access_technologies,
-             mmcli_get_3gpp_network_availability_string (
+             mm_modem_3gpp_network_availability_get_string (
                  mm_modem_3gpp_network_get_availability (network)));
     g_free (access_technologies);
 }

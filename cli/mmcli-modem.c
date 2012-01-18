@@ -283,31 +283,31 @@ print_modem_info (void)
         break;
     default:
         unlock = g_strdup_printf ("%s (%u retries)",
-                                  mmcli_get_lock_string (unlock_required),
+                                  mm_modem_lock_get_string (unlock_required),
                                   mm_modem_get_unlock_retries (ctx->modem));
         break;
     }
 
     /* Strings in heap */
-    capabilities_string = mm_modem_get_capabilities_string (
+    capabilities_string = mm_modem_capability_build_string_from_mask (
         mm_modem_get_modem_capabilities (ctx->modem));
-    access_technologies_string = mm_modem_get_access_technologies_string (
+    access_technologies_string = mm_modem_access_technology_build_string_from_mask (
         mm_modem_get_access_technologies (ctx->modem));
     mm_modem_get_allowed_bands (ctx->modem,
                                 &bands,
                                 &n_bands);
-    allowed_bands_string = mm_modem_get_bands_string (bands, n_bands);
+    allowed_bands_string = mm_common_build_bands_string (bands, n_bands);
     g_free (bands);
     mm_modem_get_supported_bands (ctx->modem,
                                   &bands,
                                   &n_bands);
-    supported_bands_string = mm_modem_get_bands_string (bands, n_bands);
+    supported_bands_string = mm_common_build_bands_string (bands, n_bands);
     g_free (bands);
-    allowed_modes_string = mm_modem_get_modes_string (
+    allowed_modes_string = mm_modem_mode_build_string_from_mask (
         mm_modem_get_allowed_modes (ctx->modem));
-    preferred_mode_string = mm_modem_get_modes_string (
+    preferred_mode_string = mm_modem_mode_build_string_from_mask (
         mm_modem_get_preferred_mode (ctx->modem));
-    supported_modes_string = mm_modem_get_modes_string (
+    supported_modes_string = mm_modem_mode_build_string_from_mask (
         mm_modem_get_supported_modes (ctx->modem));
 
     /* Rework possible multiline strings */
@@ -348,7 +348,7 @@ print_modem_info (void)
              "           |          state: '%s'\n"
              "           |    access tech: '%s'\n",
              VALIDATE_UNKNOWN (unlock),
-             VALIDATE_UNKNOWN (mmcli_get_state_string (mm_modem_get_state (ctx->modem))),
+             VALIDATE_UNKNOWN (mm_modem_state_get_string (mm_modem_get_state (ctx->modem))),
              VALIDATE_UNKNOWN (access_technologies_string));
 
     /* Modes */
@@ -377,7 +377,7 @@ print_modem_info (void)
                  VALIDATE_UNKNOWN (mm_modem_3gpp_get_imei (ctx->modem_3gpp)),
                  VALIDATE_UNKNOWN (mm_modem_3gpp_get_operator_code (ctx->modem_3gpp)),
                  VALIDATE_UNKNOWN (mm_modem_3gpp_get_operator_name (ctx->modem_3gpp)),
-                 mmcli_get_3gpp_registration_state_string (
+                 mm_modem_3gpp_registration_state_get_string (
                      mm_modem_3gpp_get_registration_state ((ctx->modem_3gpp))));
     }
 
@@ -408,9 +408,9 @@ print_modem_info (void)
                  VALIDATE_UNKNOWN (mm_modem_cdma_get_esn (ctx->modem_cdma)),
                  VALIDATE_UNKNOWN (sid_str),
                  VALIDATE_UNKNOWN (nid_str),
-                 mmcli_get_cdma_registration_state_string (
+                 mm_modem_cdma_registration_state_get_string (
                      mm_modem_cdma_get_cdma1x_registration_state ((ctx->modem_cdma))),
-                 mmcli_get_cdma_registration_state_string (
+                 mm_modem_cdma_registration_state_get_string (
                      mm_modem_cdma_get_evdo_registration_state ((ctx->modem_cdma))));
 
         g_free (sid_str);
@@ -743,8 +743,8 @@ state_changed (MMModem                  *modem,
 {
     g_print ("\t%s: State changed, '%s' --> '%s' (Reason: %s)\n",
              mm_modem_get_path (modem),
-             mmcli_get_state_string (old_state),
-             mmcli_get_state_string (new_state),
+             mm_modem_state_get_string (old_state),
+             mm_modem_state_get_string (new_state),
              mmcli_get_state_reason_string (reason));
     fflush (stdout);
 }
@@ -774,7 +774,7 @@ get_modem_ready (GObject      *source,
         current = mm_modem_get_state (ctx->modem);
         g_print ("\t%s: Initial state, '%s'\n",
                  mm_object_get_path (ctx->object),
-                 mmcli_get_state_string (current));
+                 mm_modem_state_get_string (current));
 
         /* If we get cancelled, operation done */
         g_cancellable_connect (ctx->cancellable,

@@ -694,32 +694,6 @@ mmcli_get_sim_sync (GDBusConnection *connection,
 }
 
 const gchar *
-mmcli_get_bearer_ip_method_string (MMBearerIpMethod method)
-{
-    static GEnumClass *enum_class = NULL;
-    GEnumValue *value;
-
-    if (!enum_class)
-        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_BEARER_IP_METHOD));
-
-    value = g_enum_get_value (enum_class, method);
-    return value->value_nick;
-}
-
-const gchar *
-mmcli_get_state_string (MMModemState state)
-{
-    static GEnumClass *enum_class = NULL;
-    GEnumValue *value;
-
-    if (!enum_class)
-        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_STATE));
-
-    value = g_enum_get_value (enum_class, state);
-    return value->value_nick;
-}
-
-const gchar *
 mmcli_get_state_reason_string (MMModemStateChangeReason reason)
 {
     switch (reason) {
@@ -733,71 +707,6 @@ mmcli_get_state_reason_string (MMModemStateChangeReason reason)
 
     g_warn_if_reached ();
     return NULL;
-}
-
-const gchar *
-mmcli_get_lock_string (MMModemLock lock)
-{
-    static GEnumClass *enum_class = NULL;
-    GEnumValue *value;
-
-    if (!enum_class)
-        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_LOCK));
-
-    value = g_enum_get_value (enum_class, lock);
-    return value->value_nick;
-}
-
-const gchar *
-mmcli_get_3gpp_network_availability_string (MMModem3gppNetworkAvailability availability)
-{
-    static GEnumClass *enum_class = NULL;
-    GEnumValue *value;
-
-    if (!enum_class)
-        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_3GPP_NETWORK_AVAILABILITY));
-
-    value = g_enum_get_value (enum_class, availability);
-    return value->value_nick;
-}
-
-const gchar *
-mmcli_get_3gpp_registration_state_string (MMModem3gppRegistrationState state)
-{
-    static GEnumClass *enum_class = NULL;
-    GEnumValue *value;
-
-    if (!enum_class)
-        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_3GPP_REGISTRATION_STATE));
-
-    value = g_enum_get_value (enum_class, state);
-    return value->value_nick;
-}
-
-const gchar *
-mmcli_get_cdma_registration_state_string (MMModemCdmaRegistrationState state)
-{
-    static GEnumClass *enum_class = NULL;
-    GEnumValue *value;
-
-    if (!enum_class)
-        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_CDMA_REGISTRATION_STATE));
-
-    value = g_enum_get_value (enum_class, state);
-    return value->value_nick;
-}
-
-const gchar *
-mmcli_get_cdma_rm_protocol_string (MMModemCdmaRmProtocol protocol)
-{
-    static GEnumClass *enum_class = NULL;
-    GEnumValue *value;
-
-    if (!enum_class)
-        enum_class = G_ENUM_CLASS (g_type_class_ref (MM_TYPE_MODEM_CDMA_RM_PROTOCOL));
-
-    value = g_enum_get_value (enum_class, protocol);
-    return value->value_nick;
 }
 
 /* Common options */

@@ -64,15 +64,7 @@ MMSim *mmcli_get_sim_sync   (GDBusConnection *connection,
                              MMManager **manager,
                              MMObject **object);
 
-const gchar *mmcli_get_bearer_ip_method_string          (MMBearerIpMethod method);
-const gchar *mmcli_get_state_string                     (MMModemState state);
-const gchar *mmcli_get_state_reason_string              (MMModemStateChangeReason reason);
-const gchar *mmcli_get_lock_string                      (MMModemLock lock);
-const gchar *mmcli_get_3gpp_network_availability_string (MMModem3gppNetworkAvailability availability);
-const gchar *mmcli_get_3gpp_registration_state_string   (MMModem3gppRegistrationState state);
-const gchar *mmcli_get_cdma_registration_state_string   (MMModemCdmaRegistrationState state);
-const gchar *mmcli_get_cdma_rm_protocol_string          (MMModemCdmaRmProtocol protocol);
-
+const gchar *mmcli_get_state_reason_string (MMModemStateChangeReason reason);
 
 GOptionGroup *mmcli_get_common_option_group (void);
 const gchar  *mmcli_get_common_modem_string (void);

@@ -209,7 +209,7 @@ status_process_reply (MMModemSimpleStatusProperties *result,
 
     g_print ("  -------------------------\n"
              "  Status |          state: '%s'\n",
-             mmcli_get_state_string (state));
+             mm_modem_state_get_string (state));
 
     if (state >= MM_MODEM_STATE_REGISTERED) {
         const MMModemBand *bands = NULL;
@@ -223,8 +223,8 @@ status_process_reply (MMModemSimpleStatusProperties *result,
                               result,
                               &signal_quality_recent));
         mm_modem_simple_status_properties_get_bands (result, &bands, &n_bands);
-        bands_str = mm_modem_get_bands_string (bands, n_bands);
-        access_tech_str = (mm_modem_get_access_technologies_string (
+        bands_str = mm_common_build_bands_string (bands, n_bands);
+        access_tech_str = (mm_modem_access_technology_build_string_from_mask (
                                mm_modem_simple_status_properties_get_access_technologies (result)));
 
         g_print ("         | signal quality: '%u' (%s)\n"
@@ -242,7 +242,7 @@ status_process_reply (MMModemSimpleStatusProperties *result,
                      " 3GPP    |   registration: '%s'\n"
                      "         |  operator code: '%s'\n"
                      "         |  operator name: '%s'\n",
-                     mmcli_get_3gpp_registration_state_string (
+                     mm_modem_3gpp_registration_state_get_string (
                          mm_modem_simple_status_properties_get_3gpp_registration_state (result)),
                      VALIDATE_UNKNOWN (mm_modem_simple_status_properties_get_3gpp_operator_code (result)),
                      VALIDATE_UNKNOWN (mm_modem_simple_status_properties_get_3gpp_operator_name (result)));
@@ -274,9 +274,9 @@ status_process_reply (MMModemSimpleStatusProperties *result,
                      "         |                 EV-DO  '%s'\n",
                      VALIDATE_UNKNOWN (sid_str),
                      VALIDATE_UNKNOWN (nid_str),
-                     mmcli_get_cdma_registration_state_string (
+                     mm_modem_cdma_registration_state_get_string (
                          mm_modem_simple_status_properties_get_cdma_cdma1x_registration_state (result)),
-                     mmcli_get_cdma_registration_state_string (
+                     mm_modem_cdma_registration_state_get_string (
                          mm_modem_simple_status_properties_get_cdma_evdo_registration_state (result)));
 
             g_free (sid_str);
