@@ -1738,27 +1738,31 @@ qcdm_cmd_gsm_subsys_state_info_result (const char *buf, size_t len, int *out_err
     if (imxi_to_bcd_string (rsp->imsi, imxi, sizeof (imxi)))
         qcdm_result_add_string (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_IMSI, imxi);
 
-    /* Quick convert BCD LAI into MCC/MNC/LAC */
-    mcc = (rsp->lai[0] & 0xF) * 100;
-    mcc += ((rsp->lai[0] >> 4) & 0xF) * 10;
-    mcc += rsp->lai[1] & 0xF;
-    qcdm_result_add_u32 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_LAI_MCC, mcc);
-
-    mnc = (rsp->lai[2] & 0XF) * 100;
-    mnc += ((rsp->lai[2] >> 4) & 0xF) * 10;
-    mnc3 = (rsp->lai[1] >> 4) & 0xF;
-    if (mnc3 != 0xF)
-        mnc += mnc3;
-    qcdm_result_add_u32 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_LAI_MNC, mnc);
-
-    qcdm_result_add_u32 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_LAI_LAC,
-                         le16toh (*(u_int16_t *)(&rsp->lai[3])));
-
-    qcdm_result_add_u32 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CELLID, le16toh (rsp->cellid));
-
     qcdm_result_add_u8 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CM_CALL_STATE, rsp->cm_call_state);
     qcdm_result_add_u8 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CM_OP_MODE, rsp->cm_opmode);
     qcdm_result_add_u8 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CM_SYS_MODE, rsp->cm_sysmode);
+
+    /* MCC/MNC, LAC, and CI don't seem to be valid when the modem is not in GSM mode */
+    if (   rsp->cm_sysmode == QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_GSM
+        || rsp->cm_sysmode == QCDM_CMD_CM_SUBSYS_STATE_INFO_SYSTEM_MODE_GW) {
+        /* Quick convert BCD LAI into MCC/MNC/LAC */
+        mcc = (rsp->lai[0] & 0xF) * 100;
+        mcc += ((rsp->lai[0] >> 4) & 0xF) * 10;
+        mcc += rsp->lai[1] & 0xF;
+        qcdm_result_add_u32 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_LAI_MCC, mcc);
+
+        mnc = (rsp->lai[2] & 0XF) * 100;
+        mnc += ((rsp->lai[2] >> 4) & 0xF) * 10;
+        mnc3 = (rsp->lai[1] >> 4) & 0xF;
+        if (mnc3 != 0xF)
+            mnc += mnc3;
+        qcdm_result_add_u32 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_LAI_MNC, mnc);
+
+        qcdm_result_add_u32 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_LAI_LAC,
+                             le16toh (*(u_int16_t *)(&rsp->lai[3])));
+
+        qcdm_result_add_u32 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CELLID, le16toh (rsp->cellid));
+    }
 
     return result;
 }
