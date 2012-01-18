@@ -136,6 +136,7 @@ typedef struct {
      * structures.
      */
     GHashTable *sms_parts;
+    gboolean sms_pdu_mode;
 
     guint sms_fetch_pending;
 
@@ -1799,6 +1800,88 @@ clck_cb (MMAtSerialPort *port,
     mm_serial_port_close (MM_SERIAL_PORT (port));
 }
 
+static void
+sms_set_format_cb (MMAtSerialPort *port,
+                   GString *response,
+                   GError *error,
+                   gpointer user_data)
+{
+    if (error) {
+        mm_warn ("(%s): failed to set SMS mode, assuming text mode",
+                 mm_port_get_device (MM_PORT (port)));
+        MM_GENERIC_GSM_GET_PRIVATE (user_data)->sms_pdu_mode = FALSE;
+    } else {
+        mm_info ("(%s): using %s mode for SMS",
+                 mm_port_get_device (MM_PORT (port)),
+                 MM_GENERIC_GSM_GET_PRIVATE (user_data)->sms_pdu_mode ? "PDU" : "text");
+    }
+}
+
+
+#define CMGF_TAG "+CMGF:"
+
+static void
+sms_get_format_cb (MMAtSerialPort *port,
+                   GString *response,
+                   GError *error,
+                   gpointer user_data)
+{
+    MMGenericGsm *self;
+    MMGenericGsmPrivate *priv;
+    const char *reply;
+    GRegex *r;
+    GMatchInfo *match_info;
+    char *s;
+    guint32 min = -1, max = -1;
+
+    if (error) {
+        mm_warn ("(%s): failed to query SMS mode, assuming text mode",
+                 mm_port_get_device (MM_PORT (port)));
+        return;
+    }
+
+    /* Strip whitespace and response tag */
+    reply = response->str;
+    if (g_str_has_prefix (reply, CMGF_TAG))
+        reply += strlen (CMGF_TAG);
+    while (isspace (*reply))
+        reply++;
+
+    r = g_regex_new ("\\(?\\s*(\\d+)\\s*[-,]?\\s*(\\d+)?\\s*\\)?", 0, 0, NULL);
+    if (!r) {
+        mm_warn ("(%s): failed to parse CMGF query result", mm_port_get_device (MM_PORT (port)));
+        return;
+    }
+
+    self = MM_GENERIC_GSM (user_data);
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+    if (g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, NULL)) {
+        s = g_match_info_fetch (match_info, 1);
+        if (s)
+            min = atoi (s);
+        g_free (s);
+
+        s = g_match_info_fetch (match_info, 2);
+        if (s)
+            max = atoi (s);
+        g_free (s);
+
+        /* If the modem only supports PDU mode, use PDUs.
+         * FIXME: when the PDU code is more robust, default to PDU if the
+         * modem supports it.
+         */
+        if (min == 0 && max < 1) {
+            /* Will get reset to FALSE on receipt of error */
+            priv->sms_pdu_mode = TRUE;
+            mm_at_serial_port_queue_command (priv->primary, "AT+CMGF=0", 3, sms_set_format_cb, self);
+        } else
+            mm_at_serial_port_queue_command (priv->primary, "AT+CMGF=1", 3, sms_set_format_cb, self);
+    }
+    g_match_info_free (match_info);
+
+    g_regex_unref (r);
+}
+
 void
 mm_generic_gsm_enable_complete (MMGenericGsm *self,
                                 GError *error,
@@ -1848,6 +1931,9 @@ mm_generic_gsm_enable_complete (MMGenericGsm *self,
     if (cmd && strlen (cmd))
         mm_at_serial_port_queue_command (priv->primary, cmd, 3, NULL, NULL);
     g_free (cmd);
+
+    /* Check and enable the right SMS mode */
+    mm_at_serial_port_queue_command (priv->primary, "AT+CMGF=?", 3, sms_get_format_cb, self);
 
     /* Enable USSD notifications */
     mm_at_serial_port_queue_command (priv->primary, "+CUSD=1", 3, cusd_enable_cb, self);
@@ -4669,21 +4755,49 @@ sms_send (MMModemGsmSms *modem,
           gpointer user_data)
 {
     MMCallbackInfo *info;
+    MMGenericGsm *self = MM_GENERIC_GSM (modem);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     char *command;
     MMAtSerialPort *port;
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
-    port = mm_generic_gsm_get_best_at_port (MM_GENERIC_GSM (modem), &info->error);
+    port = mm_generic_gsm_get_best_at_port (self, &info->error);
     if (!port) {
         mm_callback_info_schedule (info);
         return;
     }
 
-    /* FIXME: use the PDU mode instead */
-    mm_at_serial_port_queue_command (port, "AT+CMGF=1", 3, NULL, NULL);
+    if (priv->sms_pdu_mode) {
+        guint8 *pdu;
+        guint pdulen = 0;
+        guint smsclen = 0;
+        char *hex;
 
-    command = g_strdup_printf ("+CMGS=\"%s\"\r%s\x1a", number, text);
+        pdu = sms_create_submit_pdu (number, text, smsc, validity, class, &pdulen, &info->error);
+        if (!pdu) {
+            mm_callback_info_schedule (info);
+            return;
+        }
+        smsclen = pdu[0];
+
+        hex = utils_bin2hexstr (pdu, pdulen);
+        g_free (pdu);
+        if (hex == NULL) {
+            g_set_error_literal (&info->error,
+                                 MM_MODEM_ERROR,
+                                 MM_MODEM_ERROR_GENERAL,
+                                 "Not enough memory to send SMS PDU");
+            mm_callback_info_schedule (info);
+            return;
+        }
+
+        /* CMGS length is the size of the PDU without SMSC information */
+        command = g_strdup_printf ("+CMGS=%d\r%s\x1a", pdulen - smsclen, hex);
+        g_free (hex);
+    } else
+        command = g_strdup_printf ("+CMGS=\"%s\"\r%s\x1a", number, text);
+
     mm_at_serial_port_queue_command (port, command, 10, sms_send_done, info);
     g_free (command);
 }
