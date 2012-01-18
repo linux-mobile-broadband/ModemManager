@@ -19,6 +19,7 @@ mmcli_SOURCES = \
 	mmcli-modem-3gpp.c \
 	mmcli-modem-cdma.c \
 	mmcli-modem-simple.c \
+	mmcli-modem-location.c \
 	mmcli-bearer.c \
 	mmcli-sim.c
 

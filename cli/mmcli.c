@@ -189,6 +189,8 @@ main (gint argc, gchar **argv)
 	g_option_context_add_group (context,
 	                            mmcli_modem_simple_get_option_group ());
 	g_option_context_add_group (context,
+	                            mmcli_modem_location_get_option_group ());
+	g_option_context_add_group (context,
 	                            mmcli_sim_get_option_group ());
 	g_option_context_add_group (context,
 	                            mmcli_bearer_get_option_group ());
@@ -268,6 +270,13 @@ main (gint argc, gchar **argv)
         else
             mmcli_modem_simple_run_synchronous (connection);
     }
+    /* Modem Location options? */
+    else if (mmcli_modem_location_options_enabled ()) {
+        if (async_flag)
+            mmcli_modem_location_run_asynchronous (connection, cancellable);
+        else
+            mmcli_modem_location_run_synchronous (connection);
+    }
     /* Modem options?
      * NOTE: let this check be always the last one, as other groups also need
      * having a modem specified, and therefore if -m is set, modem options
@@ -296,6 +305,8 @@ main (gint argc, gchar **argv)
         mmcli_modem_cdma_shutdown ();
     } else if (mmcli_modem_simple_options_enabled ()) {
         mmcli_modem_simple_shutdown ();
+    } else if (mmcli_modem_location_options_enabled ()) {
+        mmcli_modem_location_shutdown ();
     }  else if (mmcli_sim_options_enabled ()) {
         mmcli_sim_shutdown ();
     } else if (mmcli_bearer_options_enabled ()) {
