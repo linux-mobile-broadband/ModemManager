@@ -19,11 +19,29 @@ import sys
 import dbus
 import os
 
-if len(sys.argv) != 3:
-    print "Usage: %s <number> <message>" % sys.argv[0]
+arglen = len(sys.argv)
+if arglen != 4 and arglen != 6 and arglen != 8:
+    print "Usage: %s --number <number> [--smsc <smsc>] [--validity <5 minute units>] <message>" % sys.argv[0]
     sys.exit(1)
 
-number = sys.argv[1]
+number = None
+validity = None
+smsc = None
+message = None
+x = 1
+while x < arglen - 1:
+    if sys.argv[x] == "--number":
+        x += 1
+        number = sys.argv[x].strip()
+    elif sys.argv[x] == "--validity":
+        x += 1
+        validity = int(sys.argv[x])
+    elif sys.argv[x] == "--smsc":
+        x += 1
+        smsc = sys.argv[x].strip()
+    else:
+        raise ValueError("Unknown option '%s'" % sys.argv[x])
+    x += 1
 
 try:
     lang = os.getenv("LANG")
@@ -32,7 +50,8 @@ try:
         lang = lang[idx + 1:]
 except KeyError:
     lang = "utf-8"
-message = unicode(sys.argv[2], "utf-8")
+message = unicode(sys.argv[arglen - 1], "utf-8")
+
 
 bus = dbus.SystemBus()
 
@@ -47,10 +66,19 @@ proxy = bus.get_object('org.freedesktop.ModemManager', modems[0])
 modem = dbus.Interface(proxy, dbus_interface='org.freedesktop.ModemManager.Modem')
 modem.Enable(True)
 
-msg_dict = dbus.Dictionary({ dbus.String('number') : dbus.String(number),
-                             dbus.String('text') : dbus.String(message)
-                             },
-                           signature=dbus.Signature("sv"))
+msg_dict = dbus.Dictionary(
+    {
+        dbus.String('number') : dbus.String(number),
+        dbus.String('text') : dbus.String(message)
+    },
+    signature=dbus.Signature("sv")
+)
+
+if smsc:
+    msg_dict[dbus.String('smsc')] = dbus.String(smsc)
+
+if validity:
+    msg_dict[dbus.String('validity')] = dbus.UInt32(validity)
 
 sms_iface = dbus.Interface(proxy, dbus_interface='org.freedesktop.ModemManager.Modem.Gsm.SMS')
 try:
