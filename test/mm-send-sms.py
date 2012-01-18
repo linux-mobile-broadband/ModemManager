@@ -21,7 +21,7 @@ import os
 
 arglen = len(sys.argv)
 if arglen != 4 and arglen != 6 and arglen != 8:
-    print "Usage: %s --number <number> [--smsc <smsc>] [--validity <5 minute units>] <message>" % sys.argv[0]
+    print "Usage: %s --number <number> [--smsc <smsc>] [--validity <minutes>] <message>" % sys.argv[0]
     sys.exit(1)
 
 number = None

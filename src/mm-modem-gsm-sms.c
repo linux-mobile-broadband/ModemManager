@@ -607,7 +607,7 @@ sms_send_auth_cb (MMAuthRequest *req,
     if (value)
         smsc = g_value_get_string (value);
 
-    value = (GValue *) g_hash_table_lookup (info->hash, "validity");
+    value = (GValue *) g_hash_table_lookup (info->hash, "relative-validity");
     if (value)
         validity = g_value_get_uint (value);
 
