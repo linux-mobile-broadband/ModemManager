@@ -132,6 +132,8 @@ modem_manager_SOURCES = \
 	mm-sim.c \
 	mm-bearer.h \
 	mm-bearer.c \
+	mm-broadband-bearer.h \
+	mm-broadband-bearer.c \
 	mm-bearer-3gpp.h \
 	mm-bearer-3gpp.c \
 	mm-bearer-cdma.h \
