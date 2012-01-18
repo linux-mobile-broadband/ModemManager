@@ -17,13 +17,22 @@
 
 import sys
 import dbus
+import os
 
 if len(sys.argv) != 3:
     print "Usage: %s <number> <message>" % sys.argv[0]
     sys.exit(1)
 
 number = sys.argv[1]
-message = sys.argv[2]
+
+try:
+    lang = os.getenv("LANG")
+    idx = lang.find(".")
+    if idx != -1:
+        lang = lang[idx + 1:]
+except KeyError:
+    lang = "utf-8"
+message = unicode(sys.argv[2], "utf-8")
 
 bus = dbus.SystemBus()
 
