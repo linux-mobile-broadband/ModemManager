@@ -35,6 +35,11 @@ typedef void (*MMModemGsmSmsListFn) (MMModemGsmSms *modem,
                                      GError *error,
                                      gpointer user_data);
 
+typedef void (*MMModemGsmSmsSendFn) (MMModemGsmSms *modem,
+                                     GArray *indexes,
+                                     GError *error,
+                                     gpointer user_data);
+
 struct _MMModemGsmSms {
     GTypeInterface g_iface;
 
@@ -45,7 +50,7 @@ struct _MMModemGsmSms {
                   const char *smsc,
                   guint validity,
                   guint class,
-                  MMModemFn callback,
+                  MMModemGsmSmsSendFn callback,
                   gpointer user_data);
 
     void (*get) (MMModemGsmSms *modem,
@@ -80,7 +85,7 @@ void mm_modem_gsm_sms_send (MMModemGsmSms *self,
                             const char *smsc,
                             guint validity,
                             guint class,
-                            MMModemFn callback,
+                            MMModemGsmSmsSendFn callback,
                             gpointer user_data);
 
 void mm_modem_gsm_sms_get (MMModemGsmSms *self,

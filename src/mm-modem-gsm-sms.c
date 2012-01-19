@@ -133,6 +133,14 @@ sms_list_done (MMModemGsmSms *self,
 
 /*****************************************************************************/
 
+static void
+sms_send_invoke (MMCallbackInfo *info)
+{
+    MMModemGsmSmsSendFn callback = (MMModemGsmSmsSendFn) info->callback;
+
+    callback (MM_MODEM_GSM_SMS (info->modem), NULL, info->error, info->user_data);
+}
+
 void
 mm_modem_gsm_sms_send (MMModemGsmSms *self,
                        const char *number,
@@ -140,7 +148,7 @@ mm_modem_gsm_sms_send (MMModemGsmSms *self,
                        const char *smsc,
                        guint validity,
                        guint class,
-                       MMModemFn callback,
+                       MMModemGsmSmsSendFn callback,
                        gpointer user_data)
 {
     g_return_if_fail (MM_IS_MODEM_GSM_SMS (self));
@@ -150,9 +158,18 @@ mm_modem_gsm_sms_send (MMModemGsmSms *self,
 
     if (MM_MODEM_GSM_SMS_GET_INTERFACE (self)->send)
         MM_MODEM_GSM_SMS_GET_INTERFACE (self)->send (self, number, text, smsc, validity, class, callback, user_data);
-    else
-        async_call_not_supported (self, callback, user_data);
+    else {
+        MMCallbackInfo *info;
 
+        info = mm_callback_info_new_full (MM_MODEM (self),
+                                          sms_send_invoke,
+                                          G_CALLBACK (callback),
+                                          user_data);
+
+        info->error = g_error_new_literal (MM_MODEM_ERROR, MM_MODEM_ERROR_OPERATION_NOT_SUPPORTED,
+                                           "Operation not supported");
+        mm_callback_info_schedule (info);
+    }
 }
 
 static void
@@ -576,6 +593,20 @@ impl_gsm_modem_sms_save (MMModemGsmSms *modem,
 /*****************************************************************************/
 
 static void
+send_sms_call_done (MMModemGsmSms *modem,
+                    GArray *indexes,
+                    GError *error,
+                    gpointer user_data)
+{
+    DBusGMethodInvocation *context = (DBusGMethodInvocation *) user_data;
+
+    if (error)
+        dbus_g_method_return_error (context, error);
+    else
+        dbus_g_method_return (context, indexes);
+}
+
+static void
 sms_send_auth_cb (MMAuthRequest *req,
                   GObject *owner,
                   DBusGMethodInvocation *context,
@@ -625,10 +656,10 @@ sms_send_auth_cb (MMAuthRequest *req,
 
 done:
     if (error) {
-        async_call_done (MM_MODEM (self), error, context);
+        send_sms_call_done (self, NULL, error, context);
         g_error_free (error);
     } else
-        mm_modem_gsm_sms_send (self, number, text, smsc, validity, class, async_call_done, context);
+        mm_modem_gsm_sms_send (self, number, text, smsc, validity, class, send_sms_call_done, context);
 }
 
 static void
