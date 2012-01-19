@@ -4,9 +4,9 @@
  ModemManager 0.6 Interface Specification
 
    Copyright (C) 2008 Novell, Inc.
-   Copyright (C) 2008-2011 Red Hat, Inc.
+   Copyright (C) 2008-2012 Red Hat, Inc.
    Copyright (C) 2011 The Chromium OS Authors
-   Copyright (C) 2011 Google, Inc.
+   Copyright (C) 2011-2012 Google, Inc.
 -->
 
 <node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
@@ -22,7 +22,6 @@
 
     <!--
         Connect:
-        @number: The number to use for dialing (optional).
 
         Requests activation of a packet data connection with the network using
         this bearer's properties. Upon successful activation, the modem can
@@ -35,16 +34,8 @@
         #org.freedesktop.ModemManager1.Bearer:Ip6Config
         properties become valid and may contain IP configuration information for
         the data interface associated with this bearer.
-
-        @number is usually not required, in which case it should be an empty
-        (zero-length) string.  @number is only required for POTS connections or
-        in certain special circumstances. If a number is given for 3GPP
-        (GSM/UMTS/LTE) based devices, it is always ignored, as the number is
-        generated internally if one is required at all.
     -->
-    <method name="Connect">
-      <arg name="number" type="s" direction="in" />
-    </method>
+    <method name="Connect" />
 
     <!--
         Disconnect:
