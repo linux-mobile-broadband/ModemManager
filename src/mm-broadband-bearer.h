@@ -21,6 +21,8 @@
 #include <glib.h>
 #include <glib-object.h>
 
+#include <libmm-common.h>
+
 #include "mm-bearer.h"
 #include "mm-broadband-modem.h"
 
@@ -48,6 +50,36 @@ struct _MMBroadbandBearer {
 
 struct _MMBroadbandBearerClass {
     MMBearerClass parent;
+
+    /* Full 3GPP connection sequence */
+    void     (* connect_3gpp)        (MMBroadbandBearer *self,
+                                      MMBroadbandModem *modem,
+                                      MMAtSerialPort *primary,
+                                      MMAtSerialPort *secondary,
+                                      MMPort *data,
+                                      GCancellable *cancellable,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data);
+    gboolean (* connect_3gpp_finish) (MMBroadbandBearer *self,
+                                      GAsyncResult *res,
+                                      MMCommonBearerIpConfig **ipv4_config,
+                                      MMCommonBearerIpConfig **ipv6_config,
+                                      GError **error);
+
+    /* Full CDMA connection sequence */
+    void     (* connect_cdma)        (MMBroadbandBearer *self,
+                                      MMBroadbandModem *modem,
+                                      MMAtSerialPort *primary,
+                                      MMAtSerialPort *secondary,
+                                      MMPort *data,
+                                      GCancellable *cancellable,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data);
+    gboolean (* connect_cdma_finish) (MMBroadbandBearer *self,
+                                      GAsyncResult *res,
+                                      MMCommonBearerIpConfig **ipv4_config,
+                                      MMCommonBearerIpConfig **ipv6_config,
+                                      GError **error);
 };
 
 GType mm_broadband_bearer_get_type (void);

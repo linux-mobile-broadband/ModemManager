@@ -99,6 +99,128 @@ mm_broadband_bearer_get_allow_roaming (MMBroadbandBearer *self)
 }
 
 /*****************************************************************************/
+/* Detailed connect context, used in both CDMA and 3GPP sequences */
+typedef struct {
+    MMBroadbandBearer *self;
+    MMBaseModem *modem;
+    MMAtSerialPort *primary;
+    MMPort *data;
+    GCancellable *cancellable;
+    GSimpleAsyncResult *result;
+
+    /* 3GPP-specific */
+    guint cid;
+    guint max_cid;
+    GError *saved_error;
+} DetailedConnectContext;
+
+static gboolean
+detailed_connect_finish (MMBroadbandBearer *self,
+                         GAsyncResult *res,
+                         MMCommonBearerIpConfig **ipv4_config,
+                         MMCommonBearerIpConfig **ipv6_config,
+                         GError **error)
+{
+    MMCommonBearerIpConfig *config;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    config = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+
+    /* In the default implementation, we assume we'll have the same configs */
+    *ipv4_config = g_object_ref (config);
+    *ipv6_config = g_object_ref (config);
+    return TRUE;
+}
+
+static void
+detailed_connect_context_complete_and_free (DetailedConnectContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    if (ctx->saved_error)
+        g_error_free (ctx->saved_error);
+    g_object_unref (ctx->cancellable);
+    g_object_unref (ctx->data);
+    g_object_unref (ctx->primary);
+    g_object_unref (ctx->self);
+    g_object_unref (ctx->modem);
+    g_free (ctx);
+}
+
+static void
+detailed_connect_context_complete_and_free_successful (DetailedConnectContext *ctx)
+{
+    MMCommonBearerIpConfig *config;
+
+    /* If serial port, set PPP method. Otherwise, assume DHCP is needed. */
+    config = mm_common_bearer_ip_config_new ();
+    mm_common_bearer_ip_config_set_method (config,
+                                           (MM_IS_AT_SERIAL_PORT (ctx->data) ?
+                                            MM_BEARER_IP_METHOD_PPP :
+                                            MM_BEARER_IP_METHOD_DHCP));
+    g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                               config,
+                                               (GDestroyNotify)g_object_unref);
+    detailed_connect_context_complete_and_free (ctx);
+}
+
+static gboolean
+detailed_connect_context_set_error_if_cancelled (DetailedConnectContext *ctx,
+                                                 GError **error)
+{
+    if (!g_cancellable_is_cancelled (ctx->cancellable))
+        return FALSE;
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_CANCELLED,
+                 "Connection setup operation has been cancelled");
+    return TRUE;
+}
+
+static gboolean
+detailed_connect_context_complete_and_free_if_cancelled (DetailedConnectContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!detailed_connect_context_set_error_if_cancelled (ctx, &error))
+        return FALSE;
+
+    g_simple_async_result_take_error (ctx->result, error);
+    detailed_connect_context_complete_and_free (ctx);
+    return TRUE;
+}
+
+static DetailedConnectContext *
+detailed_connect_context_new (MMBroadbandBearer *self,
+                              MMBroadbandModem *modem,
+                              MMAtSerialPort *primary,
+                              MMPort *data,
+                              GCancellable *cancellable,
+                              GAsyncReadyCallback callback,
+                              gpointer user_data)
+{
+    DetailedConnectContext *ctx;
+
+    ctx = g_new0 (DetailedConnectContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
+    ctx->primary = g_object_ref (primary);
+    ctx->data = g_object_ref (data);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             detailed_connect_context_new);
+    /* NOTE:
+     * We don't currently support cancelling AT commands, so we'll just check
+     * whether the operation is to be cancelled at each step. */
+    ctx->cancellable = g_object_ref (cancellable);
+    return ctx;
+}
+
+/*****************************************************************************/
 /* CDMA CONNECT
  *
  * CDMA connection procedure of a bearer involves several steps:
@@ -109,111 +231,37 @@ mm_broadband_bearer_get_allow_roaming (MMBroadbandBearer *self)
  * 3) Initiate call.
  */
 
-typedef struct {
-    MMBroadbandBearer *self;
-    MMBaseModem *modem;
-    MMAtSerialPort *primary;
-    MMPort *data;
-    GSimpleAsyncResult *result;
-    gchar *number;
-    GError *error;
-    GCancellable *cancellable;
-} ConnectContextCdma;
-
 static void
-connect_context_cdma_complete_and_free (ConnectContextCdma *ctx)
+dial_cdma_ready (MMBaseModem *modem,
+                 GAsyncResult *res,
+                 DetailedConnectContext *ctx)
 {
-    if (ctx->error) {
-        /* On errors, close the data port */
-        if (MM_IS_AT_SERIAL_PORT (ctx->data))
-            mm_serial_port_close (MM_SERIAL_PORT (ctx->data));
+    GError *error = NULL;
 
-        g_simple_async_result_take_error (ctx->result, ctx->error);
-    } else {
-        GVariant *ip_config;
-        GVariantBuilder builder;
-        MMBearerIpMethod ip_method;
-
-        /* Port is connected; update the state */
-        mm_port_set_connected (ctx->data, TRUE);
-        mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (ctx->self),
-                                       TRUE);
-        mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (ctx->self),
-                                       mm_port_get_device (ctx->data));
-
-        /* If serial port, set PPP method */
-        ip_method = (MM_IS_AT_SERIAL_PORT (ctx->data) ?
-                     MM_BEARER_IP_METHOD_PPP :
-                     MM_BEARER_IP_METHOD_DHCP);
-
-        g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
-        g_variant_builder_add (&builder, "{sv}", "method", g_variant_new_uint32 (ip_method));
-        ip_config = g_variant_builder_end (&builder);
-        mm_gdbus_bearer_set_ip4_config (MM_GDBUS_BEARER (ctx->self), ip_config);
-        mm_gdbus_bearer_set_ip6_config (MM_GDBUS_BEARER (ctx->self), ip_config);
-
-        /* Keep data port around while connected */
-        ctx->self->priv->port = g_object_ref (ctx->data);
-
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    }
-
-    g_simple_async_result_complete_in_idle (ctx->result);
-
-    g_free (ctx->number);
-    g_object_unref (ctx->cancellable);
-    g_object_unref (ctx->data);
-    g_object_unref (ctx->primary);
-    g_object_unref (ctx->self);
-    g_object_unref (ctx->modem);
-    g_object_unref (ctx->result);
-    g_free (ctx);
-}
-
-static gboolean
-connect_context_cdma_set_error_if_cancelled (ConnectContextCdma *ctx,
-                                             GError **error)
-{
-    if (!g_cancellable_is_cancelled (ctx->cancellable))
-        return FALSE;
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_CANCELLED,
-                 "CDMA connection setup operation has been cancelled");
-    return TRUE;
-}
-
-static void
-dial_ready (MMBaseModem *modem,
-            GAsyncResult *res,
-            ConnectContextCdma *ctx)
-{
     /* DO NOT check for cancellable here. If we got here without errors, the
      * bearer is really connected and therefore we need to reflect that in
      * the state machine. */
-    mm_base_modem_at_command_finish (modem, res, &(ctx->error));
-    if (ctx->error)
-        mm_warn ("Couldn't connect: '%s'", ctx->error->message);
-    /* else... Yuhu! */
+    mm_base_modem_at_command_finish (modem, res, &error);
+    if (error) {
+        mm_warn ("Couldn't connect: '%s'", error->message);
+        g_simple_async_result_take_error (ctx->result, error);
+        detailed_connect_context_complete_and_free (ctx);
+        return;
+    }
 
-    connect_context_cdma_complete_and_free (ctx);
+    /* else... Yuhu! */
+    detailed_connect_context_complete_and_free_successful (ctx);
 }
 
 static void
-cdma_connect_context_dial (ConnectContextCdma *ctx)
+cdma_connect_context_dial (DetailedConnectContext *ctx)
 {
     gchar *command;
 
-    /* Decide which number to dial, in the following order:
-     *  (1) If a number given during Connect(), use it.
-     *  (2) If a number given when creating the bearer, use that one. Wait, this is quite
-     *      redundant, isn't it?
-     *  (3) Otherwise, use the default one, #777
+    /* If a number was given when creating the bearer, use that one.
+     * Otherwise, use the default one, #777
      */
-    if (ctx->number)
-        command = g_strconcat ("DT", ctx->number, NULL);
-    else if (ctx->self->priv->number)
+    if (ctx->self->priv->number)
         command = g_strconcat ("DT", ctx->self->priv->number, NULL);
     else
         command = g_strdup ("DT#777");
@@ -224,7 +272,7 @@ cdma_connect_context_dial (ConnectContextCdma *ctx)
         90,
         FALSE,
         NULL, /* cancellable */
-        (GAsyncReadyCallback)dial_ready,
+        (GAsyncReadyCallback)dial_cdma_ready,
         ctx);
     g_free (command);
 }
@@ -232,18 +280,19 @@ cdma_connect_context_dial (ConnectContextCdma *ctx)
 static void
 set_rm_protocol_ready (MMBaseModem *self,
                        GAsyncResult *res,
-                       ConnectContextCdma *ctx)
+                       DetailedConnectContext *ctx)
 {
-     /* If cancelled, complete */
-    if (connect_context_cdma_set_error_if_cancelled (ctx, &ctx->error)) {
-        connect_context_cdma_complete_and_free (ctx);
-        return;
-    }
+    GError *error = NULL;
 
-    mm_base_modem_at_command_finish (self, res, &(ctx->error));
-    if (ctx->error) {
-        mm_warn ("Couldn't set RM protocol: '%s'", ctx->error->message);
-        connect_context_cdma_complete_and_free (ctx);
+    /* If cancelled, complete */
+    if (detailed_connect_context_complete_and_free_if_cancelled (ctx))
+        return;
+
+    mm_base_modem_at_command_finish (self, res, &error);
+    if (error) {
+        mm_warn ("Couldn't set RM protocol: '%s'", error->message);
+        g_simple_async_result_take_error (ctx->result, error);
+        detailed_connect_context_complete_and_free (ctx);
         return;
     }
 
@@ -254,33 +303,34 @@ set_rm_protocol_ready (MMBaseModem *self,
 static void
 current_rm_protocol_ready (MMBaseModem *self,
                            GAsyncResult *res,
-                           ConnectContextCdma *ctx)
+                           DetailedConnectContext *ctx)
 {
     const gchar *result;
+    GError *error = NULL;
     guint current_index;
     MMModemCdmaRmProtocol current_rm;
 
     /* If cancelled, complete */
-    if (connect_context_cdma_set_error_if_cancelled (ctx, &ctx->error)) {
-        connect_context_cdma_complete_and_free (ctx);
+    if (detailed_connect_context_complete_and_free_if_cancelled (ctx))
         return;
-    }
 
-    result = mm_base_modem_at_command_finish (self, res, &(ctx->error));
-    if (ctx->error) {
-        mm_warn ("Couldn't query current RM protocol: '%s'", ctx->error->message);
-        connect_context_cdma_complete_and_free (ctx);
+    result = mm_base_modem_at_command_finish (self, res, &error);
+    if (error) {
+        mm_warn ("Couldn't query current RM protocol: '%s'", error->message);
+        g_simple_async_result_take_error (ctx->result, error);
+        detailed_connect_context_complete_and_free (ctx);
         return;
     }
 
     result = mm_strip_tag (result, "+CRM:");
     current_index = (guint) atoi (result);
-    current_rm = mm_cdma_get_rm_protocol_from_index (current_index, &ctx->error);
-    if (ctx->error) {
+    current_rm = mm_cdma_get_rm_protocol_from_index (current_index, &error);
+    if (error) {
         mm_warn ("Couldn't parse RM protocol reply (%s): '%s'",
                  result,
-                 ctx->error->message);
-        connect_context_cdma_complete_and_free (ctx);
+                 error->message);
+        g_simple_async_result_take_error (ctx->result, error);
+        detailed_connect_context_complete_and_free (ctx);
         return;
     }
 
@@ -292,11 +342,12 @@ current_rm_protocol_ready (MMBaseModem *self,
 
         new_index = (mm_cdma_get_index_from_rm_protocol (
                          ctx->self->priv->rm_protocol,
-                         &ctx->error));
-        if (ctx->error) {
+                         &error));
+        if (error) {
             mm_warn ("Cannot set RM protocol: '%s'",
-                     ctx->error->message);
-            connect_context_cdma_complete_and_free (ctx);
+                     error->message);
+            g_simple_async_result_take_error (ctx->result, error);
+            detailed_connect_context_complete_and_free (ctx);
             return;
         }
 
@@ -320,32 +371,23 @@ current_rm_protocol_ready (MMBaseModem *self,
 
 static void
 connect_cdma (MMBroadbandBearer *self,
-              MMBaseModem *modem,
+              MMBroadbandModem *modem,
               MMAtSerialPort *primary,
+              MMAtSerialPort *secondary, /* unused by us */
               MMPort *data,
-              const gchar *number,
               GCancellable *cancellable,
               GAsyncReadyCallback callback,
               gpointer user_data)
 {
-    ConnectContextCdma *ctx;
+    DetailedConnectContext *ctx;
 
-    ctx = g_new0 (ConnectContextCdma, 1);
-    ctx->primary = g_object_ref (primary);
-    ctx->data = g_object_ref (data);
-    ctx->self = g_object_ref (self);
-    ctx->number = g_strdup (number);
-    ctx->modem = g_object_ref (modem);
-
-    /* NOTE:
-     * We don't currently support cancelling AT commands, so we'll just check
-     * whether the operation is to be cancelled at each step. */
-    ctx->cancellable = g_object_ref (cancellable);
-
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             connect_cdma);
+    ctx = detailed_connect_context_new (self,
+                                        modem,
+                                        primary,
+                                        data,
+                                        cancellable,
+                                        callback,
+                                        user_data);
 
     if (self->priv->rm_protocol != MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
         /* Need to query current RM protocol */
@@ -381,122 +423,46 @@ connect_cdma (MMBroadbandBearer *self,
  * 4) Initiate call.
  */
 
-typedef struct {
-    MMBroadbandBearer *self;
-    MMBaseModem *modem;
-    MMAtSerialPort *primary;
-    MMPort *data;
-    guint cid;
-    guint max_cid;
-    GSimpleAsyncResult *result;
-    GError *error;
-    GCancellable *cancellable;
-} ConnectContext3gpp;
-
-static void
-connect_context_3gpp_complete_and_free (ConnectContext3gpp *ctx)
-{
-    if (ctx->error) {
-        /* On errors, close the data port */
-        if (MM_IS_AT_SERIAL_PORT (ctx->data))
-            mm_serial_port_close (MM_SERIAL_PORT (ctx->data));
-
-        g_simple_async_result_take_error (ctx->result, ctx->error);
-    } else {
-        GVariant *ip_config;
-        GVariantBuilder builder;
-        MMBearerIpMethod ip_method;
-
-        /* Port is connected; update the state */
-        mm_port_set_connected (ctx->data, TRUE);
-        mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (ctx->self),
-                                       TRUE);
-        mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (ctx->self),
-                                       mm_port_get_device (ctx->data));
-
-        /* If serial port, set PPP method */
-        ip_method = (MM_IS_AT_SERIAL_PORT (ctx->data) ?
-                     MM_BEARER_IP_METHOD_PPP :
-                     MM_BEARER_IP_METHOD_DHCP);
-
-        g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
-        g_variant_builder_add (&builder, "{sv}", "method", g_variant_new_uint32 (ip_method));
-        ip_config = g_variant_builder_end (&builder);
-        mm_gdbus_bearer_set_ip4_config (MM_GDBUS_BEARER (ctx->self), ip_config);
-        mm_gdbus_bearer_set_ip6_config (MM_GDBUS_BEARER (ctx->self), ip_config);
-
-        /* Keep data port and CID around while connected */
-        ctx->self->priv->cid = ctx->cid;
-        ctx->self->priv->port = g_object_ref (ctx->data);
-
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    }
-
-    g_simple_async_result_complete_in_idle (ctx->result);
-
-    g_object_unref (ctx->cancellable);
-    g_object_unref (ctx->data);
-    g_object_unref (ctx->primary);
-    g_object_unref (ctx->self);
-    g_object_unref (ctx->modem);
-    g_object_unref (ctx->result);
-    g_free (ctx);
-}
-
-static gboolean
-connect_context_3gpp_set_error_if_cancelled (ConnectContext3gpp *ctx,
-                                             GError **error)
-{
-    if (!g_cancellable_is_cancelled (ctx->cancellable))
-        return FALSE;
-
-    g_set_error (error,
-                 MM_CORE_ERROR,
-                 MM_CORE_ERROR_CANCELLED,
-                 "3GPP connection setup operation has been cancelled");
-    return TRUE;
-}
-
 static void
 connect_report_ready (MMBaseModem *modem,
                       GAsyncResult *res,
-                      ConnectContext3gpp *ctx)
+                      DetailedConnectContext *ctx)
 {
     const gchar *result;
 
     /* If cancelled, complete */
-    if (connect_context_3gpp_set_error_if_cancelled (ctx, &ctx->error)) {
-        connect_context_3gpp_complete_and_free (ctx);
+    if (detailed_connect_context_complete_and_free_if_cancelled (ctx))
         return;
-    }
 
     result = mm_base_modem_at_command_finish (modem, res, NULL);
     if (result &&
         g_str_has_prefix (result, "+CEER: ") &&
         strlen (result) > 7) {
-        GError *rebuilt;
+        g_simple_async_result_set_error (ctx->result,
+                                         ctx->saved_error->domain,
+                                         ctx->saved_error->code,
+                                         "%s", &result[7]);
+    } else
+        g_simple_async_result_take_error (ctx->result,
+                                          ctx->saved_error);
 
-        rebuilt = g_error_new (ctx->error->domain,
-                               ctx->error->code,
-                               "%s", &result[7]);
-        g_error_free (ctx->error);
-        ctx->error = rebuilt;
-    }
+    g_error_free (ctx->saved_error);
+    ctx->saved_error = NULL;
 
     /* Done with errors */
-    connect_context_3gpp_complete_and_free (ctx);
+    detailed_connect_context_complete_and_free (ctx);
 }
 
 static void
-connect_ready (MMBaseModem *modem,
-               GAsyncResult *res,
-               ConnectContext3gpp *ctx)
+dial_3gpp_ready (MMBaseModem *modem,
+                 GAsyncResult *res,
+                 DetailedConnectContext *ctx)
 {
     /* DO NOT check for cancellable here. If we got here without errors, the
      * bearer is really connected and therefore we need to reflect that in
      * the state machine. */
-    mm_base_modem_at_command_finish (modem, res, &(ctx->error));
-    if (ctx->error) {
+    mm_base_modem_at_command_finish (modem, res, &(ctx->saved_error));
+    if (ctx->saved_error) {
         /* Try to get more information why it failed */
         mm_base_modem_at_command_in_port (
             modem,
@@ -510,27 +476,32 @@ connect_ready (MMBaseModem *modem,
         return;
     }
 
+    /* Keep data port and CID around while connected */
+    ctx->self->priv->cid = ctx->cid;
+    ctx->self->priv->port = g_object_ref (ctx->data);
+
     /* Yuhu! */
-    connect_context_3gpp_complete_and_free (ctx);
+    detailed_connect_context_complete_and_free_successful (ctx);
 }
 
 static void
 initialize_pdp_context_ready (MMBaseModem *self,
                               GAsyncResult *res,
-                              ConnectContext3gpp *ctx)
+                              DetailedConnectContext *ctx)
 {
+    GError *error = NULL;
     gchar *command;
 
     /* If cancelled, complete */
-    if (connect_context_3gpp_set_error_if_cancelled (ctx, &ctx->error)) {
-        connect_context_3gpp_complete_and_free (ctx);
+    if (detailed_connect_context_complete_and_free_if_cancelled (ctx))
         return;
-    }
 
-    mm_base_modem_at_command_finish (self, res, &(ctx->error));
-    if (ctx->error) {
-        mm_warn ("Couldn't initialize PDP context with our APN: '%s'", ctx->error->message);
-        connect_context_3gpp_complete_and_free (ctx);
+    mm_base_modem_at_command_finish (self, res, &error);
+    if (error) {
+        mm_warn ("Couldn't initialize PDP context with our APN: '%s'",
+                 error->message);
+        g_simple_async_result_take_error (ctx->result, error);
+        detailed_connect_context_complete_and_free (ctx);
         return;
     }
 
@@ -543,7 +514,7 @@ initialize_pdp_context_ready (MMBaseModem *self,
         60,
         FALSE,
         NULL, /* cancellable */
-        (GAsyncReadyCallback)connect_ready,
+        (GAsyncReadyCallback)dial_3gpp_ready,
         ctx);
     g_free (command);
 }
@@ -551,7 +522,7 @@ initialize_pdp_context_ready (MMBaseModem *self,
 static void
 find_cid_ready (MMBaseModem *self,
                 GAsyncResult *res,
-                ConnectContext3gpp *ctx)
+                DetailedConnectContext *ctx)
 {
     GVariant *result;
     gchar *command;
@@ -560,18 +531,16 @@ find_cid_ready (MMBaseModem *self,
     result = mm_base_modem_at_sequence_finish (self, res, NULL, &error);
     if (!result) {
         mm_warn ("Couldn't find best CID to use: '%s'", error->message);
-        ctx->error = error;
-        connect_context_3gpp_complete_and_free (ctx);
+        g_simple_async_result_take_error (ctx->result, error);
+        detailed_connect_context_complete_and_free (ctx);
         return;
     }
 
     /* If cancelled, complete. Normally, we would get the cancellation error
      * already when finishing the sequence, but we may still get cancelled
      * between last command result parsing in the sequence and the ready(). */
-    if (connect_context_3gpp_set_error_if_cancelled (ctx, &ctx->error)) {
-        connect_context_3gpp_complete_and_free (ctx);
+    if (detailed_connect_context_complete_and_free_if_cancelled (ctx))
         return;
-    }
 
     /* Initialize PDP context with our APN */
     ctx->cid = g_variant_get_uint32 (result);
@@ -592,7 +561,7 @@ find_cid_ready (MMBaseModem *self,
 
 static gboolean
 parse_cid_range (MMBaseModem *self,
-                 ConnectContext3gpp *ctx,
+                 DetailedConnectContext *ctx,
                  const gchar *command,
                  const gchar *response,
                  gboolean last_command,
@@ -606,7 +575,7 @@ parse_cid_range (MMBaseModem *self,
     guint cid = 0;
 
     /* If cancelled, set result error */
-    if (connect_context_3gpp_set_error_if_cancelled (ctx, result_error))
+    if (detailed_connect_context_set_error_if_cancelled (ctx, result_error))
         return FALSE;
 
     if (error) {
@@ -677,7 +646,7 @@ parse_cid_range (MMBaseModem *self,
 
 static gboolean
 parse_pdp_list (MMBaseModem *self,
-                ConnectContext3gpp *ctx,
+                DetailedConnectContext *ctx,
                 const gchar *command,
                 const gchar *response,
                 gboolean last_command,
@@ -691,7 +660,7 @@ parse_pdp_list (MMBaseModem *self,
     guint cid;
 
     /* If cancelled, set result error */
-    if (connect_context_3gpp_set_error_if_cancelled (ctx, result_error))
+    if (detailed_connect_context_set_error_if_cancelled (ctx, result_error))
         return FALSE;
 
     ctx->max_cid = 0;
@@ -760,30 +729,23 @@ static const MMBaseModemAtCommand find_cid_sequence[] = {
 
 static void
 connect_3gpp (MMBroadbandBearer *self,
-              MMBaseModem *modem,
+              MMBroadbandModem *modem,
               MMAtSerialPort *primary,
+              MMAtSerialPort *secondary, /* unused by us */
               MMPort *data,
               GCancellable *cancellable,
               GAsyncReadyCallback callback,
               gpointer user_data)
 {
-    ConnectContext3gpp *ctx;
+    DetailedConnectContext *ctx;
 
-    ctx = g_new0 (ConnectContext3gpp, 1);
-    ctx->primary = g_object_ref (primary);
-    ctx->data = g_object_ref (data);
-    ctx->self = g_object_ref (self);
-    ctx->modem = g_object_ref (modem);
-
-    /* NOTE:
-     * We don't currently support cancelling AT commands, so we'll just check
-     * whether the operation is to be cancelled at each step. */
-    ctx->cancellable = g_object_ref (cancellable);
-
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             connect_3gpp);
+    ctx = detailed_connect_context_new (self,
+                                        modem,
+                                        primary,
+                                        data,
+                                        cancellable,
+                                        callback,
+                                        user_data);
 
     mm_dbg ("Looking for best CID...");
     mm_base_modem_at_sequence_in_port (
@@ -800,24 +762,144 @@ connect_3gpp (MMBroadbandBearer *self,
 /*****************************************************************************/
 /* CONNECT */
 
+typedef struct {
+    MMPort *data;
+    MMCommonBearerIpConfig *ipv4_config;
+    MMCommonBearerIpConfig *ipv6_config;
+} ConnectResult;
+
+static void
+connect_result_free (ConnectResult *result)
+{
+    if (result->ipv4_config)
+        g_object_unref (result->ipv4_config);
+    if (result->ipv6_config)
+        g_object_unref (result->ipv6_config);
+    g_object_unref (result->data);
+    g_free (result);
+}
+
+typedef struct {
+    MMBroadbandBearer *self;
+    GSimpleAsyncResult *result;
+    MMPort *data;
+} ConnectContext;
+
+static void
+connect_context_complete_and_free (ConnectContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->data);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
 static gboolean
 connect_finish (MMBearer *self,
                 GAsyncResult *res,
+                MMPort **data,
+                MMCommonBearerIpConfig **ipv4_config,
+                MMCommonBearerIpConfig **ipv6_config,
                 GError **error)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    ConnectResult *result;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    result = (ConnectResult *) g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    *data = MM_PORT (g_object_ref (result->data));
+    *ipv4_config = (result->ipv4_config ? g_object_ref (result->ipv4_config) : NULL);
+    *ipv6_config = (result->ipv6_config ? g_object_ref (result->ipv6_config) : NULL);
+
+    return TRUE;
+}
+
+static void
+connect_succeeded (ConnectContext *ctx,
+                   MMCommonBearerIpConfig *ipv4_config,
+                   MMCommonBearerIpConfig *ipv6_config)
+{
+    ConnectResult *result;
+
+    /* Port is connected; update the state */
+    mm_port_set_connected (ctx->data, TRUE);
+
+    /* Build result */
+    result = g_new0 (ConnectResult, 1);
+    result->data = g_object_ref (ctx->data);
+    result->ipv4_config = ipv4_config;
+    result->ipv6_config = ipv6_config;
+
+    /* Set operation result */
+    g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                               result,
+                                               (GDestroyNotify)connect_result_free);
+
+    connect_context_complete_and_free (ctx);
+}
+
+static void
+connect_failed (ConnectContext *ctx,
+                GError *error)
+{
+    /* On errors, close the data port */
+    if (MM_IS_AT_SERIAL_PORT (ctx->data))
+        mm_serial_port_close (MM_SERIAL_PORT (ctx->data));
+
+    g_simple_async_result_take_error (ctx->result, error);
+    connect_context_complete_and_free (ctx);
+}
+
+static void
+connect_cdma_ready (MMBroadbandBearer *self,
+                    GAsyncResult *res,
+                    ConnectContext *ctx)
+{
+    GError *error = NULL;
+    MMCommonBearerIpConfig *ipv4_config = NULL;
+    MMCommonBearerIpConfig *ipv6_config = NULL;
+
+    if (!MM_BROADBAND_BEARER_GET_CLASS (self)->connect_cdma_finish (self,
+                                                                    res,
+                                                                    &ipv4_config,
+                                                                    &ipv6_config,
+                                                                    &error))
+        connect_failed (ctx, error);
+    else
+        connect_succeeded (ctx, ipv4_config, ipv6_config);
+}
+
+static void
+connect_3gpp_ready (MMBroadbandBearer *self,
+                    GAsyncResult *res,
+                    ConnectContext *ctx)
+{
+    GError *error = NULL;
+    MMCommonBearerIpConfig *ipv4_config = NULL;
+    MMCommonBearerIpConfig *ipv6_config = NULL;
+
+    if (!MM_BROADBAND_BEARER_GET_CLASS (self)->connect_3gpp_finish (self,
+                                                                    res,
+                                                                    &ipv4_config,
+                                                                    &ipv6_config,
+                                                                    &error))
+        connect_failed (ctx, error);
+    else
+        connect_succeeded (ctx, ipv4_config, ipv6_config);
 }
 
 static void
 connect (MMBearer *self,
-         const gchar *number,
          GCancellable *cancellable,
          GAsyncReadyCallback callback,
          gpointer user_data)
 {
+    MMBaseModem *modem = NULL;
     MMAtSerialPort *primary;
     MMPort *data;
-    MMBaseModem *modem = NULL;
+    ConnectContext *ctx;
 
     /* Don't try to connect if already connected */
     if (MM_BROADBAND_BEARER (self)->priv->port) {
@@ -870,46 +952,55 @@ connect (MMBearer *self,
      * which is actually always right now, this is already ensured because the
      * primary port is kept open as long as the modem is enabled, but anyway
      * there's no real problem in keeping an open count here as well. */
-     if (MM_IS_AT_SERIAL_PORT (data)) {
-         GError *error = NULL;
+    if (MM_IS_AT_SERIAL_PORT (data)) {
+        GError *error = NULL;
 
-         if (!mm_serial_port_open (MM_SERIAL_PORT (data), &error)) {
-             g_prefix_error (&error, "Couldn't connect: cannot keep data port open.");
-             g_simple_async_report_take_gerror_in_idle (
-                 G_OBJECT (self),
-                 callback,
-                 user_data,
-                 error);
-             g_object_unref (modem);
-             return;
-         }
+        if (!mm_serial_port_open (MM_SERIAL_PORT (data), &error)) {
+            g_prefix_error (&error, "Couldn't connect: cannot keep data port open.");
+            g_simple_async_report_take_gerror_in_idle (
+                G_OBJECT (self),
+                callback,
+                user_data,
+                error);
+            g_object_unref (modem);
+            return;
+        }
     }
+
+    /* In this context, we only keep the stuff we'll need later */
+    ctx = g_new0 (ConnectContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->data = g_object_ref (data);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             connect);
 
     /* If the modem has 3GPP capabilities, launch 3GPP-based connection */
-    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self))) {
-        if (number && number[0])
-            mm_warn ("Ignoring number to use when connecting 3GPP bearer: '%s'", number);
-
-        connect_3gpp (MM_BROADBAND_BEARER (self),
-                      modem,
-                      primary,
-                      data,
-                      cancellable,
-                      callback,
-                      user_data);
-        g_object_unref (modem);
-        return;
+    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (modem))) {
+        MM_BROADBAND_BEARER_GET_CLASS (self)->connect_3gpp (
+            MM_BROADBAND_BEARER (self),
+            MM_BROADBAND_MODEM (modem),
+            primary,
+            mm_base_modem_get_port_secondary (modem),
+            data,
+            cancellable,
+            (GAsyncReadyCallback) connect_3gpp_ready,
+            ctx);
+    }
+    /* Otherwise, launch CDMA-specific connection */
+    else {
+        MM_BROADBAND_BEARER_GET_CLASS (self)->connect_cdma (
+            MM_BROADBAND_BEARER (self),
+            MM_BROADBAND_MODEM (modem),
+            primary,
+            mm_base_modem_get_port_secondary (modem),
+            data,
+            cancellable,
+            (GAsyncReadyCallback) connect_cdma_ready,
+            ctx);
     }
 
-    /* Otherwise, launch CDMA-specific connection */
-    connect_cdma (MM_BROADBAND_BEARER (self),
-                  modem,
-                  primary,
-                  data,
-                  number,
-                  cancellable,
-                  callback,
-                  user_data);
     g_object_unref (modem);
 }
 
@@ -1437,6 +1528,11 @@ mm_broadband_bearer_class_init (MMBroadbandBearerClass *klass)
     bearer_class->disconnect = disconnect;
     bearer_class->disconnect_finish = disconnect_finish;
 
+    klass->connect_3gpp = connect_3gpp;
+    klass->connect_3gpp_finish = detailed_connect_finish;
+    klass->connect_cdma = connect_cdma;
+    klass->connect_cdma_finish = detailed_connect_finish;
+
     properties[PROP_3GPP_APN] =
         g_param_spec_string (MM_BROADBAND_BEARER_3GPP_APN,
                              "3GPP APN",
@@ -1471,7 +1567,7 @@ mm_broadband_bearer_class_init (MMBroadbandBearerClass *klass)
     g_object_class_install_property (object_class, PROP_IP_TYPE, properties[PROP_IP_TYPE]);
 
     properties[PROP_ALLOW_ROAMING] =
-        g_param_spec_boolean (MM_BEARER_ALLOW_ROAMING,
+        g_param_spec_boolean (MM_BROADBAND_BEARER_ALLOW_ROAMING,
                               "Allow roaming",
                               "Whether connections are allowed when roaming",
                               TRUE,
