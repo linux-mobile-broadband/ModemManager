@@ -119,9 +119,17 @@ connect_ready (MMBearer *self,
 {
     GError *error = NULL;
     gboolean launch_disconnect = FALSE;
+    MMPort *data = NULL;
+    MMCommonBearerIpConfig *ipv4_config = NULL;
+    MMCommonBearerIpConfig *ipv6_config = NULL;
 
     /* NOTE: connect() implementations *MUST* handle cancellations themselves */
-    if (!MM_BEARER_GET_CLASS (self)->connect_finish (self, res, &error)) {
+    if (!MM_BEARER_GET_CLASS (self)->connect_finish (self,
+                                                     res,
+                                                     &data,
+                                                     &ipv4_config,
+                                                     &ipv6_config,
+                                                     &error)) {
         mm_dbg ("Couldn't connect bearer '%s': '%s'",
                 self->priv->path,
                 error->message);
@@ -136,8 +144,14 @@ connect_ready (MMBearer *self,
         }
         g_simple_async_result_take_error (simple, error);
     }
+    /* Handle cancellations detected after successful connection */
     else if (g_cancellable_is_cancelled (self->priv->connect_cancellable)) {
         mm_dbg ("Connected bearer '%s', but need to disconnect", self->priv->path);
+
+        g_clear_object (&data);
+        g_clear_object (&ipv4_config);
+        g_clear_object (&ipv6_config);
+
         g_simple_async_result_set_error (
             simple,
             MM_CORE_ERROR,
@@ -147,8 +161,24 @@ connect_ready (MMBearer *self,
     }
     else {
         mm_dbg ("Connected bearer '%s'", self->priv->path);
+
         self->priv->status = MM_BEARER_STATUS_CONNECTED;
         g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
+
+        /* Update the interface state */
+        mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (self), TRUE);
+        mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (self), mm_port_get_device (data));
+        mm_gdbus_bearer_set_ip4_config (
+            MM_GDBUS_BEARER (self),
+            mm_common_bearer_ip_config_get_dictionary (ipv4_config));
+        mm_gdbus_bearer_set_ip6_config (
+            MM_GDBUS_BEARER (self),
+            mm_common_bearer_ip_config_get_dictionary (ipv6_config));
+
+        g_clear_object (&data);
+        g_clear_object (&ipv4_config);
+        g_clear_object (&ipv6_config);
+
         g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     }
 
@@ -316,6 +346,13 @@ disconnect_ready (MMBearer *self,
     else {
         mm_dbg ("Disconnected bearer '%s'", self->priv->path);
         self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
+
+        /* Update the interface state */
+        mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (self), FALSE);
+        mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (self), NULL);
+        mm_gdbus_bearer_set_ip4_config (MM_GDBUS_BEARER (self), NULL);
+        mm_gdbus_bearer_set_ip6_config (MM_GDBUS_BEARER (self), NULL);
+
         g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     }
 
@@ -340,6 +377,12 @@ status_changed_complete_disconnect (MMBearer *self,
     g_signal_handler_disconnect (self,
                                  self->priv->disconnect_signal_handler);
     self->priv->disconnect_signal_handler = 0;
+
+    /* Update the interface state */
+    mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (self), FALSE);
+    mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (self), NULL);
+    mm_gdbus_bearer_set_ip4_config (MM_GDBUS_BEARER (self), NULL);
+    mm_gdbus_bearer_set_ip6_config (MM_GDBUS_BEARER (self), NULL);
 
     g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     g_simple_async_result_complete (simple);

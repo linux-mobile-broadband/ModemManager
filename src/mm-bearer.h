@@ -73,6 +73,9 @@ struct _MMBearerClass {
                       gpointer user_data);
     gboolean (* connect_finish) (MMBearer *bearer,
                                  GAsyncResult *res,
+                                 MMPort **data,
+                                 MMCommonBearerIpConfig **ipv4_config,
+                                 MMCommonBearerIpConfig **ipv6_config,
                                  GError **error);
 
     /* Disconnect this bearer */
