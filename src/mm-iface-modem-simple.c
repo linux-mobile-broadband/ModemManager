@@ -25,8 +25,6 @@
 #include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-cdma.h"
 #include "mm-iface-modem-simple.h"
-#include "mm-bearer-3gpp.h"
-#include "mm-bearer-cdma.h"
 #include "mm-log.h"
 
 /*****************************************************************************/
@@ -169,314 +167,6 @@ register_in_3gpp_or_cdma_network (MMIfaceModemSimple *self,
 
 /*****************************************************************************/
 
-typedef struct {
-    GSimpleAsyncResult *result;
-    MMIfaceModemSimple *self;
-    MMCommonBearerProperties *bearer_properties;
-    gboolean create_cdma_bearer;
-    gboolean create_3gpp_bearer;
-    GList *list;
-} CreateBearersContext;
-
-static void
-create_bearers_context_complete_and_free (CreateBearersContext *ctx)
-{
-    g_simple_async_result_complete_in_idle (ctx->result);
-    g_list_free_full (ctx->list, (GDestroyNotify)g_object_unref);
-    g_object_unref (ctx->bearer_properties);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
-
-static GList *
-create_3gpp_and_cdma_bearers_finish (MMIfaceModemSimple *self,
-                                     GAsyncResult *res,
-                                     GError **error)
-{
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    /* We return the list itself. Note that there was no GDestroyNotify given when
-     * the result was set, as we know that this finish() is always executed */
-    return (GList *) g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
-}
-
-static void create_next_bearer (CreateBearersContext *ctx);
-
-static void
-create_bearer_ready (MMIfaceModem *self,
-                     GAsyncResult *res,
-                     CreateBearersContext *ctx)
-{
-    GError *error = NULL;
-    MMBearer *bearer;
-
-    bearer = mm_iface_modem_create_bearer_finish (self, res, &error);
-    if (!bearer) {
-        g_simple_async_result_take_error (ctx->result, error);
-        create_bearers_context_complete_and_free (ctx);
-        return;
-    }
-
-    /* Keep the new bearer */
-    ctx->list = g_list_prepend (ctx->list, bearer);
-
-    /* And see if we need to create a new one */
-    create_next_bearer (ctx);
-}
-
-static void
-create_next_bearer (CreateBearersContext *ctx)
-{
-    /* Create 3GPP bearer if needed */
-    if (ctx->create_3gpp_bearer) {
-        ctx->create_3gpp_bearer = FALSE;
-        mm_iface_modem_create_bearer (MM_IFACE_MODEM (ctx->self),
-                                      ctx->bearer_properties,
-                                      (GAsyncReadyCallback)create_bearer_ready,
-                                      ctx);
-        return;
-    }
-
-    /* Create CDMA bearer if needed */
-    if (ctx->create_cdma_bearer) {
-        MMCommonBearerProperties *cdma_properties = NULL;
-
-        ctx->create_cdma_bearer = FALSE;
-
-        /* If the bearer properties has 'apn', we need to remove that before
-         * trying to create the bearer. */
-        if (mm_common_bearer_properties_get_apn (ctx->bearer_properties)) {
-            cdma_properties = mm_common_bearer_properties_dup (ctx->bearer_properties);
-            mm_common_bearer_properties_set_apn (cdma_properties, NULL);
-        }
-
-        mm_iface_modem_create_bearer (
-            MM_IFACE_MODEM (ctx->self),
-            (cdma_properties ? cdma_properties : ctx->bearer_properties),
-            (GAsyncReadyCallback)create_bearer_ready,
-            ctx);
-
-        if (cdma_properties)
-            g_object_unref (cdma_properties);
-        return;
-    }
-
-    /* If no more bearers to create, we're done.
-     * NOTE: we won't provide a GDestroyNotify to clear the gpointer passed as
-     * result, as we know that finish() will ALWAYS be executed. */
-    g_assert (ctx->list != NULL);
-    g_simple_async_result_set_op_res_gpointer (ctx->result, ctx->list, NULL);
-    ctx->list = NULL;
-    create_bearers_context_complete_and_free (ctx);
-}
-
-static void
-create_3gpp_and_cdma_bearers (MMIfaceModemSimple *self,
-                              MMCommonBearerProperties *bearer_properties,
-                              GAsyncReadyCallback callback,
-                              gpointer user_data)
-{
-    guint n_bearers_needed;
-    MMBearerList *list = NULL;
-    CreateBearersContext *ctx;
-
-    /* The implementation of this async method requires a valid callback, so
-     * that we ensure that finish() will always be called. */
-    g_assert (callback != NULL);
-
-    ctx = g_new0 (CreateBearersContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->bearer_properties = g_object_ref (bearer_properties);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             create_3gpp_and_cdma_bearers);
-
-    /* 3GPP-only modems... */
-    if (mm_iface_modem_is_3gpp_only (MM_IFACE_MODEM (ctx->self)))
-        ctx->create_3gpp_bearer = TRUE;
-    /* CDMA-only modems... */
-    else if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (ctx->self)))
-        ctx->create_cdma_bearer = TRUE;
-    /* Mixed CDMA+3GPP modems */
-    else {
-        /* If we have APN, we'll create both 3GPP and CDMA bearers.
-         * Otherwise we'll only create a CDMA bearer. */
-        if (mm_common_bearer_properties_get_apn (ctx->bearer_properties)) {
-            ctx->create_3gpp_bearer = TRUE;
-        }
-        ctx->create_cdma_bearer = TRUE;
-    }
-
-    n_bearers_needed = ctx->create_3gpp_bearer + ctx->create_cdma_bearer;
-    if (n_bearers_needed == 0)
-        g_assert_not_reached ();
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_BEARER_LIST, &list,
-                  NULL);
-
-    /* TODO:  check if the bearers we want to create are already in the list */
-
-    /* If we don't have enough space to create all needed bearers, try to remove
-     * all existing ones first BUT only if that will give us enough space. */
-    if (mm_bearer_list_get_max (list) < (mm_bearer_list_get_count (list) +
-                                         n_bearers_needed)) {
-        if (mm_bearer_list_get_max (list) < n_bearers_needed) {
-            g_simple_async_result_set_error (
-                ctx->result,
-                MM_CORE_ERROR,
-                MM_CORE_ERROR_TOO_MANY,
-                "Cannot create bearers: need %u but only %u allowed",
-                n_bearers_needed,
-                mm_bearer_list_get_max (list));
-            create_bearers_context_complete_and_free (ctx);
-            g_object_unref (list);
-            return;
-        }
-
-        /* We are told to force the creation of the new bearer.
-         * We'll remove all existing bearers, and then go on creating the new one */
-        mm_bearer_list_delete_all_bearers (list);
-    }
-
-    create_next_bearer (ctx);
-    g_object_unref (list);
-}
-
-/*****************************************************************************/
-
-typedef struct {
-    MMIfaceModemSimple *self;
-    GSimpleAsyncResult *result;
-    GList *bearers;
-    MMBearer *current;
-} ConnectBearerContext;
-
-static void
-connect_bearer_context_complete_and_free (ConnectBearerContext *ctx)
-{
-    g_simple_async_result_complete_in_idle (ctx->result);
-    if (ctx->current)
-        g_object_unref (ctx->current);
-    g_list_free_full (ctx->bearers, (GDestroyNotify)g_object_unref);
-    g_object_unref (ctx->result);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
-
-static MMBearer *
-connect_3gpp_or_cdma_bearer_finish (MMIfaceModemSimple *self,
-                                    GAsyncResult *res,
-                                    GError **error)
-{
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return NULL;
-
-    return MM_BEARER (g_object_ref (g_simple_async_result_get_op_res_gpointer (
-                                        G_SIMPLE_ASYNC_RESULT (res))));
-}
-
-static void connect_next_bearer (ConnectBearerContext *ctx);
-
-static void
-connect_bearer_ready (MMBearer *bearer,
-                      GAsyncResult *res,
-                      ConnectBearerContext *ctx)
-{
-    GError *error = NULL;
-
-    if (!mm_bearer_connect_finish (bearer, res, &error)) {
-        mm_dbg ("Couldn't connect bearer: '%s'", error->message);
-        g_error_free (error);
-        /* We'll try with the next one */
-        connect_next_bearer (ctx);
-        return;
-    }
-
-    /* We got connected! */
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               g_object_ref (ctx->current),
-                                               (GDestroyNotify)g_object_unref);
-    connect_bearer_context_complete_and_free (ctx);
-}
-
-static void
-connect_next_bearer (ConnectBearerContext *ctx)
-{
-    GList *l;
-
-    g_clear_object (&ctx->current);
-
-    /* First, look for 3GPP bearers */
-    for (l = ctx->bearers; l; l = g_list_next (l)) {
-        if (MM_IS_BEARER_3GPP (l->data)) {
-            /* Try to connect the current bearer. If the modem is not yet
-             * registered in the 3GPP network, connection won't succeed.
-             * Steal the reference from the list. */
-            ctx->current = MM_BEARER (l->data);
-            ctx->bearers = g_list_delete_link (ctx->bearers, l);
-            mm_bearer_connect (MM_BEARER (ctx->current),
-                               NULL, /* no number given */
-                               (GAsyncReadyCallback)connect_bearer_ready,
-                               ctx);
-            return;
-        }
-    }
-
-    /* Then, we look for CDMA bearers */
-    for (l = ctx->bearers; l; l = g_list_next (l)) {
-        if (MM_IS_BEARER_CDMA (l->data)) {
-            /* Try to connect the current bearer. If the modem is not yet
-             * registered in the 3GPP network, connection won't succeed.
-             * Steal the reference from the list. */
-            ctx->current = MM_BEARER (l->data);
-            ctx->bearers = g_list_delete_link (ctx->bearers, l);
-            mm_bearer_connect (MM_BEARER (ctx->current),
-                               NULL, /* no number given */
-                               (GAsyncReadyCallback)connect_bearer_ready,
-                               ctx);
-            return;
-        }
-    }
-
-    /* Here we shouldn't have any remaining bearer.
-     * POTS modem not yet supported */
-
-    /* If we got here, we didn't get connected :-/ */
-    g_simple_async_result_set_error (ctx->result,
-                                     MM_CORE_ERROR,
-                                     MM_CORE_ERROR_UNAUTHORIZED,
-                                     "Cannot connect any bearer");
-    connect_bearer_context_complete_and_free (ctx);
-}
-
-static void
-connect_3gpp_or_cdma_bearer (MMIfaceModemSimple *self,
-                             GList *bearers,
-                             GAsyncReadyCallback callback,
-                             gpointer user_data)
-{
-    ConnectBearerContext *ctx;
-
-    g_assert (bearers != NULL);
-
-    ctx = g_new0 (ConnectBearerContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             connect_3gpp_or_cdma_bearer);
-    ctx->bearers = g_list_copy (bearers);
-    g_list_foreach (ctx->bearers, (GFunc)g_object_ref, NULL);
-
-    connect_next_bearer (ctx);
-}
-
-/*****************************************************************************/
-
 typedef enum {
     CONNECTION_STEP_FIRST,
     CONNECTION_STEP_UNLOCK_CHECK,
@@ -499,16 +189,13 @@ typedef struct {
     MMCommonConnectProperties *properties;
 
     /* Results to set */
-    GList *bearers;
-    MMBearer *connected_bearer;
+    MMBearer *bearer;
 } ConnectionContext;
 
 static void
 connection_context_free (ConnectionContext *ctx)
 {
-    g_list_free_full (ctx->bearers, (GDestroyNotify)g_object_unref);
-    if (ctx->connected_bearer)
-        g_object_unref (ctx->connected_bearer);
+    g_object_unref (ctx->bearer);
     g_object_unref (ctx->properties);
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
@@ -519,14 +206,14 @@ connection_context_free (ConnectionContext *ctx)
 static void connection_step (ConnectionContext *ctx);
 
 static void
-connect_3gpp_or_cdma_bearer_ready (MMIfaceModemSimple *self,
-                                   GAsyncResult *res,
-                                   ConnectionContext *ctx)
+connect_bearer_ready (MMBearer *bearer,
+                      GAsyncResult *res,
+                      ConnectionContext *ctx)
 {
     GError *error = NULL;
 
-    ctx->connected_bearer = connect_3gpp_or_cdma_bearer_finish (self, res, &error);
-    if (!ctx->connected_bearer) {
+    if (!mm_bearer_connect_finish (bearer, res, &error)) {
+        mm_dbg ("Couldn't connect bearer: '%s'", error->message);
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         connection_context_free (ctx);
         return;
@@ -538,21 +225,21 @@ connect_3gpp_or_cdma_bearer_ready (MMIfaceModemSimple *self,
 }
 
 static void
-create_3gpp_and_cdma_bearers_ready (MMIfaceModemSimple *self,
-                                    GAsyncResult *res,
-                                    ConnectionContext *ctx)
+create_bearer_ready (MMIfaceModem *self,
+                     GAsyncResult *res,
+                     ConnectionContext *ctx)
 {
     GError *error = NULL;
 
-    /* List ownership for the caller */
-    ctx->bearers = create_3gpp_and_cdma_bearers_finish (self, res, &error);
-    if (!ctx->bearers) {
+    /* ownership for the caller */
+    ctx->bearer = mm_iface_modem_create_bearer_finish (self, res, &error);
+    if (!ctx->bearer) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         connection_context_free (ctx);
         return;
     }
 
-    /* Bearers available! */
+    /* Bearer available! */
     ctx->step++;
     connection_step (ctx);
 }
@@ -804,50 +491,45 @@ connection_step (ConnectionContext *ctx)
          * So, fall down to next step */
         ctx->step++;
 
-    case CONNECTION_STEP_BEARER:
+    case CONNECTION_STEP_BEARER: {
+        MMBearerList *list = NULL;
+        MMCommonBearerProperties *bearer_properties;
+
         mm_info ("Simple connect state (%d/%d): Bearer",
                  ctx->step, CONNECTION_STEP_LAST);
 
-        if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self)) ||
-            mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->self))) {
-            MMCommonBearerProperties *bearer_properties;
+        g_object_get (ctx->self,
+                      MM_IFACE_MODEM_BEARER_LIST, &list,
+                      NULL);
 
-            bearer_properties = (mm_common_connect_properties_get_bearer_properties (
-                                     ctx->properties));
-            /* 3GPP and/or CDMA bearer creation */
-            create_3gpp_and_cdma_bearers (
-                ctx->self,
-                bearer_properties,
-                (GAsyncReadyCallback)create_3gpp_and_cdma_bearers_ready,
-                ctx);
+        /* TODO:  check if the bearer we want to create is already in the list */
 
-            g_object_unref (bearer_properties);
-            return;
+        /* If we don't have enough space to create the, try to remove
+         * all existing ones first BUT only if that will give us enough space. */
+        if (mm_bearer_list_get_max (list) == mm_bearer_list_get_count (list)) {
+            /* We'll remove all existing bearers, and then go on creating the new one */
+            mm_bearer_list_delete_all_bearers (list);
         }
 
-        /* If not 3GPP and not CDMA, this will possibly be a POTS modem,
-         * currently unsupported. So, just abort. */
-        g_assert_not_reached ();
+        bearer_properties = (mm_common_connect_properties_get_bearer_properties (
+                                 ctx->properties));
+        mm_iface_modem_create_bearer (MM_IFACE_MODEM (ctx->self),
+                                      bearer_properties,
+                                      (GAsyncReadyCallback)create_bearer_ready,
+                                      ctx);
+
+        g_object_unref (list);
+        g_object_unref (bearer_properties);
         return;
+    }
 
     case CONNECTION_STEP_CONNECT:
         mm_info ("Simple connect state (%d/%d): Connect",
                  ctx->step, CONNECTION_STEP_LAST);
 
-        if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self)) ||
-            mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->self))) {
-            /* 3GPP or CDMA bearer connection */
-            connect_3gpp_or_cdma_bearer (
-                ctx->self,
-                ctx->bearers,
-                (GAsyncReadyCallback)connect_3gpp_or_cdma_bearer_ready,
-                ctx);
-            return;
-        }
-
-        /* If not 3GPP and not CDMA, this will possibly be a POTS modem,
-         * currently unsupported. So, just abort. */
-        g_assert_not_reached ();
+        mm_bearer_connect (ctx->bearer,
+                           (GAsyncReadyCallback)connect_bearer_ready,
+                           ctx);
         return;
 
     case CONNECTION_STEP_LAST:
@@ -857,7 +539,7 @@ connection_step (ConnectionContext *ctx)
         mm_gdbus_modem_simple_complete_connect (
             ctx->skeleton,
             ctx->invocation,
-            mm_bearer_get_path (ctx->connected_bearer));
+            mm_bearer_get_path (ctx->bearer));
         connection_context_free (ctx);
         return;
     }
