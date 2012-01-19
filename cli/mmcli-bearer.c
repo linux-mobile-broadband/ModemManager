@@ -44,18 +44,13 @@ static Context *ctx;
 
 /* Options */
 static gboolean info_flag; /* set when no action found */
-static gchar *connect_with_number_str;
 static gboolean connect_flag;
 static gboolean disconnect_flag;
 
 static GOptionEntry entries[] = {
     { "connect", 'c', 0, G_OPTION_ARG_NONE, &connect_flag,
-      "Connect a given bearer using the default number, if any.",
+      "Connect a given bearer.",
       NULL
-    },
-    { "connect-with-number", 0, 0, G_OPTION_ARG_STRING, &connect_with_number_str,
-      "Connect a given bearer using the specified number.",
-      "[NUMBER]"
     },
     { "disconnect", 'x', 0, G_OPTION_ARG_NONE, &disconnect_flag,
       "Disconnect a given bearer.",
@@ -89,8 +84,7 @@ mmcli_bearer_options_enabled (void)
     if (checked)
         return !!n_actions;
 
-    n_actions = (!!connect_with_number_str +
-                 connect_flag +
+    n_actions = (connect_flag +
                  disconnect_flag);
 
     if (n_actions == 0 && mmcli_get_common_bearer_string ()) {
@@ -302,10 +296,9 @@ get_bearer_ready (GObject      *source,
         g_assert_not_reached ();
 
     /* Request to connect the bearer? */
-    if (connect_flag || connect_with_number_str) {
+    if (connect_flag) {
         g_debug ("Asynchronously connecting bearer...");
         mm_bearer_connect (ctx->bearer,
-                           connect_flag ? "" : connect_with_number_str,
                            ctx->cancellable,
                            (GAsyncReadyCallback)connect_ready,
                            NULL);
@@ -362,12 +355,11 @@ mmcli_bearer_run_synchronous (GDBusConnection *connection)
     }
 
     /* Request to connect the bearer? */
-    if (connect_flag || connect_with_number_str) {
+    if (connect_flag) {
         gboolean result;
 
         g_debug ("Synchronously connecting bearer...");
         result = mm_bearer_connect_sync (ctx->bearer,
-                                         connect_flag ? "" : connect_with_number_str,
                                          NULL,
                                          &error);
         connect_process_reply (result, error);
