@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
 
 #include "mm-generic-gsm.h"
 #include "mm-modem-gsm-card.h"
@@ -4612,12 +4613,33 @@ mm_generic_gsm_get_charset (MMGenericGsm *self)
 /* MMModemGsmSms interface */
 
 static void
+sms_send_invoke (MMCallbackInfo *info)
+{
+    MMModemGsmSmsSendFn callback = (MMModemGsmSmsSendFn) info->callback;
+
+    callback (MM_MODEM_GSM_SMS (info->modem),
+              mm_callback_info_get_data (info, "indexes"),
+              info->error,
+              info->user_data);
+}
+
+static void
+free_indexes (gpointer data)
+{
+    g_array_free ((GArray *) data, TRUE);
+}
+
+static void
 sms_send_done (MMAtSerialPort *port,
                GString *response,
                GError *error,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    const char *p;
+    unsigned long num;
+    GArray *indexes = NULL;
+    guint32 idx = 0;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
@@ -4626,7 +4648,25 @@ sms_send_done (MMAtSerialPort *port,
 
     if (error)
         info->error = g_error_copy (error);
-
+    else {
+        /* If the response happens to have a ">" in it from the interactive
+         * handling of the CMGS command, skip it.
+         */
+        p = strchr (response->str, '+');
+        if (p && *p) {
+            /* Check for the message index */
+            p = mm_strip_tag (p, "+CMGS:");
+            if (p && *p) {
+                errno = 0;
+                num = strtoul (p, NULL, 10);
+                if ((num < G_MAXUINT32) && (errno == 0))
+                    idx = (guint32) num;
+            }
+        }
+        indexes = g_array_sized_new (FALSE, TRUE, sizeof (guint32), 1);
+        g_array_append_val (indexes, idx);
+        mm_callback_info_set_data (info, "indexes", indexes, free_indexes);
+    }
     mm_callback_info_schedule (info);
 }
 
@@ -4637,7 +4677,7 @@ sms_send (MMModemGsmSms *modem,
           const char *smsc,
           guint validity,
           guint class,
-          MMModemFn callback,
+          MMModemGsmSmsSendFn callback,
           gpointer user_data)
 {
     MMCallbackInfo *info;
@@ -4646,7 +4686,10 @@ sms_send (MMModemGsmSms *modem,
     char *command;
     MMAtSerialPort *port;
 
-    info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
+    info = mm_callback_info_new_full (MM_MODEM (modem),
+                                      sms_send_invoke,
+                                      G_CALLBACK (callback),
+                                      user_data);
 
     port = mm_generic_gsm_get_best_at_port (self, &info->error);
     if (!port) {
