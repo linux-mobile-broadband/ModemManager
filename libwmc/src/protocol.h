@@ -21,6 +21,8 @@
 #define WMC_CMD_MARKER ((u_int8_t) 0xC8)
 
 enum {
+    WMC_CMD_GET_GLOBAL_MODE = 0x03,
+    WMC_CMD_SET_GLOBAL_MODE = 0x04,
     WMC_CMD_DEVICE_INFO = 0x06,
     WMC_CMD_IP_INFO = 0x0A,
     WMC_CMD_NET_INFO = 0x0B,
@@ -93,12 +95,32 @@ struct WmcCmdDeviceInfo2Rsp {
 } __attribute__ ((packed));
 typedef struct WmcCmdDeviceInfo2Rsp WmcCmdDeviceInfo2Rsp;
 
+/*****************************************************/
+
+enum {
+    WMC_SERVICE_NONE = 0,
+    WMC_SERVICE_AMPS = 1,
+    WMC_SERVICE_IS95A = 2,
+    WMC_SERVICE_IS95B = 3,
+    WMC_SERVICE_GSM = 4,
+    WMC_SERVICE_GPRS = 5,
+    WMC_SERVICE_1XRTT = 6,
+    WMC_SERVICE_1XEVDO_0 = 7,
+    WMC_SERVICE_UMTS = 8,
+    WMC_SERVICE_1XEVDO_A = 9,
+    WMC_SERVICE_EDGE = 10,
+    WMC_SERVICE_HSDPA = 11,
+    WMC_SERVICE_HSUPA = 12,
+    WMC_SERVICE_HSPA = 13,
+    WMC_SERVICE_LTE = 14
+};
+
 /* Shorter response used by earlier devices like PC5740 */
 struct WmcCmdNetworkInfoRsp {
     WmcCmdHeader hdr;
     u_int8_t  _unknown1;
     u_int8_t  _unknown2[3];    /* Always zero */
-    u_int8_t  _unknown3;       /* Always 0x06 */
+    u_int8_t  service;         /* One of WMC_SERVICE_* */
     u_int8_t  _unknown4;       /* Either 0x00 or 0x01 */
     u_int8_t  magic[10];
     u_int16_t counter1;        /* A timestamp/counter? */
@@ -115,7 +137,7 @@ struct WmcCmdNetworkInfo2Rsp {
     WmcCmdHeader hdr;
     u_int8_t  _unknown1;       /* 0x00 on LTE, 0x07 or 0x1F on CDMA */
     u_int8_t  _unknown2[3];    /* Always zero */
-    u_int8_t  _unknown3;       /* 0x0E on LTE, 0x0F on CDMA */
+    u_int8_t  service;         /* One of WMC_SERVICE_* */
     u_int8_t  _unknown4;
     u_int8_t  magic[10];       /* Whatever was passed in WMC_CMD_INIT with some changes */
     u_int16_t counter1;        /* A timestamp/counter? */
@@ -139,6 +161,8 @@ struct WmcCmdNetworkInfo2Rsp {
 } __attribute__ ((packed));
 typedef struct WmcCmdNetworkInfo2Rsp WmcCmdNetworkInfo2Rsp;
 
+/*****************************************************/
+
 struct WmcCmdConnectionInfoRsp {
     WmcCmdHeader hdr;
     u_int32_t rx_bytes;
@@ -151,5 +175,48 @@ struct WmcCmdConnectionInfoRsp {
     u_int8_t  ip6_address[40]; /* String format */
 } __attribute__ ((packed));
 typedef struct WmcCmdConnectionInfoRsp WmcCmdConnectionInfoRsp;
+
+/*****************************************************/
+
+enum {
+    WMC_GLOBAL_MODE_CDMA = 0x00,
+    WMC_GLOBAL_MODE_GSM  = 0x0A,
+    WMC_GLOBAL_MODE_AUTO = 0x14,
+};
+
+struct WmcCmdGetGlobalMode {
+    WmcCmdHeader hdr;
+    u_int8_t _unknown1;  /* always 0 */
+} __attribute__ ((packed));
+typedef struct WmcCmdGetGlobalMode WmcCmdGetGlobalMode;
+
+struct WmcCmdGetGlobalModeRsp {
+    WmcCmdHeader hdr;
+    u_int8_t _unknown1;  /* always 0x01 */
+    u_int8_t mode;       /* one of WMC_GLOBAL_MODE_* */
+    u_int8_t _unknown2;  /* always 0x05 */
+    u_int8_t _unknown3;  /* always 0x00 */
+} __attribute__ ((packed));
+typedef struct WmcCmdGetGlobalModeRsp WmcCmdGetGlobalModeRsp;
+
+/*****************************************************/
+
+struct WmcCmdSetGlobalMode {
+    WmcCmdHeader hdr;
+    u_int8_t _unknown1;  /* always 0x01 */
+    u_int8_t mode;       /* one of WMC_GLOBAL_MODE_* */
+    u_int8_t _unknown2;  /* always 0x05 */
+    u_int8_t _unknown3;  /* always 0x00 */
+} __attribute__ ((packed));
+typedef struct WmcCmdSetGlobalMode WmcCmdSetGlobalMode;
+
+struct WmcCmdSetGlobalModeRsp {
+    WmcCmdHeader hdr;
+    u_int8_t _unknown1;   /* always 0x01 */
+    u_int32_t _unknown2;  /* always zero */
+} __attribute__ ((packed));
+typedef struct WmcCmdSetGlobalModeRsp WmcCmdSetGlobalModeRsp;
+
+/*****************************************************/
 
 #endif  /* LIBWMC_PROTOCOL_H */
