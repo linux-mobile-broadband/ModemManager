@@ -82,7 +82,8 @@ if validity:
 
 sms_iface = dbus.Interface(proxy, dbus_interface='org.freedesktop.ModemManager.Modem.Gsm.SMS')
 try:
-    sms_iface.Send(msg_dict)
+    indexes = sms_iface.Send(msg_dict)
+    print "Message index: %d" % indexes[0]
 except Exception, e:
     print "Sending message failed: %s" % e
 
