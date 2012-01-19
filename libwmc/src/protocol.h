@@ -23,7 +23,7 @@
 enum {
     WMC_CMD_DEVICE_INFO = 0x06,
     WMC_CMD_IP_INFO = 0x0A,
-    WMC_CMD_STATUS = 0x0B,
+    WMC_CMD_NET_INFO = 0x0B,
     WMC_CMD_INIT = 0x0D,
     WMC_CMD_EPS_BEARER_INFO = 0x4D,
 };
@@ -94,7 +94,7 @@ struct WmcCmdDeviceInfo2Rsp {
 typedef struct WmcCmdDeviceInfo2Rsp WmcCmdDeviceInfo2Rsp;
 
 /* Shorter response used by earlier devices like PC5740 */
-struct WmcCmdStatusRsp {
+struct WmcCmdNetworkInfoRsp {
     WmcCmdHeader hdr;
     u_int8_t  _unknown1;
     u_int8_t  _unknown2[3];    /* Always zero */
@@ -108,10 +108,10 @@ struct WmcCmdStatusRsp {
     u_int8_t  cdma1x_dbm;
     u_int8_t  _unknown8[37];   /* Always zero */
 } __attribute__ ((packed));
-typedef struct WmcCmdStatusRsp WmcCmdStatusRsp;
+typedef struct WmcCmdNetworkInfoRsp WmcCmdNetworkInfoRsp;
 
 /* Long-format response used on newer devices like the UML290 */
-struct WmcCmdStatus2Rsp {
+struct WmcCmdNetworkInfo2Rsp {
     WmcCmdHeader hdr;
     u_int8_t  _unknown1;       /* 0x00 on LTE, 0x07 or 0x1F on CDMA */
     u_int8_t  _unknown2[3];    /* Always zero */
@@ -137,9 +137,9 @@ struct WmcCmdStatus2Rsp {
     u_int8_t  _unknown14[3];   /* Always zero */
     u_int8_t  _unknown15[4];
 } __attribute__ ((packed));
-typedef struct WmcCmdStatus2Rsp WmcCmdStatus2Rsp;
+typedef struct WmcCmdNetworkInfo2Rsp WmcCmdNetworkInfo2Rsp;
 
-struct WmcCmdIpInfoRsp {
+struct WmcCmdConnectionInfoRsp {
     WmcCmdHeader hdr;
     u_int32_t rx_bytes;
     u_int32_t tx_bytes;
@@ -150,6 +150,6 @@ struct WmcCmdIpInfoRsp {
     u_int8_t  _unknown6[8];    /* Netmask? */
     u_int8_t  ip6_address[40]; /* String format */
 } __attribute__ ((packed));
-typedef struct WmcCmdIpInfoRsp WmcCmdIpInfoRsp;
+typedef struct WmcCmdConnectionInfoRsp WmcCmdConnectionInfoRsp;
 
 #endif  /* LIBWMC_PROTOCOL_H */

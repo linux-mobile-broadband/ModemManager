@@ -47,14 +47,14 @@ WmcResult * wmc_cmd_device_info_result (const char *buf, size_t len);
 
 /**********************************************************************/
 
-#define WMC_CMD_STATUS_ITEM_CDMA_DBM    "cdma-dbm"
-#define WMC_CMD_STATUS_ITEM_HDR_DBM     "hdr-dbm"
-#define WMC_CMD_STATUS_ITEM_LTE_DBM     "lte-dbm"
-#define WMC_CMD_STATUS_ITEM_OPNAME      "opname"
+#define WMC_CMD_NETWORK_INFO_ITEM_CDMA_DBM    "cdma-dbm"
+#define WMC_CMD_NETWORK_INFO_ITEM_HDR_DBM     "hdr-dbm"
+#define WMC_CMD_NETWORK_INFO_ITEM_LTE_DBM     "lte-dbm"
+#define WMC_CMD_NETWORK_INFO_ITEM_OPNAME      "opname"
 
-size_t      wmc_cmd_status_new    (char *buf, size_t buflen);
+size_t      wmc_cmd_network_info_new    (char *buf, size_t buflen);
 
-WmcResult * wmc_cmd_status_result (const char *buf, size_t len);
+WmcResult * wmc_cmd_network_info_result (const char *buf, size_t len);
 
 /**********************************************************************/
 

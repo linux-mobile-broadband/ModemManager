@@ -200,7 +200,7 @@ wmc_cmd_device_info_result (const char *buf, size_t buflen)
 /**********************************************************************/
 
 size_t
-wmc_cmd_status_new (char *buf, size_t buflen)
+wmc_cmd_network_info_new (char *buf, size_t buflen)
 {
     WmcCmdHeader *cmd = (WmcCmdHeader *) buf;
 
@@ -209,7 +209,7 @@ wmc_cmd_status_new (char *buf, size_t buflen)
 
     memset (cmd, 0, sizeof (*cmd));
     cmd->marker = WMC_CMD_MARKER;
-    cmd->cmd = WMC_CMD_STATUS;
+    cmd->cmd = WMC_CMD_NET_INFO;
     return sizeof (*cmd);
 }
 
@@ -221,40 +221,40 @@ sanitize_dbm (u_int8_t in_dbm)
 }
 
 WmcResult *
-wmc_cmd_status_result (const char *buf, size_t buflen)
+wmc_cmd_network_info_result (const char *buf, size_t buflen)
 {
     WmcResult *r = NULL;
-    WmcCmdStatusRsp *rsp = (WmcCmdStatusRsp *) buf;
-    WmcCmdStatus2Rsp *rsp2 = (WmcCmdStatus2Rsp *) buf;
+    WmcCmdNetworkInfoRsp *rsp = (WmcCmdNetworkInfoRsp *) buf;
+    WmcCmdNetworkInfo2Rsp *rsp2 = (WmcCmdNetworkInfo2Rsp *) buf;
     char tmp[65];
 
     wmc_return_val_if_fail (buf != NULL, NULL);
 
-    if (check_command (buf, buflen, WMC_CMD_STATUS, sizeof (WmcCmdStatus2Rsp)) < 0) {
+    if (check_command (buf, buflen, WMC_CMD_NET_INFO, sizeof (WmcCmdNetworkInfo2Rsp)) < 0) {
         rsp2 = NULL;
-        if (check_command (buf, buflen, WMC_CMD_STATUS, sizeof (WmcCmdStatusRsp)) < 0)
+        if (check_command (buf, buflen, WMC_CMD_NET_INFO, sizeof (WmcCmdNetworkInfoRsp)) < 0)
             return NULL;
     }
 
     r = wmc_result_new ();
 
-    wmc_result_add_u8 (r, WMC_CMD_STATUS_ITEM_CDMA_DBM, sanitize_dbm (rsp->cdma1x_dbm));
+    wmc_result_add_u8 (r, WMC_CMD_NETWORK_INFO_ITEM_CDMA_DBM, sanitize_dbm (rsp->cdma1x_dbm));
 
     if (rsp2) {
-        wmc_result_add_u8 (r, WMC_CMD_STATUS_ITEM_HDR_DBM, sanitize_dbm (rsp2->hdr_dbm));
-        wmc_result_add_u8 (r, WMC_CMD_STATUS_ITEM_LTE_DBM, sanitize_dbm (rsp2->lte_dbm));
+        wmc_result_add_u8 (r, WMC_CMD_NETWORK_INFO_ITEM_HDR_DBM, sanitize_dbm (rsp2->hdr_dbm));
+        wmc_result_add_u8 (r, WMC_CMD_NETWORK_INFO_ITEM_LTE_DBM, sanitize_dbm (rsp2->lte_dbm));
 
         memset (tmp, 0, sizeof (tmp));
         if (sanitize_dbm (rsp2->lte_dbm)) {
             /* LTE operator name */
             wmc_assert (sizeof (rsp2->lte_opname) <= sizeof (tmp));
             memcpy (tmp, rsp2->lte_opname, sizeof (rsp2->lte_opname));
-            wmc_result_add_string (r, WMC_CMD_STATUS_ITEM_OPNAME, tmp);
+            wmc_result_add_string (r, WMC_CMD_NETWORK_INFO_ITEM_OPNAME, tmp);
         } else if (sanitize_dbm (rsp2->hdr_dbm) || sanitize_dbm (rsp2->cdma1x_dbm)) {
             /* CDMA2000 operator name */
             wmc_assert (sizeof (rsp2->cdma_opname) <= sizeof (tmp));
             memcpy (tmp, rsp2->cdma_opname, sizeof (rsp2->cdma_opname));
-            wmc_result_add_string (r, WMC_CMD_STATUS_ITEM_OPNAME, tmp);
+            wmc_result_add_string (r, WMC_CMD_NETWORK_INFO_ITEM_OPNAME, tmp);
         }
     }
 
