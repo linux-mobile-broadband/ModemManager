@@ -44,7 +44,11 @@ enum {
 enum {
     DIAG_NV_MODE_PREF_DIGITAL         = 0x00,
     DIAG_NV_MODE_PREF_DIGITAL_ONLY    = 0x01,
+    DIAG_NV_MODE_PREF_ANALOG          = 0x02,
+    DIAG_NV_MODE_PREF_ANALOG_ONLY     = 0x03,
     DIAG_NV_MODE_PREF_AUTO            = 0x04,
+    DIAG_NV_MODE_PREF_E911            = 0x05,
+    DIAG_NV_MODE_PREF_HOME_ONLY       = 0x06,
     DIAG_NV_MODE_PREF_1X_ONLY         = 0x09,
     DIAG_NV_MODE_PREF_HDR_ONLY        = 0x0A,
     DIAG_NV_MODE_PREF_1X_HDR_ONLY     = 0x0D,
