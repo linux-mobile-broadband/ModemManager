@@ -66,6 +66,18 @@ struct _MMBroadbandBearerClass {
                                       MMCommonBearerIpConfig **ipv6_config,
                                       GError **error);
 
+    /* Full 3GPP disconnection sequence */
+    void     (* disconnect_3gpp)        (MMBroadbandBearer *self,
+                                         MMBroadbandModem *modem,
+                                         MMAtSerialPort *primary,
+                                         MMAtSerialPort *secondary,
+                                         MMPort *data,
+                                         GAsyncReadyCallback callback,
+                                         gpointer user_data);
+    gboolean (* disconnect_3gpp_finish) (MMBroadbandBearer *self,
+                                         GAsyncResult *res,
+                                         GError **error);
+
     /* Full CDMA connection sequence */
     void     (* connect_cdma)        (MMBroadbandBearer *self,
                                       MMBroadbandModem *modem,
@@ -80,6 +92,18 @@ struct _MMBroadbandBearerClass {
                                       MMCommonBearerIpConfig **ipv4_config,
                                       MMCommonBearerIpConfig **ipv6_config,
                                       GError **error);
+
+    /* Full CDMA disconnection sequence */
+    void     (* disconnect_cdma)        (MMBroadbandBearer *self,
+                                         MMBroadbandModem *modem,
+                                         MMAtSerialPort *primary,
+                                         MMAtSerialPort *secondary,
+                                         MMPort *data,
+                                         GAsyncReadyCallback callback,
+                                         gpointer user_data);
+    gboolean (* disconnect_cdma_finish) (MMBroadbandBearer *self,
+                                         GAsyncResult *res,
+                                         GError **error);
 };
 
 GType mm_broadband_bearer_get_type (void);

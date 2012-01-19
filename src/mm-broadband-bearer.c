@@ -1061,8 +1061,7 @@ connect (MMBearer *self,
 }
 
 /*****************************************************************************/
-/* DISCONNECT (more or less the same for CDMA and 3GPP) */
-
+/* Detailed disconnect context, used in both CDMA and 3GPP sequences */
 typedef struct {
     MMBroadbandBearer *self;
     MMBaseModem *modem;
@@ -1070,73 +1069,67 @@ typedef struct {
     MMAtSerialPort *secondary;
     MMPort *data;
     GSimpleAsyncResult *result;
-    GError *error;
 
-    gboolean cgact_needed;
+    /* 3GPP-specific */
     gchar *cgact_command;
     gboolean cgact_sent;
-} DisconnectContext;
+} DetailedDisconnectContext;
+
+static gboolean
+detailed_disconnect_finish (MMBroadbandBearer *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
 
 static void
-disconnect_context_complete_and_free (DisconnectContext *ctx)
+detailed_disconnect_context_complete_and_free (DetailedDisconnectContext *ctx)
 {
-    if (ctx->error) {
-        g_simple_async_result_take_error (ctx->result, ctx->error);
-    } else {
-        /* If properly disconnected, close the data port */
-        if (MM_IS_AT_SERIAL_PORT (ctx->data))
-            mm_serial_port_close (MM_SERIAL_PORT (ctx->data));
-
-        /* Port is disconnected; update the state */
-        mm_port_set_connected (ctx->data, FALSE);
-        mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (ctx->self), FALSE);
-        mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (ctx->self), NULL);
-        mm_gdbus_bearer_set_ip4_config (MM_GDBUS_BEARER (ctx->self), NULL);
-        mm_gdbus_bearer_set_ip6_config (MM_GDBUS_BEARER (ctx->self), NULL);
-        /* Clear data port and CID */
-        if (ctx->self->priv->cid)
-            ctx->self->priv->cid = 0;
-        g_clear_object (&ctx->self->priv->port);
-
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    }
-
     g_simple_async_result_complete_in_idle (ctx->result);
-
+    if (ctx->cgact_command)
+        g_free (ctx->cgact_command);
+    g_object_unref (ctx->result);
     g_object_unref (ctx->data);
     g_object_unref (ctx->primary);
     if (ctx->secondary)
         g_object_unref (ctx->secondary);
     g_object_unref (ctx->self);
     g_object_unref (ctx->modem);
-    g_object_unref (ctx->result);
-    g_free (ctx->cgact_command);
     g_free (ctx);
 }
 
-static gboolean
-disconnect_finish (MMBearer *self,
-                   GAsyncResult *res,
-                   GError **error)
+static DetailedDisconnectContext *
+detailed_disconnect_context_new (MMBroadbandBearer *self,
+                                 MMBroadbandModem *modem,
+                                 MMAtSerialPort *primary,
+                                 MMAtSerialPort *secondary,
+                                 MMPort *data,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data)
 {
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+    DetailedDisconnectContext *ctx;
+
+    ctx = g_new0 (DetailedDisconnectContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
+    ctx->primary = g_object_ref (primary);
+    ctx->secondary = (secondary ? g_object_ref (secondary) : NULL);
+    ctx->data = g_object_ref (data);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             detailed_disconnect_context_new);
+    return ctx;
 }
 
-static void
-cgact_primary_ready (MMBaseModem *modem,
-                     GAsyncResult *res,
-                     DisconnectContext *ctx)
-{
-    /* Ignore errors for now */
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, NULL);
-
-    disconnect_context_complete_and_free (ctx);
-}
+/*****************************************************************************/
+/* CDMA DISCONNECT */
 
 static void
-primary_flash_ready (MMSerialPort *port,
-                     GError *error,
-                     DisconnectContext *ctx)
+primary_flash_cdma_ready (MMSerialPort *port,
+                          GError *error,
+                          DetailedDisconnectContext *ctx)
 {
     if (error) {
         /* Ignore "NO CARRIER" response when modem disconnects and any flash
@@ -1149,8 +1142,85 @@ primary_flash_ready (MMSerialPort *port,
                               MM_SERIAL_ERROR,
                               MM_SERIAL_ERROR_FLASH_FAILED)) {
             /* Fatal */
-            ctx->error = g_error_copy (error);
-            disconnect_context_complete_and_free (ctx);
+            g_simple_async_result_set_from_error (ctx->result, error);
+            detailed_disconnect_context_complete_and_free (ctx);
+            return;
+        }
+
+        mm_dbg ("Port flashing failed (not fatal): %s", error->message);
+    }
+
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    detailed_disconnect_context_complete_and_free (ctx);
+}
+
+static void
+disconnect_cdma (MMBroadbandBearer *self,
+                 MMBroadbandModem *modem,
+                 MMAtSerialPort *primary,
+                 MMAtSerialPort *secondary,
+                 MMPort *data,
+                 GAsyncReadyCallback callback,
+                 gpointer user_data)
+{
+    DetailedDisconnectContext *ctx;
+
+    ctx = detailed_disconnect_context_new (self,
+                                           modem,
+                                           primary,
+                                           secondary,
+                                           data,
+                                           callback,
+                                           user_data);
+
+    /* Just flash the primary port */
+    mm_serial_port_flash (MM_SERIAL_PORT (ctx->primary),
+                          1000,
+                          TRUE,
+                          (MMSerialFlashFn)primary_flash_cdma_ready,
+                          ctx);
+}
+
+/*****************************************************************************/
+/* 3GPP DISCONNECT */
+
+static void
+cgact_primary_ready (MMBaseModem *modem,
+                     GAsyncResult *res,
+                     DetailedDisconnectContext *ctx)
+{
+
+    GError *error = NULL;
+
+    /* Ignore errors for now */
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error);
+    if (error) {
+        mm_dbg ("PDP context deactivation failed (not fatal): %s", error->message);
+        g_error_free (error);
+    }
+
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    detailed_disconnect_context_complete_and_free (ctx);
+}
+
+static void
+primary_flash_3gpp_ready (MMSerialPort *port,
+                          GError *error,
+                          DetailedDisconnectContext *ctx)
+{
+    if (error) {
+        /* Ignore "NO CARRIER" response when modem disconnects and any flash
+         * failures we might encounter. Other errors are hard errors.
+         */
+        if (!g_error_matches (error,
+                              MM_CONNECTION_ERROR,
+                              MM_CONNECTION_ERROR_NO_CARRIER) &&
+            !g_error_matches (error,
+                              MM_SERIAL_ERROR,
+                              MM_SERIAL_ERROR_FLASH_FAILED)) {
+            /* Fatal */
+            g_simple_async_result_set_from_error (ctx->result, error);
+            detailed_disconnect_context_complete_and_free (ctx);
             return;
         }
 
@@ -1159,11 +1229,18 @@ primary_flash_ready (MMSerialPort *port,
 
     /* Don't bother doing the CGACT again if it was done on a secondary port
      * or if not needed */
-    if (!ctx->cgact_needed ||
-        !ctx->cgact_sent) {
-        disconnect_context_complete_and_free (ctx);
+    if (ctx->cgact_sent) {
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        detailed_disconnect_context_complete_and_free (ctx);
         return;
     }
+
+    /* We don't want to try to send CGACT to the still connected port, so
+     * if the primary AT port is actually the data port, set it as
+     * disconnected here already. */
+    if ((gpointer)ctx->primary == (gpointer)ctx->data)
+        /* Port is disconnected; update the state */
+        mm_port_set_connected (ctx->data, FALSE);
 
     mm_base_modem_at_command_in_port (
         ctx->modem,
@@ -1179,7 +1256,7 @@ primary_flash_ready (MMSerialPort *port,
 static void
 cgact_secondary_ready (MMBaseModem *modem,
                        GAsyncResult *res,
-                       DisconnectContext *ctx)
+                       DetailedDisconnectContext *ctx)
 {
     GError *error = NULL;
 
@@ -1192,8 +1269,146 @@ cgact_secondary_ready (MMBaseModem *modem,
     mm_serial_port_flash (MM_SERIAL_PORT (ctx->primary),
                           1000,
                           TRUE,
-                          (MMSerialFlashFn)primary_flash_ready,
+                          (MMSerialFlashFn)primary_flash_3gpp_ready,
                           ctx);
+}
+
+static void
+disconnect_3gpp (MMBroadbandBearer *self,
+                 MMBroadbandModem *modem,
+                 MMAtSerialPort *primary,
+                 MMAtSerialPort *secondary,
+                 MMPort *data,
+                 GAsyncReadyCallback callback,
+                 gpointer user_data)
+{
+    DetailedDisconnectContext *ctx;
+
+    ctx = detailed_disconnect_context_new (self,
+                                           modem,
+                                           primary,
+                                           secondary,
+                                           data,
+                                           callback,
+                                           user_data);
+
+    /* If no specific CID was used, disable all PDP contexts */
+    ctx->cgact_command =
+        (MM_BROADBAND_BEARER (self)->priv->cid >= 0 ?
+         g_strdup_printf ("+CGACT=0,%d", MM_BROADBAND_BEARER (self)->priv->cid) :
+         g_strdup_printf ("+CGACT=0"));
+
+    /* If the primary port is connected (with PPP) then try sending the PDP
+     * context deactivation on the secondary port because not all modems will
+     * respond to flashing (since either the modem or the kernel's serial
+     * driver doesn't support it).
+     */
+    if (ctx->secondary &&
+        mm_port_get_connected (MM_PORT (ctx->primary))) {
+        mm_base_modem_at_command_in_port (
+            ctx->modem,
+            ctx->secondary,
+            ctx->cgact_command,
+            3,
+            FALSE,
+            NULL, /* cancellable */
+            (GAsyncReadyCallback)cgact_secondary_ready,
+            ctx);
+        return;
+    }
+
+    /* If no secondary port, go on to flash the primary port */
+    mm_serial_port_flash (MM_SERIAL_PORT (ctx->primary),
+                          1000,
+                          TRUE,
+                          (MMSerialFlashFn)primary_flash_3gpp_ready,
+                          ctx);
+}
+
+/*****************************************************************************/
+/* DISCONNECT */
+
+typedef struct {
+    MMBroadbandBearer *self;
+    GSimpleAsyncResult *result;
+    MMPort *data;
+} DisconnectContext;
+
+static void
+disconnect_context_complete_and_free (DisconnectContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->data);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+disconnect_finish (MMBearer *self,
+                   GAsyncResult *res,
+                   GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+disconnect_succeeded (DisconnectContext *ctx)
+{
+    /* If properly disconnected, close the data port */
+    if (MM_IS_AT_SERIAL_PORT (ctx->data))
+        mm_serial_port_close (MM_SERIAL_PORT (ctx->data));
+
+    /* Port is disconnected; update the state. Note: implementations may
+     * already have set the port as disconnected (e.g the 3GPP one) */
+    mm_port_set_connected (ctx->data, FALSE);
+
+    /* Clear data port and CID (if any) */
+    if (ctx->self->priv->cid)
+        ctx->self->priv->cid = 0;
+    g_clear_object (&ctx->self->priv->port);
+
+    /* Set operation result */
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    disconnect_context_complete_and_free (ctx);
+}
+
+static void
+disconnect_failed (DisconnectContext *ctx,
+                   GError *error)
+{
+    g_simple_async_result_take_error (ctx->result, error);
+    disconnect_context_complete_and_free (ctx);
+}
+
+static void
+disconnect_cdma_ready (MMBroadbandBearer *self,
+                       GAsyncResult *res,
+                       DisconnectContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_BROADBAND_BEARER_GET_CLASS (self)->disconnect_cdma_finish (self,
+                                                                       res,
+                                                                       &error))
+        disconnect_failed (ctx, error);
+    else
+        disconnect_succeeded (ctx);
+}
+
+static void
+disconnect_3gpp_ready (MMBroadbandBearer *self,
+                       GAsyncResult *res,
+                       DisconnectContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_BROADBAND_BEARER_GET_CLASS (self)->disconnect_3gpp_finish (self,
+                                                                       res,
+                                                                       &error))
+        disconnect_failed (ctx, error);
+    else
+        disconnect_succeeded (ctx);
 }
 
 static void
@@ -1201,8 +1416,8 @@ disconnect (MMBearer *self,
             GAsyncReadyCallback callback,
             gpointer user_data)
 {
-    DisconnectContext *ctx;
     MMBaseModem *modem = NULL;
+    DisconnectContext *ctx;
 
     if (!MM_BROADBAND_BEARER (self)->priv->port) {
         g_simple_async_report_error_in_idle (
@@ -1220,55 +1435,43 @@ disconnect (MMBearer *self,
                   NULL);
     g_assert (modem != NULL);
 
+    /* In this context, we only keep the stuff we'll need later */
     ctx = g_new0 (DisconnectContext, 1);
-    ctx->data = g_object_ref (MM_BROADBAND_BEARER (self)->priv->port);
-    ctx->primary = g_object_ref (mm_base_modem_get_port_primary (modem));
-    ctx->secondary = mm_base_modem_get_port_secondary (modem);
-    if (ctx->secondary)
-        g_object_ref (ctx->secondary);
     ctx->self = g_object_ref (self);
-    ctx->modem = modem;
+    ctx->data = g_object_ref (MM_BROADBAND_BEARER (self)->priv->port);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
                                              disconnect);
 
-    /* If the modem has 3GPP capabilities, send CGACT to disable contexts */
-    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (modem))) {
-        ctx->cgact_needed = TRUE;
-
-        /* If no specific CID was used, disable all PDP contexts */
-        ctx->cgact_command =
-            (MM_BROADBAND_BEARER (self)->priv->cid >= 0 ?
-             g_strdup_printf ("+CGACT=0,%d", MM_BROADBAND_BEARER (self)->priv->cid) :
-             g_strdup_printf ("+CGACT=0"));
-
-        /* If the primary port is connected (with PPP) then try sending the PDP
-         * context deactivation on the secondary port because not all modems will
-         * respond to flashing (since either the modem or the kernel's serial
-         * driver doesn't support it).
-         */
-        if (ctx->secondary &&
-            mm_port_get_connected (MM_PORT (ctx->primary))) {
-            mm_base_modem_at_command_in_port (
-                ctx->modem,
-                ctx->secondary,
-                ctx->cgact_command,
-                3,
-                FALSE,
-                NULL, /* cancellable */
-                (GAsyncReadyCallback)cgact_secondary_ready,
+    switch (MM_BROADBAND_BEARER (self)->priv->connection_type) {
+    case CONNECTION_TYPE_3GPP:
+            MM_BROADBAND_BEARER_GET_CLASS (self)->disconnect_3gpp (
+                MM_BROADBAND_BEARER (self),
+                MM_BROADBAND_MODEM (modem),
+                mm_base_modem_get_port_primary (modem),
+                mm_base_modem_get_port_secondary (modem),
+                MM_BROADBAND_BEARER (self)->priv->port,
+                (GAsyncReadyCallback) disconnect_3gpp_ready,
                 ctx);
-            return;
-        }
+        break;
+
+    case CONNECTION_TYPE_CDMA:
+        MM_BROADBAND_BEARER_GET_CLASS (self)->disconnect_cdma (
+            MM_BROADBAND_BEARER (self),
+            MM_BROADBAND_MODEM (modem),
+            mm_base_modem_get_port_primary (modem),
+            mm_base_modem_get_port_secondary (modem),
+            MM_BROADBAND_BEARER (self)->priv->port,
+            (GAsyncReadyCallback) disconnect_cdma_ready,
+            ctx);
+        break;
+
+    case CONNECTION_TYPE_NONE:
+        g_assert_not_reached ();
     }
 
-    /* If CGACT not needed, or if no secondary port, go on to flash the primary port */
-    mm_serial_port_flash (MM_SERIAL_PORT (ctx->primary),
-                          1000,
-                          TRUE,
-                          (MMSerialFlashFn)primary_flash_ready,
-                          ctx);
+    g_object_unref (modem);
 }
 
 /*****************************************************************************/
@@ -1724,6 +1927,11 @@ mm_broadband_bearer_class_init (MMBroadbandBearerClass *klass)
     klass->connect_3gpp_finish = detailed_connect_finish;
     klass->connect_cdma = connect_cdma;
     klass->connect_cdma_finish = detailed_connect_finish;
+
+    klass->disconnect_3gpp = disconnect_3gpp;
+    klass->disconnect_3gpp_finish = detailed_disconnect_finish;
+    klass->disconnect_cdma = disconnect_cdma;
+    klass->disconnect_cdma_finish = detailed_disconnect_finish;
 
     properties[PROP_3GPP_APN] =
         g_param_spec_string (MM_BROADBAND_BEARER_3GPP_APN,
