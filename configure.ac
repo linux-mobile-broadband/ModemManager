@@ -4,7 +4,7 @@ dnl The MM version number
 m4_define([mm_major_version], [0])
 m4_define([mm_minor_version], [5])
 m4_define([mm_micro_version], [1])
-m4_define([mm_nano_version],  [95])
+m4_define([mm_nano_version],  [96])
 m4_define([mm_version],
           [mm_major_version.mm_minor_version.mm_micro_version.mm_nano_version])
 
