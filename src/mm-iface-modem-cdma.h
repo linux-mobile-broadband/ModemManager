@@ -148,15 +148,6 @@ struct _MMIfaceModemCdma {
     gboolean (*register_in_network_finish) (MMIfaceModemCdma *self,
                                             GAsyncResult *res,
                                             GError **error);
-
-    /* New CDMA bearer */
-    void (* bearer_new) (MMIfaceModemCdma *self,
-                         MMCommonBearerProperties *properties,
-                         GCancellable *cancellable,
-                         GAsyncReadyCallback callback,
-                         gpointer user_data);
-    MMBearer * (* bearer_new_finish) (GAsyncResult *res,
-                                      GError **error);
 };
 
 GType mm_iface_modem_cdma_get_type (void);
@@ -231,15 +222,6 @@ void     mm_iface_modem_cdma_register_in_network        (MMIfaceModemCdma *self,
 gboolean mm_iface_modem_cdma_register_in_network_finish (MMIfaceModemCdma *self,
                                                          GAsyncResult *res,
                                                          GError **error);
-
-/* Create new CDMA bearer */
-void mm_iface_modem_cdma_create_bearer (MMIfaceModemCdma *self,
-                                        MMCommonBearerProperties *properties,
-                                        GAsyncReadyCallback callback,
-                                        gpointer user_data);
-MMBearer *mm_iface_modem_cdma_create_bearer_finish (MMIfaceModemCdma *self,
-                                                    GAsyncResult *res,
-                                                    GError **error);
 
 /* Bind properties for simple GetStatus() */
 void mm_iface_modem_cdma_bind_simple_status (MMIfaceModemCdma *self,
