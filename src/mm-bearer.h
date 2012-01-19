@@ -36,11 +36,10 @@ typedef struct _MMBearer MMBearer;
 typedef struct _MMBearerClass MMBearerClass;
 typedef struct _MMBearerPrivate MMBearerPrivate;
 
-#define MM_BEARER_PATH                        "bearer-path"
-#define MM_BEARER_CONNECTION                  "bearer-connection"
-#define MM_BEARER_MODEM                       "bearer-modem"
-#define MM_BEARER_CONNECTION_FORBIDDEN_REASON "bearer-connection-forbidden-reason"
-#define MM_BEARER_STATUS                      "bearer-status"
+#define MM_BEARER_PATH       "bearer-path"
+#define MM_BEARER_CONNECTION "bearer-connection"
+#define MM_BEARER_MODEM      "bearer-modem"
+#define MM_BEARER_STATUS     "bearer-status"
 
 /* Prefix for all bearer object paths */
 #define MM_DBUS_BEARER_PREFIX MM_DBUS_PATH "/Bearers"
@@ -51,12 +50,6 @@ typedef enum { /*< underscore_name=mm_bearer_status >*/
     MM_BEARER_STATUS_CONNECTING,
     MM_BEARER_STATUS_CONNECTED,
 } MMBearerStatus;
-
-typedef enum { /*< underscore_name=mm_bearer_connection_forbidden_reason >*/
-    MM_BEARER_CONNECTION_FORBIDDEN_REASON_NONE,
-    MM_BEARER_CONNECTION_FORBIDDEN_REASON_UNREGISTERED,
-    MM_BEARER_CONNECTION_FORBIDDEN_REASON_ROAMING,
-} MMBearerConnectionForbiddenReason;
 
 struct _MMBearer {
     MmGdbusBearerSkeleton parent;
@@ -95,10 +88,6 @@ const gchar *mm_bearer_get_path (MMBearer *bearer);
 void mm_bearer_expose_properties (MMBearer *bearer,
                                   MMCommonBearerProperties *properties);
 
-void mm_bearer_set_connection_allowed   (MMBearer *bearer);
-void mm_bearer_set_connection_forbidden (MMBearer *bearer,
-                                         MMBearerConnectionForbiddenReason reason);
-
 MMBearerStatus mm_bearer_get_status (MMBearer *bearer);
 
 void     mm_bearer_connect        (MMBearer *self,
@@ -114,5 +103,7 @@ void     mm_bearer_disconnect        (MMBearer *self,
 gboolean mm_bearer_disconnect_finish (MMBearer *self,
                                       GAsyncResult *res,
                                       GError **error);
+
+void mm_bearer_disconnect_force (MMBearer *self);
 
 #endif /* MM_BEARER_H */
