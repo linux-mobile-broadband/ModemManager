@@ -40,11 +40,11 @@ class Packet:
             if data[len(data) - 2:] == "0d":
                 data = data[:len(data) - 2]
             self.type = TO_MODEM
-#	elif data[len(data) - 6:] == "30307e":
+#        elif data[len(data) - 6:] == "30307e":
 #            # device->host: remove HDLC terminator and fake CRC
 #            data = data[:len(data) - 6]
 #            self.type = TO_HOST
-	elif data[len(data) - 2:] == "7e":
+        elif data[len(data) - 2:] == "7e":
             # device->host: remove HDLC terminator and CRC
             data = data[:len(data) - 6]
             self.type = TO_HOST
@@ -82,7 +82,7 @@ class Packet:
         elif self.type == TO_HOST:
             line = "<"
 
-	offset = 0
+        offset = 0
         items = []
         printed = False
         for i in self.data:
@@ -140,8 +140,8 @@ class FindPackets(handler.ContentHandler):
             self.inPayload = False
         elif name == "payload":
             if self.packet:
-		p = Packet(self.packet, self.idx)
-		self.idx = self.idx + 1
+                p = Packet(self.packet, self.idx)
+                self.idx = self.idx + 1
                 packets.append(p)
                 self.packet = None
 
