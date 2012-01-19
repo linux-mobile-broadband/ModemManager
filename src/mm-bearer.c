@@ -167,7 +167,6 @@ connect_ready (MMBearer *self,
 
 void
 mm_bearer_connect (MMBearer *self,
-                   const gchar *number,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
 {
@@ -235,7 +234,6 @@ mm_bearer_connect (MMBearer *self,
     g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
     MM_BEARER_GET_CLASS (self)->connect (
         self,
-        number,
         self->priv->connect_cancellable,
         (GAsyncReadyCallback)connect_ready,
         result);
@@ -258,11 +256,9 @@ handle_connect_ready (MMBearer *self,
 
 static gboolean
 handle_connect (MMBearer *self,
-                GDBusMethodInvocation *invocation,
-                const gchar *number)
+                GDBusMethodInvocation *invocation)
 {
     mm_bearer_connect (self,
-                       number,
                        (GAsyncReadyCallback)handle_connect_ready,
                        g_object_ref (invocation));
     return TRUE;

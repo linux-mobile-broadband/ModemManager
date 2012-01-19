@@ -68,7 +68,6 @@ struct _MMBearerClass {
 
     /* Connect this bearer */
     void (* connect) (MMBearer *bearer,
-                      const gchar *number,
                       GCancellable *cancellable,
                       GAsyncReadyCallback callback,
                       gpointer user_data);
@@ -100,7 +99,6 @@ void mm_bearer_set_connection_forbidden (MMBearer *bearer,
 MMBearerStatus mm_bearer_get_status (MMBearer *bearer);
 
 void     mm_bearer_connect        (MMBearer *self,
-                                   const gchar *number,
                                    GAsyncReadyCallback callback,
                                    gpointer user_data);
 gboolean mm_bearer_connect_finish (MMBearer *self,
