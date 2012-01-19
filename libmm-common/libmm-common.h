@@ -29,6 +29,7 @@
 #include "mm-common-simple-properties.h"
 #include "mm-common-connect-properties.h"
 #include "mm-common-bearer-properties.h"
+#include "mm-common-bearer-ip-config.h"
 #include "mm-common-location-3gpp.h"
 #include "mm-gdbus-manager.h"
 #include "mm-gdbus-modem.h"
