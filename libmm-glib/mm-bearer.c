@@ -395,15 +395,12 @@ mm_bearer_get_properties (MMBearer *self)
 /**
  * mm_bearer_connect:
  * @self: A #MMBearer.
- * @number: (allow-none): Number to use for dialing.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
  * @user_data: User data to pass to @callback.
  *
  * Asynchronously requests activation of a packet data connection with the
  * network using this #MMBearer properties.
- * @number is usually not required. It is only required for POTS connections
- * or in certain special circumstances.
  *
  * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
  * You can then call mm_bearer_connect_finish() to get the result of the operation.
@@ -412,7 +409,6 @@ mm_bearer_get_properties (MMBearer *self)
  */
 void
 mm_bearer_connect (MMBearer *self,
-                   const gchar *number,
                    GCancellable *cancellable,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
@@ -420,7 +416,6 @@ mm_bearer_connect (MMBearer *self,
     g_return_if_fail (MM_GDBUS_IS_BEARER (self));
 
     mm_gdbus_bearer_call_connect (self,
-                                  number,
                                   cancellable,
                                   callback,
                                   user_data);
@@ -449,14 +444,11 @@ mm_bearer_connect_finish (MMBearer *self,
 /**
  * mm_bearer_connect_sync:
  * @self: A #MMBearer.
- * @number: (allow-none): Number to use for dialing.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
  * Synchronously requests activation of a packet data connection with the
  * network using this #MMBearer properties.
- * @number is usually not required. It is only required for POTS connections
- * or in certain special circumstances.
  *
  * The calling thread is blocked until a reply is received.
  * See mm_bearer_connect() for the asynchronous version of this method.
@@ -465,14 +457,12 @@ mm_bearer_connect_finish (MMBearer *self,
  */
 gboolean
 mm_bearer_connect_sync (MMBearer *self,
-                        const gchar *number,
                         GCancellable *cancellable,
                         GError **error)
 {
     g_return_val_if_fail (MM_GDBUS_IS_BEARER (self), FALSE);
 
     return mm_gdbus_bearer_call_connect_sync (self,
-                                              number,
                                               cancellable,
                                               error);
 }

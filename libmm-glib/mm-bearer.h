@@ -51,7 +51,6 @@ gboolean     mm_bearer_get_connected (MMBearer *self);
 gboolean     mm_bearer_get_suspended (MMBearer *self);
 
 void     mm_bearer_connect        (MMBearer *self,
-                                   const gchar *number,
                                    GCancellable *cancellable,
                                    GAsyncReadyCallback callback,
                                    gpointer user_data);
@@ -59,7 +58,6 @@ gboolean mm_bearer_connect_finish (MMBearer *self,
                                    GAsyncResult *res,
                                    GError **error);
 gboolean mm_bearer_connect_sync   (MMBearer *self,
-                                   const gchar *number,
                                    GCancellable *cancellable,
                                    GError **error);
 
