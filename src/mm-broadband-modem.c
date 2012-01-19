@@ -32,8 +32,7 @@
 #include "mm-iface-modem-cdma.h"
 #include "mm-iface-modem-simple.h"
 #include "mm-iface-modem-location.h"
-#include "mm-bearer-3gpp.h"
-#include "mm-bearer-cdma.h"
+#include "mm-broadband-bearer.h"
 #include "mm-bearer-list.h"
 #include "mm-sim.h"
 #include "mm-log.h"
@@ -176,33 +175,14 @@ modem_create_bearer_finish (MMIfaceModem *self,
 }
 
 static void
-modem_cdma_create_bearer_ready (MMIfaceModemCdma *self,
-                                GAsyncResult *res,
-                                GSimpleAsyncResult *simple)
+broadband_bearer_new_ready (GObject *source,
+                            GAsyncResult *res,
+                            GSimpleAsyncResult *simple)
 {
     MMBearer *bearer = NULL;
     GError *error = NULL;
 
-    bearer = mm_iface_modem_cdma_create_bearer_finish (self, res, &error);
-    if (!bearer)
-        g_simple_async_result_take_error (simple, error);
-    else
-        g_simple_async_result_set_op_res_gpointer (simple,
-                                                   bearer,
-                                                   (GDestroyNotify)g_object_unref);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
-}
-
-static void
-modem_3gpp_create_bearer_ready (MMIfaceModem3gpp *self,
-                                GAsyncResult *res,
-                                GSimpleAsyncResult *simple)
-{
-    MMBearer *bearer = NULL;
-    GError *error = NULL;
-
-    bearer = mm_iface_modem_3gpp_create_bearer_finish (self, res, &error);
+    bearer = mm_broadband_bearer_new_finish (res, &error);
     if (!bearer)
         g_simple_async_result_take_error (simple, error);
     else
@@ -221,57 +201,19 @@ modem_create_bearer (MMIfaceModem *self,
 {
     GSimpleAsyncResult *result;
 
-
     /* Set a new ref to the bearer object as result */
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
                                         modem_create_bearer);
 
-    /* On 3GPP-only modems, new 3GPP bearer */
-    if (mm_iface_modem_is_3gpp_only (self)) {
-        mm_dbg ("Creating 3GPP Bearer in 3GPP-only modem");
-        mm_iface_modem_3gpp_create_bearer (MM_IFACE_MODEM_3GPP (self),
-                                           properties,
-                                           (GAsyncReadyCallback)modem_3gpp_create_bearer_ready,
-                                           result);
-        return;
-    }
-
-    /* On CDMA-only modems, new CDMA bearer */
-    if (mm_iface_modem_is_cdma_only (self)) {
-        mm_dbg ("Creating CDMA Bearer in CDMA-only modem");
-        mm_iface_modem_cdma_create_bearer (MM_IFACE_MODEM_CDMA (self),
-                                           properties,
-                                           (GAsyncReadyCallback)modem_cdma_create_bearer_ready,
-                                           result);
-        return;
-    }
-
-    /* On mixed 3GPP and CDMA modems, we'll build a 3GPP bearer if 'apn' was
-     * given, and a CDMA bearer otherwise.
-     * Plugins supporting mixed 3GPP+CDMA modems can override this method and provide
-     * their own specific and detailed logic. */
-    if (mm_iface_modem_is_cdma (self) &&
-        mm_iface_modem_is_3gpp (self)) {
-        if (mm_common_bearer_properties_get_apn (properties)) {
-            mm_dbg ("Creating 3GPP Bearer in mixed CDMA+LTE modem");
-            mm_iface_modem_3gpp_create_bearer (MM_IFACE_MODEM_3GPP (self),
-                                               properties,
-                                               (GAsyncReadyCallback)modem_3gpp_create_bearer_ready,
-                                               result);
-        } else {
-            mm_dbg ("Creating CDMA Bearer in mixed CDMA+LTE modem");
-            mm_iface_modem_cdma_create_bearer (MM_IFACE_MODEM_CDMA (self),
-                                               properties,
-                                               (GAsyncReadyCallback)modem_cdma_create_bearer_ready,
-                                               result);
-        }
-        return;
-    }
-
-    /* POTS modems are not expected yet. */
-    g_assert_not_reached ();
+    /* We just create a MMBroadbandBearer */
+    mm_dbg ("Creating Broadband bearer in broadband modem");
+    mm_broadband_bearer_new (MM_BROADBAND_MODEM (self),
+                             properties,
+                             NULL, /* cancellable */
+                             (GAsyncReadyCallback)broadband_bearer_new_ready,
+                             result);
 }
 
 /*****************************************************************************/
@@ -4996,8 +4938,6 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->register_in_network_finish = modem_3gpp_register_in_network_finish;
     iface->scan_networks = modem_3gpp_scan_networks;
     iface->scan_networks_finish = modem_3gpp_scan_networks_finish;
-    iface->bearer_new = mm_bearer_3gpp_new;
-    iface->bearer_new_finish = mm_bearer_3gpp_new_finish;
 }
 
 static void
@@ -5024,8 +4964,6 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
     /* Additional actions */
     iface->register_in_network = modem_cdma_register_in_network;
     iface->register_in_network_finish = modem_cdma_register_in_network_finish;
-    iface->bearer_new = mm_bearer_cdma_new;
-    iface->bearer_new_finish = mm_bearer_cdma_new_finish;
 }
 
 static void
