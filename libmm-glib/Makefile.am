@@ -36,6 +36,8 @@ libmm_glib_la_SOURCES = \
 	mm-sim.c \
 	mm-bearer-properties.h \
 	mm-bearer-properties.c \
+	mm-bearer-ip-config.h \
+	mm-bearer-ip-config.c \
 	mm-bearer.h \
 	mm-bearer.c
 
@@ -55,4 +57,5 @@ include_HEADERS = \
 	mm-modem-simple.h \
 	mm-sim.h \
 	mm-bearer-properties.h \
+	mm-bearer-ip-config.h \
 	mm-bearer.h

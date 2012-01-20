@@ -137,237 +137,41 @@ mm_bearer_get_suspended (MMBearer *self)
     return mm_gdbus_bearer_get_suspended (self);
 }
 
-struct _MMBearerIpConfig {
-    MMBearerIpMethod method;
-    gchar *address;
-    guint32 prefix;
-    gchar *dns[4];
-    gchar *gateway;
-};
-
-void
-mm_bearer_ip_config_free (MMBearerIpConfig *config)
-{
-    if (!config)
-        return;
-
-    g_free (config->address);
-    g_free (config->gateway);
-    g_free (config->dns[0]);
-    g_free (config->dns[1]);
-    g_free (config->dns[2]);
-    g_slice_free (MMBearerIpConfig, config);
-}
-
-MMBearerIpMethod
-mm_bearer_ip_config_get_method (const MMBearerIpConfig *config)
-{
-    g_return_val_if_fail (config != NULL, MM_BEARER_IP_METHOD_UNKNOWN);
-
-    return config->method;
-}
-
-const gchar *
-mm_bearer_ip_config_get_address (const MMBearerIpConfig *config)
-{
-    g_return_val_if_fail (config != NULL, NULL);
-
-    return config->address;
-}
-
-gchar *
-mm_bearer_ip_config_dup_address (const MMBearerIpConfig *config)
-{
-    g_return_val_if_fail (config != NULL, NULL);
-
-    return g_strdup (config->address);
-}
-
-guint
-mm_bearer_ip_config_get_prefix (const MMBearerIpConfig *config)
-{
-    g_return_val_if_fail (config != NULL, 0);
-
-    return config->prefix;
-}
-
-const gchar **
-mm_bearer_ip_config_get_dns (const MMBearerIpConfig *config)
-{
-    g_return_val_if_fail (config != NULL, NULL);
-
-    return (const gchar **)config->dns;
-}
-
-gchar **
-mm_bearer_ip_config_dup_dns (const MMBearerIpConfig *config)
-{
-    g_return_val_if_fail (config != NULL, NULL);
-
-    return g_strdupv ((gchar **)config->dns);
-}
-
-const gchar *
-mm_bearer_ip_config_get_gateway (const MMBearerIpConfig *config)
-{
-    g_return_val_if_fail (config != NULL, NULL);
-
-    return config->gateway;
-}
-
-gchar *
-mm_bearer_ip_config_dup_gateway (const MMBearerIpConfig *config)
-{
-    g_return_val_if_fail (config != NULL, NULL);
-
-    return g_strdup (config->gateway);
-}
-
-static MMBearerIpConfig *
-create_ip_config_struct (GVariant *variant)
-{
-    GVariantIter iter;
-    const gchar *key;
-    GVariant *value;
-    MMBearerIpConfig *c;
-
-    c = g_slice_new0 (MMBearerIpConfig);
-
-    g_variant_iter_init (&iter, variant);
-    while (g_variant_iter_loop (&iter, "{sv}", &key, &value)) {
-        if (g_str_equal (key, "method")) {
-            g_warn_if_fail (c->method == 0);
-            c->method = (MMBearerIpMethod) g_variant_get_uint32 (value);
-        } else if (g_str_equal (key, "address")) {
-            g_warn_if_fail (c->address == NULL);
-            c->address = g_variant_dup_string (value, NULL);
-        } else if (g_str_equal (key, "prefix")) {
-            g_warn_if_fail (c->prefix == 0);
-            c->prefix = g_variant_get_uint32 (value);
-        } else if (g_str_equal (key, "dns1")) {
-            g_warn_if_fail (c->dns[0] == NULL);
-            c->dns[0] = g_variant_dup_string (value, NULL);
-        } else if (g_str_equal (key, "dns2")) {
-            g_warn_if_fail (c->dns[1] == NULL);
-            c->dns[1] = g_variant_dup_string (value, NULL);
-        } else if (g_str_equal (key, "dns3")) {
-            g_warn_if_fail (c->dns[2] == NULL);
-            c->dns[2] = g_variant_dup_string (value, NULL);
-        } else if (g_str_equal (key, "gateway")) {
-            g_warn_if_fail (c->gateway == NULL);
-            c->gateway = g_variant_dup_string (value, NULL);
-        } else
-            g_warning ("Unexpected property '%s' found in Bearer IP configuration", key);
-    }
-
-    /* If no method is set, don't build the config struct */
-    if (!c->method) {
-        mm_bearer_ip_config_free (c);
-        return NULL;
-    }
-
-    return c;
-}
-
-#define MM_BEARER_IPV4_CONFIG_DATA "bearer-ipv4"
-
-static void
-ipv4_config_changed (MMBearer *self)
-{
-    g_object_set_data (G_OBJECT (self), MM_BEARER_IPV4_CONFIG_DATA, NULL);
-}
-
-const MMBearerIpConfig *
+MMBearerIpConfig *
 mm_bearer_get_ipv4_config (MMBearer *self)
 {
     MMBearerIpConfig *config;
-
-    g_return_val_if_fail (MM_IS_BEARER (self), NULL);
-
-    config = g_object_get_data (G_OBJECT (self),
-                                MM_BEARER_IPV4_CONFIG_DATA);
-    if (!config) {
-        config = create_ip_config_struct (
-            mm_gdbus_bearer_get_ip4_config (MM_GDBUS_BEARER (self)));
-
-        /* Note: if no specific method set, config struct will not be created */
-        if (config) {
-            g_object_set_data_full (G_OBJECT (self),
-                                    MM_BEARER_IPV4_CONFIG_DATA,
-                                    config,
-                                    (GDestroyNotify)mm_bearer_ip_config_free);
-            g_signal_connect (self,
-                              "notify::ipv4-config",
-                              G_CALLBACK (ipv4_config_changed),
-                              NULL);
-        }
-    }
-
-    return config;
-}
-
-MMBearerIpConfig *
-mm_bearer_dup_ipv4_config (MMBearer *self)
-{
-    MMBearerIpConfig *config;
     GVariant *variant;
+    GError *error = NULL;
 
     g_return_val_if_fail (MM_IS_BEARER (self), NULL);
 
     variant = mm_gdbus_bearer_dup_ip4_config (MM_GDBUS_BEARER (self));
-    config = create_ip_config_struct (variant);
+    config = mm_common_bearer_ip_config_new_from_dictionary (variant, &error);
+    if (!config) {
+        g_warning ("Couldn't create IP config: '%s'", error->message);
+        g_error_free (error);
+    }
     g_variant_unref (variant);
 
     return config;
 }
 
-#define MM_BEARER_IPV6_CONFIG_DATA "bearer-ipv6"
-
-static void
-ipv6_config_changed (MMBearer *self)
-{
-    g_object_set_data (G_OBJECT (self), MM_BEARER_IPV6_CONFIG_DATA, NULL);
-}
-
-const MMBearerIpConfig *
+MMBearerIpConfig *
 mm_bearer_get_ipv6_config (MMBearer *self)
 {
     MMBearerIpConfig *config;
-
-    g_return_val_if_fail (MM_IS_BEARER (self), NULL);
-
-    config = g_object_get_data (G_OBJECT (self),
-                                MM_BEARER_IPV6_CONFIG_DATA);
-    if (!config) {
-        config = create_ip_config_struct (
-            mm_gdbus_bearer_get_ip6_config (MM_GDBUS_BEARER (self)));
-
-        /* Note: if no specific method set, config struct will not be created */
-        if (config) {
-            g_object_set_data_full (G_OBJECT (self),
-                                    MM_BEARER_IPV6_CONFIG_DATA,
-                                    config,
-                                    (GDestroyNotify)mm_bearer_ip_config_free);
-            g_signal_connect (self,
-                              "notify::ipv6-config",
-                              G_CALLBACK (ipv6_config_changed),
-                              NULL);
-        }
-    }
-
-    return config;
-}
-
-MMBearerIpConfig *
-mm_bearer_dup_ipv6_config (MMBearer *self)
-{
-    MMBearerIpConfig *config;
     GVariant *variant;
+    GError *error = NULL;
 
     g_return_val_if_fail (MM_IS_BEARER (self), NULL);
 
     variant = mm_gdbus_bearer_dup_ip6_config (MM_GDBUS_BEARER (self));
-    config = create_ip_config_struct (variant);
+    config = mm_common_bearer_ip_config_new_from_dictionary (variant, &error);
+    if (!config) {
+        g_warning ("Couldn't create IP config: '%s'", error->message);
+        g_error_free (error);
+    }
     g_variant_unref (variant);
 
     return config;

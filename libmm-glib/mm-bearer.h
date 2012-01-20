@@ -27,16 +27,9 @@
 #include <libmm-common.h>
 
 #include "mm-bearer-properties.h"
+#include "mm-bearer-ip-config.h"
 
 G_BEGIN_DECLS
-
-/**
- * MMBearerIpConfig:
- *
- * Addressing details for assignment to the data interface.
- * This is an opaque struct.
- */
-typedef struct _MMBearerIpConfig MMBearerIpConfig;
 
 typedef MmGdbusBearer     MMBearer;
 #define MM_TYPE_BEARER(o) MM_GDBUS_TYPE_BEARER (o)
@@ -72,22 +65,9 @@ gboolean mm_bearer_disconnect_sync   (MMBearer *self,
                                       GCancellable *cancellable,
                                       GError **error);
 
-MMBearerProperties *mm_bearer_get_properties (MMBearer *self);
-
-const MMBearerIpConfig *mm_bearer_get_ipv4_config (MMBearer *self);
-MMBearerIpConfig       *mm_bearer_dup_ipv4_config (MMBearer *self);
-const MMBearerIpConfig *mm_bearer_get_ipv6_config (MMBearer *self);
-MMBearerIpConfig       *mm_bearer_dup_ipv6_config (MMBearer *self);
-
-MMBearerIpMethod   mm_bearer_ip_config_get_method  (const MMBearerIpConfig *config);
-const gchar       *mm_bearer_ip_config_get_address (const MMBearerIpConfig *config);
-gchar             *mm_bearer_ip_config_dup_address (const MMBearerIpConfig *config);
-guint              mm_bearer_ip_config_get_prefix  (const MMBearerIpConfig *config);
-const gchar      **mm_bearer_ip_config_get_dns     (const MMBearerIpConfig *config);
-gchar            **mm_bearer_ip_config_dup_dns     (const MMBearerIpConfig *config);
-const gchar       *mm_bearer_ip_config_get_gateway (const MMBearerIpConfig *config);
-gchar             *mm_bearer_ip_config_dup_gateway (const MMBearerIpConfig *config);
-void               mm_bearer_ip_config_free        (MMBearerIpConfig *config);
+MMBearerProperties *mm_bearer_get_properties  (MMBearer *self);
+MMBearerIpConfig   *mm_bearer_get_ipv4_config (MMBearer *self);
+MMBearerIpConfig   *mm_bearer_get_ipv6_config (MMBearer *self);
 
 G_END_DECLS
 
