@@ -443,7 +443,7 @@ test_com_get_global_mode (void *f, void *data)
     size_t reply_len;
 
     len = wmc_cmd_get_global_mode_new (buf, sizeof (buf));
-    g_assert (len == 2);
+    g_assert (len == 3);
 
     /* Send the command */
     success = send_command (d, buf, sizeof (buf), len);

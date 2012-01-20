@@ -354,14 +354,14 @@ wmc_cmd_network_info_result (const char *buf, size_t buflen)
 size_t
 wmc_cmd_get_global_mode_new (char *buf, size_t buflen)
 {
-    WmcCmdHeader *cmd = (WmcCmdHeader *) buf;
+    WmcCmdGetGlobalMode *cmd = (WmcCmdGetGlobalMode *) buf;
 
     wmc_return_val_if_fail (buf != NULL, 0);
     wmc_return_val_if_fail (buflen >= sizeof (*cmd), 0);
 
     memset (cmd, 0, sizeof (*cmd));
-    cmd->marker = WMC_CMD_MARKER;
-    cmd->cmd = WMC_CMD_GET_GLOBAL_MODE;
+    cmd->hdr.marker = WMC_CMD_MARKER;
+    cmd->hdr.cmd = WMC_CMD_GET_GLOBAL_MODE;
     return sizeof (*cmd);
 }
 
