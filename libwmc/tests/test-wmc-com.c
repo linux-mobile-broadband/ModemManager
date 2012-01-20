@@ -95,14 +95,21 @@ test_com_teardown (gpointer user_data)
 static void
 print_buf (const char *detail, const char *buf, size_t len)
 {
-    int i = 0;
+    int i = 0, z;
     wmcbool newline = FALSE;
+    char *f;
+    guint flen;
 
-    g_print ("%s (%zu)  ", detail, len);
+    f = g_strdup_printf ("%s (%zu)  ", detail, len);
+    flen = strlen (f);
+    g_print (f);
     for (i = 0; i < len; i++) {
         g_print ("0x%02x ", buf[i] & 0xFF);
         if (((i + 1) % 12) == 0) {
             g_print ("\n");
+            z = flen;
+            while (z--)
+                g_print (" ");
             newline = TRUE;
         } else
             newline = FALSE;
@@ -123,6 +130,9 @@ send_command (TestComData *d,
     size_t i = 0, sendlen;
     char sendbuf[600];
 
+    if (d->debug)
+        print_buf ("\nRAW>>>", inbuf, cmd_len);
+
     /* Encapsulate the data for the device */
     sendlen = wmc_encapsulate (inbuf, cmd_len, inbuf_len, sendbuf, sizeof (sendbuf), d->uml290);
     if (sendlen <= 0) {
@@ -131,7 +141,7 @@ send_command (TestComData *d,
     }
 
     if (d->debug)
-        print_buf (">>>", sendbuf, sendlen);
+        print_buf ("ENC>>>", sendbuf, sendlen);
 
     while (i < sendlen) {
         errno = 0;
@@ -189,6 +199,9 @@ wait_reply (TestComData *d, char *buf, size_t len)
             decap_len = 0;
             success = wmc_decapsulate (readbuf, total, buf, len, &decap_len, &used, &more, d->uml290);
 
+            if (success && !more && d->debug)
+                print_buf ("RAW<<<", readbuf, total);
+
             /* Discard used data */
             if (used > 0) {
                 total -= used;
@@ -205,10 +218,8 @@ wait_reply (TestComData *d, char *buf, size_t len)
         }
     } while (total < sizeof (readbuf));
 
-    if (d->debug) {
-        print_buf ("<<<", readbuf, total);
-        print_buf ("D<<", buf, decap_len);
-    }
+    if (d->debug)
+        print_buf ("DCP<<<", buf, decap_len);
 
     return decap_len;
 }
