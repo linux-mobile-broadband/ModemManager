@@ -230,8 +230,10 @@ typedef struct WmcCmdConnectionInfoRsp WmcCmdConnectionInfoRsp;
 /*****************************************************/
 
 enum {
-    WMC_GLOBAL_MODE_CDMA      = 0x00,
-    WMC_GLOBAL_MODE_GSM_AUTO  = 0x0A,
+    WMC_GLOBAL_MODE_AUTO_CDMA = 0x00,
+    WMC_GLOBAL_MODE_CDMA_ONLY = 0x01,
+    WMC_GLOBAL_MODE_EVDO_ONLY = 0x02,
+    WMC_GLOBAL_MODE_AUTO_GSM  = 0x0A,
     WMC_GLOBAL_MODE_GPRS_ONLY = 0x0B,
     WMC_GLOBAL_MODE_UMTS_ONLY = 0x0C,
     WMC_GLOBAL_MODE_AUTO      = 0x14,

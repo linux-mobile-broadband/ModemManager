@@ -427,10 +427,14 @@ static const char *
 mode_to_string (u_int8_t service)
 {
     switch (service) {
-    case WMC_NETWORK_MODE_CDMA:
+    case WMC_NETWORK_MODE_AUTO_CDMA:
         return "CDMA/EVDO";
-    case WMC_NETWORK_MODE_GSM_AUTO:
-        return "GSM/UMTS Auto";
+    case WMC_NETWORK_MODE_CDMA_ONLY:
+        return "CDMA only";
+    case WMC_NETWORK_MODE_EVDO_ONLY:
+        return "EVDO only";
+    case WMC_NETWORK_MODE_AUTO_GSM:
+        return "GSM/UMTS";
     case WMC_NETWORK_MODE_GPRS_ONLY:
         return "GSM/GPRS/EDGE only";
     case WMC_NETWORK_MODE_UMTS_ONLY:

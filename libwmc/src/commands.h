@@ -82,8 +82,10 @@ WmcResult * wmc_cmd_network_info_result (const char *buf, size_t len);
 /**********************************************************************/
 
 enum {
-    WMC_NETWORK_MODE_CDMA      = 0x00,
-    WMC_NETWORK_MODE_GSM_AUTO  = 0x0A,
+    WMC_NETWORK_MODE_AUTO_CDMA = 0x00,
+    WMC_NETWORK_MODE_CDMA_ONLY = 0x01,
+    WMC_NETWORK_MODE_EVDO_ONLY = 0x02,
+    WMC_NETWORK_MODE_AUTO_GSM  = 0x0A,
     WMC_NETWORK_MODE_GPRS_ONLY = 0x0B,
     WMC_NETWORK_MODE_UMTS_ONLY = 0x0C,
     WMC_NETWORK_MODE_AUTO      = 0x14,
