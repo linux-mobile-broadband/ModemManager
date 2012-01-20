@@ -131,8 +131,8 @@ mmcli_bearer_shutdown (void)
 static void
 print_bearer_info (MMBearer *bearer)
 {
-    const MMBearerIpConfig *ipv4_config;
-    const MMBearerIpConfig *ipv6_config;
+    MMBearerIpConfig *ipv4_config;
+    MMBearerIpConfig *ipv6_config;
     MMBearerProperties *properties;
 
     ipv4_config = mm_bearer_get_ipv4_config (bearer);
@@ -173,7 +173,6 @@ print_bearer_info (MMBearer *bearer)
                  VALIDATE_NONE (mm_bearer_properties_get_number (properties)),
                  VALIDATE_UNKNOWN (mm_modem_cdma_rm_protocol_get_string (
                                        mm_bearer_properties_get_rm_protocol (properties))));
-        g_object_unref (properties);
     }
 
     /* IPv4 */
@@ -227,6 +226,10 @@ print_bearer_info (MMBearer *bearer)
             g_print (", '%s'", dns[i]);
         g_print ("\n");
     }
+
+    g_clear_object (&properties);
+    g_clear_object (&ipv4_config);
+    g_clear_object (&ipv6_config);
 }
 
 static void
