@@ -45,7 +45,7 @@ enum {
 #define wmc_return_if_fail(e) \
 { \
     if (!(e)) { \
-        fprintf (stderr, "failed: ##e##\n"); \
+        fprintf (stderr, "failed: " #e "\n"); \
         return; \
     } \
 }
@@ -53,7 +53,7 @@ enum {
 #define wmc_return_val_if_fail(e, v) \
 { \
     if (!(e)) { \
-        fprintf (stderr, "failed: ##e##\n"); \
+        fprintf (stderr, "failed: " #e "\n"); \
         return v; \
     } \
 }
