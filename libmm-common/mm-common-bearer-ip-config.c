@@ -115,19 +115,19 @@ mm_common_bearer_ip_config_get_dictionary (MMCommonBearerIpConfig *self)
 {
     GVariantBuilder builder;
 
-    /* We do allow NULL */
-    if (!self)
-        return NULL;
-
+    /* We do allow self==NULL. We'll just report method=unknown in this case */
     g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
 
     g_variant_builder_add (&builder,
                            "{sv}",
                            PROPERTY_METHOD,
-                           g_variant_new_uint32 (self->priv->method));
+                           g_variant_new_uint32 (self ?
+                                                 self->priv->method :
+                                                 MM_BEARER_IP_METHOD_UNKNOWN));
 
     /* If static IP method, report remaining configuration */
-    if (self->priv->method == MM_BEARER_IP_METHOD_STATIC) {
+    if (self &&
+        self->priv->method == MM_BEARER_IP_METHOD_STATIC) {
         if (self->priv->address)
             g_variant_builder_add (&builder,
                                    "{sv}",
@@ -181,6 +181,7 @@ mm_common_bearer_ip_config_new_from_dictionary (GVariant *dictionary,
     GVariant *value;
     MMCommonBearerIpConfig *self;
     gchar *dns_array[4] = { 0 };
+    gboolean method_received = FALSE;
 
     self = mm_common_bearer_ip_config_new ();
     if (!dictionary)
@@ -188,11 +189,12 @@ mm_common_bearer_ip_config_new_from_dictionary (GVariant *dictionary,
 
     g_variant_iter_init (&iter, dictionary);
     while (g_variant_iter_next (&iter, "{sv}", &key, &value)) {
-        if (g_str_equal (key, PROPERTY_METHOD))
+        if (g_str_equal (key, PROPERTY_METHOD)) {
+            method_received = TRUE;
             mm_common_bearer_ip_config_set_method (
                 self,
                 (MMBearerIpMethod) g_variant_get_uint32 (value));
-        else if (g_str_equal (key, PROPERTY_ADDRESS))
+        } else if (g_str_equal (key, PROPERTY_ADDRESS))
             mm_common_bearer_ip_config_set_address (
                 self,
                 g_variant_get_string (value, NULL));
@@ -221,7 +223,7 @@ mm_common_bearer_ip_config_new_from_dictionary (GVariant *dictionary,
     if (dns_array[0])
         mm_common_bearer_ip_config_set_dns (self, (const gchar **)dns_array);
 
-    if (self->priv->method == MM_BEARER_IP_METHOD_UNKNOWN) {
+    if (!method_received) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_INVALID_ARGS,
