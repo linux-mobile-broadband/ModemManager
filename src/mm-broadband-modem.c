@@ -3972,6 +3972,7 @@ modem_location_load_capabilities (MMIfaceModemLocation *self,
 
 typedef enum {
     DISABLING_STEP_FIRST,
+    DISABLING_STEP_DISCONNECT_BEARERS,
     DISABLING_STEP_IFACE_SIMPLE,
     DISABLING_STEP_IFACE_MESSAGING,
     DISABLING_STEP_IFACE_LOCATION,
@@ -4047,12 +4048,37 @@ INTERFACE_DISABLE_READY_FN (iface_modem_cdma,     MM_IFACE_MODEM_CDMA,     TRUE)
 INTERFACE_DISABLE_READY_FN (iface_modem_location, MM_IFACE_MODEM_LOCATION, FALSE)
 
 static void
+bearer_list_disconnect_all_bearers_ready (MMBearerList *list,
+                                          GAsyncResult *res,
+                                          DisablingContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_bearer_list_disconnect_all_bearers_finish (list, res, &error)) {
+        g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (ctx->result), error);
+        disabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    disabling_step (ctx);
+}
+
+static void
 disabling_step (DisablingContext *ctx)
 {
     switch (ctx->step) {
     case DISABLING_STEP_FIRST:
         /* Fall down to next step */
         ctx->step++;
+
+    case DISABLING_STEP_DISCONNECT_BEARERS:
+        mm_bearer_list_disconnect_all_bearers (
+            ctx->self->priv->modem_bearer_list,
+            (GAsyncReadyCallback)bearer_list_disconnect_all_bearers_ready,
+            ctx);
+        return;
 
     case DISABLING_STEP_IFACE_SIMPLE:
         /* Fall down to next step */
