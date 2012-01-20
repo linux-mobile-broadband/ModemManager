@@ -45,7 +45,7 @@ enum {
 #define wmc_return_if_fail(e) \
 { \
     if (!(e)) { \
-        fprintf (stderr, "failed: " #e "\n"); \
+        wmc_warn (0, "failed: " #e "\n"); \
         return; \
     } \
 }
@@ -53,7 +53,7 @@ enum {
 #define wmc_return_val_if_fail(e, v) \
 { \
     if (!(e)) { \
-        fprintf (stderr, "failed: " #e "\n"); \
+        wmc_warn (0, "failed: " #e "\n"); \
         return v; \
     } \
 }
@@ -68,6 +68,9 @@ void _wmc_log (const char *file,
 
 #define wmc_dbg(domain, ...) \
 	_wmc_log (__FILE__, __LINE__, __func__, domain, LOGL_DEBUG, ## __VA_ARGS__ )
+
+#define wmc_warn(domain, ...) \
+	_wmc_log (__FILE__, __LINE__, __func__, domain, LOGL_WARN, ## __VA_ARGS__ )
 
 #define wmc_err(domain, ...) \
 	_wmc_log (__FILE__, __LINE__, __func__, domain, LOGL_ERR, ## __VA_ARGS__ )
