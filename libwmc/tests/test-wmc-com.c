@@ -48,7 +48,7 @@ test_com_setup (const char *port, wmcbool uml290, wmcbool debug)
 
 	d = g_malloc0 (sizeof (TestComData));
 	g_assert (d);
-	d->uml290 = uml290;
+    d->uml290 = uml290;
 	d->debug = debug;
 
     if (getenv ("SERIAL_DEBUG"))
@@ -158,7 +158,7 @@ wait_reply (TestComData *d, char *buf, size_t len)
     fd_set in;
     int result;
     struct timeval timeout = { 1, 0 };
-    char readbuf[1024];
+    char readbuf[2048];
     ssize_t bytes_read;
     int total = 0, retries = 0;
     size_t decap_len = 0;
@@ -236,7 +236,7 @@ test_com_init (void *f, void *data)
     size_t reply_len;
 
     len = wmc_cmd_init_new (buf, sizeof (buf), d->uml290);
-    g_assert (len == 16);
+    g_assert (len);
 
     /* Send the command */
     success = send_command (d, buf, sizeof (buf), len);
@@ -257,7 +257,7 @@ test_com_device_info (void *f, void *data)
 {
     TestComData *d = data;
     wmcbool success;
-    char buf[1024];
+    char buf[2048];
     const char *str, *str2;
     gint len;
     WmcResult *result;
@@ -314,14 +314,53 @@ test_com_device_info (void *f, void *data)
     wmc_result_unref (result);
 }
 
+static const char *
+service_to_string (u_int8_t service)
+{
+    switch (service) {
+    case WMC_NETWORK_SERVICE_NONE:
+        return "none";
+    case WMC_NETWORK_SERVICE_AMPS:
+        return "AMPS";
+    case WMC_NETWORK_SERVICE_IS95A:
+        return "IS95-A";
+    case WMC_NETWORK_SERVICE_IS95B:
+        return "IS95-B";
+    case WMC_NETWORK_SERVICE_GSM:
+        return "GSM";
+    case WMC_NETWORK_SERVICE_GPRS:
+        return "GPRS";
+    case WMC_NETWORK_SERVICE_1XRTT:
+        return "1xRTT";
+    case WMC_NETWORK_SERVICE_EVDO_0:
+        return "EVDO r0";
+    case WMC_NETWORK_SERVICE_UMTS:
+        return "UMTS";
+    case WMC_NETWORK_SERVICE_EVDO_A:
+        return "EVDO rA";
+    case WMC_NETWORK_SERVICE_EDGE:
+        return "EDGE";
+    case WMC_NETWORK_SERVICE_HSDPA:
+        return "HSDPA";
+    case WMC_NETWORK_SERVICE_HSUPA:
+        return "HSUPA";
+    case WMC_NETWORK_SERVICE_HSPA:
+        return "HSPA";
+    case WMC_NETWORK_SERVICE_LTE:
+        return "LTE";
+    default:
+        return "unknown";
+    }
+}
+
 void
-test_com_status (void *f, void *data)
+test_com_network_info (void *f, void *data)
 {
     TestComData *d = data;
     wmcbool success;
     char buf[1024];
     const char *str;
-    u_int8_t dbm;
+    u_int8_t dbm, service;
     gint len;
     WmcResult *result;
     size_t reply_len;
@@ -342,21 +381,86 @@ test_com_status (void *f, void *data)
 
     g_print ("\n");
 
-    dbm = 0;
-    wmc_result_get_u8 (result, WMC_CMD_NETWORK_INFO_ITEM_CDMA_DBM, &dbm);
-    g_message ("%s: CDMA 1x dBm: %d", __func__, dbm);
+    service = 0;
+    wmc_result_get_u8 (result, WMC_CMD_NETWORK_INFO_ITEM_SERVICE, &service);
+    g_message ("%s: Service: %d (%s)", __func__, service, service_to_string (service));
 
     dbm = 0;
-    wmc_result_get_u8 (result, WMC_CMD_NETWORK_INFO_ITEM_HDR_DBM, &dbm);
-    g_message ("%s: HDR dBm: %d", __func__, dbm);
+    wmc_result_get_u8 (result, WMC_CMD_NETWORK_INFO_ITEM_2G_DBM, &dbm);
+    g_message ("%s: 2G dBm: -%d", __func__, dbm);
+
+    dbm = 0;
+    wmc_result_get_u8 (result, WMC_CMD_NETWORK_INFO_ITEM_3G_DBM, &dbm);
+    g_message ("%s: 3G dBm: -%d", __func__, dbm);
 
     dbm = 0;
     wmc_result_get_u8 (result, WMC_CMD_NETWORK_INFO_ITEM_LTE_DBM, &dbm);
-    g_message ("%s: LTE dBm: %d", __func__, dbm);
+    g_message ("%s: LTE dBm: -%d", __func__, dbm);
 
     str = NULL;
     wmc_result_get_string (result, WMC_CMD_NETWORK_INFO_ITEM_OPNAME, &str);
     g_message ("%s: Operator Name: %s", __func__, str ? str : "(none)");
+
+    str = NULL;
+    wmc_result_get_string (result, WMC_CMD_NETWORK_INFO_ITEM_MCC, &str);
+    g_message ("%s: MCC: %s", __func__, str ? str : "(none)");
+
+    str = NULL;
+    wmc_result_get_string (result, WMC_CMD_NETWORK_INFO_ITEM_MNC, &str);
+    g_message ("%s: MNC: %s", __func__, str ? str : "(none)");
+
+    wmc_result_unref (result);
+}
+
+static const char *
+mode_to_string (u_int8_t service)
+{
+    switch (service) {
+    case WMC_NETWORK_MODE_CDMA:
+        return "CDMA/EVDO";
+    case WMC_NETWORK_MODE_GSM_AUTO:
+        return "GSM/UMTS Auto";
+    case WMC_NETWORK_MODE_GPRS_ONLY:
+        return "GSM/GPRS/EDGE only";
+    case WMC_NETWORK_MODE_UMTS_ONLY:
+        return "UMTS/HSPA only";
+    case WMC_NETWORK_MODE_AUTO:
+        return "Auto";
+    default:
+        return "unknown";
+    }
+}
+
+void
+test_com_get_global_mode (void *f, void *data)
+{
+    TestComData *d = data;
+    wmcbool success;
+    char buf[1024];
+    u_int8_t mode;
+    gint len;
+    WmcResult *result;
+    size_t reply_len;
+
+    len = wmc_cmd_get_global_mode_new (buf, sizeof (buf));
+    g_assert (len == 2);
+
+    /* Send the command */
+    success = send_command (d, buf, sizeof (buf), len);
+    g_assert (success);
+
+    /* Get a response */
+    reply_len = wait_reply (d, buf, sizeof (buf));
+
+    /* Parse the response into a result structure */
+    result = wmc_cmd_get_global_mode_result (buf, reply_len);
+    g_assert (result);
+
+    g_print ("\n");
+
+    mode = 0;
+    wmc_result_get_u8 (result, WMC_CMD_GET_GLOBAL_MODE_ITEM_MODE, &mode);
+    g_message ("%s: Mode: %d (%s)", __func__, mode, mode_to_string (mode));
 
     wmc_result_unref (result);
 }

@@ -213,12 +213,49 @@ wmc_cmd_network_info_new (char *buf, size_t buflen)
     return sizeof (*cmd);
 }
 
-static u_int8_t
-sanitize_dbm (u_int8_t in_dbm)
+static wmcbool
+is_gsm_service (u_int8_t service)
 {
-    /* 0x7D (-125 dBm) really means no signal */
-    return in_dbm >= 0x7D ? 0 : in_dbm;
+    return (service == WMC_SERVICE_GSM || service == WMC_SERVICE_GPRS || service == WMC_SERVICE_EDGE);
 }
+
+static wmcbool
+is_umts_service (u_int8_t service)
+{
+    return (service == WMC_SERVICE_UMTS || service == WMC_SERVICE_HSDPA
+            || service == WMC_SERVICE_HSUPA || service == WMC_SERVICE_HSPA);
+}
+
+static wmcbool
+is_cdma_service (u_int8_t service)
+{
+    return (service == WMC_SERVICE_IS95A || service == WMC_SERVICE_IS95B || service == WMC_SERVICE_1XRTT);
+}
+
+static wmcbool
+is_evdo_service (u_int8_t service)
+{
+    return (service == WMC_SERVICE_EVDO_0 || service == WMC_SERVICE_EVDO_A);
+}
+
+static wmcbool
+is_lte_service (u_int8_t service)
+{
+    return (service == WMC_SERVICE_LTE);
+}
+
+static u_int8_t
+sanitize_dbm (u_int8_t in_dbm, u_int8_t service)
+{
+    u_int8_t cutoff;
+
+    /* 0x6A (-106 dBm) = no signal for GSM/GPRS/EDGE */
+    /* 0x7D (-125 dBm) = no signal for everything else */
+    cutoff = is_gsm_service (service) ? 0x6A : 0x7D;
+
+    return in_dbm >= cutoff ? 0 : in_dbm;
+}
+
 
 WmcResult *
 wmc_cmd_network_info_result (const char *buf, size_t buflen)
@@ -226,38 +263,121 @@ wmc_cmd_network_info_result (const char *buf, size_t buflen)
     WmcResult *r = NULL;
     WmcCmdNetworkInfoRsp *rsp = (WmcCmdNetworkInfoRsp *) buf;
     WmcCmdNetworkInfo2Rsp *rsp2 = (WmcCmdNetworkInfo2Rsp *) buf;
+    WmcCmdNetworkInfo3Rsp *rsp3 = (WmcCmdNetworkInfo3Rsp *) buf;
     char tmp[65];
+    int err;
+    u_int32_t mccmnc = 0, mcc, mnc;
 
     wmc_return_val_if_fail (buf != NULL, NULL);
 
-    if (check_command (buf, buflen, WMC_CMD_NET_INFO, sizeof (WmcCmdNetworkInfo2Rsp)) < 0) {
-        rsp2 = NULL;
-        if (check_command (buf, buflen, WMC_CMD_NET_INFO, sizeof (WmcCmdNetworkInfoRsp)) < 0)
+    err = check_command (buf, buflen, WMC_CMD_NET_INFO, sizeof (WmcCmdNetworkInfo3Rsp));
+    if (err != WMC_SUCCESS) {
+        if (err != -WMC_ERROR_RESPONSE_BAD_LENGTH)
             return NULL;
+        rsp3 = NULL;
+
+        err = check_command (buf, buflen, WMC_CMD_NET_INFO, sizeof (WmcCmdNetworkInfo2Rsp));
+        if (err != WMC_SUCCESS) {
+            if (err != -WMC_ERROR_RESPONSE_BAD_LENGTH)
+                return NULL;
+            rsp2 = NULL;
+
+            err = check_command (buf, buflen, WMC_CMD_NET_INFO, sizeof (WmcCmdNetworkInfoRsp));
+            if (err != WMC_SUCCESS)
+                return NULL;
+        }
     }
 
     r = wmc_result_new ();
 
-    wmc_result_add_u8 (r, WMC_CMD_NETWORK_INFO_ITEM_CDMA_DBM, sanitize_dbm (rsp->cdma1x_dbm));
+    wmc_result_add_u8 (r, WMC_CMD_NETWORK_INFO_ITEM_SERVICE, rsp->service);
 
     if (rsp2) {
-        wmc_result_add_u8 (r, WMC_CMD_NETWORK_INFO_ITEM_HDR_DBM, sanitize_dbm (rsp2->hdr_dbm));
-        wmc_result_add_u8 (r, WMC_CMD_NETWORK_INFO_ITEM_LTE_DBM, sanitize_dbm (rsp2->lte_dbm));
+        wmc_result_add_u8 (r, WMC_CMD_NETWORK_INFO_ITEM_2G_DBM, sanitize_dbm (rsp2->two_g_dbm, rsp->service));
+        wmc_result_add_u8 (r, WMC_CMD_NETWORK_INFO_ITEM_3G_DBM, sanitize_dbm (rsp2->three_g_dbm, WMC_SERVICE_NONE));
 
         memset (tmp, 0, sizeof (tmp));
-        if (sanitize_dbm (rsp2->lte_dbm)) {
-            /* LTE operator name */
-            wmc_assert (sizeof (rsp2->lte_opname) <= sizeof (tmp));
-            memcpy (tmp, rsp2->lte_opname, sizeof (rsp2->lte_opname));
-            wmc_result_add_string (r, WMC_CMD_NETWORK_INFO_ITEM_OPNAME, tmp);
-        } else if (sanitize_dbm (rsp2->hdr_dbm) || sanitize_dbm (rsp2->cdma1x_dbm)) {
+        if (   (is_cdma_service (rsp->service) && sanitize_dbm (rsp2->two_g_dbm, rsp->service))
+            || (is_evdo_service (rsp->service) && sanitize_dbm (rsp2->three_g_dbm, rsp->service))) {
             /* CDMA2000 operator name */
             wmc_assert (sizeof (rsp2->cdma_opname) <= sizeof (tmp));
             memcpy (tmp, rsp2->cdma_opname, sizeof (rsp2->cdma_opname));
             wmc_result_add_string (r, WMC_CMD_NETWORK_INFO_ITEM_OPNAME, tmp);
+        } else {
+            if (   (is_gsm_service (rsp->service) && sanitize_dbm (rsp2->two_g_dbm, rsp->service))
+                || (is_umts_service (rsp->service) && sanitize_dbm (rsp2->three_g_dbm, rsp->service))) {
+                /* GSM/UMTS operator name */
+                wmc_assert (sizeof (rsp2->tgpp_opname) <= sizeof (tmp));
+                memcpy (tmp, rsp2->tgpp_opname, sizeof (rsp2->tgpp_opname));
+                wmc_result_add_string (r, WMC_CMD_NETWORK_INFO_ITEM_OPNAME, tmp);
+            }
+        }
+
+        /* MCC/MNC */
+        mccmnc = le32toh (rsp2->mcc_mnc);
+        if (mccmnc < 100000)
+            mccmnc *= 10;    /* account for possible 2-digit MNC */
+        mcc = mccmnc / 1000;
+        mnc = mccmnc - (mcc * 1000);
+
+        if (mcc > 100) {
+            memset (tmp, 0, sizeof (tmp));
+            snprintf (tmp, sizeof (tmp), "%u", mccmnc / 1000);
+            wmc_result_add_string (r, WMC_CMD_NETWORK_INFO_ITEM_MCC, tmp);
+
+            memset (tmp, 0, sizeof (tmp));
+            snprintf (tmp, sizeof (tmp), "%03u", mnc);
+            wmc_result_add_string (r, WMC_CMD_NETWORK_INFO_ITEM_MNC, tmp);
+        }
+    } else {
+        /* old format */
+        wmc_result_add_u8 (r, WMC_CMD_NETWORK_INFO_ITEM_2G_DBM, sanitize_dbm (rsp->two_g_dbm, rsp->service));
+    }
+
+    if (rsp3) {
+        wmc_result_add_u8 (r, WMC_CMD_NETWORK_INFO_ITEM_LTE_DBM, sanitize_dbm (rsp3->lte_dbm, WMC_SERVICE_NONE));
+
+        memset (tmp, 0, sizeof (tmp));
+        if (is_lte_service (rsp->service) && sanitize_dbm (rsp3->lte_dbm, rsp->service)) {
+            /* LTE operator name */
+            wmc_assert (sizeof (rsp2->tgpp_opname) <= sizeof (tmp));
+            memcpy (tmp, rsp2->tgpp_opname, sizeof (rsp2->tgpp_opname));
+            wmc_result_add_string (r, WMC_CMD_NETWORK_INFO_ITEM_OPNAME, tmp);
         }
     }
 
+    return r;
+}
+
+/**********************************************************************/
+
+size_t
+wmc_cmd_get_global_mode_new (char *buf, size_t buflen)
+{
+    WmcCmdHeader *cmd = (WmcCmdHeader *) buf;
+
+    wmc_return_val_if_fail (buf != NULL, 0);
+    wmc_return_val_if_fail (buflen >= sizeof (*cmd), 0);
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->marker = WMC_CMD_MARKER;
+    cmd->cmd = WMC_CMD_GET_GLOBAL_MODE;
+    return sizeof (*cmd);
+}
+
+WmcResult *
+wmc_cmd_get_global_mode_result (const char *buf, size_t buflen)
+{
+    WmcResult *r = NULL;
+    WmcCmdGetGlobalModeRsp *rsp = (WmcCmdGetGlobalModeRsp *) buf;
+
+    wmc_return_val_if_fail (buf != NULL, NULL);
+
+    if (check_command (buf, buflen, WMC_CMD_GET_GLOBAL_MODE, sizeof (WmcCmdGetGlobalModeRsp)) < 0)
+        return NULL;
+
+    r = wmc_result_new ();
+    wmc_result_add_u8 (r, WMC_CMD_GET_GLOBAL_MODE_ITEM_MODE, rsp->mode);
     return r;
 }
 

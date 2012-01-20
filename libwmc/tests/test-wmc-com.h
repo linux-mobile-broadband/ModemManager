@@ -29,7 +29,9 @@ void test_com_init (void *f, void *data);
 
 void test_com_device_info (void *f, void *data);
 
-void test_com_status (void *f, void *data);
+void test_com_network_info (void *f, void *data);
+
+void test_com_get_global_mode (void *f, void *data);
 
 #endif  /* TEST_WMC_COM_H */
 

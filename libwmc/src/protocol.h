@@ -27,8 +27,25 @@ enum {
     WMC_CMD_IP_INFO = 0x0A,
     WMC_CMD_NET_INFO = 0x0B,
     WMC_CMD_INIT = 0x0D,
+    WMC_CMD_SET_OPERATOR = 0x33,
+    WMC_CMD_GET_FIRST_OPERATOR = 0x34,
+    WMC_CMD_GET_NEXT_OPERATOR = 0x35,
     WMC_CMD_EPS_BEARER_INFO = 0x4D,
 };
+
+/* MCC/MNC representation
+ *
+ * Various commands accept or return an MCC/MNC.  When sending, convert
+ * the MCC/MNC into a number using eg. atoi() and store it as an LE 32-bit
+ * value.  3-digit MNCs appear to be sent as 3-digit only if the firmware
+ * reports them as 3-digit.  For example:
+ *
+ * T-Mobile US: 310-260
+ * mcc_mnc = 0x00007932 = 31026  (note the 2-digit-only MNC)
+ *
+ * AT&T: 310-410
+ * mcc_mnc = 0x0004bc8a = 310410
+ */
 
 
 /* Generic WMC command header */
@@ -105,9 +122,9 @@ enum {
     WMC_SERVICE_GSM = 4,
     WMC_SERVICE_GPRS = 5,
     WMC_SERVICE_1XRTT = 6,
-    WMC_SERVICE_1XEVDO_0 = 7,
+    WMC_SERVICE_EVDO_0 = 7,
     WMC_SERVICE_UMTS = 8,
-    WMC_SERVICE_1XEVDO_A = 9,
+    WMC_SERVICE_EVDO_A = 9,
     WMC_SERVICE_EDGE = 10,
     WMC_SERVICE_HSDPA = 11,
     WMC_SERVICE_HSUPA = 12,
@@ -115,7 +132,7 @@ enum {
     WMC_SERVICE_LTE = 14
 };
 
-/* Shorter response used by earlier devices like PC5740 */
+/* PC5740 response */
 struct WmcCmdNetworkInfoRsp {
     WmcCmdHeader hdr;
     u_int8_t  _unknown1;
@@ -127,12 +144,12 @@ struct WmcCmdNetworkInfoRsp {
     u_int8_t  _unknown5;
     u_int8_t  _unknown6;
     u_int8_t  _unknown7[3];    /* Always 0xFE 0xFF 0xFF */
-    u_int8_t  cdma1x_dbm;
+    u_int8_t  two_g_dbm;       /* 0x7D = no signal */
     u_int8_t  _unknown8[37];   /* Always zero */
 } __attribute__ ((packed));
 typedef struct WmcCmdNetworkInfoRsp WmcCmdNetworkInfoRsp;
 
-/* Long-format response used on newer devices like the UML290 */
+/* UML190 response */
 struct WmcCmdNetworkInfo2Rsp {
     WmcCmdHeader hdr;
     u_int8_t  _unknown1;       /* 0x00 on LTE, 0x07 or 0x1F on CDMA */
@@ -144,22 +161,56 @@ struct WmcCmdNetworkInfo2Rsp {
     u_int16_t counter2;        /* Time since firmware start? */
     u_int8_t  _unknown5;       /* 0x00 on LTE, various values (0xD4, 0x5C) on CDMA */
     u_int8_t  _unknown6[3];    /* always zero on LTE, 0xFE 0xFF 0xFF on CDMA */
-    u_int8_t  cdma1x_dbm;      /* 0x7D = no signal */
+    u_int8_t  two_g_dbm;       /* 0x7D = no CDMA signal, 0x6a = no GSM signal */
     u_int8_t  _unknown7[3];    /* Always zero */
     u_int8_t  cdma_opname[16]; /* Zero terminated? */
     u_int8_t  _unknown8[18];   /* Always zero */
-    u_int8_t  hdr_dbm;         /* 0x7D = no signal */
-    u_int8_t  _unknown9[3];   /* Always zero */
+    u_int8_t  three_g_dbm;     /* 0x7D = no signal */
+    u_int8_t  _unknown9[3];    /* Always zero */
     u_int8_t  _unknown10;      /* 0x01 on LTE, 0x40 on CDMA */
     u_int8_t  _unknown11[3];   /* Always zero */
     u_int8_t  _unknown12;      /* Always 0x01 */
-    u_int8_t  lte_opname[8];   /* Zero terminated? Sometimes "MCC MNC" too */
-    u_int8_t  _unknown13[60];  /* Always zero */
-    u_int8_t  lte_dbm;         /* 0x00 if not in LTE mode */
-    u_int8_t  _unknown14[3];   /* Always zero */
-    u_int8_t  _unknown15[4];
+    u_int8_t  tgpp_opname[8];  /* 3GPP operator name (Zero terminated? Sometimes "MCC MNC" too */
+    u_int8_t  _unknown13[4];   /* Always zero */
+    u_int32_t _unknown14;      /* 43 75 3a 00 on GSM/WCDMA mode, zero on others  */
+    u_int32_t _unknown15;      /* 49 7d 3a 00 on GSM/WCDMA mode, zero on others  */
+    u_int8_t  _unknown16[44];  /* Always zero */
+    u_int32_t mcc_mnc;         /* GSM/WCDMA only, see MCC/MNC format note */
 } __attribute__ ((packed));
 typedef struct WmcCmdNetworkInfo2Rsp WmcCmdNetworkInfo2Rsp;
+
+/* UML290 response */
+struct WmcCmdNetworkInfo3Rsp {
+    WmcCmdHeader hdr;
+    u_int8_t  _unknown1;       /* 0x00 on LTE, 0x07 or 0x1F on CDMA */
+    u_int8_t  _unknown2[3];    /* Always zero */
+    u_int8_t  service;         /* One of WMC_SERVICE_* */
+    u_int8_t  _unknown4;
+    u_int8_t  magic[10];       /* Whatever was passed in WMC_CMD_INIT with some changes */
+    u_int16_t counter1;        /* A timestamp/counter? */
+    u_int16_t counter2;        /* Time since firmware start? */
+    u_int8_t  _unknown5;       /* 0x00 on LTE, various values (0xD4, 0x5C) on CDMA */
+    u_int8_t  _unknown6[3];    /* always zero on LTE, 0xFE 0xFF 0xFF on CDMA */
+    u_int8_t  two_g_dbm;       /* 0x7D = no CDMA signal, 0x6a = no GSM signal */
+    u_int8_t  _unknown7[3];    /* Always zero */
+    u_int8_t  cdma_opname[16]; /* Zero terminated? */
+    u_int8_t  _unknown8[18];   /* Always zero */
+    u_int8_t  three_g_dbm;     /* 0x7D = no signal */
+    u_int8_t  _unknown9[3];    /* Always zero */
+    u_int8_t  _unknown10;      /* 0x01 on LTE, 0x40 on CDMA */
+    u_int8_t  _unknown11[3];   /* Always zero */
+    u_int8_t  _unknown12;      /* Always 0x01 */
+    u_int8_t  tgpp_opname[8];   /* Zero terminated? Sometimes "MCC MNC" too */
+    u_int8_t  _unknown13[4];   /* Always zero */
+    u_int32_t _unknown14;      /* 43 75 3a 00 on GSM/WCDMA mode, zero on others  */
+    u_int32_t _unknown15;      /* 49 7d 3a 00 on GSM/WCDMA mode, zero on others  */
+    u_int8_t  _unknown16[44];  /* Always zero */
+    u_int32_t mcc_mnc;         /* GSM/WCDMA only, see MCC/MNC format note */
+    u_int8_t  lte_dbm;         /* 0x00 if not in LTE mode */
+    u_int8_t  _unknown17[3];   /* Always zero */
+    u_int8_t  _unknown18[4];
+} __attribute__ ((packed));
+typedef struct WmcCmdNetworkInfo3Rsp WmcCmdNetworkInfo3Rsp;
 
 /*****************************************************/
 
@@ -179,9 +230,11 @@ typedef struct WmcCmdConnectionInfoRsp WmcCmdConnectionInfoRsp;
 /*****************************************************/
 
 enum {
-    WMC_GLOBAL_MODE_CDMA = 0x00,
-    WMC_GLOBAL_MODE_GSM  = 0x0A,
-    WMC_GLOBAL_MODE_AUTO = 0x14,
+    WMC_GLOBAL_MODE_CDMA      = 0x00,
+    WMC_GLOBAL_MODE_GSM_AUTO  = 0x0A,
+    WMC_GLOBAL_MODE_GPRS_ONLY = 0x0B,
+    WMC_GLOBAL_MODE_UMTS_ONLY = 0x0C,
+    WMC_GLOBAL_MODE_AUTO      = 0x14,
 };
 
 struct WmcCmdGetGlobalMode {
@@ -216,6 +269,57 @@ struct WmcCmdSetGlobalModeRsp {
     u_int32_t _unknown2;  /* always zero */
 } __attribute__ ((packed));
 typedef struct WmcCmdSetGlobalModeRsp WmcCmdSetGlobalModeRsp;
+
+/*****************************************************/
+
+struct WmcCmdSetOperator {
+    WmcCmdHeader hdr;
+    u_int8_t automatic;      /* 0x00 = manual, 0x01 = auto */
+    u_int8_t _unknown1;      /* always 0x50 */
+    u_int8_t _unknown2[3];   /* always zero */
+    u_int32_t mcc_mnc;       /* MCC/MNC for manual reg (see format note), zero for auto */
+    u_int8_t _unknown3[56];  /* always zero */
+} __attribute__ ((packed));
+typedef struct WmcCmdSetOperator WmcCmdSetOperator;
+
+enum {
+    WMC_SET_OPERATOR_STATUS_OK = 0,
+    WMC_SET_OPERATOR_STATUS_REGISTERING = 0x63,
+    WMC_SET_OPERATOR_STATUS_FAILED = 0x68,
+};
+
+struct WmcCmdSetOperatorRsp {
+    WmcCmdHeader hdr;
+    u_int8_t status;        /* one of WMC_SET_OPERATOR_STATUS_* */
+    u_int8_t _unknown1[3];  /* always zero */
+} __attribute__ ((packed));
+typedef struct WmcCmdSetOperatorRsp WmcCmdSetOperatorRsp;
+
+/*****************************************************/
+
+enum {
+    WMC_OPERATOR_SERVICE_UNKNOWN = 0,
+    WMC_OPERATOR_SERVICE_GSM = 1,
+    WMC_OPERATOR_SERVICE_UMTS = 2,
+};
+
+/* Response for both GET_FIRST_OPERATOR and GET_NEXT_OPERATOR */
+struct WmcCmdGetOperatorRsp {
+    WmcCmdHeader hdr;
+    u_int8_t  _unknown1;     /* Usually 0x50, sometimes 0x00 */
+    u_int8_t  _unknown2[3];  /* always zero */
+    u_int32_t mcc_mnc;       /* see format note */
+    u_int8_t  opname[8];
+    u_int8_t  _unknown3[56]; /* always zero */
+    u_int8_t  stat;          /* follows 3GPP TS27.007 +COPS <stat> ? */
+    u_int8_t  _unknown4[3];  /* always zero */
+    u_int8_t  service;       /* one of WMC_OPERATOR_SERVICE_* */
+    u_int8_t  _unknown5[3];  /* always zero */
+    u_int8_t  _unknown6;     /* 0x63 (GET_FIRST_OP) might mean "wait" */
+    u_int8_t  _unknown7;     /* 0x00 or 0x01 */
+    u_int8_t  _unknown8[2];  /* always zero */
+} __attribute__ ((packed));
+typedef struct WmcCmdSetOperatorRsp WmcCmdSetOperatorRsp;
 
 /*****************************************************/
 

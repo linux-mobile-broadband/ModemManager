@@ -47,14 +47,54 @@ WmcResult * wmc_cmd_device_info_result (const char *buf, size_t len);
 
 /**********************************************************************/
 
-#define WMC_CMD_NETWORK_INFO_ITEM_CDMA_DBM    "cdma-dbm"
-#define WMC_CMD_NETWORK_INFO_ITEM_HDR_DBM     "hdr-dbm"
-#define WMC_CMD_NETWORK_INFO_ITEM_LTE_DBM     "lte-dbm"
-#define WMC_CMD_NETWORK_INFO_ITEM_OPNAME      "opname"
+enum {
+    WMC_NETWORK_SERVICE_NONE = 0,
+    WMC_NETWORK_SERVICE_AMPS = 1,
+    WMC_NETWORK_SERVICE_IS95A = 2,
+    WMC_NETWORK_SERVICE_IS95B = 3,
+    WMC_NETWORK_SERVICE_GSM = 4,
+    WMC_NETWORK_SERVICE_GPRS = 5,
+    WMC_NETWORK_SERVICE_1XRTT = 6,
+    WMC_NETWORK_SERVICE_EVDO_0 = 7,
+    WMC_NETWORK_SERVICE_UMTS = 8,
+    WMC_NETWORK_SERVICE_EVDO_A = 9,
+    WMC_NETWORK_SERVICE_EDGE = 10,
+    WMC_NETWORK_SERVICE_HSDPA = 11,
+    WMC_NETWORK_SERVICE_HSUPA = 12,
+    WMC_NETWORK_SERVICE_HSPA = 13,
+    WMC_NETWORK_SERVICE_LTE = 14
+};
+
+/* One of WMC_NETWORK_SERVICE_* */
+#define WMC_CMD_NETWORK_INFO_ITEM_SERVICE       "service"
+
+#define WMC_CMD_NETWORK_INFO_ITEM_2G_DBM   "2g-dbm"
+#define WMC_CMD_NETWORK_INFO_ITEM_3G_DBM   "3g-dbm"
+#define WMC_CMD_NETWORK_INFO_ITEM_LTE_DBM  "lte-dbm"
+#define WMC_CMD_NETWORK_INFO_ITEM_OPNAME   "opname"
+#define WMC_CMD_NETWORK_INFO_ITEM_MCC      "mcc"
+#define WMC_CMD_NETWORK_INFO_ITEM_MNC      "mnc"
 
 size_t      wmc_cmd_network_info_new    (char *buf, size_t buflen);
 
 WmcResult * wmc_cmd_network_info_result (const char *buf, size_t len);
+
+/**********************************************************************/
+
+enum {
+    WMC_NETWORK_MODE_CDMA      = 0x00,
+    WMC_NETWORK_MODE_GSM_AUTO  = 0x0A,
+    WMC_NETWORK_MODE_GPRS_ONLY = 0x0B,
+    WMC_NETWORK_MODE_UMTS_ONLY = 0x0C,
+    WMC_NETWORK_MODE_AUTO      = 0x14,
+};
+
+/* One of WMC_NETWORK_MODE_* */
+#define WMC_CMD_GET_GLOBAL_MODE_ITEM_MODE   "mode"
+
+size_t      wmc_cmd_get_global_mode_new    (char *buf, size_t buflen);
+
+WmcResult * wmc_cmd_get_global_mode_result (const char *buf, size_t len);
 
 /**********************************************************************/
 
