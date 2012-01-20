@@ -8,6 +8,7 @@ EXTRA_DIST = \
 	org.freedesktop.ModemManager.xml \
 	org.freedesktop.ModemManager.Modem.xml \
 	org.freedesktop.ModemManager.Modem.Cdma.xml \
+	org.freedesktop.ModemManager.Modem.Firmware.xml \
 	org.freedesktop.ModemManager.Modem.Gsm.xml \
 	org.freedesktop.ModemManager.Modem.Gsm.Card.xml \
 	org.freedesktop.ModemManager.Modem.Gsm.Contacts.xml \
