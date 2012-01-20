@@ -640,9 +640,11 @@ mm_bearer_init (MMBearer *self)
     mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (self), NULL);
     mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_suspended (MM_GDBUS_BEARER (self), FALSE);
-    mm_gdbus_bearer_set_ip4_config (MM_GDBUS_BEARER (self), NULL);
-    mm_gdbus_bearer_set_ip6_config (MM_GDBUS_BEARER (self), NULL);
     mm_gdbus_bearer_set_properties (MM_GDBUS_BEARER (self), NULL);
+    mm_gdbus_bearer_set_ip4_config (MM_GDBUS_BEARER (self),
+                                    mm_common_bearer_ip_config_get_dictionary (NULL));
+    mm_gdbus_bearer_set_ip6_config (MM_GDBUS_BEARER (self),
+                                    mm_common_bearer_ip_config_get_dictionary (NULL));
 }
 
 static void
