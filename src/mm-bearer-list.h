@@ -72,4 +72,11 @@ void mm_bearer_list_foreach (MMBearerList *self,
                              MMBearerListForeachFunc func,
                              gpointer user_data);
 
+void     mm_bearer_list_disconnect_all_bearers        (MMBearerList *self,
+                                                       GAsyncReadyCallback callback,
+                                                       gpointer user_data);
+gboolean mm_bearer_list_disconnect_all_bearers_finish (MMBearerList *self,
+                                                       GAsyncResult *res,
+                                                       GError **error);
+
 #endif /* MM_BEARER_LIST_H */
