@@ -99,6 +99,8 @@ dbus_call_context_new (MmGdbusModem *skeleton,
 
 /*****************************************************************************/
 
+static MMModemState get_current_consolidated_state (MMIfaceModem *self);
+
 typedef struct {
     MMBearer *self;
     guint others_connected;
@@ -150,7 +152,7 @@ bearer_status_changed (MMBearer *bearer,
             new_state = MM_MODEM_STATE_DISCONNECTING;
             break;
         case MM_BEARER_STATUS_DISCONNECTED:
-            new_state = MM_MODEM_STATE_REGISTERED;
+            new_state = get_current_consolidated_state (self);
             break;
         }
 
@@ -745,13 +747,44 @@ subsystem_state_array_free (GArray *array)
 }
 
 static MMModemState
-get_consolidated_state (MMIfaceModem *self,
-                        const gchar *subsystem,
-                        MMModemState subsystem_state)
+get_current_consolidated_state (MMIfaceModem *self)
+{
+    MMModemState consolidated = MM_MODEM_STATE_DISABLED;
+    GArray *subsystem_states;
+
+    if (G_UNLIKELY (!state_update_context_quark))
+        state_update_context_quark = (g_quark_from_static_string (
+                                          STATE_UPDATE_CONTEXT_TAG));
+
+    subsystem_states = g_object_get_qdata (G_OBJECT (self),
+                                           state_update_context_quark);
+
+    /* Build consolidated state, expected fixes are:
+     *  - Enabled (meaning unregistered) --> Searching|Registered
+     *  - Searching --> Registered
+     */
+    if (subsystem_states) {
+        guint i;
+
+        for (i = 0; i < subsystem_states->len; i++) {
+            SubsystemState *s;
+
+            s = &g_array_index (subsystem_states, SubsystemState, i);
+            if (s->state > consolidated)
+                consolidated = s->state;
+        }
+    }
+
+    return consolidated;
+}
+
+static MMModemState
+get_updated_consolidated_state (MMIfaceModem *self,
+                                const gchar *subsystem,
+                                MMModemState subsystem_state)
 {
     guint i;
     GArray *subsystem_states;
-    MMModemState consolidated;
 
     /* Reported subsystem states will be REGISTRATION-related. This means
      * that we would only expect a subset of the states being reported for
@@ -799,20 +832,7 @@ get_consolidated_state (MMIfaceModem *self,
         g_array_append_val (subsystem_states, s);
     }
 
-    /* Build consolidated state, expected fixes are:
-     *  - Enabled (meaning unregistered) --> Searching|Registered
-     *  - Searching --> Registered
-     */
-    consolidated = MM_MODEM_STATE_UNKNOWN;
-    for (i = 0; i < subsystem_states->len; i++) {
-        SubsystemState *s;
-
-        s = &g_array_index (subsystem_states, SubsystemState, i);
-        if (s->state > consolidated)
-            consolidated = s->state;
-    }
-
-    return consolidated;
+    return get_current_consolidated_state (self);
 }
 
 void
@@ -826,7 +846,7 @@ mm_iface_modem_update_subsystem_state (MMIfaceModem *self,
     /* We may have different subsystems being handled (e.g. 3GPP and CDMA), and
      * the registration status value is unique, so if we get subsystem-specific
      * state updates, we'll need to merge all to get a consolidated one. */
-    consolidated = get_consolidated_state (self, subsystem, new_state);
+    consolidated = get_updated_consolidated_state (self, subsystem, new_state);
     mm_iface_modem_update_state (self, consolidated, reason);
 }
 
