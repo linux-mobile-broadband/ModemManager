@@ -106,7 +106,7 @@ def show_device_info(data, prefix, direction):
     print prefix + "  MCC:      %s" % mcc
     print prefix + "  MNC:      %s" % mnc
 
-def show_ip_info(data, prefix, direction):
+def show_connection_info(data, prefix, direction):
     if direction != defs.TO_HOST:
         return
 
@@ -136,7 +136,7 @@ def get_signal(item):
     else:
         return (item * -1, "")
 
-def show_status(data, prefix, direction):
+def show_network_info(data, prefix, direction):
     if direction != defs.TO_HOST:
         return
 
@@ -185,9 +185,63 @@ def show_init(data, prefix, direction):
 def show_bearer_info(data, prefix, direction):
     pass
 
-cmds = { 0x06: ("DEVICE_INFO", show_device_info),
-         0x0A: ("IP_INFO", show_ip_info),
-         0x0B: ("STATUS", show_status),
+def mode_to_string(mode):
+    if mode == 0x00:
+        return "CDMA/EVDO"
+    elif mode == 0x01:
+        return "CDMA only"
+    elif mode == 0x02:
+        return "EVDO only"
+    elif mode == 0x0A:
+        return "GSM/UMTS"
+    elif mode == 0x0B:
+        return "GSM/GPRS/EDGE only"
+    elif mode == 0x0C:
+        return "UMTS/HSPA only"
+    elif mode == 0x14:
+        return "Auto"
+    return "unknown"
+
+def show_get_global_mode(data, prefix, direction):
+    if direction != defs.TO_HOST:
+        return
+
+    fmt = "<"
+    fmt = fmt + "B"   # unknown1
+    fmt = fmt + "B"   # mode
+    fmt = fmt + "B"   # unknown2
+    fmt = fmt + "B"   # unknown3
+
+    expected = struct.calcsize(fmt)
+    if len(data) != expected:
+        raise ValueError("Unexpected GET_GLOBAL_MODE command response len (got %d expected %d)" % (len(data), expected))
+    (u1, mode, u2, u3) = struct.unpack(fmt, data)
+
+    print prefix + "  Mode:   0x%X (%s)" % (mode, mode_to_string(mode))
+
+def show_set_global_mode(data, prefix, direction):
+    if direction != defs.TO_MODEM:
+        return;
+
+    fmt = "<"
+    fmt = fmt + "B"   # unknown1
+    fmt = fmt + "B"   # mode
+    fmt = fmt + "B"   # unknown2
+    fmt = fmt + "B"   # unknown3
+
+    expected = struct.calcsize(fmt)
+    if len(data) != expected:
+        raise ValueError("Unexpected SET_GLOBAL_MODE command response len (got %d expected %d)" % (len(data), expected))
+    (u1, mode, u2, u3) = struct.unpack(fmt, data)
+
+    print prefix + "  Mode:   0x%X (%s)" % (mode, mode_to_string(mode))
+
+
+cmds = { 0x03: ("GET_GLOBAL_MODE", show_get_global_mode),
+         0x04: ("SET_GLOBAL_MODE", show_set_global_mode),
+         0x06: ("DEVICE_INFO", show_device_info),
+         0x0A: ("CONNECTION_INFO", show_connection_info),
+         0x0B: ("NETWORK_INFO", show_network_info),
          0x0D: ("INIT", show_init),
          0x4D: ("EPS_BEARER_INFO", show_bearer_info)
        }
