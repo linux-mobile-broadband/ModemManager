@@ -37,6 +37,7 @@
   <xi:include href="org.freedesktop.ModemManager.Modem.Gsm.Ussd.xml"/>
   <xi:include href="org.freedesktop.ModemManager.Modem.Firmware.xml"/>
   <xi:include href="org.freedesktop.ModemManager.Modem.Location.xml"/>
+  <xi:include href="org.freedesktop.ModemManager.Modem.Time.xml"/>
   <xi:include href="org.freedesktop.DBus.Properties.xml"/>
 
   <xi:include href="mm-serial-error.xml"/>
