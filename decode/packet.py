@@ -42,8 +42,14 @@ funcs = {
 }
 
 def get_urb_info(l):
-    num = 0
     direction = defs.TO_UNKNOWN
+
+    tsstr = ""
+    if l[0] == '[':
+        idx = l.find(" ms]")
+        if idx <= 0:
+            return (defs.TO_UNKNOWN, -1, -1)
+        tsstr = l[1:idx]
     
     idx = string.find(l, ">>>  URB ")
     if idx >= 0:
@@ -53,7 +59,7 @@ def get_urb_info(l):
         if idx >= 0:
             direction = defs.TO_HOST
         else:
-            return (defs.TO_UNKNOWN, -1)
+            return (defs.TO_UNKNOWN, -1, -1)
 
     # Yay, valid packet, grab URB number
     numstr = ""
@@ -66,7 +72,7 @@ def get_urb_info(l):
     if not len(numstr):
         raise Exception("Failed to get URB number ('%s')" % l)
 
-    return (direction, int(numstr))
+    return (direction, int(numstr), int(tsstr))
 
 class Packet:
     def __init__(self, line, control_prot, transfer_prot):
@@ -74,9 +80,9 @@ class Packet:
         self.func = URBF_UNKNOWN
         self.control_prot = control_prot
         self.transfer_prot  = transfer_prot
-        self.extra = []
         self.data = None
         self.urbnum = 0
+        self.timestamp = 0
         self.protocol = None
         self.has_data = False
         self.typecode = None
@@ -90,7 +96,7 @@ class Packet:
 
         # Check if this is actually a packet
         self.lines.append(line)
-        (self.direction, self.urbnum) = get_urb_info(line)
+        (self.direction, self.urbnum, self.timestamp) = get_urb_info(line)
 
     def add_line(self, line):
         line = line.strip()
