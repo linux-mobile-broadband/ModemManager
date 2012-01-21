@@ -538,6 +538,15 @@ mm_bearer_disconnect_force (MMBearer *self)
 
 /*****************************************************************************/
 
+gboolean
+mm_bearer_cmp_properties (MMBearer *self,
+                          MMCommonBearerProperties *properties)
+{
+    return MM_BEARER_GET_CLASS (self)->cmp_properties (self, properties);
+}
+
+/*****************************************************************************/
+
 void
 mm_bearer_expose_properties (MMBearer *bearer,
                              MMCommonBearerProperties *properties)

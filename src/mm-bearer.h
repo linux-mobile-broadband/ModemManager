@@ -75,6 +75,10 @@ struct _MMBearerClass {
     gboolean (* disconnect_finish) (MMBearer *bearer,
                                     GAsyncResult *res,
                                     GError **error);
+
+    /* Check if the bearer has the exact same properties */
+    gboolean (* cmp_properties) (MMBearer *self,
+                                 MMCommonBearerProperties *properties);
 };
 
 GType mm_bearer_get_type (void);
@@ -102,5 +106,8 @@ gboolean mm_bearer_disconnect_finish (MMBearer *self,
                                       GError **error);
 
 void mm_bearer_disconnect_force (MMBearer *self);
+
+gboolean mm_bearer_cmp_properties (MMBearer *self,
+                                   MMCommonBearerProperties *properties);
 
 #endif /* MM_BEARER_H */
