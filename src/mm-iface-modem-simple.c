@@ -501,25 +501,35 @@ connection_step (ConnectionContext *ctx)
                       MM_IFACE_MODEM_BEARER_LIST, &list,
                       NULL);
 
-        /* TODO:  check if the bearer we want to create is already in the list */
-
-        /* If we don't have enough space to create the, try to remove
-         * all existing ones first BUT only if that will give us enough space. */
-        if (mm_bearer_list_get_max (list) == mm_bearer_list_get_count (list)) {
-            /* We'll remove all existing bearers, and then go on creating the new one */
-            mm_bearer_list_delete_all_bearers (list);
-        }
-
         bearer_properties = (mm_common_connect_properties_get_bearer_properties (
                                  ctx->properties));
-        mm_iface_modem_create_bearer (MM_IFACE_MODEM (ctx->self),
-                                      bearer_properties,
-                                      (GAsyncReadyCallback)create_bearer_ready,
-                                      ctx);
 
+        /* Check if the bearer we want to create is already in the list */
+        ctx->bearer = mm_bearer_list_find (list, bearer_properties);
+        if (!ctx->bearer) {
+            mm_dbg ("Creating new bearer...");
+            /* If we don't have enough space to create the bearer, try to remove
+             * all existing ones first. */
+            if (mm_bearer_list_get_max (list) == mm_bearer_list_get_count (list))
+                /* We'll remove all existing bearers, and then go on creating the new one */
+                mm_bearer_list_delete_all_bearers (list);
+
+            mm_iface_modem_create_bearer (MM_IFACE_MODEM (ctx->self),
+                                          bearer_properties,
+                                          (GAsyncReadyCallback)create_bearer_ready,
+                                          ctx);
+
+            g_object_unref (list);
+            g_object_unref (bearer_properties);
+            return;
+        }
+
+        mm_dbg ("Using already existing bearer at '%s'...",
+                mm_bearer_get_path (ctx->bearer));
         g_object_unref (list);
         g_object_unref (bearer_properties);
-        return;
+        /* Fall down to next step */
+        ctx->step++;
     }
 
     case CONNECTION_STEP_CONNECT:
