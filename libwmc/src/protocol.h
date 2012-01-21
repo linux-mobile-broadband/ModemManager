@@ -55,10 +55,16 @@ struct WmcCmdHeader {
 } __attribute__ ((packed));
 typedef struct WmcCmdHeader WmcCmdHeader;
 
-/* Used on newer devices like the UML290 */
+/* Used on newer devices like the UML190 and later */
 struct WmcCmdInit2 {
     WmcCmdHeader hdr;
-    u_int8_t timestamp[14];  /* a timestamp of some sort */
+    u_int16_t year;
+    u_int8_t  month;
+    u_int16_t day;        /* big endian */
+    u_int16_t hours;      /* big endian */
+    u_int16_t minutes;    /* big endian */
+    u_int16_t seconds;    /* big endian */
+    u_int8_t _unknown1[2];
 } __attribute__ ((packed));
 typedef struct WmcCmdInit2 WmcCmdInit2;
 
@@ -169,14 +175,18 @@ struct WmcCmdNetworkInfoRsp {
     u_int8_t  _unknown1;
     u_int8_t  _unknown2[3];    /* Always zero */
     u_int8_t  service;         /* One of WMC_SERVICE_* */
-    u_int8_t  _unknown4;       /* Either 0x00 or 0x01 */
-    u_int8_t  magic[10];
+    u_int8_t  _unknown3;       /* Either 0x00 or 0x01 */
+    u_int16_t ts_year;
+    u_int8_t  ts_month;
+    u_int16_t ts_day;          /* BE */
+    u_int16_t ts_hours;        /* BE */
+    u_int16_t ts_minutes;      /* BE */
+    u_int16_t ts_seconds;      /* BE */
     u_int16_t counter1;        /* A timestamp/counter? */
-    u_int8_t  _unknown5;
-    u_int8_t  _unknown6;
-    u_int8_t  _unknown7[3];    /* Always 0xFE 0xFF 0xFF */
+    u_int16_t _unknown4;
+    u_int8_t  _unknown5[3];    /* Always 0xFE 0xFF 0xFF */
     u_int8_t  two_g_dbm;       /* 0x7D = no signal */
-    u_int8_t  _unknown8[37];   /* Always zero */
+    u_int8_t  _unknown6[37];   /* Always zero */
 } __attribute__ ((packed));
 typedef struct WmcCmdNetworkInfoRsp WmcCmdNetworkInfoRsp;
 
@@ -186,11 +196,16 @@ struct WmcCmdNetworkInfo2Rsp {
     u_int8_t  _unknown1;       /* 0x00 on LTE, 0x07 or 0x1F on CDMA */
     u_int8_t  _unknown2[3];    /* Always zero */
     u_int8_t  service;         /* One of WMC_SERVICE_* */
-    u_int8_t  _unknown4;
-    u_int8_t  magic[10];       /* Whatever was passed in WMC_CMD_INIT with some changes */
-    u_int16_t counter1;        /* A timestamp/counter? */
-    u_int16_t counter2;        /* Time since firmware start? */
-    u_int8_t  _unknown5;       /* 0x00 on LTE, various values (0xD4, 0x5C) on CDMA */
+    u_int8_t  _unknown3;
+    u_int16_t ts_year;
+    u_int8_t  ts_month;
+    u_int16_t ts_day;          /* BE */
+    u_int16_t ts_hours;        /* BE */
+    u_int16_t ts_minutes;      /* BE */
+    u_int16_t ts_seconds;      /* BE */
+    u_int8_t  _unknown4;       /* always zero */
+    u_int16_t uptime_secs;
+    u_int8_t  _unknown5;
     u_int8_t  _unknown6[3];    /* always zero on LTE, 0xFE 0xFF 0xFF on CDMA */
     u_int8_t  two_g_dbm;       /* 0x7D = no CDMA signal, 0x6a = no GSM signal */
     u_int8_t  _unknown7[3];    /* Always zero */
@@ -216,11 +231,16 @@ struct WmcCmdNetworkInfo3Rsp {
     u_int8_t  _unknown1;       /* 0x00 on LTE, 0x07 or 0x1F on CDMA */
     u_int8_t  _unknown2[3];    /* Always zero */
     u_int8_t  service;         /* One of WMC_SERVICE_* */
-    u_int8_t  _unknown4;
-    u_int8_t  magic[10];       /* Whatever was passed in WMC_CMD_INIT with some changes */
-    u_int16_t counter1;        /* A timestamp/counter? */
-    u_int16_t counter2;        /* Time since firmware start? */
-    u_int8_t  _unknown5;       /* 0x00 on LTE, various values (0xD4, 0x5C) on CDMA */
+    u_int8_t  _unknown3;
+    u_int16_t ts_year;
+    u_int8_t  ts_month;
+    u_int16_t ts_day;          /* BE */
+    u_int16_t ts_hours;        /* BE */
+    u_int16_t ts_minutes;      /* BE */
+    u_int16_t ts_seconds;      /* BE */
+    u_int8_t  _unknown4;       /* always zero */
+    u_int16_t uptime_secs;
+    u_int8_t  _unknown5;
     u_int8_t  _unknown6[3];    /* always zero on LTE, 0xFE 0xFF 0xFF on CDMA */
     u_int8_t  two_g_dbm;       /* 0x7D = no CDMA signal, 0x6a = no GSM signal */
     u_int8_t  _unknown7[3];    /* Always zero */
