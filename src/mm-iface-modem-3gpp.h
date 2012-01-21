@@ -54,6 +54,14 @@ struct _MMIfaceModem3gpp {
                                          GAsyncResult *res,
                                          GError **error);
 
+    /* Asynchronous setting up unsolicited events */
+    void (*setup_unsolicited_events) (MMIfaceModem3gpp *self,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data);
+    gboolean (*setup_unsolicited_events_finish) (MMIfaceModem3gpp *self,
+                                                 GAsyncResult *res,
+                                                 GError **error);
+
     /* Asynchronous enabling of unsolicited events */
     void (*enable_unsolicited_events) (MMIfaceModem3gpp *self,
                                        GAsyncReadyCallback callback,
@@ -61,6 +69,14 @@ struct _MMIfaceModem3gpp {
     gboolean (*enable_unsolicited_events_finish) (MMIfaceModem3gpp *self,
                                                   GAsyncResult *res,
                                                   GError **error);
+
+    /* Asynchronous cleaning up of unsolicited events */
+    void (*cleanup_unsolicited_events) (MMIfaceModem3gpp *self,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data);
+    gboolean (*cleanup_unsolicited_events_finish) (MMIfaceModem3gpp *self,
+                                                   GAsyncResult *res,
+                                                   GError **error);
 
     /* Asynchronous disabling of unsolicited events */
     void (*disable_unsolicited_events) (MMIfaceModem3gpp *self,

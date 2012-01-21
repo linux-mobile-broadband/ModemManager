@@ -883,6 +883,7 @@ typedef enum {
     DISABLING_STEP_CLEANUP_PS_REGISTRATION,
     DISABLING_STEP_CLEANUP_CS_REGISTRATION,
     DISABLING_STEP_CLEANUP_UNSOLICITED_REGISTRATION,
+    DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS,
     DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS,
     DISABLING_STEP_LAST
 } DisablingStep;
@@ -963,6 +964,8 @@ VOID_REPLY_READY_FN (cleanup_ps_registration,
                      "cleanup PS registration")
 VOID_REPLY_READY_FN (cleanup_cs_registration,
                      "cleanup CS registration")
+VOID_REPLY_READY_FN (cleanup_unsolicited_events,
+                     "cleanup unsolicited events")
 VOID_REPLY_READY_FN (disable_unsolicited_events,
                      "disable unsolicited events")
 
@@ -1031,6 +1034,26 @@ interface_disabling_step (DisablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
+    case DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS:
+        if (G_UNLIKELY (!unsolicited_events_supported_quark))
+            unsolicited_events_supported_quark = (g_quark_from_static_string (
+                                                      UNSOLICITED_EVENTS_SUPPORTED_TAG));
+
+        /* Only try to disable if supported */
+        if (GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (ctx->self),
+                                                  unsolicited_events_supported_quark))) {
+            if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events &&
+                MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events_finish) {
+                MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events (
+                    ctx->self,
+                    (GAsyncReadyCallback)cleanup_unsolicited_events_ready,
+                    ctx);
+                return;
+            }
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
     case DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS:
         if (G_UNLIKELY (!unsolicited_events_supported_quark))
             unsolicited_events_supported_quark = (g_quark_from_static_string (
@@ -1079,6 +1102,7 @@ static void interface_enabling_step (EnablingContext *ctx);
 typedef enum {
     ENABLING_STEP_FIRST,
     ENABLING_STEP_SETUP_INDICATORS,
+    ENABLING_STEP_SETUP_UNSOLICITED_EVENTS,
     ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS,
     ENABLING_STEP_SETUP_UNSOLICITED_REGISTRATION,
     ENABLING_STEP_SETUP_CS_REGISTRATION,
@@ -1213,6 +1237,36 @@ enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
 }
 
 static void
+setup_unsolicited_events_ready (MMIfaceModem3gpp *self,
+                                GAsyncResult *res,
+                                EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->setup_unsolicited_events_finish (self, res, &error);
+    if (error) {
+        /* This error shouldn't be treated as critical */
+        mm_dbg ("Setting up unsolicited events failed: '%s'", error->message);
+        g_error_free (error);
+
+        /* Reset support flag */
+        g_object_set_qdata (G_OBJECT (self),
+                            unsolicited_events_supported_quark,
+                            GUINT_TO_POINTER (FALSE));
+
+        /* If we get an error setting up unsolicited events, don't even bother trying to
+         * enable them. */
+        ctx->step = ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS + 1;
+        interface_enabling_step (ctx);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_enabling_step (ctx);
+}
+
+static void
 setup_cs_registration_ready (MMIfaceModem3gpp *self,
                              GAsyncResult *res,
                              EnablingContext *ctx)
@@ -1273,7 +1327,24 @@ run_all_registration_checks_ready (MMIfaceModem3gpp *self,
     interface_enabling_step (ctx);
 }
 
-VOID_REPLY_READY_FN (setup_unsolicited_registration)
+static void
+setup_unsolicited_registration_ready (MMIfaceModem3gpp *self,
+                                      GAsyncResult *res,
+                                      EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->setup_unsolicited_registration_finish (self, res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        enabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_enabling_step (ctx);
+}
 
 static void
 interface_enabling_step (EnablingContext *ctx)
@@ -1313,9 +1384,26 @@ interface_enabling_step (EnablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
+    case ENABLING_STEP_SETUP_UNSOLICITED_EVENTS:
+        /* Only try to setup unsolicited events if they are supported */
+        if (GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (ctx->self),
+                                                  unsolicited_events_supported_quark))) {
+            if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_unsolicited_events &&
+                MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_unsolicited_events_finish) {
+                MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->setup_unsolicited_events (
+                    ctx->self,
+                    (GAsyncReadyCallback)setup_unsolicited_events_ready,
+                    ctx);
+                return;
+            }
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
     case ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS:
-        if (!GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (ctx->self),
-                                                   unsolicited_events_supported_quark))) {
+        /* Only try to enable unsolicited events if they are supported */
+        if (GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (ctx->self),
+                                                  unsolicited_events_supported_quark))) {
             if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->enable_unsolicited_events &&
                 MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->enable_unsolicited_events_finish) {
                 MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->enable_unsolicited_events (
