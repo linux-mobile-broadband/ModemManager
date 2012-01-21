@@ -356,10 +356,10 @@ set_property (GObject *object,
         self->priv->modem_cdma_evdo_registration_state = g_value_get_enum (value);
         break;
     case PROP_CDMA_SID:
-        self->priv->modem_cdma_sid = g_value_get_enum (value);
+        self->priv->modem_cdma_sid = g_value_get_uint (value);
         break;
     case PROP_CDMA_NID:
-        self->priv->modem_cdma_nid = g_value_get_enum (value);
+        self->priv->modem_cdma_nid = g_value_get_uint (value);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -404,10 +404,10 @@ get_property (GObject *object,
         g_value_set_enum (value, self->priv->modem_cdma_evdo_registration_state);
         break;
     case PROP_CDMA_SID:
-        g_value_set_enum (value, self->priv->modem_cdma_sid);
+        g_value_set_uint (value, self->priv->modem_cdma_sid);
         break;
     case PROP_CDMA_NID:
-        g_value_set_enum (value, self->priv->modem_cdma_nid);
+        g_value_set_uint (value, self->priv->modem_cdma_nid);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
