@@ -81,6 +81,25 @@ struct _MMSimClass {
     gchar * (* load_operator_name_finish) (MMSim *self,
                                            GAsyncResult *res,
                                            GError **error);
+
+    /* Send PIN (async) */
+    void (* send_pin) (MMSim *self,
+                       const gchar *pin,
+                       GAsyncReadyCallback callback,
+                       gpointer user_data);
+    gboolean (* send_pin_finish) (MMSim *self,
+                                  GAsyncResult *res,
+                                  GError **error);
+
+    /* Send PUK (async) */
+    void (* send_puk) (MMSim *self,
+                       const gchar *puk,
+                       const gchar *new_pin,
+                       GAsyncReadyCallback callback,
+                       gpointer user_data);
+    gboolean (* send_puk_finish) (MMSim *self,
+                                  GAsyncResult *res,
+                                  GError **error);
 };
 
 GType mm_sim_get_type (void);
@@ -103,10 +122,18 @@ gboolean mm_sim_initialize_finish (MMSim *self,
 
 void     mm_sim_send_pin        (MMSim *self,
                                  const gchar *pin,
-                                 const gchar *puk,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data);
 gboolean mm_sim_send_pin_finish (MMSim *self,
+                                 GAsyncResult *res,
+                                 GError **error);
+
+void     mm_sim_send_puk        (MMSim *self,
+                                 const gchar *puk,
+                                 const gchar *new_pin,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data);
+gboolean mm_sim_send_puk_finish (MMSim *self,
                                  GAsyncResult *res,
                                  GError **error);
 

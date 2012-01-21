@@ -174,7 +174,82 @@ handle_enable_pin (MMSim *self,
 }
 
 /*****************************************************************************/
-/* SEND PIN/PUK */
+/* SEND PIN/PUK (Generic implementation) */
+
+static gboolean
+common_send_pin_puk_finish (MMSim *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+send_pin_puk_ready (MMBaseModem *modem,
+                    GAsyncResult *res,
+                    GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (modem, res, &error);
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+common_send_pin_puk (MMSim *self,
+                     const gchar *pin,
+                     const gchar *puk,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    gchar *command;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        common_send_pin_puk);
+
+    command = (puk ?
+               g_strdup_printf ("+CPIN=\"%s\",\"%s\"", puk, pin) :
+               g_strdup_printf ("+CPIN=\"%s\"", pin));
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self->priv->modem),
+                              command,
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)send_pin_puk_ready,
+                              result);
+    g_free (command);
+}
+
+static void
+send_puk (MMSim *self,
+          const gchar *puk,
+          const gchar *new_pin,
+          GAsyncReadyCallback callback,
+          gpointer user_data)
+{
+    common_send_pin_puk (self, new_pin, puk, callback, user_data);
+}
+
+static void
+send_pin (MMSim *self,
+          const gchar *pin,
+          GAsyncReadyCallback callback,
+          gpointer user_data)
+{
+    common_send_pin_puk (self, pin, NULL, callback, user_data);
+}
+
+/*****************************************************************************/
+/* SEND PIN/PUK (common logic) */
 
 typedef struct {
     MMSim *self;
@@ -232,6 +307,14 @@ mm_sim_send_pin_finish (MMSim *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
+gboolean
+mm_sim_send_puk_finish (MMSim *self,
+                        GAsyncResult *res,
+                        GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
 static void
 unlock_check_ready (MMIfaceModem *modem,
                     GAsyncResult *res,
@@ -264,14 +347,27 @@ unlock_check_ready (MMIfaceModem *modem,
 }
 
 static void
-send_pin_puk_ready (MMBaseModem *modem,
-                           GAsyncResult *res,
-                           SendPinPukContext *ctx)
+send_pin_ready (MMSim *self,
+                GAsyncResult *res,
+                SendPinPukContext *ctx)
 {
-    mm_base_modem_at_command_finish (modem, res, &ctx->save_error);
+    MM_SIM_GET_CLASS (self)->send_pin_finish (self, res, &ctx->save_error);
 
     /* Once pin/puk has been sent, recheck lock */
-    mm_iface_modem_unlock_check (MM_IFACE_MODEM (modem),
+    mm_iface_modem_unlock_check (MM_IFACE_MODEM (self->priv->modem),
+                                 (GAsyncReadyCallback)unlock_check_ready,
+                                 ctx);
+}
+
+static void
+send_puk_ready (MMSim *self,
+                GAsyncResult *res,
+                SendPinPukContext *ctx)
+{
+    MM_SIM_GET_CLASS (self)->send_puk_finish (self, res, &ctx->save_error);
+
+    /* Once pin/puk has been sent, recheck lock */
+    mm_iface_modem_unlock_check (MM_IFACE_MODEM (self->priv->modem),
                                  (GAsyncReadyCallback)unlock_check_ready,
                                  ctx);
 }
@@ -279,12 +375,10 @@ send_pin_puk_ready (MMBaseModem *modem,
 void
 mm_sim_send_pin (MMSim *self,
                  const gchar *pin,
-                 const gchar *puk,
                  GAsyncReadyCallback callback,
                  gpointer user_data)
 {
     SendPinPukContext *ctx;
-    gchar *command;
 
     ctx = g_new0 (SendPinPukContext, 1);
     ctx->self = g_object_ref (self);
@@ -293,22 +387,37 @@ mm_sim_send_pin (MMSim *self,
                                              user_data,
                                              mm_sim_send_pin);
 
-    command = (puk ?
-               g_strdup_printf ("+CPIN=\"%s\",\"%s\"", puk, pin) :
-               g_strdup_printf ("+CPIN=\"%s\"", pin));
+    MM_SIM_GET_CLASS (self)->send_pin (self,
+                                       pin,
+                                       (GAsyncReadyCallback)send_pin_ready,
+                                       ctx);
+}
 
-    mm_base_modem_at_command (MM_BASE_MODEM (self->priv->modem),
-                              command,
-                              3,
-                              FALSE,
-                              NULL, /* cancellable */
-                              (GAsyncReadyCallback)send_pin_puk_ready,
-                              ctx);
-    g_free (command);
+void
+mm_sim_send_puk (MMSim *self,
+                 const gchar *puk,
+                 const gchar *new_pin,
+                 GAsyncReadyCallback callback,
+                 gpointer user_data)
+{
+    SendPinPukContext *ctx;
+
+    ctx = g_new0 (SendPinPukContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_sim_send_puk);
+
+    MM_SIM_GET_CLASS (self)->send_puk (self,
+                                       puk,
+                                       new_pin,
+                                       (GAsyncReadyCallback)send_puk_ready,
+                                       ctx);
 }
 
 /*****************************************************************************/
-/* SEND PIN */
+/* SEND PIN (DBus call handling) */
 
 static void
 handle_send_pin_ready (MMSim *self,
@@ -332,7 +441,6 @@ handle_send_pin (MMSim *self,
 {
     mm_sim_send_pin (self,
                      pin,
-                     NULL,
                      (GAsyncReadyCallback)handle_send_pin_ready,
                      dbus_call_context_new (self,
                                             invocation));
@@ -340,7 +448,7 @@ handle_send_pin (MMSim *self,
 }
 
 /*****************************************************************************/
-/* SEND PUK */
+/* SEND PUK (DBus call handling) */
 
 static void
 handle_send_puk_ready (MMSim *self,
@@ -349,7 +457,7 @@ handle_send_puk_ready (MMSim *self,
 {
     GError *error = NULL;
 
-    if (!mm_sim_send_pin_finish (self, res, &error))
+    if (!mm_sim_send_puk_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_sim_complete_send_puk (MM_GDBUS_SIM (self), ctx->invocation);
@@ -361,11 +469,11 @@ static gboolean
 handle_send_puk (MMSim *self,
                  GDBusMethodInvocation *invocation,
                  const gchar *puk,
-                 const gchar *pin)
+                 const gchar *new_pin)
 {
-    mm_sim_send_pin (self,
-                     pin,
+    mm_sim_send_puk (self,
                      puk,
+                     new_pin,
                      (GAsyncReadyCallback)handle_send_puk_ready,
                      dbus_call_context_new (self,
                                             invocation));
@@ -1306,6 +1414,10 @@ mm_sim_class_init (MMSimClass *klass)
     klass->load_operator_identifier_finish = load_operator_identifier_finish;
     klass->load_operator_name = load_operator_name;
     klass->load_operator_name_finish = load_operator_name_finish;
+    klass->send_pin = send_pin;
+    klass->send_pin_finish = common_send_pin_puk_finish;
+    klass->send_puk = send_puk;
+    klass->send_puk_finish = common_send_pin_puk_finish;
 
     properties[PROP_CONNECTION] =
         g_param_spec_object (MM_SIM_CONNECTION,

@@ -397,7 +397,6 @@ unlock_check_ready (MMIfaceModem *self,
 
     mm_sim_send_pin (sim,
                      mm_common_connect_properties_get_pin (ctx->properties),
-                     NULL,
                      (GAsyncReadyCallback)send_pin_ready,
                      ctx);
     g_object_unref (sim);
