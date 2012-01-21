@@ -16,6 +16,7 @@
  */
 
 #include <string.h>
+#include <time.h>
 
 #include "commands.h"
 #include "errors.h"
@@ -72,15 +73,23 @@ wmc_cmd_init_new (char *buf, size_t buflen, int wmc2)
 
     if (wmc2) {
         WmcCmdInit2 *cmd = (WmcCmdInit2 *) buf;
-        const char data[] = { 0xda, 0x07, 0x0c, 0x00, 0x1e, 0x00, 0x09, 0x00, 0x39,
-                              0x00, 0x18, 0x00, 0x04, 0x00 };
+        time_t now;
+        struct tm *tm;
 
         wmc_return_val_if_fail (buflen >= sizeof (*cmd), 0);
+
+        now = time (NULL);
+        tm = localtime (&now);
 
         memset (cmd, 0, sizeof (*cmd));
         cmd->hdr.marker = WMC_CMD_MARKER;
         cmd->hdr.cmd = WMC_CMD_INIT;
-        memcpy (cmd->_unknown1, data, sizeof (data));
+        cmd->year = htole16 (tm->tm_year);
+        cmd->month = tm->tm_mon;
+        cmd->day = htobe16 (tm->tm_mday);
+        cmd->hours = htobe16 (tm->tm_hour);
+        cmd->minutes = htobe16 (tm->tm_min);
+        cmd->seconds = htobe16 (tm->tm_sec);
         return sizeof (*cmd);
     } else {
         WmcCmdHeader *cmd = (WmcCmdHeader *) buf;
@@ -132,14 +141,18 @@ wmc_cmd_device_info_result (const char *buf, size_t buflen)
     WmcResult *r = NULL;
     WmcCmdDeviceInfoRsp *rsp = (WmcCmdDeviceInfoRsp *) buf;
     WmcCmdDeviceInfo2Rsp *rsp2 = (WmcCmdDeviceInfo2Rsp *) buf;
+    WmcCmdDeviceInfo3Rsp *rsp3 = (WmcCmdDeviceInfo3Rsp *) buf;
     char tmp[65];
 
     wmc_return_val_if_fail (buf != NULL, NULL);
 
-    if (check_command (buf, buflen, WMC_CMD_DEVICE_INFO, sizeof (WmcCmdDeviceInfo2Rsp)) < 0) {
-        rsp2 = NULL;
-        if (check_command (buf, buflen, WMC_CMD_DEVICE_INFO, sizeof (WmcCmdDeviceInfoRsp)) < 0)
-            return NULL;
+    if (check_command (buf, buflen, WMC_CMD_DEVICE_INFO, sizeof (WmcCmdDeviceInfo3Rsp)) < 0) {
+        rsp3 = NULL;
+        if (check_command (buf, buflen, WMC_CMD_DEVICE_INFO, sizeof (WmcCmdDeviceInfo2Rsp)) < 0) {
+            rsp2 = NULL;
+            if (check_command (buf, buflen, WMC_CMD_DEVICE_INFO, sizeof (WmcCmdDeviceInfoRsp)) < 0)
+                return NULL;
+        }
     }
 
     r = wmc_result_new ();
@@ -180,17 +193,19 @@ wmc_cmd_device_info_result (const char *buf, size_t buflen)
         wmc_assert (sizeof (rsp2->iccid) <= sizeof (tmp));
         memcpy (tmp, rsp2->iccid, sizeof (rsp2->iccid));
         wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_ICCID, tmp);
+    }
 
+    if (rsp3) {
         /* MCC */
         memset (tmp, 0, sizeof (tmp));
-        wmc_assert (sizeof (rsp2->mcc) <= sizeof (tmp));
-        memcpy (tmp, rsp2->mcc, sizeof (rsp2->mcc));
+        wmc_assert (sizeof (rsp3->mcc) <= sizeof (tmp));
+        memcpy (tmp, rsp3->mcc, sizeof (rsp3->mcc));
         wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_MCC, tmp);
 
         /* MNC */
         memset (tmp, 0, sizeof (tmp));
-        wmc_assert (sizeof (rsp2->mnc) <= sizeof (tmp));
-        memcpy (tmp, rsp2->mnc, sizeof (rsp2->mnc));
+        wmc_assert (sizeof (rsp3->mnc) <= sizeof (tmp));
+        memcpy (tmp, rsp3->mnc, sizeof (rsp3->mnc));
         wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_MNC, tmp);
     }
 
