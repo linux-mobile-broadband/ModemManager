@@ -235,7 +235,7 @@ is_cdma_service (u_int8_t service)
 static wmcbool
 is_evdo_service (u_int8_t service)
 {
-    return (service == WMC_SERVICE_EVDO_0 || service == WMC_SERVICE_EVDO_A);
+    return (service == WMC_SERVICE_EVDO_0 || service == WMC_SERVICE_EVDO_A || service == WMC_SERVICE_EVDO_A_EHRPD);
 }
 
 static wmcbool

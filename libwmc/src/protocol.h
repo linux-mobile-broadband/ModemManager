@@ -24,13 +24,13 @@ enum {
     WMC_CMD_GET_GLOBAL_MODE = 0x03,
     WMC_CMD_SET_GLOBAL_MODE = 0x04,
     WMC_CMD_DEVICE_INFO = 0x06,
-    WMC_CMD_IP_INFO = 0x0A,
+    WMC_CMD_CONNECTION_INFO = 0x0A,
     WMC_CMD_NET_INFO = 0x0B,
     WMC_CMD_INIT = 0x0D,
     WMC_CMD_SET_OPERATOR = 0x33,
     WMC_CMD_GET_FIRST_OPERATOR = 0x34,
     WMC_CMD_GET_NEXT_OPERATOR = 0x35,
-    WMC_CMD_EPS_BEARER_INFO = 0x4D,
+    WMC_CMD_GET_APN = 0x4D,
 };
 
 /* MCC/MNC representation
@@ -58,7 +58,7 @@ typedef struct WmcCmdHeader WmcCmdHeader;
 /* Used on newer devices like the UML290 */
 struct WmcCmdInit2 {
     WmcCmdHeader hdr;
-    u_int8_t _unknown1[14];
+    u_int8_t timestamp[14];  /* a timestamp of some sort */
 } __attribute__ ((packed));
 typedef struct WmcCmdInit2 WmcCmdInit2;
 
@@ -99,18 +99,48 @@ struct WmcCmdDeviceInfo2Rsp {
     u_int16_t eri_ver;      /* ? */
     u_int8_t _unknown6[3];
     u_int8_t _unknown7[64];
-    u_int8_t meid[20];
-    u_int8_t imei[22];
-    u_int8_t _unknown9[16];
-    u_int8_t iccid[22];
-    u_int8_t _unknown10[4];
-    u_int8_t mcc[16];
-    u_int8_t mnc[16];
-    u_int8_t _unknown11[4];
-    u_int8_t _unknown12[4];
-    u_int8_t _unknown13[4];
+    u_int8_t _unknown8;
+    u_int8_t meid[14];
+    u_int8_t _unknown9[6];  /* always zero */
+    u_int8_t imei[16];
+    u_int8_t _unknown10[6];  /* always zero */
+    u_int8_t _unknown11[16];
+    u_int8_t iccid[20];
+    u_int8_t _unknown12[6];
 } __attribute__ ((packed));
 typedef struct WmcCmdDeviceInfo2Rsp WmcCmdDeviceInfo2Rsp;
+
+struct WmcCmdDeviceInfo3Rsp {
+    WmcCmdHeader hdr;
+    u_int8_t _unknown1[27];
+    char     manf[64];
+    char     model[64];
+    char     fwrev[64];
+    char     hwrev[64];
+    u_int8_t _unknown2[64];
+    u_int8_t _unknown3[64];
+    u_int8_t min[10];       /* CDMA2000/IS-95 MIN */
+    u_int8_t _unknown4[12];
+    u_int16_t home_sid;     /* ? */
+    u_int8_t _unknown5[6];
+    u_int16_t eri_ver;      /* ? */
+    u_int8_t _unknown6[3];
+    u_int8_t _unknown7[64];
+    u_int8_t _unknown8;
+    u_int8_t meid[14];
+    u_int8_t _unknown9[6];  /* always zero */
+    u_int8_t imei[16];
+    u_int8_t _unknown10[6];  /* always zero */
+    u_int8_t _unknown11[16];
+    u_int8_t iccid[20];
+    u_int8_t _unknown12[6];
+    u_int8_t mcc[16];
+    u_int8_t mnc[16];
+    u_int8_t _unknown13[4];
+    u_int8_t _unknown14[4];
+    u_int8_t _unknown15[4];
+} __attribute__ ((packed));
+typedef struct WmcCmdDeviceInfo3Rsp WmcCmdDeviceInfo3Rsp;
 
 /*****************************************************/
 
@@ -129,7 +159,8 @@ enum {
     WMC_SERVICE_HSDPA = 11,
     WMC_SERVICE_HSUPA = 12,
     WMC_SERVICE_HSPA = 13,
-    WMC_SERVICE_LTE = 14
+    WMC_SERVICE_LTE = 14,
+    WMC_SERVICE_EVDO_A_EHRPD = 15,
 };
 
 /* PC5740 response */
@@ -214,18 +245,46 @@ typedef struct WmcCmdNetworkInfo3Rsp WmcCmdNetworkInfo3Rsp;
 
 /*****************************************************/
 
+enum {
+    WMC_CONNECTION_STATE_UNKNOWN = 0,
+    WMC_CONNECTION_STATE_IDLE = 1,
+    WMC_CONNECTION_STATE_CONNECTING = 2,
+    WMC_CONNECTION_STATE_AUTHENTICATING = 3,
+    WMC_CONNECTION_STATE_CONNECTED = 4,
+    WMC_CONNECTION_STATE_DORMANT = 5,
+    WMC_CONNECTION_STATE_UPDATING_NAM = 6,
+    WMC_CONNECTION_STATE_UPDATING_PRL = 7,
+    WMC_CONNECTION_STATE_DISCONNECTING = 8,
+    WMC_CONNECTION_STATE_ERROR = 9,
+    WMC_CONNECTION_STATE_UPDATING_UICC = 10,
+    WMC_CONNECTION_STATE_UPDATING_PLMN = 11
+};
+
+/* Used on UML190 */
 struct WmcCmdConnectionInfoRsp {
     WmcCmdHeader hdr;
     u_int32_t rx_bytes;
     u_int32_t tx_bytes;
-    u_int8_t  _unknown3[8];
-    u_int8_t  _unknown4;       /* Either 0x01, 0x02, 0x03, or 0x04 */
-    u_int8_t  _unknown5[7];    /* Always 0xc0 0x0b 0x00 0x01 0x00 0x00 0x00 */
-    u_int8_t  ip4_address[16]; /* String format, ie "10.156.45.3" */
-    u_int8_t  _unknown6[8];    /* Netmask? */
-    u_int8_t  ip6_address[40]; /* String format */
+    u_int8_t  _unknown1[8];
+    u_int8_t  state;           /* One of WMC_CONNECTION_STATE_* */
+    u_int8_t  _unknown2[3];    /* Always 0xc0 0x0b 0x00 */
 } __attribute__ ((packed));
 typedef struct WmcCmdConnectionInfoRsp WmcCmdConnectionInfoRsp;
+
+/* Used on UML290 */
+struct WmcCmdConnectionInfo2Rsp {
+    WmcCmdHeader hdr;
+    u_int32_t rx_bytes;
+    u_int32_t tx_bytes;
+    u_int8_t  _unknown1[8];
+    u_int8_t  state;           /* One of WMC_CONNECTION_STATE_* */
+    u_int8_t  _unknown2[3];    /* Always 0xc0 0x0b 0x00 */
+    u_int8_t  _unknown3[4];    /* Always 0x01 0x00 0x00 0x00 */
+    u_int8_t  ip4_address[16]; /* String format, ie "10.156.45.3" */
+    u_int8_t  _unknown4[8];    /* Netmask? */
+    u_int8_t  ip6_address[40]; /* String format */
+} __attribute__ ((packed));
+typedef struct WmcCmdConnection2InfoRsp WmcCmdConnection2InfoRsp;
 
 /*****************************************************/
 
