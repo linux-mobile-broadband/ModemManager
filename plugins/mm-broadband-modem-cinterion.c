@@ -29,13 +29,16 @@
 #include "mm-log.h"
 #include "mm-errors-types.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-3gpp.h"
 #include "mm-base-modem-at.h"
 #include "mm-broadband-modem-cinterion.h"
 
-static void iface_modem_init (MMIfaceModem *iface);
+static void iface_modem_init      (MMIfaceModem *iface);
+static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemCinterion, mm_broadband_modem_cinterion, MM_TYPE_BROADBAND_MODEM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
 
 struct _MMBroadbandModemCinterionPrivate {
     /* Command to go into sleep mode */
@@ -46,6 +49,38 @@ struct _MMBroadbandModemCinterionPrivate {
     gboolean only_utran;
     gboolean both_geran_utran;
 };
+
+/*****************************************************************************/
+/* Unsolicited events enabling */
+
+static gboolean
+enable_unsolicited_events_finish (MMIfaceModem3gpp *self,
+                                  GAsyncResult *res,
+                                  GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+enable_unsolicited_events (MMIfaceModem3gpp *self,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    mm_base_modem_at_command_in_port (
+        MM_BASE_MODEM (self),
+        /* Only primary port is expected in the Cinterion modems */
+        mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+        /* AT=CMER=[<mode>[,<keyp>[,<disp>[,<ind>[,<bfr>]]]]]
+         *  but <ind> should be either not set, or equal to 0 or 2.
+         * Enabled with 2.
+         */
+        "+CMER=3,0,0,2",
+        3,
+        FALSE,
+        NULL, /* cancellable */
+        callback,
+        user_data);
+}
 
 /*****************************************************************************/
 /* MODEM POWER DOWN */
@@ -334,6 +369,13 @@ iface_modem_init (MMIfaceModem *iface)
     iface->setup_flow_control_finish = setup_flow_control_finish;
     iface->modem_power_down = modem_power_down;
     iface->modem_power_down_finish = modem_power_down_finish;
+}
+
+static void
+iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
+{
+    iface->enable_unsolicited_events = enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = enable_unsolicited_events_finish;
 }
 
 static void
