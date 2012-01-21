@@ -1476,6 +1476,26 @@ disconnect (MMBearer *self,
 
 /*****************************************************************************/
 
+static gboolean
+cmp_properties (MMBearer *self,
+                MMCommonBearerProperties *properties)
+{
+    MMBroadbandBearer *broadband = MM_BROADBAND_BEARER (self);
+
+    return ((!g_strcmp0 (broadband->priv->apn,
+                         mm_common_bearer_properties_get_apn (properties))) &&
+            (!g_strcmp0 (broadband->priv->ip_type,
+                         mm_common_bearer_properties_get_ip_type (properties))) &&
+            (broadband->priv->allow_roaming ==
+             mm_common_bearer_properties_get_allow_roaming (properties)) &&
+            (!g_strcmp0 (broadband->priv->number,
+                         mm_common_bearer_properties_get_number (properties))) &&
+            (broadband->priv->rm_protocol ==
+             mm_common_bearer_properties_get_rm_protocol (properties)));
+}
+
+/*****************************************************************************/
+
 typedef struct _InitAsyncContext InitAsyncContext;
 static void interface_initialization_step (InitAsyncContext *ctx);
 
@@ -1936,6 +1956,7 @@ mm_broadband_bearer_class_init (MMBroadbandBearerClass *klass)
     object_class->finalize = finalize;
     object_class->dispose = dispose;
 
+    bearer_class->cmp_properties = cmp_properties;
     bearer_class->connect = connect;
     bearer_class->connect_finish = connect_finish;
     bearer_class->disconnect = disconnect;
