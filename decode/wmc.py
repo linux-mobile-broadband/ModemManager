@@ -208,36 +208,46 @@ def show_network_info(data, prefix, direction):
         return
 
     fmt = "<"
-    fmt = fmt + "B"   # unknown1
-    fmt = fmt + "3s"  # unknown2
-    fmt = fmt + "B"   # service
-    fmt = fmt + "B"   # unknown4
-    fmt = fmt + "10s" # magic
-    fmt = fmt + "H"   # counter1
-    fmt = fmt + "H"   # counter2
-    fmt = fmt + "B"   # unknown5
-    fmt = fmt + "3s"  # unknown6
-    fmt = fmt + "B"   # 2g_dbm
-    fmt = fmt + "3s"  # unknown7
-    fmt = fmt + "16s" # cdma_opname
-    fmt = fmt + "18s" # unknown8
-    fmt = fmt + "B"   # 3g_dbm
-    fmt = fmt + "3s"  # unknown9
-    fmt = fmt + "B"   # unknown10
-    fmt = fmt + "3s"  # unknown11
-    fmt = fmt + "B"   # unknown12
-    fmt = fmt + "8s"  # 3gpp_opname
-    fmt = fmt + "4s"  # unknown13
-    fmt = fmt + "I"   # unknown14
-    fmt = fmt + "I"   # unknown15
-    fmt = fmt + "44s" # unknown16
-    fmt = fmt + "I"   # mcc/mnc
+    fmt += "B"   # unknown1
+    fmt += "3s"  # unknown2
+    fmt += "B"   # service
+    fmt += "B"   # unknown3
+    fmt += "H"   # year
+    fmt += "B"   # month
+    fmt += "B"   # zero
+    fmt += "B"   # day
+    fmt += "B"   # zero
+    fmt += "B"   # hours
+    fmt += "B"   # zero
+    fmt += "B"   # minutes
+    fmt += "B"   # zero
+    fmt += "B"   # seconds
+    fmt += "H"   # counter1
+    fmt += "H"   # counter2
+    fmt += "3s"  # unknown4
+    fmt += "B"   # 2g_dbm
+    fmt += "3s"  # unknown5
+    fmt += "16s" # cdma_opname
+    fmt += "18s" # unknown6
+    fmt += "B"   # 3g_dbm
+    fmt += "3s"  # unknown7
+    fmt += "B"   # unknown8
+    fmt += "3s"  # unknown9
+    fmt += "B"   # unknown10
+    fmt += "8s"  # 3gpp_opname
+    fmt += "4s"  # unknown11
+    fmt += "I"   # unknown12
+    fmt += "I"   # unknown13
+    fmt += "44s" # unknown14
+    fmt += "I"   # mcc/mnc
 
     expected = struct.calcsize(fmt)
     if len(data) >= expected:
-        (u1, u2, service, u4, magic, counter1, counter2, u5, u6, two_g_dbm, u7, \
-         cdma_opname, u8, three_g_dbm, u9, u10, u11, u12, tgpp_opname, u13, u14, \
-         u15, u16, mccmnc) = struct.unpack(fmt, data[:expected])
+        (u1, u2, service, u3, year, month, z1, day, z2, hours, z3, minutes, z4, \
+         seconds, counter1, counter2, u4, two_g_dbm, u5, \
+         cdma_opname, u6, three_g_dbm, u7, u8, u9, u10, tgpp_opname, u11, u12, \
+         u13, u14, mccmnc) = struct.unpack(fmt, data[:expected])
+        print prefix + "  Time:     %04d/%02d/%02d %02d:%02d:%02d" % (year, month, day, hours, minutes, seconds)
         print prefix + "  Counter1: %s" % counter1
         print prefix + "  Counter2: %s" % counter2
         print prefix + "  Service:  %d (%s)" % (service, service_to_string (service))
@@ -259,9 +269,9 @@ def show_network_info(data, prefix, direction):
         raise ValueError("Unexpected Network Info command response len (got %d expected %d)" % (len(data), expected))
 
     fmt3 = "<"
-    fmt3 = fmt3 + "B"   # lte_dbm
-    fmt3 = fmt3 + "3s"  # unknown17
-    fmt3 = fmt3 + "4s"  # unknown18
+    fmt3 += "B"   # lte_dbm
+    fmt3 += "3s"  # unknown15
+    fmt3 += "4s"  # unknown16
     expected3 = struct.calcsize(fmt3)
     if len(data) >= expected + expected3:
         (lte_dbm, u17, u18) = struct.unpack(fmt3, data[expected:])
@@ -269,7 +279,31 @@ def show_network_info(data, prefix, direction):
 
 
 def show_init(data, prefix, direction):
-    show_data(data, prefix)
+    if len(data) == 0:
+        # PC5740/old format
+        return
+
+    if direction == defs.TO_HOST:
+        show_data(data, prefix)
+        return
+
+    fmt = "<"
+    fmt += "H"  # year
+    fmt += "B"  # month
+    fmt += "B"  # zero
+    fmt += "B"  # day
+    fmt += "B"  # zero
+    fmt += "B"  # hours
+    fmt += "B"  # zero
+    fmt += "B"  # minutes
+    fmt += "B"  # zero
+    fmt += "B"  # seconds
+    expected = struct.calcsize(fmt)
+    if len(data) >= expected:
+        (year, month, z1, day, z2, hours, z3, minutes, z4, seconds) = struct.unpack(fmt, data[:expected])
+        print prefix + "  Time:  %04d/%02d/%02d %02d:%02d:%02d" % (year, month, day, hours, minutes, seconds)
+    else:
+        raise ValueError ("Unexpected Init command length (got %d expected %d)" % (len(data), expected))
 
 def show_bearer_info(data, prefix, direction):
     pass
