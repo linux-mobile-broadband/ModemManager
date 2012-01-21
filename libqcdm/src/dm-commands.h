@@ -532,8 +532,10 @@ typedef struct DMCmdSubsysWcdmaCallStart DMCmdSubsysWcdmaCallStart;
 /* DIAG_SUBSYS_WCDMA_STATE_INFO response */
 struct DMCmdSubsysWcdmaStateInfoRsp {
     DMCmdSubsysHeader hdr;
-    u_int8_t imei[9];
-    u_int8_t imsi[9];
+    u_int8_t imei_len;
+    u_int8_t imei[8];
+    u_int8_t imsi_len;
+    u_int8_t imsi[8];
     u_int8_t l1_state;
 } __attribute__ ((packed));
 typedef struct DMCmdSubsysWcdmaStateInfoRsp DMCmdSubsysWcdmaStateInfoRsp;
@@ -541,8 +543,10 @@ typedef struct DMCmdSubsysWcdmaStateInfoRsp DMCmdSubsysWcdmaStateInfoRsp;
 /* DIAG_SUBSYS_GSM_STATE_INFO response */
 struct DMCmdSubsysGsmStateInfoRsp {
     DMCmdSubsysHeader hdr;
-    u_int8_t imei[9];
-    u_int8_t imsi[9];
+    u_int8_t imei_len;
+    u_int8_t imei[8];
+    u_int8_t imsi_len;
+    u_int8_t imsi[8];
     u_int8_t lai[5];
     u_int16_t cellid;
     u_int8_t cm_call_state;
