@@ -1256,7 +1256,15 @@ modem_3gpp_setup_indicators (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
-/* Enabling/disabling unsolicited events (3GPP interface) */
+/* Setup/Cleanup unsolicited events (3GPP interface) */
+
+static gboolean
+modem_3gpp_setup_cleanup_unsolicited_events_finish (MMIfaceModem3gpp *self,
+                                                    GAsyncResult *res,
+                                                    GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
 
 static void
 ciev_received (MMAtSerialPort *port,
@@ -1290,6 +1298,64 @@ ciev_received (MMAtSerialPort *port,
      * ... wait, arent these already handle by unsolicited CREG responses? */
 }
 
+static void
+set_unsolicited_events_handlers (MMIfaceModem3gpp *self,
+                                 gboolean enable,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    MMAtSerialPort *ports[2];
+    GRegex *ciev_regex;
+    guint i;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        set_unsolicited_events_handlers);
+
+    ciev_regex = mm_3gpp_ciev_regex_get ();
+    ports[0] = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+
+    /* Enable unsolicited events in given port */
+    for (i = 0; ports[i] && i < 2; i++) {
+        /* Set/unset unsolicited CIEV event handler */
+        mm_dbg ("%s unsolicited events handlers",
+                enable ? "Setting" : "Removing");
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            ciev_regex,
+            enable ? (MMAtSerialUnsolicitedMsgFn) ciev_received : NULL,
+            enable ? self : NULL,
+            NULL);
+    }
+
+    g_regex_unref (ciev_regex);
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+static void
+modem_3gpp_setup_unsolicited_events (MMIfaceModem3gpp *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
+{
+    set_unsolicited_events_handlers (self, TRUE, callback, user_data);
+}
+
+static void
+modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
+{
+    set_unsolicited_events_handlers (self, FALSE, callback, user_data);
+}
+
+/*****************************************************************************/
+/* Enabling/disabling unsolicited events (3GPP interface) */
+
 typedef struct {
     MMBroadbandModem *self;
     gchar *command;
@@ -1297,7 +1363,6 @@ typedef struct {
     GSimpleAsyncResult *result;
     gboolean cmer_primary_done;
     gboolean cmer_secondary_done;
-    GRegex *ciev_regex;
 } UnsolicitedEventsContext;
 
 static void
@@ -1306,15 +1371,14 @@ unsolicited_events_context_complete_and_free (UnsolicitedEventsContext *ctx)
     g_simple_async_result_complete (ctx->result);
     g_object_unref (ctx->result);
     g_object_unref (ctx->self);
-    g_regex_unref (ctx->ciev_regex);
     g_free (ctx->command);
     g_free (ctx);
 }
 
 static gboolean
-modem_3gpp_unsolicited_events_finish (MMIfaceModem3gpp *self,
-                                      GAsyncResult *res,
-                                      GError **error)
+modem_3gpp_enable_disable_unsolicited_events_finish (MMIfaceModem3gpp *self,
+                                                     GAsyncResult *res,
+                                                     GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
@@ -1349,9 +1413,6 @@ run_unsolicited_events_setup (UnsolicitedEventsContext *ctx)
 {
     MMAtSerialPort *port = NULL;
 
-    if (!ctx->ciev_regex)
-        ctx->ciev_regex = mm_3gpp_ciev_regex_get ();
-
     if (!ctx->cmer_primary_done) {
         ctx->cmer_primary_done = TRUE;
         port = mm_base_modem_get_port_primary (MM_BASE_MODEM (ctx->self));
@@ -1362,23 +1423,6 @@ run_unsolicited_events_setup (UnsolicitedEventsContext *ctx)
 
     /* Enable unsolicited events in given port */
     if (port) {
-        if (ctx->enable)
-            /* When enabling, setup unsolicited CIEV event handler */
-            mm_at_serial_port_add_unsolicited_msg_handler (
-                port,
-                ctx->ciev_regex,
-                (MMAtSerialUnsolicitedMsgFn) ciev_received,
-                ctx->self,
-                NULL);
-        else
-            /* When disabling, remove unsolicited CIEV event handler */
-            mm_at_serial_port_add_unsolicited_msg_handler (
-                port,
-                ctx->ciev_regex,
-                NULL,
-                NULL,
-                NULL);
-
         mm_base_modem_at_command_in_port (MM_BASE_MODEM (ctx->self),
                                           port,
                                           ctx->command,
@@ -1410,7 +1454,6 @@ modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *self,
                                              callback,
                                              user_data,
                                              modem_3gpp_enable_unsolicited_events);
-
     run_unsolicited_events_setup (ctx);
 }
 
@@ -1428,7 +1471,6 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
                                              callback,
                                              user_data,
                                              modem_3gpp_disable_unsolicited_events);
-
     run_unsolicited_events_setup (ctx);
 }
 
@@ -4932,8 +4974,10 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     /* Enabling steps */
     iface->setup_indicators = modem_3gpp_setup_indicators;
     iface->setup_indicators_finish = modem_3gpp_setup_indicators_finish;
+    iface->setup_unsolicited_events = modem_3gpp_setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
     iface->enable_unsolicited_events = modem_3gpp_enable_unsolicited_events;
-    iface->enable_unsolicited_events_finish = modem_3gpp_unsolicited_events_finish;
+    iface->enable_unsolicited_events_finish = modem_3gpp_enable_disable_unsolicited_events_finish;
     iface->setup_unsolicited_registration = modem_3gpp_setup_unsolicited_registration;
     iface->setup_unsolicited_registration_finish = modem_3gpp_setup_unsolicited_registration_finish;
     iface->setup_cs_registration = modem_3gpp_setup_cs_registration;
@@ -4943,7 +4987,9 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 
     /* Disabling steps */
     iface->disable_unsolicited_events = modem_3gpp_disable_unsolicited_events;
-    iface->disable_unsolicited_events_finish = modem_3gpp_unsolicited_events_finish;
+    iface->disable_unsolicited_events_finish = modem_3gpp_enable_disable_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events = modem_3gpp_cleanup_unsolicited_events;
+    iface->cleanup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
     iface->cleanup_unsolicited_registration = modem_3gpp_cleanup_unsolicited_registration;
     iface->cleanup_unsolicited_registration_finish = modem_3gpp_cleanup_unsolicited_registration_finish;
     iface->cleanup_cs_registration = modem_3gpp_cleanup_cs_registration;
