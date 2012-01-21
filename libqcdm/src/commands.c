@@ -1619,7 +1619,7 @@ qcmd_cmd_log_config_mask_result_code_set (QcdmResult *result,
 static char bcd_chars[] = "0123456789\0\0\0\0\0\0";
 
 static qcdmbool
-imxi_to_bcd_string (u_int8_t bytes[9], char *buf, size_t buflen)
+imxi_bcd_to_string (u_int8_t bytes[8], size_t len, char *buf, size_t buflen)
 {
     char *p;
     u_int32_t i;
@@ -1627,22 +1627,22 @@ imxi_to_bcd_string (u_int8_t bytes[9], char *buf, size_t buflen)
     if (bytes[0] == 0)
         return TRUE;
 
-    qcdm_return_val_if_fail (bytes[0] == 0x08, FALSE);
+    qcdm_return_val_if_fail (len == 8, FALSE);
     qcdm_return_val_if_fail (buf != NULL, FALSE);
-    qcdm_return_val_if_fail (buflen > bytes[0], FALSE);
+    qcdm_return_val_if_fail (buflen > len, FALSE);
 
     p = buf;
-    for (i = 0 ; i < bytes[0]; i++) {
+    for (i = 0 ; i < len; i++) {
         /* IMxI are 15 chars long, so the lower 4-bits of the first
          * byte of the IMxI is skipped.  Not sure what it does.
          */
         if (i > 0) {
-            *p = bcd_chars[bytes[i + 1] & 0xf];
+            *p = bcd_chars[bytes[i] & 0xf];
             if (!*p)
                 return FALSE;
             p++;
         }
-        *p = bcd_chars[(bytes[i + 1] >> 4) & 0xf];
+        *p = bcd_chars[(bytes[i] >> 4) & 0xf];
         if (!*p)
             return FALSE;
         p++;
@@ -1685,11 +1685,11 @@ qcdm_cmd_wcdma_subsys_state_info_result (const char *buf, size_t len, int *out_e
     qcdm_result_add_u8 (result, QCDM_CMD_WCDMA_SUBSYS_STATE_INFO_ITEM_L1_STATE, rsp->l1_state);
 
     memset (imxi, 0, sizeof (imxi));
-    if (imxi_to_bcd_string (rsp->imei, imxi, sizeof (imxi)))
+    if (imxi_bcd_to_string (rsp->imei, rsp->imei_len, imxi, sizeof (imxi)))
         qcdm_result_add_string (result, QCDM_CMD_WCDMA_SUBSYS_STATE_INFO_ITEM_IMEI, imxi);
 
     memset (imxi, 0, sizeof (imxi));
-    if (imxi_to_bcd_string (rsp->imsi, imxi, sizeof (imxi)))
+    if (imxi_bcd_to_string (rsp->imsi, rsp->imsi_len, imxi, sizeof (imxi)))
         qcdm_result_add_string (result, QCDM_CMD_WCDMA_SUBSYS_STATE_INFO_ITEM_IMSI, imxi);
 
     return result;
@@ -1731,11 +1731,11 @@ qcdm_cmd_gsm_subsys_state_info_result (const char *buf, size_t len, int *out_err
     result = qcdm_result_new ();
 
     memset (imxi, 0, sizeof (imxi));
-    if (imxi_to_bcd_string (rsp->imei, imxi, sizeof (imxi)))
+    if (imxi_bcd_to_string (rsp->imei, rsp->imei_len, imxi, sizeof (imxi)))
         qcdm_result_add_string (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_IMEI, imxi);
 
     memset (imxi, 0, sizeof (imxi));
-    if (imxi_to_bcd_string (rsp->imsi, imxi, sizeof (imxi)))
+    if (imxi_bcd_to_string (rsp->imsi, rsp->imsi_len, imxi, sizeof (imxi)))
         qcdm_result_add_string (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_IMSI, imxi);
 
     qcdm_result_add_u8 (result, QCDM_CMD_GSM_SUBSYS_STATE_INFO_ITEM_CM_CALL_STATE, rsp->cm_call_state);

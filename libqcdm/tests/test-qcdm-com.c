@@ -1661,6 +1661,9 @@ test_com_wcdma_subsys_state_info (void *f, void *data)
     str = "unknown";
     qcdm_result_get_u8 (result, QCDM_CMD_WCDMA_SUBSYS_STATE_INFO_ITEM_L1_STATE, &num8);
     switch (num8) {
+    case QCDM_WCDMA_L1_STATE_INIT:
+        str = "Init";
+        break;
     case QCDM_WCDMA_L1_STATE_IDLE:
         str = "Idle";
         break;
@@ -1682,11 +1685,8 @@ test_com_wcdma_subsys_state_info (void *f, void *data)
     case QCDM_WCDMA_L1_STATE_DCH:
         str = "DCH";
         break;
-    case QCDM_WCDMA_L1_STATE_DEACTIVATED:
+    case QCDM_WCDMA_L1_STATE_DEACTIVATE:
         str = "Deactivated";
-        break;
-    case QCDM_WCDMA_L1_STATE_PCH_SLEEP:
-        str = "PCH Sleep";
         break;
     case QCDM_WCDMA_L1_STATE_DEEP_SLEEP:
         str = "Deep Sleep";
