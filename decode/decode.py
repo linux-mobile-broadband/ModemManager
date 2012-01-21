@@ -41,31 +41,17 @@ if __name__ == "__main__":
     lines = f.readlines()
     f.close()
 
-    in_packet = False
-    finish_packet = False
-    pkt_lines = []
+    packet = None
     for l in lines:
-        if l[0] == '[':
-            # Start of a packet
-            if "]  >>>  URB" in l or "]  <<<  URB" in l:
-                if in_packet == True:
-                    in_packet = False
-                    finish_packet = True
-                else:
-                    in_packet = True
-            elif "] UsbSnoop - " in l:
-                # Packet done?
-                if in_packet == True:
-                    in_packet = False
-                    finish_packet = True
-
-        if finish_packet == True:
-            packets.append(Packet(pkt_lines, control, transfer))
-            pkt_lines = []
-            finish_packet = False
-
-        if in_packet == True:
-            pkt_lines.append(l)
+        if packet:
+            done = packet.add_line(l)
+            if done:
+                packets.append(packet)
+                packet = None
+        else:
+            packet = Packet(l, control, transfer)
+            if packet.direction == defs.TO_UNKNOWN:
+                packet = None
 
     for p in packets:
         p.show()

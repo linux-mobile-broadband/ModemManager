@@ -24,6 +24,10 @@ TP_REQUEST = 0x00
 TP_RESPONSE = 0x02
 TP_INDICATION = 0x04
 
+def complete(data, direction):
+    # We don't handle QMUX frames spanning packets yet
+    return True
+
 def unpack(data, direction):
     return binascii.unhexlify(data)
 
@@ -183,5 +187,5 @@ def show(data, prefix, direction):
     print ""
 
 def get_funcs():
-    return (unpack, show)
+    return (complete, unpack, show)
 

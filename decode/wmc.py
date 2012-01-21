@@ -18,6 +18,18 @@ import binascii
 import struct
 import defs
 
+def complete(data, direction):
+    if direction == defs.TO_MODEM:
+        if data[len(data) - 2:] == "0d":
+            return True
+    elif direction == defs.TO_HOST:
+        if data[len(data) - 6:] == "30307e":
+            return True
+    else:
+        raise ValueError("No data direction")
+    return False
+
+
 def unpack(data, direction):
     # unpack the data
     if direction == defs.TO_MODEM:
@@ -74,37 +86,63 @@ def show_device_info(data, prefix, direction):
     fmt = fmt + "H"    # eri_ver?
     fmt = fmt + "3s"   # unknown6
     fmt = fmt + "64s"  # unknown7
-    fmt = fmt + "20s"  # meid
-    fmt = fmt + "22s"  # imei
-    fmt = fmt + "16s"  # unknown9
-    fmt = fmt + "22s"  # iccid
-    fmt = fmt + "4s"   # unknown10
-    fmt = fmt + "16s"  # MCC
-    fmt = fmt + "16s"  # MNC
-    fmt = fmt + "4s"   # unknown11
-    fmt = fmt + "4s"   # unknown12
-    fmt = fmt + "4s"   # unknown13
-    fmt = fmt + "1s"
+    fmt = fmt + "s"    # unknown8
+    fmt = fmt + "14s"  # meid
+    fmt = fmt + "6s"   # unknown9
+    fmt = fmt + "16s"  # imei
+    fmt = fmt + "6s"   # unknown10
+    fmt = fmt + "16s"  # unknown11
+    fmt = fmt + "20s"  # iccid
+    fmt = fmt + "6s"   # unknown12
 
     expected = struct.calcsize(fmt)
-    if len(data) != expected:
+    if len(data) >= expected:
+        (u1, manf, model, fwrev, hwrev, u2, u3, cdmamin, u4, homesid, u5, eriver, \
+            u6, u7, u8, meid, u9, imei, u10, u11, iccid, u12) = struct.unpack(fmt, data[:expected])
+        print prefix + "  Manf:     %s" % manf
+        print prefix + "  Model:    %s" % model
+        print prefix + "  FW Rev:   %s" % fwrev
+        print prefix + "  HW Rev:   %s" % hwrev
+        print prefix + "  MIN:      %s" % cdmamin
+        print prefix + "  Home SID: %d" % homesid
+        print prefix + "  ERI Ver:  %d" % eriver
+        print prefix + "  MEID:     %s" % meid
+        print prefix + "  IMEI:     %s" % imei
+        print prefix + "  U11 :     %s" % u11
+        print prefix + "  ICCID:    %s" % iccid
+    else:
         raise ValueError("Unexpected Info command response len (got %d expected %d)" % (len(data), expected))
-    (u1, manf, model, fwrev, hwrev, u2, u3, cdmamin, u4, homesid, u5, eriver, \
-        u6, u7, meid, imei, u9, iccid, u10, mcc, mnc, u11, u12, u13, u14) = struct.unpack(fmt, data)
 
-    print prefix + "  Manf:     %s" % manf
-    print prefix + "  Model:    %s" % model
-    print prefix + "  FW Rev:   %s" % fwrev
-    print prefix + "  HW Rev:   %s" % hwrev
-    print prefix + "  MIN:      %s" % cdmamin
-    print prefix + "  Home SID: %d" % homesid
-    print prefix + "  ERI Ver:  %d" % eriver
-    print prefix + "  MEID:     %s" % meid
-    print prefix + "  IMEI:     %s" % imei
-    print prefix + "  Unk9:     %s" % u9
-    print prefix + "  ICCID:    %s" % iccid
-    print prefix + "  MCC:      %s" % mcc
-    print prefix + "  MNC:      %s" % mnc
+    fmt3 = "<"
+    fmt3 = fmt3 + "16s"  # MCC
+    fmt3 = fmt3 + "16s"  # MNC
+    fmt3 = fmt3 + "4s"   # unknown11
+    fmt3 = fmt3 + "4s"   # unknown12
+    fmt3 = fmt3 + "4s"   # unknown13
+    expected3 = struct.calcsize(fmt3)
+    if len(data) >= expected + expected3:
+        (mcc, mnc, u11, u12, u13) = struct.unpack(fmt3, data[expected:])
+        print prefix + "  MCC:      %s" % mcc
+        print prefix + "  MNC:      %s" % mnc
+
+
+def state_to_string(state):
+    states = { 0: "unknown",
+               1: "idle",
+               2: "connecting",
+               3: "authenticating",
+               4: "connected",
+               5: "dormant",
+               6: "updating NAM",
+               7: "updating PRL",
+               8: "disconnecting",
+               9: "error",
+              10: "updating UICC",
+              11: "updating PLMN" }
+    try:
+        return states[state]
+    except KeyError:
+        return "unknown"
 
 def show_connection_info(data, prefix, direction):
     if direction != defs.TO_HOST:
@@ -113,28 +151,57 @@ def show_connection_info(data, prefix, direction):
     fmt = "<"
     fmt = fmt + "I"   # rx_bytes
     fmt = fmt + "I"   # tx_bytes
-    fmt = fmt + "8s"  # unknown3
-    fmt = fmt + "B"   # unknown4
-    fmt = fmt + "7s"  # unknown7
-    fmt = fmt + "16s" # ip4_address
-    fmt = fmt + "8s"  # netmask?
-    fmt = fmt + "40s" # ip6_address
+    fmt = fmt + "8s"  # unknown1
+    fmt = fmt + "B"   # state
+    fmt = fmt + "3s"  # unknown2
 
     expected = struct.calcsize(fmt)
-    if len(data) != expected:
-        raise ValueError("Unexpected IP Info command response len (got %d expected %d)" % (len(data), expected))
-    (rxb, txb, u3, u4, u7, ip4addr, netmask, ip6addr) = struct.unpack(fmt, data)
+    if len(data) >= expected:
+        (rxb, txb, u1, state, u2) = struct.unpack(fmt, data[:expected])
+        print prefix + "  RX Bytes: %d" % rxb
+        print prefix + "  TX Bytes: %d" % txb
+        print prefix + "  State:    %d (%s)" % (state, state_to_string (state))
+    else:
+        raise ValueError("Unexpected Connection Info command response len (got %d expected %d)" % (len(data), expected))
 
-    print prefix + "  RX Bytes: %d" % rxb
-    print prefix + "  TX Bytes: %d" % txb
-    print prefix + "  IP4 Addr: %s" % ip4addr
-    print prefix + "  IP6 Addr: %s" % ip6addr
+    fmt3 = "<"
+    fmt3 = fmt3 + "4s"  # unknown3
+    fmt3 = fmt3 + "16s" # ip4_address
+    fmt3 = fmt3 + "8s"  # netmask?
+    fmt3 = fmt3 + "40s" # ip6_address
+    expected3 = struct.calcsize(fmt3)
+    if len(data) >= expected + expected3:
+        (u3, ip4addr, netmask, ip6addr) = struct.unpack(fmt3, data[expected:])
+        print prefix + "  IP4 Addr: %s" % ip4addr
+        print prefix + "  IP6 Addr: %s" % ip6addr
 
 def get_signal(item):
     if item == 0x7D:
         return (item * -1, "(NO SIGNAL)")
     else:
         return (item * -1, "")
+
+def service_to_string(service):
+    services = { 0: "none",
+                 1: "AMPS",
+                 2: "IS95-A",
+                 3: "IS95-B",
+                 4: "GSM",
+                 5: "GPRS",
+                 6: "1xRTT",
+                 7: "EVDO r0",
+                 8: "UMTS",
+                 9: "EVDO rA",
+                10: "EDGE",
+                11: "HSDPA",
+                12: "HSUPA",
+                13: "HSPA",
+                14: "LTE",
+                15: "EVDO rA eHRPD" }
+    try:
+        return services[service]
+    except KeyError:
+        return "unknown"
 
 def show_network_info(data, prefix, direction):
     if direction != defs.TO_HOST:
@@ -143,41 +210,63 @@ def show_network_info(data, prefix, direction):
     fmt = "<"
     fmt = fmt + "B"   # unknown1
     fmt = fmt + "3s"  # unknown2
-    fmt = fmt + "B"   # unknown3
+    fmt = fmt + "B"   # service
     fmt = fmt + "B"   # unknown4
     fmt = fmt + "10s" # magic
     fmt = fmt + "H"   # counter1
     fmt = fmt + "H"   # counter2
     fmt = fmt + "B"   # unknown5
     fmt = fmt + "3s"  # unknown6
-    fmt = fmt + "B"   # cdma1x_dbm
+    fmt = fmt + "B"   # 2g_dbm
     fmt = fmt + "3s"  # unknown7
     fmt = fmt + "16s" # cdma_opname
     fmt = fmt + "18s" # unknown8
-    fmt = fmt + "B"   # hdr_dbm
+    fmt = fmt + "B"   # 3g_dbm
     fmt = fmt + "3s"  # unknown9
     fmt = fmt + "B"   # unknown10
     fmt = fmt + "3s"  # unknown11
     fmt = fmt + "B"   # unknown12
-    fmt = fmt + "8s"  # lte_opname
-    fmt = fmt + "60s" # unknown13
-    fmt = fmt + "B"   # lte_dbm
-    fmt = fmt + "3s"  # unknown14
-    fmt = fmt + "4s"  # unknown15
+    fmt = fmt + "8s"  # 3gpp_opname
+    fmt = fmt + "4s"  # unknown13
+    fmt = fmt + "I"   # unknown14
+    fmt = fmt + "I"   # unknown15
+    fmt = fmt + "44s" # unknown16
+    fmt = fmt + "I"   # mcc/mnc
 
     expected = struct.calcsize(fmt)
-    if len(data) != expected:
-        raise ValueError("Unexpected Status command response len (got %d expected %d)" % (len(data), expected))
-    (u1, u2, u3, u4, magic, counter1, counter2, u5, u6, cdma_dbm, u7, cdma_opname, \
-        u8, hdr_dbm, u9, u10, u11, u12, lte_opname, u13, lte_dbm, u14, u15) = struct.unpack(fmt, data)
+    if len(data) >= expected:
+        (u1, u2, service, u4, magic, counter1, counter2, u5, u6, two_g_dbm, u7, \
+         cdma_opname, u8, three_g_dbm, u9, u10, u11, u12, tgpp_opname, u13, u14, \
+         u15, u16, mccmnc) = struct.unpack(fmt, data[:expected])
+        print prefix + "  Counter1: %s" % counter1
+        print prefix + "  Counter2: %s" % counter2
+        print prefix + "  Service:  %d (%s)" % (service, service_to_string (service))
+        print prefix + "  2G dBm:   %d dBm %s" % get_signal(two_g_dbm)
+        print prefix + "  3G dBm:   %d dBm %s" % get_signal(three_g_dbm)
+        print prefix + "  CDMA Op:  %s" % cdma_opname
+        print prefix + "  3GPP Op:  %s" % tgpp_opname
 
-    print prefix + "  Counter1: %s" % counter1
-    print prefix + "  Counter2: %s" % counter2
-    print prefix + "  CDMA dBm: %d dBm %s" % get_signal(cdma_dbm)
-    print prefix + "  CDMA Op:  %s" % cdma_opname
-    print prefix + "  HDR dBm:  %d dBm %s" % get_signal(hdr_dbm)
-    print prefix + "  LTE Op:   %s" % lte_opname
-    print prefix + "  LTE dBm:  %d dBm %s" % get_signal(lte_dbm)
+        # handle 2-digit MNC
+        if mccmnc < 100000:
+           mccmnc *= 10;
+
+        mcc = mccmnc / 1000
+        mnc = mccmnc - (mcc * 1000)
+        if mcc > 100:
+            print prefix + "  MCC/MNC:  %u-%u" % (mcc, mnc)
+
+    else:
+        raise ValueError("Unexpected Network Info command response len (got %d expected %d)" % (len(data), expected))
+
+    fmt3 = "<"
+    fmt3 = fmt3 + "B"   # lte_dbm
+    fmt3 = fmt3 + "3s"  # unknown17
+    fmt3 = fmt3 + "4s"  # unknown18
+    expected3 = struct.calcsize(fmt3)
+    if len(data) >= expected + expected3:
+        (lte_dbm, u17, u18) = struct.unpack(fmt3, data[expected:])
+        print prefix + "  LTE dBm:  %d dBm %s" % get_signal(lte_dbm)
+
 
 def show_init(data, prefix, direction):
     show_data(data, prefix)
@@ -264,5 +353,5 @@ def show(data, prefix, direction):
     print ""
 
 def get_funcs():
-    return (unpack, show)
+    return (complete, unpack, show)
 
