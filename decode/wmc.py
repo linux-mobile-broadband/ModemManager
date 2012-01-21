@@ -72,28 +72,28 @@ def show_device_info(data, prefix, direction):
         return
 
     fmt = "<"
-    fmt = fmt + "27s"  # unknown1
-    fmt = fmt + "64s"  # manf
-    fmt = fmt + "64s"  # model
-    fmt = fmt + "64s"  # fwrev
-    fmt = fmt + "64s"  # hwrev
-    fmt = fmt + "64s"  # unknown2
-    fmt = fmt + "64s"  # unknown3
-    fmt = fmt + "10s"  # min
-    fmt = fmt + "12s"  # unknown4
-    fmt = fmt + "H"    # home_sid
-    fmt = fmt + "6s"   # unknown5
-    fmt = fmt + "H"    # eri_ver?
-    fmt = fmt + "3s"   # unknown6
-    fmt = fmt + "64s"  # unknown7
-    fmt = fmt + "s"    # unknown8
-    fmt = fmt + "14s"  # meid
-    fmt = fmt + "6s"   # unknown9
-    fmt = fmt + "16s"  # imei
-    fmt = fmt + "6s"   # unknown10
-    fmt = fmt + "16s"  # unknown11
-    fmt = fmt + "20s"  # iccid
-    fmt = fmt + "6s"   # unknown12
+    fmt += "27s"  # unknown1
+    fmt += "64s"  # manf
+    fmt += "64s"  # model
+    fmt += "64s"  # fwrev
+    fmt += "64s"  # hwrev
+    fmt += "64s"  # unknown2
+    fmt += "64s"  # unknown3
+    fmt += "10s"  # min
+    fmt += "12s"  # unknown4
+    fmt += "H"    # home_sid
+    fmt += "6s"   # unknown5
+    fmt += "H"    # eri_ver?
+    fmt += "3s"   # unknown6
+    fmt += "64s"  # unknown7
+    fmt += "s"    # unknown8
+    fmt += "14s"  # meid
+    fmt += "6s"   # unknown9
+    fmt += "16s"  # imei
+    fmt += "6s"   # unknown10
+    fmt += "16s"  # unknown11
+    fmt += "20s"  # iccid
+    fmt += "6s"   # unknown12
 
     expected = struct.calcsize(fmt)
     if len(data) >= expected:
@@ -114,11 +114,11 @@ def show_device_info(data, prefix, direction):
         raise ValueError("Unexpected Info command response len (got %d expected %d)" % (len(data), expected))
 
     fmt3 = "<"
-    fmt3 = fmt3 + "16s"  # MCC
-    fmt3 = fmt3 + "16s"  # MNC
-    fmt3 = fmt3 + "4s"   # unknown11
-    fmt3 = fmt3 + "4s"   # unknown12
-    fmt3 = fmt3 + "4s"   # unknown13
+    fmt3 += "16s"  # MCC
+    fmt3 += "16s"  # MNC
+    fmt3 += "4s"   # unknown11
+    fmt3 += "4s"   # unknown12
+    fmt3 += "4s"   # unknown13
     expected3 = struct.calcsize(fmt3)
     if len(data) >= expected + expected3:
         (mcc, mnc, u11, u12, u13) = struct.unpack(fmt3, data[expected:])
@@ -149,11 +149,11 @@ def show_connection_info(data, prefix, direction):
         return
 
     fmt = "<"
-    fmt = fmt + "I"   # rx_bytes
-    fmt = fmt + "I"   # tx_bytes
-    fmt = fmt + "8s"  # unknown1
-    fmt = fmt + "B"   # state
-    fmt = fmt + "3s"  # unknown2
+    fmt += "I"   # rx_bytes
+    fmt += "I"   # tx_bytes
+    fmt += "8s"  # unknown1
+    fmt += "B"   # state
+    fmt += "3s"  # unknown2
 
     expected = struct.calcsize(fmt)
     if len(data) >= expected:
@@ -165,10 +165,10 @@ def show_connection_info(data, prefix, direction):
         raise ValueError("Unexpected Connection Info command response len (got %d expected %d)" % (len(data), expected))
 
     fmt3 = "<"
-    fmt3 = fmt3 + "4s"  # unknown3
-    fmt3 = fmt3 + "16s" # ip4_address
-    fmt3 = fmt3 + "8s"  # netmask?
-    fmt3 = fmt3 + "40s" # ip6_address
+    fmt3 += "4s"  # unknown3
+    fmt3 += "16s" # ip4_address
+    fmt3 += "8s"  # netmask?
+    fmt3 += "40s" # ip6_address
     expected3 = struct.calcsize(fmt3)
     if len(data) >= expected + expected3:
         (u3, ip4addr, netmask, ip6addr) = struct.unpack(fmt3, data[expected:])
@@ -330,10 +330,10 @@ def show_get_global_mode(data, prefix, direction):
         return
 
     fmt = "<"
-    fmt = fmt + "B"   # unknown1
-    fmt = fmt + "B"   # mode
-    fmt = fmt + "B"   # unknown2
-    fmt = fmt + "B"   # unknown3
+    fmt += "B"   # unknown1
+    fmt += "B"   # mode
+    fmt += "B"   # unknown2
+    fmt += "B"   # unknown3
 
     expected = struct.calcsize(fmt)
     if len(data) != expected:
@@ -347,10 +347,10 @@ def show_set_global_mode(data, prefix, direction):
         return;
 
     fmt = "<"
-    fmt = fmt + "B"   # unknown1
-    fmt = fmt + "B"   # mode
-    fmt = fmt + "B"   # unknown2
-    fmt = fmt + "B"   # unknown3
+    fmt += "B"   # unknown1
+    fmt += "B"   # mode
+    fmt += "B"   # unknown2
+    fmt += "B"   # unknown3
 
     expected = struct.calcsize(fmt)
     if len(data) != expected:
