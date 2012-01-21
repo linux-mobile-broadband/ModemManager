@@ -959,8 +959,10 @@ load_sim_identifier_ready (MMSim *self,
     GError *error = NULL;
     gchar *simid;
 
-    simid  = load_sim_identifier_finish (self, res, &error);
+    simid  = MM_SIM_GET_CLASS (ctx->self)->load_sim_identifier_finish (self, res, &error);
     if (!simid) {
+        /* TODO: make the retries gobi-specific? */
+
         /* Try one more time... Gobi 1K cards may reply to the first
          * request with '+CRSM: 106,134,""' which is bogus because
          * subsequent requests work fine.
@@ -994,7 +996,7 @@ load_sim_identifier_ready (MMSim *self,
         GError *error = NULL;                                           \
         gchar *val;                                                     \
                                                                         \
-        val = load_##NAME##_finish (self, res, &error);                 \
+        val = MM_SIM_GET_CLASS (ctx->self)->load_##NAME##_finish (self, res, &error); \
         mm_gdbus_sim_set_##NAME (MM_GDBUS_SIM (self), val);             \
         g_free (val);                                                   \
                                                                         \
@@ -1025,7 +1027,7 @@ interface_initialization_step (InitAsyncContext *ctx)
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
         if (mm_gdbus_sim_get_sim_identifier (MM_GDBUS_SIM (ctx->self)) == NULL) {
-            load_sim_identifier (
+            MM_SIM_GET_CLASS (ctx->self)->load_sim_identifier (
                 ctx->self,
                 (GAsyncReadyCallback)load_sim_identifier_ready,
                 ctx);
@@ -1039,7 +1041,7 @@ interface_initialization_step (InitAsyncContext *ctx)
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
         if (mm_gdbus_sim_get_imsi (MM_GDBUS_SIM (ctx->self)) == NULL) {
-            load_imsi (
+            MM_SIM_GET_CLASS (ctx->self)->load_imsi (
                 ctx->self,
                 (GAsyncReadyCallback)load_imsi_ready,
                 ctx);
@@ -1053,7 +1055,7 @@ interface_initialization_step (InitAsyncContext *ctx)
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
         if (mm_gdbus_sim_get_operator_identifier (MM_GDBUS_SIM (ctx->self)) == NULL) {
-            load_operator_identifier (
+            MM_SIM_GET_CLASS (ctx->self)->load_operator_identifier (
                 ctx->self,
                 (GAsyncReadyCallback)load_operator_identifier_ready,
                 ctx);
@@ -1067,7 +1069,7 @@ interface_initialization_step (InitAsyncContext *ctx)
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
         if (mm_gdbus_sim_get_operator_name (MM_GDBUS_SIM (ctx->self)) == NULL) {
-            load_operator_name (
+            MM_SIM_GET_CLASS (ctx->self)->load_operator_name (
                 ctx->self,
                 (GAsyncReadyCallback)load_operator_name_ready,
                 ctx);
@@ -1295,6 +1297,15 @@ mm_sim_class_init (MMSimClass *klass)
     object_class->set_property = set_property;
     object_class->finalize = finalize;
     object_class->dispose = dispose;
+
+    klass->load_sim_identifier = load_sim_identifier;
+    klass->load_sim_identifier_finish = load_sim_identifier_finish;
+    klass->load_imsi = load_imsi;
+    klass->load_imsi_finish = load_imsi_finish;
+    klass->load_operator_identifier = load_operator_identifier;
+    klass->load_operator_identifier_finish = load_operator_identifier_finish;
+    klass->load_operator_name = load_operator_name;
+    klass->load_operator_name_finish = load_operator_name_finish;
 
     properties[PROP_CONNECTION] =
         g_param_spec_object (MM_SIM_CONNECTION,

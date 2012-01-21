@@ -49,6 +49,38 @@ struct _MMSim {
 
 struct _MMSimClass {
     MmGdbusSimSkeletonClass parent;
+
+    /* Load SIM identifier (async) */
+    void (* load_sim_identifier) (MMSim *self,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data);
+    gchar * (* load_sim_identifier_finish) (MMSim *self,
+                                            GAsyncResult *res,
+                                            GError **error);
+
+    /* Load IMSI (async) */
+    void (* load_imsi) (MMSim *self,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data);
+    gchar * (* load_imsi_finish) (MMSim *self,
+                                  GAsyncResult *res,
+                                  GError **error);
+
+    /* Load operator identifier (async) */
+    void (* load_operator_identifier) (MMSim *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data);
+    gchar * (* load_operator_identifier_finish) (MMSim *self,
+                                                 GAsyncResult *res,
+                                                 GError **error);
+
+    /* Load operator name (async) */
+    void (* load_operator_name) (MMSim *self,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data);
+    gchar * (* load_operator_name_finish) (MMSim *self,
+                                           GAsyncResult *res,
+                                           GError **error);
 };
 
 GType mm_sim_get_type (void);
