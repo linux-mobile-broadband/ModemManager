@@ -118,8 +118,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  * Boston, MA 02110-1301 USA.
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 - 2011 Red Hat, Inc.
- * Copyright (C) 2011 Google, Inc.
+ * Copyright (C) 2009 - 2012 Red Hat, Inc.
+ * Copyright (C) 2011 - 2012 Google, Inc.
  */
 
 #ifndef _MODEM_MANAGER_NAMES_H_
@@ -127,6 +127,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define MM_DBUS_PATH    "/org/freedesktop/ModemManager1"
 #define MM_DBUS_SERVICE "org.freedesktop.ModemManager1"
+
+/* Prefix for object paths */
+#define MM_DBUS_MODEM_PREFIX  MM_DBUS_PATH "/Modem"
+#define MM_DBUS_BEARER_PREFIX MM_DBUS_PATH "/Bearer"
+#define MM_DBUS_SIM_PREFIX    MM_DBUS_PATH "/SIM"
 
 /**************
  * Interfaces *

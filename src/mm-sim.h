@@ -39,9 +39,6 @@ typedef struct _MMSimPrivate MMSimPrivate;
 #define MM_SIM_CONNECTION     "sim-connection"
 #define MM_SIM_MODEM          "sim-modem"
 
-/* Prefix for all SIM object paths */
-#define MM_DBUS_SIM_PREFIX MM_DBUS_PATH "/SIMs"
-
 struct _MMSim {
     MmGdbusSimSkeleton parent;
     MMSimPrivate *priv;

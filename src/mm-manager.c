@@ -211,7 +211,7 @@ check_export_modem (MMManager *self,
     }
 
     /* No outstanding port tasks, so if the modem is valid we can export it */
-    path = g_strdup_printf (MM_DBUS_PATH"/Modems/%d", id++);
+    path = g_strdup_printf (MM_DBUS_MODEM_PREFIX "/%d", id++);
     g_object_set (modem,
                   "g-object-path", path,
                   MM_BASE_MODEM_CONNECTION, self->priv->connection,

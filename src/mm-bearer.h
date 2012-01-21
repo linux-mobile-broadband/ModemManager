@@ -41,9 +41,6 @@ typedef struct _MMBearerPrivate MMBearerPrivate;
 #define MM_BEARER_MODEM      "bearer-modem"
 #define MM_BEARER_STATUS     "bearer-status"
 
-/* Prefix for all bearer object paths */
-#define MM_DBUS_BEARER_PREFIX MM_DBUS_PATH "/Bearers"
-
 typedef enum { /*< underscore_name=mm_bearer_status >*/
     MM_BEARER_STATUS_DISCONNECTED,
     MM_BEARER_STATUS_DISCONNECTING,
