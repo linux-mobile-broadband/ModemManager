@@ -60,6 +60,21 @@ struct _MMSimPrivate {
 
 /*****************************************************************************/
 
+void
+mm_sim_export (MMSim *self)
+{
+    static guint id = 0;
+    gchar *path;
+
+    path = g_strdup_printf (MM_DBUS_SIM_PREFIX "/%d", id++);
+    g_object_set (self,
+                  MM_SIM_PATH, path,
+                  NULL);
+    g_free (path);
+}
+
+/*****************************************************************************/
+
 typedef struct {
     MMSim *self;
     GDBusMethodInvocation *invocation;
@@ -360,7 +375,7 @@ handle_send_puk (MMSim *self,
 /*****************************************************************************/
 
 static void
-mm_sim_export (MMSim *self)
+mm_sim_dbus_export (MMSim *self)
 {
     GError *error = NULL;
 
@@ -394,7 +409,7 @@ mm_sim_export (MMSim *self)
 }
 
 static void
-mm_sim_unexport (MMSim *self)
+mm_sim_dbus_unexport (MMSim *self)
 {
     /* Only unexport if currently exported */
     if (g_dbus_interface_skeleton_get_object_path (G_DBUS_INTERFACE_SKELETON (self)))
@@ -922,6 +937,9 @@ mm_sim_new_finish (GAsyncInitable *initable,
     if (!sim)
         return NULL;
 
+    /* Only export valid SIMs */
+    mm_sim_export (MM_SIM (sim));
+
     return MM_SIM (sim);
 }
 
@@ -1124,20 +1142,13 @@ mm_sim_new (MMBaseModem *modem,
             GAsyncReadyCallback callback,
             gpointer user_data)
 {
-    gchar *path;
-    static guint32 id = 0;
-
-    /* Build the unique path for the SIM, and create the object */
-    path = g_strdup_printf (MM_DBUS_PATH"/SIMs/%d", id++);
     g_async_initable_new_async (MM_TYPE_SIM,
                                 G_PRIORITY_DEFAULT,
                                 cancellable,
                                 callback,
                                 user_data,
-                                MM_SIM_PATH,  path,
                                 MM_SIM_MODEM, modem,
                                 NULL);
-    g_free (path);
 }
 
 gboolean
@@ -1172,16 +1183,21 @@ set_property (GObject *object,
     case PROP_PATH:
         g_free (self->priv->path);
         self->priv->path = g_value_dup_string (value);
+
+        /* Export when we get a DBus connection AND we have a path */
+        if (self->priv->path &&
+            self->priv->connection)
+            mm_sim_dbus_export (self);
         break;
     case PROP_CONNECTION:
         g_clear_object (&self->priv->connection);
         self->priv->connection = g_value_dup_object (value);
 
-        /* Export when we get a DBus connection */
-        if (self->priv->connection)
-            mm_sim_export (self);
-        else
-            mm_sim_unexport (self);
+        /* Export when we get a DBus connection AND we have a path */
+        if (!self->priv->connection)
+            mm_sim_dbus_unexport (self);
+        else if (self->priv->path)
+            mm_sim_dbus_export (self);
         break;
     case PROP_MODEM:
         g_clear_object (&self->priv->modem);
@@ -1251,7 +1267,7 @@ dispose (GObject *object)
     if (self->priv->connection) {
         /* If we arrived here with a valid connection, make sure we unexport
          * the object */
-        mm_sim_unexport (self);
+        mm_sim_dbus_unexport (self);
         g_clear_object (&self->priv->connection);
     }
 
@@ -1293,7 +1309,7 @@ mm_sim_class_init (MMSimClass *klass)
                              "Path",
                              "DBus path of the SIM",
                              NULL,
-                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+                             G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_PATH, properties[PROP_PATH]);
 
     properties[PROP_MODEM] =

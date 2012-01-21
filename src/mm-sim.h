@@ -39,6 +39,9 @@ typedef struct _MMSimPrivate MMSimPrivate;
 #define MM_SIM_CONNECTION     "sim-connection"
 #define MM_SIM_MODEM          "sim-modem"
 
+/* Prefix for all SIM object paths */
+#define MM_DBUS_SIM_PREFIX MM_DBUS_PATH "/SIMs"
+
 struct _MMSim {
     MmGdbusSimSkeleton parent;
     MMSimPrivate *priv;
@@ -74,6 +77,8 @@ void     mm_sim_send_pin        (MMSim *self,
 gboolean mm_sim_send_pin_finish (MMSim *self,
                                  GAsyncResult *res,
                                  GError **error);
+
+void mm_sim_export (MMSim *self);
 
 const gchar *mm_sim_get_path (MMSim *sim);
 
