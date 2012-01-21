@@ -110,8 +110,6 @@ mmcli_get_manager_sync (GDBusConnection *connection)
     return manager;
 }
 
-#define MODEM_PATH_TAG "modem-path-tag"
-
 static MMObject *
 find_modem (MMManager *manager,
             const gchar *modem_path)
@@ -139,34 +137,6 @@ find_modem (MMManager *manager,
     g_debug ("Modem found at '%s'\n", modem_path);
 
     return found;
-}
-
-static gchar *
-get_modem_path (const gchar *modem_str)
-{
-    gchar *modem_path;
-
-    /* We must have a given modem specified */
-    if (!modem_str) {
-        g_printerr ("error: no modem was specified\n");
-        exit (EXIT_FAILURE);
-    }
-
-    /* Modem path may come in two ways: full DBus path or just modem index.
-     * If it is a modem index, we'll need to generate the DBus path ourselves */
-    if (modem_str[0] == '/')
-        modem_path = g_strdup (modem_str);
-    else {
-        if (g_ascii_isdigit (modem_str[0]))
-            modem_path = g_strdup_printf (MM_DBUS_PATH "/Modems/%s", modem_str);
-        else {
-            g_printerr ("error: invalid modem string specified: '%s'\n",
-                        modem_str);
-            exit (EXIT_FAILURE);
-        }
-    }
-
-    return modem_path;
 }
 
 typedef struct {
@@ -232,9 +202,37 @@ get_manager_ready (GDBusConnection *connection,
     get_modem_context_complete_and_free (ctx);
 }
 
+static gchar *
+get_modem_path (const gchar *path_or_index)
+{
+    gchar *modem_path;
+
+    /* We must have a given modem specified */
+    if (!path_or_index) {
+        g_printerr ("error: no modem was specified\n");
+        exit (EXIT_FAILURE);
+    }
+
+    /* Modem path may come in two ways: full DBus path or just modem index.
+     * If it is a modem index, we'll need to generate the DBus path ourselves */
+    if (g_str_has_prefix (path_or_index, MM_DBUS_MODEM_PREFIX)) {
+        g_debug ("Assuming '%s' is the full modem path", path_or_index);
+        modem_path = g_strdup (path_or_index);
+    } else if (g_ascii_isdigit (path_or_index[0])) {
+        g_debug ("Assuming '%s' is the modem index", path_or_index);
+        modem_path = g_strdup_printf (MM_DBUS_MODEM_PREFIX "/%s", path_or_index);
+    } else {
+        g_printerr ("error: invalid path or index string specified: '%s'\n",
+                    path_or_index);
+        exit (EXIT_FAILURE);
+    }
+
+    return modem_path;
+}
+
 void
 mmcli_get_modem (GDBusConnection *connection,
-                 const gchar *modem_str,
+                 const gchar *path_or_index,
                  GCancellable *cancellable,
                  GAsyncReadyCallback callback,
                  gpointer user_data)
@@ -242,7 +240,7 @@ mmcli_get_modem (GDBusConnection *connection,
     GetModemContext *ctx;
 
     ctx = g_new0 (GetModemContext, 1);
-    ctx->modem_path = get_modem_path (modem_str);
+    ctx->modem_path = get_modem_path (path_or_index);
     ctx->result = g_simple_async_result_new (G_OBJECT (connection),
                                              callback,
                                              user_data,
@@ -422,9 +420,37 @@ get_bearer_manager_ready (GDBusConnection *connection,
     look_for_bearer_in_modem (ctx);
 }
 
+static gchar *
+get_bearer_path (const gchar *path_or_index)
+{
+    gchar *bearer_path;
+
+    /* We must have a given bearer specified */
+    if (!path_or_index) {
+        g_printerr ("error: no bearer was specified\n");
+        exit (EXIT_FAILURE);
+    }
+
+    /* Bearer path may come in two ways: full DBus path or just bearer index.
+     * If it is a bearer index, we'll need to generate the DBus path ourselves */
+    if (g_str_has_prefix (path_or_index, MM_DBUS_BEARER_PREFIX)) {
+        g_debug ("Assuming '%s' is the full bearer path", path_or_index);
+        bearer_path = g_strdup (path_or_index);
+    } else if (g_ascii_isdigit (path_or_index[0])) {
+        g_debug ("Assuming '%s' is the bearer index", path_or_index);
+        bearer_path = g_strdup_printf (MM_DBUS_BEARER_PREFIX "/%s", path_or_index);
+    } else {
+        g_printerr ("error: invalid path or index string specified: '%s'\n",
+                    path_or_index);
+        exit (EXIT_FAILURE);
+    }
+
+    return bearer_path;
+}
+
 void
 mmcli_get_bearer (GDBusConnection *connection,
-                  const gchar *bearer_path,
+                  const gchar *path_or_index,
                   GCancellable *cancellable,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
@@ -432,7 +458,7 @@ mmcli_get_bearer (GDBusConnection *connection,
     GetBearerContext *ctx;
 
     ctx = g_new0 (GetBearerContext, 1);
-    ctx->bearer_path = g_strdup (bearer_path);
+    ctx->bearer_path = get_bearer_path (path_or_index);
     if (cancellable)
         ctx->cancellable = g_object_ref (cancellable);
     ctx->result = g_simple_async_result_new (G_OBJECT (connection),
@@ -447,7 +473,7 @@ mmcli_get_bearer (GDBusConnection *connection,
 
 MMBearer *
 mmcli_get_bearer_sync (GDBusConnection *connection,
-                       const gchar *bearer_path,
+                       const gchar *path_or_index,
                        MMManager **o_manager,
                        MMObject **o_object)
 {
@@ -455,6 +481,9 @@ mmcli_get_bearer_sync (GDBusConnection *connection,
     GList *modems;
     GList *l;
     MMBearer *found = NULL;
+    gchar *bearer_path;
+
+    bearer_path = get_bearer_path (path_or_index);
 
     manager = mmcli_get_manager_sync (connection);
     modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (manager));
@@ -490,6 +519,7 @@ mmcli_get_bearer_sync (GDBusConnection *connection,
     }
 
     g_list_free_full (modems, (GDestroyNotify) g_object_unref);
+    g_free (bearer_path);
 
     if (o_manager)
         *o_manager = manager;
@@ -612,9 +642,37 @@ get_sim_manager_ready (GDBusConnection *connection,
     g_list_free_full (modems, (GDestroyNotify) g_object_unref);
 }
 
+static gchar *
+get_sim_path (const gchar *path_or_index)
+{
+    gchar *sim_path;
+
+    /* We must have a given sim specified */
+    if (!path_or_index) {
+        g_printerr ("error: no sim was specified\n");
+        exit (EXIT_FAILURE);
+    }
+
+    /* Sim path may come in two ways: full DBus path or just sim index.
+     * If it is a sim index, we'll need to generate the DBus path ourselves */
+    if (g_str_has_prefix (path_or_index, MM_DBUS_SIM_PREFIX)) {
+        g_debug ("Assuming '%s' is the full SIM path", path_or_index);
+        sim_path = g_strdup (path_or_index);
+    } else if (g_ascii_isdigit (path_or_index[0])) {
+        g_debug ("Assuming '%s' is the SIM index", path_or_index);
+        sim_path = g_strdup_printf (MM_DBUS_SIM_PREFIX "/%s", path_or_index);
+    } else {
+        g_printerr ("error: invalid index string specified: '%s'\n",
+                    path_or_index);
+        exit (EXIT_FAILURE);
+    }
+
+    return sim_path;
+}
+
 void
 mmcli_get_sim (GDBusConnection *connection,
-                  const gchar *sim_path,
+                  const gchar *path_or_index,
                   GCancellable *cancellable,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
@@ -622,7 +680,7 @@ mmcli_get_sim (GDBusConnection *connection,
     GetSimContext *ctx;
 
     ctx = g_new0 (GetSimContext, 1);
-    ctx->sim_path = g_strdup (sim_path);
+    ctx->sim_path = get_sim_path (path_or_index);
     if (cancellable)
         ctx->cancellable = g_object_ref (cancellable);
     ctx->result = g_simple_async_result_new (G_OBJECT (connection),
@@ -637,7 +695,7 @@ mmcli_get_sim (GDBusConnection *connection,
 
 MMSim *
 mmcli_get_sim_sync (GDBusConnection *connection,
-                    const gchar *sim_path,
+                    const gchar *path_or_index,
                     MMManager **o_manager,
                     MMObject **o_object)
 {
@@ -645,6 +703,9 @@ mmcli_get_sim_sync (GDBusConnection *connection,
     GList *modems;
     GList *l;
     MMSim *found = NULL;
+    gchar *sim_path;
+
+    sim_path = get_sim_path (path_or_index);
 
     manager = mmcli_get_manager_sync (connection);
     modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (manager));
@@ -684,6 +745,7 @@ mmcli_get_sim_sync (GDBusConnection *connection,
     }
 
     g_list_free_full (modems, (GDestroyNotify) g_object_unref);
+    g_free (sim_path);
 
     if (o_manager)
         *o_manager = manager;
