@@ -82,6 +82,26 @@ struct _MMSimClass {
                                            GAsyncResult *res,
                                            GError **error);
 
+    /* Change PIN (async) */
+    void (* change_pin) (MMSim *self,
+                         const gchar *old_pin,
+                         const gchar *new_pin,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data);
+    gboolean (* change_pin_finish) (MMSim *self,
+                                    GAsyncResult *res,
+                                    GError **error);
+
+    /* Enable PIN (async) */
+    void (* enable_pin) (MMSim *self,
+                         const gchar *pin,
+                         gboolean enabled,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data);
+    gboolean (* enable_pin_finish) (MMSim *self,
+                                    GAsyncResult *res,
+                                    GError **error);
+
     /* Send PIN (async) */
     void (* send_pin) (MMSim *self,
                        const gchar *pin,

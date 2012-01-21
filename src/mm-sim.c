@@ -100,76 +100,180 @@ dbus_call_context_new (MMSim *self,
     return ctx;
 }
 
-#undef NO_REPLY_READY_FN
-#define NO_REPLY_READY_FN(NAME)                                         \
-    static void                                                         \
-    handle_##NAME##_ready (MMBaseModem *modem,                          \
-                           GAsyncResult *res,                           \
-                           DbusCallContext *ctx)                        \
-    {                                                                   \
-        GError *error = NULL;                                           \
-                                                                        \
-        mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error); \
-        if (error)                                                      \
-            g_dbus_method_invocation_take_error (ctx->invocation, error); \
-        else                                                            \
-            mm_gdbus_sim_complete_##NAME (MM_GDBUS_SIM (ctx->self), ctx->invocation); \
-        dbus_call_context_free (ctx);                                   \
-    }
+/*****************************************************************************/
+/* CHANGE PIN (Generic implementation) */
+
+static gboolean
+change_pin_finish (MMSim *self,
+                   GAsyncResult *res,
+                   GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+change_pin_ready (MMBaseModem *modem,
+                  GAsyncResult *res,
+                  GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (modem, res, &error);
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+change_pin (MMSim *self,
+            const gchar *old_pin,
+            const gchar *new_pin,
+            GAsyncReadyCallback callback,
+            gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    gchar *command;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        change_pin);
+
+    command = g_strdup_printf ("+CPWD=\"SC\",\"%s\",\"%s\"",
+                               old_pin,
+                               new_pin);
+    mm_base_modem_at_command (MM_BASE_MODEM (self->priv->modem),
+                              command,
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)change_pin_ready,
+                              result);
+    g_free (command);
+}
 
 /*****************************************************************************/
-/* CHANGE PIN */
+/* CHANGE PIN (DBus call handling) */
 
-NO_REPLY_READY_FN (change_pin)
+static void
+handle_change_pin_ready (MMSim *self,
+                         GAsyncResult *res,
+                         DbusCallContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_SIM_GET_CLASS (self)->change_pin_finish (self, res, &error);
+    if (error)
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else
+        mm_gdbus_sim_complete_change_pin (MM_GDBUS_SIM (ctx->self), ctx->invocation);
+    dbus_call_context_free (ctx);
+}
 
 static gboolean
 handle_change_pin (MMSim *self,
                    GDBusMethodInvocation *invocation,
-                   const gchar *arg_old_pin,
-                   const gchar *arg_new_pin)
+                   const gchar *old_pin,
+                   const gchar *new_pin,
+                   gboolean changed)
 {
-    gchar *command;
-
-    command = g_strdup_printf ("+CPWD=\"SC\",\"%s\",\"%s\"",
-                               arg_old_pin,
-                               arg_new_pin);
-    mm_base_modem_at_command (MM_BASE_MODEM (self->priv->modem),
-                              command,
-                              3,
-                              FALSE,
-                              NULL, /* cancellable */
-                              (GAsyncReadyCallback)handle_change_pin_ready,
-                              dbus_call_context_new (self,
-                                                     invocation));
-    g_free (command);
+    MM_SIM_GET_CLASS (self)->change_pin (self,
+                                         old_pin,
+                                         new_pin,
+                                         (GAsyncReadyCallback)handle_change_pin_ready,
+                                         dbus_call_context_new (self,
+                                                                invocation));
     return TRUE;
 }
 
 /*****************************************************************************/
-/* ENABLE PIN */
-
-NO_REPLY_READY_FN (enable_pin)
+/* ENABLE PIN (Generic implementation) */
 
 static gboolean
-handle_enable_pin (MMSim *self,
-                   GDBusMethodInvocation *invocation,
-                   const gchar *arg_pin,
-                   gboolean arg_enabled)
+enable_pin_finish (MMSim *self,
+                   GAsyncResult *res,
+                   GError **error)
 {
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+enable_pin_ready (MMBaseModem *modem,
+                  GAsyncResult *res,
+                  GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (modem, res, &error);
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+enable_pin (MMSim *self,
+            const gchar *pin,
+            gboolean enabled,
+            GAsyncReadyCallback callback,
+            gpointer user_data)
+{
+    GSimpleAsyncResult *result;
     gchar *command;
 
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        enable_pin);
+
     command = g_strdup_printf ("+CLCK=\"SC\",%d,\"%s\"",
-                               arg_enabled ? 1 : 0,
-                               arg_pin);
+                               enabled ? 1 : 0,
+                               pin);
     mm_base_modem_at_command (MM_BASE_MODEM (self->priv->modem),
                               command,
                               3,
                               FALSE,
                               NULL, /* cancellable */
-                              (GAsyncReadyCallback)handle_enable_pin_ready,
-                              dbus_call_context_new (self,
-                                                     invocation));
+                              (GAsyncReadyCallback)enable_pin_ready,
+                              result);
     g_free (command);
+}
+
+/*****************************************************************************/
+/* ENABLE PIN (DBus call handling) */
+
+static void
+handle_enable_pin_ready (MMSim *self,
+                         GAsyncResult *res,
+                         DbusCallContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_SIM_GET_CLASS (self)->enable_pin_finish (self, res, &error);
+    if (error)
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else
+        mm_gdbus_sim_complete_enable_pin (MM_GDBUS_SIM (ctx->self), ctx->invocation);
+    dbus_call_context_free (ctx);
+}
+
+static gboolean
+handle_enable_pin (MMSim *self,
+                   GDBusMethodInvocation *invocation,
+                   const gchar *pin,
+                   gboolean enabled)
+{
+    MM_SIM_GET_CLASS (self)->enable_pin (self,
+                                         pin,
+                                         enabled,
+                                         (GAsyncReadyCallback)handle_enable_pin_ready,
+                                         dbus_call_context_new (self,
+                                                                invocation));
     return TRUE;
 }
 
@@ -1418,6 +1522,10 @@ mm_sim_class_init (MMSimClass *klass)
     klass->send_pin_finish = common_send_pin_puk_finish;
     klass->send_puk = send_puk;
     klass->send_puk_finish = common_send_pin_puk_finish;
+    klass->enable_pin = enable_pin;
+    klass->enable_pin_finish = enable_pin_finish;
+    klass->change_pin = change_pin;
+    klass->change_pin_finish = change_pin_finish;
 
     properties[PROP_CONNECTION] =
         g_param_spec_object (MM_SIM_CONNECTION,
