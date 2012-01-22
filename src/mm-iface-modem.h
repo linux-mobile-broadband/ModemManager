@@ -319,9 +319,9 @@ void mm_iface_modem_update_state (MMIfaceModem *self,
                                   MMModemStateReason reason);
 
 /* Allow reporting new access tech */
-void mm_iface_modem_update_access_tech (MMIfaceModem *self,
-                                        MMModemAccessTechnology access_tech,
-                                        guint32 mask);
+void mm_iface_modem_update_access_technologies (MMIfaceModem *self,
+                                                MMModemAccessTechnology access_tech,
+                                                guint32 mask);
 
 /* Allow updating signal quality */
 void mm_iface_modem_update_signal_quality (MMIfaceModem *self,

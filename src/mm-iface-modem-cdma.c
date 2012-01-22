@@ -954,18 +954,18 @@ mm_iface_modem_cdma_update_evdo_registration_state (MMIfaceModemCdma *self,
                                                    MM_MODEM_STATE_REGISTERED,
                                                    MM_MODEM_STATE_REASON_NONE);
             /* TODO: report proper EVDO revision (0/A/B) */
-            mm_iface_modem_update_access_tech (MM_IFACE_MODEM (self),
-                                               MM_MODEM_ACCESS_TECHNOLOGY_EVDO0,
-                                               ALL_CDMA_EVDO_ACCESS_TECHNOLOGIES_MASK);
+            mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
+                                                       MM_MODEM_ACCESS_TECHNOLOGY_EVDO0,
+                                                       ALL_CDMA_EVDO_ACCESS_TECHNOLOGIES_MASK);
             break;
         case MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN:
             mm_iface_modem_update_subsystem_state (MM_IFACE_MODEM (self),
                                                    SUBSYSTEM_EVDO,
                                                    MM_MODEM_STATE_ENABLED,
                                                    MM_MODEM_STATE_REASON_NONE);
-            mm_iface_modem_update_access_tech (MM_IFACE_MODEM (self),
-                                               0,
-                                               ALL_CDMA_EVDO_ACCESS_TECHNOLOGIES_MASK);
+            mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
+                                                       MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
+                                                       ALL_CDMA_EVDO_ACCESS_TECHNOLOGIES_MASK);
             break;
         }
     }
@@ -1004,9 +1004,9 @@ mm_iface_modem_cdma_update_cdma1x_registration_state (MMIfaceModemCdma *self,
                                                    SUBSYSTEM_CDMA1X,
                                                    MM_MODEM_STATE_REGISTERED,
                                                    MM_MODEM_STATE_REASON_NONE);
-            mm_iface_modem_update_access_tech (MM_IFACE_MODEM (self),
-                                               MM_MODEM_ACCESS_TECHNOLOGY_1XRTT,
-                                               ALL_CDMA_CDMA1X_ACCESS_TECHNOLOGIES_MASK);
+            mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
+                                                       MM_MODEM_ACCESS_TECHNOLOGY_1XRTT,
+                                                       ALL_CDMA_CDMA1X_ACCESS_TECHNOLOGIES_MASK);
             break;
         case MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN:
             if (mm_gdbus_modem_cdma_get_sid (skeleton) != MM_MODEM_CDMA_SID_UNKNOWN)
@@ -1018,9 +1018,9 @@ mm_iface_modem_cdma_update_cdma1x_registration_state (MMIfaceModemCdma *self,
                                                    SUBSYSTEM_CDMA1X,
                                                    MM_MODEM_STATE_ENABLED,
                                                    MM_MODEM_STATE_REASON_NONE);
-            mm_iface_modem_update_access_tech (MM_IFACE_MODEM (self),
-                                               0,
-                                               ALL_CDMA_CDMA1X_ACCESS_TECHNOLOGIES_MASK);
+            mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
+                                                       MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
+                                                       ALL_CDMA_CDMA1X_ACCESS_TECHNOLOGIES_MASK);
             break;
         }
     }

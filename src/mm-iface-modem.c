@@ -350,9 +350,9 @@ handle_list_bearers (MmGdbusModem *skeleton,
 /*****************************************************************************/
 
 void
-mm_iface_modem_update_access_tech (MMIfaceModem *self,
-                                   MMModemAccessTechnology new_access_tech,
-                                   guint32 mask)
+mm_iface_modem_update_access_technologies (MMIfaceModem *self,
+                                           MMModemAccessTechnology new_access_tech,
+                                           guint32 mask)
 {
     MmGdbusModem *skeleton = NULL;
     MMModemAccessTechnology old_access_tech;

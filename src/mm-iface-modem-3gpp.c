@@ -628,9 +628,9 @@ update_registration_state (MMIfaceModem3gpp *self,
                     (GAsyncReadyCallback)load_operator_name_ready,
                     NULL);
 
-            mm_iface_modem_update_access_tech (MM_IFACE_MODEM (self),
-                                               access_tech,
-                                               ALL_3GPP_ACCESS_TECHNOLOGIES_MASK);
+            mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
+                                                       access_tech,
+                                                       ALL_3GPP_ACCESS_TECHNOLOGIES_MASK);
 
             mm_iface_modem_update_subsystem_state (MM_IFACE_MODEM (self),
                                                    SUBSYSTEM_3GPP,
@@ -654,9 +654,9 @@ update_registration_state (MMIfaceModem3gpp *self,
             if (MM_IS_IFACE_MODEM_LOCATION (self))
                 mm_iface_modem_location_3gpp_clear (MM_IFACE_MODEM_LOCATION (self));
 
-            mm_iface_modem_update_access_tech (MM_IFACE_MODEM (self),
-                                               0,
-                                               ALL_3GPP_ACCESS_TECHNOLOGIES_MASK);
+            mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
+                                                       MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
+                                                       ALL_3GPP_ACCESS_TECHNOLOGIES_MASK);
 
             mm_iface_modem_update_subsystem_state (
                 MM_IFACE_MODEM (self),
