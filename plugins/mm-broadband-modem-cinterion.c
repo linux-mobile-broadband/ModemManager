@@ -518,6 +518,125 @@ load_supported_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* ALLOWED MODES */
+
+static gboolean
+set_allowed_modes_finish (MMIfaceModem *self,
+                          GAsyncResult *res,
+                          GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+allowed_access_technology_update_ready (MMBroadbandModemCinterion *self,
+                                        GAsyncResult *res,
+                                        GSimpleAsyncResult *operation_result)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error)
+        /* Let the error be critical. */
+        g_simple_async_result_take_error (operation_result, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
+    g_simple_async_result_complete (operation_result);
+    g_object_unref (operation_result);
+}
+
+static void
+set_allowed_modes (MMIfaceModem *self,
+                   MMModemMode allowed,
+                   MMModemMode preferred,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
+{
+    MMBroadbandModemCinterion *broadband = MM_BROADBAND_MODEM_CINTERION (self);
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        set_allowed_modes);
+
+    /* For dual 2G/3G devices... */
+    if (broadband->priv->both_geran_utran) {
+        GString *cmd;
+
+        /* We will try to simulate the possible allowed modes here. The
+         * Cinterion devices do not seem to allow setting preferred access
+         * technology in 3G devices, but they allow restricting to a given
+         * one:
+         * - 2G-only is forced by forcing GERAN RAT (AcT=0)
+         * - 3G-only is forced by forcing UTRAN RAT (AcT=2)
+         * - for the remaining ones, we default to automatic selection of RAT,
+         *   which is based on the quality of the connection.
+         */
+        cmd = g_string_new ("+COPS=,,,");
+        if (allowed == MM_MODEM_MODE_3G &&
+            preferred == MM_MODEM_MODE_NONE) {
+            g_string_append (cmd, "2");
+        } else if (allowed == MM_MODEM_MODE_2G &&
+                   preferred == MM_MODEM_MODE_NONE) {
+            g_string_append (cmd, "0");
+        } else {
+            gchar *allowed_str;
+            gchar *preferred_str;
+
+            /* no AcT given, defaults to Auto */
+            allowed_str = mm_modem_mode_build_string_from_mask (allowed);
+            preferred_str = mm_modem_mode_build_string_from_mask (preferred);
+            mm_warn ("Requested mode (allowed: '%s', preferred: '%s') not "
+                     "supported by the modem. Defaulting to automatic mode.",
+                     allowed_str,
+                     preferred_str);
+            g_free (allowed_str);
+            g_free (preferred_str);
+        }
+
+        mm_base_modem_at_command (
+            MM_BASE_MODEM (self),
+            cmd->str,
+            3,
+            FALSE,
+            NULL, /* cancellable */
+            (GAsyncReadyCallback)allowed_access_technology_update_ready,
+            result);
+        g_string_free (cmd, TRUE);
+        return;
+    }
+
+    /* For 3G-only devices, allow only 3G-related allowed modes.
+     * For 2G-only devices, allow only 2G-related allowed modes.
+     *
+     * Note that the common logic of the interface already limits the
+     * allowed/preferred modes that can be tried in these cases. */
+    if (broadband->priv->only_utran ||
+        broadband->priv->only_geran) {
+        gchar *allowed_str;
+        gchar *preferred_str;
+
+        allowed_str = mm_modem_mode_build_string_from_mask (allowed);
+        preferred_str = mm_modem_mode_build_string_from_mask (preferred);
+        mm_dbg ("Not doing anything. Assuming requested mode "
+                "(allowed: '%s', preferred: '%s') is supported by "
+                "%s-only modem.",
+                allowed_str,
+                preferred_str,
+                broadband->priv->only_utran ? "3G" : "2G");
+        g_free (allowed_str);
+        g_free (preferred_str);
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    g_assert_not_reached ();
+}
+
+/*****************************************************************************/
 /* FLOW CONTROL */
 
 static gboolean
@@ -613,6 +732,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface->load_supported_modes = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;
+    iface->set_allowed_modes = set_allowed_modes;
+    iface->set_allowed_modes_finish = set_allowed_modes_finish;
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->setup_flow_control = setup_flow_control;
