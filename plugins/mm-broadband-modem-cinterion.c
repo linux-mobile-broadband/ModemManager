@@ -637,6 +637,58 @@ set_allowed_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* SUPPORTED BANDS */
+
+static GArray *
+load_supported_bands_finish (MMIfaceModem *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    /* Never fails */
+    return (GArray *) g_array_ref (g_simple_async_result_get_op_res_gpointer (
+                                       G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+load_supported_bands (MMIfaceModem *self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    MMBroadbandModemCinterion *broadband = MM_BROADBAND_MODEM_CINTERION (self);
+    GArray *bands;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_supported_bands);
+
+    /* We do assume that we already know if the modem is 2G-only, 3G-only or
+     * 2G+3G. This is checked quite before trying to load supported bands. */
+
+    bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 4);
+    g_array_index (bands, MMModemBand, 0) = MM_MODEM_BAND_EGSM;
+    g_array_index (bands, MMModemBand, 1) = MM_MODEM_BAND_DCS;
+    g_array_index (bands, MMModemBand, 2) = MM_MODEM_BAND_PCS;
+    g_array_index (bands, MMModemBand, 3) = MM_MODEM_BAND_G850;
+
+    /* Add 3G-specific bands */
+    if (broadband->priv->only_utran ||
+        broadband->priv->both_geran_utran) {
+        g_array_set_size (bands, 7);
+        g_array_index (bands, MMModemBand, 4) = MM_MODEM_BAND_U2100;
+        g_array_index (bands, MMModemBand, 5) = MM_MODEM_BAND_U1900;
+        g_array_index (bands, MMModemBand, 6) = MM_MODEM_BAND_U850;
+    }
+
+    g_simple_async_result_set_op_res_gpointer (result,
+                                               bands,
+                                               (GDestroyNotify)g_array_unref);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* FLOW CONTROL */
 
 static gboolean
@@ -734,6 +786,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_modes_finish = load_supported_modes_finish;
     iface->set_allowed_modes = set_allowed_modes;
     iface->set_allowed_modes_finish = set_allowed_modes_finish;
+    iface->load_supported_bands = load_supported_bands;
+    iface->load_supported_bands_finish = load_supported_bands_finish;
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->setup_flow_control = setup_flow_control;
