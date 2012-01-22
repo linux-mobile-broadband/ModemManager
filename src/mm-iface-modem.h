@@ -136,6 +136,16 @@ struct _MMIfaceModem {
                                          GAsyncResult *res,
                                          GError **error);
 
+    /* Loading of the AccessTechnologies property */
+    void  (*load_access_technologies) (MMIfaceModem *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data);
+    gboolean (*load_access_technologies_finish) (MMIfaceModem *self,
+                                                 GAsyncResult *res,
+                                                 MMModemAccessTechnology *access_technologies,
+                                                 guint *mask,
+                                                 GError **error);
+
     /* Asynchronous reset operation */
     void (*reset) (MMIfaceModem *self,
                    GAsyncReadyCallback callback,
