@@ -401,7 +401,7 @@ struct WmcCmdGetOperatorRsp {
     u_int8_t  _unknown7;     /* 0x00 or 0x01 */
     u_int8_t  _unknown8[2];  /* always zero */
 } __attribute__ ((packed));
-typedef struct WmcCmdSetOperatorRsp WmcCmdSetOperatorRsp;
+typedef struct WmcCmdGetOperatorRsp WmcCmdGetOperatorRsp;
 
 /*****************************************************/
 
