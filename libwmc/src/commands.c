@@ -84,8 +84,8 @@ wmc_cmd_init_new (char *buf, size_t buflen, int wmc2)
         memset (cmd, 0, sizeof (*cmd));
         cmd->hdr.marker = WMC_CMD_MARKER;
         cmd->hdr.cmd = WMC_CMD_INIT;
-        cmd->year = htole16 (tm->tm_year);
-        cmd->month = tm->tm_mon;
+        cmd->year = htole16 (tm->tm_year + 1900);
+        cmd->month = tm->tm_mon + 1;
         cmd->day = htobe16 (tm->tm_mday);
         cmd->hours = htobe16 (tm->tm_hour);
         cmd->minutes = htobe16 (tm->tm_min);

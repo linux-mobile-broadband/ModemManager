@@ -64,7 +64,7 @@ struct WmcCmdInit2 {
     u_int16_t hours;      /* big endian */
     u_int16_t minutes;    /* big endian */
     u_int16_t seconds;    /* big endian */
-    u_int8_t _unknown1[2];
+    u_int8_t _unknown1[3];
 } __attribute__ ((packed));
 typedef struct WmcCmdInit2 WmcCmdInit2;
 
