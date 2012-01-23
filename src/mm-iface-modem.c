@@ -20,6 +20,7 @@
 #include "mm-modem-helpers.h"
 #include "mm-iface-modem.h"
 #include "mm-base-modem.h"
+#include "mm-base-modem-at.h"
 #include "mm-sim.h"
 #include "mm-bearer-list.h"
 #include "mm-log.h"
@@ -298,6 +299,57 @@ handle_create_bearer (MmGdbusModem *skeleton,
                                    self));
         g_object_unref (properties);
     }
+
+    return TRUE;
+}
+
+static void
+command_done (MMIfaceModem *self,
+              GAsyncResult *res,
+              DbusCallContext *ctx)
+{
+    GError *error = NULL;
+    const gchar *result;
+
+    result = MM_IFACE_MODEM_GET_INTERFACE (self)->command_finish (self,
+                                                                  res,
+                                                                  &error);
+    if (error)
+        g_dbus_method_invocation_take_error (ctx->invocation,
+                                             error);
+    else
+        mm_gdbus_modem_complete_command (ctx->skeleton,
+                                         ctx->invocation,
+                                         result);
+    dbus_call_context_free (ctx);
+}
+
+static gboolean
+handle_command (MmGdbusModem *skeleton,
+                GDBusMethodInvocation *invocation,
+                const gchar *cmd,
+                guint timeout,
+                MMIfaceModem *self)
+{
+
+    /* If command is not implemented, report an error */
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->command ||
+        !MM_IFACE_MODEM_GET_INTERFACE (self)->command_finish) {
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot send AT command to modem: "
+                                               "operation not supported");
+        return TRUE;
+    }
+
+    MM_IFACE_MODEM_GET_INTERFACE (self)->command (self,
+                                                  cmd,
+                                                  timeout,
+                                                  (GAsyncReadyCallback)command_done,
+                                                  dbus_call_context_new (skeleton,
+                                                                         invocation,
+                                                                         self));
 
     return TRUE;
 }
@@ -2919,6 +2971,10 @@ interface_initialization_step (InitializationContext *ctx)
         g_signal_connect (ctx->skeleton,
                           "handle-create-bearer",
                           G_CALLBACK (handle_create_bearer),
+                          ctx->self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-command",
+                          G_CALLBACK (handle_command),
                           ctx->self);
         g_signal_connect (ctx->skeleton,
                           "handle-delete-bearer",

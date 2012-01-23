@@ -161,6 +161,21 @@ gboolean mm_modem_factory_reset_sync   (MMModem *self,
                                         GCancellable *cancellable,
                                         GError **error);
 
+void     mm_modem_command      (MMModem *self,
+                                const gchar *cmd,
+                                guint timeout,
+                                GCancellable *cancellable,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data);
+gchar *mm_modem_command_finish (MMModem *self,
+                                GAsyncResult *res,
+                                GError **error);
+gchar *mm_modem_command_sync   (MMModem *self,
+                                const gchar *arg_cmd,
+                                guint timeout,
+                                GCancellable *cancellable,
+                                GError **error);
+
 void     mm_modem_set_allowed_modes        (MMModem *self,
                                             MMModemMode modes,
                                             MMModemMode preferred,

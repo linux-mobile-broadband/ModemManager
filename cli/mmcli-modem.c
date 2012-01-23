@@ -51,6 +51,8 @@ static gboolean enable_flag;
 static gboolean disable_flag;
 static gboolean reset_flag;
 static gchar *factory_reset_str;
+static gchar *command_str;
+static gint command_timeout;
 static gboolean list_bearers_flag;
 static gchar *create_bearer_str;
 static gchar *delete_bearer_str;
@@ -78,6 +80,14 @@ static GOptionEntry entries[] = {
     { "factory-reset", 0, 0, G_OPTION_ARG_STRING, &factory_reset_str,
       "Reset a given modem to its factory state",
       "[CODE]"
+    },
+    { "command", 0, 0, G_OPTION_ARG_STRING, &command_str,
+      "Send an AT command to the modem",
+      "[COMMAND]"
+    },
+    { "command-timeout", 0, 0, G_OPTION_ARG_INT, &command_timeout,
+      "Timeout for AT command",
+      "[SECONDS]"
     },
     { "list-bearers", 0, 0, G_OPTION_ARG_NONE, &list_bearers_flag,
       "List packet data bearers available in a given modem",
@@ -139,6 +149,7 @@ mmcli_modem_options_enabled (void)
                  !!create_bearer_str +
                  !!delete_bearer_str +
                  !!factory_reset_str +
+                 !!command_str +
                  !!set_allowed_modes_str +
                  !!set_preferred_mode_str +
                  !!set_allowed_bands_str);
@@ -542,6 +553,35 @@ factory_reset_ready (MMModem      *modem,
     mmcli_async_operation_done ();
 }
 
+
+static void
+command_process_reply (gchar  *result,
+                       const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: command failed: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("response: '%s'\n", result);
+    g_free (result);
+}
+
+static void
+command_ready (MMModem      *modem,
+               GAsyncResult *result,
+               gpointer      nothing)
+{
+    gchar * operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_modem_command_finish (modem, result, &error);
+    command_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
 static void
 list_bearers_process_reply (GList        *result,
                             const GError *error)
@@ -825,6 +865,18 @@ get_modem_ready (GObject      *source,
         return;
     }
 
+    /* Request to send a command to the modem? */
+    if (command_str) {
+        g_debug ("Asynchronously sending a command to the modem...");
+        mm_modem_command (ctx->modem,
+                          command_str,
+                          command_timeout ? command_timeout : 30,
+                          ctx->cancellable,
+                          (GAsyncReadyCallback)command_ready,
+                          NULL);
+        return;
+    }
+
     /* Request to list bearers? */
     if (list_bearers_flag) {
         g_debug ("Asynchronously listing bearers in modem...");
@@ -980,6 +1032,21 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
                                               NULL,
                                               &error);
         factory_reset_process_reply (result, error);
+        return;
+    }
+
+
+    /* Request to send a command to the modem? */
+    if (command_str) {
+        gchar *result;
+
+        g_debug ("Synchronously sending command to modem...");
+        result = mm_modem_command_sync (ctx->modem,
+                                        command_str,
+                                        command_timeout ? command_timeout : 30,
+                                        NULL,
+                                        &error);
+        command_process_reply (result, error);
         return;
     }
 

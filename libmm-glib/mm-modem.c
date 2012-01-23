@@ -1449,6 +1449,65 @@ mm_modem_factory_reset_sync (MMModem *self,
                                                    error);
 }
 
+
+void
+mm_modem_command (MMModem *self,
+                  const gchar *cmd,
+                  guint timeout,
+                  GCancellable *cancellable,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    g_return_if_fail (MM_GDBUS_IS_MODEM (self));
+
+    mm_gdbus_modem_call_command (self,
+                                 cmd,
+                                 timeout,
+                                 cancellable,
+                                 callback,
+                                 user_data);
+}
+
+gchar *
+mm_modem_command_finish (MMModem *self,
+                         GAsyncResult *res,
+                         GError **error)
+{
+    gchar *result;
+
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
+
+    if (!mm_gdbus_modem_call_command_finish (self,
+                                             &result,
+                                             res,
+                                             error))
+        return NULL;
+
+    return result;
+}
+
+gchar *
+mm_modem_command_sync (MMModem *self,
+                       const gchar *cmd,
+                       guint timeout,
+                       GCancellable *cancellable,
+                       GError **error)
+{
+    gchar *result;
+
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
+
+    if (!mm_gdbus_modem_call_command_sync (self,
+                                           cmd,
+                                           timeout,
+                                           &result,
+                                           cancellable,
+                                           error))
+        return NULL;
+
+    return result;
+}
+
 gboolean
 mm_modem_set_allowed_modes_finish (MMModem *self,
                                    GAsyncResult *res,

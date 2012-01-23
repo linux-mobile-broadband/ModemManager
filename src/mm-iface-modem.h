@@ -163,6 +163,16 @@ struct _MMIfaceModem {
                                       GAsyncResult *res,
                                       GError **error);
 
+    /* Asynchronous command operation */
+    void (*command) (MMIfaceModem *self,
+                     const gchar *cmd,
+                     guint timeout,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data);
+    const gchar * (*command_finish) (MMIfaceModem *self,
+                                     GAsyncResult *res,
+                                     GError **error);
+
     /* Asynchronous allowed band setting operation */
     void (*set_allowed_bands) (MMIfaceModem *self,
                                GArray *bands_array,

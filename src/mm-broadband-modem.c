@@ -1862,6 +1862,35 @@ modem_power_up (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Sending a command to the modem (Modem interface) */
+
+static const gchar *
+modem_command_finish (MMIfaceModem *self,
+                      GAsyncResult *res,
+                      GError **error)
+{
+    return mm_base_modem_at_command_finish (MM_BASE_MODEM (self),
+                                            res,
+                                            error);
+}
+
+static void
+modem_command (MMIfaceModem *self,
+               const gchar *cmd,
+               guint timeout,
+               GAsyncReadyCallback callback,
+               gpointer user_data)
+{
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self), cmd, timeout,
+                              FALSE,
+                              NULL, /* cancellable */
+                              callback,
+                              user_data);
+}
+
+
+/*****************************************************************************/
 /* Initializing the modem (Modem interface) */
 
 static gboolean
@@ -6668,6 +6697,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_signal_quality_finish = modem_load_signal_quality_finish;
     iface->create_bearer = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
+    iface->command = modem_command;
+    iface->command_finish = modem_command_finish;
 }
 
 static void
