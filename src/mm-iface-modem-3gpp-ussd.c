@@ -42,6 +42,23 @@ mm_iface_modem_3gpp_ussd_bind_simple_status (MMIfaceModem3gppUssd *self,
 
 /*****************************************************************************/
 
+gchar *
+mm_iface_modem_3gpp_ussd_encode (MMIfaceModem3gppUssd *self,
+                                 const gchar *command,
+                                 guint *scheme)
+{
+    return MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->encode (self, command, scheme);
+}
+
+gchar *
+mm_iface_modem_3gpp_ussd_decode (MMIfaceModem3gppUssd *self,
+                                 const gchar *reply)
+{
+    return MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->decode (self, reply);
+}
+
+/*****************************************************************************/
+
 void
 mm_iface_modem_3gpp_ussd_update_state (MMIfaceModem3gppUssd *self,
                                        MMModem3gppUssdSessionState new_state)

@@ -74,6 +74,13 @@ struct _MMIfaceModem3gppUssd {
     gboolean (*cleanup_unsolicited_result_codes_finish) (MMIfaceModem3gppUssd *self,
                                                          GAsyncResult *res,
                                                          GError **error);
+
+    /* Encode/Decode */
+    gchar * (*encode) (MMIfaceModem3gppUssd *self,
+                       const gchar *command,
+                       guint *scheme);
+    gchar * (*decode) (MMIfaceModem3gppUssd *self,
+                       const gchar *reply);
 };
 
 GType mm_iface_modem_3gpp_ussd_get_type (void);
@@ -110,6 +117,13 @@ void mm_iface_modem_3gpp_ussd_update_network_notification (MMIfaceModem3gppUssd 
                                                            const gchar *network_notification);
 void mm_iface_modem_3gpp_ussd_update_network_request      (MMIfaceModem3gppUssd *self,
                                                            const gchar *network_request);
+
+/* Encode/Decode USSD */
+gchar *mm_iface_modem_3gpp_ussd_encode (MMIfaceModem3gppUssd *self,
+                                        const gchar *command,
+                                        guint *scheme);
+gchar *mm_iface_modem_3gpp_ussd_decode (MMIfaceModem3gppUssd *self,
+                                        const gchar *reply);
 
 /* Shutdown USSD interface */
 void mm_iface_modem_3gpp_ussd_shutdown (MMIfaceModem3gppUssd *self);
