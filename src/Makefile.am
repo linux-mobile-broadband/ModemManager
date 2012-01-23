@@ -144,6 +144,8 @@ modem_manager_SOURCES = \
 	mm-iface-modem.c \
 	mm-iface-modem-3gpp.h \
 	mm-iface-modem-3gpp.c \
+	mm-iface-modem-3gpp-ussd.h \
+	mm-iface-modem-3gpp-ussd.c \
 	mm-iface-modem-cdma.h \
 	mm-iface-modem-cdma.c \
 	mm-iface-modem-simple.h \
