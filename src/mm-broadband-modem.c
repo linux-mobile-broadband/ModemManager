@@ -116,6 +116,8 @@ struct _MMBroadbandModemPrivate {
     /*<--- Modem 3GPP USSD interface --->*/
     /* Properties */
     GObject *modem_3gpp_ussd_dbus_skeleton;
+    /* Implementation helpers */
+    GSimpleAsyncResult *pending_ussd_action;
 
     /*<--- Modem CDMA interface --->*/
     /* Properties */
@@ -2861,13 +2863,142 @@ modem_3gpp_ussd_setup_cleanup_unsolicited_result_codes_finish (MMIfaceModem3gppU
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
+static gchar *
+decode_ussd_response (MMBroadbandModem *self,
+                      const gchar *reply)
+{
+    gchar **items, **iter, *p;
+    gchar *str = NULL;
+    gint encoding = -1;
+    gchar *decoded;
+
+    /* Look for the first ',' */
+    p = strchr (reply, ',');
+    if (!p)
+        return NULL;
+
+    items = g_strsplit_set (p + 1, " ,", -1);
+    for (iter = items; iter && *iter; iter++) {
+        if (*iter[0] == '\0')
+            continue;
+        if (str == NULL)
+            str = *iter;
+        else if (encoding == -1) {
+            encoding = atoi (*iter);
+            mm_dbg ("USSD data coding scheme %d", encoding);
+            break;  /* All done */
+        }
+    }
+
+    if (!str)
+        return NULL;
+
+    /* Strip quotes */
+    if (str[0] == '"')
+        str++;
+    p = strchr (str, '"');
+    if (p)
+        *p = '\0';
+
+    decoded = mm_iface_modem_3gpp_ussd_decode (MM_IFACE_MODEM_3GPP_USSD (self), str);
+    g_strfreev (items);
+    return decoded;
+}
 
 static void
 cusd_received (MMAtSerialPort *port,
                GMatchInfo *info,
                MMBroadbandModem *self)
 {
-    /* TODO */
+    gint status;
+    gchar *str;
+    MMModem3gppUssdSessionState ussd_state = MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE;
+
+    str = g_match_info_fetch (info, 1);
+    if (!str || !isdigit (*str)) {
+        mm_warn ("Received invalid USSD response: '%s'", str ? str : "(none)");
+        g_free (str);
+        return;
+    }
+
+    status = g_ascii_digit_value (*str);
+    switch (status) {
+    case 0: /* no further action required */ {
+        gchar *converted;
+
+        converted = decode_ussd_response (self, str);
+        if (self->priv->pending_ussd_action) {
+            /* Response to the user's request */
+            g_simple_async_result_set_op_res_gpointer (self->priv->pending_ussd_action,
+                                                       converted,
+                                                       g_free);
+        } else {
+            /* Network-initiated USSD-Notify */
+            mm_iface_modem_3gpp_ussd_update_network_notification (
+                MM_IFACE_MODEM_3GPP_USSD (self),
+                converted);
+            g_free (converted);
+        }
+        break;
+    }
+
+    case 1: /* further action required */ {
+        gchar *converted;
+
+        ussd_state = MM_MODEM_3GPP_USSD_SESSION_STATE_USER_RESPONSE;
+        converted = decode_ussd_response (self, str);
+        if (self->priv->pending_ussd_action) {
+            g_simple_async_result_set_op_res_gpointer (self->priv->pending_ussd_action,
+                                                       converted,
+                                                       g_free);
+        } else {
+            /* Network-initiated USSD-Request */
+            mm_iface_modem_3gpp_ussd_update_network_request (
+                MM_IFACE_MODEM_3GPP_USSD (self),
+                converted);
+            g_free (converted);
+        }
+        break;
+    }
+
+    case 2:
+        if (self->priv->pending_ussd_action)
+            g_simple_async_result_set_error (self->priv->pending_ussd_action,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_CANCELLED,
+                                             "USSD terminated by network.");
+        break;
+
+    case 4:
+        if (self->priv->pending_ussd_action)
+            g_simple_async_result_set_error (self->priv->pending_ussd_action,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_UNSUPPORTED,
+                                             "Operation not supported.");
+        break;
+
+    default:
+        if (self->priv->pending_ussd_action)
+            g_simple_async_result_set_error (self->priv->pending_ussd_action,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Unhandled USSD reply: %s (%d)",
+                                             str,
+                                             status);
+        break;
+    }
+
+    mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (self),
+                                           ussd_state);
+
+    /* Complete the pending action */
+    if (self->priv->pending_ussd_action) {
+        g_simple_async_result_complete_in_idle (self->priv->pending_ussd_action);
+        g_object_unref (self->priv->pending_ussd_action);
+        self->priv->pending_ussd_action = NULL;
+    }
+
+    g_free (str);
 }
 
 static void
