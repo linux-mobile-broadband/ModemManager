@@ -27,6 +27,7 @@ enum {
     WMC_CMD_CONNECTION_INFO = 0x0A,
     WMC_CMD_NET_INFO = 0x0B,
     WMC_CMD_INIT = 0x0D,
+    WMC_CMD_FIELD_TEST = 0x0F,
     WMC_CMD_SET_OPERATOR = 0x33,
     WMC_CMD_GET_FIRST_OPERATOR = 0x34,
     WMC_CMD_GET_NEXT_OPERATOR = 0x35,
@@ -402,6 +403,52 @@ struct WmcCmdGetOperatorRsp {
     u_int8_t  _unknown8[2];  /* always zero */
 } __attribute__ ((packed));
 typedef struct WmcCmdGetOperatorRsp WmcCmdGetOperatorRsp;
+
+/*****************************************************/
+
+enum {
+    WMC_FIELD_TEST_MOBILE_IP_MODE_MIP_OFF = 0,
+    WMC_FIELD_TEST_MOBILE_IP_MODE_MIP_PREF = 1,
+    WMC_FIELD_TEST_MOBILE_IP_MODE_MIP_ONLY = 2
+};
+
+/* Later devices return all zeros for this command */
+struct WmcCmdFieldTestRsp {
+    WmcCmdHeader hdr;
+    u_int8_t  prl_requirements;
+    u_int8_t  eri_support;
+    char      nam_name[7];
+    u_int8_t  _unknown1;         /* always zero */
+    u_int8_t  _unknown2[3];      /* always 0x0A 0x0A 0x0A */
+    u_int8_t  _unknown3[5];      /* always zero */
+    u_int8_t  _unknown4[10];     /* all 0x0F */
+    u_int16_t home_sid;
+    u_int16_t home_nid;
+    char      min1[7];
+    char      min2[3];
+    char      mcc[3];
+    char      imsi_s[10];
+    char      mnc[2];
+    u_int16_t primary_cdma_chan_a;
+    u_int16_t secondary_cdma_chan_a;
+    u_int16_t primary_cdma_chan_b;
+    u_int16_t secondary_cdma_chan_b;
+    u_int8_t  accolc;
+    char      sw_version[64];
+    char      hw_version[64];
+    u_int16_t prlver;
+    u_int16_t eriver;
+    u_int16_t nid;
+    u_int8_t  last_call_end_reason;  /* ? */
+    u_int8_t  rssi;
+    u_int16_t channel;
+    u_int8_t  prev;
+    u_int16_t pn_offset;
+    u_int8_t  sys_select_pref;
+    u_int8_t  mip_pref;
+    u_int8_t  hybrid_pref;
+} __attribute__ ((packed));
+typedef struct WmcCmdFieldTestRsp WmcCmdFieldTestRsp;
 
 /*****************************************************/
 
