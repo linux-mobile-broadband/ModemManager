@@ -42,6 +42,57 @@ mm_iface_modem_3gpp_ussd_bind_simple_status (MMIfaceModem3gppUssd *self,
 
 /*****************************************************************************/
 
+void
+mm_iface_modem_3gpp_ussd_update_state (MMIfaceModem3gppUssd *self,
+                                       MMModem3gppUssdSessionState new_state)
+{
+    MmGdbusModem3gppUssd *skeleton = NULL;
+    MMModem3gppUssdSessionState old_state;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_USSD_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    old_state = (MMModem3gppUssdSessionState) mm_gdbus_modem3gpp_ussd_get_state (skeleton);
+
+    if (old_state != new_state)
+        mm_gdbus_modem3gpp_ussd_set_state (skeleton, new_state);
+
+    g_object_unref (skeleton);
+}
+
+void
+mm_iface_modem_3gpp_ussd_update_network_notification (MMIfaceModem3gppUssd *self,
+                                                      const gchar *network_notification)
+{
+    MmGdbusModem3gppUssd *skeleton = NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_USSD_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    mm_gdbus_modem3gpp_ussd_set_network_notification (skeleton,
+                                                      network_notification);
+    g_object_unref (skeleton);
+}
+
+void
+mm_iface_modem_3gpp_ussd_update_network_request (MMIfaceModem3gppUssd *self,
+                                                 const gchar *network_request)
+{
+    MmGdbusModem3gppUssd *skeleton = NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_USSD_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    mm_gdbus_modem3gpp_ussd_set_network_request (skeleton,
+                                                 network_request);
+    g_object_unref (skeleton);
+}
+
+/*****************************************************************************/
+
 typedef struct _DisablingContext DisablingContext;
 static void interface_disabling_step (DisablingContext *ctx);
 

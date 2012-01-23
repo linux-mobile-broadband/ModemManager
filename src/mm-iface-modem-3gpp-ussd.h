@@ -103,6 +103,14 @@ gboolean mm_iface_modem_3gpp_ussd_disable_finish (MMIfaceModem3gppUssd *self,
                                                   GAsyncResult *res,
                                                   GError **error);
 
+/* Property updaters */
+void mm_iface_modem_3gpp_ussd_update_state                (MMIfaceModem3gppUssd *self,
+                                                           MMModem3gppUssdSessionState new_state);
+void mm_iface_modem_3gpp_ussd_update_network_notification (MMIfaceModem3gppUssd *self,
+                                                           const gchar *network_notification);
+void mm_iface_modem_3gpp_ussd_update_network_request      (MMIfaceModem3gppUssd *self,
+                                                           const gchar *network_request);
+
 /* Shutdown USSD interface */
 void mm_iface_modem_3gpp_ussd_shutdown (MMIfaceModem3gppUssd *self);
 
