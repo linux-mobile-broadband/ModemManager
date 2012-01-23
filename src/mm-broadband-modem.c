@@ -2810,6 +2810,59 @@ modem_3gpp_setup_ps_registration (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Check if USSD supported (3GPP/USSD interface) */
+
+static gboolean
+modem_3gpp_ussd_check_support_finish (MMIfaceModem3gppUssd *self,
+                                      GAsyncResult *res,
+                                      GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+cusd_format_check_ready (MMBroadbandModem *self,
+                         GAsyncResult *res,
+                         GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_3gpp_ussd_check_support (MMIfaceModem3gppUssd *self,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_ussd_check_support);
+
+    /* Check USSD support */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CUSD=?",
+                              3,
+                              TRUE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)cusd_format_check_ready,
+                              result);
+}
+
+/*****************************************************************************/
 /* ESN loading (CDMA interface) */
 
 static gchar *
@@ -5061,6 +5114,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 static void
 iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface)
 {
+    iface->check_support = modem_3gpp_ussd_check_support;
+    iface->check_support_finish = modem_3gpp_ussd_check_support_finish;
 }
 
 static void
