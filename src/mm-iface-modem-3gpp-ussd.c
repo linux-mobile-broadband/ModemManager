@@ -42,6 +42,197 @@ mm_iface_modem_3gpp_ussd_bind_simple_status (MMIfaceModem3gppUssd *self,
 
 /*****************************************************************************/
 
+typedef struct {
+    MmGdbusModem3gppUssd *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModem3gppUssd *self;
+} DbusCallContext;
+
+static void
+dbus_call_context_free (DbusCallContext *ctx)
+{
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static DbusCallContext *
+dbus_call_context_new (MmGdbusModem3gppUssd *skeleton,
+                       GDBusMethodInvocation *invocation,
+                       MMIfaceModem3gppUssd *self)
+{
+    DbusCallContext *ctx;
+
+    ctx = g_new (DbusCallContext, 1);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+    return ctx;
+}
+
+/*****************************************************************************/
+
+static void
+cancel_ready (MMIfaceModem3gppUssd *self,
+              GAsyncResult *res,
+              DbusCallContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cancel_finish (self,
+                                                                       res,
+                                                                       &error))
+        g_dbus_method_invocation_take_error (ctx->invocation,
+                                             error);
+    else
+        mm_gdbus_modem3gpp_ussd_complete_cancel (ctx->skeleton,
+                                                 ctx->invocation);
+    dbus_call_context_free (ctx);
+}
+
+static gboolean
+handle_cancel (MmGdbusModem3gppUssd *skeleton,
+               GDBusMethodInvocation *invocation,
+               const gchar *command,
+               MMIfaceModem3gppUssd *self)
+{
+    g_assert (MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cancel != NULL);
+    g_assert (MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cancel_finish != NULL);
+
+    MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cancel (
+        self,
+        (GAsyncReadyCallback)cancel_ready,
+        dbus_call_context_new (skeleton,
+                               invocation,
+                               self));
+    return TRUE;
+}
+
+static void
+respond_send_ready (MMIfaceModem3gppUssd *self,
+                    GAsyncResult *res,
+                    DbusCallContext *ctx)
+{
+    GError *error = NULL;
+    const gchar *reply;
+
+    reply = MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send_finish (self,
+                                                                        res,
+                                                                        &error);
+    if (!reply)
+        g_dbus_method_invocation_take_error (ctx->invocation,
+                                             error);
+    else
+        mm_gdbus_modem3gpp_ussd_complete_respond (ctx->skeleton,
+                                                  ctx->invocation,
+                                                  reply);
+    dbus_call_context_free (ctx);
+}
+
+static gboolean
+handle_respond (MmGdbusModem3gppUssd *skeleton,
+                GDBusMethodInvocation *invocation,
+                const gchar *command,
+                MMIfaceModem3gppUssd *self)
+{
+    g_assert (MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send != NULL);
+    g_assert (MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send_finish != NULL);
+
+    switch (mm_gdbus_modem3gpp_ussd_get_state (skeleton)) {
+    case MM_MODEM_3GPP_USSD_SESSION_STATE_ACTIVE:
+    case MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE:
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot respond USSD: "
+                                               "no active session");
+        break;
+
+    case MM_MODEM_3GPP_USSD_SESSION_STATE_USER_RESPONSE:
+        MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send (
+            self,
+            command,
+            (GAsyncReadyCallback)respond_send_ready,
+            dbus_call_context_new (skeleton,
+                                   invocation,
+                                   self));
+        break;
+
+    case MM_MODEM_3GPP_USSD_SESSION_STATE_UNKNOWN:
+    default:
+        /* We should never have a DBus request when in UNKNOWN state */
+        g_assert_not_reached ();
+        break;
+    }
+
+    return TRUE;
+}
+
+/*****************************************************************************/
+
+static void
+initiate_send_ready (MMIfaceModem3gppUssd *self,
+                     GAsyncResult *res,
+                     DbusCallContext *ctx)
+{
+    GError *error = NULL;
+    const gchar *reply;
+
+    reply = MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send_finish (self,
+                                                                        res,
+                                                                        &error);
+    if (!reply)
+        g_dbus_method_invocation_take_error (ctx->invocation,
+                                             error);
+    else
+        mm_gdbus_modem3gpp_ussd_complete_initiate (ctx->skeleton,
+                                                   ctx->invocation,
+                                                   reply);
+    dbus_call_context_free (ctx);
+}
+
+static gboolean
+handle_initiate (MmGdbusModem3gppUssd *skeleton,
+                 GDBusMethodInvocation *invocation,
+                 const gchar *command,
+                 MMIfaceModem3gppUssd *self)
+{
+    g_assert (MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send != NULL);
+    g_assert (MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send_finish != NULL);
+
+    switch (mm_gdbus_modem3gpp_ussd_get_state (skeleton)) {
+    case MM_MODEM_3GPP_USSD_SESSION_STATE_ACTIVE:
+    case MM_MODEM_3GPP_USSD_SESSION_STATE_USER_RESPONSE:
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot initiate USSD: "
+                                               "a session is already active");
+        break;
+
+    case MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE:
+        MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send (
+            self,
+            command,
+            (GAsyncReadyCallback)initiate_send_ready,
+            dbus_call_context_new (skeleton,
+                                   invocation,
+                                   self));
+        break;
+
+    case MM_MODEM_3GPP_USSD_SESSION_STATE_UNKNOWN:
+    default:
+        /* We should never have a DBus request when in UNKNOWN state */
+        g_assert_not_reached ();
+        break;
+    }
+
+    return TRUE;
+}
+
+/*****************************************************************************/
+
 gchar *
 mm_iface_modem_3gpp_ussd_encode (MMIfaceModem3gppUssd *self,
                                  const gchar *command,
@@ -541,6 +732,20 @@ interface_initialization_step (InitializationContext *ctx)
 
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
+
+        /* Handle method invocations */
+        g_signal_connect (ctx->skeleton,
+                          "handle-initiate",
+                          G_CALLBACK (handle_initiate),
+                          ctx->self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-respond",
+                          G_CALLBACK (handle_respond),
+                          ctx->self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-cancel",
+                          G_CALLBACK (handle_cancel),
+                          ctx->self);
 
         /* Finally, export the new interface */
         mm_gdbus_object_skeleton_set_modem3gpp_ussd (MM_GDBUS_OBJECT_SKELETON (ctx->self),

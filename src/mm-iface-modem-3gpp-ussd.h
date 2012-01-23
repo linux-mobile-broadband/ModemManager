@@ -85,6 +85,23 @@ struct _MMIfaceModem3gppUssd {
                        guint *scheme);
     gchar * (*decode) (MMIfaceModem3gppUssd *self,
                        const gchar *reply);
+
+    /* Send command */
+    void (* send) (MMIfaceModem3gppUssd *self,
+                   const gchar *command,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data);
+    const gchar * (* send_finish) (MMIfaceModem3gppUssd *self,
+                                   GAsyncResult *res,
+                                   GError **error);
+
+    /* Cancel */
+    void (* cancel) (MMIfaceModem3gppUssd *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data);
+    gboolean (* cancel_finish) (MMIfaceModem3gppUssd *self,
+                                GAsyncResult *res,
+                                GError **error);
 };
 
 GType mm_iface_modem_3gpp_ussd_get_type (void);
