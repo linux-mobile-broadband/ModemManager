@@ -467,6 +467,9 @@ mm_iface_modem_3gpp_ussd_initialize (MMIfaceModem3gppUssd *self,
         skeleton = mm_gdbus_modem3gpp_ussd_skeleton_new ();
 
         /* Set all initial property defaults */
+        mm_gdbus_modem3gpp_ussd_set_state (skeleton, MM_MODEM_3GPP_USSD_SESSION_STATE_UNKNOWN);
+        mm_gdbus_modem3gpp_ussd_set_network_notification (skeleton, NULL);
+        mm_gdbus_modem3gpp_ussd_set_network_request (skeleton, NULL);
 
         g_object_set (self,
                       MM_IFACE_MODEM_3GPP_USSD_DBUS_SKELETON, skeleton,
