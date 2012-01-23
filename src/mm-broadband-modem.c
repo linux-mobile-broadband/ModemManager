@@ -29,6 +29,7 @@
 #include "mm-broadband-modem.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-3gpp-ussd.h"
 #include "mm-iface-modem-cdma.h"
 #include "mm-iface-modem-simple.h"
 #include "mm-iface-modem-location.h"
@@ -44,6 +45,7 @@
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface);
 static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
 static void iface_modem_simple_init (MMIfaceModemSimple *iface);
 static void iface_modem_location_init (MMIfaceModemLocation *iface);
@@ -51,6 +53,7 @@ static void iface_modem_location_init (MMIfaceModemLocation *iface);
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModem, mm_broadband_modem, MM_TYPE_BASE_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP_USSD, iface_modem_3gpp_ussd_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIMPLE, iface_modem_simple_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init));
@@ -59,6 +62,7 @@ enum {
     PROP_0,
     PROP_MODEM_DBUS_SKELETON,
     PROP_MODEM_3GPP_DBUS_SKELETON,
+    PROP_MODEM_3GPP_USSD_DBUS_SKELETON,
     PROP_MODEM_CDMA_DBUS_SKELETON,
     PROP_MODEM_SIMPLE_DBUS_SKELETON,
     PROP_MODEM_LOCATION_DBUS_SKELETON,
@@ -106,6 +110,10 @@ struct _MMBroadbandModemPrivate {
     GPtrArray *modem_3gpp_registration_regex;
     gboolean modem_3gpp_manual_registration;
     GCancellable *modem_3gpp_pending_registration_cancellable;
+
+    /*<--- Modem 3GPP USSD interface --->*/
+    /* Properties */
+    GObject *modem_3gpp_ussd_dbus_skeleton;
 
     /*<--- Modem CDMA interface --->*/
     /* Properties */
@@ -4084,10 +4092,11 @@ disable_finish (MMBaseModem *self,
         disabling_step (ctx);                                           \
     }
 
-INTERFACE_DISABLE_READY_FN (iface_modem,          MM_IFACE_MODEM,          TRUE)
-INTERFACE_DISABLE_READY_FN (iface_modem_3gpp,     MM_IFACE_MODEM_3GPP,     TRUE)
-INTERFACE_DISABLE_READY_FN (iface_modem_cdma,     MM_IFACE_MODEM_CDMA,     TRUE)
-INTERFACE_DISABLE_READY_FN (iface_modem_location, MM_IFACE_MODEM_LOCATION, FALSE)
+INTERFACE_DISABLE_READY_FN (iface_modem,           MM_IFACE_MODEM,           TRUE)
+INTERFACE_DISABLE_READY_FN (iface_modem_3gpp,      MM_IFACE_MODEM_3GPP,      TRUE)
+INTERFACE_DISABLE_READY_FN (iface_modem_3gpp_ussd, MM_IFACE_MODEM_3GPP_USSD, TRUE)
+INTERFACE_DISABLE_READY_FN (iface_modem_cdma,      MM_IFACE_MODEM_CDMA,      TRUE)
+INTERFACE_DISABLE_READY_FN (iface_modem_location,  MM_IFACE_MODEM_LOCATION,  FALSE)
 
 static void
 bearer_list_disconnect_all_bearers_ready (MMBearerList *list,
@@ -4163,6 +4172,14 @@ disabling_step (DisablingContext *ctx)
         ctx->step++;
 
     case DISABLING_STEP_IFACE_3GPP_USSD:
+        if (ctx->self->priv->modem_3gpp_ussd_dbus_skeleton) {
+            mm_dbg ("Modem has 3GPP/USSD capabilities, disabling the Modem 3GPP/USSD interface...");
+            /* Disabling the Modem 3GPP USSD interface */
+            mm_iface_modem_3gpp_ussd_disable (MM_IFACE_MODEM_3GPP_USSD (ctx->self),
+                                              (GAsyncReadyCallback)iface_modem_3gpp_ussd_disable_ready,
+                                              ctx);
+            return;
+        }
         /* Fall down to next step */
         ctx->step++;
 
@@ -4330,10 +4347,11 @@ enable_finish (MMBaseModem *self,
         enabling_step (ctx);                                            \
     }
 
-INTERFACE_ENABLE_READY_FN (iface_modem,          MM_IFACE_MODEM,          TRUE)
-INTERFACE_ENABLE_READY_FN (iface_modem_3gpp,     MM_IFACE_MODEM_3GPP,     TRUE)
-INTERFACE_ENABLE_READY_FN (iface_modem_cdma,     MM_IFACE_MODEM_CDMA,     TRUE)
-INTERFACE_ENABLE_READY_FN (iface_modem_location, MM_IFACE_MODEM_LOCATION, FALSE)
+INTERFACE_ENABLE_READY_FN (iface_modem,           MM_IFACE_MODEM,           TRUE)
+INTERFACE_ENABLE_READY_FN (iface_modem_3gpp,      MM_IFACE_MODEM_3GPP,      TRUE)
+INTERFACE_ENABLE_READY_FN (iface_modem_3gpp_ussd, MM_IFACE_MODEM_3GPP_USSD, TRUE)
+INTERFACE_ENABLE_READY_FN (iface_modem_cdma,      MM_IFACE_MODEM_CDMA,      TRUE)
+INTERFACE_ENABLE_READY_FN (iface_modem_location,  MM_IFACE_MODEM_LOCATION,  FALSE)
 
 static void
 enabling_step (EnablingContext *ctx)
@@ -4364,6 +4382,13 @@ enabling_step (EnablingContext *ctx)
         ctx->step++;
 
     case ENABLING_STEP_IFACE_3GPP_USSD:
+        if (ctx->self->priv->modem_3gpp_ussd_dbus_skeleton) {
+            mm_dbg ("Modem has 3GPP/USSD capabilities, enabling the Modem 3GPP/USSD interface...");
+            mm_iface_modem_3gpp_ussd_enable (MM_IFACE_MODEM_3GPP_USSD (ctx->self),
+                                             (GAsyncReadyCallback)iface_modem_3gpp_ussd_enable_ready,
+                                             ctx);
+            return;
+        }
         /* Fall down to next step */
         ctx->step++;
 
@@ -4565,10 +4590,11 @@ initialize_finish (MMBaseModem *self,
         initialize_step (ctx);                                          \
     }
 
-INTERFACE_INIT_READY_FN (iface_modem,          MM_IFACE_MODEM,          TRUE)
-INTERFACE_INIT_READY_FN (iface_modem_3gpp,     MM_IFACE_MODEM_3GPP,     TRUE)
-INTERFACE_INIT_READY_FN (iface_modem_cdma,     MM_IFACE_MODEM_CDMA,     TRUE)
-INTERFACE_INIT_READY_FN (iface_modem_location, MM_IFACE_MODEM_LOCATION, FALSE)
+INTERFACE_INIT_READY_FN (iface_modem,           MM_IFACE_MODEM,           TRUE)
+INTERFACE_INIT_READY_FN (iface_modem_3gpp,      MM_IFACE_MODEM_3GPP,      TRUE)
+INTERFACE_INIT_READY_FN (iface_modem_3gpp_ussd, MM_IFACE_MODEM_3GPP_USSD, FALSE)
+INTERFACE_INIT_READY_FN (iface_modem_cdma,      MM_IFACE_MODEM_CDMA,      TRUE)
+INTERFACE_INIT_READY_FN (iface_modem_location,  MM_IFACE_MODEM_LOCATION,  FALSE)
 
 static void
 initialize_step (InitializeContext *ctx)
@@ -4625,6 +4651,14 @@ initialize_step (InitializeContext *ctx)
         ctx->step++;
 
     case INITIALIZE_STEP_IFACE_3GPP_USSD:
+        if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self))) {
+            /* Initialize the 3GPP/USSD interface */
+            mm_iface_modem_3gpp_ussd_initialize (MM_IFACE_MODEM_3GPP_USSD (ctx->self),
+                                                 ctx->port,
+                                                 (GAsyncReadyCallback)iface_modem_3gpp_ussd_initialize_ready,
+                                                 ctx);
+            return;
+        }
         /* Fall down to next step */
         ctx->step++;
 
@@ -4731,6 +4765,10 @@ set_property (GObject *object,
         g_clear_object (&self->priv->modem_3gpp_dbus_skeleton);
         self->priv->modem_3gpp_dbus_skeleton = g_value_dup_object (value);
         break;
+    case PROP_MODEM_3GPP_USSD_DBUS_SKELETON:
+        g_clear_object (&self->priv->modem_3gpp_ussd_dbus_skeleton);
+        self->priv->modem_3gpp_ussd_dbus_skeleton = g_value_dup_object (value);
+        break;
     case PROP_MODEM_CDMA_DBUS_SKELETON:
         g_clear_object (&self->priv->modem_cdma_dbus_skeleton);
         self->priv->modem_cdma_dbus_skeleton = g_value_dup_object (value);
@@ -4802,6 +4840,9 @@ get_property (GObject *object,
         break;
     case PROP_MODEM_3GPP_DBUS_SKELETON:
         g_value_set_object (value, self->priv->modem_3gpp_dbus_skeleton);
+        break;
+    case PROP_MODEM_3GPP_USSD_DBUS_SKELETON:
+        g_value_set_object (value, self->priv->modem_3gpp_ussd_dbus_skeleton);
         break;
     case PROP_MODEM_CDMA_DBUS_SKELETON:
         g_value_set_object (value, self->priv->modem_cdma_dbus_skeleton);
@@ -4898,6 +4939,11 @@ dispose (GObject *object)
     if (self->priv->modem_3gpp_dbus_skeleton) {
         mm_iface_modem_3gpp_shutdown (MM_IFACE_MODEM_3GPP (object));
         g_clear_object (&self->priv->modem_3gpp_dbus_skeleton);
+    }
+
+    if (self->priv->modem_3gpp_ussd_dbus_skeleton) {
+        mm_iface_modem_3gpp_ussd_shutdown (MM_IFACE_MODEM_3GPP_USSD (object));
+        g_clear_object (&self->priv->modem_3gpp_ussd_dbus_skeleton);
     }
 
     if (self->priv->modem_cdma_dbus_skeleton) {
@@ -5013,6 +5059,11 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 }
 
 static void
+iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface)
+{
+}
+
+static void
 iface_modem_cdma_init (MMIfaceModemCdma *iface)
 {
     /* Initialization steps */
@@ -5078,6 +5129,10 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_3GPP_DBUS_SKELETON,
                                       MM_IFACE_MODEM_3GPP_DBUS_SKELETON);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_3GPP_USSD_DBUS_SKELETON,
+                                      MM_IFACE_MODEM_3GPP_USSD_DBUS_SKELETON);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_CDMA_DBUS_SKELETON,
