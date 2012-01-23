@@ -42,6 +42,22 @@ struct _MMIfaceModem3gppUssd {
     gboolean (*check_support_finish) (MMIfaceModem3gppUssd *self,
                                       GAsyncResult *res,
                                       GError **error);
+
+    /* Asynchronous enabling of unsolicited result codes */
+    void (*enable_unsolicited_result_codes) (MMIfaceModem3gppUssd *self,
+                                             GAsyncReadyCallback callback,
+                                             gpointer user_data);
+    gboolean (*enable_unsolicited_result_codes_finish) (MMIfaceModem3gppUssd *self,
+                                                        GAsyncResult *res,
+                                                        GError **error);
+
+    /* Asynchronous disabling of unsolicited result codes */
+    void (*disable_unsolicited_result_codes) (MMIfaceModem3gppUssd *self,
+                                              GAsyncReadyCallback callback,
+                                              gpointer user_data);
+    gboolean (*disable_unsolicited_result_codes_finish) (MMIfaceModem3gppUssd *self,
+                                                         GAsyncResult *res,
+                                                         GError **error);
 };
 
 GType mm_iface_modem_3gpp_ussd_get_type (void);
