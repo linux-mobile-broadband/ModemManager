@@ -102,7 +102,7 @@ print_buf (const char *detail, const char *buf, size_t len)
 
     f = g_strdup_printf ("%s (%zu)  ", detail, len);
     flen = strlen (f);
-    g_print (f);
+    g_print ("%s", f);
     for (i = 0; i < len; i++) {
         g_print ("0x%02x ", buf[i] & 0xFF);
         if (((i + 1) % 12) == 0) {
