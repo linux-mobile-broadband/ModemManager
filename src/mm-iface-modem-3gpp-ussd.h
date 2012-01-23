@@ -28,6 +28,10 @@
 #define MM_IS_IFACE_MODEM_3GPP_USSD(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_3GPP_USSD))
 #define MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_3GPP_USSD, MMIfaceModem3gppUssd))
 
+/* CBS data coding scheme - 3GPP TS 23.038 */
+#define MM_MODEM_GSM_USSD_SCHEME_7BIT 0b00001111
+#define MM_MODEM_GSM_USSD_SCHEME_UCS2 0b01001000
+
 #define MM_IFACE_MODEM_3GPP_USSD_DBUS_SKELETON "iface-modem-3gpp-ussd-dbus-skeleton"
 
 typedef struct _MMIfaceModem3gppUssd MMIfaceModem3gppUssd;

@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <ctype.h>
 
 #include <ModemManager.h>
 #include <libmm-common.h>
@@ -37,6 +38,7 @@
 #include "mm-bearer-list.h"
 #include "mm-sim.h"
 #include "mm-log.h"
+#include "mm-utils.h"
 #include "mm-modem-helpers.h"
 #include "mm-error-helpers.h"
 #include "mm-qcdm-serial-port.h"
@@ -2810,6 +2812,45 @@ modem_3gpp_setup_ps_registration (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* USSD Encode/Decode (3GPP/USSD interface) */
+
+static gchar *
+modem_3gpp_ussd_encode (MMIfaceModem3gppUssd *self,
+                        const gchar *command,
+                        guint *scheme)
+{
+    MMBroadbandModem *broadband = MM_BROADBAND_MODEM (self);
+    GByteArray *ussd_command;
+    gchar *hex = NULL;
+
+    ussd_command = g_byte_array_new ();
+
+    /* encode to the current charset */
+    if (mm_modem_charset_byte_array_append (ussd_command,
+                                            command,
+                                            FALSE,
+                                            broadband->priv->modem_current_charset)) {
+        *scheme = MM_MODEM_GSM_USSD_SCHEME_7BIT;
+        /* convert to hex representation */
+        hex = utils_bin2hexstr (ussd_command->data, ussd_command->len);
+    }
+
+    g_byte_array_free (ussd_command, TRUE);
+
+    return hex;
+}
+
+static gchar *
+modem_3gpp_ussd_decode (MMIfaceModem3gppUssd *self,
+                        const gchar *reply)
+{
+    MMBroadbandModem *broadband = MM_BROADBAND_MODEM (self);
+
+    return mm_modem_charset_hex_to_utf8 (reply,
+                                         broadband->priv->modem_current_charset);
+}
+
+/*****************************************************************************/
 /* Setup/Cleanup unsolicited result codes (3GPP/USSD interface) */
 
 static gboolean
@@ -5272,6 +5313,8 @@ iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface)
     iface->enable_unsolicited_result_codes_finish = modem_3gpp_ussd_enable_disable_unsolicited_result_codes_finish;
     iface->disable_unsolicited_result_codes = modem_3gpp_ussd_disable_unsolicited_result_codes;
     iface->disable_unsolicited_result_codes_finish = modem_3gpp_ussd_enable_disable_unsolicited_result_codes_finish;
+    iface->encode = modem_3gpp_ussd_encode;
+    iface->decode = modem_3gpp_ussd_decode;
 }
 
 static void
