@@ -5212,6 +5212,7 @@ decode_ussd_response (MMGenericGsm *self,
     char **items, **iter, *p;
     char *str = NULL;
     gint encoding = -1;
+    char *decoded;
 
     /* Look for the first ',' */
     p = strchr (reply, ',');
@@ -5238,8 +5239,9 @@ decode_ussd_response (MMGenericGsm *self,
     if (p)
         *p = '\0';
 
-    return mm_modem_gsm_ussd_decode (MM_MODEM_GSM_USSD (self), str,
-                                     cur_charset);
+    decoded = mm_modem_gsm_ussd_decode (MM_MODEM_GSM_USSD (self), str, cur_charset);
+    g_strfreev (items);
+    return decoded;
 }
 
 static char*
