@@ -5232,6 +5232,9 @@ decode_ussd_response (MMGenericGsm *self,
         }
     }
 
+    if (!str)
+        return NULL;
+
     /* Strip quotes */
     if (str[0] == '"')
         str++;
@@ -6529,4 +6532,3 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
                               "+IFC=1,1",
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
-
