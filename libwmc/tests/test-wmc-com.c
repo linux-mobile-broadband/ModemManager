@@ -441,6 +441,8 @@ mode_to_string (u_int8_t service)
         return "UMTS/HSPA only";
     case WMC_NETWORK_MODE_AUTO:
         return "Auto";
+    case WMC_NETWORK_MODE_LTE_ONLY:
+        return "LTE only";
     default:
         return "unknown";
     }

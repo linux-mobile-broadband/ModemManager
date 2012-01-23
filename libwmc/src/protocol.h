@@ -316,6 +316,7 @@ enum {
     WMC_GLOBAL_MODE_GPRS_ONLY = 0x0B,
     WMC_GLOBAL_MODE_UMTS_ONLY = 0x0C,
     WMC_GLOBAL_MODE_AUTO      = 0x14,
+    WMC_GLOBAL_MODE_LTE_ONLY  = 0x1E,
 };
 
 struct WmcCmdGetGlobalMode {
