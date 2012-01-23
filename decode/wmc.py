@@ -20,10 +20,14 @@ import defs
 
 def complete(data, direction):
     if direction == defs.TO_MODEM:
-        if data[len(data) - 2:] == "0d":
+        if data[len(data) - 2:] == "0d" or data[len(data) - 2:] == "7e":
             return True
     elif direction == defs.TO_HOST:
         if data[len(data) - 6:] == "30307e":
+            # UML190 and UML290 fake CRC + term
+            return True
+        elif data[len(data) - 2:] == "7e":
+            # PC5740 uses a real CRC
             return True
     else:
         raise ValueError("No data direction")
@@ -38,6 +42,11 @@ def unpack(data, direction):
             data = data[14:]
             if data[len(data) - 2:] == "0d":
                 data = data[:len(data) - 6]
+        elif data[:2] == "c8" and data[len(data) - 2:] == "7e":
+            # PC5740 doesn't use AT*WMC= framing
+            data = data[:len(data) - 6]
+        else:
+            print "asdfasdfasfaf"
     elif direction == defs.TO_HOST:
         if data[len(data) - 2:] == "7e":
             # remove HDLC terminator and CRC
@@ -223,35 +232,40 @@ def show_network_info(data, prefix, direction):
     fmt += "B"   # zero
     fmt += "B"   # seconds
     fmt += "H"   # counter1
-    fmt += "H"   # counter2
-    fmt += "3s"  # unknown4
-    fmt += "B"   # 2g_dbm
+    fmt += "H"   # unknown4
     fmt += "3s"  # unknown5
-    fmt += "16s" # cdma_opname
-    fmt += "18s" # unknown6
-    fmt += "B"   # 3g_dbm
-    fmt += "3s"  # unknown7
-    fmt += "B"   # unknown8
-    fmt += "3s"  # unknown9
-    fmt += "B"   # unknown10
-    fmt += "8s"  # 3gpp_opname
-    fmt += "4s"  # unknown11
-    fmt += "I"   # unknown12
-    fmt += "I"   # unknown13
-    fmt += "44s" # unknown14
-    fmt += "I"   # mcc/mnc
+    fmt += "B"   # 2g_dbm
 
     expected = struct.calcsize(fmt)
     if len(data) >= expected:
         (u1, u2, service, u3, year, month, z1, day, z2, hours, z3, minutes, z4, \
-         seconds, counter1, counter2, u4, two_g_dbm, u5, \
-         cdma_opname, u6, three_g_dbm, u7, u8, u9, u10, tgpp_opname, u11, u12, \
-         u13, u14, mccmnc) = struct.unpack(fmt, data[:expected])
+         seconds, counter1, u4, u5, two_g_dbm) = struct.unpack(fmt, data[:expected])
         print prefix + "  Time:     %04d/%02d/%02d %02d:%02d:%02d" % (year, month, day, hours, minutes, seconds)
-        print prefix + "  Counter1: %s" % counter1
-        print prefix + "  Counter2: %s" % counter2
         print prefix + "  Service:  %d (%s)" % (service, service_to_string (service))
         print prefix + "  2G dBm:   %d dBm %s" % get_signal(two_g_dbm)
+    else:
+        raise ValueError("Unexpected Network Info command response len (got %d expected %d)" % (len(data), expected))
+
+    fmt2 = "<"
+    fmt2 += "3s"  # unknown7
+    fmt2 += "16s" # cdma_opname
+    fmt2 += "18s" # unknown8
+    fmt2 += "B"   # 3g_dbm
+    fmt2 += "3s"  # unknown9
+    fmt2 += "B"   # unknown10
+    fmt2 += "3s"  # unknown11
+    fmt2 += "B"   # unknown12
+    fmt2 += "8s"  # 3gpp_opname
+    fmt2 += "4s"  # unknown13
+    fmt2 += "I"   # unknown14
+    fmt2 += "I"   # unknown15
+    fmt2 += "44s" # unknown16
+    fmt2 += "I"   # mcc/mnc
+
+    expected2 = struct.calcsize(fmt2)
+    if len(data) >= expected + expected2:
+        (u7, cdma_opname, u8, three_g_dbm, u9, u10, u11, u12, tgpp_opname, u13, \
+         u14, u15, u16, mccmnc) = struct.unpack(fmt2, data[expected:expected + expected2])
         print prefix + "  3G dBm:   %d dBm %s" % get_signal(three_g_dbm)
         print prefix + "  CDMA Op:  %s" % cdma_opname
         print prefix + "  3GPP Op:  %s" % tgpp_opname
@@ -265,16 +279,13 @@ def show_network_info(data, prefix, direction):
         if mcc > 100:
             print prefix + "  MCC/MNC:  %u-%u" % (mcc, mnc)
 
-    else:
-        raise ValueError("Unexpected Network Info command response len (got %d expected %d)" % (len(data), expected))
-
     fmt3 = "<"
     fmt3 += "B"   # lte_dbm
     fmt3 += "3s"  # unknown15
     fmt3 += "4s"  # unknown16
     expected3 = struct.calcsize(fmt3)
-    if len(data) >= expected + expected3:
-        (lte_dbm, u17, u18) = struct.unpack(fmt3, data[expected:])
+    if len(data) >= expected + expected2 + expected3:
+        (lte_dbm, u17, u18) = struct.unpack(fmt3, data[expected + expected2:])
         print prefix + "  LTE dBm:  %d dBm %s" % get_signal(lte_dbm)
 
 
