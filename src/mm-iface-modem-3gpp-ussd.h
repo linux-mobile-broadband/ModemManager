@@ -43,6 +43,14 @@ struct _MMIfaceModem3gppUssd {
                                       GAsyncResult *res,
                                       GError **error);
 
+    /* Asynchronous setup of unsolicited result codes */
+    void (*setup_unsolicited_result_codes) (MMIfaceModem3gppUssd *self,
+                                            GAsyncReadyCallback callback,
+                                            gpointer user_data);
+    gboolean (*setup_unsolicited_result_codes_finish) (MMIfaceModem3gppUssd *self,
+                                                       GAsyncResult *res,
+                                                       GError **error);
+
     /* Asynchronous enabling of unsolicited result codes */
     void (*enable_unsolicited_result_codes) (MMIfaceModem3gppUssd *self,
                                              GAsyncReadyCallback callback,
@@ -56,6 +64,14 @@ struct _MMIfaceModem3gppUssd {
                                               GAsyncReadyCallback callback,
                                               gpointer user_data);
     gboolean (*disable_unsolicited_result_codes_finish) (MMIfaceModem3gppUssd *self,
+                                                         GAsyncResult *res,
+                                                         GError **error);
+
+    /* Asynchronous cleaning up of unsolicited result codes */
+    void (*cleanup_unsolicited_result_codes) (MMIfaceModem3gppUssd *self,
+                                              GAsyncReadyCallback callback,
+                                              gpointer user_data);
+    gboolean (*cleanup_unsolicited_result_codes_finish) (MMIfaceModem3gppUssd *self,
                                                          GAsyncResult *res,
                                                          GError **error);
 };
