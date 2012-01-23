@@ -64,7 +64,7 @@
         A <link linkend="MMModem3gppUssdSessionState">MMModem3gppUssdSessionState</link> value,
         indicating the state of any ongoing USSD session.
     -->
-    <property name="State" type="s" access="read" />
+    <property name="State" type="u" access="read" />
 
     <!--
         NetworkNotification:
