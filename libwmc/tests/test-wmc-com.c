@@ -57,12 +57,12 @@ test_com_setup (const char *port, wmcbool uml290, wmcbool debug)
     errno = 0;
     d->fd = open (port, O_RDWR | O_EXCL | O_NONBLOCK | O_NOCTTY);
     if (d->fd < 0)
-        g_warning ("%s: open failed: (%d) %s", port, errno, strerror (errno));
+        g_warning ("%s: open failed: %d", port, errno);
     g_assert (d->fd >= 0);
 
     ret = ioctl (d->fd, TIOCEXCL);
     if (ret) {
-        g_warning ("%s: lock failed: (%d) %s", port, errno, strerror (errno));
+        g_warning ("%s: lock failed: %d", port, errno);
         close (d->fd);
         d->fd = -1;
     }
