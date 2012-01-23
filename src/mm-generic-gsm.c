@@ -275,10 +275,6 @@ error_for_unlock_required (const char *unlock)
                         MM_MOBILE_ERROR_UNKNOWN,
                         "Unknown unlock request '%s'", unlock);
 }
-typedef void (*MMModemArrayFn) (MMModem *modem,
-                                GArray *items,
-                                GError *error,
-                                gpointer user_data);
 
 static void
 get_unlock_retries_cb (MMModem *modem,
