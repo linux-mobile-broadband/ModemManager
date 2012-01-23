@@ -2810,6 +2810,79 @@ modem_3gpp_setup_ps_registration (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Enable/Disable URCs (3GPP/USSD interface) */
+
+static gboolean
+modem_3gpp_ussd_enable_disable_unsolicited_result_codes_finish (MMIfaceModem3gppUssd *self,
+                                                                GAsyncResult *res,
+                                                                GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+urc_enable_disable_ready (MMBroadbandModem *self,
+                          GAsyncResult *res,
+                          GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_3gpp_ussd_disable_unsolicited_result_codes (MMIfaceModem3gppUssd *self,
+                                                  GAsyncReadyCallback callback,
+                                                  gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_ussd_disable_unsolicited_result_codes);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CUSD=0",
+                              3,
+                              TRUE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)urc_enable_disable_ready,
+                              result);
+}
+
+static void
+modem_3gpp_ussd_enable_unsolicited_result_codes (MMIfaceModem3gppUssd *self,
+                                                 GAsyncReadyCallback callback,
+                                                 gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_ussd_enable_unsolicited_result_codes);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CUSD=1",
+                              3,
+                              TRUE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)urc_enable_disable_ready,
+                              result);
+}
+
+/*****************************************************************************/
 /* Check if USSD supported (3GPP/USSD interface) */
 
 static gboolean
@@ -5116,6 +5189,10 @@ iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface)
 {
     iface->check_support = modem_3gpp_ussd_check_support;
     iface->check_support_finish = modem_3gpp_ussd_check_support_finish;
+    iface->enable_unsolicited_result_codes = modem_3gpp_ussd_enable_unsolicited_result_codes;
+    iface->enable_unsolicited_result_codes_finish = modem_3gpp_ussd_enable_disable_unsolicited_result_codes_finish;
+    iface->disable_unsolicited_result_codes = modem_3gpp_ussd_disable_unsolicited_result_codes;
+    iface->disable_unsolicited_result_codes_finish = modem_3gpp_ussd_enable_disable_unsolicited_result_codes_finish;
 }
 
 static void
