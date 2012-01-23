@@ -259,10 +259,14 @@ mm_base_modem_grab_port (MMBaseModem *self,
             /*     mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, cmti_received, self, NULL); */
             /*     g_regex_unref (regex); */
 
-            /*     regex = g_regex_new ("\\r\\n\\+CUSD:\\s*(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL); */
-            /*     mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, cusd_received, self, NULL); */
-            /*     g_regex_unref (regex); */
-            /* } */
+            /* Set up CUSD unsolicited message handler, with NULL callback */
+            regex = mm_3gpp_cusd_regex_get ();
+            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port),
+                                                           regex,
+                                                           NULL,
+                                                           NULL,
+                                                           NULL);
+            g_regex_unref (regex);
 
             if (ptype == MM_PORT_TYPE_PRIMARY) {
                 self->priv->primary = g_object_ref (port);
