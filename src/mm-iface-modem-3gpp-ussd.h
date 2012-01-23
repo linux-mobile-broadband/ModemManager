@@ -34,6 +34,14 @@ typedef struct _MMIfaceModem3gppUssd MMIfaceModem3gppUssd;
 
 struct _MMIfaceModem3gppUssd {
     GTypeInterface g_iface;
+
+    /* Check for USSD support (async) */
+    void (* check_support) (MMIfaceModem3gppUssd *self,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data);
+    gboolean (*check_support_finish) (MMIfaceModem3gppUssd *self,
+                                      GAsyncResult *res,
+                                      GError **error);
 };
 
 GType mm_iface_modem_3gpp_ussd_get_type (void);
