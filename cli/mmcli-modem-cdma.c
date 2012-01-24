@@ -105,6 +105,16 @@ context_free (Context *ctx)
     g_free (ctx);
 }
 
+static void
+ensure_modem_cdma (void)
+{
+    if (ctx->modem_cdma)
+        return;
+
+    g_printerr ("error: modem has no CDMA capabilities");
+    exit (EXIT_FAILURE);
+}
+
 void
 mmcli_modem_cdma_shutdown (void)
 {
@@ -145,6 +155,8 @@ get_modem_ready (GObject      *source,
 {
     ctx->object = mmcli_get_modem_finish (result, &ctx->manager);
     ctx->modem_cdma = mm_object_get_modem_cdma (ctx->object);
+
+    ensure_modem_cdma ();
 
     /* Request to activate the modem? */
     if (activate_str) {
@@ -188,6 +200,8 @@ mmcli_modem_cdma_run_synchronous (GDBusConnection *connection)
                                         mmcli_get_common_modem_string (),
                                         &ctx->manager);
     ctx->modem_cdma = mm_object_get_modem_cdma (ctx->object);
+
+    ensure_modem_cdma ();
 
     /* Request to activate the modem? */
     if (activate_str) {
