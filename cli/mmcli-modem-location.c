@@ -117,6 +117,16 @@ context_free (Context *ctx)
     g_free (ctx);
 }
 
+static void
+ensure_modem_location (void)
+{
+    if (ctx->modem_location)
+        return;
+
+    g_printerr ("error: modem has no location capabilities");
+    exit (EXIT_FAILURE);
+}
+
 void
 mmcli_modem_location_shutdown (void)
 {
@@ -219,6 +229,8 @@ get_modem_ready (GObject      *source,
     ctx->object = mmcli_get_modem_finish (result, &ctx->manager);
     ctx->modem_location = mm_object_get_modem_location (ctx->object);
 
+    ensure_modem_location ();
+
     /* Request to enable location gathering? */
     if (enable_flag) {
         g_debug ("Asynchronously enabling location gathering...");
@@ -283,6 +295,8 @@ mmcli_modem_location_run_synchronous (GDBusConnection *connection)
                                         mmcli_get_common_modem_string (),
                                         &ctx->manager);
     ctx->modem_location = mm_object_get_modem_location (ctx->object);
+
+    ensure_modem_location ();
 
     /* Request to enable location gathering? */
     if (enable_flag) {
