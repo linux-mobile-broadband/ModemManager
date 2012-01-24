@@ -2814,6 +2814,99 @@ modem_3gpp_setup_ps_registration (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Send command (3GPP/USSD interface) */
+
+static const gchar *
+modem_3gpp_ussd_send_finish (MMIfaceModem3gppUssd *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    /* We can return the string as constant because it is owned by the async
+     * result, which will be valid during the whole call of its callback, which
+     * is when we're actually calling finish() */
+    return (const gchar *)g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+}
+
+static void
+ussd_send_command_ready (MMBroadbandModem *self,
+                         GAsyncResult *res,
+                         GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        /* Some immediate error happened when sending the USSD request */
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+
+        mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (self),
+                                               MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE);
+        return;
+    }
+
+    /* Cache the action, as it will be completed via URCs.
+     * There shouldn't be any previous action pending. */
+    g_warn_if_fail (self->priv->pending_ussd_action == NULL);
+    self->priv->pending_ussd_action = simple;
+}
+
+static void
+modem_3gpp_ussd_send (MMIfaceModem3gppUssd *self,
+                      const gchar *command,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    MMBroadbandModem *broadband = MM_BROADBAND_MODEM (self);
+    GError *error = NULL;
+    GSimpleAsyncResult *result;
+    gchar *at_command;
+    gchar *hex;
+    guint scheme = 0;
+
+    /* We're going to steal the string result in finish() so we must have a
+     * callback specified. */
+    g_assert (callback != NULL);
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_ussd_send);
+
+    /* Encode USSD command */
+    hex = mm_iface_modem_3gpp_ussd_encode (MM_IFACE_MODEM_3GPP_USSD (self),
+                                           command,
+                                           &scheme,
+                                           &error);
+    if (!hex) {
+        g_simple_async_result_take_error (broadband->priv->pending_ussd_action, error);
+        g_simple_async_result_complete_in_idle (broadband->priv->pending_ussd_action);
+        g_object_unref (broadband->priv->pending_ussd_action);
+        broadband->priv->pending_ussd_action = NULL;
+        return;
+    }
+
+    /* Build AT command */
+    at_command = g_strdup_printf ("+CUSD=1,\"%s\",%d", hex, scheme);
+    g_free (hex);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              at_command,
+                              3,
+                              TRUE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)ussd_send_command_ready,
+                              result);
+    g_free (at_command);
+
+    mm_iface_modem_3gpp_ussd_update_state (MM_IFACE_MODEM_3GPP_USSD (self),
+                                           MM_MODEM_3GPP_USSD_SESSION_STATE_ACTIVE);
+}
+
+/*****************************************************************************/
 /* USSD Encode/Decode (3GPP/USSD interface) */
 
 static gchar *
@@ -5476,18 +5569,27 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 static void
 iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface)
 {
+    /* Initialization steps */
     iface->check_support = modem_3gpp_ussd_check_support;
     iface->check_support_finish = modem_3gpp_ussd_check_support_finish;
+
+    /* Enabling steps */
     iface->setup_unsolicited_result_codes = modem_3gpp_ussd_setup_unsolicited_result_codes;
-    iface->cleanup_unsolicited_result_codes_finish = modem_3gpp_ussd_setup_cleanup_unsolicited_result_codes_finish;
-    iface->cleanup_unsolicited_result_codes = modem_3gpp_ussd_cleanup_unsolicited_result_codes;
     iface->setup_unsolicited_result_codes_finish = modem_3gpp_ussd_setup_cleanup_unsolicited_result_codes_finish;
     iface->enable_unsolicited_result_codes = modem_3gpp_ussd_enable_unsolicited_result_codes;
     iface->enable_unsolicited_result_codes_finish = modem_3gpp_ussd_enable_disable_unsolicited_result_codes_finish;
+
+    /* Disabling steps */
+    iface->cleanup_unsolicited_result_codes_finish = modem_3gpp_ussd_setup_cleanup_unsolicited_result_codes_finish;
+    iface->cleanup_unsolicited_result_codes = modem_3gpp_ussd_cleanup_unsolicited_result_codes;
     iface->disable_unsolicited_result_codes = modem_3gpp_ussd_disable_unsolicited_result_codes;
     iface->disable_unsolicited_result_codes_finish = modem_3gpp_ussd_enable_disable_unsolicited_result_codes_finish;
+
+    /* Additional actions */
     iface->encode = modem_3gpp_ussd_encode;
     iface->decode = modem_3gpp_ussd_decode;
+    iface->send = modem_3gpp_ussd_send;
+    iface->send_finish = modem_3gpp_ussd_send_finish;
 }
 
 static void
