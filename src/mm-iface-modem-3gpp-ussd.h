@@ -82,9 +82,11 @@ struct _MMIfaceModem3gppUssd {
     /* Encode/Decode */
     gchar * (*encode) (MMIfaceModem3gppUssd *self,
                        const gchar *command,
-                       guint *scheme);
+                       guint *scheme,
+                       GError **error);
     gchar * (*decode) (MMIfaceModem3gppUssd *self,
-                       const gchar *reply);
+                       const gchar *reply,
+                       GError **error);
 
     /* Send command */
     void (* send) (MMIfaceModem3gppUssd *self,
@@ -142,9 +144,11 @@ void mm_iface_modem_3gpp_ussd_update_network_request      (MMIfaceModem3gppUssd 
 /* Encode/Decode USSD */
 gchar *mm_iface_modem_3gpp_ussd_encode (MMIfaceModem3gppUssd *self,
                                         const gchar *command,
-                                        guint *scheme);
+                                        guint *scheme,
+                                        GError **error);
 gchar *mm_iface_modem_3gpp_ussd_decode (MMIfaceModem3gppUssd *self,
-                                        const gchar *reply);
+                                        const gchar *reply,
+                                        GError **error);
 
 /* Shutdown USSD interface */
 void mm_iface_modem_3gpp_ussd_shutdown (MMIfaceModem3gppUssd *self);

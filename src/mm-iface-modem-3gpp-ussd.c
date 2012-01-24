@@ -236,16 +236,18 @@ handle_initiate (MmGdbusModem3gppUssd *skeleton,
 gchar *
 mm_iface_modem_3gpp_ussd_encode (MMIfaceModem3gppUssd *self,
                                  const gchar *command,
-                                 guint *scheme)
+                                 guint *scheme,
+                                 GError **error)
 {
-    return MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->encode (self, command, scheme);
+    return MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->encode (self, command, scheme, error);
 }
 
 gchar *
 mm_iface_modem_3gpp_ussd_decode (MMIfaceModem3gppUssd *self,
-                                 const gchar *reply)
+                                 const gchar *reply,
+                                 GError **error)
 {
-    return MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->decode (self, reply);
+    return MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->decode (self, reply, error);
 }
 
 /*****************************************************************************/
