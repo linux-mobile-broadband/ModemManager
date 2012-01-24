@@ -273,6 +273,7 @@ test_com_device_info (void *f, void *data)
     gint len;
     WmcResult *result;
     size_t reply_len;
+    guint32 u32;
 
     len = wmc_cmd_device_info_new (buf, sizeof (buf));
     g_assert (len == 2);
@@ -292,33 +293,53 @@ test_com_device_info (void *f, void *data)
 
     str = NULL;
     wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_MANUFACTURER, &str);
-    g_message ("%s: Manufacturer: %s", __func__, str);
+    g_message ("%s: Manuf:    %s", __func__, str);
 
     str = NULL;
     wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_MODEL, &str);
-    g_message ("%s: Model: %s", __func__, str);
+    g_message ("%s: Model:    %s", __func__, str);
 
     str = NULL;
     wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_FW_REVISION, &str);
-    g_message ("%s: FW Revision: %s", __func__, str);
+    g_message ("%s: FW Rev:   %s", __func__, str);
 
     str = NULL;
     wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_HW_REVISION, &str);
-    g_message ("%s: HW Revision: %s", __func__, str);
+    g_message ("%s: HW Rev:   %s", __func__, str);
+
+    str = NULL;
+    wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_CDMA_MIN, &str);
+    g_message ("%s: CDMA MIN: %s", __func__, str);
+
+    u32 = 0;
+    wmc_result_get_u32 (result, WMC_CMD_DEVICE_INFO_ITEM_HOME_SID, &u32);
+    g_message ("%s: Home SID: %d", __func__, u32);
+
+    u32 = 0;
+    wmc_result_get_u32 (result, WMC_CMD_DEVICE_INFO_ITEM_PRL_VERSION, &u32);
+    g_message ("%s: PRL Ver:  %d", __func__, u32);
+
+    u32 = 0;
+    wmc_result_get_u32 (result, WMC_CMD_DEVICE_INFO_ITEM_ERI_VERSION, &u32);
+    g_message ("%s: ERI Ver:  %d", __func__, u32);
+
+    str = NULL;
+    wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_MEID, &str);
+    g_message ("%s: MEID:     %s", __func__, str ? str : "(none)");
 
     str = NULL;
     wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_IMEI, &str);
-    g_message ("%s: IMEI: %s", __func__, str ? str : "(none)");
+    g_message ("%s: IMEI:     %s", __func__, str ? str : "(none)");
 
     str = NULL;
     wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_ICCID, &str);
-    g_message ("%s: ICCID: %s", __func__, str ? str : "(none)");
+    g_message ("%s: ICCID:    %s", __func__, str ? str : "(none)");
 
     str = NULL;
     wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_MCC, &str);
     str2 = NULL;
     wmc_result_get_string (result, WMC_CMD_DEVICE_INFO_ITEM_MNC, &str2);
-    g_message ("%s: MCC/MNC: %s %s", __func__,
+    g_message ("%s: MCC/MNC:  %s %s", __func__,
                str ? str : "(none)",
                str2 ? str2 : "(none)");
 

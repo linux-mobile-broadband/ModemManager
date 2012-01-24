@@ -77,16 +77,21 @@ typedef struct WmcCmdInit2Rsp WmcCmdInit2Rsp;
 
 struct WmcCmdDeviceInfoRsp {
     WmcCmdHeader hdr;
-    u_int8_t _unknown1[27];
-    char     manf[64];
-    char     model[64];
-    char     fwrev[64];
-    char     hwrev[64];
-    u_int8_t _unknown2[64];
-    u_int8_t _unknown3[64];
-    u_int8_t _unknown4[22];
-    u_int8_t _unknown5[8];
-    u_int8_t _unknown6[6];
+    u_int8_t  _unknown1[27];
+    char      manf[64];
+    char      model[64];
+    char      fwrev[64];
+    char      hwrev[64];
+    u_int8_t  _unknown2[64];
+    u_int8_t  _unknown3[64];
+    char      min[10];        /* CDMA2000/IS-95 MIN */
+    u_int8_t  _unknown4[12];
+    u_int16_t home_sid;
+    u_int8_t  _unknown5[2];
+    u_int16_t prlver;
+    u_int8_t  _unknown6[2];
+    u_int16_t eriver;
+    u_int8_t _unknown7[4];
 } __attribute__ ((packed));
 typedef struct WmcCmdDeviceInfoRsp WmcCmdDeviceInfoRsp;
 
@@ -99,21 +104,22 @@ struct WmcCmdDeviceInfo2Rsp {
     char     hwrev[64];
     u_int8_t _unknown2[64];
     u_int8_t _unknown3[64];
-    u_int8_t min[10];       /* CDMA2000/IS-95 MIN */
+    u_int8_t min[10];        /* CDMA2000/IS-95 MIN */
     u_int8_t _unknown4[12];
-    u_int16_t home_sid;     /* ? */
-    u_int8_t _unknown5[6];
-    u_int16_t eri_ver;      /* ? */
-    u_int8_t _unknown6[3];
-    u_int8_t _unknown7[64];
-    u_int8_t _unknown8;
+    u_int16_t home_sid;
+    u_int8_t _unknown5[2];
+    u_int16_t prlver;
+    u_int8_t _unknown6[2];
+    u_int16_t eriver;
+    u_int8_t _unknown7[4];
+    u_int8_t _unknown8[64];
     u_int8_t meid[14];
-    u_int8_t _unknown9[6];  /* always zero */
-    u_int8_t imei[16];
     u_int8_t _unknown10[6];  /* always zero */
-    u_int8_t _unknown11[16];
+    u_int8_t imei[16];
+    u_int8_t _unknown11[6];  /* always zero */
+    u_int8_t _unknown12[16];
     u_int8_t iccid[20];
-    u_int8_t _unknown12[6];
+    u_int8_t _unknown13[6];
 } __attribute__ ((packed));
 typedef struct WmcCmdDeviceInfo2Rsp WmcCmdDeviceInfo2Rsp;
 
@@ -126,26 +132,27 @@ struct WmcCmdDeviceInfo3Rsp {
     char     hwrev[64];
     u_int8_t _unknown2[64];
     u_int8_t _unknown3[64];
-    u_int8_t min[10];       /* CDMA2000/IS-95 MIN */
+    u_int8_t min[10];        /* CDMA2000/IS-95 MIN */
     u_int8_t _unknown4[12];
-    u_int16_t home_sid;     /* ? */
-    u_int8_t _unknown5[6];
-    u_int16_t eri_ver;      /* ? */
-    u_int8_t _unknown6[3];
-    u_int8_t _unknown7[64];
-    u_int8_t _unknown8;
+    u_int16_t home_sid;
+    u_int8_t _unknown5[2];
+    u_int16_t prlver;
+    u_int8_t _unknown6[2];
+    u_int16_t eri_ver;
+    u_int8_t _unknown7[4];
+    u_int8_t _unknown8[64];
     u_int8_t meid[14];
-    u_int8_t _unknown9[6];  /* always zero */
-    u_int8_t imei[16];
     u_int8_t _unknown10[6];  /* always zero */
-    u_int8_t _unknown11[16];
+    u_int8_t imei[16];
+    u_int8_t _unknown11[6];  /* always zero */
+    u_int8_t _unknown12[16];
     u_int8_t iccid[20];
-    u_int8_t _unknown12[6];
+    u_int8_t _unknown13[6];
     u_int8_t mcc[16];
     u_int8_t mnc[16];
-    u_int8_t _unknown13[4];
     u_int8_t _unknown14[4];
     u_int8_t _unknown15[4];
+    u_int8_t _unknown16[4];
 } __attribute__ ((packed));
 typedef struct WmcCmdDeviceInfo3Rsp WmcCmdDeviceInfo3Rsp;
 

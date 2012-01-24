@@ -181,7 +181,23 @@ wmc_cmd_device_info_result (const char *buf, size_t buflen)
     memcpy (tmp, rsp->hwrev, sizeof (rsp->hwrev));
     wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_HW_REVISION, tmp);
 
+    /* MIN */
+    memset (tmp, 0, sizeof (tmp));
+    wmc_assert (sizeof (rsp->min) <= sizeof (tmp));
+    memcpy (tmp, rsp->min, sizeof (rsp->min));
+    wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_CDMA_MIN, tmp);
+
+    wmc_result_add_u32 (r, WMC_CMD_DEVICE_INFO_ITEM_HOME_SID, le16toh (rsp->home_sid));
+    wmc_result_add_u32 (r, WMC_CMD_DEVICE_INFO_ITEM_PRL_VERSION, le16toh (rsp->prlver));
+    wmc_result_add_u32 (r, WMC_CMD_DEVICE_INFO_ITEM_ERI_VERSION, le16toh (rsp->eriver));
+
     if (rsp2) {
+        /* MEID */
+        memset (tmp, 0, sizeof (tmp));
+        wmc_assert (sizeof (rsp2->meid) <= sizeof (tmp));
+        memcpy (tmp, rsp2->meid, sizeof (rsp2->meid));
+        wmc_result_add_string (r, WMC_CMD_DEVICE_INFO_ITEM_MEID, tmp);
+
         /* IMEI */
         memset (tmp, 0, sizeof (tmp));
         wmc_assert (sizeof (rsp2->imei) <= sizeof (tmp));
