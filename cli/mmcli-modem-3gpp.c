@@ -122,6 +122,16 @@ context_free (Context *ctx)
     g_free (ctx);
 }
 
+static void
+ensure_modem_3gpp (void)
+{
+    if (ctx->modem_3gpp)
+        return;
+
+    g_printerr ("error: modem has no 3GPP capabilities");
+    exit (EXIT_FAILURE);
+}
+
 void
 mmcli_modem_3gpp_shutdown (void)
 {
@@ -230,6 +240,8 @@ get_modem_ready (GObject      *source,
     ctx->object = mmcli_get_modem_finish (result, &ctx->manager);
     ctx->modem_3gpp = mm_object_get_modem_3gpp (ctx->object);
 
+    ensure_modem_3gpp ();
+
     /* Request to scan networks? */
     if (scan_flag) {
         g_debug ("Asynchronously scanning for networks...");
@@ -282,6 +294,8 @@ mmcli_modem_3gpp_run_synchronous (GDBusConnection *connection)
                                         mmcli_get_common_modem_string (),
                                         &ctx->manager);
     ctx->modem_3gpp = mm_object_get_modem_3gpp (ctx->object);
+
+    ensure_modem_3gpp ();
 
     if (scan_flag)
         g_assert_not_reached ();
