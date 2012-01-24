@@ -28,6 +28,7 @@
 
 #include "mm-modem.h"
 #include "mm-modem-3gpp.h"
+#include "mm-modem-3gpp-ussd.h"
 #include "mm-modem-cdma.h"
 #include "mm-modem-simple.h"
 #include "mm-modem-location.h"
@@ -44,12 +45,14 @@ gchar       *mm_object_dup_path (MMObject *self);
 
 MMModem         *mm_object_get_modem            (MMObject *object);
 MMModem3gpp     *mm_object_get_modem_3gpp       (MMObject *object);
+MMModem3gppUssd *mm_object_get_modem_3gpp_ussd  (MMObject *object);
 MMModemCdma     *mm_object_get_modem_cdma       (MMObject *object);
 MMModemSimple   *mm_object_get_modem_simple     (MMObject *object);
 MMModemLocation *mm_object_get_modem_location   (MMObject *object);
 
 MMModem         *mm_object_peek_modem           (MMObject *object);
 MMModem3gpp     *mm_object_peek_modem_3gpp      (MMObject *object);
+MMModem3gppUssd *mm_object_peek_modem_3gpp_ussd (MMObject *object);
 MMModemCdma     *mm_object_peek_modem_cdma      (MMObject *object);
 MMModemSimple   *mm_object_peek_modem_simple    (MMObject *object);
 MMModemLocation *mm_object_peek_modem_location  (MMObject *object);

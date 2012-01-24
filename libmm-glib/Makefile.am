@@ -20,6 +20,8 @@ libmm_glib_la_SOURCES = \
 	mm-modem.c \
 	mm-modem-3gpp.h \
 	mm-modem-3gpp.c \
+	mm-modem-3gpp-ussd.h \
+	mm-modem-3gpp-ussd.c \
 	mm-modem-cdma.h \
 	mm-modem-cdma.c \
 	mm-modem-simple-connect-properties.h \
