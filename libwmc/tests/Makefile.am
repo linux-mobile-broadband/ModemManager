@@ -1,5 +1,6 @@
 INCLUDES = \
-	-I$(top_srcdir)/libwmc/src
+	-I$(top_srcdir)/libwmc/src \
+	-I$(top_srcdir)/src
 
 noinst_PROGRAMS = test-wmc
 
@@ -17,9 +18,13 @@ test_wmc_SOURCES = \
 test_wmc_CPPFLAGS = \
 	$(MM_CFLAGS)
 
-test_wmc_LDADD = \
-	$(top_builddir)/libwmc/src/libwmc.la \
-	$(MM_LIBS)
+test_wmc_LDADD = $(MM_LIBS)
+
+if STANDALONE
+test_wmc_LDADD += $(top_builddir)/src/libwmc.la
+else
+test_wmc_LDADD += $(top_builddir)/libwmc/src/libwmc.la
+endif
 
 if WITH_TESTS
 
