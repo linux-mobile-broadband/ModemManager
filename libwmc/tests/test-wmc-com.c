@@ -104,8 +104,8 @@ print_buf (const char *detail, const char *buf, size_t len)
     flen = strlen (f);
     g_print ("%s", f);
     for (i = 0; i < len; i++) {
-        g_print ("0x%02x ", buf[i] & 0xFF);
-        if (((i + 1) % 12) == 0) {
+        g_print ("%02x ", buf[i] & 0xFF);
+        if (((i + 1) % 16) == 0) {
             g_print ("\n");
             z = flen;
             while (z--)
