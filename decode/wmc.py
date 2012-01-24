@@ -91,36 +91,44 @@ def show_device_info(data, prefix, direction):
     fmt += "10s"  # min
     fmt += "12s"  # unknown4
     fmt += "H"    # home_sid
-    fmt += "6s"   # unknown5
-    fmt += "H"    # eri_ver?
-    fmt += "3s"   # unknown6
-    fmt += "64s"  # unknown7
-    fmt += "s"    # unknown8
-    fmt += "14s"  # meid
-    fmt += "6s"   # unknown9
-    fmt += "16s"  # imei
-    fmt += "6s"   # unknown10
-    fmt += "16s"  # unknown11
-    fmt += "20s"  # iccid
-    fmt += "6s"   # unknown12
+    fmt += "2s"   # unknown5
+    fmt += "H"    # prlver
+    fmt += "2s"   # unknown6
+    fmt += "H"    # eriver
+    fmt += "4s"   # unknown7
 
     expected = struct.calcsize(fmt)
     if len(data) >= expected:
-        (u1, manf, model, fwrev, hwrev, u2, u3, cdmamin, u4, homesid, u5, eriver, \
-            u6, u7, u8, meid, u9, imei, u10, u11, iccid, u12) = struct.unpack(fmt, data[:expected])
+        (u1, manf, model, fwrev, hwrev, u2, u3, cdmamin, u4, homesid, u5, prlver, \
+         u6, eriver, u7) = struct.unpack(fmt, data[:expected])
         print prefix + "  Manf:     %s" % manf
         print prefix + "  Model:    %s" % model
         print prefix + "  FW Rev:   %s" % fwrev
         print prefix + "  HW Rev:   %s" % hwrev
         print prefix + "  MIN:      %s" % cdmamin
         print prefix + "  Home SID: %d" % homesid
+        print prefix + "  PRL Ver:  %d" % prlver
         print prefix + "  ERI Ver:  %d" % eriver
-        print prefix + "  MEID:     %s" % meid
-        print prefix + "  IMEI:     %s" % imei
-        print prefix + "  U11 :     %s" % u11
-        print prefix + "  ICCID:    %s" % iccid
     else:
         raise ValueError("Unexpected Info command response len (got %d expected %d)" % (len(data), expected))
+
+    fmt2 = "<"
+    fmt2 += "64s"  # unknown8
+    fmt2 += "14s"  # meid
+    fmt2 += "6s"   # unknown10
+    fmt2 += "16s"  # imei
+    fmt2 += "6s"   # unknown11
+    fmt2 += "16s"  # unknown12
+    fmt2 += "20s"  # iccid
+    fmt2 += "6s"   # unknown13
+
+    expected2 = struct.calcsize(fmt2)
+    if len(data) >= expected + expected2:
+        (u8, meid, u10, imei, u11, something, iccid, u13) = struct.unpack(fmt2, data[expected:expected + expected2])
+        print prefix + "  MEID:     %s" % meid
+        print prefix + "  IMEI:     %s" % imei
+        print prefix + "  ??? :     %s" % something
+        print prefix + "  ICCID:    %s" % iccid
 
     fmt3 = "<"
     fmt3 += "16s"  # MCC
@@ -129,8 +137,8 @@ def show_device_info(data, prefix, direction):
     fmt3 += "4s"   # unknown12
     fmt3 += "4s"   # unknown13
     expected3 = struct.calcsize(fmt3)
-    if len(data) >= expected + expected3:
-        (mcc, mnc, u11, u12, u13) = struct.unpack(fmt3, data[expected:])
+    if len(data) >= expected + expected2 + expected3:
+        (mcc, mnc, u11, u12, u13) = struct.unpack(fmt3, data[expected + expected2:])
         print prefix + "  MCC:      %s" % mcc
         print prefix + "  MNC:      %s" % mnc
 
