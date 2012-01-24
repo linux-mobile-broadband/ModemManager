@@ -14,14 +14,14 @@ AC_CONFIG_MACRO_DIR([m4])
 
 AC_CONFIG_HEADERS(config.h)
 
+dnl Define _GNU_SOURCE for various things like strcasestr()
+AC_GNU_SOURCE
+
 dnl Required programs
 AC_PROG_CC
 AM_PROG_CC_C_O
 AC_PROG_INSTALL
 AC_PROG_LIBTOOL
-
-dnl Define _GNU_SOURCE for various things like strcasestr()
-AC_GNU_SOURCE
 
 dnl
 dnl Tests
@@ -37,6 +37,8 @@ case $with_tests in
         with_tests=no
         ;;
 esac
+
+AM_CONDITIONAL(STANDALONE, test "yes" = "yes")
 
 AC_CONFIG_FILES([
 Makefile
