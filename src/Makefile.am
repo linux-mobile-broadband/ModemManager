@@ -152,6 +152,8 @@ modem_manager_SOURCES = \
 	mm-iface-modem-simple.c \
 	mm-iface-modem-location.h \
 	mm-iface-modem-location.c \
+	mm-iface-modem-messaging.h \
+	mm-iface-modem-messaging.c \
 	mm-broadband-modem.h \
 	mm-broadband-modem.c \
 	mm-serial-parsers.c \
