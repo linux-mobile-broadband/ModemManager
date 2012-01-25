@@ -5137,6 +5137,8 @@ initialize_finish (MMBaseModem *self,
                                                                         \
             mm_dbg ("Couldn't initialize interface: '%s'",              \
                     error->message);                                    \
+            /* Just shutdown the interface */                           \
+            mm_##NAME##_shutdown (TYPE (self));                         \
             g_error_free (error);                                       \
         } else {                                                        \
             /* bind simple properties */                                \
