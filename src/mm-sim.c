@@ -1139,13 +1139,16 @@ init_async_context_free (InitAsyncContext *ctx,
 }
 
 MMSim *
-mm_sim_new_finish (GAsyncInitable *initable,
-                   GAsyncResult  *res,
+mm_sim_new_finish (GAsyncResult  *res,
                    GError       **error)
 {
+    GObject *source;
     GObject *sim;
 
-    sim = g_async_initable_new_finish (initable, res, error);
+    source = g_async_result_get_source_object (res);
+    sim = g_async_initable_new_finish (G_ASYNC_INITABLE (source), res, error);
+    g_object_unref (source);
+
     if (!sim)
         return NULL;
 

@@ -125,8 +125,7 @@ void   mm_sim_new        (MMBaseModem *modem,
                           GCancellable *cancellable,
                           GAsyncReadyCallback callback,
                           gpointer user_data);
-MMSim *mm_sim_new_finish (GAsyncInitable *initable,
-                          GAsyncResult  *res,
+MMSim *mm_sim_new_finish (GAsyncResult  *res,
                           GError       **error);
 
 void     mm_sim_initialize        (MMSim *self,

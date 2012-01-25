@@ -246,14 +246,14 @@ modem_create_sim_finish (MMIfaceModem *self,
 }
 
 static void
-modem_create_sim_ready (GAsyncInitable *initable,
+modem_create_sim_ready (GObject *source,
                         GAsyncResult *res,
                         GSimpleAsyncResult *simple)
 {
     MMSim *sim;
     GError *error = NULL;
 
-    sim = mm_sim_new_finish (initable, res, &error);
+    sim = mm_sim_new_finish (res, &error);
     if (!sim)
         g_simple_async_result_take_error (simple, error);
     else {
