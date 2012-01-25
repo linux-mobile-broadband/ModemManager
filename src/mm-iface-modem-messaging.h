@@ -32,6 +32,14 @@ typedef struct _MMIfaceModemMessaging MMIfaceModemMessaging;
 
 struct _MMIfaceModemMessaging {
     GTypeInterface g_iface;
+
+    /* Check for Messaging support (async) */
+    void (* check_support) (MMIfaceModemMessaging *self,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data);
+    gboolean (*check_support_finish) (MMIfaceModemMessaging *self,
+                                      GAsyncResult *res,
+                                      GError **error);
 };
 
 GType mm_iface_modem_messaging_get_type (void);

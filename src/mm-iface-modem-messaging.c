@@ -20,6 +20,12 @@
 #include "mm-iface-modem-messaging.h"
 #include "mm-log.h"
 
+#define SUPPORT_CHECKED_TAG "messaging-support-checked-tag"
+#define SUPPORTED_TAG       "messaging-supported-tag"
+
+static GQuark support_checked_quark;
+static GQuark supported_quark;
+
 /*****************************************************************************/
 
 void
@@ -211,6 +217,8 @@ static void interface_initialization_step (InitializationContext *ctx);
 
 typedef enum {
     INITIALIZATION_STEP_FIRST,
+    INITIALIZATION_STEP_CHECK_SUPPORT,
+    INITIALIZATION_STEP_FAIL_IF_UNSUPPORTED,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -257,12 +265,86 @@ initialization_context_complete_and_free (InitializationContext *ctx)
 }
 
 static void
+check_support_ready (MMIfaceModemMessaging *self,
+                     GAsyncResult *res,
+                     InitializationContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->check_support_finish (self,
+                                                                              res,
+                                                                              &error)) {
+        if (error) {
+            /* This error shouldn't be treated as critical */
+            mm_dbg ("Messaging support check failed: '%s'", error->message);
+            g_error_free (error);
+        }
+    } else {
+        /* Messaging is supported! */
+        g_object_set_qdata (G_OBJECT (self),
+                            supported_quark,
+                            GUINT_TO_POINTER (TRUE));
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
+
+static void
 interface_initialization_step (InitializationContext *ctx)
 {
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
+        /* Setup quarks if we didn't do it before */
+        if (G_UNLIKELY (!support_checked_quark))
+            support_checked_quark = (g_quark_from_static_string (
+                                         SUPPORT_CHECKED_TAG));
+        if (G_UNLIKELY (!supported_quark))
+            supported_quark = (g_quark_from_static_string (
+                                   SUPPORTED_TAG));
+
         /* Fall down to next step */
         ctx->step++;
+
+    case INITIALIZATION_STEP_CHECK_SUPPORT:
+        if (!GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (ctx->self),
+                                                   support_checked_quark))) {
+            /* Set the checked flag so that we don't run it again */
+            g_object_set_qdata (G_OBJECT (ctx->self),
+                                support_checked_quark,
+                                GUINT_TO_POINTER (TRUE));
+            /* Initially, assume we don't support it */
+            g_object_set_qdata (G_OBJECT (ctx->self),
+                                supported_quark,
+                                GUINT_TO_POINTER (FALSE));
+
+            if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->check_support &&
+                MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->check_support_finish) {
+                MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->check_support (
+                    ctx->self,
+                    (GAsyncReadyCallback)check_support_ready,
+                    ctx);
+                return;
+            }
+
+            /* If there is no implementation to check support, assume we DON'T
+             * support it. */
+        }
+
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_FAIL_IF_UNSUPPORTED:
+        if (!GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (ctx->self),
+                                                   supported_quark))) {
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_UNSUPPORTED,
+                                             "Messaging not supported");
+            initialization_context_complete_and_free (ctx);
+            return;
+        }
 
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
