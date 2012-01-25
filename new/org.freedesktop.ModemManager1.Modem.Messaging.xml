@@ -40,9 +40,7 @@
         Delete:
         @path: The object path of the SMS to delete.
 
-        Delete an SMS message. Alternatively you may use the
-        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Sms.Delete">Delete()</link>
-        method on the message object itself.
+        Delete an SMS message.
     -->
     <method name="Delete">
       <arg name="path" type="o" direction="in" />

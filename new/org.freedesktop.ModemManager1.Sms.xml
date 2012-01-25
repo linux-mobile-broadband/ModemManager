@@ -20,13 +20,6 @@
   <interface name="org.freedesktop.ModemManager1.Sms">
 
     <!--
-        Delete:
-
-        Delete the message.
-    -->
-    <method name="Delete" />
-
-    <!--
         Send:
 
         If the message has not yet been sent, queue it for delivery.
