@@ -34,6 +34,7 @@
 #include "mm-iface-modem-cdma.h"
 #include "mm-iface-modem-simple.h"
 #include "mm-iface-modem-location.h"
+#include "mm-iface-modem-messaging.h"
 #include "mm-broadband-bearer.h"
 #include "mm-bearer-list.h"
 #include "mm-sim.h"
@@ -51,6 +52,7 @@ static void iface_modem_3gpp_ussd_init (MMIfaceModem3gppUssd *iface);
 static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
 static void iface_modem_simple_init (MMIfaceModemSimple *iface);
 static void iface_modem_location_init (MMIfaceModemLocation *iface);
+static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModem, mm_broadband_modem, MM_TYPE_BASE_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -58,7 +60,8 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModem, mm_broadband_modem, MM_TYPE_BASE_MODEM
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP_USSD, iface_modem_3gpp_ussd_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIMPLE, iface_modem_simple_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init));
 
 enum {
     PROP_0,
@@ -68,6 +71,7 @@ enum {
     PROP_MODEM_CDMA_DBUS_SKELETON,
     PROP_MODEM_SIMPLE_DBUS_SKELETON,
     PROP_MODEM_LOCATION_DBUS_SKELETON,
+    PROP_MODEM_MESSAGING_DBUS_SKELETON,
     PROP_MODEM_SIM,
     PROP_MODEM_BEARER_LIST,
     PROP_MODEM_STATE,
@@ -141,6 +145,10 @@ struct _MMBroadbandModemPrivate {
     /* Properties */
     GObject *modem_location_dbus_skeleton;
     GVariant *modem_location_dictionary;
+
+    /*<--- Modem Messaging interface --->*/
+    /* Properties */
+    GObject *modem_messaging_dbus_skeleton;
 };
 
 /*****************************************************************************/
@@ -4656,6 +4664,7 @@ INTERFACE_DISABLE_READY_FN (iface_modem_3gpp,      MM_IFACE_MODEM_3GPP,      TRU
 INTERFACE_DISABLE_READY_FN (iface_modem_3gpp_ussd, MM_IFACE_MODEM_3GPP_USSD, TRUE)
 INTERFACE_DISABLE_READY_FN (iface_modem_cdma,      MM_IFACE_MODEM_CDMA,      TRUE)
 INTERFACE_DISABLE_READY_FN (iface_modem_location,  MM_IFACE_MODEM_LOCATION,  FALSE)
+INTERFACE_DISABLE_READY_FN (iface_modem_messaging, MM_IFACE_MODEM_MESSAGING, FALSE)
 
 static void
 bearer_list_disconnect_all_bearers_ready (MMBearerList *list,
@@ -4695,6 +4704,14 @@ disabling_step (DisablingContext *ctx)
         ctx->step++;
 
     case DISABLING_STEP_IFACE_MESSAGING:
+        if (ctx->self->priv->modem_messaging_dbus_skeleton) {
+            mm_dbg ("Modem has messaging capabilities, disabling the Messaging interface...");
+            /* Disabling the Modem Messaging interface */
+            mm_iface_modem_messaging_disable (MM_IFACE_MODEM_MESSAGING (ctx->self),
+                                              (GAsyncReadyCallback)iface_modem_messaging_disable_ready,
+                                              ctx);
+            return;
+        }
         /* Fall down to next step */
         ctx->step++;
 
@@ -4911,6 +4928,7 @@ INTERFACE_ENABLE_READY_FN (iface_modem_3gpp,      MM_IFACE_MODEM_3GPP,      TRUE
 INTERFACE_ENABLE_READY_FN (iface_modem_3gpp_ussd, MM_IFACE_MODEM_3GPP_USSD, TRUE)
 INTERFACE_ENABLE_READY_FN (iface_modem_cdma,      MM_IFACE_MODEM_CDMA,      TRUE)
 INTERFACE_ENABLE_READY_FN (iface_modem_location,  MM_IFACE_MODEM_LOCATION,  FALSE)
+INTERFACE_ENABLE_READY_FN (iface_modem_messaging, MM_IFACE_MODEM_MESSAGING, FALSE)
 
 static void
 enabling_step (EnablingContext *ctx)
@@ -4984,6 +5002,14 @@ enabling_step (EnablingContext *ctx)
         ctx->step++;
 
     case ENABLING_STEP_IFACE_MESSAGING:
+        if (ctx->self->priv->modem_messaging_dbus_skeleton) {
+            mm_dbg ("Modem has messaging capabilities, enabling the Messaging interface...");
+            /* Enabling the Modem Messaging interface */
+            mm_iface_modem_messaging_enable (MM_IFACE_MODEM_MESSAGING (ctx->self),
+                                            (GAsyncReadyCallback)iface_modem_messaging_enable_ready,
+                                             ctx);
+            return;
+        }
         /* Fall down to next step */
         ctx->step++;
 
@@ -5156,6 +5182,7 @@ INTERFACE_INIT_READY_FN (iface_modem_3gpp,      MM_IFACE_MODEM_3GPP,      TRUE)
 INTERFACE_INIT_READY_FN (iface_modem_3gpp_ussd, MM_IFACE_MODEM_3GPP_USSD, FALSE)
 INTERFACE_INIT_READY_FN (iface_modem_cdma,      MM_IFACE_MODEM_CDMA,      TRUE)
 INTERFACE_INIT_READY_FN (iface_modem_location,  MM_IFACE_MODEM_LOCATION,  FALSE)
+INTERFACE_INIT_READY_FN (iface_modem_messaging, MM_IFACE_MODEM_MESSAGING, FALSE)
 
 static void
 initialize_step (InitializeContext *ctx)
@@ -5252,8 +5279,12 @@ initialize_step (InitializeContext *ctx)
         return;
 
     case INITIALIZE_STEP_IFACE_MESSAGING:
-        /* Fall down to next step */
-        ctx->step++;
+        /* Initialize the Messaging interface */
+        mm_iface_modem_messaging_initialize (MM_IFACE_MODEM_MESSAGING (ctx->self),
+                                             ctx->port,
+                                             (GAsyncReadyCallback)iface_modem_messaging_initialize_ready,
+                                             ctx);
+        return;
 
     case INITIALIZE_STEP_IFACE_SIMPLE:
         mm_iface_modem_simple_initialize (MM_IFACE_MODEM_SIMPLE (ctx->self));
@@ -5342,6 +5373,10 @@ set_property (GObject *object,
         g_clear_object (&self->priv->modem_location_dbus_skeleton);
         self->priv->modem_location_dbus_skeleton = g_value_dup_object (value);
         break;
+    case PROP_MODEM_MESSAGING_DBUS_SKELETON:
+        g_clear_object (&self->priv->modem_messaging_dbus_skeleton);
+        self->priv->modem_messaging_dbus_skeleton = g_value_dup_object (value);
+        break;
     case PROP_MODEM_SIM:
         g_clear_object (&self->priv->modem_sim);
         self->priv->modem_sim = g_value_dup_object (value);
@@ -5413,6 +5448,9 @@ get_property (GObject *object,
         break;
     case PROP_MODEM_LOCATION_DBUS_SKELETON:
         g_value_set_object (value, self->priv->modem_location_dbus_skeleton);
+        break;
+    case PROP_MODEM_MESSAGING_DBUS_SKELETON:
+        g_value_set_object (value, self->priv->modem_messaging_dbus_skeleton);
         break;
     case PROP_MODEM_SIM:
         g_value_set_object (value, self->priv->modem_sim);
@@ -5515,6 +5553,11 @@ dispose (GObject *object)
     if (self->priv->modem_location_dbus_skeleton) {
         mm_iface_modem_location_shutdown (MM_IFACE_MODEM_LOCATION (object));
         g_clear_object (&self->priv->modem_location_dbus_skeleton);
+    }
+
+    if (self->priv->modem_messaging_dbus_skeleton) {
+        mm_iface_modem_messaging_shutdown (MM_IFACE_MODEM_MESSAGING (object));
+        g_clear_object (&self->priv->modem_messaging_dbus_skeleton);
     }
 
     if (self->priv->modem_simple_dbus_skeleton) {
@@ -5686,6 +5729,11 @@ iface_modem_location_init (MMIfaceModemLocation *iface)
 }
 
 static void
+iface_modem_messaging_init (MMIfaceModemMessaging *iface)
+{
+}
+
+static void
 mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
@@ -5729,6 +5777,10 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_LOCATION_DBUS_SKELETON,
                                       MM_IFACE_MODEM_LOCATION_DBUS_SKELETON);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_MESSAGING_DBUS_SKELETON,
+                                      MM_IFACE_MODEM_MESSAGING_DBUS_SKELETON);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_SIM,
