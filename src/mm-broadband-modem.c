@@ -3377,6 +3377,72 @@ modem_3gpp_ussd_check_support (MMIfaceModem3gppUssd *self,
 }
 
 /*****************************************************************************/
+/* Check if Messaging supported (Messaging interface) */
+
+static gboolean
+modem_messaging_check_support_finish (MMIfaceModemMessaging *self,
+                                      GAsyncResult *res,
+                                      GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+cnmi_format_check_ready (MMBroadbandModem *self,
+                         GAsyncResult *res,
+                         GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    /* CNMI command is supported; assume we have full messaging capabilities */
+    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_messaging_check_support (MMIfaceModemMessaging *self,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_messaging_check_support);
+
+    /* We assume that CDMA-only modems don't have messaging capabilities */
+    if (mm_iface_modem_is_cdma_only (MM_IFACE_MODEM (self))) {
+        g_simple_async_result_set_error (
+            result,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_UNSUPPORTED,
+            "CDMA-only modems don't have messaging capabilities");
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    /* Check CNMI support */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CNMI=?",
+                              3,
+                              TRUE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)cnmi_format_check_ready,
+                              result);
+}
+
+/*****************************************************************************/
 /* ESN loading (CDMA interface) */
 
 static gchar *
@@ -5731,6 +5797,8 @@ iface_modem_location_init (MMIfaceModemLocation *iface)
 static void
 iface_modem_messaging_init (MMIfaceModemMessaging *iface)
 {
+    iface->check_support = modem_messaging_check_support;
+    iface->check_support_finish = modem_messaging_check_support_finish;
 }
 
 static void
