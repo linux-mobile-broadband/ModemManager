@@ -27,5 +27,7 @@ EXTRA_DIST = \
 	location.py \
 	sms-send.py \
 	send-pin.py \
-	modem-autoenable.py
+	modem-autoenable.py \
+	ussd.py \
+	scan.py
 
