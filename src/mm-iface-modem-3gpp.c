@@ -592,12 +592,12 @@ update_registration_state (MMIfaceModem3gpp *self,
     MMModem3gppRegistrationState old_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
     MmGdbusModem3gpp *skeleton = NULL;
 
-    /* Only set new state if different */
     g_object_get (self,
                   MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, &old_state,
                   MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &skeleton,
                   NULL);
 
+    /* Only set new state if different */
     if (new_state != old_state) {
         mm_info ("Modem %s: 3GPP Registration state changed (%s -> %s)",
                  g_dbus_object_get_object_path (G_DBUS_OBJECT (self)),
@@ -610,9 +610,8 @@ update_registration_state (MMIfaceModem3gpp *self,
                       MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, new_state,
                       NULL);
 
-        switch (new_state) {
-        case MM_MODEM_3GPP_REGISTRATION_STATE_HOME:
-        case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING:
+        if (new_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+            new_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
             /* Launch operator code update */
             if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_code &&
                 MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_code_finish)
@@ -628,35 +627,15 @@ update_registration_state (MMIfaceModem3gpp *self,
                     (GAsyncReadyCallback)load_operator_name_ready,
                     NULL);
 
-            mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
-                                                       access_tech,
-                                                       ALL_3GPP_ACCESS_TECHNOLOGIES_MASK);
-
             mm_iface_modem_update_subsystem_state (MM_IFACE_MODEM (self),
                                                    SUBSYSTEM_3GPP,
                                                    MM_MODEM_STATE_REGISTERED,
                                                    MM_MODEM_STATE_REASON_NONE);
-
-            /* If we also implement the location interface, update the 3GPP location */
-            if (MM_IS_IFACE_MODEM_LOCATION (self))
-                mm_iface_modem_location_3gpp_update_lac_ci (MM_IFACE_MODEM_LOCATION (self),
-                                                            location_area_code,
-                                                            cell_id);
-            break;
-
-        case MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING:
-        case MM_MODEM_3GPP_REGISTRATION_STATE_IDLE:
-        case MM_MODEM_3GPP_REGISTRATION_STATE_DENIED:
-        case MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN:
+        }
+        /* Not registered neither in home nor roaming network */
+        else {
             mm_gdbus_modem3gpp_set_operator_code (skeleton, NULL);
             mm_gdbus_modem3gpp_set_operator_name (skeleton, NULL);
-
-            if (MM_IS_IFACE_MODEM_LOCATION (self))
-                mm_iface_modem_location_3gpp_clear (MM_IFACE_MODEM_LOCATION (self));
-
-            mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
-                                                       MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
-                                                       ALL_3GPP_ACCESS_TECHNOLOGIES_MASK);
 
             mm_iface_modem_update_subsystem_state (
                 MM_IFACE_MODEM (self),
@@ -665,8 +644,29 @@ update_registration_state (MMIfaceModem3gpp *self,
                  MM_MODEM_STATE_SEARCHING :
                  MM_MODEM_STATE_ENABLED),
                 MM_MODEM_STATE_REASON_NONE);
-            break;
         }
+    }
+
+    /* Even if registration state didn't change, report access technology or
+     * location updates, but only if something valid to report */
+    if (new_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+        new_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
+        if (access_tech != MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN)
+            mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
+                                                       access_tech,
+                                                       ALL_3GPP_ACCESS_TECHNOLOGIES_MASK);
+        if (MM_IS_IFACE_MODEM_LOCATION (self) &&
+            location_area_code > 0 &&
+            cell_id > 0)
+            mm_iface_modem_location_3gpp_update_lac_ci (MM_IFACE_MODEM_LOCATION (self),
+                                                        location_area_code,
+                                                        cell_id);
+    } else {
+        mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
+                                                   MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
+                                                   ALL_3GPP_ACCESS_TECHNOLOGIES_MASK);
+        if (MM_IS_IFACE_MODEM_LOCATION (self))
+            mm_iface_modem_location_3gpp_clear (MM_IFACE_MODEM_LOCATION (self));
     }
 
     g_object_unref (skeleton);
