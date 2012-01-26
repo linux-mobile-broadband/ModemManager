@@ -284,7 +284,6 @@ dial_cdma_ready (MMBaseModem *modem,
     }
 
     /* else... Yuhu! */
-    ctx->self->priv->connection_type = CONNECTION_TYPE_CDMA;
     detailed_connect_context_complete_and_free_successful (ctx);
 }
 
@@ -511,10 +510,8 @@ dial_3gpp_ready (MMBaseModem *modem,
         return;
     }
 
-    /* Keep data port and CID around while connected */
-    ctx->self->priv->connection_type = CONNECTION_TYPE_3GPP;
+    /* Keep CID around while connected */
     ctx->self->priv->cid = ctx->cid;
-    ctx->self->priv->port = g_object_ref (ctx->data);
 
     /* Yuhu! */
     detailed_connect_context_complete_and_free_successful (ctx);
@@ -854,6 +851,7 @@ connect_finish (MMBearer *self,
 
 static void
 connect_succeeded (ConnectContext *ctx,
+                   ConnectionType connection_type,
                    MMCommonBearerIpConfig *ipv4_config,
                    MMCommonBearerIpConfig *ipv6_config)
 {
@@ -861,6 +859,10 @@ connect_succeeded (ConnectContext *ctx,
 
     /* Port is connected; update the state */
     mm_port_set_connected (ctx->data, TRUE);
+
+    /* Keep connected port and type of connection */
+    ctx->self->priv->port = g_object_ref (ctx->data);
+    ctx->self->priv->connection_type = connection_type;
 
     /* Build result */
     result = g_new0 (ConnectResult, 1);
@@ -904,7 +906,7 @@ connect_cdma_ready (MMBroadbandBearer *self,
                                                                     &error))
         connect_failed (ctx, error);
     else
-        connect_succeeded (ctx, ipv4_config, ipv6_config);
+        connect_succeeded (ctx, CONNECTION_TYPE_CDMA, ipv4_config, ipv6_config);
 }
 
 static void
@@ -923,7 +925,7 @@ connect_3gpp_ready (MMBroadbandBearer *self,
                                                                     &error))
         connect_failed (ctx, error);
     else
-        connect_succeeded (ctx, ipv4_config, ipv6_config);
+        connect_succeeded (ctx, CONNECTION_TYPE_3GPP, ipv4_config, ipv6_config);
 }
 
 static void
@@ -1199,6 +1201,9 @@ cgact_primary_ready (MMBaseModem *modem,
         g_error_free (error);
     }
 
+    /* Clear CID if we got any set */
+    if (ctx->self->priv->cid)
+        ctx->self->priv->cid = 0;
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     detailed_disconnect_context_complete_and_free (ctx);
 }
@@ -1230,6 +1235,9 @@ primary_flash_3gpp_ready (MMSerialPort *port,
     /* Don't bother doing the CGACT again if it was done on a secondary port
      * or if not needed */
     if (ctx->cgact_sent) {
+        /* Clear CID if we got any set */
+        if (ctx->self->priv->cid)
+            ctx->self->priv->cid = 0;
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         detailed_disconnect_context_complete_and_free (ctx);
         return;
@@ -1363,10 +1371,11 @@ disconnect_succeeded (DisconnectContext *ctx)
      * already have set the port as disconnected (e.g the 3GPP one) */
     mm_port_set_connected (ctx->data, FALSE);
 
-    /* Clear data port and CID (if any) */
-    if (ctx->self->priv->cid)
-        ctx->self->priv->cid = 0;
+    /* Clear data port */
     g_clear_object (&ctx->self->priv->port);
+
+    /* Reset current connection type */
+    ctx->self->priv->connection_type = CONNECTION_TYPE_NONE;
 
     /* Set operation result */
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
