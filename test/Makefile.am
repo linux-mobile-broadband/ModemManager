@@ -26,6 +26,7 @@ EXTRA_DIST = \
 	list-modems.py \
 	location.py \
 	sms-send.py \
+	sms-get.py \
 	send-pin.py \
 	ussd.py \
 	scan.py
