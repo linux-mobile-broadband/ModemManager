@@ -70,7 +70,8 @@ typedef enum {
     MM_MODEM_PROP_PIN_RETRY_COUNTS,
     MM_MODEM_PROP_DEVICE_IDENTIFIER,
     MM_MODEM_PROP_HW_VID,       /* Not exported */
-    MM_MODEM_PROP_HW_PID        /* Not exported */
+    MM_MODEM_PROP_HW_PID,       /* Not exported */
+    MM_MODEM_PROP_NETWORK_TIMEZONE
 } MMModemProp;
 
 typedef struct _MMModem MMModem;

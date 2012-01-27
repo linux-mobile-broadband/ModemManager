@@ -29,15 +29,18 @@
 #include "mm-properties-changed-signal.h"
 #include "mm-callback-info.h"
 #include "mm-modem-helpers.h"
+#include "mm-modem-time.h"
 
 static void modem_init (MMModem *modem_class);
 static void pc_init (MMPropertiesChanged *pc_class);
+static void modem_time_init (MMModemTime *modem_time_class);
 
 G_DEFINE_TYPE_EXTENDED (MMModemBase, mm_modem_base,
                         G_TYPE_OBJECT,
                         G_TYPE_FLAG_VALUE_ABSTRACT,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_PROPERTIES_CHANGED, pc_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_PROPERTIES_CHANGED, pc_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_TIME, modem_time_init))
 
 #define MM_MODEM_BASE_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_BASE, MMModemBasePrivate))
 
@@ -75,6 +78,8 @@ typedef struct {
     MMAuthProvider *authp;
 
     GHashTable *ports;
+
+    GHashTable *tz_data;
 } MMModemBasePrivate;
 
 
@@ -481,6 +486,52 @@ mm_modem_base_set_revision (MMModemBase *self, const char *revision)
     priv->revision = g_strdup (revision);
 }
 
+static GValue *
+int_to_gvalue (gint i)
+{
+    GValue *v = g_slice_new0 (GValue);
+    g_value_init (v, G_TYPE_INT);
+    g_value_set_int (v, i);
+    return v;
+}
+
+static void
+value_destroy (gpointer data)
+{
+    GValue *v = (GValue *) data;
+    g_value_unset (v);
+    g_slice_free (GValue, v);
+}
+
+void
+mm_modem_base_set_network_timezone (MMModemBase *self, gint *offset,
+                                    gint *dst_offset, gint *leap_seconds)
+{
+    MMModemBasePrivate *priv;
+
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_MODEM_BASE (self));
+
+    priv = MM_MODEM_BASE_GET_PRIVATE (self);
+
+    if (offset)
+        g_hash_table_replace (priv->tz_data, "offset", int_to_gvalue (*offset));
+    else
+        g_hash_table_remove (priv->tz_data, "offset");
+
+    if (dst_offset)
+        g_hash_table_replace (priv->tz_data, "dst_offset", int_to_gvalue (*dst_offset));
+    else
+        g_hash_table_remove (priv->tz_data, "dst_offset");
+
+    if (leap_seconds)
+        g_hash_table_replace (priv->tz_data, "leap_seconds", int_to_gvalue (*leap_seconds));
+    else
+        g_hash_table_remove (priv->tz_data, "leap_seconds");
+
+    g_object_notify (G_OBJECT (self), MM_MODEM_TIME_NETWORK_TIMEZONE);
+}
+
 /*************************************************************************/
 static void
 card_info_simple_invoke (MMCallbackInfo *info)
@@ -700,6 +751,7 @@ mm_modem_base_init (MMModemBase *self)
     priv->authp = mm_auth_provider_get ();
 
     priv->ports = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
+    priv->tz_data = g_hash_table_new_full (g_str_hash, g_str_equal, NULL, value_destroy);
 
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_ENABLED,
@@ -729,6 +781,10 @@ mm_modem_base_init (MMModemBase *self)
                                                     MM_MODEM_IP_METHOD,
                                                     NULL,
                                                     MM_DBUS_INTERFACE_MODEM);
+    mm_properties_changed_signal_register_property (G_OBJECT (self),
+                                                    MM_MODEM_TIME_NETWORK_TIMEZONE,
+                                                    NULL,
+                                                    MM_DBUS_INTERFACE_MODEM_TIME);
 }
 
 static void
@@ -740,6 +796,11 @@ modem_init (MMModem *modem_class)
 
 static void
 pc_init (MMPropertiesChanged *pc_class)
+{
+}
+
+static void
+modem_time_init (MMModemTime *modem_time_class)
 {
 }
 
@@ -787,6 +848,7 @@ set_property (GObject *object, guint prop_id,
     case MM_MODEM_PROP_UNLOCK_REQUIRED:
     case MM_MODEM_PROP_UNLOCK_RETRIES:
     case MM_MODEM_PROP_PIN_RETRY_COUNTS:
+    case MM_MODEM_PROP_NETWORK_TIMEZONE:
         break;
     case MM_MODEM_PROP_HW_VID:
         /* Construct only */
@@ -877,6 +939,9 @@ get_property (GObject *object, guint prop_id,
     case MM_MODEM_PROP_HW_PID:
         g_value_set_uint (value, priv->pid);
         break;
+    case MM_MODEM_PROP_NETWORK_TIMEZONE:
+        g_value_set_boxed (value, priv->tz_data);
+        break;
     case PROP_MAX_TIMEOUTS:
         g_value_set_uint (value, priv->max_timeouts);
         break;
@@ -895,6 +960,7 @@ finalize (GObject *object)
     mm_auth_provider_cancel_for_owner (priv->authp, object);
 
     g_hash_table_destroy (priv->ports);
+    g_hash_table_destroy (priv->tz_data);
     g_free (priv->driver);
     g_free (priv->plugin);
     g_free (priv->device);
@@ -986,6 +1052,10 @@ mm_modem_base_class_init (MMModemBaseClass *klass)
     g_object_class_override_property (object_class,
                                       MM_MODEM_PROP_HW_PID,
                                       MM_MODEM_HW_PID);
+
+    g_object_class_override_property (object_class,
+                                      MM_MODEM_PROP_NETWORK_TIMEZONE,
+                                      MM_MODEM_TIME_NETWORK_TIMEZONE);
 
     g_object_class_install_property
         (object_class, PROP_MAX_TIMEOUTS,

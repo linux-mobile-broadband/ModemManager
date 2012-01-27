@@ -76,6 +76,10 @@ void mm_modem_base_set_unlock_required (MMModemBase *self,
 void mm_modem_base_set_pin_retry_counts (MMModemBase *self,
                                          GArray *pin_retries);
 
+void mm_modem_base_set_network_timezone (MMModemBase *self,
+                                         gint *offset,
+                                         gint *dst_offset,
+                                         gint *leap_seconds);
 
 const char *mm_modem_base_get_manf (MMModemBase *self);
 void        mm_modem_base_set_manf (MMModemBase *self, const char *manf);
