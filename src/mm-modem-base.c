@@ -80,6 +80,8 @@ typedef struct {
     GHashTable *ports;
 
     GHashTable *tz_data;
+    guint tz_poll_id;
+    guint tz_poll_count;
 } MMModemBasePrivate;
 
 
@@ -503,6 +505,81 @@ value_destroy (gpointer data)
     g_slice_free (GValue, v);
 }
 
+static void
+timezone_poll_done (MMModem *modem, GError *error, gpointer user_data)
+{
+    /* do nothing; modem will call mm_modem_base_set_network_timezone if
+       it has timezone data, and then we will stop nagging it. */
+}
+
+static gboolean
+timezone_poll_callback (gpointer data)
+{
+    MMModemBase *self = (MMModemBase *) data;
+    MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (self);
+    gboolean result;
+
+    if (priv->tz_poll_count == 0)
+        goto stop_polling;
+
+    priv->tz_poll_count--;
+    result = mm_modem_time_poll_network_timezone (MM_MODEM_TIME (self),
+                                                  timezone_poll_done,
+                                                  NULL);
+    if (!result)
+        goto stop_polling;
+
+    return TRUE;
+
+stop_polling:
+    mm_modem_base_set_network_timezone (self, NULL, NULL, NULL);
+    priv->tz_poll_id = 0;
+    return FALSE;
+}
+
+#define TIMEZONE_POLL_INTERVAL_SEC 5
+#define TIMEZONE_POLL_RETRIES 6
+
+void
+mm_modem_base_set_network_timezone_polling (MMModemBase *self,
+                                            gboolean should_poll)
+{
+    MMModemBasePrivate *priv;
+
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_MODEM_BASE (self));
+
+    priv = MM_MODEM_BASE_GET_PRIVATE (self);
+
+    if (should_poll == !!priv->tz_poll_id)
+        return;
+
+    if (should_poll) {
+        priv->tz_poll_count = TIMEZONE_POLL_RETRIES;
+        priv->tz_poll_id = g_timeout_add_seconds (TIMEZONE_POLL_INTERVAL_SEC,
+                                                  timezone_poll_callback,
+                                                  self);
+    } else {
+        g_source_remove (priv->tz_poll_id);
+        priv->tz_poll_id = 0;
+    }
+}
+
+static void
+modem_state_changed (MMModemBase *self, GParamSpec *pspec, gpointer user_data)
+{
+    MMModemState state;
+    gboolean registered;
+
+    state = mm_modem_get_state (MM_MODEM (self));
+    registered = (state >= MM_MODEM_STATE_REGISTERED);
+
+    mm_modem_base_set_network_timezone_polling (self, registered);
+
+    if (!registered)
+        mm_modem_base_set_network_timezone (self, NULL, NULL, NULL);
+}
+
 void
 mm_modem_base_set_network_timezone (MMModemBase *self, gint *offset,
                                     gint *dst_offset, gint *leap_seconds)
@@ -530,6 +607,8 @@ mm_modem_base_set_network_timezone (MMModemBase *self, gint *offset,
         g_hash_table_remove (priv->tz_data, "leap_seconds");
 
     g_object_notify (G_OBJECT (self), MM_MODEM_TIME_NETWORK_TIMEZONE);
+
+    mm_modem_base_set_network_timezone_polling (self, FALSE);
 }
 
 /*************************************************************************/
@@ -752,6 +831,7 @@ mm_modem_base_init (MMModemBase *self)
 
     priv->ports = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
     priv->tz_data = g_hash_table_new_full (g_str_hash, g_str_equal, NULL, value_destroy);
+    priv->tz_poll_id = 0;
 
     mm_properties_changed_signal_register_property (G_OBJECT (self),
                                                     MM_MODEM_ENABLED,
@@ -785,6 +865,11 @@ mm_modem_base_init (MMModemBase *self)
                                                     MM_MODEM_TIME_NETWORK_TIMEZONE,
                                                     NULL,
                                                     MM_DBUS_INTERFACE_MODEM_TIME);
+
+    g_signal_connect (self,
+                      "notify::" MM_MODEM_STATE,
+                      G_CALLBACK (modem_state_changed),
+                      NULL);
 }
 
 static void
@@ -958,6 +1043,9 @@ finalize (GObject *object)
     MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (self);
 
     mm_auth_provider_cancel_for_owner (priv->authp, object);
+
+    if (priv->tz_poll_id)
+        g_source_remove (priv->tz_poll_id);
 
     g_hash_table_destroy (priv->ports);
     g_hash_table_destroy (priv->tz_data);

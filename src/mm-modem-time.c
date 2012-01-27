@@ -87,6 +87,21 @@ mm_modem_time_get_network_time (MMModemTime *self,
         async_get_call_not_supported (self, callback, user_data);
 }
 
+gboolean
+mm_modem_time_poll_network_timezone (MMModemTime *self,
+                                     MMModemFn callback,
+                                     gpointer user_data)
+{
+    g_return_val_if_fail (MM_IS_MODEM_TIME (self), FALSE);
+    g_return_val_if_fail (callback != NULL, FALSE);
+
+    if (MM_MODEM_TIME_GET_INTERFACE (self)->poll_network_timezone)
+        return MM_MODEM_TIME_GET_INTERFACE (self)->poll_network_timezone
+                (self, callback, user_data);
+    else
+        return FALSE;
+}
+
 static void
 impl_modem_time_get_network_time (MMModemTime *self,
                                   DBusGMethodInvocation *context)

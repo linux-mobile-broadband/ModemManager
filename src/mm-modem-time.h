@@ -41,6 +41,10 @@ struct _MMModemTime {
     void (*get_network_time) (MMModemTime *self,
                               MMModemTimeGetNetworkTimeFn callback,
                               gpointer user_data);
+
+    gboolean (*poll_network_timezone) (MMModemTime *self,
+                                       MMModemFn callback,
+                                       gpointer user_data);
 };
 
 GType mm_modem_time_get_type (void);
@@ -48,5 +52,9 @@ GType mm_modem_time_get_type (void);
 void mm_modem_time_get_network_time (MMModemTime *self,
                                      MMModemTimeGetNetworkTimeFn callback,
                                      gpointer user_data);
+
+gboolean mm_modem_time_poll_network_timezone (MMModemTime *self,
+                                              MMModemFn callback,
+                                              gpointer user_data);
 
 #endif /* MM_MODEM_TIME_H */

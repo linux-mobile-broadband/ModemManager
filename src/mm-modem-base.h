@@ -81,6 +81,9 @@ void mm_modem_base_set_network_timezone (MMModemBase *self,
                                          gint *dst_offset,
                                          gint *leap_seconds);
 
+void mm_modem_base_set_network_timezone_polling (MMModemBase *self,
+                                                 gboolean should_poll);
+
 const char *mm_modem_base_get_manf (MMModemBase *self);
 void        mm_modem_base_set_manf (MMModemBase *self, const char *manf);
 
