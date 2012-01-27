@@ -32,19 +32,22 @@
 #include "mm-log.h"
 #include "mm-modem-icera.h"
 #include "mm-utils.h"
+#include "mm-modem-time.h"
 
 static void modem_init (MMModem *modem_class);
 static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
 static void modem_simple_init (MMModemSimple *class);
 static void modem_gsm_card_init (MMModemGsmCard *class);
 static void modem_icera_init (MMModemIcera *icera_class);
+static void modem_time_init (MMModemTime *class);
 
 G_DEFINE_TYPE_EXTENDED (MMModemSamsungGsm, mm_modem_samsung_gsm, MM_TYPE_GENERIC_GSM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_SIMPLE, modem_simple_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_ICERA, modem_icera_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_CARD, modem_gsm_card_init))
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_CARD, modem_gsm_card_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_TIME, modem_time_init))
 
 #define MM_MODEM_SAMSUNG_GSM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_SAMSUNG_GSM, MMModemSamsungGsmPrivate))
 
@@ -53,6 +56,9 @@ typedef struct {
 
     MMModemIceraPrivate *icera;
     char *band;
+
+    guint time_poll_source;
+    gboolean time_polling;
 } MMModemSamsungGsmPrivate;
 
 #define IPDPADDR_TAG "%IPDPADDR: "
@@ -610,6 +616,46 @@ grab_port (MMModem *modem,
     return !!port;
 }
 
+static void
+poll_timezone_done (MMModemIcera *modem,
+                    MMModemIceraTimestamp *timestamp,
+                    GError *error,
+                    gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    gint offset;
+
+    if (error || !timestamp) {
+        return;
+    }
+
+    mm_info ("setting timezone from local timestamp "
+             "%02d/%02d/%02d %02d:%02d:%02d %+02d.",
+            timestamp->year, timestamp->month, timestamp->day,
+            timestamp->hour, timestamp->minute, timestamp->second,
+            timestamp->tz_offset);
+
+    // Offset is in 15-minute intervals, as provided by GSM network
+    offset = 15 * timestamp->tz_offset;
+
+    mm_modem_base_set_network_timezone (MM_MODEM_BASE (modem),
+                                        &offset, NULL, NULL);
+
+    mm_callback_info_schedule (info);
+}
+
+static gboolean
+poll_timezone (MMModemTime *self, MMModemFn callback, gpointer user_data)
+{
+    MMCallbackInfo *info;
+
+    info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
+    mm_modem_icera_get_local_timestamp (MM_MODEM_ICERA (self),
+                                        poll_timezone_done,
+                                        info);
+    return TRUE;
+}
+
 static MMModemIceraPrivate *
 get_icera_private (MMModemIcera *icera)
 {
@@ -649,6 +695,12 @@ static void
 modem_gsm_card_init (MMModemGsmCard *class)
 {
     class->get_unlock_retries = get_unlock_retries;
+}
+
+static void
+modem_time_init (MMModemTime *class)
+{
+    class->poll_network_timezone = poll_timezone;
 }
 
 static void

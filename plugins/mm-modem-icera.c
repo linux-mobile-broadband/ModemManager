@@ -729,6 +729,97 @@ mm_modem_icera_get_ip4_config (MMModemIcera *self,
     g_free (command);
 }
 
+static void
+invoke_mm_modem_icera_timestamp_fn (MMCallbackInfo *info)
+{
+    MMModemIceraTimestampFn callback;
+    MMModemIceraTimestamp *timestamp;
+
+    callback = (MMModemIceraTimestampFn) info->callback;
+    timestamp = (MMModemIceraTimestamp *) mm_callback_info_get_result (info);
+
+    callback (MM_MODEM_ICERA (info->modem),
+              timestamp,
+              info->error, info->user_data);
+}
+
+static MMCallbackInfo *
+mm_callback_info_icera_timestamp_new (MMModemIcera *modem,
+                                      MMModemIceraTimestampFn callback,
+                                      gpointer user_data)
+{
+    g_return_val_if_fail (modem != NULL, NULL);
+
+    return mm_callback_info_new_full (MM_MODEM (modem),
+                                      invoke_mm_modem_icera_timestamp_fn,
+				      (GCallback) callback,
+				      user_data);
+}
+
+static void
+get_local_timestamp_done (MMAtSerialPort *port,
+                          GString *response,
+                          GError *error,
+                          gpointer user_data)
+{
+    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
+    MMModemIceraTimestamp *timestamp;
+    char sign;
+    int offset;
+
+    /* If the modem has already been removed, return without
+     * scheduling callback */
+    if (mm_callback_info_check_modem_removed (info))
+        return;
+
+    if (error) {
+        info->error = g_error_copy (error);
+        goto out;
+    }
+
+    timestamp = g_malloc0 (sizeof (MMModemIceraTimestamp));
+
+    if (g_str_has_prefix (response->str, "*TLTS: ") &&
+        sscanf (response->str + 7,
+                "\"%02d/%02d/%02d,%02d:%02d:%02d%c%02d\"",
+                &timestamp->year,
+                &timestamp->month,
+                &timestamp->day,
+                &timestamp->hour,
+                &timestamp->minute,
+                &timestamp->second,
+                &sign, &offset) == 8) {
+        if (sign == '-')
+            timestamp->tz_offset = -offset;
+        else
+            timestamp->tz_offset = offset;
+        mm_callback_info_set_result (info, timestamp, g_free);
+    } else {
+        mm_warn ("Unknown *TLTS response: %s", response->str);
+        mm_callback_info_set_result (info, NULL, g_free);
+        g_free (timestamp);
+    }
+
+ out:
+    mm_callback_info_schedule (info);
+}
+
+void
+mm_modem_icera_get_local_timestamp (MMModemIcera *self,
+                                    MMModemIceraTimestampFn callback,
+                                    gpointer user_data)
+{
+    MMCallbackInfo *info;
+    MMAtSerialPort *primary;
+
+    info = mm_callback_info_icera_timestamp_new (self, callback, user_data);
+
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
+    g_assert (primary);
+
+    mm_at_serial_port_queue_command (primary, "*TLTS", 3, get_local_timestamp_done, info);
+}
+
 /****************************************************************/
 
 static const char *

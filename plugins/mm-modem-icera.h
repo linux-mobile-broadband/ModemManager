@@ -43,6 +43,23 @@ struct _MMModemIcera {
     MMModemIceraPrivate * (*get_private) (MMModemIcera *icera);
 };
 
+typedef struct _MMModemIceraTimestamp MMModemIceraTimestamp;
+
+struct _MMModemIceraTimestamp {
+    int year;
+    int month;
+    int day;
+    int hour;
+    int minute;
+    int second;
+    int tz_offset;
+};
+
+typedef void (*MMModemIceraTimestampFn) (MMModemIcera *modem,
+                                         MMModemIceraTimestamp *timestamp,
+                                         GError *error,
+                                         gpointer user_data);
+
 GType mm_modem_icera_get_type (void);
 
 MMModemIceraPrivate *mm_modem_icera_init_private (void);
@@ -88,6 +105,10 @@ void mm_modem_icera_do_connect (MMModemIcera *self,
 void mm_modem_icera_get_ip4_config (MMModemIcera *self,
                                     MMModemIp4Fn callback,
                                     gpointer user_data);
+
+void mm_modem_icera_get_local_timestamp (MMModemIcera *self,
+                                         MMModemIceraTimestampFn callback,
+                                         gpointer user_data);
 
 #endif  /* MM_MODEM_ICERA_H */
 
