@@ -1,3 +1,5 @@
+if WITH_TESTS
+
 INCLUDES = \
 	-I$(top_srcdir)/libwmc/src \
 	-I$(top_srcdir)/src
@@ -20,13 +22,11 @@ test_wmc_CPPFLAGS = \
 
 test_wmc_LDADD = $(MM_LIBS)
 
-if STANDALONE
+if WMC_STANDALONE
 test_wmc_LDADD += $(top_builddir)/src/libwmc.la
 else
 test_wmc_LDADD += $(top_builddir)/libwmc/src/libwmc.la
 endif
-
-if WITH_TESTS
 
 check-local: test-wmc
 	$(abs_builddir)/test-wmc

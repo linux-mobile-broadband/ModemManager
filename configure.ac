@@ -30,6 +30,8 @@ AC_DEFINE_UNQUOTED(GETTEXT_PACKAGE,"$GETTEXT_PACKAGE", [Gettext package])
 IT_PROG_INTLTOOL([0.35.0])
 
 PKG_CHECK_MODULES(MM, dbus-glib-1 >= 0.86 glib-2.0 >= 2.18 gmodule-2.0 gobject-2.0)
+AC_SUBST(MM_CFLAGS)
+AC_SUBST(MM_LIBS)
 
 PKG_CHECK_MODULES(GUDEV, gudev-1.0)
 AC_SUBST(GUDEV_CFLAGS)
@@ -136,6 +138,10 @@ AC_ARG_WITH(dist-version, AS_HELP_STRING([--with-dist-version=<mm-dist-version>]
 if ! test x"$ac_distver" = x""; then
   AC_DEFINE_UNQUOTED(MM_DIST_VERSION, "$ac_distver", [Define the distribution version string])
 fi
+
+# Not building protocol libs standalone
+AM_CONDITIONAL(QCDM_STANDALONE, test "yes" = "no")
+AM_CONDITIONAL(WMC_STANDALONE, test "yes" = "no")
 
 AC_CONFIG_FILES([
 Makefile

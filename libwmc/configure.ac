@@ -26,19 +26,18 @@ AC_PROG_LIBTOOL
 dnl
 dnl Tests
 dnl
-AC_ARG_WITH(tests, AS_HELP_STRING([--with-tests], [Build libqcdm tests]))
+AC_ARG_WITH(tests, AS_HELP_STRING([--with-tests], [Build libwmc tests]))
 AM_CONDITIONAL(WITH_TESTS, test "x$with_tests" = "xyes")
 case $with_tests in
     yes)
-        with_tests=yes
         PKG_CHECK_MODULES(MM, glib-2.0 >= 2.20)
+	AC_SUBST(MM_CFLAGS)
+	AC_SUBST(MM_LIBS)
         ;;
-    *)
-        with_tests=no
-        ;;
+    *) ;;
 esac
 
-AM_CONDITIONAL(STANDALONE, test "yes" = "yes")
+AM_CONDITIONAL(WMC_STANDALONE, test "yes" = "yes")
 
 AC_CONFIG_FILES([
 Makefile
