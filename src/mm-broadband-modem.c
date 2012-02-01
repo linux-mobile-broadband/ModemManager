@@ -152,6 +152,9 @@ struct _MMBroadbandModemPrivate {
     /* Properties */
     GObject *modem_messaging_dbus_skeleton;
     MMBearerList *modem_messaging_sms_list;
+    /* Implementation helpers */
+    gboolean sms_use_pdu_mode;
+    gboolean sms_supported_modes_checked;
 };
 
 /*****************************************************************************/
@@ -3446,6 +3449,118 @@ modem_messaging_check_support (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
+/* Setup SMS format (Messaging interface) */
+
+static gboolean
+modem_messaging_setup_sms_format_finish (MMIfaceModemMessaging *self,
+                                         GAsyncResult *res,
+                                         GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+cmgf_set_ready (MMBroadbandModem *self,
+                GAsyncResult *res,
+                GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        mm_dbg ("Failed to set preferred SMS mode: '%s'; assuming text mode'",
+                error->message);
+        g_error_free (error);
+        self->priv->sms_use_pdu_mode = FALSE;
+    } else
+        mm_info ("Successfully set preferred SMS mode: '%s'",
+                 self->priv->sms_use_pdu_mode ? "PDU" : "text");
+
+    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+set_preferred_sms_format (MMBroadbandModem *self,
+                          GSimpleAsyncResult *result)
+{
+    gchar *cmd;
+
+    cmd = g_strdup_printf ("+CMGF=%s",
+                           self->priv->sms_use_pdu_mode ? "0" : "1");
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              cmd,
+                              3,
+                              TRUE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)cmgf_set_ready,
+                              result);
+    g_free (cmd);
+}
+
+static void
+cmgf_format_check_ready (MMBroadbandModem *self,
+                         GAsyncResult *res,
+                         GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    const gchar *response;
+    gboolean sms_pdu_supported = FALSE;
+    gboolean sms_text_supported = FALSE;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error ||
+        !mm_3gpp_parse_cmgf_format_response (response,
+                                             &sms_pdu_supported,
+                                             &sms_text_supported,
+                                             &error)) {
+        mm_dbg ("Failed to query supported SMS modes: '%s'",
+                error->message);
+        g_error_free (error);
+        self->priv->sms_use_pdu_mode = FALSE;
+    } else
+        /* If the modem only supports PDU mode, use PDUs; otherwise try text mode.
+         * FIXME: when the PDU code is more robust, default to PDU if the
+         * modem supports it.
+         */
+        self->priv->sms_use_pdu_mode = (sms_pdu_supported && !sms_text_supported);
+
+    self->priv->sms_supported_modes_checked = TRUE;
+
+    set_preferred_sms_format (self, simple);
+}
+
+static void
+modem_messaging_setup_sms_format (MMIfaceModemMessaging *self,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_messaging_setup_sms_format);
+
+    /* If we already checked for supported SMS types, go on to select the
+     * preferred format. */
+    if (MM_BROADBAND_MODEM (self)->priv->sms_supported_modes_checked) {
+        set_preferred_sms_format (MM_BROADBAND_MODEM (self), result);
+        return;
+    }
+
+    /* Check supported SMS formats */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CMGF=?",
+                              3,
+                              TRUE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)cmgf_format_check_ready,
+                              result);
+}
+
+/*****************************************************************************/
 /* ESN loading (CDMA interface) */
 
 static gchar *
@@ -5810,6 +5925,8 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
 {
     iface->check_support = modem_messaging_check_support;
     iface->check_support_finish = modem_messaging_check_support_finish;
+    iface->setup_sms_format = modem_messaging_setup_sms_format;
+    iface->setup_sms_format_finish = modem_messaging_setup_sms_format_finish;
 }
 
 static void
