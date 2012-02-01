@@ -139,6 +139,24 @@ mm_sms_multipart_is_complete (MMSms *self)
 /*****************************************************************************/
 
 static guint
+cmp_sms_part_index (MMSmsPart *part,
+                    gpointer user_data)
+{
+    return (GPOINTER_TO_UINT (user_data) - mm_sms_part_get_index (part));
+}
+
+gboolean
+mm_sms_has_part_index (MMSms *self,
+                       guint index)
+{
+    return !!g_list_find_custom (self->priv->parts,
+                                 GUINT_TO_POINTER (index),
+                                 (GCompareFunc)cmp_sms_part_index);
+}
+
+/*****************************************************************************/
+
+static guint
 cmp_sms_part_sequence (MMSmsPart *a,
                        MMSmsPart *b)
 {
