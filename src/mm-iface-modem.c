@@ -1640,10 +1640,12 @@ unlock_check_context_free (UnlockCheckContext *ctx)
 static gboolean
 restart_initialize_idle (MMIfaceModem *self)
 {
-    mm_iface_modem_initialize (self,
-                               mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
-                               NULL,
-                               NULL);
+    MM_BASE_MODEM_GET_CLASS (self)->initialize (
+        MM_BASE_MODEM (self),
+        mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+        NULL,
+        NULL,
+        NULL);
     return FALSE;
 }
 

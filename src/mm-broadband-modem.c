@@ -5377,6 +5377,7 @@ enable (MMBaseModem *self,
 typedef enum {
     INITIALIZE_STEP_FIRST,
     INITIALIZE_STEP_IFACE_MODEM,
+    INITIALIZE_STEP_ABORT_IF_LOCKED,
     INITIALIZE_STEP_IFACE_3GPP,
     INITIALIZE_STEP_IFACE_3GPP_USSD,
     INITIALIZE_STEP_IFACE_CDMA,
@@ -5503,6 +5504,22 @@ initialize_step (InitializeContext *ctx)
                                    (GAsyncReadyCallback)iface_modem_initialize_ready,
                                    ctx);
         return;
+
+    case INITIALIZE_STEP_ABORT_IF_LOCKED:
+        /* If we find ourselves in a LOCKED state, we shouldn't keep on
+         * the initialization sequence. Instead, we will re-initialize once
+         * we are unlocked. */
+        if (ctx->self->priv->modem_state == MM_MODEM_STATE_LOCKED) {
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_WRONG_STATE,
+                                             "Modem is currently locked, "
+                                             "cannot fully initialize");
+            initialize_context_complete_and_free (ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZE_STEP_IFACE_3GPP:
         if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self))) {

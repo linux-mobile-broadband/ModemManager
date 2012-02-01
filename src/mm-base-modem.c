@@ -151,8 +151,18 @@ initialize_ready (MMBaseModem *self,
     GError *error = NULL;
 
     if (!MM_BASE_MODEM_GET_CLASS (self)->initialize_finish (self, res, &error)) {
-        mm_warn ("couldn't initialize the modem: '%s'", error->message);
-        mm_base_modem_set_valid (self, FALSE);
+        /* Wrong state is returned when modem is found locked */
+        if (g_error_matches (error,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_WRONG_STATE)) {
+            mm_dbg ("Couldn't finish initialization in the current state: '%s'",
+                    error->message);
+            mm_base_modem_set_valid (self, TRUE);
+        } else {
+            mm_warn ("couldn't initialize the modem: '%s'", error->message);
+            mm_base_modem_set_valid (self, FALSE);
+        }
+
         g_error_free (error);
         return;
     }
