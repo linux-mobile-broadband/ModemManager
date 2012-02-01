@@ -23,7 +23,9 @@
 #include <ModemManager.h>
 #include <libmm-common.h>
 
+#include "mm-marshal.h"
 #include "mm-sms-list.h"
+#include "mm-sms.h"
 #include "mm-utils.h"
 #include "mm-log.h"
 
@@ -34,8 +36,15 @@ enum {
     PROP_MODEM,
     PROP_LAST
 };
-
 static GParamSpec *properties[PROP_LAST];
+
+enum {
+    SIGNAL_ADDED,
+    SIGNAL_COMPLETED,
+    SIGNAL_DELETED,
+    SIGNAL_LAST
+};
+static guint signals[SIGNAL_LAST];
 
 struct _MMSmsListPrivate {
     /* The owner modem */
@@ -70,13 +79,99 @@ mm_sms_list_get_paths (MMSmsList *self)
 
 /*****************************************************************************/
 
+static guint
+cmp_sms_by_concat_reference (MMSms *sms,
+                             gpointer user_data)
+{
+    if (!mm_sms_is_multipart (sms))
+        return -1;
+
+    return (GPOINTER_TO_UINT (user_data) - mm_sms_get_multipart_reference (sms));
+}
+
+static guint
+cmp_sms_by_part_index (MMSms *sms,
+                       gpointer user_data)
+{
+    return !mm_sms_has_part_index (sms, GPOINTER_TO_UINT (user_data));
+}
+
+static void
+take_singlepart (MMSmsList *self,
+                 MMSmsPart *part,
+                 gboolean received)
+{
+    MMSms *sms;
+
+    sms = mm_sms_new (part);
+    self->priv->list = g_list_prepend (self->priv->list, sms);
+    g_signal_emit (self, signals[SIGNAL_ADDED], 0,
+                   mm_sms_get_path (sms),
+                   received);
+}
+
+static gboolean
+take_multipart (MMSmsList *self,
+                MMSmsPart *part,
+                gboolean received,
+                GError **error)
+{
+    GList *l;
+    MMSms *sms;
+    guint concat_reference;
+
+    concat_reference = mm_sms_part_get_concat_reference (part);
+    l = g_list_find_custom (self->priv->list,
+                            GUINT_TO_POINTER (concat_reference),
+                            (GCompareFunc)cmp_sms_by_concat_reference);
+    if (l)  {
+        sms = MM_SMS (l->data);
+        /* Try to take the part */
+        if (!mm_sms_multipart_take_part (sms, part, error))
+            return FALSE;
+    } else {
+        /* Create new Multipart */
+        sms = mm_sms_multipart_new (concat_reference,
+                                    mm_sms_part_get_concat_max (part),
+                                    part);
+        self->priv->list = g_list_prepend (self->priv->list, sms);
+        g_signal_emit (self, signals[SIGNAL_ADDED], 0,
+                       mm_sms_get_path (sms),
+                       received);
+    }
+
+    /* Check if completed */
+    if (mm_sms_multipart_is_complete (sms))
+        g_signal_emit (self, signals[SIGNAL_COMPLETED], 0,
+                       mm_sms_get_path (sms));
+
+    return TRUE;
+}
+
 gboolean
 mm_sms_list_take_part (MMSmsList *self,
                        MMSmsPart *part,
                        gboolean received,
                        GError **error)
 {
-    /* TODO */
+    /* Ensure we don't have already taken a part with the same index */
+    if (g_list_find_custom (self->priv->list,
+                            GUINT_TO_POINTER (mm_sms_part_get_index (part)),
+                            (GCompareFunc)cmp_sms_by_part_index)) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "A part with index %u was already taken",
+                     mm_sms_part_get_index (part));
+        return FALSE;
+    }
+
+    /* Did we just get a part of a multi-part SMS? */
+    if (mm_sms_part_should_concat (part))
+        return take_multipart (self, part, received, error);
+
+    /* Otherwise, we build a whole new single-part MMSms just from this part */
+    take_singlepart (self, part, received);
     return TRUE;
 }
 
@@ -160,6 +255,7 @@ mm_sms_list_class_init (MMSmsListClass *klass)
     object_class->set_property = set_property;
     object_class->dispose = dispose;
 
+    /* Properties */
     properties[PROP_MODEM] =
         g_param_spec_object (MM_SMS_LIST_MODEM,
                              "Modem",
@@ -167,4 +263,32 @@ mm_sms_list_class_init (MMSmsListClass *klass)
                              MM_TYPE_BASE_MODEM,
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_MODEM, properties[PROP_MODEM]);
+
+    /* Signals */
+    signals[SIGNAL_ADDED] =
+        g_signal_new (MM_SMS_ADDED,
+                      G_OBJECT_CLASS_TYPE (object_class),
+                      G_SIGNAL_RUN_FIRST,
+                      G_STRUCT_OFFSET (MMSmsListClass, sms_added),
+                      NULL, NULL,
+                      mm_marshal_VOID__STRING_BOOLEAN,
+                      G_TYPE_NONE, 2, G_TYPE_STRING, G_TYPE_BOOLEAN);
+
+    signals[SIGNAL_COMPLETED] =
+        g_signal_new (MM_SMS_COMPLETED,
+                      G_OBJECT_CLASS_TYPE (object_class),
+                      G_SIGNAL_RUN_FIRST,
+                      G_STRUCT_OFFSET (MMSmsListClass, sms_completed),
+                      NULL, NULL,
+                      mm_marshal_VOID__STRING,
+                      G_TYPE_NONE, 1, G_TYPE_STRING);
+
+    signals[SIGNAL_DELETED] =
+        g_signal_new (MM_SMS_DELETED,
+                      G_OBJECT_CLASS_TYPE (object_class),
+                      G_SIGNAL_RUN_FIRST,
+                      G_STRUCT_OFFSET (MMSmsListClass, sms_deleted),
+                      NULL, NULL,
+                      mm_marshal_VOID__STRING,
+                      G_TYPE_NONE, 1, G_TYPE_STRING);
 }
