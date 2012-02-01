@@ -5145,61 +5145,60 @@ sms_list_done (MMAtSerialPort *port,
     GPtrArray *results = NULL;
     int rv, status, tpdu_len, offset;
     char *rstr;
+    GHashTableIter iter;
+    GHashTable *properties = NULL;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
     if (mm_callback_info_check_modem_removed (info))
         return;
 
-    if (error)
+    if (error) {
         info->error = g_error_copy (error);
-    else {
-        GHashTableIter iter;
-        gpointer key, value;
-        results = g_ptr_array_new ();
-        rstr = response->str;
-
-        while (*rstr) {
-            GHashTable *properties;
-            GError *local;
-            int idx;
-            char pdu[SMS_MAX_PDU_LEN + 1];
-
-            rv = sscanf (rstr, "+CMGL: %d,%d,,%d %344s %n",
-                         &idx, &status, &tpdu_len, pdu, &offset);
-            if (4 != rv) {
-                mm_err("Couldn't parse response to SMS LIST (%d)", rv);
-                break;
-            }
-            rstr += offset;
-
-            properties = sms_parse_pdu (pdu, &local);
-            if (properties) {
-                g_hash_table_insert (properties, "index",
-                                     simple_uint_value (idx));
-                sms_cache_insert (info->modem, properties, idx);
-                /* The cache holds a reference, so we don't need it anymore */
-                g_hash_table_unref (properties);
-            } else {
-                /* Ignore the error */
-                g_clear_error(&local);
-            }
-        }
-
-        /* Add all the complete messages to the results */
-        g_hash_table_iter_init (&iter, priv->sms_contents);
-        while (g_hash_table_iter_next (&iter, &key, &value)) {
-            GHashTable *properties = value;
-            g_hash_table_ref (properties);
-            properties = sms_cache_lookup_full (info->modem, properties,
-                                                &info->error);
-            if (properties)
-                g_ptr_array_add (results, properties);
-        }
-        if (results)
-            mm_callback_info_set_data (info, "list-sms", results,
-                                       free_list_results);
+        mm_callback_info_schedule (info);
+        return;
     }
+
+    results = g_ptr_array_new ();
+    rstr = response->str;
+    while (*rstr) {
+        GError *local;
+        int idx;
+        char pdu[SMS_MAX_PDU_LEN + 1];
+
+        rv = sscanf (rstr, "+CMGL: %d,%d,,%d %344s %n",
+                     &idx, &status, &tpdu_len, pdu, &offset);
+        if (4 != rv) {
+            mm_err("Couldn't parse response to SMS LIST (%d)", rv);
+            break;
+        }
+        rstr += offset;
+
+        properties = sms_parse_pdu (pdu, &local);
+        if (properties) {
+            g_hash_table_insert (properties, "index",
+                                 simple_uint_value (idx));
+            sms_cache_insert (info->modem, properties, idx);
+            /* The cache holds a reference, so we don't need it anymore */
+            g_hash_table_unref (properties);
+        } else {
+            /* Ignore the error */
+            g_clear_error(&local);
+        }
+    }
+
+    /* Add all the complete messages to the results */
+    properties = NULL;
+    g_hash_table_iter_init (&iter, priv->sms_contents);
+    while (g_hash_table_iter_next (&iter, NULL, (gpointer) &properties)) {
+        g_hash_table_ref (properties);
+        g_clear_error (&info->error);
+        properties = sms_cache_lookup_full (info->modem, properties, &info->error);
+        if (properties)
+            g_ptr_array_add (results, properties);
+    }
+    if (results)
+        mm_callback_info_set_data (info, "list-sms", results, free_list_results);
 
     mm_callback_info_schedule (info);
 }
@@ -5234,7 +5233,10 @@ sms_list (MMModemGsmSms *modem,
         return;
     }
 
-    command = g_strdup_printf ("+CMGL=4");
+    if (MM_GENERIC_GSM_GET_PRIVATE (modem)->sms_pdu_mode)
+        command = g_strdup_printf ("+CMGL=4");
+    else
+        command = g_strdup_printf ("+CMGL=\"ALL\"");
     mm_at_serial_port_queue_command (port, command, 10, sms_list_done, info);
 }
 
