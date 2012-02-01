@@ -218,13 +218,15 @@ struct _MMSmsPart {
     gchar *smsc;
     gchar *timestamp;
     gchar *number;
-    guint concat_reference;
-    guint concat_max;
-    guint concat_sequence;
     gchar *text;
     GByteArray *data;
     guint data_coding_scheme;
     guint class;
+
+    gboolean should_concat;
+    guint concat_reference;
+    guint concat_max;
+    guint concat_sequence;
 };
 
 void
@@ -257,6 +259,12 @@ PART_GET_FUNC (const gchar *, text)
 PART_GET_FUNC (const GByteArray *, data)
 PART_GET_FUNC (guint, data_coding_scheme)
 PART_GET_FUNC (guint, class)
+
+gboolean
+mm_sms_part_should_concat (MMSmsPart *self)
+{
+    return self->should_concat;
+}
 
 MMSmsPart *
 mm_sms_part_new (guint index,
@@ -382,6 +390,7 @@ mm_sms_part_new (guint index,
                         pdu[offset + 2] > pdu[offset + 1])
                         break;
 
+                    sms_part->should_concat = TRUE;
                     sms_part->concat_reference = pdu[offset];
                     sms_part->concat_max = pdu[offset + 1];
                     sms_part->concat_sequence = pdu[offset + 2];
@@ -392,6 +401,7 @@ mm_sms_part_new (guint index,
                         pdu[offset + 3] > pdu[offset + 2])
                         break;
 
+                    sms_part->should_concat = TRUE;
                     sms_part->concat_reference = (pdu[offset] << 8) | pdu[offset + 1];
                     sms_part->concat_max = pdu[offset + 2];
                     sms_part->concat_sequence = pdu[offset + 3];

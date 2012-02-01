@@ -32,12 +32,14 @@ guint             mm_sms_part_get_index              (MMSmsPart *part);
 const gchar      *mm_sms_part_get_smsc               (MMSmsPart *part);
 const gchar      *mm_sms_part_get_number             (MMSmsPart *part);
 const gchar      *mm_sms_part_get_timestamp          (MMSmsPart *part);
-guint             mm_sms_part_get_concat_reference   (MMSmsPart *part);
-guint             mm_sms_part_get_concat_max         (MMSmsPart *part);
-guint             mm_sms_part_get_concat_sequence    (MMSmsPart *part);
 const gchar      *mm_sms_part_get_text               (MMSmsPart *part);
 const GByteArray *mm_sms_part_get_data               (MMSmsPart *part);
 guint             mm_sms_part_get_data_coding_scheme (MMSmsPart *part);
 guint             mm_sms_part_get_class              (MMSmsPart *part);
+
+gboolean          mm_sms_part_should_concat          (MMSmsPart *part);
+guint             mm_sms_part_get_concat_reference   (MMSmsPart *part);
+guint             mm_sms_part_get_concat_max         (MMSmsPart *part);
+guint             mm_sms_part_get_concat_sequence    (MMSmsPart *part);
 
 #endif /* MM_SMS_PART_H */
