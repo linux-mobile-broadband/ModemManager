@@ -3518,13 +3518,11 @@ cmgf_format_check_ready (MMBroadbandModem *self,
         mm_dbg ("Failed to query supported SMS modes: '%s'",
                 error->message);
         g_error_free (error);
-        self->priv->sms_use_pdu_mode = FALSE;
-    } else
-        /* If the modem only supports PDU mode, use PDUs; otherwise try text mode.
-         * FIXME: when the PDU code is more robust, default to PDU if the
-         * modem supports it.
-         */
-        self->priv->sms_use_pdu_mode = (sms_pdu_supported && !sms_text_supported);
+    }
+
+    /* FIXME: we currently default to using PDU modem always, until we provide
+     * full support for text mode. */
+    self->priv->sms_use_pdu_mode = TRUE;
 
     self->priv->sms_supported_modes_checked = TRUE;
 
