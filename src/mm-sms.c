@@ -156,6 +156,118 @@ mm_sms_has_part_index (MMSms *self,
 
 /*****************************************************************************/
 
+typedef struct {
+    MMSms *self;
+    MMBaseModem *modem;
+    GSimpleAsyncResult *result;
+    MMSmsPart *current;
+    guint n_failed;
+} SmsDeletePartsContext;
+
+static void
+sms_delete_parts_context_complete_and_free (SmsDeletePartsContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    if (ctx->current)
+        mm_sms_part_free (ctx->current);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+gboolean
+mm_sms_delete_parts_finish (MMSms *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void delete_next_part (SmsDeletePartsContext *ctx);
+
+static void
+delete_part_ready (MMBaseModem *modem,
+                   GAsyncResult *res,
+                   SmsDeletePartsContext *ctx)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error);
+    if (error) {
+        ctx->n_failed++;
+        mm_dbg ("Couldn't delete SMS part with index %u: '%s'",
+                mm_sms_part_get_index (ctx->current),
+                error->message);
+        g_error_free (error);
+    }
+
+    delete_next_part (ctx);
+}
+
+static void
+delete_next_part (SmsDeletePartsContext *ctx)
+{
+    gchar *cmd;
+
+    if (ctx->current) {
+        mm_sms_part_free (ctx->current);
+        ctx->current = NULL;
+    }
+
+    /* If all removed, we're done */
+    if (!ctx->self->priv->parts) {
+        if (ctx->n_failed > 0)
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Couldn't delete %u parts from this SMS",
+                                             ctx->n_failed);
+        else
+            g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        sms_delete_parts_context_complete_and_free (ctx);
+        return;
+    }
+
+    ctx->current = ctx->self->priv->parts->data;
+    ctx->self->priv->parts = g_list_delete_link (ctx->self->priv->parts, ctx->self->priv->parts);
+
+    cmd = g_strdup_printf ("+CMGD=%d",
+                           mm_sms_part_get_index (ctx->current));
+    mm_base_modem_at_command (ctx->modem,
+                              cmd,
+                              10,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)delete_part_ready,
+                              ctx);
+    g_free (cmd);
+}
+
+void
+mm_sms_delete_parts (MMSms *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    SmsDeletePartsContext *ctx;
+
+    ctx = g_new0 (SmsDeletePartsContext, 1);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_sms_delete_parts);
+    ctx->self = g_object_ref (self);
+    ctx->modem = g_object_ref (self->priv->modem);
+
+    /* Before really removing the parts, we make sure we unexport the object */
+    mm_sms_dbus_unexport (self);
+
+    /* Go on deleting parts */
+    delete_next_part (ctx);
+}
+
+/*****************************************************************************/
+
 static guint
 cmp_sms_part_sequence (MMSmsPart *a,
                        MMSmsPart *b)

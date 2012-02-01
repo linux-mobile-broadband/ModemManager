@@ -74,4 +74,11 @@ gboolean     mm_sms_is_multipart            (MMSms *self);
 guint        mm_sms_get_multipart_reference (MMSms *self);
 gboolean     mm_sms_multipart_is_complete   (MMSms *self);
 
+void     mm_sms_delete_parts        (MMSms *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data);
+gboolean mm_sms_delete_parts_finish (MMSms *self,
+                                     GAsyncResult *res,
+                                     GError **error);
+
 #endif /* MM_SMS_H */
