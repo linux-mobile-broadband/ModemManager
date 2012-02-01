@@ -27,11 +27,9 @@
 #include "mm-serial-parsers.h"
 #include "mm-log.h"
 
-static void modem_init (MMModem *modem_class);
 static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
 
 G_DEFINE_TYPE_EXTENDED (MMModemWavecomGsm, mm_modem_wavecom_gsm, MM_TYPE_GENERIC_GSM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init))
 
 /* Bit flags for mobile station classes supported by the modem */
@@ -159,31 +157,16 @@ wavecom_ms_class_to_str (WavecomMSClass class)
     }
 }
 
-static gboolean
-grab_port (MMModem *modem,
-           const char *subsys,
-           const char *name,
-           MMPortType suggested_type,
-           gpointer user_data,
-           GError **error)
+static void
+port_grabbed (MMGenericGsm *gsm,
+              MMPort *port,
+              MMAtPortFlags pflags,
+              gpointer user_data)
 {
-    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
-    MMPortType ptype = MM_PORT_TYPE_IGNORED;
-    MMPort *port = NULL;
+    gpointer parser;
+    GRegex *regex;
 
-    if (suggested_type == MM_PORT_TYPE_UNKNOWN) {
-        if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY))
-            ptype = MM_PORT_TYPE_PRIMARY;
-        else if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY))
-            ptype = MM_PORT_TYPE_SECONDARY;
-    } else
-        ptype = suggested_type;
-
-    port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
-    if (port && MM_IS_AT_SERIAL_PORT (port)) {
-        gpointer parser;
-        GRegex *regex;
-
+    if (MM_IS_AT_SERIAL_PORT (port)) {
         parser = mm_serial_parser_v1_new ();
 
         /* AT+CPIN? replies will never have an OK appended */
@@ -198,8 +181,6 @@ grab_port (MMModem *modem,
                                                parser,
                                                mm_serial_parser_v1_destroy);
     }
-
-    return !!port;
 }
 
 static void
@@ -1131,7 +1112,7 @@ do_enable_power_up_check_needed (MMGenericGsm *self,
     info = mm_callback_info_uint_new (MM_MODEM (self), callback, user_data);
 
     /* Get port */
-    primary = mm_generic_gsm_get_at_port (self, MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (self, MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     /* Get current functionality status */
@@ -1140,12 +1121,6 @@ do_enable_power_up_check_needed (MMGenericGsm *self,
 }
 
 /*****************************************************************************/
-
-static void
-modem_init (MMModem *modem_class)
-{
-    modem_class->grab_port = grab_port;
-}
 
 static void
 modem_gsm_network_init (MMModemGsmNetwork *network_class)
@@ -1189,6 +1164,7 @@ mm_modem_wavecom_gsm_class_init (MMModemWavecomGsmClass *klass)
                                       MM_GENERIC_GSM_PROP_POWER_DOWN_CMD,
                                       MM_GENERIC_GSM_POWER_DOWN_CMD);
 
+    gsm_class->port_grabbed = port_grabbed;
     gsm_class->do_enable_power_up_check_needed = do_enable_power_up_check_needed;
     gsm_class->do_enable_power_up_done = do_enable_power_up_done;
     gsm_class->set_allowed_mode = set_allowed_mode;

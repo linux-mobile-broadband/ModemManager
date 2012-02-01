@@ -26,10 +26,7 @@
 #define LINKTOP_NETWORK_MODE_2G   5
 #define LINKTOP_NETWORK_MODE_3G   6
 
-static void modem_init (MMModem *modem_class);
-
-G_DEFINE_TYPE_EXTENDED (MMModemLinktop, mm_modem_linktop, MM_TYPE_GENERIC_GSM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init))
+G_DEFINE_TYPE (MMModemLinktop, mm_modem_linktop, MM_TYPE_GENERIC_GSM)
 
 
 MMModem *
@@ -52,35 +49,18 @@ mm_modem_linktop_new (const char *device,
                                    NULL));
 }
 
-static gboolean
-grab_port (MMModem *modem,
-           const char *subsys,
-           const char *name,
-           MMPortType suggested_type,
-           gpointer user_data,
-           GError **error)
+static void
+port_grabbed (MMGenericGsm *gsm,
+              MMPort *port,
+              MMAtPortFlags pflags,
+              gpointer user_data)
 {
-    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
-    MMPortType ptype = MM_PORT_TYPE_IGNORED;
-    MMPort *port = NULL;
-
-    if (suggested_type == MM_PORT_TYPE_UNKNOWN) {
-        if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY))
-                ptype = MM_PORT_TYPE_PRIMARY;
-        else if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY))
-            ptype = MM_PORT_TYPE_SECONDARY;
-    } else
-        ptype = suggested_type;
-
-    port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
-    if (port && MM_IS_AT_SERIAL_PORT (port)) {
+    if (MM_IS_AT_SERIAL_PORT (port)) {
         mm_at_serial_port_set_response_parser (MM_AT_SERIAL_PORT (port),
                                                mm_serial_parser_v1_e1_parse,
                                                mm_serial_parser_v1_e1_new (),
                                                mm_serial_parser_v1_e1_destroy);
     }
-
-    return !!port;
 }
 
 static int
@@ -197,12 +177,6 @@ get_allowed_mode (MMGenericGsm *gsm,
 /*****************************************************************************/
 
 static void
-modem_init (MMModem *modem_class)
-{
-    modem_class->grab_port = grab_port;
-}
-
-static void
 mm_modem_linktop_init (MMModemLinktop *self)
 {
 }
@@ -212,6 +186,7 @@ mm_modem_linktop_class_init (MMModemLinktopClass *klass)
 {
     MMGenericGsmClass *gsm_class = MM_GENERIC_GSM_CLASS (klass);
 
+    gsm_class->port_grabbed = port_grabbed;
     gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->set_allowed_mode = set_allowed_mode;
 }

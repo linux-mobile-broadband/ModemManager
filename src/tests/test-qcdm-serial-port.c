@@ -215,7 +215,7 @@ qcdm_test_child (int fd, VerInfoCb cb)
 
     loop = g_main_loop_new (NULL, FALSE);
 
-    port = mm_qcdm_serial_port_new_fd (fd, MM_PORT_TYPE_PRIMARY);
+    port = mm_qcdm_serial_port_new_fd (fd);
     g_assert (port);
 
     success = mm_serial_port_open (MM_SERIAL_PORT (port), &error);

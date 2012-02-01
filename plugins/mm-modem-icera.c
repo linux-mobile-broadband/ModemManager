@@ -325,7 +325,7 @@ mm_modem_icera_do_disconnect (MMGenericGsm *gsm,
 
     info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
 
-    primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (gsm, MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     command = g_strdup_printf ("%%IPDPACT=%d,0", cid);
@@ -445,7 +445,7 @@ connection_enabled (MMAtSerialPort *port,
         break;
     case 3:
         /* Call setup failure? */
-        primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM(self), MM_PORT_TYPE_PRIMARY);
+        primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM(self), MM_AT_PORT_FLAG_PRIMARY);
         g_assert (primary);
         /* Get additional error details */
         mm_at_serial_port_queue_command (primary, "AT%IER?", 3,
@@ -481,7 +481,7 @@ icera_call_control (MMModemIcera *self,
     char *command;
     MMAtSerialPort *primary;
 
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     command = g_strdup_printf ("%%IPDPACT=%d,%d", _get_cid (self), activate ? 1 : 0);
@@ -600,7 +600,7 @@ mm_modem_icera_do_connect (MMModemIcera *self,
 
     info = mm_callback_info_new (modem, callback, user_data);
 
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     cid = _get_cid (self);
@@ -721,7 +721,7 @@ mm_modem_icera_get_ip4_config (MMModemIcera *self,
                                       G_CALLBACK (callback),
                                       user_data);
 
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     command = g_strdup_printf ("%%IPDPADDR=%d", _get_cid (self));
@@ -814,7 +814,7 @@ mm_modem_icera_get_local_timestamp (MMModemIcera *self,
 
     info = mm_callback_info_icera_timestamp_new (self, callback, user_data);
 
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     mm_at_serial_port_queue_command (primary, "*TLTS", 3, get_local_timestamp_done, info);
@@ -876,7 +876,7 @@ mm_modem_icera_change_unsolicited_messages (MMModemIcera *self, gboolean enabled
 {
     MMAtSerialPort *primary;
 
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     mm_at_serial_port_queue_command (primary, enabled ? "%NWSTATE=1" : "%NWSTATE=0", 3, NULL, NULL);

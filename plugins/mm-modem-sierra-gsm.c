@@ -163,7 +163,7 @@ get_allowed_mode (MMGenericGsm *gsm,
     info = mm_callback_info_uint_new (MM_MODEM (gsm), callback, user_data);
 
     /* Sierra secondary ports don't have full AT command interpreters */
-    primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (gsm, MM_AT_PORT_FLAG_PRIMARY);
     if (!primary || mm_port_get_connected (MM_PORT (primary))) {
         g_set_error_literal (&info->error, MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
                              "Cannot perform this operation while connected");
@@ -213,7 +213,7 @@ set_allowed_mode (MMGenericGsm *gsm,
     info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
 
     /* Sierra secondary ports don't have full AT command interpreters */
-    primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (gsm, MM_AT_PORT_FLAG_PRIMARY);
     if (!primary || mm_port_get_connected (MM_PORT (primary))) {
         g_set_error_literal (&info->error, MM_MODEM_ERROR, MM_MODEM_ERROR_CONNECTED,
                              "Cannot perform this operation while connected");
@@ -433,6 +433,7 @@ real_do_enable_power_up_done (MMGenericGsm *gsm,
                               MMCallbackInfo *info)
 {
     MMModemSierraGsmPrivate *priv = MM_MODEM_SIERRA_GSM_GET_PRIVATE (gsm);
+    char *driver = NULL;
 
     if (error) {
         /* Chain up to parent */
@@ -440,11 +441,17 @@ real_do_enable_power_up_done (MMGenericGsm *gsm,
         return;
     }
 
-    /* Some Sierra devices return OK on +CFUN=1 right away but need some time
-     * to finish initialization.
+    /* Old Sierra devices (like the PCMCIA-based 860) return OK on +CFUN=1 right
+     * away but need some time to finish initialization.  Anything driven by
+     * 'sierra' is new enough to need no delay.
      */
-    g_warn_if_fail (priv->enable_wait_id == 0);
-    priv->enable_wait_id = g_timeout_add_seconds (10, sierra_enabled, info);
+    g_object_get (G_OBJECT (gsm), MM_MODEM_DRIVER, &driver, NULL);
+    if (g_strcmp0 (driver, "sierra") == 0)
+        sierra_enabled (info);
+    else {
+        g_warn_if_fail (priv->enable_wait_id == 0);
+        priv->enable_wait_id = g_timeout_add_seconds (10, sierra_enabled, info);
+    }
 }
 
 static void
@@ -497,7 +504,7 @@ do_enable_power_up_check_needed (MMGenericGsm *self,
     info = mm_callback_info_uint_new (MM_MODEM (self), callback, user_data);
 
     /* Get port */
-    primary = mm_generic_gsm_get_at_port (self, MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (self, MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     /* Get current functionality status */
@@ -505,47 +512,27 @@ do_enable_power_up_check_needed (MMGenericGsm *self,
     mm_at_serial_port_queue_command (primary, "+CFUN?", 3, get_current_functionality_status_cb, info);
 }
 
-static gboolean
-grab_port (MMModem *modem,
-           const char *subsys,
-           const char *name,
-           MMPortType suggested_type,
-           gpointer user_data,
-           GError **error)
+static void
+port_grabbed (MMGenericGsm *gsm,
+              MMPort *port,
+              MMAtPortFlags pflags,
+              gpointer user_data)
 {
-    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
-    MMPortType ptype = MM_PORT_TYPE_IGNORED;
-    MMPort *port;
+    GRegex *regex;
 
-    if (suggested_type == MM_PORT_TYPE_UNKNOWN) {
-        if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY))
-                ptype = MM_PORT_TYPE_PRIMARY;
-        else if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY))
-            ptype = MM_PORT_TYPE_SECONDARY;
-    } else
-        ptype = suggested_type;
+    if (MM_IS_AT_SERIAL_PORT (port)) {
+        g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
 
-    port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
+        regex = g_regex_new ("\\r\\n\\+PACSP0\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
 
-    if (port) {
-        if (MM_IS_AT_SERIAL_PORT (port)) {
-            GRegex *regex;
-
-            g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
-
-            regex = g_regex_new ("\\r\\n\\+PACSP0\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
-            g_regex_unref (regex);
-
-            /* Add Icera-specific handlers */
-            mm_modem_icera_register_unsolicted_handlers (MM_MODEM_ICERA (gsm), MM_AT_SERIAL_PORT (port));
-        } else if (mm_port_get_subsys (port) == MM_PORT_SUBSYS_NET) {
-            MM_MODEM_SIERRA_GSM_GET_PRIVATE (gsm)->has_net = TRUE;
-            g_object_set (G_OBJECT (gsm), MM_MODEM_IP_METHOD, MM_MODEM_IP_METHOD_DHCP, NULL);
-        }
+        /* Add Icera-specific handlers */
+        mm_modem_icera_register_unsolicted_handlers (MM_MODEM_ICERA (gsm), MM_AT_SERIAL_PORT (port));
+    } else if (mm_port_get_subsys (port) == MM_PORT_SUBSYS_NET) {
+        MM_MODEM_SIERRA_GSM_GET_PRIVATE (gsm)->has_net = TRUE;
+        g_object_set (G_OBJECT (gsm), MM_MODEM_IP_METHOD, MM_MODEM_IP_METHOD_DHCP, NULL);
     }
-
-    return !!port;
 }
 
 static void
@@ -740,7 +727,7 @@ do_disconnect (MMGenericGsm *gsm,
         MMAtSerialPort *primary;
         char *command;
 
-        primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
+        primary = mm_generic_gsm_get_at_port (gsm, MM_AT_PORT_FLAG_PRIMARY);
         g_assert (primary);
 
         /* If we have a net interface, deactivate it */
@@ -801,7 +788,7 @@ do_disable (MMModem *modem,
                                       (GCallback)callback,
                                       user_data);
 
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     /* Turn off unsolicited responses */
@@ -872,7 +859,6 @@ get_icera_private (MMModemIcera *icera)
 static void
 modem_init (MMModem *modem_class)
 {
-    modem_class->grab_port = grab_port;
     modem_class->connect = do_connect;
     modem_class->disable = do_disable;
     modem_class->get_ip4_config = get_ip4_config;
@@ -919,6 +905,7 @@ mm_modem_sierra_gsm_class_init (MMModemSierraGsmClass *klass)
     g_type_class_add_private (object_class, sizeof (MMModemSierraGsmPrivate));
 
     object_class->dispose = dispose;
+    gsm_class->port_grabbed = port_grabbed;
     gsm_class->do_enable_power_up_check_needed = do_enable_power_up_check_needed;
     gsm_class->do_enable_power_up_done = real_do_enable_power_up_done;
     gsm_class->set_allowed_mode = set_allowed_mode;

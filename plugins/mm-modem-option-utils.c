@@ -430,7 +430,7 @@ option_change_unsolicited_messages (MMGenericGsm *modem,
         mm_callback_info_chain_start (info, 4);
     }
 
-    primary = mm_generic_gsm_get_at_port (modem, MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (modem, MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     mm_at_serial_port_queue_command (primary, enabled ? "_OSSYS=1" : "_OSSYS=0", 3, unsolicited_msg_done, info);

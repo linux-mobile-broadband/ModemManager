@@ -151,7 +151,7 @@ _internal_hso_modem_authenticate (MMModemHso *self, MMCallbackInfo *info)
     gint cid;
     char *command;
 
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     cid = hso_get_cid (self);
@@ -291,7 +291,7 @@ hso_call_control (MMModemHso *self,
     mm_callback_info_set_data (info, IGNORE_ERRORS_TAG, GUINT_TO_POINTER (ignore_errors), NULL);
 
     command = g_strdup_printf ("AT_OWANCALL=%d,%d,1", hso_get_cid (self), activate ? 1 : 0);
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
     mm_at_serial_port_queue_command (primary, command, 3, hso_call_control_done, info);
     g_free (command);
@@ -567,7 +567,7 @@ get_ip4_config (MMModem *modem,
 
     info = mm_callback_info_new_full (modem, ip4_config_invoke, G_CALLBACK (callback), user_data);
     command = g_strdup_printf ("AT_OWANDATA=%d", hso_get_cid (MM_MODEM_HSO (modem)));
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
     mm_at_serial_port_queue_command (primary, command, 3, get_ip4_config_done, info);
     g_free (command);
@@ -603,7 +603,7 @@ do_disconnect (MMGenericGsm *gsm,
 
     info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
 
-    primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (gsm, MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     command = g_strdup_printf ("AT_OWANCALL=%d,0,0", cid);
@@ -724,80 +724,34 @@ get_access_technology (MMGenericGsm *gsm,
 
 /*****************************************************************************/
 
-static gboolean
-grab_port (MMModem *modem,
-           const char *subsys,
-           const char *name,
-           MMPortType suggested_type,
-           gpointer user_data,
-           GError **error)
+static void
+port_grabbed (MMGenericGsm *gsm,
+              MMPort *port,
+              MMAtPortFlags pflags,
+              gpointer user_data)
 {
-    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
-    MMPortType ptype = MM_PORT_TYPE_IGNORED;
-    const char *sys[] = { "tty", "net", NULL };
-    GUdevClient *client;
-    GUdevDevice *device = NULL;
-    MMPort *port = NULL;
-    const char *sysfs_path;
-
-    client = g_udev_client_new (sys);
-    if (!client) {
-        g_set_error (error, 0, 0, "Could not get udev client.");
-        return FALSE;
-    }
-
-    device = g_udev_client_query_by_subsystem_and_name (client, subsys, name);
-    if (!device) {
-        g_set_error (error, 0, 0, "Could not get udev device.");
-        goto out;
-    }
-
-    sysfs_path = g_udev_device_get_sysfs_path (device);
-    if (!sysfs_path) {
-        g_set_error (error, 0, 0, "Could not get udev device sysfs path.");
-        goto out;
-    }
-
-    if (!strcmp (subsys, "tty")) {
-        char *hsotype_path;
-        char *contents = NULL;
-
-        hsotype_path = g_build_filename (sysfs_path, "hsotype", NULL);
-        if (g_file_get_contents (hsotype_path, &contents, NULL, NULL)) {
-            if (g_str_has_prefix (contents, "Control"))
-                ptype = MM_PORT_TYPE_PRIMARY;
-            else if (g_str_has_prefix (contents, "Application") || g_str_has_prefix (contents, "Application2"))
-                ptype = MM_PORT_TYPE_SECONDARY;
-            g_free (contents);
-        }
-        g_free (hsotype_path);
-    }
-
-    port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
-    if (!port)
-        goto out;
+    GRegex *regex;
 
     if (MM_IS_AT_SERIAL_PORT (port)) {
         g_object_set (G_OBJECT (port), MM_SERIAL_PORT_SEND_DELAY, (guint64) 0, NULL);
-        if (ptype == MM_PORT_TYPE_PRIMARY) {
-            GRegex *regex;
 
-            regex = g_regex_new ("_OWANCALL: (\\d),\\s*(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, connection_enabled, modem, NULL);
-            g_regex_unref (regex);
+        regex = g_regex_new ("\\r\\n\\+PACSP0\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
 
-            regex = g_regex_new ("\\r\\n\\+PACSP0\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
-            g_regex_unref (regex);
-        }
         option_register_unsolicted_handlers (gsm, MM_AT_SERIAL_PORT (port));
     }
+}
 
-out:
-    if (device)
-        g_object_unref (device);
-    g_object_unref (client);
-    return !!port;
+
+static void
+ports_organized (MMGenericGsm *gsm, MMAtSerialPort *primary)
+{
+    GRegex *regex;
+
+    regex = g_regex_new ("_OWANCALL: (\\d),\\s*(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    mm_at_serial_port_add_unsolicited_msg_handler (primary, regex, connection_enabled, gsm, NULL);
+    g_regex_unref (regex);
 }
 
 /*****************************************************************************/
@@ -819,7 +773,6 @@ modem_init (MMModem *modem_class)
     modem_class->disable = disable;
     modem_class->connect = do_connect;
     modem_class->get_ip4_config = get_ip4_config;
-    modem_class->grab_port = grab_port;
 }
 
 static void
@@ -848,6 +801,8 @@ mm_modem_hso_class_init (MMModemHsoClass *klass)
 
     /* Virtual methods */
     object_class->finalize = finalize;
+    gsm_class->port_grabbed = port_grabbed;
+    gsm_class->ports_organized = ports_organized;
     gsm_class->do_disconnect = do_disconnect;
     gsm_class->do_enable_power_up_done = real_do_enable_power_up_done;
     gsm_class->set_allowed_mode = set_allowed_mode;

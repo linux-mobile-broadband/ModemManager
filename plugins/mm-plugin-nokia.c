@@ -135,7 +135,8 @@ grab_port (MMPluginBase *base,
     const char *name, *subsys, *devfile, *sysfs_path;
     guint32 caps;
     guint16 vendor = 0, product = 0;
-    MMPortType ptype = MM_PORT_TYPE_UNKNOWN;
+    MMPortType ptype;
+    MMAtPortFlags pflags = MM_AT_PORT_FLAG_NONE;
 
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
@@ -156,12 +157,13 @@ grab_port (MMPluginBase *base,
 
     /* Look for port type hints */
     if (g_udev_device_get_property_as_boolean (port, "ID_MM_NOKIA_PORT_TYPE_MODEM"))
-        ptype = MM_PORT_TYPE_PRIMARY;
+        pflags = MM_AT_PORT_FLAG_PRIMARY;
     else if (g_udev_device_get_property_as_boolean (port, "ID_MM_NOKIA_PORT_TYPE_AUX"))
-        ptype = MM_PORT_TYPE_SECONDARY;
+        pflags = MM_AT_PORT_FLAG_SECONDARY;
 
     caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
     sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
+    ptype = mm_plugin_base_probed_capabilities_to_port_type (caps);
     if (!existing) {
         if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
             modem = mm_modem_nokia_new (sysfs_path,
@@ -180,14 +182,14 @@ grab_port (MMPluginBase *base,
         }
 
         if (modem) {
-            if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error)) {
+            if (!mm_modem_grab_port (modem, subsys, name, ptype, pflags, NULL, error)) {
                 g_object_unref (modem);
                 return NULL;
             }
         }
     } else if (get_level_for_capabilities (caps)) {
         modem = existing;
-        if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error))
+        if (!mm_modem_grab_port (modem, subsys, name, ptype, pflags, NULL, error))
             return NULL;
     }
 

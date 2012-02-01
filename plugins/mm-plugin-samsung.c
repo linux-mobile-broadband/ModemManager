@@ -110,6 +110,7 @@ grab_port (MMPluginBase *base,
     MMModem *modem = NULL;
     guint32 caps;
     const char *name, *subsys, *sysfs_path;
+    MMPortType ptype;
 
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
@@ -123,6 +124,7 @@ grab_port (MMPluginBase *base,
         return NULL;
     }
 
+    ptype = mm_plugin_base_probed_capabilities_to_port_type (caps);
     sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
     if (!existing) {
         modem = mm_modem_samsung_gsm_new (sysfs_path,
@@ -130,14 +132,14 @@ grab_port (MMPluginBase *base,
                                           mm_plugin_get_name (MM_PLUGIN (base)));
 
         if (modem) {
-            if (!mm_modem_grab_port (modem, subsys, name, MM_PORT_TYPE_UNKNOWN, NULL, error)) {
+            if (!mm_modem_grab_port (modem, subsys, name, ptype, MM_AT_PORT_FLAG_NONE, NULL, error)) {
                 g_object_unref (modem);
                 return NULL;
             }
         }
     } else {
         modem = existing;
-        if (!mm_modem_grab_port (modem, subsys, name, MM_PORT_TYPE_UNKNOWN, NULL, error))
+        if (!mm_modem_grab_port (modem, subsys, name, ptype, MM_AT_PORT_FLAG_NONE, NULL, error))
             return NULL;
     }
 

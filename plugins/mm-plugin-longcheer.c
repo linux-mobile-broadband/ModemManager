@@ -173,7 +173,8 @@ grab_port (MMPluginBase *base,
     MMModem *modem = NULL;
     const char *name, *subsys, *sysfs_path;
     guint32 caps;
-    MMPortType ptype = MM_PORT_TYPE_UNKNOWN;
+    MMPortType ptype;
+    MMAtPortFlags pflags = MM_AT_PORT_FLAG_NONE;
     guint16 vendor = 0, product = 0;
 
     port = mm_plugin_base_supports_task_get_port (task);
@@ -184,15 +185,18 @@ grab_port (MMPluginBase *base,
      * what the Windows .INF files say the port layout should be.
      */
     if (g_udev_device_get_property_as_boolean (port, "ID_MM_LONGCHEER_PORT_TYPE_MODEM"))
-        ptype = MM_PORT_TYPE_PRIMARY;
+        pflags = MM_AT_PORT_FLAG_PRIMARY;
     else if (g_udev_device_get_property_as_boolean (port, "ID_MM_LONGCHEER_PORT_TYPE_AUX"))
-        ptype = MM_PORT_TYPE_SECONDARY;
+        pflags = MM_AT_PORT_FLAG_SECONDARY;
 
-    /* If the device was tagged by the udev rules, then ignore any other ports
-     * to guard against race conditions if a device just happens to show up
-     * with more than two AT-capable ports.
+    caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
+    ptype = mm_plugin_base_probed_capabilities_to_port_type (caps);
+
+    /* If the port was tagged by the udev rules but isn't a primary or secondary,
+     * then ignore it to guard against race conditions if a device just happens
+     * to show up with more than two AT-capable ports.
      */
-    if (   (ptype == MM_PORT_TYPE_UNKNOWN)
+    if (   (pflags == MM_AT_PORT_FLAG_NONE)
         && g_udev_device_get_property_as_boolean (port, "ID_MM_LONGCHEER_TAGGED"))
         ptype = MM_PORT_TYPE_IGNORED;
 
@@ -204,7 +208,6 @@ grab_port (MMPluginBase *base,
         return NULL;
     }
 
-    caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
     sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
     if (!existing) {
         if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
@@ -224,17 +227,14 @@ grab_port (MMPluginBase *base,
         }
 
         if (modem) {
-            if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error)) {
+            if (!mm_modem_grab_port (modem, subsys, name, ptype, pflags, NULL, error)) {
                 g_object_unref (modem);
                 return NULL;
             }
         }
     } else if (get_level_for_capabilities (caps)) {
-        if (caps & MM_PLUGIN_BASE_PORT_CAP_QCDM)
-            ptype = MM_PORT_TYPE_QCDM;
-
         modem = existing;
-        if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error))
+        if (!mm_modem_grab_port (modem, subsys, name, ptype, pflags, NULL, error))
             return NULL;
     }
 

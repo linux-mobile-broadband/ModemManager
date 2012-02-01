@@ -87,6 +87,8 @@ const char *mm_plugin_base_supports_task_get_driver (MMPluginBaseSupportsTask *t
 
 guint32 mm_plugin_base_supports_task_get_probed_capabilities (MMPluginBaseSupportsTask *task);
 
+MMPortType mm_plugin_base_probed_capabilities_to_port_type (guint32 caps);
+
 const gchar *mm_plugin_base_supports_task_get_probed_vendor (MMPluginBaseSupportsTask *task);
 
 const gchar *mm_plugin_base_supports_task_get_probed_product (MMPluginBaseSupportsTask *task);

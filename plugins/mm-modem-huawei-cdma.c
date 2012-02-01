@@ -29,10 +29,7 @@
 #include "mm-serial-parsers.h"
 #include "mm-log.h"
 
-static void modem_init (MMModem *modem_class);
-
-G_DEFINE_TYPE_EXTENDED (MMModemHuaweiCdma, mm_modem_huawei_cdma, MM_TYPE_GENERIC_CDMA, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init))
+G_DEFINE_TYPE (MMModemHuaweiCdma, mm_modem_huawei_cdma, MM_TYPE_GENERIC_CDMA)
 
 
 MMModem *
@@ -256,29 +253,24 @@ query_registration_state (MMGenericCdma *cdma,
 
 /*****************************************************************************/
 
-static gboolean
-grab_port (MMModem *modem,
-           const char *subsys,
-           const char *name,
-           MMPortType suggested_type,
-           gpointer user_data,
-           GError **error)
+static void
+port_grabbed (MMGenericCdma *cdma,
+              MMPort *port,
+              MMAtPortFlags pflags,
+              gpointer user_data)
 {
-    MMPort *port = NULL;
     GRegex *regex;
+    gboolean evdo0 = FALSE, evdoA = FALSE;
 
-	port = mm_generic_cdma_grab_port (MM_GENERIC_CDMA (modem), subsys, name, suggested_type, user_data, error);
-    if (port && MM_IS_AT_SERIAL_PORT (port)) {
-        gboolean evdo0 = FALSE, evdoA = FALSE;
-
+    if (MM_IS_AT_SERIAL_PORT (port)) {
         g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
 
         /* 1x signal level */
         regex = g_regex_new ("\\r\\n\\^RSSILVL:(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_1x_quality_change, modem, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_1x_quality_change, cdma, NULL);
         g_regex_unref (regex);
 
-        g_object_get (G_OBJECT (modem),
+        g_object_get (G_OBJECT (cdma),
                       MM_GENERIC_CDMA_EVDO_REV0, &evdo0,
                       MM_GENERIC_CDMA_EVDO_REVA, &evdoA,
                       NULL);
@@ -286,21 +278,13 @@ grab_port (MMModem *modem,
         if (evdo0 || evdoA) {
             /* EVDO signal level */
             regex = g_regex_new ("\\r\\n\\^HRSSILVL:(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_evdo_quality_change, modem, NULL);
+            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_evdo_quality_change, cdma, NULL);
             g_regex_unref (regex);
         }
     }
-
-    return !!port;
 }
 
 /*****************************************************************************/
-
-static void
-modem_init (MMModem *modem_class)
-{
-    modem_class->grab_port = grab_port;
-}
 
 static void
 mm_modem_huawei_cdma_init (MMModemHuaweiCdma *self)
@@ -314,6 +298,7 @@ mm_modem_huawei_cdma_class_init (MMModemHuaweiCdmaClass *klass)
 
     mm_modem_huawei_cdma_parent_class = g_type_class_peek_parent (klass);
 
+    cdma_class->port_grabbed = port_grabbed;
     cdma_class->query_registration_state = query_registration_state;
 }
 

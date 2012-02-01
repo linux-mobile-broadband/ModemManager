@@ -109,6 +109,8 @@ grab_port (MMPluginBase *base,
     MMModem *modem = NULL;
     const char *name, *subsys, *devfile, *sysfs_path;
     guint16 vendor = 0, product = 0;
+    guint32 caps;
+    MMPortType ptype;
 
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
@@ -127,6 +129,8 @@ grab_port (MMPluginBase *base,
         return NULL;
     }
 
+    caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
+    ptype = mm_plugin_base_probed_capabilities_to_port_type (caps);
     sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
     if (!existing) {
         modem = mm_modem_moto_c_gsm_new (sysfs_path,
@@ -136,14 +140,14 @@ grab_port (MMPluginBase *base,
                                          product);
 
         if (modem) {
-            if (!mm_modem_grab_port (modem, subsys, name, MM_PORT_TYPE_UNKNOWN, NULL, error)) {
+            if (!mm_modem_grab_port (modem, subsys, name, ptype, MM_AT_PORT_FLAG_NONE, NULL, error)) {
                 g_object_unref (modem);
                 return NULL;
             }
         }
     } else {
         modem = existing;
-        if (!mm_modem_grab_port (modem, subsys, name, MM_PORT_TYPE_UNKNOWN, NULL, error))
+        if (!mm_modem_grab_port (modem, subsys, name, ptype, MM_AT_PORT_FLAG_NONE, NULL, error))
             return NULL;
     }
 

@@ -370,7 +370,7 @@ post_enable (MMGenericCdma *cdma,
 
     info = mm_callback_info_new (MM_MODEM (cdma), callback, user_data);
 
-    primary = mm_generic_cdma_get_at_port (cdma, MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_cdma_get_at_port (cdma, MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     mm_at_serial_port_queue_command (primary, "!pcstate=1", 5, pcstate_done, info);
@@ -386,7 +386,7 @@ post_disable (MMGenericCdma *cdma,
 
     info = mm_callback_info_new (MM_MODEM (cdma), callback, user_data);
 
-    primary = mm_generic_cdma_get_at_port (cdma, MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_cdma_get_at_port (cdma, MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     mm_at_serial_port_queue_command (primary, "!pcstate=0", 5, pcstate_done, info);

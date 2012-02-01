@@ -119,6 +119,7 @@ grab_port (MMPluginBase *base,
     const char *name, *subsys, *devfile, *sysfs_path;
     guint32 caps;
     guint16 vendor = 0, product = 0;
+    MMPortType ptype;
 
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
@@ -139,6 +140,7 @@ grab_port (MMPluginBase *base,
 
     caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
     sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
+    ptype = mm_plugin_base_probed_capabilities_to_port_type (caps);
     if (!existing) {
         if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
             modem = mm_modem_novatel_gsm_new (sysfs_path,
@@ -157,19 +159,14 @@ grab_port (MMPluginBase *base,
         }
 
         if (modem) {
-            if (!mm_modem_grab_port (modem, subsys, name, MM_PORT_TYPE_UNKNOWN, NULL, error)) {
+            if (!mm_modem_grab_port (modem, subsys, name, ptype, MM_AT_PORT_FLAG_NONE, NULL, error)) {
                 g_object_unref (modem);
                 return NULL;
             }
         }
     } else if (get_level_for_capabilities (caps)) {
-        MMPortType ptype = MM_PORT_TYPE_UNKNOWN;
-
-        if (caps & MM_PLUGIN_BASE_PORT_CAP_QCDM)
-            ptype = MM_PORT_TYPE_QCDM;
-
         modem = existing;
-        if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error))
+        if (!mm_modem_grab_port (modem, subsys, name, ptype, MM_AT_PORT_FLAG_NONE, NULL, error))
             return NULL;
     }
 

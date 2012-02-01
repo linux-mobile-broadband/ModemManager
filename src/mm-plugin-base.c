@@ -261,6 +261,16 @@ mm_plugin_base_supports_task_get_probed_capabilities (MMPluginBaseSupportsTask *
     return MM_PLUGIN_BASE_SUPPORTS_TASK_GET_PRIVATE (task)->probed_caps;
 }
 
+MMPortType
+mm_plugin_base_probed_capabilities_to_port_type (guint32 caps)
+{
+    if (caps & MM_PLUGIN_BASE_PORT_CAP_AT)
+        return MM_PORT_TYPE_AT;
+    else if (caps & MM_PLUGIN_BASE_PORT_CAP_QCDM)
+        return MM_PORT_TYPE_QCDM;
+    return MM_PORT_TYPE_UNKNOWN;
+}
+
 const gchar *
 mm_plugin_base_supports_task_get_probed_vendor (MMPluginBaseSupportsTask *task)
 {
@@ -680,7 +690,7 @@ try_qcdm_probe (MMPluginBaseSupportsTask *task)
     /* Open the QCDM port */
     name = g_udev_device_get_name (priv->port);
     g_assert (name);
-    priv->qcdm_port = mm_qcdm_serial_port_new (name, MM_PORT_TYPE_PRIMARY);
+    priv->qcdm_port = mm_qcdm_serial_port_new (name);
     if (priv->qcdm_port == NULL) {
         g_warning ("(%s) failed to create new QCDM serial port.", name);
         probe_complete (task);
@@ -1064,7 +1074,7 @@ mm_plugin_base_probe_port (MMPluginBase *self,
     name = g_udev_device_get_name (port);
     g_assert (name);
 
-    serial = mm_at_serial_port_new (name, MM_PORT_TYPE_PRIMARY);
+    serial = mm_at_serial_port_new (name);
     if (serial == NULL) {
         g_set_error_literal (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
                              "Failed to create new serial port.");

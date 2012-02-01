@@ -633,7 +633,8 @@ gboolean
 mm_modem_grab_port (MMModem *self,
                     const char *subsys,
                     const char *name,
-                    MMPortType suggested_type,
+                    MMPortType ptype,
+                    MMAtPortFlags at_pflags,
                     gpointer user_data,
                     GError **error)
 {
@@ -643,7 +644,17 @@ mm_modem_grab_port (MMModem *self,
     g_return_val_if_fail (name, FALSE);
 
     g_assert (MM_MODEM_GET_INTERFACE (self)->grab_port);
-    return MM_MODEM_GET_INTERFACE (self)->grab_port (self, subsys, name, suggested_type, user_data, error);
+    return MM_MODEM_GET_INTERFACE (self)->grab_port (self, subsys, name, ptype, at_pflags, user_data, error);
+}
+
+gboolean
+mm_modem_organize_ports (MMModem *self, GError **error)
+{
+    g_return_val_if_fail (self != NULL, FALSE);
+    g_return_val_if_fail (MM_IS_MODEM (self), FALSE);
+
+    g_assert (MM_MODEM_GET_INTERFACE (self)->organize_ports);
+    return MM_MODEM_GET_INTERFACE (self)->organize_ports (self, error);
 }
 
 void

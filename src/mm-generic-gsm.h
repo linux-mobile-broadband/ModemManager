@@ -83,6 +83,23 @@ typedef struct {
 typedef struct {
     MMModemBaseClass parent;
 
+    /* Called to allow subclasses to update port flags, attach unsolicited
+     * result code handlers, change port attributes, etc.  This is called
+     * after the generic class has installed it's own handlers; if the
+     * generic class' behavior is not desired, subclasses can override the
+     * port_grabbed() method of MMModemBase.
+     */
+    void (*port_grabbed) (MMGenericGsm *self,
+                          MMPort *port,
+                          MMAtPortFlags at_pflags,
+                          gpointer user_data);
+
+    /* Called after all ports have been organized to allow subclasses to
+     * make changes to ports after we've assigned primary, secondary, and data
+     * designations.
+     */
+    void (*ports_organized) (MMGenericGsm *self, MMAtSerialPort *primary);
+
     /* Called after opening the primary serial port and updating the modem's
      * state to ENABLING, but before sending any commands to the device.  Modems
      * that need to perform custom initialization sequences or other setup should
@@ -211,17 +228,12 @@ void mm_generic_gsm_update_access_technology (MMGenericGsm *modem,
  */
 void mm_generic_gsm_update_signal_quality (MMGenericGsm *modem, guint32 quality);
 
+/* Returns the first port (if any) which has the given flag */
 MMAtSerialPort *mm_generic_gsm_get_at_port (MMGenericGsm *modem,
-                                            MMPortType ptype);
+                                            MMAtPortFlags flag);
 
 MMAtSerialPort *mm_generic_gsm_get_best_at_port (MMGenericGsm *modem,
                                                  GError **error);
-
-MMPort *mm_generic_gsm_grab_port (MMGenericGsm *modem,
-                                  const char *subsys,
-                                  const char *name,
-                                  MMPortType ptype,
-                                  GError **error);
 
 /* stay_connected should be TRUE for unsolicited registration updates, otherwise
  * the registration update will clear connected/connecting/disconnecting state

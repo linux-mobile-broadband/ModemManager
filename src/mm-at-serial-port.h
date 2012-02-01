@@ -32,6 +32,24 @@
 typedef struct _MMAtSerialPort MMAtSerialPort;
 typedef struct _MMAtSerialPortClass MMAtSerialPortClass;
 
+/* AT port flags; for example consider a device with two AT ports (ACM0 and ACM1)
+ * which could have the following layouts:
+ *
+ * ACM0(PRIMARY | PPP), ACM1(SECONDARY): port 0 is used for command and status
+ *    and for PPP data; while connected port 1 is used for command and status
+ * ACM0(PPP), ACM1(PRIMARY): port 1 is always used for command and status, and
+ *    only when connecting is port 0 opened for dialing (ATD) and PPP
+ */
+typedef enum {
+    MM_AT_PORT_FLAG_NONE    = 0x0000,
+    /* This port is preferred for command and status */ 
+    MM_AT_PORT_FLAG_PRIMARY = 0x0001,
+    /* Use port for command and status if the primary port is connected */
+    MM_AT_PORT_FLAG_SECONDARY = 0x0002,
+    /* This port should be used for PPP */
+    MM_AT_PORT_FLAG_PPP     = 0x0004
+} MMAtPortFlags;
+
 typedef gboolean (*MMAtSerialResponseParserFn) (gpointer user_data,
                                                 GString *response,
                                                 GError **error);
@@ -55,7 +73,7 @@ struct _MMAtSerialPortClass {
 
 GType mm_at_serial_port_get_type (void);
 
-MMAtSerialPort *mm_at_serial_port_new (const char *name, MMPortType ptype);
+MMAtSerialPort *mm_at_serial_port_new (const char *name);
 
 void     mm_at_serial_port_add_unsolicited_msg_handler (MMAtSerialPort *self,
                                                         GRegex *regex,
@@ -82,5 +100,10 @@ void     mm_at_serial_port_queue_command_cached (MMAtSerialPort *self,
 
 /* Just for unit tests */
 void mm_at_serial_port_remove_echo (GByteArray *response);
+
+void     mm_at_serial_port_set_flags (MMAtSerialPort *self,
+                                      MMAtPortFlags flags);
+
+MMAtPortFlags mm_at_serial_port_get_flags (MMAtSerialPort *self);
 
 #endif /* MM_AT_SERIAL_PORT_H */

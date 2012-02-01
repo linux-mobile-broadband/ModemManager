@@ -35,6 +35,7 @@ typedef struct {
     gpointer response_parser_user_data;
     GDestroyNotify response_parser_notify;
     GSList *unsolicited_msg_handlers;
+    MMAtPortFlags flags;
 } MMAtSerialPortPrivate;
 
 
@@ -325,15 +326,34 @@ debug_log (MMSerialPort *port, const char *prefix, const char *buf, gsize len)
     g_string_truncate (debug, 0);
 }
 
+void
+mm_at_serial_port_set_flags (MMAtSerialPort *self, MMAtPortFlags flags)
+{
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (MM_IS_AT_SERIAL_PORT (self));
+    g_return_if_fail (flags <= (MM_AT_PORT_FLAG_PRIMARY | MM_AT_PORT_FLAG_SECONDARY | MM_AT_PORT_FLAG_PPP));
+
+    MM_AT_SERIAL_PORT_GET_PRIVATE (self)->flags = flags;    
+}
+
+MMAtPortFlags
+mm_at_serial_port_get_flags (MMAtSerialPort *self)
+{
+    g_return_val_if_fail (self != NULL, MM_AT_PORT_FLAG_NONE);
+    g_return_val_if_fail (MM_IS_AT_SERIAL_PORT (self), MM_AT_PORT_FLAG_NONE);
+
+    return MM_AT_SERIAL_PORT_GET_PRIVATE (self)->flags;
+}
+
 /*****************************************************************************/
 
 MMAtSerialPort *
-mm_at_serial_port_new (const char *name, MMPortType ptype)
+mm_at_serial_port_new (const char *name)
 {
     return MM_AT_SERIAL_PORT (g_object_new (MM_TYPE_AT_SERIAL_PORT,
                                             MM_PORT_DEVICE, name,
                                             MM_PORT_SUBSYS, MM_PORT_SUBSYS_TTY,
-                                            MM_PORT_TYPE, ptype,
+                                            MM_PORT_TYPE, MM_PORT_TYPE_AT,
                                             NULL));
 }
 

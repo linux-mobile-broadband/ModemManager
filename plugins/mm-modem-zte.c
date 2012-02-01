@@ -352,7 +352,7 @@ cpms_timeout_cb (gpointer user_data)
 
     if (modem) {
         MM_MODEM_ZTE_GET_PRIVATE (modem)->cpms_timeout = 0;
-        primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+        primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_AT_PORT_FLAG_PRIMARY);
         g_assert (primary);
         mm_at_serial_port_queue_command (primary, "+CPMS?", 10, cpms_try_done, info);
     }
@@ -495,7 +495,7 @@ do_enable (MMGenericGsm *modem, MMModemFn callback, gpointer user_data)
 
     priv->init_retried = FALSE;
 
-    primary = mm_generic_gsm_get_at_port (modem, MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (modem, MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
@@ -552,7 +552,7 @@ disable (MMModem *modem,
 
     priv->init_retried = FALSE;
 
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     /* Turn off unsolicited responses */
@@ -620,30 +620,15 @@ simple_connect (MMModemSimple *simple,
 
 /*****************************************************************************/
 
-static gboolean
-grab_port (MMModem *modem,
-           const char *subsys,
-           const char *name,
-           MMPortType suggested_type,
-           gpointer user_data,
-           GError **error)
+static void
+port_grabbed (MMGenericGsm *gsm,
+              MMPort *port,
+              MMAtPortFlags pflags,
+              gpointer user_data)
 {
-    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
-    MMPortType ptype = MM_PORT_TYPE_IGNORED;
-    MMPort *port = NULL;
+    GRegex *regex;
 
-    if (suggested_type == MM_PORT_TYPE_UNKNOWN) {
-        if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY))
-                ptype = MM_PORT_TYPE_PRIMARY;
-        else if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY))
-            ptype = MM_PORT_TYPE_SECONDARY;
-    } else
-        ptype = suggested_type;
-
-    port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
-    if (port && MM_IS_AT_SERIAL_PORT (port)) {
-        GRegex *regex;
-
+    if (MM_IS_AT_SERIAL_PORT (port)) {
         g_object_set (port, MM_PORT_CARRIER_DETECT, FALSE, NULL);
 
         regex = g_regex_new ("\\r\\n\\+ZUSIMR:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
@@ -657,7 +642,7 @@ grab_port (MMModem *modem,
 
         /* Current network and service domain */
         regex = g_regex_new ("\\r\\n\\+ZPASR:\\s*(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, zte_access_tech_changed, modem, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, zte_access_tech_changed, gsm, NULL);
         g_regex_unref (regex);
 
         /* SIM request to Build Main Menu */
@@ -673,8 +658,6 @@ grab_port (MMModem *modem,
         /* Add Icera-specific handlers */
         mm_modem_icera_register_unsolicted_handlers (MM_MODEM_ICERA (gsm), MM_AT_SERIAL_PORT (port));
     }
-
-    return !!port;
 }
 
 /*****************************************************************************/
@@ -706,7 +689,6 @@ modem_init (MMModem *modem_class)
     modem_class->disable = disable;
     modem_class->connect = do_connect;
     modem_class->get_ip4_config = get_ip4_config;
-    modem_class->grab_port = grab_port;
 }
 
 static void
@@ -760,6 +742,7 @@ mm_modem_zte_class_init (MMModemZteClass *klass)
     g_type_class_add_private (object_class, sizeof (MMModemZtePrivate));
 
     object_class->dispose = dispose;
+    gsm_class->port_grabbed = port_grabbed;
     gsm_class->do_enable = do_enable;
     gsm_class->do_disconnect = do_disconnect;
     gsm_class->set_allowed_mode = set_allowed_mode;

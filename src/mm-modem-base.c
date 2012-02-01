@@ -113,14 +113,21 @@ mm_modem_base_get_port (MMModemBase *self,
     return port;
 }
 
-static void
-find_primary (gpointer key, gpointer data, gpointer user_data)
+GSList *
+mm_modem_base_get_ports (MMModemBase *self)
 {
-    MMPort **found = user_data;
-    MMPort *port = MM_PORT (data);
+    GHashTableIter iter;
+    MMPort *port;
+    GSList *list = NULL;
 
-    if (!*found && (mm_port_get_port_type (port) == MM_PORT_TYPE_PRIMARY))
-        *found = port;
+    g_return_val_if_fail (self != NULL, NULL);
+    g_return_val_if_fail (MM_IS_MODEM_BASE (self), NULL);
+
+    g_hash_table_iter_init (&iter, MM_MODEM_BASE_GET_PRIVATE (self)->ports);
+    while (g_hash_table_iter_next (&iter, NULL, (gpointer) &port))
+        list = g_slist_append (list, port);
+
+    return list;
 }
 
 static gboolean
@@ -159,68 +166,6 @@ serial_port_timed_out_cb (MMSerialPort *port,
     }
 }
 
-MMPort *
-mm_modem_base_add_port (MMModemBase *self,
-                        const char *subsys,
-                        const char *name,
-                        MMPortType ptype)
-{
-    MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (self);
-    MMPort *port = NULL;
-    char *key, *device;
-
-    g_return_val_if_fail (MM_IS_MODEM_BASE (self), NULL);
-    g_return_val_if_fail (subsys != NULL, NULL);
-    g_return_val_if_fail (name != NULL, NULL);
-    g_return_val_if_fail (ptype != MM_PORT_TYPE_UNKNOWN, NULL);
-
-    g_return_val_if_fail (!strcmp (subsys, "net") || !strcmp (subsys, "tty"), NULL);
-
-    key = get_hash_key (subsys, name);
-    port = g_hash_table_lookup (priv->ports, key);
-    g_free (key);
-    g_return_val_if_fail (port == NULL, NULL);
-
-    if (ptype == MM_PORT_TYPE_PRIMARY) {
-        g_hash_table_foreach (priv->ports, find_primary, &port);
-        g_return_val_if_fail (port == NULL, FALSE);
-    }
-
-    if (!strcmp (subsys, "tty")) {
-        if (ptype == MM_PORT_TYPE_QCDM)
-            port = MM_PORT (mm_qcdm_serial_port_new (name, ptype));
-        else
-            port = MM_PORT (mm_at_serial_port_new (name, ptype));
-
-        /* For serial ports, enable port timeout checks */
-        if (port)
-            g_signal_connect (port,
-                              "timed-out",
-                              G_CALLBACK (serial_port_timed_out_cb),
-                              self);
-    } else if (!strcmp (subsys, "net")) {
-        port = MM_PORT (g_object_new (MM_TYPE_PORT,
-                                      MM_PORT_DEVICE, name,
-                                      MM_PORT_SUBSYS, MM_PORT_SUBSYS_NET,
-                                      MM_PORT_TYPE, ptype,
-                                      NULL));
-    }
-
-    if (!port)
-        return NULL;
-
-    device = mm_modem_get_device (MM_MODEM (self));
-    mm_dbg ("(%s) type %s claimed by %s",
-            name,
-            mm_port_type_to_name (ptype),
-            device);
-    g_free (device);
-
-    key = get_hash_key (subsys, name);
-    g_hash_table_insert (priv->ports, key, port);
-    return port;
-}
-
 gboolean
 mm_modem_base_remove_port (MMModemBase *self, MMPort *port)
 {
@@ -250,6 +195,142 @@ mm_modem_base_remove_port (MMModemBase *self, MMPort *port)
     g_free (name);
 
     return removed;
+}
+
+static inline void
+log_port (MMPort *port, const char *device, const char *desc)
+{
+    if (port) {
+        mm_dbg ("(%s) %s/%s %s",
+                device,
+                mm_port_subsys_to_name (mm_port_get_subsys (port)),
+                mm_port_get_device (port),
+                desc);
+    }
+}
+
+gboolean
+mm_modem_base_organize_ports (MMModemBase *self,
+                              MMAtSerialPort **out_primary,
+                              MMAtSerialPort **out_secondary,
+                              MMPort **out_data,
+                              MMQcdmSerialPort **out_qcdm,
+                              GError **error)
+{
+    GSList *ports, *iter;
+    MMAtPortFlags flags;
+    MMAtSerialPort *backup_primary = NULL;
+    MMAtSerialPort *primary = NULL;
+    MMAtSerialPort *secondary = NULL;
+    MMAtSerialPort *backup_secondary = NULL;
+    MMQcdmSerialPort *qcdm = NULL;
+    MMPort *data = NULL;
+    char *device;
+
+    g_return_val_if_fail (self != NULL, FALSE);
+    g_return_val_if_fail (out_primary != NULL, FALSE);
+    g_return_val_if_fail (out_secondary != NULL, FALSE);
+    g_return_val_if_fail (out_data != NULL, FALSE);
+
+    ports = mm_modem_base_get_ports (self);
+    for (iter = ports; iter; iter = g_slist_next (iter)) {
+        MMPort *candidate = iter->data;
+        MMPortSubsys subsys = mm_port_get_subsys (candidate);
+
+        if (MM_IS_AT_SERIAL_PORT (candidate)) {
+            flags = mm_at_serial_port_get_flags (MM_AT_SERIAL_PORT (candidate));
+
+            if (flags & MM_AT_PORT_FLAG_PRIMARY) {
+                if (!primary)
+                    primary = MM_AT_SERIAL_PORT (candidate);
+                else if (!backup_primary) {
+                    /* Just in case the plugin gave us more than one primary
+                     * and no secondaries, treat additional primary ports as
+                     * secondary.
+                     */
+                    backup_primary = MM_AT_SERIAL_PORT (candidate);
+                }
+            }
+
+            if (!data && (flags & MM_AT_PORT_FLAG_PPP))
+                data = candidate;
+
+            /* Explicitly flagged secondary ports trump NONE ports for secondary */
+            if (flags & MM_AT_PORT_FLAG_SECONDARY) {
+                if (!secondary || !(mm_at_serial_port_get_flags (secondary) & MM_AT_PORT_FLAG_SECONDARY))
+                    secondary = MM_AT_SERIAL_PORT (candidate);
+            }
+
+            /* Fallback secondary */
+            if (flags == MM_AT_PORT_FLAG_NONE) {
+                if (!secondary)
+                    secondary = MM_AT_SERIAL_PORT (candidate);
+                else if (!backup_secondary)
+                    backup_secondary = MM_AT_SERIAL_PORT (candidate);
+            }
+        } else if (MM_IS_QCDM_SERIAL_PORT (candidate)) {
+            if (!qcdm)
+                qcdm = MM_QCDM_SERIAL_PORT (candidate);
+        } else if (subsys == MM_PORT_SUBSYS_NET) {
+            /* Net device (if any) is the preferred data port */
+            if (!data || MM_IS_AT_SERIAL_PORT (data))
+                data = candidate;
+        }
+    }
+    g_slist_free (ports);
+
+    /* Fall back to a secondary port if we didn't find a primary port */
+    if (!primary) {
+        if (!secondary) {
+            g_set_error_literal (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                                 "Failed to find primary port.");
+            return FALSE;
+        }
+        primary = secondary;
+        secondary = NULL;
+    }
+    g_assert (primary);
+
+    /* If the plugin didn't give us any secondary ports, use any additional
+     * primary ports or backup secondary ports as secondary.
+     */
+    if (!secondary)
+        secondary = backup_primary ? backup_primary : backup_secondary;
+
+    /* Data port defaults to primary AT port */
+    if (!data)
+        data = MM_PORT (primary);
+    g_assert (data);
+
+    /* Reset flags on all ports; clear data port first since it might also
+     * be the primary or secondary port.
+     */
+    if (MM_IS_AT_SERIAL_PORT (data))
+        mm_at_serial_port_set_flags (MM_AT_SERIAL_PORT (data), MM_AT_PORT_FLAG_NONE);
+
+    mm_at_serial_port_set_flags (primary, MM_AT_PORT_FLAG_PRIMARY);
+    if (secondary)
+        mm_at_serial_port_set_flags (secondary, MM_AT_PORT_FLAG_SECONDARY);
+
+    if (MM_IS_AT_SERIAL_PORT (data)) {
+        flags = mm_at_serial_port_get_flags (MM_AT_SERIAL_PORT (data));
+        mm_at_serial_port_set_flags (MM_AT_SERIAL_PORT (data), flags | MM_AT_PORT_FLAG_PPP);
+    }
+
+    device = mm_modem_get_device (MM_MODEM (self));
+    log_port (MM_PORT (primary), device, "primary");
+    log_port (MM_PORT (secondary), device, "secondary");
+    log_port (MM_PORT (data), device, "data");
+    log_port (MM_PORT (qcdm), device, "qcdm");
+    g_free (device);
+
+    *out_primary = primary;
+    *out_secondary = secondary;
+    *out_data = data;
+    if (out_qcdm)
+        *out_qcdm = qcdm;
+
+    return TRUE;
 }
 
 void
@@ -786,6 +867,77 @@ mm_modem_base_get_card_info (MMModemBase *self,
 /*****************************************************************************/
 
 static gboolean
+grab_port (MMModem *modem,
+           const char *subsys,
+           const char *name,
+           MMPortType ptype,
+           MMAtPortFlags at_pflags,
+           gpointer user_data,
+           GError **error)
+{
+    MMModemBase *self = MM_MODEM_BASE (modem);
+    MMModemBasePrivate *priv = MM_MODEM_BASE_GET_PRIVATE (self);
+    MMPort *port = NULL;
+    char *key, *device;
+
+    g_return_val_if_fail (MM_IS_MODEM_BASE (self), FALSE);
+    g_return_val_if_fail (subsys != NULL, FALSE);
+    g_return_val_if_fail (name != NULL, FALSE);
+
+    g_return_val_if_fail (!strcmp (subsys, "net") || !strcmp (subsys, "tty"), FALSE);
+
+    key = get_hash_key (subsys, name);
+    port = g_hash_table_lookup (priv->ports, key);
+    g_free (key);
+    g_return_val_if_fail (port == NULL, FALSE);
+
+    if (!strcmp (subsys, "tty")) {
+        if (ptype == MM_PORT_TYPE_QCDM)
+            port = MM_PORT (mm_qcdm_serial_port_new (name));
+        else if (ptype == MM_PORT_TYPE_AT)
+            port = MM_PORT (mm_at_serial_port_new (name));
+
+        /* For serial ports, enable port timeout checks */
+        if (port) {
+            g_signal_connect (port,
+                              "timed-out",
+                              G_CALLBACK (serial_port_timed_out_cb),
+                              self);
+        }
+    } else if (!strcmp (subsys, "net")) {
+        port = MM_PORT (g_object_new (MM_TYPE_PORT,
+                                      MM_PORT_DEVICE, name,
+                                      MM_PORT_SUBSYS, MM_PORT_SUBSYS_NET,
+                                      NULL));
+    }
+
+    if (!port) {
+        g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                     "Failed to grab port %s/%s: unknown type?",
+                     subsys, name);
+        mm_dbg ("(%s/%s): failed to create %s port",
+                subsys, name, mm_port_type_to_name (ptype));
+        return FALSE;
+    }
+
+    device = mm_modem_get_device (MM_MODEM (self));
+    mm_dbg ("(%s) type %s claimed by %s",
+            name,
+            mm_port_type_to_name (ptype),
+            device);
+    g_free (device);
+
+    key = get_hash_key (subsys, name);
+    g_hash_table_insert (priv->ports, key, port);
+
+    /* Let subclasses know we've grabbed it */
+    if (MM_MODEM_BASE_GET_CLASS (self)->port_grabbed)
+        MM_MODEM_BASE_GET_CLASS (self)->port_grabbed (self, port, at_pflags, user_data);
+
+    return TRUE;
+}
+
+static gboolean
 modem_auth_request (MMModem *modem,
                     const char *authorization,
                     DBusGMethodInvocation *context,
@@ -876,6 +1028,7 @@ mm_modem_base_init (MMModemBase *self)
 static void
 modem_init (MMModem *modem_class)
 {
+    modem_class->grab_port = grab_port;
     modem_class->auth_request = modem_auth_request;
     modem_class->auth_finish = modem_auth_finish;
 }

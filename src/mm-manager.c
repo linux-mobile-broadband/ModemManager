@@ -247,13 +247,36 @@ remove_modem (MMManager *manager, MMModem *modem)
     g_free (device);
 }
 
+/* Return the first outstanding supports task */
+static SupportsInfo *
+find_supports_info (MMManager *self, MMModem *modem)
+{
+    char *modem_physdev;
+    GHashTableIter iter;
+    SupportsInfo *info, *ret = NULL;
+
+    modem_physdev = mm_modem_get_device (modem);
+    g_assert (modem_physdev);
+
+    /* Check for ports that are in the process of being interrogated by plugins */
+    g_hash_table_iter_init (&iter, MM_MANAGER_GET_PRIVATE (self)->supports);
+    while (!ret && g_hash_table_iter_next (&iter, NULL, (gpointer) &info)) {
+        if (g_strcmp0 (info->physdev_path, modem_physdev) == 0)
+            ret = info;
+    }
+    g_free (modem_physdev);
+    return ret;
+}
+
 static void
 check_export_modem (MMManager *self, MMModem *modem)
 {
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (self);
-    char *modem_physdev;
-    GHashTableIter iter;
-    gpointer value;
+    SupportsInfo *info;
+    static guint32 id = 0, vid = 0, pid = 0;
+    char *path, *data_device = NULL, *modem_physdev;
+    GUdevDevice *physdev;
+    const char *subsys = NULL;
 
     /* A modem is only exported to D-Bus when both of the following are true:
      *
@@ -269,63 +292,46 @@ check_export_modem (MMManager *self, MMModem *modem)
      * all other ports are already handled.  That chance is very small though.
      */
 
+    info = find_supports_info (self, modem);
+    if (info) {
+        mm_dbg ("(%s/%s): outstanding support task prevents export of %s",
+                info->subsys, info->name, info->physdev_path);
+        return;
+    }
+
+    /* Obviously don't re-export a modem, or try to export one that's not valid */
+    if (   g_object_get_data (G_OBJECT (modem), DBUS_PATH_TAG)
+        || !mm_modem_get_valid (modem))
+        return;
+    
+    path = g_strdup_printf (MM_DBUS_PATH "/Modems/%d", id++);
+    dbus_g_connection_register_g_object (priv->connection, path, G_OBJECT (modem));
+    g_object_set_data_full (G_OBJECT (modem), DBUS_PATH_TAG, path, (GDestroyNotify) g_free);
+
     modem_physdev = mm_modem_get_device (modem);
     g_assert (modem_physdev);
+    mm_dbg ("Exported modem %s as %s", modem_physdev, path);
 
-    /* Check for ports that are in the process of being interrogated by plugins */
-    g_hash_table_iter_init (&iter, priv->supports);
-    while (g_hash_table_iter_next (&iter, NULL, &value)) {
-        SupportsInfo *info = value;
-
-        if (!strcmp (info->physdev_path, modem_physdev)) {
-            mm_dbg ("(%s/%s): outstanding support task prevents export of %s",
-                    info->subsys, info->name, modem_physdev);
-            goto out;
-        }
-    }
-
-    /* Already exported?  This can happen if the modem is exported and the kernel
-     * discovers another of the modem's ports.
-     */
-    if (g_object_get_data (G_OBJECT (modem), DBUS_PATH_TAG))
-        goto out;
-
-    /* No outstanding port tasks, so if the modem is valid we can export it */
-    if (mm_modem_get_valid (modem)) {
-        static guint32 id = 0, vid = 0, pid = 0;
-        char *path, *data_device = NULL;
-        GUdevDevice *physdev;
-        const char *subsys = NULL;
-
-        path = g_strdup_printf (MM_DBUS_PATH"/Modems/%d", id++);
-        dbus_g_connection_register_g_object (priv->connection, path, G_OBJECT (modem));
-        g_object_set_data_full (G_OBJECT (modem), DBUS_PATH_TAG, path, (GDestroyNotify) g_free);
-
-        mm_dbg ("Exported modem %s as %s", modem_physdev, path);
-
-        physdev = g_udev_client_query_by_sysfs_path (priv->udev, modem_physdev);
-        if (physdev)
-            subsys = g_udev_device_get_subsystem (physdev);
-
-        g_object_get (G_OBJECT (modem),
-                      MM_MODEM_DATA_DEVICE, &data_device,
-                      MM_MODEM_HW_VID, &vid,
-                      MM_MODEM_HW_PID, &pid,
-                      NULL);
-        mm_dbg ("(%s): VID 0x%04X PID 0x%04X (%s)",
-                 path, (vid & 0xFFFF), (pid & 0xFFFF),
-                 subsys ? subsys : "unknown");
-        mm_dbg ("(%s): data port is %s", path, data_device);
-        g_free (data_device);
-
-        if (physdev)
-            g_object_unref (physdev);
-
-        g_signal_emit (self, signals[DEVICE_ADDED], 0, modem);
-    }
-
-out:
+    physdev = g_udev_client_query_by_sysfs_path (priv->udev, modem_physdev);
     g_free (modem_physdev);
+    if (physdev)
+        subsys = g_udev_device_get_subsystem (physdev);
+
+    g_object_get (G_OBJECT (modem),
+                  MM_MODEM_DATA_DEVICE, &data_device,
+                  MM_MODEM_HW_VID, &vid,
+                  MM_MODEM_HW_PID, &pid,
+                  NULL);
+    mm_dbg ("(%s): VID 0x%04X PID 0x%04X (%s)",
+             path, (vid & 0xFFFF), (pid & 0xFFFF),
+             subsys ? subsys : "unknown");
+    mm_dbg ("(%s): data port is %s", path, data_device);
+    g_free (data_device);
+
+    if (physdev)
+        g_object_unref (physdev);
+
+    g_signal_emit (self, signals[DEVICE_ADDED], 0, modem);
 }
 
 static void
@@ -548,6 +554,7 @@ supports_cleanup (MMManager *self,
 {
     MMManagerPrivate *priv = MM_MANAGER_GET_PRIVATE (self);
     char *key;
+    GError *error = NULL;
 
     g_return_if_fail (subsys != NULL);
     g_return_if_fail (name != NULL);
@@ -556,15 +563,35 @@ supports_cleanup (MMManager *self,
     g_hash_table_remove (priv->supports, key);
     g_free (key);
 
+    if (modem == NULL)
+        return;
+
+    if (   (find_supports_info (self, modem) == NULL)
+        && !g_object_get_data (G_OBJECT (modem), "organized")) {
+        /* Yay, we're done with supports tasks, tell the modem to organize
+         * all its ports.  Guard against multiple organize calls though since
+         * if the kernel or udev is slow, ports may show up long after the
+         * first bunch of supports tasks is done.
+         */
+        g_object_set_data (G_OBJECT (modem), "organized", GUINT_TO_POINTER (1));
+        if (!mm_modem_organize_ports (modem, &error)) {
+            mm_err ("Failed to organize modem ports: (%d) %s",
+                    error ? error->code : -1,
+                    error && error->message ? error->message : "(unknown)");
+            g_clear_error (&error);
+            remove_modem (self, modem);
+            return;
+        }
+    }
+
     /* Each time a supports task is cleaned up, check whether the modem is
      * now completely probed/handled and should be exported to D-Bus clients.
      *
-     * IMPORTANT: this must be done after removing the supports into from
+     * IMPORTANT: this must be done after removing the supports info from
      * priv->supports since check_export_modem() searches through priv->supports
      * for outstanding supports tasks.
      */
-    if (modem)
-        check_export_modem (self, modem);
+    check_export_modem (self, modem);
 }
 
 static gboolean

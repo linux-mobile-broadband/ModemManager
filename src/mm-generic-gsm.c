@@ -11,7 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 - 2010 Red Hat, Inc.
+ * Copyright (C) 2009 - 2012 Red Hat, Inc.
  * Copyright (C) 2009 - 2010 Ericsson
  */
 
@@ -116,6 +116,7 @@ typedef struct {
     MMAtSerialPort *secondary;
     MMQcdmSerialPort *qcdm;
     MMPort *data;
+    gboolean data_opened_at_connect;
 
     /* Location API */
     guint32 loc_caps;
@@ -843,39 +844,28 @@ owns_port (MMModem *modem, const char *subsys, const char *name)
     return !!mm_modem_base_get_port (MM_MODEM_BASE (modem), subsys, name);
 }
 
-MMPort *
-mm_generic_gsm_grab_port (MMGenericGsm *self,
-                          const char *subsys,
-                          const char *name,
-                          MMPortType ptype,
-                          GError **error)
+static void
+port_grabbed (MMModemBase *base,
+              MMPort *port,
+              MMAtPortFlags at_pflags,
+              gpointer user_data)
 {
-    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
-    MMPort *port = NULL;
+    MMGenericGsm *self = MM_GENERIC_GSM (base);
+    GPtrArray *array;
     GRegex *regex;
-
-    g_return_val_if_fail (!strcmp (subsys, "net") || !strcmp (subsys, "tty"), FALSE);
-
-    port = mm_modem_base_add_port (MM_MODEM_BASE (self), subsys, name, ptype);
-    if (!port) {
-        g_warn_if_fail (port != NULL);
-        return NULL;
-    }
+    int i;
 
     if (MM_IS_AT_SERIAL_PORT (port)) {
-        GPtrArray *array;
-        int i;
-
         mm_at_serial_port_set_response_parser (MM_AT_SERIAL_PORT (port),
                                                mm_serial_parser_v1_parse,
                                                mm_serial_parser_v1_new (),
                                                mm_serial_parser_v1_destroy);
+        mm_at_serial_port_set_flags (MM_AT_SERIAL_PORT (port), at_pflags);
 
         /* Set up CREG unsolicited message handlers */
         array = mm_gsm_creg_regex_get (FALSE);
         for (i = 0; i < array->len; i++) {
             regex = g_ptr_array_index (array, i);
-
             mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, reg_state_changed, self, NULL);
         }
         mm_gsm_creg_regex_destroy (array);
@@ -891,72 +881,48 @@ mm_generic_gsm_grab_port (MMGenericGsm *self,
         regex = g_regex_new ("\\r\\n\\+CUSD:\\s*(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, cusd_received, self, NULL);
         g_regex_unref (regex);
-
-        if (ptype == MM_PORT_TYPE_PRIMARY) {
-            priv->primary = MM_AT_SERIAL_PORT (port);
-            if (!priv->data) {
-                priv->data = port;
-                g_object_notify (G_OBJECT (self), MM_MODEM_DATA_DEVICE);
-            }
-
-            /* Get the modem's general info */
-            initial_info_check (self);
-
-            /* Get modem's IMEI */
-            initial_imei_check (self);
-
-            /* Get modem's initial lock/unlock state; this also ensures the
-             * SIM is ready by waiting if necessary for the SIM to initalize.
-             */
-            initial_pin_check (self);
-
-            /* Determine what facility locks are supported */
-            initial_facility_lock_check (self);
-
-        } else if (ptype == MM_PORT_TYPE_SECONDARY)
-            priv->secondary = MM_AT_SERIAL_PORT (port);
-    } else if (MM_IS_QCDM_SERIAL_PORT (port)) {
-        if (!priv->qcdm)
-            priv->qcdm = MM_QCDM_SERIAL_PORT (port);
-    } else if (!strcmp (subsys, "net")) {
-        /* Net device (if any) is the preferred data port */
-        if (!priv->data || MM_IS_AT_SERIAL_PORT (priv->data)) {
-            priv->data = port;
-            g_object_notify (G_OBJECT (self), MM_MODEM_DATA_DEVICE);
-            check_valid (self);
-        }
     }
 
-    return port;
+    if (MM_GENERIC_GSM_GET_CLASS (self)->port_grabbed)
+        MM_GENERIC_GSM_GET_CLASS (self)->port_grabbed (self, port, at_pflags, user_data);
 }
 
 static gboolean
-grab_port (MMModem *modem,
-           const char *subsys,
-           const char *name,
-           MMPortType suggested_type,
-           gpointer user_data,
-           GError **error)
+organize_ports (MMModem *modem, GError **error)
 {
     MMGenericGsm *self = MM_GENERIC_GSM (modem);
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
-    MMPortType ptype = MM_PORT_TYPE_IGNORED;
 
-    if (priv->primary)
-        g_return_val_if_fail (suggested_type != MM_PORT_TYPE_PRIMARY, FALSE);
+    if (!mm_modem_base_organize_ports (MM_MODEM_BASE (modem),
+                                       &priv->primary,
+                                       &priv->secondary,
+                                       &priv->data,
+                                       &priv->qcdm,
+                                       error))
+        return FALSE;
 
-    if (!strcmp (subsys, "tty")) {
-        if (suggested_type != MM_PORT_TYPE_UNKNOWN)
-            ptype = suggested_type;
-        else {
-            if (!priv->primary)
-                ptype = MM_PORT_TYPE_PRIMARY;
-            else if (!priv->secondary)
-                ptype = MM_PORT_TYPE_SECONDARY;
-        }
-    }
+    /* Let subclasses twiddle ports if they want */
+    if (MM_GENERIC_GSM_GET_CLASS (self)->ports_organized)
+        MM_GENERIC_GSM_GET_CLASS (self)->ports_organized (self, priv->primary);
 
-    return !!mm_generic_gsm_grab_port (self, subsys, name, ptype, error);
+    g_object_notify (G_OBJECT (self), MM_MODEM_DATA_DEVICE);
+
+    /* Get the modem's general info */
+    initial_info_check (self);
+
+    /* Get modem's IMEI */
+    initial_imei_check (self);
+
+    /* Get modem's initial lock/unlock state; this also ensures the
+     * SIM is ready by waiting if necessary for the SIM to initalize.
+     */
+    initial_pin_check (self);
+
+    /* Determine what facility locks are supported */
+    initial_facility_lock_check (self);
+
+    check_valid (self);
+    return TRUE;
 }
 
 static void
@@ -3824,8 +3790,26 @@ connect (MMModem *modem,
     MMCallbackInfo *info;
     char *command;
     gint cid = mm_generic_gsm_get_cid (MM_GENERIC_GSM (modem));
+    MMAtSerialPort *dial_port;
 
     info = mm_callback_info_new (modem, callback, user_data);
+
+    /* Dial port might not be the primary port*/
+    priv->data_opened_at_connect = FALSE;
+    dial_port = priv->primary;
+    if (MM_IS_AT_SERIAL_PORT (priv->data)) {
+        dial_port = MM_AT_SERIAL_PORT (priv->data);
+
+        if (!mm_serial_port_open (MM_SERIAL_PORT (dial_port), &info->error)) {
+            g_warning ("%s: failed to open dial port: (%d) %s",
+                       __func__,
+                       info->error ? info->error->code : -1,
+                       info->error && info->error->message ? info->error->message : "(unknown)");
+            mm_callback_info_schedule (info);
+            return;
+        }
+        priv->data_opened_at_connect = TRUE;
+    }
 
     mm_modem_set_state (modem, MM_MODEM_STATE_CONNECTING, MM_MODEM_STATE_REASON_NONE);
 
@@ -3843,7 +3827,7 @@ connect (MMModem *modem,
     } else
         command = g_strconcat ("DT", number, NULL);
 
-    mm_at_serial_port_queue_command (priv->primary, command, 60, connect_done, info);
+    mm_at_serial_port_queue_command (dial_port, command, 60, connect_done, info);
     g_free (command);
 }
 
@@ -3854,11 +3838,13 @@ disconnect_done (MMModem *modem,
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMModemState prev_state;
+    MMGenericGsmPrivate *priv;
 
     /* Do nothing if modem removed */
     if (!modem || mm_callback_info_check_modem_removed (info))
         return;
 
+    priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
     if (error) {
         info->error = g_error_copy (error);
         /* Reset old state since the operation failed */
@@ -3867,12 +3853,19 @@ disconnect_done (MMModem *modem,
                             prev_state,
                             MM_MODEM_STATE_REASON_NONE);
     } else {
-        MMGenericGsm *self = MM_GENERIC_GSM (modem);
-        MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
-
         mm_port_set_connected (priv->data, FALSE);
         priv->cid = -1;
-        mm_generic_gsm_update_enabled_state (self, FALSE, MM_MODEM_STATE_REASON_NONE);
+        mm_generic_gsm_update_enabled_state (MM_GENERIC_GSM (modem), FALSE, MM_MODEM_STATE_REASON_NONE);
+    }
+
+    /* Balance any open from connect(); subclasses may not use the generic
+     * class' connect function and so the dial port may not have been
+     * opened at all.
+     */
+    if (priv->data_opened_at_connect) {
+        if (MM_IS_AT_SERIAL_PORT (priv->data))
+            mm_serial_port_close (MM_SERIAL_PORT (priv->data));
+        priv->data_opened_at_connect = FALSE;
     }
 
     mm_callback_info_schedule (info);
@@ -3965,6 +3958,7 @@ disconnect_secondary_cgact_done (MMAtSerialPort *port,
     MMCallbackInfo *info = user_data;
     MMGenericGsm *self;
     MMGenericGsmPrivate *priv;
+    MMSerialPort *dial_port;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
@@ -3980,7 +3974,11 @@ disconnect_secondary_cgact_done (MMAtSerialPort *port,
     if (!error)
         mm_callback_info_set_data (info, DISCONNECT_CGACT_DONE_TAG, GUINT_TO_POINTER (TRUE), NULL);
 
-    mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 1000, TRUE, disconnect_flash_done, info);
+    dial_port = MM_SERIAL_PORT (priv->primary);
+    if (MM_IS_AT_SERIAL_PORT (priv->data))
+        dial_port = MM_SERIAL_PORT (priv->data);
+
+    mm_serial_port_flash (dial_port, 1000, TRUE, disconnect_flash_done, info);
 }
 
 static void
@@ -3991,6 +3989,7 @@ real_do_disconnect (MMGenericGsm *self,
 {
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     MMCallbackInfo *info;
+    MMSerialPort *dial_port;
 
     info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
 
@@ -4007,8 +4006,12 @@ real_do_disconnect (MMGenericGsm *self,
                                disconnect_secondary_cgact_done,
                                info);
     } else {
-        /* Just flash the primary port */
-        mm_serial_port_flash (MM_SERIAL_PORT (priv->primary), 1000, TRUE, disconnect_flash_done, info);
+        /* Just flash the dial port */
+        dial_port = MM_SERIAL_PORT (priv->primary);
+        if (MM_IS_AT_SERIAL_PORT (priv->data))
+            dial_port = MM_SERIAL_PORT (priv->data);
+
+        mm_serial_port_flash (dial_port, 1000, TRUE, disconnect_flash_done, info);
     }
 }
 
@@ -5487,15 +5490,26 @@ sms_list (MMModemGsmSms *modem,
 
 MMAtSerialPort *
 mm_generic_gsm_get_at_port (MMGenericGsm *modem,
-                           MMPortType ptype)
+                           MMAtPortFlags flag)
 {
-    g_return_val_if_fail (MM_IS_GENERIC_GSM (modem), NULL);
-    g_return_val_if_fail (ptype != MM_PORT_TYPE_UNKNOWN, NULL);
+    MMGenericGsmPrivate *priv;
 
-    if (ptype == MM_PORT_TYPE_PRIMARY)
-        return MM_GENERIC_GSM_GET_PRIVATE (modem)->primary;
-    else if (ptype == MM_PORT_TYPE_SECONDARY)
-        return MM_GENERIC_GSM_GET_PRIVATE (modem)->secondary;
+    g_return_val_if_fail (MM_IS_GENERIC_GSM (modem), NULL);
+
+    /* We only search for a single value even though it's a bitfield */
+    g_return_val_if_fail (   flag == MM_AT_PORT_FLAG_NONE
+                          || flag == MM_AT_PORT_FLAG_PRIMARY
+                          || flag == MM_AT_PORT_FLAG_SECONDARY
+                          || flag == MM_AT_PORT_FLAG_PPP, NULL);
+
+    priv = MM_GENERIC_GSM_GET_PRIVATE (modem);
+
+    if (flag == MM_AT_PORT_FLAG_SECONDARY)
+        return priv->secondary;
+    else if (flag == MM_AT_PORT_FLAG_PRIMARY)
+        return priv->primary;
+    else if ((flag == MM_AT_PORT_FLAG_PPP) && MM_IS_AT_SERIAL_PORT (priv->data))
+        return MM_AT_SERIAL_PORT (priv->data);
 
     return NULL;
 }
@@ -6481,7 +6495,7 @@ static void
 modem_init (MMModem *modem_class)
 {
     modem_class->owns_port = owns_port;
-    modem_class->grab_port = grab_port;
+    modem_class->organize_ports = organize_ports;
     modem_class->release_port = release_port;
     modem_class->enable = enable;
     modem_class->disable = disable;
@@ -6817,11 +6831,12 @@ finalize (GObject *object)
 }
 
 static void
-mm_generic_gsm_class_init (MMGenericGsmClass *klass)
+mm_generic_gsm_class_init (MMGenericGsmClass *generic_class)
 {
-    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    GObjectClass *object_class = G_OBJECT_CLASS (generic_class);
+    MMModemBaseClass *base_class = MM_MODEM_BASE_CLASS (generic_class);
 
-    mm_generic_gsm_parent_class = g_type_class_peek_parent (klass);
+    mm_generic_gsm_parent_class = g_type_class_peek_parent (generic_class);
     g_type_class_add_private (object_class, sizeof (MMGenericGsmPrivate));
 
     /* Virtual methods */
@@ -6829,12 +6844,14 @@ mm_generic_gsm_class_init (MMGenericGsmClass *klass)
     object_class->get_property = get_property;
     object_class->finalize = finalize;
 
-    klass->do_enable = real_do_enable;
-    klass->do_enable_power_up_done = real_do_enable_power_up_done;
-    klass->do_disconnect = real_do_disconnect;
-    klass->get_sim_iccid = real_get_sim_iccid;
-    klass->get_operator_name = real_get_operator_name;
-    klass->get_operator_code = real_get_operator_code;
+    base_class->port_grabbed = port_grabbed;
+
+    generic_class->do_enable = real_do_enable;
+    generic_class->do_enable_power_up_done = real_do_enable_power_up_done;
+    generic_class->do_disconnect = real_do_disconnect;
+    generic_class->get_sim_iccid = real_get_sim_iccid;
+    generic_class->get_operator_name = real_get_operator_name;
+    generic_class->get_operator_code = real_get_operator_code;
 
     /* Properties */
     g_object_class_override_property (object_class,

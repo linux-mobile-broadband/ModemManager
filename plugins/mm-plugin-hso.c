@@ -109,6 +109,8 @@ grab_port (MMPluginBase *base,
     char *devfile;
     guint32 caps;
     guint16 vendor = 0, product = 0;
+    MMPortType ptype;
+    MMAtPortFlags pflags = MM_AT_PORT_FLAG_NONE;
 
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
@@ -140,11 +142,29 @@ grab_port (MMPluginBase *base,
         }
     }
 
+    sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
+
+    /* Detect port types */
+    if (!strcmp (subsys, "tty")) {
+        char *hsotype_path;
+        char *contents = NULL;
+
+        hsotype_path = g_build_filename (sysfs_path, "hsotype", NULL);
+        if (g_file_get_contents (hsotype_path, &contents, NULL, NULL)) {
+            if (g_str_has_prefix (contents, "Control"))
+                pflags = MM_AT_PORT_FLAG_PRIMARY;
+            else if (g_str_has_prefix (contents, "Application") || g_str_has_prefix (contents, "Application2"))
+                pflags = MM_AT_PORT_FLAG_SECONDARY;  /* secondary */
+            g_free (contents);
+        }
+        g_free (hsotype_path);
+    }
+
     caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
     if (!(caps & MM_PLUGIN_BASE_PORT_CAP_GSM) && strcmp (subsys, "net"))
         goto out;
 
-    sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
+    ptype = mm_plugin_base_probed_capabilities_to_port_type (caps);
     if (!existing) {
         modem = mm_modem_hso_new (sysfs_path,
                                   mm_plugin_base_supports_task_get_driver (task),
@@ -152,14 +172,14 @@ grab_port (MMPluginBase *base,
                                   vendor,
                                   product);
         if (modem) {
-            if (!mm_modem_grab_port (modem, subsys, name, MM_PORT_TYPE_UNKNOWN, NULL, error)) {
+            if (!mm_modem_grab_port (modem, subsys, name, ptype, pflags, NULL, error)) {
                 g_object_unref (modem);
                 return NULL;
             }
         }
     } else {
         modem = existing;
-        if (!mm_modem_grab_port (modem, subsys, name, MM_PORT_TYPE_UNKNOWN, NULL, error))
+        if (!mm_modem_grab_port (modem, subsys, name, ptype, pflags, NULL, error))
             return NULL;
     }
 

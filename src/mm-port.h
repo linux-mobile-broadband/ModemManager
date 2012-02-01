@@ -29,8 +29,7 @@ typedef enum {
 
 typedef enum {
     MM_PORT_TYPE_UNKNOWN = 0x0,
-    MM_PORT_TYPE_PRIMARY,
-    MM_PORT_TYPE_SECONDARY,
+    MM_PORT_TYPE_AT,
     MM_PORT_TYPE_IGNORED,
     MM_PORT_TYPE_QCDM,
 

@@ -23,6 +23,7 @@
 #include <ModemManager.h>
 
 #include "mm-port.h"
+#include "mm-at-serial-port.h"
 #include "mm-auth-provider.h"
 #include "mm-charsets.h"
 
@@ -118,12 +119,22 @@ struct _MMModem {
                            const char *subsys,
                            const char *name);
 
+    /* Subclasses use this function to claim a particular port */
     gboolean (*grab_port) (MMModem *self,
                            const char *subsys,
                            const char *name,
-                           MMPortType suggested_type,
+                           MMPortType ptype,
+                           MMAtPortFlags at_pflags,
                            gpointer user_data,
                            GError **error);
+
+    /* Subclasses use this function to determine which of their
+     * grabbed ports should be used for data, command and status,
+     * PPP, etc.  Called after all ports have been detected and
+     * grabbed by the modem.
+     */
+    gboolean (*organize_ports) (MMModem *self,
+                                GError **error);
 
     void (*release_port) (MMModem *self,
                           const char *subsys,
@@ -204,9 +215,13 @@ gboolean mm_modem_owns_port (MMModem *self,
 gboolean mm_modem_grab_port (MMModem *self,
                              const char *subsys,
                              const char *name,
-                             MMPortType suggested_type,
+                             MMPortType ptype,
+                             MMAtPortFlags at_pflags,
                              gpointer user_data,
                              GError **error);
+
+gboolean mm_modem_organize_ports (MMModem *self,
+                                  GError **error);
 
 void mm_modem_release_port (MMModem *self,
                             const char *subsys,

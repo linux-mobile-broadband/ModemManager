@@ -64,10 +64,8 @@ const char *
 mm_port_type_to_name (MMPortType ptype)
 {
     switch (ptype) {
-    case MM_PORT_TYPE_PRIMARY:
-        return "primary";
-    case MM_PORT_TYPE_SECONDARY:
-        return "secondary";
+    case MM_PORT_TYPE_AT:
+        return "AT";
     case MM_PORT_TYPE_IGNORED:
         return "ignored";
     case MM_PORT_TYPE_QCDM:
@@ -108,7 +106,9 @@ constructor (GType type,
         return NULL;
     }
 
-    if (priv->ptype == MM_PORT_TYPE_UNKNOWN) {
+    /* Can't have a TTY subsystem port that's unknown */
+    if (   priv->subsys != MM_PORT_SUBSYS_NET
+        && priv->ptype == MM_PORT_TYPE_UNKNOWN) {
         g_warning ("MMPort: invalid port type");
         g_object_unref (object);
         return NULL;

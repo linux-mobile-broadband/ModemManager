@@ -22,6 +22,7 @@
 
 #include "mm-port.h"
 #include "mm-at-serial-port.h"
+#include "mm-qcdm-serial-port.h"
 #include "mm-modem.h"
 
 #define MM_TYPE_MODEM_BASE            (mm_modem_base_get_type ())
@@ -42,6 +43,14 @@ struct _MMModemBase {
 
 struct _MMModemBaseClass {
     GObjectClass parent;
+
+    /* Called after the base class grabs a port so that subclasses can
+     * set port flags and other properties on the new port.
+     */
+    void (*port_grabbed) (MMModemBase *self,
+                          MMPort *port,
+                          MMAtPortFlags at_pflags,
+                          gpointer user_data);
 };
 
 GType mm_modem_base_get_type (void);
@@ -50,13 +59,17 @@ MMPort *mm_modem_base_get_port     (MMModemBase *self,
                                     const char *subsys,
                                     const char *name);
 
-MMPort *mm_modem_base_add_port     (MMModemBase *self,
-                                    const char *subsys,
-                                    const char *name,
-                                    MMPortType ptype);
+GSList *mm_modem_base_get_ports    (MMModemBase *self);
 
 gboolean mm_modem_base_remove_port (MMModemBase *self,
                                     MMPort *port);
+
+gboolean mm_modem_base_organize_ports (MMModemBase *self,
+                                       MMAtSerialPort **out_primary,
+                                       MMAtSerialPort **out_secondary,
+                                       MMPort **out_data,
+                                       MMQcdmSerialPort **out_qcdm,
+                                       GError **error);
 
 void mm_modem_base_set_valid (MMModemBase *self,
                               gboolean valid);

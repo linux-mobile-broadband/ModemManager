@@ -473,7 +473,7 @@ do_enable (MMGenericGsm *self, MMModemFn callback, gpointer user_data)
 
     info = mm_callback_info_new (MM_MODEM (self), callback, user_data);
 
-    primary = mm_generic_gsm_get_at_port (self, MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (self, MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     if (priv->have_emrdy) {
@@ -530,7 +530,7 @@ disable (MMModem *modem,
                                       (GCallback)callback,
                                       user_data);
 
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     /* Turn off unsolicited responses */
@@ -562,7 +562,7 @@ do_disconnect (MMGenericGsm *gsm,
 {
     MMAtSerialPort *primary;
 
-    primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (gsm, MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
     mm_at_serial_port_queue_command (primary, "*ENAP=0", 3, NULL, NULL);
 
@@ -756,7 +756,7 @@ enap_poll (gpointer user_data)
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMAtSerialPort *port;
 
-    port = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (info->modem), MM_PORT_TYPE_PRIMARY);
+    port = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (info->modem), MM_AT_PORT_FLAG_PRIMARY);
     g_assert (port);
 
     mm_at_serial_port_queue_command (port, "AT*ENAP?", 3, enap_poll_response, user_data);
@@ -818,7 +818,7 @@ mbm_modem_authenticate (MMModemMbm *self,
 {
     MMAtSerialPort *primary;
 
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (self), MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     if (username || password) {
@@ -944,32 +944,15 @@ mbm_get_unlock_retries (MMModemGsmCard *modem,
 
 /*****************************************************************************/
 
-static gboolean
-grab_port (MMModem *modem,
-           const char *subsys,
-           const char *name,
-           MMPortType suggested_type,
-           gpointer user_data,
-           GError **error)
+static void
+port_grabbed (MMGenericGsm *gsm,
+              MMPort *port,
+              MMAtPortFlags pflags,
+              gpointer user_data)
 {
-    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
-    MMPortType ptype = MM_PORT_TYPE_IGNORED;
-    MMPort *port = NULL;
+    GRegex *regex;
 
-    if (!strcmp (subsys, "tty")) {
-        if (suggested_type == MM_PORT_TYPE_UNKNOWN) {
-            if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY))
-                    ptype = MM_PORT_TYPE_PRIMARY;
-            else if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY))
-                ptype = MM_PORT_TYPE_SECONDARY;
-        } else
-            ptype = suggested_type;
-    }
-
-    port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
-    if (port && MM_IS_AT_SERIAL_PORT (port)) {
-        GRegex *regex;
-
+    if (MM_IS_AT_SERIAL_PORT (port)) {
         /* The Ericsson modems always have a free AT command port, so we
          * don't need to flash the ports when disconnecting to get back to
          * command mode.  F5521gw R2A07 resets port properties like echo when
@@ -977,23 +960,12 @@ grab_port (MMModem *modem,
          */
         g_object_set (G_OBJECT (port), MM_SERIAL_PORT_FLASH_OK, FALSE, NULL);
 
-        if (ptype == MM_PORT_TYPE_PRIMARY) {
-            regex = g_regex_new ("\\r\\n\\*E2NAP: (\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, mbm_e2nap_received, modem, NULL);
-            g_regex_unref (regex);
-
-            /* Catch the extended error status bit of the command too */
-            regex = g_regex_new ("\\r\\n\\*E2NAP: (\\d),.*\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, mbm_e2nap_received, modem, NULL);
-            g_regex_unref (regex);
-        }
-
         regex = g_regex_new ("\\r\\n\\*EMRDY: \\d\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, mbm_emrdy_received, modem, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, mbm_emrdy_received, gsm, NULL);
         g_regex_unref (regex);
 
         regex = g_regex_new ("\\r\\n\\+PACSP(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, mbm_pacsp_received, modem, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, mbm_pacsp_received, gsm, NULL);
         g_regex_unref (regex);
 
         /* also consume unsolicited mbm messages we are not interested in them - see LP: #416418 */
@@ -1006,11 +978,25 @@ grab_port (MMModem *modem,
         g_regex_unref (regex);
 
         regex = g_regex_new ("\\r\\n\\*ERINFO:\\s*(\\d),(\\d),(\\d).*\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, mbm_erinfo_received, modem, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, mbm_erinfo_received, gsm, NULL);
         g_regex_unref (regex);
     }
+}
 
-    return TRUE;
+static void
+ports_organized (MMGenericGsm *gsm, MMAtSerialPort *primary)
+{
+    GRegex *regex;
+
+    /* Only listen on the primary port for connect status responses */
+    regex = g_regex_new ("\\r\\n\\*E2NAP: (\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    mm_at_serial_port_add_unsolicited_msg_handler (primary, regex, mbm_e2nap_received, gsm, NULL);
+    g_regex_unref (regex);
+
+    /* Catch the extended error status bit of the command too */
+    regex = g_regex_new ("\\r\\n\\*E2NAP: (\\d),.*\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    mm_at_serial_port_add_unsolicited_msg_handler (primary, regex, mbm_e2nap_received, gsm, NULL);
+    g_regex_unref (regex);
 }
 
 /*****************************************************************************/
@@ -1036,7 +1022,6 @@ modem_simple_init (MMModemSimple *class)
 static void
 modem_init (MMModem *modem_class)
 {
-    modem_class->grab_port = grab_port;
     modem_class->disable = disable;
     modem_class->connect = do_connect;
     modem_class->reset = reset;
@@ -1073,6 +1058,8 @@ mm_modem_mbm_class_init (MMModemMbmClass *klass)
     /* Virtual methods */
     object_class->finalize = finalize;
 
+    gsm_class->port_grabbed = port_grabbed;
+    gsm_class->ports_organized = ports_organized;
     gsm_class->do_enable = do_enable;
     gsm_class->do_disconnect = do_disconnect;
     gsm_class->get_allowed_mode = get_allowed_mode;

@@ -179,30 +179,21 @@ disable (MMModem *modem,
     option_change_unsolicited_messages (MM_GENERIC_GSM (modem), FALSE, unsolicited_disable_done, info);
 }
 
-static gboolean
-grab_port (MMModem *modem,
-           const char *subsys,
-           const char *name,
-           MMPortType suggested_type,
-           gpointer user_data,
-           GError **error)
+static void
+port_grabbed (MMGenericGsm *gsm,
+              MMPort *port,
+              MMAtPortFlags pflags,
+              gpointer user_data)
 {
-    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
-    MMPort *port = NULL;
+    GRegex *regex;
 
-    port = mm_generic_gsm_grab_port (gsm, subsys, name, suggested_type, error);
-    if (port && MM_IS_AT_SERIAL_PORT (port)) {
-        if (mm_port_get_port_type (port) == MM_PORT_TYPE_PRIMARY) {
-            GRegex *regex;
+    if (MM_IS_AT_SERIAL_PORT (port)) {
+        regex = g_regex_new ("\\r\\n\\+PACSP0\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
 
-            regex = g_regex_new ("\\r\\n\\+PACSP0\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
-            g_regex_unref (regex);
-        }
         option_register_unsolicted_handlers (gsm, MM_AT_SERIAL_PORT (port));
     }
-
-    return !!port;
 }
 
 /*****************************************************************************/
@@ -211,7 +202,6 @@ static void
 modem_init (MMModem *modem_class)
 {
     modem_class->disable = disable;
-    modem_class->grab_port = grab_port;
 }
 
 static void
@@ -238,6 +228,7 @@ mm_modem_option_class_init (MMModemOptionClass *klass)
     g_type_class_add_private (object_class, sizeof (MMModemOptionPrivate));
 
     object_class->dispose = dispose;
+    gsm_class->port_grabbed = port_grabbed;
     gsm_class->do_enable_power_up_done = real_do_enable_power_up_done;
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;

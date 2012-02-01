@@ -428,7 +428,7 @@ disable (MMModem *modem,
                                       (GCallback)callback,
                                       user_data);
 
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     /*
@@ -533,7 +533,7 @@ do_enable (MMGenericGsm *modem, MMModemFn callback, gpointer user_data)
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
 
-    primary = mm_generic_gsm_get_at_port (modem, MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (modem, MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
     mm_at_serial_port_queue_command (primary, "Z", 3, init_reset_done, info);
 }
@@ -580,30 +580,13 @@ simple_connect (MMModemSimple *simple,
     parent_iface->connect (MM_MODEM_SIMPLE (simple), properties, callback, info);
 }
 
-static gboolean
-grab_port (MMModem *modem,
-           const char *subsys,
-           const char *name,
-           MMPortType suggested_type,
-           gpointer user_data,
-           GError **error)
+static void
+port_grabbed (MMGenericGsm *gsm,
+              MMPort *port,
+              MMAtPortFlags pflags,
+              gpointer user_data)
 {
-    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
-    MMPortType ptype = MM_PORT_TYPE_IGNORED;
-    MMPort *port = NULL;
-
-    if (suggested_type == MM_PORT_TYPE_UNKNOWN) {
-        if (!strcmp (subsys, "tty")) {
-            if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY))
-                ptype = MM_PORT_TYPE_PRIMARY;
-            else if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY))
-                ptype = MM_PORT_TYPE_SECONDARY;
-        }
-    } else
-        ptype = suggested_type;
-
-    port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
-    if (port && MM_IS_AT_SERIAL_PORT (port)) {
+    if (MM_IS_AT_SERIAL_PORT (port)) {
         g_object_set (port,
                       MM_PORT_CARRIER_DETECT, FALSE,
                       MM_SERIAL_PORT_SEND_DELAY, (guint64) 0,
@@ -612,8 +595,6 @@ grab_port (MMModem *modem,
         /* Add Icera-specific handlers */
         mm_modem_icera_register_unsolicted_handlers (MM_MODEM_ICERA (gsm), MM_AT_SERIAL_PORT (port));
     }
-
-    return !!port;
 }
 
 static void
@@ -669,7 +650,6 @@ modem_init (MMModem *modem_class)
     modem_class->disable = disable;
     modem_class->connect = do_connect;
     modem_class->get_ip4_config = get_ip4_config;
-    modem_class->grab_port = grab_port;
 }
 
 static void
@@ -728,7 +708,6 @@ mm_modem_samsung_gsm_class_init (MMModemSamsungGsmClass *klass)
 {
 
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
-
     MMGenericGsmClass *gsm_class = MM_GENERIC_GSM_CLASS (klass);
 
     mm_modem_samsung_gsm_parent_class = g_type_class_peek_parent (klass);
@@ -737,9 +716,9 @@ mm_modem_samsung_gsm_class_init (MMModemSamsungGsmClass *klass)
 
     object_class->dispose = dispose;
 
+    gsm_class->port_grabbed = port_grabbed;
     gsm_class->do_disconnect = do_disconnect;
     gsm_class->do_enable = do_enable;
-
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->get_access_technology = get_access_technology;

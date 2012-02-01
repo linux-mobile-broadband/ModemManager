@@ -43,6 +43,23 @@ typedef struct {
 typedef struct {
     MMModemBaseClass parent;
 
+    /* Called to allow subclasses to update port flags, attach unsolicited
+     * result code handlers, change port attributes, etc.  This is called
+     * after the generic class has installed it's own handlers; if the
+     * generic class' behavior is not desired, subclasses can override the
+     * port_grabbed() method of MMModemBase.
+     */
+    void (*port_grabbed) (MMGenericCdma *self,
+                          MMPort *port,
+                          MMAtPortFlags at_pflags,
+                          gpointer user_data);
+
+    /* Called after all ports have been organized to allow subclasses to
+     * make changes to ports after we've assigned primary, secondary, and data
+     * designations.
+     */
+    void (*ports_organized) (MMGenericCdma *self, MMAtSerialPort *primary);
+
     /* Subclasses should implement this function if they can more accurately
      * determine the registration state and/or roaming status than the base
      * class can (by using manufacturer custom AT commands or whatever).
@@ -94,14 +111,8 @@ MMModem *mm_generic_cdma_new (const char *device,
 
 /* Private, for subclasses */
 
-MMPort * mm_generic_cdma_grab_port (MMGenericCdma *self,
-                                    const char *subsys,
-                                    const char *name,
-                                    MMPortType suggested_type,
-                                    gpointer user_data,
-                                    GError **error);
-
-MMAtSerialPort *mm_generic_cdma_get_at_port (MMGenericCdma *modem, MMPortType ptype);
+/* Returns the first port (if any) which has the given flag */
+MMAtSerialPort *mm_generic_cdma_get_at_port (MMGenericCdma *modem, MMAtPortFlags flag);
 
 MMAtSerialPort *mm_generic_cdma_get_best_at_port (MMGenericCdma *modem,
                                                   GError **error);

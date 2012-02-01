@@ -35,7 +35,8 @@ mm_plugin_create (void)
 
 /*****************************************************************************/
 
-#define TAG_SIERRA_SECONDARY_PORT "sierra-secondary-port"
+#define TAG_SIERRA_APP1_PORT      "sierra-app1-port"
+#define TAG_SIERRA_APP_PPP_OK     "sierra-app-ppp-ok"
 
 #define CAP_CDMA (MM_PLUGIN_BASE_PORT_CAP_IS707_A | \
                   MM_PLUGIN_BASE_PORT_CAP_IS707_P | \
@@ -64,8 +65,16 @@ handle_probe_response (MMPluginBase *self,
         return;
     }
 
-    if (strstr (response, "APP1") || strstr (response, "APP2") || strstr (response, "APP3")) {
-        g_object_set_data (G_OBJECT (task), TAG_SIERRA_SECONDARY_PORT, GUINT_TO_POINTER (TRUE));
+    if (strstr (response, "APP1")) {
+        g_object_set_data (G_OBJECT (task), TAG_SIERRA_APP1_PORT, GUINT_TO_POINTER (TRUE));
+
+        /* 885 can handle PPP on the APP ports, leaving the primary port open
+         * for command and status while connected.  Older modems (ie 8775) say
+         * they can but fail during PPP.
+         */
+        if (strstr (response, "C885"))
+            g_object_set_data (G_OBJECT (task), TAG_SIERRA_APP_PPP_OK, GUINT_TO_POINTER (TRUE));
+
         mm_plugin_base_supports_task_complete (task, 10);
         return;
     }
@@ -141,8 +150,9 @@ grab_port (MMPluginBase *base,
     MMModem *modem = NULL;
     const char *name, *subsys, *sysfs_path;
     guint32 caps;
-    MMPortType ptype = MM_PORT_TYPE_UNKNOWN;
+    MMPortType ptype;
     guint16 vendor = 0, product = 0;
+    MMAtPortFlags pflags = MM_AT_PORT_FLAG_NONE;
 
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
@@ -150,16 +160,29 @@ grab_port (MMPluginBase *base,
     subsys = g_udev_device_get_subsystem (port);
     name = g_udev_device_get_name (port);
 
+    caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
+    ptype = mm_plugin_base_probed_capabilities_to_port_type (caps);
+
     /* Is it a GSM secondary port? */
-    if (g_object_get_data (G_OBJECT (task), TAG_SIERRA_SECONDARY_PORT))
-        ptype = MM_PORT_TYPE_SECONDARY;
+    if (g_object_get_data (G_OBJECT (task), TAG_SIERRA_APP1_PORT)) {
+        if (g_object_get_data (G_OBJECT (task), TAG_SIERRA_APP_PPP_OK))
+            pflags = MM_AT_PORT_FLAG_PPP;
+        else
+            pflags = MM_AT_PORT_FLAG_SECONDARY;
+
+        /* Secondary ports may not be tagged as AT since they only speak a
+         * limited command set.  But we know they're AT if they are tagged
+         * as secondary ports.
+         */
+        ptype = MM_PORT_TYPE_AT;
+    } else if (ptype == MM_PORT_TYPE_AT)
+        pflags = MM_AT_PORT_FLAG_PRIMARY;
 
     if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product)) {
         g_set_error (error, 0, 0, "Could not get modem product ID.");
         return NULL;
     }
 
-    caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
     sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
     if (!existing) {
         if ((caps & MM_PLUGIN_BASE_PORT_CAP_GSM) || (ptype != MM_PORT_TYPE_UNKNOWN)) {
@@ -179,7 +202,7 @@ grab_port (MMPluginBase *base,
         }
 
         if (modem) {
-            if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error)) {
+            if (!mm_modem_grab_port (modem, subsys, name, ptype, pflags, NULL, error)) {
                 g_object_unref (modem);
                 return NULL;
             }
@@ -195,7 +218,7 @@ grab_port (MMPluginBase *base,
             return modem;
 
         modem = existing;
-        if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error))
+        if (!mm_modem_grab_port (modem, subsys, name, ptype, pflags, NULL, error))
             return NULL;
     }
 

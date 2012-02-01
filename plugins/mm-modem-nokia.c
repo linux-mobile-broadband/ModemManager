@@ -21,10 +21,7 @@
 #include "mm-modem-nokia.h"
 #include "mm-serial-parsers.h"
 
-static void modem_init (MMModem *modem_class);
-
-G_DEFINE_TYPE_EXTENDED (MMModemNokia, mm_modem_nokia, MM_TYPE_GENERIC_GSM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init))
+G_DEFINE_TYPE (MMModemNokia, mm_modem_nokia, MM_TYPE_GENERIC_GSM)
 
 
 MMModem *
@@ -47,44 +44,21 @@ mm_modem_nokia_new (const char *device,
                                    NULL));
 }
 
-static gboolean
-grab_port (MMModem *modem,
-           const char *subsys,
-           const char *name,
-           MMPortType suggested_type,
-           gpointer user_data,
-           GError **error)
+static void
+port_grabbed (MMGenericGsm *gsm,
+              MMPort *port,
+              MMAtPortFlags pflags,
+              gpointer user_data)
 {
-    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
-    MMPortType ptype = MM_PORT_TYPE_IGNORED;
-    MMPort *port = NULL;
-
-    if (suggested_type == MM_PORT_TYPE_UNKNOWN) {
-        if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY))
-                ptype = MM_PORT_TYPE_PRIMARY;
-        else if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY))
-            ptype = MM_PORT_TYPE_SECONDARY;
-    } else
-        ptype = suggested_type;
-
-    port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
-    if (port && MM_IS_AT_SERIAL_PORT (port)) {
+    if (MM_IS_AT_SERIAL_PORT (port)) {
         mm_at_serial_port_set_response_parser (MM_AT_SERIAL_PORT (port),
                                                mm_serial_parser_v1_e1_parse,
                                                mm_serial_parser_v1_e1_new (),
                                                mm_serial_parser_v1_e1_destroy);
     }
-
-    return !!port;
 }
 
 /*****************************************************************************/
-
-static void
-modem_init (MMModem *modem_class)
-{
-    modem_class->grab_port = grab_port;
-}
 
 static void
 mm_modem_nokia_init (MMModemNokia *self)
@@ -134,11 +108,13 @@ static void
 mm_modem_nokia_class_init (MMModemNokiaClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    MMGenericGsmClass *gsm_class = MM_GENERIC_GSM_CLASS (klass);
 
     mm_modem_nokia_parent_class = g_type_class_peek_parent (klass);
 
     object_class->get_property = get_property;
     object_class->set_property = set_property;
+    gsm_class->port_grabbed = port_grabbed;
 
     g_object_class_override_property (object_class,
                                       MM_GENERIC_GSM_PROP_INIT_CMD,

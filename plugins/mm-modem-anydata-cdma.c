@@ -307,19 +307,15 @@ reset (MMModem *modem,
     mm_callback_info_schedule (info);
 }
 
-static gboolean
-grab_port (MMModem *modem,
-           const char *subsys,
-           const char *name,
-           MMPortType suggested_type,
-           gpointer user_data,
-           GError **error)
+static void
+port_grabbed (MMGenericCdma *cdma,
+              MMPort *port,
+              MMAtPortFlags pflags,
+              gpointer user_data)
 {
-    MMPort *port = NULL;
     GRegex *regex;
 
-    port = mm_generic_cdma_grab_port (MM_GENERIC_CDMA (modem), subsys, name, suggested_type, user_data, error);
-    if (port && MM_IS_AT_SERIAL_PORT (port)) {
+    if (MM_IS_AT_SERIAL_PORT (port)) {
         /* Data state notifications */
 
         /* Data call has connected */
@@ -337,7 +333,7 @@ grab_port (MMModem *modem,
         mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
         g_regex_unref (regex);
 
-        /* Abnomral state notifications
+        /* Abnormal state notifications
          *
          * FIXME: set 1X/EVDO registration state to UNKNOWN when these
          * notifications are received?
@@ -358,8 +354,6 @@ grab_port (MMModem *modem,
         mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
         g_regex_unref (regex);
     }
-
-    return !!port;
 }
 
 /*****************************************************************************/
@@ -367,7 +361,6 @@ grab_port (MMModem *modem,
 static void
 modem_init (MMModem *modem_class)
 {
-    modem_class->grab_port = grab_port;
     modem_class->reset = reset;
 }
 
@@ -384,6 +377,7 @@ mm_modem_anydata_cdma_class_init (MMModemAnydataCdmaClass *klass)
     mm_modem_anydata_cdma_parent_class = g_type_class_peek_parent (klass);
 
     cdma_class->query_registration_state = query_registration_state;
+    cdma_class->port_grabbed = port_grabbed;
 
 #if 0
     /* FIXME: maybe use AT*SLEEP=0/1 to disable/enable slotted mode for powersave */

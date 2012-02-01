@@ -216,17 +216,17 @@ config_fd (MMSerialPort *port, int fd, GError **error)
 /*****************************************************************************/
 
 MMQcdmSerialPort *
-mm_qcdm_serial_port_new (const char *name, MMPortType ptype)
+mm_qcdm_serial_port_new (const char *name)
 {
     return MM_QCDM_SERIAL_PORT (g_object_new (MM_TYPE_QCDM_SERIAL_PORT,
                                               MM_PORT_DEVICE, name,
                                               MM_PORT_SUBSYS, MM_PORT_SUBSYS_TTY,
-                                              MM_PORT_TYPE, ptype,
+                                              MM_PORT_TYPE, MM_PORT_TYPE_QCDM,
                                               NULL));
 }
 
 MMQcdmSerialPort *
-mm_qcdm_serial_port_new_fd (int fd, MMPortType ptype)
+mm_qcdm_serial_port_new_fd (int fd)
 {
     MMQcdmSerialPort *port;
     char *name;
@@ -235,7 +235,7 @@ mm_qcdm_serial_port_new_fd (int fd, MMPortType ptype)
     port = MM_QCDM_SERIAL_PORT (g_object_new (MM_TYPE_QCDM_SERIAL_PORT,
                                               MM_PORT_DEVICE, name,
                                               MM_PORT_SUBSYS, MM_PORT_SUBSYS_TTY,
-                                              MM_PORT_TYPE, ptype,
+                                              MM_PORT_TYPE, MM_PORT_TYPE_QCDM,
                                               MM_SERIAL_PORT_FD, fd,
                                               NULL));
     g_free (name);

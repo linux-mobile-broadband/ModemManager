@@ -24,10 +24,13 @@
 #include "mm-callback-info.h"
 #include "mm-modem-helpers.h"
 
-static void modem_init (MMModem *modem_class);
+G_DEFINE_TYPE (MMModemNovatelGsm, mm_modem_novatel_gsm, MM_TYPE_GENERIC_GSM)
 
-G_DEFINE_TYPE_EXTENDED (MMModemNovatelGsm, mm_modem_novatel_gsm, MM_TYPE_GENERIC_GSM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init))
+#define MM_MODEM_NOVATEL_GSM_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_MODEM_NOVATEL_GSM, MMModemNovatelGsmPrivate))
+
+typedef struct {
+    gboolean dmat_sent;
+} MMModemNovatelGsmPrivate;
 
 
 MMModem *
@@ -78,34 +81,22 @@ dmat_callback (MMAtSerialPort *port,
     mm_serial_port_close (MM_SERIAL_PORT (port));
 }
 
-static gboolean
-grab_port (MMModem *modem,
-           const char *subsys,
-           const char *name,
-           MMPortType suggested_type,
-           gpointer user_data,
-           GError **error)
+static void
+port_grabbed (MMGenericGsm *gsm,
+              MMPort *port,
+              MMAtPortFlags pflags,
+              gpointer user_data)
 {
-    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
-    MMPortType ptype = MM_PORT_TYPE_IGNORED;
-    MMPort *port = NULL;
+    MMModemNovatelGsm *self = MM_MODEM_NOVATEL_GSM (gsm);
+    MMModemNovatelGsmPrivate *priv = MM_MODEM_NOVATEL_GSM_GET_PRIVATE (self);
 
-    if (suggested_type == MM_PORT_TYPE_UNKNOWN) {
-        if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY))
-                ptype = MM_PORT_TYPE_PRIMARY;
-        else if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY))
-            ptype = MM_PORT_TYPE_SECONDARY;
-    } else
-        ptype = suggested_type;
-
-    port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
-    if (port && MM_IS_AT_SERIAL_PORT (port) && (ptype == MM_PORT_TYPE_PRIMARY)) {
+    if (MM_IS_AT_SERIAL_PORT (port) && !priv->dmat_sent) {
         /* Flip secondary ports to AT mode */
-        if (mm_serial_port_open (MM_SERIAL_PORT (port), NULL))
+        if (mm_serial_port_open (MM_SERIAL_PORT (port), NULL)) {
             mm_at_serial_port_queue_command (MM_AT_SERIAL_PORT (port), "$NWDMAT=1", 2, dmat_callback, NULL);
+            priv->dmat_sent = TRUE;
+        }
     }
-
-    return !!port;
 }
 
 /*****************************************************************************/
@@ -315,12 +306,6 @@ get_access_technology (MMGenericGsm *modem,
 /*****************************************************************************/
 
 static void
-modem_init (MMModem *modem_class)
-{
-    modem_class->grab_port = grab_port;
-}
-
-static void
 mm_modem_novatel_gsm_init (MMModemNovatelGsm *self)
 {
 }
@@ -360,10 +345,12 @@ mm_modem_novatel_gsm_class_init (MMModemNovatelGsmClass *klass)
     MMGenericGsmClass *gsm_class = MM_GENERIC_GSM_CLASS (klass);
 
     mm_modem_novatel_gsm_parent_class = g_type_class_peek_parent (klass);
+    g_type_class_add_private (object_class, sizeof (MMModemNovatelGsmPrivate));
 
     object_class->get_property = get_property;
     object_class->set_property = set_property;
 
+    gsm_class->port_grabbed = port_grabbed;
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->get_access_technology = get_access_technology;

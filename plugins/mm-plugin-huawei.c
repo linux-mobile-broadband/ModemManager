@@ -17,6 +17,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <gmodule.h>
+#include <errno.h>
 
 #define G_UDEV_API_IS_SUBJECT_TO_CHANGE
 #include <gudev/gudev.h>
@@ -47,6 +48,9 @@ mm_plugin_create (void)
 /*****************************************************************************/
 
 #define TAG_HUAWEI_PCUI_PORT "huawei-pcui-port"
+#define TAG_HUAWEI_MODEM_PORT "huawei-modem-port"
+#define TAG_HUAWEI_DIAG_PORT "huawei-diag-port"
+#define TAG_GETPORTMODE_SUPPORTED "getportmode-supported"
 
 #define CAP_CDMA (MM_PLUGIN_BASE_PORT_CAP_IS707_A | \
                   MM_PLUGIN_BASE_PORT_CAP_IS707_P | \
@@ -74,6 +78,23 @@ probe_result (MMPluginBase *base,
     mm_plugin_base_supports_task_complete (task, get_level_for_capabilities (capabilities));
 }
 
+static void
+cache_port_mode (MMPlugin *plugin, const char *reply, const char *type, const char *tag)
+{
+    char *p;
+    long i;
+
+    /* Get the USB interface number of the PCUI port */
+    p = strstr (reply, type);
+    if (p) {
+        errno = 0;
+        /* shift by 1 so NULL return from g_object_get_data() means no tag */
+        i = 1 + strtol (p + strlen (type), NULL, 10);
+        if (i > 0 && i < 256 && errno == 0)
+            g_object_set_data (G_OBJECT (plugin), tag, GINT_TO_POINTER ((int) i));
+    }
+}
+
 static gboolean
 getportmode_response_cb (MMPluginBaseSupportsTask *task,
                          GString *response,
@@ -90,21 +111,13 @@ getportmode_response_cb (MMPluginBaseSupportsTask *task,
         if (g_error_matches (error, MM_MOBILE_ERROR, MM_MOBILE_ERROR_UNKNOWN) == FALSE)
             return tries <= 4 ? TRUE : FALSE;
     } else {
-        MMPlugin *plugin;
-        char *p;
-        int i = 0;
+        MMPlugin *plugin = mm_plugin_base_supports_task_get_plugin (task);
 
-        /* Get the USB interface number of the PCUI port */
-        p = strstr (response->str, "PCUI:");
-        if (p)
-            i = atoi (p + strlen ("PCUI:"));
+        cache_port_mode (plugin, response->str, "PCUI:", TAG_HUAWEI_PCUI_PORT);
+        cache_port_mode (plugin, response->str, "MDM:", TAG_HUAWEI_MODEM_PORT);
+        cache_port_mode (plugin, response->str, "DIAG:", TAG_HUAWEI_DIAG_PORT);
 
-        if (i) {
-            /* Save they PCUI port number for later */
-            plugin = mm_plugin_base_supports_task_get_plugin (task);
-            g_assert (plugin);
-            g_object_set_data (G_OBJECT (plugin), TAG_HUAWEI_PCUI_PORT, GINT_TO_POINTER (i));
-        }
+        g_object_set_data (G_OBJECT (plugin), TAG_GETPORTMODE_SUPPORTED, GUINT_TO_POINTER (1));
     }
 
     /* No error or if ^GETPORTMODE is not supported, assume success */
@@ -221,6 +234,9 @@ grab_port (MMPluginBase *base,
     const char *name, *subsys, *devfile, *sysfs_path;
     guint32 caps;
     guint16 vendor = 0, product = 0;
+    MMPortType ptype;
+    int usbif;
+    MMAtPortFlags pflags = MM_AT_PORT_FLAG_NONE;
 
     port = mm_plugin_base_supports_task_get_port (task);
     g_assert (port);
@@ -239,7 +255,32 @@ grab_port (MMPluginBase *base,
         return NULL;
     }
 
+    usbif = g_udev_device_get_property_as_int (port, "ID_USB_INTERFACE_NUM");
+    if (usbif < 0) {
+        g_set_error (error, 0, 0, "Could not get USB device interface number.");
+        return NULL;
+    }
+
     caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
+    ptype = mm_plugin_base_probed_capabilities_to_port_type (caps);
+
+    if (usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (base), TAG_HUAWEI_PCUI_PORT)))
+        pflags = MM_AT_PORT_FLAG_PRIMARY;
+    else if (usbif + 1 == GPOINTER_TO_INT (g_object_get_data (G_OBJECT (base), TAG_HUAWEI_MODEM_PORT)))
+        pflags = MM_AT_PORT_FLAG_PPP;
+    else if (!g_object_get_data (G_OBJECT (base), TAG_GETPORTMODE_SUPPORTED)) {
+        /* If GETPORTMODE is not supported, we assume usbif 0 is the modem port */
+        if ((usbif == 0) && (ptype == MM_PORT_TYPE_AT)) {
+            pflags = MM_AT_PORT_FLAG_PPP;
+
+            /* For CDMA modems we assume usbif0 is both primary and PPP, since
+             * they don't have problems with talking on secondary ports.
+             */
+            if (caps & CAP_CDMA)
+                pflags |= MM_AT_PORT_FLAG_PRIMARY;
+        }
+    }
+
     sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
     if (!existing) {
         if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
@@ -259,32 +300,14 @@ grab_port (MMPluginBase *base,
         }
 
         if (modem) {
-            if (!mm_modem_grab_port (modem, subsys, name, MM_PORT_TYPE_UNKNOWN, NULL, error)) {
+            if (!mm_modem_grab_port (modem, subsys, name, ptype, pflags, NULL, error)) {
                 g_object_unref (modem);
                 return NULL;
             }
         }
     } else {
-        MMPortType ptype = MM_PORT_TYPE_UNKNOWN;
-        int pcui_usbif, port_usbif;
-
-        /* Any additional AT ports can be secondary ports, but we want to ensure
-         * that the "pcui" port found from ^GETPORTMODE above is always set as
-         * a secondary port too.
-         */
-
-        port_usbif = g_udev_device_get_property_as_int (port, "ID_USB_INTERFACE_NUM");
-        pcui_usbif = GPOINTER_TO_INT (g_object_get_data (G_OBJECT (base), TAG_HUAWEI_PCUI_PORT));
-
-        if (   (port_usbif == pcui_usbif)
-            || (caps & MM_PLUGIN_BASE_PORT_CAP_GSM)
-            || (caps & CAP_CDMA))
-            ptype = MM_PORT_TYPE_SECONDARY;
-        else if (caps & MM_PLUGIN_BASE_PORT_CAP_QCDM)
-            ptype = MM_PORT_TYPE_QCDM;
-
         modem = existing;
-        if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error))
+        if (!mm_modem_grab_port (modem, subsys, name, ptype, pflags, NULL, error))
             return NULL;
     }
 

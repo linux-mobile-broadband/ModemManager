@@ -383,7 +383,7 @@ real_do_enable_power_up_done (MMGenericGsm *gsm,
         MMAtSerialPort *primary;
 
         /* Enable unsolicited result codes */
-        primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
+        primary = mm_generic_gsm_get_at_port (gsm, MM_AT_PORT_FLAG_PRIMARY);
         g_assert (primary);
 
         /* Autoreport access technology changes */
@@ -444,44 +444,26 @@ disable (MMModem *modem,
                                       (GCallback)callback,
                                       user_data);
 
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     /* Turn off unsolicited responses */
     mm_at_serial_port_queue_command (primary, "+CNSMOD=0;+AUTOCSQ=0", 5, disable_unsolicited_done, info);
 }
 
-static gboolean
-grab_port (MMModem *modem,
-           const char *subsys,
-           const char *name,
-           MMPortType suggested_type,
-           gpointer user_data,
-           GError **error)
+static void
+port_grabbed (MMGenericGsm *gsm,
+              MMPort *port,
+              MMAtPortFlags pflags,
+              gpointer user_data)
 {
-    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
-    MMPortType ptype = MM_PORT_TYPE_IGNORED;
-    MMPort *port;
+    GRegex *regex;
 
-    if (suggested_type == MM_PORT_TYPE_UNKNOWN) {
-        if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY))
-                ptype = MM_PORT_TYPE_PRIMARY;
-        else if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY))
-            ptype = MM_PORT_TYPE_SECONDARY;
-    } else
-        ptype = suggested_type;
-
-    port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
-
-    if (port && MM_IS_AT_SERIAL_PORT (port)) {
-        GRegex *regex;
-
+    if (MM_IS_AT_SERIAL_PORT (port)) {
         regex = g_regex_new ("\\r\\n\\+CNSMOD:\\s*(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_act_change, modem, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_act_change, gsm, NULL);
         g_regex_unref (regex);
     }
-
-    return !!port;
 }
 
 /*****************************************************************************/
@@ -490,7 +472,6 @@ static void
 modem_init (MMModem *modem_class)
 {
     modem_class->disable = disable;
-    modem_class->grab_port = grab_port;
 }
 
 static void
@@ -505,6 +486,7 @@ mm_modem_simtech_gsm_class_init (MMModemSimtechGsmClass *klass)
 
     mm_modem_simtech_gsm_parent_class = g_type_class_peek_parent (klass);
 
+    gsm_class->port_grabbed = port_grabbed;
     gsm_class->do_enable_power_up_done = real_do_enable_power_up_done;
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;

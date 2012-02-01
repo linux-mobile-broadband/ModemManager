@@ -110,7 +110,8 @@ grab_port (MMPluginBase *base,
     const char *name, *subsys, *devfile, *sysfs_path;
     guint32 caps;
     int usbif;
-    MMPortType ptype = MM_PORT_TYPE_SECONDARY;
+    MMPortType ptype;
+    MMAtPortFlags pflags = MM_AT_PORT_FLAG_NONE;
     guint16 vendor = 0, product = 0;
 
     port = mm_plugin_base_supports_task_get_port (task);
@@ -122,9 +123,6 @@ grab_port (MMPluginBase *base,
         return NULL;
     }
 
-    subsys = g_udev_device_get_subsystem (port);
-    name = g_udev_device_get_name (port);
-
     /* This is the MM equivalent of NM commit 9d7f5b3d084eee2ccfff721c4beca3e3f34bdc50;
      * Genuine Option NV devices are always supposed to use USB interface 0 as
      * the modem/data port, per mail with Option engineers.  Only this port
@@ -132,8 +130,10 @@ grab_port (MMPluginBase *base,
      */
     usbif = g_udev_device_get_property_as_int (port, "ID_USB_INTERFACE_NUM");
     if (usbif == 0)
-        ptype = MM_PORT_TYPE_PRIMARY;
+        pflags = MM_AT_PORT_FLAG_PRIMARY | MM_AT_PORT_FLAG_PPP;
 
+    subsys = g_udev_device_get_subsystem (port);
+    name = g_udev_device_get_name (port);
     if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product)) {
         g_set_error (error, 0, 0, "Could not get modem product ID.");
         return NULL;
@@ -141,6 +141,7 @@ grab_port (MMPluginBase *base,
 
     caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
     sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
+    ptype = mm_plugin_base_probed_capabilities_to_port_type (caps);
     if (!existing) {
         if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
             modem = mm_modem_option_new (sysfs_path,
@@ -151,17 +152,14 @@ grab_port (MMPluginBase *base,
         }
 
         if (modem) {
-            if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error)) {
+            if (!mm_modem_grab_port (modem, subsys, name, ptype, pflags, NULL, error)) {
                 g_object_unref (modem);
                 return NULL;
             }
         }
     } else if (get_level_for_capabilities (caps)) {
-        if (caps & MM_PLUGIN_BASE_PORT_CAP_QCDM)
-            ptype = MM_PORT_TYPE_QCDM;
-
         modem = existing;
-        if (!mm_modem_grab_port (modem, subsys, name, ptype, NULL, error))
+        if (!mm_modem_grab_port (modem, subsys, name, ptype, pflags, NULL, error))
             return NULL;
     }
 

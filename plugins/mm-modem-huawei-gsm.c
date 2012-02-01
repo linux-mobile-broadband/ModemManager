@@ -726,9 +726,10 @@ do_enable_power_up_done (MMGenericGsm *gsm,
         MMAtSerialPort *primary;
 
         /* Enable unsolicited result codes */
-        primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
+        primary = mm_generic_gsm_get_at_port (gsm, MM_AT_PORT_FLAG_PRIMARY);
         g_assert (primary);
 
+        mm_at_serial_port_queue_command (primary, "^PORTSEL=0", 5, NULL, NULL);
         mm_at_serial_port_queue_command (primary, "^CURC=1", 5, NULL, NULL);
     }
 
@@ -783,7 +784,7 @@ disable (MMModem *modem,
                                       (GCallback)callback,
                                       user_data);
 
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     /* Turn off unsolicited responses */
@@ -792,77 +793,33 @@ disable (MMModem *modem,
 
 /*****************************************************************************/
 
-static gboolean
-grab_port (MMModem *modem,
-           const char *subsys,
-           const char *name,
-           MMPortType suggested_type,
-           gpointer user_data,
-           GError **error)
+static void
+port_grabbed (MMGenericGsm *gsm,
+              MMPort *port,
+              MMAtPortFlags pflags,
+              gpointer user_data)
 {
-    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
-    MMPortType ptype = MM_PORT_TYPE_IGNORED;
-    const char *sys[] = { "tty", NULL };
-    GUdevClient *client;
-    GUdevDevice *device = NULL;
-    MMPort *port = NULL;
-    int usbif;
+    GRegex *regex;
 
-    client = g_udev_client_new (sys);
-    if (!client) {
-        g_set_error (error, 0, 0, "Could not get udev client.");
-        return FALSE;
-    }
-
-    device = g_udev_client_query_by_subsystem_and_name (client, subsys, name);
-    if (!device) {
-        g_set_error (error, 0, 0, "Could not get udev device.");
-        goto out;
-    }
-
-    usbif = g_udev_device_get_property_as_int (device, "ID_USB_INTERFACE_NUM");
-    if (usbif < 0) {
-        g_set_error (error, 0, 0, "Could not get USB device interface number.");
-        goto out;
-    }
-
-    if (usbif == 0) {
-        if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY))
-            ptype = MM_PORT_TYPE_PRIMARY;
-    } else if (suggested_type == MM_PORT_TYPE_SECONDARY) {
-        if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY))
-            ptype = MM_PORT_TYPE_SECONDARY;
-    }
-
-    port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
-
-    if (port && MM_IS_AT_SERIAL_PORT (port)) {
-        GRegex *regex;
-
+    if (MM_IS_AT_SERIAL_PORT (port)) {
         g_object_set (G_OBJECT (port), MM_PORT_CARRIER_DETECT, FALSE, NULL);
 
         regex = g_regex_new ("\\r\\n\\^RSSI:(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_signal_quality_change, modem, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_signal_quality_change, gsm, NULL);
         g_regex_unref (regex);
 
         regex = g_regex_new ("\\r\\n\\^MODE:(\\d),(\\d)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_mode_change, modem, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_mode_change, gsm, NULL);
         g_regex_unref (regex);
 
         regex = g_regex_new ("\\r\\n\\^DSFLOWRPT:(.+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_status_change, modem, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, handle_status_change, gsm, NULL);
         g_regex_unref (regex);
 
         regex = g_regex_new ("\\r\\n\\^BOOT:.+\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, modem, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, gsm, NULL);
         g_regex_unref (regex);
     }
-
-out:
-    if (device)
-        g_object_unref (device);
-    g_object_unref (client);
-    return !!port;
 }
 
 /* Encode to packed GSM - this is what Huawei supports on all known models */
@@ -919,7 +876,6 @@ ussd_decode (MMModemGsmUssd *self, const char* reply, guint scheme)
 static void
 modem_init (MMModem *modem_class)
 {
-    modem_class->grab_port = grab_port;
     modem_class->disable = disable;
 }
 
@@ -957,6 +913,7 @@ mm_modem_huawei_gsm_class_init (MMModemHuaweiGsmClass *klass)
     mm_modem_huawei_gsm_parent_class = g_type_class_peek_parent (klass);
     g_type_class_add_private (object_class, sizeof (MMModemHuaweiGsmPrivate));
 
+    gsm_class->port_grabbed = port_grabbed;
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->get_access_technology = get_access_technology;
