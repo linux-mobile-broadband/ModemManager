@@ -105,6 +105,8 @@ struct _MMBroadbandModemPrivate {
     MMModemCharset modem_current_charset;
     gboolean modem_cind_supported;
     guint modem_cind_indicator_signal_quality;
+    guint modem_cind_min_signal_quality;
+    guint modem_cind_max_signal_quality;
     guint modem_cind_indicator_roaming;
     guint modem_cind_indicator_service;
 
@@ -1029,6 +1031,28 @@ signal_quality_csq (SignalQualityContext *ctx)
         ctx);
 }
 
+static guint
+normalize_ciev_cind_signal_quality (guint quality,
+                                    guint min,
+                                    guint max)
+{
+    if (!max &&
+        quality >= 0) {
+        /* If we didn't get a max, assume it was 5. Note that we do allow
+         * 0, meaning no signal at all. */
+        return (quality * 20);
+    }
+
+    if (quality >= min &&
+        quality <= max)
+        return ((100 * (quality - min)) / (max - min));
+
+    /* Value out of range, assume no signal here. Some modems (Cinterion
+     * for example) will send out-of-range values when they cannot get
+     * the signal strength. */
+    return 0;
+}
+
 static void
 signal_quality_cind_ready (MMBroadbandModem *self,
                            GAsyncResult *res,
@@ -1050,7 +1074,9 @@ signal_quality_cind_ready (MMBroadbandModem *self,
         quality = g_array_index (indicators,
                                  guint8,
                                  self->priv->modem_cind_indicator_signal_quality);
-        quality = CLAMP (quality, 0, 5) * 20;
+        quality = normalize_ciev_cind_signal_quality (quality,
+                                                      self->priv->modem_cind_min_signal_quality,
+                                                      self->priv->modem_cind_max_signal_quality);
         g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                    GUINT_TO_POINTER (quality),
                                                    NULL);
@@ -1239,30 +1265,38 @@ cind_format_check_ready (MMBroadbandModem *self,
      * indicators. */
     self->priv->modem_cind_supported = TRUE;
 
-#define FIND_INDEX(indicator_str,var_suffix) do {                       \
-        r = g_hash_table_lookup (indicators, indicator_str);            \
-        self->priv->modem_cind_indicator_##var_suffix = (r ?            \
-                                                   cind_response_get_index (r) : \
-                                                   CIND_INDICATOR_INVALID); \
-    } while (0)
+    /* Check if we support signal quality indications */
+    r = g_hash_table_lookup (indicators, "signal");
+    if (r) {
+        self->priv->modem_cind_indicator_signal_quality = cind_response_get_index (r);
+        self->priv->modem_cind_min_signal_quality = cind_response_get_min (r);
+        self->priv->modem_cind_max_signal_quality = cind_response_get_max (r);
 
-    FIND_INDEX ("signal", signal_quality);
-    FIND_INDEX ("roam", roaming);
-    FIND_INDEX ("service", service);
+        mm_dbg ("Modem supports signal quality indications via CIND at index '%u'"
+                "(min: %u, max: %u)",
+                self->priv->modem_cind_indicator_signal_quality,
+                self->priv->modem_cind_min_signal_quality,
+                self->priv->modem_cind_max_signal_quality);
+    } else
+        self->priv->modem_cind_indicator_signal_quality = CIND_INDICATOR_INVALID;
 
-    if (CIND_INDICATOR_IS_VALID (self->priv->modem_cind_indicator_signal_quality))
-        mm_dbg ("Modem supports signal quality indications via CIND at index '%u'",
-                self->priv->modem_cind_indicator_signal_quality);
-
-    if (CIND_INDICATOR_IS_VALID (self->priv->modem_cind_indicator_roaming))
+    /* Check if we support roaming indications */
+    r = g_hash_table_lookup (indicators, "roam");
+    if (r) {
+        self->priv->modem_cind_indicator_roaming = cind_response_get_index (r);
         mm_dbg ("Modem supports roaming indications via CIND at index '%u'",
                 self->priv->modem_cind_indicator_roaming);
+    } else
+        self->priv->modem_cind_indicator_roaming = CIND_INDICATOR_INVALID;
 
-    if (CIND_INDICATOR_IS_VALID (self->priv->modem_cind_indicator_service))
+    /* Check if we support service indications */
+    r = g_hash_table_lookup (indicators, "service");
+    if (r) {
+        self->priv->modem_cind_indicator_service = cind_response_get_index (r);
         mm_dbg ("Modem supports service indications via CIND at index '%u'",
                 self->priv->modem_cind_indicator_service);
-
-#undef FIND_INDEX
+    } else
+        self->priv->modem_cind_indicator_service = CIND_INDICATOR_INVALID;
 
     g_hash_table_destroy (indicators);
 
@@ -1310,27 +1344,33 @@ ciev_received (MMAtSerialPort *port,
                MMBroadbandModem *self)
 {
     gint ind = 0;
-    gchar *str;
+    gchar *item;
 
-    str = g_match_info_fetch (info, 1);
-    if (str) {
-        ind = atoi (str);
-        g_free (str);
-    }
+    item = g_match_info_fetch (info, 1);
+    if (item)
+        ind = atoi (item);
 
     /* Handle signal quality change indication */
-    if (ind == self->priv->modem_cind_indicator_signal_quality) {
-        str = g_match_info_fetch (info, 2);
-        if (str) {
+    if (ind == self->priv->modem_cind_indicator_signal_quality ||
+        g_str_equal (item, "signal")) {
+        gchar *value;
+
+        value = g_match_info_fetch (info, 2);
+        if (value) {
             gint quality = 0;
 
-            quality = atoi (str);
-            if (quality > 0)
-                mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self),
-                                                      (guint) (quality * 20));
-            g_free (str);
+            quality = atoi (value);
+
+            mm_iface_modem_update_signal_quality (
+                MM_IFACE_MODEM (self),
+                normalize_ciev_cind_signal_quality (quality,
+                                                    self->priv->modem_cind_min_signal_quality,
+                                                    self->priv->modem_cind_max_signal_quality));
+            g_free (value);
         }
     }
+
+    g_free (item);
 
     /* FIXME: handle roaming and service indicators.
      * ... wait, arent these already handle by unsolicited CREG responses? */
