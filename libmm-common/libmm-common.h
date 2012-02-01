@@ -35,5 +35,6 @@
 #include "mm-gdbus-modem.h"
 #include "mm-gdbus-bearer.h"
 #include "mm-gdbus-sim.h"
+#include "mm-gdbus-sms.h"
 
 #endif /* _LIBMM_COMMON_H_ */
