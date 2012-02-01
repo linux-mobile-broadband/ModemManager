@@ -37,6 +37,34 @@ mm_iface_modem_messaging_bind_simple_status (MMIfaceModemMessaging *self,
 
 /*****************************************************************************/
 
+gboolean
+mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
+                                    MMSmsPart *sms_part,
+                                    gboolean received)
+{
+    MMSmsList *list = NULL;
+    GError *error = NULL;
+    gboolean added;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
+                  NULL);
+    g_assert (list != NULL);
+    added = mm_sms_list_take_part (list, sms_part, received, &error);
+    if (!added) {
+        mm_dbg ("Couldn't take part in SMS list: '%s'", error->message);
+        g_error_free (error);
+
+        /* If part wasn't taken, we need to free the part ourselves */
+        mm_sms_part_free (sms_part);
+    }
+    g_object_unref (list);
+
+    return added;
+}
+
+/*****************************************************************************/
+
 typedef struct _DisablingContext DisablingContext;
 static void interface_disabling_step (DisablingContext *ctx);
 
@@ -136,6 +164,7 @@ static void interface_enabling_step (EnablingContext *ctx);
 typedef enum {
     ENABLING_STEP_FIRST,
     ENABLING_STEP_SETUP_SMS_FORMAT,
+    ENABLING_STEP_LOAD_INITIAL_SMS_PARTS,
     ENABLING_STEP_LAST
 } EnablingStep;
 
@@ -212,6 +241,28 @@ setup_sms_format_ready (MMIfaceModemMessaging *self,
 }
 
 static void
+load_initial_sms_parts_ready (MMIfaceModemMessaging *self,
+                              GAsyncResult *res,
+                              EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->load_initial_sms_parts_finish (self,
+                                                                                       res,
+                                                                                       &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        enabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    mm_dbg ("Initial SMS parts correctly loaded");
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_enabling_step (ctx);
+}
+
+static void
 interface_enabling_step (EnablingContext *ctx)
 {
     switch (ctx->step) {
@@ -235,6 +286,19 @@ interface_enabling_step (EnablingContext *ctx)
             MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->setup_sms_format (
                 ctx->self,
                 (GAsyncReadyCallback)setup_sms_format_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_LOAD_INITIAL_SMS_PARTS:
+        /* Allow loading the initial list of SMS parts */
+        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->load_initial_sms_parts &&
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->load_initial_sms_parts_finish) {
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->load_initial_sms_parts (
+                ctx->self,
+                (GAsyncReadyCallback)load_initial_sms_parts_ready,
                 ctx);
             return;
         }

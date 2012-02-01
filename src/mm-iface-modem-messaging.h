@@ -20,6 +20,7 @@
 #include <gio/gio.h>
 
 #include "mm-at-serial-port.h"
+#include "mm-sms-part.h"
 
 #define MM_TYPE_IFACE_MODEM_MESSAGING               (mm_iface_modem_messaging_get_type ())
 #define MM_IFACE_MODEM_MESSAGING(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM_MESSAGING, MMIfaceModemMessaging))
@@ -49,6 +50,15 @@ struct _MMIfaceModemMessaging {
     gboolean (*setup_sms_format_finish) (MMIfaceModemMessaging *self,
                                          GAsyncResult *res,
                                          GError **error);
+
+    /* Load initial SMS parts (async).
+     * Found parts need to be reported with take_part() */
+    void (* load_initial_sms_parts) (MMIfaceModemMessaging *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data);
+    gboolean (*load_initial_sms_parts_finish) (MMIfaceModemMessaging *self,
+                                               GAsyncResult *res,
+                                               GError **error);
 };
 
 GType mm_iface_modem_messaging_get_type (void);
@@ -84,5 +94,10 @@ void mm_iface_modem_messaging_shutdown (MMIfaceModemMessaging *self);
 /* Bind properties for simple GetStatus() */
 void mm_iface_modem_messaging_bind_simple_status (MMIfaceModemMessaging *self,
                                                   MMCommonSimpleProperties *status);
+
+/* Report new SMS part */
+gboolean mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
+                                             MMSmsPart *sms_part,
+                                             gboolean received);
 
 #endif /* MM_IFACE_MODEM_MESSAGING_H */
