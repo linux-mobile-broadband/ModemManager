@@ -174,15 +174,6 @@ sms_added (MMSmsList *list,
 }
 
 static void
-sms_completed (MMSmsList *list,
-               const gchar *sms_path,
-               MmGdbusModemMessaging *skeleton)
-{
-    mm_dbg ("Completed SMS at '%s'", sms_path);
-    mm_gdbus_modem_messaging_emit_completed (skeleton, sms_path);
-}
-
-static void
 sms_deleted (MMSmsList *list,
              const gchar *sms_path,
              MmGdbusModemMessaging *skeleton)
@@ -406,10 +397,6 @@ interface_enabling_step (EnablingContext *ctx)
         g_signal_connect (list,
                           MM_SMS_ADDED,
                           G_CALLBACK (sms_added),
-                          ctx->skeleton);
-        g_signal_connect (list,
-                          MM_SMS_COMPLETED,
-                          G_CALLBACK (sms_completed),
                           ctx->skeleton);
         g_signal_connect (list,
                           MM_SMS_DELETED,

@@ -40,7 +40,6 @@ static GParamSpec *properties[PROP_LAST];
 
 enum {
     SIGNAL_ADDED,
-    SIGNAL_COMPLETED,
     SIGNAL_DELETED,
     SIGNAL_LAST
 };
@@ -224,11 +223,6 @@ take_multipart (MMSmsList *self,
                        received);
     }
 
-    /* Check if completed */
-    if (mm_sms_multipart_is_complete (sms))
-        g_signal_emit (self, signals[SIGNAL_COMPLETED], 0,
-                       mm_sms_get_path (sms));
-
     return TRUE;
 }
 
@@ -357,15 +351,6 @@ mm_sms_list_class_init (MMSmsListClass *klass)
                       NULL, NULL,
                       mm_marshal_VOID__STRING_BOOLEAN,
                       G_TYPE_NONE, 2, G_TYPE_STRING, G_TYPE_BOOLEAN);
-
-    signals[SIGNAL_COMPLETED] =
-        g_signal_new (MM_SMS_COMPLETED,
-                      G_OBJECT_CLASS_TYPE (object_class),
-                      G_SIGNAL_RUN_FIRST,
-                      G_STRUCT_OFFSET (MMSmsListClass, sms_completed),
-                      NULL, NULL,
-                      mm_marshal_VOID__STRING,
-                      G_TYPE_NONE, 1, G_TYPE_STRING);
 
     signals[SIGNAL_DELETED] =
         g_signal_new (MM_SMS_DELETED,

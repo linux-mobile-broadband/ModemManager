@@ -36,7 +36,6 @@ typedef struct _MMSmsListPrivate MMSmsListPrivate;
 #define MM_SMS_LIST_MODEM "sms-list-modem"
 
 #define MM_SMS_ADDED     "sms-added"
-#define MM_SMS_COMPLETED "sms-completed"
 #define MM_SMS_DELETED   "sms-deleted"
 
 struct _MMSmsList {
@@ -51,8 +50,6 @@ struct _MMSmsListClass {
     void (*sms_added)     (MMSmsList *self,
                            const gchar *sms_path,
                            gboolean received);
-    void (*sms_completed) (MMSmsList *self,
-                           const gchar *sms_path);
     void (*sms_deleted)   (MMSmsList *self,
                            const gchar *sms_path);
 };
