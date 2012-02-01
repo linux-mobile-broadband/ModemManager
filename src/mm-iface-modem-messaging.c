@@ -37,6 +37,79 @@ mm_iface_modem_messaging_bind_simple_status (MMIfaceModemMessaging *self,
 
 /*****************************************************************************/
 
+typedef struct {
+    MmGdbusModemMessaging *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModemMessaging *self;
+} DbusCallContext;
+
+static void
+dbus_call_context_free (DbusCallContext *ctx)
+{
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static DbusCallContext *
+dbus_call_context_new (MmGdbusModemMessaging *skeleton,
+                       GDBusMethodInvocation *invocation,
+                       MMIfaceModemMessaging *self)
+{
+    DbusCallContext *ctx;
+
+    ctx = g_new (DbusCallContext, 1);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+    return ctx;
+}
+
+/*****************************************************************************/
+
+static void
+delete_sms_ready (MMSmsList *list,
+                  GAsyncResult *res,
+                  DbusCallContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_sms_list_delete_sms_finish (list, res, &error))
+        g_dbus_method_invocation_take_error (ctx->invocation,
+                                             error);
+    else
+        mm_gdbus_modem_messaging_complete_delete (ctx->skeleton,
+                                                  ctx->invocation);
+    dbus_call_context_free (ctx);
+}
+
+static gboolean
+handle_delete (MmGdbusModemMessaging *skeleton,
+               GDBusMethodInvocation *invocation,
+               const gchar *path,
+               MMIfaceModemMessaging *self)
+{
+    MMSmsList *list = NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
+                  NULL);
+    g_assert (list != NULL);
+
+    mm_sms_list_delete_sms (list,
+                            path,
+                            (GAsyncReadyCallback)delete_sms_ready,
+                            dbus_call_context_new (skeleton,
+                                                   invocation,
+                                                   self));
+    g_object_unref (list);
+
+    return TRUE;
+}
+
+/*****************************************************************************/
+
 gboolean
 mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
                                     MMSmsPart *sms_part,
@@ -510,6 +583,12 @@ interface_initialization_step (InitializationContext *ctx)
 
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
+
+        /* Handle method invocations */
+        g_signal_connect (ctx->skeleton,
+                          "handle-delete",
+                          G_CALLBACK (handle_delete),
+                          ctx->self);
 
         /* Finally, export the new interface */
         mm_gdbus_object_skeleton_set_modem_messaging (MM_GDBUS_OBJECT_SKELETON (ctx->self),
