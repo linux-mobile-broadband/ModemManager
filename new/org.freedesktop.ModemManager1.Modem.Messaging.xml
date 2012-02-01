@@ -72,7 +72,6 @@
         Added:
         @path: Object path of the new SMS.
         @received: %TRUE if the message was received from the network, as opposed to being added locally.
-        @properties: Message properties from the <link linkend="gdbus-org.freedesktop.ModemManager1.Sms">SMS D-Bus interface</link>.
 
         Emitted when any part of a new SMS has been received or added (but not
         for subsequent parts, if any). For messages received from the network,
@@ -86,15 +85,13 @@
         signal will also be emitted when the message is complete.
     -->
     <signal name="Added">
-      <arg name="path"       type="o"     />
-      <arg name="received"   type="b"     />
-      <arg name="properties" type="a{sv}" />
+      <arg name="path" type="o" />
+      <arg name="received" type="b" />
     </signal>
 
     <!--
         Completed:
         @path: Object path of the new SMS.
-        @properties: Message properties from the <link linkend="gdbus-org.freedesktop.ModemManager1.Sms">SMS D-Bus interface</link>.
 
         Emitted when the complete-ness status of an SMS message changes.
 
@@ -103,8 +100,7 @@
         single-part messages.
     -->
     <signal name="Completed">
-      <arg name="path"       type="o"     />
-      <arg name="properties" type="a{sv}" />
+      <arg name="path" type="o" />
     </signal>
 
     <!--
