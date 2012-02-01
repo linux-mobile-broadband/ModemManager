@@ -3561,6 +3561,101 @@ modem_messaging_setup_sms_format (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
+/* Load initial list of SMS parts (Messaging interface) */
+
+static gboolean
+modem_messaging_load_initial_sms_parts_finish (MMIfaceModemMessaging *self,
+                                               GAsyncResult *res,
+                                               GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+sms_part_list_ready (MMBroadbandModem *self,
+                     GAsyncResult *res,
+                     GSimpleAsyncResult *simple)
+{
+    const gchar *response;
+    GError *error = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    while (*response) {
+        MMSmsPart *part;
+        gint idx;
+        gint status;
+        gint tpdu_len;
+        gchar pdu[SMS_MAX_PDU_LEN + 1];
+        gint offset;
+        gint rv;
+
+        rv = sscanf (response,
+                     "+CMGL: %d,%d,,%d %" G_STRINGIFY (SMS_MAX_PDU_LEN) "s %n",
+                     &idx, &status, &tpdu_len, pdu, &offset);
+        if (4 != rv) {
+            g_simple_async_result_set_error (simple,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_INVALID_ARGS,
+                                             "Couldn't parse SMS list response: "
+                                             "only %d fields parsed",
+                                             rv);
+            g_simple_async_result_complete (simple);
+            g_object_unref (simple);
+            return;
+        }
+
+        /* Will try to keep on the loop */
+        response += offset;
+
+        part = mm_sms_part_new (idx, pdu, &error);
+        if (part) {
+            mm_dbg ("Correctly parsed PDU (%d)", idx);
+            mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
+                                                part,
+                                                FALSE);
+        } else {
+            /* Don't treat the error as critical */
+            mm_dbg ("Error parsing PDU (%d): %s", idx, error->message);
+            g_error_free (error);
+        }
+    }
+
+    /* We consider all done */
+    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_messaging_load_initial_sms_parts (MMIfaceModemMessaging *self,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_messaging_load_initial_sms_parts);
+
+    /* Get SMS parts from ALL types (4) */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CMGL=4",
+                              10,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)sms_part_list_ready,
+                              result);
+}
+
+/*****************************************************************************/
 /* ESN loading (CDMA interface) */
 
 static gchar *
@@ -5927,6 +6022,8 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
     iface->check_support_finish = modem_messaging_check_support_finish;
     iface->setup_sms_format = modem_messaging_setup_sms_format;
     iface->setup_sms_format_finish = modem_messaging_setup_sms_format_finish;
+    iface->load_initial_sms_parts = modem_messaging_load_initial_sms_parts;
+    iface->load_initial_sms_parts_finish = modem_messaging_load_initial_sms_parts_finish;
 }
 
 static void
