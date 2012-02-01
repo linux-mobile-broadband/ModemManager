@@ -66,6 +66,8 @@ gboolean  mm_sms_multipart_take_part (MMSms *self,
 
 void         mm_sms_export       (MMSms *self);
 const gchar *mm_sms_get_path     (MMSms *self);
-gboolean     mm_sms_is_multipart (MMSms *self);
+gboolean     mm_sms_is_multipart            (MMSms *self);
+guint        mm_sms_get_multipart_reference (MMSms *self);
+gboolean     mm_sms_multipart_is_complete   (MMSms *self);
 
 #endif /* MM_SMS_H */

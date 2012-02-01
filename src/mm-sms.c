@@ -122,6 +122,20 @@ mm_sms_is_multipart (MMSms *self)
     return self->priv->is_multipart;
 }
 
+guint
+mm_sms_get_multipart_reference (MMSms *self)
+{
+    g_return_val_if_fail (self->priv->is_multipart, 0);
+
+    return self->priv->multipart_reference;
+}
+
+gboolean
+mm_sms_multipart_is_complete (MMSms *self)
+{
+    return (g_list_length (self->priv->parts) == self->priv->max_parts);
+}
+
 /*****************************************************************************/
 
 static guint
@@ -178,10 +192,6 @@ mm_sms_multipart_take_part (MMSms *self,
     self->priv->parts = g_list_insert_sorted (self->priv->parts,
                                               part,
                                               (GCompareFunc)cmp_sms_part_sequence);
-
-    if (g_list_length (self->priv->parts) == self->priv->max_parts) {
-        /* TODO: Multipart SMS completed */
-    }
 
     return TRUE;
 }
