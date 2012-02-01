@@ -144,6 +144,8 @@ modem_manager_SOURCES = \
 	mm-sms-part.c \
 	mm-sms.h \
 	mm-sms.c \
+	mm-sms-list.h \
+	mm-sms-list.c \
 	mm-iface-modem.h \
 	mm-iface-modem.c \
 	mm-iface-modem-3gpp.h \
