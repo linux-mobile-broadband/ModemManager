@@ -41,6 +41,14 @@ struct _MMIfaceModemMessaging {
     gboolean (*check_support_finish) (MMIfaceModemMessaging *self,
                                       GAsyncResult *res,
                                       GError **error);
+
+    /* Setup SMS format (async) */
+    void (* setup_sms_format) (MMIfaceModemMessaging *self,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data);
+    gboolean (*setup_sms_format_finish) (MMIfaceModemMessaging *self,
+                                         GAsyncResult *res,
+                                         GError **error);
 };
 
 GType mm_iface_modem_messaging_get_type (void);

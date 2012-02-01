@@ -135,6 +135,7 @@ static void interface_enabling_step (EnablingContext *ctx);
 
 typedef enum {
     ENABLING_STEP_FIRST,
+    ENABLING_STEP_SETUP_SMS_FORMAT,
     ENABLING_STEP_LAST
 } EnablingStep;
 
@@ -189,6 +190,28 @@ mm_iface_modem_messaging_enable_finish (MMIfaceModemMessaging *self,
 }
 
 static void
+setup_sms_format_ready (MMIfaceModemMessaging *self,
+                        GAsyncResult *res,
+                        EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->setup_sms_format_finish (self,
+                                                                                 res,
+                                                                                 &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        enabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    mm_dbg ("SMS format correctly setup");
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_enabling_step (ctx);
+}
+
+static void
 interface_enabling_step (EnablingContext *ctx)
 {
     switch (ctx->step) {
@@ -204,6 +227,17 @@ interface_enabling_step (EnablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
     }
+
+    case ENABLING_STEP_SETUP_SMS_FORMAT:
+        /* Allow setting SMS format to use */
+        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->setup_sms_format &&
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->setup_sms_format_finish) {
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->setup_sms_format (
+                ctx->self,
+                (GAsyncReadyCallback)setup_sms_format_ready,
+                ctx);
+            return;
+        }
         /* Fall down to next step */
         ctx->step++;
 
