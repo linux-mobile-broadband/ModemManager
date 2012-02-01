@@ -1718,7 +1718,7 @@ sms_get_format_cb (MMAtSerialPort *port,
     GRegex *r;
     GMatchInfo *match_info;
     char *s;
-    guint32 min = -1, max = -1;
+    int min = -1, max = -1;
 
     if (error) {
         mm_warn ("(%s): failed to query SMS mode, assuming text mode",
