@@ -516,7 +516,7 @@ parse_mcc_mnc (const gchar *mccmnc,
     gchar mcc[4] = { 0, 0, 0, 0 };
     gchar mnc[4] = { 0, 0, 0, 0 };
 
-    mccmnc_len = strlen (mccmnc);
+    mccmnc_len = (mccmnc ? strlen (mccmnc) : 0);
     if (mccmnc_len != 5 &&
         mccmnc_len != 6) {
         mm_dbg ("Unexpected MCC/MNC string '%s'", mccmnc);
