@@ -22,7 +22,7 @@
 
     <!--
         List:
-        @result: A dict of message object paths mapped to a dictionary containing that message's properties as specified in the <link linkend="gdbus-org.freedesktop.ModemManager1.Sms">SMS D-Bus interface</link>.
+        @result: The list of SMS object paths.
 
         Retrieve all SMS messages.
 
@@ -33,7 +33,7 @@
         or by querying the specific SMS object of interest.
     -->
     <method name="List">
-      <arg name="result" type="a{oa{sv}}" direction="out" />
+      <arg name="result" type="ao" direction="out" />
     </method>
 
     <!--
