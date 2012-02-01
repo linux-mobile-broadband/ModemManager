@@ -537,7 +537,7 @@ mm_3gpp_creg_regex_destroy (GPtrArray *array)
 GRegex *
 mm_3gpp_ciev_regex_get (void)
 {
-    return g_regex_new ("\\r\\n\\+CIEV: (\\d+),(\\d)\\r\\n",
+    return g_regex_new ("\\r\\n\\+CIEV: (.*),(\\d)\\r\\n",
                         G_REGEX_RAW | G_REGEX_OPTIMIZE,
                         0,
                         NULL);
