@@ -69,4 +69,12 @@ gboolean mm_sms_list_take_part (MMSmsList *self,
                                 gboolean received,
                                 GError **error);
 
+void     mm_sms_list_delete_sms        (MMSmsList *self,
+                                        const gchar *sms_path,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data);
+gboolean mm_sms_list_delete_sms_finish (MMSmsList *self,
+                                        GAsyncResult *res,
+                                        GError **error);
+
 #endif /* MM_SMS_LIST_H */
