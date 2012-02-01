@@ -63,6 +63,10 @@ struct _MMSmsPrivate {
     /* List of SMS parts */
     guint max_parts;
     GList *parts;
+
+    /* Set to true when all needed parts were received,
+     * parsed and assembled */
+    gboolean is_assembled;
 };
 
 /*****************************************************************************/
@@ -134,6 +138,12 @@ gboolean
 mm_sms_multipart_is_complete (MMSms *self)
 {
     return (g_list_length (self->priv->parts) == self->priv->max_parts);
+}
+
+gboolean
+mm_sms_multipart_is_assembled (MMSms *self)
+{
+    return self->priv->is_assembled;
 }
 
 /*****************************************************************************/
@@ -268,6 +278,67 @@ mm_sms_delete_parts (MMSms *self,
 
 /*****************************************************************************/
 
+static gboolean
+assemble_sms (MMSms *self,
+              GError **error)
+{
+    GList *l;
+    gchar **textparts;
+    guint idx;
+    gchar *fulltext;
+    MMSmsPart *first = NULL;
+
+    /* Assemble text from all parts */
+    textparts = g_malloc0 ((1 + self->priv->max_parts) * sizeof (* textparts));
+    for (l = self->priv->parts; l; l = g_list_next (l)) {
+        idx = mm_sms_part_get_concat_sequence ((MMSmsPart *)l->data);
+        if (textparts[idx]) {
+            mm_warn ("Duplicate part index (%u) found, ignoring", idx);
+            continue;
+        }
+        /* NOTE! we don't strdup here */
+        textparts[idx] = (gchar *)mm_sms_part_get_text ((MMSmsPart *)l->data);
+
+        /* If first in multipart, keep it for later */
+        if (idx == 0)
+            first = (MMSmsPart *)l->data;
+    }
+
+    /* Check if we have all parts */
+    for (idx = 0; idx < self->priv->max_parts; idx++) {
+        if (!textparts[idx]) {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Cannot assemble SMS, missing part at index %u",
+                         idx);
+            g_free (textparts);
+            return FALSE;
+        }
+    }
+
+    /* If we got all parts, we also have the first one always */
+    g_assert (first != NULL);
+
+    /* If we got everything, assemble the text! */
+    fulltext = g_strjoinv (NULL, textparts);
+    g_object_set (self,
+                  "text",      fulltext,
+                  "smsc",      mm_sms_part_get_smsc (first),
+                  "class",     mm_sms_part_get_class (first),
+                  "to",        mm_sms_part_get_number (first),
+                  "timestamp", mm_sms_part_get_timestamp (first),
+                  NULL);
+    g_free (fulltext);
+    g_free (textparts);
+
+    self->priv->is_assembled = TRUE;
+
+    return TRUE;
+}
+
+/*****************************************************************************/
+
 static guint
 cmp_sms_part_sequence (MMSmsPart *a,
                        MMSmsPart *b)
@@ -323,33 +394,58 @@ mm_sms_multipart_take_part (MMSms *self,
                                               part,
                                               (GCompareFunc)cmp_sms_part_sequence);
 
+    /* We only populate contents when the multipart SMS is complete */
+    if (mm_sms_multipart_is_complete (self)) {
+        GError *inner_error = NULL;
+
+        if (!assemble_sms (self, &inner_error)) {
+            /* We DO NOT propagate the error. The part was properly taken
+             * so ownership passed to the MMSms object. */
+            mm_warn ("Couldn't assemble SMS: '%s'",
+                     inner_error->message);
+            g_error_free (inner_error);
+        } else
+            /* Only export once properly assembled */
+            mm_sms_export (self);
+    }
+
     return TRUE;
 }
 
 MMSms *
 mm_sms_new (MMBaseModem *modem,
-            MMSmsPart *part)
+            gboolean received,
+            MMSmsPart *part,
+            GError **error)
 {
     MMSms *self;
 
     self = g_object_new (MM_TYPE_SMS,
                          MM_SMS_MODEM, modem,
+                         "state", (received ?
+                                   MM_MODEM_SMS_STATE_RECEIVED :
+                                   MM_MODEM_SMS_STATE_STORED),
                          NULL);
 
     /* Keep the single part in the list */
     self->priv->parts = g_list_prepend (self->priv->parts, part);
 
-    /* Only export once properly created */
-    mm_sms_export (self);
+    if (!assemble_sms (self, error))
+        g_clear_object (&self);
+    else
+        /* Only export once properly created */
+        mm_sms_export (self);
 
     return self;
 }
 
 MMSms *
 mm_sms_multipart_new (MMBaseModem *modem,
+                      gboolean received,
                       guint reference,
                       guint max_parts,
-                      MMSmsPart *first_part)
+                      MMSmsPart *first_part,
+                      GError **error)
 {
     MMSms *self;
 
@@ -358,13 +454,13 @@ mm_sms_multipart_new (MMBaseModem *modem,
                          MM_SMS_IS_MULTIPART,        TRUE,
                          MM_SMS_MAX_PARTS,           max_parts,
                          MM_SMS_MULTIPART_REFERENCE, reference,
+                         "state", (received ?
+                                   MM_MODEM_SMS_STATE_RECEIVED :
+                                   MM_MODEM_SMS_STATE_STORED),
                          NULL);
 
-    /* Add the first part to the list */
-    self->priv->parts = g_list_prepend (self->priv->parts, first_part);
-
-    /* Only export once properly created */
-    mm_sms_export (self);
+    if (!mm_sms_multipart_take_part (self, first_part, error))
+        g_clear_object (&self);
 
     return self;
 }

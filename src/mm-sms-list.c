@@ -184,12 +184,21 @@ take_singlepart (MMSmsList *self,
                  gboolean received)
 {
     MMSms *sms;
+    GError *error = NULL;
 
-    sms = mm_sms_new (self->priv->modem, part);
-    self->priv->list = g_list_prepend (self->priv->list, sms);
-    g_signal_emit (self, signals[SIGNAL_ADDED], 0,
-                   mm_sms_get_path (sms),
-                   received);
+    sms = mm_sms_new (self->priv->modem,
+                      received,
+                      part,
+                      &error);
+    if (!sms) {
+        mm_warn ("Couldn't create single-part SMS: '%s'", error->message);
+        g_error_free (error);
+    } else {
+        self->priv->list = g_list_prepend (self->priv->list, sms);
+        g_signal_emit (self, signals[SIGNAL_ADDED], 0,
+                       mm_sms_get_path (sms),
+                       received);
+    }
 }
 
 static gboolean
@@ -214,14 +223,22 @@ take_multipart (MMSmsList *self,
     } else {
         /* Create new Multipart */
         sms = mm_sms_multipart_new (self->priv->modem,
+                                    received,
                                     concat_reference,
                                     mm_sms_part_get_concat_max (part),
-                                    part);
+                                    part,
+                                    error);
+        if (!sms)
+            return FALSE;
+
         self->priv->list = g_list_prepend (self->priv->list, sms);
-        g_signal_emit (self, signals[SIGNAL_ADDED], 0,
-                       mm_sms_get_path (sms),
-                       received);
     }
+
+    /* Check if completed and assembled */
+    if (mm_sms_multipart_is_complete (sms) &&
+        mm_sms_multipart_is_assembled (sms))
+        g_signal_emit (self, signals[SIGNAL_ADDED], 0,
+                       mm_sms_get_path (sms));
 
     return TRUE;
 }

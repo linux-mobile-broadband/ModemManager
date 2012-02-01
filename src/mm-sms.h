@@ -56,12 +56,16 @@ struct _MMSmsClass {
 GType mm_sms_get_type (void);
 
 MMSms *mm_sms_new (MMBaseModem *modem,
-                   MMSmsPart *part);
+                   gboolean received,
+                   MMSmsPart *part,
+                   GError **error);
 
 MMSms    *mm_sms_multipart_new       (MMBaseModem *modem,
+                                      gboolean received,
                                       guint reference,
                                       guint max_parts,
-                                      MMSmsPart *first_part);
+                                      MMSmsPart *first_part,
+                                      GError **error);
 gboolean  mm_sms_multipart_take_part (MMSms *self,
                                       MMSmsPart *part,
                                       GError **error);
@@ -75,6 +79,7 @@ gboolean     mm_sms_has_part_index (MMSms *self,
 gboolean     mm_sms_is_multipart            (MMSms *self);
 guint        mm_sms_get_multipart_reference (MMSms *self);
 gboolean     mm_sms_multipart_is_complete   (MMSms *self);
+gboolean     mm_sms_multipart_is_assembled  (MMSms *self);
 
 void     mm_sms_delete_parts        (MMSms *self,
                                      GAsyncReadyCallback callback,
