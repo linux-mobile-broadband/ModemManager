@@ -1250,6 +1250,18 @@ cind_format_check_ready (MMBroadbandModem *self,
     FIND_INDEX ("roam", roaming);
     FIND_INDEX ("service", service);
 
+    if (CIND_INDICATOR_IS_VALID (self->priv->modem_cind_indicator_signal_quality))
+        mm_dbg ("Modem supports signal quality indications via CIND at index '%u'",
+                self->priv->modem_cind_indicator_signal_quality);
+
+    if (CIND_INDICATOR_IS_VALID (self->priv->modem_cind_indicator_roaming))
+        mm_dbg ("Modem supports roaming indications via CIND at index '%u'",
+                self->priv->modem_cind_indicator_roaming);
+
+    if (CIND_INDICATOR_IS_VALID (self->priv->modem_cind_indicator_service))
+        mm_dbg ("Modem supports service indications via CIND at index '%u'",
+                self->priv->modem_cind_indicator_service);
+
 #undef FIND_INDEX
 
     g_hash_table_destroy (indicators);
