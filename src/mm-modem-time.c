@@ -119,6 +119,7 @@ mm_modem_time_init (gpointer g_iface)
 
     if (initialized)
         return;
+    initialized = TRUE;
 
     g_object_interface_install_property
         (g_iface,
