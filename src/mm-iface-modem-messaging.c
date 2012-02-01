@@ -65,6 +65,38 @@ mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
 
 /*****************************************************************************/
 
+static void
+sms_added (MMSmsList *list,
+           const gchar *sms_path,
+           gboolean received,
+           MmGdbusModemMessaging *skeleton)
+{
+    mm_dbg ("Added %s SMS at '%s'",
+            received ? "received" : "local",
+            sms_path);
+    mm_gdbus_modem_messaging_emit_added (skeleton, sms_path, received);
+}
+
+static void
+sms_completed (MMSmsList *list,
+               const gchar *sms_path,
+               MmGdbusModemMessaging *skeleton)
+{
+    mm_dbg ("Completed SMS at '%s'", sms_path);
+    mm_gdbus_modem_messaging_emit_completed (skeleton, sms_path);
+}
+
+static void
+sms_deleted (MMSmsList *list,
+             const gchar *sms_path,
+             MmGdbusModemMessaging *skeleton)
+{
+    mm_dbg ("Deleted SMS at '%s'", sms_path);
+    mm_gdbus_modem_messaging_emit_deleted (skeleton, sms_path);
+}
+
+/*****************************************************************************/
+
 typedef struct _DisablingContext DisablingContext;
 static void interface_disabling_step (DisablingContext *ctx);
 
@@ -273,6 +305,21 @@ interface_enabling_step (EnablingContext *ctx)
         g_object_set (ctx->self,
                       MM_IFACE_MODEM_MESSAGING_SMS_LIST, list,
                       NULL);
+
+        /* Connect to list's signals */
+        g_signal_connect (list,
+                          MM_SMS_ADDED,
+                          G_CALLBACK (sms_added),
+                          ctx->skeleton);
+        g_signal_connect (list,
+                          MM_SMS_COMPLETED,
+                          G_CALLBACK (sms_completed),
+                          ctx->skeleton);
+        g_signal_connect (list,
+                          MM_SMS_DELETED,
+                          G_CALLBACK (sms_deleted),
+                          ctx->skeleton);
+
         g_object_unref (list);
 
         /* Fall down to next step */
