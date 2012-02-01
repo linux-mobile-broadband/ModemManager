@@ -294,6 +294,63 @@ mm_3gpp_parse_scan_response (const gchar *reply,
 
 /*************************************************************************/
 
+#define CMGF_TAG "+CMGF:"
+
+gboolean
+mm_3gpp_parse_cmgf_format_response (const gchar *reply,
+                                    gboolean *sms_pdu_supported,
+                                    gboolean *sms_text_supported,
+                                    GError **error)
+{
+    GRegex *r;
+    GMatchInfo *match_info;
+    char *s;
+    guint32 min = -1, max = -1;
+
+    /* Strip whitespace and response tag */
+    if (g_str_has_prefix (reply, CMGF_TAG))
+        reply += strlen (CMGF_TAG);
+    while (isspace (*reply))
+        reply++;
+
+    r = g_regex_new ("\\(?\\s*(\\d+)\\s*[-,]?\\s*(\\d+)?\\s*\\)?", 0, 0, error);
+    if (!r)
+        return FALSE;
+
+    if (!g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, NULL)) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Failed to parse CMGF query result '%s'",
+                     reply);
+        g_match_info_free (match_info);
+        g_regex_unref (r);
+        return FALSE;
+    }
+
+    s = g_match_info_fetch (match_info, 1);
+    if (s)
+        min = atoi (s);
+    g_free (s);
+
+    s = g_match_info_fetch (match_info, 2);
+    if (s)
+        max = atoi (s);
+    g_free (s);
+
+    /* CMGF=0 for PDU mode */
+    *sms_pdu_supported = (min == 0);
+
+    /* CMGF=1 for Text mode */
+    *sms_text_supported = (max >= 1);
+
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+    return TRUE;
+}
+
+/*************************************************************************/
+
 static void
 mm_3gpp_pdp_context_free (MM3gppPdpContext *pdp)
 {
