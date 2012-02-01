@@ -110,6 +110,29 @@ handle_delete (MmGdbusModemMessaging *skeleton,
 
 /*****************************************************************************/
 
+static gboolean
+handle_list (MmGdbusModemMessaging *skeleton,
+             GDBusMethodInvocation *invocation,
+             MMIfaceModemMessaging *self)
+{
+    GStrv paths;
+    MMSmsList *list = NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
+                  NULL);
+    g_assert (list != NULL);
+
+    paths = mm_sms_list_get_paths (list);
+    mm_gdbus_modem_messaging_complete_list (skeleton,
+                                            invocation,
+                                            (const gchar *const *)paths);
+    g_strfreev (paths);
+    return TRUE;
+}
+
+/*****************************************************************************/
+
 gboolean
 mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
                                     MMSmsPart *sms_part,
@@ -588,6 +611,10 @@ interface_initialization_step (InitializationContext *ctx)
         g_signal_connect (ctx->skeleton,
                           "handle-delete",
                           G_CALLBACK (handle_delete),
+                          ctx->self);
+        g_signal_connect (ctx->skeleton,
+                          "handle-list",
+                          G_CALLBACK (handle_list),
                           ctx->self);
 
         /* Finally, export the new interface */
