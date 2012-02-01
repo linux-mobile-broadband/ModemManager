@@ -37,6 +37,7 @@
 #include "mm-iface-modem-messaging.h"
 #include "mm-broadband-bearer.h"
 #include "mm-bearer-list.h"
+#include "mm-sms-list.h"
 #include "mm-sim.h"
 #include "mm-log.h"
 #include "mm-utils.h"
@@ -83,6 +84,7 @@ enum {
     PROP_MODEM_CDMA_EVDO_REGISTRATION_STATE,
     PROP_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED,
     PROP_MODEM_CDMA_EVDO_NETWORK_SUPPORTED,
+    PROP_MODEM_MESSAGING_SMS_LIST,
     PROP_MODEM_SIMPLE_STATUS,
     PROP_LAST
 };
@@ -149,6 +151,7 @@ struct _MMBroadbandModemPrivate {
     /*<--- Modem Messaging interface --->*/
     /* Properties */
     GObject *modem_messaging_dbus_skeleton;
+    MMBearerList *modem_messaging_sms_list;
 };
 
 /*****************************************************************************/
@@ -5478,6 +5481,10 @@ set_property (GObject *object,
     case PROP_MODEM_CDMA_EVDO_NETWORK_SUPPORTED:
         self->priv->modem_cdma_evdo_network_supported = g_value_get_boolean (value);
         break;
+    case PROP_MODEM_MESSAGING_SMS_LIST:
+        g_clear_object (&self->priv->modem_messaging_sms_list);
+        self->priv->modem_messaging_sms_list = g_value_dup_object (value);
+        break;
     case PROP_MODEM_SIMPLE_STATUS:
         g_clear_object (&self->priv->modem_simple_status);
         self->priv->modem_simple_status = g_value_dup_object (value);
@@ -5550,6 +5557,9 @@ get_property (GObject *object,
         break;
     case PROP_MODEM_CDMA_EVDO_NETWORK_SUPPORTED:
         g_value_set_boolean (value, self->priv->modem_cdma_evdo_network_supported);
+        break;
+    case PROP_MODEM_MESSAGING_SMS_LIST:
+        g_value_set_object (value, self->priv->modem_messaging_sms_list);
         break;
     case PROP_MODEM_SIMPLE_STATUS:
         g_value_set_object (value, self->priv->modem_simple_status);
@@ -5633,6 +5643,7 @@ dispose (GObject *object)
 
     g_clear_object (&self->priv->modem_sim);
     g_clear_object (&self->priv->modem_bearer_list);
+    g_clear_object (&self->priv->modem_messaging_sms_list);
     g_clear_object (&self->priv->modem_simple_status);
 
     G_OBJECT_CLASS (mm_broadband_modem_parent_class)->dispose (object);
@@ -5895,7 +5906,10 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
                                       MM_IFACE_MODEM_CDMA_EVDO_NETWORK_SUPPORTED);
 
     g_object_class_override_property (object_class,
+                                      PROP_MODEM_MESSAGING_SMS_LIST,
+                                      MM_IFACE_MODEM_MESSAGING_SMS_LIST);
+
+    g_object_class_override_property (object_class,
                                       PROP_MODEM_SIMPLE_STATUS,
                                       MM_IFACE_MODEM_SIMPLE_STATUS);
-
 }
