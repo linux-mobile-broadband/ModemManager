@@ -27,6 +27,7 @@
 #define MM_IFACE_MODEM_MESSAGING_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_MESSAGING, MMIfaceModemMessaging))
 
 #define MM_IFACE_MODEM_MESSAGING_DBUS_SKELETON "iface-modem-messaging-dbus-skeleton"
+#define MM_IFACE_MODEM_MESSAGING_SMS_LIST      "iface-modem-messaging-sms-list"
 
 typedef struct _MMIfaceModemMessaging MMIfaceModemMessaging;
 

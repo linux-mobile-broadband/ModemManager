@@ -18,6 +18,7 @@
 
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-messaging.h"
+#include "mm-sms-list.h"
 #include "mm-log.h"
 
 #define SUPPORT_CHECKED_TAG "messaging-support-checked-tag"
@@ -103,6 +104,11 @@ interface_disabling_step (DisablingContext *ctx)
         ctx->step++;
 
     case DISABLING_STEP_LAST:
+        /* Clear SMS list */
+        g_object_set (ctx->self,
+                      MM_IFACE_MODEM_MESSAGING_SMS_LIST, NULL,
+                      NULL);
+
         /* We are done without errors! */
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         disabling_context_complete_and_free (ctx);
@@ -186,7 +192,18 @@ static void
 interface_enabling_step (EnablingContext *ctx)
 {
     switch (ctx->step) {
-    case ENABLING_STEP_FIRST:
+    case ENABLING_STEP_FIRST: {
+        MMSmsList *list;
+
+        list = mm_sms_list_new (MM_BASE_MODEM (ctx->self));
+        g_object_set (ctx->self,
+                      MM_IFACE_MODEM_MESSAGING_SMS_LIST, list,
+                      NULL);
+        g_object_unref (list);
+
+        /* Fall down to next step */
+        ctx->step++;
+    }
         /* Fall down to next step */
         ctx->step++;
 
@@ -432,6 +449,14 @@ iface_modem_messaging_init (gpointer g_iface)
                               "Messaging DBus skeleton",
                               "DBus skeleton for the Messaging interface",
                               MM_GDBUS_TYPE_MODEM_MESSAGING_SKELETON,
+                              G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_object (MM_IFACE_MODEM_MESSAGING_SMS_LIST,
+                              "SMS list",
+                              "List of SMS objects managed in the interface",
+                              MM_TYPE_SMS_LIST,
                               G_PARAM_READWRITE));
 
     initialized = TRUE;
