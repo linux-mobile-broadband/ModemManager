@@ -1475,7 +1475,7 @@ mm_parse_cind_test_response (const char *reply, GError **error)
     while (isspace (*reply))
         reply++;
 
-    r = g_regex_new ("\\(([^,]*),\\((\\d+)[-,](\\d+)\\)", G_REGEX_UNGREEDY, 0, NULL);
+    r = g_regex_new ("\\(([^,]*),\\((\\d+)[-,](\\d+).*\\)", G_REGEX_UNGREEDY, 0, NULL);
     if (!r) {
         g_set_error_literal (error,
                              MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
