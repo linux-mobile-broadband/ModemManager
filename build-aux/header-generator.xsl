@@ -132,6 +132,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define MM_DBUS_MODEM_PREFIX  MM_DBUS_PATH "/Modem"
 #define MM_DBUS_BEARER_PREFIX MM_DBUS_PATH "/Bearer"
 #define MM_DBUS_SIM_PREFIX    MM_DBUS_PATH "/SIM"
+#define MM_DBUS_SMS_PREFIX    MM_DBUS_PATH "/SMS"
 
 /**************
  * Interfaces *
