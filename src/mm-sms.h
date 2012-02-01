@@ -55,9 +55,11 @@ struct _MMSmsClass {
 
 GType mm_sms_get_type (void);
 
-MMSms *mm_sms_new (MMSmsPart *part);
+MMSms *mm_sms_new (MMBaseModem *modem,
+                   MMSmsPart *part);
 
-MMSms    *mm_sms_multipart_new       (guint reference,
+MMSms    *mm_sms_multipart_new       (MMBaseModem *modem,
+                                      guint reference,
                                       guint max_parts,
                                       MMSmsPart *first_part);
 gboolean  mm_sms_multipart_take_part (MMSms *self,

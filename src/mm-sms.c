@@ -327,11 +327,14 @@ mm_sms_multipart_take_part (MMSms *self,
 }
 
 MMSms *
-mm_sms_new (MMSmsPart *part)
+mm_sms_new (MMBaseModem *modem,
+            MMSmsPart *part)
 {
     MMSms *self;
 
-    self = g_object_new (MM_TYPE_SMS, NULL);
+    self = g_object_new (MM_TYPE_SMS,
+                         MM_SMS_MODEM, modem,
+                         NULL);
 
     /* Keep the single part in the list */
     self->priv->parts = g_list_prepend (self->priv->parts, part);
@@ -343,13 +346,15 @@ mm_sms_new (MMSmsPart *part)
 }
 
 MMSms *
-mm_sms_multipart_new (guint reference,
+mm_sms_multipart_new (MMBaseModem *modem,
+                      guint reference,
                       guint max_parts,
                       MMSmsPart *first_part)
 {
     MMSms *self;
 
     self = g_object_new (MM_TYPE_SMS,
+                         MM_SMS_MODEM,               modem,
                          MM_SMS_IS_MULTIPART,        TRUE,
                          MM_SMS_MAX_PARTS,           max_parts,
                          MM_SMS_MULTIPART_REFERENCE, reference,

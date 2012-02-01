@@ -186,7 +186,7 @@ take_singlepart (MMSmsList *self,
 {
     MMSms *sms;
 
-    sms = mm_sms_new (part);
+    sms = mm_sms_new (self->priv->modem, part);
     self->priv->list = g_list_prepend (self->priv->list, sms);
     g_signal_emit (self, signals[SIGNAL_ADDED], 0,
                    mm_sms_get_path (sms),
@@ -214,7 +214,8 @@ take_multipart (MMSmsList *self,
             return FALSE;
     } else {
         /* Create new Multipart */
-        sms = mm_sms_multipart_new (concat_reference,
+        sms = mm_sms_multipart_new (self->priv->modem,
+                                    concat_reference,
                                     mm_sms_part_get_concat_max (part),
                                     part);
         self->priv->list = g_list_prepend (self->priv->list, sms);
