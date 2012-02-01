@@ -52,4 +52,23 @@ if modem.Get(MM_DBUS_INTERFACE_MODEM, "Enabled") == False:
 sms = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_SMS)
 
 msgs = sms.List()
-print msgs
+i = 0
+for m in msgs:
+    print "-------------------------------------------------------------------"
+    print "%d: From: %s  Time: %s  SMSC: %s" % (m["index"], m["number"], m["timestamp"], m["smsc"])
+    if len(m["text"]):
+        print "   %s\n" % m["text"]
+    elif len(m["data"]):
+        print "   Coding: %d" % m["data-coding-scheme"]
+        z = 1
+        s = ""
+        for c in m["data"]:
+            s += "%02X " % c
+            if not z % 16:
+                print "   %s" % s
+                s = ""
+            z += 1
+        if len(s):
+            print "   %s" % s
+    i += 1
+
