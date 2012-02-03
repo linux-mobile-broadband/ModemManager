@@ -326,14 +326,54 @@ mm_modem_novatel_gsm_init (MMModemNovatelGsm *self)
 }
 
 static void
+set_property (GObject *object,
+              guint prop_id,
+              const GValue *value,
+              GParamSpec *pspec)
+{
+    /* Do nothing... see set_property() in parent, which also does nothing */
+}
+
+static void
+get_property (GObject *object,
+              guint prop_id,
+              GValue *value,
+              GParamSpec *pspec)
+{
+    switch (prop_id) {
+    case MM_GENERIC_GSM_PROP_SMS_INDICATION_ENABLE_CMD:
+        /* Many Qualcomm chipsets don't support mode=2 */
+        g_value_set_string (value, "+CNMI=1,1,2,1,0");
+        break;
+    case MM_GENERIC_GSM_PROP_SMS_STORAGE_LOCATION_CMD:
+        g_value_set_string (value, "+CPMS=\"SM\",\"SM\",\"SM\"");
+        break;
+    default:
+        break;
+    }
+}
+
+static void
 mm_modem_novatel_gsm_class_init (MMModemNovatelGsmClass *klass)
 {
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
     MMGenericGsmClass *gsm_class = MM_GENERIC_GSM_CLASS (klass);
 
     mm_modem_novatel_gsm_parent_class = g_type_class_peek_parent (klass);
 
+    object_class->get_property = get_property;
+    object_class->set_property = set_property;
+
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->get_access_technology = get_access_technology;
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_SMS_INDICATION_ENABLE_CMD,
+                                      MM_GENERIC_GSM_SMS_INDICATION_ENABLE_CMD);
+
+    g_object_class_override_property (object_class,
+                                      MM_GENERIC_GSM_PROP_SMS_STORAGE_LOCATION_CMD,
+                                      MM_GENERIC_GSM_SMS_STORAGE_LOCATION_CMD);
 }
 
