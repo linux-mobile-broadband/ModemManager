@@ -189,6 +189,7 @@ static void interface_disabling_step (DisablingContext *ctx);
 
 typedef enum {
     DISABLING_STEP_FIRST,
+    DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS,
     DISABLING_STEP_LAST
 } DisablingStep;
 
@@ -243,10 +244,42 @@ mm_iface_modem_messaging_disable_finish (MMIfaceModemMessaging *self,
 }
 
 static void
+cleanup_unsolicited_events_ready (MMIfaceModemMessaging *self,
+                                  GAsyncResult *res,
+                                  DisablingContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->cleanup_unsolicited_events_finish (self, res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        disabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_disabling_step (ctx);
+}
+
+static void
 interface_disabling_step (DisablingContext *ctx)
 {
     switch (ctx->step) {
     case DISABLING_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS:
+        /* Allow cleaning up unsolicited events */
+        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events &&
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events_finish) {
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events (
+                ctx->self,
+                (GAsyncReadyCallback)cleanup_unsolicited_events_ready,
+                ctx);
+            return;
+        }
         /* Fall down to next step */
         ctx->step++;
 
@@ -283,6 +316,7 @@ static void interface_enabling_step (EnablingContext *ctx);
 typedef enum {
     ENABLING_STEP_FIRST,
     ENABLING_STEP_SETUP_SMS_FORMAT,
+    ENABLING_STEP_SETUP_UNSOLICITED_EVENTS,
     ENABLING_STEP_LOAD_INITIAL_SMS_PARTS,
     ENABLING_STEP_LAST
 } EnablingStep;
@@ -337,49 +371,30 @@ mm_iface_modem_messaging_enable_finish (MMIfaceModemMessaging *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
-static void
-setup_sms_format_ready (MMIfaceModemMessaging *self,
-                        GAsyncResult *res,
-                        EnablingContext *ctx)
-{
-    GError *error = NULL;
-
-    if (!MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->setup_sms_format_finish (self,
-                                                                                 res,
-                                                                                 &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        enabling_context_complete_and_free (ctx);
-        return;
+#undef VOID_REPLY_READY_FN
+#define VOID_REPLY_READY_FN(NAME)                                       \
+    static void                                                         \
+    NAME##_ready (MMIfaceModemMessaging *self,                          \
+                  GAsyncResult *res,                                    \
+                  EnablingContext *ctx)                                 \
+    {                                                                   \
+        GError *error = NULL;                                           \
+                                                                        \
+        MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->NAME##_finish (self, res, &error); \
+        if (error) {                                                    \
+            g_simple_async_result_take_error (ctx->result, error);      \
+            enabling_context_complete_and_free (ctx);                   \
+            return;                                                     \
+        }                                                               \
+                                                                        \
+        /* Go on to next step */                                        \
+        ctx->step++;                                                    \
+        interface_enabling_step (ctx);                                  \
     }
 
-    mm_dbg ("SMS format correctly setup");
-
-    /* Go on to next step */
-    ctx->step++;
-    interface_enabling_step (ctx);
-}
-
-static void
-load_initial_sms_parts_ready (MMIfaceModemMessaging *self,
-                              GAsyncResult *res,
-                              EnablingContext *ctx)
-{
-    GError *error = NULL;
-
-    if (!MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->load_initial_sms_parts_finish (self,
-                                                                                       res,
-                                                                                       &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        enabling_context_complete_and_free (ctx);
-        return;
-    }
-
-    mm_dbg ("Initial SMS parts correctly loaded");
-
-    /* Go on to next step */
-    ctx->step++;
-    interface_enabling_step (ctx);
-}
+VOID_REPLY_READY_FN (setup_sms_format)
+VOID_REPLY_READY_FN (setup_unsolicited_events)
+VOID_REPLY_READY_FN (load_initial_sms_parts)
 
 static void
 interface_enabling_step (EnablingContext *ctx)
@@ -416,6 +431,19 @@ interface_enabling_step (EnablingContext *ctx)
             MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->setup_sms_format (
                 ctx->self,
                 (GAsyncReadyCallback)setup_sms_format_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_SETUP_UNSOLICITED_EVENTS:
+        /* Allow setting up unsolicited events */
+        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->setup_unsolicited_events &&
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->setup_unsolicited_events_finish) {
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->setup_unsolicited_events (
+                ctx->self,
+                (GAsyncReadyCallback)setup_unsolicited_events_ready,
                 ctx);
             return;
         }
