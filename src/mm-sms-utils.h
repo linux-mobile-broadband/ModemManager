@@ -31,6 +31,14 @@ guint8 *sms_create_submit_pdu (const char *number,
                                guint *out_msgstart,
                                GError **error);
 
+GHashTable *sms_properties_hash_new (const char *smsc,
+                                     const char *number,
+                                     const char *timestamp,
+                                     const char *text,
+                                     const GByteArray *data,
+                                     guint data_coding_scheme,
+                                     guint *class);
+
 /* For testcases only */
 guint sms_encode_address (const char *address,
                           guint8 *buf,
