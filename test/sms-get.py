@@ -55,7 +55,13 @@ msgs = sms.List()
 i = 0
 for m in msgs:
     print "-------------------------------------------------------------------"
-    print "%d: From: %s  Time: %s  SMSC: %s" % (m["index"], m["number"], m["timestamp"], m["smsc"])
+    smsc = ""
+    try:
+        smsc = m["smsc"]
+    except KeyError:
+        pass
+
+    print "%d: From: %s  Time: %s  SMSC: %s" % (m["index"], m["number"], m["timestamp"], smsc)
     if len(m["text"]):
         print "   %s\n" % m["text"]
     elif len(m["data"]):
