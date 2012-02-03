@@ -346,6 +346,39 @@ byte_array_value (const GByteArray *array)
 }
 
 GHashTable *
+sms_properties_hash_new (const char *smsc,
+                         const char *number,
+                         const char *timestamp,
+                         const char *text,
+                         const GByteArray *data,
+                         guint data_coding_scheme,
+                         guint *class)
+{
+    GHashTable *properties;
+
+    g_return_val_if_fail (number != NULL, NULL);
+    g_return_val_if_fail (text != NULL, NULL);
+    g_return_val_if_fail (data != NULL, NULL);
+
+    properties = g_hash_table_new_full (g_str_hash, g_str_equal, NULL, simple_free_gvalue);
+    g_hash_table_insert (properties, "number", simple_string_value (number));
+    g_hash_table_insert (properties, "data", byte_array_value (data));
+    g_hash_table_insert (properties, "data-coding-scheme", simple_uint_value (data_coding_scheme));
+    g_hash_table_insert (properties, "text", simple_string_value (text));
+
+    if (smsc)
+        g_hash_table_insert (properties, "smsc", simple_string_value (smsc));
+
+    if (timestamp)
+        g_hash_table_insert (properties, "timestamp", simple_string_value (timestamp));
+
+    if (class)
+        g_hash_table_insert (properties, "class", simple_uint_value (*class));
+
+    return properties;
+}
+
+GHashTable *
 sms_parse_pdu (const char *hexpdu, GError **error)
 {
     GHashTable *properties;
@@ -358,13 +391,14 @@ sms_parse_pdu (const char *hexpdu, GError **error)
     char *smsc_addr, *sender_addr, *sc_timestamp, *msg_text;
     SmsEncoding user_data_encoding;
     GByteArray *pdu_data;
+    guint concat_ref = 0, concat_max = 0, concat_seq = 0, msg_class = 0;
+    gboolean multipart = FALSE, class_valid = FALSE;
 
     /* Convert PDU from hex to binary */
     pdu = (guint8 *) utils_hexstr2bin (hexpdu, &pdu_len);
     if (!pdu) {
-        *error = g_error_new_literal (MM_MODEM_ERROR,
-                                      MM_MODEM_ERROR_GENERAL,
-                                      "Couldn't parse PDU of SMS GET response from hex");
+        g_set_error_literal (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                             "Couldn't parse PDU of SMS GET response from hex");
         return NULL;
     }
 
@@ -372,10 +406,10 @@ sms_parse_pdu (const char *hexpdu, GError **error)
     smsc_addr_num_octets = pdu[0];
     variable_length_items = smsc_addr_num_octets;
     if (pdu_len < variable_length_items + SMS_MIN_PDU_LEN) {
-        *error = g_error_new (MM_MODEM_ERROR,
-                              MM_MODEM_ERROR_GENERAL,
-                              "PDU too short (1): %zd vs %d", pdu_len,
-                              variable_length_items + SMS_MIN_PDU_LEN);
+        g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                     "PDU too short (1): %zd vs %d",
+                     pdu_len,
+                     variable_length_items + SMS_MIN_PDU_LEN);
         g_free (pdu);
         return NULL;
     }
@@ -390,10 +424,10 @@ sms_parse_pdu (const char *hexpdu, GError **error)
     sender_addr_num_octets = (sender_addr_num_digits + 1) >> 1;
     variable_length_items += sender_addr_num_octets;
     if (pdu_len < variable_length_items + SMS_MIN_PDU_LEN) {
-        *error = g_error_new (MM_MODEM_ERROR,
-                              MM_MODEM_ERROR_GENERAL,
-                              "PDU too short (2): %zd vs %d", pdu_len,
-                              variable_length_items + SMS_MIN_PDU_LEN);
+        g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                     "PDU too short (2): %zd vs %d",
+                     pdu_len,
+                     variable_length_items + SMS_MIN_PDU_LEN);
         g_free (pdu);
         return NULL;
     }
@@ -410,42 +444,22 @@ sms_parse_pdu (const char *hexpdu, GError **error)
     else
         variable_length_items += user_data_len;
     if (pdu_len < variable_length_items + SMS_MIN_PDU_LEN) {
-        *error = g_error_new (MM_MODEM_ERROR,
-                              MM_MODEM_ERROR_GENERAL,
-                              "PDU too short (3): %zd vs %d", pdu_len,
-                              variable_length_items + SMS_MIN_PDU_LEN);
+        g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                     "PDU too short (3): %zd vs %d",
+                     pdu_len,
+                     variable_length_items + SMS_MIN_PDU_LEN);
         g_free (pdu);
         return NULL;
     }
 
     /* Only handle SMS-DELIVER */
     if ((pdu[msg_start_offset] & SMS_TP_MTI_MASK) != SMS_TP_MTI_SMS_DELIVER) {
-        *error = g_error_new (MM_MODEM_ERROR,
-                              MM_MODEM_ERROR_GENERAL,
-                              "Unhandled message type: 0x%02x",
-                              pdu[msg_start_offset]);
+        g_set_error (error, MM_MODEM_ERROR, MM_MODEM_ERROR_GENERAL,
+                     "Unhandled message type: 0x%02x",
+                     pdu[msg_start_offset]);
         g_free (pdu);
         return NULL;
     }
-
-    properties = g_hash_table_new_full (g_str_hash, g_str_equal, NULL,
-                                        simple_free_gvalue);
-
-    smsc_addr = sms_decode_address (&pdu[1], 2 * (pdu[0] - 1));
-    g_hash_table_insert (properties, "smsc",
-                         simple_string_value (smsc_addr));
-    g_free (smsc_addr);
-
-    sender_addr = sms_decode_address (&pdu[msg_start_offset + 2],
-                                      pdu[msg_start_offset + 1]);
-    g_hash_table_insert (properties, "number",
-                         simple_string_value (sender_addr));
-    g_free (sender_addr);
-
-    sc_timestamp = sms_decode_timestamp (&pdu[tp_dcs_offset + 1]);
-    g_hash_table_insert (properties, "timestamp",
-                         simple_string_value (sc_timestamp));
-    g_free (sc_timestamp);
 
     bit_offset = 0;
     if (pdu[msg_start_offset] & SMS_TP_UDHI) {
@@ -470,12 +484,10 @@ sms_parse_pdu (const char *hexpdu, GError **error)
                         pdu[offset + 2] > pdu[offset + 1])
                         break;
 
-                    g_hash_table_insert (properties, "concat-reference",
-                                         simple_uint_value (pdu[offset]));
-                    g_hash_table_insert (properties, "concat-max",
-                                         simple_uint_value (pdu[offset + 1]));
-                    g_hash_table_insert (properties, "concat-sequence",
-                                         simple_uint_value (pdu[offset + 2]));
+                    concat_ref = pdu[offset];
+                    concat_max = pdu[offset + 1];
+                    concat_seq = pdu[offset + 2];
+                    multipart = TRUE;
                     break;
                 case 0x08:
                     /* Concatenated short message, 16-bit reference */
@@ -483,14 +495,10 @@ sms_parse_pdu (const char *hexpdu, GError **error)
                         pdu[offset + 3] > pdu[offset + 2])
                         break;
 
-                    g_hash_table_insert (properties, "concat-reference",
-                                         simple_uint_value (
-                                             (pdu[offset] << 8)
-                                             | pdu[offset + 1]));
-                    g_hash_table_insert (properties, "concat-max",
-                                         simple_uint_value (pdu[offset + 2]));
-                    g_hash_table_insert (properties, "concat-sequence",
-                                         simple_uint_value (pdu[offset + 3]));
+                    concat_ref = (pdu[offset] << 8) | pdu[offset + 1];
+                    concat_max = pdu[offset + 2];
+                    concat_seq = pdu[offset + 3];
+                    multipart = TRUE;
                     break;
             }
 
@@ -525,21 +533,39 @@ sms_parse_pdu (const char *hexpdu, GError **error)
                                     user_data_encoding, bit_offset);
         g_warn_if_fail (msg_text != NULL);
     }
-    g_hash_table_insert (properties, "text", simple_string_value (msg_text));
-    g_free (msg_text);
 
-    /* Add the raw PDU data */
+    /* Raw PDU data */
     pdu_data = g_byte_array_sized_new (user_data_len);
     g_byte_array_append (pdu_data, &pdu[user_data_offset], user_data_len);
-    g_hash_table_insert (properties, "data", byte_array_value (pdu_data));
-    g_byte_array_free (pdu_data, TRUE);
-    g_hash_table_insert (properties, "data-coding-scheme",
-                         simple_uint_value (pdu[tp_dcs_offset] & 0xFF));
 
-    if (pdu[tp_dcs_offset] & SMS_DCS_CLASS_VALID)
-        g_hash_table_insert (properties, "class",
-                             simple_uint_value (pdu[tp_dcs_offset] &
-                                                SMS_DCS_CLASS_MASK));
+    if (pdu[tp_dcs_offset] & SMS_DCS_CLASS_VALID) {
+        msg_class = pdu[tp_dcs_offset] & SMS_DCS_CLASS_MASK;
+        class_valid = TRUE;
+    }
+
+    smsc_addr = sms_decode_address (&pdu[1], 2 * (pdu[0] - 1));
+    sender_addr = sms_decode_address (&pdu[msg_start_offset + 2], pdu[msg_start_offset + 1]);
+    sc_timestamp = sms_decode_timestamp (&pdu[tp_dcs_offset + 1]);
+
+    properties = sms_properties_hash_new (smsc_addr,
+                                          sender_addr,
+                                          sc_timestamp,
+                                          msg_text,
+                                          pdu_data,
+                                          pdu[tp_dcs_offset] & 0xFF,
+                                          class_valid ? &msg_class : NULL);
+    g_assert (properties);
+    if (multipart) {
+        g_hash_table_insert (properties, "concat-reference", simple_uint_value (concat_ref));
+        g_hash_table_insert (properties, "concat-max", simple_uint_value (concat_max));
+        g_hash_table_insert (properties, "concat-sequence", simple_uint_value (concat_seq));
+    }
+
+    g_free (smsc_addr);
+    g_free (sender_addr);
+    g_free (sc_timestamp);
+    g_free (msg_text);
+    g_byte_array_free (pdu_data, TRUE);
     g_free (pdu);
 
     return properties;
