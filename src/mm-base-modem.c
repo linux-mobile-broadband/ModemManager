@@ -265,9 +265,14 @@ mm_base_modem_grab_port (MMBaseModem *self,
                                                            NULL);
             g_regex_unref (regex);
 
-            /*     regex = g_regex_new ("\\r\\n\\+CMTI: \"(\\S+)\",(\\d+)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL); */
-            /*     mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, cmti_received, self, NULL); */
-            /*     g_regex_unref (regex); */
+            /* Set up CMTI unsolicited message handler, with NULL callback */
+            regex = mm_3gpp_cmti_regex_get ();
+            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port),
+                                                           regex,
+                                                           NULL,
+                                                           NULL,
+                                                           NULL);
+            g_regex_unref (regex);
 
             /* Set up CUSD unsolicited message handler, with NULL callback */
             regex = mm_3gpp_cusd_regex_get ();
