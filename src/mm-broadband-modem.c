@@ -157,6 +157,7 @@ struct _MMBroadbandModemPrivate {
     /* Implementation helpers */
     gboolean sms_use_pdu_mode;
     gboolean sms_supported_modes_checked;
+    GHashTable *known_sms_parts;
 };
 
 /*****************************************************************************/
@@ -3611,6 +3612,181 @@ modem_messaging_setup_sms_format (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
+/* Setup/cleanup messaging related unsolicited events (Messaging interface) */
+
+static gboolean
+modem_messaging_setup_cleanup_unsolicited_events_finish (MMIfaceModemMessaging *self,
+                                                         GAsyncResult *res,
+                                                         GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+typedef struct {
+    MMBroadbandModem *self;
+    GSimpleAsyncResult *result;
+    guint idx;
+} SmsPartContext;
+
+static void
+sms_part_context_complete_and_free (SmsPartContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static void
+sms_part_ready (MMBroadbandModem *self,
+                GAsyncResult *res,
+                SmsPartContext *ctx)
+{
+    MMSmsPart *part;
+    gint rv, status, tpdu_len;
+    gchar pdu[SMS_MAX_PDU_LEN + 1];
+    const gchar *response;
+    GError *error = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        /* We're really ignoring this error afterwards, as we don't have a callback
+         * passed to the async operation, so just log the error here. */
+        mm_warn ("Couldn't retrieve SMS part: '%s'",
+                 error->message);
+        g_simple_async_result_take_error (ctx->result, error);
+        sms_part_context_complete_and_free (ctx);
+        return;
+    }
+
+    rv = sscanf (response, "+CMGR: %d,,%d %" G_STRINGIFY (SMS_MAX_PDU_LEN) "s",
+                 &status, &tpdu_len, pdu);
+    if (rv != 3) {
+        error = g_error_new (MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Failed to parse CMGR response (parsed %d items)", rv);
+        mm_warn ("Couldn't retrieve SMS part: '%s'", error->message);
+        g_simple_async_result_take_error (ctx->result, error);
+        sms_part_context_complete_and_free (ctx);
+        return;
+    }
+
+    part = mm_sms_part_new (ctx->idx, pdu, &error);
+    if (part) {
+        mm_dbg ("Correctly parsed PDU (%d)", ctx->idx);
+        mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
+                                            part,
+                                            TRUE);
+    } else {
+        /* Don't treat the error as critical */
+        mm_dbg ("Error parsing PDU (%d): %s", ctx->idx, error->message);
+        g_error_free (error);
+    }
+
+    /* All done */
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    sms_part_context_complete_and_free (ctx);
+}
+
+static void
+cmti_received (MMAtSerialPort *port,
+               GMatchInfo *info,
+               MMBroadbandModem *self)
+{
+    guint idx = 0;
+    gchar *str, *command;
+    SmsPartContext *ctx;
+
+    str = g_match_info_fetch (info, 2);
+    if (str)
+        idx = atoi (str);
+    g_free (str);
+
+    if (G_UNLIKELY (!self->priv->known_sms_parts))
+        self->priv->known_sms_parts = g_hash_table_new (g_direct_hash, g_direct_equal);
+    else if (g_hash_table_lookup_extended (self->priv->known_sms_parts,
+                                           GUINT_TO_POINTER (idx),
+                                           NULL,
+                                           NULL))
+        /* Don't signal multiple times if there are multiple CMTI notifications for a message */
+        return;
+
+    /* Nothing is currently stored in the hash table - presence is all that matters. */
+    g_hash_table_insert (self->priv->known_sms_parts, GUINT_TO_POINTER (idx), NULL);
+
+    ctx = g_new0 (SmsPartContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self), NULL, NULL, cmti_received);
+    ctx->idx = idx;
+
+    /* Retrieve the message */
+    command = g_strdup_printf ("+CMGR=%d", idx);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              command,
+                              10,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)sms_part_ready,
+                              ctx);
+    g_free (command);
+}
+
+static void
+set_messaging_unsolicited_events_handlers (MMIfaceModemMessaging *self,
+                                           gboolean enable,
+                                           GAsyncReadyCallback callback,
+                                           gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    MMAtSerialPort *ports[2];
+    GRegex *cmti_regex;
+    guint i;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        set_messaging_unsolicited_events_handlers);
+
+    cmti_regex = mm_3gpp_cmti_regex_get ();
+    ports[0] = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+
+    /* Enable unsolicited events in given port */
+    for (i = 0; ports[i] && i < 2; i++) {
+        /* Set/unset unsolicited CMTI event handler */
+        mm_dbg ("%s messaging unsolicited events handlers",
+                enable ? "Setting" : "Removing");
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            cmti_regex,
+            enable ? (MMAtSerialUnsolicitedMsgFn) cmti_received : NULL,
+            enable ? self : NULL,
+            NULL);
+    }
+
+    g_regex_unref (cmti_regex);
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+static void
+modem_messaging_setup_unsolicited_events (MMIfaceModemMessaging *self,
+                                          GAsyncReadyCallback callback,
+                                          gpointer user_data)
+{
+    set_messaging_unsolicited_events_handlers (self, TRUE, callback, user_data);
+}
+
+static void
+modem_messaging_cleanup_unsolicited_events (MMIfaceModemMessaging *self,
+                                            GAsyncReadyCallback callback,
+                                            gpointer user_data)
+{
+    set_messaging_unsolicited_events_handlers (self, FALSE, callback, user_data);
+}
+
+/*****************************************************************************/
 /* Load initial list of SMS parts (Messaging interface) */
 
 static gboolean
@@ -5875,6 +6051,9 @@ finalize (GObject *object)
     if (self->priv->modem_3gpp_registration_regex)
         mm_3gpp_creg_regex_destroy (self->priv->modem_3gpp_registration_regex);
 
+    if (self->priv->known_sms_parts)
+        g_hash_table_unref (self->priv->known_sms_parts);
+
     G_OBJECT_CLASS (mm_broadband_modem_parent_class)->finalize (object);
 }
 
@@ -6091,6 +6270,10 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
     iface->setup_sms_format_finish = modem_messaging_setup_sms_format_finish;
     iface->load_initial_sms_parts = modem_messaging_load_initial_sms_parts;
     iface->load_initial_sms_parts_finish = modem_messaging_load_initial_sms_parts_finish;
+    iface->setup_unsolicited_events = modem_messaging_setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish = modem_messaging_setup_cleanup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events = modem_messaging_cleanup_unsolicited_events;
+    iface->cleanup_unsolicited_events_finish = modem_messaging_setup_cleanup_unsolicited_events_finish;
 }
 
 static void
