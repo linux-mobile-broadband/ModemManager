@@ -111,6 +111,55 @@ handle_delete (MmGdbusModemMessaging *skeleton,
 /*****************************************************************************/
 
 static gboolean
+handle_create (MmGdbusModemMessaging *skeleton,
+               GDBusMethodInvocation *invocation,
+               GVariant *dictionary,
+               gboolean send,
+               MMIfaceModemMessaging *self)
+{
+    GError *error = NULL;
+    MMSmsList *list = NULL;
+    MMCommonSmsProperties *properties;
+    MMSms *sms;
+
+    /* Parse input properties */
+    properties = mm_common_sms_properties_new_from_dictionary (dictionary, &error);
+    if (!properties) {
+        g_dbus_method_invocation_take_error (invocation, error);
+        return TRUE;
+    }
+
+    sms = mm_sms_new_from_properties (MM_BASE_MODEM (self),
+                                      properties,
+                                      &error);
+    if (!sms) {
+        g_dbus_method_invocation_take_error (invocation, error);
+        return TRUE;
+    }
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
+                  NULL);
+    g_assert (list != NULL);
+
+    /* Add it to the list */
+    mm_sms_list_add_sms (list, sms);
+
+    /* Complete the DBus call */
+    mm_gdbus_modem_messaging_complete_create (skeleton,
+                                              invocation,
+                                              mm_sms_get_path (sms));
+    g_object_unref (sms);
+
+    g_object_unref (properties);
+    g_object_unref (list);
+
+    return TRUE;
+}
+
+/*****************************************************************************/
+
+static gboolean
 handle_list (MmGdbusModemMessaging *skeleton,
              GDBusMethodInvocation *invocation,
              MMIfaceModemMessaging *self)
@@ -623,6 +672,10 @@ interface_initialization_step (InitializationContext *ctx)
         /* We are done without errors! */
 
         /* Handle method invocations */
+        g_signal_connect (ctx->skeleton,
+                          "handle-create",
+                          G_CALLBACK (handle_create),
+                          ctx->self);
         g_signal_connect (ctx->skeleton,
                           "handle-delete",
                           G_CALLBACK (handle_delete),
