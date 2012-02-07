@@ -188,7 +188,9 @@ take_singlepart (MMSmsList *self,
     GError *error = NULL;
 
     sms = mm_sms_singlepart_new (self->priv->modem,
-                                 received,
+                                 (received ?
+                                  MM_MODEM_SMS_STATE_RECEIVED :
+                                  MM_MODEM_SMS_STATE_STORED),
                                  part,
                                  &error);
 
@@ -225,7 +227,9 @@ take_multipart (MMSmsList *self,
     } else {
         /* Create new Multipart */
         sms = mm_sms_multipart_new (self->priv->modem,
-                                    received,
+                                    (received ?
+                                     MM_MODEM_SMS_STATE_RECEIVED :
+                                     MM_MODEM_SMS_STATE_STORED),
                                     concat_reference,
                                     mm_sms_part_get_concat_max (part),
                                     part,
