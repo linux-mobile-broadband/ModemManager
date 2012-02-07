@@ -202,6 +202,8 @@ reg_info_call_done (MMModemGsmNetwork *self,
         g_value_unset (&value);
 
         dbus_g_method_return (context, array);
+
+        g_value_array_free (array);
     }
 }
 
