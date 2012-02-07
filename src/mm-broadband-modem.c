@@ -3878,7 +3878,7 @@ sms_text_part_list_ready (MMBroadbandModem *self,
     while (g_match_info_matches (match_info)) {
         MMSmsPart *part;
         guint matches, idx;
-        gchar *number = NULL, *timestamp, *text, *ucs2_text;
+        gchar *number, *timestamp, *text, *ucs2_text;
         gsize ucs2_len = 0;
         GByteArray *raw;
 
@@ -3895,16 +3895,21 @@ sms_text_part_list_ready (MMBroadbandModem *self,
 
         /* <stat is ignored for now> */
 
+        /* Get and parse number */
         number = get_match_string_unquoted (match_info, 3);
         if (!number) {
             mm_dbg ("Failed to get message sender number");
             goto next;
         }
+        number = mm_charset_take_and_convert_to_utf8 (number,
+                                                      self->priv->modem_current_charset);
 
+        /* Get and parse timestamp (always expected in ASCII) */
         timestamp = get_match_string_unquoted (match_info, 5);
 
-        text = g_match_info_fetch (match_info, 6);
-        /* FIXME: Text is going to be in the character set we've set with +CSCS */
+        /* Get and parse text */
+        text = mm_charset_take_and_convert_to_utf8 (g_match_info_fetch (match_info, 6),
+                                                    self->priv->modem_current_charset);
 
         /* The raw SMS data can only be GSM, UCS2, or unknown (8-bit), so we
          * need to convert to UCS2 here.
