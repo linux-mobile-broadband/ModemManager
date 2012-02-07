@@ -29,7 +29,7 @@
     <!--
         State:
 
-        A <link linkend="MMModemSmsState">MMModemSmsState</link> value,
+        A <link linkend="MMSmsState">MMSmsState</link> value,
         describing the state of the message.
     -->
     <property name="State" type="u" access="read" />

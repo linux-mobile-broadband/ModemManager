@@ -75,12 +75,12 @@ MMSms *mm_sms_user_new (MMBaseModem *modem,
                         GError **error);
 
 MMSms *mm_sms_singlepart_new (MMBaseModem *modem,
-                              MMModemSmsState state,
+                              MMSmsState state,
                               MMSmsPart *part,
                               GError **error);
 
 MMSms    *mm_sms_multipart_new       (MMBaseModem *modem,
-                                      MMModemSmsState state,
+                                      MMSmsState state,
                                       guint reference,
                                       guint max_parts,
                                       MMSmsPart *first_part,

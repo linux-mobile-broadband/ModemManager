@@ -455,7 +455,7 @@ mm_sms_new (MMBaseModem *modem)
 
 MMSms *
 mm_sms_singlepart_new (MMBaseModem *modem,
-                       MMModemSmsState state,
+                       MMSmsState state,
                        MMSmsPart *part,
                        GError **error)
 {
@@ -480,7 +480,7 @@ mm_sms_singlepart_new (MMBaseModem *modem,
 
 MMSms *
 mm_sms_multipart_new (MMBaseModem *modem,
-                      MMModemSmsState state,
+                      MMSmsState state,
                       guint reference,
                       guint max_parts,
                       MMSmsPart *first_part,
@@ -521,7 +521,7 @@ mm_sms_user_new (MMBaseModem *modem,
     mm_sms_part_set_class (part, class);
 
     return mm_sms_singlepart_new (modem,
-                                  MM_MODEM_SMS_STATE_UNKNOWN,
+                                  MM_SMS_STATE_UNKNOWN,
                                   part,
                                   error);
 }

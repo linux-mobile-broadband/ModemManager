@@ -16,9 +16,9 @@ MMModemContactsStorage
 MMModemLocationSource
 MMModemLock
 MMModemMode
-MMModemSmsState
 MMModemState
 MMModemStateChangeReason
+MMSmsState
 </SECTION>
 
 <SECTION>

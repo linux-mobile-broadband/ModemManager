@@ -280,24 +280,24 @@ typedef enum { /*< underscore_name=mm_modem_band >*/
 } MMModemBand;
 
 /**
- * MMModemSmsState:
- * @MM_MODEM_SMS_STATE_UNKNOWN: State unknown or not reportable.
- * @MM_MODEM_SMS_STATE_STORED: The message has been neither received nor yet sent.
- * @MM_MODEM_SMS_STATE_RECEIVING: The message is being received but is not yet complete.
- * @MM_MODEM_SMS_STATE_RECEIVED: The message has been completely received.
- * @MM_MODEM_SMS_STATE_SENDING: The message is queued for delivery.
- * @MM_MODEM_SMS_STATE_SENT: The message was successfully sent.
+ * MMSmsState:
+ * @MM_SMS_STATE_UNKNOWN: State unknown or not reportable.
+ * @MM_SMS_STATE_STORED: The message has been neither received nor yet sent.
+ * @MM_SMS_STATE_RECEIVING: The message is being received but is not yet complete.
+ * @MM_SMS_STATE_RECEIVED: The message has been completely received.
+ * @MM_SMS_STATE_SENDING: The message is queued for delivery.
+ * @MM_SMS_STATE_SENT: The message was successfully sent.
  *
  * State of a given SMS.
  */
-typedef enum { /*< underscore_name=mm_modem_sms_state >*/
-    MM_MODEM_SMS_STATE_UNKNOWN   = 0,
-    MM_MODEM_SMS_STATE_STORED    = 1,
-    MM_MODEM_SMS_STATE_RECEIVING = 2,
-    MM_MODEM_SMS_STATE_RECEIVED  = 3,
-    MM_MODEM_SMS_STATE_SENDING   = 4,
-    MM_MODEM_SMS_STATE_SENT      = 5,
-} MMModemSmsState;
+typedef enum { /*< underscore_name=mm_sms_state >*/
+    MM_SMS_STATE_UNKNOWN   = 0,
+    MM_SMS_STATE_STORED    = 1,
+    MM_SMS_STATE_RECEIVING = 2,
+    MM_SMS_STATE_RECEIVED  = 3,
+    MM_SMS_STATE_SENDING   = 4,
+    MM_SMS_STATE_SENT      = 5,
+} MMSmsState;
 
 /**
  * MMModemLocationSource:
