@@ -503,22 +503,18 @@ mm_sms_multipart_new (MMBaseModem *modem,
 }
 
 MMSms *
-mm_sms_user_new (MMBaseModem *modem,
-                 const gchar *text,
-                 const gchar *number,
-                 const gchar *smsc,
-                 guint validity,
-                 guint class,
-                 GError **error)
+mm_sms_new_from_properties (MMBaseModem *modem,
+                            MMCommonSmsProperties *properties,
+                            GError **error)
 {
     MMSmsPart *part;
 
     part = mm_sms_part_new (0);
-    mm_sms_part_set_text (part, text);
-    mm_sms_part_set_number (part, number);
-    mm_sms_part_set_smsc (part, smsc);
-    mm_sms_part_set_validity (part, validity);
-    mm_sms_part_set_class (part, class);
+    mm_sms_part_set_text (part, mm_common_sms_properties_get_text (properties));
+    mm_sms_part_set_number (part, mm_common_sms_properties_get_number (properties));
+    mm_sms_part_set_smsc (part, mm_common_sms_properties_get_smsc (properties));
+    mm_sms_part_set_validity (part, mm_common_sms_properties_get_validity (properties));
+    mm_sms_part_set_class (part, mm_common_sms_properties_get_class (properties));
 
     return mm_sms_singlepart_new (modem,
                                   MM_SMS_STATE_UNKNOWN,
