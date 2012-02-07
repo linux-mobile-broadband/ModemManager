@@ -327,3 +327,40 @@ mm_sms_send_sync (MMSms *self,
                                         cancellable,
                                         error);
 }
+
+void
+mm_sms_new (GDBusConnection *connection,
+            const gchar *path,
+            GCancellable *cancellable,
+            GAsyncReadyCallback callback,
+            gpointer user_data)
+{
+    return mm_gdbus_sms_proxy_new (connection,
+                                   G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+                                   MM_DBUS_SERVICE,
+                                   path,
+                                   cancellable,
+                                   callback,
+                                   user_data);
+}
+
+MMSms *
+mm_sms_new_finish (GAsyncResult *res,
+                   GError **error)
+{
+    return mm_gdbus_sms_proxy_new_finish (res, error);
+}
+
+MMSms *
+mm_sms_new_sync (GDBusConnection *connection,
+                 const gchar *path,
+                 GCancellable *cancellable,
+                 GError **error)
+{
+    return mm_gdbus_sms_proxy_new_sync (connection,
+                                        G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
+                                        MM_DBUS_SERVICE,
+                                        path,
+                                        cancellable,
+                                        error);
+}

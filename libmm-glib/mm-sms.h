@@ -38,6 +38,19 @@ typedef MmGdbusSms     MMSms;
 const gchar *mm_sms_get_path (MMSms *self);
 gchar       *mm_sms_dup_path (MMSms *self);
 
+void mm_sms_new (GDBusConnection     *connection,
+                 const gchar         *object_path,
+                 GCancellable        *cancellable,
+                 GAsyncReadyCallback  callback,
+                 gpointer             user_data);
+MMSms *mm_sms_new_finish (GAsyncResult  *res,
+                          GError       **error);
+
+MMSms *mm_sms_new_sync (GDBusConnection     *connection,
+                        const gchar         *object_path,
+                        GCancellable        *cancellable,
+                        GError             **error);
+
 void     mm_sms_send        (MMSms *self,
                              GCancellable *cancellable,
                              GAsyncReadyCallback callback,
