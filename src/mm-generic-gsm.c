@@ -5090,8 +5090,11 @@ get_match_string_unquoted (GMatchInfo *m, guint match_index)
 static gboolean
 text_parse_cmgl (MMGenericGsm *self, const char *response, GError **error)
 {
+    MMGenericGsmPrivate *priv;
     GRegex *r;
     GMatchInfo *match_info = NULL;
+
+    priv = MM_GENERIC_GSM_GET_PRIVATE (self);
 
     /* +CMGL: <index>,<stat>,<oa/da>,[alpha],<scts><CR><LF><data><CR><LF> */
     r = g_regex_new ("\\+CMGL:\\s*(\\d+)\\s*,\\s*([^,]*),\\s*([^,]*),\\s*([^,]*),\\s*([^\\r\\n]*)\\r\\n(.*)\\r\\n", 0, 0, NULL);
@@ -5125,16 +5128,21 @@ text_parse_cmgl (MMGenericGsm *self, const char *response, GError **error)
 
         /* <stat is ignored for now> */
 
+        /* Get and parse number */
         number = get_match_string_unquoted (match_info, 3);
         if (!number) {
             mm_dbg ("Failed to get message sender number");
             goto next;
         }
+        number = mm_charset_take_and_convert_to_utf8 (number,
+                                                      priv->cur_charset);
 
+        /* Get and parse timestamp (always expected in ASCII) */
         timestamp = get_match_string_unquoted (match_info, 5);
 
-        text = g_match_info_fetch (match_info, 6);
-        /* FIXME: Text is going to be in the character set we've set with +CSCS */
+        /* Get and parse text */
+        text = mm_charset_take_and_convert_to_utf8 (g_match_info_fetch (match_info, 6),
+                                                    priv->cur_charset);
 
         /* The raw SMS data can only be GSM, UCS2, or unknown (8-bit), so we
          * need to convert to UCS2 here.
