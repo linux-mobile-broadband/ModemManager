@@ -358,7 +358,7 @@ assemble_sms (MMSms *self,
                   "text",      fulltext,
                   "smsc",      mm_sms_part_get_smsc (first),
                   "class",     mm_sms_part_get_class (first),
-                  "to",        mm_sms_part_get_number (first),
+                  "number",    mm_sms_part_get_number (first),
                   "timestamp", mm_sms_part_get_timestamp (first),
                   "validity",  mm_sms_part_get_validity (first),
                   NULL);

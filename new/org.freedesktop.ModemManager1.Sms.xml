@@ -35,11 +35,11 @@
     <property name="State" type="u" access="read" />
 
     <!--
-        To:
+        Number:
 
         Number to which the message is addressed.
     -->
-    <property name="To" type="s" access="readwrite" />
+    <property name="Number" type="s" access="readwrite" />
 
     <!--
         Text:
