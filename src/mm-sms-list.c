@@ -168,6 +168,15 @@ mm_sms_list_delete_sms (MMSmsList *self,
 
 /*****************************************************************************/
 
+void
+mm_sms_list_add_sms (MMSmsList *self,
+                     MMSms *sms)
+{
+    self->priv->list = g_list_prepend (self->priv->list, g_object_ref (sms));
+}
+
+/*****************************************************************************/
+
 static guint
 cmp_sms_by_concat_reference (MMSms *sms,
                              gpointer user_data)

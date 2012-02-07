@@ -66,6 +66,9 @@ gboolean mm_sms_list_take_part (MMSmsList *self,
                                 gboolean received,
                                 GError **error);
 
+void mm_sms_list_add_sms (MMSmsList *self,
+                          MMSms *sms);
+
 void     mm_sms_list_delete_sms        (MMSmsList *self,
                                         const gchar *sms_path,
                                         GAsyncReadyCallback callback,
