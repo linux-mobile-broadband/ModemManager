@@ -26,6 +26,8 @@
 
 #include <gmodule.h>
 
+#include <mm-errors-types.h>
+
 #include "mm-plugin-generic.h"
 #include "mm-broadband-modem.h"
 #include "mm-serial-parsers.h"
@@ -55,7 +57,10 @@ grab_port (MMPluginBase *base,
     /* The generic plugin cannot do anything with non-AT and non-QCDM ports */
     if (!mm_port_probe_is_at (probe) &&
         !mm_port_probe_is_qcdm (probe)) {
-        g_set_error (error, 0, 0, "Ignoring non-AT/non-QCDM ports");
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_UNSUPPORTED,
+                     "Ignoring non-AT/non-QCDM ports");
         return NULL;
     }
 
@@ -66,7 +71,10 @@ grab_port (MMPluginBase *base,
     devfile = g_udev_device_get_device_file (port);
     if (!devfile) {
         if (!driver || !g_str_equal (driver, "bluetooth")) {
-            g_set_error (error, 0, 0, "Could not get port's sysfs file.");
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Could not get port's sysfs file.");
             return NULL;
         }
 

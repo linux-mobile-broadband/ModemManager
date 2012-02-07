@@ -26,6 +26,7 @@
 
 #include "mm-plugin-cinterion.h"
 #include "mm-broadband-modem-cinterion.h"
+#include "mm-errors-types.h"
 #include "mm-log.h"
 
 G_DEFINE_TYPE (MMPluginCinterion, mm_plugin_cinterion, MM_TYPE_PLUGIN_BASE)
@@ -45,7 +46,10 @@ grab_port (MMPluginBase *base,
 
     /* The Cinterion plugin cannot do anything with non-AT ports */
     if (!mm_port_probe_is_at (probe)) {
-        g_set_error (error, 0, 0, "Ignoring non-AT port");
+        g_set_error_literal (error,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_UNSUPPORTED,
+                             "Ignoring non-AT port");
         return NULL;
     }
 

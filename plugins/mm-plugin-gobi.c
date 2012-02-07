@@ -41,7 +41,10 @@ grab_port (MMPluginBase *base,
 
     /* The Gobi plugin only handles AT and QCDM ports (for now) */
     if (!mm_port_probe_is_at (probe) && !mm_port_probe_is_qcdm (probe)) {
-        g_set_error (error, 0, 0, "Ignoring non-AT/non-QCDM port");
+        g_set_error_literal (error,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_UNSUPPORTED,
+                             "Ignoring non-AT/non-QCDM port");
         return NULL;
     }
 
@@ -50,7 +53,10 @@ grab_port (MMPluginBase *base,
     driver = mm_port_probe_get_port_driver (probe);
 
     if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product)) {
-        g_set_error (error, 0, 0, "Could not get modem product ID.");
+        g_set_error_literal (error,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_FAILED,
+                             "Could not get modem product ID");
         return NULL;
     }
 
@@ -106,4 +112,3 @@ mm_plugin_gobi_class_init (MMPluginGobiClass *klass)
 
     pb_class->grab_port = grab_port;
 }
-
