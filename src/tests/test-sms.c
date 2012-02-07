@@ -74,7 +74,7 @@ test_pdu1 (void *f, gpointer d)
     0x28, 0xec, 0x26, 0x83, 0xbe, 0x60, 0x50, 0x78,
     0x0e, 0xba, 0x97, 0xd9, 0x6c, 0x17};
   GHashTable *sms;
-  GError *error;
+  GError *error = NULL;
   char *hexpdu;
 
   hexpdu = utils_bin2hexstr (pdu, sizeof(pdu));
@@ -102,7 +102,7 @@ test_pdu2 (void *f, gpointer d)
     0x30, 0x92, 0x91, 0x02, 0x40, 0x61, 0x08, 0x04,
     0x42, 0x04, 0x35, 0x04, 0x41, 0x04, 0x42};
   GHashTable *sms;
-  GError *error;
+  GError *error = NULL;
   char *hexpdu;
 
   hexpdu = utils_bin2hexstr (pdu, sizeof(pdu));
@@ -128,7 +128,7 @@ test_pdu3 (void *f, gpointer d)
     0x65, 0x00, 0x0a, 0xe8, 0x32, 0x9b, 0xfd, 0x46,
     0x97, 0xd9, 0xec, 0x37};
   GHashTable *sms;
-  GError *error;
+  GError *error = NULL;
   char *hexpdu;
 
   hexpdu = utils_bin2hexstr (pdu, sizeof(pdu));
@@ -156,7 +156,7 @@ test_pdu3_nzpid (void *f, gpointer d)
     0x65, 0x00, 0x0a, 0xe8, 0x32, 0x9b, 0xfd, 0x46,
     0x97, 0xd9, 0xec, 0x37};
   GHashTable *sms;
-  GError *error;
+  GError *error = NULL;
   char *hexpdu;
 
   hexpdu = utils_bin2hexstr (pdu, sizeof(pdu));
@@ -185,7 +185,7 @@ test_pdu3_mms (void *f, gpointer d)
     0x65, 0x00, 0x0a, 0xe8, 0x32, 0x9b, 0xfd, 0x46,
     0x97, 0xd9, 0xec, 0x37};
   GHashTable *sms;
-  GError *error;
+  GError *error = NULL;
   char *hexpdu;
 
   hexpdu = utils_bin2hexstr (pdu, sizeof(pdu));
@@ -213,7 +213,7 @@ test_pdu3_natl (void *f, gpointer d)
     0x65, 0x00, 0x0a, 0xe8, 0x32, 0x9b, 0xfd, 0x46,
     0x97, 0xd9, 0xec, 0x37};
   GHashTable *sms;
-  GError *error;
+  GError *error = NULL;
   char *hexpdu;
 
   hexpdu = utils_bin2hexstr (pdu, sizeof(pdu));
@@ -242,7 +242,7 @@ test_pdu3_8bit (void *f, gpointer d)
   static const guint8 expected_data[] = {
     0xe8, 0x32, 0x9b, 0xfd, 0x46, 0x97, 0xd9, 0xec, 0x37, 0xde };
   GHashTable *sms;
-  GError *error;
+  GError *error = NULL;
   char *hexpdu;
 
   hexpdu = utils_bin2hexstr (pdu, sizeof(pdu));
@@ -298,7 +298,7 @@ test_pdu_dcsf1 (void *f, gpointer d)
     0x00, 0x47, 0xBF, 0xDD, 0x65, 0x50, 0xB8, 0x0E,
     0xCA, 0xD9, 0x66};
   GHashTable *sms;
-  GError *error;
+  GError *error = NULL;
   char *hexpdu;
 
   hexpdu = utils_bin2hexstr (pdu, sizeof(pdu));
@@ -330,7 +330,7 @@ test_pdu_dcsf_8bit (void *f, gpointer d)
   static const guint8 expected_data[] = {
     0xe8, 0x32, 0x9b, 0xfd, 0x46, 0x97, 0xd9, 0xec, 0x37, 0xde };
   GHashTable *sms;
-  GError *error;
+  GError *error = NULL;
   char *hexpdu;
 
   hexpdu = utils_bin2hexstr (pdu, sizeof(pdu));
@@ -359,7 +359,7 @@ test_pdu_insufficient_data (void *f, gpointer d)
     0x97, 0xd9, 0xec, 0x37
   };
   GHashTable *sms;
-  GError *error;
+  GError *error = NULL;
   char *hexpdu;
 
   hexpdu = utils_bin2hexstr (pdu, sizeof(pdu));
@@ -381,7 +381,7 @@ test_pdu_udhi (void *f, gpointer d)
 "5C7683D27350984D4FABC9A0B33C4C4FCF5D20EBFB2D079DCB62793DBD06D9C36E50FB2D4E97D9"
 "A0B49B5E96BBCB";
   GHashTable *sms;
-  GError *error;
+  GError *error = NULL;
 
   sms = sms_parse_pdu (hexpdu, &error);
   g_assert (sms);
@@ -402,7 +402,7 @@ static void
 test_pduX (void *f, gpointer d)
 {
   GHashTable *sms;
-  GError *error;
+  GError *error = NULL;
   char *hexpdu;
 
   hexpdu = utils_bin2hexstr (pdu1, sizeof(pdu1));
