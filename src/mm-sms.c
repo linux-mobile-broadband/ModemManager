@@ -186,10 +186,10 @@ sms_delete_parts_context_complete_and_free (SmsDeletePartsContext *ctx)
     g_free (ctx);
 }
 
-gboolean
-mm_sms_delete_parts_finish (MMSms *self,
-                            GAsyncResult *res,
-                            GError **error)
+static gboolean
+sms_delete_finish (MMSms *self,
+                   GAsyncResult *res,
+                   GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
@@ -254,10 +254,10 @@ delete_next_part (SmsDeletePartsContext *ctx)
     g_free (cmd);
 }
 
-void
-mm_sms_delete_parts (MMSms *self,
-                     GAsyncReadyCallback callback,
-                     gpointer user_data)
+static void
+sms_delete (MMSms *self,
+            GAsyncReadyCallback callback,
+            gpointer user_data)
 {
     SmsDeletePartsContext *ctx;
 
@@ -265,7 +265,7 @@ mm_sms_delete_parts (MMSms *self,
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             mm_sms_delete_parts);
+                                             sms_delete);
     ctx->self = g_object_ref (self);
     ctx->modem = g_object_ref (self->priv->modem);
 
@@ -274,6 +274,38 @@ mm_sms_delete_parts (MMSms *self,
 
     /* Go on deleting parts */
     delete_next_part (ctx);
+}
+
+/*****************************************************************************/
+
+gboolean
+mm_sms_delete_finish (MMSms *self,
+                      GAsyncResult *res,
+                      GError **error)
+{
+    if (MM_SMS_GET_CLASS (self)->delete_finish)
+        return MM_SMS_GET_CLASS (self)->delete_finish (self, res, error);
+
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+void
+mm_sms_delete (MMSms *self,
+               GAsyncReadyCallback callback,
+               gpointer user_data)
+{
+    if (MM_SMS_GET_CLASS (self)->delete &&
+        MM_SMS_GET_CLASS (self)->delete_finish) {
+        MM_SMS_GET_CLASS (self)->delete (self, callback, user_data);
+        return;
+    }
+
+    g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                         callback,
+                                         user_data,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_UNSUPPORTED,
+                                         "Deleting SMS is not supported by this modem");
 }
 
 /*****************************************************************************/
@@ -605,6 +637,9 @@ mm_sms_class_init (MMSmsClass *klass)
     object_class->set_property = set_property;
     object_class->finalize = finalize;
     object_class->dispose = dispose;
+
+    klass->delete = sms_delete;
+    klass->delete_finish = sms_delete_finish;
 
     properties[PROP_CONNECTION] =
         g_param_spec_object (MM_SMS_CONNECTION,

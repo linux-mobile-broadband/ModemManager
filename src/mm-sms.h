@@ -51,6 +51,14 @@ struct _MMSms {
 
 struct _MMSmsClass {
     MmGdbusSmsSkeletonClass parent;
+
+    /* Delete the SMS */
+    void (* delete) (MMSms *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data);
+    gboolean (* delete_finish) (MMSms *self,
+                                GAsyncResult *res,
+                                GError **error);
 };
 
 GType mm_sms_get_type (void);
@@ -81,11 +89,12 @@ guint        mm_sms_get_multipart_reference (MMSms *self);
 gboolean     mm_sms_multipart_is_complete   (MMSms *self);
 gboolean     mm_sms_multipart_is_assembled  (MMSms *self);
 
-void     mm_sms_delete_parts        (MMSms *self,
-                                     GAsyncReadyCallback callback,
-                                     gpointer user_data);
-gboolean mm_sms_delete_parts_finish (MMSms *self,
-                                     GAsyncResult *res,
-                                     GError **error);
+
+void     mm_sms_delete        (MMSms *self,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data);
+gboolean mm_sms_delete_finish (MMSms *self,
+                               GAsyncResult *res,
+                               GError **error);
 
 #endif /* MM_SMS_H */

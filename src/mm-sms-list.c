@@ -87,13 +87,13 @@ mm_sms_list_delete_sms_finish (MMSmsList *self,
 }
 
 static void
-delete_parts_ready (MMSms *sms,
-                    GAsyncResult *res,
-                    GSimpleAsyncResult *simple)
+delete_ready (MMSms *sms,
+              GAsyncResult *res,
+              GSimpleAsyncResult *simple)
 {
     GError *error = NULL;
 
-    if (!mm_sms_delete_parts_finish (sms, res, &error))
+    if (!mm_sms_delete_finish (sms, res, &error))
         /* We report the error, but we really get the SMS removed */
         g_simple_async_result_take_error (simple, error);
     else
@@ -150,9 +150,9 @@ mm_sms_list_delete_sms (MMSmsList *self,
     sms = l->data;
     self->priv->list = g_list_delete_link (self->priv->list, l);
 
-    mm_sms_delete_parts (sms,
-                         (GAsyncReadyCallback)delete_parts_ready,
-                         result);
+    mm_sms_delete (sms,
+                   (GAsyncReadyCallback)delete_ready,
+                   result);
 
     /* We do remove here our last reference to the SMS object. The
      * async method will keep its own while the operation is ongoing. */
