@@ -248,17 +248,78 @@ mm_sms_part_free (MMSmsPart *self)
         return self->name;                    \
     }
 
+#define PART_SET_UINT_FUNC(name)              \
+    void                                      \
+    mm_sms_part_set_##name (MMSmsPart *self,  \
+                            guint value)      \
+    {                                         \
+        self->name = value;                   \
+    }
+
+#define PART_SET_TAKE_STR_FUNC(name)             \
+    void                                         \
+    mm_sms_part_set_##name (MMSmsPart *self,     \
+                            const gchar *value)  \
+    {                                            \
+        g_free (self->name);                     \
+        self->name = g_strdup (value);           \
+    }                                            \
+                                                 \
+    void                                         \
+    mm_sms_part_take_##name (MMSmsPart *self,    \
+                             gchar *value)       \
+    {                                            \
+        g_free (self->name);                     \
+        self->name = value;                      \
+    }
+
 PART_GET_FUNC (guint, index)
 PART_GET_FUNC (const gchar *, smsc)
+PART_SET_TAKE_STR_FUNC (smsc)
 PART_GET_FUNC (const gchar *, number)
+PART_SET_TAKE_STR_FUNC (number)
 PART_GET_FUNC (const gchar *, timestamp)
-PART_GET_FUNC (guint, concat_reference)
+PART_SET_TAKE_STR_FUNC (timestamp)
 PART_GET_FUNC (guint, concat_max)
+PART_SET_UINT_FUNC (concat_max)
 PART_GET_FUNC (guint, concat_sequence)
+PART_SET_UINT_FUNC (concat_sequence)
 PART_GET_FUNC (const gchar *, text)
-PART_GET_FUNC (const GByteArray *, data)
+PART_SET_TAKE_STR_FUNC (text)
 PART_GET_FUNC (guint, data_coding_scheme)
+PART_SET_UINT_FUNC (data_coding_scheme)
 PART_GET_FUNC (guint, class)
+PART_SET_UINT_FUNC (class)
+
+PART_GET_FUNC (guint, concat_reference)
+
+void
+mm_sms_part_set_concat_reference (MMSmsPart *self,
+                                  guint value)
+{
+    self->should_concat = TRUE;
+    self->concat_reference = value;
+}
+
+PART_GET_FUNC (const GByteArray *, data)
+
+void
+mm_sms_part_set_data (MMSmsPart *self,
+                      GByteArray *value)
+{
+    if (self->data)
+        g_byte_array_unref (self->data);
+    self->data = g_byte_array_ref (value);
+}
+
+void
+mm_sms_part_take_data (MMSmsPart *self,
+                       GByteArray *value)
+{
+    if (self->data)
+        g_byte_array_unref (self->data);
+    self->data = value;
+}
 
 gboolean
 mm_sms_part_should_concat (MMSmsPart *self)
@@ -267,9 +328,20 @@ mm_sms_part_should_concat (MMSmsPart *self)
 }
 
 MMSmsPart *
-mm_sms_part_new (guint index,
-                 const gchar *hexpdu,
-                 GError **error)
+mm_sms_part_new (guint index)
+{
+    MMSmsPart *sms_part;
+
+    sms_part = g_slice_new0 (MMSmsPart);
+    sms_part->index = index;
+
+    return sms_part;
+}
+
+MMSmsPart *
+mm_sms_part_new_from_pdu (guint index,
+                          const gchar *hexpdu,
+                          GError **error)
 {
     MMSmsPart *sms_part;
     gsize pdu_len;
@@ -279,6 +351,7 @@ mm_sms_part_new (guint index,
             tp_pid_offset, tp_dcs_offset, user_data_offset, user_data_len,
             user_data_len_offset, bit_offset;
     SmsEncoding user_data_encoding;
+    GByteArray *raw;
 
     /* Convert PDU from hex to binary */
     pdu = (guint8 *) utils_hexstr2bin (hexpdu, &pdu_len);
@@ -360,12 +433,14 @@ mm_sms_part_new (guint index,
     }
 
     /* Create the new MMSmsPart */
-    sms_part = g_slice_new0 (MMSmsPart);
-    sms_part->index = index;
-    sms_part->smsc = sms_decode_address (&pdu[1], 2 * (pdu[0] - 1));
-    sms_part->number = sms_decode_address (&pdu[msg_start_offset + 2],
-                                           pdu[msg_start_offset + 1]);
-    sms_part->timestamp = sms_decode_timestamp (&pdu[tp_dcs_offset + 1]);
+    sms_part = mm_sms_part_new (index);
+    mm_sms_part_take_smsc (sms_part,
+                           sms_decode_address (&pdu[1], 2 * (pdu[0] - 1)));
+    mm_sms_part_take_number (sms_part,
+                             sms_decode_address (&pdu[msg_start_offset + 2],
+                                                 pdu[msg_start_offset + 1]));
+    mm_sms_part_take_timestamp (sms_part,
+                                sms_decode_timestamp (&pdu[tp_dcs_offset + 1]));
 
     bit_offset = 0;
     if (pdu[msg_start_offset] & SMS_TP_UDHI) {
@@ -390,10 +465,12 @@ mm_sms_part_new (guint index,
                         pdu[offset + 2] > pdu[offset + 1])
                         break;
 
-                    sms_part->should_concat = TRUE;
-                    sms_part->concat_reference = pdu[offset];
-                    sms_part->concat_max = pdu[offset + 1];
-                    sms_part->concat_sequence = pdu[offset + 2];
+                    mm_sms_part_set_concat_reference (sms_part,
+                                                      pdu[offset]);
+                    mm_sms_part_set_concat_max (sms_part,
+                                                pdu[offset + 1]);
+                    mm_sms_part_set_concat_sequence (sms_part,
+                                                     pdu[offset + 2]);
                     break;
                 case 0x08:
                     /* Concatenated short message, 16-bit reference */
@@ -401,10 +478,12 @@ mm_sms_part_new (guint index,
                         pdu[offset + 3] > pdu[offset + 2])
                         break;
 
-                    sms_part->should_concat = TRUE;
-                    sms_part->concat_reference = (pdu[offset] << 8) | pdu[offset + 1];
-                    sms_part->concat_max = pdu[offset + 2];
-                    sms_part->concat_sequence = pdu[offset + 3];
+                    mm_sms_part_set_concat_reference (sms_part,
+                                                      (pdu[offset] << 8) | pdu[offset + 1]);
+                    mm_sms_part_set_concat_max (sms_part,
+                                                pdu[offset + 2]);
+                    mm_sms_part_set_concat_sequence (sms_part,
+                                                     pdu[offset + 3]);
                     break;
             }
 
@@ -432,21 +511,24 @@ mm_sms_part_new (guint index,
         /* 8-bit encoding is usually binary data, and we have no idea what
          * actual encoding the data is in so we can't convert it.
          */
-        sms_part->text = g_strdup ("");
+        mm_sms_part_set_text (sms_part, "");
     } else {
         /* Otherwise if it's 7-bit or UCS2 we can decode it */
-        sms_part->text  = sms_decode_text (&pdu[user_data_offset], user_data_len,
-                                           user_data_encoding, bit_offset);
+        mm_sms_part_take_text (sms_part,
+                               sms_decode_text (&pdu[user_data_offset], user_data_len,
+                                                user_data_encoding, bit_offset));
         g_warn_if_fail (sms_part->text != NULL);
     }
 
     /* Add the raw PDU data */
-    sms_part->data = g_byte_array_sized_new (user_data_len);
-    g_byte_array_append (sms_part->data, &pdu[user_data_offset], user_data_len);
-    sms_part->data_coding_scheme = pdu[tp_dcs_offset] & 0xFF;
+    raw = g_byte_array_sized_new (user_data_len);
+    g_byte_array_append (raw, &pdu[user_data_offset], user_data_len);
+    mm_sms_part_take_data (sms_part, raw);
+    mm_sms_part_set_data_coding_scheme (sms_part, pdu[tp_dcs_offset] & 0xFF);
 
     if (pdu[tp_dcs_offset] & SMS_DCS_CLASS_VALID)
-        sms_part->class = pdu[tp_dcs_offset] & SMS_DCS_CLASS_MASK;
+        mm_sms_part_set_class (sms_part,
+                               pdu[tp_dcs_offset] & SMS_DCS_CLASS_MASK);
 
     g_free (pdu);
 
