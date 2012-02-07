@@ -186,10 +186,10 @@ take_singlepart (MMSmsList *self,
     MMSms *sms;
     GError *error = NULL;
 
-    sms = mm_sms_new (self->priv->modem,
-                      received,
-                      part,
-                      &error);
+    sms = mm_sms_singlepart_new (self->priv->modem,
+                                 received,
+                                 part,
+                                 &error);
     if (!sms) {
         mm_warn ("Couldn't create single-part SMS: '%s'", error->message);
         g_error_free (error);

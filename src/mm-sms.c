@@ -413,10 +413,10 @@ mm_sms_multipart_take_part (MMSms *self,
 }
 
 MMSms *
-mm_sms_new (MMBaseModem *modem,
-            gboolean received,
-            MMSmsPart *part,
-            GError **error)
+mm_sms_singlepart_new (MMBaseModem *modem,
+                       gboolean received,
+                       MMSmsPart *part,
+                       GError **error)
 {
     MMSms *self;
 

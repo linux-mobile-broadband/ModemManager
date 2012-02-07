@@ -55,10 +55,10 @@ struct _MMSmsClass {
 
 GType mm_sms_get_type (void);
 
-MMSms *mm_sms_new (MMBaseModem *modem,
-                   gboolean received,
-                   MMSmsPart *part,
-                   GError **error);
+MMSms *mm_sms_singlepart_new (MMBaseModem *modem,
+                              gboolean received,
+                              MMSmsPart *part,
+                              GError **error);
 
 MMSms    *mm_sms_multipart_new       (MMBaseModem *modem,
                                       gboolean received,
