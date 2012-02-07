@@ -151,6 +151,7 @@ mm-common-helpers.c: mm-errors-types.h mm-enums-types.h
 mm-common-simple-properties.c: mm-errors-types.h mm-enums-types.h
 mm-common-connect-properties.c: mm-errors-types.h
 mm-common-bearer-properties.c: mm-errors-types.h
+mm-common-sms-properties.c: mm-errors-types.h
 mm-common-bearer-ip-config.c: mm-errors-types.h
 mm-common-location-3gpp.c: mm-errors-types.h
 mm-errors-quarks.c: mm-errors-types.h
@@ -163,6 +164,7 @@ include_HEADERS = \
 	mm-common-simple-properties.h \
 	mm-common-connect-properties.h \
 	mm-common-bearer-properties.h \
+	mm-common-sms-properties.h \
 	mm-common-bearer-ip-config.h \
 	mm-common-location-3gpp.h \
 	mm-gdbus-manager.h \
@@ -183,6 +185,8 @@ libmm_common_la_SOURCES = \
 	mm-common-connect-properties.c \
 	mm-common-bearer-properties.h \
 	mm-common-bearer-properties.c \
+	mm-common-sms-properties.h \
+	mm-common-sms-properties.c \
 	mm-common-bearer-ip-config.h \
 	mm-common-bearer-ip-config.c \
 	mm-common-location-3gpp.h \
