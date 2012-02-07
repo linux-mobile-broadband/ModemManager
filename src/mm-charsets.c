@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "mm-charsets.h"
 #include "mm-utils.h"
@@ -672,3 +673,94 @@ gsm_pack (const guint8 *src,
     return packed;
 }
 
+/* We do all our best to get the given string, which is possibly given in the
+ * specified charset, to UTF8. It may happen that the given string is really
+ * the hex representation of the charset-encoded string, so we need to cope with
+ * that case. */
+gchar *
+mm_charset_take_and_convert_to_utf8 (gchar *str,
+                                     MMModemCharset charset)
+{
+    gchar *utf8 = NULL;
+
+    switch (charset) {
+    case MM_MODEM_CHARSET_UNKNOWN:
+        g_warn_if_reached ();
+        utf8 = str;
+        break;
+
+    case MM_MODEM_CHARSET_HEX:
+        /* We'll assume that the HEX string is really valid ASCII at the end */
+        utf8 = str;
+        break;
+
+    case MM_MODEM_CHARSET_GSM:
+    case MM_MODEM_CHARSET_8859_1:
+    case MM_MODEM_CHARSET_PCCP437:
+    case MM_MODEM_CHARSET_PCDN: {
+        const gchar *iconv_from;
+        GError *error = NULL;
+
+        iconv_from = charset_iconv_from (charset);
+        utf8 = g_convert (str, strlen (str),
+                          "UTF-8//TRANSLIT", iconv_from,
+                          NULL, NULL, &error);
+        if (!utf8 || error) {
+            g_clear_error (&error);
+            utf8 = NULL;
+        }
+
+        g_free (str);
+        break;
+    }
+
+    case MM_MODEM_CHARSET_UCS2: {
+        gsize len;
+        gboolean possibly_hex = TRUE;
+
+        /* If the string comes in hex-UCS-2, len needs to be a multiple of 4 */
+        len = strlen (str);
+        if ((len < 4) || ((len % 4) != 0))
+            possibly_hex = FALSE;
+        else {
+            const gchar *p = str;
+
+            /* All chars in the string must be hex */
+            while (*p && possibly_hex)
+                possibly_hex = isxdigit (*p++);
+        }
+
+        /* If we get UCS-2, we expect the HEX representation of the string */
+        if (possibly_hex) {
+            utf8 = mm_modem_charset_hex_to_utf8 (str, charset);
+            if (!utf8) {
+                /* If we couldn't convert the string as HEX-UCS-2, try to see if
+                 * the string is valid UTF-8 itself. */
+                utf8 = str;
+            } else
+                g_free (str);
+        } else
+            /* If we already know it's not hex, try to use the string as it is */
+            utf8 = str;
+
+        break;
+    }
+
+    /* If the given charset is ASCII or UTF8, we really expect the final string
+     * already here */
+    case MM_MODEM_CHARSET_IRA:
+    case MM_MODEM_CHARSET_UTF8:
+        utf8 = str;
+        break;
+    }
+
+    /* Validate UTF-8 always before returning. This result will be exposed in DBus
+     * very likely... */
+    if (!g_utf8_validate (utf8, -1, NULL)) {
+        /* Better return NULL than an invalid UTF-8 string */
+        g_free (utf8);
+        utf8 = NULL;
+    }
+
+    return utf8;
+}
