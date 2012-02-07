@@ -2953,35 +2953,6 @@ reg_info_updated (MMGenericGsm *self,
     }
 }
 
-static void
-convert_operator_from_ucs2 (char **operator)
-{
-    const char *p;
-    char *converted;
-    size_t len;
-
-    g_return_if_fail (operator != NULL);
-    g_return_if_fail (*operator != NULL);
-
-    p = *operator;
-    len = strlen (p);
-
-    /* Len needs to be a multiple of 4 for UCS2 */
-    if ((len < 4) || ((len % 4) != 0))
-        return;
-
-    while (*p) {
-        if (!isxdigit (*p++))
-            return;
-    }
-
-    converted = mm_modem_charset_hex_to_utf8 (*operator, MM_MODEM_CHARSET_UCS2);
-    if (converted) {
-        g_free (*operator);
-        *operator = converted;
-    }
-}
-
 static char *
 parse_operator (const char *reply, MMModemCharset cur_charset)
 {
@@ -3011,7 +2982,7 @@ parse_operator (const char *reply, MMModemCharset cur_charset)
          * character set.
          */
         if (cur_charset == MM_MODEM_CHARSET_UCS2)
-            convert_operator_from_ucs2 (&operator);
+            operator = mm_charset_take_and_convert_to_utf8 (operator, MM_MODEM_CHARSET_UCS2);
 
         /* Ensure the operator name is valid UTF-8 so that we can send it
          * through D-Bus and such.
