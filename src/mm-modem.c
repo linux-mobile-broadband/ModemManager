@@ -323,6 +323,8 @@ get_ip4_done (MMModem *modem,
         value_array_add_uint (array, dns3);
 
         dbus_g_method_return (context, array);
+
+        g_value_array_free (array);
     }
 }
 
@@ -411,6 +413,8 @@ info_call_done (MMModem *self,
         g_value_unset (&value);
 
         dbus_g_method_return (context, array);
+
+        g_value_array_free (array);
     }
 }
 
