@@ -71,8 +71,14 @@ mm_sms_list_get_paths (MMSmsList *self)
     path_list = g_new0 (gchar *,
                         1 + g_list_length (self->priv->list));
 
-    for (i = 0, l = self->priv->list; l; l = g_list_next (l))
-        path_list[i++] = g_strdup (mm_sms_get_path (MM_SMS (l->data)));
+    for (i = 0, l = self->priv->list; l; l = g_list_next (l)) {
+        const gchar *path;
+
+        /* Don't try to add NULL paths (not yet exported SMS objects) */
+        path = mm_sms_get_path (MM_SMS (l->data));
+        if (path)
+            path_list[i++] = g_strdup (path);
+    }
 
     return path_list;
 }
@@ -115,7 +121,7 @@ static guint
 cmp_sms_by_path (MMSms *sms,
                  const gchar *path)
 {
-    return strcmp (mm_sms_get_path (sms), path);
+    return g_strcmp0 (mm_sms_get_path (sms), path);
 }
 
 void
