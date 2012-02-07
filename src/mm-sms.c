@@ -445,6 +445,14 @@ mm_sms_multipart_take_part (MMSms *self,
 }
 
 MMSms *
+mm_sms_new (MMBaseModem *modem)
+{
+    return MM_SMS (g_object_new (MM_TYPE_SMS,
+                                 MM_SMS_MODEM, modem,
+                                 NULL));
+}
+
+MMSms *
 mm_sms_singlepart_new (MMBaseModem *modem,
                        gboolean received,
                        MMSmsPart *part,
@@ -452,12 +460,12 @@ mm_sms_singlepart_new (MMBaseModem *modem,
 {
     MMSms *self;
 
-    self = g_object_new (MM_TYPE_SMS,
-                         MM_SMS_MODEM, modem,
-                         "state", (received ?
-                                   MM_MODEM_SMS_STATE_RECEIVED :
-                                   MM_MODEM_SMS_STATE_STORED),
-                         NULL);
+    self = mm_sms_new (modem);
+    g_object_set (self,
+                  "state", (received ?
+                            MM_MODEM_SMS_STATE_RECEIVED :
+                            MM_MODEM_SMS_STATE_STORED),
+                  NULL);
 
     /* Keep the single part in the list */
     self->priv->parts = g_list_prepend (self->priv->parts, part);
@@ -481,20 +489,44 @@ mm_sms_multipart_new (MMBaseModem *modem,
 {
     MMSms *self;
 
-    self = g_object_new (MM_TYPE_SMS,
-                         MM_SMS_MODEM,               modem,
-                         MM_SMS_IS_MULTIPART,        TRUE,
-                         MM_SMS_MAX_PARTS,           max_parts,
-                         MM_SMS_MULTIPART_REFERENCE, reference,
-                         "state", (received ?
-                                   MM_MODEM_SMS_STATE_RECEIVED :
-                                   MM_MODEM_SMS_STATE_STORED),
-                         NULL);
+    self = mm_sms_new (modem);
+    g_object_set (self,
+                  MM_SMS_IS_MULTIPART,        TRUE,
+                  MM_SMS_MAX_PARTS,           max_parts,
+                  MM_SMS_MULTIPART_REFERENCE, reference,
+                  "state", (received ?
+                            MM_MODEM_SMS_STATE_RECEIVED :
+                            MM_MODEM_SMS_STATE_STORED),
+                  NULL);
 
     if (!mm_sms_multipart_take_part (self, first_part, error))
         g_clear_object (&self);
 
     return self;
+}
+
+MMSms *
+mm_sms_user_new (MMBaseModem *modem,
+                 const gchar *text,
+                 const gchar *number,
+                 const gchar *smsc,
+                 guint validity,
+                 guint class,
+                 GError **error)
+{
+    MMSmsPart *part;
+
+    part = mm_sms_part_new (0);
+    mm_sms_part_set_text (part, text);
+    mm_sms_part_set_number (part, number);
+    mm_sms_part_set_smsc (part, smsc);
+    mm_sms_part_set_validity (part, validity);
+    mm_sms_part_set_class (part, class);
+
+    return mm_sms_singlepart_new (modem,
+                                  FALSE,
+                                  part,
+                                  error);
 }
 
 /*****************************************************************************/

@@ -6427,6 +6427,7 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
     iface->setup_unsolicited_events_finish = modem_messaging_setup_cleanup_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = modem_messaging_cleanup_unsolicited_events;
     iface->cleanup_unsolicited_events_finish = modem_messaging_setup_cleanup_unsolicited_events_finish;
+    iface->create_sms = mm_sms_new;
 }
 
 static void

@@ -21,6 +21,7 @@
 
 #include "mm-at-serial-port.h"
 #include "mm-sms-part.h"
+#include "mm-sms.h"
 
 #define MM_TYPE_IFACE_MODEM_MESSAGING               (mm_iface_modem_messaging_get_type ())
 #define MM_IFACE_MODEM_MESSAGING(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_IFACE_MODEM_MESSAGING, MMIfaceModemMessaging))
@@ -75,6 +76,9 @@ struct _MMIfaceModemMessaging {
     gboolean (*load_initial_sms_parts_finish) (MMIfaceModemMessaging *self,
                                                GAsyncResult *res,
                                                GError **error);
+
+    /* Create SMS objects */
+    MMSms * (* create_sms) (MMBaseModem *self);
 };
 
 GType mm_iface_modem_messaging_get_type (void);

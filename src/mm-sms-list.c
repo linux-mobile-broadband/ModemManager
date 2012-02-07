@@ -23,6 +23,7 @@
 #include <ModemManager.h>
 #include <libmm-common.h>
 
+#include "mm-iface-modem-messaging.h"
 #include "mm-marshal.h"
 #include "mm-sms-list.h"
 #include "mm-sms.h"
@@ -190,6 +191,7 @@ take_singlepart (MMSmsList *self,
                                  received,
                                  part,
                                  &error);
+
     if (!sms) {
         mm_warn ("Couldn't create single-part SMS: '%s'", error->message);
         g_error_free (error);

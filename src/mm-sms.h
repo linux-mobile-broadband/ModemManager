@@ -63,6 +63,17 @@ struct _MMSmsClass {
 
 GType mm_sms_get_type (void);
 
+/* This one can be overriden by plugins */
+MMSms *mm_sms_new (MMBaseModem *modem);
+
+MMSms *mm_sms_user_new (MMBaseModem *modem,
+                        const gchar *text,
+                        const gchar *number,
+                        const gchar *smsc,
+                        guint validity,
+                        guint class,
+                        GError **error);
+
 MMSms *mm_sms_singlepart_new (MMBaseModem *modem,
                               gboolean received,
                               MMSmsPart *part,
