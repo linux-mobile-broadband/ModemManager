@@ -5068,7 +5068,7 @@ text_parse_cmgl (MMGenericGsm *self, const char *response, GError **error)
     priv = MM_GENERIC_GSM_GET_PRIVATE (self);
 
     /* +CMGL: <index>,<stat>,<oa/da>,[alpha],<scts><CR><LF><data><CR><LF> */
-    r = g_regex_new ("\\+CMGL:\\s*(\\d+)\\s*,\\s*([^,]*),\\s*([^,]*),\\s*([^,]*),\\s*([^\\r\\n]*)\\r\\n(.*)", 0, 0, NULL);
+    r = g_regex_new ("\\+CMGL:\\s*(\\d+)\\s*,\\s*([^,]*),\\s*([^,]*),\\s*([^,]*),\\s*([^\\r\\n]*)\\r\\n([^\\r\\n]*)", 0, 0, NULL);
     g_assert (r);
 
     if (!g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, NULL)) {
