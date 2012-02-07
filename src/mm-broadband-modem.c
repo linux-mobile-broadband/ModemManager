@@ -3573,9 +3573,8 @@ cmgf_format_check_ready (MMBroadbandModem *self,
         g_error_free (error);
     }
 
-    /* FIXME: we currently default to using PDU modem always, until we provide
-     * full support for text mode. */
-    self->priv->sms_use_pdu_mode = TRUE;
+    /* If text mode is supported, default to use it for now; othewise try PDU mode */
+    self->priv->sms_use_pdu_mode = !sms_text_supported;
 
     self->priv->sms_supported_modes_checked = TRUE;
 
@@ -3671,7 +3670,7 @@ sms_part_ready (MMBroadbandModem *self,
         return;
     }
 
-    part = mm_sms_part_new (ctx->idx, pdu, &error);
+    part = mm_sms_part_new_from_pdu (ctx->idx, pdu, &error);
     if (part) {
         mm_dbg ("Correctly parsed PDU (%d)", ctx->idx);
         mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
@@ -3797,10 +3796,154 @@ modem_messaging_load_initial_sms_parts_finish (MMIfaceModemMessaging *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
+static gboolean
+get_match_uint (GMatchInfo *m,
+                guint match_index,
+                guint *out_val)
+{
+    gchar *s;
+    gulong num;
+
+    g_return_val_if_fail (out_val != NULL, FALSE);
+
+    s = g_match_info_fetch (m, match_index);
+    g_return_val_if_fail (s != NULL, FALSE);
+
+    errno = 0;
+    num = strtoul (s, NULL, 10);
+    g_free (s);
+
+    if (num <= 1000 && errno == 0) {
+        *out_val = (guint) num;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static gchar *
+get_match_string_unquoted (GMatchInfo *m,
+                           guint match_index)
+{
+    gchar *s, *p, *q, *ret = NULL;
+
+    q = s = g_match_info_fetch (m, match_index);
+    g_return_val_if_fail (s != NULL, FALSE);
+
+    /* remove quotes */
+    if (*q == '"')
+        q++;
+    p = strchr (q, '"');
+    if (p)
+        *p = '\0';
+    if (*q)
+        ret = g_strdup (q);
+    g_free (s);
+    return ret;
+}
+
 static void
-sms_part_list_ready (MMBroadbandModem *self,
-                     GAsyncResult *res,
-                     GSimpleAsyncResult *simple)
+sms_text_part_list_ready (MMBroadbandModem *self,
+                          GAsyncResult *res,
+                          GSimpleAsyncResult *simple)
+{
+    GRegex *r;
+    GMatchInfo *match_info = NULL;
+    const gchar *response;
+    GError *error = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    /* +CMGL: <index>,<stat>,<oa/da>,[alpha],<scts><CR><LF><data><CR><LF> */
+    r = g_regex_new ("\\+CMGL:\\s*(\\d+)\\s*,\\s*([^,]*),\\s*([^,]*),\\s*([^,]*),\\s*([^\\r\\n]*)\\r\\n(.*)\\r\\n",
+                     0, 0, NULL);
+    g_assert (r);
+
+    if (!g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, NULL)) {
+        g_simple_async_result_set_error (simple,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_INVALID_ARGS,
+                                         "Couldn't parse SMS list response");
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        g_regex_unref (r);
+        return;
+    }
+
+    while (g_match_info_matches (match_info)) {
+        MMSmsPart *part;
+        guint matches, idx;
+        gchar *number = NULL, *timestamp, *text, *ucs2_text;
+        gsize ucs2_len = 0;
+        GByteArray *raw;
+
+        matches = g_match_info_get_match_count (match_info);
+        if (matches != 7) {
+            mm_dbg ("Failed to match entire CMGL response (count %d)", matches);
+            goto next;
+        }
+
+        if (!get_match_uint (match_info, 1, &idx)) {
+            mm_dbg ("Failed to convert message index");
+            goto next;
+        }
+
+        /* <stat is ignored for now> */
+
+        number = get_match_string_unquoted (match_info, 3);
+        if (!number) {
+            mm_dbg ("Failed to get message sender number");
+            goto next;
+        }
+
+        timestamp = get_match_string_unquoted (match_info, 5);
+
+        text = g_match_info_fetch (match_info, 6);
+        /* FIXME: Text is going to be in the character set we've set with +CSCS */
+
+        /* The raw SMS data can only be GSM, UCS2, or unknown (8-bit), so we
+         * need to convert to UCS2 here.
+         */
+        ucs2_text = g_convert (text, -1, "UCS-2BE//TRANSLIT", "UTF-8", NULL, &ucs2_len, NULL);
+        g_assert (ucs2_text);
+        raw = g_byte_array_sized_new (ucs2_len);
+        g_byte_array_append (raw, (const guint8 *) ucs2_text, ucs2_len);
+        g_free (ucs2_text);
+
+        /* all take() methods pass ownership of the value as well */
+        part = mm_sms_part_new (idx);
+        mm_sms_part_take_number (part, number);
+        mm_sms_part_take_timestamp (part, timestamp);
+        mm_sms_part_take_text (part, text);
+        mm_sms_part_take_data (part, raw);
+        mm_sms_part_set_data_coding_scheme (part, 2); /* DCS = UCS2 */
+        mm_sms_part_set_class (part, 0);
+
+        mm_dbg ("Correctly parsed SMS list entry (%d)", idx);
+        mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
+                                            part,
+                                            FALSE);
+next:
+        g_match_info_next (match_info, NULL);
+    }
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    /* We consider all done */
+    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+sms_pdu_part_list_ready (MMBroadbandModem *self,
+                         GAsyncResult *res,
+                         GSimpleAsyncResult *simple)
 {
     const gchar *response;
     GError *error = NULL;
@@ -3840,7 +3983,7 @@ sms_part_list_ready (MMBroadbandModem *self,
         /* Will try to keep on the loop */
         response += offset;
 
-        part = mm_sms_part_new (idx, pdu, &error);
+        part = mm_sms_part_new_from_pdu (idx, pdu, &error);
         if (part) {
             mm_dbg ("Correctly parsed PDU (%d)", idx);
             mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
@@ -3871,13 +4014,18 @@ modem_messaging_load_initial_sms_parts (MMIfaceModemMessaging *self,
                                         user_data,
                                         modem_messaging_load_initial_sms_parts);
 
-    /* Get SMS parts from ALL types (4) */
+    /* Get SMS parts from ALL types.
+     * Different command to be used if we are on Text or PDU mode */
     mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "+CMGL=4",
+                              (MM_BROADBAND_MODEM (self)->priv->sms_use_pdu_mode ?
+                               "+CMGL=4" :
+                               "+CMGL=\"ALL\""),
                               10,
                               FALSE,
                               NULL, /* cancellable */
-                              (GAsyncReadyCallback)sms_part_list_ready,
+                              (GAsyncReadyCallback) (MM_BROADBAND_MODEM (self)->priv->sms_use_pdu_mode ?
+                                                     sms_pdu_part_list_ready :
+                                                     sms_text_part_list_ready),
                               result);
 }
 
