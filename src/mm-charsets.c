@@ -160,7 +160,8 @@ mm_modem_charset_hex_to_utf8 (const char *src, MMModemCharset charset)
     g_return_val_if_fail (iconv_from != NULL, FALSE);
 
     unconverted = utils_hexstr2bin (src, &unconverted_len);
-    g_return_val_if_fail (unconverted != NULL, NULL);
+    if (!unconverted)
+        return NULL;
 
     if (charset == MM_MODEM_CHARSET_UTF8 || charset == MM_MODEM_CHARSET_IRA)
         return unconverted;
