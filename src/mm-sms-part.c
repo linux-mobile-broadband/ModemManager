@@ -222,6 +222,7 @@ struct _MMSmsPart {
     GByteArray *data;
     guint data_coding_scheme;
     guint class;
+    guint validity;
 
     gboolean should_concat;
     guint concat_reference;
@@ -290,6 +291,8 @@ PART_GET_FUNC (guint, data_coding_scheme)
 PART_SET_UINT_FUNC (data_coding_scheme)
 PART_GET_FUNC (guint, class)
 PART_SET_UINT_FUNC (class)
+PART_GET_FUNC (guint, validity)
+PART_SET_UINT_FUNC (validity)
 
 PART_GET_FUNC (guint, concat_reference)
 
