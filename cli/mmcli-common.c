@@ -512,7 +512,7 @@ mmcli_get_bearer_sync (GDBusConnection *connection,
         found = find_bearer_in_list (bearers, bearer_path);
         g_list_free_full (bearers, (GDestroyNotify) g_object_unref);
 
-        if (o_object)
+        if (found && o_object)
             *o_object = g_object_ref (object);
 
         g_object_unref (modem);
@@ -732,7 +732,7 @@ mmcli_get_sim_sync (GDBusConnection *connection,
                 exit (EXIT_FAILURE);
             }
 
-            if (o_object)
+            if (found && o_object)
                 *o_object = g_object_ref (object);
         }
 
@@ -998,7 +998,7 @@ mmcli_get_sms_sync (GDBusConnection *connection,
         found = find_sms_in_list (sms_list, sms_path);
         g_list_free_full (sms_list, (GDestroyNotify) g_object_unref);
 
-        if (o_object)
+        if (found && o_object)
             *o_object = g_object_ref (object);
 
         g_object_unref (modem);
