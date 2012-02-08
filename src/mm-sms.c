@@ -509,7 +509,7 @@ mm_sms_new_from_properties (MMBaseModem *modem,
 {
     MMSmsPart *part;
 
-    part = mm_sms_part_new (0);
+    part = mm_sms_part_new (SMS_PART_INVALID_INDEX);
     mm_sms_part_set_text (part, mm_common_sms_properties_get_text (properties));
     mm_sms_part_set_number (part, mm_common_sms_properties_get_number (properties));
     mm_sms_part_set_smsc (part, mm_common_sms_properties_get_smsc (properties));

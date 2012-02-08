@@ -22,6 +22,7 @@
 typedef struct _MMSmsPart MMSmsPart;
 
 #define SMS_MAX_PDU_LEN 344
+#define SMS_PART_INVALID_INDEX G_MAXUINT
 
 MMSmsPart *mm_sms_part_new  (guint index);
 MMSmsPart *mm_sms_part_new_from_pdu  (guint index,
