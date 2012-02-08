@@ -40,6 +40,8 @@ libmm_glib_la_SOURCES = \
 	mm-sms-properties.c \
 	mm-sms.h \
 	mm-sms.c \
+	mm-modem-messaging.h \
+	mm-modem-messaging.c \
 	mm-bearer-properties.h \
 	mm-bearer-properties.c \
 	mm-bearer-ip-config.h \
