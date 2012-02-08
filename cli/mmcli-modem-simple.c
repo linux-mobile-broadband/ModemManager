@@ -322,7 +322,7 @@ get_modem_ready (GObject      *source,
 
         properties = mm_modem_simple_connect_properties_new_from_string (connect_str, &error);
         if (!properties) {
-            g_printerr ("Error parsing connect string: '%s'", error->message);
+            g_printerr ("Error parsing connect string: '%s'\n", error->message);
             exit (EXIT_FAILURE);
         }
 

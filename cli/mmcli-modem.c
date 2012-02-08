@@ -842,7 +842,7 @@ get_modem_ready (GObject      *source,
 
         properties = mm_bearer_properties_new_from_string (create_bearer_str, &error);
         if (!properties) {
-            g_printerr ("Error parsing properties string: '%s'", error->message);
+            g_printerr ("Error parsing properties string: '%s'\n", error->message);
             exit (EXIT_FAILURE);
         }
 
@@ -1001,7 +1001,7 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
 
         properties = mm_bearer_properties_new_from_string (create_bearer_str, &error);
         if (!properties) {
-            g_printerr ("Error parsing properties string: '%s'", error->message);
+            g_printerr ("Error parsing properties string: '%s'\n", error->message);
             exit (EXIT_FAILURE);
         }
 

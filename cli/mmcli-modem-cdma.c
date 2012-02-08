@@ -111,7 +111,7 @@ ensure_modem_cdma (void)
     if (ctx->modem_cdma)
         return;
 
-    g_printerr ("error: modem has no CDMA capabilities");
+    g_printerr ("error: modem has no CDMA capabilities\n");
     exit (EXIT_FAILURE);
 }
 

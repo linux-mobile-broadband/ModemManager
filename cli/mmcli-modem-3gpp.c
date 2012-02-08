@@ -164,7 +164,7 @@ ensure_modem_3gpp (void)
     if (ctx->modem_3gpp)
         return;
 
-    g_printerr ("error: modem has no 3GPP capabilities");
+    g_printerr ("error: modem has no 3GPP capabilities\n");
     exit (EXIT_FAILURE);
 }
 
@@ -174,7 +174,7 @@ ensure_modem_3gpp_ussd (void)
     if (ctx->modem_3gpp_ussd)
         return;
 
-    g_printerr ("error: modem has no USSD capabilities");
+    g_printerr ("error: modem has no USSD capabilities\n");
     exit (EXIT_FAILURE);
 }
 

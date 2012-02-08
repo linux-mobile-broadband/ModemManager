@@ -123,7 +123,7 @@ ensure_modem_location (void)
     if (ctx->modem_location)
         return;
 
-    g_printerr ("error: modem has no location capabilities");
+    g_printerr ("error: modem has no location capabilities\n");
     exit (EXIT_FAILURE);
 }
 

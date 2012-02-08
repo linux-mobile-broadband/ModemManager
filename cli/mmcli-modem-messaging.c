@@ -123,7 +123,7 @@ ensure_modem_messaging (void)
     if (ctx->modem_messaging)
         return;
 
-    g_printerr ("error: modem has no messaging capabilities");
+    g_printerr ("error: modem has no messaging capabilities\n");
     exit (EXIT_FAILURE);
 }
 
@@ -265,7 +265,7 @@ get_modem_ready (GObject      *source,
 
         properties = mm_sms_properties_new_from_string (create_str, &error);
         if (!properties) {
-            g_printerr ("Error parsing properties string: '%s'", error->message);
+            g_printerr ("Error parsing properties string: '%s'\n", error->message);
             exit (EXIT_FAILURE);
         }
 
@@ -342,7 +342,7 @@ mmcli_modem_messaging_run_synchronous (GDBusConnection *connection)
 
         properties = mm_sms_properties_new_from_string (create_str, &error);
         if (!properties) {
-            g_printerr ("Error parsing properties string: '%s'", error->message);
+            g_printerr ("Error parsing properties string: '%s'\n", error->message);
             exit (EXIT_FAILURE);
         }
 

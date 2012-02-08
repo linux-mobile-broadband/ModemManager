@@ -69,7 +69,7 @@ signals_handler (int signum)
         /* Ignore consecutive requests of cancellation */
         if (!g_cancellable_is_cancelled (cancellable)) {
             g_printerr ("%s\n",
-                        "cancelling the operation...");
+                        "cancelling the operation...\n");
             g_cancellable_cancel (cancellable);
         }
         return;
@@ -78,7 +78,7 @@ signals_handler (int signum)
     if (loop &&
         g_main_loop_is_running (loop)) {
         g_printerr ("%s\n",
-                    "cancelling the main loop...");
+                    "cancelling the main loop...\n");
         g_main_loop_quit (loop);
     }
 }
