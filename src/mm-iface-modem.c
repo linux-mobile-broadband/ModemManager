@@ -1886,28 +1886,26 @@ mm_iface_modem_disable_finish (MMIfaceModem *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
-#undef VOID_REPLY_READY_FN
-#define VOID_REPLY_READY_FN(NAME)                                       \
-    static void                                                         \
-    NAME##_ready (MMIfaceModem *self,                                   \
-                  GAsyncResult *res,                                    \
-                  DisablingContext *ctx)                                \
-    {                                                                   \
-        GError *error = NULL;                                           \
-                                                                        \
-        MM_IFACE_MODEM_GET_INTERFACE (self)->NAME##_finish (self, res, &error); \
-        if (error) {                                                    \
-            g_simple_async_result_take_error (ctx->result, error);      \
-            disabling_context_complete_and_free (ctx);                  \
-            return;                                                     \
-        }                                                               \
-                                                                        \
-        /* Go on to next step */                                        \
-        ctx->step++;                                                    \
-        interface_disabling_step (ctx);                                 \
+static void
+modem_power_down_ready (MMIfaceModem *self,
+                        GAsyncResult *res,
+                        DisablingContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_GET_INTERFACE (self)->modem_power_down_finish (self, res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        disabling_context_complete_and_free (ctx);
+        return;
     }
 
-VOID_REPLY_READY_FN (modem_power_down)
+    mm_dbg ("Modem properly powered down...");
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_disabling_step (ctx);
+}
 
 static void
 interface_disabling_step (DisablingContext *ctx)
@@ -1942,6 +1940,7 @@ interface_disabling_step (DisablingContext *ctx)
          * closing in order to get it really closed (open count = 1), it should
          * be safe to check whether they are really open before trying to close.
          */
+        mm_dbg ("Closing all ports...");
         if (mm_serial_port_is_open (MM_SERIAL_PORT (ctx->primary)))
             mm_serial_port_close (MM_SERIAL_PORT (ctx->primary));
         if (ctx->secondary && mm_serial_port_is_open (MM_SERIAL_PORT (ctx->secondary)))
