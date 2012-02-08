@@ -91,6 +91,20 @@ handle_delete (MmGdbusModemMessaging *skeleton,
                MMIfaceModemMessaging *self)
 {
     MMSmsList *list = NULL;
+    MMModemState modem_state;
+
+    modem_state = MM_MODEM_STATE_UNKNOWN;
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+
+    if (modem_state < MM_MODEM_STATE_ENABLED) {
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot delete SMS: device not yet enabled");
+        return TRUE;
+    }
 
     g_object_get (self,
                   MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
@@ -121,6 +135,20 @@ handle_create (MmGdbusModemMessaging *skeleton,
     MMSmsList *list = NULL;
     MMCommonSmsProperties *properties;
     MMSms *sms;
+    MMModemState modem_state;
+
+    modem_state = MM_MODEM_STATE_UNKNOWN;
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+
+    if (modem_state < MM_MODEM_STATE_ENABLED) {
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot create SMS: device not yet enabled");
+        return TRUE;
+    }
 
     /* Parse input properties */
     properties = mm_common_sms_properties_new_from_dictionary (dictionary, &error);
@@ -166,6 +194,21 @@ handle_list (MmGdbusModemMessaging *skeleton,
 {
     GStrv paths;
     MMSmsList *list = NULL;
+    MMModemState modem_state;
+
+    modem_state = MM_MODEM_STATE_UNKNOWN;
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+
+    if (modem_state < MM_MODEM_STATE_ENABLED) {
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot list SMS messages: "
+                                               "device not yet enabled");
+        return TRUE;
+    }
 
     g_object_get (self,
                   MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
