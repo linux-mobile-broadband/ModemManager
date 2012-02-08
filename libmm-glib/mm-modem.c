@@ -908,7 +908,7 @@ mm_modem_list_bearers_finish (MMModem *self,
 {
     GList *list;
 
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return NULL;
@@ -1056,7 +1056,7 @@ mm_modem_list_bearers_sync (MMModem *self,
     gchar **bearer_paths = NULL;
     guint i;
 
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
     if (!mm_gdbus_modem_call_list_bearers_sync (self,
                                                 &bearer_paths,
