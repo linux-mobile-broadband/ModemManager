@@ -755,6 +755,266 @@ mmcli_get_sim_sync (GDBusConnection *connection,
     return found;
 }
 
+typedef struct {
+    GSimpleAsyncResult *result;
+    GCancellable *cancellable;
+    gchar *sms_path;
+    MMManager *manager;
+    GList *modems;
+    MMObject *current;
+    MMSms *sms;
+} GetSmsContext;
+
+static void
+get_sms_context_free (GetSmsContext *ctx)
+{
+    if (ctx->current)
+        g_object_unref (ctx->current);
+    if (ctx->cancellable)
+        g_object_unref (ctx->cancellable);
+    if (ctx->manager)
+        g_object_unref (ctx->manager);
+    if (ctx->sms)
+        g_object_unref (ctx->sms);
+    g_list_free_full (ctx->modems, (GDestroyNotify) g_object_unref);
+    g_free (ctx->sms_path);
+    g_free (ctx);
+}
+
+static void
+get_sms_context_complete (GetSmsContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    ctx->result = NULL;
+}
+
+MMSms *
+mmcli_get_sms_finish (GAsyncResult *res,
+                      MMManager **o_manager,
+                      MMObject **o_object)
+{
+    GetSmsContext *ctx;
+
+    ctx = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    if (o_manager)
+        *o_manager = g_object_ref (ctx->manager);
+    if (o_object)
+        *o_object = g_object_ref (ctx->current);
+    return g_object_ref (ctx->sms);
+}
+
+static void look_for_sms_in_modem (GetSmsContext *ctx);
+
+static MMSms *
+find_sms_in_list (GList *list,
+                  const gchar *sms_path)
+{
+    GList *l;
+
+    for (l = list; l; l = g_list_next (l)) {
+        MMSms *sms = MM_SMS (l->data);
+
+        if (g_str_equal (mm_sms_get_path (sms), sms_path)) {
+            g_debug ("Sms found at '%s'\n", sms_path);
+            return g_object_ref (sms);
+        }
+    }
+
+    g_printerr ("error: couldn't find sms at '%s'\n", sms_path);
+    exit (EXIT_FAILURE);
+    return NULL;
+}
+
+static void
+list_sms_ready (MMModemMessaging *modem,
+                GAsyncResult *res,
+                GetSmsContext *ctx)
+{
+    GList *sms_list;
+    GError *error = NULL;
+
+    sms_list = mm_modem_messaging_list_finish (modem, res, &error);
+    if (error) {
+        g_printerr ("error: couldn't list SMS at '%s': '%s'\n",
+                    mm_modem_messaging_get_path (modem),
+                    error->message);
+        exit (EXIT_FAILURE);
+    }
+
+    ctx->sms = find_sms_in_list (sms_list, ctx->sms_path);
+    g_list_free_full (sms_list, (GDestroyNotify) g_object_unref);
+
+    /* Found! */
+    if (ctx->sms) {
+        g_simple_async_result_set_op_res_gpointer (
+            ctx->result,
+            ctx,
+            (GDestroyNotify)get_sms_context_free);
+        get_sms_context_complete (ctx);
+        return;
+    }
+
+    /* Not found, try with next modem */
+    look_for_sms_in_modem (ctx);
+}
+
+static void
+look_for_sms_in_modem (GetSmsContext *ctx)
+{
+    MMModemMessaging *modem;
+
+    if (!ctx->modems) {
+        g_printerr ("error: couldn't find SMS at '%s': 'not found in any modem'\n",
+                    ctx->sms_path);
+        exit (EXIT_FAILURE);
+    }
+
+    /* Loop looking for the sms in each modem found */
+    ctx->current = MM_OBJECT (ctx->modems->data);
+    ctx->modems = g_list_delete_link (ctx->modems, ctx->modems);
+    g_debug ("Looking for sms '%s' in modem '%s'...",
+             ctx->sms_path,
+             mm_object_get_path (ctx->current));
+
+    modem = mm_object_get_modem_messaging (ctx->current);
+    mm_modem_messaging_list (modem,
+                             ctx->cancellable,
+                             (GAsyncReadyCallback)list_sms_ready,
+                             ctx);
+    g_object_unref (modem);
+}
+
+static void
+get_sms_manager_ready (GDBusConnection *connection,
+                       GAsyncResult *res,
+                       GetSmsContext *ctx)
+{
+    ctx->manager = mmcli_get_manager_finish (res);
+    ctx->modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (ctx->manager));
+    if (!ctx->modems) {
+        g_printerr ("error: couldn't find SMS at '%s': 'no modems found'\n",
+                    ctx->sms_path);
+        exit (EXIT_FAILURE);
+    }
+
+    look_for_sms_in_modem (ctx);
+}
+
+static gchar *
+get_sms_path (const gchar *path_or_index)
+{
+    gchar *sms_path;
+
+    /* We must have a given sms specified */
+    if (!path_or_index) {
+        g_printerr ("error: no SMS was specified\n");
+        exit (EXIT_FAILURE);
+    }
+
+    /* Sms path may come in two ways: full DBus path or just sms index.
+     * If it is a sms index, we'll need to generate the DBus path ourselves */
+    if (g_str_has_prefix (path_or_index, MM_DBUS_SMS_PREFIX)) {
+        g_debug ("Assuming '%s' is the full SMS path", path_or_index);
+        sms_path = g_strdup (path_or_index);
+    } else if (g_ascii_isdigit (path_or_index[0])) {
+        g_debug ("Assuming '%s' is the SMS index", path_or_index);
+        sms_path = g_strdup_printf (MM_DBUS_SMS_PREFIX "/%s", path_or_index);
+    } else {
+        g_printerr ("error: invalid path or index string specified: '%s'\n",
+                    path_or_index);
+        exit (EXIT_FAILURE);
+    }
+
+    return sms_path;
+}
+
+void
+mmcli_get_sms (GDBusConnection *connection,
+               const gchar *path_or_index,
+               GCancellable *cancellable,
+               GAsyncReadyCallback callback,
+               gpointer user_data)
+{
+    GetSmsContext *ctx;
+
+    ctx = g_new0 (GetSmsContext, 1);
+    ctx->sms_path = get_sms_path (path_or_index);
+    if (cancellable)
+        ctx->cancellable = g_object_ref (cancellable);
+    ctx->result = g_simple_async_result_new (G_OBJECT (connection),
+                                             callback,
+                                             user_data,
+                                             mmcli_get_modem);
+    mmcli_get_manager (connection,
+                       cancellable,
+                       (GAsyncReadyCallback)get_sms_manager_ready,
+                       ctx);
+}
+
+MMSms *
+mmcli_get_sms_sync (GDBusConnection *connection,
+                    const gchar *path_or_index,
+                    MMManager **o_manager,
+                    MMObject **o_object)
+{
+    MMManager *manager;
+    GList *modems;
+    GList *l;
+    MMSms *found = NULL;
+    gchar *sms_path;
+
+    sms_path = get_sms_path (path_or_index);
+
+    manager = mmcli_get_manager_sync (connection);
+    modems = g_dbus_object_manager_get_objects (G_DBUS_OBJECT_MANAGER (manager));
+    if (!modems) {
+        g_printerr ("error: couldn't find sms at '%s': 'no modems found'\n",
+                    sms_path);
+        exit (EXIT_FAILURE);
+    }
+
+    for (l = modems; !found && l; l = g_list_next (l)) {
+        GError *error = NULL;
+        MMObject *object;
+        MMModemMessaging *modem;
+        GList *sms_list;
+
+        object = MM_OBJECT (l->data);
+        modem = mm_object_get_modem_messaging (object);
+
+        /* If this modem doesn't implement messaging, continue to next one */
+        if (!modem)
+            continue;
+
+        sms_list = mm_modem_messaging_list_sync (modem, NULL, &error);
+        if (error) {
+            g_printerr ("error: couldn't list SMS at '%s': '%s'\n",
+                        mm_modem_messaging_get_path (modem),
+                        error->message);
+            exit (EXIT_FAILURE);
+        }
+
+        found = find_sms_in_list (sms_list, sms_path);
+        g_list_free_full (sms_list, (GDestroyNotify) g_object_unref);
+
+        if (o_object)
+            *o_object = g_object_ref (object);
+
+        g_object_unref (modem);
+    }
+
+    g_list_free_full (modems, (GDestroyNotify) g_object_unref);
+    g_free (sms_path);
+
+    if (o_manager)
+        *o_manager = manager;
+    else
+        g_object_unref (manager);
+
+    return found;
+}
+
 const gchar *
 mmcli_get_state_reason_string (MMModemStateChangeReason reason)
 {
@@ -775,6 +1035,7 @@ mmcli_get_state_reason_string (MMModemStateChangeReason reason)
 static gchar *modem_str;
 static gchar *bearer_str;
 static gchar *sim_str;
+static gchar *sms_str;
 
 static GOptionEntry entries[] = {
     { "modem", 'm', 0, G_OPTION_ARG_STRING, &modem_str,
@@ -785,8 +1046,12 @@ static GOptionEntry entries[] = {
       "Specify bearer by path or index. Shows bearer information if no action specified.",
       "[PATH|INDEX]"
     },
-    { "sim", 's', 0, G_OPTION_ARG_STRING, &sim_str,
-      "Specify SIM by path or index. Shows SIM information if no action specified.",
+    { "sim", 'i', 0, G_OPTION_ARG_STRING, &sim_str,
+      "Specify SIM card by path or index. Shows SIM card information if no action specified.",
+      "[PATH|INDEX]"
+    },
+    { "sms", 's', 0, G_OPTION_ARG_STRING, &sms_str,
+      "Specify SMS by path or index. Shows SMS information if no action specified.",
       "[PATH|INDEX]"
     },
     { NULL }
@@ -824,4 +1089,10 @@ const gchar *
 mmcli_get_common_sim_string (void)
 {
     return sim_str;
+}
+
+const gchar *
+mmcli_get_common_sms_string (void)
+{
+    return sms_str;
 }
