@@ -93,8 +93,27 @@ modem_power_down_finish (MMIfaceModem *self,
                          GAsyncResult *res,
                          GError **error)
 {
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+sleep_ready (MMBaseModem *self,
+             GAsyncResult *res,
+             GSimpleAsyncResult *operation_result)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+
     /* Ignore errors */
-    return TRUE;
+    if (error) {
+        mm_dbg ("Couldn't send power down command: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
+    g_simple_async_result_complete_in_idle (operation_result);
+    g_object_unref (operation_result);
 }
 
 static void
@@ -102,10 +121,21 @@ send_sleep_mode_command (MMBroadbandModemCinterion *self,
                          GSimpleAsyncResult *operation_result)
 {
     if (self->priv->sleep_mode_cmd &&
-        self->priv->sleep_mode_cmd[0])
-        mm_base_modem_at_command_ignore_reply (MM_BASE_MODEM (self),
-                                               self->priv->sleep_mode_cmd,
-                                               5);
+        self->priv->sleep_mode_cmd[0]) {
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  self->priv->sleep_mode_cmd,
+                                  5,
+                                  FALSE,
+                                  NULL, /* cancellable */
+                                  (GAsyncReadyCallback)sleep_ready,
+                                  operation_result);
+        return;
+    }
+
+    /* No default command; just finish without sending anything */
+    g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
+    g_simple_async_result_complete_in_idle (operation_result);
+    g_object_unref (operation_result);
 }
 
 static void
