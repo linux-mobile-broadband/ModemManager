@@ -980,7 +980,7 @@ load_operator_identifier (MMSim *self,
     mm_base_modem_at_command (
         MM_BASE_MODEM (self->priv->modem),
         "+CRSM=176,28589,0,0,4",
-        3,
+        10,
         FALSE,
         NULL, /* cancellable */
         (GAsyncReadyCallback)load_operator_identifier_command_ready,
@@ -1092,7 +1092,7 @@ load_operator_name (MMSim *self,
     mm_base_modem_at_command (
         MM_BASE_MODEM (self->priv->modem),
         "+CRSM=176,28486,0,0,17",
-        3,
+        10,
         FALSE,
         NULL, /* cancellable */
         (GAsyncReadyCallback)load_operator_name_command_ready,
