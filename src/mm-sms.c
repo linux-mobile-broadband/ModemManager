@@ -71,6 +71,123 @@ struct _MMSmsPrivate {
 
 /*****************************************************************************/
 
+typedef struct {
+    MMSms *self;
+    GDBusMethodInvocation *invocation;
+} DbusCallContext;
+
+static void
+dbus_call_context_free (DbusCallContext *ctx)
+{
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static DbusCallContext *
+dbus_call_context_new (MMSms *self,
+                       GDBusMethodInvocation *invocation)
+{
+    DbusCallContext *ctx;
+
+    ctx = g_new0 (DbusCallContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->invocation = g_object_ref (invocation);
+    return ctx;
+}
+
+/*****************************************************************************/
+/* Store SMS (DBus call handling) */
+
+static void
+handle_store_ready (MMSms *self,
+                    GAsyncResult *res,
+                    DbusCallContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_SMS_GET_CLASS (self)->store_finish (self, res, &error);
+    if (error)
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else
+        mm_gdbus_sms_complete_store (MM_GDBUS_SMS (ctx->self), ctx->invocation);
+    dbus_call_context_free (ctx);
+}
+
+static gboolean
+sms_is_stored (MMSms *self)
+{
+    GList *l;
+
+    for (l = self->priv->parts; l; l = g_list_next (l)) {
+        if (mm_sms_part_get_index ((MMSmsPart *)l->data) == SMS_PART_INVALID_INDEX)
+            return FALSE;
+    }
+
+    return TRUE;
+}
+
+static gboolean
+handle_store (MMSms *self,
+              GDBusMethodInvocation *invocation)
+{
+    /* First of all, check if we already have the SMS stored. */
+    if (sms_is_stored (self))
+        mm_gdbus_sms_complete_store (MM_GDBUS_SMS (self), invocation);
+    /* If not stored, check if we do support doing it */
+    else if (MM_SMS_GET_CLASS (self)->store &&
+        MM_SMS_GET_CLASS (self)->store_finish)
+        MM_SMS_GET_CLASS (self)->store (self,
+                                        (GAsyncReadyCallback)handle_store_ready,
+                                        dbus_call_context_new (self,
+                                                               invocation));
+    else
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Storing SMS is not supported by this modem");
+    return TRUE;
+}
+
+/*****************************************************************************/
+/* Send SMS (DBus call handling) */
+
+static void
+handle_send_ready (MMSms *self,
+                   GAsyncResult *res,
+                   DbusCallContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_SMS_GET_CLASS (self)->send_finish (self, res, &error);
+    if (error)
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else
+        mm_gdbus_sms_complete_send (MM_GDBUS_SMS (ctx->self), ctx->invocation);
+    dbus_call_context_free (ctx);
+}
+
+static gboolean
+handle_send (MMSms *self,
+             GDBusMethodInvocation *invocation)
+{
+    /* Check if we do support doing it */
+    if (MM_SMS_GET_CLASS (self)->send &&
+        MM_SMS_GET_CLASS (self)->send_finish)
+        MM_SMS_GET_CLASS (self)->send (self,
+                                       (GAsyncReadyCallback)handle_send_ready,
+                                       dbus_call_context_new (self,
+                                                              invocation));
+    else
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Sending SMS is not supported by this modem");
+    return TRUE;
+}
+
+/*****************************************************************************/
+
 void
 mm_sms_export (MMSms *self)
 {
@@ -91,7 +208,15 @@ mm_sms_dbus_export (MMSms *self)
 {
     GError *error = NULL;
 
-    /* TODO: Handle method invocations */
+    /* Handle method invocations */
+    g_signal_connect (self,
+                      "handle-store",
+                      G_CALLBACK (handle_store),
+                      NULL);
+    g_signal_connect (self,
+                      "handle-send",
+                      G_CALLBACK (handle_send),
+                      NULL);
 
     if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (self),
                                            self->priv->connection,
