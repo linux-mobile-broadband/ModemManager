@@ -27,6 +27,13 @@
     <method name="Send" />
 
     <!--
+        Store:
+
+        Store the message in the device if not already done.
+    -->
+    <method name="Store" />
+
+    <!--
         State:
 
         A <link linkend="MMSmsState">MMSmsState</link> value,
