@@ -20,6 +20,7 @@ mmcli_SOURCES = \
 	mmcli-modem-cdma.c \
 	mmcli-modem-simple.c \
 	mmcli-modem-location.c \
+	mmcli-modem-messaging.c \
 	mmcli-bearer.c \
 	mmcli-sim.c \
 	mmcli-sms.c

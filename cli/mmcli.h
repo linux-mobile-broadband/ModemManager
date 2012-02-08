@@ -76,6 +76,14 @@ void          mmcli_modem_location_run_asynchronous   (GDBusConnection *connecti
 void          mmcli_modem_location_run_synchronous    (GDBusConnection *connection);
 void          mmcli_modem_location_shutdown           (void);
 
+/* Messaging group */
+GOptionGroup *mmcli_modem_messaging_get_option_group   (void);
+gboolean      mmcli_modem_messaging_options_enabled    (void);
+void          mmcli_modem_messaging_run_asynchronous   (GDBusConnection *connection,
+                                                        GCancellable    *cancellable);
+void          mmcli_modem_messaging_run_synchronous    (GDBusConnection *connection);
+void          mmcli_modem_messaging_shutdown           (void);
+
 /* Bearer group */
 GOptionGroup *mmcli_bearer_get_option_group   (void);
 gboolean      mmcli_bearer_options_enabled    (void);
