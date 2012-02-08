@@ -2058,11 +2058,11 @@ enabling_context_complete_and_free (EnablingContext *ctx)
             MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
         /* Close the ports if enabling failed */
         if (ctx->primary_open)
-            mm_serial_port_close_force (MM_SERIAL_PORT (ctx->primary));
+            mm_serial_port_close (MM_SERIAL_PORT (ctx->primary));
         if (ctx->secondary_open)
-            mm_serial_port_close_force (MM_SERIAL_PORT (ctx->secondary));
+            mm_serial_port_close (MM_SERIAL_PORT (ctx->secondary));
         if (ctx->qcdm_open)
-            mm_serial_port_close_force (MM_SERIAL_PORT (ctx->qcdm));
+            mm_serial_port_close (MM_SERIAL_PORT (ctx->qcdm));
     }
 
     g_object_unref (ctx->self);
