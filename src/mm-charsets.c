@@ -714,6 +714,9 @@ mm_charset_take_and_convert_to_utf8 (gchar *str,
 {
     gchar *utf8 = NULL;
 
+    if (!str)
+        return NULL;
+
     switch (charset) {
     case MM_MODEM_CHARSET_UNKNOWN:
         g_warn_if_reached ();
