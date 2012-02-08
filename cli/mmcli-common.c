@@ -782,12 +782,12 @@ static GOptionEntry entries[] = {
       "[PATH|INDEX]"
     },
     { "bearer", 'b', 0, G_OPTION_ARG_STRING, &bearer_str,
-      "Specify bearer by path. Shows bearer information if no action specified.",
-      "[PATH]"
+      "Specify bearer by path or index. Shows bearer information if no action specified.",
+      "[PATH|INDEX]"
     },
     { "sim", 's', 0, G_OPTION_ARG_STRING, &sim_str,
-      "Specify SIM by path. Shows SIM information if no action specified.",
-      "[PATH]"
+      "Specify SIM by path or index. Shows SIM information if no action specified.",
+      "[PATH|INDEX]"
     },
     { NULL }
 };
