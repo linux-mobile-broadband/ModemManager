@@ -92,4 +92,12 @@ void          mmcli_sim_run_asynchronous   (GDBusConnection *connection,
 void          mmcli_sim_run_synchronous    (GDBusConnection *connection);
 void          mmcli_sim_shutdown           (void);
 
+/* SMS group */
+GOptionGroup *mmcli_sms_get_option_group   (void);
+gboolean      mmcli_sms_options_enabled    (void);
+void          mmcli_sms_run_asynchronous   (GDBusConnection *connection,
+                                            GCancellable    *cancellable);
+void          mmcli_sms_run_synchronous    (GDBusConnection *connection);
+void          mmcli_sms_shutdown           (void);
+
 #endif /* __MMCLI_H__ */

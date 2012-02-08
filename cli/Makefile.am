@@ -21,7 +21,8 @@ mmcli_SOURCES = \
 	mmcli-modem-simple.c \
 	mmcli-modem-location.c \
 	mmcli-bearer.c \
-	mmcli-sim.c
+	mmcli-sim.c \
+	mmcli-sms.c
 
 mmcli_LDADD = \
 	$(MMCLI_LIBS) \
