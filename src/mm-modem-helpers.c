@@ -294,6 +294,98 @@ mm_3gpp_parse_scan_response (const gchar *reply,
 
 /*************************************************************************/
 
+static MMSmsStorage
+storage_from_str (const gchar *str)
+{
+    if (g_str_equal (str, "SM"))
+        return MM_SMS_STORAGE_SM;
+    if (g_str_equal (str, "ME"))
+        return MM_SMS_STORAGE_ME;
+    if (g_str_equal (str, "MT"))
+        return MM_SMS_STORAGE_MT;
+    if (g_str_equal (str, "SR"))
+        return MM_SMS_STORAGE_SR;
+    if (g_str_equal (str, "BM"))
+        return MM_SMS_STORAGE_BM;
+    if (g_str_equal (str, "TA"))
+        return MM_SMS_STORAGE_TA;
+    return MM_SMS_STORAGE_UNKNOWN;
+}
+
+gboolean
+mm_3gpp_parse_cpms_format_response (const gchar *reply,
+                                    GArray **mem1,
+                                    GArray **mem2,
+                                    GArray **mem3)
+{
+    GRegex *r;
+    gchar **split;
+    guint i;
+
+    g_assert (mem1 != NULL);
+    g_assert (mem2 != NULL);
+    g_assert (mem3 != NULL);
+
+    /*
+     * +CPMS: ("SM","ME"),("SM","ME"),("SM","ME")
+     */
+    split = g_strsplit_set (mm_strip_tag (reply, "+CPMS:"), "()", -1);
+    if (!split)
+        return FALSE;
+
+    r = g_regex_new ("\\s*\"([^,\\)]+)\"\\s*", 0, 0, NULL);
+    g_assert (r);
+
+    for (i = 0; split[i]; i++) {
+        GMatchInfo *match_info;
+
+        /* Got a range group to match */
+        if (g_regex_match_full (r, split[i], strlen (split[i]), 0, 0, &match_info, NULL)) {
+            GArray *array = NULL;
+
+            while (g_match_info_matches (match_info)) {
+                gchar *str;
+
+                str = g_match_info_fetch (match_info, 1);
+                if (str) {
+                    MMSmsStorage storage;
+
+                    if (!array)
+                        array = g_array_new (FALSE, FALSE, sizeof (MMSmsStorage));
+
+                    storage = storage_from_str (str);
+                    g_array_append_val (array, storage);
+                    g_free (str);
+                }
+
+                g_match_info_next (match_info, NULL);
+            }
+
+            if (!*mem1)
+                *mem1 = array;
+            else if (!*mem2)
+                *mem2 = array;
+            else if (!*mem3)
+                *mem3 = array;
+        }
+        g_match_info_free (match_info);
+
+        if (*mem3 != NULL)
+            break; /* once we got the last group, exit... */
+    }
+
+    g_strfreev (split);
+    g_regex_unref (r);
+
+    g_warn_if_fail (*mem1 != NULL);
+    g_warn_if_fail (*mem2 != NULL);
+    g_warn_if_fail (*mem3 != NULL);
+
+    return (*mem1 && *mem2 && *mem3);
+}
+
+/*************************************************************************/
+
 #define CMGF_TAG "+CMGF:"
 
 gboolean

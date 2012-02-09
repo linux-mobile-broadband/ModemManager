@@ -69,6 +69,11 @@ gboolean mm_3gpp_parse_cmgf_format_response (const gchar *reply,
                                              gboolean *sms_text_supported,
                                              GError **error);
 
+gboolean mm_3gpp_parse_cpms_format_response (const gchar *reply,
+                                             GArray **mem1,
+                                             GArray **mem2,
+                                             GArray **mem3);
+
 GRegex *mm_3gpp_ciev_regex_get (void);
 
 GRegex *mm_3gpp_cusd_regex_get (void);
