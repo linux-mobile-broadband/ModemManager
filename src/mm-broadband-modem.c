@@ -86,6 +86,9 @@ enum {
     PROP_MODEM_CDMA_EVDO_NETWORK_SUPPORTED,
     PROP_MODEM_MESSAGING_SMS_LIST,
     PROP_MODEM_MESSAGING_SMS_PDU_MODE,
+    PROP_MODEM_MESSAGING_SMS_MEM1_STORAGE,
+    PROP_MODEM_MESSAGING_SMS_MEM2_STORAGE,
+    PROP_MODEM_MESSAGING_SMS_MEM3_STORAGE,
     PROP_MODEM_SIMPLE_STATUS,
     PROP_LAST
 };
@@ -156,6 +159,9 @@ struct _MMBroadbandModemPrivate {
     GObject *modem_messaging_dbus_skeleton;
     MMBearerList *modem_messaging_sms_list;
     gboolean modem_messaging_sms_pdu_mode;
+    MMSmsStorage modem_messaging_sms_mem1_storage;
+    MMSmsStorage modem_messaging_sms_mem2_storage;
+    MMSmsStorage modem_messaging_sms_mem3_storage;
     /* Implementation helpers */
     gboolean sms_supported_modes_checked;
     GHashTable *known_sms_parts;
@@ -6242,6 +6248,15 @@ set_property (GObject *object,
     case PROP_MODEM_MESSAGING_SMS_PDU_MODE:
         self->priv->modem_messaging_sms_pdu_mode = g_value_get_boolean (value);
         break;
+    case PROP_MODEM_MESSAGING_SMS_MEM1_STORAGE:
+        self->priv->modem_messaging_sms_mem1_storage = g_value_get_enum (value);
+        break;
+    case PROP_MODEM_MESSAGING_SMS_MEM2_STORAGE:
+        self->priv->modem_messaging_sms_mem2_storage = g_value_get_enum (value);
+        break;
+    case PROP_MODEM_MESSAGING_SMS_MEM3_STORAGE:
+        self->priv->modem_messaging_sms_mem3_storage = g_value_get_enum (value);
+        break;
     case PROP_MODEM_SIMPLE_STATUS:
         g_clear_object (&self->priv->modem_simple_status);
         self->priv->modem_simple_status = g_value_dup_object (value);
@@ -6321,6 +6336,15 @@ get_property (GObject *object,
     case PROP_MODEM_MESSAGING_SMS_PDU_MODE:
         g_value_set_boolean (value, self->priv->modem_messaging_sms_pdu_mode);
         break;
+    case PROP_MODEM_MESSAGING_SMS_MEM1_STORAGE:
+        g_value_set_enum (value, self->priv->modem_messaging_sms_mem1_storage);
+        break;
+    case PROP_MODEM_MESSAGING_SMS_MEM2_STORAGE:
+        g_value_set_enum (value, self->priv->modem_messaging_sms_mem2_storage);
+        break;
+    case PROP_MODEM_MESSAGING_SMS_MEM3_STORAGE:
+        g_value_set_enum (value, self->priv->modem_messaging_sms_mem3_storage);
+        break;
     case PROP_MODEM_SIMPLE_STATUS:
         g_value_set_object (value, self->priv->modem_simple_status);
         break;
@@ -6348,6 +6372,9 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv->modem_cdma_evdo_registration_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     self->priv->modem_cdma_cdma1x_network_supported = TRUE;
     self->priv->modem_cdma_evdo_network_supported = TRUE;
+    self->priv->modem_messaging_sms_mem1_storage = MM_SMS_STORAGE_ME;
+    self->priv->modem_messaging_sms_mem2_storage = MM_SMS_STORAGE_ME;
+    self->priv->modem_messaging_sms_mem3_storage = MM_SMS_STORAGE_ME;
 }
 
 static void
@@ -6686,6 +6713,18 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_MESSAGING_SMS_PDU_MODE,
                                       MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_MESSAGING_SMS_MEM1_STORAGE,
+                                      MM_IFACE_MODEM_MESSAGING_SMS_MEM1_STORAGE);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_MESSAGING_SMS_MEM2_STORAGE,
+                                      MM_IFACE_MODEM_MESSAGING_SMS_MEM2_STORAGE);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_MESSAGING_SMS_MEM3_STORAGE,
+                                      MM_IFACE_MODEM_MESSAGING_SMS_MEM3_STORAGE);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_SIMPLE_STATUS,
