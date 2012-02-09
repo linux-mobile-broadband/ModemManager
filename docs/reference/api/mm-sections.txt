@@ -19,6 +19,7 @@ MMModemMode
 MMModemState
 MMModemStateChangeReason
 MMSmsState
+MMSmsStorage
 </SECTION>
 
 <SECTION>

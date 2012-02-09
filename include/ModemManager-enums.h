@@ -300,6 +300,28 @@ typedef enum { /*< underscore_name=mm_sms_state >*/
 } MMSmsState;
 
 /**
+ * MMSmsStorage:
+ * @MM_SMS_STORAGE_UNKNOWN: Storage unknown.
+ * @MM_SMS_STORAGE_SM: SIM card storage area.
+ * @MM_SMS_STORAGE_ME: Mobile equipment storage area.
+ * @MM_SMS_STORAGE_MT: Sum of SIM and Mobile equipment storages
+ * @MM_SMS_STORAGE_SR: Status report message storage area.
+ * @MM_SMS_STORAGE_BM: Broadcast message storage area.
+ * @MM_SMS_STORAGE_TA: Terminal adaptor message storage area.
+ *
+ * Storage for SMS messages.
+ */
+typedef enum { /*< underscore_name=mm_sms_storage >*/
+    MM_SMS_STORAGE_UNKNOWN = 0,
+    MM_SMS_STORAGE_SM      = 1,
+    MM_SMS_STORAGE_ME      = 2,
+    MM_SMS_STORAGE_MT      = 3,
+    MM_SMS_STORAGE_SR      = 4,
+    MM_SMS_STORAGE_BM      = 5,
+    MM_SMS_STORAGE_TA      = 6,
+} MMSmsStorage;
+
+/**
  * MMModemLocationSource:
  * @MM_MODEM_LOCATION_SOURCE_NONE: None.
  * @MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI: Location Area Code and Cell ID.
