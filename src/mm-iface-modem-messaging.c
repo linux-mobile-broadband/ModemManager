@@ -786,7 +786,6 @@ interface_initialization_step (InitializationContext *ctx)
             /* If there is no implementation to check support, assume we DON'T
              * support it. */
         }
-
         /* Fall down to next step */
         ctx->step++;
 
@@ -930,6 +929,33 @@ iface_modem_messaging_init (gpointer g_iface)
                                "Whether PDU mode should be used",
                                FALSE,
                                G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_enum (MM_IFACE_MODEM_MESSAGING_SMS_MEM1_STORAGE,
+                            "SMS mem1 storage",
+                            "Default storage to be used when listing/reading/deleting SMS messages",
+                            MM_TYPE_SMS_STORAGE,
+                            MM_SMS_STORAGE_ME,
+                            G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_enum (MM_IFACE_MODEM_MESSAGING_SMS_MEM2_STORAGE,
+                            "SMS mem2 storage",
+                            "Default storage to be used when writing/sending SMS messages",
+                            MM_TYPE_SMS_STORAGE,
+                            MM_SMS_STORAGE_ME,
+                            G_PARAM_READWRITE));
+
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_enum (MM_IFACE_MODEM_MESSAGING_SMS_MEM3_STORAGE,
+                            "SMS mem3 storage",
+                            "Default storage to be used when receiving SMS messages",
+                            MM_TYPE_SMS_STORAGE,
+                            MM_SMS_STORAGE_ME,
+                            G_PARAM_READWRITE));
 
     initialized = TRUE;
 }

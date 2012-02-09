@@ -28,9 +28,12 @@
 #define MM_IS_IFACE_MODEM_MESSAGING(obj)            (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM_MESSAGING))
 #define MM_IFACE_MODEM_MESSAGING_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM_MESSAGING, MMIfaceModemMessaging))
 
-#define MM_IFACE_MODEM_MESSAGING_DBUS_SKELETON "iface-modem-messaging-dbus-skeleton"
-#define MM_IFACE_MODEM_MESSAGING_SMS_LIST      "iface-modem-messaging-sms-list"
-#define MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE  "iface-modem-messaging-sms-pdu-mode"
+#define MM_IFACE_MODEM_MESSAGING_DBUS_SKELETON    "iface-modem-messaging-dbus-skeleton"
+#define MM_IFACE_MODEM_MESSAGING_SMS_LIST         "iface-modem-messaging-sms-list"
+#define MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE     "iface-modem-messaging-sms-pdu-mode"
+#define MM_IFACE_MODEM_MESSAGING_SMS_MEM1_STORAGE "iface-modem-messaging-sms-mem1-storage"
+#define MM_IFACE_MODEM_MESSAGING_SMS_MEM2_STORAGE "iface-modem-messaging-sms-mem2-storage"
+#define MM_IFACE_MODEM_MESSAGING_SMS_MEM3_STORAGE "iface-modem-messaging-sms-mem3-storage"
 
 typedef struct _MMIfaceModemMessaging MMIfaceModemMessaging;
 
