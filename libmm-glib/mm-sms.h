@@ -62,6 +62,17 @@ gboolean mm_sms_send_sync   (MMSms *self,
                              GCancellable *cancellable,
                              GError **error);
 
+void     mm_sms_store        (MMSms *self,
+                              GCancellable *cancellable,
+                              GAsyncReadyCallback callback,
+                              gpointer user_data);
+gboolean mm_sms_store_finish (MMSms *self,
+                              GAsyncResult *res,
+                              GError **error);
+gboolean mm_sms_store_sync   (MMSms *self,
+                              GCancellable *cancellable,
+                              GError **error);
+
 const gchar *mm_sms_get_text      (MMSms *self);
 gchar       *mm_sms_dup_text      (MMSms *self);
 const gchar *mm_sms_get_number    (MMSms *self);

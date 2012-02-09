@@ -328,6 +328,79 @@ mm_sms_send_sync (MMSms *self,
                                         error);
 }
 
+/**
+ * mm_sms_store:
+ * @self: A #MMSms.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
+ * @user_data: User data to pass to @callback.
+ *
+ * TODO
+ *
+ * When the operation is finished, @callback will be invoked in the <link linkend="g-main-context-push-thread-default">thread-default main loop</link> of the thread you are calling this method from.
+ * You can then call mm_sms_store_finish() to get the result of the operation.
+ *
+ * See mm_sms_store_sync() for the synchronous, blocking version of this method.
+ */
+void
+mm_sms_store (MMSms *self,
+              GCancellable *cancellable,
+              GAsyncReadyCallback callback,
+              gpointer user_data)
+{
+    g_return_if_fail (MM_GDBUS_IS_SMS (self));
+
+    mm_gdbus_sms_call_store (self,
+                             cancellable,
+                             callback,
+                             user_data);
+}
+
+/**
+ * mm_sms_store_finish:
+ * @self: A #MMSms.
+ * @res: The #GAsyncResult obtained from the #GAsyncReadyCallback passed to mm_sms_store().
+ * @error: Return location for error or %NULL.
+ *
+ * Finishes an operation started with mm_sms_store().
+ *
+ * Returns: (skip): %TRUE if the operation succeded, %FALSE if @error is set.
+ */
+gboolean
+mm_sms_store_finish (MMSms *self,
+                     GAsyncResult *res,
+                     GError **error)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), FALSE);
+
+    return mm_gdbus_sms_call_store_finish (self, res, error);
+}
+
+/**
+ * mm_sms_store_sync:
+ * @self: A #MMSms.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @error: Return location for error or %NULL.
+ *
+ * TODO
+ *
+ * The calling thread is blocked until a reply is received.
+ * See mm_sms_store() for the asynchronous version of this method.
+ *
+ * Returns: (skip): %TRUE if the operation succeded, %FALSE if @error is set.
+ */
+gboolean
+mm_sms_store_sync (MMSms *self,
+                   GCancellable *cancellable,
+                   GError **error)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), FALSE);
+
+    return mm_gdbus_sms_call_store_sync (self,
+                                         cancellable,
+                                         error);
+}
+
 void
 mm_sms_new (GDBusConnection *connection,
             const gchar *path,
