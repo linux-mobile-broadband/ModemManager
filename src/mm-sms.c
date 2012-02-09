@@ -26,6 +26,7 @@
 #include <libmm-common.h>
 
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-messaging.h"
 #include "mm-sms.h"
 #include "mm-base-modem-at.h"
 #include "mm-base-modem.h"
@@ -295,6 +296,178 @@ mm_sms_has_part_index (MMSms *self,
     return !!g_list_find_custom (self->priv->parts,
                                  GUINT_TO_POINTER (index),
                                  (GCompareFunc)cmp_sms_part_index);
+}
+
+/*****************************************************************************/
+
+static gchar *
+sms_get_store_or_send_command (MMSmsPart *part,
+                               gboolean text_or_pdu,   /* TRUE for PDU */
+                               gboolean store_or_send, /* TRUE for send */
+                               GError **error)
+{
+    gchar *cmd;
+
+    if (!text_or_pdu) {
+        /* Text mode */
+        cmd = g_strdup_printf ("+CMG%c=\"%s\"\r%s\x1a",
+                               store_or_send ? 'S' : 'W',
+                               mm_sms_part_get_number (part),
+                               mm_sms_part_get_text (part));
+    } else {
+        guint8 *pdu;
+        guint pdulen = 0;
+        guint msgstart = 0;
+        gchar *hex;
+
+        /* AT+CMGW=<length>[, <stat>]<CR> PDU can be entered. <CTRL-Z>/<ESC> */
+
+        pdu = mm_sms_part_get_submit_pdu (part, &pdulen, &msgstart, error);
+        if (!pdu)
+            return NULL;
+
+        /* Convert PDU to hex */
+        hex = utils_bin2hexstr (pdu, pdulen);
+        g_free (pdu);
+
+        if (!hex) {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_FAILED,
+                         "Not enough memory to send SMS PDU");
+            return NULL;
+        }
+
+        /* CMGW/S length is the size of the PDU without SMSC information */
+        cmd = g_strdup_printf ("+CMG%c=%d\r%s\x1a",
+                               store_or_send ? 'S' : 'W',
+                               pdulen - msgstart,
+                               hex);
+        g_free (hex);
+    }
+
+    return cmd;
+}
+
+/*****************************************************************************/
+/* Store the SMS */
+
+typedef struct {
+    MMSms *self;
+    MMBaseModem *modem;
+    GSimpleAsyncResult *result;
+} SmsStoreContext;
+
+static void
+sms_store_context_complete_and_free (SmsStoreContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+sms_store_finish (MMSms *self,
+                  GAsyncResult *res,
+                  GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+store_ready (MMBaseModem *modem,
+             GAsyncResult *res,
+             SmsStoreContext *ctx)
+{
+    const gchar *response;
+    GError *error = NULL;
+    gint rv;
+    gint idx;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        sms_store_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Read the new part index from the reply */
+    rv = sscanf (response, "+CMGW: %d", &idx);
+    if (rv != 1 || idx < 0) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't read index of already stored part: "
+                                         "%d fields parsed",
+                                         rv);
+        sms_store_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Set the index in the part we hold */
+    mm_sms_part_set_index ((MMSmsPart *)ctx->self->priv->parts->data, (guint)idx);
+
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    sms_store_context_complete_and_free (ctx);
+}
+
+static void
+sms_store (MMSms *self,
+           GAsyncReadyCallback callback,
+           gpointer user_data)
+{
+    GError *error = NULL;
+    gboolean use_pdu_mode;
+    SmsStoreContext *ctx;
+    gchar *cmd;
+
+    /* We currently support storing *only* single part SMS */
+    if (g_list_length (self->priv->parts) != 1) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_UNSUPPORTED,
+                                             "Cannot store SMS with %u parts",
+                                             g_list_length (self->priv->parts));
+        return;
+    }
+
+    /* Setup the context */
+    ctx = g_new0 (SmsStoreContext, 1);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             sms_store);
+    ctx->self = g_object_ref (self);
+    ctx->modem = g_object_ref (self->priv->modem);
+
+    /* Different ways to do it if on PDU or text mode */
+    use_pdu_mode = FALSE;
+    g_object_get (self->priv->modem,
+                  MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE, &use_pdu_mode,
+                  NULL);
+
+    cmd = sms_get_store_or_send_command ((MMSmsPart *)ctx->self->priv->parts->data,
+                                         use_pdu_mode,
+                                         FALSE,
+                                         &error);
+    if (!cmd) {
+        g_simple_async_result_take_error (ctx->result, error);
+        sms_store_context_complete_and_free (ctx);
+        return;
+    }
+
+    mm_base_modem_at_command (ctx->modem,
+                              cmd,
+                              10,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback) store_ready,
+                              ctx);
+    g_free (cmd);
 }
 
 /*****************************************************************************/
@@ -828,6 +1001,8 @@ mm_sms_class_init (MMSmsClass *klass)
     object_class->finalize = finalize;
     object_class->dispose = dispose;
 
+    klass->store = sms_store;
+    klass->store_finish = sms_store_finish;
     klass->delete = sms_delete;
     klass->delete_finish = sms_delete_finish;
 
