@@ -172,8 +172,21 @@ static gboolean
 handle_send (MMSms *self,
              GDBusMethodInvocation *invocation)
 {
+    MMSmsState state = MM_SMS_STATE_UNKNOWN;
+
+    g_object_get (self,
+                  "state", &state,
+                  NULL);
+
+    /* We can only send SMS created by the user */
+    if (state == MM_SMS_STATE_RECEIVED ||
+        state == MM_SMS_STATE_RECEIVING)
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_FAILED,
+                                               "This SMS was received, cannot send it");
     /* Check if we do support doing it */
-    if (MM_SMS_GET_CLASS (self)->send &&
+    else if (MM_SMS_GET_CLASS (self)->send &&
         MM_SMS_GET_CLASS (self)->send_finish)
         MM_SMS_GET_CLASS (self)->send (self,
                                        (GAsyncReadyCallback)handle_send_ready,
