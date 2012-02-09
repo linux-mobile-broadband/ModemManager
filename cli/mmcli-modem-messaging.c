@@ -272,7 +272,6 @@ get_modem_ready (GObject      *source,
         g_debug ("Asynchronously creating new SMS in modem...");
         mm_modem_messaging_create (ctx->modem_messaging,
                                    properties,
-                                   FALSE, /* never send it here */
                                    ctx->cancellable,
                                    (GAsyncReadyCallback)create_ready,
                                    NULL);
@@ -349,7 +348,6 @@ mmcli_modem_messaging_run_synchronous (GDBusConnection *connection)
         g_debug ("Synchronously creating new SMS in modem...");
         sms = mm_modem_messaging_create_sync (ctx->modem_messaging,
                                               properties,
-                                              FALSE, /* never send it here */
                                               NULL,
                                               &error);
         g_object_unref (properties);

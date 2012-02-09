@@ -41,7 +41,6 @@ gchar       *mm_modem_messaging_dup_path (MMModemMessaging *self);
 
 void   mm_modem_messaging_create        (MMModemMessaging *self,
                                          MMSmsProperties *properties,
-                                         gboolean send,
                                          GCancellable *cancellable,
                                          GAsyncReadyCallback callback,
                                          gpointer user_data);
@@ -50,7 +49,6 @@ MMSms *mm_modem_messaging_create_finish (MMModemMessaging *self,
                                          GError **error);
 MMSms *mm_modem_messaging_create_sync   (MMModemMessaging *self,
                                          MMSmsProperties *properties,
-                                         gboolean send,
                                          GCancellable *cancellable,
                                          GError **error);
 

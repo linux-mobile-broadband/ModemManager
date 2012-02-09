@@ -128,7 +128,6 @@ static gboolean
 handle_create (MmGdbusModemMessaging *skeleton,
                GDBusMethodInvocation *invocation,
                GVariant *dictionary,
-               gboolean send,
                MMIfaceModemMessaging *self)
 {
     GError *error = NULL;

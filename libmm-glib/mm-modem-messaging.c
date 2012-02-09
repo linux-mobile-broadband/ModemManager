@@ -374,7 +374,6 @@ create_sms_ready (MMModemMessaging *self,
  * mm_modem_messaging_create_sms:
  * @self: A #MMModemMessaging.
  * @properties: A ##MMSmsProperties object with the properties to use.
- * @send: #TRUE if the SMS should be also sent, #FALSE otherwise.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @callback: A #GAsyncReadyCallback to call when the request is satisfied or %NULL.
  * @user_data: User data to pass to @callback.
@@ -389,7 +388,6 @@ create_sms_ready (MMModemMessaging *self,
 void
 mm_modem_messaging_create (MMModemMessaging *self,
                            MMSmsProperties *properties,
-                           gboolean send,
                            GCancellable *cancellable,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
@@ -412,7 +410,6 @@ mm_modem_messaging_create (MMModemMessaging *self,
     mm_gdbus_modem_messaging_call_create (
         self,
         dictionary,
-        send,
         cancellable,
         (GAsyncReadyCallback)create_sms_ready,
         ctx);
@@ -424,7 +421,6 @@ mm_modem_messaging_create (MMModemMessaging *self,
  * mm_modem_create_sms_sync:
  * @self: A #MMModemMessaging.
  * @properties: A ##MMSmsProperties object with the properties to use.
- * @send: #TRUE if the SMS should be also sent, #FALSE otherwise.
  * @cancellable: (allow-none): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
@@ -438,7 +434,6 @@ mm_modem_messaging_create (MMModemMessaging *self,
 MMSms *
 mm_modem_messaging_create_sync (MMModemMessaging *self,
                                 MMSmsProperties *properties,
-                                gboolean send,
                                 GCancellable *cancellable,
                                 GError **error)
 {
@@ -452,7 +447,6 @@ mm_modem_messaging_create_sync (MMModemMessaging *self,
                       MM_COMMON_SMS_PROPERTIES (properties)));
     mm_gdbus_modem_messaging_call_create_sync (self,
                                                dictionary,
-                                               send,
                                                &sms_path,
                                                cancellable,
                                                error);
