@@ -201,6 +201,14 @@ mm_sms_export (MMSms *self)
     g_free (path);
 }
 
+void
+mm_sms_unexport (MMSms *self)
+{
+    g_object_set (self,
+                  MM_SMS_PATH, NULL,
+                  NULL);
+}
+
 /*****************************************************************************/
 
 static void
@@ -295,7 +303,7 @@ typedef struct {
     MMSms *self;
     MMBaseModem *modem;
     GSimpleAsyncResult *result;
-    MMSmsPart *current;
+    GList *current;
     guint n_failed;
 } SmsDeletePartsContext;
 
@@ -303,8 +311,6 @@ static void
 sms_delete_parts_context_complete_and_free (SmsDeletePartsContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
-    if (ctx->current)
-        mm_sms_part_free (ctx->current);
     g_object_unref (ctx->result);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
@@ -332,11 +338,15 @@ delete_part_ready (MMBaseModem *modem,
     if (error) {
         ctx->n_failed++;
         mm_dbg ("Couldn't delete SMS part with index %u: '%s'",
-                mm_sms_part_get_index (ctx->current),
+                mm_sms_part_get_index ((MMSmsPart *)ctx->current->data),
                 error->message);
         g_error_free (error);
     }
 
+    /* We reset the index, as there is no longer that part */
+    mm_sms_part_set_index ((MMSmsPart *)ctx->current->data, SMS_PART_INVALID_INDEX);
+
+    ctx->current = g_list_next (ctx->current);
     delete_next_part (ctx);
 }
 
@@ -345,30 +355,34 @@ delete_next_part (SmsDeletePartsContext *ctx)
 {
     gchar *cmd;
 
-    if (ctx->current) {
-        mm_sms_part_free (ctx->current);
-        ctx->current = NULL;
-    }
+    /* Skip non-stored parts */
+    while (ctx->current &&
+           mm_sms_part_get_index ((MMSmsPart *)ctx->current->data) == SMS_PART_INVALID_INDEX)
+        ctx->current = g_list_next (ctx->current);
 
     /* If all removed, we're done */
-    if (!ctx->self->priv->parts) {
+    if (!ctx->current) {
         if (ctx->n_failed > 0)
             g_simple_async_result_set_error (ctx->result,
                                              MM_CORE_ERROR,
                                              MM_CORE_ERROR_FAILED,
                                              "Couldn't delete %u parts from this SMS",
                                              ctx->n_failed);
-        else
+        else {
+            /* We do change the state of this SMS back to UNKNOWN, as it is no
+             * longer stored in the device */
+            g_object_set (ctx->self,
+                          "state", MM_SMS_STATE_UNKNOWN,
+                          NULL);
+
             g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        }
         sms_delete_parts_context_complete_and_free (ctx);
         return;
     }
 
-    ctx->current = ctx->self->priv->parts->data;
-    ctx->self->priv->parts = g_list_delete_link (ctx->self->priv->parts, ctx->self->priv->parts);
-
     cmd = g_strdup_printf ("+CMGD=%d",
-                           mm_sms_part_get_index (ctx->current));
+                           mm_sms_part_get_index ((MMSmsPart *)ctx->current->data));
     mm_base_modem_at_command (ctx->modem,
                               cmd,
                               10,
@@ -394,10 +408,8 @@ sms_delete (MMSms *self,
     ctx->self = g_object_ref (self);
     ctx->modem = g_object_ref (self->priv->modem);
 
-    /* Before really removing the parts, we make sure we unexport the object */
-    mm_sms_dbus_unexport (self);
-
     /* Go on deleting parts */
+    ctx->current = ctx->self->priv->parts;
     delete_next_part (ctx);
 }
 
@@ -690,8 +702,9 @@ set_property (GObject *object,
         self->priv->path = g_value_dup_string (value);
 
         /* Export when we get a DBus connection AND we have a path */
-        if (self->priv->path &&
-            self->priv->connection)
+        if (!self->priv->path)
+            mm_sms_dbus_unexport (self);
+        else if (self->priv->connection)
             mm_sms_dbus_export (self);
         break;
     case PROP_CONNECTION:
