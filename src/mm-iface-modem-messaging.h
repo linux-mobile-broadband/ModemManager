@@ -30,6 +30,7 @@
 
 #define MM_IFACE_MODEM_MESSAGING_DBUS_SKELETON "iface-modem-messaging-dbus-skeleton"
 #define MM_IFACE_MODEM_MESSAGING_SMS_LIST      "iface-modem-messaging-sms-list"
+#define MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE  "iface-modem-messaging-sms-pdu-mode"
 
 typedef struct _MMIfaceModemMessaging MMIfaceModemMessaging;
 

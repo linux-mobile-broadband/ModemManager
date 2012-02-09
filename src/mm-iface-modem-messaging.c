@@ -820,6 +820,14 @@ iface_modem_messaging_init (gpointer g_iface)
                               MM_TYPE_SMS_LIST,
                               G_PARAM_READWRITE));
 
+    g_object_interface_install_property
+        (g_iface,
+         g_param_spec_boolean (MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE,
+                               "PDU mode",
+                               "Whether PDU mode should be used",
+                               FALSE,
+                               G_PARAM_READWRITE));
+
     initialized = TRUE;
 }
 
