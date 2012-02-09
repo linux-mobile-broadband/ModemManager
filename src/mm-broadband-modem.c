@@ -85,6 +85,7 @@ enum {
     PROP_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED,
     PROP_MODEM_CDMA_EVDO_NETWORK_SUPPORTED,
     PROP_MODEM_MESSAGING_SMS_LIST,
+    PROP_MODEM_MESSAGING_SMS_PDU_MODE,
     PROP_MODEM_SIMPLE_STATUS,
     PROP_LAST
 };
@@ -154,8 +155,8 @@ struct _MMBroadbandModemPrivate {
     /* Properties */
     GObject *modem_messaging_dbus_skeleton;
     MMBearerList *modem_messaging_sms_list;
+    gboolean modem_messaging_sms_pdu_mode;
     /* Implementation helpers */
-    gboolean sms_use_pdu_mode;
     gboolean sms_supported_modes_checked;
     GHashTable *known_sms_parts;
 };
@@ -3524,10 +3525,10 @@ cmgf_set_ready (MMBroadbandModem *self,
         mm_dbg ("Failed to set preferred SMS mode: '%s'; assuming text mode'",
                 error->message);
         g_error_free (error);
-        self->priv->sms_use_pdu_mode = FALSE;
+        self->priv->modem_messaging_sms_pdu_mode = FALSE;
     } else
         mm_info ("Successfully set preferred SMS mode: '%s'",
-                 self->priv->sms_use_pdu_mode ? "PDU" : "text");
+                 self->priv->modem_messaging_sms_pdu_mode ? "PDU" : "text");
 
     g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     g_simple_async_result_complete (simple);
@@ -3541,7 +3542,7 @@ set_preferred_sms_format (MMBroadbandModem *self,
     gchar *cmd;
 
     cmd = g_strdup_printf ("+CMGF=%s",
-                           self->priv->sms_use_pdu_mode ? "0" : "1");
+                           self->priv->modem_messaging_sms_pdu_mode ? "0" : "1");
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               cmd,
                               3,
@@ -3574,7 +3575,7 @@ cmgf_format_check_ready (MMBroadbandModem *self,
     }
 
     /* If text mode is supported, default to use it for now; othewise try PDU mode */
-    self->priv->sms_use_pdu_mode = !sms_text_supported;
+    self->priv->modem_messaging_sms_pdu_mode = !sms_text_supported;
 
     self->priv->sms_supported_modes_checked = TRUE;
 
@@ -4063,13 +4064,13 @@ modem_messaging_load_initial_sms_parts (MMIfaceModemMessaging *self,
     /* Get SMS parts from ALL types.
      * Different command to be used if we are on Text or PDU mode */
     mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              (MM_BROADBAND_MODEM (self)->priv->sms_use_pdu_mode ?
+                              (MM_BROADBAND_MODEM (self)->priv->modem_messaging_sms_pdu_mode ?
                                "+CMGL=4" :
                                "+CMGL=\"ALL\""),
                               10,
                               FALSE,
                               NULL, /* cancellable */
-                              (GAsyncReadyCallback) (MM_BROADBAND_MODEM (self)->priv->sms_use_pdu_mode ?
+                              (GAsyncReadyCallback) (MM_BROADBAND_MODEM (self)->priv->modem_messaging_sms_pdu_mode ?
                                                      sms_pdu_part_list_ready :
                                                      sms_text_part_list_ready),
                               result);
@@ -6132,6 +6133,9 @@ set_property (GObject *object,
         g_clear_object (&self->priv->modem_messaging_sms_list);
         self->priv->modem_messaging_sms_list = g_value_dup_object (value);
         break;
+    case PROP_MODEM_MESSAGING_SMS_PDU_MODE:
+        self->priv->modem_messaging_sms_pdu_mode = g_value_get_boolean (value);
+        break;
     case PROP_MODEM_SIMPLE_STATUS:
         g_clear_object (&self->priv->modem_simple_status);
         self->priv->modem_simple_status = g_value_dup_object (value);
@@ -6207,6 +6211,9 @@ get_property (GObject *object,
         break;
     case PROP_MODEM_MESSAGING_SMS_LIST:
         g_value_set_object (value, self->priv->modem_messaging_sms_list);
+        break;
+    case PROP_MODEM_MESSAGING_SMS_PDU_MODE:
+        g_value_set_boolean (value, self->priv->modem_messaging_sms_pdu_mode);
         break;
     case PROP_MODEM_SIMPLE_STATUS:
         g_value_set_object (value, self->priv->modem_simple_status);
@@ -6567,6 +6574,10 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_MESSAGING_SMS_LIST,
                                       MM_IFACE_MODEM_MESSAGING_SMS_LIST);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_MESSAGING_SMS_PDU_MODE,
+                                      MM_IFACE_MODEM_MESSAGING_SMS_PDU_MODE);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_SIMPLE_STATUS,
