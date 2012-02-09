@@ -30,6 +30,11 @@ MMSmsPart *mm_sms_part_new_from_pdu  (guint index,
                                       GError **error);
 void       mm_sms_part_free (MMSmsPart *part);
 
+guint8    *mm_sms_part_get_submit_pdu (MMSmsPart *part,
+                                       guint *out_pdulen,
+                                       guint *out_msgstart,
+                                       GError **error);
+
 guint             mm_sms_part_get_index              (MMSmsPart *part);
 void              mm_sms_part_set_index              (MMSmsPart *part,
                                                       guint index);
@@ -88,5 +93,11 @@ void              mm_sms_part_set_concat_sequence    (MMSmsPart *part,
                                                       guint concat_sequence);
 
 gboolean          mm_sms_part_should_concat          (MMSmsPart *part);
+
+/* For testcases only */
+guint mm_sms_part_encode_address (const gchar *address,
+                                  guint8 *buf,
+                                  gsize buflen,
+                                  gboolean is_smsc);
 
 #endif /* MM_SMS_PART_H */
