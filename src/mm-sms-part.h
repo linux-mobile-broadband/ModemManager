@@ -31,6 +31,8 @@ MMSmsPart *mm_sms_part_new_from_pdu  (guint index,
 void       mm_sms_part_free (MMSmsPart *part);
 
 guint             mm_sms_part_get_index              (MMSmsPart *part);
+void              mm_sms_part_set_index              (MMSmsPart *part,
+                                                      guint index);
 
 const gchar      *mm_sms_part_get_smsc               (MMSmsPart *part);
 void              mm_sms_part_set_smsc               (MMSmsPart *part,

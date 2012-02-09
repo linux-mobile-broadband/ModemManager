@@ -275,6 +275,7 @@ mm_sms_part_free (MMSmsPart *self)
     }
 
 PART_GET_FUNC (guint, index)
+PART_SET_UINT_FUNC (index)
 PART_GET_FUNC (const gchar *, smsc)
 PART_SET_TAKE_STR_FUNC (smsc)
 PART_GET_FUNC (const gchar *, number)
