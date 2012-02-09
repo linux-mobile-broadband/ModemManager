@@ -45,6 +45,21 @@ struct _MMIfaceModemMessaging {
                                       GAsyncResult *res,
                                       GError **error);
 
+    /* Load supported storages for...
+     *  mem1: listing/reading/deleting
+     *  mem2: writing/sending
+     *  mem3: receiving
+     */
+    void (* load_supported_storages) (MMIfaceModemMessaging *self,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data);
+    gboolean (*load_supported_storages_finish) (MMIfaceModemMessaging *self,
+                                                GAsyncResult *res,
+                                                GArray **mem1,
+                                                GArray **mem2,
+                                                GArray **mem3,
+                                                GError **error);
+
     /* Setup SMS format (async) */
     void (* setup_sms_format) (MMIfaceModemMessaging *self,
                                GAsyncReadyCallback callback,

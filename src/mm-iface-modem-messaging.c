@@ -23,9 +23,11 @@
 
 #define SUPPORT_CHECKED_TAG "messaging-support-checked-tag"
 #define SUPPORTED_TAG       "messaging-supported-tag"
+#define STORAGE_CONTEXT_TAG "messaging-storage-context-tag"
 
 static GQuark support_checked_quark;
 static GQuark supported_quark;
+static GQuark storage_context_quark;
 
 /*****************************************************************************/
 
@@ -33,6 +35,50 @@ void
 mm_iface_modem_messaging_bind_simple_status (MMIfaceModemMessaging *self,
                                             MMCommonSimpleProperties *status)
 {
+}
+
+/*****************************************************************************/
+
+typedef struct {
+    GArray *supported_mem1;
+    GArray *supported_mem2;
+    GArray *supported_mem3;
+} StorageContext;
+
+static void
+storage_context_free (StorageContext *ctx)
+{
+    if (ctx->supported_mem1)
+        g_array_unref (ctx->supported_mem1);
+    if (ctx->supported_mem2)
+        g_array_unref (ctx->supported_mem2);
+    if (ctx->supported_mem3)
+        g_array_unref (ctx->supported_mem3);
+    g_free (ctx);
+}
+
+static StorageContext *
+get_storage_context (MMIfaceModemMessaging *self)
+{
+    StorageContext *ctx;
+
+    if (G_UNLIKELY (!storage_context_quark))
+        storage_context_quark =  (g_quark_from_static_string (
+                                      STORAGE_CONTEXT_TAG));
+
+    ctx = g_object_get_qdata (G_OBJECT (self), storage_context_quark);
+    if (!ctx) {
+        /* Create context and keep it as object data */
+        ctx = g_new0 (StorageContext, 1);
+
+        g_object_set_qdata_full (
+            G_OBJECT (self),
+            storage_context_quark,
+            ctx,
+            (GDestroyNotify)storage_context_free);
+    }
+
+    return ctx;
 }
 
 /*****************************************************************************/
@@ -583,6 +629,7 @@ typedef enum {
     INITIALIZATION_STEP_FIRST,
     INITIALIZATION_STEP_CHECK_SUPPORT,
     INITIALIZATION_STEP_FAIL_IF_UNSUPPORTED,
+    INITIALIZATION_STEP_LOAD_SUPPORTED_STORAGES,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -626,6 +673,50 @@ initialization_context_complete_and_free (InitializationContext *ctx)
     g_object_unref (ctx->result);
     g_object_unref (ctx->skeleton);
     g_free (ctx);
+}
+
+static void
+load_supported_storages_ready (MMIfaceModemMessaging *self,
+                               GAsyncResult *res,
+                               InitializationContext *ctx)
+{
+    StorageContext *storage_ctx;
+    GError *error = NULL;
+
+    storage_ctx = get_storage_context (self);
+    if (!MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->load_supported_storages_finish (
+            self,
+            res,
+            &storage_ctx->supported_mem1,
+            &storage_ctx->supported_mem2,
+            &storage_ctx->supported_mem3,
+            &error)) {
+        mm_dbg ("Couldn't load supported storages: '%s'", error->message);
+        g_error_free (error);
+    } else {
+        gchar *mem1;
+        gchar *mem2;
+        gchar *mem3;
+
+        mem1 = mm_common_build_sms_storages_string ((MMSmsStorage *)storage_ctx->supported_mem1->data,
+                                                    storage_ctx->supported_mem1->len);
+        mem2 = mm_common_build_sms_storages_string ((MMSmsStorage *)storage_ctx->supported_mem2->data,
+                                                    storage_ctx->supported_mem2->len);
+        mem3 = mm_common_build_sms_storages_string ((MMSmsStorage *)storage_ctx->supported_mem3->data,
+                                                    storage_ctx->supported_mem3->len);
+
+        mm_dbg ("Supported storages loaded:");
+        mm_dbg ("  mem1 (list/read/delete) storages: '%s'", mem1);
+        mm_dbg ("  mem2 (write/send) storages:       '%s'", mem2);
+        mm_dbg ("  mem3 (reception) storages:        '%s'", mem3);
+        g_free (mem1);
+        g_free (mem2);
+        g_free (mem3);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
 }
 
 static void
@@ -709,6 +800,18 @@ interface_initialization_step (InitializationContext *ctx)
             initialization_context_complete_and_free (ctx);
             return;
         }
+
+    case INITIALIZATION_STEP_LOAD_SUPPORTED_STORAGES:
+        if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->load_supported_storages &&
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->load_supported_storages_finish) {
+            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->load_supported_storages (
+                ctx->self,
+                (GAsyncReadyCallback)load_supported_storages_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
