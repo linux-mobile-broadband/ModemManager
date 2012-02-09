@@ -45,6 +45,30 @@ mm_common_build_bands_string (const MMModemBand *bands,
     return g_string_free (str, FALSE);
 }
 
+gchar *
+mm_common_build_sms_storages_string (const MMSmsStorage *storages,
+                                     guint n_storages)
+{
+    gboolean first = TRUE;
+    GString *str;
+    guint i;
+
+    if (!storages || !n_storages)
+        return g_strdup ("none");
+
+    str = g_string_new ("");
+    for (i = 0; i < n_storages; i++) {
+        g_string_append_printf (str, "%s%s",
+                                first ? "" : ", ",
+                                mm_sms_storage_get_string (storages[i]));
+
+        if (first)
+            first = FALSE;
+    }
+
+    return g_string_free (str, FALSE);
+}
+
 MMModemMode
 mm_common_get_modes_from_string (const gchar *str,
                                  GError **error)

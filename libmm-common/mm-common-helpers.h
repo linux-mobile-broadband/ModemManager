@@ -22,6 +22,9 @@
 gchar *mm_common_build_bands_string (const MMModemBand *bands,
                                      guint n_bands);
 
+gchar *mm_common_build_sms_storages_string (const MMSmsStorage *storages,
+                                            guint n_storages);
+
 MMModemMode           mm_common_get_modes_from_string       (const gchar *str,
                                                              GError **error);
 void                  mm_common_get_bands_from_string       (const gchar *str,
