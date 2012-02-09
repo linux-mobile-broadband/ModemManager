@@ -85,36 +85,28 @@ mm_sms_list_get_paths (MMSmsList *self)
 
 /*****************************************************************************/
 
+typedef struct {
+    MMSmsList *self;
+    GSimpleAsyncResult *result;
+    gchar *path;
+} DeleteSmsContext;
+
+static void
+delete_sms_context_complete_and_free (DeleteSmsContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx->path);
+    g_free (ctx);
+}
+
 gboolean
 mm_sms_list_delete_sms_finish (MMSmsList *self,
                                GAsyncResult *res,
                                GError **error)
 {
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
-}
-
-static void
-delete_ready (MMSms *sms,
-              GAsyncResult *res,
-              GSimpleAsyncResult *simple)
-{
-    GError *error = NULL;
-
-    if (!mm_sms_delete_finish (sms, res, &error))
-        /* We report the error, but we really get the SMS removed */
-        g_simple_async_result_take_error (simple, error);
-    else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-
-    /* We don't need to unref the SMS any more, but we can use the
-     * reference we got in the method, which is the one kept alive
-     * during the async operation. */
-    g_signal_emit (MM_SMS_LIST (g_async_result_get_source_object (G_ASYNC_RESULT (simple))),
-                   signals[SIGNAL_DELETED], 0,
-                   mm_sms_get_path (sms));
-
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
 }
 
 static guint
@@ -124,46 +116,78 @@ cmp_sms_by_path (MMSms *sms,
     return g_strcmp0 (mm_sms_get_path (sms), path);
 }
 
+static void
+delete_ready (MMSms *sms,
+              GAsyncResult *res,
+              DeleteSmsContext *ctx)
+{
+    GError *error = NULL;
+    GList *l;
+
+    if (!mm_sms_delete_finish (sms, res, &error)) {
+        /* We report the error */
+        g_simple_async_result_take_error (ctx->result, error);
+        delete_sms_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* The SMS was properly deleted, we now remove it from our list */
+    l = g_list_find_custom (ctx->self->priv->list,
+                            ctx->path,
+                            (GCompareFunc)cmp_sms_by_path);
+    if (l) {
+        g_object_unref (MM_SMS (l->data));
+        ctx->self->priv->list = g_list_delete_link (ctx->self->priv->list, l);
+    }
+
+    /* We don't need to unref the SMS any more, but we can use the
+     * reference we got in the method, which is the one kept alive
+     * during the async operation. */
+    mm_sms_unexport (sms);
+
+    g_signal_emit (ctx->self,
+                   signals[SIGNAL_DELETED], 0,
+                   ctx->path);
+
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    delete_sms_context_complete_and_free (ctx);
+}
+
 void
 mm_sms_list_delete_sms (MMSmsList *self,
                         const gchar *sms_path,
                         GAsyncReadyCallback callback,
                         gpointer user_data)
 {
-    GSimpleAsyncResult *result;
-    MMSms *sms;
+    DeleteSmsContext *ctx;
     GList *l;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_sms_list_delete_sms);
 
     l = g_list_find_custom (self->priv->list,
                             (gpointer)sms_path,
                             (GCompareFunc)cmp_sms_by_path);
     if (!l) {
-        g_simple_async_result_set_error (result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_NOT_FOUND,
-                                         "No SMS found with path '%s'",
-                                         sms_path);
-        g_simple_async_result_complete_in_idle (result);
-        g_object_unref (result);
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_NOT_FOUND,
+                                             "No SMS found with path '%s'",
+                                             sms_path);
         return;
     }
 
-    /* Remove it from our list of SMS objects */
-    sms = l->data;
-    self->priv->list = g_list_delete_link (self->priv->list, l);
+    /* Delete all SMS parts */
+    ctx = g_new0 (DeleteSmsContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->path = g_strdup (sms_path);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_sms_list_delete_sms);
 
-    mm_sms_delete (sms,
+    mm_sms_delete (MM_SMS (l->data),
                    (GAsyncReadyCallback)delete_ready,
-                   result);
-
-    /* We do remove here our last reference to the SMS object. The
-     * async method will keep its own while the operation is ongoing. */
-    g_object_unref (sms);
+                   ctx);
 }
 
 /*****************************************************************************/
