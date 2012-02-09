@@ -45,10 +45,15 @@ static Context *ctx;
 /* Options */
 static gboolean info_flag; /* set when no action found */
 static gboolean send_flag;
+static gboolean store_flag;
 
 static GOptionEntry entries[] = {
     { "send", 0, 0, G_OPTION_ARG_NONE, &send_flag,
       "Send SMS.",
+      NULL,
+    },
+    { "store", 0, 0, G_OPTION_ARG_NONE, &store_flag,
+      "Store the SMS in the device.",
       NULL,
     },
     { NULL }
@@ -79,7 +84,8 @@ mmcli_sms_options_enabled (void)
     if (checked)
         return !!n_actions;
 
-    n_actions = (send_flag);
+    n_actions = (send_flag +
+                 store_flag);
 
     if (n_actions == 0 && mmcli_get_common_sms_string ()) {
         /* default to info */
@@ -178,6 +184,33 @@ send_ready (MMSms        *sms,
 }
 
 static void
+store_process_reply (gboolean      result,
+                     const GError *error)
+{
+    if (!result) {
+        g_printerr ("error: couldn't store the SMS: '%s'\n",
+                    error ? error->message : "unknown error");
+        exit (EXIT_FAILURE);
+    }
+
+    g_print ("successfully sent the SMS\n");
+}
+
+static void
+store_ready (MMSms        *sms,
+             GAsyncResult *result,
+             gpointer      nothing)
+{
+    gboolean operation_result;
+    GError *error = NULL;
+
+    operation_result = mm_sms_store_finish (sms, result, &error);
+    store_process_reply (operation_result, error);
+
+    mmcli_async_operation_done ();
+}
+
+static void
 get_sms_ready (GObject      *source,
                GAsyncResult *result,
                gpointer      none)
@@ -195,6 +228,15 @@ get_sms_ready (GObject      *source,
                      ctx->cancellable,
                      (GAsyncReadyCallback)send_ready,
                      NULL);
+        return;
+    }
+
+    /* Requesting to store the SMS? */
+    if (store_flag) {
+        mm_sms_store (ctx->sms,
+                      ctx->cancellable,
+                      (GAsyncReadyCallback)store_ready,
+                      NULL);
         return;
     }
 
@@ -245,6 +287,17 @@ mmcli_sms_run_synchronous (GDBusConnection *connection)
                                              NULL,
                                              &error);
         send_process_reply (operation_result, error);
+        return;
+    }
+
+    /* Requesting to store the SMS? */
+    if (store_flag) {
+        gboolean operation_result;
+
+        operation_result = mm_sms_store_sync (ctx->sms,
+                                              NULL,
+                                              &error);
+        store_process_reply (operation_result, error);
         return;
     }
 
