@@ -562,9 +562,20 @@ mm_sms_multipart_take_part (MMSms *self,
             mm_warn ("Couldn't assemble SMS: '%s'",
                      inner_error->message);
             g_error_free (inner_error);
-        } else
-            /* Only export once properly assembled */
-            mm_sms_export (self);
+        } else {
+            /* Completed AND assembled */
+            MMSmsState state = MM_SMS_STATE_UNKNOWN;
+
+            /* Change state RECEIVING->RECEIVED, and signal completeness */
+            g_object_get (self,
+                          "state", &state,
+                          NULL);
+            if (state == MM_SMS_STATE_RECEIVING) {
+                g_object_set (self,
+                              "state", MM_SMS_STATE_RECEIVED,
+                              NULL);
+            }
+        }
     }
 
     return TRUE;
@@ -612,6 +623,11 @@ mm_sms_multipart_new (MMBaseModem *modem,
                       GError **error)
 {
     MMSms *self;
+
+    /* If this is the first part of a RECEIVED SMS, we overwrite the state
+     * as RECEIVING, to indicate that it is not completed yet. */
+    if (state == MM_SMS_STATE_RECEIVED)
+        state = MM_SMS_STATE_RECEIVING;
 
     self = mm_sms_new (modem);
     g_object_set (self,

@@ -118,6 +118,6 @@ void mm_iface_modem_messaging_bind_simple_status (MMIfaceModemMessaging *self,
 /* Report new SMS part */
 gboolean mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
                                              MMSmsPart *sms_part,
-                                             gboolean received);
+                                             MMSmsState state);
 
 #endif /* MM_IFACE_MODEM_MESSAGING_H */

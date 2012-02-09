@@ -194,36 +194,32 @@ cmp_sms_by_part_index (MMSms *sms,
     return !mm_sms_has_part_index (sms, GPOINTER_TO_UINT (user_data));
 }
 
-static void
+static gboolean
 take_singlepart (MMSmsList *self,
                  MMSmsPart *part,
-                 gboolean received)
+                 MMSmsState state,
+                 GError **error)
 {
     MMSms *sms;
-    GError *error = NULL;
 
     sms = mm_sms_singlepart_new (self->priv->modem,
-                                 (received ?
-                                  MM_SMS_STATE_RECEIVED :
-                                  MM_SMS_STATE_STORED),
+                                 state,
                                  part,
-                                 &error);
+                                 error);
+    if (!sms)
+        return FALSE;
 
-    if (!sms) {
-        mm_warn ("Couldn't create single-part SMS: '%s'", error->message);
-        g_error_free (error);
-    } else {
-        self->priv->list = g_list_prepend (self->priv->list, sms);
-        g_signal_emit (self, signals[SIGNAL_ADDED], 0,
-                       mm_sms_get_path (sms),
-                       received);
-    }
+    self->priv->list = g_list_prepend (self->priv->list, sms);
+    g_signal_emit (self, signals[SIGNAL_ADDED], 0,
+                   mm_sms_get_path (sms),
+                   state == MM_SMS_STATE_RECEIVED);
+    return TRUE;
 }
 
 static gboolean
 take_multipart (MMSmsList *self,
                 MMSmsPart *part,
-                gboolean received,
+                MMSmsState state,
                 GError **error)
 {
     GList *l;
@@ -234,32 +230,32 @@ take_multipart (MMSmsList *self,
     l = g_list_find_custom (self->priv->list,
                             GUINT_TO_POINTER (concat_reference),
                             (GCompareFunc)cmp_sms_by_concat_reference);
-    if (l)  {
-        sms = MM_SMS (l->data);
+    if (l)
         /* Try to take the part */
-        if (!mm_sms_multipart_take_part (sms, part, error))
-            return FALSE;
-    } else {
-        /* Create new Multipart */
-        sms = mm_sms_multipart_new (self->priv->modem,
-                                    (received ?
-                                     MM_SMS_STATE_RECEIVED :
-                                     MM_SMS_STATE_STORED),
-                                    concat_reference,
-                                    mm_sms_part_get_concat_max (part),
-                                    part,
-                                    error);
-        if (!sms)
-            return FALSE;
+        return mm_sms_multipart_take_part (MM_SMS (l->data), part, error);
 
-        self->priv->list = g_list_prepend (self->priv->list, sms);
-    }
+    /* Create new Multipart */
+    sms = mm_sms_multipart_new (self->priv->modem,
+                                state,
+                                concat_reference,
+                                mm_sms_part_get_concat_max (part),
+                                part,
+                                error);
+    if (!sms)
+        return FALSE;
 
-    /* Check if completed and assembled */
-    if (mm_sms_multipart_is_complete (sms) &&
-        mm_sms_multipart_is_assembled (sms))
-        g_signal_emit (self, signals[SIGNAL_ADDED], 0,
-                       mm_sms_get_path (sms));
+    /* We do export uncomplete multipart messages, in order to be able to
+     *  request removal of all parts of those multipart SMS that will never
+     *  get completed.
+     * Only the STATE of the SMS object will be valid in the exported DBus
+     *  interface.*/
+    mm_sms_export (sms);
+
+    self->priv->list = g_list_prepend (self->priv->list, sms);
+    g_signal_emit (self, signals[SIGNAL_ADDED], 0,
+                   mm_sms_get_path (sms),
+                   (state == MM_SMS_STATE_RECEIVED ||
+                    state == MM_SMS_STATE_RECEIVING));
 
     return TRUE;
 }
@@ -267,7 +263,7 @@ take_multipart (MMSmsList *self,
 gboolean
 mm_sms_list_take_part (MMSmsList *self,
                        MMSmsPart *part,
-                       gboolean received,
+                       MMSmsState state,
                        GError **error)
 {
     /* Ensure we don't have already taken a part with the same index */
@@ -284,11 +280,10 @@ mm_sms_list_take_part (MMSmsList *self,
 
     /* Did we just get a part of a multi-part SMS? */
     if (mm_sms_part_should_concat (part))
-        return take_multipart (self, part, received, error);
+        return take_multipart (self, part, state, error);
 
     /* Otherwise, we build a whole new single-part MMSms just from this part */
-    take_singlepart (self, part, received);
-    return TRUE;
+    return take_singlepart (self, part, state, error);
 }
 
 /*****************************************************************************/

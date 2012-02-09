@@ -3675,7 +3675,7 @@ sms_part_ready (MMBroadbandModem *self,
         mm_dbg ("Correctly parsed PDU (%d)", ctx->idx);
         mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
                                             part,
-                                            TRUE);
+                                            MM_SMS_STATE_RECEIVED);
     } else {
         /* Don't treat the error as critical */
         mm_dbg ("Error parsing PDU (%d): %s", ctx->idx, error->message);
@@ -3932,7 +3932,7 @@ sms_text_part_list_ready (MMBroadbandModem *self,
         mm_dbg ("Correctly parsed SMS list entry (%d)", idx);
         mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
                                             part,
-                                            FALSE);
+                                            MM_SMS_STATE_STORED);
 next:
         g_match_info_next (match_info, NULL);
     }
@@ -3993,7 +3993,7 @@ sms_pdu_part_list_ready (MMBroadbandModem *self,
             mm_dbg ("Correctly parsed PDU (%d)", idx);
             mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
                                                 part,
-                                                FALSE);
+                                                MM_SMS_STATE_STORED);
         } else {
             /* Don't treat the error as critical */
             mm_dbg ("Error parsing PDU (%d): %s", idx, error->message);
