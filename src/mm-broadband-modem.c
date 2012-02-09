@@ -3841,6 +3841,23 @@ get_match_string_unquoted (GMatchInfo *m,
     return ret;
 }
 
+static MMSmsState
+sms_state_from_str (const gchar *str)
+{
+    /* We merge unread and read messages in the same state */
+    if (strstr (str, "REC"))
+        return MM_SMS_STATE_RECEIVED;
+
+    /* look for 'unsent' BEFORE looking for 'sent' */
+    if (strstr (str, "UNSENT"))
+        return MM_SMS_STATE_STORED;
+
+    if (strstr (str, "SENT"))
+        return MM_SMS_STATE_SENT;
+
+    return MM_SMS_STATE_UNKNOWN;
+}
+
 static void
 sms_text_part_list_ready (MMBroadbandModem *self,
                           GAsyncResult *res,
@@ -3878,7 +3895,7 @@ sms_text_part_list_ready (MMBroadbandModem *self,
     while (g_match_info_matches (match_info)) {
         MMSmsPart *part;
         guint matches, idx;
-        gchar *number, *timestamp, *text, *ucs2_text;
+        gchar *number, *timestamp, *text, *ucs2_text, *stat;
         gsize ucs2_len = 0;
         GByteArray *raw;
 
@@ -3893,8 +3910,6 @@ sms_text_part_list_ready (MMBroadbandModem *self,
             goto next;
         }
 
-        /* <stat is ignored for now> */
-
         /* Get and parse number */
         number = get_match_string_unquoted (match_info, 3);
         if (!number) {
@@ -3903,6 +3918,14 @@ sms_text_part_list_ready (MMBroadbandModem *self,
         }
         number = mm_charset_take_and_convert_to_utf8 (number,
                                                       self->priv->modem_current_charset);
+
+        /* Get part state */
+        stat = get_match_string_unquoted (match_info, 2);
+        if (!stat) {
+            mm_dbg ("Failed to get part status");
+            g_free (number);
+            goto next;
+        }
 
         /* Get and parse timestamp (always expected in ASCII) */
         timestamp = get_match_string_unquoted (match_info, 5);
@@ -3932,7 +3955,8 @@ sms_text_part_list_ready (MMBroadbandModem *self,
         mm_dbg ("Correctly parsed SMS list entry (%d)", idx);
         mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
                                             part,
-                                            MM_SMS_STATE_STORED);
+                                            sms_state_from_str (stat));
+        g_free (stat);
 next:
         g_match_info_next (match_info, NULL);
     }
@@ -3943,6 +3967,23 @@ next:
     g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
+}
+
+static MMSmsState
+sms_state_from_index (guint index)
+{
+    /* We merge unread and read messages in the same state */
+    switch (index) {
+    case 0: /* received, unread */
+    case 1: /* received, read */
+        return MM_SMS_STATE_RECEIVED;
+    case 2:
+        return MM_SMS_STATE_STORED;
+    case 3:
+        return MM_SMS_STATE_SENT;
+    default:
+        return MM_SMS_STATE_UNKNOWN;
+    }
 }
 
 static void
@@ -3993,7 +4034,7 @@ sms_pdu_part_list_ready (MMBroadbandModem *self,
             mm_dbg ("Correctly parsed PDU (%d)", idx);
             mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
                                                 part,
-                                                MM_SMS_STATE_STORED);
+                                                sms_state_from_index (status));
         } else {
             /* Don't treat the error as critical */
             mm_dbg ("Error parsing PDU (%d): %s", idx, error->message);
