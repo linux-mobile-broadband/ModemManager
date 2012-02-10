@@ -3743,8 +3743,16 @@ cmgf_format_check_ready (MMBroadbandModem *self,
         g_error_free (error);
     }
 
-    /* If text mode is supported, default to use it for now; othewise try PDU mode */
-    self->priv->modem_messaging_sms_pdu_mode = !sms_text_supported;
+    /* Only use text mode if PDU mode not supported */
+    self->priv->modem_messaging_sms_pdu_mode = TRUE;
+    if (!sms_pdu_supported) {
+        if (sms_text_supported) {
+            mm_dbg ("PDU mode not supported, will try to use Text mode");
+            self->priv->modem_messaging_sms_pdu_mode = FALSE;
+        } else
+            mm_dbg ("Neither PDU nor Text modes are reported as supported; "
+                    "will anyway default to PDU mode");
+    }
 
     self->priv->sms_supported_modes_checked = TRUE;
 
