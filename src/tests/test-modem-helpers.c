@@ -1228,6 +1228,44 @@ test_cgdcont_response_nokia (void *f, gpointer d)
     test_cgdcont_results ("Nokia", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
+static gboolean
+is_storage_supported (GArray *supported,
+                      MMSmsStorage storage)
+{
+    guint i;
+
+    for (i = 0; i < supported->len; i++) {
+        if (storage == g_array_index (supported, MMSmsStorage, i))
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
+static void
+test_cpms_response_cinterion (void *f, gpointer d)
+{
+    const gchar *reply = "+CPMS: (\"ME\",\"SM\",\"MT\"),(\"ME\",\"SM\",\"MT\"),(\"SM\",\"MT\")";
+    GArray *mem1 = NULL;
+    GArray *mem2 = NULL;
+    GArray *mem3 = NULL;
+
+    g_print ("\nTesting Cinterion +CPMS=? response...\n");
+
+    g_assert (mm_3gpp_parse_cpms_format_response (reply, &mem1, &mem2, &mem3));
+    g_assert (mem1->len == 3);
+    g_assert (is_storage_supported (mem1, MM_SMS_STORAGE_ME));
+    g_assert (is_storage_supported (mem1, MM_SMS_STORAGE_SM));
+    g_assert (is_storage_supported (mem1, MM_SMS_STORAGE_MT));
+    g_assert (mem2->len == 3);
+    g_assert (is_storage_supported (mem2, MM_SMS_STORAGE_ME));
+    g_assert (is_storage_supported (mem2, MM_SMS_STORAGE_SM));
+    g_assert (is_storage_supported (mem2, MM_SMS_STORAGE_MT));
+    g_assert (mem3->len == 2);
+    g_assert (is_storage_supported (mem3, MM_SMS_STORAGE_SM));
+    g_assert (is_storage_supported (mem3, MM_SMS_STORAGE_MT));
+}
+
 static TestData *
 test_data_new (void)
 {
@@ -1347,6 +1385,8 @@ int main (int argc, char **argv)
         g_test_suite_add (suite, TESTCASE (test_devid_item, (gconstpointer) item));
         item++;
     }
+
+    g_test_suite_add (suite, TESTCASE (test_cpms_response_cinterion, NULL));
 
 	g_test_suite_add (suite, TESTCASE (test_cgdcont_response_nokia, NULL));
 
