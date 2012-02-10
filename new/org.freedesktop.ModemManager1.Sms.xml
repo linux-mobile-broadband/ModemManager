@@ -94,5 +94,13 @@
     -->
     <property name="Timestamp" type="s" access="read" />
 
+    <!--
+        Storage:
+
+        A <link linkend="MMSmsStorage">MMSmsStorage</link> value,
+        describing the storage where this message is kept.
+    -->
+    <property name="Storage" type="u" access="read" />
+
   </interface>
 </node>
