@@ -101,6 +101,7 @@ struct _MMIfaceModemMessaging {
     /* Load initial SMS parts (async).
      * Found parts need to be reported with take_part() */
     void (* load_initial_sms_parts) (MMIfaceModemMessaging *self,
+                                     MMSmsStorage storage,
                                      GAsyncReadyCallback callback,
                                      gpointer user_data);
     gboolean (*load_initial_sms_parts_finish) (MMIfaceModemMessaging *self,

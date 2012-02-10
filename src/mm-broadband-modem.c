@@ -4162,16 +4162,23 @@ sms_pdu_part_list_ready (MMBroadbandModem *self,
 }
 
 static void
-modem_messaging_load_initial_sms_parts (MMIfaceModemMessaging *self,
-                                        GAsyncReadyCallback callback,
-                                        gpointer user_data)
+list_parts_storage_ready (MMBroadbandModem *self,
+                          GAsyncResult *res,
+                          GSimpleAsyncResult *simple)
 {
-    GSimpleAsyncResult *result;
+    GError *error = NULL;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_messaging_load_initial_sms_parts);
+    if (!mm_iface_modem_messaging_set_preferred_storages_finish (
+            MM_IFACE_MODEM_MESSAGING (self),
+            res,
+            &error)) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    /* Storage now set */
 
     /* Get SMS parts from ALL types.
      * Different command to be used if we are on Text or PDU mode */
@@ -4185,7 +4192,32 @@ modem_messaging_load_initial_sms_parts (MMIfaceModemMessaging *self,
                               (GAsyncReadyCallback) (MM_BROADBAND_MODEM (self)->priv->modem_messaging_sms_pdu_mode ?
                                                      sms_pdu_part_list_ready :
                                                      sms_text_part_list_ready),
-                              result);
+                              simple);
+}
+
+static void
+modem_messaging_load_initial_sms_parts (MMIfaceModemMessaging *self,
+                                        MMSmsStorage storage,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_messaging_load_initial_sms_parts);
+
+    mm_dbg ("Listing SMS parts in storage '%s'",
+            mm_sms_storage_get_string (storage));
+
+    /* First, request to set the proper storage to read from */
+    mm_iface_modem_messaging_set_preferred_storages (self,
+                                                     storage,
+                                                     MM_SMS_STORAGE_UNKNOWN,
+                                                     MM_SMS_STORAGE_UNKNOWN,
+                                                     (GAsyncReadyCallback)list_parts_storage_ready,
+                                                     result);
 }
 
 /*****************************************************************************/

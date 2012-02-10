@@ -317,6 +317,10 @@ is_storage_supported (GArray *supported,
 {
     guint i;
 
+    /* We do allow setting UNKNOWN here, so that we set the *default* storage */
+    if (preferred == MM_SMS_STORAGE_UNKNOWN)
+        return TRUE;
+
     for (i = 0; i < supported->len; i++) {
         if (preferred == g_array_index (supported, MMSmsStorage, i))
             return TRUE;
@@ -537,6 +541,8 @@ struct _EnablingContext {
     EnablingStep step;
     GSimpleAsyncResult *result;
     MmGdbusModemMessaging *skeleton;
+
+    guint mem1_storage_index;
 };
 
 static EnablingContext *
@@ -604,7 +610,63 @@ mm_iface_modem_messaging_enable_finish (MMIfaceModemMessaging *self,
 
 VOID_REPLY_READY_FN (setup_sms_format)
 VOID_REPLY_READY_FN (setup_unsolicited_events)
-VOID_REPLY_READY_FN (load_initial_sms_parts)
+
+static void load_initial_sms_parts_from_storages (EnablingContext *ctx);
+
+static void
+load_initial_sms_parts_ready (MMIfaceModemMessaging *self,
+                              GAsyncResult *res,
+                              EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->load_initial_sms_parts_finish (self, res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        enabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Go on with the storage iteration */
+    ctx->mem1_storage_index++;
+    load_initial_sms_parts_from_storages (ctx);
+}
+
+static void
+load_initial_sms_parts_from_storages (EnablingContext *ctx)
+{
+    gboolean all_loaded = FALSE;
+    StorageContext *storage_ctx;
+
+    storage_ctx = get_storage_context (ctx->self);
+
+    if (ctx->mem1_storage_index >= storage_ctx->supported_mem1->len)
+        all_loaded = TRUE;
+    /* We'll skip the 'MT' storage, as that is a combination of 'SM' and 'ME' */
+    else if (g_array_index (storage_ctx->supported_mem1,
+                            MMSmsStorage,
+                            ctx->mem1_storage_index) == MM_SMS_STORAGE_MT) {
+        ctx->mem1_storage_index++;
+        if (ctx->mem1_storage_index >= storage_ctx->supported_mem1->len)
+            all_loaded = TRUE;
+    }
+
+    if (all_loaded) {
+        /* Go on with next step */
+        ctx->step++;
+        interface_enabling_step (ctx);
+        return;
+    }
+
+    MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->load_initial_sms_parts (
+        ctx->self,
+        g_array_index (storage_ctx->supported_mem1,
+                       MMSmsStorage,
+                       ctx->mem1_storage_index),
+        (GAsyncReadyCallback)load_initial_sms_parts_ready,
+        ctx);
+    return;
+}
 
 static void
 interface_enabling_step (EnablingContext *ctx)
@@ -664,10 +726,7 @@ interface_enabling_step (EnablingContext *ctx)
         /* Allow loading the initial list of SMS parts */
         if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->load_initial_sms_parts &&
             MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->load_initial_sms_parts_finish) {
-            MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->load_initial_sms_parts (
-                ctx->self,
-                (GAsyncReadyCallback)load_initial_sms_parts_ready,
-                ctx);
+            load_initial_sms_parts_from_storages (ctx);
             return;
         }
         /* Fall down to next step */
@@ -872,6 +931,8 @@ interface_initialization_step (InitializationContext *ctx)
             initialization_context_complete_and_free (ctx);
             return;
         }
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZATION_STEP_LOAD_SUPPORTED_STORAGES:
         if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (ctx->self)->load_supported_storages &&
