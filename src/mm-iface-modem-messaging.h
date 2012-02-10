@@ -149,7 +149,8 @@ void mm_iface_modem_messaging_bind_simple_status (MMIfaceModemMessaging *self,
 /* Report new SMS part */
 gboolean mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
                                              MMSmsPart *sms_part,
-                                             MMSmsState state);
+                                             MMSmsState state,
+                                             MMSmsStorage storage);
 
 /* Set preferred storages */
 void mm_iface_modem_messaging_set_preferred_storages (MMIfaceModemMessaging *self,

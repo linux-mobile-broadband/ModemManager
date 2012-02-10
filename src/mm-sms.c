@@ -110,8 +110,19 @@ handle_store_ready (MMSms *self,
     MM_SMS_GET_CLASS (self)->store_finish (self, res, &error);
     if (error)
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
+    else {
+        MMSmsStorage storage = MM_SMS_STORAGE_UNKNOWN;
+
+        /* We'll set now the proper storage, taken from the default mem2 one */
+        g_object_get (self->priv->modem,
+                      MM_IFACE_MODEM_MESSAGING_SMS_MEM2_STORAGE, &storage,
+                      NULL);
+        g_object_set (self,
+                      "storage", storage,
+                      NULL);
+
         mm_gdbus_sms_complete_store (MM_GDBUS_SMS (ctx->self), ctx->invocation);
+    }
     dbus_call_context_free (ctx);
 }
 
@@ -940,6 +951,7 @@ mm_sms_new (MMBaseModem *modem)
 MMSms *
 mm_sms_singlepart_new (MMBaseModem *modem,
                        MMSmsState state,
+                       MMSmsStorage storage,
                        MMSmsPart *part,
                        GError **error)
 {
@@ -948,6 +960,7 @@ mm_sms_singlepart_new (MMBaseModem *modem,
     self = mm_sms_new (modem);
     g_object_set (self,
                   "state", state,
+                  "storage", storage,
                   NULL);
 
     /* Keep the single part in the list */
@@ -965,6 +978,7 @@ mm_sms_singlepart_new (MMBaseModem *modem,
 MMSms *
 mm_sms_multipart_new (MMBaseModem *modem,
                       MMSmsState state,
+                      MMSmsStorage storage,
                       guint reference,
                       guint max_parts,
                       MMSmsPart *first_part,
@@ -983,6 +997,7 @@ mm_sms_multipart_new (MMBaseModem *modem,
                   MM_SMS_MAX_PARTS,           max_parts,
                   MM_SMS_MULTIPART_REFERENCE, reference,
                   "state", state,
+                  "storage", storage,
                   NULL);
 
     if (!mm_sms_multipart_take_part (self, first_part, error))
@@ -1018,6 +1033,7 @@ mm_sms_new_from_properties (MMBaseModem *modem,
 
     return mm_sms_singlepart_new (modem,
                                   MM_SMS_STATE_UNKNOWN,
+                                  MM_SMS_STORAGE_UNKNOWN, /* not stored anywhere yet */
                                   part,
                                   error);
 }

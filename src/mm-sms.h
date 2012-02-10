@@ -88,11 +88,13 @@ MMSms *mm_sms_new_from_properties (MMBaseModem *modem,
 
 MMSms *mm_sms_singlepart_new (MMBaseModem *modem,
                               MMSmsState state,
+                              MMSmsStorage storage,
                               MMSmsPart *part,
                               GError **error);
 
 MMSms    *mm_sms_multipart_new       (MMBaseModem *modem,
                                       MMSmsState state,
+                                      MMSmsStorage storage,
                                       guint reference,
                                       guint max_parts,
                                       MMSmsPart *first_part,

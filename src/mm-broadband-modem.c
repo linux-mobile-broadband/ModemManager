@@ -3845,7 +3845,9 @@ sms_part_ready (MMBroadbandModem *self,
         mm_dbg ("Correctly parsed PDU (%d)", ctx->idx);
         mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
                                             part,
-                                            MM_SMS_STATE_RECEIVED);
+                                            MM_SMS_STATE_RECEIVED,
+                                            /* use default reception (mem3) storage */
+                                            self->priv->modem_messaging_sms_mem3_storage);
     } else {
         /* Don't treat the error as critical */
         mm_dbg ("Error parsing PDU (%d): %s", ctx->idx, error->message);
@@ -3958,6 +3960,21 @@ modem_messaging_cleanup_unsolicited_events (MMIfaceModemMessaging *self,
 /*****************************************************************************/
 /* Load initial list of SMS parts (Messaging interface) */
 
+typedef struct {
+    MMBroadbandModem *self;
+    GSimpleAsyncResult *result;
+    MMSmsStorage list_storage;
+} ListPartsContext;
+
+static void
+list_parts_context_complete_and_free (ListPartsContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
 static gboolean
 modem_messaging_load_initial_sms_parts_finish (MMIfaceModemMessaging *self,
                                                GAsyncResult *res,
@@ -4031,7 +4048,7 @@ sms_state_from_str (const gchar *str)
 static void
 sms_text_part_list_ready (MMBroadbandModem *self,
                           GAsyncResult *res,
-                          GSimpleAsyncResult *simple)
+                          ListPartsContext *ctx)
 {
     GRegex *r;
     GMatchInfo *match_info = NULL;
@@ -4040,9 +4057,8 @@ sms_text_part_list_ready (MMBroadbandModem *self,
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_simple_async_result_take_error (ctx->result, error);
+        list_parts_context_complete_and_free (ctx);
         return;
     }
 
@@ -4052,12 +4068,11 @@ sms_text_part_list_ready (MMBroadbandModem *self,
     g_assert (r);
 
     if (!g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, NULL)) {
-        g_simple_async_result_set_error (simple,
+        g_simple_async_result_set_error (ctx->result,
                                          MM_CORE_ERROR,
                                          MM_CORE_ERROR_INVALID_ARGS,
                                          "Couldn't parse SMS list response");
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        list_parts_context_complete_and_free (ctx);
         g_regex_unref (r);
         return;
     }
@@ -4125,7 +4140,8 @@ sms_text_part_list_ready (MMBroadbandModem *self,
         mm_dbg ("Correctly parsed SMS list entry (%d)", idx);
         mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
                                             part,
-                                            sms_state_from_str (stat));
+                                            sms_state_from_str (stat),
+                                            ctx->list_storage);
         g_free (stat);
 next:
         g_match_info_next (match_info, NULL);
@@ -4134,9 +4150,8 @@ next:
     g_regex_unref (r);
 
     /* We consider all done */
-    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    list_parts_context_complete_and_free (ctx);
 }
 
 static MMSmsState
@@ -4159,16 +4174,15 @@ sms_state_from_index (guint index)
 static void
 sms_pdu_part_list_ready (MMBroadbandModem *self,
                          GAsyncResult *res,
-                         GSimpleAsyncResult *simple)
+                         ListPartsContext *ctx)
 {
     const gchar *response;
     GError *error = NULL;
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_simple_async_result_take_error (ctx->result, error);
+        list_parts_context_complete_and_free (ctx);
         return;
     }
 
@@ -4185,14 +4199,13 @@ sms_pdu_part_list_ready (MMBroadbandModem *self,
                      "+CMGL: %d,%d,,%d %" G_STRINGIFY (SMS_MAX_PDU_LEN) "s %n",
                      &idx, &status, &tpdu_len, pdu, &offset);
         if (4 != rv) {
-            g_simple_async_result_set_error (simple,
+            g_simple_async_result_set_error (ctx->result,
                                              MM_CORE_ERROR,
                                              MM_CORE_ERROR_INVALID_ARGS,
                                              "Couldn't parse SMS list response: "
                                              "only %d fields parsed",
                                              rv);
-            g_simple_async_result_complete (simple);
-            g_object_unref (simple);
+            list_parts_context_complete_and_free (ctx);
             return;
         }
 
@@ -4204,7 +4217,8 @@ sms_pdu_part_list_ready (MMBroadbandModem *self,
             mm_dbg ("Correctly parsed PDU (%d)", idx);
             mm_iface_modem_messaging_take_part (MM_IFACE_MODEM_MESSAGING (self),
                                                 part,
-                                                sms_state_from_index (status));
+                                                sms_state_from_index (status),
+                                                ctx->list_storage);
         } else {
             /* Don't treat the error as critical */
             mm_dbg ("Error parsing PDU (%d): %s", idx, error->message);
@@ -4213,15 +4227,14 @@ sms_pdu_part_list_ready (MMBroadbandModem *self,
     }
 
     /* We consider all done */
-    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    list_parts_context_complete_and_free (ctx);
 }
 
 static void
 list_parts_storage_ready (MMBroadbandModem *self,
                           GAsyncResult *res,
-                          GSimpleAsyncResult *simple)
+                          ListPartsContext *ctx)
 {
     GError *error = NULL;
 
@@ -4229,9 +4242,8 @@ list_parts_storage_ready (MMBroadbandModem *self,
             MM_IFACE_MODEM_MESSAGING (self),
             res,
             &error)) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
+        g_simple_async_result_take_error (ctx->result, error);
+        list_parts_context_complete_and_free (ctx);
         return;
     }
 
@@ -4249,7 +4261,7 @@ list_parts_storage_ready (MMBroadbandModem *self,
                               (GAsyncReadyCallback) (MM_BROADBAND_MODEM (self)->priv->modem_messaging_sms_pdu_mode ?
                                                      sms_pdu_part_list_ready :
                                                      sms_text_part_list_ready),
-                              simple);
+                              ctx);
 }
 
 static void
@@ -4258,12 +4270,15 @@ modem_messaging_load_initial_sms_parts (MMIfaceModemMessaging *self,
                                         GAsyncReadyCallback callback,
                                         gpointer user_data)
 {
-    GSimpleAsyncResult *result;
+    ListPartsContext *ctx;
 
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        modem_messaging_load_initial_sms_parts);
+    ctx = g_new0 (ListPartsContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             modem_messaging_load_initial_sms_parts);
+    ctx->list_storage = storage;
 
     mm_dbg ("Listing SMS parts in storage '%s'",
             mm_sms_storage_get_string (storage));
@@ -4274,7 +4289,7 @@ modem_messaging_load_initial_sms_parts (MMIfaceModemMessaging *self,
                                                      MM_SMS_STORAGE_UNKNOWN,
                                                      MM_SMS_STORAGE_UNKNOWN,
                                                      (GAsyncReadyCallback)list_parts_storage_ready,
-                                                     result);
+                                                     ctx);
 }
 
 /*****************************************************************************/

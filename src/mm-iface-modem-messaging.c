@@ -273,7 +273,8 @@ handle_list (MmGdbusModemMessaging *skeleton,
 gboolean
 mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
                                     MMSmsPart *sms_part,
-                                    MMSmsState state)
+                                    MMSmsState state,
+                                    MMSmsStorage storage)
 {
     MMSmsList *list = NULL;
     GError *error = NULL;
@@ -283,7 +284,7 @@ mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
                   MM_IFACE_MODEM_MESSAGING_SMS_LIST, &list,
                   NULL);
     g_assert (list != NULL);
-    added = mm_sms_list_take_part (list, sms_part, state, &error);
+    added = mm_sms_list_take_part (list, sms_part, state, storage, &error);
     if (!added) {
         mm_dbg ("Couldn't take part in SMS list: '%s'", error->message);
         g_error_free (error);

@@ -222,12 +222,14 @@ static gboolean
 take_singlepart (MMSmsList *self,
                  MMSmsPart *part,
                  MMSmsState state,
+                 MMSmsStorage storage,
                  GError **error)
 {
     MMSms *sms;
 
     sms = mm_sms_singlepart_new (self->priv->modem,
                                  state,
+                                 storage,
                                  part,
                                  error);
     if (!sms)
@@ -244,6 +246,7 @@ static gboolean
 take_multipart (MMSmsList *self,
                 MMSmsPart *part,
                 MMSmsState state,
+                MMSmsStorage storage,
                 GError **error)
 {
     GList *l;
@@ -261,6 +264,7 @@ take_multipart (MMSmsList *self,
     /* Create new Multipart */
     sms = mm_sms_multipart_new (self->priv->modem,
                                 state,
+                                storage,
                                 concat_reference,
                                 mm_sms_part_get_concat_max (part),
                                 part,
@@ -288,6 +292,7 @@ gboolean
 mm_sms_list_take_part (MMSmsList *self,
                        MMSmsPart *part,
                        MMSmsState state,
+                       MMSmsStorage storage,
                        GError **error)
 {
     /* Ensure we don't have already taken a part with the same index */
@@ -304,10 +309,10 @@ mm_sms_list_take_part (MMSmsList *self,
 
     /* Did we just get a part of a multi-part SMS? */
     if (mm_sms_part_should_concat (part))
-        return take_multipart (self, part, state, error);
+        return take_multipart (self, part, state, storage, error);
 
     /* Otherwise, we build a whole new single-part MMSms just from this part */
-    return take_singlepart (self, part, state, error);
+    return take_singlepart (self, part, state, storage, error);
 }
 
 /*****************************************************************************/

@@ -64,6 +64,7 @@ guint mm_sms_list_get_count (MMSmsList *self);
 gboolean mm_sms_list_take_part (MMSmsList *self,
                                 MMSmsPart *part,
                                 MMSmsState state,
+                                MMSmsStorage storage,
                                 GError **error);
 
 void mm_sms_list_add_sms (MMSmsList *self,
