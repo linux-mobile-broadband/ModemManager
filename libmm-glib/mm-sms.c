@@ -256,6 +256,22 @@ mm_sms_get_state (MMSms *self)
 }
 
 /**
+ * mm_sms_get_storage:
+ * @self: A #MMSms.
+ *
+ * TODO
+ *
+ * Returns: TODO
+ */
+MMSmsStorage
+mm_sms_get_storage (MMSms *self)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_SMS (self), FALSE);
+
+    return mm_gdbus_sms_get_storage (self);
+}
+
+/**
  * mm_sms_send:
  * @self: A #MMSms.
  * @cancellable: (allow-none): A #GCancellable or %NULL.

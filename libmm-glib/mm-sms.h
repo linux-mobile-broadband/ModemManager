@@ -84,6 +84,7 @@ gchar       *mm_sms_dup_timestamp (MMSms *self);
 guint        mm_sms_get_validity  (MMSms *self);
 guint        mm_sms_get_class     (MMSms *self);
 MMSmsState   mm_sms_get_state     (MMSms *self);
+MMSmsStorage mm_sms_get_storage   (MMSms *self);
 
 G_END_DECLS
 
