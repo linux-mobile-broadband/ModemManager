@@ -345,6 +345,9 @@ mm_iface_modem_messaging_set_preferred_storages (MMIfaceModemMessaging *self,
 {
     GError *error = NULL;
     StorageContext *ctx;
+    MMSmsStorage default_mem1;
+    MMSmsStorage default_mem2;
+    MMSmsStorage default_mem3;
 
     if (!MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_preferred_storages ||
         !MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_preferred_storages_finish) {
@@ -368,6 +371,23 @@ mm_iface_modem_messaging_set_preferred_storages (MMIfaceModemMessaging *self,
                                                    error);
         return;
     }
+
+    default_mem1 = MM_SMS_STORAGE_UNKNOWN;
+    default_mem2 = MM_SMS_STORAGE_UNKNOWN;
+    default_mem3 = MM_SMS_STORAGE_UNKNOWN;
+    g_object_get (self,
+                  MM_IFACE_MODEM_MESSAGING_SMS_MEM1_STORAGE, &default_mem1,
+                  MM_IFACE_MODEM_MESSAGING_SMS_MEM2_STORAGE, &default_mem2,
+                  MM_IFACE_MODEM_MESSAGING_SMS_MEM3_STORAGE, &default_mem3,
+                  NULL);
+
+    /* If unknown given, set defaults */
+    if (mem1 == MM_SMS_STORAGE_UNKNOWN)
+        mem1 = default_mem1;
+    if (mem2 == MM_SMS_STORAGE_UNKNOWN)
+        mem2 = default_mem2;
+    if (mem3 == MM_SMS_STORAGE_UNKNOWN)
+        mem3 = default_mem3;
 
     MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_preferred_storages (
         self, mem1, mem2, mem3, callback, user_data);
