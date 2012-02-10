@@ -146,14 +146,16 @@ print_sms_info (MMSms *sms)
              "             |      smsc: '%s'\n"
              "             | timestamp: '%s'\n"
              "             |  validity: '%u'\n"
-             "             |     class: '%u'\n",
+             "             |     class: '%u'\n"
+             "             |   storage: '%s'\n",
              VALIDATE (mm_sms_get_text (sms)),
              VALIDATE (mm_sms_get_number (sms)),
              mm_sms_state_get_string (mm_sms_get_state (sms)),
              VALIDATE (mm_sms_get_smsc (sms)),
              VALIDATE (mm_sms_get_timestamp (sms)),
              mm_sms_get_validity (sms),
-             mm_sms_get_class (sms));
+             mm_sms_get_class (sms),
+             mm_sms_storage_get_string (mm_sms_get_storage (sms)));
 }
 
 static void
