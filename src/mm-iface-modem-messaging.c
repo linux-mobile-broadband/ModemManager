@@ -298,6 +298,79 @@ mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
 
 /*****************************************************************************/
 
+gboolean
+mm_iface_modem_messaging_set_preferred_storages_finish (MMIfaceModemMessaging *self,
+                                                        GAsyncResult *res,
+                                                        GError **error)
+{
+    if (MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_preferred_storages_finish)
+        return MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_preferred_storages_finish (self, res, error);
+
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static gboolean
+is_storage_supported (GArray *supported,
+                      MMSmsStorage preferred,
+                      const gchar *name,
+                      GError **error)
+{
+    guint i;
+
+    for (i = 0; i < supported->len; i++) {
+        if (preferred == g_array_index (supported, MMSmsStorage, i))
+            return TRUE;
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_UNSUPPORTED,
+                 "Storage '%s' is not supported in '%s'",
+                 mm_sms_storage_get_string (preferred),
+                 name);
+    return FALSE;
+}
+
+void
+mm_iface_modem_messaging_set_preferred_storages (MMIfaceModemMessaging *self,
+                                                 MMSmsStorage mem1,
+                                                 MMSmsStorage mem2,
+                                                 MMSmsStorage mem3,
+                                                 GAsyncReadyCallback callback,
+                                                 gpointer user_data)
+{
+    GError *error = NULL;
+    StorageContext *ctx;
+
+    if (!MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_preferred_storages ||
+        !MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_preferred_storages_finish) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Setting preferred storage is not supported");
+        return;
+    }
+
+    /* Check if the requested storages are really supported */
+    ctx = get_storage_context (self);
+    if (!is_storage_supported (ctx->supported_mem1, mem1, "mem1", &error) ||
+        !is_storage_supported (ctx->supported_mem2, mem2, "mem2", &error) ||
+        !is_storage_supported (ctx->supported_mem3, mem3, "mem3", &error)) {
+        g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
+                                                   callback,
+                                                   user_data,
+                                                   error);
+        return;
+    }
+
+    MM_IFACE_MODEM_MESSAGING_GET_INTERFACE (self)->set_preferred_storages (
+        self, mem1, mem2, mem3, callback, user_data);
+}
+
+/*****************************************************************************/
+
 static void
 sms_added (MMSmsList *list,
            const gchar *sms_path,

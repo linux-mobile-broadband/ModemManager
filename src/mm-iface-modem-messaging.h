@@ -63,6 +63,17 @@ struct _MMIfaceModemMessaging {
                                                 GArray **mem3,
                                                 GError **error);
 
+    /* Set preferred storages (async) */
+    void (* set_preferred_storages) (MMIfaceModemMessaging *self,
+                                     MMSmsStorage mem1,
+                                     MMSmsStorage mem2,
+                                     MMSmsStorage mem3,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data);
+    gboolean (*set_preferred_storages_finish) (MMIfaceModemMessaging *self,
+                                               GAsyncResult *res,
+                                               GError **error);
+
     /* Setup SMS format (async) */
     void (* setup_sms_format) (MMIfaceModemMessaging *self,
                                GAsyncReadyCallback callback,
@@ -138,5 +149,16 @@ void mm_iface_modem_messaging_bind_simple_status (MMIfaceModemMessaging *self,
 gboolean mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,
                                              MMSmsPart *sms_part,
                                              MMSmsState state);
+
+/* Set preferred storages */
+void mm_iface_modem_messaging_set_preferred_storages (MMIfaceModemMessaging *self,
+                                                      MMSmsStorage mem1,
+                                                      MMSmsStorage mem2,
+                                                      MMSmsStorage mem3,
+                                                      GAsyncReadyCallback callback,
+                                                      gpointer user_data);
+gboolean mm_iface_modem_messaging_set_preferred_storages_finish (MMIfaceModemMessaging *self,
+                                                                 GAsyncResult *res,
+                                                                 GError **error);
 
 #endif /* MM_IFACE_MODEM_MESSAGING_H */
