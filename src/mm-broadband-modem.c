@@ -3615,6 +3615,63 @@ modem_messaging_load_supported_storages (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
+/* Set preferred SMS storage (Messaging interface) */
+
+static gboolean
+modem_messaging_set_preferred_storages_finish (MMIfaceModemMessaging *self,
+                                               GAsyncResult *res,
+                                               GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+cpms_set_ready (MMBroadbandModem *self,
+                GAsyncResult *res,
+                GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_messaging_set_preferred_storages (MMIfaceModemMessaging *self,
+                                        MMSmsStorage mem1,
+                                        MMSmsStorage mem2,
+                                        MMSmsStorage mem3,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data)
+{
+    gchar *cmd;
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_messaging_set_preferred_storages);
+
+    cmd = g_strdup_printf ("+CPMS=\"%s\",\"%s\",\"%s\"",
+                           g_ascii_strup (mm_sms_storage_get_string (mem1), -1),
+                           g_ascii_strup (mm_sms_storage_get_string (mem2), -1),
+                           g_ascii_strup (mm_sms_storage_get_string (mem3), -1));
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              cmd,
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)cpms_set_ready,
+                              result);
+    g_free (cmd);
+}
+
+/*****************************************************************************/
 /* Setup SMS format (Messaging interface) */
 
 static gboolean
@@ -4186,7 +4243,7 @@ list_parts_storage_ready (MMBroadbandModem *self,
                               (MM_BROADBAND_MODEM (self)->priv->modem_messaging_sms_pdu_mode ?
                                "+CMGL=4" :
                                "+CMGL=\"ALL\""),
-                              10,
+                              20,
                               FALSE,
                               NULL, /* cancellable */
                               (GAsyncReadyCallback) (MM_BROADBAND_MODEM (self)->priv->modem_messaging_sms_pdu_mode ?
@@ -6634,6 +6691,8 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
     iface->check_support_finish = modem_messaging_check_support_finish;
     iface->load_supported_storages = modem_messaging_load_supported_storages;
     iface->load_supported_storages_finish = modem_messaging_load_supported_storages_finish;
+    iface->set_preferred_storages = modem_messaging_set_preferred_storages;
+    iface->set_preferred_storages_finish = modem_messaging_set_preferred_storages_finish;
     iface->setup_sms_format = modem_messaging_setup_sms_format;
     iface->setup_sms_format_finish = modem_messaging_setup_sms_format_finish;
     iface->load_initial_sms_parts = modem_messaging_load_initial_sms_parts;
