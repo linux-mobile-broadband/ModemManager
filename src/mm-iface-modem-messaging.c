@@ -355,7 +355,7 @@ mm_iface_modem_messaging_set_preferred_storages (MMIfaceModemMessaging *self,
                                              callback,
                                              user_data,
                                              MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
+                                             MM_CORE_ERROR_UNSUPPORTED,
                                              "Setting preferred storage is not supported");
         return;
     }
@@ -552,6 +552,7 @@ typedef enum {
     ENABLING_STEP_SETUP_SMS_FORMAT,
     ENABLING_STEP_SETUP_UNSOLICITED_EVENTS,
     ENABLING_STEP_LOAD_INITIAL_SMS_PARTS,
+    ENABLING_STEP_STORAGE_DEFAULTS,
     ENABLING_STEP_LAST
 } EnablingStep;
 
@@ -689,6 +690,23 @@ load_initial_sms_parts_from_storages (EnablingContext *ctx)
 }
 
 static void
+set_default_storages_ready (MMIfaceModemMessaging *self,
+                            GAsyncResult *res,
+                            EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_iface_modem_messaging_set_preferred_storages_finish (self, res, &error)) {
+        mm_dbg ("Couldn't set preferred storages: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Go on with next step */
+    ctx->step++;
+    interface_enabling_step (ctx);
+}
+
+static void
 interface_enabling_step (EnablingContext *ctx)
 {
     switch (ctx->step) {
@@ -751,6 +769,17 @@ interface_enabling_step (EnablingContext *ctx)
         }
         /* Fall down to next step */
         ctx->step++;
+
+    case ENABLING_STEP_STORAGE_DEFAULTS:
+        /* Set storage defaults */
+        mm_dbg ("Setting default preferred storages...");
+        mm_iface_modem_messaging_set_preferred_storages (ctx->self,
+                                                         MM_SMS_STORAGE_UNKNOWN,
+                                                         MM_SMS_STORAGE_UNKNOWN,
+                                                         MM_SMS_STORAGE_UNKNOWN,
+                                                         (GAsyncReadyCallback)set_default_storages_ready,
+                                                         ctx);
+        return;
 
     case ENABLING_STEP_LAST:
         /* We are done without errors! */
