@@ -54,6 +54,7 @@ libmm-common/mm-gdbus-*.[ch]
 libmm-common/mm-enums-types.[ch]
 libmm-common/mm-errors-types.[ch]
 libmm-common/*.xml
+libmm-common/tests/test-common-helpers
 
 po/Makefile.in.in
 po/POTFILES

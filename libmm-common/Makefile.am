@@ -1,3 +1,4 @@
+SUBDIRS = . tests
 
 lib_LTLIBRARIES = libmm-common.la
 

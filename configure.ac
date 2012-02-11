@@ -196,6 +196,7 @@ data/Makefile
 include/Makefile
 build-aux/Makefile
 libmm-common/Makefile
+libmm-common/tests/Makefile
 libqcdm/Makefile
 libqcdm/src/Makefile
 libqcdm/tests/Makefile
