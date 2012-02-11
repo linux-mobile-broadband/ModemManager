@@ -46,4 +46,13 @@ GVariant    *mm_common_bands_garray_to_variant (GArray *array);
 GVariant    *mm_common_build_bands_any     (void);
 GVariant    *mm_common_build_bands_unknown (void);
 
+typedef gboolean (*MMParseKeyValueForeachFn) (const gchar *key,
+                                              const gchar *value,
+                                              gpointer user_data);
+gboolean mm_common_parse_key_value_string (const gchar *str,
+                                           GError **error,
+                                           MMParseKeyValueForeachFn callback,
+                                           gpointer user_data);
+
+
 #endif /* MM_COMMON_HELPERS_H */
