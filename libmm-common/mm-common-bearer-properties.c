@@ -256,58 +256,43 @@ mm_common_bearer_properties_consume_string (MMCommonBearerProperties *self,
     return TRUE;
 }
 
+typedef struct {
+    MMCommonBearerProperties *properties;
+    GError *error;
+} ParseKeyValueContext;
+
+static gboolean
+key_value_foreach (const gchar *key,
+                   const gchar *value,
+                   ParseKeyValueContext *ctx)
+{
+    return mm_common_bearer_properties_consume_string (ctx->properties,
+                                                       key,
+                                                       value,
+                                                       &ctx->error);
+}
+
 MMCommonBearerProperties *
 mm_common_bearer_properties_new_from_string (const gchar *str,
                                              GError **error)
 {
-    GError *inner_error = NULL;
-    MMCommonBearerProperties *properties;
-    gchar **words;
-    gchar *key;
-    gchar *value;
-    guint i;
+    ParseKeyValueContext ctx;
 
-    properties = mm_common_bearer_properties_new ();
+    ctx.error = NULL;
+    ctx.properties = mm_common_bearer_properties_new ();
 
-    /* Expecting input as:
-     *   key1=string,key2=true,key3=false...
-     * */
-
-    words = g_strsplit_set (str, ",= ", -1);
-    if (!words)
-        return properties;
-
-    i = 0;
-    key = words[i];
-    while (key) {
-        value = words[++i];
-
-        if (!value) {
-            inner_error = g_error_new (MM_CORE_ERROR,
-                                       MM_CORE_ERROR_INVALID_ARGS,
-                                       "Invalid properties string, no value for key '%s'",
-                                       key);
-            break;
-        }
-
-        if (!mm_common_bearer_properties_consume_string (properties,
-                                                         key,
-                                                         value,
-                                                         &inner_error))
-            break;
-
-        key = words[++i];
-    }
-
+    mm_common_parse_key_value_string (str,
+                                      &ctx.error,
+                                      (MMParseKeyValueForeachFn)key_value_foreach,
+                                      &ctx);
     /* If error, destroy the object */
-    if (inner_error) {
-        g_propagate_error (error, inner_error);
-        g_object_unref (properties);
-        properties = NULL;
+    if (ctx.error) {
+        g_propagate_error (error, ctx.error);
+        g_object_unref (ctx.properties);
+        ctx.properties = NULL;
     }
 
-    g_strfreev (words);
-    return properties;
+    return ctx.properties;
 }
 
 /*****************************************************************************/
