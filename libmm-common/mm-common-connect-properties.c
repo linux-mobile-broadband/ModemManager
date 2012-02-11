@@ -271,109 +271,104 @@ mm_common_connect_properties_get_dictionary (MMCommonConnectProperties *self)
 
 /*****************************************************************************/
 
+typedef struct {
+    MMCommonConnectProperties *properties;
+    GError *error;
+    gchar *allowed_modes_str;
+    gchar *preferred_mode_str;
+} ParseKeyValueContext;
+
+static gboolean
+key_value_foreach (const gchar *key,
+                   const gchar *value,
+                   ParseKeyValueContext *ctx)
+{
+    /* First, check if we can consume this as bearer properties */
+    if (mm_common_bearer_properties_consume_string (ctx->properties->priv->bearer_properties,
+                                                    key, value,
+                                                    NULL))
+        return TRUE;
+
+    if (g_str_equal (key, PROPERTY_PIN))
+        mm_common_connect_properties_set_pin (ctx->properties, value);
+    else if (g_str_equal (key, PROPERTY_OPERATOR_ID))
+        mm_common_connect_properties_set_operator_id (ctx->properties, value);
+    else if (g_str_equal (key, PROPERTY_ALLOWED_BANDS)) {
+        MMModemBand *bands = NULL;
+        guint n_bands = 0;
+
+        mm_common_get_bands_from_string (value, &bands, &n_bands, &ctx->error);
+        if (!ctx->error) {
+            mm_common_connect_properties_set_allowed_bands (ctx->properties, bands, n_bands);
+            g_free (bands);
+        }
+    } else if (g_str_equal (key, PROPERTY_ALLOWED_MODES)) {
+        ctx->allowed_modes_str = g_strdup (value);
+    } else if (g_str_equal (key, PROPERTY_PREFERRED_MODE)) {
+        ctx->preferred_mode_str = g_strdup (value);
+    } else {
+        ctx->error = g_error_new (MM_CORE_ERROR,
+                                  MM_CORE_ERROR_INVALID_ARGS,
+                                  "Invalid properties string, unexpected key '%s'",
+                                  key);
+    }
+
+    return !ctx->error;
+}
+
 MMCommonConnectProperties *
 mm_common_connect_properties_new_from_string (const gchar *str,
                                               GError **error)
 {
-    GError *inner_error = NULL;
-    MMCommonConnectProperties *properties;
-    gchar **words;
-    gchar *key;
-    gchar *value;
-    guint i;
-    const gchar *allowed_modes_str = NULL;
-    const gchar *preferred_mode_str = NULL;
+    ParseKeyValueContext ctx;
 
-    properties = mm_common_connect_properties_new ();
+    ctx.error = NULL;
+    ctx.allowed_modes_str = NULL;
+    ctx.preferred_mode_str = NULL;
+    ctx.properties = mm_common_connect_properties_new ();
 
-    /* Expecting input as:
-     *   key1=string,key2=true,key3=false...
-     * */
-
-    words = g_strsplit_set (str, ",= ", -1);
-    if (!words)
-        return properties;
-
-    i = 0;
-    key = words[i];
-    while (key) {
-        value = words[++i];
-
-        if (!value) {
-            inner_error = g_error_new (MM_CORE_ERROR,
-                                       MM_CORE_ERROR_INVALID_ARGS,
-                                       "Invalid properties string, no value for key '%s'",
-                                       key);
-            break;
-        }
-
-        /* First, check if we can consume this as bearer properties */
-        if (!mm_common_bearer_properties_consume_string (properties->priv->bearer_properties,
-                                                         key, value,
-                                                         NULL)) {
-            if (g_str_equal (key, PROPERTY_PIN))
-                mm_common_connect_properties_set_pin (properties, value);
-            else if (g_str_equal (key, PROPERTY_OPERATOR_ID))
-                mm_common_connect_properties_set_operator_id (properties, value);
-            else if (g_str_equal (key, PROPERTY_ALLOWED_BANDS)) {
-                MMModemBand *bands = NULL;
-                guint n_bands = 0;
-
-                mm_common_get_bands_from_string (value, &bands, &n_bands, &inner_error);
-                if (!inner_error)
-                    mm_common_connect_properties_set_allowed_bands (properties, bands, n_bands);
-                g_free (bands);
-            } else if (g_str_equal (key, PROPERTY_ALLOWED_MODES)) {
-                allowed_modes_str = value;
-            } else if (g_str_equal (key, PROPERTY_PREFERRED_MODE)) {
-                preferred_mode_str = value;
-            } else {
-                inner_error = g_error_new (MM_CORE_ERROR,
-                                           MM_CORE_ERROR_INVALID_ARGS,
-                                           "Invalid properties string, unexpected key '%s'",
-                                           key);
-                break;
-            }
-        }
-
-        key = words[++i];
-    }
+    mm_common_parse_key_value_string (str,
+                                      &ctx.error,
+                                      (MMParseKeyValueForeachFn)key_value_foreach,
+                                      &ctx);
 
     /* If error, destroy the object */
-    if (inner_error) {
-        g_propagate_error (error, inner_error);
-        g_object_unref (properties);
-        properties = NULL;
+    if (ctx.error) {
+        g_propagate_error (error, ctx.error);
+        g_object_unref (ctx.properties);
+        ctx.properties = NULL;
     }
-    else if (allowed_modes_str || preferred_mode_str) {
+    else if (ctx.allowed_modes_str || ctx.preferred_mode_str) {
         MMModemMode allowed_modes;
         MMModemMode preferred_mode;
 
-        allowed_modes = (allowed_modes_str ?
-                         mm_common_get_modes_from_string (allowed_modes_str,
-                                                          &inner_error) :
+        allowed_modes = (ctx.allowed_modes_str ?
+                         mm_common_get_modes_from_string (ctx.allowed_modes_str,
+                                                          &ctx.error) :
                          MM_MODEM_MODE_ANY);
-        if (!inner_error) {
-            preferred_mode = (preferred_mode_str ?
-                              mm_common_get_modes_from_string (preferred_mode_str,
-                                                               &inner_error) :
+        if (!ctx.error) {
+            preferred_mode = (ctx.preferred_mode_str ?
+                              mm_common_get_modes_from_string (ctx.preferred_mode_str,
+                                                               &ctx.error) :
                               MM_MODEM_MODE_NONE);
         }
 
-        if (inner_error) {
-            g_propagate_error (error, inner_error);
-            g_object_unref (properties);
-            properties = NULL;
+        if (ctx.error) {
+            g_propagate_error (error, ctx.error);
+            g_object_unref (ctx.properties);
+            ctx.properties = NULL;
         } else {
             mm_common_connect_properties_set_allowed_modes (
-                properties,
+                ctx.properties,
                 allowed_modes,
                 preferred_mode);
         }
     }
 
-    g_strfreev (words);
-    return properties;
+    g_free (ctx.allowed_modes_str);
+    g_free (ctx.preferred_mode_str);
+
+    return ctx.properties;
 }
 
 /*****************************************************************************/
