@@ -45,7 +45,7 @@ mm-serial-enums-types.h: Makefile.am $(SERIAL_ENUMS) $(top_srcdir)/build-aux/mm-
 		--ftail "#endif /* __MM_SERIAL_ENUMS_TYPES_H__ */\n" \
 		$(SERIAL_ENUMS) > $@
 
-mm-serial-enums-types.c: Makefile.am $(top_srcdir)/include/ModemManager-enums.h $(top_srcdir)/build-aux/mm-enums-template.c mm-serial-enums-types.h
+mm-serial-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-template.c mm-serial-enums-types.h
 	$(AM_V_GEN) glib-mkenums \
 		--fhead "#include \"mm-serial-enums-types.h\"" \
 		--template $(top_srcdir)/build-aux/mm-enums-template.c \
@@ -81,7 +81,7 @@ mm-daemon-enums-types.h: Makefile.am $(DAEMON_ENUMS) $(top_srcdir)/build-aux/mm-
 		--ftail "#endif /* __MM_DAEMON_ENUMS_TYPES_H__ */\n" \
 		$(DAEMON_ENUMS) > $@
 
-mm-daemon-enums-types.c: Makefile.am $(top_srcdir)/include/ModemManager-enums.h $(top_srcdir)/build-aux/mm-enums-template.c mm-daemon-enums-types.h
+mm-daemon-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-template.c mm-daemon-enums-types.h
 	$(AM_V_GEN) glib-mkenums \
 		--fhead "#include \"mm-daemon-enums-types.h\"" \
 		--template $(top_srcdir)/build-aux/mm-enums-template.c \
