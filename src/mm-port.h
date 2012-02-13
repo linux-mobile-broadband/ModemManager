@@ -19,7 +19,7 @@
 #include <glib.h>
 #include <glib-object.h>
 
-typedef enum {
+typedef enum { /*< underscore_name=mm_port_subsys >*/
     MM_PORT_SUBSYS_UNKNOWN = 0x0,
     MM_PORT_SUBSYS_TTY,
     MM_PORT_SUBSYS_NET,
@@ -27,7 +27,7 @@ typedef enum {
     MM_PORT_SUBSYS_LAST = MM_PORT_SUBSYS_NET
 } MMPortSubsys;
 
-typedef enum {
+typedef enum { /*< underscore_name=mm_port_type >*/
     MM_PORT_TYPE_UNKNOWN = 0x0,
     MM_PORT_TYPE_AT,
     MM_PORT_TYPE_IGNORED,
@@ -79,4 +79,3 @@ const char * mm_port_type_to_name       (MMPortType ptype);
 const char * mm_port_subsys_to_name     (MMPortSubsys psubsys);
 
 #endif /* MM_PORT_H */
-

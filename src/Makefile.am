@@ -35,6 +35,22 @@ libmodem_helpers_la_SOURCES = \
 	mm-sms-utils.c \
 	mm-sms-utils.h
 
+# libserial specific enum types
+SERIAL_ENUMS = mm-port.h
+
+mm-serial-enums-types.h: Makefile.am $(SERIAL_ENUMS) $(top_srcdir)/build-aux/mm-enums-template.h
+	$(AM_V_GEN) glib-mkenums \
+		--fhead "#include \"mm-port.h\"\n#ifndef __MM_SERIAL_ENUMS_TYPES_H__\n#define __MM_SERIAL_ENUMS_TYPES_H__\n" \
+		--template $(top_srcdir)/build-aux/mm-enums-template.h \
+		--ftail "#endif /* __MM_SERIAL_ENUMS_TYPES_H__ */\n" \
+		$(SERIAL_ENUMS) > $@
+
+mm-serial-enums-types.c: Makefile.am $(top_srcdir)/include/ModemManager-enums.h $(top_srcdir)/build-aux/mm-enums-template.c mm-serial-enums-types.h
+	$(AM_V_GEN) glib-mkenums \
+		--fhead "#include \"mm-serial-enums-types.h\"" \
+		--template $(top_srcdir)/build-aux/mm-enums-template.c \
+		$(SERIAL_ENUMS) > $@
+
 libserial_la_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	-I$(top_srcdir) \
@@ -51,7 +67,9 @@ libserial_la_SOURCES = \
 	mm-at-serial-port.c \
 	mm-at-serial-port.h \
 	mm-qcdm-serial-port.c \
-	mm-qcdm-serial-port.h
+	mm-qcdm-serial-port.h \
+	mm-serial-enums-types.h \
+	mm-serial-enums-types.c
 
 # Daemon specific enum types
 DAEMON_ENUMS = mm-bearer.h
