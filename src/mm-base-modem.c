@@ -238,7 +238,7 @@ mm_base_modem_grab_port (MMBaseModem *self,
             int i;
 
             /* AT port */
-            port = MM_PORT (mm_at_serial_port_new (name, ptype));
+            port = MM_PORT (mm_at_serial_port_new (name));
 
             /* Set common response parser */
             mm_at_serial_port_set_response_parser (MM_AT_SERIAL_PORT (port),

@@ -31,6 +31,7 @@ typedef enum { /*< underscore_name=mm_port_type >*/
     MM_PORT_TYPE_UNKNOWN = 0x0,
     MM_PORT_TYPE_AT,
     MM_PORT_TYPE_IGNORED,
+    MM_PORT_TYPE_AT,
     MM_PORT_TYPE_QCDM,
 
     MM_PORT_TYPE_LAST = MM_PORT_TYPE_QCDM
