@@ -28,6 +28,7 @@
 #include "mm-base-modem.h"
 
 #include "mm-log.h"
+#include "mm-serial-enums-types.h"
 #include "mm-at-serial-port.h"
 #include "mm-qcdm-serial-port.h"
 #include "mm-serial-parsers.h"
@@ -132,7 +133,7 @@ serial_port_timed_out_cb (MMSerialPort *port,
     if (self->priv->max_timeouts > 0 &&
         n_consecutive_timeouts >= self->priv->max_timeouts) {
         mm_warn ("(%s/%s) port timed out %u times, marking modem '%s' as disabled",
-                 mm_port_type_to_name (mm_port_get_port_type (MM_PORT (port))),
+                 mm_port_type_get_string (mm_port_get_port_type (MM_PORT (port))),
                  mm_port_get_device (MM_PORT (port)),
                  n_consecutive_timeouts,
                  g_dbus_object_get_object_path (G_DBUS_OBJECT (self)));
@@ -312,7 +313,7 @@ mm_base_modem_grab_port (MMBaseModem *self,
         mm_dbg ("(%s/%s) port (%s) grabbed by %s",
                 subsys,
                 name,
-                mm_port_type_to_name (ptype),
+                mm_port_type_get_string (ptype),
                 mm_port_get_device (port));
     } else {
         /* Net */
@@ -346,8 +347,6 @@ mm_base_modem_release_port (MMBaseModem *self,
                             const gchar *subsys,
                             const gchar *name)
 {
-    const gchar *type_name;
-    const gchar *device;
     gchar *key;
     MMPort *port;
 
@@ -383,13 +382,11 @@ mm_base_modem_release_port (MMBaseModem *self,
         g_clear_object (&self->priv->qcdm);
 
     /* Remove it from the tracking HT */
-    type_name = mm_port_type_to_name (mm_port_get_port_type (port));
-    device = mm_port_get_device (port);
     mm_dbg ("(%s/%s) type %s released from %s",
             subsys,
             name,
-            type_name,
-            device);
+            mm_port_type_get_string (mm_port_get_port_type (port)),
+            mm_port_get_device (port));
     g_hash_table_remove (self->priv->ports, key);
     g_free (key);
 
