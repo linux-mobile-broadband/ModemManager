@@ -400,7 +400,10 @@ mm_base_modem_set_valid (MMBaseModem *self,
 {
     g_return_if_fail (MM_IS_BASE_MODEM (self));
 
-    if (self->priv->valid != new_valid) {
+    /* If validity changed OR if both old and new were invalid, notify. This
+     * last case is to cover failures during initialization. */
+    if (self->priv->valid != new_valid ||
+        !new_valid) {
         self->priv->valid = new_valid;
         g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_VALID]);
     }
