@@ -28,15 +28,20 @@ org.freedesktop.ModemManager.service
 org.freedesktop.ModemManager.conf
 ModemManager.pc
 marshallers/mm-marshal.[ch]
-src/modem-manager
-docs/spec.html
 callouts/mm-modem-probe
 test/lsudev
+
+src/modem-manager
+src/mm-daemon-enums-types.c
+src/mm-daemon-enums-types.h
+src/mm-serial-enums-types.c
+src/mm-serial-enums-types.h
 src/tests/test-modem-helpers
 src/tests/test-charsets
 src/tests/test-qcdm-serial-port
 src/tests/test-at-serial-port
 src/tests/test-sms
+
 policy/org.freedesktop.modem-manager.policy
 
 cli/mmcli
@@ -120,5 +125,3 @@ m4/xsize.m4
 
 TAGS
 ABOUT-NLS
-/src/mm-private-enums-types.c
-/src/mm-private-enums-types.h
