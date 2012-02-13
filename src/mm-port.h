@@ -74,8 +74,4 @@ gboolean     mm_port_get_connected      (MMPort *self);
 
 void         mm_port_set_connected      (MMPort *self, gboolean connected);
 
-const char * mm_port_type_to_name       (MMPortType ptype);
-
-const char * mm_port_subsys_to_name     (MMPortSubsys psubsys);
-
 #endif /* MM_PORT_H */

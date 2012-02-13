@@ -46,38 +46,6 @@ typedef struct {
 
 /*****************************************************************************/
 
-const char *
-mm_port_subsys_to_name (MMPortSubsys psubsys)
-{
-    switch (psubsys) {
-    case MM_PORT_SUBSYS_TTY:
-        return "tty";
-    case MM_PORT_SUBSYS_NET:
-        return "net";
-    default:
-        break;
-    }
-    return "(unknown)";
-}
-
-const char *
-mm_port_type_to_name (MMPortType ptype)
-{
-    switch (ptype) {
-    case MM_PORT_TYPE_AT:
-        return "AT";
-    case MM_PORT_TYPE_IGNORED:
-        return "ignored";
-    case MM_PORT_TYPE_QCDM:
-        return "QCDM";
-    default:
-        break;
-    }
-    return "(unknown)";
-}
-
-/*****************************************************************************/
-
 static GObject*
 constructor (GType type,
              guint n_construct_params,
