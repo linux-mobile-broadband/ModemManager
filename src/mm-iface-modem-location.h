@@ -62,7 +62,6 @@ GType mm_iface_modem_location_get_type (void);
 
 /* Initialize Location interface (async) */
 void     mm_iface_modem_location_initialize        (MMIfaceModemLocation *self,
-                                                    MMAtSerialPort *port,
                                                     GAsyncReadyCallback callback,
                                                     gpointer user_data);
 gboolean mm_iface_modem_location_initialize_finish (MMIfaceModemLocation *self,

@@ -538,8 +538,6 @@ mm_base_modem_organize_ports (MMBaseModem *self,
 
     /* As soon as we get the ports organized, we initialize the modem */
     MM_BASE_MODEM_GET_CLASS (self)->initialize (self,
-                                                /* FIXME: don't bother passing the port */
-                                                MM_AT_SERIAL_PORT (self->priv->primary),
                                                 NULL, /* TODO: cancellable */
                                                 (GAsyncReadyCallback)initialize_ready,
                                                 NULL);

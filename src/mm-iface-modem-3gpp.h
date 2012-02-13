@@ -193,7 +193,6 @@ GType mm_iface_modem_3gpp_get_type (void);
 
 /* Initialize Modem 3GPP interface (async) */
 void     mm_iface_modem_3gpp_initialize        (MMIfaceModem3gpp *self,
-                                                MMAtSerialPort *port,
                                                 GAsyncReadyCallback callback,
                                                 gpointer user_data);
 gboolean mm_iface_modem_3gpp_initialize_finish (MMIfaceModem3gpp *self,

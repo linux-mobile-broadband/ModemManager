@@ -272,7 +272,6 @@ gboolean mm_iface_modem_is_cdma_only (MMIfaceModem *self);
 
 /* Initialize Modem interface (async) */
 void     mm_iface_modem_initialize        (MMIfaceModem *self,
-                                           MMAtSerialPort *port,
                                            GAsyncReadyCallback callback,
                                            gpointer user_data);
 gboolean mm_iface_modem_initialize_finish (MMIfaceModem *self,

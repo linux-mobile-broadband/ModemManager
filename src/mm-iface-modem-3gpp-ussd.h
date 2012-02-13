@@ -110,7 +110,6 @@ GType mm_iface_modem_3gpp_ussd_get_type (void);
 
 /* Initialize USSD interface (async) */
 void     mm_iface_modem_3gpp_ussd_initialize        (MMIfaceModem3gppUssd *self,
-                                                     MMAtSerialPort *port,
                                                      GAsyncReadyCallback callback,
                                                      gpointer user_data);
 gboolean mm_iface_modem_3gpp_ussd_initialize_finish (MMIfaceModem3gppUssd *self,

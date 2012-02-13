@@ -6195,7 +6195,7 @@ initialize_step (InitializeContext *ctx)
          * We do keep the primary port open during the whole initialization
          * sequence. Note that this port is not really passed to the interfaces,
          * they will get the primary port themselves. */
-        ctx->port = mm_base_modem_get_port_primary (MM_BASE_MODEM (ctx->self));
+        ctx->port = g_object_ref (mm_base_modem_get_port_primary (MM_BASE_MODEM (ctx->self)));
         if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->port), &error)) {
             g_simple_async_result_take_error (ctx->result, error);
             initialize_context_complete_and_free (ctx);
@@ -6230,7 +6230,6 @@ initialize_step (InitializeContext *ctx)
     case INITIALIZE_STEP_IFACE_MODEM:
         /* Initialize the Modem interface */
         mm_iface_modem_initialize (MM_IFACE_MODEM (ctx->self),
-                                   ctx->port,
                                    (GAsyncReadyCallback)iface_modem_initialize_ready,
                                    ctx);
         return;
@@ -6255,7 +6254,6 @@ initialize_step (InitializeContext *ctx)
         if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self))) {
             /* Initialize the 3GPP interface */
             mm_iface_modem_3gpp_initialize (MM_IFACE_MODEM_3GPP (ctx->self),
-                                            ctx->port,
                                             (GAsyncReadyCallback)iface_modem_3gpp_initialize_ready,
                                             ctx);
             return;
@@ -6268,7 +6266,6 @@ initialize_step (InitializeContext *ctx)
         if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self))) {
             /* Initialize the 3GPP/USSD interface */
             mm_iface_modem_3gpp_ussd_initialize (MM_IFACE_MODEM_3GPP_USSD (ctx->self),
-                                                 ctx->port,
                                                  (GAsyncReadyCallback)iface_modem_3gpp_ussd_initialize_ready,
                                                  ctx);
             return;
@@ -6280,7 +6277,6 @@ initialize_step (InitializeContext *ctx)
         if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->self))) {
             /* Initialize the CDMA interface */
             mm_iface_modem_cdma_initialize (MM_IFACE_MODEM_CDMA (ctx->self),
-                                            ctx->port,
                                             (GAsyncReadyCallback)iface_modem_cdma_initialize_ready,
                                             ctx);
             return;
@@ -6299,7 +6295,6 @@ initialize_step (InitializeContext *ctx)
     case INITIALIZE_STEP_IFACE_LOCATION:
         /* Initialize the Location interface */
         mm_iface_modem_location_initialize (MM_IFACE_MODEM_LOCATION (ctx->self),
-                                            ctx->port,
                                             (GAsyncReadyCallback)iface_modem_location_initialize_ready,
                                             ctx);
         return;
@@ -6307,7 +6302,6 @@ initialize_step (InitializeContext *ctx)
     case INITIALIZE_STEP_IFACE_MESSAGING:
         /* Initialize the Messaging interface */
         mm_iface_modem_messaging_initialize (MM_IFACE_MODEM_MESSAGING (ctx->self),
-                                             ctx->port,
                                              (GAsyncReadyCallback)iface_modem_messaging_initialize_ready,
                                              ctx);
         return;
@@ -6329,7 +6323,6 @@ initialize_step (InitializeContext *ctx)
 
 static void
 initialize (MMBaseModem *self,
-            MMAtSerialPort *port,
             GCancellable *cancellable,
             GAsyncReadyCallback callback,
             gpointer user_data)

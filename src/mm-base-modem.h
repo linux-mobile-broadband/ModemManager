@@ -63,9 +63,8 @@ struct _MMBaseModemClass {
                           MMPort *port);
 
     /* Modem initialization.
-     * Whenever the primary AT port is grabbed, this method gets called */
+     * As soon as the ports are organized, this method gets called */
     void (* initialize) (MMBaseModem *self,
-                         MMAtSerialPort *port,
                          GCancellable *cancellable,
                          GAsyncReadyCallback callback,
                          gpointer user_data);

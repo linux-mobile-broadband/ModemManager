@@ -57,4 +57,3 @@ MMBroadbandModem *mm_broadband_modem_new (const gchar *device,
                                           guint16 product_id);
 
 #endif /* MM_BROADBAND_MODEM_H */
-

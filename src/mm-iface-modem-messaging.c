@@ -817,7 +817,6 @@ typedef enum {
 
 struct _InitializationContext {
     MMIfaceModemMessaging *self;
-    MMAtSerialPort *port;
     MmGdbusModemMessaging *skeleton;
     GSimpleAsyncResult *result;
     InitializationStep step;
@@ -825,7 +824,6 @@ struct _InitializationContext {
 
 static InitializationContext *
 initialization_context_new (MMIfaceModemMessaging *self,
-                            MMAtSerialPort *port,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
@@ -833,7 +831,6 @@ initialization_context_new (MMIfaceModemMessaging *self,
 
     ctx = g_new0 (InitializationContext, 1);
     ctx->self = g_object_ref (self);
-    ctx->port = g_object_ref (port);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -851,7 +848,6 @@ initialization_context_complete_and_free (InitializationContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->self);
-    g_object_unref (ctx->port);
     g_object_unref (ctx->result);
     g_object_unref (ctx->skeleton);
     g_free (ctx);
@@ -1027,8 +1023,8 @@ interface_initialization_step (InitializationContext *ctx)
 
 gboolean
 mm_iface_modem_messaging_initialize_finish (MMIfaceModemMessaging *self,
-                                           GAsyncResult *res,
-                                           GError **error)
+                                            GAsyncResult *res,
+                                            GError **error)
 {
     g_return_val_if_fail (MM_IS_IFACE_MODEM_MESSAGING (self), FALSE);
     g_return_val_if_fail (G_IS_ASYNC_RESULT (res), FALSE);
@@ -1038,9 +1034,8 @@ mm_iface_modem_messaging_initialize_finish (MMIfaceModemMessaging *self,
 
 void
 mm_iface_modem_messaging_initialize (MMIfaceModemMessaging *self,
-                                    MMAtSerialPort *port,
-                                    GAsyncReadyCallback callback,
-                                    gpointer user_data)
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
 {
     MmGdbusModemMessaging *skeleton = NULL;
 
@@ -1061,7 +1056,6 @@ mm_iface_modem_messaging_initialize (MMIfaceModemMessaging *self,
 
     /* Perform async initialization here */
     interface_initialization_step (initialization_context_new (self,
-                                                               port,
                                                                callback,
                                                                user_data));
     g_object_unref (skeleton);

@@ -1599,7 +1599,6 @@ handle_set_allowed_modes (MmGdbusModem *skeleton,
 typedef struct _UnlockCheckContext UnlockCheckContext;
 struct _UnlockCheckContext {
     MMIfaceModem *self;
-    MMAtSerialPort *port;
     guint pin_check_tries;
     guint pin_check_timeout_id;
     GSimpleAsyncResult *result;
@@ -1615,7 +1614,6 @@ unlock_check_context_new (MMIfaceModem *self,
 
     ctx = g_new0 (UnlockCheckContext, 1);
     ctx->self = g_object_ref (self);
-    ctx->port = g_object_ref (mm_base_modem_get_port_primary (MM_BASE_MODEM (self)));
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -1631,7 +1629,6 @@ static void
 unlock_check_context_free (UnlockCheckContext *ctx)
 {
     g_object_unref (ctx->self);
-    g_object_unref (ctx->port);
     g_object_unref (ctx->result);
     g_object_unref (ctx->skeleton);
     g_free (ctx);
@@ -1642,7 +1639,6 @@ restart_initialize_idle (MMIfaceModem *self)
 {
     MM_BASE_MODEM_GET_CLASS (self)->initialize (
         MM_BASE_MODEM (self),
-        mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
         NULL,
         NULL,
         NULL);
@@ -2335,7 +2331,6 @@ interface_enabling_step (EnablingContext *ctx)
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         ctx->enabled = TRUE;
         enabling_context_complete_and_free (ctx);
-        /* mm_serial_port_close (MM_SERIAL_PORT (ctx->port)); */
         return;
     }
 
@@ -2378,7 +2373,6 @@ typedef enum {
 
 struct _InitializationContext {
     MMIfaceModem *self;
-    MMAtSerialPort *port;
     InitializationStep step;
     GSimpleAsyncResult *result;
     MmGdbusModem *skeleton;
@@ -2386,7 +2380,6 @@ struct _InitializationContext {
 
 static InitializationContext *
 initialization_context_new (MMIfaceModem *self,
-                            MMAtSerialPort *port,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
@@ -2394,7 +2387,6 @@ initialization_context_new (MMIfaceModem *self,
 
     ctx = g_new0 (InitializationContext, 1);
     ctx->self = g_object_ref (self);
-    ctx->port = g_object_ref (port);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -2412,7 +2404,6 @@ initialization_context_complete_and_free (InitializationContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->self);
-    g_object_unref (ctx->port);
     g_object_unref (ctx->result);
     g_object_unref (ctx->skeleton);
     g_free (ctx);
@@ -2983,7 +2974,6 @@ mm_iface_modem_initialize_finish (MMIfaceModem *self,
 
 void
 mm_iface_modem_initialize (MMIfaceModem *self,
-                           MMAtSerialPort *port,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
@@ -3037,7 +3027,6 @@ mm_iface_modem_initialize (MMIfaceModem *self,
 
     /* Perform async initialization here */
     interface_initialization_step (initialization_context_new (self,
-                                                               port,
                                                                callback,
                                                                user_data));
     g_object_unref (skeleton);

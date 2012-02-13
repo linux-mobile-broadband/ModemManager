@@ -1349,7 +1349,6 @@ typedef enum {
 
 struct _InitializationContext {
     MMIfaceModemCdma *self;
-    MMAtSerialPort *port;
     MmGdbusModemCdma *skeleton;
     GSimpleAsyncResult *result;
     InitializationStep step;
@@ -1357,7 +1356,6 @@ struct _InitializationContext {
 
 static InitializationContext *
 initialization_context_new (MMIfaceModemCdma *self,
-                            MMAtSerialPort *port,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
@@ -1365,7 +1363,6 @@ initialization_context_new (MMIfaceModemCdma *self,
 
     ctx = g_new0 (InitializationContext, 1);
     ctx->self = g_object_ref (self);
-    ctx->port = g_object_ref (port);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -1383,7 +1380,6 @@ initialization_context_complete_and_free (InitializationContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->self);
-    g_object_unref (ctx->port);
     g_object_unref (ctx->result);
     g_object_unref (ctx->skeleton);
     g_free (ctx);
@@ -1494,7 +1490,6 @@ mm_iface_modem_cdma_initialize_finish (MMIfaceModemCdma *self,
 
 void
 mm_iface_modem_cdma_initialize (MMIfaceModemCdma *self,
-                                MMAtSerialPort *port,
                                 GAsyncReadyCallback callback,
                                 gpointer user_data)
 {
@@ -1530,7 +1525,6 @@ mm_iface_modem_cdma_initialize (MMIfaceModemCdma *self,
 
     /* Perform async initialization here */
     interface_initialization_step (initialization_context_new (self,
-                                                               port,
                                                                callback,
                                                                user_data));
     g_object_unref (skeleton);
