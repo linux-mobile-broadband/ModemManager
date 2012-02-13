@@ -797,6 +797,25 @@ mm_port_probe_is_qcdm (MMPortProbe *self)
     return self->priv->is_qcdm;
 }
 
+MMPortType
+mm_port_probe_get_port_type (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
+
+    if (g_str_equal (self->priv->subsys, "net"))
+        return MM_PORT_TYPE_UNKNOWN;
+
+    if (self->priv->flags & MM_PORT_PROBE_QCDM &&
+        self->priv->is_qcdm)
+        return MM_PORT_TYPE_QCDM;
+
+    if (self->priv->flags & MM_PORT_PROBE_AT &&
+        self->priv->is_at)
+        return MM_PORT_TYPE_AT;
+
+    return MM_PORT_TYPE_UNKNOWN;
+}
+
 GUdevDevice *
 mm_port_probe_get_port (MMPortProbe *self)
 {

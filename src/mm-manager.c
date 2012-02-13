@@ -115,6 +115,8 @@ remove_modem (MMManager *manager,
 
         mm_dbg ("Unexported modem '%s' from path '%s'", device, path);
         g_free (path);
+    } else {
+        mm_dbg ("Removing modem '%s', which wasn't exported yet", device);
     }
 
     /* Run dispose before unref-ing, in order to cleanup the SIM object,
@@ -161,6 +163,7 @@ static void
 check_export_modem (MMManager *self,
                     MMBaseModem *modem)
 {
+    GError *error = NULL;
     static guint32 id = 0;
     const gchar *modem_physdev;
     const gchar *name;
@@ -194,11 +197,21 @@ check_export_modem (MMManager *self,
         return;
     }
 
-    /* If modem not yet valid, don't export it */
-    if (!mm_base_modem_get_valid (modem)) {
-        mm_dbg ("Not exporting invalid modem '%s'", modem_physdev);
+    /* Plugin manager is not trying to find more ports supported by this device,
+     * so we can organize the ports now (if not done already). */
+    if (!mm_base_modem_organize_ports (modem, &error)) {
+        /* If the ports were not properly organized, the modem will be marked as
+         * invalid and therefore removed */
+        mm_err ("Failed to organize modem ports: '%s'",
+                error->message);
+        g_error_free (error);
+        remove_modem (self, modem);
         return;
     }
+
+    /* If modem not yet valid (not fully initialized), don't export it */
+    if (!mm_base_modem_get_valid (modem))
+        return;
 
     /* Don't export already exported modems */
     g_object_get (modem,

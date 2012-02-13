@@ -100,9 +100,9 @@ grab_port (MMPluginBase *base,
     if (!mm_base_modem_grab_port (existing ? existing : modem,
                                   subsys,
                                   name,
-                                  (mm_port_probe_is_qcdm (probe) ?
-                                   MM_PORT_TYPE_QCDM :
-                                   MM_PORT_TYPE_UNKNOWN))) {
+                                  mm_port_probe_get_port_type (probe),
+                                  MM_AT_PORT_FLAG_NONE,
+                                  error)) {
         if (modem)
             g_object_unref (modem);
         return NULL;

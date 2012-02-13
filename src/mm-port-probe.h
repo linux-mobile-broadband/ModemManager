@@ -24,6 +24,7 @@
 #include <gudev/gudev.h>
 
 #include "mm-port-probe-at-command.h"
+#include "mm-at-serial-port.h"
 
 #define MM_TYPE_PORT_PROBE            (mm_port_probe_get_type ())
 #define MM_PORT_PROBE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PORT_PROBE, MMPortProbe))
@@ -76,10 +77,10 @@ gboolean mm_port_probe_run_finish (MMPortProbe *self,
 gboolean mm_port_probe_run_cancel (MMPortProbe *self);
 
 /* Probing result getters */
-gboolean     mm_port_probe_is_at            (MMPortProbe *self);
-gboolean     mm_port_probe_is_qcdm          (MMPortProbe *self);
-const gchar *mm_port_probe_get_vendor       (MMPortProbe *self);
-const gchar *mm_port_probe_get_product      (MMPortProbe *self);
+MMPortType    mm_port_probe_get_port_type    (MMPortProbe *self);
+gboolean      mm_port_probe_is_at            (MMPortProbe *self);
+gboolean      mm_port_probe_is_qcdm          (MMPortProbe *self);
+const gchar  *mm_port_probe_get_vendor       (MMPortProbe *self);
+const gchar  *mm_port_probe_get_product      (MMPortProbe *self);
 
 #endif /* MM_PORT_PROBE_H */
-

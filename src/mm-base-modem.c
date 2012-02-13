@@ -145,38 +145,13 @@ serial_port_timed_out_cb (MMSerialPort *port,
     }
 }
 
-static void
-initialize_ready (MMBaseModem *self,
-                  GAsyncResult *res)
-{
-    GError *error = NULL;
-
-    if (!MM_BASE_MODEM_GET_CLASS (self)->initialize_finish (self, res, &error)) {
-        /* Wrong state is returned when modem is found locked */
-        if (g_error_matches (error,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_WRONG_STATE)) {
-            mm_dbg ("Couldn't finish initialization in the current state: '%s'",
-                    error->message);
-            mm_base_modem_set_valid (self, TRUE);
-        } else {
-            mm_warn ("couldn't initialize the modem: '%s'", error->message);
-            mm_base_modem_set_valid (self, FALSE);
-        }
-
-        g_error_free (error);
-        return;
-    }
-
-    mm_dbg ("modem properly initialized");
-    mm_base_modem_set_valid (self, TRUE);
-}
-
 gboolean
 mm_base_modem_grab_port (MMBaseModem *self,
                          const gchar *subsys,
                          const gchar *name,
-                         MMPortType suggested_type)
+                         MMPortType ptype,
+                         MMAtPortFlag at_pflags,
+                         GError **error)
 {
     MMPort *port;
     gchar *key;
@@ -188,16 +163,12 @@ mm_base_modem_grab_port (MMBaseModem *self,
     /* Only allow 'tty' and 'net' ports */
     if (!g_str_equal (subsys, "net") &&
         !g_str_equal (subsys, "tty")) {
-        mm_warn ("(%s/%s): cannot add port, unhandled subsystem",
-                 subsys, name);
-        return FALSE;
-    }
-
-    /* Don't allow more than one Primary port to be set */
-    if (self->priv->primary &&
-        suggested_type == MM_PORT_TYPE_PRIMARY) {
-        mm_warn ("(%s/%s): cannot add port, primary port already exists",
-                 subsys, name);
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_UNSUPPORTED,
+                     "Cannot add port '%s/%s', unhandled subsystem",
+                     subsys,
+                     name);
         return FALSE;
     }
 
@@ -205,38 +176,22 @@ mm_base_modem_grab_port (MMBaseModem *self,
     key = get_hash_key (subsys, name);
     port = g_hash_table_lookup (self->priv->ports, key);
     if (port) {
-        mm_warn ("(%s/%s): cannot add port, already exists",
-                 subsys, name);
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_UNSUPPORTED,
+                     "Cannot add port '%s/%s', already exists",
+                     subsys,
+                     name);
         g_free (key);
         return FALSE;
     }
 
-    /* If we have a tty, decide whether it will be primary, secondary, or none */
+    /* Serial ports... */
     if (g_str_equal (subsys, "tty")) {
-        MMPortType ptype;
-
-        /* Decide port type */
-        if (suggested_type != MM_PORT_TYPE_UNKNOWN)
-            ptype = suggested_type;
-        else {
-            if (!self->priv->primary)
-                ptype = MM_PORT_TYPE_PRIMARY;
-            else if (!self->priv->secondary)
-                ptype = MM_PORT_TYPE_SECONDARY;
-            else
-                ptype = MM_PORT_TYPE_IGNORED;
-        }
-
-        if (ptype == MM_PORT_TYPE_QCDM) {
+        if (ptype == MM_PORT_TYPE_QCDM)
             /* QCDM port */
             port = MM_PORT (mm_qcdm_serial_port_new (name));
-            if (!self->priv->qcdm)
-                self->priv->qcdm = g_object_ref (port);
-        } else {
-            GRegex *regex;
-            GPtrArray *array;
-            int i;
-
+        else if (ptype == MM_PORT_TYPE_AT) {
             /* AT port */
             port = MM_PORT (mm_at_serial_port_new (name));
 
@@ -245,99 +200,48 @@ mm_base_modem_grab_port (MMBaseModem *self,
                                                    mm_serial_parser_v1_parse,
                                                    mm_serial_parser_v1_new (),
                                                    mm_serial_parser_v1_destroy);
-
-            /* Set up CREG unsolicited message handlers, with NULL callbacks */
-            array = mm_3gpp_creg_regex_get (FALSE);
-            for (i = 0; i < array->len; i++) {
-                mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port),
-                                                               (GRegex *)g_ptr_array_index (array, i),
-                                                               NULL,
-                                                               NULL,
-                                                               NULL);
-            }
-            mm_3gpp_creg_regex_destroy (array);
-
-            /* Set up CIEV unsolicited message handler, with NULL callback */
-            regex = mm_3gpp_ciev_regex_get ();
-            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port),
-                                                           regex,
-                                                           NULL,
-                                                           NULL,
-                                                           NULL);
-            g_regex_unref (regex);
-
-            /* Set up CMTI unsolicited message handler, with NULL callback */
-            regex = mm_3gpp_cmti_regex_get ();
-            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port),
-                                                           regex,
-                                                           NULL,
-                                                           NULL,
-                                                           NULL);
-            g_regex_unref (regex);
-
-            /* Set up CUSD unsolicited message handler, with NULL callback */
-            regex = mm_3gpp_cusd_regex_get ();
-            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port),
-                                                           regex,
-                                                           NULL,
-                                                           NULL,
-                                                           NULL);
-            g_regex_unref (regex);
-
-            if (ptype == MM_PORT_TYPE_PRIMARY) {
-                self->priv->primary = g_object_ref (port);
-
-                /* Primary port, which will also be data port */
-                if (!self->priv->data)
-                    self->priv->data = g_object_ref (port);
-
-                /* As soon as we get the primary AT port, we initialize the
-                 * modem */
-                MM_BASE_MODEM_GET_CLASS (self)->initialize (self,
-                                                            MM_AT_SERIAL_PORT (port),
-                                                            NULL, /* TODO: cancellable */
-                                                            (GAsyncReadyCallback)initialize_ready,
-                                                            NULL);
-
-            } else if (ptype == MM_PORT_TYPE_SECONDARY)
-                self->priv->secondary = g_object_ref (port);
+            /* Store flags already */
+            mm_at_serial_port_set_flags (MM_AT_SERIAL_PORT (port), at_pflags);
+        } else {
+            g_set_error (error,
+                         MM_CORE_ERROR,
+                         MM_CORE_ERROR_UNSUPPORTED,
+                         "Cannot add port '%s/%s', unhandled serial type",
+                         subsys,
+                         name);
+            g_free (key);
+            return FALSE;
         }
 
         /* For serial ports, enable port timeout checks */
-        if (port)
-            g_signal_connect (port,
-                              "timed-out",
-                              G_CALLBACK (serial_port_timed_out_cb),
-                              self);
-
-        mm_dbg ("(%s/%s) port (%s) grabbed by %s",
-                subsys,
-                name,
-                mm_port_type_get_string (ptype),
-                mm_port_get_device (port));
-    } else {
-        /* Net */
+        g_signal_connect (port,
+                          "timed-out",
+                          G_CALLBACK (serial_port_timed_out_cb),
+                          self);
+    }
+    /* Net ports... */
+    else if (g_str_equal (subsys, "net")) {
         port = MM_PORT (g_object_new (MM_TYPE_PORT,
                                       MM_PORT_DEVICE, name,
                                       MM_PORT_SUBSYS, MM_PORT_SUBSYS_NET,
-                                      MM_PORT_TYPE, MM_PORT_TYPE_IGNORED,
+                                      /* MM_PORT_TYPE, MM_PORT_TYPE_IGNORED, */
                                       NULL));
+    } else
+        /* We already filter out before all non-tty, non-net ports */
+        g_assert_not_reached();
 
-        /* Net device (if any) is the preferred data port */
-        if (!self->priv->data || MM_IS_AT_SERIAL_PORT (self->priv->data)) {
-            g_clear_object (&self->priv->data);
-            self->priv->data = g_object_ref (port);
-        }
-
-        mm_dbg ("(%s/%s) port grabbed by %s",
-                subsys,
-                name,
-                mm_port_get_device (port));
-    }
+    mm_dbg ("(%s) type '%s' claimed by %s",
+            name,
+            mm_port_type_get_string (ptype),
+            mm_base_modem_get_device (self));
 
     /* Add it to the tracking HT.
      * Note: 'key' and 'port' now owned by the HT. */
     g_hash_table_insert (self->priv->ports, key, port);
+
+    /* Let subclasses know we've grabbed it */
+    if (MM_BASE_MODEM_GET_CLASS (self)->port_grabbed)
+        MM_BASE_MODEM_GET_CLASS (self)->port_grabbed (self, port);
 
     return TRUE;
 }
@@ -389,9 +293,6 @@ mm_base_modem_release_port (MMBaseModem *self,
             mm_port_get_device (port));
     g_hash_table_remove (self->priv->ports, key);
     g_free (key);
-
-    /* TODO */
-    /* check_valid (MM_GENERIC_GSM (modem)); */
 }
 
 void
@@ -478,6 +379,172 @@ mm_base_modem_get_best_at_port (MMBaseModem *self,
     }
 
     return port;
+}
+
+static void
+initialize_ready (MMBaseModem *self,
+                  GAsyncResult *res)
+{
+    GError *error = NULL;
+
+    if (!MM_BASE_MODEM_GET_CLASS (self)->initialize_finish (self, res, &error)) {
+        /* Wrong state is returned when modem is found locked */
+        if (g_error_matches (error,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_WRONG_STATE)) {
+            mm_dbg ("Couldn't finish initialization in the current state: '%s'",
+                    error->message);
+            mm_base_modem_set_valid (self, TRUE);
+        } else {
+            mm_warn ("couldn't initialize the modem: '%s'", error->message);
+            mm_base_modem_set_valid (self, FALSE);
+        }
+
+        g_error_free (error);
+        return;
+    }
+
+    mm_dbg ("modem properly initialized");
+    mm_base_modem_set_valid (self, TRUE);
+}
+
+static inline void
+log_port (MMBaseModem *self, MMPort *port, const char *desc)
+{
+    if (port) {
+        mm_dbg ("(%s) %s/%s %s",
+                self->priv->device,
+                mm_port_subsys_get_string (mm_port_get_subsys (port)),
+                mm_port_get_device (port),
+                desc);
+    }
+}
+
+gboolean
+mm_base_modem_organize_ports (MMBaseModem *self,
+                              GError **error)
+{
+    GHashTableIter iter;
+    MMPort *candidate;
+    MMAtPortFlag flags;
+    MMAtSerialPort *backup_primary = NULL;
+    MMAtSerialPort *primary = NULL;
+    MMAtSerialPort *secondary = NULL;
+    MMAtSerialPort *backup_secondary = NULL;
+    MMQcdmSerialPort *qcdm = NULL;
+    MMPort *data = NULL;
+
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), FALSE);
+
+    /* If ports have already been organized, just return success */
+    if (self->priv->primary)
+        return TRUE;
+
+    g_hash_table_iter_init (&iter, self->priv->ports);
+    while (g_hash_table_iter_next (&iter, NULL, (gpointer *) &candidate)) {
+        MMPortSubsys subsys = mm_port_get_subsys (candidate);
+
+        if (MM_IS_AT_SERIAL_PORT (candidate)) {
+            flags = mm_at_serial_port_get_flags (MM_AT_SERIAL_PORT (candidate));
+
+            if (flags & MM_AT_PORT_FLAG_PRIMARY) {
+                if (!primary)
+                    primary = MM_AT_SERIAL_PORT (candidate);
+                else if (!backup_primary) {
+                    /* Just in case the plugin gave us more than one primary
+                     * and no secondaries, treat additional primary ports as
+                     * secondary.
+                     */
+                    backup_primary = MM_AT_SERIAL_PORT (candidate);
+                }
+            }
+
+            if (!data && (flags & MM_AT_PORT_FLAG_PPP))
+                data = candidate;
+
+            /* Explicitly flagged secondary ports trump NONE ports for secondary */
+            if (flags & MM_AT_PORT_FLAG_SECONDARY) {
+                if (!secondary || !(mm_at_serial_port_get_flags (secondary) & MM_AT_PORT_FLAG_SECONDARY))
+                    secondary = MM_AT_SERIAL_PORT (candidate);
+            }
+
+            /* Fallback secondary */
+            if (flags == MM_AT_PORT_FLAG_NONE) {
+                if (!secondary)
+                    secondary = MM_AT_SERIAL_PORT (candidate);
+                else if (!backup_secondary)
+                    backup_secondary = MM_AT_SERIAL_PORT (candidate);
+            }
+        } else if (MM_IS_QCDM_SERIAL_PORT (candidate)) {
+            if (!qcdm)
+                qcdm = MM_QCDM_SERIAL_PORT (candidate);
+        } else if (subsys == MM_PORT_SUBSYS_NET) {
+            /* Net device (if any) is the preferred data port */
+            if (!data || MM_IS_AT_SERIAL_PORT (data))
+                data = candidate;
+        }
+    }
+
+    /* Fall back to a secondary port if we didn't find a primary port */
+    if (!primary) {
+        if (!secondary) {
+            g_set_error_literal (error,
+                                 MM_CORE_ERROR,
+                                 MM_CORE_ERROR_FAILED,
+                                 "Failed to find primary port");
+            return FALSE;
+        }
+        primary = secondary;
+        secondary = NULL;
+    }
+    g_assert (primary);
+
+    /* If the plugin didn't give us any secondary ports, use any additional
+     * primary ports or backup secondary ports as secondary.
+     */
+    if (!secondary)
+        secondary = backup_primary ? backup_primary : backup_secondary;
+
+    /* Data port defaults to primary AT port */
+    if (!data)
+        data = MM_PORT (primary);
+    g_assert (data);
+
+    /* Reset flags on all ports; clear data port first since it might also
+     * be the primary or secondary port.
+     */
+    if (MM_IS_AT_SERIAL_PORT (data))
+        mm_at_serial_port_set_flags (MM_AT_SERIAL_PORT (data), MM_AT_PORT_FLAG_NONE);
+
+    mm_at_serial_port_set_flags (primary, MM_AT_PORT_FLAG_PRIMARY);
+    if (secondary)
+        mm_at_serial_port_set_flags (secondary, MM_AT_PORT_FLAG_SECONDARY);
+
+    if (MM_IS_AT_SERIAL_PORT (data)) {
+        flags = mm_at_serial_port_get_flags (MM_AT_SERIAL_PORT (data));
+        mm_at_serial_port_set_flags (MM_AT_SERIAL_PORT (data), flags | MM_AT_PORT_FLAG_PPP);
+    }
+
+    log_port (self, MM_PORT (primary),   "primary");
+    log_port (self, MM_PORT (secondary), "secondary");
+    log_port (self, MM_PORT (data),      "data");
+    log_port (self, MM_PORT (qcdm),      "qcdm");
+
+    /* We keep new refs to the objects here */
+    self->priv->primary = g_object_ref (primary);
+    self->priv->secondary = (secondary ? g_object_ref (secondary) : NULL);
+    self->priv->data = g_object_ref (data);
+    self->priv->qcdm = (qcdm ? g_object_ref (qcdm) : NULL);
+
+    /* As soon as we get the ports organized, we initialize the modem */
+    MM_BASE_MODEM_GET_CLASS (self)->initialize (self,
+                                                /* FIXME: don't bother passing the port */
+                                                MM_AT_SERIAL_PORT (self->priv->primary),
+                                                NULL, /* TODO: cancellable */
+                                                (GAsyncReadyCallback)initialize_ready,
+                                                NULL);
+
+    return TRUE;
 }
 
 gboolean

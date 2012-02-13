@@ -73,7 +73,9 @@ grab_port (MMPluginBase *base,
     if (!mm_base_modem_grab_port (existing ? existing : modem,
                                   subsys,
                                   name,
-                                  MM_PORT_TYPE_UNKNOWN)) {
+                                  MM_PORT_TYPE_AT, /* we only allow AT ports here */
+                                  MM_AT_PORT_FLAG_NONE,
+                                  error)) {
         if (modem)
             g_object_unref (modem);
         return NULL;

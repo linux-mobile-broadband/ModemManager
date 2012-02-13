@@ -56,6 +56,12 @@ struct _MMBaseModem {
 struct _MMBaseModemClass {
     MmGdbusObjectSkeletonClass parent;
 
+    /* Called after the base class grabs a port so that subclasses can
+     * set port flags and other properties on the new port.
+     */
+    void (*port_grabbed) (MMBaseModem *self,
+                          MMPort *port);
+
     /* Modem initialization.
      * Whenever the primary AT port is grabbed, this method gets called */
     void (* initialize) (MMBaseModem *self,
@@ -93,7 +99,9 @@ GType mm_base_modem_get_type (void);
 gboolean  mm_base_modem_grab_port    (MMBaseModem *self,
                                       const gchar *subsys,
                                       const gchar *name,
-                                      MMPortType suggested_type);
+                                      MMPortType ptype,
+                                      MMAtPortFlag at_pflags,
+                                      GError **error);
 void      mm_base_modem_release_port (MMBaseModem *self,
                                       const gchar *subsys,
                                       const gchar *name);
@@ -103,6 +111,9 @@ MMPort   *mm_base_modem_get_port     (MMBaseModem *self,
 gboolean  mm_base_modem_owns_port    (MMBaseModem *self,
                                       const gchar *subsys,
                                       const gchar *name);
+
+gboolean  mm_base_modem_organize_ports (MMBaseModem *self,
+                                        GError **error);
 
 MMAtSerialPort   *mm_base_modem_get_port_primary   (MMBaseModem *self);
 MMAtSerialPort   *mm_base_modem_get_port_secondary (MMBaseModem *self);

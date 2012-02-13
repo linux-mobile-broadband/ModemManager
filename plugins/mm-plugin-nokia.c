@@ -87,7 +87,7 @@ grab_port (MMPluginBase *base,
     GUdevDevice *port;
     const gchar *name, *subsys, *driver;
     guint16 vendor = 0, product = 0;
-    MMPortType ptype = MM_PORT_TYPE_UNKNOWN;
+    MMAtPortFlag pflags = MM_AT_PORT_FLAG_NONE;
 
     /* The Nokia plugin cannot do anything with non-AT ports */
     if (!mm_port_probe_is_at (probe)) {
@@ -113,9 +113,9 @@ grab_port (MMPluginBase *base,
 
     /* Look for port type hints */
     if (g_udev_device_get_property_as_boolean (port, "ID_MM_NOKIA_PORT_TYPE_MODEM"))
-        ptype = MM_PORT_TYPE_PRIMARY;
+        pflags = MM_AT_PORT_FLAG_PRIMARY;
     else if (g_udev_device_get_property_as_boolean (port, "ID_MM_NOKIA_PORT_TYPE_AUX"))
-        ptype = MM_PORT_TYPE_SECONDARY;
+        pflags = MM_AT_PORT_FLAG_SECONDARY;
 
     /* If this is the first port being grabbed, create a new modem object */
     if (!existing)
@@ -128,7 +128,9 @@ grab_port (MMPluginBase *base,
     if (!mm_base_modem_grab_port (existing ? existing : modem,
                                   subsys,
                                   name,
-                                  ptype)) {
+                                  MM_PORT_TYPE_AT, /* we only allow AT ports here */
+                                  pflags,
+                                  error)) {
         if (modem)
             g_object_unref (modem);
         return NULL;

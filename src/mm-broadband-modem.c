@@ -5511,6 +5511,59 @@ modem_location_load_capabilities (MMIfaceModemLocation *self,
 
 /*****************************************************************************/
 
+static void
+port_grabbed (MMBaseModem *self,
+              MMPort *port)
+{
+    GRegex *regex;
+    GPtrArray *array;
+    int i;
+
+    /* Nothing special to be done on non-AT ports */
+    if (!MM_IS_AT_SERIAL_PORT (port))
+        return;
+
+    /* Set up CREG unsolicited message handlers, with NULL callbacks */
+    array = mm_3gpp_creg_regex_get (FALSE);
+    for (i = 0; i < array->len; i++) {
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port),
+                                                       (GRegex *)g_ptr_array_index (array, i),
+                                                       NULL,
+                                                       NULL,
+                                                       NULL);
+    }
+    mm_3gpp_creg_regex_destroy (array);
+
+    /* Set up CIEV unsolicited message handler, with NULL callback */
+    regex = mm_3gpp_ciev_regex_get ();
+    mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port),
+                                                   regex,
+                                                   NULL,
+                                                   NULL,
+                                                   NULL);
+    g_regex_unref (regex);
+
+    /* Set up CMTI unsolicited message handler, with NULL callback */
+    regex = mm_3gpp_cmti_regex_get ();
+    mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port),
+                                                   regex,
+                                                   NULL,
+                                                   NULL,
+                                                   NULL);
+    g_regex_unref (regex);
+
+    /* Set up CUSD unsolicited message handler, with NULL callback */
+    regex = mm_3gpp_cusd_regex_get ();
+    mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port),
+                                                   regex,
+                                                   NULL,
+                                                   NULL,
+                                                   NULL);
+    g_regex_unref (regex);
+}
+
+/*****************************************************************************/
+
 typedef enum {
     DISABLING_STEP_FIRST,
     DISABLING_STEP_DISCONNECT_BEARERS,
@@ -6741,6 +6794,7 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     object_class->dispose = dispose;
     object_class->finalize = finalize;
 
+    base_modem_class->port_grabbed = port_grabbed;
     base_modem_class->initialize = initialize;
     base_modem_class->initialize_finish = initialize_finish;
     base_modem_class->enable = enable;
