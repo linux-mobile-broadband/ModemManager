@@ -41,6 +41,11 @@ struct _MMBroadbandModem {
 
 struct _MMBroadbandModemClass {
     MMBaseModemClass parent;
+
+    /* Setup ports, e.g. to setup unsolicited response handlers.
+     * Plugins which need specific setups should chain up parent's port setup
+     * as well. */
+    void (* setup_ports) (MMBroadbandModem *self);
 };
 
 GType mm_broadband_modem_get_type (void);

@@ -5512,53 +5512,62 @@ modem_location_load_capabilities (MMIfaceModemLocation *self,
 /*****************************************************************************/
 
 static void
-port_grabbed (MMBaseModem *self,
-              MMPort *port)
+setup_ports (MMBroadbandModem *self)
 {
+    MMAtSerialPort *ports[2];
     GRegex *regex;
     GPtrArray *array;
-    int i;
+    gint i, j;
 
-    /* Nothing special to be done on non-AT ports */
-    if (!MM_IS_AT_SERIAL_PORT (port))
-        return;
+    ports[0] = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+
+    /* Cleanup all unsolicited message handlers in all AT ports */
 
     /* Set up CREG unsolicited message handlers, with NULL callbacks */
     array = mm_3gpp_creg_regex_get (FALSE);
-    for (i = 0; i < array->len; i++) {
-        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port),
-                                                       (GRegex *)g_ptr_array_index (array, i),
-                                                       NULL,
-                                                       NULL,
-                                                       NULL);
+    for (i = 0; ports[i] && i < 2; i++) {
+        for (j = 0; j < array->len; j++) {
+            mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]),
+                                                           (GRegex *)g_ptr_array_index (array, j),
+                                                           NULL,
+                                                           NULL,
+                                                           NULL);
+        }
     }
     mm_3gpp_creg_regex_destroy (array);
 
     /* Set up CIEV unsolicited message handler, with NULL callback */
     regex = mm_3gpp_ciev_regex_get ();
-    mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port),
-                                                   regex,
-                                                   NULL,
-                                                   NULL,
-                                                   NULL);
+    for (i = 0; ports[i] && i < 2; i++) {
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]),
+                                                       regex,
+                                                       NULL,
+                                                       NULL,
+                                                       NULL);
+    }
     g_regex_unref (regex);
 
     /* Set up CMTI unsolicited message handler, with NULL callback */
     regex = mm_3gpp_cmti_regex_get ();
-    mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port),
-                                                   regex,
-                                                   NULL,
-                                                   NULL,
-                                                   NULL);
+    for (i = 0; ports[i] && i < 2; i++) {
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]),
+                                                       regex,
+                                                       NULL,
+                                                       NULL,
+                                                       NULL);
+    }
     g_regex_unref (regex);
 
     /* Set up CUSD unsolicited message handler, with NULL callback */
     regex = mm_3gpp_cusd_regex_get ();
-    mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port),
-                                                   regex,
-                                                   NULL,
-                                                   NULL,
-                                                   NULL);
+    for (i = 0; ports[i] && i < 2; i++) {
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]),
+                                                       regex,
+                                                       NULL,
+                                                       NULL,
+                                                       NULL);
+    }
     g_regex_unref (regex);
 }
 
@@ -6074,6 +6083,9 @@ enable (MMBaseModem *self,
 
 typedef enum {
     INITIALIZE_STEP_FIRST,
+    INITIALIZE_STEP_SETUP_PORTS,
+    INITIALIZE_STEP_PRIMARY_OPEN,
+    INITIALIZE_STEP_SETUP_SIMPLE_STATUS,
     INITIALIZE_STEP_IFACE_MODEM,
     INITIALIZE_STEP_ABORT_IF_LOCKED,
     INITIALIZE_STEP_IFACE_3GPP,
@@ -6166,19 +6178,31 @@ static void
 initialize_step (InitializeContext *ctx)
 {
     switch (ctx->step) {
-    case INITIALIZE_STEP_FIRST: {
+    case INITIALIZE_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZE_STEP_SETUP_PORTS:
+        if (MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->setup_ports)
+            MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->setup_ports (ctx->self);
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZE_STEP_PRIMARY_OPEN: {
         GError *error = NULL;
 
-        if (!ctx->self->priv->modem_simple_status)
-            ctx->self->priv->modem_simple_status = mm_common_simple_properties_new ();
-
-        /* Open and send first commands to the serial port */
+        /* Open and send first commands to the primary serial port.
+         * We do keep the primary port open during the whole initialization
+         * sequence. Note that this port is not really passed to the interfaces,
+         * they will get the primary port themselves. */
+        ctx->port = mm_base_modem_get_port_primary (MM_BASE_MODEM (ctx->self));
         if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->port), &error)) {
             g_simple_async_result_take_error (ctx->result, error);
             initialize_context_complete_and_free (ctx);
             return;
         }
         ctx->close_port = TRUE;
+
         /* Try to disable echo */
         mm_base_modem_at_command_in_port_ignore_reply (
             MM_BASE_MODEM (ctx->self),
@@ -6194,6 +6218,14 @@ initialize_step (InitializeContext *ctx)
         /* Fall down to next step */
         ctx->step++;
     }
+    case INITIALIZE_STEP_SETUP_SIMPLE_STATUS:
+        /* Simple status must be created before any interface initialization,
+         * so that interfaces add and bind the properties they want to export.
+         */
+        if (!ctx->self->priv->modem_simple_status)
+            ctx->self->priv->modem_simple_status = mm_common_simple_properties_new ();
+        /* Fall down to next step */
+        ctx->step++;
 
     case INITIALIZE_STEP_IFACE_MODEM:
         /* Initialize the Modem interface */
@@ -6306,7 +6338,6 @@ initialize (MMBaseModem *self,
 
     ctx = g_new0 (InitializeContext, 1);
     ctx->self = g_object_ref (self);
-    ctx->port = g_object_ref (port);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -6794,13 +6825,14 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     object_class->dispose = dispose;
     object_class->finalize = finalize;
 
-    base_modem_class->port_grabbed = port_grabbed;
     base_modem_class->initialize = initialize;
     base_modem_class->initialize_finish = initialize_finish;
     base_modem_class->enable = enable;
     base_modem_class->enable_finish = enable_finish;
     base_modem_class->disable = disable;
     base_modem_class->disable_finish = disable_finish;
+
+    klass->setup_ports = setup_ports;
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_DBUS_SKELETON,
