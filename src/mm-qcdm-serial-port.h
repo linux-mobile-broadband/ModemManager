@@ -64,4 +64,3 @@ void     mm_qcdm_serial_port_queue_command_cached (MMQcdmSerialPort *self,
                                                    gpointer user_data);
 
 #endif /* MM_QCDM_SERIAL_PORT_H */
-

@@ -226,8 +226,7 @@ serial_probe_qcdm (MMPortProbe *self)
     }
 
     /* Open the QCDM port */
-    task->serial = MM_SERIAL_PORT (mm_qcdm_serial_port_new (self->priv->name,
-                                                            MM_PORT_TYPE_PRIMARY));
+    task->serial = MM_SERIAL_PORT (mm_qcdm_serial_port_new (self->priv->name));
     if (!task->serial) {
         port_probe_run_task_complete (
             task,

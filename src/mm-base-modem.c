@@ -229,7 +229,7 @@ mm_base_modem_grab_port (MMBaseModem *self,
 
         if (ptype == MM_PORT_TYPE_QCDM) {
             /* QCDM port */
-            port = MM_PORT (mm_qcdm_serial_port_new (name, ptype));
+            port = MM_PORT (mm_qcdm_serial_port_new (name));
             if (!self->priv->qcdm)
                 self->priv->qcdm = g_object_ref (port);
         } else {
