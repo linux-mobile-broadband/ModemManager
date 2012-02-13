@@ -25,7 +25,7 @@
 #include <ModemManager.h>
 #include <libmm-common.h>
 
-#include "mm-private-enums-types.h"
+#include "mm-daemon-enums-types.h"
 #include "mm-iface-modem.h"
 #include "mm-bearer.h"
 #include "mm-base-modem-at.h"
