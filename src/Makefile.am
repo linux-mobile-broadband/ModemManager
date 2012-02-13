@@ -36,11 +36,13 @@ libmodem_helpers_la_SOURCES = \
 	mm-sms-utils.h
 
 # libserial specific enum types
-SERIAL_ENUMS = mm-port.h
+SERIAL_ENUMS = \
+	mm-port.h \
+	mm-at-serial-port.h
 
 mm-serial-enums-types.h: Makefile.am $(SERIAL_ENUMS) $(top_srcdir)/build-aux/mm-enums-template.h
 	$(AM_V_GEN) glib-mkenums \
-		--fhead "#include \"mm-port.h\"\n#ifndef __MM_SERIAL_ENUMS_TYPES_H__\n#define __MM_SERIAL_ENUMS_TYPES_H__\n" \
+		--fhead "#include \"mm-port.h\"\n#include \"mm-at-serial-port.h\"\n#ifndef __MM_SERIAL_ENUMS_TYPES_H__\n#define __MM_SERIAL_ENUMS_TYPES_H__\n" \
 		--template $(top_srcdir)/build-aux/mm-enums-template.h \
 		--ftail "#endif /* __MM_SERIAL_ENUMS_TYPES_H__ */\n" \
 		$(SERIAL_ENUMS) > $@

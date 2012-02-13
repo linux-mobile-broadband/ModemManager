@@ -40,15 +40,15 @@ typedef struct _MMAtSerialPortClass MMAtSerialPortClass;
  * ACM0(PPP), ACM1(PRIMARY): port 1 is always used for command and status, and
  *    only when connecting is port 0 opened for dialing (ATD) and PPP
  */
-typedef enum {
-    MM_AT_PORT_FLAG_NONE    = 0x0000,
-    /* This port is preferred for command and status */ 
-    MM_AT_PORT_FLAG_PRIMARY = 0x0001,
+typedef enum { /*< underscore_name=mm_at_port_flag >*/
+    MM_AT_PORT_FLAG_NONE      = 0x0000,
+    /* This port is preferred for command and status */
+    MM_AT_PORT_FLAG_PRIMARY   = 0x0001,
     /* Use port for command and status if the primary port is connected */
     MM_AT_PORT_FLAG_SECONDARY = 0x0002,
     /* This port should be used for PPP */
-    MM_AT_PORT_FLAG_PPP     = 0x0004
-} MMAtPortFlags;
+    MM_AT_PORT_FLAG_PPP       = 0x0004
+} MMAtPortFlag;
 
 typedef gboolean (*MMAtSerialResponseParserFn) (gpointer user_data,
                                                 GString *response,
@@ -104,8 +104,8 @@ void     mm_at_serial_port_queue_command_cached (MMAtSerialPort *self,
 void mm_at_serial_port_remove_echo (GByteArray *response);
 
 void     mm_at_serial_port_set_flags (MMAtSerialPort *self,
-                                      MMAtPortFlags flags);
+                                      MMAtPortFlag flags);
 
-MMAtPortFlags mm_at_serial_port_get_flags (MMAtSerialPort *self);
+MMAtPortFlag mm_at_serial_port_get_flags (MMAtSerialPort *self);
 
 #endif /* MM_AT_SERIAL_PORT_H */

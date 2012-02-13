@@ -39,8 +39,10 @@ typedef struct {
     MMAtSerialResponseParserFn response_parser_fn;
     gpointer response_parser_user_data;
     GDestroyNotify response_parser_notify;
+
     GSList *unsolicited_msg_handlers;
-    MMAtPortFlags flags;
+
+    MMAtPortFlag flags;
 
     gboolean remove_echo;
 } MMAtSerialPortPrivate;
@@ -355,7 +357,7 @@ debug_log (MMSerialPort *port, const char *prefix, const char *buf, gsize len)
 }
 
 void
-mm_at_serial_port_set_flags (MMAtSerialPort *self, MMAtPortFlags flags)
+mm_at_serial_port_set_flags (MMAtSerialPort *self, MMAtPortFlag flags)
 {
     g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_AT_SERIAL_PORT (self));
@@ -364,7 +366,7 @@ mm_at_serial_port_set_flags (MMAtSerialPort *self, MMAtPortFlags flags)
     MM_AT_SERIAL_PORT_GET_PRIVATE (self)->flags = flags;    
 }
 
-MMAtPortFlags
+MMAtPortFlag
 mm_at_serial_port_get_flags (MMAtSerialPort *self)
 {
     g_return_val_if_fail (self != NULL, MM_AT_PORT_FLAG_NONE);
