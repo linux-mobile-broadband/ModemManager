@@ -624,7 +624,7 @@ test_creg2_iridium_solicited (void *f, gpointer d)
 {
     TestData *data = (TestData *) d;
     const char *reply = "+CREG:002,001,\"18d8\",\"ffff\"";
-    const CregResult result = { 1, 0x18D8, 0xFFFF, -1 , 4, FALSE};
+    const CregResult result = { 1, 0x18D8, 0xFFFF, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 4, FALSE};
 
     test_creg_match ("Iridium, CREG=2", TRUE, reply, data, &result);
 }
