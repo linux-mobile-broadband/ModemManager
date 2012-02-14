@@ -27,15 +27,55 @@
 #include "mm-errors-types.h"
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-3gpp.h"
 #include "mm-iface-modem-messaging.h"
 #include "mm-broadband-modem-iridium.h"
 #include "mm-sim-iridium.h"
 #include "mm-modem-helpers.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
+static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemIridium, mm_broadband_modem_iridium, MM_TYPE_BROADBAND_MODEM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
+
+/*****************************************************************************/
+/* Operator Code and Name loading (3GPP interface) */
+
+static gchar *
+load_operator_code_finish (MMIfaceModem3gpp *self,
+                           GAsyncResult *res,
+                           GError **error)
+{
+    /* Only "90103" operator code is assumed */
+    return g_strdup ("90103");
+}
+
+static gchar *
+load_operator_name_finish (MMIfaceModem3gpp *self,
+                           GAsyncResult *res,
+                           GError **error)
+{
+    /* Only "IRIDIUM" operator name is assumed */
+    return g_strdup ("IRIDIUM");
+}
+
+static void
+load_operator_name_or_code (MMIfaceModem3gpp *self,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_operator_name_or_code);
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
 
 /*****************************************************************************/
 /* Signal quality (Modem interface) */
@@ -213,6 +253,16 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_power_up_finish = NULL;
     iface->modem_power_down = NULL;
     iface->modem_power_down_finish = NULL;
+}
+
+static void
+iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
+{
+    /* Fixed operator code and name to be reported */
+    iface->load_operator_name = load_operator_name_or_code;
+    iface->load_operator_name_finish = load_operator_name_finish;
+    iface->load_operator_code = load_operator_name_or_code;
+    iface->load_operator_code_finish = load_operator_code_finish;
 }
 
 static void
