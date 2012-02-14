@@ -63,9 +63,9 @@ typedef struct {
     gchar **subsystems;
     gchar **drivers;
     guint16 *vendor_ids;
-    guint16 *product_ids;
+    mm_uint16_pair *product_ids;
     gchar **vendor_strings;
-    gchar **product_strings;
+    mm_str_pair *product_strings;
     gchar **udev_tags;
     gboolean at;
     gboolean qcdm;
@@ -283,6 +283,10 @@ apply_pre_probing_filters (MMPluginBase *self,
                            gboolean *need_product_probing)
 {
     MMPluginBasePrivate *priv = MM_PLUGIN_BASE_GET_PRIVATE (self);
+    guint16 vendor = 0;
+    guint16 product = 0;
+    gboolean product_filtered = FALSE;
+    gboolean vendor_filtered = FALSE;
     guint i;
 
     *need_vendor_probing = FALSE;
@@ -314,16 +318,12 @@ apply_pre_probing_filters (MMPluginBase *self,
             return TRUE;
     }
 
+    mm_plugin_base_get_device_ids (self, subsys, name, &vendor, &product);
+
     /* The plugin may specify that only some vendor IDs are supported. If that
      * is the case, filter by vendor ID. */
     if (priv->vendor_ids) {
-        gboolean vendor_filtered = FALSE;
-        guint16 vendor = 0;
-        guint16 product = 0;
-
-        mm_plugin_base_get_device_ids (self, subsys, name, &vendor, &product);
-
-        /* If we didn't get any vendor: unsupported */
+        /* If we didn't get any vendor: filtered */
         if (!vendor)
             vendor_filtered = TRUE;
         else {
@@ -331,54 +331,44 @@ apply_pre_probing_filters (MMPluginBase *self,
                 if (vendor == priv->vendor_ids[i])
                     break;
 
-            /* If we didn't match any vendor: unsupported */
+            /* If we didn't match any vendor: filtered */
             if (!priv->vendor_ids[i])
                 vendor_filtered = TRUE;
         }
+    }
 
-        if (vendor_filtered) {
-            /* If we got filtered by vendor and we do not have vendor strings
-             * to compare with: unsupported */
-            if (!priv->vendor_strings)
-                return TRUE;
+    /* The plugin may specify that only some product IDs are supported. If
+     * that is the case, filter by vendor+product ID pair */
+    if (priv->product_ids) {
+        /* If we didn't get any product: filtered */
+        if (!product)
+            product_filtered = TRUE;
+        else {
+            for (i = 0; priv->product_ids[i].l; i++)
+                if (vendor == priv->product_ids[i].l &&
+                    product == priv->product_ids[i].r)
+                    break;
 
-            /* Otherwise, we need to probe vendor strings. This cover the
-             * case where a RS232 modem is connected via a USB<->RS232 adaptor,
-             * and we get in udev the vendor ID of the adaptor */
-            *need_vendor_probing = TRUE;
-        }
-
-        /* The plugin may specify that only some product IDs are supported. If
-         * that is the case, filter by product ID */
-        if (priv->product_ids) {
-            gboolean product_filtered = FALSE;
-
-            /* If we didn't get any product: unsupported */
-            if (!product)
+            /* If we didn't match any product: filtered */
+            if (!priv->product_ids[i].l)
                 product_filtered = TRUE;
-            else {;
-                for (i = 0; priv->product_ids[i]; i++)
-                    if (product == priv->product_ids[i])
-                        break;
+        }
+    }
 
-                /* If we didn't match any product: unsupported */
-                if (!priv->product_ids[i])
-                    product_filtered = TRUE;
-            }
+    /* If we got filtered by vendor or product IDs  and we do not have vendor
+     * or product strings to compare with: unsupported */
+    if ((vendor_filtered || product_filtered) &&
+        !priv->vendor_strings &&
+        !priv->product_strings)
+        return TRUE;
 
-            if (product_filtered) {
-                /* If we got filtered by product and we do not have product
-                 * strings to compare with: unsupported */
-                if (!priv->product_strings)
-                    return TRUE;
+    /* If we need to filter by vendor/product strings, need to probe for both.
+     * This covers the case where a RS232 modem is connected via a USB<->RS232
+     * adaptor, and we get in udev the vendor ID of the adaptor */
 
-                /* Otherwise, we need to probe product strings. This cover the
-                 * case where a RS232 modem is connected via a USB<->RS232
-                 * adaptor, and we get in udev the product ID of the adaptor */
-                *need_product_probing = TRUE;
-            }
-        } else if (priv->vendor_strings)
-            *need_product_probing = TRUE;
+    if (priv->product_strings) {
+        *need_vendor_probing = TRUE;
+        *need_product_probing = TRUE;
     } else if (priv->vendor_strings)
         *need_vendor_probing = TRUE;
 
@@ -406,6 +396,8 @@ apply_post_probing_filters (MMPluginBase *self,
                             MMPortProbe *probe)
 {
     MMPluginBasePrivate *priv = MM_PLUGIN_BASE_GET_PRIVATE (self);
+    gboolean vendor_filtered = FALSE;
+    gboolean product_filtered = FALSE;
     guint i;
 
     /* The plugin may specify that only some vendor strings are supported. If
@@ -415,51 +407,68 @@ apply_post_probing_filters (MMPluginBase *self,
 
         vendor = mm_port_probe_get_vendor (probe);
 
-        /* If we didn't get any vendor: unsupported */
+        /* If we didn't get any vendor: filtered */
         if (!vendor)
-            return TRUE;
-
-        for (i = 0; priv->vendor_strings[i]; i++) {
-            gboolean found;
-            gchar *casefolded;
-
-            casefolded = g_utf8_casefold (priv->vendor_strings[i], -1);
-            found = !!strstr (vendor, casefolded);
-            g_free (casefolded);
-            if (found)
-                break;
-        }
-
-        /* If we didn't match any vendor: unsupported */
-        if (!priv->vendor_strings[i])
-            return TRUE;
-
-        /* The plugin may specify that only some product strings are supported.
-         * If that is the case, filter by product string */
-        if (priv->product_strings) {
-            const gchar *product;
-
-            product = mm_port_probe_get_product (probe);
-
-            /* If we didn't get any product: unsupported */
-            if (!product)
-                return TRUE;
-
-            for (i = 0; priv->product_strings[i]; i++) {
+            vendor_filtered = TRUE;
+        else {
+            for (i = 0; priv->vendor_strings[i]; i++) {
                 gboolean found;
                 gchar *casefolded;
 
-                casefolded = g_utf8_casefold (priv->product_strings[i], -1);
-                found = !!strstr (product, casefolded);
+                casefolded = g_utf8_casefold (priv->vendor_strings[i], -1);
+                found = !!strstr (vendor, casefolded);
                 g_free (casefolded);
                 if (found)
                     break;
             }
 
-            /* If we didn't match any product: unsupported */
-            if (!priv->product_strings[i])
-                return TRUE;
+            /* If we didn't match any vendor: filtered */
+            if (!priv->vendor_strings[i])
+                vendor_filtered = TRUE;
         }
+
+        if (vendor_filtered) {
+            if (!priv->product_strings)
+                return TRUE;
+        } else
+            /* Vendor matched */
+            return FALSE;
+    }
+
+    /* The plugin may specify that only some vendor+product string pairs are
+     * supported. If that is the case, filter by product string */
+    if (priv->product_strings) {
+        const gchar *vendor;
+        const gchar *product;
+
+        vendor = mm_port_probe_get_vendor (probe);
+        product = mm_port_probe_get_product (probe);
+
+        /* If we didn't get any vendor or product: filtered */
+        if (!vendor || !product)
+            product_filtered = TRUE;
+        else {
+            for (i = 0; priv->product_strings[i].l; i++) {
+                gboolean found;
+                gchar *casefolded_vendor;
+                gchar *casefolded_product;
+
+                casefolded_vendor = g_utf8_casefold (priv->product_strings[i].l, -1);
+                casefolded_product = g_utf8_casefold (priv->product_strings[i].r, -1);
+                found = (!!strstr (vendor, casefolded_vendor) &&
+                         !!strstr (product, casefolded_product));
+                g_free (casefolded_vendor);
+                g_free (casefolded_product);
+                if (found)
+                    break;
+            }
+
+            /* If we didn't match any product: unsupported */
+            if (!priv->product_strings[i].l)
+                product_filtered = TRUE;
+        }
+
+        return product_filtered;
     }
 
     return FALSE;
@@ -942,9 +951,9 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
         (object_class, PROP_ALLOWED_PRODUCT_IDS,
          g_param_spec_boxed (MM_PLUGIN_BASE_ALLOWED_PRODUCT_IDS,
                              "Allowed product IDs",
-                             "List of product IDs this plugin can support, "
-                             "should be an array of guint16 finished with '0'",
-                             MM_TYPE_UINT16_ARRAY,
+                             "List of vendor+product ID pairs this plugin can support, "
+                             "should be an array of mm_uint16_pair finished with '0,0'",
+                             MM_TYPE_UINT16_PAIR_ARRAY,
                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
 
@@ -961,9 +970,9 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
         (object_class, PROP_ALLOWED_PRODUCT_STRINGS,
          g_param_spec_boxed (MM_PLUGIN_BASE_ALLOWED_PRODUCT_STRINGS,
                              "Allowed product strings",
-                             "List of product strings this plugin can support, "
-                             "should be an array of strings finished with 'NULL'",
-                             G_TYPE_STRV,
+                             "List of vendor+product string pairs this plugin can support, "
+                             "should be an array of mm_str_pair finished with 'NULL,NULL'",
+                             MM_TYPE_STR_PAIR_ARRAY,
                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property
