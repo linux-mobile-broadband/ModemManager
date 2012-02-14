@@ -325,25 +325,25 @@ modem_create_sim (MMIfaceModem *self,
 /* Capabilities loading (Modem interface) */
 
 typedef struct {
-	gchar *name;
-	MMModemCapability bits;
+    gchar *name;
+    MMModemCapability bits;
 } ModemCaps;
 
 static const ModemCaps modem_caps[] = {
-	{ "+CGSM",     MM_MODEM_CAPABILITY_GSM_UMTS  },
-	{ "+CLTE2",    MM_MODEM_CAPABILITY_LTE       }, /* Novatel */
-	{ "+CLTE",     MM_MODEM_CAPABILITY_LTE       },
-	{ "+CIS707-A", MM_MODEM_CAPABILITY_CDMA_EVDO },
-	{ "+CIS707A",  MM_MODEM_CAPABILITY_CDMA_EVDO }, /* Cmotech */
-	{ "+CIS707",   MM_MODEM_CAPABILITY_CDMA_EVDO },
-	{ "CIS707",    MM_MODEM_CAPABILITY_CDMA_EVDO }, /* Qualcomm Gobi */
-	{ "+CIS707P",  MM_MODEM_CAPABILITY_CDMA_EVDO },
-	{ "CIS-856",   MM_MODEM_CAPABILITY_CDMA_EVDO },
-	{ "+IS-856",   MM_MODEM_CAPABILITY_CDMA_EVDO }, /* Cmotech */
-	{ "CIS-856-A", MM_MODEM_CAPABILITY_CDMA_EVDO },
-	{ "CIS-856A",  MM_MODEM_CAPABILITY_CDMA_EVDO }, /* Kyocera KPC680 */
+    { "+CGSM",     MM_MODEM_CAPABILITY_GSM_UMTS  },
+    { "+CLTE2",    MM_MODEM_CAPABILITY_LTE       }, /* Novatel */
+    { "+CLTE",     MM_MODEM_CAPABILITY_LTE       },
+    { "+CIS707-A", MM_MODEM_CAPABILITY_CDMA_EVDO },
+    { "+CIS707A",  MM_MODEM_CAPABILITY_CDMA_EVDO }, /* Cmotech */
+    { "+CIS707",   MM_MODEM_CAPABILITY_CDMA_EVDO },
+    { "CIS707",    MM_MODEM_CAPABILITY_CDMA_EVDO }, /* Qualcomm Gobi */
+    { "+CIS707P",  MM_MODEM_CAPABILITY_CDMA_EVDO },
+    { "CIS-856",   MM_MODEM_CAPABILITY_CDMA_EVDO },
+    { "+IS-856",   MM_MODEM_CAPABILITY_CDMA_EVDO }, /* Cmotech */
+    { "CIS-856-A", MM_MODEM_CAPABILITY_CDMA_EVDO },
+    { "CIS-856A",  MM_MODEM_CAPABILITY_CDMA_EVDO }, /* Kyocera KPC680 */
     /* TODO: FCLASS, MS, ES, DS? */
-	{ NULL }
+    { NULL }
 };
 
 static gboolean
