@@ -35,6 +35,63 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemIridium, mm_broadband_modem_iridium, MM_
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
 
 /*****************************************************************************/
+/* Flow control (Modem interface) */
+
+static gboolean
+setup_flow_control_finish (MMIfaceModem *self,
+                           GAsyncResult *res,
+                           GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+setup_flow_control_ready (MMBroadbandModemIridium *self,
+                          GAsyncResult *res,
+                          GSimpleAsyncResult *operation_result)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error))
+        /* Let the error be critical. We DO need RTS/CTS in order to have
+         * proper modem disabling. */
+        g_simple_async_result_take_error (operation_result, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
+
+    g_simple_async_result_complete (operation_result);
+    g_object_unref (operation_result);
+}
+
+static void
+setup_flow_control (MMIfaceModem *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        setup_flow_control);
+
+    /* Enable RTS/CTS flow control.
+     * Other available values:
+     *   AT&K0: Disable flow control
+     *   AT&K3: RTS/CTS
+     *   AT&K4: XOFF/XON
+     *   AT&K6: Both RTS/CTS and XOFF/XON
+     */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "&K3",
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)setup_flow_control_ready,
+                              result);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemIridium *
 mm_broadband_modem_iridium_new (const gchar *device,
@@ -60,6 +117,10 @@ mm_broadband_modem_iridium_init (MMBroadbandModemIridium *self)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    /* RTS/CTS flow control */
+    iface->setup_flow_control = setup_flow_control;
+    iface->setup_flow_control_finish = setup_flow_control_finish;
+
     /* No need to power-up/power-down the modem */
     iface->modem_power_up = NULL;
     iface->modem_power_up_finish = NULL;
