@@ -342,6 +342,7 @@ static const ModemCaps modem_caps[] = {
     { "+IS-856",   MM_MODEM_CAPABILITY_CDMA_EVDO }, /* Cmotech */
     { "CIS-856-A", MM_MODEM_CAPABILITY_CDMA_EVDO },
     { "CIS-856A",  MM_MODEM_CAPABILITY_CDMA_EVDO }, /* Kyocera KPC680 */
+    { "+WIRIDIUM", MM_MODEM_CAPABILITY_IRIDIUM   }, /* Iridium satellite modems */
     /* TODO: FCLASS, MS, ES, DS? */
     { NULL }
 };

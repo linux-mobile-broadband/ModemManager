@@ -33,6 +33,7 @@
  * @MM_MODEM_CAPABILITY_GSM_UMTS: Modem supports at least one of GSM, GPRS, EDGE, UMTS, HSDPA, HSUPA, or HSPA+ packet switched data capability.
  * @MM_MODEM_CAPABILITY_LTE: Modem has LTE data capability.
  * @MM_MODEM_CAPABILITY_LTE_ADVANCED: Modem has LTE Advanced data capability.
+ * @MM_MODEM_CAPABILITY_IRIDIUM: Modem has Iridium capabilities.
  *
  * Flags describing one or more of the general access technology families that a
  * modem supports.
@@ -44,6 +45,7 @@ typedef enum { /*< underscore_name=mm_modem_capability >*/
     MM_MODEM_CAPABILITY_GSM_UMTS     = 1 << 2,
     MM_MODEM_CAPABILITY_LTE          = 1 << 3,
     MM_MODEM_CAPABILITY_LTE_ADVANCED = 1 << 4,
+    MM_MODEM_CAPABILITY_IRIDIUM      = 1 << 5,
 } MMModemCapability;
 
 /**
