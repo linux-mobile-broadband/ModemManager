@@ -27,6 +27,7 @@
 #include "mm-errors-types.h"
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-messaging.h"
 #include "mm-broadband-modem-iridium.h"
 #include "mm-sim-iridium.h"
 
@@ -130,6 +131,9 @@ mm_broadband_modem_iridium_new (const gchar *device,
                          MM_BASE_MODEM_PLUGIN, plugin,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         MM_IFACE_MODEM_MESSAGING_SMS_MEM1_STORAGE, MM_SMS_STORAGE_SM,
+                         MM_IFACE_MODEM_MESSAGING_SMS_MEM2_STORAGE, MM_SMS_STORAGE_SM,
+                         MM_IFACE_MODEM_MESSAGING_SMS_MEM3_STORAGE, MM_SMS_STORAGE_SM,
                          NULL);
 }
 
