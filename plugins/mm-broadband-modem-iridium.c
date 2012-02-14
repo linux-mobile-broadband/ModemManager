@@ -26,9 +26,13 @@
 #include "mm-log.h"
 #include "mm-errors-types.h"
 #include "mm-base-modem-at.h"
+#include "mm-iface-modem.h"
 #include "mm-broadband-modem-iridium.h"
 
-G_DEFINE_TYPE (MMBroadbandModemIridium, mm_broadband_modem_iridium, MM_TYPE_BROADBAND_MODEM);
+static void iface_modem_init (MMIfaceModem *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMBroadbandModemIridium, mm_broadband_modem_iridium, MM_TYPE_BROADBAND_MODEM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
 
 /*****************************************************************************/
 
@@ -51,6 +55,16 @@ mm_broadband_modem_iridium_new (const gchar *device,
 static void
 mm_broadband_modem_iridium_init (MMBroadbandModemIridium *self)
 {
+}
+
+static void
+iface_modem_init (MMIfaceModem *iface)
+{
+    /* No need to power-up/power-down the modem */
+    iface->modem_power_up = NULL;
+    iface->modem_power_up_finish = NULL;
+    iface->modem_power_down = NULL;
+    iface->modem_power_down_finish = NULL;
 }
 
 static void
