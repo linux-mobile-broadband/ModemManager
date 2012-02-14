@@ -1241,7 +1241,9 @@ interface_initialization_step (InitAsyncContext *ctx)
         /* SIM ID is meant to be loaded only once during the whole
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
-        if (mm_gdbus_sim_get_sim_identifier (MM_GDBUS_SIM (ctx->self)) == NULL) {
+        if (mm_gdbus_sim_get_sim_identifier (MM_GDBUS_SIM (ctx->self)) == NULL &&
+            MM_SIM_GET_CLASS (ctx->self)->load_sim_identifier &&
+            MM_SIM_GET_CLASS (ctx->self)->load_sim_identifier_finish) {
             MM_SIM_GET_CLASS (ctx->self)->load_sim_identifier (
                 ctx->self,
                 (GAsyncReadyCallback)load_sim_identifier_ready,
@@ -1255,7 +1257,9 @@ interface_initialization_step (InitAsyncContext *ctx)
         /* IMSI is meant to be loaded only once during the whole
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
-        if (mm_gdbus_sim_get_imsi (MM_GDBUS_SIM (ctx->self)) == NULL) {
+        if (mm_gdbus_sim_get_imsi (MM_GDBUS_SIM (ctx->self)) == NULL &&
+            MM_SIM_GET_CLASS (ctx->self)->load_imsi &&
+            MM_SIM_GET_CLASS (ctx->self)->load_imsi_finish) {
             MM_SIM_GET_CLASS (ctx->self)->load_imsi (
                 ctx->self,
                 (GAsyncReadyCallback)load_imsi_ready,
@@ -1269,7 +1273,9 @@ interface_initialization_step (InitAsyncContext *ctx)
         /* Operator ID is meant to be loaded only once during the whole
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
-        if (mm_gdbus_sim_get_operator_identifier (MM_GDBUS_SIM (ctx->self)) == NULL) {
+        if (mm_gdbus_sim_get_operator_identifier (MM_GDBUS_SIM (ctx->self)) == NULL &&
+            MM_SIM_GET_CLASS (ctx->self)->load_operator_identifier &&
+            MM_SIM_GET_CLASS (ctx->self)->load_operator_identifier_finish) {
             MM_SIM_GET_CLASS (ctx->self)->load_operator_identifier (
                 ctx->self,
                 (GAsyncReadyCallback)load_operator_identifier_ready,
@@ -1283,7 +1289,9 @@ interface_initialization_step (InitAsyncContext *ctx)
         /* Operator Name is meant to be loaded only once during the whole
          * lifetime of the modem. Therefore, if we already have them loaded,
          * don't try to load them again. */
-        if (mm_gdbus_sim_get_operator_name (MM_GDBUS_SIM (ctx->self)) == NULL) {
+        if (mm_gdbus_sim_get_operator_name (MM_GDBUS_SIM (ctx->self)) == NULL &&
+            MM_SIM_GET_CLASS (ctx->self)->load_operator_name &&
+            MM_SIM_GET_CLASS (ctx->self)->load_operator_name_finish) {
             MM_SIM_GET_CLASS (ctx->self)->load_operator_name (
                 ctx->self,
                 (GAsyncReadyCallback)load_operator_name_ready,
