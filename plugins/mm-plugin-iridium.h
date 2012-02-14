@@ -16,7 +16,7 @@
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  *
- * Copyright (C) 2011 Ammonit Measurement GmbH
+ * Copyright (C) 2011 - 2012 Ammonit Measurement GmbH
  * Author: Aleksander Morgado <aleksander@lanedo.com>
  */
 
@@ -24,7 +24,6 @@
 #define MM_PLUGIN_IRIDIUM_H
 
 #include "mm-plugin-base.h"
-#include "mm-generic-gsm.h"
 
 #define MM_TYPE_PLUGIN_IRIDIUM            (mm_plugin_iridium_get_type ())
 #define MM_PLUGIN_IRIDIUM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_IRIDIUM, MMPluginIridium))

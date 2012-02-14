@@ -16,14 +16,21 @@
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  *
+<<<<<<< HEAD
  * Copyright (C) 2011 Ammonit Measurement GmbH
+=======
+ * Copyright (C) 2011 - 2012 Ammonit Measurement GmbH
+>>>>>>> 4ce461e... iridium: start porting the Iridium plugin to the '06-api' codebase
  * Author: Aleksander Morgado <aleksander@lanedo.com>
  */
 
 #include <string.h>
 #include <gmodule.h>
+
 #include "mm-plugin-iridium.h"
-#include "mm-modem-iridium-gsm.h"
+#include "mm-broadband-modem-iridium.h"
+#include "mm-errors-types.h"
+#include "mm-private-boxed-types.h"
 #include "mm-log.h"
 
 G_DEFINE_TYPE (MMPluginIridium, mm_plugin_iridium, MM_TYPE_PLUGIN_BASE)
@@ -31,195 +38,84 @@ G_DEFINE_TYPE (MMPluginIridium, mm_plugin_iridium, MM_TYPE_PLUGIN_BASE)
 int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
 int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 
-G_MODULE_EXPORT MMPlugin *
-mm_plugin_create (void)
-{
-    return MM_PLUGIN (g_object_new (MM_TYPE_PLUGIN_IRIDIUM,
-                                    MM_PLUGIN_BASE_NAME, "Iridium",
-                                    MM_PLUGIN_BASE_SORT_LAST, TRUE,
-                                    NULL));
-}
-
-static guint32
-get_level_for_capabilities (guint32 capabilities)
-{
-    if (capabilities & MM_PLUGIN_BASE_PORT_CAP_GSM &&
-        capabilities & MM_PLUGIN_BASE_PORT_CAP_IRIDIUM)
-        return 10;
-    return 0;
-}
-
-static gboolean
-check_vendor_iridium (MMPluginBaseSupportsTask *task)
-{
-    MMPluginBase *base;
-    GUdevDevice *port;
-    const char *subsys, *name;
-    guint16 vendor = 0;
-
-    base = MM_PLUGIN_BASE (mm_plugin_base_supports_task_get_plugin (task));
-    port = mm_plugin_base_supports_task_get_port (task);
-
-    /* Try to get device IDs from udev. Note that it is not an error
-     * if we can't get them in our case, as we also support serial
-     * modems. */
-    subsys = g_udev_device_get_subsystem (port);
-    name = g_udev_device_get_name (port);
-    mm_plugin_base_get_device_ids (base, subsys, name, &vendor, NULL);
-
-    /* Vendors: Iridium (0x1edd)*/
-    if (vendor == 0x1edd) {
-        mm_dbg ("Iridium USB modem detected");
-        return TRUE;
-    }
-
-    /* We may get Iridium modems connected in RS232 port, try to get
-     * probed Vendor ID string to check */
-    if (mm_plugin_base_supports_task_propagate_cached (task)) {
-        const gchar *probed_vendor;
-        gchar *probed_vendor_strdown;
-        gboolean probed_vendor_correct = FALSE;
-
-        probed_vendor = mm_plugin_base_supports_task_get_probed_vendor (task);
-        if (!probed_vendor)
-            return FALSE;
-
-        /* Lowercase the vendor string and compare */
-        probed_vendor_strdown = g_utf8_strdown (probed_vendor, -1);
-        if (strstr (probed_vendor_strdown, "iridium")) {
-            mm_dbg ("Iridium RS232 modem detected");
-            probed_vendor_correct = TRUE;
-        } else if (strstr (probed_vendor_strdown, "motorola")) {
-            const gchar *probed_product;
-            gchar *probed_product_strdown;
-
-            probed_product = mm_plugin_base_supports_task_get_probed_product (task);
-            probed_product_strdown = g_utf8_strdown (probed_product, -1);
-            if (strstr (probed_product_strdown, "satellite")) {
-                mm_dbg ("Motorola/Iridium RS232 modem detected");
-                probed_vendor_correct = TRUE;
-            }
-            g_free (probed_product_strdown);
-        }
-
-        g_free (probed_vendor_strdown);
-
-        return probed_vendor_correct;
-    }
-
-    return FALSE;
-}
-
-static void
-probe_result (MMPluginBase *base,
-              MMPluginBaseSupportsTask *task,
-              guint32 capabilities,
-              gpointer user_data)
-{
-    /* Note: the signal contains only capabilities, but we can also query the
-     * probed vendor and product strings here. */
-
-    /* Check vendor */
-    mm_plugin_base_supports_task_complete (task,
-                                           (check_vendor_iridium (task) ?
-                                            get_level_for_capabilities (capabilities) : 0));
-}
-
-static MMPluginSupportsResult
-supports_port (MMPluginBase *base,
-               MMModem *existing,
-               MMPluginBaseSupportsTask *task)
-{
-    GUdevDevice *port;
-    guint32 cached = 0;
-
-    /* Can't do anything with non-serial ports */
-    port = mm_plugin_base_supports_task_get_port (task);
-    if (strcmp (g_udev_device_get_subsystem (port), "tty"))
-        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
-
-    /* First thing to check in this plugin is if we got capabilities already.
-     * This is because we have a later check of the probed vendor, which is
-     * taken also during port probing.
-     * Note that we also relaunch a port probe if we got a cached value but no
-     * capabilities set (used when trying to detect RS232 modems during
-     * re-scans). */
-    if (!mm_plugin_base_supports_task_propagate_cached (task) ||
-        !mm_plugin_base_supports_task_get_probed_capabilities (task)) {
-        /* Kick off a probe */
-        if (mm_plugin_base_probe_port (base, task, 100000, NULL))
-            return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
-
-        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
-    }
-
-    /* Check vendor */
-    if (!check_vendor_iridium (task))
-        return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
-
-    /* Completed! */
-    cached = mm_plugin_base_supports_task_get_probed_capabilities (task);
-    mm_plugin_base_supports_task_complete (task, get_level_for_capabilities (cached));
-    return MM_PLUGIN_SUPPORTS_PORT_IN_PROGRESS;
-}
-
-static MMModem *
+static MMBaseModem *
 grab_port (MMPluginBase *base,
-           MMModem *existing,
-           MMPluginBaseSupportsTask *task,
+           MMBaseModem *existing,
+           MMPortProbe *probe,
            GError **error)
 {
-    GUdevDevice *port = NULL;
-    MMModem *modem = NULL;
-    const char *name, *subsys, *sysfs_path;
-    guint32 caps;
-    guint16 vendor = 0x1e2d;
-    guint16 product = 0;
-    MMPortType ptype;
+    MMBaseModem *modem = NULL;
+    const gchar *name, *subsys, *driver;
+    guint16 vendor = 0, product = 0;
 
-    port = mm_plugin_base_supports_task_get_port (task);
-    g_assert (port);
+    /* The Iridium plugin cannot do anything with non-AT ports */
+    if (!mm_port_probe_is_at (probe)) {
+        g_set_error_literal (error,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_UNSUPPORTED,
+                             "Ignoring non-AT port");
+        return NULL;
+    }
+
+    subsys = mm_port_probe_get_port_subsys (probe);
+    name = mm_port_probe_get_port_name (probe);
+    driver = mm_port_probe_get_port_driver (probe);
 
     /* Try to get Product IDs from udev. Note that it is not an error
      * if we can't get them in our case, as we also support serial
      * modems. */
-    subsys = g_udev_device_get_subsystem (port);
-    name = g_udev_device_get_name (port);
-    mm_plugin_base_get_device_ids (base, subsys, name, NULL, &product);
+    mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product);
 
-    caps = mm_plugin_base_supports_task_get_probed_capabilities (task);
-    sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
-    ptype = mm_plugin_base_probed_capabilities_to_port_type (caps);
-    if (!existing) {
-        if (caps & MM_PLUGIN_BASE_PORT_CAP_GSM) {
-            modem = mm_modem_iridium_gsm_new (sysfs_path,
-                                              mm_plugin_base_supports_task_get_driver (task),
-                                              mm_plugin_get_name (MM_PLUGIN (base)),
-                                              vendor,
-                                              product);
-        }
+    /* If this is the first port being grabbed, create a new modem object */
+    if (!existing)
+        modem = MM_BASE_MODEM (mm_broadband_modem_iridium_new (
+                                   mm_port_probe_get_port_physdev (probe),
+                                   driver,
+                                   mm_plugin_get_name (MM_PLUGIN (base)),
+                                   vendor,
+                                   product));
 
-        if (modem) {
-            if (!mm_modem_grab_port (modem, subsys, name, ptype, MM_AT_PORT_FLAG_NONE, NULL, error)) {
-                g_object_unref (modem);
-                return NULL;
-            }
-        }
-    } else if (get_level_for_capabilities (caps)) {
-        modem = existing;
-        if (!mm_modem_grab_port (modem, subsys, name, ptype, MM_AT_PORT_FLAG_NONE, NULL, error))
-            return NULL;
+    if (!mm_base_modem_grab_port (existing ? existing : modem,
+                                  subsys,
+                                  name,
+                                  MM_PORT_TYPE_AT, /* we only allow AT ports here */
+                                  MM_AT_PORT_FLAG_NONE,
+                                  error)) {
+        if (modem)
+            g_object_unref (modem);
+        return NULL;
     }
 
-    return modem;
+    return existing ? existing : modem;
 }
 
 /*****************************************************************************/
 
+G_MODULE_EXPORT MMPlugin *
+mm_plugin_create (void)
+{
+    static const gchar *subsystems[] = { "tty", NULL };
+    static const guint16 vendor_ids[] = { 0x1edd, 0 };
+    static const gchar *vendor_strings[] = { "iridium", NULL };
+    /* Also support motorola-branded Iridium modems */
+    static const mm_str_pair product_strings[] = {{"motorola", "satellite" },
+                                                  { NULL, NULL }};
+
+    return MM_PLUGIN (
+        g_object_new (MM_TYPE_PLUGIN_IRIDIUM,
+                      MM_PLUGIN_BASE_NAME, "Iridium",
+                      MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS, subsystems,
+                      MM_PLUGIN_BASE_ALLOWED_VENDOR_STRINGS, vendor_strings,
+                      MM_PLUGIN_BASE_ALLOWED_PRODUCT_STRINGS, product_strings,
+                      MM_PLUGIN_BASE_ALLOWED_VENDOR_IDS, vendor_ids,
+                      MM_PLUGIN_BASE_ALLOWED_AT, TRUE,
+                      MM_PLUGIN_BASE_SORT_LAST, TRUE,
+                      NULL));
+}
+
 static void
 mm_plugin_iridium_init (MMPluginIridium *self)
 {
-    g_signal_connect (self, "probe-result", G_CALLBACK (probe_result), NULL);
 }
 
 static void
@@ -227,6 +123,5 @@ mm_plugin_iridium_class_init (MMPluginIridiumClass *klass)
 {
     MMPluginBaseClass *pb_class = MM_PLUGIN_BASE_CLASS (klass);
 
-    pb_class->supports_port = supports_port;
     pb_class->grab_port = grab_port;
 }
