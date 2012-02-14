@@ -30,11 +30,62 @@
 #include "mm-iface-modem-messaging.h"
 #include "mm-broadband-modem-iridium.h"
 #include "mm-sim-iridium.h"
+#include "mm-modem-helpers.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemIridium, mm_broadband_modem_iridium, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
+
+/*****************************************************************************/
+/* Signal quality (Modem interface) */
+
+static guint
+load_signal_quality_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    gint quality = 0;
+    const gchar *result;
+
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!result)
+        return 0;
+
+    /* Skip possible whitespaces after '+CSQF:' and before the response */
+    result = mm_strip_tag (result, "+CSQF:");
+    while (*result == ' ')
+        result++;
+
+    if (sscanf (result, "%d", &quality))
+        /* Normalize the quality. <rssi> is NOT given in dBs,
+         * given as a relative value between 0 and 5 */
+        quality = CLAMP (quality, 0, 5) * 100 / 5;
+    else
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Could not parse signal quality results");
+
+    return quality;
+}
+
+static void
+load_signal_quality (MMIfaceModem *self,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    /* The iridium modem may have a huge delay to get signal quality if we pass
+     * AT+CSQ, so we'll default to use AT+CSQF, which is a fast version that
+     * returns right away the last signal quality value retrieved */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CSQF",
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              callback,
+                              user_data);
+}
 
 /*****************************************************************************/
 /* Flow control (Modem interface) */
@@ -148,6 +199,10 @@ iface_modem_init (MMIfaceModem *iface)
     /* Create Iridium-specific SIM */
     iface->create_sim = create_sim;
     iface->create_sim_finish = create_sim_finish;
+
+    /* CSQF-based signal quality */
+    iface->load_signal_quality = load_signal_quality;
+    iface->load_signal_quality_finish = load_signal_quality_finish;
 
     /* RTS/CTS flow control */
     iface->setup_flow_control = setup_flow_control;
