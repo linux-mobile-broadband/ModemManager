@@ -155,8 +155,6 @@ mm_bearer_list_get_paths (MMBearerList *self)
     return path_list;
 }
 
-typedef void (*MMBearerListForeachFunc) (MMBearer *bearer,
-                                         gpointer user_data);
 void
 mm_bearer_list_foreach (MMBearerList *self,
                         MMBearerListForeachFunc func,
