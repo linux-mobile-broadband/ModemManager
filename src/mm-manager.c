@@ -128,35 +128,27 @@ remove_modem (MMManager *manager,
 
 static void
 debug_modem_info (MMManager *self,
-                  MMBaseModem *modem)
+                  MMBaseModem *modem,
+                  const gchar *path)
 {
-    /* guint32 vid = 0; */
-    /* guint32 pid = 0; */
-    /* GUdevDevice *physdev; */
-    /* const gchar *subsys; */
+    GUdevDevice *physdev;
+    const gchar *subsys;
 
-    /* physdev = g_udev_client_query_by_sysfs_path ( */
-    /*     self->priv->udev, */
-    /*     mm_base_modem_get_device (modem)); */
-    /* subsys = (physdev ? */
-    /*           g_udev_device_get_subsystem (physdev) : */
-    /*           NULL); */
+    physdev = g_udev_client_query_by_sysfs_path (self->priv->udev,
+                                                 mm_base_modem_get_device (modem));
+    subsys = (physdev ?
+              g_udev_device_get_subsystem (physdev) :
+              NULL);
 
-    /* g_object_get (G_OBJECT (modem), */
-    /*               MM_MODEM_DATA_DEVICE, &data_device, */
-    /*               MM_MODEM_HW_VID, &vid, */
-    /*               MM_MODEM_HW_PID, &pid, */
-    /*               NULL); */
-    /* mm_dbg ("(%s): VID 0x%04X PID 0x%04X (%s)", */
-    /*         path, */
-    /*         (vid & 0xFFFF), */
-    /*         (pid & 0xFFFF), */
-    /*         subsys ? subsys : "unknown"); */
-    /* mm_dbg ("(%s): data port is %s", path, data_device); */
-    /* g_free (data_device); */
+    mm_dbg ("(%s): '%s' modem, VID 0x%04X PID 0x%04X (%s)",
+            path,
+            mm_base_modem_get_plugin (modem),
+            (mm_base_modem_get_vendor_id (modem) & 0xFFFF),
+            (mm_base_modem_get_product_id (modem) & 0xFFFF),
+            subsys ? subsys : "unknown");
 
-    /* if (physdev) */
-    /*     g_object_unref (physdev); */
+    if (physdev)
+        g_object_unref (physdev);
 }
 
 static void
@@ -232,10 +224,10 @@ check_export_modem (MMManager *self,
     g_dbus_object_manager_server_export (self->priv->object_manager,
                                          G_DBUS_OBJECT_SKELETON (modem));
     mm_dbg ("Exported modem '%s' at path '%s'", modem_physdev, path);
-    g_free (path);
 
     /* Once connected, dump additional debug info about the modem */
-    debug_modem_info (self, modem);
+    debug_modem_info (self, modem, path);
+    g_free (path);
 }
 
 static void
