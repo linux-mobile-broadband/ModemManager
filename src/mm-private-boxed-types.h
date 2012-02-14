@@ -23,6 +23,14 @@ G_BEGIN_DECLS
 GType mm_uint16_array_get_type (void) G_GNUC_CONST;
 #define MM_TYPE_UINT16_ARRAY (mm_uint16_array_get_type ())
 
+typedef struct { guint16 l; guint16 r; } mm_uint16_pair;
+GType mm_uint16_pair_array_get_type (void) G_GNUC_CONST;
+#define MM_TYPE_UINT16_PAIR_ARRAY (mm_uint16_pair_array_get_type ())
+
+typedef struct { gchar *l; gchar *r; } mm_str_pair;
+GType mm_str_pair_array_get_type (void) G_GNUC_CONST;
+#define MM_TYPE_STR_PAIR_ARRAY (mm_str_pair_array_get_type ())
+
 GType mm_pointer_array_get_type (void) G_GNUC_CONST;
 #define MM_TYPE_POINTER_ARRAY (mm_pointer_array_get_type ())
 
