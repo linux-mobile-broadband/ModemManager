@@ -809,11 +809,14 @@ cpin_query_ready (MMIfaceModem *self,
     }
 
     if (result &&
-        strstr (result, "+CPIN: ")) {
+        strstr (result, "+CPIN:")) {
         CPinResult *iter = &unlock_results[0];
         const gchar *str;
 
-        str = strstr (result, "+CPIN: ") + 7;
+        str = strstr (result, "+CPIN:") + 6;
+        /* Skip possible whitespaces after '+CPIN:' and before the response */
+        while (*str == ' ')
+            str++;
 
         /* Some phones (Motorola EZX models) seem to quote the response */
         if (str[0] == '"')
