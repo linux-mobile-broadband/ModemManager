@@ -28,6 +28,7 @@
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
 #include "mm-broadband-modem-iridium.h"
+#include "mm-sim-iridium.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 
@@ -92,6 +93,29 @@ setup_flow_control (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Create SIM (Modem inteface) */
+
+static MMSim *
+create_sim_finish (MMIfaceModem *self,
+                   GAsyncResult *res,
+                   GError **error)
+{
+    return mm_sim_new_finish (res, error);
+}
+
+static void
+create_sim (MMIfaceModem *self,
+            GAsyncReadyCallback callback,
+            gpointer user_data)
+{
+    /* New Iridium SIM */
+    mm_sim_iridium_new (MM_BASE_MODEM (self),
+                        NULL, /* cancellable */
+                        callback,
+                        user_data);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemIridium *
 mm_broadband_modem_iridium_new (const gchar *device,
@@ -117,6 +141,10 @@ mm_broadband_modem_iridium_init (MMBroadbandModemIridium *self)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    /* Create Iridium-specific SIM */
+    iface->create_sim = create_sim;
+    iface->create_sim_finish = create_sim_finish;
+
     /* RTS/CTS flow control */
     iface->setup_flow_control = setup_flow_control;
     iface->setup_flow_control_finish = setup_flow_control_finish;
