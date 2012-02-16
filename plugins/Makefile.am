@@ -250,6 +250,8 @@ libmm_plugin_iridium_la_SOURCES = \
 	mm-plugin-iridium.h \
 	mm-broadband-modem-iridium.c \
 	mm-broadband-modem-iridium.h \
+	mm-bearer-iridium.c \
+	mm-bearer-iridium.h \
 	mm-sim-iridium.c \
 	mm-sim-iridium.h
 libmm_plugin_iridium_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
