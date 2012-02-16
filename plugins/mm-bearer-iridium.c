@@ -178,6 +178,44 @@ dial_ready (MMBaseModem *modem,
 }
 
 static void
+service_type_ready (MMBaseModem *modem,
+                    GAsyncResult *res,
+                    ConnectContext *ctx)
+{
+    GError *error = NULL;
+
+    /* If cancelled, complete */
+    if (g_cancellable_is_cancelled (ctx->cancellable)) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_CANCELLED,
+                                         "Connection setup operation has been cancelled");
+        connect_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Errors setting the service type will be critical */
+    mm_base_modem_at_command_finish (modem, res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        connect_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* We just use the default number to dial in the Iridium network. Also note
+     * that we won't specify a specific port to use; Iridium modems only expose
+     * one. */
+    mm_base_modem_at_command (
+        modem,
+        "ATDT008816000025",
+        60,
+        FALSE,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)dial_ready,
+        ctx);
+}
+
+static void
 connect (MMBearer *self,
          GCancellable *cancellable,
          GAsyncReadyCallback callback,
@@ -203,16 +241,15 @@ connect (MMBearer *self,
                                              user_data,
                                              connect);
 
-    /* We just use the default number to dial in the Iridium network. Also note
-     * that we won't specify a specific port to use; Iridium modems only expose
-     * one. */
+    /* Bearer service type set to 9600bps (V.110), which behaves better than the
+     * default 9600bps (V.32). */
     mm_base_modem_at_command (
         modem,
-        "ATDT008816000025",
-        60,
+        "+CBST=71,0,1",
+        3,
         FALSE,
         NULL, /* cancellable */
-        (GAsyncReadyCallback)dial_ready,
+        (GAsyncReadyCallback)service_type_ready,
         ctx);
 
     g_object_unref (modem);
