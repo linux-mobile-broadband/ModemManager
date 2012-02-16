@@ -35,10 +35,12 @@
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemIridium, mm_broadband_modem_iridium, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init));
 
 /*****************************************************************************/
 /* Initializing the modem (Modem interface) */
@@ -169,6 +171,38 @@ load_operator_name_or_code (MMIfaceModem3gpp *self,
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
+}
+
+/*****************************************************************************/
+/* Enable unsolicited events (SMS indications) (Messaging interface) */
+
+static gboolean
+messaging_enable_unsolicited_events_finish (MMIfaceModemMessaging *self,
+                                            GAsyncResult *res,
+                                            GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
+{
+    /* AT+CNMI=<mode>,[<mt>[,<bm>[,<ds>[,<bfr>]]]]
+     *  but <bm> can only be 0,
+     *  and <ds> can only be either 0 or 1
+     *
+     * Note: Modem may return +CMS ERROR:322, which indicates Memory Full,
+     * not a big deal
+     */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CNMI=2,1,0,0,1",
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              callback,
+                              user_data);
 }
 
 /*****************************************************************************/
@@ -391,6 +425,13 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
      */
     iface->scan_networks = NULL;
     iface->scan_networks_finish = NULL;
+}
+
+static void
+iface_modem_messaging_init (MMIfaceModemMessaging *iface)
+{
+    iface->enable_unsolicited_events = messaging_enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = messaging_enable_unsolicited_events_finish;
 }
 
 static void
