@@ -34,6 +34,9 @@
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 
+/* We require up to 20s to get a proper IP when using PPP */
+#define MM_BEARER_IP_TIMEOUT_DEFAULT 20
+
 G_DEFINE_TYPE (MMBearer, mm_bearer, MM_GDBUS_TYPE_BEARER_SKELETON);
 
 enum {
@@ -650,6 +653,7 @@ mm_bearer_init (MMBearer *self)
     mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_suspended (MM_GDBUS_BEARER (self), FALSE);
     mm_gdbus_bearer_set_properties (MM_GDBUS_BEARER (self), NULL);
+    mm_gdbus_bearer_set_ip_timeout (MM_GDBUS_BEARER (self), MM_BEARER_IP_TIMEOUT_DEFAULT);
     mm_gdbus_bearer_set_ip4_config (MM_GDBUS_BEARER (self),
                                     mm_common_bearer_ip_config_get_dictionary (NULL));
     mm_gdbus_bearer_set_ip6_config (MM_GDBUS_BEARER (self),

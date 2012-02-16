@@ -220,6 +220,13 @@
     <property name="Ip6Config" type="a{sv}" access="read" />
 
     <!--
+        IpTimeout:
+
+        Maximum time to wait for a successful IP establishment, when PPP is used.
+    -->
+    <property name="IpTimeout" type="u" access="read" />
+
+    <!--
         Properties:
 
         List of properties used when creating the bearer.
