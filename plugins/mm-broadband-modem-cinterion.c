@@ -36,10 +36,12 @@
 
 static void iface_modem_init      (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemCinterion, mm_broadband_modem_cinterion, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init));
 
 struct _MMBroadbandModemCinterionPrivate {
     /* Flag to know if we should try AT^SIND or not to get psinfo */
@@ -84,6 +86,35 @@ enable_unsolicited_events (MMIfaceModem3gpp *self,
         NULL, /* cancellable */
         callback,
         user_data);
+}
+
+/*****************************************************************************/
+/* Enable unsolicited events (SMS indications) (Messaging interface) */
+
+static gboolean
+messaging_enable_unsolicited_events_finish (MMIfaceModemMessaging *self,
+                                            GAsyncResult *res,
+                                            GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
+{
+    /* AT+CNMI=<mode>,[<mt>[,<bm>[,<ds>[,<bfr>]]]]
+     *  but <bfr> should be either not set, or equal to 1;
+     *  and <ds> can be only either 0 or 2 (EGS5)
+     */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CNMI=2,1,2,2,1",
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              callback,
+                              user_data);
 }
 
 /*****************************************************************************/
@@ -833,6 +864,13 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 {
     iface->enable_unsolicited_events = enable_unsolicited_events;
     iface->enable_unsolicited_events_finish = enable_unsolicited_events_finish;
+}
+
+static void
+iface_modem_messaging_init (MMIfaceModemMessaging *iface)
+{
+    iface->enable_unsolicited_events = messaging_enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = messaging_enable_unsolicited_events_finish;
 }
 
 static void
