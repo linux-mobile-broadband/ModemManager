@@ -47,7 +47,8 @@ test_at_serial_port_SOURCES = \
 
 test_at_serial_port_CPPFLAGS = \
 	$(MM_CFLAGS) \
-	-I$(top_srcdir)
+	-I$(top_srcdir) \
+	-I$(top_srcdir)/src
 
 test_at_serial_port_LDADD = \
 	$(MM_LIBS) \
