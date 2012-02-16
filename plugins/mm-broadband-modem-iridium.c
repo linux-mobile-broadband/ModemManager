@@ -237,6 +237,8 @@ mm_broadband_modem_iridium_new (const gchar *device,
                          MM_BASE_MODEM_PLUGIN, plugin,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         /* Allow only up to 3 consecutive timeouts in the serial port */
+                         MM_BASE_MODEM_MAX_TIMEOUTS, 3,
                          /* Only CS network is supported by the Iridium modem */
                          MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED, FALSE,
                          MM_IFACE_MODEM_MESSAGING_SMS_MEM1_STORAGE, MM_SMS_STORAGE_SM,
