@@ -98,6 +98,22 @@ struct _MMIfaceModemMessaging {
                                                    GAsyncResult *res,
                                                    GError **error);
 
+    /* Asynchronous enabling unsolicited SMS reception events */
+    void (* enable_unsolicited_events) (MMIfaceModemMessaging *self,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data);
+    gboolean (* enable_unsolicited_events_finish) (MMIfaceModemMessaging *self,
+                                                   GAsyncResult *res,
+                                                   GError **error);
+
+    /* Asynchronous disabling unsolicited SMS reception events */
+    void (* disable_unsolicited_events) (MMIfaceModemMessaging *self,
+                                         GAsyncReadyCallback callback,
+                                         gpointer user_data);
+    gboolean (* disable_unsolicited_events_finish) (MMIfaceModemMessaging *self,
+                                                    GAsyncResult *res,
+                                                    GError **error);
+
     /* Load initial SMS parts (async).
      * Found parts need to be reported with take_part() */
     void (* load_initial_sms_parts) (MMIfaceModemMessaging *self,
