@@ -151,10 +151,12 @@ print_bearer_info (MMBearer *bearer)
     g_print ("  -------------------------\n"
              "  Status             |   connected: '%s'\n"
              "                     |   suspended: '%s'\n"
-             "                     |   interface: '%s'\n",
+             "                     |   interface: '%s'\n"
+             "                     |  IP timeout: '%u'\n",
              mm_bearer_get_connected (bearer) ? "yes" : "no",
              mm_bearer_get_suspended (bearer) ? "yes" : "no",
-             VALIDATE_UNKNOWN (mm_bearer_get_interface (bearer)));
+             VALIDATE_UNKNOWN (mm_bearer_get_interface (bearer)),
+             mm_bearer_get_ip_timeout (bearer));
 
     if (properties) {
         g_print ("  -------------------------\n"
