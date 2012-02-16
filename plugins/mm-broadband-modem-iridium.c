@@ -209,6 +209,21 @@ create_sim (MMIfaceModem *self,
 
 /*****************************************************************************/
 
+static void
+setup_ports (MMBroadbandModem *self)
+{
+    /* Call parent's setup ports first always */
+    MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_iridium_parent_class)->setup_ports (self);
+
+    /* Set 9600 baudrate by default in the AT port */
+    mm_dbg ("Baudrate will be set to 9600 bps...");
+    g_object_set (G_OBJECT (mm_base_modem_get_port_primary (MM_BASE_MODEM (self))),
+                  MM_SERIAL_PORT_BAUD, 9600,
+                  NULL);
+}
+
+/*****************************************************************************/
+
 MMBroadbandModemIridium *
 mm_broadband_modem_iridium_new (const gchar *device,
                                 const gchar *driver,
@@ -281,4 +296,7 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 static void
 mm_broadband_modem_iridium_class_init (MMBroadbandModemIridiumClass *klass)
 {
+    MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
+
+    broadband_modem_class->setup_ports = setup_ports;
 }
