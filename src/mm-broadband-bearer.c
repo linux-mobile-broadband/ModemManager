@@ -476,11 +476,11 @@ connect_report_ready (MMBaseModem *modem,
                                          ctx->saved_error->domain,
                                          ctx->saved_error->code,
                                          "%s", &result[7]);
+        g_error_free (ctx->saved_error);
     } else
         g_simple_async_result_take_error (ctx->result,
                                           ctx->saved_error);
 
-    g_error_free (ctx->saved_error);
     ctx->saved_error = NULL;
 
     /* Done with errors */
