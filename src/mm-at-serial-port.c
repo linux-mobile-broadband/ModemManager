@@ -66,7 +66,7 @@ mm_at_serial_port_remove_echo (GByteArray *response)
     if (response->len <= 2)
         return;
 
-    for (i = 0; i < (response->len - 2); i++) {
+    for (i = 0; i < (response->len - 1); i++) {
         /* If there is any content before the first
          * <CR><LF>, assume it's echo or garbage, and skip it */
         if (response->data[i] == '\r' && response->data[i + 1] == '\n') {
