@@ -137,6 +137,14 @@ mm_bearer_get_suspended (MMBearer *self)
     return mm_gdbus_bearer_get_suspended (self);
 }
 
+guint
+mm_bearer_get_ip_timeout (MMBearer *self)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_BEARER (self), 0);
+
+    return mm_gdbus_bearer_get_ip_timeout (self);
+}
+
 MMBearerIpConfig *
 mm_bearer_get_ipv4_config (MMBearer *self)
 {

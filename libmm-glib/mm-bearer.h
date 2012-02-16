@@ -36,12 +36,13 @@ typedef MmGdbusBearer     MMBearer;
 #define MM_BEARER(o)      MM_GDBUS_BEARER(o)
 #define MM_IS_BEARER(o)   MM_GDBUS_IS_BEARER(o)
 
-const gchar *mm_bearer_get_path      (MMBearer *self);
-gchar       *mm_bearer_dup_path      (MMBearer *self);
-const gchar *mm_bearer_get_interface (MMBearer *self);
-gchar       *mm_bearer_dup_interface (MMBearer *self);
-gboolean     mm_bearer_get_connected (MMBearer *self);
-gboolean     mm_bearer_get_suspended (MMBearer *self);
+const gchar *mm_bearer_get_path       (MMBearer *self);
+gchar       *mm_bearer_dup_path       (MMBearer *self);
+const gchar *mm_bearer_get_interface  (MMBearer *self);
+gchar       *mm_bearer_dup_interface  (MMBearer *self);
+gboolean     mm_bearer_get_connected  (MMBearer *self);
+gboolean     mm_bearer_get_suspended  (MMBearer *self);
+guint        mm_bearer_get_ip_timeout (MMBearer *self);
 
 void     mm_bearer_connect        (MMBearer *self,
                                    GCancellable *cancellable,
