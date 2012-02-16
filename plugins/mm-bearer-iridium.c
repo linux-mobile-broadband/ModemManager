@@ -299,6 +299,38 @@ primary_flash_ready (MMSerialPort *port,
     g_object_unref (result);
 }
 
+static gboolean
+after_disconnect_sleep_cb (GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    MMAtSerialPort *primary;
+    MMBearer *self;
+    MMBaseModem *modem;
+
+    self = MM_BEARER (g_async_result_get_source_object (G_ASYNC_RESULT (simple)));
+    g_object_get (self,
+                  MM_BEARER_MODEM, &modem,
+                  NULL);
+    primary = mm_base_modem_get_port_primary (modem);
+
+    /* Propagate errors when reopening the port */
+    if (!mm_serial_port_open (MM_SERIAL_PORT (primary), &error)) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+    } else {
+        mm_serial_port_flash (MM_SERIAL_PORT (primary),
+                              1000,
+                              TRUE,
+                              (MMSerialFlashFn)primary_flash_ready,
+                              simple);
+    }
+
+    g_object_unref (modem);
+    g_object_unref (self);
+    return FALSE;
+}
+
 static void
 disconnect (MMBearer *self,
             GAsyncReadyCallback callback,
@@ -331,11 +363,15 @@ disconnect (MMBearer *self,
                                         callback,
                                         user_data,
                                         disconnect);
-    mm_serial_port_flash (MM_SERIAL_PORT (primary),
-                          1000,
-                          TRUE,
-                          (MMSerialFlashFn)primary_flash_ready,
-                          result);
+
+    /* When we enable the modem we kept one open count in the primary port.
+     * We now need to fully close that one, as if we were disabled, and reopen
+     * it again afterwards. */
+    mm_serial_port_close (MM_SERIAL_PORT (primary));
+    g_warn_if_fail (!mm_serial_port_is_open (MM_SERIAL_PORT (primary)));
+
+    mm_dbg ("Waiting some seconds before reopening the port...");
+    g_timeout_add_seconds (5, (GSourceFunc)after_disconnect_sleep_cb, result);
 }
 
 /*****************************************************************************/
