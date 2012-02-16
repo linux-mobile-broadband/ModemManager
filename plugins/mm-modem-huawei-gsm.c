@@ -729,82 +729,6 @@ handle_status_change (MMAtSerialPort *port,
 
 /*****************************************************************************/
 
-static void
-do_enable_power_up_done (MMGenericGsm *gsm,
-                         GString *response,
-                         GError *error,
-                         MMCallbackInfo *info)
-{
-    if (!error) {
-        MMAtSerialPort *primary;
-
-        /* Enable unsolicited result codes */
-        primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
-        g_assert (primary);
-
-        mm_at_serial_port_queue_command (primary, "^CURC=1", 5, NULL, NULL);
-    }
-
-    /* Chain up to parent */
-    MM_GENERIC_GSM_CLASS (mm_modem_huawei_gsm_parent_class)->do_enable_power_up_done (gsm, NULL, error, info);
-}
-
-/*****************************************************************************/
-
-static void
-disable_unsolicited_done (MMAtSerialPort *port,
-                          GString *response,
-                          GError *error,
-                          gpointer user_data)
-
-{
-    MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-
-    /* If the modem has already been removed, return without
-     * scheduling callback */
-    if (mm_callback_info_check_modem_removed (info))
-        return;
-
-    /* Ignore all errors */
-    mm_callback_info_schedule (info);
-}
-
-static void
-invoke_call_parent_disable_fn (MMCallbackInfo *info)
-{
-    /* Note: we won't call the parent disable if info->modem is no longer
-     * valid. The invoke is called always once the info gets scheduled, which
-     * may happen during removed modem detection. */
-    if (info->modem) {
-        MMModem *parent_modem_iface;
-
-        parent_modem_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (info->modem));
-        parent_modem_iface->disable (info->modem, (MMModemFn)info->callback, info->user_data);
-    }
-}
-
-static void
-disable (MMModem *modem,
-         MMModemFn callback,
-         gpointer user_data)
-{
-    MMAtSerialPort *primary;
-    MMCallbackInfo *info;
-
-    info = mm_callback_info_new_full (modem,
-                                      invoke_call_parent_disable_fn,
-                                      (GCallback)callback,
-                                      user_data);
-
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (modem), MM_PORT_TYPE_PRIMARY);
-    g_assert (primary);
-
-    /* Turn off unsolicited responses */
-    mm_at_serial_port_queue_command (primary, "^CURC=0", 5, disable_unsolicited_done, info);
-}
-
-/*****************************************************************************/
-
 static gboolean
 grab_port (MMModem *modem,
            const char *subsys,
@@ -933,7 +857,6 @@ static void
 modem_init (MMModem *modem_class)
 {
     modem_class->grab_port = grab_port;
-    modem_class->disable = disable;
 }
 
 static void
@@ -973,6 +896,5 @@ mm_modem_huawei_gsm_class_init (MMModemHuaweiGsmClass *klass)
     gsm_class->set_allowed_mode = set_allowed_mode;
     gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->get_access_technology = get_access_technology;
-    gsm_class->do_enable_power_up_done = do_enable_power_up_done;
 }
 
