@@ -3995,6 +3995,31 @@ modem_messaging_cleanup_unsolicited_events (MMIfaceModemMessaging *self,
 }
 
 /*****************************************************************************/
+/* Enable unsolicited events (SMS indications) (Messaging interface) */
+
+static gboolean
+modem_messaging_enable_unsolicited_events_finish (MMIfaceModemMessaging *self,
+                                                  GAsyncResult *res,
+                                                  GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+modem_messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
+                                           GAsyncReadyCallback callback,
+                                           gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CNMI=2,1,2,1,0",
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Load initial list of SMS parts (Messaging interface) */
 
 typedef struct {
@@ -6830,6 +6855,8 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
     iface->load_initial_sms_parts_finish = modem_messaging_load_initial_sms_parts_finish;
     iface->setup_unsolicited_events = modem_messaging_setup_unsolicited_events;
     iface->setup_unsolicited_events_finish = modem_messaging_setup_cleanup_unsolicited_events_finish;
+    iface->enable_unsolicited_events = modem_messaging_enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = modem_messaging_enable_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = modem_messaging_cleanup_unsolicited_events;
     iface->cleanup_unsolicited_events_finish = modem_messaging_setup_cleanup_unsolicited_events_finish;
     iface->create_sms = mm_sms_new;
