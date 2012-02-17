@@ -39,7 +39,7 @@ void mm_modem_simple_connect_properties_set_pin (
 void mm_modem_simple_connect_properties_set_operator_id (
     MMModemSimpleConnectProperties *properties,
     const gchar *operator_id);
-void mm_modem_simple_connect_properties_set_allowed_bands (
+void mm_modem_simple_connect_properties_set_bands (
     MMModemSimpleConnectProperties *properties,
     const MMModemBand *bands,
     guint n_bands);

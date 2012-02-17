@@ -680,20 +680,20 @@ mm_modem_get_supported_bands (MMModem *self,
 }
 
 /**
- * mm_modem_get_allowed_bands:
+ * mm_modem_get_bands:
  * @self: A #MMModem.
  * @bands: (out): Return location for the array of #MMModemBand values.
  * @n_bands: (out): Return location for the number of values in @bands.
  *
  * Gets the list of radio frequency and technology bands the #MMModem is currently
- * allowed to use when connecting to a network.
+ * using when connecting to a network.
  *
  * For POTS devices, only the #MM_MODEM_BAND_ANY band is supported.
  */
 void
-mm_modem_get_allowed_bands (MMModem *self,
-                            MMModemBand **bands,
-                            guint *n_bands)
+mm_modem_get_bands (MMModem *self,
+                    MMModemBand **bands,
+                    guint *n_bands)
 {
     GArray *array;
 
@@ -701,7 +701,7 @@ mm_modem_get_allowed_bands (MMModem *self,
     g_return_if_fail (bands != NULL);
     g_return_if_fail (n_bands != NULL);
 
-    array = mm_common_bands_variant_to_garray (mm_gdbus_modem_get_allowed_bands (self));
+    array = mm_common_bands_variant_to_garray (mm_gdbus_modem_get_bands (self));
     *n_bands = array->len;
     *bands = (MMModemBand *)g_array_free (array, FALSE);
 }
@@ -1555,44 +1555,44 @@ mm_modem_set_allowed_modes_sync (MMModem *self,
 }
 
 gboolean
-mm_modem_set_allowed_bands_finish (MMModem *self,
-                                   GAsyncResult *res,
-                                   GError **error)
+mm_modem_set_bands_finish (MMModem *self,
+                           GAsyncResult *res,
+                           GError **error)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
 
-    return mm_gdbus_modem_call_set_allowed_bands_finish (self,
-                                                         res,
-                                                         error);
+    return mm_gdbus_modem_call_set_bands_finish (self,
+                                                 res,
+                                                 error);
 }
 
 void
-mm_modem_set_allowed_bands (MMModem *self,
-                            const MMModemBand *bands,
-                            guint n_bands,
-                            GCancellable *cancellable,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data)
+mm_modem_set_bands (MMModem *self,
+                    const MMModemBand *bands,
+                    guint n_bands,
+                    GCancellable *cancellable,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
 {
     g_return_if_fail (MM_GDBUS_IS_MODEM (self));
 
-    mm_gdbus_modem_call_set_allowed_bands (self,
-                                           mm_common_bands_array_to_variant (bands, n_bands),
-                                           cancellable,
-                                           callback,
-                                           user_data);
+    mm_gdbus_modem_call_set_bands (self,
+                                   mm_common_bands_array_to_variant (bands, n_bands),
+                                   cancellable,
+                                   callback,
+                                   user_data);
 }
 
 gboolean
-mm_modem_set_allowed_bands_sync (MMModem *self,
-                                 const MMModemBand *bands,
-                                 guint n_bands,
-                                 GCancellable *cancellable,
-                                 GError **error)
+mm_modem_set_bands_sync (MMModem *self,
+                         const MMModemBand *bands,
+                         guint n_bands,
+                         GCancellable *cancellable,
+                         GError **error)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), FALSE);
 
-    return (mm_gdbus_modem_call_set_allowed_bands_sync (
+    return (mm_gdbus_modem_call_set_bands_sync (
                 self,
                 mm_common_bands_array_to_variant (bands, n_bands),
                 cancellable,

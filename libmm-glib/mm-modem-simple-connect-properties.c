@@ -34,13 +34,13 @@ mm_modem_simple_connect_properties_set_operator_id (MMModemSimpleConnectProperti
 }
 
 void
-mm_modem_simple_connect_properties_set_allowed_bands (MMModemSimpleConnectProperties *self,
-                                                      const MMModemBand *bands,
-                                                      guint n_bands)
+mm_modem_simple_connect_properties_set_bands (MMModemSimpleConnectProperties *self,
+                                              const MMModemBand *bands,
+                                              guint n_bands)
 {
     g_return_if_fail (MM_IS_MODEM_SIMPLE_CONNECT_PROPERTIES (self));
 
-    mm_common_connect_properties_set_allowed_bands (self, bands, n_bands);
+    mm_common_connect_properties_set_bands (self, bands, n_bands);
 }
 
 void

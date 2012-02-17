@@ -59,7 +59,7 @@ void mm_common_connect_properties_set_pin (
 void mm_common_connect_properties_set_operator_id (
     MMCommonConnectProperties *properties,
     const gchar *operator_id);
-void mm_common_connect_properties_set_allowed_bands (
+void mm_common_connect_properties_set_bands (
     MMCommonConnectProperties *properties,
     const MMModemBand *bands,
     guint n_bands);
@@ -90,7 +90,7 @@ const gchar *mm_common_connect_properties_get_pin (
     MMCommonConnectProperties *properties);
 const gchar *mm_common_connect_properties_get_operator_id (
     MMCommonConnectProperties *properties);
-void mm_common_connect_properties_get_allowed_bands (
+void mm_common_connect_properties_get_bands (
     MMCommonConnectProperties *properties,
     const MMModemBand **bands,
     guint *n_bands);

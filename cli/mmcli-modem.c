@@ -58,7 +58,7 @@ static gchar *create_bearer_str;
 static gchar *delete_bearer_str;
 static gchar *set_allowed_modes_str;
 static gchar *set_preferred_mode_str;
-static gchar *set_allowed_bands_str;
+static gchar *set_bands_str;
 
 static GOptionEntry entries[] = {
     { "monitor-state", 'w', 0, G_OPTION_ARG_NONE, &monitor_state_flag,
@@ -105,8 +105,8 @@ static GOptionEntry entries[] = {
       "Set allowed modes in a given modem.",
       "[MODE1|MODE2...]"
     },
-    { "set-allowed-bands", 0, 0, G_OPTION_ARG_STRING, &set_allowed_bands_str,
-      "Set allowed bands in a given modem.",
+    { "set-bands", 0, 0, G_OPTION_ARG_STRING, &set_bands_str,
+      "Set bands to be used by a given modem.",
       "[BAND1|BAND2...]"
     },
     { "set-preferred-mode", 0, 0, G_OPTION_ARG_STRING, &set_preferred_mode_str,
@@ -152,7 +152,7 @@ mmcli_modem_options_enabled (void)
                  !!command_str +
                  !!set_allowed_modes_str +
                  !!set_preferred_mode_str +
-                 !!set_allowed_bands_str);
+                 !!set_bands_str);
 
     if (n_actions == 0 && mmcli_get_common_modem_string ()) {
         /* default to info */
@@ -272,7 +272,7 @@ print_modem_info (void)
     gchar *allowed_modes_string;
     gchar *preferred_mode_string;
     gchar *supported_bands_string;
-    gchar *allowed_bands_string;
+    gchar *bands_string;
     MMModemBand *bands = NULL;
     guint n_bands = 0;
 
@@ -304,14 +304,10 @@ print_modem_info (void)
         mm_modem_get_modem_capabilities (ctx->modem));
     access_technologies_string = mm_modem_access_technology_build_string_from_mask (
         mm_modem_get_access_technologies (ctx->modem));
-    mm_modem_get_allowed_bands (ctx->modem,
-                                &bands,
-                                &n_bands);
-    allowed_bands_string = mm_common_build_bands_string (bands, n_bands);
+    mm_modem_get_bands (ctx->modem, &bands, &n_bands);
+    bands_string = mm_common_build_bands_string (bands, n_bands);
     g_free (bands);
-    mm_modem_get_supported_bands (ctx->modem,
-                                  &bands,
-                                  &n_bands);
+    mm_modem_get_supported_bands (ctx->modem, &bands, &n_bands);
     supported_bands_string = mm_common_build_bands_string (bands, n_bands);
     g_free (bands);
     allowed_modes_string = mm_modem_mode_build_string_from_mask (
@@ -374,9 +370,9 @@ print_modem_info (void)
     /* Band related stuff */
     g_print ("  -------------------------\n"
              "  Bands    |      supported: '%s'\n"
-             "           |        allowed: '%s'\n",
+             "           |        current: '%s'\n",
              VALIDATE_UNKNOWN (supported_bands_string),
-             VALIDATE_UNKNOWN (allowed_bands_string));
+             VALIDATE_UNKNOWN (bands_string));
 
     /* If available, 3GPP related stuff */
     if (ctx->modem_3gpp) {
@@ -434,7 +430,7 @@ print_modem_info (void)
              VALIDATE_PATH (mm_modem_get_sim_path (ctx->modem)));
     g_print ("\n");
 
-    g_free (allowed_bands_string);
+    g_free (bands_string);
     g_free (supported_bands_string);
     g_free (access_technologies_string);
     g_free (capabilities_string);
@@ -731,44 +727,44 @@ parse_modes (MMModemMode *allowed,
 }
 
 static void
-set_allowed_bands_process_reply (gboolean      result,
-                                 const GError *error)
+set_bands_process_reply (gboolean      result,
+                         const GError *error)
 {
     if (!result) {
-        g_printerr ("error: couldn't set allowed bands: '%s'\n",
+        g_printerr ("error: couldn't set bands: '%s'\n",
                     error ? error->message : "unknown error");
         exit (EXIT_FAILURE);
     }
 
-    g_print ("successfully set allowed bands in the modem\n");
+    g_print ("successfully set bands in the modem\n");
 }
 
 static void
-set_allowed_bands_ready (MMModem      *modem,
-                         GAsyncResult *result,
-                         gpointer      nothing)
+set_bands_ready (MMModem      *modem,
+                 GAsyncResult *result,
+                 gpointer      nothing)
 {
     gboolean operation_result;
     GError *error = NULL;
 
-    operation_result = mm_modem_set_allowed_bands_finish (modem, result, &error);
-    set_allowed_bands_process_reply (operation_result, error);
+    operation_result = mm_modem_set_bands_finish (modem, result, &error);
+    set_bands_process_reply (operation_result, error);
 
     mmcli_async_operation_done ();
 }
 
 static void
-parse_bands (MMModemBand **allowed,
-             guint *n_allowed)
+parse_bands (MMModemBand **bands,
+             guint *n_bands)
 {
     GError *error = NULL;
 
-    mm_common_get_bands_from_string (set_allowed_bands_str,
-                                     allowed,
-                                     n_allowed,
+    mm_common_get_bands_from_string (set_bands_str,
+                                     bands,
+                                     n_bands,
                                      &error);
     if (error) {
-        g_printerr ("error: couldn't parse list of allowed bands: '%s'\n",
+        g_printerr ("error: couldn't parse list of bands: '%s'\n",
                     error->message);
         exit (EXIT_FAILURE);
     }
@@ -934,18 +930,18 @@ get_modem_ready (GObject      *source,
     }
 
     /* Request to set allowed bands in a given modem? */
-    if (set_allowed_bands_str) {
-        MMModemBand *allowed;
-        guint n_allowed;
+    if (set_bands_str) {
+        MMModemBand *bands;
+        guint n_bands;
 
-        parse_bands (&allowed, &n_allowed);
-        mm_modem_set_allowed_bands (ctx->modem,
-                                    allowed,
-                                    n_allowed,
-                                    ctx->cancellable,
-                                    (GAsyncReadyCallback)set_allowed_bands_ready,
-                                    NULL);
-        g_free (allowed);
+        parse_bands (&bands, &n_bands);
+        mm_modem_set_bands (ctx->modem,
+                            bands,
+                            n_bands,
+                            ctx->cancellable,
+                            (GAsyncReadyCallback)set_bands_ready,
+                            NULL);
+        g_free (bands);
         return;
     }
 
@@ -1114,19 +1110,19 @@ mmcli_modem_run_synchronous (GDBusConnection *connection)
     }
 
     /* Request to set allowed bands in a given modem? */
-    if (set_allowed_bands_str) {
+    if (set_bands_str) {
         gboolean result;
-        MMModemBand *allowed;
-        guint n_allowed;
+        MMModemBand *bands;
+        guint n_bands;
 
-        parse_bands (&allowed, &n_allowed);
-        result = mm_modem_set_allowed_bands_sync (ctx->modem,
-                                                  allowed,
-                                                  n_allowed,
-                                                  NULL,
-                                                  &error);
-        g_free (allowed);
-        set_allowed_bands_process_reply (result, error);
+        parse_bands (&bands, &n_bands);
+        result = mm_modem_set_bands_sync (ctx->modem,
+                                          bands,
+                                          n_bands,
+                                          NULL,
+                                          &error);
+        g_free (bands);
+        set_bands_process_reply (result, error);
         return;
     }
 

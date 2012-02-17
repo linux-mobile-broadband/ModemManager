@@ -136,13 +136,13 @@
     </method>
 
     <!--
-        SetAllowedBands:
-        @bands: List of <link linkend="MMModemBand">MMModemBand</link> values, to specify all the bands allowed in the modem.
+        SetBands:
+        @bands: List of <link linkend="MMModemBand">MMModemBand</link> values, to specify the bands to be used.
 
         Set the radio frequency and technology bands the device is currently
         allowed to use when connecting to a network.
     -->
-    <method name="SetAllowedBands">
+    <method name="SetBands">
       <arg name="bands" type="au" direction="in" />
     </method>
 
@@ -419,19 +419,15 @@
     <property name="SupportedBands" type="au" access="read" />
 
     <!--
-        AllowedBands:
+        Bands:
 
         List of <link linkend="MMModemBand">MMModemBand</link> values,
         specifying the radio frequency and technology bands the device is
-        currently allowed to use when connecting to a network.
+        currently using when connecting to a network.
 
         It must be a subset of #org.freedesktop.ModemManager1.Modem:SupportedBands.
-
-        For POTS devices, only the
-        <link linkend="MM-MODEM-BAND-ANY:CAPS"><constant>MM_MODEM_BAND_ANY</constant></link>
-        mode is supported.
     -->
-    <property name="AllowedBands" type="au" access="read" />
+    <property name="Bands" type="au" access="read" />
 
   </interface>
 </node>

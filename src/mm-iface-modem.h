@@ -174,13 +174,13 @@ struct _MMIfaceModem {
                                      GError **error);
 
     /* Asynchronous allowed band setting operation */
-    void (*set_allowed_bands) (MMIfaceModem *self,
-                               GArray *bands_array,
-                               GAsyncReadyCallback callback,
-                               gpointer user_data);
-    gboolean (*set_allowed_bands_finish) (MMIfaceModem *self,
-                                          GAsyncResult *res,
-                                          GError **error);
+    void (*set_bands) (MMIfaceModem *self,
+                       GArray *bands_array,
+                       GAsyncReadyCallback callback,
+                       gpointer user_data);
+    gboolean (*set_bands_finish) (MMIfaceModem *self,
+                                  GAsyncResult *res,
+                                  GError **error);
 
     /* Asynchronous allowed mode setting operation */
     void (*set_allowed_modes) (MMIfaceModem *self,
@@ -356,14 +356,14 @@ gboolean mm_iface_modem_set_allowed_modes_finish (MMIfaceModem *self,
                                                   GAsyncResult *res,
                                                   GError **error);
 
-/* Allow setting allowed bands */
-void     mm_iface_modem_set_allowed_bands        (MMIfaceModem *self,
-                                                  GArray *bands_array,
-                                                  GAsyncReadyCallback callback,
-                                                  gpointer user_data);
-gboolean mm_iface_modem_set_allowed_bands_finish (MMIfaceModem *self,
-                                                  GAsyncResult *res,
-                                                  GError **error);
+/* Allow setting bands */
+void     mm_iface_modem_set_bands        (MMIfaceModem *self,
+                                          GArray *bands_array,
+                                          GAsyncReadyCallback callback,
+                                          gpointer user_data);
+gboolean mm_iface_modem_set_bands_finish (MMIfaceModem *self,
+                                          GAsyncResult *res,
+                                          GError **error);
 
 /* Allow creating bearers */
 void     mm_iface_modem_create_bearer         (MMIfaceModem *self,

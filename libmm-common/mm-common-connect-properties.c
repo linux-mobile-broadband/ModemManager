@@ -23,7 +23,7 @@ G_DEFINE_TYPE (MMCommonConnectProperties, mm_common_connect_properties, G_TYPE_O
 
 #define PROPERTY_PIN             "pin"
 #define PROPERTY_OPERATOR_ID     "operator-id"
-#define PROPERTY_ALLOWED_BANDS   "allowed-bands"
+#define PROPERTY_BANDS           "bands"
 #define PROPERTY_ALLOWED_MODES   "allowed-modes"
 #define PROPERTY_PREFERRED_MODE  "preferred-mode"
 
@@ -33,8 +33,8 @@ struct _MMCommonConnectPropertiesPrivate {
     /* Operator ID */
     gchar *operator_id;
     /* Bands */
-    MMModemBand *allowed_bands;
-    guint n_allowed_bands;
+    MMModemBand *bands;
+    guint n_bands;
     /* Modes */
     gboolean allowed_modes_set;
     MMModemMode allowed_modes;
@@ -62,16 +62,16 @@ mm_common_connect_properties_set_operator_id (MMCommonConnectProperties *self,
 }
 
 void
-mm_common_connect_properties_set_allowed_bands (MMCommonConnectProperties *self,
-                                                const MMModemBand *bands,
-                                                guint n_bands)
+mm_common_connect_properties_set_bands (MMCommonConnectProperties *self,
+                                        const MMModemBand *bands,
+                                        guint n_bands)
 {
-    g_free (self->priv->allowed_bands);
-    self->priv->n_allowed_bands = n_bands;
-    self->priv->allowed_bands = g_new (MMModemBand, self->priv->n_allowed_bands);
-    memcpy (self->priv->allowed_bands,
+    g_free (self->priv->bands);
+    self->priv->n_bands = n_bands;
+    self->priv->bands = g_new (MMModemBand, self->priv->n_bands);
+    memcpy (self->priv->bands,
             bands,
-            sizeof (MMModemBand) * self->priv->n_allowed_bands);
+            sizeof (MMModemBand) * self->priv->n_bands);
 }
 
 void
@@ -153,12 +153,12 @@ mm_common_connect_properties_get_operator_id (MMCommonConnectProperties *self)
 }
 
 void
-mm_common_connect_properties_get_allowed_bands (MMCommonConnectProperties *self,
-                                                const MMModemBand **bands,
-                                                guint *n_bands)
+mm_common_connect_properties_get_bands (MMCommonConnectProperties *self,
+                                        const MMModemBand **bands,
+                                        guint *n_bands)
 {
-    *bands = self->priv->allowed_bands;
-    *n_bands = self->priv->n_allowed_bands;
+    *bands = self->priv->bands;
+    *n_bands = self->priv->n_bands;
 }
 
 void
@@ -235,12 +235,12 @@ mm_common_connect_properties_get_dictionary (MMCommonConnectProperties *self)
                                PROPERTY_OPERATOR_ID,
                                g_variant_new_string (self->priv->operator_id));
 
-    if (self->priv->allowed_bands)
+    if (self->priv->bands)
         g_variant_builder_add (&builder,
                                "{sv}",
-                               PROPERTY_ALLOWED_BANDS,
-                               mm_common_bands_array_to_variant (self->priv->allowed_bands,
-                                                                 self->priv->n_allowed_bands));
+                               PROPERTY_BANDS,
+                               mm_common_bands_array_to_variant (self->priv->bands,
+                                                                 self->priv->n_bands));
 
     if (self->priv->allowed_modes_set) {
         g_variant_builder_add (&builder,
@@ -293,13 +293,13 @@ key_value_foreach (const gchar *key,
         mm_common_connect_properties_set_pin (ctx->properties, value);
     else if (g_str_equal (key, PROPERTY_OPERATOR_ID))
         mm_common_connect_properties_set_operator_id (ctx->properties, value);
-    else if (g_str_equal (key, PROPERTY_ALLOWED_BANDS)) {
+    else if (g_str_equal (key, PROPERTY_BANDS)) {
         MMModemBand *bands = NULL;
         guint n_bands = 0;
 
         mm_common_get_bands_from_string (value, &bands, &n_bands, &ctx->error);
         if (!ctx->error) {
-            mm_common_connect_properties_set_allowed_bands (ctx->properties, bands, n_bands);
+            mm_common_connect_properties_set_bands (ctx->properties, bands, n_bands);
             g_free (bands);
         }
     } else if (g_str_equal (key, PROPERTY_ALLOWED_MODES)) {
@@ -405,11 +405,11 @@ mm_common_connect_properties_new_from_dictionary (GVariant *dictionary,
                 mm_common_connect_properties_set_operator_id (
                     properties,
                     g_variant_get_string (value, NULL));
-            else if (g_str_equal (key, PROPERTY_ALLOWED_BANDS)) {
+            else if (g_str_equal (key, PROPERTY_BANDS)) {
                 GArray *array;
 
                 array = mm_common_bands_variant_to_garray (value);
-                mm_common_connect_properties_set_allowed_bands (
+                mm_common_connect_properties_set_bands (
                     properties,
                     (MMModemBand *)array->data,
                     array->len);
@@ -483,9 +483,9 @@ mm_common_connect_properties_init (MMCommonConnectProperties *self)
     self->priv->bearer_properties = mm_common_bearer_properties_new ();
     self->priv->allowed_modes = MM_MODEM_MODE_ANY;
     self->priv->preferred_mode = MM_MODEM_MODE_NONE;
-    self->priv->allowed_bands = g_new (MMModemBand, 1);
-    self->priv->allowed_bands[0] = MM_MODEM_BAND_ANY;
-    self->priv->n_allowed_bands = 1;
+    self->priv->bands = g_new (MMModemBand, 1);
+    self->priv->bands[0] = MM_MODEM_BAND_ANY;
+    self->priv->n_bands = 1;
 }
 
 static void
@@ -495,7 +495,7 @@ finalize (GObject *object)
 
     g_free (self->priv->pin);
     g_free (self->priv->operator_id);
-    g_free (self->priv->allowed_bands);
+    g_free (self->priv->bands);
     g_object_unref (self->priv->bearer_properties);
 
     G_OBJECT_CLASS (mm_common_connect_properties_parent_class)->finalize (object);
