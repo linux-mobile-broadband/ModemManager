@@ -333,8 +333,13 @@ mm_common_parse_key_value_string (const gchar *str,
     g_return_val_if_fail (callback != NULL, FALSE);
     g_return_val_if_fail (str != NULL, FALSE);
 
-    dup = g_strdup (str);
+    /* Allow empty strings, we'll just return with success */
+    while (g_ascii_isspace (*str))
+        str++;
+    if (!str[0])
+        return TRUE;
 
+    dup = g_strdup (str);
     p = dup;
 
     while (TRUE) {
