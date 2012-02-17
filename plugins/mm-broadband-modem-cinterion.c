@@ -56,6 +56,51 @@ struct _MMBroadbandModemCinterionPrivate {
     gboolean both_geran_utran;
 };
 
+/* Setup relationship between the band bitmask in the modem and the bitmask
+ * in ModemManager. */
+typedef struct {
+    gchar *cinterion_band;
+    MMModemBand mm_bands [4];
+} CinterionBand2G;
+
+/* Table checked in both MC75i (GPRS/EDGE) and EGS5 (GPRS) references.
+ * Note that the modem's configuration is also based on a bitmask, but as we
+ * will just support some of the combinations, we just use strings for them.
+ */
+static const CinterionBand2G bands_2g[] = {
+    { "1",  { MM_MODEM_BAND_EGSM, 0, 0, 0 }},
+    { "2",  { MM_MODEM_BAND_DCS,  0, 0, 0 }},
+    { "4",  { MM_MODEM_BAND_PCS,  0, 0, 0 }},
+    { "8",  { MM_MODEM_BAND_G850, 0, 0, 0 }},
+    { "3",  { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, 0, 0 }},
+    { "5",  { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_PCS, 0, 0 }},
+    { "10", { MM_MODEM_BAND_G850, MM_MODEM_BAND_DCS, 0, 0 }},
+    { "12", { MM_MODEM_BAND_G850, MM_MODEM_BAND_PCS, 0, 0 }},
+    { "15", { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS, MM_MODEM_BAND_G850 }}
+};
+
+/* Setup relationship between the 3G band bitmask in the modem and the bitmask
+ * in ModemManager. */
+typedef struct {
+    guint32 cinterion_band_flag;
+    MMModemBand mm_band;
+} CinterionBand3G;
+
+/* Table checked in HC25 (3G) reference. This table includes both 2G and 3G
+ * frequencies. Depending on which one is configured, one access technology or
+ * the other will be used. This may conflict with the allowed mode configuration
+ * set, so you shouldn't for example set 3G frequency bands, and then use a
+ * 2G-only allowed mode. */
+static const CinterionBand3G bands_3g[] = {
+    { (1 << 0), MM_MODEM_BAND_EGSM  },
+    { (1 << 1), MM_MODEM_BAND_DCS   },
+    { (1 << 2), MM_MODEM_BAND_PCS   },
+    { (1 << 3), MM_MODEM_BAND_G850  },
+    { (1 << 4), MM_MODEM_BAND_U2100 },
+    { (1 << 5), MM_MODEM_BAND_U1900 },
+    { (1 << 6), MM_MODEM_BAND_U850  }
+};
+
 /*****************************************************************************/
 /* Unsolicited events enabling */
 
@@ -751,6 +796,201 @@ load_supported_bands (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* CURRENT BANDS */
+
+static GArray *
+load_current_bands_finish (MMIfaceModem *self,
+                           GAsyncResult *res,
+                           GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return (GArray *) g_array_ref (g_simple_async_result_get_op_res_gpointer (
+                                       G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+get_2g_band_ready (MMBroadbandModemCinterion *self,
+                   GAsyncResult *res,
+                   GSimpleAsyncResult *operation_result)
+{
+    const gchar *response;
+    GError *error = NULL;
+    GArray *bands_array = NULL;
+    GRegex *regex;
+    GMatchInfo *match_info = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response) {
+        /* Let the error be critical. */
+        g_simple_async_result_take_error (operation_result, error);
+        g_simple_async_result_complete (operation_result);
+        g_object_unref (operation_result);
+        return;
+    }
+
+    /* The AT^SCFG? command replies a list of several different config
+     * values. We will only look for 'Radio/Band".
+     *
+     * AT+SCFG="Radio/Band"
+     * ^SCFG: "Radio/Band","0031","0031"
+     *
+     * Note that "0031" is a UCS2-encoded string, as we configured UCS2 as
+     * character set to use.
+     */
+    regex = g_regex_new ("\\^SCFG:\\s*\"Radio/Band\",\\s*\"(.*)\",\\s*\"(.*)\"", 0, 0, NULL);
+    g_assert (regex != NULL);
+
+    if (g_regex_match_full (regex, response, strlen (response), 0, 0, &match_info, NULL)) {
+        gchar *current;
+
+        /* The first number given is the current band configuration, the
+         * second number given is the allowed band configuration, which we
+         * don't really need to get here. */
+        current = g_match_info_fetch (match_info, 1);
+        if (current) {
+            guint i;
+
+            /* If in UCS2, convert to UTF-8 */
+            current = mm_broadband_modem_take_and_convert_to_utf8 (MM_BROADBAND_MODEM (self),
+                                                                   current);
+
+            for (i = 0; i < G_N_ELEMENTS (bands_2g); i++) {
+                if (strcmp (bands_2g[i].cinterion_band, current) == 0) {
+                    guint j;
+
+                    if (G_UNLIKELY (!bands_array))
+                        bands_array = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
+
+                    for (j = 0; j < 4 && bands_2g[i].mm_bands[j] != 0; j++)
+                        g_array_append_val (bands_array, bands_2g[i].mm_bands[j]);
+
+                    break;
+                }
+            }
+
+            g_free (current);
+        }
+    }
+
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (regex);
+
+    if (!bands_array)
+        g_simple_async_result_set_error (operation_result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't parse current bands reply");
+    else
+        g_simple_async_result_set_op_res_gpointer (operation_result,
+                                                   bands_array,
+                                                   (GDestroyNotify)g_array_unref);
+
+    g_simple_async_result_complete (operation_result);
+    g_object_unref (operation_result);
+}
+
+static void
+get_3g_band_ready (MMBroadbandModemCinterion *self,
+                   GAsyncResult *res,
+                   GSimpleAsyncResult *operation_result)
+{
+    const gchar *response;
+    GError *error = NULL;
+    GArray *bands_array = NULL;
+    GRegex *regex;
+    GMatchInfo *match_info = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response) {
+        /* Let the error be critical. */
+        g_simple_async_result_take_error (operation_result, error);
+        g_simple_async_result_complete (operation_result);
+        g_object_unref (operation_result);
+        return;
+    }
+
+    /* The AT^SCFG? command replies a list of several different config
+     * values. We will only look for 'Radio/Band".
+     *
+     * AT+SCFG="Radio/Band"
+     * ^SCFG: "Radio/Band",127
+     *
+     * Note that in this case, the <rba> replied is a number, not a string.
+     */
+    regex = g_regex_new ("\\^SCFG:\\s*\"Radio/Band\",\\s*(\\d*)", 0, 0, NULL);
+    g_assert (regex != NULL);
+
+    if (g_regex_match_full (regex, response, strlen (response), 0, 0, &match_info, NULL)) {
+        gchar *current;
+
+        current = g_match_info_fetch (match_info, 1);
+        if (current) {
+            guint32 current_int;
+            guint i;
+
+            current_int = (guint32) atoi (current);
+
+            for (i = 0; i < G_N_ELEMENTS (bands_3g); i++) {
+                if (current_int & bands_3g[i].cinterion_band_flag) {
+                    if (G_UNLIKELY (!bands_array))
+                        bands_array = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
+                    g_array_append_val (bands_array, bands_3g[i].mm_band);
+                }
+            }
+
+            g_free (current);
+        }
+    }
+
+    if (match_info)
+        g_match_info_free (match_info);
+    g_regex_unref (regex);
+
+    if (!bands_array)
+        g_simple_async_result_set_error (operation_result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't parse current bands reply");
+    else
+        g_simple_async_result_set_op_res_gpointer (operation_result,
+                                                   bands_array,
+                                                   (GDestroyNotify)g_array_unref);
+
+    g_simple_async_result_complete (operation_result);
+    g_object_unref (operation_result);
+}
+
+static void
+load_current_bands (MMIfaceModem *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    MMBroadbandModemCinterion *broadband = MM_BROADBAND_MODEM_CINTERION (self);
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_current_bands);
+
+    /* Query the currently used Radio/Band. The query command is the same for
+     * both 2G and 3G devices, but the reply reader is different. */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "AT^SCFG=\"Radio/Band\"",
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              (GAsyncReadyCallback)((!broadband->priv->only_utran &&
+                                                     !broadband->priv->both_geran_utran) ?
+                                                    get_2g_band_ready :
+                                                    get_3g_band_ready),
+                              result);
+}
+
+/*****************************************************************************/
 /* FLOW CONTROL */
 
 static gboolean
@@ -851,6 +1091,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->set_allowed_modes_finish = set_allowed_modes_finish;
     iface->load_supported_bands = load_supported_bands;
     iface->load_supported_bands_finish = load_supported_bands_finish;
+    iface->load_current_bands = load_current_bands;
+    iface->load_current_bands_finish = load_current_bands_finish;
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->setup_flow_control = setup_flow_control;
