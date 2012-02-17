@@ -1851,6 +1851,7 @@ static void interface_disabling_step (DisablingContext *ctx);
 
 typedef enum {
     DISABLING_STEP_FIRST,
+    DISABLING_STEP_CURRENT_BANDS,
     DISABLING_STEP_MODEM_POWER_DOWN,
     DISABLING_STEP_CLOSE_PORTS,
     DISABLING_STEP_LAST
@@ -1965,6 +1966,12 @@ interface_disabling_step (DisablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
+    case DISABLING_STEP_CURRENT_BANDS:
+        /* Clear current bands */
+        mm_gdbus_modem_set_bands (ctx->skeleton, mm_common_build_bands_unknown ());
+        /* Fall down to next step */
+        ctx->step++;
+
     case DISABLING_STEP_MODEM_POWER_DOWN:
         /* CFUN=0 is dangerous and often will shoot devices in the head (that's
          * what it's supposed to do).  So don't use CFUN=0 by default, but let
@@ -2037,6 +2044,7 @@ typedef enum {
     ENABLING_STEP_FLOW_CONTROL,
     ENABLING_STEP_SUPPORTED_CHARSETS,
     ENABLING_STEP_CHARSET,
+    ENABLING_STEP_CURRENT_BANDS,
     ENABLING_STEP_LAST
 } EnablingStep;
 
@@ -2197,6 +2205,34 @@ setup_charset_ready (MMIfaceModem *self,
         /* Done, Go on to next step */
         ctx->step++;
 
+    interface_enabling_step (ctx);
+}
+
+static void
+load_current_bands_ready (MMIfaceModem *self,
+                          GAsyncResult *res,
+                          EnablingContext *ctx)
+{
+    GArray *bands_array;
+    GError *error = NULL;
+
+    bands_array = MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_bands_finish (self, res, &error);
+
+    if (bands_array) {
+        mm_gdbus_modem_set_bands (ctx->skeleton,
+                                  mm_common_bands_garray_to_variant (bands_array));
+        g_array_unref (bands_array);
+    } else
+        mm_gdbus_modem_set_bands (ctx->skeleton, mm_common_build_bands_unknown ());
+
+    /* Errors when getting current bands won't be critical */
+    if (error) {
+        mm_warn ("couldn't load current Bands: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Done, Go on to next step */
+    ctx->step++;
     interface_enabling_step (ctx);
 }
 
@@ -2377,6 +2413,19 @@ interface_enabling_step (EnablingContext *ctx)
             enabling_context_complete_and_free (ctx);
             return;
         }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_CURRENT_BANDS:
+        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_bands &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_bands_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_current_bands (
+                    ctx->self,
+                    (GAsyncReadyCallback)load_current_bands_ready,
+                    ctx);
+                return;
+        } else
+            mm_gdbus_modem_set_bands (ctx->skeleton, mm_common_build_bands_unknown ());
         /* Fall down to next step */
         ctx->step++;
 
@@ -2579,8 +2628,6 @@ load_supported_bands_ready (MMIfaceModem *self,
     if (bands_array) {
         mm_gdbus_modem_set_supported_bands (ctx->skeleton,
                                             mm_common_bands_garray_to_variant (bands_array));
-        mm_gdbus_modem_set_bands (ctx->skeleton,
-                                  mm_common_bands_garray_to_variant (bands_array));
         g_array_unref (bands_array);
     }
 

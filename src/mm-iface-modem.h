@@ -128,6 +128,14 @@ struct _MMIfaceModem {
                                              GAsyncResult *res,
                                              GError **error);
 
+    /* Loading of the Bands property */
+    void (*load_current_bands) (MMIfaceModem *self,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data);
+    GArray * (*load_current_bands_finish) (MMIfaceModem *self,
+                                           GAsyncResult *res,
+                                           GError **error);
+
     /* Loading of the SignalQuality property */
     void  (*load_signal_quality) (MMIfaceModem *self,
                                   GAsyncReadyCallback callback,
