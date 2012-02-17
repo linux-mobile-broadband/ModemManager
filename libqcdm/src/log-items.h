@@ -43,8 +43,10 @@ enum {
     DM_LOG_ITEM_CDMA_SERVICE_CONFIG             = 0x102e,
 
     /* WCDMA items */
+    DM_LOG_ITEM_WCDMA_TA_FINGER_INFO       = 0x4003,
     DM_LOG_ITEM_WCDMA_AGC_INFO             = 0x4105,
     DM_LOG_ITEM_WCDMA_RRC_STATE            = 0x4125,
+    DM_LOG_ITEM_WCDMA_CELL_ID              = 0x4127,
 
     /* GSM items */
     DM_LOG_ITEM_GSM_BURST_METRICS          = 0x506c,
@@ -85,8 +87,25 @@ struct DMLogItemCdmaReversePowerControl {
 typedef struct DMLogItemCdmaReversePowerControl DMLogItemCdmaReversePowerControl;
 
 
+/* DM_LOG_ITEM_WCDMA_TA_FINGER_INFO */
+struct DMLogItemWcdmaTaFingerInfo {
+    int32_t tx_pos;
+    int16_t coherent_interval_len;
+    u_int8_t non_coherent_interval_len;
+    u_int8_t num_paths;
+    u_int32_t path_enr;
+    int32_t pn_pos_path
+    int16_t pri_cpich_psc;
+    u_int8_t unknown1;
+    u_int8_t sec_cpich_ssc;
+    u_int8_t finger_channel_code_index;
+    u_int8_t finger_index;
+} __attribute__ ((packed));
+typedef struct DMLogItemWcdmaTaFingerInfo DMLogItemWcdmaTaFingerInfo;
+
+
 /* DM_LOG_ITEM_WCDMA_AGC_INFO */
-struct DMLogItemWcdmRrcState {
+struct DMLogItemWcdmaAgcInfo {
     u_int8_t num_samples;
     u_int16_t rx_agc;
     u_int16_t tx_agc;
@@ -96,7 +115,7 @@ struct DMLogItemWcdmRrcState {
     /* Bit 4 means tx_agc is valid */
     u_int8_t agc_info;
 } __attribute__ ((packed));
-typedef struct DMLogItemWcdmRrcState DMLogItemWcdmRrcState;
+typedef struct DMLogItemWcdmaAgcInfo DMLogItemWcdmaAgcInfo;
 
 
 /* DM_LOG_ITEM_WCDMA_RRC_STATE */
@@ -109,10 +128,19 @@ enum {
     DM_LOG_ITEM_WCDMA_RRC_STATE_URA_PCH      = 5,
 };
 
-struct DMLogItemWcdmRrcState {
+struct DMLogItemWcdmaRrcState {
     u_int8_t rrc_state;
 } __attribute__ ((packed));
-typedef struct DMLogItemWcdmRrcState DMLogItemWcdmRrcState;
+typedef struct DMLogItemWcdmaRrcState DMLogItemWcdmaRrcState;
+
+
+/* DM_LOG_ITEM_WCDMA_CELL_ID */
+struct DMLogItemWcdmaCellId {
+    u_int8_t unknown1[8];
+    u_int32_t cellid;
+    u_int8_t unknown2[4];
+} __attribute__ ((packed));
+typedef struct DMLogItemWcdmaCellId DMLogItemWcdmaCellId;
 
 
 /* DM_LOG_ITEM_GSM_BURST_METRICS */
