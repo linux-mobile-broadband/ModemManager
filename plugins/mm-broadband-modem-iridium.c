@@ -31,6 +31,7 @@
 #include "mm-iface-modem-messaging.h"
 #include "mm-broadband-modem-iridium.h"
 #include "mm-sim-iridium.h"
+#include "mm-bearer-iridium.h"
 #include "mm-modem-helpers.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
@@ -336,6 +337,46 @@ create_sim (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Create Bearer (Modem interface) */
+
+static MMBearer *
+create_bearer_finish (MMIfaceModem *self,
+                      GAsyncResult *res,
+                      GError **error)
+{
+    MMBearer *bearer;
+
+    bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    mm_dbg ("New Iridium bearer created at DBus path '%s'", mm_bearer_get_path (bearer));
+
+    return g_object_ref (bearer);
+}
+
+static void
+create_bearer (MMIfaceModem *self,
+               MMCommonBearerProperties *properties,
+               GAsyncReadyCallback callback,
+               gpointer user_data)
+{
+    MMBearer *bearer;
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        create_bearer);
+    /* We just create a MMBearerIridium
+     * Note that we do not need to use properties here */
+    mm_dbg ("Creating Iridium bearer...");
+    bearer = mm_bearer_iridium_new (MM_BROADBAND_MODEM_IRIDIUM (self));
+    g_simple_async_result_set_op_res_gpointer (result,
+                                               bearer,
+                                               (GDestroyNotify)g_object_unref);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 
 static void
 setup_ports (MMBroadbandModem *self)
@@ -387,9 +428,11 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_init = modem_init;
     iface->modem_init_finish = modem_init_finish;
 
-    /* Create Iridium-specific SIM */
+    /* Create Iridium-specific SIM and bearer*/
     iface->create_sim = create_sim;
     iface->create_sim_finish = create_sim_finish;
+    iface->create_bearer = create_bearer;
+    iface->create_bearer_finish = create_bearer_finish;
 
     /* CSQF-based signal quality */
     iface->load_signal_quality = load_signal_quality;
