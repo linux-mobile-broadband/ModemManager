@@ -346,7 +346,7 @@ mm_common_parse_key_value_string (const gchar *str,
         gboolean keep_iteration = FALSE;
 
         /* Skip leading spaces */
-        while (*p && g_ascii_isspace (*p))
+        while (g_ascii_isspace (*p))
             p++;
 
         /* Key start */
@@ -371,7 +371,7 @@ mm_common_parse_key_value_string (const gchar *str,
         }
 
         /* Skip whitespaces, if any */
-        while (*p && g_ascii_isspace (*p))
+        while (g_ascii_isspace (*p))
             p++;
 
         /* Equal sign must be here */
@@ -385,7 +385,7 @@ mm_common_parse_key_value_string (const gchar *str,
         p++;
 
         /* Skip whitespaces, if any */
-        while (*p && g_ascii_isspace (*p))
+        while (g_ascii_isspace (*p))
             p++;
 
         /* Do we have a quote-enclosed string? */
@@ -421,7 +421,7 @@ mm_common_parse_key_value_string (const gchar *str,
         /* Note that we allow value == value_end here */
 
         /* Skip whitespaces, if any */
-        while (*p && g_ascii_isspace (*p))
+        while (g_ascii_isspace (*p))
             p++;
 
         /* If a comma is found, we should keep the iteration */
