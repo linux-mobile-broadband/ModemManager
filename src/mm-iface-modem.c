@@ -1712,7 +1712,9 @@ set_lock_status (MMIfaceModem *self,
     if (lock == MM_MODEM_LOCK_NONE ||
         lock == MM_MODEM_LOCK_SIM_PIN2 ||
         lock == MM_MODEM_LOCK_SIM_PUK2) {
-        if (old_lock != MM_MODEM_LOCK_NONE) {
+        if (old_lock != MM_MODEM_LOCK_NONE &&
+            old_lock != MM_MODEM_LOCK_SIM_PIN2 &&
+            old_lock != MM_MODEM_LOCK_SIM_PUK2) {
             /* Notify transition from UNKNOWN/LOCKED to DISABLED */
             mm_iface_modem_update_state (self,
                                          MM_MODEM_STATE_DISABLED,

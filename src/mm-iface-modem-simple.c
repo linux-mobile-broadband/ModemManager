@@ -360,8 +360,11 @@ unlock_check_ready (MMIfaceModem *self,
         return;
     }
 
-    /* If we are already unlocked, go on to next step */
-    if (lock == MM_MODEM_LOCK_NONE) {
+    /* If we are already unlocked, go on to next step. Note that we do also
+     * allow SIM-PIN2, as we don't need to unlock that in order to get
+     * connected. */
+    if (lock == MM_MODEM_LOCK_NONE ||
+        lock == MM_MODEM_LOCK_SIM_PIN2) {
         ctx->step++;
         connection_step (ctx);
         return;
