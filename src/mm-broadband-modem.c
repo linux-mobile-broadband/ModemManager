@@ -4167,8 +4167,9 @@ sms_text_part_list_ready (MMBroadbandModem *self,
             mm_dbg ("Failed to get message sender number");
             goto next;
         }
-        number = mm_charset_take_and_convert_to_utf8 (number,
-                                                      self->priv->modem_current_charset);
+
+        number = mm_broadband_modem_take_and_convert_to_utf8 (MM_BROADBAND_MODEM (self),
+                                                              number);
 
         /* Get part state */
         stat = get_match_string_unquoted (match_info, 2);
@@ -4182,8 +4183,8 @@ sms_text_part_list_ready (MMBroadbandModem *self,
         timestamp = get_match_string_unquoted (match_info, 5);
 
         /* Get and parse text */
-        text = mm_charset_take_and_convert_to_utf8 (g_match_info_fetch (match_info, 6),
-                                                    self->priv->modem_current_charset);
+        text = mm_broadband_modem_take_and_convert_to_utf8 (MM_BROADBAND_MODEM (self),
+                                                            g_match_info_fetch (match_info, 6));
 
         /* The raw SMS data can only be GSM, UCS2, or unknown (8-bit), so we
          * need to convert to UCS2 here.
@@ -6396,6 +6397,20 @@ initialize (MMBaseModem *self,
     ctx->step = INITIALIZE_STEP_FIRST;
 
     initialize_step (ctx);
+}
+
+/*****************************************************************************/
+
+gchar *
+mm_broadband_modem_take_and_convert_to_utf8 (MMBroadbandModem *self,
+                                             gchar *str)
+{
+    /* should only be used AFTER current charset is set */
+    if (self->priv->modem_current_charset == MM_MODEM_CHARSET_UNKNOWN)
+        return str;
+
+    return mm_charset_take_and_convert_to_utf8 (str,
+                                                self->priv->modem_current_charset);
 }
 
 /*****************************************************************************/

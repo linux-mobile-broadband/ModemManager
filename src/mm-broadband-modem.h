@@ -56,4 +56,10 @@ MMBroadbandModem *mm_broadband_modem_new (const gchar *device,
                                           guint16 vendor_id,
                                           guint16 product_id);
 
+/* Convert the given string, which comes in the charset currently set in the
+ * modem, to UTF-8. Given in the API so that subclasses can also use it directly.
+ */
+gchar *mm_broadband_modem_take_and_convert_to_utf8 (MMBroadbandModem *self,
+                                                    gchar *str);
+
 #endif /* MM_BROADBAND_MODEM_H */
