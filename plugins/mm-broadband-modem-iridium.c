@@ -263,6 +263,17 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->load_operator_name_finish = load_operator_name_finish;
     iface->load_operator_code = load_operator_name_or_code;
     iface->load_operator_code_finish = load_operator_code_finish;
+
+    /* Don't try to scan networks with AT+COPS=?.
+     * It does work, but it will only reply about the Iridium network
+     * being found (so not very helpful, as that is the only one expected), but
+     * also, it will use a non-standard reply format. Instead of supporting that
+     * specific format used, just fully skip it.
+     * For reference, the result is:
+     *  +COPS:(002),"IRIDIUM","IRIDIUM","90103",,(000-001),(000-002)
+     */
+    iface->scan_networks = NULL;
+    iface->scan_networks_finish = NULL;
 }
 
 static void
