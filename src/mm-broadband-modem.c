@@ -6413,6 +6413,17 @@ mm_broadband_modem_take_and_convert_to_utf8 (MMBroadbandModem *self,
                                                 self->priv->modem_current_charset);
 }
 
+gchar *
+mm_broadband_modem_take_and_convert_to_current_charset (MMBroadbandModem *self,
+                                                        gchar *str)
+{
+    /* should only be used AFTER current charset is set */
+    if (self->priv->modem_current_charset == MM_MODEM_CHARSET_UNKNOWN)
+        return str;
+
+    return mm_utf8_take_and_convert_to_charset (str, self->priv->modem_current_charset);
+}
+
 /*****************************************************************************/
 
 MMBroadbandModem *
