@@ -186,6 +186,7 @@ mm_modem_charset_utf8_to_hex (const char *src, MMModemCharset charset)
     char *converted;
     const char *iconv_to;
     GError *error = NULL;
+    gchar *hex;
 
     g_return_val_if_fail (src != NULL, NULL);
     g_return_val_if_fail (charset != MM_MODEM_CHARSET_UNKNOWN, NULL);
@@ -202,13 +203,13 @@ mm_modem_charset_utf8_to_hex (const char *src, MMModemCharset charset)
     if (!converted || error) {
         g_clear_error (&error);
         g_free (converted);
-        converted = NULL;
-    } else {
-        /* Get hex representation of the string */
-        converted = utils_bin2hexstr ((guint8 *)converted, converted_len);
+        return NULL;
     }
 
-    return converted;
+    /* Get hex representation of the string */
+    hex = utils_bin2hexstr ((guint8 *)converted, converted_len);
+    g_free (converted);
+    return hex;
 }
 
 /* GSM 03.38 encoding conversion stuff */
