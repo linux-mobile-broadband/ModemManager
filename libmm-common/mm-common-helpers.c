@@ -255,6 +255,44 @@ mm_common_bands_garray_to_variant (GArray *array)
     return mm_common_bands_array_to_variant (NULL, 0);
 }
 
+static guint
+cmp_band (MMModemBand *a, MMModemBand *b)
+{
+    return (*a - *b);
+}
+
+gboolean
+mm_common_bands_garray_cmp (GArray *a, GArray *b)
+{
+    GArray *dup_a;
+    GArray *dup_b;
+    guint i;
+    gboolean different;
+
+    if (a->len != b->len)
+        return FALSE;
+
+    dup_a = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), a->len);
+    g_array_append_vals (dup_a, a->data, a->len);
+
+    dup_b = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), b->len);
+    g_array_append_vals (dup_b, b->data, b->len);
+
+    g_array_sort (dup_a, (GCompareFunc)cmp_band);
+    g_array_sort (dup_b, (GCompareFunc)cmp_band);
+
+    different = FALSE;
+    for (i = 0; !different && i < a->len; i++) {
+        if (g_array_index (dup_a, MMModemBand, i) != g_array_index (dup_b, MMModemBand, i))
+            different = TRUE;
+    }
+
+    g_array_unref (dup_a);
+    g_array_unref (dup_b);
+
+    return !different;
+}
+
 gboolean
 mm_common_get_boolean_from_string (const gchar *value,
                                    GError **error)

@@ -46,6 +46,8 @@ GVariant    *mm_common_bands_garray_to_variant (GArray *array);
 GVariant    *mm_common_build_bands_any     (void);
 GVariant    *mm_common_build_bands_unknown (void);
 
+gboolean     mm_common_bands_garray_cmp (GArray *a, GArray *b);
+
 typedef gboolean (*MMParseKeyValueForeachFn) (const gchar *key,
                                               const gchar *value,
                                               gpointer user_data);

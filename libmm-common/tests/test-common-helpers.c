@@ -249,6 +249,103 @@ key_value_error_test_missing_comma_2 (void)
                                  "key2='value2'");
 }
 
+/********************* BAND ARRAY TESTS *********************/
+
+static void
+common_band_array_cmp_test (gboolean equal,
+                            const MMModemBand *bands_a,
+                            guint n_bands_a,
+                            const MMModemBand *bands_b,
+                            guint n_bands_b)
+{
+    GArray *a;
+    GArray *b;
+
+    a = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), n_bands_a);
+    g_array_append_vals (a, bands_a, n_bands_a);
+
+    b = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), n_bands_b);
+    g_array_append_vals (b, bands_b, n_bands_b);
+
+    g_assert_cmpuint (equal, ==, mm_common_bands_garray_cmp (a, b));
+    g_assert_cmpuint (equal, ==, mm_common_bands_garray_cmp (b, a));
+
+    g_array_unref (a);
+    g_array_unref (b);
+}
+
+static void
+band_array_cmp_test_equal_empty (void)
+{
+    const MMModemBand a[] = { };
+    const MMModemBand b[] = { };
+
+    common_band_array_cmp_test (TRUE, a, G_N_ELEMENTS (a), b, G_N_ELEMENTS (b));
+}
+
+static void
+band_array_cmp_test_equal_one (void)
+{
+    const MMModemBand a[] = { MM_MODEM_BAND_EGSM };
+    const MMModemBand b[] = { MM_MODEM_BAND_EGSM };
+
+    common_band_array_cmp_test (TRUE, a, G_N_ELEMENTS (a), b, G_N_ELEMENTS (b));
+}
+
+static void
+band_array_cmp_test_equal_multiple_same_order (void)
+{
+    const MMModemBand a[] = { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS };
+    const MMModemBand b[] = { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS };
+
+    common_band_array_cmp_test (TRUE, a, G_N_ELEMENTS (a), b, G_N_ELEMENTS (b));
+}
+
+static void
+band_array_cmp_test_equal_multiple_different_order (void)
+{
+    const MMModemBand a[] = { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, MM_MODEM_BAND_PCS  };
+    const MMModemBand b[] = { MM_MODEM_BAND_DCS,  MM_MODEM_BAND_PCS, MM_MODEM_BAND_EGSM };
+
+    common_band_array_cmp_test (TRUE, a, G_N_ELEMENTS (a), b, G_N_ELEMENTS (b));
+}
+
+static void
+band_array_cmp_test_different_one (void)
+{
+    const MMModemBand a[] = { MM_MODEM_BAND_EGSM };
+    const MMModemBand b[] = { MM_MODEM_BAND_DCS  };
+
+    common_band_array_cmp_test (FALSE, a, G_N_ELEMENTS (a), b, G_N_ELEMENTS (b));
+}
+
+static void
+band_array_cmp_test_different_none (void)
+{
+    const MMModemBand a[] = { };
+    const MMModemBand b[] = { MM_MODEM_BAND_EGSM };
+
+    common_band_array_cmp_test (FALSE, a, G_N_ELEMENTS (a), b, G_N_ELEMENTS (b));
+}
+
+static void
+band_array_cmp_test_different_multiple_1 (void)
+{
+    const MMModemBand a[] = { MM_MODEM_BAND_EGSM };
+    const MMModemBand b[] = { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS };
+
+    common_band_array_cmp_test (FALSE, a, G_N_ELEMENTS (a), b, G_N_ELEMENTS (b));
+}
+
+static void
+band_array_cmp_test_different_multiple_2 (void)
+{
+    const MMModemBand a[] = { MM_MODEM_BAND_EGSM };
+    const MMModemBand b[] = { MM_MODEM_BAND_DCS, MM_MODEM_BAND_EGSM };
+
+    common_band_array_cmp_test (FALSE, a, G_N_ELEMENTS (a), b, G_N_ELEMENTS (b));
+}
+
 int main (int argc, char **argv)
 {
     g_type_init ();
@@ -272,6 +369,15 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/Common/KeyValue/Error/missing-comma-0", key_value_error_test_missing_comma_0);
     g_test_add_func ("/MM/Common/KeyValue/Error/missing-comma-1", key_value_error_test_missing_comma_1);
     g_test_add_func ("/MM/Common/KeyValue/Error/missing-comma-2", key_value_error_test_missing_comma_2);
+
+    g_test_add_func ("/MM/Common/BandArray/Cmp/equal-empty", band_array_cmp_test_equal_empty);
+    g_test_add_func ("/MM/Common/BandArray/Cmp/equal-one", band_array_cmp_test_equal_one);
+    g_test_add_func ("/MM/Common/BandArray/Cmp/equal-multiple-same-order", band_array_cmp_test_equal_multiple_same_order);
+    g_test_add_func ("/MM/Common/BandArray/Cmp/equal-multiple-different-order", band_array_cmp_test_equal_multiple_different_order);
+    g_test_add_func ("/MM/Common/BandArray/Cmp/different-one", band_array_cmp_test_different_one);
+    g_test_add_func ("/MM/Common/BandArray/Cmp/different-none", band_array_cmp_test_different_none);
+    g_test_add_func ("/MM/Common/BandArray/Cmp/different-multiple-1", band_array_cmp_test_different_multiple_1);
+    g_test_add_func ("/MM/Common/BandArray/Cmp/different-multiple-2", band_array_cmp_test_different_multiple_2);
 
     return g_test_run ();
 }
