@@ -75,4 +75,7 @@ guint8 *gsm_pack (const guint8 *src,
 gchar *mm_charset_take_and_convert_to_utf8 (gchar *str,
                                             MMModemCharset charset);
 
+gchar *mm_utf8_take_and_convert_to_charset (gchar *str,
+                                            MMModemCharset charset);
+
 #endif /* MM_CHARSETS_H */
