@@ -34,6 +34,12 @@
 #define MM_IFACE_MODEM_CDMA_EVDO_NETWORK_SUPPORTED    "iface-modem-cdma-evdo-network-supported"
 #define MM_IFACE_MODEM_CDMA_CDMA1X_NETWORK_SUPPORTED  "iface-modem-cdma-cdma1x-network-supported"
 
+#define MM_IFACE_MODEM_CDMA_ALL_ACCESS_TECHNOLOGIES_MASK    \
+    (MM_MODEM_ACCESS_TECHNOLOGY_1XRTT |                     \
+     MM_MODEM_ACCESS_TECHNOLOGY_EVDO0 |                     \
+     MM_MODEM_ACCESS_TECHNOLOGY_EVDOA |                     \
+     MM_MODEM_ACCESS_TECHNOLOGY_EVDOB)
+
 typedef struct _MMIfaceModemCdma MMIfaceModemCdma;
 
 struct _MMIfaceModemCdma {
