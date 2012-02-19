@@ -162,10 +162,10 @@ libmm_plugin_gobi_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # Nokia
 libmm_plugin_nokia_la_SOURCES = \
-	mm-plugin-nokia.c \
-	mm-plugin-nokia.h \
-	mm-broadband-modem-nokia.c \
-	mm-broadband-modem-nokia.h
+	nokia/mm-plugin-nokia.c \
+	nokia/mm-plugin-nokia.h \
+	nokia/mm-broadband-modem-nokia.c \
+	nokia/mm-broadband-modem-nokia.h
 libmm_plugin_nokia_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_nokia_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
@@ -257,21 +257,24 @@ libmm_plugin_iridium_la_SOURCES = \
 libmm_plugin_iridium_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_iridium_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
-#
-#udevrulesdir = $(UDEV_BASE_DIR)/rules.d
-#udevrules_DATA = \
+# UDev rules
+udevrulesdir = $(UDEV_BASE_DIR)/rules.d
+udevrules_DATA = \
+	nokia/77-mm-nokia-port-types.rules
+
 #	77-mm-ericsson-mbm.rules \
 #	77-mm-zte-port-types.rules \
 #	77-mm-longcheer-port-types.rules \
 #	77-mm-simtech-port-types.rules \
 #	77-mm-x22x-port-types.rules \
-#	77-mm-nokia-port-types.rules
 #
 #BUILT_SOURCES = \
 #	mm-modem-gsm-hso-glue.h
 #
 #CLEANFILES = $(BUILT_SOURCES)
 #
-#EXTRA_DIST = \
-#	$(udevrules_DATA) \
+
+# Additional files to include in the distribution
+EXTRA_DIST = \
+	$(udevrules_DATA)
 #	mm-modem-option-utils.c
