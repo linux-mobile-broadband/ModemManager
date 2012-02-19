@@ -33,6 +33,18 @@
 #define MM_IFACE_MODEM_3GPP_PS_NETWORK_SUPPORTED "iface-modem-3gpp-ps-network-supported"
 #define MM_IFACE_MODEM_3GPP_CS_NETWORK_SUPPORTED "iface-modem-3gpp-cs-network-supported"
 
+#define MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK    \
+    (MM_MODEM_ACCESS_TECHNOLOGY_GSM |                       \
+     MM_MODEM_ACCESS_TECHNOLOGY_GSM_COMPACT |               \
+     MM_MODEM_ACCESS_TECHNOLOGY_GPRS |                      \
+     MM_MODEM_ACCESS_TECHNOLOGY_EDGE |                      \
+     MM_MODEM_ACCESS_TECHNOLOGY_UMTS |                      \
+     MM_MODEM_ACCESS_TECHNOLOGY_HSDPA |                     \
+     MM_MODEM_ACCESS_TECHNOLOGY_HSUPA |                     \
+     MM_MODEM_ACCESS_TECHNOLOGY_HSPA |                      \
+     MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS |                 \
+     MM_MODEM_ACCESS_TECHNOLOGY_LTE)
+
 typedef struct _MMIfaceModem3gpp MMIfaceModem3gpp;
 
 struct _MMIfaceModem3gpp {

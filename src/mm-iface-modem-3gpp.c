@@ -570,18 +570,6 @@ load_operator_code_ready (MMIfaceModem3gpp *self,
     g_object_unref (skeleton);
 }
 
-#define ALL_3GPP_ACCESS_TECHNOLOGIES_MASK         \
-    (MM_MODEM_ACCESS_TECHNOLOGY_GSM |             \
-     MM_MODEM_ACCESS_TECHNOLOGY_GSM_COMPACT |     \
-     MM_MODEM_ACCESS_TECHNOLOGY_GPRS |            \
-     MM_MODEM_ACCESS_TECHNOLOGY_EDGE |            \
-     MM_MODEM_ACCESS_TECHNOLOGY_UMTS |            \
-     MM_MODEM_ACCESS_TECHNOLOGY_HSDPA |           \
-     MM_MODEM_ACCESS_TECHNOLOGY_HSUPA |           \
-     MM_MODEM_ACCESS_TECHNOLOGY_HSPA |            \
-     MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS |       \
-     MM_MODEM_ACCESS_TECHNOLOGY_LTE)
-
 static void
 update_registration_state (MMIfaceModem3gpp *self,
                            MMModem3gppRegistrationState new_state,
@@ -654,7 +642,7 @@ update_registration_state (MMIfaceModem3gpp *self,
         if (access_tech != MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN)
             mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
                                                        access_tech,
-                                                       ALL_3GPP_ACCESS_TECHNOLOGIES_MASK);
+                                                       MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
         if (MM_IS_IFACE_MODEM_LOCATION (self) &&
             location_area_code > 0 &&
             cell_id > 0)
@@ -664,7 +652,7 @@ update_registration_state (MMIfaceModem3gpp *self,
     } else {
         mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
                                                    MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
-                                                   ALL_3GPP_ACCESS_TECHNOLOGIES_MASK);
+                                                   MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
         if (MM_IS_IFACE_MODEM_LOCATION (self))
             mm_iface_modem_location_3gpp_clear (MM_IFACE_MODEM_LOCATION (self));
     }
