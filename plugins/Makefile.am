@@ -37,7 +37,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-iridium.la \
 	libmm-plugin-nokia.la \
 	libmm-plugin-gobi.la \
-	libmm-plugin-motorola.la
+	libmm-plugin-motorola.la \
+	libmm-plugin-option.la
 
 #pkglib_LTLIBRARIES = \
 #	libmm-plugin-generic.la \
@@ -117,16 +118,16 @@ libmm_plugin_gobi_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 #	mm-modem-mbm.h
 #libmm_plugin_mbm_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 #libmm_plugin_mbm_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-#
-## Option
-#libmm_plugin_option_la_SOURCES = \
-#	mm-plugin-option.c \
-#	mm-plugin-option.h \
-#	mm-modem-option.c \
-#	mm-modem-option.h
-#libmm_plugin_option_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-#libmm_plugin_option_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-#
+
+# Option
+libmm_plugin_option_la_SOURCES = \
+	option/mm-plugin-option.c \
+	option/mm-plugin-option.h \
+	option/mm-broadband-modem-option.c \
+	option/mm-broadband-modem-option.h
+libmm_plugin_option_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_option_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
 ## Sierra
 #libmm_plugin_sierra_la_SOURCES = \
 #	mm-plugin-sierra.c \
