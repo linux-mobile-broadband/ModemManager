@@ -237,10 +237,10 @@ libmm_plugin_nokia_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # Cinterion (previously Siemens) modem
 libmm_plugin_cinterion_la_SOURCES = \
-	mm-plugin-cinterion.c \
-	mm-plugin-cinterion.h \
-	mm-broadband-modem-cinterion.c \
-	mm-broadband-modem-cinterion.h
+	cinterion/mm-plugin-cinterion.c \
+	cinterion/mm-plugin-cinterion.h \
+	cinterion/mm-broadband-modem-cinterion.c \
+	cinterion/mm-broadband-modem-cinterion.h
 libmm_plugin_cinterion_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_cinterion_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
