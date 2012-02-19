@@ -114,7 +114,7 @@ gchar *mm_3gpp_parse_operator (const gchar *reply,
 
 char *mm_gsm_get_facility_name (MMModemGsmFacility facility);
 
-MMModemGsmAccessTech mm_gsm_string_to_access_tech (const char *string);
+MMModemAccessTechnology mm_3gpp_string_to_access_tech (const gchar *string);
 
 char *mm_create_device_identifier (guint vid,
                                    guint pid,

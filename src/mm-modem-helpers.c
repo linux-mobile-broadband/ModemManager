@@ -1350,34 +1350,43 @@ mm_gsm_parse_clck_response (const char *reply, gboolean *enabled)
 
 /*************************************************************************/
 
-MMModemGsmAccessTech
-mm_gsm_string_to_access_tech (const char *string)
+MMModemAccessTechnology
+mm_3gpp_string_to_access_tech (const gchar *string)
 {
-    g_return_val_if_fail (string != NULL, MM_MODEM_GSM_ACCESS_TECH_UNKNOWN);
+    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
 
-    /* Better technologies are listed first since modems sometimes say
-     * stuff like "GPRS/EDGE" and that should be handled as EDGE.
-     */
+    g_return_val_if_fail (string != NULL, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+
+    /* We're returning a MASK of technologies found; so we can include more
+     * than one technology in the result */
+    if (strcasestr (string, "LTE"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_LTE;
+
     if (strcasestr (string, "HSPA+"))
-        return MM_MODEM_GSM_ACCESS_TECH_HSPA_PLUS;
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS;
     else if (strcasestr (string, "HSPA"))
-        return MM_MODEM_GSM_ACCESS_TECH_HSPA;
-    else if (strcasestr (string, "HSDPA/HSUPA"))
-        return MM_MODEM_GSM_ACCESS_TECH_HSPA;
-    else if (strcasestr (string, "HSUPA"))
-        return MM_MODEM_GSM_ACCESS_TECH_HSUPA;
-    else if (strcasestr (string, "HSDPA"))
-        return MM_MODEM_GSM_ACCESS_TECH_HSDPA;
-    else if (strcasestr (string, "UMTS"))
-        return MM_MODEM_GSM_ACCESS_TECH_UMTS;
-    else if (strcasestr (string, "EDGE"))
-        return MM_MODEM_GSM_ACCESS_TECH_EDGE;
-    else if (strcasestr (string, "GPRS"))
-        return MM_MODEM_GSM_ACCESS_TECH_GPRS;
-    else if (strcasestr (string, "GSM"))
-        return MM_MODEM_GSM_ACCESS_TECH_GSM;
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_HSPA;
 
-    return MM_MODEM_GSM_ACCESS_TECH_UNKNOWN;
+
+    if (strcasestr (string, "HSUPA"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
+
+    if (strcasestr (string, "HSDPA"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
+
+    if (strcasestr (string, "UMTS"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+
+    if (strcasestr (string, "EDGE"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
+
+    if (strcasestr (string, "GPRS"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
+
+    if (strcasestr (string, "GSM"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_GSM;
+
+    return act;
 }
 
 /*************************************************************************/
