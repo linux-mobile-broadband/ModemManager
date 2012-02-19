@@ -61,8 +61,8 @@ pkglib_LTLIBRARIES = \
 
 # Generic
 libmm_plugin_generic_la_SOURCES = \
-	mm-plugin-generic.c \
-	mm-plugin-generic.h
+	generic/mm-plugin-generic.c \
+	generic/mm-plugin-generic.h
 libmm_plugin_generic_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_generic_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
