@@ -36,7 +36,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-cinterion.la \
 	libmm-plugin-iridium.la \
 	libmm-plugin-nokia.la \
-	libmm-plugin-gobi.la
+	libmm-plugin-gobi.la \
+	libmm-plugin-motorola.la
 
 #pkglib_LTLIBRARIES = \
 #	libmm-plugin-generic.la \
@@ -65,15 +66,14 @@ libmm_plugin_generic_la_SOURCES = \
 libmm_plugin_generic_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_generic_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
-## Motorola C-series phones
-#libmm_plugin_moto_c_la_SOURCES = \
-#	mm-plugin-moto-c.c \
-#	mm-plugin-moto-c.h \
-#	mm-modem-moto-c-gsm.c \
-#	mm-modem-moto-c-gsm.h
-#libmm_plugin_moto_c_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-#libmm_plugin_moto_c_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-#
+## Motorola
+libmm_plugin_motorola_la_SOURCES = \
+	motorola/mm-plugin-motorola.c \
+	motorola/mm-plugin-motorola.h \
+	motorola/mm-broadband-modem-motorola.c \
+	motorola/mm-broadband-modem-motorola.h
+libmm_plugin_motorola_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_motorola_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # Gobi
 libmm_plugin_gobi_la_SOURCES = \
