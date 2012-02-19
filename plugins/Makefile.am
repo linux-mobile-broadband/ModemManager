@@ -77,10 +77,10 @@ libmm_plugin_generic_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # Gobi
 libmm_plugin_gobi_la_SOURCES = \
-	mm-plugin-gobi.c \
-	mm-plugin-gobi.h \
-	mm-broadband-modem-gobi.c \
-	mm-broadband-modem-gobi.h
+	gobi/mm-plugin-gobi.c \
+	gobi/mm-plugin-gobi.h \
+	gobi/mm-broadband-modem-gobi.c \
+	gobi/mm-broadband-modem-gobi.h
 libmm_plugin_gobi_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_gobi_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
