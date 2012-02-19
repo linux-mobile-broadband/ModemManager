@@ -246,14 +246,14 @@ libmm_plugin_cinterion_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # Iridium modem
 libmm_plugin_iridium_la_SOURCES = \
-	mm-plugin-iridium.c \
-	mm-plugin-iridium.h \
-	mm-broadband-modem-iridium.c \
-	mm-broadband-modem-iridium.h \
-	mm-bearer-iridium.c \
-	mm-bearer-iridium.h \
-	mm-sim-iridium.c \
-	mm-sim-iridium.h
+	iridium/mm-plugin-iridium.c \
+	iridium/mm-plugin-iridium.h \
+	iridium/mm-broadband-modem-iridium.c \
+	iridium/mm-broadband-modem-iridium.h \
+	iridium/mm-bearer-iridium.c \
+	iridium/mm-bearer-iridium.h \
+	iridium/mm-sim-iridium.c \
+	iridium/mm-sim-iridium.h
 libmm_plugin_iridium_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_iridium_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
