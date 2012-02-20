@@ -21,6 +21,23 @@
 #include "mm-sms-part.h"
 #include "mm-utils.h"
 
+/* If defined will print debugging traces */
+#ifdef TEST_SMS_PART_ENABLE_TRACE
+#define trace_pdu(pdu, pdu_len) do {      \
+        guint i;                          \
+                                          \
+        g_print ("\n        ");           \
+        for (i = 0; i < len; i++) {       \
+            g_print ("  0x%02X", pdu[i]); \
+            if (((i + 1) % 12) == 0)      \
+                g_print ("\n        ");   \
+        }                                 \
+        g_print ("\n");                   \
+    } while (0)
+#else
+#define trace_pdu(...)
+#endif
+
 /********************* PDU PARSER TESTS *********************/
 
 static void
@@ -444,6 +461,8 @@ common_test_create_pdu (const gchar *smsc,
                                       &msgstart,
                                       &error);
 
+    trace_pdu (pdu, len);
+
     g_assert_no_error (error);
     g_assert (pdu != NULL);
     g_assert_cmpuint (len, ==, expected_size);
@@ -601,19 +620,6 @@ test_create_pdu_gsm_no_validity (void)
                             sizeof (expected),
                             1); /* expected_msgstart */
 }
-
-#if 0
-{
-int i;
-g_print ("\n        ");
-for (i = 0; i < len; i++) {
-   g_print ("  0x%02X", pdu[i]);
-   if (((i + 1) % 12) == 0)
-      g_print ("\n        ");
-}
-g_print ("\n");
-}
-#endif
 
 int main (int argc, char **argv)
 {
