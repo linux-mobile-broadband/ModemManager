@@ -120,6 +120,16 @@ struct _MMIfaceModem {
                                                 GAsyncResult *res,
                                                 GError **error);
 
+    /* Loading of the AllowedModes and PreferredMode properties */
+    void (*load_allowed_modes) (MMIfaceModem *self,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data);
+    gboolean (*load_allowed_modes_finish) (MMIfaceModem *self,
+                                           GAsyncResult *res,
+                                           MMModemMode *allowed,
+                                           MMModemMode *preferred,
+                                           GError **error);
+
     /* Loading of the SupportedBands property */
     void (*load_supported_bands) (MMIfaceModem *self,
                                   GAsyncReadyCallback callback,

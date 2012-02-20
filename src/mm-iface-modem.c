@@ -1852,6 +1852,7 @@ static void interface_disabling_step (DisablingContext *ctx);
 typedef enum {
     DISABLING_STEP_FIRST,
     DISABLING_STEP_CURRENT_BANDS,
+    DISABLING_STEP_ALLOWED_MODES,
     DISABLING_STEP_MODEM_POWER_DOWN,
     DISABLING_STEP_CLOSE_PORTS,
     DISABLING_STEP_LAST
@@ -1972,6 +1973,13 @@ interface_disabling_step (DisablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
+    case DISABLING_STEP_ALLOWED_MODES:
+        /* Clear allowed/preferred modes */
+        mm_gdbus_modem_set_allowed_modes (ctx->skeleton, MM_MODEM_MODE_NONE);
+        mm_gdbus_modem_set_preferred_mode (ctx->skeleton, MM_MODEM_MODE_NONE);
+        /* Fall down to next step */
+        ctx->step++;
+
     case DISABLING_STEP_MODEM_POWER_DOWN:
         /* CFUN=0 is dangerous and often will shoot devices in the head (that's
          * what it's supposed to do).  So don't use CFUN=0 by default, but let
@@ -2044,6 +2052,7 @@ typedef enum {
     ENABLING_STEP_FLOW_CONTROL,
     ENABLING_STEP_SUPPORTED_CHARSETS,
     ENABLING_STEP_CHARSET,
+    ENABLING_STEP_ALLOWED_MODES,
     ENABLING_STEP_CURRENT_BANDS,
     ENABLING_STEP_LAST
 } EnablingStep;
@@ -2205,6 +2214,38 @@ setup_charset_ready (MMIfaceModem *self,
         /* Done, Go on to next step */
         ctx->step++;
 
+    interface_enabling_step (ctx);
+}
+
+static void
+load_allowed_modes_ready (MMIfaceModem *self,
+                          GAsyncResult *res,
+                          EnablingContext *ctx)
+{
+    MMModemMode allowed = MM_MODEM_MODE_NONE;
+    MMModemMode preferred = MM_MODEM_MODE_NONE;
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_GET_INTERFACE (self)->load_allowed_modes_finish (self,
+                                                                         res,
+                                                                         &allowed,
+                                                                         &preferred,
+                                                                         &error)) {
+        /* Errors when getting allowed/preferred won't be critical */
+        mm_warn ("couldn't load current allowed/preferred modes: '%s'", error->message);
+        g_error_free (error);
+
+        /* If errors getting allowed modes, assume allowed=supported,
+         * and none preferred */
+        allowed = mm_gdbus_modem_get_supported_modes (ctx->skeleton);
+        preferred = MM_MODEM_MODE_NONE;
+    }
+
+    mm_gdbus_modem_set_allowed_modes (ctx->skeleton, allowed);
+    mm_gdbus_modem_set_preferred_mode (ctx->skeleton, preferred);
+
+    /* Done, Go on to next step */
+    ctx->step++;
     interface_enabling_step (ctx);
 }
 
@@ -2413,6 +2454,24 @@ interface_enabling_step (EnablingContext *ctx)
             enabling_context_complete_and_free (ctx);
             return;
         }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_ALLOWED_MODES:
+        if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_allowed_modes &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_allowed_modes_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_allowed_modes (
+                    ctx->self,
+                    (GAsyncReadyCallback)load_allowed_modes_ready,
+                    ctx);
+                return;
+        }
+
+        /* If no way to get allowed modes, assume allowed=supported,
+         * and none preferred */
+        mm_gdbus_modem_set_allowed_modes (ctx->skeleton,
+                                          mm_gdbus_modem_get_supported_modes (ctx->skeleton));
+        mm_gdbus_modem_set_preferred_mode (ctx->skeleton, MM_MODEM_MODE_NONE);
         /* Fall down to next step */
         ctx->step++;
 
