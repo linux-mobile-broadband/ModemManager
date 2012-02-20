@@ -56,7 +56,6 @@ PKG_CHECK_MODULES(LIBMM_COMMON,
                   gio-2.0
                   gio-unix-2.0)
 PKG_CHECK_MODULES(MM,
-                  dbus-glib-1 >= 0.86
                   glib-2.0 >= 2.30.2
                   gmodule-2.0
                   gobject-2.0
@@ -125,12 +124,6 @@ case $with_polkit in
         with_polkit=no
         ;;
 esac
-
-dnl
-dnl Checks for new dbus-glib property access function
-dnl
-AC_CHECK_LIB([dbus-glib-1], [dbus_glib_global_set_disable_legacy_property_access], ac_have_dg_prop="1", ac_have_dg_prop="0")
-AC_DEFINE_UNQUOTED(HAVE_DBUS_GLIB_DISABLE_LEGACY_PROP_ACCESS, $ac_have_dg_prop, [Define if you have a dbus-glib with dbus_glib_global_set_disable_legacy_property_access()])
 
 # PPPD
 AC_CHECK_HEADERS(pppd/pppd.h, have_pppd_headers="yes", have_pppd_headers="no")
