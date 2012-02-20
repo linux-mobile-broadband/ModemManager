@@ -22,7 +22,8 @@ G_DEFINE_TYPE (MMAuthRequest, mm_auth_request, G_TYPE_OBJECT)
 typedef struct {
     GObject *owner;
     char *auth;
-    DBusGMethodInvocation *context;
+
+    GDBusMethodInvocation *context;
     MMAuthRequestCb callback;
     gpointer callback_data;
 
@@ -35,7 +36,7 @@ GObject *
 mm_auth_request_new (GType atype,
                      const char *authorization,
                      GObject *owner,
-                     DBusGMethodInvocation *context,
+                     GDBusMethodInvocation *context,
                      MMAuthRequestCb callback,
                      gpointer callback_data,
                      GDestroyNotify notify)
@@ -179,4 +180,3 @@ mm_auth_request_class_init (MMAuthRequestClass *class)
                   g_cclosure_marshal_VOID__VOID,
                   G_TYPE_NONE, 0, G_TYPE_NONE);
 }
-

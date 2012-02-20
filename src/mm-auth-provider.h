@@ -16,8 +16,7 @@
 #ifndef MM_AUTH_PROVIDER_H
 #define MM_AUTH_PROVIDER_H
 
-#include <glib-object.h>
-#include <dbus/dbus-glib-lowlevel.h>
+#include <gio/gio.h>
 
 #include "mm-auth-request.h"
 
@@ -52,7 +51,7 @@ typedef struct {
     MMAuthRequest * (*create_request) (MMAuthProvider *provider,
                                        const char *authorization,
                                        GObject *owner,
-                                       DBusGMethodInvocation *context,
+                                       GDBusMethodInvocation *context,
                                        MMAuthRequestCb callback,
                                        gpointer callback_data,
                                        GDestroyNotify notify);
@@ -64,7 +63,7 @@ GType mm_auth_provider_get_type (void);
 MMAuthRequest *mm_auth_provider_request_auth (MMAuthProvider *provider,
                                               const char *authorization,
                                               GObject *owner,
-                                              DBusGMethodInvocation *context,
+                                              GDBusMethodInvocation *context,
                                               MMAuthRequestCb callback,
                                               gpointer callback_data,
                                               GDestroyNotify notify,
@@ -86,4 +85,3 @@ void mm_auth_provider_finish_request (MMAuthProvider *provider,
 void mm_auth_provider_cancel_request (MMAuthProvider *provider, MMAuthRequest *req);
 
 #endif /* MM_AUTH_PROVIDER_H */
-

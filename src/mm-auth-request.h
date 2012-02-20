@@ -16,8 +16,7 @@
 #ifndef MM_AUTH_REQUEST_H
 #define MM_AUTH_REQUEST_H
 
-#include <glib-object.h>
-#include <dbus/dbus-glib-lowlevel.h>
+#include <gio/gio.h>
 
 #define MM_TYPE_AUTH_REQUEST            (mm_auth_request_get_type ())
 #define MM_AUTH_REQUEST(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_AUTH_REQUEST, MMAuthRequest))
@@ -49,13 +48,13 @@ GType mm_auth_request_get_type (void);
 
 typedef void (*MMAuthRequestCb) (MMAuthRequest *req,
                                  GObject *owner,
-                                 DBusGMethodInvocation *context,
+                                 GDBusMethodInvocation *context,
                                  gpointer user_data);
 
 GObject *mm_auth_request_new (GType atype,
                               const char *authorization,
                               GObject *owner,
-                              DBusGMethodInvocation *context,
+                              GDBusMethodInvocation *context,
                               MMAuthRequestCb callback,
                               gpointer callback_data,
                               GDestroyNotify notify);
@@ -69,4 +68,3 @@ void                   mm_auth_request_callback          (MMAuthRequest *req);
 void                   mm_auth_request_dispose           (MMAuthRequest *req);
 
 #endif /* MM_AUTH_REQUEST_H */
-

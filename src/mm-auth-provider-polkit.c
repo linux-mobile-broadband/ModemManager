@@ -55,7 +55,7 @@ static MMAuthRequest *
 real_create_request (MMAuthProvider *provider,
                      const char *authorization,
                      GObject *owner,
-                     DBusGMethodInvocation *context,
+                     GDBusMethodInvocation *context,
                      MMAuthRequestCb callback,
                      gpointer callback_data,
                      GDestroyNotify notify)
@@ -171,4 +171,3 @@ mm_auth_provider_polkit_class_init (MMAuthProviderPolkitClass *class)
     /* Properties */
     g_object_class_override_property (object_class, PROP_NAME, MM_AUTH_PROVIDER_NAME);
 }
-

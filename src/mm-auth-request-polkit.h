@@ -16,9 +16,8 @@
 #ifndef MM_AUTH_REQUEST_POLKIT_H
 #define MM_AUTH_REQUEST_POLKIT_H
 
-#include <glib-object.h>
+#include <gio/gio.h>
 #include <polkit/polkit.h>
-#include <dbus/dbus-glib-lowlevel.h>
 
 #include "mm-auth-request.h"
 
@@ -42,7 +41,7 @@ GType mm_auth_request_polkit_get_type (void);
 GObject *mm_auth_request_polkit_new (PolkitAuthority *authority,
                                      const char *authorization,
                                      GObject *owner,
-                                     DBusGMethodInvocation *context,
+                                     GDBusMethodInvocation *context,
                                      MMAuthRequestCb callback,
                                      gpointer callback_data,
                                      GDestroyNotify notify);
@@ -50,4 +49,3 @@ GObject *mm_auth_request_polkit_new (PolkitAuthority *authority,
 void mm_auth_request_polkit_cancel (MMAuthRequestPolkit *self);
 
 #endif /* MM_AUTH_REQUEST_POLKIT_H */
-

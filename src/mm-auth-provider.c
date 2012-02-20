@@ -105,12 +105,12 @@ static MMAuthRequest *
 real_create_request (MMAuthProvider *provider,
                      const char *authorization,
                      GObject *owner,
-                     DBusGMethodInvocation *context,
+                     GDBusMethodInvocation *context,
                      MMAuthRequestCb callback,
                      gpointer callback_data,
                      GDestroyNotify notify)
 {
-    return (MMAuthRequest *) mm_auth_request_new (0, 
+    return (MMAuthRequest *) mm_auth_request_new (0,
                                                   authorization,
                                                   owner,
                                                   context,
@@ -165,7 +165,7 @@ MMAuthRequest *
 mm_auth_provider_request_auth (MMAuthProvider *self,
                                const char *authorization,
                                GObject *owner,
-                               DBusGMethodInvocation *context,
+                               GDBusMethodInvocation *context,
                                MMAuthRequestCb callback,
                                gpointer callback_data,
                                GDestroyNotify notify,
@@ -297,4 +297,3 @@ mm_auth_provider_class_init (MMAuthProviderClass *class)
                               NULL_PROVIDER,
                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
-
