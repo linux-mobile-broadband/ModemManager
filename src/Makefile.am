@@ -32,8 +32,8 @@ libmodem_helpers_la_SOURCES = \
 	mm-charsets.h \
 	mm-utils.c \
 	mm-utils.h \
-	mm-sms-utils.c \
-	mm-sms-utils.h
+	mm-sms-part.h \
+	mm-sms-part.c
 
 # libserial specific enum types
 SERIAL_ENUMS = \
