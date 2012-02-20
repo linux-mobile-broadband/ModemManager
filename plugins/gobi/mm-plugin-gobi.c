@@ -17,7 +17,7 @@
 #include <string.h>
 #include <gmodule.h>
 
-#include <mm-errors-types.h>
+#include <libmm-common.h>
 
 #include "mm-plugin-gobi.h"
 #include "mm-broadband-modem-gobi.h"

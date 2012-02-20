@@ -19,7 +19,6 @@
 #define MM_PLUGIN_OPTION_H
 
 #include "mm-plugin-base.h"
-#include "mm-generic-gsm.h"
 
 #define MM_TYPE_PLUGIN_OPTION            (mm_plugin_option_get_type ())
 #define MM_PLUGIN_OPTION(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_OPTION, MMPluginOption))

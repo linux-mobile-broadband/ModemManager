@@ -27,9 +27,10 @@
 #include <string.h>
 #include <gmodule.h>
 
+#include <libmm-common.h>
+
 #include "mm-plugin-iridium.h"
 #include "mm-broadband-modem-iridium.h"
-#include "mm-errors-types.h"
 #include "mm-private-boxed-types.h"
 #include "mm-log.h"
 

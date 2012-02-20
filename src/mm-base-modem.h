@@ -23,10 +23,11 @@
 
 #include <mm-gdbus-modem.h>
 
+#include "mm-auth-request.h"
+#include "mm-auth-provider.h"
 #include "mm-port.h"
 #include "mm-at-serial-port.h"
 #include "mm-qcdm-serial-port.h"
-#include "mm-modem.h"
 
 #define MM_TYPE_BASE_MODEM            (mm_base_modem_get_type ())
 #define MM_BASE_MODEM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_BASE_MODEM, MMBaseModem))

@@ -24,9 +24,10 @@
 #include <string.h>
 #include <gmodule.h>
 
+#include <libmm-common.h>
+
 #include "mm-plugin-cinterion.h"
 #include "mm-broadband-modem-cinterion.h"
-#include "mm-errors-types.h"
 #include "mm-log.h"
 
 G_DEFINE_TYPE (MMPluginCinterion, mm_plugin_cinterion, MM_TYPE_PLUGIN_BASE)

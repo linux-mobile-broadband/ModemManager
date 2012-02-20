@@ -14,6 +14,7 @@
  */
 
 #include <glib.h>
+#include <glib-object.h>
 #include <string.h>
 
 #include "mm-modem-helpers.h"

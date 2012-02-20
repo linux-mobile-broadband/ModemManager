@@ -19,7 +19,6 @@
 
 #include <ModemManager.h>
 
-#include "mm-modem-cdma.h"
 #include "mm-charsets.h"
 
 #define MM_MODEM_CAPABILITY_3GPP_LTE    \

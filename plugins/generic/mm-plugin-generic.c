@@ -26,7 +26,7 @@
 
 #include <gmodule.h>
 
-#include <mm-errors-types.h>
+#include <libmm-common.h>
 
 #include "mm-plugin-generic.h"
 #include "mm-broadband-modem.h"

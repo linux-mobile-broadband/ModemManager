@@ -18,7 +18,7 @@
 #include <string.h>
 #include <gmodule.h>
 
-#include <mm-errors-types.h>
+#include <libmm-common.h>
 
 #include "mm-private-boxed-types.h"
 #include "mm-plugin-option.h"
