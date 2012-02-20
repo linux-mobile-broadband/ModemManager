@@ -52,7 +52,7 @@ typedef struct {
     MMAuthRequest * (*create_request) (MMAuthProvider *provider,
                                        const char *authorization,
                                        GObject *owner,
-                                       gpointer context,
+                                       DBusGMethodInvocation *context,
                                        MMAuthRequestCb callback,
                                        gpointer callback_data,
                                        GDestroyNotify notify);
@@ -64,7 +64,7 @@ GType mm_auth_provider_get_type (void);
 MMAuthRequest *mm_auth_provider_request_auth (MMAuthProvider *provider,
                                               const char *authorization,
                                               GObject *owner,
-                                              gpointer context,
+                                              DBusGMethodInvocation *context,
                                               MMAuthRequestCb callback,
                                               gpointer callback_data,
                                               GDestroyNotify notify,

@@ -55,33 +55,20 @@ static MMAuthRequest *
 real_create_request (MMAuthProvider *provider,
                      const char *authorization,
                      GObject *owner,
-                     gpointer context,
+                     DBusGMethodInvocation *context,
                      MMAuthRequestCb callback,
                      gpointer callback_data,
                      GDestroyNotify notify)
 {
     MMAuthProviderPolkitPrivate *priv = MM_AUTH_PROVIDER_POLKIT_GET_PRIVATE (provider);
-    MMAuthRequest *auth_request;
-    gchar *sender;
 
-    /* Ugly temporary hack... */
-    if (G_IS_DBUS_METHOD_INVOCATION (context)) {
-        sender = g_strdup (g_dbus_method_invocation_get_sender (context));
-    } else {
-        sender = dbus_g_method_get_sender (context);
-    }
-
-    auth_request = (MMAuthRequest *)mm_auth_request_polkit_new (priv->authority,
-                                                                authorization,
-                                                                owner,
-                                                                context,
-                                                                sender,
-                                                                callback,
-                                                                callback_data,
-                                                                notify);
-    g_free (sender);
-
-    return auth_request;
+    return (MMAuthRequest *) mm_auth_request_polkit_new (priv->authority,
+                                                         authorization,
+                                                         owner,
+                                                         context,
+                                                         callback,
+                                                         callback_data,
+                                                         notify);
 }
 
 /*****************************************************************************/

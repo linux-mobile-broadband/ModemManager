@@ -47,18 +47,15 @@ typedef struct {
 
 GType mm_auth_request_get_type (void);
 
-/* TODO: Change the context gpointer to be a GDBusMethodInvocation when
- * fully ported to GDBus, and remove all (MMAuthRequestCb) casts */
-
 typedef void (*MMAuthRequestCb) (MMAuthRequest *req,
                                  GObject *owner,
-                                 gpointer context,
+                                 DBusGMethodInvocation *context,
                                  gpointer user_data);
 
 GObject *mm_auth_request_new (GType atype,
                               const char *authorization,
                               GObject *owner,
-                              gpointer context,
+                              DBusGMethodInvocation *context,
                               MMAuthRequestCb callback,
                               gpointer callback_data,
                               GDestroyNotify notify);

@@ -105,7 +105,7 @@ static MMAuthRequest *
 real_create_request (MMAuthProvider *provider,
                      const char *authorization,
                      GObject *owner,
-                     gpointer context,
+                     DBusGMethodInvocation *context,
                      MMAuthRequestCb callback,
                      gpointer callback_data,
                      GDestroyNotify notify)
@@ -165,7 +165,7 @@ MMAuthRequest *
 mm_auth_provider_request_auth (MMAuthProvider *self,
                                const char *authorization,
                                GObject *owner,
-                               gpointer context,
+                               DBusGMethodInvocation *context,
                                MMAuthRequestCb callback,
                                gpointer callback_data,
                                GDestroyNotify notify,

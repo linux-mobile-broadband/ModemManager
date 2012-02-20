@@ -34,14 +34,14 @@ GObject *
 mm_auth_request_polkit_new (PolkitAuthority *authority,
                             const char *authorization,
                             GObject *owner,
-                            gpointer context,
-                            const gchar *sender,
+                            DBusGMethodInvocation *context,
                             MMAuthRequestCb callback,
                             gpointer callback_data,
                             GDestroyNotify notify)
 {
     GObject *obj;
     MMAuthRequestPolkitPrivate *priv;
+    char *sender;
 
     g_return_val_if_fail (authorization != NULL, NULL);
     g_return_val_if_fail (owner != NULL, NULL);
@@ -59,7 +59,10 @@ mm_auth_request_polkit_new (PolkitAuthority *authority,
         priv = MM_AUTH_REQUEST_POLKIT_GET_PRIVATE (obj);
         priv->authority = authority;
         priv->cancellable = g_cancellable_new ();
+
+        sender = dbus_g_method_get_sender (context);
         priv->subject = polkit_system_bus_name_new (sender);
+    	g_free (sender);
     }
 
     return obj;
@@ -98,7 +101,7 @@ pk_auth_cb (GObject *object, GAsyncResult *result, gpointer user_data)
 
         g_signal_emit_by_name (self, "result");
     }
-
+    
     g_object_unref (self);
 }
 
