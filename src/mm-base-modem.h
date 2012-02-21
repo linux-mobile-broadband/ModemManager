@@ -23,8 +23,7 @@
 
 #include <mm-gdbus-modem.h>
 
-#include "mm-auth-request.h"
-#include "mm-auth-provider.h"
+#include "mm-auth.h"
 #include "mm-port.h"
 #include "mm-at-serial-port.h"
 #include "mm-qcdm-serial-port.h"
@@ -126,16 +125,14 @@ void     mm_base_modem_set_valid    (MMBaseModem *self,
                                      gboolean valid);
 gboolean mm_base_modem_get_valid    (MMBaseModem *self);
 
-gboolean mm_base_modem_auth_request (MMBaseModem *self,
-                                     const gchar *authorization,
-                                     GDBusMethodInvocation *context,
-                                     MMAuthRequestCb callback,
-                                     gpointer callback_data,
-                                     GDestroyNotify notify,
-                                     GError **error);
-gboolean mm_base_modem_auth_finish  (MMBaseModem *self,
-                                     MMAuthRequest *req,
-                                     GError **error);
+void     mm_base_modem_authorize (MMBaseModem *self,
+                                  GDBusMethodInvocation *invocation,
+                                  const gchar *authorization,
+                                  GAsyncReadyCallback callback,
+                                  gpointer user_data);
+gboolean mm_base_modem_authorize_finish (MMBaseModem *self,
+                                         GAsyncResult *res,
+                                         GError **error);
 
 const gchar *mm_base_modem_get_device (MMBaseModem *self);
 const gchar *mm_base_modem_get_driver (MMBaseModem *self);

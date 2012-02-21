@@ -67,7 +67,9 @@ struct _MMBaseModemPrivate {
     guint max_timeouts;
     guint set_invalid_unresponsive_modem_id;
 
+    /* The authorization provider */
     MMAuthProvider *authp;
+    GCancellable *authp_cancellable;
 
     GHashTable *ports;
     MMAtSerialPort *primary;
@@ -545,43 +547,55 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     return TRUE;
 }
 
-gboolean
-mm_base_modem_auth_request (MMBaseModem *self,
-                            const gchar *authorization,
-                            GDBusMethodInvocation *invocation,
-                            MMAuthRequestCb callback,
-                            gpointer callback_data,
-                            GDestroyNotify notify,
-                            GError **error)
-{
-    g_return_val_if_fail (MM_IS_BASE_MODEM (self), FALSE);
-
-    return !!mm_auth_provider_request_auth (self->priv->authp,
-                                            authorization,
-                                            G_OBJECT (self),
-                                            invocation,
-                                            callback,
-                                            callback_data,
-                                            notify,
-                                            error);
-}
+/*****************************************************************************/
+/* Authorization */
 
 gboolean
-mm_base_modem_auth_finish (MMBaseModem *self,
-                           MMAuthRequest *req,
-                           GError **error)
+mm_base_modem_authorize_finish (MMBaseModem *self,
+                                GAsyncResult *res,
+                                GError **error)
 {
-    if (mm_auth_request_get_result (req) != MM_AUTH_RESULT_AUTHORIZED) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_UNAUTHORIZED,
-                     "This request requires the '%s' authorization",
-                     mm_auth_request_get_authorization (req));
-        return FALSE;
-    }
-
-    return TRUE;
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
+
+static void
+authorize_ready (MMAuthProvider *authp,
+                 GAsyncResult *res,
+                 GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!mm_auth_provider_authorize_finish (authp, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+void
+mm_base_modem_authorize (MMBaseModem *self,
+                         GDBusMethodInvocation *invocation,
+                         const gchar *authorization,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        mm_base_modem_authorize);
+    mm_auth_provider_authorize (self->priv->authp,
+                                invocation,
+                                authorization,
+                                self->priv->authp_cancellable,
+                                (GAsyncReadyCallback)authorize_ready,
+                                result);
+}
+
+/*****************************************************************************/
 
 const gchar *
 mm_base_modem_get_device (MMBaseModem *self)
@@ -633,7 +647,9 @@ mm_base_modem_init (MMBaseModem *self)
                                               MM_TYPE_BASE_MODEM,
                                               MMBaseModemPrivate);
 
-    self->priv->authp = mm_auth_provider_get ();
+    /* Setup authorization provider */
+    self->priv->authp = mm_auth_get_provider ();
+    self->priv->authp_cancellable = g_cancellable_new ();
 
     self->priv->ports = g_hash_table_new_full (g_str_hash,
                                                g_str_equal,
@@ -728,7 +744,9 @@ finalize (GObject *object)
 {
     MMBaseModem *self = MM_BASE_MODEM (object);
 
-    mm_auth_provider_cancel_for_owner (self->priv->authp, object);
+    /* TODO
+     * mm_auth_provider_cancel_for_owner (self->priv->authp, object);
+    */
 
     mm_dbg ("Modem (%s) '%s' completely disposed",
             self->priv->plugin,
@@ -746,6 +764,9 @@ dispose (GObject *object)
 {
     MMBaseModem *self = MM_BASE_MODEM (object);
 
+    /* Cancel all ongoing auth requests */
+    g_cancellable_cancel (self->priv->authp_cancellable);
+
     g_clear_object (&self->priv->primary);
     g_clear_object (&self->priv->secondary);
     g_clear_object (&self->priv->data);
@@ -757,6 +778,9 @@ dispose (GObject *object)
     }
 
     g_clear_object (&self->priv->connection);
+
+    g_clear_object (&self->priv->authp);
+    g_clear_object (&self->priv->authp_cancellable);
 
     G_OBJECT_CLASS (mm_base_modem_parent_class)->dispose (object);
 }
