@@ -10,27 +10,14 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2010 Red Hat, Inc.
+ * Copyright (C) 2010 - 2012 Red Hat, Inc.
+ * Copyright (C) 2012 Google, Inc.
  */
 
 #ifndef MM_AUTH_PROVIDER_H
 #define MM_AUTH_PROVIDER_H
 
 #include <gio/gio.h>
-
-#include "mm-auth-request.h"
-
-/* Authorizations */
-#define MM_AUTHORIZATION_MANAGER_CONTROL "org.freedesktop.ModemManager.Control"
-#define MM_AUTHORIZATION_DEVICE_INFO     "org.freedesktop.ModemManager.Device.Info"
-#define MM_AUTHORIZATION_DEVICE_CONTROL  "org.freedesktop.ModemManager.Device.Control"
-#define MM_AUTHORIZATION_CONTACTS        "org.freedesktop.ModemManager.Contacts"
-#define MM_AUTHORIZATION_SMS             "org.freedesktop.ModemManager.SMS"
-#define MM_AUTHORIZATION_USSD            "org.freedesktop.ModemManager.USSD"
-#define MM_AUTHORIZATION_LOCATION        "org.freedesktop.ModemManager.Location"
-#define MM_AUTHORIZATION_FIRMWARE        "org.freedesktop.ModemManager.Firmware"
-/******************/
-
 
 #define MM_TYPE_AUTH_PROVIDER            (mm_auth_provider_get_type ())
 #define MM_AUTH_PROVIDER(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_AUTH_PROVIDER, MMAuthProvider))
@@ -39,49 +26,50 @@
 #define MM_IS_AUTH_PROVIDER_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_AUTH_PROVIDER))
 #define MM_AUTH_PROVIDER_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_AUTH_PROVIDER, MMAuthProviderClass))
 
-#define MM_AUTH_PROVIDER_NAME "name"
+/* Authorizations */
+#define MM_AUTHORIZATION_MANAGER_CONTROL "org.freedesktop.ModemManager1.Control"
+#define MM_AUTHORIZATION_DEVICE_CONTROL  "org.freedesktop.ModemManager1.Device.Control"
+#define MM_AUTHORIZATION_CONTACTS        "org.freedesktop.ModemManager1.Contacts"
+#define MM_AUTHORIZATION_MESSAGING       "org.freedesktop.ModemManager1.Messaging"
+#define MM_AUTHORIZATION_USSD            "org.freedesktop.ModemManager1.USSD"
+#define MM_AUTHORIZATION_LOCATION        "org.freedesktop.ModemManager1.Location"
+#define MM_AUTHORIZATION_FIRMWARE        "org.freedesktop.ModemManager1.Firmware"
 
-typedef struct {
+typedef struct _MMAuthProvider MMAuthProvider;
+typedef struct _MMAuthProviderClass MMAuthProviderClass;
+
+struct _MMAuthProvider {
     GObject parent;
-} MMAuthProvider;
+};
 
-typedef struct {
+struct _MMAuthProviderClass {
     GObjectClass parent;
 
-    MMAuthRequest * (*create_request) (MMAuthProvider *provider,
-                                       const char *authorization,
-                                       GObject *owner,
-                                       GDBusMethodInvocation *context,
-                                       MMAuthRequestCb callback,
-                                       gpointer callback_data,
-                                       GDestroyNotify notify);
-} MMAuthProviderClass;
+    /* Perform authorization checks in this request (async).
+     * Returns TRUE if authorized, FALSE if error is set. */
+    void (* authorize) (MMAuthProvider *self,
+                        GDBusMethodInvocation *invocation,
+                        const gchar *authorization,
+                        GCancellable *cancellable,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data);
+    gboolean (* authorize_finish) (MMAuthProvider *self,
+                                   GAsyncResult *res,
+                                   GError **error);
+};
 
 GType mm_auth_provider_get_type (void);
 
-/* Don't do anything clever from the notify callback... */
-MMAuthRequest *mm_auth_provider_request_auth (MMAuthProvider *provider,
-                                              const char *authorization,
-                                              GObject *owner,
-                                              GDBusMethodInvocation *context,
-                                              MMAuthRequestCb callback,
-                                              gpointer callback_data,
-                                              GDestroyNotify notify,
-                                              GError **error);
+MMAuthProvider *mm_auth_provider_new (void);
 
-void mm_auth_provider_cancel_for_owner (MMAuthProvider *provider,
-                                        GObject *owner);
-
-/* Subclass API */
-
-/* To get an auth provider instance, implemented in mm-auth-provider-factory.c */
-MMAuthProvider *mm_auth_provider_get (void);
-
-/* schedules the request's completion */
-void mm_auth_provider_finish_request (MMAuthProvider *provider,
-                                      MMAuthRequest *req,
-                                      MMAuthResult result);
-
-void mm_auth_provider_cancel_request (MMAuthProvider *provider, MMAuthRequest *req);
+void mm_auth_provider_authorize (MMAuthProvider *self,
+                                 GDBusMethodInvocation *invocation,
+                                 const gchar *authorization,
+                                 GCancellable *cancellable,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data);
+gboolean mm_auth_provider_authorize_finish (MMAuthProvider *self,
+                                            GAsyncResult *res,
+                                            GError **error);
 
 #endif /* MM_AUTH_PROVIDER_H */

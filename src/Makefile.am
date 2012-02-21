@@ -118,21 +118,6 @@ if WITH_POLKIT
 modem_manager_LDADD += $(POLKIT_LIBS)
 endif
 
-auth_sources = \
-	mm-auth-request.c \
-	mm-auth-request.h \
-	mm-auth-provider.h \
-	mm-auth-provider.c \
-	mm-auth-provider-factory.c
-
-if WITH_POLKIT
-auth_sources += \
-	mm-auth-request-polkit.c \
-	mm-auth-request-polkit.h \
-	mm-auth-provider-polkit.c \
-	mm-auth-provider-polkit.h
-endif
-
 modem_manager_SOURCES = \
 	main.c \
 	mm-log.c \
@@ -141,7 +126,10 @@ modem_manager_SOURCES = \
 	mm-daemon-enums-types.c \
 	mm-private-boxed-types.h \
 	mm-private-boxed-types.c \
-	$(auth_sources) \
+	mm-auth.h \
+	mm-auth.c \
+	mm-auth-provider.h \
+	mm-auth-provider.c \
 	mm-manager.c \
 	mm-manager.h \
 	mm-plugin-manager.c \
@@ -192,6 +180,12 @@ modem_manager_SOURCES = \
 	mm-plugin.h \
 	mm-plugin-base.c \
 	mm-plugin-base.h
+
+if WITH_POLKIT
+modem_manager_SOURCES += \
+	mm-auth-provider-polkit.c \
+	mm-auth-provider-polkit.h
+endif
 
 CLEANFILES = \
 	mm-private-enums-types.h \

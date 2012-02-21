@@ -10,13 +10,12 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2010 Red Hat, Inc.
+ * Copyright (C) 2010 - 2012 Red Hat, Inc.
+ * Copyright (C) 2012 Google, Inc.
  */
 
 #ifndef MM_AUTH_PROVIDER_POLKIT_H
 #define MM_AUTH_PROVIDER_POLKIT_H
-
-#include <glib-object.h>
 
 #include "mm-auth-provider.h"
 
@@ -27,17 +26,21 @@
 #define MM_IS_AUTH_PROVIDER_POLKIT_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_AUTH_PROVIDER_POLKIT))
 #define MM_AUTH_PROVIDER_POLKIT_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_AUTH_PROVIDER_POLKIT, MMAuthProviderPolkitClass))
 
-typedef struct {
-    MMAuthProvider parent;
-} MMAuthProviderPolkit;
+typedef struct _MMAuthProviderPolkit MMAuthProviderPolkit;
+typedef struct _MMAuthProviderPolkitClass MMAuthProviderPolkitClass;
+typedef struct _MMAuthProviderPolkitPrivate MMAuthProviderPolkitPrivate;
 
-typedef struct {
+struct _MMAuthProviderPolkit {
+    MMAuthProvider parent;
+    MMAuthProviderPolkitPrivate *priv;
+};
+
+struct _MMAuthProviderPolkitClass {
     MMAuthProviderClass parent;
-} MMAuthProviderPolkitClass;
+};
 
 GType mm_auth_provider_polkit_get_type (void);
 
-GObject *mm_auth_provider_polkit_new (void);
+MMAuthProvider *mm_auth_provider_polkit_new (void);
 
 #endif /* MM_AUTH_PROVIDER_POLKIT_H */
-

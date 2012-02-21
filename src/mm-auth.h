@@ -10,36 +10,18 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2010 Red Hat, Inc.
+ * Copyright (C) 2010 - 2012 Red Hat, Inc.
+ * Copyright (C) 2012 Google, Inc.
  */
 
-#include <string.h>
+#ifndef MM_AUTH_H
+#define MM_AUTH_H
 
-#include "config.h"
 #include "mm-auth-provider.h"
 
-GObject *mm_auth_provider_new (void);
+/* Get the default provider */
+MMAuthProvider *mm_auth_get_provider (void);
 
-#ifdef WITH_POLKIT
-#define IN_AUTH_PROVIDER_FACTORY_C
-#include "mm-auth-provider-polkit.h"
-#undef IN_AUTH_PROVIDER_FACTORY_C
-#endif
+void mm_auth_shutdown (void);
 
-MMAuthProvider *
-mm_auth_provider_get (void)
-{
-    static MMAuthProvider *singleton;
-
-    if (!singleton) {
-#if WITH_POLKIT
-        singleton = (MMAuthProvider *) mm_auth_provider_polkit_new ();
-#else
-        singleton = (MMAuthProvider *) mm_auth_provider_new ();
-#endif
-    }
-
-    g_assert (singleton);
-    return singleton;
-}
-
+#endif /* MM_AUTH_H */
