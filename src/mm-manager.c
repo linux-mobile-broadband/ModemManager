@@ -30,7 +30,7 @@
 
 #include "mm-manager.h"
 #include "mm-plugin-manager.h"
-#include "mm-auth-provider.h"
+#include "mm-auth.h"
 #include "mm-plugin.h"
 #include "mm-log.h"
 #include "mm-port-probe-cache.h"
@@ -57,8 +57,9 @@ struct _MMManagerPrivate {
     GDBusConnection *connection;
     /* The UDev client */
     GUdevClient *udev;
-    /* The authentication provider */
+    /* The authorization provider */
     MMAuthProvider *authp;
+    GCancellable *authp_cancellable;
     /* The Plugin Manager object */
     MMPluginManager *plugin_manager;
     /* The container of currently available modems */
@@ -711,6 +712,10 @@ mm_manager_shutdown (MMManager *self)
     g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_MANAGER (self));
 
+    /* Cancel all ongoing auth requests */
+    g_cancellable_cancel (self->priv->authp_cancellable);
+
+
     modems = g_hash_table_get_values (self->priv->modems);
     for (iter = modems; iter; iter = g_list_next (iter)) {
         MMBaseModem *modem = MM_BASE_MODEM (iter->data);
@@ -738,68 +743,116 @@ mm_manager_num_modems (MMManager *self)
     return g_hash_table_size (self->priv->modems);
 }
 
+/*****************************************************************************/
+
+typedef struct {
+    MMManager *self;
+    GDBusMethodInvocation *invocation;
+    gchar *level;
+} SetLoggingContext;
+
+static void
+set_logging_context_free (SetLoggingContext *ctx)
+{
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_free (ctx->level);
+    g_free (ctx);
+}
+
+static void
+set_logging_auth_ready (MMAuthProvider *authp,
+                        GAsyncResult *res,
+                        SetLoggingContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_auth_provider_authorize_finish (authp, res, &error))
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+	else if (!mm_log_set_level (ctx->level, &error))
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else {
+        mm_info ("logging: level '%s'", ctx->level);
+        mm_gdbus_org_freedesktop_modem_manager1_complete_set_logging (
+            MM_GDBUS_ORG_FREEDESKTOP_MODEM_MANAGER1 (ctx->self),
+            ctx->invocation);
+    }
+
+    set_logging_context_free (ctx);
+}
+
 static gboolean
 handle_set_logging (MmGdbusOrgFreedesktopModemManager1 *manager,
                     GDBusMethodInvocation *invocation,
                     const gchar *level)
 {
-    GError *error = NULL;
+    SetLoggingContext *ctx;
 
-	if (!mm_log_set_level (level, &error)) {
-		mm_warn ("couldn't set logging level to '%s': '%s'",
-                 level,
-                 error->message);
-        g_dbus_method_invocation_return_gerror (invocation, error);
-        g_error_free (error);
-        return TRUE;
-	}
+    ctx = g_new0 (SetLoggingContext, 1);
+    ctx->self = g_object_ref (manager);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->level = g_strdup (level);
 
-    mm_info ("logging: level '%s'", level);
-    mm_gdbus_org_freedesktop_modem_manager1_complete_set_logging (manager, invocation);
+    mm_auth_provider_authorize (ctx->self->priv->authp,
+                                invocation,
+                                MM_AUTHORIZATION_MANAGER_CONTROL,
+                                ctx->self->priv->authp_cancellable,
+                                (GAsyncReadyCallback)set_logging_auth_ready,
+                                ctx);
     return TRUE;
 }
 
+/*****************************************************************************/
+
+typedef struct {
+    MMManager *self;
+    GDBusMethodInvocation *invocation;
+} ScanDevicesContext;
+
 static void
-scan_devices_request_auth_cb (MMAuthRequest *req,
-                              MmGdbusOrgFreedesktopModemManager1 *manager,
-                              GDBusMethodInvocation *invocation,
-                              gpointer user_data)
+scan_devices_context_free (ScanDevicesContext *ctx)
 {
-    if (mm_auth_request_get_result (req) != MM_AUTH_RESULT_AUTHORIZED) {
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNAUTHORIZED,
-                                               "This request requires the '%s' authorization",
-                                               mm_auth_request_get_authorization (req));
-        return;
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static void
+scan_devices_auth_ready (MMAuthProvider *authp,
+                         GAsyncResult *res,
+                         ScanDevicesContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_auth_provider_authorize_finish (authp, res, &error))
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else {
+        /* Otherwise relaunch device scan */
+        mm_manager_start (MM_MANAGER (ctx->self));
+        mm_gdbus_org_freedesktop_modem_manager1_complete_scan_devices (
+            MM_GDBUS_ORG_FREEDESKTOP_MODEM_MANAGER1 (ctx->self),
+            ctx->invocation);
     }
 
-    /* Otherwise relaunch device scan */
-    mm_manager_start (MM_MANAGER (manager));
-
-    mm_gdbus_org_freedesktop_modem_manager1_complete_scan_devices (manager, invocation);
-    g_object_unref (invocation);
+    scan_devices_context_free (ctx);
 }
 
 static gboolean
 handle_scan_devices (MmGdbusOrgFreedesktopModemManager1 *manager,
                      GDBusMethodInvocation *invocation)
 {
-    GError *error = NULL;
+    ScanDevicesContext *ctx;
 
-    if (!mm_auth_provider_request_auth (MM_MANAGER (manager)->priv->authp,
-                                        MM_AUTHORIZATION_MANAGER_CONTROL,
-                                        G_OBJECT (manager),
-                                        g_object_ref (invocation),
-                                        (MMAuthRequestCb)scan_devices_request_auth_cb,
-                                        NULL,
-                                        NULL,
-                                        &error)) {
-        g_dbus_method_invocation_return_gerror (invocation, error);
-        g_error_free (error);
-        g_object_unref (invocation);
-    }
+    ctx = g_new (ScanDevicesContext, 1);
+    ctx->self = g_object_ref (manager);
+    ctx->invocation = g_object_ref (invocation);
 
+    mm_auth_provider_authorize (ctx->self->priv->authp,
+                                invocation,
+                                MM_AUTHORIZATION_MANAGER_CONTROL,
+                                ctx->self->priv->authp_cancellable,
+                                (GAsyncReadyCallback)scan_devices_auth_ready,
+                                ctx);
     return TRUE;
 }
 
@@ -865,8 +918,9 @@ mm_manager_init (MMManager *manager)
                                                         MM_TYPE_MANAGER,
                                                         MMManagerPrivate);
 
-    /* Setup authentication provider */
-    priv->authp = mm_auth_provider_get ();
+    /* Setup authorization provider */
+    priv->authp = mm_auth_get_provider ();
+    priv->authp_cancellable = g_cancellable_new ();
 
     /* Setup internal list of modem objects */
     priv->modems = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
@@ -921,8 +975,6 @@ finalize (GObject *object)
 {
     MMManagerPrivate *priv = MM_MANAGER (object)->priv;
 
-    mm_auth_provider_cancel_for_owner (priv->authp, object);
-
     g_hash_table_destroy (priv->modems);
 
     if (priv->udev)
@@ -936,6 +988,12 @@ finalize (GObject *object)
 
     if (priv->connection)
         g_object_unref (priv->connection);
+
+    if (priv->authp)
+        g_object_unref (priv->authp);
+
+    if (priv->authp_cancellable)
+        g_object_unref (priv->authp_cancellable);
 
     G_OBJECT_CLASS (mm_manager_parent_class)->finalize (object);
 }
