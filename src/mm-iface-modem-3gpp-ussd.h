@@ -10,6 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
+ * Copyright (C) 2010 Guido Guenther <agx@sigxcpu.org>
  * Copyright (C) 2012 Google, Inc.
  */
 
