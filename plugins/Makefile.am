@@ -43,6 +43,7 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-gobi.la \
 	libmm-plugin-motorola.la \
 	libmm-plugin-novatel.la \
+	libmm-plugin-samsung.la \
 	libmm-plugin-option.la \
 	libmm-plugin-hso.la \
 	libmm-plugin-anydata.la \
@@ -247,16 +248,16 @@ libmm_plugin_pantech_la_SOURCES = \
 libmm_plugin_pantech_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_pantech_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
-## Samsung modem
-#libmm_plugin_samsung_la_SOURCES = \
-#	mm-plugin-samsung.c \
-#	mm-plugin-samsung.h \
-#	mm-modem-samsung-gsm.c \
-#	mm-modem-samsung-gsm.h
-#libmm_plugin_samsung_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-#libmm_plugin_samsung_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-#libmm_plugin_samsung_la_LIBADD = $(builddir)/libicera-utils.la
-#
+# Samsung modem
+libmm_plugin_samsung_la_SOURCES = \
+	samsung/mm-plugin-samsung.c \
+	samsung/mm-plugin-samsung.h \
+	samsung/mm-broadband-modem-samsung.c \
+	samsung/mm-broadband-modem-samsung.h \
+	samsung/mm-broadband-bearer-samsung.c \
+	samsung/mm-broadband-bearer-samsung.h
+libmm_plugin_samsung_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_samsung_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 # Cinterion (previously Siemens) modem
 libmm_plugin_cinterion_la_SOURCES = \
