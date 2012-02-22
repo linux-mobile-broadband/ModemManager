@@ -808,7 +808,7 @@ gchar *
 mm_utf8_take_and_convert_to_charset (gchar *str,
                                      MMModemCharset charset)
 {
-    gchar *encoded;
+    gchar *encoded = NULL;
 
     if (!str)
         return NULL;
