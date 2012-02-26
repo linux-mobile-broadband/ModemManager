@@ -70,6 +70,22 @@
            send_interface="org.freedesktop.ModemManager1.Modem"
            send_member="Command"/>
 
+    <!-- org.freedesktop.ModemManager1.Modem.Simple.xml -->
+
+    <!-- Allowed for everyone -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Simple"
+           send_member="GetStatus"/>
+
+    <!-- Protected by the Device.Control policy rule -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Simple"
+           send_member="Connect"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Simple"
+           send_member="Disconnect"/>
+
   </policy>
 
   <policy user="root">
