@@ -15,6 +15,7 @@ Overview of changes in ModemManager 0.5.2
 - Added support for Sierra Wireless devices using Icera chips (USB305, Lightning)
 - Fixed sending SMS messages with modems that only support PDU mode
 - Fix reading SMS messages in text mode
+- Fix communication with some Nokia phones
 
 
 Overview of changes in ModemManager 0.5
