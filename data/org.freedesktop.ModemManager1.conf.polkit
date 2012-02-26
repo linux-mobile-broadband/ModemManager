@@ -5,12 +5,30 @@
   <policy context="default">
     <deny send_destination="org.freedesktop.ModemManager1"/>
 
-    <allow send_destination="org.freedesktop.ModemManager1"
-           send_interface="org.freedesktop.DBus.Introspectable"/>
-
     <!-- Methods listed here are explicitly allowed or PolicyKit protected.
          The rest are restricted to root for security.
       -->
+
+    <!-- org.freedesktop.ModemManager1.xml -->
+
+    <!-- Allowed for everyone -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.DBus.Introspectable"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.DBus.Properties"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.DBus.ObjectManager"/>
+
+    <!-- Protected by the Control policy rule -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1"
+           send_member="ScanDevices"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1"
+           send_member="SetLogging"/>
   </policy>
 
   <policy user="root">
