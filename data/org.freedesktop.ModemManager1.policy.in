@@ -45,7 +45,7 @@
     </defaults>
   </action>
 
-  <action id="org.freedesktop.ModemManager1.Sms">
+  <action id="org.freedesktop.ModemManager1.Messaging">
     <_description>Send, save, modify, and delete text messages</_description>
     <_message>System policy prevents sending or maniuplating this device's text messages.</_message>
     <defaults>
