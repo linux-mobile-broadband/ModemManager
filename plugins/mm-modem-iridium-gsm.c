@@ -37,11 +37,9 @@
  *
  */
 
-static void modem_init (MMModem *modem_class);
 static void modem_gsm_network_init (MMModemGsmNetwork *gsm_network_class);
 
 G_DEFINE_TYPE_EXTENDED (MMModemIridiumGsm, mm_modem_iridium_gsm, MM_TYPE_GENERIC_GSM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM, modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_MODEM_GSM_NETWORK, modem_gsm_network_init))
 
 
@@ -79,35 +77,16 @@ mm_modem_iridium_gsm_new (const char *device,
                                    NULL));
 }
 
-static gboolean
-grab_port (MMModem *modem,
-           const char *subsys,
-           const char *name,
-           MMPortType suggested_type,
-           gpointer user_data,
-           GError **error)
+static void
+port_grabbed (MMGenericGsm *gsm,
+              MMPort *port,
+              MMAtPortFlags pflags,
+              gpointer user_data)
 {
-    MMGenericGsm *gsm = MM_GENERIC_GSM (modem);
-    MMPortType ptype = MM_PORT_TYPE_IGNORED;
-    MMPort *port = NULL;
-
-    if (suggested_type == MM_PORT_TYPE_UNKNOWN) {
-        if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY))
-            ptype = MM_PORT_TYPE_PRIMARY;
-        else if (!mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_SECONDARY))
-            ptype = MM_PORT_TYPE_SECONDARY;
-    } else
-        ptype = suggested_type;
-
-    port = mm_generic_gsm_grab_port (gsm, subsys, name, ptype, error);
-    if (port && MM_IS_AT_SERIAL_PORT (port)) {
+    if (MM_IS_AT_SERIAL_PORT (port)) {
         /* Set 9600 baudrate by default */
-        g_object_set (G_OBJECT (port),
-                      MM_SERIAL_PORT_BAUD, 9600,
-                      NULL);
+        g_object_set (G_OBJECT (port), MM_SERIAL_PORT_BAUD, 9600, NULL);
     }
-
-    return !!port;
 }
 
 static gboolean
@@ -116,7 +95,7 @@ after_atz_sleep_cb (gpointer user_data)
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
     MMAtSerialPort *port;
 
-    port = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (info->modem), MM_PORT_TYPE_PRIMARY);
+    port = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (info->modem), MM_AT_PORT_FLAG_PRIMARY);
     g_assert (port);
 
     /* And send remaining initialization commands here, we do not care about the
@@ -176,7 +155,7 @@ do_enable (MMGenericGsm *modem, MMModemFn callback, gpointer user_data)
     MMCallbackInfo *info;
     MMAtSerialPort *primary;
 
-    primary = mm_generic_gsm_get_at_port (modem, MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (modem, MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     info = mm_callback_info_new (MM_MODEM (modem), callback, user_data);
@@ -222,7 +201,7 @@ after_disconnect_sleep_cb (gpointer user_data)
     if (mm_callback_info_check_modem_removed (info))
         return FALSE;
 
-    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (info->modem), MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (MM_GENERIC_GSM (info->modem), MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     /* Propagate errors when reopening the port */
@@ -246,7 +225,7 @@ do_disconnect (MMGenericGsm *gsm,
 
     info = mm_callback_info_new (MM_MODEM (gsm), callback, user_data);
 
-    primary = mm_generic_gsm_get_at_port (gsm, MM_PORT_TYPE_PRIMARY);
+    primary = mm_generic_gsm_get_at_port (gsm, MM_AT_PORT_FLAG_PRIMARY);
     g_assert (primary);
 
     /* Close the serial port and wait some seconds before reopening it */
@@ -484,12 +463,6 @@ get_property (GObject *object,
 /*****************************************************************************/
 
 static void
-modem_init (MMModem *modem_class)
-{
-    modem_class->grab_port = grab_port;
-}
-
-static void
 modem_gsm_network_init (MMModemGsmNetwork *network_class)
 {
     network_class->get_signal_quality = get_signal_quality;
@@ -531,6 +504,7 @@ mm_modem_iridium_gsm_class_init (MMModemIridiumGsmClass *klass)
                                       MM_GENERIC_GSM_PROP_PS_NETWORK_SUPPORTED,
                                       MM_GENERIC_GSM_PS_NETWORK_SUPPORTED);
 
+    gsm_class->port_grabbed = port_grabbed;
     gsm_class->do_enable = do_enable;
     gsm_class->do_disconnect = do_disconnect;
     gsm_class->get_access_technology = get_access_technology;
