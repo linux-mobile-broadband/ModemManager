@@ -2312,7 +2312,7 @@ simple_connect (MMModemSimple *simple,
                                      MM_MODEM_ERROR_OPERATION_IN_PROGRESS,
                                      "Connection is already in progress");
         callback (MM_MODEM (simple), error, user_data);
-        g_error_free (error);
+        g_clear_error (&error);
         return;
     }
 
@@ -2329,7 +2329,7 @@ simple_connect (MMModemSimple *simple,
     }
 
     simple_state_machine (MM_MODEM (simple), error, info);
-    g_error_free (error);
+    g_clear_error (&error);
 }
 
 static void
