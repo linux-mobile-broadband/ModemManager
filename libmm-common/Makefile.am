@@ -174,9 +174,11 @@ include_HEADERS = \
 	mm-gdbus-sim.h \
 	libmm-common.h
 
-libmm_common_la_SOURCES = \
+nodist_libmm_common_la_SOURCES = \
 	$(GENERATED_H) \
-	$(GENERATED_C) \
+	$(GENERATED_C)
+
+libmm_common_la_SOURCES = \
 	mm-errors-quarks.c \
 	mm-common-helpers.h \
 	mm-common-helpers.c \

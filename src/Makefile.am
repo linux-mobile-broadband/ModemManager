@@ -58,6 +58,10 @@ libserial_la_CPPFLAGS = \
 	-I$(top_srcdir)/libmm-common \
 	-I$(top_builddir)/libmm-common
 
+nodist_libserial_la_SOURCES = \
+	mm-serial-enums-types.h \
+	mm-serial-enums-types.c
+
 libserial_la_SOURCES = \
 	mm-port.c \
 	mm-port.h \
@@ -66,9 +70,7 @@ libserial_la_SOURCES = \
 	mm-at-serial-port.c \
 	mm-at-serial-port.h \
 	mm-qcdm-serial-port.c \
-	mm-qcdm-serial-port.h \
-	mm-serial-enums-types.h \
-	mm-serial-enums-types.c
+	mm-qcdm-serial-port.h
 
 # Daemon specific enum types
 DAEMON_ENUMS = mm-bearer.h
@@ -122,14 +124,16 @@ if WITH_POLKIT
 ModemManager_LDADD += $(POLKIT_LIBS)
 endif
 
-ModemManager_SOURCES = \
-	main.c \
+nodist_ModemManager_SOURCES = \
 	mm-marshal.h \
 	mm-marshal.c \
+	mm-daemon-enums-types.h \
+	mm-daemon-enums-types.c
+
+ModemManager_SOURCES = \
+	main.c \
 	mm-log.c \
 	mm-log.h \
-	mm-daemon-enums-types.h \
-	mm-daemon-enums-types.c \
 	mm-private-boxed-types.h \
 	mm-private-boxed-types.c \
 	mm-auth.h \
@@ -186,6 +190,10 @@ ModemManager_SOURCES = \
 	mm-plugin.h \
 	mm-plugin-base.c \
 	mm-plugin-base.h
+
+# Additional dependency rules
+mm-bearer.c: mm-daemon-enums-types.h
+mm-sms-list.c: mm-marshal.h
 
 if WITH_POLKIT
 ModemManager_SOURCES += \
