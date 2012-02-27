@@ -108,6 +108,25 @@
            send_interface="org.freedesktop.ModemManager1.Modem.ModemCdma"
            send_member="ActivateManual"/>
 
+    <!-- org.freedesktop.ModemManager1.Sim.xml -->
+
+    <!-- Protected by the Device.Control policy rule -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Sim"
+           send_member="SendPin"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Sim"
+           send_member="SendPuk"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Sim"
+           send_member="EnablePin"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Sim"
+           send_member="ChangePin"/>
+
   </policy>
 
   <policy user="root">
