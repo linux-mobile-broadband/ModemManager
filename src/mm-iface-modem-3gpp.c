@@ -69,37 +69,6 @@ mm_iface_modem_3gpp_bind_simple_status (MMIfaceModem3gpp *self,
 
 /*****************************************************************************/
 
-typedef struct {
-    MmGdbusModem3gpp *skeleton;
-    GDBusMethodInvocation *invocation;
-    MMIfaceModem3gpp *self;
-} DbusCallContext;
-
-static void
-dbus_call_context_free (DbusCallContext *ctx)
-{
-    g_object_unref (ctx->skeleton);
-    g_object_unref (ctx->invocation);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
-
-static DbusCallContext *
-dbus_call_context_new (MmGdbusModem3gpp *skeleton,
-                       GDBusMethodInvocation *invocation,
-                       MMIfaceModem3gpp *self)
-{
-    DbusCallContext *ctx;
-
-    ctx = g_new (DbusCallContext, 1);
-    ctx->skeleton = g_object_ref (skeleton);
-    ctx->invocation = g_object_ref (invocation);
-    ctx->self = g_object_ref (self);
-    return ctx;
-}
-
-/*****************************************************************************/
-
 gboolean
 mm_iface_modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
                                                 GAsyncResult *res,
@@ -144,31 +113,51 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
         result);
 }
 
+typedef struct {
+    MmGdbusModem3gpp *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModem3gpp *self;
+    gchar *operator_id;
+} HandleRegisterContext;
+
+static void
+handle_register_context_free (HandleRegisterContext *ctx)
+{
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_free (ctx->operator_id);
+    g_free (ctx);
+}
+
 static void
 handle_register_ready (MMIfaceModem3gpp *self,
                        GAsyncResult *res,
-                       DbusCallContext *ctx)
+                       HandleRegisterContext *ctx)
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network_finish (self,
-                                                                               res,
-                                                                               &error))
-        g_dbus_method_invocation_take_error (ctx->invocation,
-                                             error);
+    if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network_finish (self, res,&error))
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
-        mm_gdbus_modem3gpp_complete_register (ctx->skeleton,
-                                               ctx->invocation);
-    dbus_call_context_free (ctx);
+        mm_gdbus_modem3gpp_complete_register (ctx->skeleton, ctx->invocation);
+
+    handle_register_context_free (ctx);
 }
 
-static gboolean
-handle_register (MmGdbusModem3gpp *skeleton,
-                 GDBusMethodInvocation *invocation,
-                 const gchar *operator_id,
-                 MMIfaceModem3gpp *self)
+static void
+handle_register_auth_ready (MMBaseModem *self,
+                            GAsyncResult *res,
+                            HandleRegisterContext *ctx)
 {
     MMModemState modem_state;
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_register_context_free (ctx);
+        return;
+    }
 
     g_assert (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network != NULL);
     g_assert (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network_finish != NULL);
@@ -185,7 +174,7 @@ handle_register (MmGdbusModem3gpp *skeleton,
         break;
 
     case MM_MODEM_STATE_LOCKED:
-        g_dbus_method_invocation_return_error (invocation,
+        g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
                                                "Cannot register modem: device locked");
@@ -194,17 +183,15 @@ handle_register (MmGdbusModem3gpp *skeleton,
     case MM_MODEM_STATE_ENABLED:
     case MM_MODEM_STATE_SEARCHING:
     case MM_MODEM_STATE_REGISTERED:
-        mm_iface_modem_3gpp_register_in_network (self,
-                                                 operator_id,
+        mm_iface_modem_3gpp_register_in_network (MM_IFACE_MODEM_3GPP (self),
+                                                 ctx->operator_id,
                                                  60,
                                                  (GAsyncReadyCallback)handle_register_ready,
-                                                 dbus_call_context_new (skeleton,
-                                                                        invocation,
-                                                                        self));
-        break;
+                                                 ctx);
+        return;
 
     case MM_MODEM_STATE_DISABLING:
-        g_dbus_method_invocation_return_error (invocation,
+        g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
                                                "Cannot register modem: "
@@ -213,7 +200,7 @@ handle_register (MmGdbusModem3gpp *skeleton,
 
     case MM_MODEM_STATE_ENABLING:
     case MM_MODEM_STATE_DISABLED:
-        g_dbus_method_invocation_return_error (invocation,
+        g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
                                                "Cannot register modem: "
@@ -223,7 +210,7 @@ handle_register (MmGdbusModem3gpp *skeleton,
     case MM_MODEM_STATE_DISCONNECTING:
     case MM_MODEM_STATE_CONNECTING:
     case MM_MODEM_STATE_CONNECTED:
-        g_dbus_method_invocation_return_error (invocation,
+        g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
                                                "Cannot register modem: "
@@ -231,10 +218,48 @@ handle_register (MmGdbusModem3gpp *skeleton,
         break;
     }
 
+    handle_register_context_free (ctx);
+}
+
+static gboolean
+handle_register (MmGdbusModem3gpp *skeleton,
+                 GDBusMethodInvocation *invocation,
+                 const gchar *operator_id,
+                 MMIfaceModem3gpp *self)
+{
+    HandleRegisterContext *ctx;
+
+    ctx = g_new (HandleRegisterContext, 1);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+    ctx->operator_id = g_strdup (operator_id);
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)handle_register_auth_ready,
+                             ctx);
+
     return TRUE;
 }
 
 /*****************************************************************************/
+
+typedef struct {
+    MmGdbusModem3gpp *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModem3gpp *self;
+} HandleScanContext;
+
+static void
+handle_scan_context_free (HandleScanContext *ctx)
+{
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
 
 static GVariant *
 scan_networks_build_result (GList *info_list)
@@ -273,19 +298,16 @@ scan_networks_build_result (GList *info_list)
 }
 
 static void
-scan_networks_ready (MMIfaceModem3gpp *self,
-                     GAsyncResult *res,
-                     DbusCallContext *ctx)
+handle_scan_ready (MMIfaceModem3gpp *self,
+                   GAsyncResult *res,
+                   HandleScanContext *ctx)
 {
     GError *error = NULL;
     GList *info_list;
 
-    info_list = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->scan_networks_finish (self,
-                                                                                res,
-                                                                                &error);
+    info_list = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->scan_networks_finish (self, res, &error);
     if (error)
-        g_dbus_method_invocation_take_error (ctx->invocation,
-                                             error);
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         GVariant *dict_array;
 
@@ -297,25 +319,32 @@ scan_networks_ready (MMIfaceModem3gpp *self,
     }
 
     mm_3gpp_network_info_list_free (info_list);
-    dbus_call_context_free (ctx);
+    handle_scan_context_free (ctx);
 }
 
-static gboolean
-handle_scan (MmGdbusModem3gpp *skeleton,
-             GDBusMethodInvocation *invocation,
-             MMIfaceModem3gpp *self)
+static void
+handle_scan_auth_ready (MMBaseModem *self,
+                        GAsyncResult *res,
+                        HandleScanContext *ctx)
 {
-
     MMModemState modem_state;
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_scan_context_free (ctx);
+        return;
+    }
 
     /* If scanning is not implemented, report an error */
     if (!MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->scan_networks ||
         !MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->scan_networks_finish) {
-        g_dbus_method_invocation_return_error (invocation,
+        g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_UNSUPPORTED,
                                                "Cannot scan networks: operation not supported");
-        return TRUE;
+        handle_scan_context_free (ctx);
+        return;
     }
 
     modem_state = MM_MODEM_STATE_UNKNOWN;
@@ -330,7 +359,7 @@ handle_scan (MmGdbusModem3gpp *skeleton,
         break;
 
     case MM_MODEM_STATE_LOCKED:
-        g_dbus_method_invocation_return_error (invocation,
+        g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
                                                "Cannot scan networks: device locked");
@@ -339,7 +368,7 @@ handle_scan (MmGdbusModem3gpp *skeleton,
     case MM_MODEM_STATE_DISABLED:
     case MM_MODEM_STATE_DISABLING:
     case MM_MODEM_STATE_ENABLING:
-        g_dbus_method_invocation_return_error (invocation,
+        g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
                                                "Cannot scan networks: not enabled yet");
@@ -352,14 +381,32 @@ handle_scan (MmGdbusModem3gpp *skeleton,
     case MM_MODEM_STATE_CONNECTING:
     case MM_MODEM_STATE_CONNECTED:
         MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->scan_networks (
-            self,
-            (GAsyncReadyCallback)scan_networks_ready,
-            dbus_call_context_new (skeleton,
-                                   invocation,
-                                   self));
-        break;
+            MM_IFACE_MODEM_3GPP (self),
+            (GAsyncReadyCallback)handle_scan_ready,
+            ctx);
+        return;
     }
 
+    handle_scan_context_free (ctx);
+}
+
+static gboolean
+handle_scan (MmGdbusModem3gpp *skeleton,
+             GDBusMethodInvocation *invocation,
+             MMIfaceModem3gpp *self)
+{
+    HandleScanContext *ctx;
+
+    ctx = g_new (HandleScanContext, 1);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)handle_scan_auth_ready,
+                             ctx);
     return TRUE;
 }
 
