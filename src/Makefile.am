@@ -7,9 +7,6 @@ udevrules_DATA = \
 	77-mm-platform-serial-whitelist.rules \
 	80-mm-candidate.rules
 
-EXTRA_DIST = \
-	$(udevrules_DATA)
-
 noinst_LTLIBRARIES = libmodem-helpers.la libserial.la
 
 libmodem_helpers_la_CPPFLAGS = \
@@ -89,6 +86,15 @@ mm-daemon-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-template.c
 		--template $(top_srcdir)/build-aux/mm-enums-template.c \
 		$(DAEMON_ENUMS) > $@
 
+# Marshallers
+
+mm-marshal.h: mm-marshal.list
+	$(AM_V_GEN) $(GLIB_GENMARSHAL) $< --prefix=mm_marshal --header > $@
+
+mm-marshal.c: mm-marshal.list mm-marshal.h
+	$(AM_V_GEN) echo "#include \"mm-marshal.h\"" > $@ && \
+		$(GLIB_GENMARSHAL) $< --prefix=mm_marshal --body >> $@
+
 sbin_PROGRAMS = modem-manager
 
 modem_manager_CPPFLAGS = \
@@ -99,7 +105,6 @@ modem_manager_CPPFLAGS = \
 	-I$(top_builddir)/include \
 	-I$(top_srcdir)/libmm-common \
 	-I$(top_builddir)/libmm-common \
-	-I${top_builddir}/marshallers \
 	-DPLUGINDIR=\"$(pkglibdir)\"
 
 if WITH_POLKIT
@@ -109,7 +114,6 @@ endif
 modem_manager_LDADD = \
 	$(MM_LIBS) \
 	$(GUDEV_LIBS) \
-	$(top_builddir)/marshallers/libmarshallers.la \
 	$(builddir)/libmodem-helpers.la \
 	$(builddir)/libserial.la \
 	$(top_builddir)/libqcdm/src/libqcdm.la
@@ -120,6 +124,8 @@ endif
 
 modem_manager_SOURCES = \
 	main.c \
+	mm-marshal.h \
+	mm-marshal.c \
 	mm-log.c \
 	mm-log.h \
 	mm-daemon-enums-types.h \
@@ -187,6 +193,14 @@ modem_manager_SOURCES += \
 	mm-auth-provider-polkit.h
 endif
 
+EXTRA_DIST = \
+	$(udevrules_DATA) \
+	mm-marshal.list
+
 CLEANFILES = \
-	mm-private-enums-types.h \
-	mm-private-enums-types.c
+	mm-marshal.h \
+	mm-marshal.c \
+	mm-daemon-enums-types.h \
+	mm-daemon-enums-types.c \
+	mm-serial-enums-types.h \
+	mm-serial-enums-types.c
