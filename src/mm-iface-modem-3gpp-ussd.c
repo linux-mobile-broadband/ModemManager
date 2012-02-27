@@ -47,10 +47,10 @@ typedef struct {
     MmGdbusModem3gppUssd *skeleton;
     GDBusMethodInvocation *invocation;
     MMIfaceModem3gppUssd *self;
-} DbusCallContext;
+} HandleCancelContext;
 
 static void
-dbus_call_context_free (DbusCallContext *ctx)
+handle_cancel_context_free (HandleCancelContext *ctx)
 {
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
@@ -58,92 +58,120 @@ dbus_call_context_free (DbusCallContext *ctx)
     g_free (ctx);
 }
 
-static DbusCallContext *
-dbus_call_context_new (MmGdbusModem3gppUssd *skeleton,
-                       GDBusMethodInvocation *invocation,
-                       MMIfaceModem3gppUssd *self)
-{
-    DbusCallContext *ctx;
-
-    ctx = g_new (DbusCallContext, 1);
-    ctx->skeleton = g_object_ref (skeleton);
-    ctx->invocation = g_object_ref (invocation);
-    ctx->self = g_object_ref (self);
-    return ctx;
-}
-
-/*****************************************************************************/
-
 static void
-cancel_ready (MMIfaceModem3gppUssd *self,
-              GAsyncResult *res,
-              DbusCallContext *ctx)
+handle_cancel_ready (MMIfaceModem3gppUssd *self,
+                     GAsyncResult *res,
+                     HandleCancelContext *ctx)
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cancel_finish (self,
-                                                                       res,
-                                                                       &error))
-        g_dbus_method_invocation_take_error (ctx->invocation,
-                                             error);
+    if (!MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cancel_finish (self, res, &error))
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
-        mm_gdbus_modem3gpp_ussd_complete_cancel (ctx->skeleton,
-                                                 ctx->invocation);
-    dbus_call_context_free (ctx);
+        mm_gdbus_modem3gpp_ussd_complete_cancel (ctx->skeleton, ctx->invocation);
+
+    handle_cancel_context_free (ctx);
+}
+
+static void
+handle_cancel_auth_ready (MMBaseModem *self,
+                          GAsyncResult *res,
+                          HandleCancelContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_cancel_context_free (ctx);
+        return;
+    }
+
+    g_assert (MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cancel != NULL);
+    g_assert (MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cancel_finish != NULL);
+
+    MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cancel (
+        MM_IFACE_MODEM_3GPP_USSD (self),
+        (GAsyncReadyCallback)handle_cancel_ready,
+        ctx);
 }
 
 static gboolean
 handle_cancel (MmGdbusModem3gppUssd *skeleton,
                GDBusMethodInvocation *invocation,
-               const gchar *command,
                MMIfaceModem3gppUssd *self)
 {
-    g_assert (MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cancel != NULL);
-    g_assert (MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cancel_finish != NULL);
+    HandleCancelContext *ctx;
 
-    MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->cancel (
-        self,
-        (GAsyncReadyCallback)cancel_ready,
-        dbus_call_context_new (skeleton,
-                               invocation,
-                               self));
+    ctx = g_new (HandleCancelContext, 1);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_USSD,
+                             (GAsyncReadyCallback)handle_cancel_auth_ready,
+                             ctx);
     return TRUE;
 }
 
+/*****************************************************************************/
+
+typedef struct {
+    MmGdbusModem3gppUssd *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModem3gppUssd *self;
+    gchar *command;
+} HandleRespondContext;
+
 static void
-respond_send_ready (MMIfaceModem3gppUssd *self,
-                    GAsyncResult *res,
-                    DbusCallContext *ctx)
+handle_respond_context_free (HandleRespondContext *ctx)
+{
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_free (ctx->command);
+    g_free (ctx);
+}
+
+static void
+handle_respond_ready (MMIfaceModem3gppUssd *self,
+                      GAsyncResult *res,
+                      HandleRespondContext *ctx)
 {
     GError *error = NULL;
     const gchar *reply;
 
-    reply = MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send_finish (self,
-                                                                        res,
-                                                                        &error);
+    reply = MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send_finish (self, res,&error);
     if (!reply)
-        g_dbus_method_invocation_take_error (ctx->invocation,
-                                             error);
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem3gpp_ussd_complete_respond (ctx->skeleton,
                                                   ctx->invocation,
                                                   reply);
-    dbus_call_context_free (ctx);
+    handle_respond_context_free (ctx);
 }
 
-static gboolean
-handle_respond (MmGdbusModem3gppUssd *skeleton,
-                GDBusMethodInvocation *invocation,
-                const gchar *command,
-                MMIfaceModem3gppUssd *self)
+static void
+handle_respond_auth_ready (MMBaseModem *self,
+                           GAsyncResult *res,
+                           HandleRespondContext *ctx)
 {
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_respond_context_free (ctx);
+        return;
+    }
+
     g_assert (MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send != NULL);
     g_assert (MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send_finish != NULL);
 
-    switch (mm_gdbus_modem3gpp_ussd_get_state (skeleton)) {
+    switch (mm_gdbus_modem3gpp_ussd_get_state (ctx->skeleton)) {
     case MM_MODEM_3GPP_USSD_SESSION_STATE_ACTIVE:
     case MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE:
-        g_dbus_method_invocation_return_error (invocation,
+        g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
                                                "Cannot respond USSD: "
@@ -152,13 +180,11 @@ handle_respond (MmGdbusModem3gppUssd *skeleton,
 
     case MM_MODEM_3GPP_USSD_SESSION_STATE_USER_RESPONSE:
         MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send (
-            self,
-            command,
-            (GAsyncReadyCallback)respond_send_ready,
-            dbus_call_context_new (skeleton,
-                                   invocation,
-                                   self));
-        break;
+            MM_IFACE_MODEM_3GPP_USSD (self),
+            ctx->command,
+            (GAsyncReadyCallback)handle_respond_ready,
+            ctx);
+        return;
 
     case MM_MODEM_3GPP_USSD_SESSION_STATE_UNKNOWN:
     default:
@@ -167,45 +193,88 @@ handle_respond (MmGdbusModem3gppUssd *skeleton,
         break;
     }
 
+    handle_respond_context_free (ctx);
+}
+
+static gboolean
+handle_respond (MmGdbusModem3gppUssd *skeleton,
+                GDBusMethodInvocation *invocation,
+                const gchar *command,
+                MMIfaceModem3gppUssd *self)
+{
+    HandleRespondContext *ctx;
+
+    ctx = g_new (HandleRespondContext, 1);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+    ctx->command = g_strdup (command);
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_USSD,
+                             (GAsyncReadyCallback)handle_respond_auth_ready,
+                             ctx);
     return TRUE;
 }
 
 /*****************************************************************************/
 
+typedef struct {
+    MmGdbusModem3gppUssd *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModem3gppUssd *self;
+    gchar *command;
+} HandleInitiateContext;
+
 static void
-initiate_send_ready (MMIfaceModem3gppUssd *self,
-                     GAsyncResult *res,
-                     DbusCallContext *ctx)
+handle_initiate_context_free (HandleInitiateContext *ctx)
+{
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_free (ctx->command);
+    g_free (ctx);
+}
+
+static void
+handle_initiate_ready (MMIfaceModem3gppUssd *self,
+                       GAsyncResult *res,
+                       HandleInitiateContext *ctx)
 {
     GError *error = NULL;
     const gchar *reply;
 
-    reply = MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send_finish (self,
-                                                                        res,
-                                                                        &error);
+    reply = MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send_finish (self, res, &error);
     if (!reply)
-        g_dbus_method_invocation_take_error (ctx->invocation,
-                                             error);
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_modem3gpp_ussd_complete_initiate (ctx->skeleton,
                                                    ctx->invocation,
                                                    reply);
-    dbus_call_context_free (ctx);
+    handle_initiate_context_free (ctx);
 }
 
-static gboolean
-handle_initiate (MmGdbusModem3gppUssd *skeleton,
-                 GDBusMethodInvocation *invocation,
-                 const gchar *command,
-                 MMIfaceModem3gppUssd *self)
+static void
+handle_initiate_auth_ready (MMBaseModem *self,
+                            GAsyncResult *res,
+                            HandleInitiateContext *ctx)
 {
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_initiate_context_free (ctx);
+        return;
+    }
+
     g_assert (MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send != NULL);
     g_assert (MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send_finish != NULL);
 
-    switch (mm_gdbus_modem3gpp_ussd_get_state (skeleton)) {
+    switch (mm_gdbus_modem3gpp_ussd_get_state (ctx->skeleton)) {
     case MM_MODEM_3GPP_USSD_SESSION_STATE_ACTIVE:
     case MM_MODEM_3GPP_USSD_SESSION_STATE_USER_RESPONSE:
-        g_dbus_method_invocation_return_error (invocation,
+        g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
                                                "Cannot initiate USSD: "
@@ -214,13 +283,11 @@ handle_initiate (MmGdbusModem3gppUssd *skeleton,
 
     case MM_MODEM_3GPP_USSD_SESSION_STATE_IDLE:
         MM_IFACE_MODEM_3GPP_USSD_GET_INTERFACE (self)->send (
-            self,
-            command,
-            (GAsyncReadyCallback)initiate_send_ready,
-            dbus_call_context_new (skeleton,
-                                   invocation,
-                                   self));
-        break;
+            MM_IFACE_MODEM_3GPP_USSD (self),
+            ctx->command,
+            (GAsyncReadyCallback)handle_initiate_ready,
+            ctx);
+        return;
 
     case MM_MODEM_3GPP_USSD_SESSION_STATE_UNKNOWN:
     default:
@@ -229,6 +296,28 @@ handle_initiate (MmGdbusModem3gppUssd *skeleton,
         break;
     }
 
+    handle_initiate_context_free (ctx);
+}
+
+static gboolean
+handle_initiate (MmGdbusModem3gppUssd *skeleton,
+                 GDBusMethodInvocation *invocation,
+                 const gchar *command,
+                 MMIfaceModem3gppUssd *self)
+{
+    HandleInitiateContext *ctx;
+
+    ctx = g_new (HandleInitiateContext, 1);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+    ctx->command = g_strdup (command);
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_USSD,
+                             (GAsyncReadyCallback)handle_initiate_auth_ready,
+                             ctx);
     return TRUE;
 }
 
