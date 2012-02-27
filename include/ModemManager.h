@@ -1,6 +1,6 @@
 /*
  * ModemManager Interface Specification
- * version 0.5
+ * version 0.6
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,155 +18,21 @@
  * Boston, MA 02110-1301 USA.
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 - 2011 Red Hat, Inc.
+ * Copyright (C) 2009 - 2012 Red Hat, Inc.
+ * Copyright (C) 2011 - 2012 Google, Inc.
  */
 
 #ifndef _MODEM_MANAGER_H_
 #define _MODEM_MANAGER_H_
 
-/* Temporarily include the new header in order to resolve conflicts */
-#include "ModemManager1.h"
+/* Public header with DBus Interface, Method, Signal and Property names */
+#include <ModemManager-names.h>
 
-/* MM_MODEM_TYPE enum values */
+/* Public header with enumerations and flags */
+#include <ModemManager-enums.h>
 
-typedef enum {
-    MM_MODEM_TYPE_UNKNOWN = 0,
-    MM_MODEM_TYPE_GSM = 1,
-    MM_MODEM_TYPE_CDMA = 2,
-} MMModemType;
+/* Public header with errors */
+#include <ModemManager-errors.h>
 
-/* MM_MODEM_IP_METHOD enum values */
-
-typedef enum {
-    MM_MODEM_IP_METHOD_PPP = 0,
-    MM_MODEM_IP_METHOD_STATIC = 1,
-    MM_MODEM_IP_METHOD_DHCP = 2,
-} MMModemIpMethod;
-
-/* MM_MODEM_STATE_REASON enum values */
-
-typedef enum {
-    MM_MODEM_STATE_REASON_NONE = 0,
-    MM_MODEM_STATE_REASON_USER_REQUESTED = 1,
-    MM_MODEM_STATE_REASON_SUSPEND = 2,
-} MMModemStateReason;
-
-/* MM_MODEM_LOCATION_CAPABILITIES flag values */
-
-typedef enum {
-    MM_MODEM_LOCATION_CAPABILITY_UNKNOWN = 0x0,
-    MM_MODEM_LOCATION_CAPABILITY_GPS_NMEA = 0x1,
-    MM_MODEM_LOCATION_CAPABILITY_GSM_LAC_CI = 0x2,
-    MM_MODEM_LOCATION_CAPABILITY_GPS_RAW = 0x4,
-} MMModemLocationCapabilities;
-
-
-/* MM_MODEM_GSM_ALLOWED_MODE enum values */
-
-typedef enum {
-    MM_MODEM_GSM_ALLOWED_MODE_ANY = 0,
-    MM_MODEM_GSM_ALLOWED_MODE_2G_PREFERRED = 1,
-    MM_MODEM_GSM_ALLOWED_MODE_3G_PREFERRED = 2,
-    MM_MODEM_GSM_ALLOWED_MODE_2G_ONLY = 3,
-    MM_MODEM_GSM_ALLOWED_MODE_3G_ONLY = 4,
-} MMModemGsmAllowedMode;
-
-/* MM_MODEM_GSM_ACCESS_TECH enum values */
-
-typedef enum {
-    MM_MODEM_GSM_ACCESS_TECH_UNKNOWN = 0,
-    MM_MODEM_GSM_ACCESS_TECH_GSM = 1,
-    MM_MODEM_GSM_ACCESS_TECH_GSM_COMPACT = 2,
-    MM_MODEM_GSM_ACCESS_TECH_GPRS = 3,
-    MM_MODEM_GSM_ACCESS_TECH_EDGE = 4,
-    MM_MODEM_GSM_ACCESS_TECH_UMTS = 5,
-    MM_MODEM_GSM_ACCESS_TECH_HSDPA = 6,
-    MM_MODEM_GSM_ACCESS_TECH_HSUPA = 7,
-    MM_MODEM_GSM_ACCESS_TECH_HSPA = 8,
-    MM_MODEM_GSM_ACCESS_TECH_HSPA_PLUS = 9,
-    MM_MODEM_GSM_ACCESS_TECH_LTE = 10,
-} MMModemGsmAccessTech;
-
-/* MM_MODEM_GSM_MODE flag values */
-
-typedef enum {
-    MM_MODEM_GSM_MODE_UNKNOWN = 0x0,
-    MM_MODEM_GSM_MODE_ANY = 0x1,
-    MM_MODEM_GSM_MODE_GPRS = 0x2,
-    MM_MODEM_GSM_MODE_EDGE = 0x4,
-    MM_MODEM_GSM_MODE_UMTS = 0x8,
-    MM_MODEM_GSM_MODE_HSDPA = 0x10,
-    MM_MODEM_GSM_MODE_2G_PREFERRED = 0x20,
-    MM_MODEM_GSM_MODE_3G_PREFERRED = 0x40,
-    MM_MODEM_GSM_MODE_2G_ONLY = 0x80,
-    MM_MODEM_GSM_MODE_3G_ONLY = 0x100,
-    MM_MODEM_GSM_MODE_HSUPA = 0x200,
-    MM_MODEM_GSM_MODE_HSPA = 0x400,
-    MM_MODEM_GSM_MODE_GSM = 0x800,
-    MM_MODEM_GSM_MODE_GSM_COMPACT = 0x1000,
-} MMModemGsmMode;
-
-/* MM_MODEM_GSM_BAND flag values */
-
-typedef enum {
-    MM_MODEM_GSM_BAND_UNKNOWN = 0x0,
-    MM_MODEM_GSM_BAND_ANY = 0x1,
-    MM_MODEM_GSM_BAND_EGSM = 0x2,
-    MM_MODEM_GSM_BAND_DCS = 0x4,
-    MM_MODEM_GSM_BAND_PCS = 0x8,
-    MM_MODEM_GSM_BAND_G850 = 0x10,
-    MM_MODEM_GSM_BAND_U2100 = 0x20,
-    MM_MODEM_GSM_BAND_U1800 = 0x40,
-    MM_MODEM_GSM_BAND_U17IV = 0x80,
-    MM_MODEM_GSM_BAND_U800 = 0x100,
-    MM_MODEM_GSM_BAND_U850 = 0x200,
-    MM_MODEM_GSM_BAND_U900 = 0x400,
-    MM_MODEM_GSM_BAND_U17IX = 0x800,
-    MM_MODEM_GSM_BAND_U1900 = 0x1000,
-    MM_MODEM_GSM_BAND_U2600 = 0x2000,
-} MMModemGsmBand;
-
-/* MM_MODEM_GSM_FACILITY flag values */
-
-typedef enum {
-    MM_MODEM_GSM_FACILITY_NONE = 0x0,
-    MM_MODEM_GSM_FACILITY_SIM = 0x1,
-    MM_MODEM_GSM_FACILITY_FIXED_DIALING = 0x2,
-    MM_MODEM_GSM_FACILITY_PH_SIM = 0x4,
-    MM_MODEM_GSM_FACILITY_PH_FSIM = 0x8,
-    MM_MODEM_GSM_FACILITY_NET_PERS = 0x10,
-    MM_MODEM_GSM_FACILITY_NET_SUB_PERS = 0x20,
-    MM_MODEM_GSM_FACILITY_PROVIDER_PERS = 0x40,
-    MM_MODEM_GSM_FACILITY_CORP_PERS = 0x80,
-} MMModemGsmFacility;
-
-/* MM_MODEM_GSM_NETWORK_REG_STATUS enum values */
-
-typedef enum {
-    MM_MODEM_GSM_NETWORK_REG_STATUS_IDLE = 0,
-    MM_MODEM_GSM_NETWORK_REG_STATUS_HOME = 1,
-    MM_MODEM_GSM_NETWORK_REG_STATUS_SEARCHING = 2,
-    MM_MODEM_GSM_NETWORK_REG_STATUS_DENIED = 3,
-    MM_MODEM_GSM_NETWORK_REG_STATUS_UNKNOWN = 4,
-    MM_MODEM_GSM_NETWORK_REG_STATUS_ROAMING = 5,
-} MMModemGsmNetworkRegStatus;
-
-/* MM_MODEM_GSM_NETWORK_DEPRECATED_MODE enum values */
-
-typedef enum {
-    MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_ANY = 0,
-    MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_GPRS = 1,
-    MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_EDGE = 2,
-    MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_UMTS = 3,
-    MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_HSDPA = 4,
-    MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_2G_PREFERRED = 5,
-    MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_3G_PREFERRED = 6,
-    MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_2G_ONLY = 7,
-    MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_3G_ONLY = 8,
-    MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_HSUPA = 9,
-    MM_MODEM_GSM_NETWORK_DEPRECATED_MODE_HSPA = 10,
-} MMModemGsmNetworkDeprecatedMode;
 
 #endif /*  _MODEM_MANAGER_H_ */
-
-

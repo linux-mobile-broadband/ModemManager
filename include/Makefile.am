@@ -8,7 +8,6 @@ include_HEADERS = \
 	ModemManager-names.h \
 	ModemManager-enums.h \
 	ModemManager-errors.h \
-	ModemManager1.h \
 	ModemManager.h
 
 ModemManager-names.h: $(XMLS) $(top_srcdir)/build-aux/header-generator.xsl
