@@ -27,12 +27,6 @@ dbusactivation_DATA = $(dbusactivation_in_files:.service.in=.service)
 	$(edit) $< >$@
 
 
-# DBus Introspection files
-XMLS = $(wildcard $(top_srcdir)/new/*.xml)
-xmldir = $(datadir)/dbus-1/interfaces
-xml_DATA = $(filter-out $(top_srcdir)/new/all.xml, $(XMLS))
-
-
 # Icon
 icondir=${datadir}/icons/hicolor/22x22/apps
 icon_DATA = modem-manager.png
@@ -57,4 +51,3 @@ EXTRA_DIST = \
 	$(dbusservice_file_nopolkit) \
 	$(icon_DATA) \
 	$(dist_polkit_policy_in_files)
-

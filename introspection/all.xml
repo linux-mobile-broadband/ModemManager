@@ -2,46 +2,17 @@
    xmlns:tp="http://telepathy.freedesktop.org/wiki/DbusSpec#extensions-v0"
    xmlns:xi="http://www.w3.org/2001/XInclude">
 
-  <tp:title>ModemManager Interface Specification</tp:title>
-  <tp:version>0.5</tp:version>
-  <tp:copyright>Copyright (C) 2008 Novell, Inc.</tp:copyright>
-  <tp:copyright>Copyright (C) 2008 - 2010 Red Hat, Inc.</tp:copyright>
-  <tp:copyright>Copyright (C) 2011 The Chromium OS Authors</tp:copyright>
+  <xi:include href="org.freedesktop.ModemManager1.xml"/>
+  <xi:include href="org.freedesktop.ModemManager1.Sim.xml"/>
+  <xi:include href="org.freedesktop.ModemManager1.Bearer.xml"/>
+  <xi:include href="org.freedesktop.ModemManager1.Sms.xml"/>
+  <xi:include href="org.freedesktop.ModemManager1.Modem.xml"/>
+  <xi:include href="org.freedesktop.ModemManager1.Modem.Modem3gpp.xml"/>
+  <xi:include href="org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml"/>
+  <xi:include href="org.freedesktop.ModemManager1.Modem.ModemCdma.xml"/>
+  <xi:include href="org.freedesktop.ModemManager1.Modem.Messaging.xml"/>
+  <xi:include href="org.freedesktop.ModemManager1.Modem.Location.xml"/>
+  <xi:include href="org.freedesktop.ModemManager1.Modem.Firmware.xml"/>
+  <xi:include href="org.freedesktop.ModemManager1.Modem.Contacts.xml"/>
 
-  <tp:license xmlns="http://www.w3.org/1999/xhtml">
-    <p>This program is free software; you can redistribute it and/or modify
-      it under the terms of the GNU General Public License as published by
-      the Free Software Foundation; either version 2 of the License, or
-      (at your option) any later version.</p>
-
-    <p>This program is distributed in the hope that it will be useful,
-      but WITHOUT ANY WARRANTY; without even the implied warranty of
-      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-      General Public License for more details.</p>
-
-    <p>You should have received a copy of the GNU Lesser General Public
-      License along with this library; if not, write to the Free Software
-      Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.</p>
-  </tp:license>
-
-  <xi:include href="org.freedesktop.ModemManager.xml"/>
-  <xi:include href="org.freedesktop.ModemManager.Modem.xml"/>
-  <xi:include href="org.freedesktop.ModemManager.Modem.Simple.xml"/>
-  <xi:include href="org.freedesktop.ModemManager.Modem.Cdma.xml"/>
-  <xi:include href="org.freedesktop.ModemManager.Modem.Gsm.xml"/>
-  <xi:include href="org.freedesktop.ModemManager.Modem.Gsm.Card.xml"/>
-  <xi:include href="org.freedesktop.ModemManager.Modem.Gsm.Contacts.xml"/>
-  <xi:include href="org.freedesktop.ModemManager.Modem.Gsm.Hso.xml"/>
-  <xi:include href="org.freedesktop.ModemManager.Modem.Gsm.Network.xml"/>
-  <xi:include href="org.freedesktop.ModemManager.Modem.Gsm.SMS.xml"/>
-  <xi:include href="org.freedesktop.ModemManager.Modem.Gsm.Ussd.xml"/>
-  <xi:include href="org.freedesktop.ModemManager.Modem.Firmware.xml"/>
-  <xi:include href="org.freedesktop.ModemManager.Modem.Location.xml"/>
-  <xi:include href="org.freedesktop.ModemManager.Modem.Time.xml"/>
-  <xi:include href="org.freedesktop.DBus.Properties.xml"/>
-
-  <xi:include href="mm-serial-error.xml"/>
-  <xi:include href="mm-modem-error.xml"/>
-  <xi:include href="mm-modem-connect-error.xml"/>
-  <xi:include href="mm-mobile-error.xml"/>
 </tp:spec>

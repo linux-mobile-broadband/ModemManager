@@ -68,7 +68,7 @@ mm_gdbus_manager_generated = \
 	mm-gdbus-manager.h \
 	mm-gdbus-manager.c \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.xml
-$(mm_gdbus_manager_generated): $(top_srcdir)/new/org.freedesktop.ModemManager1.xml
+$(mm_gdbus_manager_generated): $(top_srcdir)/introspection/org.freedesktop.ModemManager1.xml
 	$(AM_V_GEN) gdbus-codegen \
 		--interface-prefix org.freedesktop.ModemManager1. \
 		--c-namespace=MmGdbus \
@@ -82,7 +82,7 @@ mm_gdbus_sim_generated = \
 	mm-gdbus-sim.h \
 	mm-gdbus-sim.c \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Sim.xml
-$(mm_gdbus_sim_generated): $(top_srcdir)/new/org.freedesktop.ModemManager1.Sim.xml
+$(mm_gdbus_sim_generated): $(top_srcdir)/introspection/org.freedesktop.ModemManager1.Sim.xml
 	$(AM_V_GEN) gdbus-codegen \
 		--interface-prefix org.freedesktop.ModemManager1. \
 		--c-namespace=MmGdbus \
@@ -97,15 +97,15 @@ mm_gdbus_modem_generated = \
 	mm-gdbus-modem.c \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.xml
 mm_gdbus_modem_deps = \
-	$(top_srcdir)/new/org.freedesktop.ModemManager1.Modem.xml \
-	$(top_srcdir)/new/org.freedesktop.ModemManager1.Modem.Messaging.xml \
-	$(top_srcdir)/new/org.freedesktop.ModemManager1.Modem.Location.xml \
-	$(top_srcdir)/new/org.freedesktop.ModemManager1.Modem.Firmware.xml \
-	$(top_srcdir)/new/org.freedesktop.ModemManager1.Modem.Contacts.xml \
-	$(top_srcdir)/new/org.freedesktop.ModemManager1.Modem.ModemCdma.xml \
-	$(top_srcdir)/new/org.freedesktop.ModemManager1.Modem.Modem3gpp.xml \
-	$(top_srcdir)/new/org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml \
-	$(top_srcdir)/new/org.freedesktop.ModemManager1.Modem.Simple.xml
+	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.xml \
+	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Messaging.xml \
+	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Location.xml \
+	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Firmware.xml \
+	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Contacts.xml \
+	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.ModemCdma.xml \
+	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Modem3gpp.xml \
+	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml \
+	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Simple.xml
 $(mm_gdbus_modem_generated): $(mm_gdbus_modem_deps)
 	$(AM_V_GEN) gdbus-codegen \
 		--interface-prefix org.freedesktop.ModemManager1. \
@@ -124,7 +124,7 @@ mm_gdbus_sms_generated = \
 	mm-gdbus-sms.h \
 	mm-gdbus-sms.c \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Sms.xml
-$(mm_gdbus_sms_generated): $(top_srcdir)/new/org.freedesktop.ModemManager1.Sms.xml
+$(mm_gdbus_sms_generated): $(top_srcdir)/introspection/org.freedesktop.ModemManager1.Sms.xml
 	$(AM_V_GEN) gdbus-codegen \
 		--interface-prefix org.freedesktop.ModemManager1. \
 		--c-namespace=MmGdbus \
@@ -138,7 +138,7 @@ mm_gdbus_bearer_generated = \
 	mm-gdbus-bearer.h \
 	mm-gdbus-bearer.c \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Bearer.xml
-$(mm_gdbus_bearer_generated): $(top_srcdir)/new/org.freedesktop.ModemManager1.Bearer.xml
+$(mm_gdbus_bearer_generated): $(top_srcdir)/introspection/org.freedesktop.ModemManager1.Bearer.xml
 	$(AM_V_GEN) gdbus-codegen \
 		--interface-prefix org.freedesktop.ModemManager1. \
 		--c-namespace=MmGdbus \
