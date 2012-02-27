@@ -255,59 +255,77 @@ mm_bearer_connect (MMBearer *self,
         result);
 }
 
+typedef struct {
+    MMBearer *self;
+    MMBaseModem *modem;
+    GDBusMethodInvocation *invocation;
+} HandleConnectContext;
+
+static void
+handle_connect_context_free (HandleConnectContext *ctx)
+{
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
 static void
 handle_connect_ready (MMBearer *self,
                       GAsyncResult *res,
-                      GDBusMethodInvocation *invocation)
+                      HandleConnectContext *ctx)
 {
     GError *error = NULL;
 
     if (!mm_bearer_connect_finish (self, res, &error))
-        g_dbus_method_invocation_take_error (invocation, error);
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
-        mm_gdbus_bearer_complete_connect (MM_GDBUS_BEARER (self), invocation);
+        mm_gdbus_bearer_complete_connect (MM_GDBUS_BEARER (self), ctx->invocation);
 
-    g_object_unref (invocation);
+    handle_connect_context_free (ctx);
+}
+
+static void
+handle_connect_auth_ready (MMBaseModem *modem,
+                           GAsyncResult *res,
+                           HandleConnectContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_connect_context_free (ctx);
+        return;
+    }
+
+    mm_bearer_connect (ctx->self,
+                       (GAsyncReadyCallback)handle_connect_ready,
+                       ctx);
 }
 
 static gboolean
 handle_connect (MMBearer *self,
                 GDBusMethodInvocation *invocation)
 {
-    mm_bearer_connect (self,
-                       (GAsyncReadyCallback)handle_connect_ready,
-                       g_object_ref (invocation));
+    HandleConnectContext *ctx;
+
+    ctx = g_new0 (HandleConnectContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->invocation = g_object_ref (invocation);
+    g_object_get (self,
+                  MM_BEARER_MODEM, &ctx->modem,
+                  NULL);
+
+    mm_base_modem_authorize (ctx->modem,
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)handle_connect_auth_ready,
+                             ctx);
     return TRUE;
 }
 
 /*****************************************************************************/
 /* DISCONNECT */
-
-static void
-handle_disconnect_ready (MMBearer *self,
-                         GAsyncResult *res,
-                         GDBusMethodInvocation *invocation)
-{
-    GError *error = NULL;
-
-    if (!mm_bearer_disconnect_finish (self, res, &error))
-        g_dbus_method_invocation_take_error (invocation, error);
-    else
-        mm_gdbus_bearer_complete_disconnect (MM_GDBUS_BEARER (self), invocation);
-    g_object_unref (invocation);
-}
-
-static gboolean
-handle_disconnect (MMBearer *self,
-                   GDBusMethodInvocation *invocation)
-{
-    mm_bearer_disconnect (self,
-                          (GAsyncReadyCallback)handle_disconnect_ready,
-                          g_object_ref (invocation));
-    return TRUE;
-}
-
-/*****************************************************************************/
 
 gboolean
 mm_bearer_disconnect_finish (MMBearer *self,
@@ -436,6 +454,75 @@ mm_bearer_disconnect (MMBearer *self,
         self,
         (GAsyncReadyCallback)disconnect_ready,
         simple); /* takes ownership */
+}
+
+typedef struct {
+    MMBearer *self;
+    MMBaseModem *modem;
+    GDBusMethodInvocation *invocation;
+} HandleDisconnectContext;
+
+static void
+handle_disconnect_context_free (HandleDisconnectContext *ctx)
+{
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static void
+handle_disconnect_ready (MMBearer *self,
+                         GAsyncResult *res,
+                         HandleDisconnectContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_bearer_disconnect_finish (self, res, &error))
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else
+        mm_gdbus_bearer_complete_disconnect (MM_GDBUS_BEARER (self), ctx->invocation);
+
+    handle_disconnect_context_free (ctx);
+}
+
+static void
+handle_disconnect_auth_ready (MMBaseModem *modem,
+                              GAsyncResult *res,
+                              HandleDisconnectContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_disconnect_context_free (ctx);
+        return;
+    }
+
+    mm_bearer_disconnect (ctx->self,
+                          (GAsyncReadyCallback)handle_disconnect_ready,
+                          ctx);
+}
+
+static gboolean
+handle_disconnect (MMBearer *self,
+                   GDBusMethodInvocation *invocation)
+{
+    HandleDisconnectContext *ctx;
+
+    ctx = g_new0 (HandleDisconnectContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->invocation = g_object_ref (invocation);
+    g_object_get (self,
+                  MM_BEARER_MODEM, &ctx->modem,
+                  NULL);
+
+    mm_base_modem_authorize (ctx->modem,
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)handle_disconnect_auth_ready,
+                             ctx);
+    return TRUE;
 }
 
 /*****************************************************************************/
