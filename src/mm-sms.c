@@ -71,44 +71,31 @@ struct _MMSmsPrivate {
 };
 
 /*****************************************************************************/
+/* Store SMS (DBus call handling) */
 
 typedef struct {
     MMSms *self;
+    MMBaseModem *modem;
     GDBusMethodInvocation *invocation;
-} DbusCallContext;
+} HandleStoreContext;
 
 static void
-dbus_call_context_free (DbusCallContext *ctx)
+handle_store_context_free (HandleStoreContext *ctx)
 {
     g_object_unref (ctx->invocation);
+    g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_free (ctx);
 }
 
-static DbusCallContext *
-dbus_call_context_new (MMSms *self,
-                       GDBusMethodInvocation *invocation)
-{
-    DbusCallContext *ctx;
-
-    ctx = g_new0 (DbusCallContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->invocation = g_object_ref (invocation);
-    return ctx;
-}
-
-/*****************************************************************************/
-/* Store SMS (DBus call handling) */
-
 static void
 handle_store_ready (MMSms *self,
                     GAsyncResult *res,
-                    DbusCallContext *ctx)
+                    HandleStoreContext *ctx)
 {
     GError *error = NULL;
 
-    MM_SMS_GET_CLASS (self)->store_finish (self, res, &error);
-    if (error)
+    if (!MM_SMS_GET_CLASS (self)->store_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         MMSmsStorage storage = MM_SMS_STORAGE_UNKNOWN;
@@ -123,7 +110,8 @@ handle_store_ready (MMSms *self,
 
         mm_gdbus_sms_complete_store (MM_GDBUS_SMS (ctx->self), ctx->invocation);
     }
-    dbus_call_context_free (ctx);
+
+    handle_store_context_free (ctx);
 }
 
 static gboolean
@@ -139,75 +127,156 @@ sms_is_stored (MMSms *self)
     return TRUE;
 }
 
+static void
+handle_store_auth_ready (MMBaseModem *modem,
+                         GAsyncResult *res,
+                         HandleStoreContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_store_context_free (ctx);
+        return;
+    }
+
+    /* First of all, check if we already have the SMS stored. */
+    if (sms_is_stored (ctx->self)) {
+        mm_gdbus_sms_complete_store (MM_GDBUS_SMS (ctx->self), ctx->invocation);
+        handle_store_context_free (ctx);
+        return;
+    }
+
+    /* If not stored, check if we do support doing it */
+    if (!MM_SMS_GET_CLASS (ctx->self)->store ||
+        !MM_SMS_GET_CLASS (ctx->self)->store_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Storing SMS is not supported by this modem");
+        handle_store_context_free (ctx);
+        return;
+    }
+
+    MM_SMS_GET_CLASS (ctx->self)->store (ctx->self,
+                                         (GAsyncReadyCallback)handle_store_ready,
+                                         ctx);
+}
+
 static gboolean
 handle_store (MMSms *self,
               GDBusMethodInvocation *invocation)
 {
-    /* First of all, check if we already have the SMS stored. */
-    if (sms_is_stored (self))
-        mm_gdbus_sms_complete_store (MM_GDBUS_SMS (self), invocation);
-    /* If not stored, check if we do support doing it */
-    else if (MM_SMS_GET_CLASS (self)->store &&
-        MM_SMS_GET_CLASS (self)->store_finish)
-        MM_SMS_GET_CLASS (self)->store (self,
-                                        (GAsyncReadyCallback)handle_store_ready,
-                                        dbus_call_context_new (self,
-                                                               invocation));
-    else
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Storing SMS is not supported by this modem");
+    HandleStoreContext *ctx;
+
+    ctx = g_new0 (HandleStoreContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->invocation = g_object_ref (invocation);
+    g_object_get (self,
+                  MM_SMS_MODEM, &ctx->modem,
+                  NULL);
+
+    mm_base_modem_authorize (ctx->modem,
+                             invocation,
+                             MM_AUTHORIZATION_MESSAGING,
+                             (GAsyncReadyCallback)handle_store_auth_ready,
+                             ctx);
     return TRUE;
 }
 
 /*****************************************************************************/
 /* Send SMS (DBus call handling) */
 
+typedef struct {
+    MMSms *self;
+    MMBaseModem *modem;
+    GDBusMethodInvocation *invocation;
+} HandleSendContext;
+
+static void
+handle_send_context_free (HandleSendContext *ctx)
+{
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
 static void
 handle_send_ready (MMSms *self,
                    GAsyncResult *res,
-                   DbusCallContext *ctx)
+                   HandleSendContext *ctx)
 {
     GError *error = NULL;
 
-    MM_SMS_GET_CLASS (self)->send_finish (self, res, &error);
-    if (error)
+    if (!MM_SMS_GET_CLASS (self)->send_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_sms_complete_send (MM_GDBUS_SMS (ctx->self), ctx->invocation);
-    dbus_call_context_free (ctx);
+
+    handle_send_context_free (ctx);
+}
+
+static void
+handle_send_auth_ready (MMBaseModem *modem,
+                        GAsyncResult *res,
+                        HandleSendContext *ctx)
+{
+    MMSmsState state;
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_send_context_free (ctx);
+        return;
+    }
+
+    /* We can only send SMS created by the user */
+    state = mm_gdbus_sms_get_state (MM_GDBUS_SMS (ctx->self));
+    if (state == MM_SMS_STATE_RECEIVED ||
+        state == MM_SMS_STATE_RECEIVING) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_FAILED,
+                                               "This SMS was received, cannot send it");
+        handle_send_context_free (ctx);
+        return;
+    }
+
+    /* Check if we do support doing it */
+    if (!MM_SMS_GET_CLASS (ctx->self)->send ||
+        !MM_SMS_GET_CLASS (ctx->self)->send_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Sending SMS is not supported by this modem");
+        handle_send_context_free (ctx);
+        return;
+    }
+
+    MM_SMS_GET_CLASS (ctx->self)->send (ctx->self,
+                                        (GAsyncReadyCallback)handle_send_ready,
+                                        ctx);
 }
 
 static gboolean
 handle_send (MMSms *self,
              GDBusMethodInvocation *invocation)
 {
-    MMSmsState state = MM_SMS_STATE_UNKNOWN;
+    HandleSendContext *ctx;
 
+    ctx = g_new0 (HandleSendContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->invocation = g_object_ref (invocation);
     g_object_get (self,
-                  "state", &state,
+                  MM_SMS_MODEM, &ctx->modem,
                   NULL);
 
-    /* We can only send SMS created by the user */
-    if (state == MM_SMS_STATE_RECEIVED ||
-        state == MM_SMS_STATE_RECEIVING)
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_FAILED,
-                                               "This SMS was received, cannot send it");
-    /* Check if we do support doing it */
-    else if (MM_SMS_GET_CLASS (self)->send &&
-        MM_SMS_GET_CLASS (self)->send_finish)
-        MM_SMS_GET_CLASS (self)->send (self,
-                                       (GAsyncReadyCallback)handle_send_ready,
-                                       dbus_call_context_new (self,
-                                                              invocation));
-    else
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_UNSUPPORTED,
-                                               "Sending SMS is not supported by this modem");
+    mm_base_modem_authorize (ctx->modem,
+                             invocation,
+                             MM_AUTHORIZATION_MESSAGING,
+                             (GAsyncReadyCallback)handle_send_auth_ready,
+                             ctx);
     return TRUE;
 }
 
