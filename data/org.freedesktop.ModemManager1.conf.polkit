@@ -181,6 +181,17 @@
            send_interface="org.freedesktop.ModemManager1.Modem.Messaging"
            send_member="Delete"/>
 
+    <!-- org.freedesktop.ModemManager1.Sms.xml -->
+
+    <!-- Protected by the Messaging policy rule -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Sms"
+           send_member="Store"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Sms"
+           send_member="Send"/>
+
   </policy>
 
   <policy user="root">
