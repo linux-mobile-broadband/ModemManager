@@ -71,97 +71,118 @@ typedef struct {
     MmGdbusModemCdma *skeleton;
     GDBusMethodInvocation *invocation;
     MMIfaceModemCdma *self;
-} DbusCallContext;
+    gchar *carrier;
+} HandleActivateContext;
 
 static void
-dbus_call_context_free (DbusCallContext *ctx)
+handle_activate_context_free (HandleActivateContext *ctx)
 {
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
+    g_free (ctx->carrier);
     g_free (ctx);
-}
-
-static DbusCallContext *
-dbus_call_context_new (MmGdbusModemCdma *skeleton,
-                       GDBusMethodInvocation *invocation,
-                       MMIfaceModemCdma *self)
-{
-    DbusCallContext *ctx;
-
-    ctx = g_new (DbusCallContext, 1);
-    ctx->skeleton = g_object_ref (skeleton);
-    ctx->invocation = g_object_ref (invocation);
-    ctx->self = g_object_ref (self);
-    return ctx;
-}
-
-/*****************************************************************************/
-
-gboolean
-mm_iface_modem_cdma_activate_finish (MMIfaceModemCdma *self,
-                                     GAsyncResult *res,
-                                     GError **error)
-{
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
-}
-
-static void
-activate_ready (MMIfaceModemCdma *self,
-                GAsyncResult *res,
-                GSimpleAsyncResult *simple)
-{
-    GError *error = NULL;
-
-    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_finish (self,
-                                                                    res,
-                                                                    &error))
-        g_simple_async_result_take_error (simple, error);
-    else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
-}
-
-void
-mm_iface_modem_cdma_activate (MMIfaceModemCdma *self,
-                              const gchar *carrier,
-                              GAsyncReadyCallback callback,
-                              gpointer user_data)
-{
-    GSimpleAsyncResult *result;
-
-    g_assert (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate != NULL);
-    g_assert (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_finish != NULL);
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_iface_modem_cdma_activate);
-
-    MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate (
-        self,
-        carrier,
-        (GAsyncReadyCallback)activate_ready,
-        result);
 }
 
 static void
 handle_activate_ready (MMIfaceModemCdma *self,
                        GAsyncResult *res,
-                       DbusCallContext *ctx)
+                       HandleActivateContext *ctx)
 {
     GError *error = NULL;
 
-    if (!mm_iface_modem_cdma_activate_finish (self, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation,
-                                             error);
+    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_finish (self, res,&error))
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
-        mm_gdbus_modem_cdma_complete_activate (ctx->skeleton,
-                                               ctx->invocation);
+        mm_gdbus_modem_cdma_complete_activate (ctx->skeleton, ctx->invocation);
 
-    dbus_call_context_free (ctx);
+    handle_activate_context_free (ctx);
+}
+
+static void
+handle_activate_auth_ready (MMBaseModem *self,
+                            GAsyncResult *res,
+                            HandleActivateContext *ctx)
+{
+    MMModemState modem_state;
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_activate_context_free (ctx);
+        return;
+    }
+
+    /* If activating OTA is not implemented, report an error */
+    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate ||
+        !MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot perform OTA activation: "
+                                               "operation not supported");
+        handle_activate_context_free (ctx);
+        return;
+    }
+
+    modem_state = MM_MODEM_STATE_UNKNOWN;
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+
+    switch (modem_state) {
+    case MM_MODEM_STATE_UNKNOWN:
+        /* We should never have such request in UNKNOWN state */
+        g_assert_not_reached ();
+        break;
+
+    case MM_MODEM_STATE_LOCKED:
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot perform OTA activation: "
+                                               "device locked");
+        break;
+
+    case MM_MODEM_STATE_ENABLED:
+    case MM_MODEM_STATE_SEARCHING:
+    case MM_MODEM_STATE_REGISTERED:
+        MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate (
+            MM_IFACE_MODEM_CDMA (self),
+            ctx->carrier,
+            (GAsyncReadyCallback)handle_activate_ready,
+            ctx);
+        return;
+
+    case MM_MODEM_STATE_DISABLING:
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot perform OTA activation: "
+                                               "currently being disabled");
+        break;
+
+    case MM_MODEM_STATE_ENABLING:
+    case MM_MODEM_STATE_DISABLED:
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot perform OTA activation: "
+                                               "not enabled yet");
+        break;
+
+    case MM_MODEM_STATE_DISCONNECTING:
+    case MM_MODEM_STATE_CONNECTING:
+    case MM_MODEM_STATE_CONNECTED:
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot perform OTA activation: "
+                                               "modem is connected");
+        break;
+    }
+
+    handle_activate_context_free (ctx);
 }
 
 static gboolean
@@ -170,17 +191,81 @@ handle_activate (MmGdbusModemCdma *skeleton,
                  const gchar *carrier,
                  MMIfaceModemCdma *self)
 {
+    HandleActivateContext *ctx;
+
+    ctx = g_new (HandleActivateContext, 1);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+    ctx->carrier = g_strdup (carrier);
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)handle_activate_auth_ready,
+                             ctx);
+
+    return TRUE;
+}
+
+/*****************************************************************************/
+
+typedef struct {
+    MmGdbusModemCdma *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModemCdma *self;
+    GVariant *properties;
+} HandleActivateManualContext;
+
+static void
+handle_activate_manual_context_free (HandleActivateManualContext *ctx)
+{
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_variant_unref (ctx->properties);
+    g_free (ctx);
+}
+
+static void
+handle_activate_manual_ready (MMIfaceModemCdma *self,
+                              GAsyncResult *res,
+                              HandleActivateManualContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual_finish (self, res,&error))
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else
+        mm_gdbus_modem_cdma_complete_activate (ctx->skeleton, ctx->invocation);
+
+    handle_activate_manual_context_free (ctx);
+}
+
+static void
+handle_activate_manual_auth_ready (MMBaseModem *self,
+                                   GAsyncResult *res,
+                                   HandleActivateManualContext *ctx)
+{
     MMModemState modem_state;
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_activate_manual_context_free (ctx);
+        return;
+    }
 
     /* If activating OTA is not implemented, report an error */
     if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate ||
         !MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_finish) {
-        g_dbus_method_invocation_return_error (invocation,
+        g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_UNSUPPORTED,
-                                               "Cannot perform OTA activation: "
+                                               "Cannot perform manual activation: "
                                                "operation not supported");
-        return TRUE;
+        handle_activate_manual_context_free (ctx);
+        return;
     }
 
     modem_state = MM_MODEM_STATE_UNKNOWN;
@@ -195,121 +280,52 @@ handle_activate (MmGdbusModemCdma *skeleton,
         break;
 
     case MM_MODEM_STATE_LOCKED:
-        g_dbus_method_invocation_return_error (invocation,
+        g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot perform OTA activation: "
+                                               "Cannot perform manual activation: "
                                                "device locked");
         break;
-
 
     case MM_MODEM_STATE_ENABLED:
     case MM_MODEM_STATE_SEARCHING:
     case MM_MODEM_STATE_REGISTERED:
-        mm_iface_modem_cdma_activate (self,
-                                      carrier,
-                                      (GAsyncReadyCallback)handle_activate_ready,
-                                      dbus_call_context_new (skeleton,
-                                                             invocation,
-                                                             self));
+        MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual (
+            MM_IFACE_MODEM_CDMA (self),
+            ctx->properties,
+            (GAsyncReadyCallback)handle_activate_manual_ready,
+            ctx);
+        return;
 
     case MM_MODEM_STATE_DISABLING:
-        g_dbus_method_invocation_return_error (invocation,
+        g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot perform OTA activation: "
+                                               "Cannot perform manual activation: "
                                                "currently being disabled");
         break;
 
     case MM_MODEM_STATE_ENABLING:
     case MM_MODEM_STATE_DISABLED:
-        g_dbus_method_invocation_return_error (invocation,
+        g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot perform OTA activation: "
+                                               "Cannot perform manual activation: "
                                                "not enabled yet");
         break;
 
     case MM_MODEM_STATE_DISCONNECTING:
     case MM_MODEM_STATE_CONNECTING:
     case MM_MODEM_STATE_CONNECTED:
-        g_dbus_method_invocation_return_error (invocation,
+        g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot perform OTA activation: "
+                                               "Cannot perform manual activation: "
                                                "modem is connected");
         break;
     }
 
-    return TRUE;
-}
-
-/*****************************************************************************/
-
-gboolean
-mm_iface_modem_cdma_activate_manual_finish (MMIfaceModemCdma *self,
-                                            GAsyncResult *res,
-                                            GError **error)
-{
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
-}
-
-static void
-activate_manual_ready (MMIfaceModemCdma *self,
-                       GAsyncResult *res,
-                       GSimpleAsyncResult *simple)
-{
-    GError *error = NULL;
-
-    if (!MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual_finish (self,
-                                                                           res,
-                                                                           &error))
-        g_simple_async_result_take_error (simple, error);
-    else
-        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
-
-    g_simple_async_result_complete (simple);
-    g_object_unref (simple);
-}
-
-void
-mm_iface_modem_cdma_activate_manual (MMIfaceModemCdma *self,
-                                     GVariant *properties,
-                                     GAsyncReadyCallback callback,
-                                     gpointer user_data)
-{
-    GSimpleAsyncResult *result;
-
-    g_assert (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual != NULL);
-    g_assert (MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual_finish != NULL);
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        mm_iface_modem_cdma_activate_manual);
-
-    MM_IFACE_MODEM_CDMA_GET_INTERFACE (self)->activate_manual (
-        self,
-        properties,
-        (GAsyncReadyCallback)activate_manual_ready,
-        result);
-}
-
-static void
-handle_activate_manual_ready (MMIfaceModemCdma *self,
-                              GAsyncResult *res,
-                              DbusCallContext *ctx)
-{
-    GError *error = NULL;
-
-    if (!mm_iface_modem_cdma_activate_manual_finish (self, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation,
-                                             error);
-    else
-        mm_gdbus_modem_cdma_complete_activate_manual (ctx->skeleton,
-                                                      ctx->invocation);
-
-    dbus_call_context_free (ctx);
+    handle_activate_manual_context_free (ctx);
 }
 
 static gboolean
@@ -318,66 +334,19 @@ handle_activate_manual (MmGdbusModemCdma *skeleton,
                         GVariant *properties,
                         MMIfaceModemCdma *self)
 {
-    MMModemState modem_state;
+    HandleActivateManualContext *ctx;
 
-    modem_state = MM_MODEM_STATE_UNKNOWN;
-    g_object_get (self,
-                  MM_IFACE_MODEM_STATE, &modem_state,
-                  NULL);
+    ctx = g_new (HandleActivateManualContext, 1);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+    ctx->properties = g_variant_ref (properties);
 
-    switch (modem_state) {
-    case MM_MODEM_STATE_UNKNOWN:
-        /* We should never have such request in UNKNOWN state */
-        g_assert_not_reached ();
-        break;
-
-    case MM_MODEM_STATE_LOCKED:
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot perform manual activation: "
-                                               "device locked");
-        break;
-
-
-    case MM_MODEM_STATE_ENABLED:
-    case MM_MODEM_STATE_SEARCHING:
-    case MM_MODEM_STATE_REGISTERED:
-        mm_iface_modem_cdma_activate_manual (self,
-                                             properties,
-                                             (GAsyncReadyCallback)handle_activate_manual_ready,
-                                             dbus_call_context_new (skeleton,
-                                                                    invocation,
-                                                                    self));
-
-    case MM_MODEM_STATE_DISABLING:
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot perform manual activation: "
-                                               "currently being disabled");
-        break;
-
-    case MM_MODEM_STATE_ENABLING:
-    case MM_MODEM_STATE_DISABLED:
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot perform manual activation: "
-                                               "not enabled yet");
-        break;
-
-    case MM_MODEM_STATE_DISCONNECTING:
-    case MM_MODEM_STATE_CONNECTING:
-    case MM_MODEM_STATE_CONNECTED:
-        g_dbus_method_invocation_return_error (invocation,
-                                               MM_CORE_ERROR,
-                                               MM_CORE_ERROR_WRONG_STATE,
-                                               "Cannot perform manual activation: "
-                                               "modem is connected");
-        break;
-    }
-
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)handle_activate_manual_auth_ready,
+                             ctx);
     return TRUE;
 }
 

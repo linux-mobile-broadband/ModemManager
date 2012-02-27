@@ -185,24 +185,6 @@ gboolean mm_iface_modem_cdma_disable_finish (MMIfaceModemCdma *self,
 /* Shutdown CDMA interface */
 void mm_iface_modem_cdma_shutdown (MMIfaceModemCdma *self);
 
-/* Allow OTA activation */
-gboolean mm_iface_modem_cdma_activate_finish (MMIfaceModemCdma *self,
-                                              GAsyncResult *res,
-                                              GError **error);
-void     mm_iface_modem_cdma_activate        (MMIfaceModemCdma *self,
-                                              const gchar *carrier,
-                                              GAsyncReadyCallback callback,
-                                              gpointer user_data);
-
-/* Allow manual activation */
-gboolean mm_iface_modem_cdma_activate_manual_finish (MMIfaceModemCdma *self,
-                                                     GAsyncResult *res,
-                                                     GError **error);
-void     mm_iface_modem_cdma_activate_manual        (MMIfaceModemCdma *self,
-                                                     GVariant *properties,
-                                                     GAsyncReadyCallback callback,
-                                                     gpointer user_data);
-
 /* Objects implementing this interface can report new registration states. */
 void mm_iface_modem_cdma_update_cdma1x_registration_state (MMIfaceModemCdma *self,
                                                            MMModemCdmaRegistrationState state,
