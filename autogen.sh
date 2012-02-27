@@ -7,7 +7,7 @@ REQUIRED_AUTOMAKE_VERSION=1.9
 PKG_NAME=ModemManager
 
 (test -f $srcdir/configure.ac \
-  && test -f $srcdir/src/mm-modem.c) || {
+  && test -f $srcdir/src/main.c) || {
     echo -n "**Error**: Directory "\`$srcdir\'" does not look like the"
     echo " top-level $PKG_NAME directory"
     exit 1
@@ -21,3 +21,4 @@ PKG_NAME=ModemManager
         ./configure --enable-maintainer-mode $@
     fi
 )
+
