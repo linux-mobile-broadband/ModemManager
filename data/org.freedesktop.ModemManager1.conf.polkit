@@ -153,6 +153,18 @@
            send_interface="org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd"
            send_member="Cancel"/>
 
+    <!-- org.freedesktop.ModemManager1.Modem.Location.xml -->
+
+    <!-- Protected by the Device.Control policy rule -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Location"
+           send_member="Enable"/>
+
+    <!-- Protected by the Location policy rule -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Location"
+           send_member="GetLocation"/>
+
   </policy>
 
   <policy user="root">
