@@ -186,6 +186,7 @@ typedef struct {
     ConnectionStep step;
 
     /* Expected input properties */
+    GVariant *dictionary;
     MMCommonConnectProperties *properties;
 
     /* Results to set */
@@ -195,8 +196,10 @@ typedef struct {
 static void
 connection_context_free (ConnectionContext *ctx)
 {
+    g_variant_unref (ctx->dictionary);
+    if (ctx->properties)
+        g_object_unref (ctx->properties);
     g_object_unref (ctx->bearer);
-    g_object_unref (ctx->properties);
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
@@ -559,32 +562,50 @@ connection_step (ConnectionContext *ctx)
     g_assert_not_reached ();
 }
 
+static void
+connect_auth_ready (MMBaseModem *self,
+                    GAsyncResult *res,
+                    ConnectionContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        connection_context_free (ctx);
+        return;
+    }
+
+    ctx->properties = mm_common_connect_properties_new_from_dictionary (ctx->dictionary, &error);
+    if (!ctx->properties) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        connection_context_free (ctx);
+        return;
+    }
+
+    /* Start */
+    ctx->step = CONNECTION_STEP_FIRST;
+    connection_step (ctx);
+}
+
 static gboolean
 handle_connect (MmGdbusModemSimple *skeleton,
                 GDBusMethodInvocation *invocation,
                 GVariant *dictionary,
                 MMIfaceModemSimple *self)
 {
-    GError *error = NULL;
-    MMCommonConnectProperties *properties;
     ConnectionContext *ctx;
-
-    properties = mm_common_connect_properties_new_from_dictionary (dictionary, &error);
-    if (!properties) {
-        g_dbus_method_invocation_take_error (invocation, error);
-        return TRUE;
-    }
 
     ctx = g_new0 (ConnectionContext, 1);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
-    ctx->step = CONNECTION_STEP_FIRST;
-    ctx->properties = properties;
+    ctx->dictionary = g_variant_ref (dictionary);
 
-    /* Start */
-    connection_step (ctx);
-
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)connect_auth_ready,
+                             ctx);
     return TRUE;
 }
 
@@ -661,18 +682,51 @@ build_connected_bearer_list (MMBearer *bearer,
         ctx->bearers = g_list_prepend (ctx->bearers, g_object_ref (bearer));
 }
 
+static void
+disconnect_auth_ready (MMBaseModem *self,
+                       GAsyncResult *res,
+                       DisconnectionContext *ctx)
+{
+    GError *error = NULL;
+    MMBearerList *list = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        disconnection_context_free (ctx);
+        return;
+    }
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_BEARER_LIST, &list,
+                  NULL);
+    mm_bearer_list_foreach (list,
+                            (MMBearerListForeachFunc)build_connected_bearer_list,
+                            ctx);
+    g_object_unref (list);
+
+    if (ctx->bearer_path &&
+        !ctx->bearers) {
+        g_dbus_method_invocation_return_error (
+            ctx->invocation,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_INVALID_ARGS,
+            "Couldn't disconnect bearer '%s': not found",
+            ctx->bearer_path);
+        disconnection_context_free (ctx);
+        return;
+    }
+
+    /* Go on disconnecting bearers */
+    disconnect_next_bearer (ctx);
+}
+
 static gboolean
 handle_disconnect (MmGdbusModemSimple *skeleton,
                    GDBusMethodInvocation *invocation,
                    const gchar *bearer_path,
                    MMIfaceModemSimple *self)
 {
-    MMBearerList *list = NULL;
     DisconnectionContext *ctx;
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_BEARER_LIST, &list,
-                  NULL);
 
     ctx = g_new0 (DisconnectionContext, 1);
     ctx->skeleton = g_object_ref (skeleton);
@@ -685,24 +739,11 @@ handle_disconnect (MmGdbusModemSimple *skeleton,
         ctx->bearer_path = g_strdup (ctx->bearer_path);
     }
 
-    mm_bearer_list_foreach (list,
-                            (MMBearerListForeachFunc)build_connected_bearer_list,
-                            ctx);
-    g_object_unref (list);
-
-    if (ctx->bearer_path &&
-        !ctx->bearers) {
-        g_dbus_method_invocation_return_error (
-            invocation,
-            MM_CORE_ERROR,
-            MM_CORE_ERROR_INVALID_ARGS,
-            "Couldn't disconnect bearer '%s': not found",
-            ctx->bearer_path);
-        disconnection_context_free (ctx);
-        return TRUE;
-    }
-
-    disconnect_next_bearer (ctx);
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)disconnect_auth_ready,
+                             ctx);
     return TRUE;
 }
 
