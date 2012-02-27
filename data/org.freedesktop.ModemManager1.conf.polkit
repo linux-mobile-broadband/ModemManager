@@ -86,6 +86,17 @@
            send_interface="org.freedesktop.ModemManager1.Modem.Simple"
            send_member="Disconnect"/>
 
+    <!-- org.freedesktop.ModemManager1.Modem.Modem3gpp.xml -->
+
+    <!-- Protected by the Device.Control policy rule -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Modem3gpp"
+           send_member="Register"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Modem3gpp"
+           send_member="Scan"/>
+
   </policy>
 
   <policy user="root">
