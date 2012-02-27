@@ -665,7 +665,7 @@ update_registration_state (MMIfaceModem3gpp *self,
             mm_iface_modem_update_subsystem_state (MM_IFACE_MODEM (self),
                                                    SUBSYSTEM_3GPP,
                                                    MM_MODEM_STATE_REGISTERED,
-                                                   MM_MODEM_STATE_REASON_NONE);
+                                                   MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
         }
         /* Not registered neither in home nor roaming network */
         else {
@@ -678,7 +678,7 @@ update_registration_state (MMIfaceModem3gpp *self,
                 (new_state == MM_MODEM_3GPP_REGISTRATION_STATE_SEARCHING ?
                  MM_MODEM_STATE_SEARCHING :
                  MM_MODEM_STATE_ENABLED),
-                MM_MODEM_STATE_REASON_NONE);
+                MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
         }
     }
 

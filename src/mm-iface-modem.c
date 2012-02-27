@@ -927,7 +927,7 @@ bearer_list_count_connected (MMBearer *bearer,
 void
 mm_iface_modem_update_state (MMIfaceModem *self,
                              MMModemState new_state,
-                             MMModemStateReason reason)
+                             MMModemStateChangeReason reason)
 {
     MMModemState old_state = MM_MODEM_STATE_UNKNOWN;
     MmGdbusModem *skeleton = NULL;
@@ -1115,7 +1115,7 @@ void
 mm_iface_modem_update_subsystem_state (MMIfaceModem *self,
                                        const gchar *subsystem,
                                        MMModemState new_state,
-                                       MMModemStateReason reason)
+                                       MMModemStateChangeReason reason)
 {
     MMModemState consolidated;
 

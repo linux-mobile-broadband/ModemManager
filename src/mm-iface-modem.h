@@ -350,10 +350,10 @@ guint mm_iface_modem_signal_quality_check_finish (MMIfaceModem *self,
 void mm_iface_modem_update_subsystem_state (MMIfaceModem *self,
                                             const gchar *subsystem,
                                             MMModemState new_state,
-                                            MMModemStateReason reason);
+                                            MMModemStateChangeReason reason);
 void mm_iface_modem_update_state (MMIfaceModem *self,
                                   MMModemState new_state,
-                                  MMModemStateReason reason);
+                                  MMModemStateChangeReason reason);
 
 /* Allow reporting new access tech */
 void mm_iface_modem_update_access_technologies (MMIfaceModem *self,

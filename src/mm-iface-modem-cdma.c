@@ -921,7 +921,7 @@ mm_iface_modem_cdma_update_evdo_registration_state (MMIfaceModemCdma *self,
             mm_iface_modem_update_subsystem_state (MM_IFACE_MODEM (self),
                                                    SUBSYSTEM_EVDO,
                                                    MM_MODEM_STATE_REGISTERED,
-                                                   MM_MODEM_STATE_REASON_NONE);
+                                                   MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
             /* TODO: report proper EVDO revision (0/A/B) */
             mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
                                                        MM_MODEM_ACCESS_TECHNOLOGY_EVDO0,
@@ -931,7 +931,7 @@ mm_iface_modem_cdma_update_evdo_registration_state (MMIfaceModemCdma *self,
             mm_iface_modem_update_subsystem_state (MM_IFACE_MODEM (self),
                                                    SUBSYSTEM_EVDO,
                                                    MM_MODEM_STATE_ENABLED,
-                                                   MM_MODEM_STATE_REASON_NONE);
+                                                   MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
             mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
                                                        MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
                                                        ALL_CDMA_EVDO_ACCESS_TECHNOLOGIES_MASK);
@@ -972,7 +972,7 @@ mm_iface_modem_cdma_update_cdma1x_registration_state (MMIfaceModemCdma *self,
             mm_iface_modem_update_subsystem_state (MM_IFACE_MODEM (self),
                                                    SUBSYSTEM_CDMA1X,
                                                    MM_MODEM_STATE_REGISTERED,
-                                                   MM_MODEM_STATE_REASON_NONE);
+                                                   MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
             mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
                                                        MM_MODEM_ACCESS_TECHNOLOGY_1XRTT,
                                                        ALL_CDMA_CDMA1X_ACCESS_TECHNOLOGIES_MASK);
@@ -986,7 +986,7 @@ mm_iface_modem_cdma_update_cdma1x_registration_state (MMIfaceModemCdma *self,
             mm_iface_modem_update_subsystem_state (MM_IFACE_MODEM (self),
                                                    SUBSYSTEM_CDMA1X,
                                                    MM_MODEM_STATE_ENABLED,
-                                                   MM_MODEM_STATE_REASON_NONE);
+                                                   MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
             mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
                                                        MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN,
                                                        ALL_CDMA_CDMA1X_ACCESS_TECHNOLOGIES_MASK);
