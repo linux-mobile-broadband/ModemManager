@@ -165,6 +165,22 @@
            send_interface="org.freedesktop.ModemManager1.Modem.Location"
            send_member="GetLocation"/>
 
+    <!-- org.freedesktop.ModemManager1.Modem.Messaging.xml -->
+
+    <!-- Allowed for everyone -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Messaging"
+           send_member="List"/>
+
+    <!-- Protected by the Messaging policy rule -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Messaging"
+           send_member="Create"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Messaging"
+           send_member="Delete"/>
+
   </policy>
 
   <policy user="root">
