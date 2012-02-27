@@ -97,6 +97,17 @@
            send_interface="org.freedesktop.ModemManager1.Modem.Modem3gpp"
            send_member="Scan"/>
 
+    <!-- org.freedesktop.ModemManager1.Modem.ModemCdma.xml -->
+
+    <!-- Protected by the Device.Control policy rule -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.ModemCdma"
+           send_member="Activate"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.ModemCdma"
+           send_member="ActivateManual"/>
+
   </policy>
 
   <policy user="root">
