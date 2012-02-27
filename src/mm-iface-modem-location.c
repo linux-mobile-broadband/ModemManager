@@ -35,37 +35,6 @@ mm_iface_modem_location_bind_simple_status (MMIfaceModemLocation *self,
 /*****************************************************************************/
 
 typedef struct {
-    MmGdbusModemLocation *skeleton;
-    GDBusMethodInvocation *invocation;
-    MMIfaceModemLocation *self;
-} DbusCallContext;
-
-static void
-dbus_call_context_free (DbusCallContext *ctx)
-{
-    g_object_unref (ctx->skeleton);
-    g_object_unref (ctx->invocation);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
-
-static DbusCallContext *
-dbus_call_context_new (MmGdbusModemLocation *skeleton,
-                       GDBusMethodInvocation *invocation,
-                       MMIfaceModemLocation *self)
-{
-    DbusCallContext *ctx;
-
-    ctx = g_new (DbusCallContext, 1);
-    ctx->skeleton = g_object_ref (skeleton);
-    ctx->invocation = g_object_ref (invocation);
-    ctx->self = g_object_ref (self);
-    return ctx;
-}
-
-/*****************************************************************************/
-
-typedef struct {
     /* 3GPP location */
     MMCommonLocation3gpp *location_3gpp;
 } LocationContext;
@@ -249,16 +218,31 @@ mm_iface_modem_location_3gpp_clear (MMIfaceModemLocation *self)
 
 /*****************************************************************************/
 
+typedef struct {
+    MmGdbusModemLocation *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModemLocation *self;
+    gboolean enable;
+    gboolean signal_location;
+} HandleEnableContext;
+
+static void
+handle_enable_context_free (HandleEnableContext *ctx)
+{
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
 static void
 enable_location_gathering_ready (MMIfaceModemLocation *self,
                                  GAsyncResult *res,
-                                 DbusCallContext *ctx)
+                                 HandleEnableContext *ctx)
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering_finish (self,
-                                                                                         res,
-                                                                                         &error))
+    if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         mm_gdbus_modem_location_set_enabled (ctx->skeleton, TRUE);
@@ -266,19 +250,17 @@ enable_location_gathering_ready (MMIfaceModemLocation *self,
                                                  ctx->invocation);
     }
 
-    dbus_call_context_free (ctx);
+    handle_enable_context_free (ctx);
 }
 
 static void
 disable_location_gathering_ready (MMIfaceModemLocation *self,
                                   GAsyncResult *res,
-                                  DbusCallContext *ctx)
+                                  HandleEnableContext *ctx)
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering_finish (self,
-                                                                                          res,
-                                                                                          &error))
+    if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else {
         clear_location_context (self);
@@ -287,7 +269,91 @@ disable_location_gathering_ready (MMIfaceModemLocation *self,
                                                  ctx->invocation);
     }
 
-    dbus_call_context_free (ctx);
+    handle_enable_context_free (ctx);
+}
+
+static void
+handle_enable_auth_ready (MMBaseModem *self,
+                          GAsyncResult *res,
+                          HandleEnableContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_enable_context_free (ctx);
+        return;
+    }
+
+    /* Enabling */
+    if (ctx->enable) {
+        LocationContext *location_ctx;
+
+        location_ctx = get_location_context (ctx->self);
+        mm_dbg ("Enabling location gathering%s...",
+                ctx->signal_location ? " (with signaling)" : "");
+
+        /* Update the new signal location value */
+        if (mm_gdbus_modem_location_get_signals_location (ctx->skeleton) != ctx->signal_location) {
+            mm_dbg ("%s location signaling",
+                    ctx->signal_location ? "Enabling" : "Disabling");
+            mm_gdbus_modem_location_set_signals_location (ctx->skeleton,
+                                                          ctx->signal_location);
+            mm_gdbus_modem_location_set_location (ctx->skeleton,
+                                                  build_location_dictionary (ctx->signal_location ?
+                                                                             location_ctx->location_3gpp :
+                                                                             NULL));
+        }
+
+        /* If already enabled, just done */
+        if (mm_gdbus_modem_location_get_enabled (ctx->skeleton)) {
+            mm_gdbus_modem_location_complete_enable (ctx->skeleton, ctx->invocation);
+            handle_enable_context_free (ctx);
+            return;
+        }
+
+        /* Plugins can run custom actions to enable location gathering */
+        if (MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering &&
+            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering_finish) {
+            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering (
+                MM_IFACE_MODEM_LOCATION (self),
+                (GAsyncReadyCallback)enable_location_gathering_ready,
+                ctx);
+            return;
+        }
+
+        /* If no plugin-specific setup needed or interface not yet enabled, just done */
+        mm_gdbus_modem_location_set_enabled (ctx->skeleton, TRUE);
+        mm_gdbus_modem_location_complete_enable (ctx->skeleton, ctx->invocation);
+        handle_enable_context_free (ctx);
+        return;
+    }
+
+    /* Disabling */
+    mm_dbg ("Disabling location gathering...");
+
+    /* If already disabled, just done */
+    if (!mm_gdbus_modem_location_get_enabled (ctx->skeleton)) {
+        mm_gdbus_modem_location_complete_enable (ctx->skeleton, ctx->invocation);
+        handle_enable_context_free (ctx);
+        return;
+    }
+
+    /* Plugins can run custom actions to disable location gathering */
+    if (MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering &&
+        MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering_finish) {
+        MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering (
+            MM_IFACE_MODEM_LOCATION (self),
+            (GAsyncReadyCallback)disable_location_gathering_ready,
+            ctx);
+        return;
+    }
+
+    /* If no plugin-specific setup needed, or interface not yet enabled, just done */
+    clear_location_context (ctx->self);
+    mm_gdbus_modem_location_set_enabled (ctx->skeleton, FALSE);
+    mm_gdbus_modem_location_complete_enable (ctx->skeleton, ctx->invocation);
+    handle_enable_context_free (ctx);
 }
 
 static gboolean
@@ -297,85 +363,78 @@ handle_enable (MmGdbusModemLocation *skeleton,
                gboolean signal_location,
                MMIfaceModemLocation *self)
 {
-    /* Enabling */
-    if (enable) {
-        LocationContext *ctx;
+    HandleEnableContext *ctx;
 
-        ctx = get_location_context (self);
-        mm_dbg ("Enabling location gathering%s...",
-                signal_location ? " (with signaling)" : "");
+    ctx = g_new (HandleEnableContext, 1);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+    ctx->enable = enable;
+    ctx->signal_location = signal_location;
 
-        /* Update the new signal location value */
-        if (mm_gdbus_modem_location_get_signals_location (skeleton) != signal_location) {
-            mm_dbg ("%s location signaling",
-                    signal_location ? "Enabling" : "Disabling");
-            mm_gdbus_modem_location_set_signals_location (skeleton,
-                                                          signal_location);
-            mm_gdbus_modem_location_set_location (skeleton,
-                                                  build_location_dictionary (signal_location ?
-                                                                             ctx->location_3gpp :
-                                                                             NULL));
-        }
-
-        /* If already enabled, just done */
-        if (mm_gdbus_modem_location_get_enabled (skeleton))
-            mm_gdbus_modem_location_complete_enable (skeleton, invocation);
-        /* Plugins can run custom actions to enable location gathering */
-        else if (MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering &&
-                 MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering_finish)
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering (
-                self,
-                (GAsyncReadyCallback)enable_location_gathering_ready,
-                dbus_call_context_new (skeleton,
-                                       invocation,
-                                       self));
-        else {
-            /* If no plugin-specific setup needed or interface not yet enabled, just done */
-            mm_gdbus_modem_location_set_enabled (skeleton, TRUE);
-            mm_gdbus_modem_location_complete_enable (skeleton, invocation);
-        }
-    }
-    /* Disabling */
-    else {
-        mm_dbg ("Disabling location gathering...");
-
-        /* If already disabled, just done */
-        if (!mm_gdbus_modem_location_get_enabled (skeleton))
-            mm_gdbus_modem_location_complete_enable (skeleton, invocation);
-        /* Plugins can run custom actions to disable location gathering */
-        else if (MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering &&
-                 MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering_finish)
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering (
-                self,
-                (GAsyncReadyCallback)disable_location_gathering_ready,
-                dbus_call_context_new (skeleton,
-                                       invocation,
-                                       self));
-        else {
-            /* If no plugin-specific setup needed, or interface not yet enabled, just done */
-            clear_location_context (self);
-            mm_gdbus_modem_location_set_enabled (skeleton, FALSE);
-            mm_gdbus_modem_location_complete_enable (skeleton, invocation);
-        }
-    }
-
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)handle_enable_auth_ready,
+                             ctx);
     return TRUE;
 }
 
 /*****************************************************************************/
+
+typedef struct {
+    MmGdbusModemLocation *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModemLocation *self;
+} HandleGetLocationContext;
+
+static void
+handle_get_location_context_free (HandleGetLocationContext *ctx)
+{
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static void
+handle_get_location_auth_ready (MMBaseModem *self,
+                                GAsyncResult *res,
+                                HandleGetLocationContext *ctx)
+{
+    LocationContext *location_ctx;
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_get_location_context_free (ctx);
+        return;
+    }
+
+    location_ctx = get_location_context (ctx->self);
+    mm_gdbus_modem_location_complete_get_location (
+        ctx->skeleton,
+        ctx->invocation,
+        build_location_dictionary (location_ctx->location_3gpp));
+}
 
 static gboolean
 handle_get_location (MmGdbusModemLocation *skeleton,
                      GDBusMethodInvocation *invocation,
                      MMIfaceModemLocation *self)
 {
-    LocationContext *ctx;
+    HandleGetLocationContext *ctx;
 
-    ctx = get_location_context (self);
-    mm_gdbus_modem_location_complete_get_location (
-        skeleton,
-        invocation,
-        build_location_dictionary (ctx->location_3gpp));
+    ctx = g_new (HandleGetLocationContext, 1);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_LOCATION,
+                             (GAsyncReadyCallback)handle_get_location_auth_ready,
+                             ctx);
     return TRUE;
 }
 
