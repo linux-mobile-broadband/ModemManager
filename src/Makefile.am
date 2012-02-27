@@ -38,14 +38,14 @@ SERIAL_ENUMS = \
 	mm-at-serial-port.h
 
 mm-serial-enums-types.h: Makefile.am $(SERIAL_ENUMS) $(top_srcdir)/build-aux/mm-enums-template.h
-	$(AM_V_GEN) glib-mkenums \
+	$(AM_V_GEN) $(GLIB_MKENUMS) \
 		--fhead "#include \"mm-port.h\"\n#include \"mm-at-serial-port.h\"\n#ifndef __MM_SERIAL_ENUMS_TYPES_H__\n#define __MM_SERIAL_ENUMS_TYPES_H__\n" \
 		--template $(top_srcdir)/build-aux/mm-enums-template.h \
 		--ftail "#endif /* __MM_SERIAL_ENUMS_TYPES_H__ */\n" \
 		$(SERIAL_ENUMS) > $@
 
 mm-serial-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-template.c mm-serial-enums-types.h
-	$(AM_V_GEN) glib-mkenums \
+	$(AM_V_GEN) $(GLIB_MKENUMS) \
 		--fhead "#include \"mm-serial-enums-types.h\"" \
 		--template $(top_srcdir)/build-aux/mm-enums-template.c \
 		$(SERIAL_ENUMS) > $@
@@ -76,14 +76,14 @@ libserial_la_SOURCES = \
 DAEMON_ENUMS = mm-bearer.h
 
 mm-daemon-enums-types.h: Makefile.am $(DAEMON_ENUMS) $(top_srcdir)/build-aux/mm-enums-template.h
-	$(AM_V_GEN) glib-mkenums \
+	$(AM_V_GEN) $(GLIB_MKENUMS) \
 		--fhead "#include \"mm-bearer.h\"\n#ifndef __MM_DAEMON_ENUMS_TYPES_H__\n#define __MM_DAEMON_ENUMS_TYPES_H__\n" \
 		--template $(top_srcdir)/build-aux/mm-enums-template.h \
 		--ftail "#endif /* __MM_DAEMON_ENUMS_TYPES_H__ */\n" \
 		$(DAEMON_ENUMS) > $@
 
 mm-daemon-enums-types.c: Makefile.am $(top_srcdir)/build-aux/mm-enums-template.c mm-daemon-enums-types.h
-	$(AM_V_GEN) glib-mkenums \
+	$(AM_V_GEN) $(GLIB_MKENUMS) \
 		--fhead "#include \"mm-daemon-enums-types.h\"" \
 		--template $(top_srcdir)/build-aux/mm-enums-template.c \
 		$(DAEMON_ENUMS) > $@
