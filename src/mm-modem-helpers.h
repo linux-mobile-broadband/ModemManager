@@ -103,15 +103,18 @@ gboolean mm_cdma_parse_crm_range_response (const gchar *reply,
 gboolean mm_gsm_parse_cscs_support_response (const char *reply,
                                              MMModemCharset *out_charsets);
 
+/* TODO: port to the new codebase */
+#if 0
 gboolean mm_gsm_parse_clck_test_response (const char *reply,
                                           MMModemGsmFacility *out_facilities);
 gboolean mm_gsm_parse_clck_response (const char *reply,
                                      gboolean *enabled);
+char *mm_gsm_get_facility_name (MMModemGsmFacility facility);
+#endif
 
 gchar *mm_3gpp_parse_operator (const gchar *reply,
                                MMModemCharset cur_charset);
 
-char *mm_gsm_get_facility_name (MMModemGsmFacility facility);
 
 MMModemAccessTechnology mm_3gpp_string_to_access_tech (const gchar *string);
 

@@ -1202,6 +1202,9 @@ mm_3gpp_parse_operator (const gchar *reply,
 
 /*************************************************************************/
 
+/* TODO: port to the new codebase */
+#if 0
+
 /* Map two letter facility codes into flag values. There are
  * many more facilities defined (for various flavors of call
  * barring); we only map the ones we care about. */
@@ -1347,6 +1350,8 @@ mm_gsm_parse_clck_response (const char *reply, gboolean *enabled)
     g_regex_unref (r);
     return success;
 }
+
+#endif
 
 /*************************************************************************/
 
