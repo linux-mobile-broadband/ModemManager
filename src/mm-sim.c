@@ -74,33 +74,6 @@ mm_sim_export (MMSim *self)
 }
 
 /*****************************************************************************/
-
-typedef struct {
-    MMSim *self;
-    GDBusMethodInvocation *invocation;
-} DbusCallContext;
-
-static void
-dbus_call_context_free (DbusCallContext *ctx)
-{
-    g_object_unref (ctx->invocation);
-    g_object_unref (ctx->self);
-    g_free (ctx);
-}
-
-static DbusCallContext *
-dbus_call_context_new (MMSim *self,
-                       GDBusMethodInvocation *invocation)
-{
-    DbusCallContext *ctx;
-
-    ctx = g_new0 (DbusCallContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->invocation = g_object_ref (invocation);
-    return ctx;
-}
-
-/*****************************************************************************/
 /* CHANGE PIN (Generic implementation) */
 
 static gboolean
@@ -158,10 +131,29 @@ change_pin (MMSim *self,
 /*****************************************************************************/
 /* CHANGE PIN (DBus call handling) */
 
+typedef struct {
+    MMSim *self;
+    MMBaseModem *modem;
+    GDBusMethodInvocation *invocation;
+    gchar *old_pin;
+    gchar *new_pin;
+} HandleChangePinContext;
+
+static void
+handle_change_pin_context_free (HandleChangePinContext *ctx)
+{
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->self);
+    g_free (ctx->old_pin);
+    g_free (ctx->new_pin);
+    g_free (ctx);
+}
+
 static void
 handle_change_pin_ready (MMSim *self,
                          GAsyncResult *res,
-                         DbusCallContext *ctx)
+                         HandleChangePinContext *ctx)
 {
     GError *error = NULL;
 
@@ -170,7 +162,40 @@ handle_change_pin_ready (MMSim *self,
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
         mm_gdbus_sim_complete_change_pin (MM_GDBUS_SIM (ctx->self), ctx->invocation);
-    dbus_call_context_free (ctx);
+
+    handle_change_pin_context_free (ctx);
+}
+
+static void
+handle_change_pin_auth_ready (MMBaseModem *modem,
+                              GAsyncResult *res,
+                              HandleChangePinContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_change_pin_context_free (ctx);
+        return;
+    }
+
+    /* If changing PIN is not implemented, report an error */
+    if (!MM_SIM_GET_CLASS (ctx->self)->change_pin ||
+        !MM_SIM_GET_CLASS (ctx->self)->change_pin_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot change PIN: "
+                                               "operation not supported");
+        handle_change_pin_context_free (ctx);
+        return;
+    }
+
+    MM_SIM_GET_CLASS (ctx->self)->change_pin (ctx->self,
+                                              ctx->old_pin,
+                                              ctx->new_pin,
+                                              (GAsyncReadyCallback)handle_change_pin_ready,
+                                              ctx);
 }
 
 static gboolean
@@ -180,12 +205,22 @@ handle_change_pin (MMSim *self,
                    const gchar *new_pin,
                    gboolean changed)
 {
-    MM_SIM_GET_CLASS (self)->change_pin (self,
-                                         old_pin,
-                                         new_pin,
-                                         (GAsyncReadyCallback)handle_change_pin_ready,
-                                         dbus_call_context_new (self,
-                                                                invocation));
+    HandleChangePinContext *ctx;
+
+    ctx = g_new0 (HandleChangePinContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->invocation = g_object_ref (invocation);
+    g_object_get (self,
+                  MM_SIM_MODEM, &ctx->modem,
+                  NULL);
+    ctx->old_pin = g_strdup (old_pin);
+    ctx->new_pin = g_strdup (new_pin);
+
+    mm_base_modem_authorize (ctx->modem,
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)handle_change_pin_auth_ready,
+                             ctx);
     return TRUE;
 }
 
@@ -247,10 +282,28 @@ enable_pin (MMSim *self,
 /*****************************************************************************/
 /* ENABLE PIN (DBus call handling) */
 
+typedef struct {
+    MMSim *self;
+    MMBaseModem *modem;
+    GDBusMethodInvocation *invocation;
+    gchar *pin;
+    gboolean enabled;
+} HandleEnablePinContext;
+
+static void
+handle_enable_pin_context_free (HandleEnablePinContext *ctx)
+{
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->self);
+    g_free (ctx->pin);
+    g_free (ctx);
+}
+
 static void
 handle_enable_pin_ready (MMSim *self,
                          GAsyncResult *res,
-                         DbusCallContext *ctx)
+                         HandleEnablePinContext *ctx)
 {
     GError *error = NULL;
 
@@ -258,8 +311,41 @@ handle_enable_pin_ready (MMSim *self,
     if (error)
         g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
-        mm_gdbus_sim_complete_enable_pin (MM_GDBUS_SIM (ctx->self), ctx->invocation);
-    dbus_call_context_free (ctx);
+        mm_gdbus_sim_complete_enable_pin (MM_GDBUS_SIM (self), ctx->invocation);
+
+    handle_enable_pin_context_free (ctx);
+}
+
+static void
+handle_enable_pin_auth_ready (MMBaseModem *modem,
+                              GAsyncResult *res,
+                              HandleEnablePinContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_enable_pin_context_free (ctx);
+        return;
+    }
+
+    /* If changing PIN is not implemented, report an error */
+    if (!MM_SIM_GET_CLASS (ctx->self)->enable_pin ||
+        !MM_SIM_GET_CLASS (ctx->self)->enable_pin_finish) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot enable/disable PIN: "
+                                               "operation not supported");
+        handle_enable_pin_context_free (ctx);
+        return;
+    }
+
+    MM_SIM_GET_CLASS (ctx->self)->enable_pin (ctx->self,
+                                              ctx->pin,
+                                              ctx->enabled,
+                                              (GAsyncReadyCallback)handle_enable_pin_ready,
+                                              ctx);
 }
 
 static gboolean
@@ -268,12 +354,22 @@ handle_enable_pin (MMSim *self,
                    const gchar *pin,
                    gboolean enabled)
 {
-    MM_SIM_GET_CLASS (self)->enable_pin (self,
-                                         pin,
-                                         enabled,
-                                         (GAsyncReadyCallback)handle_enable_pin_ready,
-                                         dbus_call_context_new (self,
-                                                                invocation));
+    HandleEnablePinContext *ctx;
+
+    ctx = g_new0 (HandleEnablePinContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->invocation = g_object_ref (invocation);
+    g_object_get (self,
+                  MM_SIM_MODEM, &ctx->modem,
+                  NULL);
+    ctx->pin = g_strdup (pin);
+    ctx->enabled = enabled;
+
+    mm_base_modem_authorize (ctx->modem,
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)handle_enable_pin_auth_ready,
+                             ctx);
     return TRUE;
 }
 
@@ -484,6 +580,19 @@ mm_sim_send_pin (MMSim *self,
 {
     SendPinPukContext *ctx;
 
+    /* If sending PIN is not implemented, report an error */
+    if (!MM_SIM_GET_CLASS (self)->send_pin ||
+        !MM_SIM_GET_CLASS (self)->send_pin_finish) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_UNSUPPORTED,
+                                             "Cannot send PIN: "
+                                             "operation not supported");
+        return;
+    }
+
     ctx = g_new0 (SendPinPukContext, 1);
     ctx->self = g_object_ref (self);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
@@ -506,6 +615,19 @@ mm_sim_send_puk (MMSim *self,
 {
     SendPinPukContext *ctx;
 
+    /* If sending PIN is not implemented, report an error */
+    if (!MM_SIM_GET_CLASS (self)->send_puk ||
+        !MM_SIM_GET_CLASS (self)->send_puk_finish) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_UNSUPPORTED,
+                                             "Cannot send PUK: "
+                                             "operation not supported");
+        return;
+    }
+
     ctx = g_new0 (SendPinPukContext, 1);
     ctx->self = g_object_ref (self);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
@@ -523,10 +645,27 @@ mm_sim_send_puk (MMSim *self,
 /*****************************************************************************/
 /* SEND PIN (DBus call handling) */
 
+typedef struct {
+    MMSim *self;
+    MMBaseModem *modem;
+    GDBusMethodInvocation *invocation;
+    gchar *pin;
+} HandleSendPinContext;
+
+static void
+handle_send_pin_context_free (HandleSendPinContext *ctx)
+{
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->self);
+    g_free (ctx->pin);
+    g_free (ctx);
+}
+
 static void
 handle_send_pin_ready (MMSim *self,
                        GAsyncResult *res,
-                       DbusCallContext *ctx)
+                       HandleSendPinContext *ctx)
 {
     GError *error = NULL;
 
@@ -535,7 +674,26 @@ handle_send_pin_ready (MMSim *self,
     else
         mm_gdbus_sim_complete_send_pin (MM_GDBUS_SIM (self), ctx->invocation);
 
-    dbus_call_context_free (ctx);
+    handle_send_pin_context_free (ctx);
+}
+
+static void
+handle_send_pin_auth_ready (MMBaseModem *modem,
+                            GAsyncResult *res,
+                            HandleSendPinContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_send_pin_context_free (ctx);
+        return;
+    }
+
+    mm_sim_send_pin (ctx->self,
+                     ctx->pin,
+                     (GAsyncReadyCallback)handle_send_pin_ready,
+                     ctx);
 }
 
 static gboolean
@@ -543,21 +701,50 @@ handle_send_pin (MMSim *self,
                  GDBusMethodInvocation *invocation,
                  const gchar *pin)
 {
-    mm_sim_send_pin (self,
-                     pin,
-                     (GAsyncReadyCallback)handle_send_pin_ready,
-                     dbus_call_context_new (self,
-                                            invocation));
+    HandleSendPinContext *ctx;
+
+    ctx = g_new0 (HandleSendPinContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->invocation = g_object_ref (invocation);
+    g_object_get (self,
+                  MM_SIM_MODEM, &ctx->modem,
+                  NULL);
+    ctx->pin = g_strdup (pin);
+
+    mm_base_modem_authorize (ctx->modem,
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)handle_send_pin_auth_ready,
+                             ctx);
     return TRUE;
 }
 
 /*****************************************************************************/
 /* SEND PUK (DBus call handling) */
 
+typedef struct {
+    MMSim *self;
+    MMBaseModem *modem;
+    GDBusMethodInvocation *invocation;
+    gchar *puk;
+    gchar *new_pin;
+} HandleSendPukContext;
+
+static void
+handle_send_puk_context_free (HandleSendPukContext *ctx)
+{
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->self);
+    g_free (ctx->puk);
+    g_free (ctx->new_pin);
+    g_free (ctx);
+}
+
 static void
 handle_send_puk_ready (MMSim *self,
                        GAsyncResult *res,
-                       DbusCallContext *ctx)
+                       HandleSendPukContext *ctx)
 {
     GError *error = NULL;
 
@@ -566,7 +753,27 @@ handle_send_puk_ready (MMSim *self,
     else
         mm_gdbus_sim_complete_send_puk (MM_GDBUS_SIM (self), ctx->invocation);
 
-    dbus_call_context_free (ctx);
+    handle_send_puk_context_free (ctx);
+}
+
+static void
+handle_send_puk_auth_ready (MMBaseModem *modem,
+                            GAsyncResult *res,
+                            HandleSendPukContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_authorize_finish (modem, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_send_puk_context_free (ctx);
+        return;
+    }
+
+    mm_sim_send_puk (ctx->self,
+                     ctx->puk,
+                     ctx->new_pin,
+                     (GAsyncReadyCallback)handle_send_puk_ready,
+                     ctx);
 }
 
 static gboolean
@@ -575,12 +782,22 @@ handle_send_puk (MMSim *self,
                  const gchar *puk,
                  const gchar *new_pin)
 {
-    mm_sim_send_puk (self,
-                     puk,
-                     new_pin,
-                     (GAsyncReadyCallback)handle_send_puk_ready,
-                     dbus_call_context_new (self,
-                                            invocation));
+    HandleSendPukContext *ctx;
+
+    ctx = g_new0 (HandleSendPukContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->invocation = g_object_ref (invocation);
+    g_object_get (self,
+                  MM_SIM_MODEM, &ctx->modem,
+                  NULL);
+    ctx->puk = g_strdup (puk);
+    ctx->new_pin = g_strdup (new_pin);
+
+    mm_base_modem_authorize (ctx->modem,
+                             invocation,
+                             MM_AUTHORIZATION_DEVICE_CONTROL,
+                             (GAsyncReadyCallback)handle_send_puk_auth_ready,
+                             ctx);
     return TRUE;
 }
 
