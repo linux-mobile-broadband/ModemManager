@@ -127,6 +127,17 @@
            send_interface="org.freedesktop.ModemManager1.Sim"
            send_member="ChangePin"/>
 
+    <!-- org.freedesktop.ModemManager1.Bearer.xml -->
+
+    <!-- Protected by the Device.Control policy rule -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Bearer"
+           send_member="Connect"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Bearer"
+           send_member="Disconnect"/>
+
   </policy>
 
   <policy user="root">
