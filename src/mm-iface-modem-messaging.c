@@ -87,69 +87,60 @@ typedef struct {
     MmGdbusModemMessaging *skeleton;
     GDBusMethodInvocation *invocation;
     MMIfaceModemMessaging *self;
-} DbusCallContext;
+    gchar *path;
+} HandleDeleteContext;
 
 static void
-dbus_call_context_free (DbusCallContext *ctx)
+handle_delete_context_free (HandleDeleteContext *ctx)
 {
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
+    g_free (ctx->path);
     g_free (ctx);
 }
 
-static DbusCallContext *
-dbus_call_context_new (MmGdbusModemMessaging *skeleton,
-                       GDBusMethodInvocation *invocation,
-                       MMIfaceModemMessaging *self)
-{
-    DbusCallContext *ctx;
-
-    ctx = g_new (DbusCallContext, 1);
-    ctx->skeleton = g_object_ref (skeleton);
-    ctx->invocation = g_object_ref (invocation);
-    ctx->self = g_object_ref (self);
-    return ctx;
-}
-
-/*****************************************************************************/
-
 static void
-delete_sms_ready (MMSmsList *list,
-                  GAsyncResult *res,
-                  DbusCallContext *ctx)
+handle_delete_ready (MMSmsList *list,
+                     GAsyncResult *res,
+                     HandleDeleteContext *ctx)
 {
     GError *error = NULL;
 
     if (!mm_sms_list_delete_sms_finish (list, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation,
-                                             error);
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
     else
-        mm_gdbus_modem_messaging_complete_delete (ctx->skeleton,
-                                                  ctx->invocation);
-    dbus_call_context_free (ctx);
+        mm_gdbus_modem_messaging_complete_delete (ctx->skeleton, ctx->invocation);
+
+    handle_delete_context_free (ctx);
 }
 
-static gboolean
-handle_delete (MmGdbusModemMessaging *skeleton,
-               GDBusMethodInvocation *invocation,
-               const gchar *path,
-               MMIfaceModemMessaging *self)
+static void
+handle_delete_auth_ready (MMBaseModem *self,
+                          GAsyncResult *res,
+                          HandleDeleteContext *ctx)
 {
+    MMModemState modem_state = MM_MODEM_STATE_UNKNOWN;
     MMSmsList *list = NULL;
-    MMModemState modem_state;
+    GError *error = NULL;
 
-    modem_state = MM_MODEM_STATE_UNKNOWN;
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_delete_context_free (ctx);
+        return;
+    }
+
     g_object_get (self,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
 
     if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (invocation,
+        g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
                                                "Cannot delete SMS: device not yet enabled");
-        return TRUE;
+        handle_delete_context_free (ctx);
+        return;
     }
 
     g_object_get (self,
@@ -158,56 +149,98 @@ handle_delete (MmGdbusModemMessaging *skeleton,
     g_assert (list != NULL);
 
     mm_sms_list_delete_sms (list,
-                            path,
-                            (GAsyncReadyCallback)delete_sms_ready,
-                            dbus_call_context_new (skeleton,
-                                                   invocation,
-                                                   self));
+                            ctx->path,
+                            (GAsyncReadyCallback)handle_delete_ready,
+                            ctx);
     g_object_unref (list);
+}
 
+static gboolean
+handle_delete (MmGdbusModemMessaging *skeleton,
+               GDBusMethodInvocation *invocation,
+               const gchar *path,
+               MMIfaceModemMessaging *self)
+{
+    HandleDeleteContext *ctx;
+
+    ctx = g_new (HandleDeleteContext, 1);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+    ctx->path = g_strdup (path);
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_MESSAGING,
+                             (GAsyncReadyCallback)handle_delete_auth_ready,
+                             ctx);
     return TRUE;
 }
 
 /*****************************************************************************/
 
-static gboolean
-handle_create (MmGdbusModemMessaging *skeleton,
-               GDBusMethodInvocation *invocation,
-               GVariant *dictionary,
-               MMIfaceModemMessaging *self)
+typedef struct {
+    MmGdbusModemMessaging *skeleton;
+    GDBusMethodInvocation *invocation;
+    MMIfaceModemMessaging *self;
+    GVariant *dictionary;
+} HandleCreateContext;
+
+static void
+handle_create_context_free (HandleCreateContext *ctx)
 {
-    GError *error = NULL;
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->self);
+    g_variant_unref (ctx->dictionary);
+    g_free (ctx);
+}
+
+static void
+handle_create_auth_ready (MMBaseModem *self,
+                          GAsyncResult *res,
+                          HandleCreateContext *ctx)
+{
+    MMModemState modem_state = MM_MODEM_STATE_UNKNOWN;
     MMSmsList *list = NULL;
+    GError *error = NULL;
     MMCommonSmsProperties *properties;
     MMSms *sms;
-    MMModemState modem_state;
 
-    modem_state = MM_MODEM_STATE_UNKNOWN;
+    if (!mm_base_modem_authorize_finish (self, res, &error)) {
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_create_context_free (ctx);
+        return;
+    }
+
     g_object_get (self,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
 
     if (modem_state < MM_MODEM_STATE_ENABLED) {
-        g_dbus_method_invocation_return_error (invocation,
+        g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
                                                "Cannot create SMS: device not yet enabled");
-        return TRUE;
+        handle_create_context_free (ctx);
+        return;
     }
 
     /* Parse input properties */
-    properties = mm_common_sms_properties_new_from_dictionary (dictionary, &error);
+    properties = mm_common_sms_properties_new_from_dictionary (ctx->dictionary, &error);
     if (!properties) {
-        g_dbus_method_invocation_take_error (invocation, error);
-        return TRUE;
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_create_context_free (ctx);
+        return;
     }
 
     sms = mm_sms_new_from_properties (MM_BASE_MODEM (self),
                                       properties,
                                       &error);
     if (!sms) {
-        g_dbus_method_invocation_take_error (invocation, error);
-        return TRUE;
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_create_context_free (ctx);
+        return;
     }
 
     g_object_get (self,
@@ -219,14 +252,36 @@ handle_create (MmGdbusModemMessaging *skeleton,
     mm_sms_list_add_sms (list, sms);
 
     /* Complete the DBus call */
-    mm_gdbus_modem_messaging_complete_create (skeleton,
-                                              invocation,
+    mm_gdbus_modem_messaging_complete_create (ctx->skeleton,
+                                              ctx->invocation,
                                               mm_sms_get_path (sms));
     g_object_unref (sms);
 
     g_object_unref (properties);
     g_object_unref (list);
 
+    handle_create_context_free (ctx);
+}
+
+static gboolean
+handle_create (MmGdbusModemMessaging *skeleton,
+               GDBusMethodInvocation *invocation,
+               GVariant *dictionary,
+               MMIfaceModemMessaging *self)
+{
+    HandleCreateContext *ctx;
+
+    ctx = g_new (HandleCreateContext, 1);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->self = g_object_ref (self);
+    ctx->dictionary = g_variant_ref (dictionary);
+
+    mm_base_modem_authorize (MM_BASE_MODEM (self),
+                             invocation,
+                             MM_AUTHORIZATION_MESSAGING,
+                             (GAsyncReadyCallback)handle_create_auth_ready,
+                             ctx);
     return TRUE;
 }
 
