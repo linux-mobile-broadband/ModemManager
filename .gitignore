@@ -85,6 +85,7 @@ docs/reference/api/*.txt
 docs/reference/api/html
 docs/reference/api/tmpl
 docs/reference/api/xml
+docs/reference/api/*.png
 
 docs/man/ModemManager.8
 

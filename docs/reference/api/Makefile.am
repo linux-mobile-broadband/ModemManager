@@ -1,4 +1,16 @@
 
+# Generation of the additional PNG files from DIA files
+#  (list of original '.dia' files with '.png' extension)
+DIAGRAMS = \
+	ModemManager-states.dia
+
+# The wanted PNG files
+DIAGRAMS_PNG = $(notdir $(DIAGRAMS:.dia=.png))
+
+# DIA to PNG conversion
+$(DIAGRAMS_PNG): $(DIAGRAMS)
+	$(AM_V_GEN) $(DIA) -t png $^ 1>/dev/null 2>&1
+
 # The name of the module.
 DOC_MODULE = mm
 
@@ -41,7 +53,10 @@ HTML_IMAGES = \
 	ModemManager-states.png \
 	$(NULL)
 
+#  Note that PNG files are also added in content_files so that
+#  the documentation is not built before the PNGs.
 content_files = \
+	$(HTML_IMAGES) \
 	$(NULL)
 
 expand_content_files = \
@@ -76,8 +91,7 @@ EXTRA_DIST += \
 	mm-overview.xml \
 	mm-dbus-reference.xml \
 	version.xml.in \
-	ModemManager-states.dia \
-	ModemManager-states.png \
+	$(DIAGRAMS) \
 	$(NULL)
 
 CLEANFILES += \
@@ -96,3 +110,7 @@ CLEANFILES += \
 	*.stamp \
 	-rf xml html tmpl \
 	$(NULL)
+
+# PNGs generated are removed only in maintainer-clean
+MAINTAINERCLEANFILES = \
+	$(DIAGRAMS_PNG)
