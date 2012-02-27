@@ -1,16 +1,16 @@
-.\" modem-manager(8) manual page
+.\" ModemManager(8) manual page
 .\"
 .\" Copyright (C) 2011 Aleksander Morgado
 .\"
 .TH MODEMMANAGER "8" "31 October 2011"
 .SH NAME
-modem-manager \- modem management daemon
+ModemManager \- modem management daemon
 .SH SYNOPSIS
-.B modem-manager [\-\-version] | [\-\-help]
+.B ModemManager [\-\-version] | [\-\-help]
 .PP
-.B modem-manager [\-\-debug] [\-\-log\-level=<level>] [\-\-log\-file=<filename>] [\-\-timestamps] [\-\-relative\-timestamps]
+.B ModemManager [\-\-debug] [\-\-log\-level=<level>] [\-\-log\-file=<filename>] [\-\-timestamps] [\-\-relative\-timestamps]
 .SH DESCRIPTION
-The modem-manager (a.k.a. ModemManager) daemon provides a unified high level API
+The ModemManager daemon provides a unified high level API
 for communicating with (mobile broadband) modems. While the basic commands are
 standardized, the more advanced operations (like signal quality monitoring
 while connected) varies a lot.
@@ -21,23 +21,23 @@ command line.
 The following options are supported:
 .TP
 .I "\-\-version"
-Print the modem-manager software version and exit.
+Print the ModemManager software version and exit.
 .TP
 .I "\-\-help"
-Print modem-manager's available options and exit.
+Print ModemManager's available options and exit.
 .TP
 .I "\-\-debug"
-Runs modem-manager with "DEBUG" log level and without daemonizing. This is useful
+Runs ModemManager with "DEBUG" log level and without daemonizing. This is useful
 for debugging, as it directs log output to the controlling terminal in addition to
 syslog.
 .TP
 .I "\-\-log\-level=<level>"
-Sets how much information modem-manager sends to the log destination (usually
+Sets how much information ModemManager sends to the log destination (usually
 syslog's "daemon" facility). By default, only informational, warning, and error
 messages are logged. Given level must be one of "ERR", "WARN", "INFO" or "DEBUG".
 .TP
 .I "\-\-log\-file=<filename>"
-Specify location of the file where modem-manager will dump its log messages,
+Specify location of the file where ModemManager will dump its log messages,
 instead of syslog.
 .TP
 .I "\-\-timestamps"
@@ -49,4 +49,3 @@ Include timestamps, relative to the start time of the daemon, in the log output.
 
 .SH SEE ALSO
 .BR NetworkManager (8).
-

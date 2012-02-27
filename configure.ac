@@ -199,7 +199,7 @@ introspection/Makefile
 po/Makefile.in
 docs/Makefile
 docs/man/Makefile
-docs/man/modem-manager.8
+docs/man/ModemManager.8
 docs/reference/Makefile
 docs/reference/api/Makefile
 docs/reference/api/version.xml

@@ -29,7 +29,7 @@ dbusactivation_DATA = $(dbusactivation_in_files:.service.in=.service)
 
 # Icon
 icondir=${datadir}/icons/hicolor/22x22/apps
-icon_DATA = modem-manager.png
+icon_DATA = ModemManager.png
 
 
 # Polkit

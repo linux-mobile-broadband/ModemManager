@@ -31,7 +31,7 @@ ModemManager.pc
 callouts/mm-modem-probe
 test/lsudev
 
-src/modem-manager
+src/ModemManager
 src/mm-daemon-enums-types.c
 src/mm-daemon-enums-types.h
 src/mm-serial-enums-types.c
@@ -42,8 +42,6 @@ src/tests/test-charsets
 src/tests/test-qcdm-serial-port
 src/tests/test-at-serial-port
 src/tests/test-sms-part
-
-policy/org.freedesktop.modem-manager.policy
 
 cli/mmcli
 
@@ -88,7 +86,7 @@ docs/reference/api/html
 docs/reference/api/tmpl
 docs/reference/api/xml
 
-docs/man/modem-manager.8
+docs/man/ModemManager.8
 
 m4/gtk-doc.m4
 m4/intltool.m4

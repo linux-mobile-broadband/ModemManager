@@ -7,7 +7,7 @@
 
   <vendor>ModemManager</vendor>
   <vendor_url>http://www.freedesktop.org/wiki/ModemManager</vendor_url>
-  <icon_name>modem-manager</icon_name>
+  <icon_name>ModemManager</icon_name>
 
   <action id="org.freedesktop.ModemManager1.Control">
     <_description>Control the Modem Manager daemon</_description>

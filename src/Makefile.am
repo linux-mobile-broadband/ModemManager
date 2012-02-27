@@ -95,9 +95,9 @@ mm-marshal.c: mm-marshal.list mm-marshal.h
 	$(AM_V_GEN) echo "#include \"mm-marshal.h\"" > $@ && \
 		$(GLIB_GENMARSHAL) $< --prefix=mm_marshal --body >> $@
 
-sbin_PROGRAMS = modem-manager
+sbin_PROGRAMS = ModemManager
 
-modem_manager_CPPFLAGS = \
+ModemManager_CPPFLAGS = \
 	$(MM_CFLAGS) \
 	$(GUDEV_CFLAGS) \
 	-I$(top_srcdir) \
@@ -108,10 +108,10 @@ modem_manager_CPPFLAGS = \
 	-DPLUGINDIR=\"$(pkglibdir)\"
 
 if WITH_POLKIT
-modem_manager_CPPFLAGS += $(POLKIT_CFLAGS)
+ModemManager_CPPFLAGS += $(POLKIT_CFLAGS)
 endif
 
-modem_manager_LDADD = \
+ModemManager_LDADD = \
 	$(MM_LIBS) \
 	$(GUDEV_LIBS) \
 	$(builddir)/libmodem-helpers.la \
@@ -119,10 +119,10 @@ modem_manager_LDADD = \
 	$(top_builddir)/libqcdm/src/libqcdm.la
 
 if WITH_POLKIT
-modem_manager_LDADD += $(POLKIT_LIBS)
+ModemManager_LDADD += $(POLKIT_LIBS)
 endif
 
-modem_manager_SOURCES = \
+ModemManager_SOURCES = \
 	main.c \
 	mm-marshal.h \
 	mm-marshal.c \
@@ -188,7 +188,7 @@ modem_manager_SOURCES = \
 	mm-plugin-base.h
 
 if WITH_POLKIT
-modem_manager_SOURCES += \
+ModemManager_SOURCES += \
 	mm-auth-provider-polkit.c \
 	mm-auth-provider-polkit.h
 endif
