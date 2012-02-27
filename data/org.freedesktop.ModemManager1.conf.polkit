@@ -138,6 +138,21 @@
            send_interface="org.freedesktop.ModemManager1.Bearer"
            send_member="Disconnect"/>
 
+    <!-- org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd.xml -->
+
+    <!-- Protected by the USSD policy rule -->
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd"
+           send_member="Initiate"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd"
+           send_member="Respond"/>
+
+    <allow send_destination="org.freedesktop.ModemManager1"
+           send_interface="org.freedesktop.ModemManager1.Modem.Modem3gpp.Ussd"
+           send_member="Cancel"/>
+
   </policy>
 
   <policy user="root">
