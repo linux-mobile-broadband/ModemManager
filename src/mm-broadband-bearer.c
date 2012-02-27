@@ -145,7 +145,6 @@ typedef struct {
     /* 3GPP-specific */
     guint cid;
     guint max_cid;
-    GError *saved_error;
 } DetailedConnectContext;
 
 static gboolean
@@ -173,8 +172,6 @@ detailed_connect_context_complete_and_free (DetailedConnectContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
-    if (ctx->saved_error)
-        g_error_free (ctx->saved_error);
     g_object_unref (ctx->cancellable);
     g_object_unref (ctx->data);
     g_object_unref (ctx->primary);
@@ -443,29 +440,97 @@ connect_cdma (MMBroadbandBearer *self,
 }
 
 /*****************************************************************************/
-/* 3GPP CONNECT
- *
- * 3GPP connection procedure of a bearer involves several steps:
- * 1) Get data port from the modem. Default implementation will have only
- *    one single possible data port, but plugins may have more.
- * 2) Decide which PDP context to use
- *   2.1) Look for an already existing PDP context with the same APN.
- *   2.2) If none found with the same APN, try to find a PDP context without any
- *        predefined APN.
- *   2.3) If none found, look for the highest available CID, and use that one.
- * 3) Activate PDP context.
- * 4) Initiate call.
- */
+/* 3GPP Dialing (sub-step of the 3GPP Connection sequence) */
+
+typedef struct {
+    MMBroadbandBearer *self;
+    MMBaseModem *modem;
+    MMAtSerialPort *primary;
+    GCancellable *cancellable;
+    GSimpleAsyncResult *result;
+    GError *saved_error;
+} Dial3gppContext;
+
+static Dial3gppContext *
+dial_3gpp_context_new (MMBroadbandBearer *self,
+                           MMBaseModem *modem,
+                           MMAtSerialPort *primary,
+                           GCancellable *cancellable,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    Dial3gppContext *ctx;
+
+    ctx = g_new0 (Dial3gppContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->modem = g_object_ref (modem);
+    ctx->primary = g_object_ref (primary);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             dial_3gpp_context_new);
+    ctx->cancellable = g_object_ref (cancellable);
+    return ctx;
+}
 
 static void
-connect_report_ready (MMBaseModem *modem,
+dial_3gpp_context_complete_and_free (Dial3gppContext *ctx)
+{
+    if (ctx->saved_error)
+        g_error_free (ctx->saved_error);
+    g_object_unref (ctx->cancellable);
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->primary);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+dial_3gpp_context_set_error_if_cancelled (Dial3gppContext *ctx,
+                                              GError **error)
+{
+    if (!g_cancellable_is_cancelled (ctx->cancellable))
+        return FALSE;
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_CANCELLED,
+                 "Dial operation has been cancelled");
+    return TRUE;
+}
+
+static gboolean
+dial_3gpp_context_complete_and_free_if_cancelled (Dial3gppContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!dial_3gpp_context_set_error_if_cancelled (ctx, &error))
+        return FALSE;
+
+    g_simple_async_result_take_error (ctx->result, error);
+    dial_3gpp_context_complete_and_free (ctx);
+    return TRUE;
+}
+
+static gboolean
+dial_3gpp_finish (MMBroadbandBearer *self,
+                  GAsyncResult *res,
+                  GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+extended_error_ready (MMBaseModem *modem,
                       GAsyncResult *res,
-                      DetailedConnectContext *ctx)
+                      Dial3gppContext *ctx)
 {
     const gchar *result;
 
     /* If cancelled, complete */
-    if (detailed_connect_context_complete_and_free_if_cancelled (ctx))
+    if (dial_3gpp_context_complete_and_free_if_cancelled (ctx))
         return;
 
     result = mm_base_modem_at_command_finish (modem, res, NULL);
@@ -484,29 +549,96 @@ connect_report_ready (MMBaseModem *modem,
     ctx->saved_error = NULL;
 
     /* Done with errors */
-    detailed_connect_context_complete_and_free (ctx);
+    dial_3gpp_context_complete_and_free (ctx);
 }
 
 static void
-dial_3gpp_ready (MMBaseModem *modem,
-                 GAsyncResult *res,
-                 DetailedConnectContext *ctx)
+atd_ready (MMBaseModem *modem,
+           GAsyncResult *res,
+           Dial3gppContext *ctx)
 {
     /* DO NOT check for cancellable here. If we got here without errors, the
      * bearer is really connected and therefore we need to reflect that in
      * the state machine. */
-    mm_base_modem_at_command_finish (modem, res, &(ctx->saved_error));
+    mm_base_modem_at_command_finish (modem, res, &ctx->saved_error);
+
     if (ctx->saved_error) {
         /* Try to get more information why it failed */
         mm_base_modem_at_command_in_port (
-            modem,
+            ctx->modem,
             ctx->primary,
             "+CEER",
             3,
             FALSE,
             NULL, /* cancellable */
-            (GAsyncReadyCallback)connect_report_ready,
+            (GAsyncReadyCallback)extended_error_ready,
             ctx);
+        return;
+    }
+
+    dial_3gpp_context_complete_and_free (ctx);
+}
+
+static void
+dial_3gpp (MMBroadbandBearer *self,
+           MMBaseModem *modem,
+           MMAtSerialPort *primary,
+           guint cid,
+           GCancellable *cancellable,
+           GAsyncReadyCallback callback,
+           gpointer user_data)
+{
+    gchar *command;
+    Dial3gppContext *ctx;
+
+    ctx = dial_3gpp_context_new (self,
+                                 modem,
+                                 primary,
+                                 cancellable,
+                                 callback,
+                                 user_data);
+
+    /* Use default *99 to connect */
+    command = g_strdup_printf ("ATD*99***%d#", cid);
+    mm_base_modem_at_command_in_port (
+        ctx->modem,
+        ctx->primary,
+        command,
+        60,
+        FALSE,
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)atd_ready,
+        ctx);
+    g_free (command);
+}
+
+/*****************************************************************************/
+/* 3GPP CONNECT
+ *
+ * 3GPP connection procedure of a bearer involves several steps:
+ * 1) Get data port from the modem. Default implementation will have only
+ *    one single possible data port, but plugins may have more.
+ * 2) Decide which PDP context to use
+ *   2.1) Look for an already existing PDP context with the same APN.
+ *   2.2) If none found with the same APN, try to find a PDP context without any
+ *        predefined APN.
+ *   2.3) If none found, look for the highest available CID, and use that one.
+ * 3) Activate PDP context.
+ * 4) Initiate call.
+ */
+
+static void
+dial_3gpp_ready (MMBroadbandModem *modem,
+                 GAsyncResult *res,
+                 DetailedConnectContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->dial_3gpp_finish (ctx->self,
+                                                                      res,
+                                                                      &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        detailed_connect_context_complete_and_free (ctx);
         return;
     }
 
@@ -523,7 +655,6 @@ initialize_pdp_context_ready (MMBaseModem *self,
                               DetailedConnectContext *ctx)
 {
     GError *error = NULL;
-    gchar *command;
 
     /* If cancelled, complete */
     if (detailed_connect_context_complete_and_free_if_cancelled (ctx))
@@ -538,18 +669,13 @@ initialize_pdp_context_ready (MMBaseModem *self,
         return;
     }
 
-    /* Use default *99 to connect */
-    command = g_strdup_printf ("ATD*99***%d#", ctx->cid);
-    mm_base_modem_at_command_in_port (
-        ctx->modem,
-        ctx->primary,
-        command,
-        60,
-        FALSE,
-        NULL, /* cancellable */
-        (GAsyncReadyCallback)dial_3gpp_ready,
-        ctx);
-    g_free (command);
+    MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->dial_3gpp (ctx->self,
+                                                          ctx->modem,
+                                                          ctx->primary,
+                                                          ctx->cid,
+                                                          FALSE,
+                                                          (GAsyncReadyCallback)dial_3gpp_ready,
+                                                          ctx);
 }
 
 static void
@@ -1973,6 +2099,9 @@ mm_broadband_bearer_class_init (MMBroadbandBearerClass *klass)
 
     klass->connect_3gpp = connect_3gpp;
     klass->connect_3gpp_finish = detailed_connect_finish;
+    klass->dial_3gpp = dial_3gpp;
+    klass->dial_3gpp_finish = dial_3gpp_finish;
+
     klass->connect_cdma = connect_cdma;
     klass->connect_cdma_finish = detailed_connect_finish;
 

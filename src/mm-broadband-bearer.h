@@ -66,6 +66,18 @@ struct _MMBroadbandBearerClass {
                                       MMCommonBearerIpConfig **ipv6_config,
                                       GError **error);
 
+    /* Dialing sub-part of 3GPP connection */
+    void     (* dial_3gpp)        (MMBroadbandBearer *self,
+                                   MMBaseModem *modem,
+                                   MMAtSerialPort *primary,
+                                   guint cid,
+                                   GCancellable *cancellable,
+                                   GAsyncReadyCallback callback,
+                                   gpointer user_data);
+    gboolean (* dial_3gpp_finish) (MMBroadbandBearer *self,
+                                   GAsyncResult *res,
+                                   GError **error);
+
     /* Full 3GPP disconnection sequence */
     void     (* disconnect_3gpp)        (MMBroadbandBearer *self,
                                          MMBroadbandModem *modem,
