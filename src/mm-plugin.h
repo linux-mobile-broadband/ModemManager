@@ -36,17 +36,6 @@ typedef struct _MMPlugin MMPlugin;
 
 typedef MMPlugin *(*MMPluginCreateFunc) (void);
 
-/*
- * 'level' is a value between 0 and 100 inclusive, where 0 means the plugin has
- * no support for the port, and 100 means the plugin has full support for the
- * port.
- */
-typedef void (*MMSupportsPortResultFunc) (MMPlugin *plugin,
-                                          const char *subsys,
-                                          const char *name,
-                                          guint32 level,
-                                          gpointer user_data);
-
 typedef enum {
     MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED = 0x0,
     MM_PLUGIN_SUPPORTS_PORT_DEFER,
