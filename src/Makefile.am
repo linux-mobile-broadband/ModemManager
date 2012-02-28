@@ -132,6 +132,8 @@ nodist_ModemManager_SOURCES = \
 
 ModemManager_SOURCES = \
 	main.c \
+	mm-context.h \
+	mm-context.c \
 	mm-log.c \
 	mm-log.h \
 	mm-private-boxed-types.h \

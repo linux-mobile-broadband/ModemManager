@@ -27,6 +27,7 @@
 
 #include "mm-manager.h"
 #include "mm-log.h"
+#include "mm-context.h"
 
 #if !defined(MM_DIST_VERSION)
 # define MM_DIST_VERSION VERSION
@@ -103,41 +104,18 @@ main (int argc, char *argv[])
 {
     GDBusConnection *bus;
     GError *err = NULL;
-    GOptionContext *opt_ctx;
     guint name_id;
-    const char *log_level = NULL, *log_file = NULL;
-    gboolean debug = FALSE, show_ts = FALSE, rel_ts = FALSE;
-
-    GOptionEntry entries[] = {
-		{ "debug", 0, 0, G_OPTION_ARG_NONE, &debug, "Output to console rather than syslog", NULL },
-		{ "log-level", 0, 0, G_OPTION_ARG_STRING, &log_level, "Log level: one of [ERR, WARN, INFO, DEBUG]", "INFO" },
-		{ "log-file", 0, 0, G_OPTION_ARG_STRING, &log_file, "Path to log file", NULL },
-		{ "timestamps", 0, 0, G_OPTION_ARG_NONE, &show_ts, "Show timestamps in log output", NULL },
-		{ "relative-timestamps", 0, 0, G_OPTION_ARG_NONE, &rel_ts, "Use relative timestamps (from MM start)", NULL },
-		{ NULL }
-	};
 
     g_type_init ();
 
-	opt_ctx = g_option_context_new (NULL);
-	g_option_context_set_summary (opt_ctx, "DBus system service to communicate with modems.");
-	g_option_context_add_main_entries (opt_ctx, entries, NULL);
+    /* Setup application context */
+    mm_context_init (argc, argv);
 
-	if (!g_option_context_parse (opt_ctx, &argc, &argv, &err)) {
-		g_warning ("%s\n", err->message);
-		g_error_free (err);
-		exit (1);
-	}
-
-	g_option_context_free (opt_ctx);
-
-    if (debug) {
-        log_level = "DEBUG";
-        if (!show_ts && !rel_ts)
-            show_ts = TRUE;
-    }
-
-    if (!mm_log_setup (log_level, log_file, show_ts, rel_ts, &err)) {
+    if (!mm_log_setup (mm_context_get_log_level (),
+                       mm_context_get_log_file (),
+                       mm_context_get_timestamps (),
+                       mm_context_get_relative_timestamps (),
+                       &err)) {
         g_warning ("Failed to set up logging: %s", err->message);
         g_error_free (err);
         exit (1);
