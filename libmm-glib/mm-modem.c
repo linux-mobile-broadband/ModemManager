@@ -1458,14 +1458,19 @@ mm_modem_command (MMModem *self,
                   GAsyncReadyCallback callback,
                   gpointer user_data)
 {
+    gint old_timeout;
+
     g_return_if_fail (MM_GDBUS_IS_MODEM (self));
 
+    old_timeout = g_dbus_proxy_get_default_timeout (G_DBUS_PROXY (self));
+    g_dbus_proxy_set_default_timeout (G_DBUS_PROXY (self), (timeout + 1) * 1000);
     mm_gdbus_modem_call_command (self,
                                  cmd,
                                  timeout,
                                  cancellable,
                                  callback,
                                  user_data);
+    g_dbus_proxy_set_default_timeout (G_DBUS_PROXY (self), old_timeout);
 }
 
 gchar *
@@ -1494,15 +1499,22 @@ mm_modem_command_sync (MMModem *self,
                        GError **error)
 {
     gchar *result;
+    gboolean success;
+    gint old_timeout;
 
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    if (!mm_gdbus_modem_call_command_sync (self,
-                                           cmd,
-                                           timeout,
-                                           &result,
-                                           cancellable,
-                                           error))
+    old_timeout = g_dbus_proxy_get_default_timeout (G_DBUS_PROXY (self));
+    g_dbus_proxy_set_default_timeout (G_DBUS_PROXY (self), (timeout + 1) * 1000);
+    success = mm_gdbus_modem_call_command_sync (self,
+                                                cmd,
+                                                timeout,
+                                                &result,
+                                                cancellable,
+                                                error);
+    g_dbus_proxy_set_default_timeout (G_DBUS_PROXY (self), old_timeout);
+
+    if (!success)
         return NULL;
 
     return result;
