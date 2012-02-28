@@ -57,7 +57,6 @@ typedef struct {
     gchar *name;
     GUdevClient *client;
     GHashTable *tasks;
-    gboolean sort_last;
 
     /* Plugin-specific setups */
     gchar **subsystems;
@@ -87,7 +86,6 @@ enum {
     PROP_ALLOWED_QCDM,
     PROP_CUSTOM_INIT,
     PROP_SEND_DELAY,
-    PROP_SORT_LAST,
     LAST_PROP
 };
 
@@ -206,7 +204,10 @@ get_name (MMPlugin *plugin)
 static gboolean
 get_sort_last (const MMPlugin *plugin)
 {
-    return MM_PLUGIN_BASE_GET_PRIVATE (plugin)->sort_last;
+    MMPluginBasePrivate *priv = MM_PLUGIN_BASE_GET_PRIVATE (plugin);
+
+    /* If we have any post-probing filter, we need to sort the plugin last */
+    return (priv->vendor_strings || priv->product_strings);
 }
 
 static char *
@@ -824,10 +825,6 @@ set_property (GObject *object, guint prop_id,
         /* Construct only */
         priv->send_delay = (guint64)g_value_get_uint64 (value);
         break;
-    case PROP_SORT_LAST:
-        /* Construct only */
-        priv->sort_last = g_value_get_boolean (value);
-        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -876,9 +873,6 @@ get_property (GObject *object, guint prop_id,
         break;
     case PROP_SEND_DELAY:
         g_value_set_uint64 (value, priv->send_delay);
-        break;
-    case PROP_SORT_LAST:
-        g_value_set_boolean (value, priv->sort_last);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -1018,13 +1012,4 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
                               "in microseconds",
                               0, G_MAXUINT64, 100000,
                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
-
-    g_object_class_install_property
-        (object_class, PROP_SORT_LAST,
-         g_param_spec_boolean (MM_PLUGIN_BASE_SORT_LAST,
-                               "Sort Last",
-                               "Whether the plugin should be sorted last in the"
-                               "list of plugins loaded",
-                               FALSE,
-                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }
