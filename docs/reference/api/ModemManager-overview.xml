@@ -55,7 +55,7 @@
     </para>
     <figure id="mm-modemmanager-states">
       <title>ModemManager states</title>
-      <graphic fileref="../ModemManager-states.png" format="PNG"></graphic>
+      <graphic fileref="ModemManager-states.png" format="PNG"></graphic>
     </figure>
     <para>
       The state machine of a modem can be summarized in 5 main sequences:
