@@ -34,8 +34,8 @@ libmodem_helpers_la_SOURCES = \
 
 # libserial specific enum types
 SERIAL_ENUMS = \
-	mm-port.h \
-	mm-at-serial-port.h
+	$(srcdir)/mm-port.h \
+	$(srcdir)/mm-at-serial-port.h
 
 mm-serial-enums-types.h: Makefile.am $(SERIAL_ENUMS) $(top_srcdir)/build-aux/mm-enums-template.h
 	$(AM_V_GEN) $(GLIB_MKENUMS) \
@@ -73,7 +73,7 @@ libserial_la_SOURCES = \
 	mm-qcdm-serial-port.h
 
 # Daemon specific enum types
-DAEMON_ENUMS = mm-bearer.h
+DAEMON_ENUMS = $(srcdir)/mm-bearer.h
 
 mm-daemon-enums-types.h: Makefile.am $(DAEMON_ENUMS) $(top_srcdir)/build-aux/mm-enums-template.h
 	$(AM_V_GEN) $(GLIB_MKENUMS) \
