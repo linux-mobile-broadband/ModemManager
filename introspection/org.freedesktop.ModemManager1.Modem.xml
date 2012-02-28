@@ -148,11 +148,14 @@
 
     <!--
        Command
-       @cmd The command string, e.g. "AT+GCAP" or "+GCAP" (leading AT is inserted if necessary)
-       @timeout The number of seconds to wait for a response
-       @response The modem's response
+       @cmd The command string, e.g. "AT+GCAP" or "+GCAP" (leading AT is inserted if necessary).
+       @timeout The number of seconds to wait for a response.
+       @response The modem's response.
 
        Send an arbitrary AT command to a modem and get the response.
+
+       Note that using this interface call is only allowed when running
+       ModemManager in debug mode.
       -->
     <method name="Command">
       <arg name="cmd"      type="s" direction="in"  />

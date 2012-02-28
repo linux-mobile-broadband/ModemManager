@@ -24,6 +24,7 @@
 #include "mm-sim.h"
 #include "mm-bearer-list.h"
 #include "mm-log.h"
+#include "mm-context.h"
 
 #define SIGNAL_QUALITY_RECENT_TIMEOUT_SEC     60
 #define SIGNAL_QUALITY_CHECK_TIMEOUT_SEC      30
@@ -363,6 +364,17 @@ handle_command_auth_ready (MMBaseModem *self,
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_command_context_free (ctx);
+        return;
+    }
+
+    /* If we are not in Debug mode, report an error */
+    if (!mm_context_get_debug ()) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNAUTHORIZED,
+                                               "Cannot send AT command to modem: "
+                                               "operation only allowed in debug mode");
         handle_command_context_free (ctx);
         return;
     }
