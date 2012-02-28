@@ -75,11 +75,11 @@ po/quot.sed
 po/remove-potcdate.sin
 
 docs/reference/api/version.xml
-docs/reference/api/mm.args
-docs/reference/api/mm.hierarchy
-docs/reference/api/mm.interfaces
-docs/reference/api/mm.prerequisites
-docs/reference/api/mm.signals
+docs/reference/api/ModemManager.args
+docs/reference/api/ModemManager.hierarchy
+docs/reference/api/ModemManager.interfaces
+docs/reference/api/ModemManager.prerequisites
+docs/reference/api/ModemManager.signals
 docs/reference/api/*.stamp
 docs/reference/api/*.txt
 docs/reference/api/html

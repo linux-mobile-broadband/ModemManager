@@ -12,7 +12,7 @@ $(DIAGRAMS_PNG): $(DIAGRAMS)
 	$(AM_V_GEN) $(DIA) -t png $^ 1>/dev/null 2>&1
 
 # The name of the module.
-DOC_MODULE = mm
+DOC_MODULE = ModemManager
 
 # The top-level SGML file.
 DOC_MAIN_SGML_FILE = $(DOC_MODULE)-docs.xml
@@ -60,8 +60,8 @@ content_files = \
 	$(NULL)
 
 expand_content_files = \
-	mm-overview.xml \
-	mm-dbus-reference.xml \
+	ModemManager-overview.xml \
+	ModemManager-dbus-reference.xml \
 	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.xml \
 	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Sim.xml \
 	$(top_builddir)/libmm-common/mm-gdbus-doc-org.freedesktop.ModemManager1.Sms.xml \
@@ -88,8 +88,8 @@ CLEANFILES =
 endif
 
 EXTRA_DIST += \
-	mm-overview.xml \
-	mm-dbus-reference.xml \
+	ModemManager-overview.xml \
+	ModemManager-dbus-reference.xml \
 	version.xml.in \
 	$(DIAGRAMS) \
 	$(NULL)

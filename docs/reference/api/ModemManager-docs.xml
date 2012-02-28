@@ -3,7 +3,7 @@
 "http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd" [
 <!ENTITY version SYSTEM "version.xml">
 ]>
-<book id="mm" xmlns:xi="http://www.w3.org/2003/XInclude">
+<book id="ModemManager" xmlns:xi="http://www.w3.org/2003/XInclude">
   <bookinfo>
     <title>ModemManager Reference Manual</title>
     <releaseinfo>For ModemManager version &version;</releaseinfo>
@@ -61,10 +61,10 @@
   </bookinfo>
 
   <!-- Part 1, overview -->
-  <xi:include href="xml/mm-overview.xml"/>
+  <xi:include href="xml/ModemManager-overview.xml"/>
 
   <!-- Part 2, DBus reference -->
-  <xi:include href="xml/mm-dbus-reference.xml"/>
+  <xi:include href="xml/ModemManager-dbus-reference.xml"/>
 
   <index>
     <title>Index</title>
