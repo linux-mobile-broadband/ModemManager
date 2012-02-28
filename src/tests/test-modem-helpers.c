@@ -1223,7 +1223,7 @@ test_cgdcont_response_nokia (void *f, gpointer d)
 {
     const gchar *reply = "+CGDCONT: 1,\"IP\",,,0,0";
     static MM3gppPdpContext expected[] = {
-        { 1, "IP", "" }
+        { 1, "IP", NULL }
     };
 
     test_cgdcont_results ("Nokia", reply, &expected[0], G_N_ELEMENTS (expected));
