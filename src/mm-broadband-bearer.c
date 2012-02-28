@@ -857,7 +857,8 @@ parse_pdp_list (MMBaseModem *self,
                 mm_dbg ("Found PDP context with CID %u and no APN",
                         pdp->cid);
                 cid = pdp->cid;
-            } else if (g_str_equal (pdp->apn, ctx->self->priv->apn)) {
+            } else if (ctx->self->priv->apn &&
+                       g_str_equal (pdp->apn, ctx->self->priv->apn)) {
                 /* Found a PDP context with the same CID, we'll use it. */
                 mm_dbg ("Found PDP context with CID %u for APN '%s'",
                         pdp->cid, pdp->apn);
