@@ -461,15 +461,15 @@ typedef enum { /*< underscore_name=mm_modem_3gpp_registration_state >*/
  * and the PIN and PIN2 locks, which are SIM locks.
  */
 typedef enum { /*< underscore_name=mm_modem_3gpp_facility >*/
-    MM_MODEM_3GPP_FACILITY_NONE          = 0x00,
-    MM_MODEM_3GPP_FACILITY_SIM           = 0x01,
-    MM_MODEM_3GPP_FACILITY_FIXED_DIALING = 0x02,
-    MM_MODEM_3GPP_FACILITY_PH_SIM        = 0x04,
-    MM_MODEM_3GPP_FACILITY_PH_FSIM       = 0x08,
-    MM_MODEM_3GPP_FACILITY_NET_PERS      = 0x10,
-    MM_MODEM_3GPP_FACILITY_NET_SUB_PERS  = 0x20,
-    MM_MODEM_3GPP_FACILITY_PROVIDER_PERS = 0x40,
-    MM_MODEM_3GPP_FACILITY_CORP_PERS     = 0x80
+    MM_MODEM_3GPP_FACILITY_NONE          = 0,
+    MM_MODEM_3GPP_FACILITY_SIM           = 1 << 0,
+    MM_MODEM_3GPP_FACILITY_FIXED_DIALING = 1 << 1,
+    MM_MODEM_3GPP_FACILITY_PH_SIM        = 1 << 2,
+    MM_MODEM_3GPP_FACILITY_PH_FSIM       = 1 << 3,
+    MM_MODEM_3GPP_FACILITY_NET_PERS      = 1 << 4,
+    MM_MODEM_3GPP_FACILITY_NET_SUB_PERS  = 1 << 5,
+    MM_MODEM_3GPP_FACILITY_PROVIDER_PERS = 1 << 6,
+    MM_MODEM_3GPP_FACILITY_CORP_PERS     = 1 << 7,
 } MMModem3gppFacility;
 
 /**
