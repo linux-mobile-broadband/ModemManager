@@ -1580,6 +1580,22 @@ initialization_context_complete_and_free (InitializationContext *ctx)
 }
 
 static void
+sim_pin_lock_enabled_cb (MMSim *self,
+                         gboolean enabled,
+                         MmGdbusModem3gpp *skeleton)
+{
+    MMModem3gppFacility facilities;
+
+    facilities = mm_gdbus_modem3gpp_get_enabled_facility_locks (skeleton);
+    if (enabled)
+        facilities |= MM_MODEM_3GPP_FACILITY_SIM;
+    else
+        facilities &= ~MM_MODEM_3GPP_FACILITY_SIM;
+
+    mm_gdbus_modem3gpp_set_enabled_facility_locks (skeleton, facilities);
+}
+
+static void
 load_enabled_facility_locks_ready (MMIfaceModem3gpp *self,
                                    GAsyncResult *res,
                                    InitializationContext *ctx)
@@ -1593,6 +1609,21 @@ load_enabled_facility_locks_ready (MMIfaceModem3gpp *self,
     if (error) {
         mm_warn ("couldn't load facility locks: '%s'", error->message);
         g_error_free (error);
+    } else {
+        MMSim *sim = NULL;
+
+        /* We loaded the initial list of facility locks; but we do need to update
+         * the SIM PIN lock status when that changes. We'll connect to the signal
+         * which notifies about such update. There is no need to ref self as the
+         * SIM itself is an object which exists as long as self exists. */
+        g_object_get (self,
+                      MM_IFACE_MODEM_SIM, &sim,
+                      NULL);
+        g_signal_connect (sim,
+                          MM_SIM_PIN_LOCK_ENABLED,
+                          G_CALLBACK (sim_pin_lock_enabled_cb),
+                          ctx->skeleton);
+        g_object_unref (sim);
     }
 
     /* Go on to next step */
