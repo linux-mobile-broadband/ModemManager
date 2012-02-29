@@ -333,10 +333,10 @@ typedef enum { /*< underscore_name=mm_sms_storage >*/
  * Sources of location information supported by the modem.
  */
 typedef enum { /*< underscore_name=mm_modem_location_source >*/
-    MM_MODEM_LOCATION_SOURCE_NONE       = 0,
+    MM_MODEM_LOCATION_SOURCE_NONE        = 0,
     MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI = 1 << 0,
-    MM_MODEM_LOCATION_SOURCE_GPS_RAW    = 1 << 1,
-    MM_MODEM_LOCATION_SOURCE_GPS_NMEA   = 1 << 2,
+    MM_MODEM_LOCATION_SOURCE_GPS_RAW     = 1 << 1,
+    MM_MODEM_LOCATION_SOURCE_GPS_NMEA    = 1 << 2,
 } MMModemLocationSource;
 
 /**
