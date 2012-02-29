@@ -32,6 +32,7 @@
 #include "mm-common-bearer-properties.h"
 #include "mm-common-bearer-ip-config.h"
 #include "mm-common-location-3gpp.h"
+#include "mm-unlock-retries.h"
 #include "mm-gdbus-manager.h"
 #include "mm-gdbus-modem.h"
 #include "mm-gdbus-bearer.h"
