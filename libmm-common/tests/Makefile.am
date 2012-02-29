@@ -17,4 +17,9 @@ test_common_helpers_LDADD = \
 	$(top_builddir)/libmm-common/libmm-common.la \
 	$(MM_LIBS)
 
-TEST_PROGS = test-common-helpers
+if WITH_TESTS
+
+check-local: test-common-helpers
+	$(abs_builddir)/test-common-helpers
+
+endif
