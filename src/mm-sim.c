@@ -32,6 +32,7 @@
 #include "mm-utils.h"
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
+#include "mm-marshal.h"
 
 static void async_initable_iface_init     (GAsyncInitableIface *iface);
 
@@ -47,6 +48,11 @@ enum {
     PROP_LAST
 };
 
+enum {
+    SIGNAL_PIN_LOCK_ENABLED,
+    SIGNAL_LAST
+};
+
 static GParamSpec *properties[PROP_LAST];
 
 struct _MMSimPrivate {
@@ -57,6 +63,8 @@ struct _MMSimPrivate {
     /* The path where the SIM object is exported */
     gchar *path;
 };
+
+static guint signals[SIGNAL_LAST] = { 0 };
 
 /*****************************************************************************/
 
@@ -310,8 +318,12 @@ handle_enable_pin_ready (MMSim *self,
     MM_SIM_GET_CLASS (self)->enable_pin_finish (self, res, &error);
     if (error)
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else
+    else {
         mm_gdbus_sim_complete_enable_pin (MM_GDBUS_SIM (self), ctx->invocation);
+
+        /* Signal about the new lock state */
+        g_signal_emit (self, signals[SIGNAL_PIN_LOCK_ENABLED], 0, ctx->enabled);
+    }
 
     handle_enable_pin_context_free (ctx);
 }
@@ -1778,4 +1790,14 @@ mm_sim_class_init (MMSimClass *klass)
                              MM_TYPE_BASE_MODEM,
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_MODEM, properties[PROP_MODEM]);
+
+    /* Signals */
+    signals[SIGNAL_PIN_LOCK_ENABLED] =
+        g_signal_new (MM_SIM_PIN_LOCK_ENABLED,
+                      G_OBJECT_CLASS_TYPE (object_class),
+                      G_SIGNAL_RUN_FIRST,
+                      G_STRUCT_OFFSET (MMSimClass, pin_lock_enabled),
+                      NULL, NULL,
+                      mm_marshal_VOID__BOOLEAN,
+                      G_TYPE_NONE, 1, G_TYPE_BOOLEAN);
 }

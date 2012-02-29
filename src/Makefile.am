@@ -196,6 +196,7 @@ ModemManager_SOURCES = \
 # Additional dependency rules
 mm-bearer.c: mm-daemon-enums-types.h
 mm-sms-list.c: mm-marshal.h
+mm-sim.c: mm-marshal.h
 
 if WITH_POLKIT
 ModemManager_SOURCES += \

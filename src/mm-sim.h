@@ -35,9 +35,13 @@ typedef struct _MMSim MMSim;
 typedef struct _MMSimClass MMSimClass;
 typedef struct _MMSimPrivate MMSimPrivate;
 
+/* Properties */
 #define MM_SIM_PATH           "sim-path"
 #define MM_SIM_CONNECTION     "sim-connection"
 #define MM_SIM_MODEM          "sim-modem"
+
+/* Signals */
+#define MM_SIM_PIN_LOCK_ENABLED "pin-lock-enabled"
 
 struct _MMSim {
     MmGdbusSimSkeleton parent;
@@ -117,6 +121,10 @@ struct _MMSimClass {
     gboolean (* send_puk_finish) (MMSim *self,
                                   GAsyncResult *res,
                                   GError **error);
+
+    /* Signals */
+    void (*pin_lock_enabled) (MMSim *self,
+                              gboolean enabled);
 };
 
 GType mm_sim_get_type (void);
