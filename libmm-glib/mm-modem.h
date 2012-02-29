@@ -63,7 +63,7 @@ gchar             *mm_modem_dup_plugin               (MMModem *self);
 const gchar       *mm_modem_get_equipment_identifier (MMModem *self);
 gchar             *mm_modem_dup_equipment_identifier (MMModem *self);
 MMModemLock        mm_modem_get_unlock_required      (MMModem *self);
-guint              mm_modem_get_unlock_retries       (MMModem *self);
+MMUnlockRetries   *mm_modem_get_unlock_retries       (MMModem *self);
 MMModemState       mm_modem_get_state                (MMModem *self);
 MMModemAccessTechnology mm_modem_get_access_technologies (MMModem *self);
 guint              mm_modem_get_signal_quality       (MMModem *self,

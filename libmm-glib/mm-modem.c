@@ -517,18 +517,22 @@ mm_modem_get_unlock_required (MMModem *self)
  * mm_modem_get_unlock_retries:
  * @self: A #MMModem.
  *
- * Gets the number of unlock retries remaining for the lock code given by the
- * UnlockRequired property (if any), or 999 if the device does not support reporting
- * unlock retries.
+ * TODO
  *
- * Returns: The number of unlock retries.
+ * Returns: a new reference to a #MMUnlockRetries object.
  */
-guint
+MMUnlockRetries *
 mm_modem_get_unlock_retries (MMModem *self)
 {
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), 0);
+    MMUnlockRetries *unlock_retries;
+    GVariant *dictionary;
 
-    return mm_gdbus_modem_get_unlock_retries (self);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
+
+    dictionary = mm_gdbus_modem_get_unlock_retries (self);
+    unlock_retries = mm_unlock_retries_new_from_dictionary (dictionary);
+
+    return unlock_retries;
 }
 
 /**

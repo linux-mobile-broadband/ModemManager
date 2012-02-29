@@ -2165,6 +2165,106 @@ mm_iface_modem_unlock_check (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Unlock retry count */
+
+gboolean
+mm_iface_modem_update_unlock_retries_finish (MMIfaceModem *self,
+                                             GAsyncResult *res,
+                                             GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    return g_simple_async_result_get_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res));
+}
+
+static void
+update_unlock_retries (MMIfaceModem *self,
+                       MMUnlockRetries *unlock_retries)
+{
+    MmGdbusModem *skeleton = NULL;
+    GError *error = NULL;
+    GVariant *previous_dictionary;
+    MMUnlockRetries *previous_unlock_retries;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    previous_dictionary = mm_gdbus_modem_get_unlock_retries (skeleton);
+    previous_unlock_retries = mm_unlock_retries_new_from_dictionary (previous_dictionary);
+
+    if (error) {
+        mm_warn ("Couldn't build previous unlock retries: '%s'", error->message);
+        g_error_free (error);
+    } else {
+        /* If they are different, update */
+        if (!mm_unlock_retries_cmp (unlock_retries, previous_unlock_retries)) {
+            GVariant *new_dictionary;
+
+            new_dictionary = mm_unlock_retries_get_dictionary (unlock_retries);
+            mm_gdbus_modem_set_unlock_retries (skeleton, new_dictionary);
+            g_variant_unref (new_dictionary);
+        }
+    }
+
+    g_object_unref (previous_unlock_retries);
+    g_object_unref (skeleton);
+}
+
+static void
+unlock_retries_ready (MMIfaceModem *self,
+                      GAsyncResult *res,
+                      GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+    MMUnlockRetries *unlock_retries;
+
+    unlock_retries = MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_retries_finish (self, res, &error);
+    if (!unlock_retries) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    /* Update the dictionary in the DBus interface */
+    update_unlock_retries (self, unlock_retries);
+    g_object_unref (unlock_retries);
+
+    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+void
+mm_iface_modem_update_unlock_retries (MMIfaceModem *self,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        mm_iface_modem_update_unlock_retries);
+
+    if (MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_retries &&
+        MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_retries_finish) {
+        MM_IFACE_MODEM_GET_INTERFACE (self)->load_unlock_retries (
+            self,
+            (GAsyncReadyCallback)unlock_retries_ready,
+            result);
+        return;
+    }
+
+    /* Return FALSE when we cannot load unlock retries */
+    g_simple_async_result_set_op_res_gboolean (result, FALSE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* MODEM DISABLING */
 
 typedef struct _DisablingContext DisablingContext;
@@ -3043,7 +3143,23 @@ load_unlock_required_ready (MMIfaceModem *self,
     interface_initialization_step (ctx);
 }
 
-UINT_REPLY_READY_FN (unlock_retries, "Unlock Retries")
+static void
+update_unlock_retries_ready (MMIfaceModem *self,
+                             GAsyncResult *res,
+                             InitializationContext *ctx)
+{
+    GError *error = NULL;
+
+    mm_iface_modem_update_unlock_retries_finish (self, res, &error);
+    if (error) {
+        mm_warn ("couldn't update unlock retries: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
 
 static void
 sim_new_ready (GAsyncInitable *initable,
@@ -3298,24 +3414,10 @@ interface_initialization_step (InitializationContext *ctx)
         ctx->step++;
 
     case INITIALIZATION_STEP_UNLOCK_RETRIES:
-        if ((MMModemLock)mm_gdbus_modem_get_unlock_required (ctx->skeleton) == MM_MODEM_LOCK_NONE) {
-            /* Default to 0 when unlocked */
-            mm_gdbus_modem_set_unlock_retries (ctx->skeleton, 0);
-        } else {
-            if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_retries &&
-                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_retries_finish) {
-                MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_retries (
-                    ctx->self,
-                    (GAsyncReadyCallback)load_unlock_retries_ready,
-                    ctx);
-                return;
-            }
-
-            /* Default to 999 when we cannot check it */
-            mm_gdbus_modem_set_unlock_retries (ctx->skeleton, 999);
-        }
-        /* Fall down to next step */
-        ctx->step++;
+        mm_iface_modem_update_unlock_retries (ctx->self,
+                                              (GAsyncReadyCallback)update_unlock_retries_ready,
+                                              ctx);
+        return;
 
     case INITIALIZATION_STEP_SIM:
         /* If the modem doesn't need any SIM, skip */

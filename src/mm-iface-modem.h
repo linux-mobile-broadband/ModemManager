@@ -19,6 +19,8 @@
 #include <glib-object.h>
 #include <gio/gio.h>
 
+#include <libmm-common.h>
+
 #include "mm-charsets.h"
 #include "mm-at-serial-port.h"
 #include "mm-bearer.h"
@@ -108,9 +110,9 @@ struct _MMIfaceModem {
     void (*load_unlock_retries) (MMIfaceModem *self,
                                  GAsyncReadyCallback callback,
                                  gpointer user_data);
-    MMModemLock (*load_unlock_retries_finish) (MMIfaceModem *self,
-                                               GAsyncResult *res,
-                                               GError **error);
+    MMUnlockRetries * (*load_unlock_retries_finish) (MMIfaceModem *self,
+                                                     GAsyncResult *res,
+                                                     GError **error);
 
     /* Loading of the SupportedModes property */
     void (*load_supported_modes) (MMIfaceModem *self,
@@ -334,6 +336,14 @@ void        mm_iface_modem_unlock_check        (MMIfaceModem *self,
 MMModemLock mm_iface_modem_unlock_check_finish (MMIfaceModem *self,
                                                 GAsyncResult *res,
                                                 GError **error);
+
+/* Check unlock retries */
+void mm_iface_modem_update_unlock_retries            (MMIfaceModem *self,
+                                                      GAsyncReadyCallback callback,
+                                                      gpointer user_data);
+gboolean mm_iface_modem_update_unlock_retries_finish (MMIfaceModem *self,
+                                                      GAsyncResult *res,
+                                                      GError **error);
 
 /* Request signal quality check update.
  * It will not only return the signal quality status, but also set the property

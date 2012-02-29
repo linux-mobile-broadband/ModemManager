@@ -315,22 +315,13 @@
     <!--
         UnlockRetries:
 
-        The number of unlock retries remaining for the lock code given by the
-        UnlockRequired property (if any), or 999 if the device does not support reporting
-        unlock retries.
-    -->
-    <property name="UnlockRetries" type="u" access="read" />
-
-    <!--
-        PinRetryCounts:
-
         A dictionary in which the keys are <link linkend="MMModemLock">MMModemLock</link>
         flags, and the values are integers giving the number of PIN tries remaining
         before the code becomes blocked (requiring a PUK) or permanently blocked. Dictionary
         entries exist only for the codes for which the modem is able to report retry
         counts.
      -->
-    <property name="PinRetryCounts" type="a{uu}" access="read" />
+    <property name="UnlockRetries" type="a{uu}" access="read" />
 
     <!--
         State:

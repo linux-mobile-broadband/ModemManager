@@ -263,9 +263,7 @@ print_bearer_short_info (MMBearer *bearer)
 static void
 print_modem_info (void)
 {
-    MMModemLock unlock_required;
     gchar *prefixed_revision;
-    gchar *unlock;
     gchar *capabilities_string;
     gchar *access_technologies_string;
     gchar *supported_modes_string;
@@ -273,7 +271,9 @@ print_modem_info (void)
     gchar *preferred_mode_string;
     gchar *supported_bands_string;
     gchar *bands_string;
+    gchar *unlock_retries_string;
     MMModemBand *bands = NULL;
+    MMUnlockRetries *unlock_retries;
     guint n_bands = 0;
 
     /* Not the best thing to do, as we may be doing _get() calls twice, but
@@ -282,22 +282,6 @@ print_modem_info (void)
 #define VALIDATE_UNKNOWN(str) (str ? str : "unknown")
 #undef VALIDATE_PATH
 #define VALIDATE_PATH(str) ((str && !g_str_equal (str, "/")) ? str : "none")
-
-    /* Strings with mixed properties */
-    unlock_required = mm_modem_get_unlock_required (ctx->modem);
-    switch (unlock_required) {
-    case MM_MODEM_LOCK_NONE:
-        unlock = g_strdup ("not required");
-        break;
-    case MM_MODEM_LOCK_UNKNOWN:
-        unlock = g_strdup ("unknown");
-        break;
-    default:
-        unlock = g_strdup_printf ("%s (%u retries)",
-                                  mm_modem_lock_get_string (unlock_required),
-                                  mm_modem_get_unlock_retries (ctx->modem));
-        break;
-    }
 
     /* Strings in heap */
     capabilities_string = mm_modem_capability_build_string_from_mask (
@@ -316,6 +300,10 @@ print_modem_info (void)
         mm_modem_get_preferred_mode (ctx->modem));
     supported_modes_string = mm_modem_mode_build_string_from_mask (
         mm_modem_get_supported_modes (ctx->modem));
+
+    unlock_retries = mm_modem_get_unlock_retries (ctx->modem);
+    unlock_retries_string = mm_unlock_retries_build_string (unlock_retries);
+    g_object_unref (unlock_retries);
 
     /* Rework possible multiline strings */
     prefixed_revision = prefix_newlines ("           |                  ",
@@ -351,10 +339,12 @@ print_modem_info (void)
 
     /* Status related stuff */
     g_print ("  -------------------------\n"
-             "  Status   |         unlock: '%s'\n"
+             "  Status   |           lock: '%s'\n"
+             "           | unlock retries: '%s'\n"
              "           |          state: '%s'\n"
              "           |    access tech: '%s'\n",
-             VALIDATE_UNKNOWN (unlock),
+             mm_modem_lock_get_string (mm_modem_get_unlock_required (ctx->modem)),
+             VALIDATE_UNKNOWN (unlock_retries_string),
              VALIDATE_UNKNOWN (mm_modem_state_get_string (mm_modem_get_state (ctx->modem))),
              VALIDATE_UNKNOWN (access_technologies_string));
 
@@ -446,7 +436,7 @@ print_modem_info (void)
     g_free (allowed_modes_string);
     g_free (preferred_mode_string);
     g_free (supported_modes_string);
-    g_free (unlock);
+    g_free (unlock_retries_string);
 }
 
 static void
