@@ -910,9 +910,10 @@ mm_gsm_parse_clck_test_response (const char *reply,
     if (g_regex_match_full (r, p, strlen (p), 0, 0, &match_info, NULL)) {
         while (g_match_info_matches (match_info)) {
             str = g_match_info_fetch (match_info, 1);
-            if (str)
+            if (str) {
                 facilities |= mm_gsm_string_to_facility (str);
-            g_free (str);
+                g_free (str);
+            }
 
             g_match_info_next (match_info, NULL);
             success = TRUE;
@@ -956,6 +957,8 @@ mm_gsm_parse_clck_response (const char *reply, gboolean *enabled)
                 *enabled = TRUE;
             else
                 success = FALSE;
+
+            g_free (str);
         }
     }
     g_match_info_free (match_info);
@@ -1271,4 +1274,3 @@ done:
 
     return array;
 }
-
