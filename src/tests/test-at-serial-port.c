@@ -17,7 +17,6 @@
 #include <string.h>
 #include <glib.h>
 
-#include "mm-errors.h"
 #include "mm-at-serial-port.h"
 #include "mm-log.h"
 
