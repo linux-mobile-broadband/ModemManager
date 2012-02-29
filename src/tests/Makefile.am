@@ -89,7 +89,7 @@ test_sms_part_LDADD = \
 
 if WITH_TESTS
 
-check-local: test-modem-helpers
+check-local: test-modem-helpers test-charsets test-qcdm-serial-port test-sms-part
 	$(abs_builddir)/test-modem-helpers
 	$(abs_builddir)/test-charsets
 	$(abs_builddir)/test-qcdm-serial-port
