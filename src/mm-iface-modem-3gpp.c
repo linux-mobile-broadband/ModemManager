@@ -1537,6 +1537,7 @@ static void interface_initialization_step (InitializationContext *ctx);
 typedef enum {
     INITIALIZATION_STEP_FIRST,
     INITIALIZATION_STEP_IMEI,
+    INITIALIZATION_STEP_ENABLED_FACILITY_LOCKS,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -1579,6 +1580,27 @@ initialization_context_complete_and_free (InitializationContext *ctx)
 }
 
 static void
+load_enabled_facility_locks_ready (MMIfaceModem3gpp *self,
+                                   GAsyncResult *res,
+                                   InitializationContext *ctx)
+{
+    GError *error = NULL;
+    MMModem3gppFacility facilities;
+
+    facilities = MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_enabled_facility_locks_finish (self, res, &error);
+    mm_gdbus_modem3gpp_set_enabled_facility_locks (ctx->skeleton, facilities);
+
+    if (error) {
+        mm_warn ("couldn't load facility locks: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
+
+static void
 load_imei_ready (MMIfaceModem3gpp *self,
                  GAsyncResult *res,
                  InitializationContext *ctx)
@@ -1618,6 +1640,18 @@ interface_initialization_step (InitializationContext *ctx)
             MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->load_imei (
                 ctx->self,
                 (GAsyncReadyCallback)load_imei_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case INITIALIZATION_STEP_ENABLED_FACILITY_LOCKS:
+        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->load_enabled_facility_locks &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->load_enabled_facility_locks_finish) {
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (ctx->self)->load_enabled_facility_locks (
+                ctx->self,
+                (GAsyncReadyCallback)load_enabled_facility_locks_ready,
                 ctx);
             return;
         }

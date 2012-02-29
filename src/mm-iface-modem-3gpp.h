@@ -58,6 +58,14 @@ struct _MMIfaceModem3gpp {
                                  GAsyncResult *res,
                                  GError **error);
 
+    /* Loading of the facility locks property */
+    void (*load_enabled_facility_locks) (MMIfaceModem3gpp *self,
+                                         GAsyncReadyCallback callback,
+                                         gpointer user_data);
+    MMModem3gppFacility (*load_enabled_facility_locks_finish) (MMIfaceModem3gpp *self,
+                                                               GAsyncResult *res,
+                                                               GError **error);
+
     /* Asynchronous setup of indicators */
     void (*setup_indicators) (MMIfaceModem3gpp *self,
                               GAsyncReadyCallback callback,
