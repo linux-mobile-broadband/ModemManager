@@ -376,16 +376,24 @@ print_modem_info (void)
 
     /* If available, 3GPP related stuff */
     if (ctx->modem_3gpp) {
+        gchar *facility_locks;
+
+        facility_locks = (mm_modem_3gpp_facility_build_string_from_mask (
+                              mm_modem_3gpp_get_enabled_facility_locks (ctx->modem_3gpp)));
         g_print ("  -------------------------\n"
                  "  3GPP     |           imei: '%s'\n"
+                 "           |  enabled locks: '%s'\n"
                  "           |    operator id: '%s'\n"
                  "           |  operator name: '%s'\n"
                  "           |   registration: '%s'\n",
                  VALIDATE_UNKNOWN (mm_modem_3gpp_get_imei (ctx->modem_3gpp)),
+                 facility_locks,
                  VALIDATE_UNKNOWN (mm_modem_3gpp_get_operator_code (ctx->modem_3gpp)),
                  VALIDATE_UNKNOWN (mm_modem_3gpp_get_operator_name (ctx->modem_3gpp)),
                  mm_modem_3gpp_registration_state_get_string (
                      mm_modem_3gpp_get_registration_state ((ctx->modem_3gpp))));
+
+        g_free (facility_locks);
     }
 
     /* If available, CDMA related stuff */
