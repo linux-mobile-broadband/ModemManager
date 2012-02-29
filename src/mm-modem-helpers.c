@@ -1202,74 +1202,57 @@ mm_3gpp_parse_operator (const gchar *reply,
 
 /*************************************************************************/
 
-/* TODO: port to the new codebase */
-#if 0
-
 /* Map two letter facility codes into flag values. There are
  * many more facilities defined (for various flavors of call
  * barring); we only map the ones we care about. */
-static MMModemGsmFacility
-mm_gsm_string_to_facility (const char *string)
+typedef struct {
+    MMModem3gppFacility facility;
+    gchar *acronym;
+} FacilityAcronym;
+
+static const FacilityAcronym facility_acronyms[] = {
+    { MM_MODEM_3GPP_FACILITY_SIM,           "SC" },
+    { MM_MODEM_3GPP_FACILITY_PH_SIM,        "PS" },
+    { MM_MODEM_3GPP_FACILITY_PH_FSIM,       "PF" },
+    { MM_MODEM_3GPP_FACILITY_FIXED_DIALING, "FD" },
+    { MM_MODEM_3GPP_FACILITY_NET_PERS,      "PN" },
+    { MM_MODEM_3GPP_FACILITY_NET_SUB_PERS,  "PU" },
+    { MM_MODEM_3GPP_FACILITY_PROVIDER_PERS, "PP" },
+    { MM_MODEM_3GPP_FACILITY_CORP_PERS,     "PC" }
+};
+
+static MMModem3gppFacility
+string_to_facility (const gchar *str)
 {
-    g_return_val_if_fail (string != NULL, MM_MODEM_GSM_FACILITY_NONE);
+    guint i;
 
-    if (!strcmp (string, "SC"))
-        return MM_MODEM_GSM_FACILITY_SIM;
-    else if (!strcmp (string, "PS"))
-        return MM_MODEM_GSM_FACILITY_PH_SIM;
-    else if (!strcmp (string, "PF"))
-        return MM_MODEM_GSM_FACILITY_PH_FSIM;
-    else if (!strcmp (string, "FD"))
-        return MM_MODEM_GSM_FACILITY_FIXED_DIALING;
-    else if (!strcmp (string, "PN"))
-        return MM_MODEM_GSM_FACILITY_NET_PERS;
-    else if (!strcmp (string, "PU"))
-        return MM_MODEM_GSM_FACILITY_NET_SUB_PERS;
-    else if (!strcmp (string, "PP"))
-        return MM_MODEM_GSM_FACILITY_PROVIDER_PERS;
-    else if (!strcmp (string, "PC"))
-        return MM_MODEM_GSM_FACILITY_CORP_PERS;
-    else
-        return MM_MODEM_GSM_FACILITY_NONE;
+    for (i = 0; i < G_N_ELEMENTS (facility_acronyms); i++) {
+        if (g_str_equal (facility_acronyms[i].acronym, str))
+            return facility_acronyms[i].facility;
+    }
 
+    return MM_MODEM_3GPP_FACILITY_NONE;
 }
 
-/*************************************************************************/
-
-char *
-mm_gsm_get_facility_name (MMModemGsmFacility facility)
+gchar *
+mm_3gpp_get_facility_acronym (MMModem3gppFacility facility)
 {
-    switch (facility) {
-    case MM_MODEM_GSM_FACILITY_SIM:
-        return "SC";
-    case MM_MODEM_GSM_FACILITY_PH_SIM:
-        return "PS";
-    case MM_MODEM_GSM_FACILITY_PH_FSIM:
-        return "PF";
-    case MM_MODEM_GSM_FACILITY_FIXED_DIALING:
-        return "FD";
-    case MM_MODEM_GSM_FACILITY_NET_PERS:
-        return "PN";
-    case MM_MODEM_GSM_FACILITY_NET_SUB_PERS:
-        return "PU";
-    case MM_MODEM_GSM_FACILITY_PROVIDER_PERS:
-        return "PP";
-    case MM_MODEM_GSM_FACILITY_CORP_PERS:
-        return "PC";
-    default:
-        return NULL;
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (facility_acronyms); i++) {
+        if (facility_acronyms[i].facility == facility)
+            return facility_acronyms[i].acronym;
     }
+
+    return NULL;
 }
 
 gboolean
-mm_gsm_parse_clck_test_response (const char *reply,
-                                 MMModemGsmFacility *out_facilities)
+mm_3gpp_parse_clck_test_response (const gchar *reply,
+                                  MMModem3gppFacility *out_facilities)
 {
-    MMModemGsmFacility facilities = MM_MODEM_GSM_FACILITY_NONE;
     GRegex *r;
     GMatchInfo *match_info;
-    char *p, *str;
-    gboolean success = FALSE;
 
     g_return_val_if_fail (reply != NULL, FALSE);
     g_return_val_if_fail (out_facilities != NULL, FALSE);
@@ -1278,80 +1261,71 @@ mm_gsm_parse_clck_test_response (const char *reply,
      *
      * +CLCK: ("SC","AO","AI","PN")
      */
-    p = strchr (reply, '(');
-    if (p)
-        p++;
-    else {
-        p = strchr (reply, '"');
-        if (!p)
-            return FALSE;
-    }
+    reply = mm_strip_tag (reply, "+CLCK:");
 
     /* Now parse each facility */
     r = g_regex_new ("\\s*\"([^,\\)]+)\"\\s*", 0, 0, NULL);
-    if (!r)
-        return FALSE;
+    g_assert (r != NULL);
 
-    if (g_regex_match_full (r, p, strlen (p), 0, 0, &match_info, NULL)) {
+    *out_facilities = MM_MODEM_3GPP_FACILITY_NONE;
+    if (g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, NULL)) {
         while (g_match_info_matches (match_info)) {
+            gchar *str;
+
             str = g_match_info_fetch (match_info, 1);
             if (str) {
-                facilities |= mm_gsm_string_to_facility (str);
+                *out_facilities |= string_to_facility (str);
                 g_free (str);
             }
 
             g_match_info_next (match_info, NULL);
+        }
+    }
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    return (*out_facilities != MM_MODEM_3GPP_FACILITY_NONE);
+}
+
+gboolean
+mm_3gpp_parse_clck_response (const gchar *reply,
+                             gboolean *enabled)
+{
+    GRegex *r;
+    GMatchInfo *match_info;
+    gboolean success = FALSE;
+
+    g_return_val_if_fail (reply != NULL, FALSE);
+    g_return_val_if_fail (enabled != NULL, FALSE);
+
+    reply = mm_strip_tag (reply, "+CLCK:");
+
+    r = g_regex_new ("\\s*([01])\\s*", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    if (g_regex_match (r, reply, 0, &match_info)) {
+        gchar *str;
+
+        str = g_match_info_fetch (match_info, 1);
+        if (str) {
+            /* We're trying to match either '0' or '1',
+             * so we don't expect any other thing */
+            if (*str == '0')
+                *enabled = FALSE;
+            else if (*str == '1')
+                *enabled = TRUE;
+            else
+                g_assert_not_reached ();
+
+            g_free (str);
             success = TRUE;
         }
     }
     g_match_info_free (match_info);
     g_regex_unref (r);
 
-    if (success)
-        *out_facilities = facilities;
-
     return success;
 }
-
-gboolean
-mm_gsm_parse_clck_response (const char *reply, gboolean *enabled)
-{
-    GRegex *r;
-    GMatchInfo *match_info;
-    char *p, *str;
-    gboolean success = FALSE;
-
-    g_return_val_if_fail (reply != NULL, FALSE);
-    g_return_val_if_fail (enabled != NULL, FALSE);
-
-    p = strchr (reply, ':');
-    if (p)
-        p++;
-
-    r = g_regex_new ("\\s*([01])\\s*", 0, 0, NULL);
-    if (!r)
-        return FALSE;
-
-    if (g_regex_match (r, p, 0, &match_info)) {
-        success = TRUE;
-        str = g_match_info_fetch (match_info, 1);
-        if (str) {
-            if (*str == '0')
-                *enabled = FALSE;
-            else if (*str == '1')
-                *enabled = TRUE;
-            else
-                success = FALSE;
-
-            g_free (str);
-        }
-    }
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-    return success;
-}
-
-#endif
 
 /*************************************************************************/
 
