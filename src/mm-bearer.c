@@ -120,8 +120,8 @@ connect_ready (MMBearer *self,
     GError *error = NULL;
     gboolean launch_disconnect = FALSE;
     MMPort *data = NULL;
-    MMCommonBearerIpConfig *ipv4_config = NULL;
-    MMCommonBearerIpConfig *ipv6_config = NULL;
+    MMBearerIpConfig *ipv4_config = NULL;
+    MMBearerIpConfig *ipv6_config = NULL;
 
     /* NOTE: connect() implementations *MUST* handle cancellations themselves */
     if (!MM_BEARER_GET_CLASS (self)->connect_finish (self,
@@ -170,10 +170,10 @@ connect_ready (MMBearer *self,
         mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (self), mm_port_get_device (data));
         mm_gdbus_bearer_set_ip4_config (
             MM_GDBUS_BEARER (self),
-            mm_common_bearer_ip_config_get_dictionary (ipv4_config));
+            mm_bearer_ip_config_get_dictionary (ipv4_config));
         mm_gdbus_bearer_set_ip6_config (
             MM_GDBUS_BEARER (self),
-            mm_common_bearer_ip_config_get_dictionary (ipv6_config));
+            mm_bearer_ip_config_get_dictionary (ipv6_config));
 
         g_clear_object (&data);
         g_clear_object (&ipv4_config);
@@ -742,9 +742,9 @@ mm_bearer_init (MMBearer *self)
     mm_gdbus_bearer_set_properties (MM_GDBUS_BEARER (self), NULL);
     mm_gdbus_bearer_set_ip_timeout (MM_GDBUS_BEARER (self), MM_BEARER_IP_TIMEOUT_DEFAULT);
     mm_gdbus_bearer_set_ip4_config (MM_GDBUS_BEARER (self),
-                                    mm_common_bearer_ip_config_get_dictionary (NULL));
+                                    mm_bearer_ip_config_get_dictionary (NULL));
     mm_gdbus_bearer_set_ip6_config (MM_GDBUS_BEARER (self),
-                                    mm_common_bearer_ip_config_get_dictionary (NULL));
+                                    mm_bearer_ip_config_get_dictionary (NULL));
 }
 
 static void

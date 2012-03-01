@@ -62,8 +62,8 @@ struct _MMBroadbandBearerClass {
                                       gpointer user_data);
     gboolean (* connect_3gpp_finish) (MMBroadbandBearer *self,
                                       GAsyncResult *res,
-                                      MMCommonBearerIpConfig **ipv4_config,
-                                      MMCommonBearerIpConfig **ipv6_config,
+                                      MMBearerIpConfig **ipv4_config,
+                                      MMBearerIpConfig **ipv6_config,
                                       GError **error);
 
     /* Dialing sub-part of 3GPP connection */
@@ -101,8 +101,8 @@ struct _MMBroadbandBearerClass {
                                       gpointer user_data);
     gboolean (* connect_cdma_finish) (MMBroadbandBearer *self,
                                       GAsyncResult *res,
-                                      MMCommonBearerIpConfig **ipv4_config,
-                                      MMCommonBearerIpConfig **ipv6_config,
+                                      MMBearerIpConfig **ipv4_config,
+                                      MMBearerIpConfig **ipv6_config,
                                       GError **error);
 
     /* Full CDMA disconnection sequence */

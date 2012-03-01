@@ -38,8 +38,8 @@ G_DEFINE_TYPE (MMBearerIridium, mm_bearer_iridium, MM_TYPE_BEARER);
 
 typedef struct {
     MMPort *data;
-    MMCommonBearerIpConfig *ipv4_config;
-    MMCommonBearerIpConfig *ipv6_config;
+    MMBearerIpConfig *ipv4_config;
+    MMBearerIpConfig *ipv6_config;
 } ConnectResult;
 
 static void
@@ -76,8 +76,8 @@ static gboolean
 connect_finish (MMBearer *self,
                 GAsyncResult *res,
                 MMPort **data,
-                MMCommonBearerIpConfig **ipv4_config,
-                MMCommonBearerIpConfig **ipv6_config,
+                MMBearerIpConfig **ipv4_config,
+                MMBearerIpConfig **ipv6_config,
                 GError **error)
 {
     ConnectResult *result;
@@ -137,7 +137,7 @@ dial_ready (MMBaseModem *modem,
             GAsyncResult *res,
             ConnectContext *ctx)
 {
-    MMCommonBearerIpConfig *config;
+    MMBearerIpConfig *config;
     ConnectResult *result;
 
     /* DO NOT check for cancellable here. If we got here without errors, the
@@ -161,8 +161,8 @@ dial_ready (MMBaseModem *modem,
     mm_port_set_connected (MM_PORT (mm_base_modem_get_port_primary (modem)), TRUE);
 
     /* Build IP config; always PPP based */
-    config = mm_common_bearer_ip_config_new ();
-    mm_common_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_PPP);
+    config = mm_bearer_ip_config_new ();
+    mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_PPP);
 
     /* Build result */
     result = g_new0 (ConnectResult, 1);

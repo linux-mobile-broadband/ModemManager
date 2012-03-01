@@ -27,7 +27,6 @@
 #include <libmm-common.h>
 
 #include "mm-bearer-properties.h"
-#include "mm-bearer-ip-config.h"
 
 G_BEGIN_DECLS
 

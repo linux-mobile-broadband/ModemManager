@@ -16,9 +16,9 @@
 #include <string.h>
 
 #include "mm-errors-types.h"
-#include "mm-common-bearer-ip-config.h"
+#include "mm-bearer-ip-config.h"
 
-G_DEFINE_TYPE (MMCommonBearerIpConfig, mm_common_bearer_ip_config, G_TYPE_OBJECT);
+G_DEFINE_TYPE (MMBearerIpConfig, mm_bearer_ip_config, G_TYPE_OBJECT);
 
 #define PROPERTY_METHOD  "method"
 #define PROPERTY_ADDRESS "address"
@@ -28,7 +28,7 @@ G_DEFINE_TYPE (MMCommonBearerIpConfig, mm_common_bearer_ip_config, G_TYPE_OBJECT
 #define PROPERTY_DNS3    "dns3"
 #define PROPERTY_GATEWAY "gateway"
 
-struct _MMCommonBearerIpConfigPrivate {
+struct _MMBearerIpConfigPrivate {
     MMBearerIpMethod method;
     gchar *address;
     guint prefix;
@@ -39,39 +39,49 @@ struct _MMCommonBearerIpConfigPrivate {
 /*****************************************************************************/
 
 void
-mm_common_bearer_ip_config_set_method (MMCommonBearerIpConfig *self,
-                                       MMBearerIpMethod method)
+mm_bearer_ip_config_set_method (MMBearerIpConfig *self,
+                                MMBearerIpMethod method)
 {
+    g_return_if_fail (MM_IS_BEARER_IP_CONFIG (self));
+
     self->priv->method = method;
 }
 
 void
-mm_common_bearer_ip_config_set_address (MMCommonBearerIpConfig *self,
-                                        const gchar *address)
+mm_bearer_ip_config_set_address (MMBearerIpConfig *self,
+                                 const gchar *address)
 {
+    g_return_if_fail (MM_IS_BEARER_IP_CONFIG (self));
+
     g_free (self->priv->address);
     self->priv->address = g_strdup (address);
 }
 
 void
-mm_common_bearer_ip_config_set_prefix (MMCommonBearerIpConfig *self,
-                                       guint prefix)
+mm_bearer_ip_config_set_prefix (MMBearerIpConfig *self,
+                                guint prefix)
 {
+    g_return_if_fail (MM_IS_BEARER_IP_CONFIG (self));
+
     self->priv->prefix = prefix;
 }
 
 void
-mm_common_bearer_ip_config_set_dns (MMCommonBearerIpConfig *self,
-                                    const gchar **dns)
+mm_bearer_ip_config_set_dns (MMBearerIpConfig *self,
+                             const gchar **dns)
 {
+    g_return_if_fail (MM_IS_BEARER_IP_CONFIG (self));
+
     g_strfreev (self->priv->dns);
     self->priv->dns = g_strdupv ((gchar **)dns);
 }
 
 void
-mm_common_bearer_ip_config_set_gateway (MMCommonBearerIpConfig *self,
-                                        const gchar *gateway)
+mm_bearer_ip_config_set_gateway (MMBearerIpConfig *self,
+                                 const gchar *gateway)
 {
+    g_return_if_fail (MM_IS_BEARER_IP_CONFIG (self));
+
     g_free (self->priv->gateway);
     self->priv->gateway = g_strdup (gateway);
 }
@@ -79,45 +89,57 @@ mm_common_bearer_ip_config_set_gateway (MMCommonBearerIpConfig *self,
 /*****************************************************************************/
 
 MMBearerIpMethod
-mm_common_bearer_ip_config_get_method (MMCommonBearerIpConfig *self)
+mm_bearer_ip_config_get_method (MMBearerIpConfig *self)
 {
+    g_return_val_if_fail (MM_IS_BEARER_IP_CONFIG (self), MM_BEARER_IP_METHOD_UNKNOWN);
+
     return self->priv->method;
 }
 
 const gchar *
-mm_common_bearer_ip_config_get_address (MMCommonBearerIpConfig *self)
+mm_bearer_ip_config_get_address (MMBearerIpConfig *self)
 {
+    g_return_val_if_fail (MM_IS_BEARER_IP_CONFIG (self), NULL);
+
     return self->priv->address;
 }
 
 guint
-mm_common_bearer_ip_config_get_prefix (MMCommonBearerIpConfig *self)
+mm_bearer_ip_config_get_prefix (MMBearerIpConfig *self)
 {
+    g_return_val_if_fail (MM_IS_BEARER_IP_CONFIG (self), 0);
+
     return self->priv->prefix;
 }
 
 const gchar **
-mm_common_bearer_ip_config_get_dns (MMCommonBearerIpConfig *self)
+mm_bearer_ip_config_get_dns (MMBearerIpConfig *self)
 {
+    g_return_val_if_fail (MM_IS_BEARER_IP_CONFIG (self), NULL);
+
     return (const gchar **)self->priv->dns;
 }
 
 const gchar *
-mm_common_bearer_ip_config_get_gateway (MMCommonBearerIpConfig *self)
+mm_bearer_ip_config_get_gateway (MMBearerIpConfig *self)
 {
+    g_return_val_if_fail (MM_IS_BEARER_IP_CONFIG (self), NULL);
+
     return self->priv->gateway;
 }
 
 /*****************************************************************************/
 
 GVariant *
-mm_common_bearer_ip_config_get_dictionary (MMCommonBearerIpConfig *self)
+mm_bearer_ip_config_get_dictionary (MMBearerIpConfig *self)
 {
     GVariantBuilder builder;
 
     /* We do allow self==NULL. We'll just report method=unknown in this case */
-    g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
+    if (self)
+        g_return_val_if_fail (MM_IS_BEARER_IP_CONFIG (self), NULL);
 
+    g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
     g_variant_builder_add (&builder,
                            "{sv}",
                            PROPERTY_METHOD,
@@ -172,34 +194,44 @@ mm_common_bearer_ip_config_get_dictionary (MMCommonBearerIpConfig *self)
 
 /*****************************************************************************/
 
-MMCommonBearerIpConfig *
-mm_common_bearer_ip_config_new_from_dictionary (GVariant *dictionary,
-                                                GError **error)
+MMBearerIpConfig *
+mm_bearer_ip_config_new_from_dictionary (GVariant *dictionary,
+                                         GError **error)
 {
     GVariantIter iter;
     gchar *key;
     GVariant *value;
-    MMCommonBearerIpConfig *self;
+    MMBearerIpConfig *self;
     gchar *dns_array[4] = { 0 };
     gboolean method_received = FALSE;
 
-    self = mm_common_bearer_ip_config_new ();
+    self = mm_bearer_ip_config_new ();
     if (!dictionary)
         return self;
+
+    if (!g_variant_is_of_type (dictionary, G_VARIANT_TYPE ("a{sv}"))) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_INVALID_ARGS,
+                     "Cannot create IP config from dictionary: "
+                     "invalid variant type received");
+        g_object_unref (self);
+        return NULL;
+    }
 
     g_variant_iter_init (&iter, dictionary);
     while (g_variant_iter_next (&iter, "{sv}", &key, &value)) {
         if (g_str_equal (key, PROPERTY_METHOD)) {
             method_received = TRUE;
-            mm_common_bearer_ip_config_set_method (
+            mm_bearer_ip_config_set_method (
                 self,
                 (MMBearerIpMethod) g_variant_get_uint32 (value));
         } else if (g_str_equal (key, PROPERTY_ADDRESS))
-            mm_common_bearer_ip_config_set_address (
+            mm_bearer_ip_config_set_address (
                 self,
                 g_variant_get_string (value, NULL));
         else if (g_str_equal (key, PROPERTY_PREFIX))
-            mm_common_bearer_ip_config_set_prefix (
+            mm_bearer_ip_config_set_prefix (
                 self,
                 g_variant_get_uint32 (value));
         else if (g_str_equal (key, PROPERTY_DNS1)) {
@@ -212,7 +244,7 @@ mm_common_bearer_ip_config_new_from_dictionary (GVariant *dictionary,
             g_free (dns_array[2]);
             dns_array[2] = g_variant_dup_string (value, NULL);
         } else if (g_str_equal (key, PROPERTY_GATEWAY))
-            mm_common_bearer_ip_config_set_gateway (
+            mm_bearer_ip_config_set_gateway (
                 self,
                 g_variant_get_string (value, NULL));
 
@@ -221,7 +253,7 @@ mm_common_bearer_ip_config_new_from_dictionary (GVariant *dictionary,
     }
 
     if (dns_array[0])
-        mm_common_bearer_ip_config_set_dns (self, (const gchar **)dns_array);
+        mm_bearer_ip_config_set_dns (self, (const gchar **)dns_array);
 
     if (!method_received) {
         g_set_error (error,
@@ -240,15 +272,17 @@ mm_common_bearer_ip_config_new_from_dictionary (GVariant *dictionary,
 
 /*****************************************************************************/
 
-MMCommonBearerIpConfig *
-mm_common_bearer_ip_config_dup (MMCommonBearerIpConfig *orig)
+MMBearerIpConfig *
+mm_bearer_ip_config_dup (MMBearerIpConfig *orig)
 {
     GVariant *dict;
-    MMCommonBearerIpConfig *copy;
+    MMBearerIpConfig *copy;
     GError *error = NULL;
 
-    dict = mm_common_bearer_ip_config_get_dictionary (orig);
-    copy = mm_common_bearer_ip_config_new_from_dictionary (dict, &error);
+    g_return_val_if_fail (MM_IS_BEARER_IP_CONFIG (orig), NULL);
+
+    dict = mm_bearer_ip_config_get_dictionary (orig);
+    copy = mm_bearer_ip_config_new_from_dictionary (dict, &error);
     g_assert_no_error (error);
     g_variant_unref (dict);
 
@@ -257,19 +291,19 @@ mm_common_bearer_ip_config_dup (MMCommonBearerIpConfig *orig)
 
 /*****************************************************************************/
 
-MMCommonBearerIpConfig *
-mm_common_bearer_ip_config_new (void)
+MMBearerIpConfig *
+mm_bearer_ip_config_new (void)
 {
-    return (MM_COMMON_BEARER_IP_CONFIG (
-                g_object_new (MM_TYPE_COMMON_BEARER_IP_CONFIG, NULL)));
+    return (MM_BEARER_IP_CONFIG (
+                g_object_new (MM_TYPE_BEARER_IP_CONFIG, NULL)));
 }
 
 static void
-mm_common_bearer_ip_config_init (MMCommonBearerIpConfig *self)
+mm_bearer_ip_config_init (MMBearerIpConfig *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
-                                              MM_TYPE_COMMON_BEARER_IP_CONFIG,
-                                              MMCommonBearerIpConfigPrivate);
+                                              MM_TYPE_BEARER_IP_CONFIG,
+                                              MMBearerIpConfigPrivate);
 
     /* Some defaults */
     self->priv->method = MM_BEARER_IP_METHOD_UNKNOWN;
@@ -278,21 +312,21 @@ mm_common_bearer_ip_config_init (MMCommonBearerIpConfig *self)
 static void
 finalize (GObject *object)
 {
-    MMCommonBearerIpConfig *self = MM_COMMON_BEARER_IP_CONFIG (object);
+    MMBearerIpConfig *self = MM_BEARER_IP_CONFIG (object);
 
     g_free (self->priv->address);
     g_free (self->priv->gateway);
     g_strfreev (self->priv->dns);
 
-    G_OBJECT_CLASS (mm_common_bearer_ip_config_parent_class)->finalize (object);
+    G_OBJECT_CLASS (mm_bearer_ip_config_parent_class)->finalize (object);
 }
 
 static void
-mm_common_bearer_ip_config_class_init (MMCommonBearerIpConfigClass *klass)
+mm_bearer_ip_config_class_init (MMBearerIpConfigClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
-    g_type_class_add_private (object_class, sizeof (MMCommonBearerIpConfigPrivate));
+    g_type_class_add_private (object_class, sizeof (MMBearerIpConfigPrivate));
 
     object_class->finalize = finalize;
 }

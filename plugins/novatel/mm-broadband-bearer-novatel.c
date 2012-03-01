@@ -90,10 +90,10 @@ detailed_connect_context_complete_and_free (DetailedConnectContext *ctx)
 static void
 detailed_connect_context_complete_and_free_successful (DetailedConnectContext *ctx)
 {
-    MMCommonBearerIpConfig *config;
+    MMBearerIpConfig *config;
 
-    config = mm_common_bearer_ip_config_new ();
-    mm_common_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_DHCP);
+    config = mm_bearer_ip_config_new ();
+    mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_DHCP);
     g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                config,
                                                (GDestroyNotify)g_object_unref);
@@ -104,11 +104,11 @@ detailed_connect_context_complete_and_free_successful (DetailedConnectContext *c
 static gboolean
 connect_3gpp_finish (MMBroadbandBearer *self,
                      GAsyncResult *res,
-                     MMCommonBearerIpConfig **ipv4_config,
-                     MMCommonBearerIpConfig **ipv6_config,
+                     MMBearerIpConfig **ipv4_config,
+                     MMBearerIpConfig **ipv6_config,
                      GError **error)
 {
-    MMCommonBearerIpConfig *config;
+    MMBearerIpConfig *config;
 
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return FALSE;
@@ -150,7 +150,7 @@ connect_3gpp_qmistatus_ready (MMBaseModem *modem,
         mm_dbg("Error: '%s'", result);
         if (ctx->retries > 0) {
             ctx->retries--;
-            mm_dbg("Retrying status check in a second. %d retries left.", 
+            mm_dbg("Retrying status check in a second. %d retries left.",
                    ctx->retries);
             g_timeout_add_seconds(1, (GSourceFunc)connect_3gpp_qmistatus, ctx);
             return;

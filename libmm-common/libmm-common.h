@@ -30,7 +30,7 @@
 #include "mm-common-connect-properties.h"
 #include "mm-sms-properties.h"
 #include "mm-common-bearer-properties.h"
-#include "mm-common-bearer-ip-config.h"
+#include "mm-bearer-ip-config.h"
 #include "mm-common-location-3gpp.h"
 #include "mm-unlock-retries.h"
 #include "mm-gdbus-manager.h"

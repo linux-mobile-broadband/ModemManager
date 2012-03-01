@@ -150,11 +150,11 @@ typedef struct {
 static gboolean
 detailed_connect_finish (MMBroadbandBearer *self,
                          GAsyncResult *res,
-                         MMCommonBearerIpConfig **ipv4_config,
-                         MMCommonBearerIpConfig **ipv6_config,
+                         MMBearerIpConfig **ipv4_config,
+                         MMBearerIpConfig **ipv6_config,
                          GError **error)
 {
-    MMCommonBearerIpConfig *config;
+    MMBearerIpConfig *config;
 
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return FALSE;
@@ -183,14 +183,14 @@ detailed_connect_context_complete_and_free (DetailedConnectContext *ctx)
 static void
 detailed_connect_context_complete_and_free_successful (DetailedConnectContext *ctx)
 {
-    MMCommonBearerIpConfig *config;
+    MMBearerIpConfig *config;
 
     /* If serial port, set PPP method. Otherwise, assume DHCP is needed. */
-    config = mm_common_bearer_ip_config_new ();
-    mm_common_bearer_ip_config_set_method (config,
-                                           (MM_IS_AT_SERIAL_PORT (ctx->data) ?
-                                            MM_BEARER_IP_METHOD_PPP :
-                                            MM_BEARER_IP_METHOD_DHCP));
+    config = mm_bearer_ip_config_new ();
+    mm_bearer_ip_config_set_method (config,
+                                    (MM_IS_AT_SERIAL_PORT (ctx->data) ?
+                                     MM_BEARER_IP_METHOD_PPP :
+                                     MM_BEARER_IP_METHOD_DHCP));
     g_simple_async_result_set_op_res_gpointer (ctx->result,
                                                config,
                                                (GDestroyNotify)g_object_unref);
@@ -924,8 +924,8 @@ connect_3gpp (MMBroadbandBearer *self,
 
 typedef struct {
     MMPort *data;
-    MMCommonBearerIpConfig *ipv4_config;
-    MMCommonBearerIpConfig *ipv6_config;
+    MMBearerIpConfig *ipv4_config;
+    MMBearerIpConfig *ipv6_config;
 } ConnectResult;
 
 static void
@@ -959,8 +959,8 @@ static gboolean
 connect_finish (MMBearer *self,
                 GAsyncResult *res,
                 MMPort **data,
-                MMCommonBearerIpConfig **ipv4_config,
-                MMCommonBearerIpConfig **ipv6_config,
+                MMBearerIpConfig **ipv4_config,
+                MMBearerIpConfig **ipv6_config,
                 GError **error)
 {
     ConnectResult *result;
@@ -979,8 +979,8 @@ connect_finish (MMBearer *self,
 static void
 connect_succeeded (ConnectContext *ctx,
                    ConnectionType connection_type,
-                   MMCommonBearerIpConfig *ipv4_config,
-                   MMCommonBearerIpConfig *ipv6_config)
+                   MMBearerIpConfig *ipv4_config,
+                   MMBearerIpConfig *ipv6_config)
 {
     ConnectResult *result;
 
@@ -1023,8 +1023,8 @@ connect_cdma_ready (MMBroadbandBearer *self,
                     ConnectContext *ctx)
 {
     GError *error = NULL;
-    MMCommonBearerIpConfig *ipv4_config = NULL;
-    MMCommonBearerIpConfig *ipv6_config = NULL;
+    MMBearerIpConfig *ipv4_config = NULL;
+    MMBearerIpConfig *ipv6_config = NULL;
 
     if (!MM_BROADBAND_BEARER_GET_CLASS (self)->connect_cdma_finish (self,
                                                                     res,
@@ -1042,8 +1042,8 @@ connect_3gpp_ready (MMBroadbandBearer *self,
                     ConnectContext *ctx)
 {
     GError *error = NULL;
-    MMCommonBearerIpConfig *ipv4_config = NULL;
-    MMCommonBearerIpConfig *ipv6_config = NULL;
+    MMBearerIpConfig *ipv4_config = NULL;
+    MMBearerIpConfig *ipv6_config = NULL;
 
     if (!MM_BROADBAND_BEARER_GET_CLASS (self)->connect_3gpp_finish (self,
                                                                     res,

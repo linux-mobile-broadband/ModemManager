@@ -155,7 +155,7 @@ mm_bearer_get_ipv4_config (MMBearer *self)
     g_return_val_if_fail (MM_IS_BEARER (self), NULL);
 
     variant = mm_gdbus_bearer_dup_ip4_config (MM_GDBUS_BEARER (self));
-    config = mm_common_bearer_ip_config_new_from_dictionary (variant, &error);
+    config = mm_bearer_ip_config_new_from_dictionary (variant, &error);
     if (!config) {
         g_warning ("Couldn't create IP config: '%s'", error->message);
         g_error_free (error);
@@ -175,7 +175,7 @@ mm_bearer_get_ipv6_config (MMBearer *self)
     g_return_val_if_fail (MM_IS_BEARER (self), NULL);
 
     variant = mm_gdbus_bearer_dup_ip6_config (MM_GDBUS_BEARER (self));
-    config = mm_common_bearer_ip_config_new_from_dictionary (variant, &error);
+    config = mm_bearer_ip_config_new_from_dictionary (variant, &error);
     if (!config) {
         g_warning ("Couldn't create IP config: '%s'", error->message);
         g_error_free (error);
