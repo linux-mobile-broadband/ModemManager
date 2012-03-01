@@ -193,7 +193,7 @@ mm_bearer_get_properties (MMBearer *self)
 
     g_return_val_if_fail (MM_IS_BEARER (self), NULL);
 
-    properties = (mm_common_bearer_properties_new_from_dictionary (
+    properties = (mm_bearer_properties_new_from_dictionary (
                       mm_gdbus_bearer_get_properties (MM_GDBUS_BEARER (self)),
                       &error));
     if (!properties) {

@@ -151,7 +151,7 @@ $(mm_gdbus_bearer_generated): $(top_srcdir)/introspection/org.freedesktop.ModemM
 mm-common-helpers.c: mm-errors-types.h mm-enums-types.h
 mm-common-simple-properties.c: mm-errors-types.h mm-enums-types.h
 mm-common-connect-properties.c: mm-errors-types.h
-mm-common-bearer-properties.c: mm-errors-types.h
+mm-bearer-properties.c: mm-errors-types.h
 mm-sms-properties.c: mm-errors-types.h
 mm-bearer-ip-config.c: mm-errors-types.h
 mm-common-location-3gpp.c: mm-errors-types.h
@@ -165,7 +165,7 @@ include_HEADERS = \
 	mm-common-helpers.h \
 	mm-common-simple-properties.h \
 	mm-common-connect-properties.h \
-	mm-common-bearer-properties.h \
+	mm-bearer-properties.h \
 	mm-sms-properties.h \
 	mm-bearer-ip-config.h \
 	mm-common-location-3gpp.h \
@@ -188,8 +188,8 @@ libmm_common_la_SOURCES = \
 	mm-common-simple-properties.c \
 	mm-common-connect-properties.h \
 	mm-common-connect-properties.c \
-	mm-common-bearer-properties.h \
-	mm-common-bearer-properties.c \
+	mm-bearer-properties.h \
+	mm-bearer-properties.c \
 	mm-sms-properties.h \
 	mm-sms-properties.c \
 	mm-bearer-ip-config.h \

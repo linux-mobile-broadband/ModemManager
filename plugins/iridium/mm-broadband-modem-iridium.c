@@ -354,7 +354,7 @@ create_bearer_finish (MMIfaceModem *self,
 
 static void
 create_bearer (MMIfaceModem *self,
-               MMCommonBearerProperties *properties,
+               MMBearerProperties *properties,
                GAsyncReadyCallback callback,
                gpointer user_data)
 {

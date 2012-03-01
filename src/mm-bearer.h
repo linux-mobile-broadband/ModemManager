@@ -78,7 +78,7 @@ struct _MMBearerClass {
 
     /* Check if the bearer has the exact same properties */
     gboolean (* cmp_properties) (MMBearer *self,
-                                 MMCommonBearerProperties *properties);
+                                 MMBearerProperties *properties);
 };
 
 GType mm_bearer_get_type (void);
@@ -87,7 +87,7 @@ void         mm_bearer_export   (MMBearer *self);
 const gchar *mm_bearer_get_path (MMBearer *bearer);
 
 void mm_bearer_expose_properties (MMBearer *bearer,
-                                  MMCommonBearerProperties *properties);
+                                  MMBearerProperties *properties);
 
 MMBearerStatus mm_bearer_get_status (MMBearer *bearer);
 
@@ -108,6 +108,6 @@ gboolean mm_bearer_disconnect_finish (MMBearer *self,
 void mm_bearer_disconnect_force (MMBearer *self);
 
 gboolean mm_bearer_cmp_properties (MMBearer *self,
-                                   MMCommonBearerProperties *properties);
+                                   MMBearerProperties *properties);
 
 #endif /* MM_BEARER_H */

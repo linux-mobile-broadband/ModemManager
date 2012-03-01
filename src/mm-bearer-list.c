@@ -165,7 +165,7 @@ mm_bearer_list_foreach (MMBearerList *self,
 
 MMBearer *
 mm_bearer_list_find (MMBearerList *self,
-                     MMCommonBearerProperties *properties)
+                     MMBearerProperties *properties)
 {
     GList *l;
 

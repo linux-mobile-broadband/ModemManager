@@ -498,7 +498,7 @@ connection_step (ConnectionContext *ctx)
 
     case CONNECTION_STEP_BEARER: {
         MMBearerList *list = NULL;
-        MMCommonBearerProperties *bearer_properties;
+        MMBearerProperties *bearer_properties;
 
         mm_info ("Simple connect state (%d/%d): Bearer",
                  ctx->step, CONNECTION_STEP_LAST);

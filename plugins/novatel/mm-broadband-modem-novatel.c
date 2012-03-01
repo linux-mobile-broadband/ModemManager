@@ -72,7 +72,7 @@ broadband_bearer_new_ready (GObject *source,
 
 static void
 modem_create_bearer (MMIfaceModem *self,
-                     MMCommonBearerProperties *properties,
+                     MMBearerProperties *properties,
                      GAsyncReadyCallback callback,
                      gpointer user_data)
 {

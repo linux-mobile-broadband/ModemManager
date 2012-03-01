@@ -630,7 +630,7 @@ mm_bearer_disconnect_force (MMBearer *self)
 
 gboolean
 mm_bearer_cmp_properties (MMBearer *self,
-                          MMCommonBearerProperties *properties)
+                          MMBearerProperties *properties)
 {
     return MM_BEARER_GET_CLASS (self)->cmp_properties (self, properties);
 }
@@ -639,12 +639,12 @@ mm_bearer_cmp_properties (MMBearer *self,
 
 void
 mm_bearer_expose_properties (MMBearer *bearer,
-                             MMCommonBearerProperties *properties)
+                             MMBearerProperties *properties)
 {
     GVariant *dictionary;
 
     /* Keep the whole list of properties in the interface */
-    dictionary = mm_common_bearer_properties_get_dictionary (properties);
+    dictionary = mm_bearer_properties_get_dictionary (properties);
     mm_gdbus_bearer_set_properties (MM_GDBUS_BEARER (bearer),
                                     dictionary);
     g_variant_unref (dictionary);

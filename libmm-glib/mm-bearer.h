@@ -26,8 +26,6 @@
 #include <ModemManager.h>
 #include <libmm-common.h>
 
-#include "mm-bearer-properties.h"
-
 G_BEGIN_DECLS
 
 typedef MmGdbusBearer     MMBearer;

@@ -17,9 +17,9 @@
 
 #include "mm-errors-types.h"
 #include "mm-common-helpers.h"
-#include "mm-common-bearer-properties.h"
+#include "mm-bearer-properties.h"
 
-G_DEFINE_TYPE (MMCommonBearerProperties, mm_common_bearer_properties, G_TYPE_OBJECT);
+G_DEFINE_TYPE (MMBearerProperties, mm_bearer_properties, G_TYPE_OBJECT);
 
 #define PROPERTY_APN             "apn"
 #define PROPERTY_USER            "user"
@@ -29,7 +29,7 @@ G_DEFINE_TYPE (MMCommonBearerProperties, mm_common_bearer_properties, G_TYPE_OBJ
 #define PROPERTY_ALLOW_ROAMING   "allow-roaming"
 #define PROPERTY_RM_PROTOCOL     "rm-protocol"
 
-struct _MMCommonBearerPropertiesPrivate {
+struct _MMBearerPropertiesPrivate {
     /* APN */
     gchar *apn;
     /* IP type */
@@ -50,114 +50,144 @@ struct _MMCommonBearerPropertiesPrivate {
 /*****************************************************************************/
 
 void
-mm_common_bearer_properties_set_apn (MMCommonBearerProperties *self,
-                                     const gchar *apn)
+mm_bearer_properties_set_apn (MMBearerProperties *self,
+                              const gchar *apn)
 {
+    g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
+
     g_free (self->priv->apn);
     self->priv->apn = g_strdup (apn);
 }
 
 void
-mm_common_bearer_properties_set_user (MMCommonBearerProperties *self,
-                                      const gchar *user)
+mm_bearer_properties_set_user (MMBearerProperties *self,
+                               const gchar *user)
 {
+    g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
+
     g_free (self->priv->user);
     self->priv->user = g_strdup (user);
 }
 
 void
-mm_common_bearer_properties_set_password (MMCommonBearerProperties *self,
-                                          const gchar *password)
+mm_bearer_properties_set_password (MMBearerProperties *self,
+                                   const gchar *password)
 {
+    g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
+
     g_free (self->priv->password);
     self->priv->password = g_strdup (password);
 }
 
 void
-mm_common_bearer_properties_set_ip_type (MMCommonBearerProperties *self,
-                                         const gchar *ip_type)
+mm_bearer_properties_set_ip_type (MMBearerProperties *self,
+                                  const gchar *ip_type)
 {
+    g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
+
     g_free (self->priv->ip_type);
     self->priv->ip_type = g_strdup (ip_type);
 }
 
 void
-mm_common_bearer_properties_set_allow_roaming (MMCommonBearerProperties *self,
-                                               gboolean allow_roaming)
+mm_bearer_properties_set_allow_roaming (MMBearerProperties *self,
+                                        gboolean allow_roaming)
 {
+    g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
+
     self->priv->allow_roaming = allow_roaming;
     self->priv->allow_roaming_set = TRUE;
 }
 
 void
-mm_common_bearer_properties_set_number (MMCommonBearerProperties *self,
-                                        const gchar *number)
+mm_bearer_properties_set_number (MMBearerProperties *self,
+                                 const gchar *number)
 {
+    g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
+
     g_free (self->priv->number);
     self->priv->number = g_strdup (number);
 }
 
 void
-mm_common_bearer_properties_set_rm_protocol (MMCommonBearerProperties *self,
-                                             MMModemCdmaRmProtocol protocol)
+mm_bearer_properties_set_rm_protocol (MMBearerProperties *self,
+                                      MMModemCdmaRmProtocol protocol)
 {
+    g_return_if_fail (MM_IS_BEARER_PROPERTIES (self));
+
     self->priv->rm_protocol = protocol;
 }
 
 /*****************************************************************************/
 
 const gchar *
-mm_common_bearer_properties_get_apn (MMCommonBearerProperties *self)
+mm_bearer_properties_get_apn (MMBearerProperties *self)
 {
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
+
     return self->priv->apn;
 }
 
 const gchar *
-mm_common_bearer_properties_get_user (MMCommonBearerProperties *self)
+mm_bearer_properties_get_user (MMBearerProperties *self)
 {
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
+
     return self->priv->user;
 }
 
 const gchar *
-mm_common_bearer_properties_get_password (MMCommonBearerProperties *self)
+mm_bearer_properties_get_password (MMBearerProperties *self)
 {
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
+
     return self->priv->password;
 }
 
 const gchar *
-mm_common_bearer_properties_get_ip_type (MMCommonBearerProperties *self)
+mm_bearer_properties_get_ip_type (MMBearerProperties *self)
 {
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
+
     return self->priv->ip_type;
 }
 
 gboolean
-mm_common_bearer_properties_get_allow_roaming (MMCommonBearerProperties *self)
+mm_bearer_properties_get_allow_roaming (MMBearerProperties *self)
 {
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), FALSE);
+
     return self->priv->allow_roaming;
 }
 
 const gchar *
-mm_common_bearer_properties_get_number (MMCommonBearerProperties *self)
+mm_bearer_properties_get_number (MMBearerProperties *self)
 {
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
+
     return self->priv->number;
 }
 
 MMModemCdmaRmProtocol
-mm_common_bearer_properties_get_rm_protocol (MMCommonBearerProperties *self)
+mm_bearer_properties_get_rm_protocol (MMBearerProperties *self)
 {
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN);
+
     return self->priv->rm_protocol;
 }
 
 /*****************************************************************************/
 
 GVariant *
-mm_common_bearer_properties_get_dictionary (MMCommonBearerProperties *self)
+mm_bearer_properties_get_dictionary (MMBearerProperties *self)
 {
     GVariantBuilder builder;
 
     /* We do allow NULL */
     if (!self)
         return NULL;
+
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), NULL);
 
     g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
 
@@ -209,19 +239,21 @@ mm_common_bearer_properties_get_dictionary (MMCommonBearerProperties *self)
 /*****************************************************************************/
 
 gboolean
-mm_common_bearer_properties_consume_string (MMCommonBearerProperties *self,
-                                            const gchar *key,
-                                            const gchar *value,
-                                            GError **error)
+mm_bearer_properties_consume_string (MMBearerProperties *self,
+                                     const gchar *key,
+                                     const gchar *value,
+                                     GError **error)
 {
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (self), FALSE);
+
     if (g_str_equal (key, PROPERTY_APN))
-        mm_common_bearer_properties_set_apn (self, value);
+        mm_bearer_properties_set_apn (self, value);
     else if (g_str_equal (key, PROPERTY_USER))
-        mm_common_bearer_properties_set_user (self, value);
+        mm_bearer_properties_set_user (self, value);
     else if (g_str_equal (key, PROPERTY_PASSWORD))
-        mm_common_bearer_properties_set_password (self, value);
+        mm_bearer_properties_set_password (self, value);
     else if (g_str_equal (key, PROPERTY_IP_TYPE))
-        mm_common_bearer_properties_set_ip_type (self, value);
+        mm_bearer_properties_set_ip_type (self, value);
     else if (g_str_equal (key, PROPERTY_ALLOW_ROAMING)) {
         GError *inner_error = NULL;
         gboolean allow_roaming;
@@ -231,9 +263,9 @@ mm_common_bearer_properties_consume_string (MMCommonBearerProperties *self,
             g_propagate_error (error, inner_error);
             return FALSE;
         }
-        mm_common_bearer_properties_set_allow_roaming (self, allow_roaming);
+        mm_bearer_properties_set_allow_roaming (self, allow_roaming);
     } else if (g_str_equal (key, PROPERTY_NUMBER))
-        mm_common_bearer_properties_set_number (self, value);
+        mm_bearer_properties_set_number (self, value);
     else if (g_str_equal (key, PROPERTY_RM_PROTOCOL)) {
         GError *inner_error = NULL;
         MMModemCdmaRmProtocol protocol;
@@ -243,7 +275,7 @@ mm_common_bearer_properties_consume_string (MMCommonBearerProperties *self,
             g_propagate_error (error, inner_error);
             return FALSE;
         }
-        mm_common_bearer_properties_set_rm_protocol (self, protocol);
+        mm_bearer_properties_set_rm_protocol (self, protocol);
     } else {
         g_set_error (error,
                      MM_CORE_ERROR,
@@ -257,7 +289,7 @@ mm_common_bearer_properties_consume_string (MMCommonBearerProperties *self,
 }
 
 typedef struct {
-    MMCommonBearerProperties *properties;
+    MMBearerProperties *properties;
     GError *error;
 } ParseKeyValueContext;
 
@@ -266,20 +298,20 @@ key_value_foreach (const gchar *key,
                    const gchar *value,
                    ParseKeyValueContext *ctx)
 {
-    return mm_common_bearer_properties_consume_string (ctx->properties,
-                                                       key,
-                                                       value,
-                                                       &ctx->error);
+    return mm_bearer_properties_consume_string (ctx->properties,
+                                                key,
+                                                value,
+                                                &ctx->error);
 }
 
-MMCommonBearerProperties *
-mm_common_bearer_properties_new_from_string (const gchar *str,
-                                             GError **error)
+MMBearerProperties *
+mm_bearer_properties_new_from_string (const gchar *str,
+                                      GError **error)
 {
     ParseKeyValueContext ctx;
 
     ctx.error = NULL;
-    ctx.properties = mm_common_bearer_properties_new ();
+    ctx.properties = mm_bearer_properties_new ();
 
     mm_common_parse_key_value_string (str,
                                       &ctx.error,
@@ -298,33 +330,35 @@ mm_common_bearer_properties_new_from_string (const gchar *str,
 /*****************************************************************************/
 
 gboolean
-mm_common_bearer_properties_consume_variant (MMCommonBearerProperties *properties,
-                                             const gchar *key,
-                                             GVariant *value,
-                                             GError **error)
+mm_bearer_properties_consume_variant (MMBearerProperties *properties,
+                                      const gchar *key,
+                                      GVariant *value,
+                                      GError **error)
 {
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (properties), FALSE);
+
     if (g_str_equal (key, PROPERTY_APN))
-        mm_common_bearer_properties_set_apn (
+        mm_bearer_properties_set_apn (
             properties,
             g_variant_get_string (value, NULL));
     else if (g_str_equal (key, PROPERTY_USER))
-        mm_common_bearer_properties_set_user (
+        mm_bearer_properties_set_user (
             properties,
             g_variant_get_string (value, NULL));
     else if (g_str_equal (key, PROPERTY_PASSWORD))
-        mm_common_bearer_properties_set_password (
+        mm_bearer_properties_set_password (
             properties,
             g_variant_get_string (value, NULL));
     else if (g_str_equal (key, PROPERTY_IP_TYPE))
-        mm_common_bearer_properties_set_ip_type (
+        mm_bearer_properties_set_ip_type (
             properties,
             g_variant_get_string (value, NULL));
     else if (g_str_equal (key, PROPERTY_NUMBER))
-        mm_common_bearer_properties_set_number (
+        mm_bearer_properties_set_number (
             properties,
             g_variant_get_string (value, NULL));
     else if (g_str_equal (key, PROPERTY_ALLOW_ROAMING))
-        mm_common_bearer_properties_set_allow_roaming (
+        mm_bearer_properties_set_allow_roaming (
             properties,
             g_variant_get_boolean (value));
     else {
@@ -340,24 +374,34 @@ mm_common_bearer_properties_consume_variant (MMCommonBearerProperties *propertie
     return TRUE;
 }
 
-MMCommonBearerProperties *
-mm_common_bearer_properties_new_from_dictionary (GVariant *dictionary,
-                                                 GError **error)
+MMBearerProperties *
+mm_bearer_properties_new_from_dictionary (GVariant *dictionary,
+                                          GError **error)
 {
     GError *inner_error = NULL;
     GVariantIter iter;
     gchar *key;
     GVariant *value;
-    MMCommonBearerProperties *properties;
+    MMBearerProperties *properties;
 
-    properties = mm_common_bearer_properties_new ();
+    properties = mm_bearer_properties_new ();
     if (!dictionary)
         return properties;
+
+    if (!g_variant_is_of_type (dictionary, G_VARIANT_TYPE ("a{sv}"))) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_INVALID_ARGS,
+                     "Cannot create Bearer properties from dictionary: "
+                     "invalid variant type received");
+        g_object_unref (properties);
+        return NULL;
+    }
 
     g_variant_iter_init (&iter, dictionary);
     while (!inner_error &&
            g_variant_iter_next (&iter, "{sv}", &key, &value)) {
-        mm_common_bearer_properties_consume_variant (properties,
+        mm_bearer_properties_consume_variant (properties,
                                                      key,
                                                      value,
                                                      &inner_error);
@@ -377,15 +421,17 @@ mm_common_bearer_properties_new_from_dictionary (GVariant *dictionary,
 
 /*****************************************************************************/
 
-MMCommonBearerProperties *
-mm_common_bearer_properties_dup (MMCommonBearerProperties *orig)
+MMBearerProperties *
+mm_bearer_properties_dup (MMBearerProperties *orig)
 {
     GVariant *dict;
-    MMCommonBearerProperties *copy;
+    MMBearerProperties *copy;
     GError *error = NULL;
 
-    dict = mm_common_bearer_properties_get_dictionary (orig);
-    copy = mm_common_bearer_properties_new_from_dictionary (dict, &error);
+    g_return_val_if_fail (MM_IS_BEARER_PROPERTIES (orig), NULL);
+
+    dict = mm_bearer_properties_get_dictionary (orig);
+    copy = mm_bearer_properties_new_from_dictionary (dict, &error);
     g_assert_no_error (error);
     g_variant_unref (dict);
 
@@ -394,19 +440,19 @@ mm_common_bearer_properties_dup (MMCommonBearerProperties *orig)
 
 /*****************************************************************************/
 
-MMCommonBearerProperties *
-mm_common_bearer_properties_new (void)
+MMBearerProperties *
+mm_bearer_properties_new (void)
 {
-    return (MM_COMMON_BEARER_PROPERTIES (
-                g_object_new (MM_TYPE_COMMON_BEARER_PROPERTIES, NULL)));
+    return (MM_BEARER_PROPERTIES (
+                g_object_new (MM_TYPE_BEARER_PROPERTIES, NULL)));
 }
 
 static void
-mm_common_bearer_properties_init (MMCommonBearerProperties *self)
+mm_bearer_properties_init (MMBearerProperties *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
-                                              MM_TYPE_COMMON_BEARER_PROPERTIES,
-                                              MMCommonBearerPropertiesPrivate);
+                                              MM_TYPE_BEARER_PROPERTIES,
+                                              MMBearerPropertiesPrivate);
 
     /* Some defaults */
     self->priv->allow_roaming = TRUE;
@@ -416,7 +462,7 @@ mm_common_bearer_properties_init (MMCommonBearerProperties *self)
 static void
 finalize (GObject *object)
 {
-    MMCommonBearerProperties *self = MM_COMMON_BEARER_PROPERTIES (object);
+    MMBearerProperties *self = MM_BEARER_PROPERTIES (object);
 
     g_free (self->priv->apn);
     g_free (self->priv->user);
@@ -424,15 +470,15 @@ finalize (GObject *object)
     g_free (self->priv->ip_type);
     g_free (self->priv->number);
 
-    G_OBJECT_CLASS (mm_common_bearer_properties_parent_class)->finalize (object);
+    G_OBJECT_CLASS (mm_bearer_properties_parent_class)->finalize (object);
 }
 
 static void
-mm_common_bearer_properties_class_init (MMCommonBearerPropertiesClass *klass)
+mm_bearer_properties_class_init (MMBearerPropertiesClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
-    g_type_class_add_private (object_class, sizeof (MMCommonBearerPropertiesPrivate));
+    g_type_class_add_private (object_class, sizeof (MMBearerPropertiesPrivate));
 
     object_class->finalize = finalize;
 }

@@ -406,7 +406,7 @@ mm_broadband_bearer_novatel_new_finish (GAsyncResult *res,
 }
 
 void mm_broadband_bearer_novatel_new (MMBroadbandModemNovatel *modem,
-                                      MMCommonBearerProperties *properties,
+                                      MMBearerProperties *properties,
                                       GCancellable *cancellable,
                                       GAsyncReadyCallback callback,
                                       gpointer user_data)

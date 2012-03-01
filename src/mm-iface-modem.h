@@ -280,7 +280,7 @@ struct _MMIfaceModem {
 
     /* Create bearer */
     void (*create_bearer) (MMIfaceModem *self,
-                           MMCommonBearerProperties *properties,
+                           MMBearerProperties *properties,
                            GAsyncReadyCallback callback,
                            gpointer user_data);
     MMBearer * (*create_bearer_finish) (MMIfaceModem *self,
@@ -395,7 +395,7 @@ gboolean mm_iface_modem_set_bands_finish (MMIfaceModem *self,
 
 /* Allow creating bearers */
 void     mm_iface_modem_create_bearer         (MMIfaceModem *self,
-                                               MMCommonBearerProperties *properties,
+                                               MMBearerProperties *properties,
                                                GAsyncReadyCallback callback,
                                                gpointer user_data);
 MMBearer *mm_iface_modem_create_bearer_finish (MMIfaceModem *self,

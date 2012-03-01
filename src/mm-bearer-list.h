@@ -73,7 +73,7 @@ void mm_bearer_list_foreach (MMBearerList *self,
                              gpointer user_data);
 
 MMBearer *mm_bearer_list_find (MMBearerList *self,
-                               MMCommonBearerProperties *properties);
+                               MMBearerProperties *properties);
 
 void     mm_bearer_list_disconnect_all_bearers        (MMBearerList *self,
                                                        GAsyncReadyCallback callback,

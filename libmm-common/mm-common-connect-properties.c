@@ -40,7 +40,7 @@ struct _MMCommonConnectPropertiesPrivate {
     MMModemMode allowed_modes;
     MMModemMode preferred_mode;
     /* Bearer properties */
-    MMCommonBearerProperties *bearer_properties;
+    MMBearerProperties *bearer_properties;
 };
 
 /*****************************************************************************/
@@ -88,53 +88,53 @@ void
 mm_common_connect_properties_set_apn (MMCommonConnectProperties *self,
                                       const gchar *apn)
 {
-    mm_common_bearer_properties_set_apn (self->priv->bearer_properties,
-                                         apn);
+    mm_bearer_properties_set_apn (self->priv->bearer_properties,
+                                  apn);
 }
 
 void
 mm_common_connect_properties_set_user (MMCommonConnectProperties *self,
                                        const gchar *user)
 {
-    mm_common_bearer_properties_set_user (self->priv->bearer_properties,
-                                          user);
+    mm_bearer_properties_set_user (self->priv->bearer_properties,
+                                   user);
 }
 
 void
 mm_common_connect_properties_set_password (MMCommonConnectProperties *self,
                                            const gchar *password)
 {
-    mm_common_bearer_properties_set_password (self->priv->bearer_properties,
-                                              password);
+    mm_bearer_properties_set_password (self->priv->bearer_properties,
+                                       password);
 }
 
 void
 mm_common_connect_properties_set_ip_type (MMCommonConnectProperties *self,
                                           const gchar *ip_type)
 {
-    mm_common_bearer_properties_set_ip_type (self->priv->bearer_properties,
-                                             ip_type);
+    mm_bearer_properties_set_ip_type (self->priv->bearer_properties,
+                                      ip_type);
 }
 
 void
 mm_common_connect_properties_set_allow_roaming (MMCommonConnectProperties *self,
                                                 gboolean allow_roaming)
 {
-    mm_common_bearer_properties_set_allow_roaming (self->priv->bearer_properties,
-                                                   allow_roaming);
+    mm_bearer_properties_set_allow_roaming (self->priv->bearer_properties,
+                                            allow_roaming);
 }
 
 void
 mm_common_connect_properties_set_number (MMCommonConnectProperties *self,
                                          const gchar *number)
 {
-    mm_common_bearer_properties_set_number (self->priv->bearer_properties,
-                                            number);
+    mm_bearer_properties_set_number (self->priv->bearer_properties,
+                                     number);
 }
 
 /*****************************************************************************/
 
-MMCommonBearerProperties *
+MMBearerProperties *
 mm_common_connect_properties_get_bearer_properties (MMCommonConnectProperties *self)
 {
     return g_object_ref (self->priv->bearer_properties);
@@ -173,37 +173,37 @@ mm_common_connect_properties_get_allowed_modes (MMCommonConnectProperties *self,
 const gchar *
 mm_common_connect_properties_get_apn (MMCommonConnectProperties *self)
 {
-    return mm_common_bearer_properties_get_apn (self->priv->bearer_properties);
+    return mm_bearer_properties_get_apn (self->priv->bearer_properties);
 }
 
 const gchar *
 mm_common_connect_properties_get_user (MMCommonConnectProperties *self)
 {
-    return mm_common_bearer_properties_get_user (self->priv->bearer_properties);
+    return mm_bearer_properties_get_user (self->priv->bearer_properties);
 }
 
 const gchar *
 mm_common_connect_properties_get_password (MMCommonConnectProperties *self)
 {
-    return mm_common_bearer_properties_get_password (self->priv->bearer_properties);
+    return mm_bearer_properties_get_password (self->priv->bearer_properties);
 }
 
 const gchar *
 mm_common_connect_properties_get_ip_type (MMCommonConnectProperties *self)
 {
-    return mm_common_bearer_properties_get_ip_type (self->priv->bearer_properties);
+    return mm_bearer_properties_get_ip_type (self->priv->bearer_properties);
 }
 
 gboolean
 mm_common_connect_properties_get_allow_roaming (MMCommonConnectProperties *self)
 {
-    return mm_common_bearer_properties_get_allow_roaming (self->priv->bearer_properties);
+    return mm_bearer_properties_get_allow_roaming (self->priv->bearer_properties);
 }
 
 const gchar *
 mm_common_connect_properties_get_number (MMCommonConnectProperties *self)
 {
-    return mm_common_bearer_properties_get_number (self->priv->bearer_properties);
+    return mm_bearer_properties_get_number (self->priv->bearer_properties);
 }
 
 /*****************************************************************************/
@@ -254,7 +254,7 @@ mm_common_connect_properties_get_dictionary (MMCommonConnectProperties *self)
     }
 
     /* Merge dictionaries */
-    bearer_properties_dictionary = mm_common_bearer_properties_get_dictionary (self->priv->bearer_properties);
+    bearer_properties_dictionary = mm_bearer_properties_get_dictionary (self->priv->bearer_properties);
     g_variant_iter_init (&iter, bearer_properties_dictionary);
     while (g_variant_iter_next (&iter, "{sv}", &key, &value)) {
         g_variant_builder_add (&builder,
@@ -284,9 +284,9 @@ key_value_foreach (const gchar *key,
                    ParseKeyValueContext *ctx)
 {
     /* First, check if we can consume this as bearer properties */
-    if (mm_common_bearer_properties_consume_string (ctx->properties->priv->bearer_properties,
-                                                    key, value,
-                                                    NULL))
+    if (mm_bearer_properties_consume_string (ctx->properties->priv->bearer_properties,
+                                             key, value,
+                                             NULL))
         return TRUE;
 
     if (g_str_equal (key, PROPERTY_PIN))
@@ -394,9 +394,9 @@ mm_common_connect_properties_new_from_dictionary (GVariant *dictionary,
            g_variant_iter_next (&iter, "{sv}", &key, &value)) {
 
         /* First, check if we can consume this as bearer properties */
-        if (!mm_common_bearer_properties_consume_variant (properties->priv->bearer_properties,
-                                                          key, value,
-                                                          NULL)) {
+        if (!mm_bearer_properties_consume_variant (properties->priv->bearer_properties,
+                                                   key, value,
+                                                   NULL)) {
             if (g_str_equal (key, PROPERTY_PIN))
                 mm_common_connect_properties_set_pin (
                     properties,
@@ -480,7 +480,7 @@ mm_common_connect_properties_init (MMCommonConnectProperties *self)
                                               MMCommonConnectPropertiesPrivate);
 
     /* Some defaults */
-    self->priv->bearer_properties = mm_common_bearer_properties_new ();
+    self->priv->bearer_properties = mm_bearer_properties_new ();
     self->priv->allowed_modes = MM_MODEM_MODE_ANY;
     self->priv->preferred_mode = MM_MODEM_MODE_NONE;
     self->priv->bands = g_new (MMModemBand, 1);

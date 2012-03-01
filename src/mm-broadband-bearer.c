@@ -1614,20 +1614,20 @@ disconnect (MMBearer *self,
 
 static gboolean
 cmp_properties (MMBearer *self,
-                MMCommonBearerProperties *properties)
+                MMBearerProperties *properties)
 {
     MMBroadbandBearer *broadband = MM_BROADBAND_BEARER (self);
 
     return ((!g_strcmp0 (broadband->priv->apn,
-                         mm_common_bearer_properties_get_apn (properties))) &&
+                         mm_bearer_properties_get_apn (properties))) &&
             (!g_strcmp0 (broadband->priv->ip_type,
-                         mm_common_bearer_properties_get_ip_type (properties))) &&
+                         mm_bearer_properties_get_ip_type (properties))) &&
             (broadband->priv->allow_roaming ==
-             mm_common_bearer_properties_get_allow_roaming (properties)) &&
+             mm_bearer_properties_get_allow_roaming (properties)) &&
             (!g_strcmp0 (broadband->priv->number,
-                         mm_common_bearer_properties_get_number (properties))) &&
+                         mm_bearer_properties_get_number (properties))) &&
             (broadband->priv->rm_protocol ==
-             mm_common_bearer_properties_get_rm_protocol (properties)));
+             mm_bearer_properties_get_rm_protocol (properties)));
 }
 
 /*****************************************************************************/
@@ -1843,15 +1843,15 @@ interface_initialization_step (InitAsyncContext *ctx)
         ctx->step++;
 
     case INITIALIZATION_STEP_EXPOSE_PROPERTIES: {
-        MMCommonBearerProperties *properties;
+        MMBearerProperties *properties;
 
         /* We create a new properties object just with the stuff we really used */
-        properties = mm_common_bearer_properties_new ();
-        mm_common_bearer_properties_set_apn (properties, ctx->self->priv->apn);
-        mm_common_bearer_properties_set_number (properties, ctx->self->priv->number);
-        mm_common_bearer_properties_set_rm_protocol (properties, ctx->self->priv->rm_protocol);
-        mm_common_bearer_properties_set_ip_type (properties, ctx->self->priv->ip_type);
-        mm_common_bearer_properties_set_allow_roaming (properties, ctx->self->priv->allow_roaming);
+        properties = mm_bearer_properties_new ();
+        mm_bearer_properties_set_apn (properties, ctx->self->priv->apn);
+        mm_bearer_properties_set_number (properties, ctx->self->priv->number);
+        mm_bearer_properties_set_rm_protocol (properties, ctx->self->priv->rm_protocol);
+        mm_bearer_properties_set_ip_type (properties, ctx->self->priv->ip_type);
+        mm_bearer_properties_set_allow_roaming (properties, ctx->self->priv->allow_roaming);
         mm_bearer_expose_properties (MM_BEARER (ctx->self), properties);
         g_object_unref (properties);
 
@@ -1931,7 +1931,7 @@ initable_init_async (GAsyncInitable *initable,
 
 void
 mm_broadband_bearer_new (MMBroadbandModem *modem,
-                         MMCommonBearerProperties *properties,
+                         MMBearerProperties *properties,
                          GCancellable *cancellable,
                          GAsyncReadyCallback callback,
                          gpointer user_data)
@@ -1943,11 +1943,11 @@ mm_broadband_bearer_new (MMBroadbandModem *modem,
         callback,
         user_data,
         MM_BEARER_MODEM,                      modem,
-        MM_BROADBAND_BEARER_3GPP_APN,         mm_common_bearer_properties_get_apn (properties),
-        MM_BROADBAND_BEARER_CDMA_NUMBER,      mm_common_bearer_properties_get_number (properties),
-        MM_BROADBAND_BEARER_CDMA_RM_PROTOCOL, mm_common_bearer_properties_get_rm_protocol (properties),
-        MM_BROADBAND_BEARER_IP_TYPE,          mm_common_bearer_properties_get_ip_type (properties),
-        MM_BROADBAND_BEARER_ALLOW_ROAMING,    mm_common_bearer_properties_get_allow_roaming (properties),
+        MM_BROADBAND_BEARER_3GPP_APN,         mm_bearer_properties_get_apn (properties),
+        MM_BROADBAND_BEARER_CDMA_NUMBER,      mm_bearer_properties_get_number (properties),
+        MM_BROADBAND_BEARER_CDMA_RM_PROTOCOL, mm_bearer_properties_get_rm_protocol (properties),
+        MM_BROADBAND_BEARER_IP_TYPE,          mm_bearer_properties_get_ip_type (properties),
+        MM_BROADBAND_BEARER_ALLOW_ROAMING,    mm_bearer_properties_get_allow_roaming (properties),
         NULL);
 }
 

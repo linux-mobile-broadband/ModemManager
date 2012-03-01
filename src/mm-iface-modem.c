@@ -196,7 +196,7 @@ create_bearer_ready (MMIfaceModem *self,
 
 void
 mm_iface_modem_create_bearer (MMIfaceModem *self,
-                              MMCommonBearerProperties *properties,
+                              MMBearerProperties *properties,
                               GAsyncReadyCallback callback,
                               gpointer user_data)
 {
@@ -270,7 +270,7 @@ handle_create_bearer_auth_ready (MMBaseModem *self,
                                  GAsyncResult *res,
                                  HandleCreateBearerContext *ctx)
 {
-    MMCommonBearerProperties *properties;
+    MMBearerProperties *properties;
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
@@ -279,7 +279,7 @@ handle_create_bearer_auth_ready (MMBaseModem *self,
         return;
     }
 
-    properties = mm_common_bearer_properties_new_from_dictionary (ctx->dictionary, &error);
+    properties = mm_bearer_properties_new_from_dictionary (ctx->dictionary, &error);
     if (!properties) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_create_bearer_context_free (ctx);

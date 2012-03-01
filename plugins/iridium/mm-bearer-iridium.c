@@ -378,13 +378,13 @@ disconnect (MMBearer *self,
 
 static gboolean
 cmp_properties (MMBearer *self,
-                MMCommonBearerProperties *properties)
+                MMBearerProperties *properties)
 {
-    return (mm_common_bearer_properties_get_apn (properties) == NULL &&
-            mm_common_bearer_properties_get_ip_type (properties) == NULL &&
-            mm_common_bearer_properties_get_number (properties) == NULL &&
-            mm_common_bearer_properties_get_rm_protocol (properties) == MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN &&
-            mm_common_bearer_properties_get_allow_roaming (properties));
+    return (mm_bearer_properties_get_apn (properties) == NULL &&
+            mm_bearer_properties_get_ip_type (properties) == NULL &&
+            mm_bearer_properties_get_number (properties) == NULL &&
+            mm_bearer_properties_get_rm_protocol (properties) == MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN &&
+            mm_bearer_properties_get_allow_roaming (properties));
 }
 
 /*****************************************************************************/

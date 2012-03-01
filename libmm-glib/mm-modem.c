@@ -1225,8 +1225,7 @@ mm_modem_create_bearer (MMModem *self,
     if (cancellable)
         ctx->cancellable = g_object_ref (cancellable);
 
-    dictionary = (mm_common_bearer_properties_get_dictionary (
-                      MM_COMMON_BEARER_PROPERTIES (properties)));
+    dictionary = mm_bearer_properties_get_dictionary (properties);
     mm_gdbus_modem_call_create_bearer (
         self,
         dictionary,
@@ -1268,8 +1267,7 @@ mm_modem_create_bearer_sync (MMModem *self,
 
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
-    dictionary = (mm_common_bearer_properties_get_dictionary (
-                      MM_COMMON_BEARER_PROPERTIES (properties)));
+    dictionary = mm_bearer_properties_get_dictionary (properties);
     mm_gdbus_modem_call_create_bearer_sync (self,
                                             dictionary,
                                             &bearer_path,

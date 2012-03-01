@@ -49,12 +49,12 @@ GType mm_broadband_bearer_novatel_get_type (void);
 
 /* Default 3GPP bearer creation implementation */
 void mm_broadband_bearer_novatel_new (MMBroadbandModemNovatel *modem,
-                            MMCommonBearerProperties *properties,
-                            GCancellable *cancellable,
-                            GAsyncReadyCallback callback,
-                            gpointer user_data);
+                                      MMBearerProperties *properties,
+                                      GCancellable *cancellable,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data);
 MMBearer *mm_broadband_bearer_novatel_new_finish (GAsyncResult *res,
-                                        GError **error);
+                                                  GError **error);
 
 
 #endif /* MM_BROADBAND_BEARER_NOVATEL_H */

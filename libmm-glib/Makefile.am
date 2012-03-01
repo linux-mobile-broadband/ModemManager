@@ -40,8 +40,6 @@ libmm_glib_la_SOURCES = \
 	mm-sms.c \
 	mm-modem-messaging.h \
 	mm-modem-messaging.c \
-	mm-bearer-properties.h \
-	mm-bearer-properties.c \
 	mm-bearer.h \
 	mm-bearer.c
 
@@ -61,5 +59,4 @@ include_HEADERS = \
 	mm-modem-simple.h \
 	mm-sim.h \
 	mm-sms.h \
-	mm-bearer-properties.h \
 	mm-bearer.h

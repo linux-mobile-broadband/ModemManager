@@ -19,7 +19,7 @@
 #include <ModemManager.h>
 #include <glib-object.h>
 
-#include "mm-common-bearer-properties.h"
+#include "mm-bearer-properties.h"
 
 G_BEGIN_DECLS
 
@@ -111,7 +111,7 @@ gboolean mm_common_connect_properties_get_allow_roaming (
 const gchar *mm_common_connect_properties_get_number (
     MMCommonConnectProperties *properties);
 
-MMCommonBearerProperties *mm_common_connect_properties_get_bearer_properties (
+MMBearerProperties *mm_common_connect_properties_get_bearer_properties (
     MMCommonConnectProperties *properties);
 
 GVariant *mm_common_connect_properties_get_dictionary (MMCommonConnectProperties *self);

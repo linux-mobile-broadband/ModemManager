@@ -28,7 +28,6 @@
 
 #include "mm-sim.h"
 #include "mm-bearer.h"
-#include "mm-bearer-properties.h"
 
 G_BEGIN_DECLS
 
