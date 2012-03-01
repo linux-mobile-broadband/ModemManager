@@ -3528,7 +3528,7 @@ interface_initialization_step (InitializationContext *ctx)
                           G_CALLBACK (handle_factory_reset),
                           ctx->self);
         g_signal_connect (ctx->skeleton,
-                          "handle-set-allowed-bands",
+                          "handle-set-bands",
                           G_CALLBACK (handle_set_bands),
                           ctx->self);
         g_signal_connect (ctx->skeleton,
