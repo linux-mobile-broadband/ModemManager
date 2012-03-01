@@ -187,7 +187,7 @@ typedef struct {
 
     /* Expected input properties */
     GVariant *dictionary;
-    MMCommonConnectProperties *properties;
+    MMSimpleConnectProperties *properties;
 
     /* Results to set */
     MMBearer *bearer;
@@ -375,7 +375,7 @@ unlock_check_ready (MMIfaceModem *self,
 
     /* During simple connect we are only allowed to use SIM PIN */
     if (lock != MM_MODEM_LOCK_SIM_PIN ||
-        !mm_common_connect_properties_get_pin (ctx->properties)) {
+        !mm_simple_connect_properties_get_pin (ctx->properties)) {
         g_dbus_method_invocation_return_error (
             ctx->invocation,
             MM_CORE_ERROR,
@@ -402,7 +402,7 @@ unlock_check_ready (MMIfaceModem *self,
     }
 
     mm_sim_send_pin (sim,
-                     mm_common_connect_properties_get_pin (ctx->properties),
+                     mm_simple_connect_properties_get_pin (ctx->properties),
                      (GAsyncReadyCallback)send_pin_ready,
                      ctx);
     g_object_unref (sim);
@@ -440,7 +440,7 @@ connection_step (ConnectionContext *ctx)
         mm_info ("Simple connect state (%d/%d): Allowed mode",
                  ctx->step, CONNECTION_STEP_LAST);
 
-        mm_common_connect_properties_get_allowed_modes (ctx->properties,
+        mm_simple_connect_properties_get_allowed_modes (ctx->properties,
                                                         &allowed_modes,
                                                         &preferred_mode);
         mm_iface_modem_set_allowed_modes (MM_IFACE_MODEM (ctx->self),
@@ -460,7 +460,7 @@ connection_step (ConnectionContext *ctx)
         mm_info ("Simple connect state (%d/%d): Bands",
                  ctx->step, CONNECTION_STEP_LAST);
 
-        mm_common_connect_properties_get_bands (ctx->properties,
+        mm_simple_connect_properties_get_bands (ctx->properties,
                                                 &bands,
                                                 &n_bands);
 
@@ -485,7 +485,7 @@ connection_step (ConnectionContext *ctx)
             /* 3GPP or CDMA registration */
             register_in_3gpp_or_cdma_network (
                 ctx->self,
-                mm_common_connect_properties_get_operator_id (ctx->properties),
+                mm_simple_connect_properties_get_operator_id (ctx->properties),
                 (GAsyncReadyCallback)register_in_3gpp_or_cdma_network_ready,
                 ctx);
             return;
@@ -507,8 +507,7 @@ connection_step (ConnectionContext *ctx)
                       MM_IFACE_MODEM_BEARER_LIST, &list,
                       NULL);
 
-        bearer_properties = (mm_common_connect_properties_get_bearer_properties (
-                                 ctx->properties));
+        bearer_properties = mm_simple_connect_properties_get_bearer_properties (ctx->properties);
 
         /* Check if the bearer we want to create is already in the list */
         ctx->bearer = mm_bearer_list_find (list, bearer_properties);
@@ -575,7 +574,7 @@ connect_auth_ready (MMBaseModem *self,
         return;
     }
 
-    ctx->properties = mm_common_connect_properties_new_from_dictionary (ctx->dictionary, &error);
+    ctx->properties = mm_simple_connect_properties_new_from_dictionary (ctx->dictionary, &error);
     if (!ctx->properties) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         connection_context_free (ctx);

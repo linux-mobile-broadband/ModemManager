@@ -140,7 +140,7 @@ simple_connect_ready (MMModemSimple *self,
 
 void
 mm_modem_simple_connect (MMModemSimple *self,
-                         MMModemSimpleConnectProperties *properties,
+                         MMSimpleConnectProperties *properties,
                          GCancellable *cancellable,
                          GAsyncReadyCallback callback,
                          gpointer user_data)
@@ -158,8 +158,7 @@ mm_modem_simple_connect (MMModemSimple *self,
     if (cancellable)
         ctx->cancellable = g_object_ref (cancellable);
 
-    variant = mm_common_connect_properties_get_dictionary (
-        MM_COMMON_CONNECT_PROPERTIES (properties));
+    variant = mm_simple_connect_properties_get_dictionary (properties);
     mm_gdbus_modem_simple_call_connect (
         self,
         variant,
@@ -172,7 +171,7 @@ mm_modem_simple_connect (MMModemSimple *self,
 
 MMBearer *
 mm_modem_simple_connect_sync (MMModemSimple *self,
-                              MMModemSimpleConnectProperties *properties,
+                              MMSimpleConnectProperties *properties,
                               GCancellable *cancellable,
                               GError **error)
 {
@@ -182,8 +181,7 @@ mm_modem_simple_connect_sync (MMModemSimple *self,
 
     g_return_val_if_fail (MM_GDBUS_IS_MODEM_SIMPLE (self), NULL);
 
-    variant = mm_common_connect_properties_get_dictionary (
-        MM_COMMON_CONNECT_PROPERTIES (properties));
+    variant = mm_simple_connect_properties_get_dictionary (properties);
     mm_gdbus_modem_simple_call_connect_sync (self,
                                              variant,
                                              &bearer_path,

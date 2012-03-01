@@ -27,7 +27,7 @@
 #include "mm-enums-types.h"
 #include "mm-common-helpers.h"
 #include "mm-common-simple-properties.h"
-#include "mm-common-connect-properties.h"
+#include "mm-simple-connect-properties.h"
 #include "mm-sms-properties.h"
 #include "mm-bearer-properties.h"
 #include "mm-bearer-ip-config.h"

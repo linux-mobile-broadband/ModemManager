@@ -27,7 +27,6 @@
 #include <mm-gdbus-modem.h>
 
 #include "mm-bearer.h"
-#include "mm-modem-simple-connect-properties.h"
 #include "mm-modem-simple-status-properties.h"
 
 G_BEGIN_DECLS
@@ -41,7 +40,7 @@ const gchar *mm_modem_simple_get_path (MMModemSimple *self);
 gchar       *mm_modem_simple_dup_path (MMModemSimple *self);
 
 void      mm_modem_simple_connect        (MMModemSimple *self,
-                                          MMModemSimpleConnectProperties *properties,
+                                          MMSimpleConnectProperties *properties,
                                           GCancellable *cancellable,
                                           GAsyncReadyCallback callback,
                                           gpointer user_data);
@@ -49,7 +48,7 @@ MMBearer *mm_modem_simple_connect_finish (MMModemSimple *self,
                                           GAsyncResult *res,
                                           GError **error);
 MMBearer *mm_modem_simple_connect_sync   (MMModemSimple *self,
-                                          MMModemSimpleConnectProperties *properties,
+                                          MMSimpleConnectProperties *properties,
                                           GCancellable *cancellable,
                                           GError **error);
 

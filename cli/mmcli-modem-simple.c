@@ -316,11 +316,11 @@ get_modem_ready (GObject      *source,
     /* Request to connect the modem? */
     if (connect_str) {
         GError *error = NULL;
-        MMModemSimpleConnectProperties *properties;
+        MMSimpleConnectProperties *properties;
 
         g_debug ("Asynchronously connecting the modem...");
 
-        properties = mm_modem_simple_connect_properties_new_from_string (connect_str, &error);
+        properties = mm_simple_connect_properties_new_from_string (connect_str, &error);
         if (!properties) {
             g_printerr ("Error parsing connect string: '%s'\n", error->message);
             exit (EXIT_FAILURE);

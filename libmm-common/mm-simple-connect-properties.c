@@ -17,9 +17,9 @@
 
 #include "mm-errors-types.h"
 #include "mm-common-helpers.h"
-#include "mm-common-connect-properties.h"
+#include "mm-simple-connect-properties.h"
 
-G_DEFINE_TYPE (MMCommonConnectProperties, mm_common_connect_properties, G_TYPE_OBJECT);
+G_DEFINE_TYPE (MMSimpleConnectProperties, mm_simple_connect_properties, G_TYPE_OBJECT);
 
 #define PROPERTY_PIN             "pin"
 #define PROPERTY_OPERATOR_ID     "operator-id"
@@ -27,7 +27,7 @@ G_DEFINE_TYPE (MMCommonConnectProperties, mm_common_connect_properties, G_TYPE_O
 #define PROPERTY_ALLOWED_MODES   "allowed-modes"
 #define PROPERTY_PREFERRED_MODE  "preferred-mode"
 
-struct _MMCommonConnectPropertiesPrivate {
+struct _MMSimpleConnectPropertiesPrivate {
     /* PIN */
     gchar *pin;
     /* Operator ID */
@@ -46,26 +46,32 @@ struct _MMCommonConnectPropertiesPrivate {
 /*****************************************************************************/
 
 void
-mm_common_connect_properties_set_pin (MMCommonConnectProperties *self,
+mm_simple_connect_properties_set_pin (MMSimpleConnectProperties *self,
                                       const gchar *pin)
 {
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
     g_free (self->priv->pin);
     self->priv->pin = g_strdup (pin);
 }
 
 void
-mm_common_connect_properties_set_operator_id (MMCommonConnectProperties *self,
+mm_simple_connect_properties_set_operator_id (MMSimpleConnectProperties *self,
                                               const gchar *operator_id)
 {
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
     g_free (self->priv->operator_id);
     self->priv->operator_id = g_strdup (operator_id);
 }
 
 void
-mm_common_connect_properties_set_bands (MMCommonConnectProperties *self,
+mm_simple_connect_properties_set_bands (MMSimpleConnectProperties *self,
                                         const MMModemBand *bands,
                                         guint n_bands)
 {
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
     g_free (self->priv->bands);
     self->priv->n_bands = n_bands;
     self->priv->bands = g_new (MMModemBand, self->priv->n_bands);
@@ -75,59 +81,73 @@ mm_common_connect_properties_set_bands (MMCommonConnectProperties *self,
 }
 
 void
-mm_common_connect_properties_set_allowed_modes (MMCommonConnectProperties *self,
+mm_simple_connect_properties_set_allowed_modes (MMSimpleConnectProperties *self,
                                                 MMModemMode allowed,
                                                 MMModemMode preferred)
 {
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
     self->priv->allowed_modes = allowed;
     self->priv->preferred_mode = preferred;
     self->priv->allowed_modes_set = TRUE;
 }
 
 void
-mm_common_connect_properties_set_apn (MMCommonConnectProperties *self,
+mm_simple_connect_properties_set_apn (MMSimpleConnectProperties *self,
                                       const gchar *apn)
 {
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
     mm_bearer_properties_set_apn (self->priv->bearer_properties,
                                   apn);
 }
 
 void
-mm_common_connect_properties_set_user (MMCommonConnectProperties *self,
+mm_simple_connect_properties_set_user (MMSimpleConnectProperties *self,
                                        const gchar *user)
 {
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
     mm_bearer_properties_set_user (self->priv->bearer_properties,
                                    user);
 }
 
 void
-mm_common_connect_properties_set_password (MMCommonConnectProperties *self,
+mm_simple_connect_properties_set_password (MMSimpleConnectProperties *self,
                                            const gchar *password)
 {
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
     mm_bearer_properties_set_password (self->priv->bearer_properties,
                                        password);
 }
 
 void
-mm_common_connect_properties_set_ip_type (MMCommonConnectProperties *self,
+mm_simple_connect_properties_set_ip_type (MMSimpleConnectProperties *self,
                                           const gchar *ip_type)
 {
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
     mm_bearer_properties_set_ip_type (self->priv->bearer_properties,
                                       ip_type);
 }
 
 void
-mm_common_connect_properties_set_allow_roaming (MMCommonConnectProperties *self,
+mm_simple_connect_properties_set_allow_roaming (MMSimpleConnectProperties *self,
                                                 gboolean allow_roaming)
 {
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
     mm_bearer_properties_set_allow_roaming (self->priv->bearer_properties,
                                             allow_roaming);
 }
 
 void
-mm_common_connect_properties_set_number (MMCommonConnectProperties *self,
+mm_simple_connect_properties_set_number (MMSimpleConnectProperties *self,
                                          const gchar *number)
 {
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+
     mm_bearer_properties_set_number (self->priv->bearer_properties,
                                      number);
 }
@@ -135,81 +155,107 @@ mm_common_connect_properties_set_number (MMCommonConnectProperties *self,
 /*****************************************************************************/
 
 MMBearerProperties *
-mm_common_connect_properties_get_bearer_properties (MMCommonConnectProperties *self)
+mm_simple_connect_properties_get_bearer_properties (MMSimpleConnectProperties *self)
 {
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), NULL);
+
     return g_object_ref (self->priv->bearer_properties);
 }
 
 const gchar *
-mm_common_connect_properties_get_pin (MMCommonConnectProperties *self)
+mm_simple_connect_properties_get_pin (MMSimpleConnectProperties *self)
 {
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), NULL);
+
     return self->priv->pin;
 }
 
 const gchar *
-mm_common_connect_properties_get_operator_id (MMCommonConnectProperties *self)
+mm_simple_connect_properties_get_operator_id (MMSimpleConnectProperties *self)
 {
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), NULL);
+
     return self->priv->operator_id;
 }
 
 void
-mm_common_connect_properties_get_bands (MMCommonConnectProperties *self,
+mm_simple_connect_properties_get_bands (MMSimpleConnectProperties *self,
                                         const MMModemBand **bands,
                                         guint *n_bands)
 {
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+    g_return_if_fail (bands != NULL);
+    g_return_if_fail (n_bands != NULL);
+
     *bands = self->priv->bands;
     *n_bands = self->priv->n_bands;
 }
 
 void
-mm_common_connect_properties_get_allowed_modes (MMCommonConnectProperties *self,
+mm_simple_connect_properties_get_allowed_modes (MMSimpleConnectProperties *self,
                                                 MMModemMode *allowed,
                                                 MMModemMode *preferred)
 {
+    g_return_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self));
+    g_return_if_fail (allowed != NULL);
+    g_return_if_fail (preferred != NULL);
+
     *allowed = self->priv->allowed_modes;
     *preferred = self->priv->preferred_mode;
 }
 
 const gchar *
-mm_common_connect_properties_get_apn (MMCommonConnectProperties *self)
+mm_simple_connect_properties_get_apn (MMSimpleConnectProperties *self)
 {
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), NULL);
+
     return mm_bearer_properties_get_apn (self->priv->bearer_properties);
 }
 
 const gchar *
-mm_common_connect_properties_get_user (MMCommonConnectProperties *self)
+mm_simple_connect_properties_get_user (MMSimpleConnectProperties *self)
 {
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), NULL);
+
     return mm_bearer_properties_get_user (self->priv->bearer_properties);
 }
 
 const gchar *
-mm_common_connect_properties_get_password (MMCommonConnectProperties *self)
+mm_simple_connect_properties_get_password (MMSimpleConnectProperties *self)
 {
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), NULL);
+
     return mm_bearer_properties_get_password (self->priv->bearer_properties);
 }
 
 const gchar *
-mm_common_connect_properties_get_ip_type (MMCommonConnectProperties *self)
+mm_simple_connect_properties_get_ip_type (MMSimpleConnectProperties *self)
 {
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), NULL);
+
     return mm_bearer_properties_get_ip_type (self->priv->bearer_properties);
 }
 
 gboolean
-mm_common_connect_properties_get_allow_roaming (MMCommonConnectProperties *self)
+mm_simple_connect_properties_get_allow_roaming (MMSimpleConnectProperties *self)
 {
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), FALSE);
+
     return mm_bearer_properties_get_allow_roaming (self->priv->bearer_properties);
 }
 
 const gchar *
-mm_common_connect_properties_get_number (MMCommonConnectProperties *self)
+mm_simple_connect_properties_get_number (MMSimpleConnectProperties *self)
 {
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), NULL);
+
     return mm_bearer_properties_get_number (self->priv->bearer_properties);
 }
 
 /*****************************************************************************/
 
 GVariant *
-mm_common_connect_properties_get_dictionary (MMCommonConnectProperties *self)
+mm_simple_connect_properties_get_dictionary (MMSimpleConnectProperties *self)
 {
     GVariantBuilder builder;
     GVariantIter iter;
@@ -220,6 +266,8 @@ mm_common_connect_properties_get_dictionary (MMCommonConnectProperties *self)
     /* We do allow NULL */
     if (!self)
         return NULL;
+
+    g_return_val_if_fail (MM_IS_SIMPLE_CONNECT_PROPERTIES (self), NULL);
 
     g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
 
@@ -272,7 +320,7 @@ mm_common_connect_properties_get_dictionary (MMCommonConnectProperties *self)
 /*****************************************************************************/
 
 typedef struct {
-    MMCommonConnectProperties *properties;
+    MMSimpleConnectProperties *properties;
     GError *error;
     gchar *allowed_modes_str;
     gchar *preferred_mode_str;
@@ -290,16 +338,16 @@ key_value_foreach (const gchar *key,
         return TRUE;
 
     if (g_str_equal (key, PROPERTY_PIN))
-        mm_common_connect_properties_set_pin (ctx->properties, value);
+        mm_simple_connect_properties_set_pin (ctx->properties, value);
     else if (g_str_equal (key, PROPERTY_OPERATOR_ID))
-        mm_common_connect_properties_set_operator_id (ctx->properties, value);
+        mm_simple_connect_properties_set_operator_id (ctx->properties, value);
     else if (g_str_equal (key, PROPERTY_BANDS)) {
         MMModemBand *bands = NULL;
         guint n_bands = 0;
 
         mm_common_get_bands_from_string (value, &bands, &n_bands, &ctx->error);
         if (!ctx->error) {
-            mm_common_connect_properties_set_bands (ctx->properties, bands, n_bands);
+            mm_simple_connect_properties_set_bands (ctx->properties, bands, n_bands);
             g_free (bands);
         }
     } else if (g_str_equal (key, PROPERTY_ALLOWED_MODES)) {
@@ -316,8 +364,8 @@ key_value_foreach (const gchar *key,
     return !ctx->error;
 }
 
-MMCommonConnectProperties *
-mm_common_connect_properties_new_from_string (const gchar *str,
+MMSimpleConnectProperties *
+mm_simple_connect_properties_new_from_string (const gchar *str,
                                               GError **error)
 {
     ParseKeyValueContext ctx;
@@ -325,7 +373,7 @@ mm_common_connect_properties_new_from_string (const gchar *str,
     ctx.error = NULL;
     ctx.allowed_modes_str = NULL;
     ctx.preferred_mode_str = NULL;
-    ctx.properties = mm_common_connect_properties_new ();
+    ctx.properties = mm_simple_connect_properties_new ();
 
     mm_common_parse_key_value_string (str,
                                       &ctx.error,
@@ -358,7 +406,7 @@ mm_common_connect_properties_new_from_string (const gchar *str,
             g_object_unref (ctx.properties);
             ctx.properties = NULL;
         } else {
-            mm_common_connect_properties_set_allowed_modes (
+            mm_simple_connect_properties_set_allowed_modes (
                 ctx.properties,
                 allowed_modes,
                 preferred_mode);
@@ -373,21 +421,31 @@ mm_common_connect_properties_new_from_string (const gchar *str,
 
 /*****************************************************************************/
 
-MMCommonConnectProperties *
-mm_common_connect_properties_new_from_dictionary (GVariant *dictionary,
+MMSimpleConnectProperties *
+mm_simple_connect_properties_new_from_dictionary (GVariant *dictionary,
                                                   GError **error)
 {
     GError *inner_error = NULL;
     GVariantIter iter;
     gchar *key;
     GVariant *value;
-    MMCommonConnectProperties *properties;
+    MMSimpleConnectProperties *properties;
     GVariant *allowed_modes_variant = NULL;
     GVariant *preferred_mode_variant = NULL;
 
-    properties = mm_common_connect_properties_new ();
+    properties = mm_simple_connect_properties_new ();
     if (!dictionary)
         return properties;
+
+    if (!g_variant_is_of_type (dictionary, G_VARIANT_TYPE ("a{sv}"))) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_INVALID_ARGS,
+                     "Cannot create Simple Connect properties from dictionary: "
+                     "invalid variant type received");
+        g_object_unref (properties);
+        return NULL;
+    }
 
     g_variant_iter_init (&iter, dictionary);
     while (!inner_error &&
@@ -398,18 +456,18 @@ mm_common_connect_properties_new_from_dictionary (GVariant *dictionary,
                                                    key, value,
                                                    NULL)) {
             if (g_str_equal (key, PROPERTY_PIN))
-                mm_common_connect_properties_set_pin (
+                mm_simple_connect_properties_set_pin (
                     properties,
                     g_variant_get_string (value, NULL));
             else if (g_str_equal (key, PROPERTY_OPERATOR_ID))
-                mm_common_connect_properties_set_operator_id (
+                mm_simple_connect_properties_set_operator_id (
                     properties,
                     g_variant_get_string (value, NULL));
             else if (g_str_equal (key, PROPERTY_BANDS)) {
                 GArray *array;
 
                 array = mm_common_bands_variant_to_garray (value);
-                mm_common_connect_properties_set_bands (
+                mm_simple_connect_properties_set_bands (
                     properties,
                     (MMModemBand *)array->data,
                     array->len);
@@ -439,7 +497,7 @@ mm_common_connect_properties_new_from_dictionary (GVariant *dictionary,
     }
     /* If we got allowed modes variant, check if we got preferred mode */
     else if (allowed_modes_variant) {
-        mm_common_connect_properties_set_allowed_modes (
+        mm_simple_connect_properties_set_allowed_modes (
             properties,
             g_variant_get_uint32 (allowed_modes_variant),
             (preferred_mode_variant ?
@@ -448,7 +506,7 @@ mm_common_connect_properties_new_from_dictionary (GVariant *dictionary,
     }
     /* If we only got preferred mode, assume allowed is ANY */
     else if (preferred_mode_variant) {
-        mm_common_connect_properties_set_allowed_modes (
+        mm_simple_connect_properties_set_allowed_modes (
             properties,
             MM_MODEM_MODE_ANY,
             g_variant_get_uint32 (preferred_mode_variant));
@@ -465,19 +523,19 @@ mm_common_connect_properties_new_from_dictionary (GVariant *dictionary,
 
 /*****************************************************************************/
 
-MMCommonConnectProperties *
-mm_common_connect_properties_new (void)
+MMSimpleConnectProperties *
+mm_simple_connect_properties_new (void)
 {
-    return (MM_COMMON_CONNECT_PROPERTIES (
-                g_object_new (MM_TYPE_COMMON_CONNECT_PROPERTIES, NULL)));
+    return (MM_SIMPLE_CONNECT_PROPERTIES (
+                g_object_new (MM_TYPE_SIMPLE_CONNECT_PROPERTIES, NULL)));
 }
 
 static void
-mm_common_connect_properties_init (MMCommonConnectProperties *self)
+mm_simple_connect_properties_init (MMSimpleConnectProperties *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
-                                              MM_TYPE_COMMON_CONNECT_PROPERTIES,
-                                              MMCommonConnectPropertiesPrivate);
+                                              MM_TYPE_SIMPLE_CONNECT_PROPERTIES,
+                                              MMSimpleConnectPropertiesPrivate);
 
     /* Some defaults */
     self->priv->bearer_properties = mm_bearer_properties_new ();
@@ -491,22 +549,22 @@ mm_common_connect_properties_init (MMCommonConnectProperties *self)
 static void
 finalize (GObject *object)
 {
-    MMCommonConnectProperties *self = MM_COMMON_CONNECT_PROPERTIES (object);
+    MMSimpleConnectProperties *self = MM_SIMPLE_CONNECT_PROPERTIES (object);
 
     g_free (self->priv->pin);
     g_free (self->priv->operator_id);
     g_free (self->priv->bands);
     g_object_unref (self->priv->bearer_properties);
 
-    G_OBJECT_CLASS (mm_common_connect_properties_parent_class)->finalize (object);
+    G_OBJECT_CLASS (mm_simple_connect_properties_parent_class)->finalize (object);
 }
 
 static void
-mm_common_connect_properties_class_init (MMCommonConnectPropertiesClass *klass)
+mm_simple_connect_properties_class_init (MMSimpleConnectPropertiesClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
-    g_type_class_add_private (object_class, sizeof (MMCommonConnectPropertiesPrivate));
+    g_type_class_add_private (object_class, sizeof (MMSimpleConnectPropertiesPrivate));
 
     object_class->finalize = finalize;
 }

@@ -24,8 +24,6 @@ libmm_glib_la_SOURCES = \
 	mm-modem-3gpp-ussd.c \
 	mm-modem-cdma.h \
 	mm-modem-cdma.c \
-	mm-modem-simple-connect-properties.h \
-	mm-modem-simple-connect-properties.c \
 	mm-modem-simple-status-properties.h \
 	mm-modem-simple-status-properties.c \
 	mm-modem-simple.h \
@@ -54,7 +52,6 @@ include_HEADERS = \
 	mm-object.h \
 	mm-modem.h \
 	mm-modem-3gpp.h \
-	mm-modem-simple-connect-properties.h \
 	mm-modem-simple-status-properties.h \
 	mm-modem-simple.h \
 	mm-sim.h \
