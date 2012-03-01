@@ -138,6 +138,7 @@ typedef struct {
      */
     GHashTable *sms_parts;
     gboolean sms_pdu_mode;
+    gboolean sms_pdu_supported;
 
     guint sms_fetch_pending;
 } MMGenericGsmPrivate;
@@ -1689,14 +1690,18 @@ sms_set_format_cb (MMAtSerialPort *port,
                    GError *error,
                    gpointer user_data)
 {
+    MMGenericGsm *self = MM_GENERIC_GSM (user_data);
+    MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
+
     if (error) {
         mm_warn ("(%s): failed to set SMS mode, assuming text mode",
                  mm_port_get_device (MM_PORT (port)));
-        MM_GENERIC_GSM_GET_PRIVATE (user_data)->sms_pdu_mode = FALSE;
+        priv->sms_pdu_mode = FALSE;
+        priv->sms_pdu_supported = FALSE;
     } else {
         mm_info ("(%s): using %s mode for SMS",
                  mm_port_get_device (MM_PORT (port)),
-                 MM_GENERIC_GSM_GET_PRIVATE (user_data)->sms_pdu_mode ? "PDU" : "text");
+                 priv->sms_pdu_mode ? "PDU" : "text");
     }
 }
 
@@ -1759,6 +1764,10 @@ sms_get_format_cb (MMAtSerialPort *port,
             mm_at_serial_port_queue_command (priv->primary, "AT+CMGF=0", 3, sms_set_format_cb, self);
         } else
             mm_at_serial_port_queue_command (priv->primary, "AT+CMGF=1", 3, sms_set_format_cb, self);
+
+        /* Save whether PDU mode is supported so we can fall back to it if text fails */
+        if (min == 0)
+            priv->sms_pdu_supported = TRUE;
     }
     g_match_info_free (match_info);
 
@@ -4604,19 +4613,41 @@ sms_send_done (MMAtSerialPort *port,
                gpointer user_data)
 {
     MMCallbackInfo *info = (MMCallbackInfo *) user_data;
-    const char *p;
+    const char *p, *pdu;
     unsigned long num;
     GArray *indexes = NULL;
     guint32 idx = 0;
+    guint cmgs_pdu_size;
+    char *command;
 
     /* If the modem has already been removed, return without
      * scheduling callback */
     if (mm_callback_info_check_modem_removed (info))
         return;
 
-    if (error)
+    if (error) {
+        MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (info->modem);
+
+        /* If there was an error sending in text mode the retry with the PDU;
+         * text mode is pretty dumb on most devices and often fails.  Later we'll
+         * just use text mode exclusively.
+         */
+        pdu = mm_callback_info_get_data (info, "pdu");
+        if (priv->sms_pdu_mode == FALSE && priv->sms_pdu_supported && pdu) {
+            cmgs_pdu_size = GPOINTER_TO_UINT (mm_callback_info_get_data (info, "cmgs-pdu-size"));
+            g_assert (cmgs_pdu_size);
+            command = g_strdup_printf ("+CMGS=%d\r%s\x1a", cmgs_pdu_size, pdu);
+            mm_at_serial_port_queue_command (port, command, 10, sms_send_done, info);
+            g_free (command);
+
+            /* Clear the PDU data so we don't keep getting here */
+            mm_callback_info_set_data (info, "pdu", NULL, NULL);
+            return;
+        }
+
+        /* Otherwise it's a hard error */
         info->error = g_error_copy (error);
-    else {
+    } else {
         /* If the response happens to have a ">" in it from the interactive
          * handling of the CMGS command, skip it.
          */
@@ -4653,6 +4684,9 @@ sms_send (MMModemGsmSms *modem,
     MMGenericGsmPrivate *priv = MM_GENERIC_GSM_GET_PRIVATE (self);
     char *command;
     MMAtSerialPort *port;
+    guint8 *pdu;
+    guint pdulen = 0, msgstart = 0;
+    char *hex;
 
     info = mm_callback_info_new_full (MM_MODEM (modem),
                                       sms_send_invoke,
@@ -4665,31 +4699,29 @@ sms_send (MMModemGsmSms *modem,
         return;
     }
 
+    /* Always create a PDU since we might need it for fallback from text mode */
+    pdu = sms_create_submit_pdu (number, text, smsc, validity, class, &pdulen, &msgstart, &info->error);
+    if (!pdu) {
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    hex = utils_bin2hexstr (pdu, pdulen);
+    g_free (pdu);
+    if (hex == NULL) {
+        g_set_error_literal (&info->error,
+                             MM_MODEM_ERROR,
+                             MM_MODEM_ERROR_GENERAL,
+                             "Not enough memory to send SMS PDU");
+        mm_callback_info_schedule (info);
+        return;
+    }
+
+    mm_callback_info_set_data (info, "pdu", hex, g_free);
+    mm_callback_info_set_data (info, "cmgs-pdu-size", GUINT_TO_POINTER (pdulen - msgstart), NULL);
     if (priv->sms_pdu_mode) {
-        guint8 *pdu;
-        guint pdulen = 0, msgstart = 0;
-        char *hex;
-
-        pdu = sms_create_submit_pdu (number, text, smsc, validity, class, &pdulen, &msgstart, &info->error);
-        if (!pdu) {
-            mm_callback_info_schedule (info);
-            return;
-        }
-
-        hex = utils_bin2hexstr (pdu, pdulen);
-        g_free (pdu);
-        if (hex == NULL) {
-            g_set_error_literal (&info->error,
-                                 MM_MODEM_ERROR,
-                                 MM_MODEM_ERROR_GENERAL,
-                                 "Not enough memory to send SMS PDU");
-            mm_callback_info_schedule (info);
-            return;
-        }
-
         /* CMGS length is the size of the PDU without SMSC information */
         command = g_strdup_printf ("+CMGS=%d\r%s\x1a", pdulen - msgstart, hex);
-        g_free (hex);
     } else
         command = g_strdup_printf ("+CMGS=\"%s\"\r%s\x1a", number, text);
 
