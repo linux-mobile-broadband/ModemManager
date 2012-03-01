@@ -19,11 +19,11 @@
 
 #include "mm-errors-types.h"
 #include "mm-common-helpers.h"
-#include "mm-common-location-3gpp.h"
+#include "mm-location-3gpp.h"
 
-G_DEFINE_TYPE (MMCommonLocation3gpp, mm_common_location_3gpp, G_TYPE_OBJECT);
+G_DEFINE_TYPE (MMLocation3gpp, mm_location_3gpp, G_TYPE_OBJECT);
 
-struct _MMCommonLocation3gppPrivate {
+struct _MMLocation3gppPrivate {
     guint mobile_country_code;
     guint mobile_network_code;
     gulong location_area_code;
@@ -33,42 +33,43 @@ struct _MMCommonLocation3gppPrivate {
 /*****************************************************************************/
 
 guint
-mm_common_location_3gpp_get_mobile_country_code (MMCommonLocation3gpp *self)
+mm_location_3gpp_get_mobile_country_code (MMLocation3gpp *self)
 {
+    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), 0);
+
     return self->priv->mobile_country_code;
 }
 
 guint
-mm_common_location_3gpp_get_mobile_network_code (MMCommonLocation3gpp *self)
+mm_location_3gpp_get_mobile_network_code (MMLocation3gpp *self)
 {
+    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), 0);
+
     return self->priv->mobile_network_code;
 }
 
 gulong
-mm_common_location_3gpp_get_location_area_code (MMCommonLocation3gpp *self)
+mm_location_3gpp_get_location_area_code (MMLocation3gpp *self)
 {
+    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), 0);
+
     return self->priv->location_area_code;
 }
 
 gulong
-mm_common_location_3gpp_get_cell_id (MMCommonLocation3gpp *self)
+mm_location_3gpp_get_cell_id (MMLocation3gpp *self)
 {
+    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), 0);
+
     return self->priv->cell_id;
 }
 
-/* void */
-/* mm_common_location_3gpp_clear (MMCommonLocation3gpp *self) */
-/* { */
-/*     self->priv->mobile_country_code = 0; */
-/*     self->priv->mobile_network_code = 0; */
-/*     self->priv->location_area_code = 0; */
-/*     self->priv->cell_id = 0; */
-/* } */
-
 gboolean
-mm_common_location_3gpp_set_mobile_country_code (MMCommonLocation3gpp *self,
-                                                 guint mobile_country_code)
+mm_location_3gpp_set_mobile_country_code (MMLocation3gpp *self,
+                                          guint mobile_country_code)
 {
+    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), FALSE);
+
     /* If no change in the location info, don't do anything */
     if (self->priv->mobile_country_code == mobile_country_code)
         return FALSE;
@@ -78,9 +79,11 @@ mm_common_location_3gpp_set_mobile_country_code (MMCommonLocation3gpp *self,
 }
 
 gboolean
-mm_common_location_3gpp_set_mobile_network_code (MMCommonLocation3gpp *self,
-                                                 guint mobile_network_code)
+mm_location_3gpp_set_mobile_network_code (MMLocation3gpp *self,
+                                          guint mobile_network_code)
 {
+    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), FALSE);
+
     /* If no change in the location info, don't do anything */
     if (self->priv->mobile_network_code == mobile_network_code)
         return FALSE;
@@ -90,9 +93,11 @@ mm_common_location_3gpp_set_mobile_network_code (MMCommonLocation3gpp *self,
 }
 
 gboolean
-mm_common_location_3gpp_set_location_area_code (MMCommonLocation3gpp *self,
-                                                gulong location_area_code)
+mm_location_3gpp_set_location_area_code (MMLocation3gpp *self,
+                                         gulong location_area_code)
 {
+    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), FALSE);
+
     /* If no change in the location info, don't do anything */
     if (self->priv->location_area_code == location_area_code)
         return FALSE;
@@ -103,9 +108,11 @@ mm_common_location_3gpp_set_location_area_code (MMCommonLocation3gpp *self,
 
 
 gboolean
-mm_common_location_3gpp_set_cell_id (MMCommonLocation3gpp *self,
-                                     gulong cell_id)
+mm_location_3gpp_set_cell_id (MMLocation3gpp *self,
+                              gulong cell_id)
 {
+    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), FALSE);
+
     /* If no change in the location info, don't do anything */
     if (self->priv->cell_id == cell_id)
         return FALSE;
@@ -117,9 +124,11 @@ mm_common_location_3gpp_set_cell_id (MMCommonLocation3gpp *self,
 /*****************************************************************************/
 
 GVariant *
-mm_common_location_3gpp_get_string_variant (MMCommonLocation3gpp *self)
+mm_location_3gpp_get_string_variant (MMLocation3gpp *self)
 {
     GVariant *variant = NULL;
+
+    g_return_val_if_fail (MM_IS_LOCATION_3GPP (self), NULL);
 
     if (self->priv->mobile_country_code &&
         self->priv->mobile_network_code &&
@@ -198,12 +207,21 @@ validate_numeric_string_content (const gchar *display,
     return TRUE;
 }
 
-MMCommonLocation3gpp *
-mm_common_location_3gpp_new_from_string_variant (GVariant *string,
-                                                 GError **error)
+MMLocation3gpp *
+mm_location_3gpp_new_from_string_variant (GVariant *string,
+                                          GError **error)
 {
-    MMCommonLocation3gpp *self = NULL;
+    MMLocation3gpp *self = NULL;
     gchar **split;
+
+    if (!g_variant_is_of_type (string, G_VARIANT_TYPE_STRING)) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_INVALID_ARGS,
+                     "Cannot create 3GPP location from string: "
+                     "invalid variant type received");
+        return NULL;
+    }
 
     split = g_strsplit (g_variant_get_string (string, NULL), ",", -1);
     if (!split) {
@@ -225,7 +243,7 @@ mm_common_location_3gpp_new_from_string_variant (GVariant *string,
         validate_string_length ("Cell ID", split[3], 8, error) &&
         validate_numeric_string_content ("Cell ID", split[3], TRUE, error)) {
         /* Create new location object */
-        self = mm_common_location_3gpp_new ();
+        self = mm_location_3gpp_new ();
         self->priv->mobile_country_code = strtol (split[0], NULL, 10);
         self->priv->mobile_network_code = strtol (split[1], NULL, 10);
         self->priv->location_area_code = strtol (split[2], NULL, 16);
@@ -238,25 +256,25 @@ mm_common_location_3gpp_new_from_string_variant (GVariant *string,
 
 /*****************************************************************************/
 
-MMCommonLocation3gpp *
-mm_common_location_3gpp_new (void)
+MMLocation3gpp *
+mm_location_3gpp_new (void)
 {
-    return (MM_COMMON_LOCATION_3GPP (
-                g_object_new (MM_TYPE_COMMON_LOCATION_3GPP, NULL)));
+    return (MM_LOCATION_3GPP (
+                g_object_new (MM_TYPE_LOCATION_3GPP, NULL)));
 }
 
 static void
-mm_common_location_3gpp_init (MMCommonLocation3gpp *self)
+mm_location_3gpp_init (MMLocation3gpp *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
-                                              MM_TYPE_COMMON_LOCATION_3GPP,
-                                              MMCommonLocation3gppPrivate);
+                                              MM_TYPE_LOCATION_3GPP,
+                                              MMLocation3gppPrivate);
 }
 
 static void
-mm_common_location_3gpp_class_init (MMCommonLocation3gppClass *klass)
+mm_location_3gpp_class_init (MMLocation3gppClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
-    g_type_class_add_private (object_class, sizeof (MMCommonLocation3gppPrivate));
+    g_type_class_add_private (object_class, sizeof (MMLocation3gppPrivate));
 }

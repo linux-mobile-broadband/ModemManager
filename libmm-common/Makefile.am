@@ -154,7 +154,7 @@ mm-simple-connect-properties.c: mm-errors-types.h
 mm-bearer-properties.c: mm-errors-types.h
 mm-sms-properties.c: mm-errors-types.h
 mm-bearer-ip-config.c: mm-errors-types.h
-mm-common-location-3gpp.c: mm-errors-types.h
+mm-location-3gpp.c: mm-errors-types.h
 mm-errors-quarks.c: mm-errors-types.h
 mm-unlock-retries.c: mm-enums-types.h
 
@@ -168,7 +168,7 @@ include_HEADERS = \
 	mm-bearer-properties.h \
 	mm-sms-properties.h \
 	mm-bearer-ip-config.h \
-	mm-common-location-3gpp.h \
+	mm-location-3gpp.h \
 	mm-unlock-retries.h \
 	mm-gdbus-manager.h \
 	mm-gdbus-modem.h \
@@ -194,8 +194,8 @@ libmm_common_la_SOURCES = \
 	mm-sms-properties.c \
 	mm-bearer-ip-config.h \
 	mm-bearer-ip-config.c \
-	mm-common-location-3gpp.h \
-	mm-common-location-3gpp.c \
+	mm-location-3gpp.h \
+	mm-location-3gpp.c \
 	mm-unlock-retries.h \
 	mm-unlock-retries.c \
 	libmm-common.h

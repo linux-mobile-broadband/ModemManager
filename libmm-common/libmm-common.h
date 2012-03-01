@@ -31,7 +31,7 @@
 #include "mm-sms-properties.h"
 #include "mm-bearer-properties.h"
 #include "mm-bearer-ip-config.h"
-#include "mm-common-location-3gpp.h"
+#include "mm-location-3gpp.h"
 #include "mm-unlock-retries.h"
 #include "mm-gdbus-manager.h"
 #include "mm-gdbus-modem.h"

@@ -24,9 +24,7 @@
 #define _MM_MODEM_LOCATION_H_
 
 #include <ModemManager.h>
-#include <mm-gdbus-modem.h>
-
-#include "mm-modem-location-3gpp.h"
+#include <libmm-common.h>
 
 G_BEGIN_DECLS
 
@@ -63,16 +61,16 @@ gboolean mm_modem_location_disable_sync   (MMModemLocation *self,
                                            GCancellable *cancellable,
                                            GError **error);
 
-void                 mm_modem_location_get_3gpp        (MMModemLocation *self,
-                                                        GCancellable *cancellable,
-                                                        GAsyncReadyCallback callback,
-                                                        gpointer user_data);
-MMModemLocation3gpp *mm_modem_location_get_3gpp_finish (MMModemLocation *self,
-                                                        GAsyncResult *res,
-                                                        GError **error);
-MMModemLocation3gpp *mm_modem_location_get_3gpp_sync   (MMModemLocation *self,
-                                                        GCancellable *cancellable,
-                                                        GError **error);
+void            mm_modem_location_get_3gpp        (MMModemLocation *self,
+                                                   GCancellable *cancellable,
+                                                   GAsyncReadyCallback callback,
+                                                   gpointer user_data);
+MMLocation3gpp *mm_modem_location_get_3gpp_finish (MMModemLocation *self,
+                                                   GAsyncResult *res,
+                                                   GError **error);
+MMLocation3gpp *mm_modem_location_get_3gpp_sync   (MMModemLocation *self,
+                                                   GCancellable *cancellable,
+                                                   GError **error);
 G_END_DECLS
 
 #endif /* _MM_MODEM_LOCATION_H_ */

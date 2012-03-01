@@ -160,11 +160,11 @@ mm_modem_location_enable_sync (MMModemLocation *self,
                                                      error);
 }
 
-static MMModemLocation3gpp *
+static MMLocation3gpp *
 build_3gpp_location (GVariant *dictionary,
                      GError **error)
 {
-    MMCommonLocation3gpp *location = NULL;
+    MMLocation3gpp *location = NULL;
     GError *inner_error = NULL;
     GVariant *value;
     guint source;
@@ -179,7 +179,7 @@ build_3gpp_location (GVariant *dictionary,
            g_variant_iter_next (&iter, "{uv}", &source, &value)) {
         /* If we have 3GPP LAC/CI location, build result */
         if (source == MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI)
-            location = mm_common_location_3gpp_new_from_string_variant (value, &inner_error);
+            location = mm_location_3gpp_new_from_string_variant (value, &inner_error);
 
         g_variant_unref (value);
     }
@@ -189,10 +189,10 @@ build_3gpp_location (GVariant *dictionary,
     if (inner_error)
         g_propagate_error (error, inner_error);
 
-    return (MMModemLocation3gpp *)location;
+    return (MMLocation3gpp *)location;
 }
 
-MMModemLocation3gpp *
+MMLocation3gpp *
 mm_modem_location_get_3gpp_finish (MMModemLocation *self,
                                    GAsyncResult *res,
                                    GError **error)
@@ -222,7 +222,7 @@ mm_modem_location_get_3gpp (MMModemLocation *self,
                                                user_data);
 }
 
-MMModemLocation3gpp *
+MMLocation3gpp *
 mm_modem_location_get_3gpp_sync (MMModemLocation *self,
                                  GCancellable *cancellable,
                                  GError **error)

@@ -36,7 +36,7 @@ mm_iface_modem_location_bind_simple_status (MMIfaceModemLocation *self,
 
 typedef struct {
     /* 3GPP location */
-    MMCommonLocation3gpp *location_3gpp;
+    MMLocation3gpp *location_3gpp;
 } LocationContext;
 
 static void
@@ -87,13 +87,13 @@ get_location_context (MMIfaceModemLocation *self)
 /*****************************************************************************/
 
 static GVariant *
-build_location_dictionary (MMCommonLocation3gpp *location_3gpp)
+build_location_dictionary (MMLocation3gpp *location_3gpp)
 {
     GVariant *location_3gpp_value = NULL;
     GVariantBuilder builder;
 
     if (location_3gpp)
-        location_3gpp_value = mm_common_location_3gpp_get_string_variant (location_3gpp);
+        location_3gpp_value = mm_location_3gpp_get_string_variant (location_3gpp);
 
     g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{uv}"));
     if (location_3gpp_value)
@@ -107,7 +107,7 @@ build_location_dictionary (MMCommonLocation3gpp *location_3gpp)
 static void
 notify_location_update (MMIfaceModemLocation *self,
                         MmGdbusModemLocation *skeleton,
-                        MMCommonLocation3gpp *location_3gpp)
+                        MMLocation3gpp *location_3gpp)
 {
     const gchar *dbus_path;
 
@@ -115,10 +115,10 @@ notify_location_update (MMIfaceModemLocation *self,
     mm_info ("Modem %s: 3GPP location updated "
              "(MCC: '%u', MNC: '%u', Location area code: '%lX', Cell ID: '%lX')",
              dbus_path,
-             mm_common_location_3gpp_get_mobile_country_code (location_3gpp),
-             mm_common_location_3gpp_get_mobile_network_code (location_3gpp),
-             mm_common_location_3gpp_get_location_area_code (location_3gpp),
-             mm_common_location_3gpp_get_cell_id (location_3gpp));
+             mm_location_3gpp_get_mobile_country_code (location_3gpp),
+             mm_location_3gpp_get_mobile_network_code (location_3gpp),
+             mm_location_3gpp_get_location_area_code (location_3gpp),
+             mm_location_3gpp_get_cell_id (location_3gpp));
 
     /* We only update the property if we are supposed to signal
      * location */
@@ -145,12 +145,12 @@ mm_iface_modem_location_3gpp_update_mcc_mnc (MMIfaceModemLocation *self,
         guint changed = 0;
 
         if (G_UNLIKELY (!ctx->location_3gpp))
-            ctx->location_3gpp = mm_common_location_3gpp_new ();
+            ctx->location_3gpp = mm_location_3gpp_new ();
 
-        changed += mm_common_location_3gpp_set_mobile_country_code (ctx->location_3gpp,
-                                                                    mobile_country_code);
-        changed += mm_common_location_3gpp_set_mobile_network_code (ctx->location_3gpp,
-                                                                    mobile_network_code);
+        changed += mm_location_3gpp_set_mobile_country_code (ctx->location_3gpp,
+                                                             mobile_country_code);
+        changed += mm_location_3gpp_set_mobile_network_code (ctx->location_3gpp,
+                                                             mobile_network_code);
         if (changed)
             notify_location_update (self, skeleton, ctx->location_3gpp);
     }
@@ -175,12 +175,12 @@ mm_iface_modem_location_3gpp_update_lac_ci (MMIfaceModemLocation *self,
         guint changed = 0;
 
         if (G_UNLIKELY (!ctx->location_3gpp))
-            ctx->location_3gpp = mm_common_location_3gpp_new ();
+            ctx->location_3gpp = mm_location_3gpp_new ();
 
-        changed += mm_common_location_3gpp_set_location_area_code (ctx->location_3gpp,
-                                                                   location_area_code);
-        changed += mm_common_location_3gpp_set_cell_id (ctx->location_3gpp,
-                                                        cell_id);
+        changed += mm_location_3gpp_set_location_area_code (ctx->location_3gpp,
+                                                            location_area_code);
+        changed += mm_location_3gpp_set_cell_id (ctx->location_3gpp,
+                                                 cell_id);
         if (changed)
             notify_location_update (self, skeleton, ctx->location_3gpp);
     }
@@ -203,12 +203,12 @@ mm_iface_modem_location_3gpp_clear (MMIfaceModemLocation *self)
         guint changed = 0;
 
         if (G_UNLIKELY (!ctx->location_3gpp))
-            ctx->location_3gpp = mm_common_location_3gpp_new ();
+            ctx->location_3gpp = mm_location_3gpp_new ();
 
-        changed += mm_common_location_3gpp_set_location_area_code (ctx->location_3gpp, 0);
-        changed += mm_common_location_3gpp_set_cell_id (ctx->location_3gpp, 0);
-        changed += mm_common_location_3gpp_set_mobile_country_code (ctx->location_3gpp, 0);
-        changed += mm_common_location_3gpp_set_mobile_network_code (ctx->location_3gpp, 0);
+        changed += mm_location_3gpp_set_location_area_code (ctx->location_3gpp, 0);
+        changed += mm_location_3gpp_set_cell_id (ctx->location_3gpp, 0);
+        changed += mm_location_3gpp_set_mobile_country_code (ctx->location_3gpp, 0);
+        changed += mm_location_3gpp_set_mobile_network_code (ctx->location_3gpp, 0);
         if (changed)
             notify_location_update (self, skeleton, ctx->location_3gpp);
     }

@@ -186,7 +186,7 @@ disable_ready (MMModemLocation *modem_location,
 }
 
 static void
-get_3gpp_process_reply (MMModemLocation3gpp *location,
+get_3gpp_process_reply (MMLocation3gpp *location,
                         const GError *error)
 {
     if (!location) {
@@ -200,10 +200,10 @@ get_3gpp_process_reply (MMModemLocation3gpp *location,
              "                | Mobile network code: '%u'\n"
              "                |  Location area code: '%lu'\n"
              "                |             Cell ID: '%lu'\n",
-             mm_modem_location_3gpp_get_mobile_country_code (location),
-             mm_modem_location_3gpp_get_mobile_network_code (location),
-             mm_modem_location_3gpp_get_location_area_code (location),
-             mm_modem_location_3gpp_get_cell_id (location));
+             mm_location_3gpp_get_mobile_country_code (location),
+             mm_location_3gpp_get_mobile_network_code (location),
+             mm_location_3gpp_get_location_area_code (location),
+             mm_location_3gpp_get_cell_id (location));
 
     g_object_unref (location);
 }
@@ -212,7 +212,7 @@ static void
 get_3gpp_ready (MMModemLocation  *modem_location,
                 GAsyncResult *result)
 {
-    MMModemLocation3gpp *operation_result;
+    MMLocation3gpp *operation_result;
     GError *error = NULL;
 
     operation_result = mm_modem_location_get_3gpp_finish (modem_location, result, &error);
@@ -326,7 +326,7 @@ mmcli_modem_location_run_synchronous (GDBusConnection *connection)
 
     /* Request to get 3GPP based location from the modem? */
     if (get_3gpp_flag) {
-        MMModemLocation3gpp *result;
+        MMLocation3gpp *result;
 
         g_debug ("Synchronously getting 3GPP-based location from the modem...");
 
