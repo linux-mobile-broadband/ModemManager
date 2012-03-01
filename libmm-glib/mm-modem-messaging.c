@@ -405,8 +405,7 @@ mm_modem_messaging_create (MMModemMessaging *self,
     if (cancellable)
         ctx->cancellable = g_object_ref (cancellable);
 
-    dictionary = (mm_common_sms_properties_get_dictionary (
-                      MM_COMMON_SMS_PROPERTIES (properties)));
+    dictionary = (mm_sms_properties_get_dictionary (properties));
     mm_gdbus_modem_messaging_call_create (
         self,
         dictionary,
@@ -443,8 +442,7 @@ mm_modem_messaging_create_sync (MMModemMessaging *self,
 
     g_return_val_if_fail (MM_GDBUS_IS_MODEM_MESSAGING (self), NULL);
 
-    dictionary = (mm_common_sms_properties_get_dictionary (
-                      MM_COMMON_SMS_PROPERTIES (properties)));
+    dictionary = (mm_sms_properties_get_dictionary (properties));
     mm_gdbus_modem_messaging_call_create_sync (self,
                                                dictionary,
                                                &sms_path,

@@ -26,8 +26,6 @@
 #include <ModemManager.h>
 #include <libmm-common.h>
 
-#include "mm-sms-properties.h"
-
 G_BEGIN_DECLS
 
 typedef MmGdbusSms     MMSms;

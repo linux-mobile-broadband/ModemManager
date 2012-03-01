@@ -28,7 +28,7 @@
 #include "mm-common-helpers.h"
 #include "mm-common-simple-properties.h"
 #include "mm-common-connect-properties.h"
-#include "mm-common-sms-properties.h"
+#include "mm-sms-properties.h"
 #include "mm-common-bearer-properties.h"
 #include "mm-common-bearer-ip-config.h"
 #include "mm-common-location-3gpp.h"

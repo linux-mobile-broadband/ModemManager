@@ -19,9 +19,9 @@
 
 #include "mm-errors-types.h"
 #include "mm-common-helpers.h"
-#include "mm-common-sms-properties.h"
+#include "mm-sms-properties.h"
 
-G_DEFINE_TYPE (MMCommonSmsProperties, mm_common_sms_properties, G_TYPE_OBJECT);
+G_DEFINE_TYPE (MMSmsProperties, mm_sms_properties, G_TYPE_OBJECT);
 
 #define PROPERTY_TEXT      "text"
 #define PROPERTY_NUMBER    "number"
@@ -29,7 +29,7 @@ G_DEFINE_TYPE (MMCommonSmsProperties, mm_common_sms_properties, G_TYPE_OBJECT);
 #define PROPERTY_VALIDITY  "validity"
 #define PROPERTY_CLASS     "class"
 
-struct _MMCommonSmsPropertiesPrivate {
+struct _MMSmsPropertiesPrivate {
     gchar *text;
     gchar *number;
     gchar *smsc;
@@ -42,41 +42,51 @@ struct _MMCommonSmsPropertiesPrivate {
 /*****************************************************************************/
 
 void
-mm_common_sms_properties_set_text (MMCommonSmsProperties *self,
-                                   const gchar *text)
+mm_sms_properties_set_text (MMSmsProperties *self,
+                            const gchar *text)
 {
+    g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
+
     g_free (self->priv->text);
     self->priv->text = g_strdup (text);
 }
 
 void
-mm_common_sms_properties_set_number (MMCommonSmsProperties *self,
-                                     const gchar *number)
+mm_sms_properties_set_number (MMSmsProperties *self,
+                              const gchar *number)
 {
+    g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
+
     g_free (self->priv->number);
     self->priv->number = g_strdup (number);
 }
 
 void
-mm_common_sms_properties_set_smsc (MMCommonSmsProperties *self,
-                                     const gchar *smsc)
+mm_sms_properties_set_smsc (MMSmsProperties *self,
+                            const gchar *smsc)
 {
+    g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
+
     g_free (self->priv->smsc);
     self->priv->smsc = g_strdup (smsc);
 }
 
 void
-mm_common_sms_properties_set_validity (MMCommonSmsProperties *self,
-                                       guint validity)
+mm_sms_properties_set_validity (MMSmsProperties *self,
+                                guint validity)
 {
+    g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
+
     self->priv->validity_set = TRUE;
     self->priv->validity = validity;
 }
 
 void
-mm_common_sms_properties_set_class (MMCommonSmsProperties *self,
-                                    guint class)
+mm_sms_properties_set_class (MMSmsProperties *self,
+                             guint class)
 {
+    g_return_if_fail (MM_IS_SMS_PROPERTIES (self));
+
     self->priv->class_set = TRUE;
     self->priv->class = class;
 }
@@ -84,45 +94,57 @@ mm_common_sms_properties_set_class (MMCommonSmsProperties *self,
 /*****************************************************************************/
 
 const gchar *
-mm_common_sms_properties_get_text (MMCommonSmsProperties *self)
+mm_sms_properties_get_text (MMSmsProperties *self)
 {
+    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), NULL);
+
     return self->priv->text;
 }
 
 const gchar *
-mm_common_sms_properties_get_number (MMCommonSmsProperties *self)
+mm_sms_properties_get_number (MMSmsProperties *self)
 {
+    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), NULL);
+
     return self->priv->number;
 }
 
 const gchar *
-mm_common_sms_properties_get_smsc (MMCommonSmsProperties *self)
+mm_sms_properties_get_smsc (MMSmsProperties *self)
 {
+    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), NULL);
+
     return self->priv->smsc;
 }
 
 guint
-mm_common_sms_properties_get_validity (MMCommonSmsProperties *self)
+mm_sms_properties_get_validity (MMSmsProperties *self)
 {
+    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), 0);
+
     return self->priv->validity;
 }
 
 guint
-mm_common_sms_properties_get_class (MMCommonSmsProperties *self)
+mm_sms_properties_get_class (MMSmsProperties *self)
 {
+    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), 0);
+
     return self->priv->class;
 }
 
 /*****************************************************************************/
 
 GVariant *
-mm_common_sms_properties_get_dictionary (MMCommonSmsProperties *self)
+mm_sms_properties_get_dictionary (MMSmsProperties *self)
 {
     GVariantBuilder builder;
 
     /* We do allow NULL */
     if (!self)
         return NULL;
+
+    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (self), NULL);
 
     g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
 
@@ -175,23 +197,23 @@ parse_uint (const gchar *str,
     g_set_error (error,
                  MM_CORE_ERROR,
                  MM_CORE_ERROR_INVALID_ARGS,
-                 "Invalid properties string, cannot parset '%s' as uint",
+                 "Invalid properties string, cannot parse '%s' as uint",
                  str);
     return 0;
 }
 
 static gboolean
-consume_string (MMCommonSmsProperties *self,
+consume_string (MMSmsProperties *self,
                 const gchar *key,
                 const gchar *value,
                 GError **error)
 {
     if (g_str_equal (key, PROPERTY_TEXT))
-        mm_common_sms_properties_set_text (self, value);
+        mm_sms_properties_set_text (self, value);
     else if (g_str_equal (key, PROPERTY_NUMBER))
-        mm_common_sms_properties_set_number (self, value);
+        mm_sms_properties_set_number (self, value);
     else if (g_str_equal (key, PROPERTY_SMSC))
-        mm_common_sms_properties_set_smsc (self, value);
+        mm_sms_properties_set_smsc (self, value);
     else if (g_str_equal (key, PROPERTY_VALIDITY)) {
         GError *inner_error = NULL;
         guint n;
@@ -202,7 +224,7 @@ consume_string (MMCommonSmsProperties *self,
             return FALSE;
         }
 
-        mm_common_sms_properties_set_validity (self, n);
+        mm_sms_properties_set_validity (self, n);
     } else if (g_str_equal (key, PROPERTY_CLASS)) {
         GError *inner_error = NULL;
         guint n;
@@ -213,7 +235,7 @@ consume_string (MMCommonSmsProperties *self,
             return FALSE;
         }
 
-        mm_common_sms_properties_set_class (self, n);
+        mm_sms_properties_set_class (self, n);
     } else {
         g_set_error (error,
                      MM_CORE_ERROR,
@@ -227,7 +249,7 @@ consume_string (MMCommonSmsProperties *self,
 }
 
 typedef struct {
-    MMCommonSmsProperties *properties;
+    MMSmsProperties *properties;
     GError *error;
 } ParseKeyValueContext;
 
@@ -242,13 +264,13 @@ key_value_foreach (const gchar *key,
                            &ctx->error);
 }
 
-MMCommonSmsProperties *
-mm_common_sms_properties_new_from_string (const gchar *str,
-                                          GError **error)
+MMSmsProperties *
+mm_sms_properties_new_from_string (const gchar *str,
+                                   GError **error)
 {
     ParseKeyValueContext ctx;
 
-    ctx.properties = mm_common_sms_properties_new ();
+    ctx.properties = mm_sms_properties_new ();
     ctx.error = NULL;
 
     mm_common_parse_key_value_string (str,
@@ -269,29 +291,29 @@ mm_common_sms_properties_new_from_string (const gchar *str,
 /*****************************************************************************/
 
 static gboolean
-consume_variant (MMCommonSmsProperties *properties,
+consume_variant (MMSmsProperties *properties,
                  const gchar *key,
                  GVariant *value,
                  GError **error)
 {
     if (g_str_equal (key, PROPERTY_TEXT))
-        mm_common_sms_properties_set_text (
+        mm_sms_properties_set_text (
             properties,
             g_variant_get_string (value, NULL));
     else if (g_str_equal (key, PROPERTY_NUMBER))
-        mm_common_sms_properties_set_number (
+        mm_sms_properties_set_number (
             properties,
             g_variant_get_string (value, NULL));
     else if (g_str_equal (key, PROPERTY_SMSC))
-        mm_common_sms_properties_set_smsc (
+        mm_sms_properties_set_smsc (
             properties,
             g_variant_get_string (value, NULL));
     else if (g_str_equal (key, PROPERTY_VALIDITY))
-        mm_common_sms_properties_set_validity (
+        mm_sms_properties_set_validity (
             properties,
             g_variant_get_uint32 (value));
     else if (g_str_equal (key, PROPERTY_CLASS))
-        mm_common_sms_properties_set_class (
+        mm_sms_properties_set_class (
             properties,
             g_variant_get_uint32 (value));
     else {
@@ -307,19 +329,29 @@ consume_variant (MMCommonSmsProperties *properties,
     return TRUE;
 }
 
-MMCommonSmsProperties *
-mm_common_sms_properties_new_from_dictionary (GVariant *dictionary,
-                                              GError **error)
+MMSmsProperties *
+mm_sms_properties_new_from_dictionary (GVariant *dictionary,
+                                       GError **error)
 {
     GError *inner_error = NULL;
     GVariantIter iter;
     gchar *key;
     GVariant *value;
-    MMCommonSmsProperties *properties;
+    MMSmsProperties *properties;
 
-    properties = mm_common_sms_properties_new ();
+    properties = mm_sms_properties_new ();
     if (!dictionary)
         return properties;
+
+    if (!g_variant_is_of_type (dictionary, G_VARIANT_TYPE ("a{sv}"))) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_INVALID_ARGS,
+                     "Cannot create SMS properties from dictionary: "
+                     "invalid variant type received");
+        g_object_unref (properties);
+        return NULL;
+    }
 
     g_variant_iter_init (&iter, dictionary);
     while (!inner_error &&
@@ -344,15 +376,17 @@ mm_common_sms_properties_new_from_dictionary (GVariant *dictionary,
 
 /*****************************************************************************/
 
-MMCommonSmsProperties *
-mm_common_sms_properties_dup (MMCommonSmsProperties *orig)
+MMSmsProperties *
+mm_sms_properties_dup (MMSmsProperties *orig)
 {
     GVariant *dict;
-    MMCommonSmsProperties *copy;
+    MMSmsProperties *copy;
     GError *error = NULL;
 
-    dict = mm_common_sms_properties_get_dictionary (orig);
-    copy = mm_common_sms_properties_new_from_dictionary (dict, &error);
+    g_return_val_if_fail (MM_IS_SMS_PROPERTIES (orig), NULL);
+
+    dict = mm_sms_properties_get_dictionary (orig);
+    copy = mm_sms_properties_new_from_dictionary (dict, &error);
     g_assert_no_error (error);
     g_variant_unref (dict);
 
@@ -361,39 +395,38 @@ mm_common_sms_properties_dup (MMCommonSmsProperties *orig)
 
 /*****************************************************************************/
 
-MMCommonSmsProperties *
-mm_common_sms_properties_new (void)
+MMSmsProperties *
+mm_sms_properties_new (void)
 {
-    return (MM_COMMON_SMS_PROPERTIES (
-                g_object_new (MM_TYPE_COMMON_SMS_PROPERTIES, NULL)));
+    return (MM_SMS_PROPERTIES (g_object_new (MM_TYPE_SMS_PROPERTIES, NULL)));
 }
 
 static void
-mm_common_sms_properties_init (MMCommonSmsProperties *self)
+mm_sms_properties_init (MMSmsProperties *self)
 {
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
-                                              MM_TYPE_COMMON_SMS_PROPERTIES,
-                                              MMCommonSmsPropertiesPrivate);
+                                              MM_TYPE_SMS_PROPERTIES,
+                                              MMSmsPropertiesPrivate);
 }
 
 static void
 finalize (GObject *object)
 {
-    MMCommonSmsProperties *self = MM_COMMON_SMS_PROPERTIES (object);
+    MMSmsProperties *self = MM_SMS_PROPERTIES (object);
 
     g_free (self->priv->text);
     g_free (self->priv->number);
     g_free (self->priv->smsc);
 
-    G_OBJECT_CLASS (mm_common_sms_properties_parent_class)->finalize (object);
+    G_OBJECT_CLASS (mm_sms_properties_parent_class)->finalize (object);
 }
 
 static void
-mm_common_sms_properties_class_init (MMCommonSmsPropertiesClass *klass)
+mm_sms_properties_class_init (MMSmsPropertiesClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
-    g_type_class_add_private (object_class, sizeof (MMCommonSmsPropertiesPrivate));
+    g_type_class_add_private (object_class, sizeof (MMSmsPropertiesPrivate));
 
     object_class->finalize = finalize;
 }

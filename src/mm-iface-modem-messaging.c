@@ -204,7 +204,7 @@ handle_create_auth_ready (MMBaseModem *self,
     MMModemState modem_state = MM_MODEM_STATE_UNKNOWN;
     MMSmsList *list = NULL;
     GError *error = NULL;
-    MMCommonSmsProperties *properties;
+    MMSmsProperties *properties;
     MMSms *sms;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
@@ -227,7 +227,7 @@ handle_create_auth_ready (MMBaseModem *self,
     }
 
     /* Parse input properties */
-    properties = mm_common_sms_properties_new_from_dictionary (ctx->dictionary, &error);
+    properties = mm_sms_properties_new_from_dictionary (ctx->dictionary, &error);
     if (!properties) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         handle_create_context_free (ctx);

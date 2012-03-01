@@ -83,7 +83,7 @@ GType mm_sms_get_type (void);
 MMSms *mm_sms_new (MMBaseModem *modem);
 
 MMSms *mm_sms_new_from_properties (MMBaseModem *modem,
-                                   MMCommonSmsProperties *properties,
+                                   MMSmsProperties *properties,
                                    GError **error);
 
 MMSms *mm_sms_singlepart_new (MMBaseModem *modem,
