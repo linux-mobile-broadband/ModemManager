@@ -331,12 +331,24 @@ supports_port_ready_cb (MMPlugin *plugin,
         break;
 
     case MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED:
-        /* We are deferred until a suggested plugin is given. If last supports task
-         * of a given device is finished without finding a best plugin, this task
-         * will get finished reporting unsupported. */
-        mm_dbg ("(%s) deferring support check until result suggested",
-                info->name);
-        info->defer_until_suggested = TRUE;
+        /* If we arrived here and we already have a plugin suggested, use it */
+        if (info->suggested_plugin) {
+            mm_dbg ("(%s): (%s) task completed, got suggested plugin",
+                    mm_plugin_get_name (info->suggested_plugin),
+                    info->name);
+            /* Schedule checking support, which will end the operation */
+            info->best_plugin = info->suggested_plugin;
+            info->current = NULL;
+            info->source_id = g_idle_add ((GSourceFunc)find_port_support_idle,
+                                          info);
+        } else {
+            /* We are deferred until a suggested plugin is given. If last supports task
+             * of a given device is finished without finding a best plugin, this task
+             * will get finished reporting unsupported. */
+            mm_dbg ("(%s) deferring support check until result suggested",
+                    info->name);
+            info->defer_until_suggested = TRUE;
+        }
         break;
     }
 }
