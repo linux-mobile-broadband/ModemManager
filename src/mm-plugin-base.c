@@ -622,6 +622,8 @@ supports_port (MMPlugin *plugin,
         goto out;
     }
 
+    mm_dbg ("(%s) checking port support (%s,%s)", priv->name, subsys, name);
+
     /* Need to launch new probing */
 
     /* Lookup current probes, there shouldn't be any (unless for net devices) */
@@ -671,7 +673,7 @@ supports_port (MMPlugin *plugin,
     ctx->result = g_object_ref (async_result);
 
     /* Launch the probe */
-    mm_dbg ("(%s) launching probe for (%s,%s)!", priv->name, subsys, name);
+    mm_dbg ("(%s)   launching probe for (%s,%s)", priv->name, subsys, name);
     mm_port_probe_run (probe,
                        probe_run_flags,
                        priv->send_delay,
