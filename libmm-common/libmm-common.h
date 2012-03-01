@@ -26,7 +26,7 @@
 #include "mm-errors-types.h"
 #include "mm-enums-types.h"
 #include "mm-common-helpers.h"
-#include "mm-common-simple-properties.h"
+#include "mm-simple-status.h"
 #include "mm-simple-connect-properties.h"
 #include "mm-sms-properties.h"
 #include "mm-bearer-properties.h"

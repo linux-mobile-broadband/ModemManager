@@ -36,7 +36,7 @@ static GQuark supported_quark;
 
 void
 mm_iface_modem_3gpp_ussd_bind_simple_status (MMIfaceModem3gppUssd *self,
-                                             MMCommonSimpleProperties *status)
+                                             MMSimpleStatus *status)
 {
     /* Nothing shown in simple status */
 }

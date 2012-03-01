@@ -44,7 +44,7 @@ static GQuark registration_check_context_quark;
 
 void
 mm_iface_modem_3gpp_bind_simple_status (MMIfaceModem3gpp *self,
-                                        MMCommonSimpleProperties *status)
+                                        MMSimpleStatus *status)
 {
     MmGdbusModem3gpp *skeleton;
 
@@ -53,15 +53,15 @@ mm_iface_modem_3gpp_bind_simple_status (MMIfaceModem3gpp *self,
                   NULL);
 
     g_object_bind_property (skeleton, "registration-state",
-                            status, MM_COMMON_SIMPLE_PROPERTY_3GPP_REGISTRATION_STATE,
+                            status, MM_SIMPLE_PROPERTY_3GPP_REGISTRATION_STATE,
                             G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
 
     g_object_bind_property (skeleton, "operator-code",
-                            status, MM_COMMON_SIMPLE_PROPERTY_3GPP_OPERATOR_CODE,
+                            status, MM_SIMPLE_PROPERTY_3GPP_OPERATOR_CODE,
                             G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
 
     g_object_bind_property (skeleton, "operator-name",
-                            status, MM_COMMON_SIMPLE_PROPERTY_3GPP_OPERATOR_NAME,
+                            status, MM_SIMPLE_PROPERTY_3GPP_OPERATOR_NAME,
                             G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
 
     g_object_unref (skeleton);

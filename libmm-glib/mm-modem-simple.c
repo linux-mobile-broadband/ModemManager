@@ -244,12 +244,12 @@ mm_modem_simple_disconnect_sync (MMModemSimple *self,
                                                        error);
 }
 
-MMModemSimpleStatusProperties *
+MMSimpleStatus *
 mm_modem_simple_get_status_finish (MMModemSimple *self,
                                    GAsyncResult *res,
                                    GError **error)
 {
-    MMCommonSimpleProperties *properties;
+    MMSimpleStatus *status;
     GVariant *dictionary = NULL;
 
     g_return_val_if_fail (MM_GDBUS_IS_MODEM_SIMPLE (self), NULL);
@@ -257,9 +257,9 @@ mm_modem_simple_get_status_finish (MMModemSimple *self,
     if (!mm_gdbus_modem_simple_call_get_status_finish (self, &dictionary, res, error))
         return NULL;
 
-    properties = mm_common_simple_properties_new_from_dictionary (dictionary, error);
+    status = mm_simple_status_new_from_dictionary (dictionary, error);
     g_variant_unref (dictionary);
-    return (MMModemSimpleStatusProperties *)properties;
+    return status;
 }
 
 void
@@ -276,12 +276,12 @@ mm_modem_simple_get_status (MMModemSimple *self,
                                            user_data);
 }
 
-MMModemSimpleStatusProperties *
+MMSimpleStatus *
 mm_modem_simple_get_status_sync (MMModemSimple *self,
                                  GCancellable *cancellable,
                                  GError **error)
 {
-    MMCommonSimpleProperties *properties;
+    MMSimpleStatus *status;
     GVariant *dictionary = NULL;
 
     g_return_val_if_fail (MM_GDBUS_IS_MODEM_SIMPLE (self), NULL);
@@ -289,7 +289,7 @@ mm_modem_simple_get_status_sync (MMModemSimple *self,
     if (!mm_gdbus_modem_simple_call_get_status_sync (self, &dictionary, cancellable, error))
         return NULL;
 
-    properties = mm_common_simple_properties_new_from_dictionary (dictionary, error);
+    status = mm_simple_status_new_from_dictionary (dictionary, error);
     g_variant_unref (dictionary);
-    return (MMModemSimpleStatusProperties *)properties;
+    return status;
 }

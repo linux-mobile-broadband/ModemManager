@@ -28,7 +28,7 @@ static GQuark location_context_quark;
 
 void
 mm_iface_modem_location_bind_simple_status (MMIfaceModemLocation *self,
-                                            MMCommonSimpleProperties *status)
+                                            MMSimpleStatus *status)
 {
 }
 

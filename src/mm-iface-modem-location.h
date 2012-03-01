@@ -98,6 +98,6 @@ void mm_iface_modem_location_3gpp_update_lac_ci  (MMIfaceModemLocation *self,
 
 /* Bind properties for simple GetStatus() */
 void mm_iface_modem_location_bind_simple_status (MMIfaceModemLocation *self,
-                                                 MMCommonSimpleProperties *status);
+                                                 MMSimpleStatus *status);
 
 #endif /* MM_IFACE_MODEM_LOCATION_H */

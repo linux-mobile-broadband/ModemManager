@@ -155,6 +155,6 @@ void mm_iface_modem_3gpp_ussd_shutdown (MMIfaceModem3gppUssd *self);
 
 /* Bind properties for simple GetStatus() */
 void mm_iface_modem_3gpp_ussd_bind_simple_status (MMIfaceModem3gppUssd *self,
-                                                  MMCommonSimpleProperties *status);
+                                                  MMSimpleStatus *status);
 
 #endif /* MM_IFACE_MODEM_3GPP_USSD_H */

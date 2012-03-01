@@ -33,7 +33,7 @@ static GQuark storage_context_quark;
 
 void
 mm_iface_modem_messaging_bind_simple_status (MMIfaceModemMessaging *self,
-                                            MMCommonSimpleProperties *status)
+                                             MMSimpleStatus *status)
 {
 }
 

@@ -147,7 +147,7 @@ struct _MMBroadbandModemPrivate {
     /*<--- Modem Simple interface --->*/
     /* Properties */
     GObject *modem_simple_dbus_skeleton;
-    MMCommonSimpleProperties *modem_simple_status;
+    MMSimpleStatus *modem_simple_status;
 
     /*<--- Modem Location interface --->*/
     /* Properties */
@@ -6431,7 +6431,7 @@ initialize_step (InitializeContext *ctx)
          * so that interfaces add and bind the properties they want to export.
          */
         if (!ctx->self->priv->modem_simple_status)
-            ctx->self->priv->modem_simple_status = mm_common_simple_properties_new ();
+            ctx->self->priv->modem_simple_status = mm_simple_status_new ();
         /* Fall down to next step */
         ctx->step++;
 

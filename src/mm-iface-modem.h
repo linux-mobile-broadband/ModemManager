@@ -403,6 +403,6 @@ MMBearer *mm_iface_modem_create_bearer_finish (MMIfaceModem *self,
                                                GError **error);
 
 void mm_iface_modem_bind_simple_status (MMIfaceModem *self,
-                                        MMCommonSimpleProperties *status);
+                                        MMSimpleStatus *status);
 
 #endif /* MM_IFACE_MODEM_H */

@@ -159,7 +159,7 @@ void mm_iface_modem_messaging_shutdown (MMIfaceModemMessaging *self);
 
 /* Bind properties for simple GetStatus() */
 void mm_iface_modem_messaging_bind_simple_status (MMIfaceModemMessaging *self,
-                                                  MMCommonSimpleProperties *status);
+                                                  MMSimpleStatus *status);
 
 /* Report new SMS part */
 gboolean mm_iface_modem_messaging_take_part (MMIfaceModemMessaging *self,

@@ -753,18 +753,18 @@ handle_get_status (MmGdbusModemSimple *skeleton,
                    GDBusMethodInvocation *invocation,
                    MMIfaceModemSimple *self)
 {
-    MMCommonSimpleProperties *properties = NULL;
+    MMSimpleStatus *status = NULL;
     GVariant *dictionary;
 
     g_object_get (self,
-                  MM_IFACE_MODEM_SIMPLE_STATUS, &properties,
+                  MM_IFACE_MODEM_SIMPLE_STATUS, &status,
                   NULL);
 
-    dictionary = mm_common_simple_properties_get_dictionary (properties);
+    dictionary = mm_simple_status_get_dictionary (status);
     mm_gdbus_modem_simple_complete_get_status (skeleton, invocation, dictionary);
     g_variant_unref (dictionary);
 
-    g_object_unref (properties);
+    g_object_unref (status);
     return TRUE;
 }
 
@@ -845,7 +845,7 @@ iface_modem_simple_init (gpointer g_iface)
          g_param_spec_object (MM_IFACE_MODEM_SIMPLE_STATUS,
                               "Simple status",
                               "Compilation of status values",
-                              MM_TYPE_COMMON_SIMPLE_PROPERTIES,
+                              MM_TYPE_SIMPLE_STATUS,
                               G_PARAM_READWRITE));
 
     initialized = TRUE;

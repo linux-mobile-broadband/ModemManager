@@ -149,7 +149,7 @@ $(mm_gdbus_bearer_generated): $(top_srcdir)/introspection/org.freedesktop.ModemM
 
 # Additional dependency rules
 mm-common-helpers.c: mm-errors-types.h mm-enums-types.h
-mm-common-simple-properties.c: mm-errors-types.h mm-enums-types.h
+mm-simple-status.c: mm-errors-types.h mm-enums-types.h
 mm-simple-connect-properties.c: mm-errors-types.h
 mm-bearer-properties.c: mm-errors-types.h
 mm-sms-properties.c: mm-errors-types.h
@@ -163,7 +163,7 @@ include_HEADERS = \
 	mm-errors-types.h \
 	mm-enums-types.h \
 	mm-common-helpers.h \
-	mm-common-simple-properties.h \
+	mm-simple-status.h \
 	mm-simple-connect-properties.h \
 	mm-bearer-properties.h \
 	mm-sms-properties.h \
@@ -184,8 +184,8 @@ libmm_common_la_SOURCES = \
 	mm-errors-quarks.c \
 	mm-common-helpers.h \
 	mm-common-helpers.c \
-	mm-common-simple-properties.h \
-	mm-common-simple-properties.c \
+	mm-simple-status.h \
+	mm-simple-status.c \
 	mm-simple-connect-properties.h \
 	mm-simple-connect-properties.c \
 	mm-bearer-properties.h \

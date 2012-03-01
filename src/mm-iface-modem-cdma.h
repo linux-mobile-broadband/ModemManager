@@ -212,6 +212,6 @@ gboolean mm_iface_modem_cdma_register_in_network_finish (MMIfaceModemCdma *self,
 
 /* Bind properties for simple GetStatus() */
 void mm_iface_modem_cdma_bind_simple_status (MMIfaceModemCdma *self,
-                                             MMCommonSimpleProperties *status);
+                                             MMSimpleStatus *status);
 
 #endif /* MM_IFACE_MODEM_CDMA_H */

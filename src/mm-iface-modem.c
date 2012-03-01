@@ -44,7 +44,7 @@ static GQuark access_technologies_check_context_quark;
 
 void
 mm_iface_modem_bind_simple_status (MMIfaceModem *self,
-                                   MMCommonSimpleProperties *status)
+                                   MMSimpleStatus *status)
 {
     MmGdbusModem *skeleton;
 
@@ -53,19 +53,19 @@ mm_iface_modem_bind_simple_status (MMIfaceModem *self,
                   NULL);
 
     g_object_bind_property (skeleton, "state",
-                            status, MM_COMMON_SIMPLE_PROPERTY_STATE,
+                            status, MM_SIMPLE_PROPERTY_STATE,
                             G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
 
     g_object_bind_property (skeleton, "signal-quality",
-                            status, MM_COMMON_SIMPLE_PROPERTY_SIGNAL_QUALITY,
+                            status, MM_SIMPLE_PROPERTY_SIGNAL_QUALITY,
                             G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
 
     g_object_bind_property (skeleton, "bands",
-                            status, MM_COMMON_SIMPLE_PROPERTY_BANDS,
+                            status, MM_SIMPLE_PROPERTY_BANDS,
                             G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
 
     g_object_bind_property (skeleton, "access-technologies",
-                            status, MM_COMMON_SIMPLE_PROPERTY_ACCESS_TECHNOLOGIES,
+                            status, MM_SIMPLE_PROPERTY_ACCESS_TECHNOLOGIES,
                             G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
 
     g_object_unref (skeleton);
