@@ -2,7 +2,9 @@
 # Generation of the additional PNG files from DIA files
 #  (list of original '.dia' files with '.png' extension)
 DIAGRAMS = \
-	ModemManager-states.dia
+	ModemManager-states.dia \
+	ModemManager-interface-initialization-sequence.dia \
+	ModemManager-interface-initialization-sequence-subclassed.dia
 
 # The wanted PNG files
 DIAGRAMS_PNG = $(notdir $(DIAGRAMS:.dia=.png))
@@ -50,7 +52,7 @@ MKDB_OPTIONS = --output-format=xml --sgml-mode --name-space=mm
 
 # Images to copy into HTML directory
 HTML_IMAGES = \
-	ModemManager-states.png \
+	$(DIAGRAMS_PNG) \
 	$(NULL)
 
 #  Note that PNG files are also added in content_files so that

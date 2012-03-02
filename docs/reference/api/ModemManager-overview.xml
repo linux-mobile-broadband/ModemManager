@@ -433,7 +433,7 @@ mm_plugin_create (void)
       </para>
       <itemizedlist>
         <listitem>
-          <emphasis>Modem interface initialization</emphasis>
+          <para><emphasis>Modem interface initialization</emphasis></para>
           <para>
             The <link linkend="gdbus-org.freedesktop.ModemManager1.Modem">Modem interface</link>
             provides common actions and information available in the majority of the modems
@@ -639,6 +639,55 @@ mm_plugin_create (void)
 
       </itemizedlist>
     </section>
+  </chapter>
 
+  <chapter id="ref-overview-plugin-specific-modems">
+    <title>Plugin-specific Modems</title>
+    <para>
+      ModemManager plugins exist in order to handle all non-standard vendor-specific behaviour
+      that needs to get supported.
+    </para>
+    <para>
+      Plugins will provide their own Modem object implementations, usually subclassing the
+      generic <structname>MMBroadbandModem</structname> object. As previously explained, this
+      object implements every interface that may be exported by the Modem object in DBus; and
+      then, depending on the per-interface support checks, the interface will end up being
+      really exported or not.
+    </para>
+    <para>
+      Each interface defines every step to be run during the initialization, enabling or
+      disabling sequences. Then, the object implementing the interface may or may not provide
+      the implementation of such step. By default, the generic
+      <structname>MMBroadbandModem</structname> object implements already most of the steps
+      in the interfaces providing common features:
+    </para>
+    <figure id="mm-modemmanager-interface-initialization-sequence">
+      <title>Modem interface initialization sequence</title>
+      <graphic fileref="ModemManager-interface-initialization-sequence.png" format="PNG"></graphic>
+    </figure>
+    <para>
+      Vendor-specific subclasses of <structname>MMBroadbandModem</structname> are then able to
+      either provide their own implementation of a given step (in the image below, a custom
+      implementation for capabilities checking); or even completely disable the step if they
+      know that there is no way to run it (in the image below, revision string loading is
+      removed).
+    </para>
+    <figure id="mm-modemmanager-interface-initialization-sequence-subclassed">
+      <title>Modem interface initialization sequence subclassed</title>
+      <graphic fileref="ModemManager-interface-initialization-sequence-subclassed.png" format="PNG"></graphic>
+    </figure>
+    <para>
+      These subclass-able steps are all implemented as standard GIO asynchronous functions,
+      so subclassing a step involves implementing both the async method which receives the
+      input arguments to the action and the corresponding <literal>_finish()</literal> method
+      which provides the results of the action once the operation is ready.
+    </para>
+    <para>
+      It is worth noting that these steps and the asynchronous methods implementing them
+      don't assume that an AT port will be used to implement the real action. This means
+      that any other kind of port may be really used (e.g. QCDM or QMI) in the implementation,
+      or even that a static reply can be returned (e.g. Iridium modems will always report
+      "Iridium" as current OperatorName).
+    </para>
   </chapter>
 </part>
