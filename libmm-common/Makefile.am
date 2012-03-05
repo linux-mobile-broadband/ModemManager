@@ -28,6 +28,7 @@ GENERATED_DOC = \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Messaging.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Location.xml \
+	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Time.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Firmware.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.Contacts.xml \
 	mm-gdbus-doc-org.freedesktop.ModemManager1.Modem.ModemCdma.xml \
@@ -100,6 +101,7 @@ mm_gdbus_modem_deps = \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Messaging.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Location.xml \
+	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Time.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Firmware.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.Contacts.xml \
 	$(top_srcdir)/introspection/org.freedesktop.ModemManager1.Modem.ModemCdma.xml \
