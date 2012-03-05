@@ -33,6 +33,7 @@
 #include "mm-bearer-ip-config.h"
 #include "mm-location-3gpp.h"
 #include "mm-unlock-retries.h"
+#include "mm-network-timezone.h"
 #include "mm-gdbus-manager.h"
 #include "mm-gdbus-modem.h"
 #include "mm-gdbus-bearer.h"
