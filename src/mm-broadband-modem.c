@@ -35,6 +35,7 @@
 #include "mm-iface-modem-simple.h"
 #include "mm-iface-modem-location.h"
 #include "mm-iface-modem-messaging.h"
+#include "mm-iface-modem-time.h"
 #include "mm-broadband-bearer.h"
 #include "mm-bearer-list.h"
 #include "mm-sms-list.h"
@@ -54,6 +55,7 @@ static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
 static void iface_modem_simple_init (MMIfaceModemSimple *iface);
 static void iface_modem_location_init (MMIfaceModemLocation *iface);
 static void iface_modem_messaging_init (MMIfaceModemMessaging *iface);
+static void iface_modem_time_init (MMIfaceModemTime *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModem, mm_broadband_modem, MM_TYPE_BASE_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
@@ -62,7 +64,8 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModem, mm_broadband_modem, MM_TYPE_BASE_MODEM
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_SIMPLE, iface_modem_simple_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_MESSAGING, iface_modem_messaging_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_TIME, iface_modem_time_init));
 
 enum {
     PROP_0,
@@ -73,6 +76,7 @@ enum {
     PROP_MODEM_SIMPLE_DBUS_SKELETON,
     PROP_MODEM_LOCATION_DBUS_SKELETON,
     PROP_MODEM_MESSAGING_DBUS_SKELETON,
+    PROP_MODEM_TIME_DBUS_SKELETON,
     PROP_MODEM_SIM,
     PROP_MODEM_BEARER_LIST,
     PROP_MODEM_STATE,
@@ -165,6 +169,10 @@ struct _MMBroadbandModemPrivate {
     /* Implementation helpers */
     gboolean sms_supported_modes_checked;
     GHashTable *known_sms_parts;
+
+    /*<--- Modem Time interface --->*/
+    /* Properties */
+    GObject *modem_time_dbus_skeleton;
 };
 
 /*****************************************************************************/
@@ -5785,6 +5793,7 @@ typedef enum {
     DISABLING_STEP_FIRST,
     DISABLING_STEP_DISCONNECT_BEARERS,
     DISABLING_STEP_IFACE_SIMPLE,
+    DISABLING_STEP_IFACE_TIME,
     DISABLING_STEP_IFACE_MESSAGING,
     DISABLING_STEP_IFACE_LOCATION,
     DISABLING_STEP_IFACE_FIRMWARE,
@@ -5859,6 +5868,7 @@ INTERFACE_DISABLE_READY_FN (iface_modem_3gpp_ussd, MM_IFACE_MODEM_3GPP_USSD, TRU
 INTERFACE_DISABLE_READY_FN (iface_modem_cdma,      MM_IFACE_MODEM_CDMA,      TRUE)
 INTERFACE_DISABLE_READY_FN (iface_modem_location,  MM_IFACE_MODEM_LOCATION,  FALSE)
 INTERFACE_DISABLE_READY_FN (iface_modem_messaging, MM_IFACE_MODEM_MESSAGING, FALSE)
+INTERFACE_DISABLE_READY_FN (iface_modem_time,      MM_IFACE_MODEM_TIME,      FALSE)
 
 static void
 bearer_list_disconnect_all_bearers_ready (MMBearerList *list,
@@ -5894,6 +5904,18 @@ disabling_step (DisablingContext *ctx)
         return;
 
     case DISABLING_STEP_IFACE_SIMPLE:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case DISABLING_STEP_IFACE_TIME:
+        if (ctx->self->priv->modem_time_dbus_skeleton) {
+            mm_dbg ("Modem has time capabilities, disabling the Time interface...");
+            /* Disabling the Modem Time interface */
+            mm_iface_modem_time_disable (MM_IFACE_MODEM_TIME (ctx->self),
+                                         (GAsyncReadyCallback)iface_modem_time_disable_ready,
+                                         ctx);
+            return;
+        }
         /* Fall down to next step */
         ctx->step++;
 
@@ -6057,6 +6079,7 @@ typedef enum {
     ENABLING_STEP_IFACE_FIRMWARE,
     ENABLING_STEP_IFACE_LOCATION,
     ENABLING_STEP_IFACE_MESSAGING,
+    ENABLING_STEP_IFACE_TIME,
     ENABLING_STEP_IFACE_SIMPLE,
     ENABLING_STEP_LAST,
 } EnablingStep;
@@ -6123,6 +6146,7 @@ INTERFACE_ENABLE_READY_FN (iface_modem_3gpp_ussd, MM_IFACE_MODEM_3GPP_USSD, TRUE
 INTERFACE_ENABLE_READY_FN (iface_modem_cdma,      MM_IFACE_MODEM_CDMA,      TRUE)
 INTERFACE_ENABLE_READY_FN (iface_modem_location,  MM_IFACE_MODEM_LOCATION,  FALSE)
 INTERFACE_ENABLE_READY_FN (iface_modem_messaging, MM_IFACE_MODEM_MESSAGING, FALSE)
+INTERFACE_ENABLE_READY_FN (iface_modem_time,      MM_IFACE_MODEM_TIME,      FALSE)
 
 static void
 enabling_step (EnablingContext *ctx)
@@ -6202,6 +6226,18 @@ enabling_step (EnablingContext *ctx)
             mm_iface_modem_messaging_enable (MM_IFACE_MODEM_MESSAGING (ctx->self),
                                             (GAsyncReadyCallback)iface_modem_messaging_enable_ready,
                                              ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_IFACE_TIME:
+        if (ctx->self->priv->modem_time_dbus_skeleton) {
+            mm_dbg ("Modem has time capabilities, enabling the Time interface...");
+            /* Enabling the Modem Time interface */
+            mm_iface_modem_time_enable (MM_IFACE_MODEM_TIME (ctx->self),
+                                        (GAsyncReadyCallback)iface_modem_time_enable_ready,
+                                        ctx);
             return;
         }
         /* Fall down to next step */
@@ -6303,6 +6339,7 @@ typedef enum {
     INITIALIZE_STEP_IFACE_FIRMWARE,
     INITIALIZE_STEP_IFACE_LOCATION,
     INITIALIZE_STEP_IFACE_MESSAGING,
+    INITIALIZE_STEP_IFACE_TIME,
     INITIALIZE_STEP_IFACE_SIMPLE,
     INITIALIZE_STEP_LAST,
 } InitializeStep;
@@ -6381,6 +6418,7 @@ INTERFACE_INIT_READY_FN (iface_modem_3gpp_ussd, MM_IFACE_MODEM_3GPP_USSD, FALSE)
 INTERFACE_INIT_READY_FN (iface_modem_cdma,      MM_IFACE_MODEM_CDMA,      TRUE)
 INTERFACE_INIT_READY_FN (iface_modem_location,  MM_IFACE_MODEM_LOCATION,  FALSE)
 INTERFACE_INIT_READY_FN (iface_modem_messaging, MM_IFACE_MODEM_MESSAGING, FALSE)
+INTERFACE_INIT_READY_FN (iface_modem_time,      MM_IFACE_MODEM_TIME,      FALSE)
 
 static void
 initialize_step (InitializeContext *ctx)
@@ -6514,6 +6552,13 @@ initialize_step (InitializeContext *ctx)
                                              ctx);
         return;
 
+    case INITIALIZE_STEP_IFACE_TIME:
+        /* Initialize the Time interface */
+        mm_iface_modem_time_initialize (MM_IFACE_MODEM_TIME (ctx->self),
+                                        (GAsyncReadyCallback)iface_modem_time_initialize_ready,
+                                        ctx);
+        return;
+
     case INITIALIZE_STEP_IFACE_SIMPLE:
         mm_iface_modem_simple_initialize (MM_IFACE_MODEM_SIMPLE (ctx->self));
         /* Fall down to next step */
@@ -6628,6 +6673,10 @@ set_property (GObject *object,
         g_clear_object (&self->priv->modem_messaging_dbus_skeleton);
         self->priv->modem_messaging_dbus_skeleton = g_value_dup_object (value);
         break;
+    case PROP_MODEM_TIME_DBUS_SKELETON:
+        g_clear_object (&self->priv->modem_time_dbus_skeleton);
+        self->priv->modem_time_dbus_skeleton = g_value_dup_object (value);
+        break;
     case PROP_MODEM_SIM:
         g_clear_object (&self->priv->modem_sim);
         self->priv->modem_sim = g_value_dup_object (value);
@@ -6718,6 +6767,9 @@ get_property (GObject *object,
         break;
     case PROP_MODEM_MESSAGING_DBUS_SKELETON:
         g_value_set_object (value, self->priv->modem_messaging_dbus_skeleton);
+        break;
+    case PROP_MODEM_TIME_DBUS_SKELETON:
+        g_value_set_object (value, self->priv->modem_time_dbus_skeleton);
         break;
     case PROP_MODEM_SIM:
         g_value_set_object (value, self->priv->modem_sim);
@@ -6846,6 +6898,11 @@ dispose (GObject *object)
     if (self->priv->modem_messaging_dbus_skeleton) {
         mm_iface_modem_messaging_shutdown (MM_IFACE_MODEM_MESSAGING (object));
         g_clear_object (&self->priv->modem_messaging_dbus_skeleton);
+    }
+
+    if (self->priv->modem_time_dbus_skeleton) {
+        mm_iface_modem_time_shutdown (MM_IFACE_MODEM_TIME (object));
+        g_clear_object (&self->priv->modem_time_dbus_skeleton);
     }
 
     if (self->priv->modem_simple_dbus_skeleton) {
@@ -7044,6 +7101,11 @@ iface_modem_messaging_init (MMIfaceModemMessaging *iface)
 }
 
 static void
+iface_modem_time_init (MMIfaceModemTime *iface)
+{
+}
+
+static void
 mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
@@ -7093,6 +7155,10 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_MESSAGING_DBUS_SKELETON,
                                       MM_IFACE_MODEM_MESSAGING_DBUS_SKELETON);
+
+    g_object_class_override_property (object_class,
+                                      PROP_MODEM_TIME_DBUS_SKELETON,
+                                      MM_IFACE_MODEM_TIME_DBUS_SKELETON);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_SIM,
