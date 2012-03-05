@@ -347,6 +347,17 @@ mm_sms_get_path (MMSms *self)
     return self->priv->path;
 }
 
+MMSmsStorage
+mm_sms_get_storage (MMSms *self)
+{
+    MMSmsStorage storage = MM_SMS_STORAGE_UNKNOWN;
+
+    g_object_get (self,
+                  "storage", &storage,
+                  NULL);
+    return storage;
+}
+
 gboolean
 mm_sms_is_multipart (MMSms *self)
 {

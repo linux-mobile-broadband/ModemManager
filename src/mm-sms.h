@@ -103,9 +103,10 @@ gboolean  mm_sms_multipart_take_part (MMSms *self,
                                       MMSmsPart *part,
                                       GError **error);
 
-void         mm_sms_export       (MMSms *self);
-void         mm_sms_unexport     (MMSms *self);
-const gchar *mm_sms_get_path     (MMSms *self);
+void          mm_sms_export      (MMSms *self);
+void          mm_sms_unexport    (MMSms *self);
+const gchar  *mm_sms_get_path    (MMSms *self);
+MMSmsStorage  mm_sms_get_storage (MMSms *self);
 
 gboolean     mm_sms_has_part_index (MMSms *self,
                                     guint index);

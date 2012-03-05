@@ -211,11 +211,17 @@ cmp_sms_by_concat_reference (MMSms *sms,
     return (GPOINTER_TO_UINT (user_data) - mm_sms_get_multipart_reference (sms));
 }
 
+typedef struct {
+    guint part_index;
+    MMSmsStorage storage;
+} PartIndexAndStorage;
+
 static guint
-cmp_sms_by_part_index (MMSms *sms,
-                       gpointer user_data)
+cmp_sms_by_part_index_and_storage (MMSms *sms,
+                                   PartIndexAndStorage *ctx)
 {
-    return !mm_sms_has_part_index (sms, GPOINTER_TO_UINT (user_data));
+    return !(mm_sms_get_storage (sms) == ctx->storage &&
+             mm_sms_has_part_index (sms, ctx->part_index));
 }
 
 static gboolean
@@ -295,10 +301,15 @@ mm_sms_list_take_part (MMSmsList *self,
                        MMSmsStorage storage,
                        GError **error)
 {
+    PartIndexAndStorage ctx;
+
+    ctx.part_index = mm_sms_part_get_index (part);
+    ctx.storage = storage;
+
     /* Ensure we don't have already taken a part with the same index */
     if (g_list_find_custom (self->priv->list,
-                            GUINT_TO_POINTER (mm_sms_part_get_index (part)),
-                            (GCompareFunc)cmp_sms_by_part_index)) {
+                            &ctx,
+                            (GCompareFunc)cmp_sms_by_part_index_and_storage)) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
