@@ -364,12 +364,32 @@ update_network_timezone (MMIfaceModemTime *self,
 
 /*****************************************************************************/
 
+void
+mm_iface_modem_time_update_network_time (MMIfaceModemTime *self,
+                                         const gchar *network_time)
+{
+    MmGdbusModemTime *skeleton;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_TIME_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    /* Notify about the updated network time */
+    mm_gdbus_modem_time_emit_network_time_changed (skeleton, network_time);
+
+    g_object_unref (skeleton);
+}
+
+/*****************************************************************************/
+
 typedef struct _DisablingContext DisablingContext;
 static void interface_disabling_step (DisablingContext *ctx);
 
 typedef enum {
     DISABLING_STEP_FIRST,
     DISABLING_STEP_CANCEL_NETWORK_TIMEZONE_UPDATE,
+    DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS,
+    DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS,
     DISABLING_STEP_LAST
 } DisablingStep;
 
@@ -424,6 +444,44 @@ mm_iface_modem_time_disable_finish (MMIfaceModemTime *self,
 }
 
 static void
+disable_unsolicited_events_ready (MMIfaceModemTime *self,
+                                  GAsyncResult *res,
+                                  DisablingContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->disable_unsolicited_events_finish (self, res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        disabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_disabling_step (ctx);
+}
+
+static void
+cleanup_unsolicited_events_ready (MMIfaceModemTime *self,
+                                  GAsyncResult *res,
+                                  DisablingContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->cleanup_unsolicited_events_finish (self, res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        disabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_disabling_step (ctx);
+}
+
+static void
 interface_disabling_step (DisablingContext *ctx)
 {
     switch (ctx->step) {
@@ -450,6 +508,32 @@ interface_disabling_step (DisablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
     }
+
+    case DISABLING_STEP_DISABLE_UNSOLICITED_EVENTS:
+        /* Allow cleaning up unsolicited events */
+        if (MM_IFACE_MODEM_TIME_GET_INTERFACE (ctx->self)->disable_unsolicited_events &&
+            MM_IFACE_MODEM_TIME_GET_INTERFACE (ctx->self)->disable_unsolicited_events_finish) {
+            MM_IFACE_MODEM_TIME_GET_INTERFACE (ctx->self)->disable_unsolicited_events (
+                ctx->self,
+                (GAsyncReadyCallback)disable_unsolicited_events_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case DISABLING_STEP_CLEANUP_UNSOLICITED_EVENTS:
+        /* Allow cleaning up unsolicited events */
+        if (MM_IFACE_MODEM_TIME_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events &&
+            MM_IFACE_MODEM_TIME_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events_finish) {
+            MM_IFACE_MODEM_TIME_GET_INTERFACE (ctx->self)->cleanup_unsolicited_events (
+                ctx->self,
+                (GAsyncReadyCallback)cleanup_unsolicited_events_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
 
     case DISABLING_STEP_LAST:
         /* We are done without errors! */
@@ -479,6 +563,8 @@ static void interface_enabling_step (EnablingContext *ctx);
 typedef enum {
     ENABLING_STEP_FIRST,
     ENABLING_STEP_SETUP_NETWORK_TIMEZONE_RETRIEVAL,
+    ENABLING_STEP_SETUP_UNSOLICITED_EVENTS,
+    ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS,
     ENABLING_STEP_LAST
 } EnablingStep;
 
@@ -553,6 +639,43 @@ update_network_timezone_ready (MMIfaceModemTime *self,
 }
 
 static void
+setup_unsolicited_events_ready (MMIfaceModemTime *self,
+                                GAsyncResult *res,
+                                EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->setup_unsolicited_events_finish (self, res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        enabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_enabling_step (ctx);
+}
+
+static void
+enable_unsolicited_events_ready (MMIfaceModemTime *self,
+                                 GAsyncResult *res,
+                                 EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    /* Not critical! */
+    if (!MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->enable_unsolicited_events_finish (self, res, &error)) {
+        mm_dbg ("Couldn't enable unsolicited events: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Go on with next step */
+    ctx->step++;
+    interface_enabling_step (ctx);
+}
+
+static void
 interface_enabling_step (EnablingContext *ctx)
 {
     switch (ctx->step) {
@@ -585,6 +708,32 @@ interface_enabling_step (EnablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
     }
+
+    case ENABLING_STEP_SETUP_UNSOLICITED_EVENTS:
+        /* Allow setting up unsolicited events */
+        if (MM_IFACE_MODEM_TIME_GET_INTERFACE (ctx->self)->setup_unsolicited_events &&
+            MM_IFACE_MODEM_TIME_GET_INTERFACE (ctx->self)->setup_unsolicited_events_finish) {
+            MM_IFACE_MODEM_TIME_GET_INTERFACE (ctx->self)->setup_unsolicited_events (
+                ctx->self,
+                (GAsyncReadyCallback)setup_unsolicited_events_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_ENABLE_UNSOLICITED_EVENTS:
+        /* Allow setting up unsolicited events */
+        if (MM_IFACE_MODEM_TIME_GET_INTERFACE (ctx->self)->enable_unsolicited_events &&
+            MM_IFACE_MODEM_TIME_GET_INTERFACE (ctx->self)->enable_unsolicited_events_finish) {
+            MM_IFACE_MODEM_TIME_GET_INTERFACE (ctx->self)->enable_unsolicited_events (
+                ctx->self,
+                (GAsyncReadyCallback)enable_unsolicited_events_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
 
     case ENABLING_STEP_LAST:
         /* We are done without errors! */

@@ -56,6 +56,38 @@ struct _MMIfaceModemTime {
     MMNetworkTimezone * (* load_network_timezone_finish) (MMIfaceModemTime *self,
                                                           GAsyncResult *res,
                                                           GError **error);
+
+    /* Asynchronous setting up unsolicited events */
+    void (*setup_unsolicited_events) (MMIfaceModemTime *self,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data);
+    gboolean (*setup_unsolicited_events_finish) (MMIfaceModemTime *self,
+                                                 GAsyncResult *res,
+                                                 GError **error);
+
+    /* Asynchronous cleaning up of unsolicited events */
+    void (*cleanup_unsolicited_events) (MMIfaceModemTime *self,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data);
+    gboolean (*cleanup_unsolicited_events_finish) (MMIfaceModemTime *self,
+                                                   GAsyncResult *res,
+                                                   GError **error);
+
+    /* Asynchronous enabling unsolicited events */
+    void (* enable_unsolicited_events) (MMIfaceModemTime *self,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data);
+    gboolean (* enable_unsolicited_events_finish) (MMIfaceModemTime *self,
+                                                   GAsyncResult *res,
+                                                   GError **error);
+
+    /* Asynchronous disabling unsolicited events */
+    void (* disable_unsolicited_events) (MMIfaceModemTime *self,
+                                         GAsyncReadyCallback callback,
+                                         gpointer user_data);
+    gboolean (* disable_unsolicited_events_finish) (MMIfaceModemTime *self,
+                                                    GAsyncResult *res,
+                                                    GError **error);
 };
 
 GType mm_iface_modem_time_get_type (void);
@@ -90,5 +122,10 @@ void mm_iface_modem_time_shutdown (MMIfaceModemTime *self);
 /* Bind properties for simple GetStatus() */
 void mm_iface_modem_time_bind_simple_status (MMIfaceModemTime *self,
                                              MMSimpleStatus *status);
+
+/* Implementations of the unsolicited events handling should call this method
+ * to notify about the updated time */
+void mm_iface_modem_time_update_network_time (MMIfaceModemTime *self,
+                                              const gchar *network_time);
 
 #endif /* MM_IFACE_MODEM_TIME_H */
