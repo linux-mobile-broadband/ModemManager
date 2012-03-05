@@ -137,8 +137,11 @@ load_network_timezone_ready (MMIfaceModemTime *self,
         /* Retry? */
         ctx->network_timezone_poll_retries--;
 
-        /* Fatal if no more retries */
-        if (ctx->network_timezone_poll_retries == 0) {
+        /* Fatal if no more retries, or if specific error is not RETRY */
+        if (ctx->network_timezone_poll_retries == 0 ||
+            !g_error_matches (error,
+                              MM_CORE_ERROR,
+                              MM_CORE_ERROR_RETRY)) {
             g_simple_async_result_take_error (ctx->result, error);
             update_network_timezone_context_complete_and_free (ctx);
             return;
