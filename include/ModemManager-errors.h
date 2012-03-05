@@ -39,6 +39,7 @@
  * @MM_CORE_ERROR_CONNECTED: Operation cannot be executed while being connected.
  * @MM_CORE_ERROR_TOO_MANY: Too many items.
  * @MM_CORE_ERROR_NOT_FOUND: Item not found.
+ * @MM_CORE_ERROR_RETRY: Operation cannot yet be performed, retry later.
  *
  * Common errors that may be reported by ModemManager.
  */
@@ -55,6 +56,7 @@ typedef enum { /*< underscore_name=mm_core_error >*/
     MM_CORE_ERROR_CONNECTED    = 9,
     MM_CORE_ERROR_TOO_MANY     = 10,
     MM_CORE_ERROR_NOT_FOUND    = 11,
+    MM_CORE_ERROR_RETRY        = 12,
 } MMCoreError;
 
 /**
