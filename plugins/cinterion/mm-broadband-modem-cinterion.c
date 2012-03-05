@@ -190,7 +190,7 @@ sleep_ready (MMBaseModem *self,
     }
 
     g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
-    g_simple_async_result_complete_in_idle (operation_result);
+    g_simple_async_result_complete (operation_result);
     g_object_unref (operation_result);
 }
 
