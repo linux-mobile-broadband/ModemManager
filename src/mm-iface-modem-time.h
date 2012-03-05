@@ -35,9 +35,17 @@ struct _MMIfaceModemTime {
     void (* check_support) (MMIfaceModemTime *self,
                             GAsyncReadyCallback callback,
                             gpointer user_data);
-    gboolean (*check_support_finish) (MMIfaceModemTime *self,
-                                      GAsyncResult *res,
-                                      GError **error);
+    gboolean (* check_support_finish) (MMIfaceModemTime *self,
+                                       GAsyncResult *res,
+                                       GError **error);
+
+    /* Loading of the network timezone property */
+    void (* load_network_timezone) (MMIfaceModemTime *self,
+                                    GAsyncReadyCallback callback,
+                                    gpointer user_data);
+    MMNetworkTimezone * (* load_network_timezone_finish) (MMIfaceModemTime *self,
+                                                          GAsyncResult *res,
+                                                          GError **error);
 };
 
 GType mm_iface_modem_time_get_type (void);

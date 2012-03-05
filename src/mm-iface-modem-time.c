@@ -20,11 +20,16 @@
 #include "mm-iface-modem-time.h"
 #include "mm-log.h"
 
-#define SUPPORT_CHECKED_TAG "time-support-checked-tag"
-#define SUPPORTED_TAG       "time-supported-tag"
+#define SUPPORT_CHECKED_TAG              "time-support-checked-tag"
+#define SUPPORTED_TAG                    "time-supported-tag"
+#define NETWORK_TIMEZONE_CANCELLABLE_TAG "time-network-timezone-cancellable"
 
 static GQuark support_checked_quark;
 static GQuark supported_quark;
+static GQuark network_timezone_cancellable_quark;
+
+#define TIMEZONE_POLL_INTERVAL_SEC 5
+#define TIMEZONE_POLL_RETRIES 6
 
 /*****************************************************************************/
 
@@ -36,11 +41,250 @@ mm_iface_modem_time_bind_simple_status (MMIfaceModemTime *self,
 
 /*****************************************************************************/
 
+typedef struct {
+    MMIfaceModemTime *self;
+    GSimpleAsyncResult *result;
+    GCancellable *cancellable;
+    gulong cancelled_id;
+    gulong state_changed_id;
+    guint network_timezone_poll_id;
+    guint network_timezone_poll_retries;
+} UpdateNetworkTimezoneContext;
+
+static gboolean timezone_poll_cb (UpdateNetworkTimezoneContext *ctx);
+
+static void
+update_network_timezone_context_complete_and_free (UpdateNetworkTimezoneContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->cancellable);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+update_network_timezone_finish (MMIfaceModemTime *self,
+                                GAsyncResult *res,
+                                GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+cancelled (GCancellable *cancellable,
+           UpdateNetworkTimezoneContext *ctx)
+{
+    /* If waiting to get registered, disconnect signal */
+    if (ctx->state_changed_id)
+        g_signal_handler_disconnect (ctx->self,
+                                     ctx->state_changed_id);
+
+    /* If waiting in the timeout loop, remove the timeout */
+    else if (ctx->network_timezone_poll_id)
+        g_source_remove (ctx->network_timezone_poll_id);
+
+    g_simple_async_result_set_error (ctx->result,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_CANCELLED,
+                                     "Network timezone loading cancelled");
+    update_network_timezone_context_complete_and_free (ctx);
+}
+
+static void
+update_network_timezone_dictionary (MMIfaceModemTime *self,
+                                    MMNetworkTimezone *tz)
+{
+    MmGdbusModemTime *skeleton = NULL;
+    GVariant *dictionary;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_TIME_DBUS_SKELETON, &skeleton,
+                  NULL);
+    g_assert (skeleton != NULL);
+
+    dictionary = mm_network_timezone_get_dictionary (tz);
+    mm_gdbus_modem_time_set_network_timezone (skeleton, dictionary);
+    if (dictionary)
+        g_variant_unref (dictionary);
+
+    g_object_unref (skeleton);
+}
+
+static void
+load_network_timezone_ready (MMIfaceModemTime *self,
+                             GAsyncResult *res,
+                             UpdateNetworkTimezoneContext *ctx)
+{
+    GError *error = NULL;
+    MMNetworkTimezone *tz;
+
+    if (g_cancellable_is_cancelled (ctx->cancellable)) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_CANCELLED,
+                                         "Finished network timezone loading, "
+                                         "but cancelled meanwhile");
+        update_network_timezone_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Finish the async operation */
+    tz = MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_timezone_finish (self,
+                                                                                 res,
+                                                                                 &error);
+    if (error) {
+        /* Retry? */
+        ctx->network_timezone_poll_retries--;
+
+        /* Fatal if no more retries */
+        if (ctx->network_timezone_poll_retries == 0) {
+            g_simple_async_result_take_error (ctx->result, error);
+            update_network_timezone_context_complete_and_free (ctx);
+            return;
+        }
+
+        /* Otherwise, reconnect cancellable and relaunch timeout to query a bit
+         * later */
+        ctx->cancelled_id = g_cancellable_connect (ctx->cancellable,
+                                                   G_CALLBACK (cancelled),
+                                                   ctx,
+                                                   NULL);
+        ctx->network_timezone_poll_id = g_timeout_add_seconds (TIMEZONE_POLL_INTERVAL_SEC,
+                                                               (GSourceFunc)timezone_poll_cb,
+                                                               ctx);
+
+        g_error_free (error);
+        return;
+    }
+
+    /* Got final result properly, update the property in the skeleton */
+    update_network_timezone_dictionary (ctx->self, tz);
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    update_network_timezone_context_complete_and_free (ctx);
+    g_object_unref (tz);
+}
+
+static gboolean
+timezone_poll_cb (UpdateNetworkTimezoneContext *ctx)
+{
+    ctx->network_timezone_poll_id = 0;
+
+    /* Before we launch the async loading of the network timezone,
+     * we disconnect the cancellable signal. We don't want to get
+     * signaled while waiting to finish this async method, we'll
+     * check the cancellable afterwards instead. */
+    g_cancellable_disconnect (ctx->cancellable,
+                              ctx->cancelled_id);
+    ctx->cancelled_id = 0;
+
+    MM_IFACE_MODEM_TIME_GET_INTERFACE (ctx->self)->load_network_timezone (
+        ctx->self,
+        (GAsyncReadyCallback)load_network_timezone_ready,
+        ctx);
+
+    return FALSE;
+}
+
+static void
+start_timezone_poll (UpdateNetworkTimezoneContext *ctx)
+{
+    /* Setup loop to query current timezone, don't do it right away.
+     * Note that we're passing the context reference to the loop. */
+    ctx->network_timezone_poll_retries = TIMEZONE_POLL_RETRIES;
+    ctx->network_timezone_poll_id = g_timeout_add_seconds (TIMEZONE_POLL_INTERVAL_SEC,
+                                                           (GSourceFunc)timezone_poll_cb,
+                                                           ctx);
+}
+
+static void
+state_changed (MMIfaceModemTime *self,
+               GParamSpec *spec,
+               UpdateNetworkTimezoneContext *ctx)
+{
+    MMModemState state = MM_MODEM_STATE_UNKNOWN;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &state,
+                  NULL);
+
+    /* We're waiting to get registered */
+    if (state < MM_MODEM_STATE_REGISTERED)
+        return;
+
+    /* Got registered, disconnect signal */
+    if (ctx->state_changed_id) {
+        g_signal_handler_disconnect (self,
+                                     ctx->state_changed_id);
+        ctx->state_changed_id = 0;
+    }
+
+    /* Once we know we're registered, start timezone poll */
+    start_timezone_poll (ctx);
+}
+
+static void
+update_network_timezone (MMIfaceModemTime *self,
+                         GCancellable *cancellable,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data)
+{
+    UpdateNetworkTimezoneContext *ctx;
+    MMModemState state = MM_MODEM_STATE_UNKNOWN;
+
+    /* If loading network timezone not supported, just finish here */
+    if (!MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_timezone ||
+        !MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_timezone_finish) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_UNSUPPORTED,
+                                             "Loading network timezone is not supported");
+        return;
+    }
+
+    ctx = g_new0 (UpdateNetworkTimezoneContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->cancellable = g_object_ref (cancellable);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             update_network_timezone);
+
+    /* Note: we don't expect to get cancelled by any other thread, so no
+     * need to check if we're cancelled just after connecting to the
+     * cancelled signal */
+    ctx->cancelled_id = g_cancellable_connect (ctx->cancellable,
+                                               G_CALLBACK (cancelled),
+                                               ctx,
+                                               NULL);
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &state,
+                  NULL);
+
+    /* Already registered? */
+    if (state >= MM_MODEM_STATE_REGISTERED) {
+        /* Once we know we're registered, start timezone poll */
+        start_timezone_poll (ctx);
+    } else {
+        /* Want to get notified when modem state changes */
+        ctx->state_changed_id = g_signal_connect (ctx->self,
+                                                  "notify::" MM_IFACE_MODEM_STATE,
+                                                  G_CALLBACK (state_changed),
+                                                  ctx);
+    }
+}
+
+/*****************************************************************************/
+
 typedef struct _DisablingContext DisablingContext;
 static void interface_disabling_step (DisablingContext *ctx);
 
 typedef enum {
     DISABLING_STEP_FIRST,
+    DISABLING_STEP_CANCEL_NETWORK_TIMEZONE_UPDATE,
     DISABLING_STEP_LAST
 } DisablingStep;
 
@@ -102,6 +346,26 @@ interface_disabling_step (DisablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
+    case DISABLING_STEP_CANCEL_NETWORK_TIMEZONE_UPDATE: {
+        if (G_LIKELY (network_timezone_cancellable_quark)) {
+            GCancellable *cancellable = NULL;
+
+            cancellable = g_object_get_qdata (G_OBJECT (ctx->self),
+                                              network_timezone_cancellable_quark);
+
+            /* If network timezone loading is currently running, abort it */
+            if (cancellable) {
+                g_cancellable_cancel (cancellable);
+                g_object_set_qdata (G_OBJECT (ctx->self),
+                                    network_timezone_cancellable_quark,
+                                    NULL);
+            }
+        }
+
+        /* Fall down to next step */
+        ctx->step++;
+    }
+
     case DISABLING_STEP_LAST:
         /* We are done without errors! */
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
@@ -129,6 +393,7 @@ static void interface_enabling_step (EnablingContext *ctx);
 
 typedef enum {
     ENABLING_STEP_FIRST,
+    ENABLING_STEP_SETUP_NETWORK_TIMEZONE_RETRIEVAL,
     ENABLING_STEP_LAST
 } EnablingStep;
 
@@ -183,12 +448,58 @@ mm_iface_modem_time_enable_finish (MMIfaceModemTime *self,
 }
 
 static void
+update_network_timezone_ready (MMIfaceModemTime *self,
+                               GAsyncResult *res)
+{
+    GError *error = NULL;
+
+    if (!update_network_timezone_finish (self, res, &error)) {
+        if (!g_error_matches (error,
+                              MM_CORE_ERROR,
+                              MM_CORE_ERROR_UNSUPPORTED))
+            mm_dbg ("Couldn't update network timezone: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    /* Cleanup our cancellable in the context */
+    g_object_set_qdata (G_OBJECT (self),
+                        network_timezone_cancellable_quark,
+                        NULL);
+}
+
+static void
 interface_enabling_step (EnablingContext *ctx)
 {
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
         /* Fall down to next step */
         ctx->step++;
+
+    case ENABLING_STEP_SETUP_NETWORK_TIMEZONE_RETRIEVAL: {
+        GCancellable *cancellable;
+
+        /* We'll create a cancellable which is valid as long as we're updating
+         * network timezone, and we set it as context */
+        cancellable = g_cancellable_new ();
+        if (G_UNLIKELY (!network_timezone_cancellable_quark))
+            network_timezone_cancellable_quark = (g_quark_from_static_string (
+                                                      NETWORK_TIMEZONE_CANCELLABLE_TAG));
+        g_object_set_qdata_full (G_OBJECT (ctx->self),
+                                 network_timezone_cancellable_quark,
+                                 cancellable,
+                                 (GDestroyNotify)g_object_unref);
+
+        update_network_timezone (ctx->self,
+                                 cancellable,
+                                 (GAsyncReadyCallback)update_network_timezone_ready,
+                                 NULL);
+
+        /* NOTE!!!! We'll leave the timezone network update operation
+         * running, we don't wait for it to finish */
+
+        /* Fall down to next step */
+        ctx->step++;
+    }
 
     case ENABLING_STEP_LAST:
         /* We are done without errors! */
