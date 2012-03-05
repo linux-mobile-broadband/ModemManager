@@ -39,6 +39,14 @@ struct _MMIfaceModemTime {
                                        GAsyncResult *res,
                                        GError **error);
 
+    /* Get current network time */
+    void (* load_network_time) (MMIfaceModemTime *self,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data);
+    gchar * (* load_network_time_finish) (MMIfaceModemTime *self,
+                                          GAsyncResult *res,
+                                          GError **error);
+
     /* Loading of the network timezone property. This method may return
      * MM_CORE_ERROR_RETRY if the timezone cannot yet be loaded, so that
      * the interface retries later. */

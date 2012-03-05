@@ -42,6 +42,88 @@ mm_iface_modem_time_bind_simple_status (MMIfaceModemTime *self,
 /*****************************************************************************/
 
 typedef struct {
+    GDBusMethodInvocation *invocation;
+    MmGdbusModemTime *skeleton;
+    MMIfaceModemTime *self;
+} HandleGetNetworkTimeContext;
+
+static void
+handle_get_network_time_context_free (HandleGetNetworkTimeContext *ctx)
+{
+    g_object_unref (ctx->invocation);
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static void
+load_network_time_ready (MMIfaceModemTime *self,
+                         GAsyncResult *res,
+                         HandleGetNetworkTimeContext *ctx)
+{
+    gchar *time_str;
+    GError *error = NULL;
+
+    time_str = MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_time_finish (self,
+                                                                                   res,
+                                                                                   &error);
+    if (error)
+        g_dbus_method_invocation_take_error (ctx->invocation, error);
+    else
+        mm_gdbus_modem_time_complete_get_network_time (ctx->skeleton,
+                                                       ctx->invocation,
+                                                       time_str);
+    g_free (time_str);
+    handle_get_network_time_context_free (ctx);
+}
+
+static gboolean
+handle_get_network_time (MmGdbusModemTime *skeleton,
+                         GDBusMethodInvocation *invocation,
+                         MMIfaceModemTime *self)
+{
+    HandleGetNetworkTimeContext *ctx;
+    MMModemState state;
+
+    if (!MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_time ||
+        !MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_time_finish) {
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot load network time: "
+                                               "operation not supported");
+        return TRUE;
+    }
+
+    state = MM_MODEM_STATE_UNKNOWN;
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &state,
+                  NULL);
+    /* If we're not yet registered, we cannot get the network time */
+    if (state < MM_MODEM_STATE_REGISTERED) {
+        g_dbus_method_invocation_return_error (invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot load network time: "
+                                               "not registered yet");
+        return TRUE;
+    }
+
+    ctx = g_new (HandleGetNetworkTimeContext, 1);
+    ctx->invocation = g_object_ref (invocation);
+    ctx->skeleton = g_object_ref (skeleton);
+    ctx->self = g_object_ref (self);
+
+    MM_IFACE_MODEM_TIME_GET_INTERFACE (self)->load_network_time (
+        self,
+        (GAsyncReadyCallback)load_network_time_ready,
+        ctx);
+    return TRUE;
+}
+
+/*****************************************************************************/
+
+typedef struct {
     MMIfaceModemTime *self;
     GSimpleAsyncResult *result;
     GCancellable *cancellable;
@@ -660,7 +742,11 @@ interface_initialization_step (InitializationContext *ctx)
     case INITIALIZATION_STEP_LAST:
         /* We are done without errors! */
 
-        /* TODO: Handle method invocations */
+        /* Handle method invocations */
+        g_signal_connect (ctx->skeleton,
+                          "handle-get-network-time",
+                          G_CALLBACK (handle_get_network_time),
+                          ctx->self);
 
         /* Finally, export the new interface */
         mm_gdbus_object_skeleton_set_modem_time (MM_GDBUS_OBJECT_SKELETON (ctx->self),
