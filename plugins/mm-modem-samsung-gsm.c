@@ -56,9 +56,6 @@ typedef struct {
 
     MMModemIceraPrivate *icera;
     char *band;
-
-    guint time_poll_source;
-    gboolean time_polling;
 } MMModemSamsungGsmPrivate;
 
 #define IPDPADDR_TAG "%IPDPADDR: "
