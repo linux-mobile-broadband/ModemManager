@@ -497,6 +497,32 @@ mm_modem_dup_equipment_identifier (MMModem *self)
         mm_gdbus_modem_dup_equipment_identifier (self));
 }
 
+const gchar *const *
+mm_modem_get_own_numbers (MMModem *self)
+{
+    const gchar *const *own;
+
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
+
+    own = mm_gdbus_modem_get_own_numbers (self);
+    return (own && !own[0] ? own : NULL);
+}
+
+gchar **
+mm_modem_dup_own_numbers (MMModem *self)
+{
+    gchar **own;
+
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
+
+    own = mm_gdbus_modem_dup_own_numbers (self);
+    if (own && !own[0])
+        return own;
+
+    g_strfreev (own);
+    return NULL;
+}
+
 /**
  * mm_modem_get_unlock_required:
  * @self: A #MMModem.

@@ -61,6 +61,8 @@ const gchar       *mm_modem_get_plugin               (MMModem *self);
 gchar             *mm_modem_dup_plugin               (MMModem *self);
 const gchar       *mm_modem_get_equipment_identifier (MMModem *self);
 gchar             *mm_modem_dup_equipment_identifier (MMModem *self);
+const gchar *const *mm_modem_get_own_numbers          (MMModem *self);
+gchar            **mm_modem_dup_own_numbers          (MMModem *self);
 MMModemLock        mm_modem_get_unlock_required      (MMModem *self);
 MMUnlockRetries   *mm_modem_get_unlock_retries       (MMModem *self);
 MMModemState       mm_modem_get_state                (MMModem *self);
