@@ -272,6 +272,7 @@ print_modem_info (void)
     gchar *supported_bands_string;
     gchar *bands_string;
     gchar *unlock_retries_string;
+    gchar *own_numbers_string;
     MMModemBand *bands = NULL;
     MMUnlockRetries *unlock_retries;
     guint n_bands = 0;
@@ -305,6 +306,15 @@ print_modem_info (void)
     unlock_retries_string = mm_unlock_retries_build_string (unlock_retries);
     g_object_unref (unlock_retries);
 
+    if (mm_modem_get_own_numbers (ctx->modem)) {
+        own_numbers_string = g_strjoinv (", ", (gchar **)mm_modem_get_own_numbers (ctx->modem));
+        if (!own_numbers_string[0]) {
+            g_free (own_numbers_string);
+            own_numbers_string = NULL;
+        }
+    } else
+        own_numbers_string = NULL;
+
     /* Rework possible multiline strings */
     prefixed_revision = prefix_newlines ("           |                  ",
                                          mm_modem_get_revision (ctx->modem));
@@ -336,6 +346,11 @@ print_modem_info (void)
              VALIDATE_UNKNOWN (mm_modem_get_device (ctx->modem)),
              VALIDATE_UNKNOWN (mm_modem_get_driver (ctx->modem)),
              VALIDATE_UNKNOWN (mm_modem_get_plugin (ctx->modem)));
+
+    /* Numbers related stuff */
+    g_print ("  -------------------------\n"
+             "  Numbers  |           own : '%s'\n",
+             VALIDATE_UNKNOWN (own_numbers_string));
 
     /* Status related stuff */
     g_print ("  -------------------------\n"
@@ -437,6 +452,7 @@ print_modem_info (void)
     g_free (preferred_mode_string);
     g_free (supported_modes_string);
     g_free (unlock_retries_string);
+    g_free (own_numbers_string);
 }
 
 static void
