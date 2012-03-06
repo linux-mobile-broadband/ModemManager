@@ -361,6 +361,14 @@
     <property name="SignalQuality" type="(ub)" access="read" />
 
     <!--
+        OwnNumbers:
+
+        List of numbers (e.g. MSISDN in 3GPP) being currently handled by this
+        modem.
+    -->
+    <property name="OwnNumbers" type="as" access="read" />
+
+    <!--
         SupportedModes:
 
         Bitmask of <link linkend="MMModemMode">MMModemMode</link> values,
