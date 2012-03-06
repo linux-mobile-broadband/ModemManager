@@ -1,12 +1,6 @@
 
 
 --------------------------------------------------------------------------------
- * Missing bits from master to 06-api
-
-** Time interface
-
-
---------------------------------------------------------------------------------
  * Documentation: libmm-glib
 
 libmm-glib should have its own gtk-doc based documentation setup in
@@ -97,9 +91,6 @@ example to update the signal quality value or check registration status.
      (and port name) in each log line.
 
   ** Do we really need function name, filename and line in the debug log?
-
-  ** Modem interface should expose a list of own numbers, if any, retrieved with
-     +CNUM.
 
   ** In the default MMBroadbandModem, check how we can know if we're sitting in
      a rev0, revA or revB CDMA network. We need to expose the exact access
