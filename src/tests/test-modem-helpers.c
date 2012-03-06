@@ -20,10 +20,8 @@
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 
-typedef struct {
-    GPtrArray *solicited_creg;
-    GPtrArray *unsolicited_creg;
-} TestData;
+/*****************************************************************************/
+/* Test COPS responses */
 
 static void
 test_cops_results (const gchar *desc,
@@ -439,6 +437,33 @@ test_cops_response_umts_invalid (void *f, gpointer d)
     g_assert_no_error (error);
 }
 
+/*****************************************************************************/
+/* Test CREG/CGREG responses and unsolicited messages */
+
+typedef struct {
+    GPtrArray *solicited_creg;
+    GPtrArray *unsolicited_creg;
+} RegTestData;
+
+static RegTestData *
+reg_test_data_new (void)
+{
+    RegTestData *data;
+
+    data = g_malloc0 (sizeof (RegTestData));
+    data->solicited_creg = mm_3gpp_creg_regex_get (TRUE);
+    data->unsolicited_creg = mm_3gpp_creg_regex_get (FALSE);
+    return data;
+}
+
+static void
+reg_test_data_free (RegTestData *data)
+{
+    mm_3gpp_creg_regex_destroy (data->solicited_creg);
+    mm_3gpp_creg_regex_destroy (data->unsolicited_creg);
+    g_free (data);
+}
+
 typedef struct {
     MMModem3gppRegistrationState state;
     gulong lac;
@@ -453,7 +478,7 @@ static void
 test_creg_match (const char *test,
                  gboolean solicited,
                  const char *reply,
-                 TestData *data,
+                 RegTestData *data,
                  const CregResult *result)
 {
     int i;
@@ -512,7 +537,7 @@ test_creg_match (const char *test,
 static void
 test_creg1_solicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "+CREG: 1,3";
     const CregResult result = { 3, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 2, FALSE};
 
@@ -522,7 +547,7 @@ test_creg1_solicited (void *f, gpointer d)
 static void
 test_creg1_unsolicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CREG: 3\r\n";
     const CregResult result = { 3, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 1, FALSE};
 
@@ -532,7 +557,7 @@ test_creg1_unsolicited (void *f, gpointer d)
 static void
 test_creg2_mercury_solicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "+CREG: 0,1,84CD,00D30173";
     const CregResult result = { 1, 0x84cd, 0xd30173, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 4, FALSE};
 
@@ -542,7 +567,7 @@ test_creg2_mercury_solicited (void *f, gpointer d)
 static void
 test_creg2_mercury_unsolicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CREG: 1,84CD,00D30156\r\n";
     const CregResult result = { 1, 0x84cd, 0xd30156, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 3, FALSE};
 
@@ -552,7 +577,7 @@ test_creg2_mercury_unsolicited (void *f, gpointer d)
 static void
 test_creg2_sek850i_solicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "+CREG: 2,1,\"CE00\",\"01CEAD8F\"";
     const CregResult result = { 1, 0xce00, 0x01cead8f, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 4, FALSE};
 
@@ -562,7 +587,7 @@ test_creg2_sek850i_solicited (void *f, gpointer d)
 static void
 test_creg2_sek850i_unsolicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CREG: 1,\"CE00\",\"00005449\"\r\n";
     const CregResult result = { 1, 0xce00, 0x5449, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 3, FALSE};
 
@@ -572,7 +597,7 @@ test_creg2_sek850i_unsolicited (void *f, gpointer d)
 static void
 test_creg2_e160g_solicited_unregistered (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "+CREG: 2,0,00,0";
     const CregResult result = { 0, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 4, FALSE};
 
@@ -582,7 +607,7 @@ test_creg2_e160g_solicited_unregistered (void *f, gpointer d)
 static void
 test_creg2_e160g_solicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "+CREG: 2,1,8BE3,2BAF";
     const CregResult result = { 1, 0x8be3, 0x2baf, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 4, FALSE};
 
@@ -592,7 +617,7 @@ test_creg2_e160g_solicited (void *f, gpointer d)
 static void
 test_creg2_e160g_unsolicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CREG: 2,8BE3,2BAF\r\n";
     const CregResult result = { 2, 0x8be3, 0x2baf, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 3, FALSE};
 
@@ -602,7 +627,7 @@ test_creg2_e160g_unsolicited (void *f, gpointer d)
 static void
 test_creg2_tm506_solicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "+CREG: 2,1,\"8BE3\",\"00002BAF\"";
     const CregResult result = { 1, 0x8BE3, 0x2BAF, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 4, FALSE};
 
@@ -613,7 +638,7 @@ test_creg2_tm506_solicited (void *f, gpointer d)
 static void
 test_creg2_xu870_unsolicited_unregistered (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CREG: 2,,\r\n";
     const CregResult result = { 2, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 3, FALSE};
 
@@ -623,7 +648,7 @@ test_creg2_xu870_unsolicited_unregistered (void *f, gpointer d)
 static void
 test_creg2_iridium_solicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "+CREG:002,001,\"18d8\",\"ffff\"";
     const CregResult result = { 1, 0x18D8, 0xFFFF, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 4, FALSE};
 
@@ -633,7 +658,7 @@ test_creg2_iridium_solicited (void *f, gpointer d)
 static void
 test_cgreg1_solicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "+CGREG: 1,3";
     const CregResult result = { 3, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 2, TRUE};
 
@@ -643,7 +668,7 @@ test_cgreg1_solicited (void *f, gpointer d)
 static void
 test_cgreg1_unsolicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CGREG: 3\r\n";
     const CregResult result = { 3, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 1, TRUE};
 
@@ -653,7 +678,7 @@ test_cgreg1_unsolicited (void *f, gpointer d)
 static void
 test_cgreg2_f3607gw_solicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "+CGREG: 2,1,\"8BE3\",\"00002B5D\",3";
     const CregResult result = { 1, 0x8BE3, 0x2B5D, MM_MODEM_ACCESS_TECHNOLOGY_EDGE , 6, TRUE};
 
@@ -663,7 +688,7 @@ test_cgreg2_f3607gw_solicited (void *f, gpointer d)
 static void
 test_cgreg2_f3607gw_unsolicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CGREG: 1,\"8BE3\",\"00002B5D\",3\r\n";
     const CregResult result = { 1, 0x8BE3, 0x2B5D, MM_MODEM_ACCESS_TECHNOLOGY_EDGE , 5, TRUE};
 
@@ -673,7 +698,7 @@ test_cgreg2_f3607gw_unsolicited (void *f, gpointer d)
 static void
 test_creg2_md400_unsolicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CREG: 2,5,\"0502\",\"0404736D\"\r\n";
     const CregResult result = { 5, 0x0502, 0x0404736D, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN , 4, FALSE};
 
@@ -683,7 +708,7 @@ test_creg2_md400_unsolicited (void *f, gpointer d)
 static void
 test_cgreg2_md400_unsolicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CGREG: 5,\"0502\",\"0404736D\",2\r\n";
     const CregResult result = { 5, 0x0502, 0x0404736D, MM_MODEM_ACCESS_TECHNOLOGY_UMTS, 5, TRUE};
 
@@ -693,7 +718,7 @@ test_cgreg2_md400_unsolicited (void *f, gpointer d)
 static void
 test_creg_cgreg_multi_unsolicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CREG: 5\r\n\r\n+CGREG: 0\r\n";
     const CregResult result = { 5, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 1, FALSE};
 
@@ -703,7 +728,7 @@ test_creg_cgreg_multi_unsolicited (void *f, gpointer d)
 static void
 test_creg_cgreg_multi2_unsolicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CGREG: 0\r\n\r\n+CREG: 5\r\n";
     const CregResult result = { 0, 0, 0, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 1, TRUE};
 
@@ -713,7 +738,7 @@ test_creg_cgreg_multi2_unsolicited (void *f, gpointer d)
 static void
 test_cgreg2_x220_unsolicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CGREG: 2,1, 81ED, 1A9CEB\r\n";
     const CregResult result = { 1, 0x81ED, 0x1A9CEB, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 4, TRUE};
 
@@ -724,7 +749,7 @@ test_cgreg2_x220_unsolicited (void *f, gpointer d)
 static void
 test_creg2_s8500_wave_unsolicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CREG: 2,1,000B,2816, B, C2816\r\n";
     const CregResult result = { 1, 0x000B, 0x2816, MM_MODEM_ACCESS_TECHNOLOGY_GSM, 7, FALSE};
 
@@ -734,7 +759,7 @@ test_creg2_s8500_wave_unsolicited (void *f, gpointer d)
 static void
 test_creg2_gobi_weird_solicited (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CREG: 2,1,  0 5, 2715\r\n";
     const CregResult result = { 1, 0x0000, 0x2715, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN, 4, FALSE};
 
@@ -744,12 +769,15 @@ test_creg2_gobi_weird_solicited (void *f, gpointer d)
 static void
 test_cgreg2_unsolicited_with_rac (void *f, gpointer d)
 {
-    TestData *data = (TestData *) d;
+    RegTestData *data = (RegTestData *) d;
     const char *reply = "\r\n+CGREG: 1,\"1422\",\"00000142\",3,\"00\"\r\n";
     const CregResult result = { 1, 0x1422, 0x0142, MM_MODEM_ACCESS_TECHNOLOGY_EDGE, 8, TRUE };
 
     test_creg_match ("CGREG=2 with RAC", FALSE, reply, data, &result);
 }
+
+/*****************************************************************************/
+/* Test CSCS responses */
 
 static void
 test_cscs_icon225_support_response (void *f, gpointer d)
@@ -811,6 +839,9 @@ test_cscs_blackberry_support_response (void *f, gpointer d)
 
     g_assert (charsets == MM_MODEM_CHARSET_IRA);
 }
+
+/*****************************************************************************/
+/* Test Device Identifier builders */
 
 typedef struct {
     char *devid;
@@ -1106,6 +1137,9 @@ test_devid_item (void *f, gpointer d)
     g_assert (!strcmp (devid, item->devid));
 }
 
+/*****************************************************************************/
+/* Test CIND responses */
+
 typedef struct {
     const char *desc;
     const gint min;
@@ -1178,6 +1212,9 @@ test_cind_response_moto_v3m (void *f, gpointer d)
     test_cind_results ("Motorola V3m", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
+/*****************************************************************************/
+/* Test CGDCONT responses */
+
 static void
 test_cgdcont_results (const gchar *desc,
                       const gchar *reply,
@@ -1229,6 +1266,9 @@ test_cgdcont_response_nokia (void *f, gpointer d)
     test_cgdcont_results ("Nokia", reply, &expected[0], G_N_ELEMENTS (expected));
 }
 
+/*****************************************************************************/
+/* Test CPMS responses */
+
 static gboolean
 is_storage_supported (GArray *supported,
                       MMSmsStorage storage)
@@ -1267,24 +1307,7 @@ test_cpms_response_cinterion (void *f, gpointer d)
     g_assert (is_storage_supported (mem3, MM_SMS_STORAGE_MT));
 }
 
-static TestData *
-test_data_new (void)
-{
-    TestData *data;
-
-    data = g_malloc0 (sizeof (TestData));
-    data->solicited_creg = mm_3gpp_creg_regex_get (TRUE);
-    data->unsolicited_creg = mm_3gpp_creg_regex_get (FALSE);
-    return data;
-}
-
-static void
-test_data_free (TestData *data)
-{
-    mm_3gpp_creg_regex_destroy (data->solicited_creg);
-    mm_3gpp_creg_regex_destroy (data->unsolicited_creg);
-    g_free (data);
-}
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -1301,7 +1324,7 @@ _mm_log (const char *loc,
 int main (int argc, char **argv)
 {
 	GTestSuite *suite;
-    TestData *data;
+    RegTestData *reg_data;
     gint result;
     DevidItem *item = &devids[0];
 
@@ -1309,7 +1332,7 @@ int main (int argc, char **argv)
 	g_test_init (&argc, &argv, NULL);
 
 	suite = g_test_get_root ();
-    data = test_data_new ();
+    reg_data = reg_test_data_new ();
 
 	g_test_suite_add (suite, TESTCASE (test_cops_response_tm506, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_gt3gplus, NULL));
@@ -1341,40 +1364,40 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cops_response_gsm_invalid, NULL));
 	g_test_suite_add (suite, TESTCASE (test_cops_response_umts_invalid, NULL));
 
-    g_test_suite_add (suite, TESTCASE (test_creg1_solicited, data));
-    g_test_suite_add (suite, TESTCASE (test_creg1_unsolicited, data));
-    g_test_suite_add (suite, TESTCASE (test_creg2_mercury_solicited, data));
-    g_test_suite_add (suite, TESTCASE (test_creg2_mercury_unsolicited, data));
-    g_test_suite_add (suite, TESTCASE (test_creg2_sek850i_solicited, data));
-    g_test_suite_add (suite, TESTCASE (test_creg2_sek850i_unsolicited, data));
-    g_test_suite_add (suite, TESTCASE (test_creg2_e160g_solicited_unregistered, data));
-    g_test_suite_add (suite, TESTCASE (test_creg2_e160g_solicited, data));
-    g_test_suite_add (suite, TESTCASE (test_creg2_e160g_unsolicited, data));
-    g_test_suite_add (suite, TESTCASE (test_creg2_tm506_solicited, data));
-    g_test_suite_add (suite, TESTCASE (test_creg2_xu870_unsolicited_unregistered, data));
-    g_test_suite_add (suite, TESTCASE (test_creg2_md400_unsolicited, data));
-    g_test_suite_add (suite, TESTCASE (test_creg2_s8500_wave_unsolicited, data));
-    g_test_suite_add (suite, TESTCASE (test_creg2_gobi_weird_solicited, data));
-    g_test_suite_add (suite, TESTCASE (test_creg2_iridium_solicited, data));
+    g_test_suite_add (suite, TESTCASE (test_creg1_solicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg1_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_mercury_solicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_mercury_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_sek850i_solicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_sek850i_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_e160g_solicited_unregistered, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_e160g_solicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_e160g_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_tm506_solicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_xu870_unsolicited_unregistered, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_md400_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_s8500_wave_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_gobi_weird_solicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg2_iridium_solicited, reg_data));
 
-    g_test_suite_add (suite, TESTCASE (test_cgreg1_solicited, data));
-    g_test_suite_add (suite, TESTCASE (test_cgreg1_unsolicited, data));
-    g_test_suite_add (suite, TESTCASE (test_cgreg2_f3607gw_solicited, data));
-    g_test_suite_add (suite, TESTCASE (test_cgreg2_f3607gw_unsolicited, data));
-    g_test_suite_add (suite, TESTCASE (test_cgreg2_md400_unsolicited, data));
-    g_test_suite_add (suite, TESTCASE (test_cgreg2_x220_unsolicited, data));
-    g_test_suite_add (suite, TESTCASE (test_cgreg2_unsolicited_with_rac, data));
+    g_test_suite_add (suite, TESTCASE (test_cgreg1_solicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_cgreg1_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_cgreg2_f3607gw_solicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_cgreg2_f3607gw_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_cgreg2_md400_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_cgreg2_x220_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_cgreg2_unsolicited_with_rac, reg_data));
 
-    g_test_suite_add (suite, TESTCASE (test_creg_cgreg_multi_unsolicited, data));
-    g_test_suite_add (suite, TESTCASE (test_creg_cgreg_multi2_unsolicited, data));
+    g_test_suite_add (suite, TESTCASE (test_creg_cgreg_multi_unsolicited, reg_data));
+    g_test_suite_add (suite, TESTCASE (test_creg_cgreg_multi2_unsolicited, reg_data));
 
-    g_test_suite_add (suite, TESTCASE (test_cscs_icon225_support_response, data));
-    g_test_suite_add (suite, TESTCASE (test_cscs_sierra_mercury_support_response, data));
-    g_test_suite_add (suite, TESTCASE (test_cscs_buslink_support_response, data));
-    g_test_suite_add (suite, TESTCASE (test_cscs_blackberry_support_response, data));
+    g_test_suite_add (suite, TESTCASE (test_cscs_icon225_support_response, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cscs_sierra_mercury_support_response, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cscs_buslink_support_response, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cscs_blackberry_support_response, NULL));
 
-    g_test_suite_add (suite, TESTCASE (test_cind_response_linktop_lw273, data));
-    g_test_suite_add (suite, TESTCASE (test_cind_response_moto_v3m, data));
+    g_test_suite_add (suite, TESTCASE (test_cind_response_linktop_lw273, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cind_response_moto_v3m, NULL));
 
     while (item->devid) {
         g_test_suite_add (suite, TESTCASE (test_devid_item, (gconstpointer) item));
@@ -1387,7 +1410,7 @@ int main (int argc, char **argv)
 
     result = g_test_run ();
 
-    test_data_free (data);
+    reg_test_data_free (reg_data);
 
     return result;
 }
