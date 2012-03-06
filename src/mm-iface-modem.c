@@ -2946,6 +2946,7 @@ typedef enum {
     INITIALIZATION_STEP_REVISION,
     INITIALIZATION_STEP_EQUIPMENT_ID,
     INITIALIZATION_STEP_DEVICE_ID,
+    INITIALIZATION_STEP_OWN_NUMBERS,
     INITIALIZATION_STEP_UNLOCK_REQUIRED,
     INITIALIZATION_STEP_UNLOCK_RETRIES,
     INITIALIZATION_STEP_SIM,
@@ -3069,6 +3070,30 @@ STR_REPLY_READY_FN (model, "Model")
 STR_REPLY_READY_FN (revision, "Revision")
 STR_REPLY_READY_FN (equipment_identifier, "Equipment Identifier")
 STR_REPLY_READY_FN (device_identifier, "Device Identifier")
+
+static void
+load_own_numbers_ready (MMIfaceModem *self,
+                        GAsyncResult *res,
+                        InitializationContext *ctx)
+{
+    GError *error = NULL;
+    GStrv str_list;
+
+    str_list = MM_IFACE_MODEM_GET_INTERFACE (self)->load_own_numbers_finish (self, res, &error);
+    if (error) {
+        mm_warn ("couldn't load list of Own Numbers: '%s'", error->message);
+        g_error_free (error);
+    }
+
+    if (str_list) {
+        mm_gdbus_modem_set_own_numbers (ctx->skeleton, (const gchar *const *) str_list);
+        g_strfreev (str_list);
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    interface_initialization_step (ctx);
+}
 
 static void
 load_supported_modes_ready (MMIfaceModem *self,
@@ -3402,6 +3427,22 @@ interface_initialization_step (InitializationContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
+    case INITIALIZATION_STEP_OWN_NUMBERS:
+        /* Own numbers is meant to be loaded only once during the whole
+         * lifetime of the modem. Therefore, if we already have them loaded,
+         * don't try to load them again. */
+        if (mm_gdbus_modem_get_own_numbers (ctx->skeleton) == NULL &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_own_numbers &&
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_own_numbers_finish) {
+            MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_own_numbers (
+                ctx->self,
+                (GAsyncReadyCallback)load_own_numbers_ready,
+                ctx);
+            return;
+        }
+        /* Fall down to next step */
+        ctx->step++;
+
     case INITIALIZATION_STEP_UNLOCK_REQUIRED:
         /* Only check unlock required if we were previously not unlocked */
         if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE) {
@@ -3583,6 +3624,7 @@ mm_iface_modem_initialize (MMIfaceModem *self,
         mm_gdbus_modem_set_manufacturer (skeleton, NULL);
         mm_gdbus_modem_set_model (skeleton, NULL);
         mm_gdbus_modem_set_revision (skeleton, NULL);
+        mm_gdbus_modem_set_own_numbers (skeleton, NULL);
         mm_gdbus_modem_set_device_identifier (skeleton, NULL);
         mm_gdbus_modem_set_device (skeleton, NULL);
         mm_gdbus_modem_set_driver (skeleton, NULL);

@@ -98,6 +98,14 @@ struct _MMIfaceModem {
                                               GAsyncResult *res,
                                               GError **error);
 
+    /* Loading of the OwnNumbers property */
+    void (*load_own_numbers) (MMIfaceModem *self,
+                              GAsyncReadyCallback callback,
+                              gpointer user_data);
+    GStrv (*load_own_numbers_finish) (MMIfaceModem *self,
+                                      GAsyncResult *res,
+                                      GError **error);
+
     /* Loading of the UnlockRequired property */
     void (*load_unlock_required) (MMIfaceModem *self,
                                   GAsyncReadyCallback callback,
