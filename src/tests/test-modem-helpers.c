@@ -1308,6 +1308,105 @@ test_cpms_response_cinterion (void *f, gpointer d)
 }
 
 /*****************************************************************************/
+/* Test CNUM responses */
+
+static void
+test_cnum_results (const gchar *desc,
+                   const gchar *reply,
+                   const GStrv expected)
+{
+    GStrv results;
+    GError *error = NULL;
+    guint i;
+
+    g_print ("\nTesting +CNUM response (%s)...\n", desc);
+
+    results = mm_3gpp_parse_cnum_response (reply, &error);
+    g_assert (results);
+    g_assert_no_error (error);
+    g_assert_cmpuint (g_strv_length (results), ==, g_strv_length (expected));
+
+    for (i = 0; results[i]; i++) {
+        guint j;
+
+        for (j = 0; expected[j]; j++) {
+            if (g_str_equal (results[i], expected[j]))
+                break;
+        }
+
+        /* Ensure the result is found in the expected list */
+        g_assert (expected[j]);
+    }
+
+    g_strfreev (results);
+}
+
+static void
+test_cnum_response_generic (void *f, gpointer d)
+{
+    const gchar *reply = "+CNUM: \"something\",\"1234567890\",161";
+    const gchar *expected[] = {
+        "1234567890",
+        NULL
+    };
+
+    test_cnum_results ("Generic", reply, (GStrv)expected);
+}
+
+static void
+test_cnum_response_generic_without_detail (void *f, gpointer d)
+{
+    const gchar *reply = "+CNUM: ,\"1234567890\",161";
+    const gchar *expected[] = {
+        "1234567890",
+        NULL
+    };
+
+    test_cnum_results ("Generic, without detail", reply, (GStrv)expected);
+}
+
+static void
+test_cnum_response_generic_detail_unquoted (void *f, gpointer d)
+{
+    const gchar *reply = "+CNUM: something,\"1234567890\",161";
+    const gchar *expected[] = {
+        "1234567890",
+        NULL
+    };
+
+    test_cnum_results ("Generic, detail unquoted", reply, (GStrv)expected);
+}
+
+static void
+test_cnum_response_generic_international_number (void *f, gpointer d)
+{
+    const gchar *reply = "+CNUM: something,\"+34600000001\",145";
+    const gchar *expected[] = {
+        "+34600000001",
+        NULL
+    };
+
+    test_cnum_results ("Generic, international number", reply, (GStrv)expected);
+}
+
+static void
+test_cnum_response_generic_multiple_numbers (void *f, gpointer d)
+{
+    const gchar *reply =
+        "+CNUM: something,\"+34600000001\",145\r\n"
+        "+CNUM: ,\"+34600000002\",145\r\n"
+        "+CNUM: \"another\",\"1234567890\",161";
+    const gchar *expected[] = {
+        "+34600000001",
+        "+34600000002",
+        "1234567890",
+        NULL
+    };
+
+    test_cnum_results ("Generic, multiple numbers", reply, (GStrv)expected);
+}
+
+/*****************************************************************************/
 
 void
 _mm_log (const char *loc,
@@ -1407,6 +1506,12 @@ int main (int argc, char **argv)
     g_test_suite_add (suite, TESTCASE (test_cpms_response_cinterion, NULL));
 
 	g_test_suite_add (suite, TESTCASE (test_cgdcont_response_nokia, NULL));
+
+    g_test_suite_add (suite, TESTCASE (test_cnum_response_generic, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cnum_response_generic_without_detail, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cnum_response_generic_detail_unquoted, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cnum_response_generic_international_number, NULL));
+    g_test_suite_add (suite, TESTCASE (test_cnum_response_generic_multiple_numbers, NULL));
 
     result = g_test_run ();
 

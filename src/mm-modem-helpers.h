@@ -19,6 +19,7 @@
 
 #include <ModemManager.h>
 
+#include "glib-object.h"
 #include "mm-charsets.h"
 
 #define MM_MODEM_CAPABILITY_3GPP_LTE    \
@@ -114,6 +115,8 @@ gboolean mm_3gpp_parse_clck_response (const gchar *reply,
 gchar *mm_3gpp_parse_operator (const gchar *reply,
                                MMModemCharset cur_charset);
 
+GStrv mm_3gpp_parse_cnum_response (const gchar *reply,
+                                   GError **error);
 
 MMModemAccessTechnology mm_3gpp_string_to_access_tech (const gchar *string);
 

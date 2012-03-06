@@ -1820,3 +1820,40 @@ mm_count_bits_set (gulong number)
         number &= number - 1;
     return c;
 }
+
+GStrv
+mm_3gpp_parse_cnum_response (const gchar *reply,
+                             GError **error)
+{
+    GArray *array = NULL;
+    GRegex *r;
+    GMatchInfo *match_info;
+
+    /* Empty strings also return NULL list */
+    if (!reply || !reply[0])
+        return NULL;
+
+    r = g_regex_new ("\\+CNUM:\\s*\"?\\S*\"?,\"(\\S+)\",\\d", G_REGEX_UNGREEDY, 0, NULL);
+    g_assert (r != NULL);
+
+    g_regex_match (r, reply, 0, &match_info);
+    while (g_match_info_matches (match_info)) {
+        gchar *number;
+
+        number = g_match_info_fetch (match_info, 1);
+
+        if (number && number[0]) {
+            if (!array)
+                array = g_array_new (TRUE, TRUE, sizeof (gchar *));
+            g_array_append_val (array, number);
+        } else
+            g_free (number);
+
+        g_match_info_next (match_info, NULL);
+    }
+
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    return (array ? (GStrv) g_array_free (array, FALSE) : NULL);
+}
