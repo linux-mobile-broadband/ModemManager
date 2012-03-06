@@ -759,6 +759,38 @@ modem_load_device_identifier (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load own numbers (Modem interface) */
+
+static GStrv
+modem_load_own_numbers_finish (MMIfaceModem *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    const gchar *result;
+
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!result)
+        return NULL;
+
+    return mm_3gpp_parse_cnum_response (result, error);
+}
+
+static void
+modem_load_own_numbers (MMIfaceModem *self,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
+{
+    mm_dbg ("loading own numbers...");
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CNUM",
+                              3,
+                              FALSE,
+                              NULL, /* cancellable */
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Check if unlock required (Modem interface) */
 
 typedef struct {
@@ -6934,6 +6966,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_equipment_identifier_finish = modem_load_equipment_identifier_finish;
     iface->load_device_identifier = modem_load_device_identifier;
     iface->load_device_identifier_finish = modem_load_device_identifier_finish;
+    iface->load_own_numbers = modem_load_own_numbers;
+    iface->load_own_numbers_finish = modem_load_own_numbers_finish;
     iface->load_unlock_required = modem_load_unlock_required;
     iface->load_unlock_required_finish = modem_load_unlock_required_finish;
     iface->create_sim = modem_create_sim;
