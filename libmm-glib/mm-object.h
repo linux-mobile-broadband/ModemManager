@@ -17,7 +17,8 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.
  *
- * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2011 - 2012 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2012 Google, Inc.
  */
 
 #ifndef _MM_OBJECT_H_
@@ -33,6 +34,7 @@
 #include "mm-modem-simple.h"
 #include "mm-modem-location.h"
 #include "mm-modem-messaging.h"
+#include "mm-modem-time.h"
 
 G_BEGIN_DECLS
 
@@ -51,6 +53,7 @@ MMModemCdma      *mm_object_get_modem_cdma       (MMObject *object);
 MMModemSimple    *mm_object_get_modem_simple     (MMObject *object);
 MMModemLocation  *mm_object_get_modem_location   (MMObject *object);
 MMModemMessaging *mm_object_get_modem_messaging  (MMObject *object);
+MMModemTime      *mm_object_get_modem_time       (MMObject *object);
 
 MMModem          *mm_object_peek_modem           (MMObject *object);
 MMModem3gpp      *mm_object_peek_modem_3gpp      (MMObject *object);
@@ -59,6 +62,7 @@ MMModemCdma      *mm_object_peek_modem_cdma      (MMObject *object);
 MMModemSimple    *mm_object_peek_modem_simple    (MMObject *object);
 MMModemLocation  *mm_object_peek_modem_location  (MMObject *object);
 MMModemMessaging *mm_object_peek_modem_messaging (MMObject *object);
+MMModemTime      *mm_object_peek_modem_time      (MMObject *object);
 
 G_END_DECLS
 

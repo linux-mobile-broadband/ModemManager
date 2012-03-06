@@ -17,7 +17,8 @@
  * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301 USA.
  *
- * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2011 - 2012 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) Google, Inc.
  */
 
 #include "mm-object.h"
@@ -173,6 +174,22 @@ mm_object_get_modem_messaging (MMObject *object)
 }
 
 /**
+ * mm_object_get_modem_time:
+ * @object: A #MMObject.
+ *
+ * Gets the #MMModemTime instance for the D-Bus interface <link linkend="gdbus-interface-org-freedesktop-ModemManager1-Modem-Time.top_of_page">org.freedesktop.ModemManager1.Modem.Time</link> on @object, if any.
+ *
+ * Returns: (transfer full): A #MMModemTime that must be freed with g_object_unref() or %NULL if @object does not implement the interface.
+ */
+MMModemTime *
+mm_object_get_modem_time (MMObject *object)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (object), NULL);
+
+    return mm_gdbus_object_get_modem_time (object);
+}
+
+/**
  * mm_object_peek_modem: (skip)
  * @object: A #MMObject.
  *
@@ -278,4 +295,22 @@ mm_object_peek_modem_messaging (MMObject *object)
     g_return_val_if_fail (MM_GDBUS_IS_OBJECT (object), NULL);
 
     return mm_gdbus_object_peek_modem_messaging (object);
+}
+
+/**
+ * mm_object_peek_modem_time: (skip)
+ * @object: A #MMObject.
+ *
+ * Like mm_object_get_modem_time() but doesn't increase the reference count on the returned object.
+ *
+ * <warning>It is not safe to use the returned object if you are on another thread than the one where the #MMManager is running.</warning>
+ *
+ * Returns: (transfer none): A #MMModemTime or %NULL if @object does not implement the interface. Do not free the returned object, it is owned by @object.
+ */
+MMModemTime *
+mm_object_peek_modem_time (MMObject *object)
+{
+    g_return_val_if_fail (MM_GDBUS_IS_OBJECT (object), NULL);
+
+    return mm_gdbus_object_peek_modem_time (object);
 }

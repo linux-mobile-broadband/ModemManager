@@ -28,6 +28,8 @@ libmm_glib_la_SOURCES = \
 	mm-modem-simple.c \
 	mm-modem-location.h \
 	mm-modem-location.c \
+	mm-modem-time.h \
+	mm-modem-time.c \
 	mm-sim.h \
 	mm-sim.c \
 	mm-sms.h \
