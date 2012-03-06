@@ -835,7 +835,7 @@ parse_pdp_list (MMBaseModem *self,
         return FALSE;
     }
 
-    pdp_list = mm_3gpp_parse_pdp_query_response (response, &inner_error);
+    pdp_list = mm_3gpp_parse_cgdcont_read_response (response, &inner_error);
     if (!pdp_list) {
         /* No predefined PDP contexts found */
         mm_dbg ("No PDP contexts found");
@@ -1710,9 +1710,9 @@ crm_range_ready (MMBaseModem *modem,
         MMModemCdmaRmProtocol min = MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
         MMModemCdmaRmProtocol max = MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
 
-        if (mm_cdma_parse_crm_range_response (response,
-                                              &min, &max,
-                                              &error)) {
+        if (mm_cdma_parse_crm_test_response (response,
+                                             &min, &max,
+                                             &error)) {
             /* Check if value within the range */
             if (ctx->self->priv->rm_protocol >= min &&
                 ctx->self->priv->rm_protocol <= max) {

@@ -772,7 +772,7 @@ modem_load_own_numbers_finish (MMIfaceModem *self,
     if (!result)
         return NULL;
 
-    return mm_3gpp_parse_cnum_response (result, error);
+    return mm_3gpp_parse_cnum_exec_response (result, error);
 }
 
 static void
@@ -1116,7 +1116,7 @@ signal_quality_cind_ready (MMBroadbandModem *self,
 
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (!error)
-        indicators = mm_parse_cind_query_response (result, &error);
+        indicators = mm_3gpp_parse_cind_read_response (result, &error);
 
     if (error)
         g_simple_async_result_take_error (ctx->result, error);
@@ -1301,11 +1301,11 @@ cind_format_check_ready (MMBroadbandModem *self,
     GHashTable *indicators = NULL;
     GError *error = NULL;
     const gchar *result;
-    CindResponse *r;
+    MM3gppCindResponse *r;
 
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error ||
-        !(indicators = mm_parse_cind_test_response (result, &error))) {
+        !(indicators = mm_3gpp_parse_cind_test_response (result, &error))) {
         /* quit with error */
         g_simple_async_result_take_error (simple, error);
         g_simple_async_result_complete (simple);
@@ -1320,9 +1320,9 @@ cind_format_check_ready (MMBroadbandModem *self,
     /* Check if we support signal quality indications */
     r = g_hash_table_lookup (indicators, "signal");
     if (r) {
-        self->priv->modem_cind_indicator_signal_quality = cind_response_get_index (r);
-        self->priv->modem_cind_min_signal_quality = cind_response_get_min (r);
-        self->priv->modem_cind_max_signal_quality = cind_response_get_max (r);
+        self->priv->modem_cind_indicator_signal_quality = mm_3gpp_cind_response_get_index (r);
+        self->priv->modem_cind_min_signal_quality = mm_3gpp_cind_response_get_min (r);
+        self->priv->modem_cind_max_signal_quality = mm_3gpp_cind_response_get_max (r);
 
         mm_dbg ("Modem supports signal quality indications via CIND at index '%u'"
                 "(min: %u, max: %u)",
@@ -1335,7 +1335,7 @@ cind_format_check_ready (MMBroadbandModem *self,
     /* Check if we support roaming indications */
     r = g_hash_table_lookup (indicators, "roam");
     if (r) {
-        self->priv->modem_cind_indicator_roaming = cind_response_get_index (r);
+        self->priv->modem_cind_indicator_roaming = mm_3gpp_cind_response_get_index (r);
         mm_dbg ("Modem supports roaming indications via CIND at index '%u'",
                 self->priv->modem_cind_indicator_roaming);
     } else
@@ -1344,7 +1344,7 @@ cind_format_check_ready (MMBroadbandModem *self,
     /* Check if we support service indications */
     r = g_hash_table_lookup (indicators, "service");
     if (r) {
-        self->priv->modem_cind_indicator_service = cind_response_get_index (r);
+        self->priv->modem_cind_indicator_service = mm_3gpp_cind_response_get_index (r);
         mm_dbg ("Modem supports service indications via CIND at index '%u'",
                 self->priv->modem_cind_indicator_service);
     } else
@@ -1787,7 +1787,7 @@ cscs_format_check_ready (MMBaseModem *self,
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error)
         g_simple_async_result_take_error (simple, error);
-    else if (!mm_gsm_parse_cscs_support_response (response, &charsets))
+    else if (!mm_3gpp_parse_cscs_test_response (response, &charsets))
         g_simple_async_result_set_error (
             simple,
             MM_CORE_ERROR,
@@ -2056,7 +2056,7 @@ clck_single_query_ready (MMBaseModem *self,
 
     response = mm_base_modem_at_command_finish (self, res, NULL);
     if (response &&
-        mm_3gpp_parse_clck_response (response, &enabled) &&
+        mm_3gpp_parse_clck_write_response (response, &enabled) &&
         enabled) {
         ctx->locks |= (1 << ctx->current);
     } else {
@@ -2086,7 +2086,7 @@ get_next_facility_lock_status (LoadEnabledFacilityLocksContext *ctx)
 
             /* Query current */
             cmd = g_strdup_printf ("+CLCK=\"%s\",2",
-                                   mm_3gpp_get_facility_acronym (facility));
+                                   mm_3gpp_facility_to_acronym (facility));
             mm_base_modem_at_command (MM_BASE_MODEM (ctx->self),
                                       cmd,
                                       3,
@@ -2395,7 +2395,7 @@ modem_3gpp_scan_networks_finish (MMIfaceModem3gpp *self,
     if (!result)
         return NULL;
 
-    return mm_3gpp_parse_scan_response (result, error);
+    return mm_3gpp_parse_cops_test_response (result, error);
 }
 
 static void
@@ -3792,10 +3792,10 @@ cpms_format_check_ready (MMBroadbandModem *self,
     result = g_new0 (SupportedStoragesResult, 1);
 
     /* Parse reply */
-    if (!mm_3gpp_parse_cpms_format_response (response,
-                                             &result->mem1,
-                                             &result->mem2,
-                                             &result->mem3)) {
+    if (!mm_3gpp_parse_cpms_test_response (response,
+                                           &result->mem1,
+                                           &result->mem2,
+                                           &result->mem3)) {
         g_simple_async_result_set_error (simple,
                                          MM_CORE_ERROR,
                                          MM_CORE_ERROR_FAILED,
@@ -3956,10 +3956,10 @@ cmgf_format_check_ready (MMBroadbandModem *self,
 
     response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
     if (error ||
-        !mm_3gpp_parse_cmgf_format_response (response,
-                                             &sms_pdu_supported,
-                                             &sms_text_supported,
-                                             &error)) {
+        !mm_3gpp_parse_cmgf_test_response (response,
+                                           &sms_pdu_supported,
+                                           &sms_text_supported,
+                                           &error)) {
         mm_dbg ("Failed to query supported SMS modes: '%s'",
                 error->message);
         g_error_free (error);
@@ -5241,8 +5241,8 @@ modem_cdma_get_detailed_registration_state_finish (MMIfaceModemCdma *self,
 
 static void
 speri_ready (MMIfaceModemCdma *self,
-                 GAsyncResult *res,
-                 DetailedRegistrationStateContext *ctx)
+             GAsyncResult *res,
+             DetailedRegistrationStateContext *ctx)
 {
     gboolean roaming = FALSE;
     const gchar *response;
@@ -5259,7 +5259,7 @@ speri_ready (MMIfaceModemCdma *self,
     /* Try to parse the results */
     response = mm_strip_tag (response, "$SPERI:");
     if (!response ||
-        !mm_cdma_parse_eri (response, &roaming, NULL, NULL)) {
+        !mm_cdma_parse_speri_read_response (response, &roaming, NULL, NULL)) {
         mm_warn ("Couldn't parse SPERI response '%s'", response);
         detailed_registration_state_context_complete_and_free (ctx);
         return;
@@ -5302,9 +5302,9 @@ spservice_ready (MMIfaceModemCdma *self,
     /* Try to parse the results */
     cdma1x_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
     evdo_state = MM_MODEM_CDMA_REGISTRATION_STATE_UNKNOWN;
-    if (!mm_cdma_parse_spservice_response (response,
-                                           &cdma1x_state,
-                                           &evdo_state)) {
+    if (!mm_cdma_parse_spservice_read_response (response,
+                                                &cdma1x_state,
+                                                &evdo_state)) {
         ctx->error = g_error_new (MM_CORE_ERROR,
                                   MM_CORE_ERROR_FAILED,
                                   "Couldn't parse SPSERVICE response '%s'",

@@ -35,7 +35,7 @@ test_cops_results (const gchar *desc,
 
     g_print ("\nTesting %s +COPS response...\n", desc);
 
-    results = mm_3gpp_parse_scan_response (reply, &error);
+    results = mm_3gpp_parse_cops_test_response (reply, &error);
     g_assert (results);
     g_assert_no_error (error);
     g_assert_cmpuint (g_list_length (results), ==, expected_results_len);
@@ -420,7 +420,7 @@ test_cops_response_gsm_invalid (void *f, gpointer d)
     GList *results;
     GError *error = NULL;
 
-    results = mm_3gpp_parse_scan_response (reply, &error);
+    results = mm_3gpp_parse_cops_test_response (reply, &error);
     g_assert (results == NULL);
     g_assert_no_error (error);
 }
@@ -432,7 +432,7 @@ test_cops_response_umts_invalid (void *f, gpointer d)
    GList *results;
     GError *error = NULL;
 
-    results = mm_3gpp_parse_scan_response (reply, &error);
+    results = mm_3gpp_parse_cops_test_response (reply, &error);
     g_assert (results == NULL);
     g_assert_no_error (error);
 }
@@ -786,7 +786,7 @@ test_cscs_icon225_support_response (void *f, gpointer d)
     MMModemCharset charsets = MM_MODEM_CHARSET_UNKNOWN;
     gboolean success;
 
-    success = mm_gsm_parse_cscs_support_response (reply, &charsets);
+    success = mm_3gpp_parse_cscs_test_response (reply, &charsets);
     g_assert (success);
 
     g_assert (charsets == (MM_MODEM_CHARSET_IRA |
@@ -801,7 +801,7 @@ test_cscs_sierra_mercury_support_response (void *f, gpointer d)
     MMModemCharset charsets = MM_MODEM_CHARSET_UNKNOWN;
     gboolean success;
 
-    success = mm_gsm_parse_cscs_support_response (reply, &charsets);
+    success = mm_3gpp_parse_cscs_test_response (reply, &charsets);
     g_assert (success);
 
     g_assert (charsets == (MM_MODEM_CHARSET_IRA |
@@ -817,7 +817,7 @@ test_cscs_buslink_support_response (void *f, gpointer d)
     MMModemCharset charsets = MM_MODEM_CHARSET_UNKNOWN;
     gboolean success;
 
-    success = mm_gsm_parse_cscs_support_response (reply, &charsets);
+    success = mm_3gpp_parse_cscs_test_response (reply, &charsets);
     g_assert (success);
 
     g_assert (charsets == (MM_MODEM_CHARSET_8859_1 |
@@ -834,7 +834,7 @@ test_cscs_blackberry_support_response (void *f, gpointer d)
     MMModemCharset charsets = MM_MODEM_CHARSET_UNKNOWN;
     gboolean success;
 
-    success = mm_gsm_parse_cscs_support_response (reply, &charsets);
+    success = mm_3gpp_parse_cscs_test_response (reply, &charsets);
     g_assert (success);
 
     g_assert (charsets == MM_MODEM_CHARSET_IRA);
@@ -1158,7 +1158,7 @@ test_cind_results (const char *desc,
 
     g_print ("\nTesting %s +CIND response...\n", desc);
 
-    results = mm_parse_cind_test_response (reply, &error);
+    results = mm_3gpp_parse_cind_test_response (reply, &error);
     g_assert (results);
     g_assert (error == NULL);
 
@@ -1166,13 +1166,13 @@ test_cind_results (const char *desc,
 
     for (i = 0; i < expected_results_len; i++) {
         CindEntry *expected = &expected_results[i];
-        CindResponse *compare;
+        MM3gppCindResponse *compare;
 
         compare = g_hash_table_lookup (results, expected->desc);
         g_assert (compare);
-        g_assert_cmpint (i + 1, ==, cind_response_get_index (compare));
-        g_assert_cmpint (expected->min, ==, cind_response_get_min (compare));
-        g_assert_cmpint (expected->max, ==, cind_response_get_max (compare));
+        g_assert_cmpint (i + 1, ==, mm_3gpp_cind_response_get_index (compare));
+        g_assert_cmpint (expected->min, ==, mm_3gpp_cind_response_get_min (compare));
+        g_assert_cmpint (expected->max, ==, mm_3gpp_cind_response_get_max (compare));
     }
 
     g_hash_table_destroy (results);
@@ -1227,7 +1227,7 @@ test_cgdcont_results (const gchar *desc,
 
     g_print ("\nTesting %s +CGDCONT response...\n", desc);
 
-    results = mm_3gpp_parse_pdp_query_response (reply, &error);
+    results = mm_3gpp_parse_cgdcont_read_response (reply, &error);
     g_assert (results);
     g_assert_no_error (error);
     g_assert_cmpuint (g_list_length (results), ==, expected_results_len);
@@ -1293,7 +1293,7 @@ test_cpms_response_cinterion (void *f, gpointer d)
 
     g_print ("\nTesting Cinterion +CPMS=? response...\n");
 
-    g_assert (mm_3gpp_parse_cpms_format_response (reply, &mem1, &mem2, &mem3));
+    g_assert (mm_3gpp_parse_cpms_test_response (reply, &mem1, &mem2, &mem3));
     g_assert (mem1->len == 3);
     g_assert (is_storage_supported (mem1, MM_SMS_STORAGE_ME));
     g_assert (is_storage_supported (mem1, MM_SMS_STORAGE_SM));
@@ -1321,7 +1321,7 @@ test_cnum_results (const gchar *desc,
 
     g_print ("\nTesting +CNUM response (%s)...\n", desc);
 
-    results = mm_3gpp_parse_cnum_response (reply, &error);
+    results = mm_3gpp_parse_cnum_exec_response (reply, &error);
     g_assert (results);
     g_assert_no_error (error);
     g_assert_cmpuint (g_strv_length (results), ==, g_strv_length (expected));

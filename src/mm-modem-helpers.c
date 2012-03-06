@@ -11,7 +11,8 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 - 2011 Red Hat, Inc.
+ * Copyright (C) 2009 - 2012 Red Hat, Inc.
+ * Copyright (C) 2012 Google, Inc.
  */
 
 #include <config.h>
@@ -29,10 +30,12 @@
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 
-const char *
-mm_strip_tag (const char *str, const char *cmd)
+/*****************************************************************************/
+
+const gchar *
+mm_strip_tag (const gchar *str, const gchar *cmd)
 {
-    const char *p = str;
+    const gchar *p = str;
 
     if (p) {
         if (!strncmp (p, cmd, strlen (cmd)))
@@ -40,7 +43,235 @@ mm_strip_tag (const char *str, const char *cmd)
         while (isspace (*p))
             p++;
     }
+
     return p;
+}
+
+/*****************************************************************************/
+
+guint
+mm_count_bits_set (gulong number)
+{
+    guint c;
+
+    for (c = 0; number; c++)
+        number &= number - 1;
+    return c;
+}
+
+/*****************************************************************************/
+
+gchar *
+mm_create_device_identifier (guint vid,
+                             guint pid,
+                             const gchar *ati,
+                             const gchar *ati1,
+                             const gchar *gsn,
+                             const gchar *revision,
+                             const gchar *model,
+                             const gchar *manf)
+{
+    GString *devid, *msg = NULL;
+    GChecksum *sum;
+    gchar *p, *ret = NULL;
+    gchar str_vid[10], str_pid[10];
+
+    /* Build up the device identifier */
+    devid = g_string_sized_new (50);
+    if (ati)
+        g_string_append (devid, ati);
+    if (ati1) {
+        /* Only append "ATI1" if it's differnet than "ATI" */
+        if (!ati || (strcmp (ati, ati1) != 0))
+            g_string_append (devid, ati1);
+    }
+    if (gsn)
+        g_string_append (devid, gsn);
+    if (revision)
+        g_string_append (devid, revision);
+    if (model)
+        g_string_append (devid, model);
+    if (manf)
+        g_string_append (devid, manf);
+
+    if (!strlen (devid->str)) {
+        g_string_free (devid, TRUE);
+        return NULL;
+    }
+
+    p = devid->str;
+    msg = g_string_sized_new (strlen (devid->str) + 17);
+
+    sum = g_checksum_new (G_CHECKSUM_SHA1);
+
+    if (vid) {
+        snprintf (str_vid, sizeof (str_vid) - 1, "%08x", vid);
+        g_checksum_update (sum, (const guchar *) &str_vid[0], strlen (str_vid));
+        g_string_append_printf (msg, "%08x", vid);
+    }
+    if (vid) {
+        snprintf (str_pid, sizeof (str_pid) - 1, "%08x", pid);
+        g_checksum_update (sum, (const guchar *) &str_pid[0], strlen (str_pid));
+        g_string_append_printf (msg, "%08x", pid);
+    }
+
+    while (*p) {
+        /* Strip spaces and linebreaks */
+        if (!isblank (*p) && !isspace (*p) && isascii (*p)) {
+            g_checksum_update (sum, (const guchar *) p, 1);
+            g_string_append_c (msg, *p);
+        }
+        p++;
+    }
+    ret = g_strdup (g_checksum_get_string (sum));
+    g_checksum_free (sum);
+
+    mm_dbg ("Device ID source '%s'", msg->str);
+    mm_dbg ("Device ID '%s'", ret);
+    g_string_free (msg, TRUE);
+    g_string_free (devid, TRUE);
+
+    return ret;
+}
+
+/*****************************************************************************/
+
+/* +CREG: <stat>                      (GSM 07.07 CREG=1 unsolicited) */
+#define CREG1 "\\+(CREG|CGREG):\\s*0*([0-9])"
+
+/* +CREG: <n>,<stat>                  (GSM 07.07 CREG=1 solicited) */
+#define CREG2 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*0*([0-9])"
+
+/* +CREG: <stat>,<lac>,<ci>           (GSM 07.07 CREG=2 unsolicited) */
+#define CREG3 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)"
+
+/* +CREG: <n>,<stat>,<lac>,<ci>       (GSM 07.07 solicited and some CREG=2 unsolicited) */
+#define CREG4 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,]*)\\s*,\\s*([^,\\s]*)"
+
+/* +CREG: <stat>,<lac>,<ci>,<AcT>     (ETSI 27.007 CREG=2 unsolicited) */
+#define CREG5 "\\+(CREG|CGREG):\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])"
+
+/* +CREG: <n>,<stat>,<lac>,<ci>,<AcT> (ETSI 27.007 solicited and some CREG=2 unsolicited) */
+#define CREG6 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])"
+
+/* +CREG: <n>,<stat>,<lac>,<ci>,<AcT?>,<something> (Samsung Wave S8500) */
+/* '<CR><LF>+CREG: 2,1,000B,2816, B, C2816<CR><LF><CR><LF>OK<CR><LF>' */
+#define CREG7 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*[^,\\s]*"
+
+/* +CREG: <stat>,<lac>,<ci>,<AcT>,<RAC> (ETSI 27.007 v9.20 CREG=2 unsolicited with RAC) */
+#define CREG8 "\\+(CREG|CGREG):\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])\\s*,\\s*([^,\\s]*)"
+
+GPtrArray *
+mm_3gpp_creg_regex_get (gboolean solicited)
+{
+    GPtrArray *array = g_ptr_array_sized_new (7);
+    GRegex *regex;
+
+    /* #1 */
+    if (solicited)
+        regex = g_regex_new (CREG1 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" CREG1 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    /* #2 */
+    if (solicited)
+        regex = g_regex_new (CREG2 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" CREG2 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    /* #3 */
+    if (solicited)
+        regex = g_regex_new (CREG3 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" CREG3 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    /* #4 */
+    if (solicited)
+        regex = g_regex_new (CREG4 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" CREG4 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    /* #5 */
+    if (solicited)
+        regex = g_regex_new (CREG5 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" CREG5 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    /* #6 */
+    if (solicited)
+        regex = g_regex_new (CREG6 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" CREG6 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    /* #7 */
+    if (solicited)
+        regex = g_regex_new (CREG7 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" CREG7 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    /* #8 */
+    if (solicited)
+        regex = g_regex_new (CREG8 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    else
+        regex = g_regex_new ("\\r\\n" CREG8 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    g_assert (regex);
+    g_ptr_array_add (array, regex);
+
+    return array;
+}
+
+void
+mm_3gpp_creg_regex_destroy (GPtrArray *array)
+{
+    g_ptr_array_foreach (array, (GFunc) g_regex_unref, NULL);
+    g_ptr_array_free (array, TRUE);
+}
+
+/*************************************************************************/
+
+GRegex *
+mm_3gpp_ciev_regex_get (void)
+{
+    return g_regex_new ("\\r\\n\\+CIEV: (.*),(\\d)\\r\\n",
+                        G_REGEX_RAW | G_REGEX_OPTIMIZE,
+                        0,
+                        NULL);
+}
+
+/*************************************************************************/
+
+GRegex *
+mm_3gpp_cusd_regex_get (void)
+{
+    return g_regex_new ("\\r\\n\\+CUSD:\\s*(.*)\\r\\n",
+                        G_REGEX_RAW | G_REGEX_OPTIMIZE,
+                        0,
+                        NULL);
+}
+
+/*************************************************************************/
+
+GRegex *
+mm_3gpp_cmti_regex_get (void)
+{
+    return g_regex_new ("\\r\\n\\+CMTI: \"(\\S+)\",(\\d+)\\r\\n",
+                        G_REGEX_RAW | G_REGEX_OPTIMIZE,
+                        0,
+                        NULL);
 }
 
 /*************************************************************************/
@@ -144,8 +375,8 @@ parse_access_tech (const gchar *str)
 }
 
 GList *
-mm_3gpp_parse_scan_response (const gchar *reply,
-                             GError **error)
+mm_3gpp_parse_cops_test_response (const gchar *reply,
+                                  GError **error)
 {
     GRegex *r;
     GList *info_list = NULL;
@@ -294,155 +525,6 @@ mm_3gpp_parse_scan_response (const gchar *reply,
 
 /*************************************************************************/
 
-static MMSmsStorage
-storage_from_str (const gchar *str)
-{
-    if (g_str_equal (str, "SM"))
-        return MM_SMS_STORAGE_SM;
-    if (g_str_equal (str, "ME"))
-        return MM_SMS_STORAGE_ME;
-    if (g_str_equal (str, "MT"))
-        return MM_SMS_STORAGE_MT;
-    if (g_str_equal (str, "SR"))
-        return MM_SMS_STORAGE_SR;
-    if (g_str_equal (str, "BM"))
-        return MM_SMS_STORAGE_BM;
-    if (g_str_equal (str, "TA"))
-        return MM_SMS_STORAGE_TA;
-    return MM_SMS_STORAGE_UNKNOWN;
-}
-
-gboolean
-mm_3gpp_parse_cpms_format_response (const gchar *reply,
-                                    GArray **mem1,
-                                    GArray **mem2,
-                                    GArray **mem3)
-{
-    GRegex *r;
-    gchar **split;
-    guint i;
-
-    g_assert (mem1 != NULL);
-    g_assert (mem2 != NULL);
-    g_assert (mem3 != NULL);
-
-    /*
-     * +CPMS: ("SM","ME"),("SM","ME"),("SM","ME")
-     */
-    split = g_strsplit_set (mm_strip_tag (reply, "+CPMS:"), "()", -1);
-    if (!split)
-        return FALSE;
-
-    r = g_regex_new ("\\s*\"([^,\\)]+)\"\\s*", 0, 0, NULL);
-    g_assert (r);
-
-    for (i = 0; split[i]; i++) {
-        GMatchInfo *match_info;
-
-        /* Got a range group to match */
-        if (g_regex_match_full (r, split[i], strlen (split[i]), 0, 0, &match_info, NULL)) {
-            GArray *array = NULL;
-
-            while (g_match_info_matches (match_info)) {
-                gchar *str;
-
-                str = g_match_info_fetch (match_info, 1);
-                if (str) {
-                    MMSmsStorage storage;
-
-                    if (!array)
-                        array = g_array_new (FALSE, FALSE, sizeof (MMSmsStorage));
-
-                    storage = storage_from_str (str);
-                    g_array_append_val (array, storage);
-                    g_free (str);
-                }
-
-                g_match_info_next (match_info, NULL);
-            }
-
-            if (!*mem1)
-                *mem1 = array;
-            else if (!*mem2)
-                *mem2 = array;
-            else if (!*mem3)
-                *mem3 = array;
-        }
-        g_match_info_free (match_info);
-
-        if (*mem3 != NULL)
-            break; /* once we got the last group, exit... */
-    }
-
-    g_strfreev (split);
-    g_regex_unref (r);
-
-    g_warn_if_fail (*mem1 != NULL);
-    g_warn_if_fail (*mem2 != NULL);
-    g_warn_if_fail (*mem3 != NULL);
-
-    return (*mem1 && *mem2 && *mem3);
-}
-
-/*************************************************************************/
-
-#define CMGF_TAG "+CMGF:"
-
-gboolean
-mm_3gpp_parse_cmgf_format_response (const gchar *reply,
-                                    gboolean *sms_pdu_supported,
-                                    gboolean *sms_text_supported,
-                                    GError **error)
-{
-    GRegex *r;
-    GMatchInfo *match_info;
-    char *s;
-    guint32 min = -1, max = -1;
-
-    /* Strip whitespace and response tag */
-    if (g_str_has_prefix (reply, CMGF_TAG))
-        reply += strlen (CMGF_TAG);
-    while (isspace (*reply))
-        reply++;
-
-    r = g_regex_new ("\\(?\\s*(\\d+)\\s*[-,]?\\s*(\\d+)?\\s*\\)?", 0, 0, error);
-    if (!r)
-        return FALSE;
-
-    if (!g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, NULL)) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Failed to parse CMGF query result '%s'",
-                     reply);
-        g_match_info_free (match_info);
-        g_regex_unref (r);
-        return FALSE;
-    }
-
-    s = g_match_info_fetch (match_info, 1);
-    if (s)
-        min = atoi (s);
-    g_free (s);
-
-    s = g_match_info_fetch (match_info, 2);
-    if (s)
-        max = atoi (s);
-    g_free (s);
-
-    /* CMGF=0 for PDU mode */
-    *sms_pdu_supported = (min == 0);
-
-    /* CMGF=1 for Text mode */
-    *sms_text_supported = (max >= 1);
-
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-    return TRUE;
-}
-
-/*************************************************************************/
-
 static void
 mm_3gpp_pdp_context_free (MM3gppPdpContext *pdp)
 {
@@ -465,8 +547,8 @@ mm_3gpp_pdp_context_cmp (MM3gppPdpContext *a,
 }
 
 GList *
-mm_3gpp_parse_pdp_query_response (const gchar *reply,
-                                  GError **error)
+mm_3gpp_parse_cgdcont_read_response (const gchar *reply,
+                                     GError **error)
 {
     GError *inner_error = NULL;
     GRegex *r;
@@ -519,151 +601,11 @@ mm_3gpp_parse_pdp_query_response (const gchar *reply,
 
 /*************************************************************************/
 
-/* +CREG: <stat>                      (GSM 07.07 CREG=1 unsolicited) */
-#define CREG1 "\\+(CREG|CGREG):\\s*0*([0-9])"
-
-/* +CREG: <n>,<stat>                  (GSM 07.07 CREG=1 solicited) */
-#define CREG2 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*0*([0-9])"
-
-/* +CREG: <stat>,<lac>,<ci>           (GSM 07.07 CREG=2 unsolicited) */
-#define CREG3 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)"
-
-/* +CREG: <n>,<stat>,<lac>,<ci>       (GSM 07.07 solicited and some CREG=2 unsolicited) */
-#define CREG4 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,]*)\\s*,\\s*([^,\\s]*)"
-
-/* +CREG: <stat>,<lac>,<ci>,<AcT>     (ETSI 27.007 CREG=2 unsolicited) */
-#define CREG5 "\\+(CREG|CGREG):\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])"
-
-/* +CREG: <n>,<stat>,<lac>,<ci>,<AcT> (ETSI 27.007 solicited and some CREG=2 unsolicited) */
-#define CREG6 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])"
-
-/* +CREG: <n>,<stat>,<lac>,<ci>,<AcT?>,<something> (Samsung Wave S8500) */
-/* '<CR><LF>+CREG: 2,1,000B,2816, B, C2816<CR><LF><CR><LF>OK<CR><LF>' */
-#define CREG7 "\\+(CREG|CGREG):\\s*0*([0-9]),\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*[^,\\s]*"
-
-/* +CREG: <stat>,<lac>,<ci>,<AcT>,<RAC> (ETSI 27.007 v9.20 CREG=2 unsolicited with RAC) */
-#define CREG8 "\\+(CREG|CGREG):\\s*0*([0-9])\\s*,\\s*([^,\\s]*)\\s*,\\s*([^,\\s]*)\\s*,\\s*0*([0-9])\\s*,\\s*([^,\\s]*)"
-
-GPtrArray *
-mm_3gpp_creg_regex_get (gboolean solicited)
-{
-    GPtrArray *array = g_ptr_array_sized_new (7);
-    GRegex *regex;
-
-    /* #1 */
-    if (solicited)
-        regex = g_regex_new (CREG1 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    else
-        regex = g_regex_new ("\\r\\n" CREG1 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    g_assert (regex);
-    g_ptr_array_add (array, regex);
-
-    /* #2 */
-    if (solicited)
-        regex = g_regex_new (CREG2 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    else
-        regex = g_regex_new ("\\r\\n" CREG2 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    g_assert (regex);
-    g_ptr_array_add (array, regex);
-
-    /* #3 */
-    if (solicited)
-        regex = g_regex_new (CREG3 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    else
-        regex = g_regex_new ("\\r\\n" CREG3 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    g_assert (regex);
-    g_ptr_array_add (array, regex);
-
-    /* #4 */
-    if (solicited)
-        regex = g_regex_new (CREG4 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    else
-        regex = g_regex_new ("\\r\\n" CREG4 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    g_assert (regex);
-    g_ptr_array_add (array, regex);
-
-    /* #5 */
-    if (solicited)
-        regex = g_regex_new (CREG5 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    else
-        regex = g_regex_new ("\\r\\n" CREG5 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    g_assert (regex);
-    g_ptr_array_add (array, regex);
-
-    /* #6 */
-    if (solicited)
-        regex = g_regex_new (CREG6 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    else
-        regex = g_regex_new ("\\r\\n" CREG6 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    g_assert (regex);
-    g_ptr_array_add (array, regex);
-
-    /* #7 */
-    if (solicited)
-        regex = g_regex_new (CREG7 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    else
-        regex = g_regex_new ("\\r\\n" CREG7 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    g_assert (regex);
-    g_ptr_array_add (array, regex);
-
-    /* #8 */
-    if (solicited)
-        regex = g_regex_new (CREG8 "$", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    else
-        regex = g_regex_new ("\\r\\n" CREG8 "\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
-    g_assert (regex);
-    g_ptr_array_add (array, regex);
-
-    return array;
-}
-
-void
-mm_3gpp_creg_regex_destroy (GPtrArray *array)
-{
-    g_ptr_array_foreach (array, (GFunc) g_regex_unref, NULL);
-    g_ptr_array_free (array, TRUE);
-}
-
-/*************************************************************************/
-
-GRegex *
-mm_3gpp_ciev_regex_get (void)
-{
-    return g_regex_new ("\\r\\n\\+CIEV: (.*),(\\d)\\r\\n",
-                        G_REGEX_RAW | G_REGEX_OPTIMIZE,
-                        0,
-                        NULL);
-}
-
-/*************************************************************************/
-
-GRegex *
-mm_3gpp_cusd_regex_get (void)
-{
-    return g_regex_new ("\\r\\n\\+CUSD:\\s*(.*)\\r\\n",
-                        G_REGEX_RAW | G_REGEX_OPTIMIZE,
-                        0,
-                        NULL);
-}
-
-/*************************************************************************/
-
-GRegex *
-mm_3gpp_cmti_regex_get (void)
-{
-    return g_regex_new ("\\r\\n\\+CMTI: \"(\\S+)\",(\\d+)\\r\\n",
-                        G_REGEX_RAW | G_REGEX_OPTIMIZE,
-                        0,
-                        NULL);
-}
-
-/*************************************************************************/
-
 static gulong
 parse_uint (char *str, int base, glong nmin, glong nmax, gboolean *valid)
 {
     gulong ret = 0;
-    char *endquote;
+    gchar *endquote;
 
     *valid = FALSE;
     if (!str)
@@ -687,7 +629,7 @@ parse_uint (char *str, int base, glong nmin, glong nmax, gboolean *valid)
 static gboolean
 item_is_lac_not_stat (GMatchInfo *info, guint32 item)
 {
-    char *str;
+    gchar *str;
     gboolean is_lac = FALSE;
 
     /* A <stat> will always be a single digit, without quotes */
@@ -711,7 +653,7 @@ mm_3gpp_parse_creg_response (GMatchInfo *info,
     gint n_matches, act = -1;
     gulong stat = 0, lac = 0, ci = 0;
     guint istat = 0, ilac = 0, ici = 0, iact = 0;
-    char *str;
+    gchar *str;
 
     g_return_val_if_fail (info != NULL, FALSE);
     g_return_val_if_fail (out_reg_state != NULL, FALSE);
@@ -831,12 +773,678 @@ mm_3gpp_parse_creg_response (GMatchInfo *info,
 
 /*************************************************************************/
 
+#define CMGF_TAG "+CMGF:"
+
 gboolean
-mm_cdma_parse_spservice_response (const char *reply,
-                                  MMModemCdmaRegistrationState *out_cdma_1x_state,
-                                  MMModemCdmaRegistrationState *out_evdo_state)
+mm_3gpp_parse_cmgf_test_response (const gchar *reply,
+                                  gboolean *sms_pdu_supported,
+                                  gboolean *sms_text_supported,
+                                  GError **error)
 {
-    const char *p;
+    GRegex *r;
+    GMatchInfo *match_info;
+    gchar *s;
+    guint32 min = -1, max = -1;
+
+    /* Strip whitespace and response tag */
+    if (g_str_has_prefix (reply, CMGF_TAG))
+        reply += strlen (CMGF_TAG);
+    while (isspace (*reply))
+        reply++;
+
+    r = g_regex_new ("\\(?\\s*(\\d+)\\s*[-,]?\\s*(\\d+)?\\s*\\)?", 0, 0, error);
+    if (!r)
+        return FALSE;
+
+    if (!g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, NULL)) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Failed to parse CMGF query result '%s'",
+                     reply);
+        g_match_info_free (match_info);
+        g_regex_unref (r);
+        return FALSE;
+    }
+
+    s = g_match_info_fetch (match_info, 1);
+    if (s)
+        min = atoi (s);
+    g_free (s);
+
+    s = g_match_info_fetch (match_info, 2);
+    if (s)
+        max = atoi (s);
+    g_free (s);
+
+    /* CMGF=0 for PDU mode */
+    *sms_pdu_supported = (min == 0);
+
+    /* CMGF=1 for Text mode */
+    *sms_text_supported = (max >= 1);
+
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+    return TRUE;
+}
+
+/*************************************************************************/
+
+static MMSmsStorage
+storage_from_str (const gchar *str)
+{
+    if (g_str_equal (str, "SM"))
+        return MM_SMS_STORAGE_SM;
+    if (g_str_equal (str, "ME"))
+        return MM_SMS_STORAGE_ME;
+    if (g_str_equal (str, "MT"))
+        return MM_SMS_STORAGE_MT;
+    if (g_str_equal (str, "SR"))
+        return MM_SMS_STORAGE_SR;
+    if (g_str_equal (str, "BM"))
+        return MM_SMS_STORAGE_BM;
+    if (g_str_equal (str, "TA"))
+        return MM_SMS_STORAGE_TA;
+    return MM_SMS_STORAGE_UNKNOWN;
+}
+
+gboolean
+mm_3gpp_parse_cpms_test_response (const gchar *reply,
+                                  GArray **mem1,
+                                  GArray **mem2,
+                                  GArray **mem3)
+{
+    GRegex *r;
+    gchar **split;
+    guint i;
+
+    g_assert (mem1 != NULL);
+    g_assert (mem2 != NULL);
+    g_assert (mem3 != NULL);
+
+    /*
+     * +CPMS: ("SM","ME"),("SM","ME"),("SM","ME")
+     */
+    split = g_strsplit_set (mm_strip_tag (reply, "+CPMS:"), "()", -1);
+    if (!split)
+        return FALSE;
+
+    r = g_regex_new ("\\s*\"([^,\\)]+)\"\\s*", 0, 0, NULL);
+    g_assert (r);
+
+    for (i = 0; split[i]; i++) {
+        GMatchInfo *match_info;
+
+        /* Got a range group to match */
+        if (g_regex_match_full (r, split[i], strlen (split[i]), 0, 0, &match_info, NULL)) {
+            GArray *array = NULL;
+
+            while (g_match_info_matches (match_info)) {
+                gchar *str;
+
+                str = g_match_info_fetch (match_info, 1);
+                if (str) {
+                    MMSmsStorage storage;
+
+                    if (!array)
+                        array = g_array_new (FALSE, FALSE, sizeof (MMSmsStorage));
+
+                    storage = storage_from_str (str);
+                    g_array_append_val (array, storage);
+                    g_free (str);
+                }
+
+                g_match_info_next (match_info, NULL);
+            }
+
+            if (!*mem1)
+                *mem1 = array;
+            else if (!*mem2)
+                *mem2 = array;
+            else if (!*mem3)
+                *mem3 = array;
+        }
+        g_match_info_free (match_info);
+
+        if (*mem3 != NULL)
+            break; /* once we got the last group, exit... */
+    }
+
+    g_strfreev (split);
+    g_regex_unref (r);
+
+    g_warn_if_fail (*mem1 != NULL);
+    g_warn_if_fail (*mem2 != NULL);
+    g_warn_if_fail (*mem3 != NULL);
+
+    return (*mem1 && *mem2 && *mem3);
+}
+
+/*************************************************************************/
+
+gboolean
+mm_3gpp_parse_cscs_test_response (const gchar *reply,
+                                  MMModemCharset *out_charsets)
+{
+    MMModemCharset charsets = MM_MODEM_CHARSET_UNKNOWN;
+    GRegex *r;
+    GMatchInfo *match_info;
+    gchar *p, *str;
+    gboolean success = FALSE;
+
+    g_return_val_if_fail (reply != NULL, FALSE);
+    g_return_val_if_fail (out_charsets != NULL, FALSE);
+
+    /* Find the first '(' or '"'; the general format is:
+     *
+     * +CSCS: ("IRA","GSM","UCS2")
+     *
+     * but some devices (some Blackberries) don't include the ().
+     */
+    p = strchr (reply, '(');
+    if (p)
+        p++;
+    else {
+        p = strchr (reply, '"');
+        if (!p)
+            return FALSE;
+    }
+
+    /* Now parse each charset */
+    r = g_regex_new ("\\s*([^,\\)]+)\\s*", 0, 0, NULL);
+    if (!r)
+        return FALSE;
+
+    if (g_regex_match_full (r, p, strlen (p), 0, 0, &match_info, NULL)) {
+        while (g_match_info_matches (match_info)) {
+            str = g_match_info_fetch (match_info, 1);
+            charsets |= mm_modem_charset_from_string (str);
+            g_free (str);
+
+            g_match_info_next (match_info, NULL);
+            success = TRUE;
+        }
+    }
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    if (success)
+        *out_charsets = charsets;
+
+    return success;
+}
+
+/*************************************************************************/
+
+gboolean
+mm_3gpp_parse_clck_test_response (const gchar *reply,
+                                  MMModem3gppFacility *out_facilities)
+{
+    GRegex *r;
+    GMatchInfo *match_info;
+
+    g_return_val_if_fail (reply != NULL, FALSE);
+    g_return_val_if_fail (out_facilities != NULL, FALSE);
+
+    /* the general format is:
+     *
+     * +CLCK: ("SC","AO","AI","PN")
+     */
+    reply = mm_strip_tag (reply, "+CLCK:");
+
+    /* Now parse each facility */
+    r = g_regex_new ("\\s*\"([^,\\)]+)\"\\s*", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    *out_facilities = MM_MODEM_3GPP_FACILITY_NONE;
+    if (g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, NULL)) {
+        while (g_match_info_matches (match_info)) {
+            gchar *str;
+
+            str = g_match_info_fetch (match_info, 1);
+            if (str) {
+                *out_facilities |= mm_3gpp_acronym_to_facility (str);
+                g_free (str);
+            }
+
+            g_match_info_next (match_info, NULL);
+        }
+    }
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    return (*out_facilities != MM_MODEM_3GPP_FACILITY_NONE);
+}
+
+/*************************************************************************/
+
+gboolean
+mm_3gpp_parse_clck_write_response (const gchar *reply,
+                                   gboolean *enabled)
+{
+    GRegex *r;
+    GMatchInfo *match_info;
+    gboolean success = FALSE;
+
+    g_return_val_if_fail (reply != NULL, FALSE);
+    g_return_val_if_fail (enabled != NULL, FALSE);
+
+    reply = mm_strip_tag (reply, "+CLCK:");
+
+    r = g_regex_new ("\\s*([01])\\s*", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    if (g_regex_match (r, reply, 0, &match_info)) {
+        gchar *str;
+
+        str = g_match_info_fetch (match_info, 1);
+        if (str) {
+            /* We're trying to match either '0' or '1',
+             * so we don't expect any other thing */
+            if (*str == '0')
+                *enabled = FALSE;
+            else if (*str == '1')
+                *enabled = TRUE;
+            else
+                g_assert_not_reached ();
+
+            g_free (str);
+            success = TRUE;
+        }
+    }
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    return success;
+}
+
+/*************************************************************************/
+
+GStrv
+mm_3gpp_parse_cnum_exec_response (const gchar *reply,
+                                  GError **error)
+{
+    GArray *array = NULL;
+    GRegex *r;
+    GMatchInfo *match_info;
+
+    /* Empty strings also return NULL list */
+    if (!reply || !reply[0])
+        return NULL;
+
+    r = g_regex_new ("\\+CNUM:\\s*\"?\\S*\"?,\"(\\S+)\",\\d", G_REGEX_UNGREEDY, 0, NULL);
+    g_assert (r != NULL);
+
+    g_regex_match (r, reply, 0, &match_info);
+    while (g_match_info_matches (match_info)) {
+        gchar *number;
+
+        number = g_match_info_fetch (match_info, 1);
+
+        if (number && number[0]) {
+            if (!array)
+                array = g_array_new (TRUE, TRUE, sizeof (gchar *));
+            g_array_append_val (array, number);
+        } else
+            g_free (number);
+
+        g_match_info_next (match_info, NULL);
+    }
+
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    return (array ? (GStrv) g_array_free (array, FALSE) : NULL);
+}
+
+/*************************************************************************/
+
+struct MM3gppCindResponse {
+    gchar *desc;
+    guint idx;
+    gint min;
+    gint max;
+};
+
+static MM3gppCindResponse *
+cind_response_new (const gchar *desc, guint idx, gint min, gint max)
+{
+    MM3gppCindResponse *r;
+    gchar *p;
+
+    g_return_val_if_fail (desc != NULL, NULL);
+    g_return_val_if_fail (idx >= 0, NULL);
+
+    r = g_malloc0 (sizeof (MM3gppCindResponse));
+
+    /* Strip quotes */
+    r->desc = p = g_malloc0 (strlen (desc) + 1);
+    while (*desc) {
+        if (*desc != '"' && !isspace (*desc))
+            *p++ = tolower (*desc);
+        desc++;
+    }
+
+    r->idx = idx;
+    r->max = max;
+    r->min = min;
+    return r;
+}
+
+static void
+cind_response_free (MM3gppCindResponse *r)
+{
+    g_return_if_fail (r != NULL);
+
+    g_free (r->desc);
+    memset (r, 0, sizeof (MM3gppCindResponse));
+    g_free (r);
+}
+
+const gchar *
+mm_3gpp_cind_response_get_desc (MM3gppCindResponse *r)
+{
+    g_return_val_if_fail (r != NULL, NULL);
+
+    return r->desc;
+}
+
+guint
+mm_3gpp_cind_response_get_index (MM3gppCindResponse *r)
+{
+    g_return_val_if_fail (r != NULL, 0);
+
+    return r->idx;
+}
+
+gint
+mm_3gpp_cind_response_get_min (MM3gppCindResponse *r)
+{
+    g_return_val_if_fail (r != NULL, -1);
+
+    return r->min;
+}
+
+gint
+mm_3gpp_cind_response_get_max (MM3gppCindResponse *r)
+{
+    g_return_val_if_fail (r != NULL, -1);
+
+    return r->max;
+}
+
+#define CIND_TAG "+CIND:"
+
+GHashTable *
+mm_3gpp_parse_cind_test_response (const gchar *reply,
+                                  GError **error)
+{
+    GHashTable *hash;
+    GRegex *r;
+    GMatchInfo *match_info;
+    guint idx = 1;
+
+    g_return_val_if_fail (reply != NULL, NULL);
+
+    /* Strip whitespace and response tag */
+    if (g_str_has_prefix (reply, CIND_TAG))
+        reply += strlen (CIND_TAG);
+    while (isspace (*reply))
+        reply++;
+
+    r = g_regex_new ("\\(([^,]*),\\((\\d+)[-,](\\d+).*\\)", G_REGEX_UNGREEDY, 0, NULL);
+    if (!r) {
+        g_set_error_literal (error,
+                             MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                             "Could not parse scan results.");
+        return NULL;
+    }
+
+    hash = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) cind_response_free);
+
+    if (g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, NULL)) {
+        while (g_match_info_matches (match_info)) {
+            MM3gppCindResponse *resp;
+            gchar *desc, *tmp;
+            gint min = 0, max = 0;
+
+            desc = g_match_info_fetch (match_info, 1);
+
+            tmp = g_match_info_fetch (match_info, 2);
+            min = atoi (tmp);
+            g_free (tmp);
+
+            tmp = g_match_info_fetch (match_info, 3);
+            max = atoi (tmp);
+            g_free (tmp);
+
+            resp = cind_response_new (desc, idx++, min, max);
+            if (resp)
+                g_hash_table_insert (hash, g_strdup (resp->desc), resp);
+
+            g_free (desc);
+
+            g_match_info_next (match_info, NULL);
+        }
+    }
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    return hash;
+}
+
+/*************************************************************************/
+
+GByteArray *
+mm_3gpp_parse_cind_read_response (const gchar *reply,
+                                  GError **error)
+{
+    GByteArray *array = NULL;
+    const gchar *p = reply;
+    GRegex *r = NULL;
+    GMatchInfo *match_info;
+    guint8 t = 0;
+
+    g_return_val_if_fail (reply != NULL, NULL);
+
+    if (!g_str_has_prefix (p, CIND_TAG)) {
+        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                             "Could not parse the +CIND response");
+        return NULL;
+    }
+
+    p += strlen (CIND_TAG);
+    while (isspace (*p))
+        p++;
+
+    r = g_regex_new ("(\\d+)[^0-9]+", G_REGEX_UNGREEDY, 0, NULL);
+    if (!r) {
+        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                             "Internal failure attempting to parse +CIND response");
+        return NULL;
+    }
+
+    if (!g_regex_match_full (r, p, strlen (p), 0, 0, &match_info, NULL)) {
+        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                             "Failure parsing the +CIND response");
+        goto done;
+    }
+
+    array = g_byte_array_sized_new (g_match_info_get_match_count (match_info));
+
+    /* Add a zero element so callers can use 1-based indexes returned by
+     * mm_3gpp_cind_response_get_index().
+     */
+    g_byte_array_append (array, &t, 1);
+
+    while (g_match_info_matches (match_info)) {
+        gchar *str;
+        gulong val;
+
+        str = g_match_info_fetch (match_info, 1);
+
+        errno = 0;
+        val = strtoul (str, NULL, 10);
+
+        t = 0;
+        if ((errno == 0) && (val < 255))
+            t = (guint8) val;
+        /* FIXME: indicate errors somehow? */
+        g_byte_array_append (array, &t, 1);
+
+        g_free (str);
+        g_match_info_next (match_info, NULL);
+    }
+
+done:
+    g_match_info_free (match_info);
+    g_regex_unref (r);
+
+    return array;
+}
+
+/*************************************************************************/
+
+/* Map two letter facility codes into flag values. There are
+ * many more facilities defined (for various flavors of call
+ * barring); we only map the ones we care about. */
+typedef struct {
+    MMModem3gppFacility facility;
+    gchar *acronym;
+} FacilityAcronym;
+
+static const FacilityAcronym facility_acronyms[] = {
+    { MM_MODEM_3GPP_FACILITY_SIM,           "SC" },
+    { MM_MODEM_3GPP_FACILITY_PH_SIM,        "PS" },
+    { MM_MODEM_3GPP_FACILITY_PH_FSIM,       "PF" },
+    { MM_MODEM_3GPP_FACILITY_FIXED_DIALING, "FD" },
+    { MM_MODEM_3GPP_FACILITY_NET_PERS,      "PN" },
+    { MM_MODEM_3GPP_FACILITY_NET_SUB_PERS,  "PU" },
+    { MM_MODEM_3GPP_FACILITY_PROVIDER_PERS, "PP" },
+    { MM_MODEM_3GPP_FACILITY_CORP_PERS,     "PC" }
+};
+
+MMModem3gppFacility
+mm_3gpp_acronym_to_facility (const gchar *str)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (facility_acronyms); i++) {
+        if (g_str_equal (facility_acronyms[i].acronym, str))
+            return facility_acronyms[i].facility;
+    }
+
+    return MM_MODEM_3GPP_FACILITY_NONE;
+}
+
+gchar *
+mm_3gpp_facility_to_acronym (MMModem3gppFacility facility)
+{
+    guint i;
+
+    for (i = 0; i < G_N_ELEMENTS (facility_acronyms); i++) {
+        if (facility_acronyms[i].facility == facility)
+            return facility_acronyms[i].acronym;
+    }
+
+    return NULL;
+}
+
+/*************************************************************************/
+
+MMModemAccessTechnology
+mm_3gpp_string_to_access_tech (const gchar *string)
+{
+    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+
+    g_return_val_if_fail (string != NULL, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
+
+    /* We're returning a MASK of technologies found; so we can include more
+     * than one technology in the result */
+    if (strcasestr (string, "LTE"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_LTE;
+
+    if (strcasestr (string, "HSPA+"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS;
+    else if (strcasestr (string, "HSPA"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_HSPA;
+
+
+    if (strcasestr (string, "HSUPA"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
+
+    if (strcasestr (string, "HSDPA"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
+
+    if (strcasestr (string, "UMTS"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+
+    if (strcasestr (string, "EDGE"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
+
+    if (strcasestr (string, "GPRS"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
+
+    if (strcasestr (string, "GSM"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_GSM;
+
+    return act;
+}
+
+/*************************************************************************/
+
+gchar *
+mm_3gpp_parse_operator (const gchar *reply,
+                        MMModemCharset cur_charset)
+{
+    gchar *operator = NULL;
+
+    if (reply && !strncmp (reply, "+COPS: ", 7)) {
+        /* Got valid reply */
+		GRegex *r;
+		GMatchInfo *match_info;
+
+		reply += 7;
+		r = g_regex_new ("(\\d),(\\d),\"(.+)\"", G_REGEX_UNGREEDY, 0, NULL);
+		if (!r)
+            return NULL;
+
+		g_regex_match (r, reply, 0, &match_info);
+		if (g_match_info_matches (match_info))
+            operator = g_match_info_fetch (match_info, 3);
+
+		g_match_info_free (match_info);
+		g_regex_unref (r);
+    }
+
+    if (operator) {
+        /* Some modems (Option & HSO) return the operator name as a hexadecimal
+         * string of the bytes of the operator name as encoded by the current
+         * character set.
+         */
+        if (cur_charset == MM_MODEM_CHARSET_UCS2)
+            operator = mm_charset_take_and_convert_to_utf8 (operator, MM_MODEM_CHARSET_UCS2);
+
+        /* Ensure the operator name is valid UTF-8 so that we can send it
+         * through D-Bus and such.
+         */
+        if (!g_utf8_validate (operator, -1, NULL)) {
+            g_free (operator);
+            operator = NULL;
+        }
+    }
+
+    return operator;
+}
+
+/*************************************************************************/
+
+gboolean
+mm_cdma_parse_spservice_read_response (const gchar *reply,
+                                       MMModemCdmaRegistrationState *out_cdma_1x_state,
+                                       MMModemCdmaRegistrationState *out_evdo_state)
+{
+    const gchar *p;
 
     g_return_val_if_fail (reply != NULL, FALSE);
     g_return_val_if_fail (out_cdma_1x_state != NULL, FALSE);
@@ -869,9 +1477,9 @@ mm_cdma_parse_spservice_response (const char *reply,
 /*************************************************************************/
 
 typedef struct {
-    int num;
+    gint num;
     gboolean roam_ind;
-    const char *banner;
+    const gchar *banner;
 } EriItem;
 
 /* NOTE: these may be Sprint-specific for now... */
@@ -1067,12 +1675,12 @@ static const EriItem eris[] = {
 };
 
 gboolean
-mm_cdma_parse_eri (const char *reply,
-                   gboolean *out_roaming,
-                   guint32 *out_ind,
-                   const char **out_desc)
+mm_cdma_parse_speri_read_response (const gchar *reply,
+                                   gboolean *out_roaming,
+                                   guint32 *out_ind,
+                                   const gchar **out_desc)
 {
-    long int ind;
+    glong ind;
     const EriItem *iter = &eris[0];
     gboolean found = FALSE;
 
@@ -1103,658 +1711,10 @@ mm_cdma_parse_eri (const char *reply,
 /*************************************************************************/
 
 gboolean
-mm_gsm_parse_cscs_support_response (const char *reply,
-                                    MMModemCharset *out_charsets)
-{
-    MMModemCharset charsets = MM_MODEM_CHARSET_UNKNOWN;
-    GRegex *r;
-    GMatchInfo *match_info;
-    char *p, *str;
-    gboolean success = FALSE;
-
-    g_return_val_if_fail (reply != NULL, FALSE);
-    g_return_val_if_fail (out_charsets != NULL, FALSE);
-
-    /* Find the first '(' or '"'; the general format is:
-     *
-     * +CSCS: ("IRA","GSM","UCS2")
-     *
-     * but some devices (some Blackberries) don't include the ().
-     */
-    p = strchr (reply, '(');
-    if (p)
-        p++;
-    else {
-        p = strchr (reply, '"');
-        if (!p)
-            return FALSE;
-    }
-
-    /* Now parse each charset */
-    r = g_regex_new ("\\s*([^,\\)]+)\\s*", 0, 0, NULL);
-    if (!r)
-        return FALSE;
-
-    if (g_regex_match_full (r, p, strlen (p), 0, 0, &match_info, NULL)) {
-        while (g_match_info_matches (match_info)) {
-            str = g_match_info_fetch (match_info, 1);
-            charsets |= mm_modem_charset_from_string (str);
-            g_free (str);
-
-            g_match_info_next (match_info, NULL);
-            success = TRUE;
-        }
-    }
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
-    if (success)
-        *out_charsets = charsets;
-
-    return success;
-}
-
-/*************************************************************************/
-
-gchar *
-mm_3gpp_parse_operator (const gchar *reply,
-                        MMModemCharset cur_charset)
-{
-    gchar *operator = NULL;
-
-    if (reply && !strncmp (reply, "+COPS: ", 7)) {
-        /* Got valid reply */
-		GRegex *r;
-		GMatchInfo *match_info;
-
-		reply += 7;
-		r = g_regex_new ("(\\d),(\\d),\"(.+)\"", G_REGEX_UNGREEDY, 0, NULL);
-		if (!r)
-            return NULL;
-
-		g_regex_match (r, reply, 0, &match_info);
-		if (g_match_info_matches (match_info))
-            operator = g_match_info_fetch (match_info, 3);
-
-		g_match_info_free (match_info);
-		g_regex_unref (r);
-    }
-
-    if (operator) {
-        /* Some modems (Option & HSO) return the operator name as a hexadecimal
-         * string of the bytes of the operator name as encoded by the current
-         * character set.
-         */
-        if (cur_charset == MM_MODEM_CHARSET_UCS2)
-            operator = mm_charset_take_and_convert_to_utf8 (operator, MM_MODEM_CHARSET_UCS2);
-
-        /* Ensure the operator name is valid UTF-8 so that we can send it
-         * through D-Bus and such.
-         */
-        if (!g_utf8_validate (operator, -1, NULL)) {
-            g_free (operator);
-            operator = NULL;
-        }
-    }
-
-    return operator;
-}
-
-/*************************************************************************/
-
-/* Map two letter facility codes into flag values. There are
- * many more facilities defined (for various flavors of call
- * barring); we only map the ones we care about. */
-typedef struct {
-    MMModem3gppFacility facility;
-    gchar *acronym;
-} FacilityAcronym;
-
-static const FacilityAcronym facility_acronyms[] = {
-    { MM_MODEM_3GPP_FACILITY_SIM,           "SC" },
-    { MM_MODEM_3GPP_FACILITY_PH_SIM,        "PS" },
-    { MM_MODEM_3GPP_FACILITY_PH_FSIM,       "PF" },
-    { MM_MODEM_3GPP_FACILITY_FIXED_DIALING, "FD" },
-    { MM_MODEM_3GPP_FACILITY_NET_PERS,      "PN" },
-    { MM_MODEM_3GPP_FACILITY_NET_SUB_PERS,  "PU" },
-    { MM_MODEM_3GPP_FACILITY_PROVIDER_PERS, "PP" },
-    { MM_MODEM_3GPP_FACILITY_CORP_PERS,     "PC" }
-};
-
-static MMModem3gppFacility
-string_to_facility (const gchar *str)
-{
-    guint i;
-
-    for (i = 0; i < G_N_ELEMENTS (facility_acronyms); i++) {
-        if (g_str_equal (facility_acronyms[i].acronym, str))
-            return facility_acronyms[i].facility;
-    }
-
-    return MM_MODEM_3GPP_FACILITY_NONE;
-}
-
-gchar *
-mm_3gpp_get_facility_acronym (MMModem3gppFacility facility)
-{
-    guint i;
-
-    for (i = 0; i < G_N_ELEMENTS (facility_acronyms); i++) {
-        if (facility_acronyms[i].facility == facility)
-            return facility_acronyms[i].acronym;
-    }
-
-    return NULL;
-}
-
-gboolean
-mm_3gpp_parse_clck_test_response (const gchar *reply,
-                                  MMModem3gppFacility *out_facilities)
-{
-    GRegex *r;
-    GMatchInfo *match_info;
-
-    g_return_val_if_fail (reply != NULL, FALSE);
-    g_return_val_if_fail (out_facilities != NULL, FALSE);
-
-    /* the general format is:
-     *
-     * +CLCK: ("SC","AO","AI","PN")
-     */
-    reply = mm_strip_tag (reply, "+CLCK:");
-
-    /* Now parse each facility */
-    r = g_regex_new ("\\s*\"([^,\\)]+)\"\\s*", 0, 0, NULL);
-    g_assert (r != NULL);
-
-    *out_facilities = MM_MODEM_3GPP_FACILITY_NONE;
-    if (g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, NULL)) {
-        while (g_match_info_matches (match_info)) {
-            gchar *str;
-
-            str = g_match_info_fetch (match_info, 1);
-            if (str) {
-                *out_facilities |= string_to_facility (str);
-                g_free (str);
-            }
-
-            g_match_info_next (match_info, NULL);
-        }
-    }
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
-    return (*out_facilities != MM_MODEM_3GPP_FACILITY_NONE);
-}
-
-gboolean
-mm_3gpp_parse_clck_response (const gchar *reply,
-                             gboolean *enabled)
-{
-    GRegex *r;
-    GMatchInfo *match_info;
-    gboolean success = FALSE;
-
-    g_return_val_if_fail (reply != NULL, FALSE);
-    g_return_val_if_fail (enabled != NULL, FALSE);
-
-    reply = mm_strip_tag (reply, "+CLCK:");
-
-    r = g_regex_new ("\\s*([01])\\s*", 0, 0, NULL);
-    g_assert (r != NULL);
-
-    if (g_regex_match (r, reply, 0, &match_info)) {
-        gchar *str;
-
-        str = g_match_info_fetch (match_info, 1);
-        if (str) {
-            /* We're trying to match either '0' or '1',
-             * so we don't expect any other thing */
-            if (*str == '0')
-                *enabled = FALSE;
-            else if (*str == '1')
-                *enabled = TRUE;
-            else
-                g_assert_not_reached ();
-
-            g_free (str);
-            success = TRUE;
-        }
-    }
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
-    return success;
-}
-
-/*************************************************************************/
-
-MMModemAccessTechnology
-mm_3gpp_string_to_access_tech (const gchar *string)
-{
-    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
-
-    g_return_val_if_fail (string != NULL, MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN);
-
-    /* We're returning a MASK of technologies found; so we can include more
-     * than one technology in the result */
-    if (strcasestr (string, "LTE"))
-        act |= MM_MODEM_ACCESS_TECHNOLOGY_LTE;
-
-    if (strcasestr (string, "HSPA+"))
-        act |= MM_MODEM_ACCESS_TECHNOLOGY_HSPA_PLUS;
-    else if (strcasestr (string, "HSPA"))
-        act |= MM_MODEM_ACCESS_TECHNOLOGY_HSPA;
-
-
-    if (strcasestr (string, "HSUPA"))
-        act |= MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
-
-    if (strcasestr (string, "HSDPA"))
-        act |= MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
-
-    if (strcasestr (string, "UMTS"))
-        act |= MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
-
-    if (strcasestr (string, "EDGE"))
-        act |= MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
-
-    if (strcasestr (string, "GPRS"))
-        act |= MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
-
-    if (strcasestr (string, "GSM"))
-        act |= MM_MODEM_ACCESS_TECHNOLOGY_GSM;
-
-    return act;
-}
-
-/*************************************************************************/
-
-char *
-mm_create_device_identifier (guint vid,
-                             guint pid,
-                             const char *ati,
-                             const char *ati1,
-                             const char *gsn,
-                             const char *revision,
-                             const char *model,
-                             const char *manf)
-{
-    GString *devid, *msg = NULL;
-    GChecksum *sum;
-    char *p, *ret = NULL;
-    char str_vid[10], str_pid[10];
-
-    /* Build up the device identifier */
-    devid = g_string_sized_new (50);
-    if (ati)
-        g_string_append (devid, ati);
-    if (ati1) {
-        /* Only append "ATI1" if it's differnet than "ATI" */
-        if (!ati || (strcmp (ati, ati1) != 0))
-            g_string_append (devid, ati1);
-    }
-    if (gsn)
-        g_string_append (devid, gsn);
-    if (revision)
-        g_string_append (devid, revision);
-    if (model)
-        g_string_append (devid, model);
-    if (manf)
-        g_string_append (devid, manf);
-
-    if (!strlen (devid->str)) {
-        g_string_free (devid, TRUE);
-        return NULL;
-    }
-
-    p = devid->str;
-    msg = g_string_sized_new (strlen (devid->str) + 17);
-
-    sum = g_checksum_new (G_CHECKSUM_SHA1);
-
-    if (vid) {
-        snprintf (str_vid, sizeof (str_vid) - 1, "%08x", vid);
-        g_checksum_update (sum, (const guchar *) &str_vid[0], strlen (str_vid));
-        g_string_append_printf (msg, "%08x", vid);
-    }
-    if (vid) {
-        snprintf (str_pid, sizeof (str_pid) - 1, "%08x", pid);
-        g_checksum_update (sum, (const guchar *) &str_pid[0], strlen (str_pid));
-        g_string_append_printf (msg, "%08x", pid);
-    }
-
-    while (*p) {
-        /* Strip spaces and linebreaks */
-        if (!isblank (*p) && !isspace (*p) && isascii (*p)) {
-            g_checksum_update (sum, (const guchar *) p, 1);
-            g_string_append_c (msg, *p);
-        }
-        p++;
-    }
-    ret = g_strdup (g_checksum_get_string (sum));
-    g_checksum_free (sum);
-
-    mm_dbg ("Device ID source '%s'", msg->str);
-    mm_dbg ("Device ID '%s'", ret);
-    g_string_free (msg, TRUE);
-    g_string_free (devid, TRUE);
-
-    return ret;
-}
-
-/*************************************************************************/
-
-struct CindResponse {
-    char *desc;
-    guint idx;
-    gint min;
-    gint max;
-};
-
-static CindResponse *
-cind_response_new (const char *desc, guint idx, gint min, gint max)
-{
-    CindResponse *r;
-    char *p;
-
-    g_return_val_if_fail (desc != NULL, NULL);
-    g_return_val_if_fail (idx >= 0, NULL);
-
-    r = g_malloc0 (sizeof (CindResponse));
-
-    /* Strip quotes */
-    r->desc = p = g_malloc0 (strlen (desc) + 1);
-    while (*desc) {
-        if (*desc != '"' && !isspace (*desc))
-            *p++ = tolower (*desc);
-        desc++;
-    }
-
-    r->idx = idx;
-    r->max = max;
-    r->min = min;
-    return r;
-}
-
-static void
-cind_response_free (CindResponse *r)
-{
-    g_return_if_fail (r != NULL);
-
-    g_free (r->desc);
-    memset (r, 0, sizeof (CindResponse));
-    g_free (r);
-}
-
-const char *
-cind_response_get_desc (CindResponse *r)
-{
-    g_return_val_if_fail (r != NULL, NULL);
-
-    return r->desc;
-}
-
-guint
-cind_response_get_index (CindResponse *r)
-{
-    g_return_val_if_fail (r != NULL, 0);
-
-    return r->idx;
-}
-
-gint
-cind_response_get_min (CindResponse *r)
-{
-    g_return_val_if_fail (r != NULL, -1);
-
-    return r->min;
-}
-
-gint
-cind_response_get_max (CindResponse *r)
-{
-    g_return_val_if_fail (r != NULL, -1);
-
-    return r->max;
-}
-
-#define CIND_TAG "+CIND:"
-
-GHashTable *
-mm_parse_cind_test_response (const char *reply, GError **error)
-{
-    GHashTable *hash;
-    GRegex *r;
-    GMatchInfo *match_info;
-    guint idx = 1;
-
-    g_return_val_if_fail (reply != NULL, NULL);
-
-    /* Strip whitespace and response tag */
-    if (g_str_has_prefix (reply, CIND_TAG))
-        reply += strlen (CIND_TAG);
-    while (isspace (*reply))
-        reply++;
-
-    r = g_regex_new ("\\(([^,]*),\\((\\d+)[-,](\\d+).*\\)", G_REGEX_UNGREEDY, 0, NULL);
-    if (!r) {
-        g_set_error_literal (error,
-                             MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                             "Could not parse scan results.");
-        return NULL;
-    }
-
-    hash = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) cind_response_free);
-
-    if (g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, NULL)) {
-        while (g_match_info_matches (match_info)) {
-            CindResponse *resp;
-            char *desc, *tmp;
-            gint min = 0, max = 0;
-
-            desc = g_match_info_fetch (match_info, 1);
-
-            tmp = g_match_info_fetch (match_info, 2);
-            min = atoi (tmp);
-            g_free (tmp);
-
-            tmp = g_match_info_fetch (match_info, 3);
-            max = atoi (tmp);
-            g_free (tmp);
-
-            resp = cind_response_new (desc, idx++, min, max);
-            if (resp)
-                g_hash_table_insert (hash, g_strdup (resp->desc), resp);
-
-            g_free (desc);
-
-            g_match_info_next (match_info, NULL);
-        }
-    }
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
-    return hash;
-}
-
-GByteArray *
-mm_parse_cind_query_response(const char *reply, GError **error)
-{
-    GByteArray *array = NULL;
-    const char *p = reply;
-    GRegex *r = NULL;
-    GMatchInfo *match_info;
-    guint8 t = 0;
-
-    g_return_val_if_fail (reply != NULL, NULL);
-
-    if (!g_str_has_prefix (p, CIND_TAG)) {
-        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                             "Could not parse the +CIND response");
-        return NULL;
-    }
-
-    p += strlen (CIND_TAG);
-    while (isspace (*p))
-        p++;
-
-    r = g_regex_new ("(\\d+)[^0-9]+", G_REGEX_UNGREEDY, 0, NULL);
-    if (!r) {
-        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                             "Internal failure attempting to parse +CIND response");
-        return NULL;
-    }
-
-    if (!g_regex_match_full (r, p, strlen (p), 0, 0, &match_info, NULL)) {
-        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                             "Failure parsing the +CIND response");
-        goto done;
-    }
-
-    array = g_byte_array_sized_new (g_match_info_get_match_count (match_info));
-
-    /* Add a zero element so callers can use 1-based indexes returned by
-     * cind_response_get_index().
-     */
-    g_byte_array_append (array, &t, 1);
-
-    while (g_match_info_matches (match_info)) {
-        char *str;
-        gulong val;
-
-        str = g_match_info_fetch (match_info, 1);
-
-        errno = 0;
-        val = strtoul (str, NULL, 10);
-
-        t = 0;
-        if ((errno == 0) && (val < 255))
-            t = (guint8) val;
-        /* FIXME: indicate errors somehow? */
-        g_byte_array_append (array, &t, 1);
-
-        g_free (str);
-        g_match_info_next (match_info, NULL);
-    }
-
-done:
-    g_match_info_free (match_info);
-    g_regex_unref (r);
-
-    return array;
-}
-
-gint
-mm_cdma_normalize_class (const gchar *orig_class)
-{
-    gchar class;
-
-    g_return_val_if_fail (orig_class != NULL, '0');
-
-    class = toupper (orig_class[0]);
-
-    /* Cellular (850MHz) */
-    if (class == '1' || class == 'C')
-        return 1;
-    /* PCS (1900MHz) */
-    if (class == '2' || class == 'P')
-        return 2;
-
-    /* Unknown/not registered */
-    return 0;
-}
-
-gchar
-mm_cdma_normalize_band (const gchar *long_band,
-                        gint *out_class)
-{
-    gchar band;
-
-    g_return_val_if_fail (long_band != NULL, 'Z');
-
-    /* There are two response formats for the band; one includes the band
-     * class and the other doesn't.  For modems that include the band class
-     * (ex Novatel S720) you'll see "Px" or "Cx" depending on whether the modem
-     * is registered on a PCS/1900 (P) or Cellular/850 (C) system.
-     */
-    band = toupper (long_band[0]);
-
-    /* Possible band class in first position; return it */
-    if (band == 'C' || band == 'P') {
-        gchar tmp[2] = { band, '\0' };
-
-        *out_class = mm_cdma_normalize_class (tmp);
-        band = toupper (long_band[1]);
-    }
-
-    /* normalize to A - F, and Z */
-    if (band >= 'A' && band <= 'F')
-        return band;
-
-    /* Unknown/not registered */
-    return 'Z';
-}
-
-gint
-mm_cdma_convert_sid (const gchar *sid)
-{
-    glong tmp_sid;
-
-    g_return_val_if_fail (sid != NULL, MM_MODEM_CDMA_SID_UNKNOWN);
-
-    errno = 0;
-    tmp_sid = strtol (sid, NULL, 10);
-    if ((errno == EINVAL) || (errno == ERANGE))
-        return MM_MODEM_CDMA_SID_UNKNOWN;
-    else if (tmp_sid < G_MININT || tmp_sid > G_MAXINT)
-        return MM_MODEM_CDMA_SID_UNKNOWN;
-
-    return (gint) tmp_sid;
-}
-
-guint
-mm_cdma_get_index_from_rm_protocol (MMModemCdmaRmProtocol protocol,
-                                    GError **error)
-{
-    if (protocol == MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Unexpected RM protocol (%s)",
-                     mm_modem_cdma_rm_protocol_get_string (protocol));
-        return 0;
-    }
-
-    /* just substracting 1 from the enum value should give us the index */
-    return (protocol - 1);
-}
-
-MMModemCdmaRmProtocol
-mm_cdma_get_rm_protocol_from_index (guint index,
-                                    GError **error)
-{
-    guint protocol;
-
-    /* just adding 1 from the index value should give us the enum */
-    protocol = index + 1 ;
-    if (protocol > MM_MODEM_CDMA_RM_PROTOCOL_STU_III) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_FAILED,
-                     "Unexpected RM protocol index (%u)",
-                     index);
-        protocol = MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
-    }
-
-    return (MMModemCdmaRmProtocol)protocol;
-}
-
-gboolean
-mm_cdma_parse_crm_range_response (const gchar *reply,
-                                  MMModemCdmaRmProtocol *min,
-                                  MMModemCdmaRmProtocol *max,
-                                  GError **error)
+mm_cdma_parse_crm_test_response (const gchar *reply,
+                                 MMModemCdmaRmProtocol *min,
+                                 MMModemCdmaRmProtocol *max,
+                                 GError **error)
 {
     gboolean result = FALSE;
     GRegex *r;
@@ -1811,49 +1771,115 @@ mm_cdma_parse_crm_range_response (const gchar *reply,
     return result;
 }
 
-guint
-mm_count_bits_set (gulong number)
+/*************************************************************************/
+
+MMModemCdmaRmProtocol
+mm_cdma_get_rm_protocol_from_index (guint index,
+                                    GError **error)
 {
-    guint c;
+    guint protocol;
 
-    for (c = 0; number; c++)
-        number &= number - 1;
-    return c;
-}
-
-GStrv
-mm_3gpp_parse_cnum_response (const gchar *reply,
-                             GError **error)
-{
-    GArray *array = NULL;
-    GRegex *r;
-    GMatchInfo *match_info;
-
-    /* Empty strings also return NULL list */
-    if (!reply || !reply[0])
-        return NULL;
-
-    r = g_regex_new ("\\+CNUM:\\s*\"?\\S*\"?,\"(\\S+)\",\\d", G_REGEX_UNGREEDY, 0, NULL);
-    g_assert (r != NULL);
-
-    g_regex_match (r, reply, 0, &match_info);
-    while (g_match_info_matches (match_info)) {
-        gchar *number;
-
-        number = g_match_info_fetch (match_info, 1);
-
-        if (number && number[0]) {
-            if (!array)
-                array = g_array_new (TRUE, TRUE, sizeof (gchar *));
-            g_array_append_val (array, number);
-        } else
-            g_free (number);
-
-        g_match_info_next (match_info, NULL);
+    /* just adding 1 from the index value should give us the enum */
+    protocol = index + 1 ;
+    if (protocol > MM_MODEM_CDMA_RM_PROTOCOL_STU_III) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Unexpected RM protocol index (%u)",
+                     index);
+        protocol = MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
     }
 
-    g_match_info_free (match_info);
-    g_regex_unref (r);
+    return (MMModemCdmaRmProtocol)protocol;
+}
 
-    return (array ? (GStrv) g_array_free (array, FALSE) : NULL);
+guint
+mm_cdma_get_index_from_rm_protocol (MMModemCdmaRmProtocol protocol,
+                                    GError **error)
+{
+    if (protocol == MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Unexpected RM protocol (%s)",
+                     mm_modem_cdma_rm_protocol_get_string (protocol));
+        return 0;
+    }
+
+    /* just substracting 1 from the enum value should give us the index */
+    return (protocol - 1);
+}
+
+/*************************************************************************/
+
+gint
+mm_cdma_normalize_class (const gchar *orig_class)
+{
+    gchar class;
+
+    g_return_val_if_fail (orig_class != NULL, '0');
+
+    class = toupper (orig_class[0]);
+
+    /* Cellular (850MHz) */
+    if (class == '1' || class == 'C')
+        return 1;
+    /* PCS (1900MHz) */
+    if (class == '2' || class == 'P')
+        return 2;
+
+    /* Unknown/not registered */
+    return 0;
+}
+
+/*************************************************************************/
+
+gchar
+mm_cdma_normalize_band (const gchar *long_band,
+                        gint *out_class)
+{
+    gchar band;
+
+    g_return_val_if_fail (long_band != NULL, 'Z');
+
+    /* There are two response formats for the band; one includes the band
+     * class and the other doesn't.  For modems that include the band class
+     * (ex Novatel S720) you'll see "Px" or "Cx" depending on whether the modem
+     * is registered on a PCS/1900 (P) or Cellular/850 (C) system.
+     */
+    band = toupper (long_band[0]);
+
+    /* Possible band class in first position; return it */
+    if (band == 'C' || band == 'P') {
+        gchar tmp[2] = { band, '\0' };
+
+        *out_class = mm_cdma_normalize_class (tmp);
+        band = toupper (long_band[1]);
+    }
+
+    /* normalize to A - F, and Z */
+    if (band >= 'A' && band <= 'F')
+        return band;
+
+    /* Unknown/not registered */
+    return 'Z';
+}
+
+/*************************************************************************/
+
+gint
+mm_cdma_convert_sid (const gchar *sid)
+{
+    glong tmp_sid;
+
+    g_return_val_if_fail (sid != NULL, MM_MODEM_CDMA_SID_UNKNOWN);
+
+    errno = 0;
+    tmp_sid = strtol (sid, NULL, 10);
+    if ((errno == EINVAL) || (errno == ERANGE))
+        return MM_MODEM_CDMA_SID_UNKNOWN;
+    else if (tmp_sid < G_MININT || tmp_sid > G_MAXINT)
+        return MM_MODEM_CDMA_SID_UNKNOWN;
+
+    return (gint) tmp_sid;
 }

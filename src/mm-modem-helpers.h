@@ -11,7 +11,8 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 - 2010 Red Hat, Inc.
+ * Copyright (C) 2009 - 2012 Red Hat, Inc.
+ * Copyright (C) 2012 Google, Inc.
  */
 
 #ifndef MM_MODEM_HELPERS_H
@@ -22,6 +23,19 @@
 #include "glib-object.h"
 #include "mm-charsets.h"
 
+/* NOTE:
+ * We will use the following nomenclature for the different AT commands referred
+ *  - AT+SOMETHING       --> "Exec" command
+ *  - AT+SOMETHING?      --> "Read" command
+ *  - AT+SOMETHING=X,X   --> "Write" command
+ *  - AT+SOMETHING=?     --> "Test" command
+ */
+
+
+/*****************************************************************************/
+/* Common utilities */
+/*****************************************************************************/
+
 #define MM_MODEM_CAPABILITY_3GPP_LTE    \
     (MM_MODEM_CAPABILITY_LTE |          \
      MM_MODEM_CAPABILITY_LTE_ADVANCED)
@@ -30,7 +44,33 @@
     (MM_MODEM_CAPABILITY_GSM_UMTS |     \
      MM_MODEM_CAPABILITY_3GPP_LTE)
 
-/* Network scan results expected */
+const gchar *mm_strip_tag (const gchar *str,
+                           const gchar *cmd);
+
+guint mm_count_bits_set (gulong number);
+
+gchar *mm_create_device_identifier (guint vid,
+                                    guint pid,
+                                    const gchar *ati,
+                                    const gchar *ati1,
+                                    const gchar *gsn,
+                                    const gchar *revision,
+                                    const gchar *model,
+                                    const gchar *manf);
+
+/*****************************************************************************/
+/* 3GPP specific helpers and utilities */
+/*****************************************************************************/
+
+/* Common Regex getters */
+GPtrArray *mm_3gpp_creg_regex_get     (gboolean solicited);
+void       mm_3gpp_creg_regex_destroy (GPtrArray *array);
+GRegex    *mm_3gpp_ciev_regex_get (void);
+GRegex    *mm_3gpp_cusd_regex_get (void);
+GRegex    *mm_3gpp_cmti_regex_get (void);
+
+
+/* AT+COPS=? (network scan) response parser */
 typedef struct {
     MMModem3gppNetworkAvailability status;
     gchar *operator_long;
@@ -38,24 +78,21 @@ typedef struct {
     gchar *operator_code; /* mandatory */
     MMModemAccessTechnology access_tech;
 } MM3gppNetworkInfo;
-
 void mm_3gpp_network_info_list_free (GList *info_list);
-GList *mm_3gpp_parse_scan_response (const gchar *reply,
-                                    GError **error);
+GList *mm_3gpp_parse_cops_test_response (const gchar *reply,
+                                         GError **error);
 
-/* PDP context query results */
+/* AT+CGDCONT? (PDP context query) response parser */
 typedef struct {
     guint cid;
     gchar *pdp_type;
     gchar *apn;
 } MM3gppPdpContext;
-
 void mm_3gpp_pdp_context_list_free (GList *pdp_list);
-GList *mm_3gpp_parse_pdp_query_response (const gchar *reply,
-                                         GError **error);
+GList *mm_3gpp_parse_cgdcont_read_response (const gchar *reply,
+                                            GError **error);
 
-GPtrArray *mm_3gpp_creg_regex_get (gboolean solicited);
-void mm_3gpp_creg_regex_destroy (GPtrArray *array);
+/* CREG/CGREG response/unsolicited message parser */
 gboolean mm_3gpp_parse_creg_response (GMatchInfo *info,
                                       MMModem3gppRegistrationState *out_reg_state,
                                       gulong *out_lac,
@@ -64,88 +101,91 @@ gboolean mm_3gpp_parse_creg_response (GMatchInfo *info,
                                       gboolean *out_cgreg,
                                       GError **error);
 
-gboolean mm_3gpp_parse_cmgf_format_response (const gchar *reply,
-                                             gboolean *sms_pdu_supported,
-                                             gboolean *sms_text_supported,
-                                             GError **error);
+/* AT+CMGF=? (SMS message format) response parser */
+gboolean mm_3gpp_parse_cmgf_test_response (const gchar *reply,
+                                           gboolean *sms_pdu_supported,
+                                           gboolean *sms_text_supported,
+                                           GError **error);
 
-gboolean mm_3gpp_parse_cpms_format_response (const gchar *reply,
-                                             GArray **mem1,
-                                             GArray **mem2,
-                                             GArray **mem3);
+/* AT+CPMS=? (Preferred SMS storage) response parser */
+gboolean mm_3gpp_parse_cpms_test_response (const gchar *reply,
+                                           GArray **mem1,
+                                           GArray **mem2,
+                                           GArray **mem3);
 
-GRegex *mm_3gpp_ciev_regex_get (void);
+/* AT+CSCS=? (Supported charsets) response parser */
+gboolean mm_3gpp_parse_cscs_test_response (const gchar *reply,
+                                           MMModemCharset *out_charsets);
 
-GRegex *mm_3gpp_cusd_regex_get (void);
+/* AT+CLCK=? (Supported locks) response parser */
+gboolean mm_3gpp_parse_clck_test_response (const gchar *reply,
+                                           MMModem3gppFacility *out_facilities);
 
-GRegex *mm_3gpp_cmti_regex_get (void);
+/* AT+CLCK=X,X,X... (Current locks) response parser */
+gboolean mm_3gpp_parse_clck_write_response (const gchar *reply,
+                                            gboolean *enabled);
 
-const char *mm_strip_tag (const char *str, const char *cmd);
+/* AT+CNUM (Own numbers) response parser */
+GStrv mm_3gpp_parse_cnum_exec_response (const gchar *reply,
+                                        GError **error);
 
-gboolean mm_cdma_parse_spservice_response (const char *reply,
-                                           MMModemCdmaRegistrationState *out_cdma_1x_state,
-                                           MMModemCdmaRegistrationState *out_evdo_state);
+/* AT+CIND=? (Supported indicators) response parser */
+typedef struct MM3gppCindResponse MM3gppCindResponse;
+GHashTable  *mm_3gpp_parse_cind_test_response    (const gchar *reply,
+                                                  GError **error);
+const gchar *mm_3gpp_cind_response_get_desc      (MM3gppCindResponse *r);
+guint        mm_3gpp_cind_response_get_index     (MM3gppCindResponse *r);
+gint         mm_3gpp_cind_response_get_min       (MM3gppCindResponse *r);
+gint         mm_3gpp_cind_response_get_max       (MM3gppCindResponse *r);
 
-gboolean mm_cdma_parse_eri (const char *reply,
-                            gboolean *out_roaming,
-                            guint32 *out_ind,
-                            const char **out_desc);
+/* AT+CIND? (Current indicators) response parser */
+GByteArray *mm_3gpp_parse_cind_read_response (const gchar *reply,
+                                              GError **error);
+
+/* Additional 3GPP-specific helpers */
+
+MMModem3gppFacility mm_3gpp_acronym_to_facility (const gchar *str);
+gchar *mm_3gpp_facility_to_acronym (MMModem3gppFacility facility);
+
+MMModemAccessTechnology mm_3gpp_string_to_access_tech (const gchar *string);
+
+gchar *mm_3gpp_parse_operator (const gchar *reply,
+                               MMModemCharset cur_charset);
+
+/*****************************************************************************/
+/* CDMA specific helpers and utilities */
+/*****************************************************************************/
+
+/* AT+SPSERVICE? response parser */
+gboolean mm_cdma_parse_spservice_read_response (const gchar *reply,
+                                                MMModemCdmaRegistrationState *out_cdma_1x_state,
+                                                MMModemCdmaRegistrationState *out_evdo_state);
+
+/* AT$SPERI? response parser */
+gboolean mm_cdma_parse_speri_read_response (const gchar *reply,
+                                            gboolean *out_roaming,
+                                            guint32 *out_ind,
+                                            const gchar **out_desc);
+
+/* AT+CRM=? response parser */
+gboolean mm_cdma_parse_crm_test_response (const gchar *reply,
+                                          MMModemCdmaRmProtocol *min,
+                                          MMModemCdmaRmProtocol *max,
+                                          GError **error);
+
+/* Additional CDMA-specific helpers */
+
+#define MM_MODEM_CDMA_SID_UNKNOWN 99999
+#define MM_MODEM_CDMA_NID_UNKNOWN 99999
 
 MMModemCdmaRmProtocol mm_cdma_get_rm_protocol_from_index (guint index,
                                                           GError **error);
 guint mm_cdma_get_index_from_rm_protocol (MMModemCdmaRmProtocol protocol,
                                           GError **error);
 
-gboolean mm_cdma_parse_crm_range_response (const gchar *reply,
-                                           MMModemCdmaRmProtocol *min,
-                                           MMModemCdmaRmProtocol *max,
-                                           GError **error);
-
-gboolean mm_gsm_parse_cscs_support_response (const char *reply,
-                                             MMModemCharset *out_charsets);
-
-gchar *mm_3gpp_get_facility_acronym (MMModem3gppFacility facility);
-
-gboolean mm_3gpp_parse_clck_test_response (const gchar *reply,
-                                           MMModem3gppFacility *out_facilities);
-
-gboolean mm_3gpp_parse_clck_response (const gchar *reply,
-                                      gboolean *enabled);
-
-gchar *mm_3gpp_parse_operator (const gchar *reply,
-                               MMModemCharset cur_charset);
-
-GStrv mm_3gpp_parse_cnum_response (const gchar *reply,
-                                   GError **error);
-
-MMModemAccessTechnology mm_3gpp_string_to_access_tech (const gchar *string);
-
-char *mm_create_device_identifier (guint vid,
-                                   guint pid,
-                                   const char *ati,
-                                   const char *ati1,
-                                   const char *gsn,
-                                   const char *revision,
-                                   const char *model,
-                                   const char *manf);
-
-typedef struct CindResponse CindResponse;
-GHashTable *mm_parse_cind_test_response (const char *reply, GError **error);
-const char *cind_response_get_desc      (CindResponse *r);
-guint       cind_response_get_index     (CindResponse *r);
-gint        cind_response_get_min       (CindResponse *r);
-gint        cind_response_get_max       (CindResponse *r);
-
-GByteArray *mm_parse_cind_query_response(const char *reply, GError **error);
-
-#define MM_MODEM_CDMA_SID_UNKNOWN 99999
-#define MM_MODEM_CDMA_NID_UNKNOWN 99999
-
 gint  mm_cdma_normalize_class (const gchar *orig_class);
 gchar mm_cdma_normalize_band  (const gchar *long_band,
                                gint *out_class);
 gint  mm_cdma_convert_sid     (const gchar *sid);
-
-guint mm_count_bits_set (gulong number);
 
 #endif  /* MM_MODEM_HELPERS_H */
