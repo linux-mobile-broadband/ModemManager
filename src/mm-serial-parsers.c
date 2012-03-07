@@ -310,6 +310,15 @@ done:
     return found;
 }
 
+gboolean
+mm_serial_parser_v1_is_known_error (const GError *error)
+{
+    /* Need to return TRUE for the kind of errors that this parser may set */
+    return (error->domain == MM_MOBILE_EQUIPMENT_ERROR ||
+            error->domain == MM_CONNECTION_ERROR ||
+            error->domain == MM_MESSAGE_ERROR);
+}
+
 void
 mm_serial_parser_v1_destroy (gpointer data)
 {
