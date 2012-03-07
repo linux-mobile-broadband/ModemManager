@@ -43,6 +43,7 @@
 #define MM_PLUGIN_BASE_ALLOWED_PRODUCT_STRINGS "allowed-product-strings"
 #define MM_PLUGIN_BASE_ALLOWED_UDEV_TAGS       "allowed-udev-tags"
 #define MM_PLUGIN_BASE_ALLOWED_AT              "allowed-at"
+#define MM_PLUGIN_BASE_ALLOWED_SINGLE_AT       "allowed-single-at"
 #define MM_PLUGIN_BASE_ALLOWED_QCDM            "allowed-qcdm"
 #define MM_PLUGIN_BASE_CUSTOM_INIT             "custom-init"
 #define MM_PLUGIN_BASE_SEND_DELAY              "send-delay"
@@ -74,4 +75,3 @@ gboolean mm_plugin_base_get_device_ids (MMPluginBase *self,
                                         guint16 *product);
 
 #endif /* MM_PLUGIN_BASE_H */
-

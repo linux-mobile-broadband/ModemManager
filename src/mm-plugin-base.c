@@ -67,6 +67,7 @@ typedef struct {
     mm_str_pair *product_strings;
     gchar **udev_tags;
     gboolean at;
+    gboolean single_at;
     gboolean qcdm;
     MMPortProbeAtCommand *custom_init;
     guint64 send_delay;
@@ -83,6 +84,7 @@ enum {
     PROP_ALLOWED_PRODUCT_STRINGS,
     PROP_ALLOWED_UDEV_TAGS,
     PROP_ALLOWED_AT,
+    PROP_ALLOWED_SINGLE_AT,
     PROP_ALLOWED_QCDM,
     PROP_CUSTOM_INIT,
     PROP_SEND_DELAY,
@@ -659,6 +661,8 @@ supports_port (MMPlugin *plugin,
     probe_run_flags = 0;
     if (priv->at)
         probe_run_flags |= MM_PORT_PROBE_AT;
+    else if (priv->single_at)
+        probe_run_flags |= MM_PORT_PROBE_AT;
     if (need_vendor_probing)
         probe_run_flags |= MM_PORT_PROBE_AT_VENDOR;
     if (need_product_probing)
@@ -815,6 +819,10 @@ set_property (GObject *object, guint prop_id,
         /* Construct only */
         priv->at = g_value_get_boolean (value);
         break;
+    case PROP_ALLOWED_SINGLE_AT:
+        /* Construct only */
+        priv->single_at = g_value_get_boolean (value);
+        break;
     case PROP_ALLOWED_QCDM:
         /* Construct only */
         priv->qcdm = g_value_get_boolean (value);
@@ -863,6 +871,9 @@ get_property (GObject *object, guint prop_id,
         break;
     case PROP_ALLOWED_AT:
         g_value_set_boolean (value, priv->at);
+        break;
+    case PROP_ALLOWED_SINGLE_AT:
+        g_value_set_boolean (value, priv->single_at);
         break;
     case PROP_ALLOWED_QCDM:
         g_value_set_boolean (value, priv->qcdm);
@@ -985,6 +996,14 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
          g_param_spec_boolean (MM_PLUGIN_BASE_ALLOWED_AT,
                                "Allowed AT",
                                "Whether AT ports are allowed in this plugin",
+                               FALSE,
+                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_ALLOWED_SINGLE_AT,
+         g_param_spec_boolean (MM_PLUGIN_BASE_ALLOWED_SINGLE_AT,
+                               "Allowed single AT",
+                               "Whether just a single AT port is allowed in this plugin. ",
                                FALSE,
                                G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
