@@ -51,6 +51,7 @@ typedef struct {
     /* ---- Generic task context ---- */
     GSimpleAsyncResult *result;
     GCancellable *cancellable;
+    GCancellable *at_probing_cancellable;
     guint32 flags;
     guint source_id;
     guint buffer_full_id;
@@ -109,6 +110,8 @@ port_probe_run_task_free (PortProbeRunTask *task)
 
     if (task->cancellable)
         g_object_unref (task->cancellable);
+    if (task->at_probing_cancellable)
+        g_object_unref (task->at_probing_cancellable);
 
     g_object_unref (task->result);
     g_free (task);
@@ -384,6 +387,15 @@ serial_probe_at_parse_response (MMAtSerialPort *port,
     if (port_probe_run_is_cancelled (self))
         return;
 
+    /* If AT probing cancelled, end this partial probing */
+    if (g_cancellable_is_cancelled (task->at_probing_cancellable)) {
+        mm_dbg ("(%s) no need to keep on probing the port for AT support",
+                self->priv->name);
+        task->at_result_processor (self, NULL);
+        serial_probe_schedule (self);
+        return;
+    }
+
     if (!task->at_commands->response_processor (task->at_commands->command,
                                                 response->str,
                                                 !!task->at_commands[1].command,
@@ -441,11 +453,20 @@ serial_probe_at (MMPortProbe *self)
     if (port_probe_run_is_cancelled (self))
         return FALSE;
 
+    /* If AT probing cancelled, end this partial probing */
+    if (g_cancellable_is_cancelled (task->at_probing_cancellable)) {
+        mm_dbg ("(%s) no need to launch probing for AT support",
+                self->priv->name);
+        task->at_result_processor (self, NULL);
+        serial_probe_schedule (self);
+        return FALSE;
+    }
+
     mm_at_serial_port_queue_command (
         MM_AT_SERIAL_PORT (task->serial),
         task->at_commands->command,
         task->at_commands->timeout,
-        task->cancellable,
+        task->at_probing_cancellable,
         (MMAtSerialResponseFn)serial_probe_at_parse_response,
         self);
     return FALSE;
@@ -685,6 +706,20 @@ serial_open_at (MMPortProbe *self)
 }
 
 gboolean
+mm_port_probe_run_cancel_at_probing (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
+
+    if (self->priv->task) {
+        mm_dbg ("(%s) requested to cancel all AT probing", self->priv->name);
+        g_cancellable_cancel (self->priv->task->at_probing_cancellable);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+gboolean
 mm_port_probe_run_cancel (MMPortProbe *self)
 {
     g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
@@ -724,7 +759,7 @@ mm_port_probe_run_finish (MMPortProbe *self,
 
 void
 mm_port_probe_run (MMPortProbe *self,
-                   guint32 flags,
+                   MMPortProbeFlag flags,
                    guint64 at_send_delay,
                    const MMPortProbeAtCommand *at_custom_init,
                    GAsyncReadyCallback callback,
@@ -735,7 +770,7 @@ mm_port_probe_run (MMPortProbe *self,
     gchar *probe_list_str;
 
     g_return_if_fail (MM_IS_PORT_PROBE (self));
-    g_return_if_fail (flags != 0);
+    g_return_if_fail (flags != MM_PORT_PROBE_NONE);
     g_return_if_fail (callback != NULL);
 
     /* Shouldn't schedule more than one probing at a time */
@@ -743,7 +778,7 @@ mm_port_probe_run (MMPortProbe *self,
 
     task = g_new0 (PortProbeRunTask, 1);
     task->at_send_delay = at_send_delay;
-    task->flags = 0;
+    task->flags = MM_PORT_PROBE_NONE;
     task->at_custom_init = at_custom_init;
     task->result = g_simple_async_result_new (G_OBJECT (self),
                                               callback,
@@ -772,12 +807,6 @@ mm_port_probe_run (MMPortProbe *self,
     /* Setup internal cancellable */
     task->cancellable = g_cancellable_new ();
 
-    /* If any AT-specific probing requested, require generic AT check before */
-    if (task->flags & (MM_PORT_PROBE_AT_VENDOR |
-                       MM_PORT_PROBE_AT_PRODUCT)) {
-        task->flags |= MM_PORT_PROBE_AT;
-    }
-
     probe_list_str = mm_port_probe_flag_build_string_from_mask (task->flags);
     mm_info ("(%s) launching port probing: '%s'",
              self->priv->name,
@@ -786,6 +815,7 @@ mm_port_probe_run (MMPortProbe *self,
 
     /* If any AT probing is needed, start by opening as AT port */
     if (task->flags & MM_PORT_PROBE_AT) {
+        task->at_probing_cancellable = g_cancellable_new ();
         task->source_id = g_idle_add ((GSourceFunc)serial_open_at, self);
         return;
     }

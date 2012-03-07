@@ -69,7 +69,7 @@ const gchar *mm_port_probe_get_port_driver  (MMPortProbe *self);
 
 /* Run probing */
 void     mm_port_probe_run        (MMPortProbe *self,
-                                   guint32 flags,
+                                   MMPortProbeFlag flags,
                                    guint64 at_send_delay,
                                    const MMPortProbeAtCommand *at_custom_init,
                                    GAsyncReadyCallback callback,
@@ -78,6 +78,8 @@ gboolean mm_port_probe_run_finish (MMPortProbe *self,
                                    GAsyncResult *result,
                                    GError **error);
 gboolean mm_port_probe_run_cancel (MMPortProbe *self);
+
+gboolean mm_port_probe_run_cancel_at_probing (MMPortProbe *self);
 
 /* Probing result getters */
 MMPortType    mm_port_probe_get_port_type    (MMPortProbe *self);
