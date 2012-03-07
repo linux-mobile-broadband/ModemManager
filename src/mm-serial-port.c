@@ -89,6 +89,9 @@ typedef struct {
     guint watch_id;
     guint timeout_id;
 
+    GCancellable *cancellable;
+    gulong cancellable_id;
+
     guint n_consecutive_timeouts;
 
     guint flash_id;
@@ -105,6 +108,7 @@ typedef struct {
     gpointer user_data;
     guint32 timeout;
     gboolean cached;
+    GCancellable *cancellable;
 } MMQueueData;
 
 #if 0
@@ -563,6 +567,15 @@ mm_serial_port_got_response (MMSerialPort *self, GError *error)
         priv->timeout_id = 0;
     }
 
+    if (priv->cancellable_id) {
+        g_assert (priv->cancellable != NULL);
+        g_cancellable_disconnect (priv->cancellable,
+                                  priv->cancellable_id);
+        priv->cancellable_id = 0;
+    }
+
+    g_clear_object (&priv->cancellable);
+
     info = (MMQueueData *) g_queue_pop_head (priv->queue);
     if (info) {
         if (info->cached && !error)
@@ -577,6 +590,7 @@ mm_serial_port_got_response (MMSerialPort *self, GError *error)
                                                                          info->user_data);
         }
 
+        g_clear_object (&info->cancellable);
         g_byte_array_free (info->command, TRUE);
         g_slice_free (MMQueueData, info);
     }
@@ -618,6 +632,26 @@ mm_serial_port_timed_out (gpointer data)
     return FALSE;
 }
 
+static void
+serial_port_response_wait_cancelled (GCancellable *cancellable,
+                                     MMSerialPort *self)
+{
+    MMSerialPortPrivate *priv = MM_SERIAL_PORT_GET_PRIVATE (self);
+    GError *error;
+
+    /* We don't want to call disconnect () while in the signal handler */
+    priv->cancellable_id = 0;
+
+    error = g_error_new_literal (MM_CORE_ERROR,
+                                 MM_CORE_ERROR_CANCELLED,
+                                 "Waiting for the reply cancelled");
+
+    /* FIXME: This is not completely correct - if the response finally arrives and there's
+       some other command waiting for response right now, the other command will
+       get the output of the cancelled command. Not sure what to do here. */
+    mm_serial_port_got_response (self, error);
+}
+
 static gboolean
 mm_serial_port_queue_process (gpointer data)
 {
@@ -655,6 +689,23 @@ mm_serial_port_queue_process (gpointer data)
 
     if (mm_serial_port_process_command (self, info, &error)) {
         if (info->done) {
+            /* setup the cancellable so that we can stop waiting for a response */
+            if (info->cancellable) {
+                priv->cancellable = g_object_ref (info->cancellable);
+                priv->cancellable_id = (g_cancellable_connect (
+                                            info->cancellable,
+                                            (GCallback) serial_port_response_wait_cancelled,
+                                            self,
+                                            NULL));
+                if (!priv->cancellable_id) {
+                    error = g_error_new (MM_CORE_ERROR,
+                                         MM_CORE_ERROR_CANCELLED,
+                                         "Won't wait for the reply");
+                    mm_serial_port_got_response (self, error);
+                    return FALSE;
+                }
+            }
+
             /* If the command is finished being sent, schedule the timeout */
             priv->timeout_id = g_timeout_add_seconds (info->timeout,
                                                       mm_serial_port_timed_out,
@@ -978,6 +1029,7 @@ mm_serial_port_close (MMSerialPort *self)
             g_byte_array_free (response, TRUE);
         }
 
+        g_clear_object (&item->cancellable);
         g_byte_array_free (item->command, TRUE);
         g_slice_free (MMQueueData, item);
     }
@@ -992,6 +1044,8 @@ mm_serial_port_close (MMSerialPort *self)
         g_source_remove (priv->queue_id);
         priv->queue_id = 0;
     }
+
+    g_clear_object (&priv->cancellable);
 }
 
 void
@@ -1016,6 +1070,7 @@ internal_queue_command (MMSerialPort *self,
                         gboolean take_command,
                         gboolean cached,
                         guint32 timeout_seconds,
+                        GCancellable *cancellable,
                         MMSerialResponseFn callback,
                         gpointer user_data)
 {
@@ -1050,6 +1105,7 @@ internal_queue_command (MMSerialPort *self,
 
     info->cached = cached;
     info->timeout = timeout_seconds;
+    info->cancellable = (cancellable ? g_object_ref (cancellable) : NULL);
     info->callback = (GCallback) callback;
     info->user_data = user_data;
 
@@ -1068,10 +1124,11 @@ mm_serial_port_queue_command (MMSerialPort *self,
                               GByteArray *command,
                               gboolean take_command,
                               guint32 timeout_seconds,
+                              GCancellable *cancellable,
                               MMSerialResponseFn callback,
                               gpointer user_data)
 {
-    internal_queue_command (self, command, take_command, FALSE, timeout_seconds, callback, user_data);
+    internal_queue_command (self, command, take_command, FALSE, timeout_seconds, cancellable, callback, user_data);
 }
 
 void
@@ -1079,10 +1136,11 @@ mm_serial_port_queue_command_cached (MMSerialPort *self,
                                      GByteArray *command,
                                      gboolean take_command,
                                      guint32 timeout_seconds,
+                                     GCancellable *cancellable,
                                      MMSerialResponseFn callback,
                                      gpointer user_data)
 {
-    internal_queue_command (self, command, take_command, TRUE, timeout_seconds, callback, user_data);
+    internal_queue_command (self, command, take_command, TRUE, timeout_seconds, cancellable, callback, user_data);
 }
 
 static gboolean
