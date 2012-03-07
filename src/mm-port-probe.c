@@ -32,6 +32,7 @@
 #include "libqcdm/src/utils.h"
 #include "libqcdm/src/errors.h"
 #include "mm-qcdm-serial-port.h"
+#include "mm-daemon-enums-types.h"
 
 /*
  * Steps and flow of the Probing process:
@@ -708,6 +709,7 @@ mm_port_probe_run (MMPortProbe *self,
 {
     PortProbeRunTask *task;
     guint32 i;
+    gchar *probe_list_str;
 
     g_return_if_fail (MM_IS_PORT_PROBE (self));
     g_return_if_fail (flags != 0);
@@ -752,6 +754,12 @@ mm_port_probe_run (MMPortProbe *self,
                        MM_PORT_PROBE_AT_PRODUCT)) {
         task->flags |= MM_PORT_PROBE_AT;
     }
+
+    probe_list_str = mm_port_probe_flag_build_string_from_mask (task->flags);
+    mm_info ("(%s) launching port probing: '%s'",
+             self->priv->name,
+             probe_list_str);
+    g_free (probe_list_str);
 
     /* If any AT probing is needed, start by opening as AT port */
     if (task->flags & MM_PORT_PROBE_AT) {
