@@ -34,10 +34,13 @@
 #define MM_PORT_PROBE_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PORT_PROBE, MMPortProbeClass))
 
 /* Flags to request port probing */
-#define MM_PORT_PROBE_AT              0x0001
-#define MM_PORT_PROBE_AT_VENDOR       0x0002
-#define MM_PORT_PROBE_AT_PRODUCT      0x0004
-#define MM_PORT_PROBE_QCDM            0x0008
+typedef enum { /*< underscore_name=mm_port_probe_flag >*/
+	MM_PORT_PROBE_NONE       = 0,
+	MM_PORT_PROBE_AT         = 1 << 0,
+	MM_PORT_PROBE_AT_VENDOR  = 1 << 1,
+	MM_PORT_PROBE_AT_PRODUCT = 1 << 2,
+	MM_PORT_PROBE_QCDM       = 1 << 3,
+} MMPortProbeFlag;
 
 typedef struct _MMPortProbe MMPortProbe;
 typedef struct _MMPortProbeClass MMPortProbeClass;
