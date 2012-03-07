@@ -117,8 +117,6 @@ gboolean mm_serial_port_open              (MMSerialPort *self,
 
 void     mm_serial_port_close             (MMSerialPort *self);
 
-void     mm_serial_port_close_force       (MMSerialPort *self);
-
 gboolean mm_serial_port_flash             (MMSerialPort *self,
                                            guint32 flash_time,
                                            gboolean ignore_errors,
