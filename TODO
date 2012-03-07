@@ -124,3 +124,5 @@ example to update the signal quality value or check registration status.
      still be registered in the network. AT+COPS=2 is the one doing manual
      unregistration from the network, and we should probably include such step
      in the 3GPP disabling sequence.
+
+  ** serial-parsers: convert the v1 parser to a GObject.
