@@ -446,6 +446,7 @@ serial_probe_at (MMPortProbe *self)
         MM_AT_SERIAL_PORT (task->serial),
         task->at_commands->command,
         3,
+        task->cancellable,
         (MMAtSerialResponseFn)serial_probe_at_parse_response,
         self);
     return FALSE;

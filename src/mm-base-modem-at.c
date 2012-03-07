@@ -172,6 +172,7 @@ at_sequence_parse_response (MMAtSerialPort *port,
                     ctx->port,
                     ctx->current->command,
                     ctx->current->timeout,
+                    ctx->cancellable,
                     (MMAtSerialResponseFn)at_sequence_parse_response,
                     ctx);
             else
@@ -179,6 +180,7 @@ at_sequence_parse_response (MMAtSerialPort *port,
                     ctx->port,
                     ctx->current->command,
                     ctx->current->timeout,
+                    ctx->cancellable,
                     (MMAtSerialResponseFn)at_sequence_parse_response,
                     ctx);
             return;
@@ -244,6 +246,7 @@ mm_base_modem_at_sequence_in_port (MMBaseModem *self,
         ctx->port,
         ctx->current->command,
         ctx->current->timeout,
+        ctx->cancellable,
         (MMAtSerialResponseFn)at_sequence_parse_response,
         ctx);
 }
@@ -450,6 +453,7 @@ mm_base_modem_at_command_in_port (MMBaseModem *self,
             port,
             command,
             timeout,
+            ctx->cancellable,
             (MMAtSerialResponseFn)at_command_parse_response,
             ctx);
     else
@@ -457,6 +461,7 @@ mm_base_modem_at_command_in_port (MMBaseModem *self,
             port,
             command,
             timeout,
+            ctx->cancellable,
             (MMAtSerialResponseFn)at_command_parse_response,
             ctx);
 }
