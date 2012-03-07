@@ -1236,6 +1236,7 @@ signal_quality_qcdm (SignalQualityContext *ctx)
     mm_qcdm_serial_port_queue_command (MM_QCDM_SERIAL_PORT (ctx->port),
                                        pilot_sets,
                                        3,
+                                       NULL,
                                        (MMQcdmSerialResponseFn)signal_quality_qcdm_ready,
                                        ctx);
 }
@@ -4706,6 +4707,7 @@ modem_cdma_get_hdr_state (MMIfaceModemCdma *self,
     mm_qcdm_serial_port_queue_command (ctx->qcdm,
                                        hdrstate,
                                        3,
+                                       NULL,
                                        (MMQcdmSerialResponseFn)hdr_subsys_state_info_ready,
                                        ctx);
 }
@@ -4829,6 +4831,7 @@ modem_cdma_get_call_manager_state (MMIfaceModemCdma *self,
     mm_qcdm_serial_port_queue_command (ctx->qcdm,
                                        cmstate,
                                        3,
+                                       NULL,
                                        (MMQcdmSerialResponseFn)cm_subsys_state_info_ready,
                                        ctx);
 }
@@ -5099,6 +5102,7 @@ modem_cdma_get_cdma1x_serving_system (MMIfaceModemCdma *self,
         mm_qcdm_serial_port_queue_command (ctx->qcdm,
                                            cdma_status,
                                            3,
+                                           NULL,
                                            (MMQcdmSerialResponseFn)qcdm_cdma_status_ready,
                                            ctx);
         return;

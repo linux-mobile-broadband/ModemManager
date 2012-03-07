@@ -277,11 +277,13 @@ serial_probe_qcdm (MMPortProbe *self)
     mm_qcdm_serial_port_queue_command (MM_QCDM_SERIAL_PORT (task->serial),
                                        verinfo,
                                        3,
+                                       NULL,
                                        (MMQcdmSerialResponseFn)serial_probe_qcdm_parse_response,
                                        NULL);
     mm_qcdm_serial_port_queue_command (MM_QCDM_SERIAL_PORT (task->serial),
                                        verinfo2,
                                        3,
+                                       NULL,
                                        (MMQcdmSerialResponseFn)serial_probe_qcdm_parse_response,
                                        self);
 

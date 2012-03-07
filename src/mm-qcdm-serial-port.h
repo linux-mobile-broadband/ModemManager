@@ -54,12 +54,14 @@ MMQcdmSerialPort *mm_qcdm_serial_port_new_fd (int fd);
 void     mm_qcdm_serial_port_queue_command     (MMQcdmSerialPort *self,
                                                 GByteArray *command,
                                                 guint32 timeout_seconds,
+                                                GCancellable *cancellable,
                                                 MMQcdmSerialResponseFn callback,
                                                 gpointer user_data);
 
 void     mm_qcdm_serial_port_queue_command_cached (MMQcdmSerialPort *self,
                                                    GByteArray *command,
                                                    guint32 timeout_seconds,
+                                                   GCancellable *cancellable,
                                                    MMQcdmSerialResponseFn callback,
                                                    gpointer user_data);
 

@@ -201,7 +201,7 @@ qcdm_request_verinfo (MMQcdmSerialPort *port, VerInfoCb cb, GMainLoop *loop)
         g_byte_array_free (verinfo, TRUE);
     verinfo->len = len;
 
-    mm_qcdm_serial_port_queue_command (port, verinfo, 3, cb, loop);
+    mm_qcdm_serial_port_queue_command (port, verinfo, 3, NULL, cb, loop);
 }
 
 static void
