@@ -70,10 +70,6 @@ is a good way of minimizing this problem. Some ideas:
   ** If one AT probing suceeds, don't allow timeouts in remaining ports when
      probing for AT.
 
-  ** For modems that we know will only expose one AT port, cancel AT probings
-     in the remaining ports being probed as soon as we get the first one.
-
-
 --------------------------------------------------------------------------------
  * AT+CMUX & Serial multiplexing
 

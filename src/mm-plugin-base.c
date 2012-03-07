@@ -481,13 +481,24 @@ apply_post_probing_filters (MMPluginBase *self,
 typedef struct {
     GSimpleAsyncResult *result;
     MMPluginBase *plugin;
+    MMPortProbeFlag flags;
 } PortProbeRunContext;
+
+static void
+cancel_at_probing_in_other_probes (const gchar *key,
+                                   MMPortProbe *other,
+                                   MMPortProbe *self)
+{
+    if (self != other)
+        mm_port_probe_run_cancel_at_probing (other);
+}
 
 static void
 port_probe_run_ready (MMPortProbe *probe,
                       GAsyncResult *probe_result,
                       PortProbeRunContext *ctx)
 {
+    MMPluginBasePrivate *priv = MM_PLUGIN_BASE_GET_PRIVATE (ctx->plugin);
     GError *error = NULL;
     gboolean keep_probe = FALSE;
 
@@ -503,6 +514,18 @@ port_probe_run_ready (MMPortProbe *probe,
              * grabbed. */
             supports_result = MM_PLUGIN_SUPPORTS_PORT_SUPPORTED;
             keep_probe = TRUE;
+
+            /* If we were looking for AT ports, and the port is AT,
+             * and we were told that only one AT port is expected, cancel AT
+             * probings in the other available support tasks. */
+            if (priv->single_at &&
+                ctx->flags & MM_PORT_PROBE_AT &&
+                mm_port_probe_is_at (probe)) {
+                g_hash_table_foreach (priv->tasks,
+                                      (GHFunc) cancel_at_probing_in_other_probes,
+                                      probe);
+            }
+
         } else {
             /* Unsupported port, remove from internal tracking HT */
             supports_result = MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
@@ -518,7 +541,6 @@ port_probe_run_ready (MMPortProbe *probe,
 
     /* If no longer needed, Remove probe from internal HT */
     if (!keep_probe) {
-        MMPluginBasePrivate *priv = MM_PLUGIN_BASE_GET_PRIVATE (ctx->plugin);
         gchar *key;
 
         key = get_key (mm_port_probe_get_port_subsys (probe),
@@ -570,7 +592,7 @@ supports_port (MMPlugin *plugin,
     PortProbeRunContext *ctx;
     gboolean need_vendor_probing;
     gboolean need_product_probing;
-    guint32 probe_run_flags;
+    MMPortProbeFlag probe_run_flags;
 
     /* Setup key */
     key = get_key (subsys, name);
@@ -664,22 +686,23 @@ supports_port (MMPlugin *plugin,
     else if (priv->single_at)
         probe_run_flags |= MM_PORT_PROBE_AT;
     if (need_vendor_probing)
-        probe_run_flags |= MM_PORT_PROBE_AT_VENDOR;
+        probe_run_flags |= (MM_PORT_PROBE_AT | MM_PORT_PROBE_AT_VENDOR);
     if (need_product_probing)
-        probe_run_flags |= MM_PORT_PROBE_AT_PRODUCT;
+        probe_run_flags |= (MM_PORT_PROBE_AT | MM_PORT_PROBE_AT_PRODUCT);
     if (priv->qcdm)
         probe_run_flags |= MM_PORT_PROBE_QCDM;
-    g_assert (probe_run_flags != 0);
+    g_assert (probe_run_flags != MM_PORT_PROBE_NONE);
 
     /* Setup async call context */
     ctx = g_new (PortProbeRunContext, 1);
     ctx->plugin = g_object_ref (self);
     ctx->result = g_object_ref (async_result);
+    ctx->flags = probe_run_flags;
 
     /* Launch the probe */
     mm_dbg ("(%s)   launching probe for (%s,%s)", priv->name, subsys, name);
     mm_port_probe_run (probe,
-                       probe_run_flags,
+                       ctx->flags,
                        priv->send_delay,
                        priv->custom_init,
                        (GAsyncReadyCallback)port_probe_run_ready,
