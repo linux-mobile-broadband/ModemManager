@@ -365,22 +365,21 @@ mm_base_modem_get_best_at_port (MMBaseModem *self,
 
     /* Decide which port to use */
     port = mm_base_modem_get_port_primary (self);
-    g_assert (port);
-    if (mm_port_get_connected (MM_PORT (port))) {
-        /* If primary port is connected, check if we can get the secondary
-         * port */
-        port = mm_base_modem_get_port_secondary (self);
-        if (!port) {
-            /* If we don't have a secondary port, we need to halt the AT
-             * operation */
-            g_set_error (error,
-                         MM_CORE_ERROR,
-                         MM_CORE_ERROR_CONNECTED,
-                         "No port available to run command");
-        }
-    }
+    if (port && !mm_port_get_connected (MM_PORT (port)))
+        return port;
 
-    return port;
+    /* If primary port is connected, check if we can get the secondary
+     * port */
+    port = mm_base_modem_get_port_secondary (self);
+    if (port && !mm_port_get_connected (MM_PORT (port)))
+        return port;
+
+    /* Otherwise, we cannot get any port */
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_CONNECTED,
+                 "No port available to run command");
+    return NULL;
 }
 
 static void
