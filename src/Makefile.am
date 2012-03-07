@@ -188,8 +188,8 @@ ModemManager_SOURCES = \
 	mm-serial-parsers.h \
 	mm-port-probe.h \
 	mm-port-probe.c \
-	mm-port-probe-at-command.h \
-	mm-port-probe-at-command.c \
+	mm-port-probe-at.h \
+	mm-port-probe-at.c \
 	mm-port-probe-cache.h \
 	mm-port-probe-cache.c \
 	mm-plugin.c \

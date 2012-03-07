@@ -20,6 +20,7 @@
 
 #include <libmm-common.h>
 
+#include "mm-log.h"
 #include "mm-plugin-nokia.h"
 #include "mm-broadband-modem-nokia.h"
 
@@ -31,47 +32,10 @@ int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 /*****************************************************************************/
 /* CUSTOM INIT */
 
-static gboolean
-parse_init_last (const gchar *response,
-                 const GError *error,
-                 GValue *result,
-                 GError **result_error)
-{
-    if (error) {
-        *result_error = g_error_copy (error);
-        return FALSE;
-    }
-
-    /* Otherwise, done. And also report that it's an AT port. */
-    g_value_init (result, G_TYPE_BOOLEAN);
-    g_value_set_boolean (result, TRUE);
-    return TRUE;
-}
-
-static gboolean
-parse_init (const gchar *response,
-            const GError *error,
-            GValue *result,
-            GError **result_error)
-{
-    if (error) {
-        /* On timeout, request to retry */
-        if (g_error_matches (error,
-                             MM_SERIAL_ERROR,
-                             MM_SERIAL_ERROR_RESPONSE_TIMEOUT))
-            return FALSE; /* Retry */
-    }
-
-    /* Otherwise, done. And also report that it's an AT port. */
-    g_value_init (result, G_TYPE_BOOLEAN);
-    g_value_set_boolean (result, TRUE);
-    return TRUE;
-}
-
 static const MMPortProbeAtCommand custom_init[] = {
-    { "ATE1 E0", parse_init },
-    { "ATE1 E0", parse_init },
-    { "ATE1 E0", parse_init_last },
+    { "ATE1 E0", 3, mm_port_probe_response_processor_is_at },
+    { "ATE1 E0", 3, mm_port_probe_response_processor_is_at },
+    { "ATE1 E0", 3, mm_port_probe_response_processor_is_at },
     { NULL }
 };
 

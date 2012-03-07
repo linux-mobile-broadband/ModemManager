@@ -96,10 +96,6 @@ example to update the signal quality value or check registration status.
      a rev0, revA or revB CDMA network. We need to expose the exact access
      technology in the interface.
 
-  ** Consolidate the AT command processor in MMPluginBase; possibly just let it
-     return a GVariant instead of GValue, as with the AT command processor in
-     the MMBaseModem.
-
   ** Fix object names to show proper inheritance? For example:
      - MMPort, MMPortSerial, MMPortSerialAt, MMPortSerialQcdm
      - MMModem (instead of MMBaseModem), MMModemBroadband, MMModemPots

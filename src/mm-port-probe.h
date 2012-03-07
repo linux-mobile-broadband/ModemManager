@@ -23,7 +23,7 @@
 #define G_UDEV_API_IS_SUBJECT_TO_CHANGE
 #include <gudev/gudev.h>
 
-#include "mm-port-probe-at-command.h"
+#include "mm-port-probe-at.h"
 #include "mm-at-serial-port.h"
 
 #define MM_TYPE_PORT_PROBE            (mm_port_probe_get_type ())

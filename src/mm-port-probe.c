@@ -27,7 +27,7 @@
 #include "mm-at-serial-port.h"
 #include "mm-serial-port.h"
 #include "mm-serial-parsers.h"
-#include "mm-port-probe-at-command.h"
+#include "mm-port-probe-at.h"
 #include "libqcdm/src/commands.h"
 #include "libqcdm/src/utils.h"
 #include "libqcdm/src/errors.h"
@@ -66,7 +66,7 @@ typedef struct {
     const MMPortProbeAtCommand *at_commands;
     /* Current AT Result processor */
     void (* at_result_processor) (MMPortProbe *self,
-                                  GValue *result);
+                                  GVariant *result);
 } PortProbeRunTask;
 
 struct _MMPortProbePrivate {
@@ -292,14 +292,14 @@ serial_probe_qcdm (MMPortProbe *self)
 
 static void
 serial_probe_at_product_result_processor (MMPortProbe *self,
-                                          GValue *result)
+                                          GVariant *result)
 {
     if (result) {
         /* If any result given, it must be a string */
-        g_assert (G_VALUE_HOLDS_STRING (result));
+        g_assert (g_variant_is_of_type (result, G_VARIANT_TYPE_STRING));
 
         mm_dbg ("(%s) product probing finished", self->priv->name);
-        self->priv->product = g_utf8_casefold (g_value_get_string (result), -11);
+        self->priv->product = g_utf8_casefold (g_variant_get_string (result, NULL), -1);
         self->priv->flags |= MM_PORT_PROBE_AT_PRODUCT;
         return;
     }
@@ -311,14 +311,14 @@ serial_probe_at_product_result_processor (MMPortProbe *self,
 
 static void
 serial_probe_at_vendor_result_processor (MMPortProbe *self,
-                                         GValue *result)
+                                         GVariant *result)
 {
     if (result) {
         /* If any result given, it must be a string */
-        g_assert (G_VALUE_HOLDS_STRING (result));
+        g_assert (g_variant_is_of_type (result, G_VARIANT_TYPE_STRING));
 
         mm_dbg ("(%s) vendor probing finished", self->priv->name);
-        self->priv->vendor = g_utf8_casefold (g_value_get_string (result), -1);
+        self->priv->vendor = g_utf8_casefold (g_variant_get_string (result, NULL), -1);
         self->priv->flags |= MM_PORT_PROBE_AT_VENDOR;
         return;
     }
@@ -330,13 +330,13 @@ serial_probe_at_vendor_result_processor (MMPortProbe *self,
 
 static void
 serial_probe_at_result_processor (MMPortProbe *self,
-                                  GValue *result)
+                                  GVariant *result)
 {
     if (result) {
         /* If any result given, it must be a boolean */
-        g_assert (G_VALUE_HOLDS_BOOLEAN (result));
+        g_assert (g_variant_is_of_type (result, G_VARIANT_TYPE_BOOLEAN));
 
-        if (g_value_get_boolean (result)) {
+        if (g_variant_get_boolean (result)) {
             mm_dbg ("(%s) port is AT-capable", self->priv->name);
             self->priv->is_at = TRUE;
             self->priv->flags |= MM_PORT_PROBE_AT;
@@ -357,13 +357,13 @@ serial_probe_at_result_processor (MMPortProbe *self,
 
 static void
 serial_probe_at_custom_init_result_processor (MMPortProbe *self,
-                                              GValue *result)
+                                              GVariant *result)
 {
     PortProbeRunTask *task = self->priv->task;
 
     /* No result is really expected here, but we could get a boolean to indicate
      * AT support */
-    if (G_VALUE_HOLDS_BOOLEAN (result))
+    if (result)
         serial_probe_at_result_processor (self, result);
 
     /* Reset so that it doesn't get scheduled again */
@@ -377,14 +377,16 @@ serial_probe_at_parse_response (MMAtSerialPort *port,
                                 MMPortProbe *self)
 {
     PortProbeRunTask *task = self->priv->task;
-    GValue result = { 0 };
+    GVariant *result = NULL;
     GError *result_error = NULL;
 
     /* If already cancelled, do nothing else */
     if (port_probe_run_is_cancelled (self))
         return;
 
-    if (!task->at_commands->response_processor (response->str,
+    if (!task->at_commands->response_processor (task->at_commands->command,
+                                                response->str,
+                                                !!task->at_commands[1].command,
                                                 error,
                                                 &result,
                                                 &result_error)) {
@@ -418,14 +420,11 @@ serial_probe_at_parse_response (MMAtSerialPort *port,
         return;
     }
 
-    /* Got some processed result */
-    if (G_IS_VALUE (&result)) {
-        task->at_result_processor (self, &result);
-        g_value_unset (&result);
-    } else {
-        /* Custom init commands are allowed to not return anything */
-        task->at_result_processor (self, NULL);
-    }
+    /* Run result processor.
+     * Note that custom init commands are allowed to not return anything */
+    task->at_result_processor (self, result);
+    if (result)
+        g_variant_unref (result);
 
     /* Reschedule probing */
     serial_probe_schedule (self);
@@ -445,12 +444,33 @@ serial_probe_at (MMPortProbe *self)
     mm_at_serial_port_queue_command (
         MM_AT_SERIAL_PORT (task->serial),
         task->at_commands->command,
-        3,
+        task->at_commands->timeout,
         task->cancellable,
         (MMAtSerialResponseFn)serial_probe_at_parse_response,
         self);
     return FALSE;
 }
+
+static const MMPortProbeAtCommand at_probing[] = {
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { "AT",  3, mm_port_probe_response_processor_is_at },
+    { NULL }
+};
+
+static const MMPortProbeAtCommand vendor_probing[] = {
+    { "+CGMI", 3, mm_port_probe_response_processor_string },
+    { "+GMI",  3, mm_port_probe_response_processor_string },
+    { "I",     3, mm_port_probe_response_processor_string },
+    { NULL }
+};
+
+static const MMPortProbeAtCommand product_probing[] = {
+    { "+CGMM", 3, mm_port_probe_response_processor_string },
+    { "+GMM",  3, mm_port_probe_response_processor_string },
+    { "I",     3, mm_port_probe_response_processor_string },
+    { NULL }
+};
 
 static void
 serial_probe_schedule (MMPortProbe *self)
@@ -476,21 +496,21 @@ serial_probe_schedule (MMPortProbe *self)
              !(self->priv->flags & MM_PORT_PROBE_AT)) {
         /* Prepare AT probing */
         task->at_result_processor = serial_probe_at_result_processor;
-        task->at_commands = mm_port_probe_at_command_get_probing ();
+        task->at_commands = at_probing;
     }
     /* Vendor requested and not already probed? */
     else if ((task->flags & MM_PORT_PROBE_AT_VENDOR) &&
         !(self->priv->flags & MM_PORT_PROBE_AT_VENDOR)) {
         /* Prepare AT vendor probing */
         task->at_result_processor = serial_probe_at_vendor_result_processor;
-        task->at_commands = mm_port_probe_at_command_get_vendor_probing ();
+        task->at_commands = vendor_probing;
     }
     /* Product requested and not already probed? */
     else if ((task->flags & MM_PORT_PROBE_AT_PRODUCT) &&
              !(self->priv->flags & MM_PORT_PROBE_AT_PRODUCT)) {
         /* Prepare AT product probing */
         task->at_result_processor = serial_probe_at_product_result_processor;
-        task->at_commands = mm_port_probe_at_command_get_product_probing ();
+        task->at_commands = product_probing;
     }
 
     /* If a next AT group detected, go for it */
