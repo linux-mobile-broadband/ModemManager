@@ -18,13 +18,6 @@
 
 #include <glib.h>
 
-gpointer mm_serial_parser_v0_new     (void);
-gboolean mm_serial_parser_v0_parse   (gpointer parser,
-                                      GString *response,
-                                      GError **error);
-void     mm_serial_parser_v0_destroy (gpointer parser);
-
-
 gpointer mm_serial_parser_v1_new              (void);
 void     mm_serial_parser_v1_set_custom_regex (gpointer data,
                                                GRegex *successful,
@@ -33,12 +26,5 @@ gboolean mm_serial_parser_v1_parse            (gpointer parser,
                                                GString *response,
                                                GError **error);
 void     mm_serial_parser_v1_destroy          (gpointer parser);
-
-
-gpointer mm_serial_parser_v1_e1_new     (void);
-gboolean mm_serial_parser_v1_e1_parse   (gpointer parser,
-                                         GString *response,
-                                         GError **error);
-void     mm_serial_parser_v1_e1_destroy (gpointer parser);
 
 #endif /* MM_SERIAL_PARSERS_H */
