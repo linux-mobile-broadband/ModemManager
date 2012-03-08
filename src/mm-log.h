@@ -53,6 +53,7 @@ gboolean mm_log_setup (const char *level,
                        const char *log_file,
                        gboolean show_ts,
                        gboolean rel_ts,
+                       gboolean debug_func_loc,
                        GError **error);
 
 void mm_log_usr1 (void);
@@ -60,4 +61,3 @@ void mm_log_usr1 (void);
 void mm_log_shutdown (void);
 
 #endif  /* MM_LOG_H */
-
