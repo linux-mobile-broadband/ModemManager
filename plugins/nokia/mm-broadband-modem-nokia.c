@@ -30,6 +30,7 @@
 #include "mm-iface-modem.h"
 #include "mm-base-modem-at.h"
 #include "mm-broadband-modem-nokia.h"
+#include "mm-sim-nokia.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
 
@@ -37,7 +38,30 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemNokia, mm_broadband_modem_nokia, MM_TYPE
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
 
 /*****************************************************************************/
-/* MODEM INIT */
+/* Create SIM (Modem interface) */
+
+static MMSim *
+create_sim_finish (MMIfaceModem *self,
+                   GAsyncResult *res,
+                   GError **error)
+{
+    return mm_sim_new_finish (res, error);
+}
+
+static void
+create_sim (MMIfaceModem *self,
+            GAsyncReadyCallback callback,
+            gpointer user_data)
+{
+    /* New Nokia SIM */
+    mm_sim_nokia_new (MM_BASE_MODEM (self),
+                      NULL, /* cancellable */
+                      callback,
+                      user_data);
+}
+
+/*****************************************************************************/
+/* Modem initialization (Modem interface) */
 
 static gboolean
 modem_init_finish (MMIfaceModem *self,
@@ -112,6 +136,10 @@ iface_modem_init (MMIfaceModem *iface)
     /* Setup custom modem init */
     iface->modem_init = modem_init;
     iface->modem_init_finish = modem_init_finish;
+
+    /* Create Nokia-specific SIM*/
+    iface->create_sim = create_sim;
+    iface->create_sim_finish = create_sim_finish;
 
     /* Nokia headsets (at least N85) do not support "power on"; they do
      * support "power off" but you proabably do not want to turn off the

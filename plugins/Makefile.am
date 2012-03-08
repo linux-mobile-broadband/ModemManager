@@ -166,6 +166,8 @@ libmm_plugin_option_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 libmm_plugin_nokia_la_SOURCES = \
 	nokia/mm-plugin-nokia.c \
 	nokia/mm-plugin-nokia.h \
+	nokia/mm-sim-nokia.c \
+	nokia/mm-sim-nokia.h \
 	nokia/mm-broadband-modem-nokia.c \
 	nokia/mm-broadband-modem-nokia.h
 libmm_plugin_nokia_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
