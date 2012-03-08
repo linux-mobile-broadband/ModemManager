@@ -29,6 +29,18 @@ abort_async_if_port_unusable (MMBaseModem *self,
 {
     GError *error = NULL;
 
+    /* If no port given, probably the port dissapeared */
+    if (!port) {
+        g_simple_async_report_error_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_NOT_FOUND,
+            "Cannot run sequence: port not given");
+        return FALSE;
+    }
+
     /* Ensure we don't try to use a connected port */
     if (mm_port_get_connected (MM_PORT (port))) {
         g_simple_async_report_error_in_idle (
