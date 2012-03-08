@@ -55,6 +55,10 @@ struct _MMBaseModemPrivate {
     /* The connection to the system bus */
     GDBusConnection *connection;
 
+    /* Modem-wide cancellable. If it ever gets cancelled, no further operations
+     * should be done by the modem. */
+    GCancellable *cancellable;
+
     gchar *device;
     gchar *driver;
     gchar *plugin;
@@ -65,7 +69,6 @@ struct _MMBaseModemPrivate {
     gboolean valid;
 
     guint max_timeouts;
-    guint set_invalid_unresponsive_modem_id;
 
     /* The authorization provider */
     MMAuthProvider *authp;
@@ -117,14 +120,6 @@ mm_base_modem_owns_port (MMBaseModem *self,
     return !!mm_base_modem_get_port (self, subsys, name);
 }
 
-static gboolean
-set_invalid_unresponsive_modem_cb (MMBaseModem *self)
-{
-    mm_base_modem_set_valid (self, FALSE);
-    self->priv->set_invalid_unresponsive_modem_id = 0;
-    return FALSE;
-}
-
 static void
 serial_port_timed_out_cb (MMSerialPort *port,
                           guint n_consecutive_timeouts,
@@ -141,9 +136,7 @@ serial_port_timed_out_cb (MMSerialPort *port,
                  g_dbus_object_get_object_path (G_DBUS_OBJECT (self)));
 
         /* Only set action to invalidate modem if not already done */
-        if (!self->priv->set_invalid_unresponsive_modem_id)
-            self->priv->set_invalid_unresponsive_modem_id =
-                g_idle_add ((GSourceFunc)set_invalid_unresponsive_modem_cb, self);
+        g_cancellable_cancel (self->priv->cancellable);
     }
 }
 
@@ -275,8 +268,13 @@ mm_base_modem_release_port (MMBaseModem *self,
         return;
     }
 
-    if (port == (MMPort *)self->priv->primary)
+    if (port == (MMPort *)self->priv->primary) {
+        /* Cancel modem-wide cancellable; no further actions can be done
+         * without a primary port. */
+        g_cancellable_cancel (self->priv->cancellable);
+
         g_clear_object (&self->priv->primary);
+    }
 
     if (port == (MMPort *)self->priv->data)
         g_clear_object (&self->priv->data);
@@ -295,6 +293,75 @@ mm_base_modem_release_port (MMBaseModem *self,
             mm_port_get_device (port));
     g_hash_table_remove (self->priv->ports, key);
     g_free (key);
+}
+
+gboolean
+mm_base_modem_disable_finish (MMBaseModem *self,
+                              GAsyncResult *res,
+                              GError **error)
+{
+    return MM_BASE_MODEM_GET_CLASS (self)->disable_finish (self, res, error);
+}
+
+void
+mm_base_modem_disable (MMBaseModem *self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    g_assert (MM_BASE_MODEM_GET_CLASS (self)->disable != NULL);
+    g_assert (MM_BASE_MODEM_GET_CLASS (self)->disable_finish != NULL);
+
+    MM_BASE_MODEM_GET_CLASS (self)->disable (
+        self,
+        self->priv->cancellable,
+        callback,
+        user_data);
+}
+
+gboolean
+mm_base_modem_enable_finish (MMBaseModem *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    return MM_BASE_MODEM_GET_CLASS (self)->enable_finish (self, res, error);
+}
+
+void
+mm_base_modem_enable (MMBaseModem *self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    g_assert (MM_BASE_MODEM_GET_CLASS (self)->enable != NULL);
+    g_assert (MM_BASE_MODEM_GET_CLASS (self)->enable_finish != NULL);
+
+    MM_BASE_MODEM_GET_CLASS (self)->enable (
+        self,
+        self->priv->cancellable,
+        callback,
+        user_data);
+}
+
+gboolean
+mm_base_modem_initialize_finish (MMBaseModem *self,
+                                 GAsyncResult *res,
+                                 GError **error)
+{
+    return MM_BASE_MODEM_GET_CLASS (self)->initialize_finish (self, res, error);
+}
+
+void
+mm_base_modem_initialize (MMBaseModem *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    g_assert (MM_BASE_MODEM_GET_CLASS (self)->initialize != NULL);
+    g_assert (MM_BASE_MODEM_GET_CLASS (self)->initialize_finish != NULL);
+
+    MM_BASE_MODEM_GET_CLASS (self)->initialize (
+        self,
+        self->priv->cancellable,
+        callback,
+        user_data);
 }
 
 void
@@ -429,7 +496,7 @@ initialize_ready (MMBaseModem *self,
 {
     GError *error = NULL;
 
-    if (!MM_BASE_MODEM_GET_CLASS (self)->initialize_finish (self, res, &error)) {
+    if (!mm_base_modem_initialize_finish (self, res, &error)) {
         /* Wrong state is returned when modem is found locked */
         if (g_error_matches (error,
                              MM_CORE_ERROR,
@@ -579,10 +646,9 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     self->priv->qcdm = (qcdm ? g_object_ref (qcdm) : NULL);
 
     /* As soon as we get the ports organized, we initialize the modem */
-    MM_BASE_MODEM_GET_CLASS (self)->initialize (self,
-                                                NULL, /* TODO: cancellable */
-                                                (GAsyncReadyCallback)initialize_ready,
-                                                NULL);
+    mm_base_modem_initialize (self,
+                              (GAsyncReadyCallback)initialize_ready,
+                              NULL);
 
     return TRUE;
 }
@@ -679,6 +745,27 @@ mm_base_modem_get_product_id (MMBaseModem *self)
 
 /*****************************************************************************/
 
+static gboolean
+base_modem_invalid_idle (MMBaseModem *self)
+{
+    /* Ensure the modem is set invalid if we get the modem-wide cancellable
+     * cancelled */
+    mm_base_modem_set_valid (self, FALSE);
+    g_object_unref (self);
+    return FALSE;
+}
+
+static void
+base_modem_cancelled (GCancellable *cancellable,
+                      MMBaseModem *self)
+{
+    /* NOTE: Don't call set_valid() directly here, do it in an idle, and ensure
+     * that we pass a valid reference of the modem object as context. */
+    g_idle_add ((GSourceFunc)base_modem_invalid_idle, g_object_ref (self));
+}
+
+/*****************************************************************************/
+
 static void
 mm_base_modem_init (MMBaseModem *self)
 {
@@ -690,6 +777,13 @@ mm_base_modem_init (MMBaseModem *self)
     /* Setup authorization provider */
     self->priv->authp = mm_auth_get_provider ();
     self->priv->authp_cancellable = g_cancellable_new ();
+
+    /* Setup modem-wide cancellable */
+    self->priv->cancellable = g_cancellable_new ();
+    g_cancellable_connect (self->priv->cancellable,
+                           G_CALLBACK (base_modem_cancelled),
+                           self,
+                           NULL);
 
     self->priv->ports = g_hash_table_new_full (g_str_hash,
                                                g_str_equal,
@@ -816,6 +910,8 @@ dispose (GObject *object)
         g_hash_table_destroy (self->priv->ports);
         self->priv->ports = NULL;
     }
+
+    g_clear_object (&self->priv->cancellable);
 
     g_clear_object (&self->priv->connection);
 

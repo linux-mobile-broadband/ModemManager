@@ -1164,12 +1164,12 @@ enable_ready (MMBaseModem *self,
     GError *error = NULL;
 
     if (ctx->enable) {
-        if (!MM_BASE_MODEM_GET_CLASS (self)->enable_finish (self, res, &error))
+        if (!mm_base_modem_enable_finish (self, res, &error))
             g_dbus_method_invocation_take_error (ctx->invocation, error);
         else
             mm_gdbus_modem_complete_enable (ctx->skeleton, ctx->invocation);
     } else {
-        if (!MM_BASE_MODEM_GET_CLASS (self)->disable_finish (self, res, &error))
+        if (!mm_base_modem_disable_finish (self, res, &error))
             g_dbus_method_invocation_take_error (ctx->invocation, error);
         else
             mm_gdbus_modem_complete_enable (ctx->skeleton, ctx->invocation);
@@ -1191,25 +1191,14 @@ handle_enable_auth_ready (MMBaseModem *self,
         return;
     }
 
-    if (ctx->enable) {
-        g_assert (MM_BASE_MODEM_GET_CLASS (self)->enable != NULL);
-        g_assert (MM_BASE_MODEM_GET_CLASS (self)->enable_finish != NULL);
-
-        MM_BASE_MODEM_GET_CLASS (self)->enable (
-            self,
-            NULL, /* cancellable */
-            (GAsyncReadyCallback)enable_ready,
-            ctx);
-    } else {
-        g_assert (MM_BASE_MODEM_GET_CLASS (self)->disable != NULL);
-        g_assert (MM_BASE_MODEM_GET_CLASS (self)->disable_finish != NULL);
-
-        MM_BASE_MODEM_GET_CLASS (self)->disable (
-            self,
-            NULL, /* cancellable */
-            (GAsyncReadyCallback)enable_ready,
-            ctx);
-    }
+    if (ctx->enable)
+        mm_base_modem_enable (self,
+                              (GAsyncReadyCallback)enable_ready,
+                              ctx);
+    else
+        mm_base_modem_disable (self,
+                               (GAsyncReadyCallback)enable_ready,
+                               ctx);
 }
 
 static gboolean
@@ -2010,11 +1999,7 @@ unlock_check_context_free (UnlockCheckContext *ctx)
 static gboolean
 restart_initialize_idle (MMIfaceModem *self)
 {
-    MM_BASE_MODEM_GET_CLASS (self)->initialize (
-        MM_BASE_MODEM (self),
-        NULL,
-        NULL,
-        NULL);
+    mm_base_modem_initialize (MM_BASE_MODEM (self), NULL, NULL);
     return FALSE;
 }
 

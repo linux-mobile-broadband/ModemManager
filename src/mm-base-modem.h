@@ -133,20 +133,41 @@ void     mm_base_modem_set_valid    (MMBaseModem *self,
                                      gboolean valid);
 gboolean mm_base_modem_get_valid    (MMBaseModem *self);
 
-void     mm_base_modem_authorize (MMBaseModem *self,
-                                  GDBusMethodInvocation *invocation,
-                                  const gchar *authorization,
-                                  GAsyncReadyCallback callback,
-                                  gpointer user_data);
-gboolean mm_base_modem_authorize_finish (MMBaseModem *self,
-                                         GAsyncResult *res,
-                                         GError **error);
-
 const gchar *mm_base_modem_get_device (MMBaseModem *self);
 const gchar *mm_base_modem_get_driver (MMBaseModem *self);
 const gchar *mm_base_modem_get_plugin (MMBaseModem *self);
 
 guint mm_base_modem_get_vendor_id  (MMBaseModem *self);
 guint mm_base_modem_get_product_id (MMBaseModem *self);
+
+void     mm_base_modem_authorize        (MMBaseModem *self,
+                                         GDBusMethodInvocation *invocation,
+                                         const gchar *authorization,
+                                         GAsyncReadyCallback callback,
+                                         gpointer user_data);
+gboolean mm_base_modem_authorize_finish (MMBaseModem *self,
+                                         GAsyncResult *res,
+                                         GError **error);
+
+void     mm_base_modem_initialize        (MMBaseModem *self,
+                                          GAsyncReadyCallback callback,
+                                          gpointer user_data);
+gboolean mm_base_modem_initialize_finish (MMBaseModem *self,
+                                          GAsyncResult *res,
+                                          GError **error);
+
+void     mm_base_modem_enable        (MMBaseModem *self,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data);
+gboolean mm_base_modem_enable_finish (MMBaseModem *self,
+                                      GAsyncResult *res,
+                                      GError **error);
+
+void     mm_base_modem_disable        (MMBaseModem *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data);
+gboolean mm_base_modem_disable_finish (MMBaseModem *self,
+                                       GAsyncResult *res,
+                                       GError **error);
 
 #endif /* MM_BASE_MODEM_H */
