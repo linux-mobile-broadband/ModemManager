@@ -114,7 +114,7 @@ connect_report_ready (MMBaseModem *modem,
     }
 
     /* If we got a proper extended reply, build the new error to be set */
-    result = mm_base_modem_at_command_in_port_finish (modem, res, NULL);
+    result = mm_base_modem_at_command_full_finish (modem, res, NULL);
     if (result &&
         g_str_has_prefix (result, "+CEER: ") &&
         strlen (result) > 7) {
@@ -146,10 +146,10 @@ dial_ready (MMBaseModem *modem,
     /* DO NOT check for cancellable here. If we got here without errors, the
      * bearer is really connected and therefore we need to reflect that in
      * the state machine. */
-    mm_base_modem_at_command_in_port_finish (modem, res, &(ctx->saved_error));
+    mm_base_modem_at_command_full_finish (modem, res, &(ctx->saved_error));
     if (ctx->saved_error) {
         /* Try to get more information why it failed */
-        mm_base_modem_at_command_in_port (
+        mm_base_modem_at_command_full (
             modem,
             ctx->primary,
             "+CEER",
@@ -199,7 +199,7 @@ service_type_ready (MMBaseModem *modem,
     }
 
     /* Errors setting the service type will be critical */
-    mm_base_modem_at_command_in_port_finish (modem, res, &error);
+    mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         connect_context_complete_and_free (ctx);
@@ -209,7 +209,7 @@ service_type_ready (MMBaseModem *modem,
     /* We just use the default number to dial in the Iridium network. Also note
      * that we won't specify a specific port to use; Iridium modems only expose
      * one. */
-    mm_base_modem_at_command_in_port (
+    mm_base_modem_at_command_full (
         modem,
         ctx->primary,
         "ATDT008816000025",
@@ -249,7 +249,7 @@ connect (MMBearer *self,
 
     /* Bearer service type set to 9600bps (V.110), which behaves better than the
      * default 9600bps (V.32). */
-    mm_base_modem_at_command_in_port (
+    mm_base_modem_at_command_full (
         modem,
         ctx->primary,
         "+CBST=71,0,1",

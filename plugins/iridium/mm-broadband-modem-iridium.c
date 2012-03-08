@@ -88,7 +88,6 @@ after_atz_sleep_cb (GSimpleAsyncResult *simple)
                                modem_init_sequence,
                                NULL,  /* response_processor_context */
                                NULL,  /* response_processor_context_free */
-                               NULL,  /* cancellable */
                                (GAsyncReadyCallback)init_sequence_ready,
                                simple);
     g_object_unref (self);
@@ -132,7 +131,6 @@ modem_init (MMIfaceModem *self,
                               "Z",
                               3,
                               TRUE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)atz_ready,
                               result);
 }
@@ -201,7 +199,6 @@ messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
                               "+CNMI=2,1,0,0,1",
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               callback,
                               user_data);
 }
@@ -251,7 +248,6 @@ load_signal_quality (MMIfaceModem *self,
                               "+CSQF",
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               callback,
                               user_data);
 }
@@ -308,7 +304,6 @@ setup_flow_control (MMIfaceModem *self,
                               "&K3",
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)setup_flow_control_ready,
                               result);
 }

@@ -79,7 +79,6 @@ modem_init (MMIfaceModem *self,
                                modem_init_sequence,
                                NULL,  /* response_processor_context */
                                NULL,  /* response_processor_context_free */
-                               NULL,  /* cancellable */
                                callback,
                                user_data);
 }

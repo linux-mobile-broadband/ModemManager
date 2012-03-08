@@ -568,7 +568,6 @@ sms_store (MMSms *self,
                               cmd,
                               10,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback) store_ready,
                               ctx);
     g_free (cmd);
@@ -645,7 +644,6 @@ sms_send_generic (SmsSendContext *ctx)
                               cmd,
                               10,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)send_generic_ready,
                               ctx);
     g_free (cmd);
@@ -683,7 +681,6 @@ sms_send_from_storage (SmsSendContext *ctx)
                               cmd,
                               10,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)send_from_storage_ready,
                               ctx);
     g_free (cmd);
@@ -814,7 +811,6 @@ delete_next_part (SmsDeletePartsContext *ctx)
                               cmd,
                               10,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)delete_part_ready,
                               ctx);
     g_free (cmd);

@@ -484,7 +484,6 @@ modem_load_current_capabilities (MMIfaceModem *self,
         capabilities,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
-        NULL, /* cancellable */
         callback,
         user_data);
 }
@@ -526,7 +525,6 @@ modem_load_manufacturer (MMIfaceModem *self,
         manufacturers,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
-        NULL, /* cancellable */
         callback,
         user_data);
 }
@@ -568,7 +566,6 @@ modem_load_model (MMIfaceModem *self,
         models,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
-        NULL, /* cancellable */
         callback,
         user_data);
 }
@@ -610,7 +607,6 @@ modem_load_revision (MMIfaceModem *self,
         revisions,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
-        NULL, /* cancellable */
         callback,
         user_data);
 }
@@ -659,7 +655,6 @@ modem_load_equipment_identifier (MMIfaceModem *self,
         commands,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
-        NULL, /* cancellable */
         callback,
         user_data);
 }
@@ -753,7 +748,6 @@ modem_load_device_identifier (MMIfaceModem *self,
         device_identifier_steps,
         g_new0 (DeviceIdentifierContext, 1),
         (GDestroyNotify)device_identifier_context_free,
-        NULL, /* cancellable */
         callback,
         user_data);
 }
@@ -785,7 +779,6 @@ modem_load_own_numbers (MMIfaceModem *self,
                               "+CNUM",
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               callback,
                               user_data);
 }
@@ -908,7 +901,6 @@ modem_load_unlock_required (MMIfaceModem *self,
                               "+CPIN?",
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)cpin_query_ready,
                               result);
 }
@@ -1019,7 +1011,7 @@ signal_quality_csq_ready (MMBroadbandModem *self,
     GVariant *result;
     const gchar *result_str;
 
-    result = mm_base_modem_at_sequence_in_port_finish (MM_BASE_MODEM (self), res, NULL, &error);
+    result = mm_base_modem_at_sequence_full_finish (MM_BASE_MODEM (self), res, NULL, &error);
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         signal_quality_context_complete_and_free (ctx);
@@ -1072,7 +1064,7 @@ static const MMBaseModemAtCommand signal_quality_csq_sequence[] = {
 static void
 signal_quality_csq (SignalQualityContext *ctx)
 {
-    mm_base_modem_at_sequence_in_port (
+    mm_base_modem_at_sequence_full (
         MM_BASE_MODEM (ctx->self),
         MM_AT_SERIAL_PORT (ctx->port),
         signal_quality_csq_sequence,
@@ -1149,14 +1141,14 @@ signal_quality_cind_ready (MMBroadbandModem *self,
 static void
 signal_quality_cind (SignalQualityContext *ctx)
 {
-    mm_base_modem_at_command_in_port (MM_BASE_MODEM (ctx->self),
-                                      MM_AT_SERIAL_PORT (ctx->port),
-                                      "+CIND?",
-                                      3,
-                                      FALSE,
-                                      NULL, /* cancellable */
-                                      (GAsyncReadyCallback)signal_quality_cind_ready,
-                                      ctx);
+    mm_base_modem_at_command_full (MM_BASE_MODEM (ctx->self),
+                                   MM_AT_SERIAL_PORT (ctx->port),
+                                   "+CIND?",
+                                   3,
+                                   FALSE,
+                                   NULL, /* cancellable */
+                                   (GAsyncReadyCallback)signal_quality_cind_ready,
+                                   ctx);
 }
 
 static void
@@ -1372,7 +1364,6 @@ modem_3gpp_setup_indicators (MMIfaceModem3gpp *self,
                               "+CIND=?",
                               3,
                               TRUE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)cind_format_check_ready,
                               result);
 }
@@ -1555,14 +1546,14 @@ run_unsolicited_events_setup (UnsolicitedEventsContext *ctx)
 
     /* Enable unsolicited events in given port */
     if (port) {
-        mm_base_modem_at_command_in_port (MM_BASE_MODEM (ctx->self),
-                                          port,
-                                          ctx->command,
-                                          3,
-                                          FALSE,
-                                          NULL, /* cancellable */
-                                          (GAsyncReadyCallback)unsolicited_events_setup_ready,
-                                          ctx);
+        mm_base_modem_at_command_full (MM_BASE_MODEM (ctx->self),
+                                       port,
+                                       ctx->command,
+                                       3,
+                                       FALSE,
+                                       NULL, /* cancellable */
+                                       (GAsyncReadyCallback)unsolicited_events_setup_ready,
+                                       ctx);
         return;
     }
 
@@ -1699,7 +1690,6 @@ charset_change_ready (MMBroadbandModem *self,
                               "+CSCS?",
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)current_charset_query_ready,
                               ctx);
 }
@@ -1757,7 +1747,6 @@ modem_setup_charset (MMIfaceModem *self,
         ctx->charset_commands,
         NULL, /* response_processor_context */
         NULL, /* response_processor_context_free */
-        NULL, /* cancellable */
         (GAsyncReadyCallback)charset_change_ready,
         ctx);
 }
@@ -1831,7 +1820,6 @@ modem_load_supported_charsets (MMIfaceModem *self,
                               "+CSCS=?",
                               3,
                               TRUE,
-                              NULL,  /* cancellable */
                               (GAsyncReadyCallback)cscs_format_check_ready,
                               result);
 }
@@ -1856,9 +1844,12 @@ modem_setup_flow_control (MMIfaceModem *self,
     GSimpleAsyncResult *result;
 
     /* By default, try to set XOFF/XON flow control */
-    mm_base_modem_at_command_ignore_reply (MM_BASE_MODEM (self),
-                                           "+IFC=1,1",
-                                           3);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+IFC=1,1",
+                              3,
+                              FALSE,
+                              NULL,
+                              NULL);
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
@@ -1894,9 +1885,12 @@ modem_power_up (MMIfaceModem *self,
     if (mm_iface_modem_is_cdma_only (self))
         mm_dbg ("Skipping Power-up in CDMA-only modem...");
     else
-        mm_base_modem_at_command_ignore_reply (MM_BASE_MODEM (self),
-                                               "+CFUN=1",
-                                               5);
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "+CFUN=1",
+                                  5,
+                                  FALSE,
+                                  NULL,
+                                  NULL);
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
@@ -1930,7 +1924,6 @@ modem_command (MMIfaceModem *self,
 
     mm_base_modem_at_command (MM_BASE_MODEM (self), cmd, timeout,
                               FALSE,
-                              NULL, /* cancellable */
                               callback,
                               user_data);
 }
@@ -1976,7 +1969,6 @@ modem_init (MMIfaceModem *self,
                                modem_init_sequence,
                                NULL,  /* response_processor_context */
                                NULL,  /* response_processor_context_free */
-                               NULL,  /* cancellable */
                                callback,
                                user_data);
 }
@@ -2009,7 +2001,6 @@ modem_3gpp_load_imei (MMIfaceModem3gpp *self,
                               "+CGSN",
                               3,
                               TRUE,
-                              NULL, /* cancellable */
                               callback,
                               user_data);
 }
@@ -2093,7 +2084,6 @@ get_next_facility_lock_status (LoadEnabledFacilityLocksContext *ctx)
                                       cmd,
                                       3,
                                       FALSE,
-                                      NULL, /* cancellable */
                                       (GAsyncReadyCallback)clck_single_query_ready,
                                       ctx);
             return;
@@ -2158,7 +2148,6 @@ modem_3gpp_load_enabled_facility_locks (MMIfaceModem3gpp *self,
                               "+CLCK=?",
                               3,
                               TRUE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)clck_test_ready,
                               ctx);
 }
@@ -2195,7 +2184,6 @@ modem_3gpp_load_operator_code (MMIfaceModem3gpp *self,
                               "+COPS=3,2;+COPS?",
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               callback,
                               user_data);
 }
@@ -2232,7 +2220,6 @@ modem_3gpp_load_operator_name (MMIfaceModem3gpp *self,
                               "+COPS=3,0;+COPS?",
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               callback,
                               user_data);
 }
@@ -2411,7 +2398,6 @@ modem_3gpp_scan_networks (MMIfaceModem3gpp *self,
                               "+COPS=?",
                               120,
                               FALSE,
-                              NULL, /* cancellable */
                               callback,
                               user_data);
 }
@@ -2552,7 +2538,7 @@ register_in_3gpp_network_ready (MMBroadbandModem *self,
 {
     GError *error = NULL;
 
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, &error);
 
     if (error) {
         /* Propagate error in COPS, if any */
@@ -2628,14 +2614,18 @@ modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
     if (command) {
         /* Don't setup an additional timeout to handle registration timeouts. We
          * already do this with the 120s timeout in the AT command: if that times
-         * out, we can consider the registration itself timed out. */
-        mm_base_modem_at_command (MM_BASE_MODEM (self),
-                                  command,
-                                  120,
-                                  FALSE,
-                                  ctx->cancellable,
-                                  (GAsyncReadyCallback)register_in_3gpp_network_ready,
-                                  ctx);
+         * out, we can consider the registration itself timed out.
+         *
+         * NOTE that we provide our own Cancellable here; we want to be able to
+         * cancel the operation at any time. */
+        mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                       mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), NULL),
+                                       command,
+                                       120,
+                                       FALSE,
+                                       ctx->cancellable,
+                                       (GAsyncReadyCallback)register_in_3gpp_network_ready,
+                                       ctx);
         g_free (command);
         return;
     }
@@ -2783,7 +2773,6 @@ modem_3gpp_run_cs_registration_check (MMIfaceModem3gpp *self,
                               "+CREG?",
                               10,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)registration_status_check_ready,
                               result);
 }
@@ -2805,7 +2794,6 @@ modem_3gpp_run_ps_registration_check (MMIfaceModem3gpp *self,
                               "+CGREG?",
                               10,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)registration_status_check_ready,
                               result);
 }
@@ -2850,7 +2838,7 @@ cleanup_registration_sequence_ready (MMBroadbandModem *self,
 {
     GError *error = NULL;
 
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, &error);
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         g_simple_async_result_complete (ctx->result);
@@ -2865,7 +2853,7 @@ cleanup_registration_sequence_ready (MMBroadbandModem *self,
         if (secondary) {
             /* Now use the same registration setup in secondary port, if any */
             ctx->secondary_done = TRUE;
-            mm_base_modem_at_command_in_port (
+            mm_base_modem_at_command_full (
                 MM_BASE_MODEM (self),
                 secondary,
                 ctx->command,
@@ -2912,7 +2900,7 @@ modem_3gpp_cleanup_cs_registration (MMIfaceModem3gpp *self,
                                              modem_3gpp_cleanup_cs_registration);
     ctx->command = g_strdup ("+CREG=0");
 
-    mm_base_modem_at_command_in_port (
+    mm_base_modem_at_command_full (
         MM_BASE_MODEM (self),
         mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
         ctx->command,
@@ -2937,7 +2925,7 @@ modem_3gpp_cleanup_ps_registration (MMIfaceModem3gpp *self,
                                              modem_3gpp_cleanup_cs_registration);
     ctx->command = g_strdup ("+CGREG=0");
 
-    mm_base_modem_at_command_in_port (
+    mm_base_modem_at_command_full (
         MM_BASE_MODEM (self),
         mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
         ctx->command,
@@ -3022,7 +3010,7 @@ setup_registration_sequence_ready (MMBroadbandModem *self,
     GError *error = NULL;
 
     if (ctx->secondary_done) {
-        mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+        mm_base_modem_at_command_full_finish (MM_BASE_MODEM (self), res, &error);
         if (error) {
             g_simple_async_result_take_error (ctx->result, error);
             g_simple_async_result_complete (ctx->result);
@@ -3047,13 +3035,13 @@ setup_registration_sequence_ready (MMBroadbandModem *self,
         if (secondary) {
             /* Now use the same registration setup in secondary port, if any */
             ctx->secondary_done = TRUE;
-            mm_base_modem_at_command_in_port (
+            mm_base_modem_at_command_full (
                 MM_BASE_MODEM (self),
                 mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
                 g_variant_get_string (command, NULL),
                 3,
                 FALSE,
-                NULL,  /* cancellable */
+                NULL, /* cancellable */
                 (GAsyncReadyCallback)setup_registration_sequence_ready,
                 ctx);
             return;
@@ -3079,13 +3067,13 @@ modem_3gpp_setup_cs_registration (MMIfaceModem3gpp *self,
                                              callback,
                                              user_data,
                                              modem_3gpp_setup_cs_registration);
-    mm_base_modem_at_sequence_in_port (
+    mm_base_modem_at_sequence_full (
         MM_BASE_MODEM (self),
         mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
         cs_registration_sequence,
         NULL,  /* response processor context */
         NULL,  /* response processor context free */
-        NULL,  /* cancellable */
+        NULL, /* cancellable */
         (GAsyncReadyCallback)setup_registration_sequence_ready,
         ctx);
 }
@@ -3102,13 +3090,13 @@ modem_3gpp_setup_ps_registration (MMIfaceModem3gpp *self,
                                              callback,
                                              user_data,
                                              modem_3gpp_setup_ps_registration);
-    mm_base_modem_at_sequence_in_port (
+    mm_base_modem_at_sequence_full (
         MM_BASE_MODEM (self),
         mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
         ps_registration_sequence,
         NULL,  /* response processor context */
         NULL,  /* response processor context free */
-        NULL,  /* cancellable */
+        NULL, /* cancellable */
         (GAsyncReadyCallback)setup_registration_sequence_ready,
         ctx);
 }
@@ -3159,7 +3147,6 @@ modem_3gpp_ussd_cancel (MMIfaceModem3gppUssd *self,
                               "+CUSD=2",
                               3,
                               TRUE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)cancel_command_ready,
                               result);
 }
@@ -3248,7 +3235,6 @@ modem_3gpp_ussd_send (MMIfaceModem3gppUssd *self,
                               at_command,
                               3,
                               TRUE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)ussd_send_command_ready,
                               result);
     g_free (at_command);
@@ -3592,7 +3578,6 @@ modem_3gpp_ussd_disable_unsolicited_result_codes (MMIfaceModem3gppUssd *self,
                               "+CUSD=0",
                               3,
                               TRUE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)urc_enable_disable_ready,
                               result);
 }
@@ -3613,7 +3598,6 @@ modem_3gpp_ussd_enable_unsolicited_result_codes (MMIfaceModem3gppUssd *self,
                               "+CUSD=1",
                               3,
                               TRUE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)urc_enable_disable_ready,
                               result);
 }
@@ -3666,7 +3650,6 @@ modem_3gpp_ussd_check_support (MMIfaceModem3gppUssd *self,
                               "+CUSD=?",
                               3,
                               TRUE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)cusd_format_check_ready,
                               result);
 }
@@ -3732,7 +3715,6 @@ modem_messaging_check_support (MMIfaceModemMessaging *self,
                               "+CNMI=?",
                               3,
                               TRUE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)cnmi_format_check_ready,
                               result);
 }
@@ -3838,7 +3820,6 @@ modem_messaging_load_supported_storages (MMIfaceModemMessaging *self,
                               "+CPMS=?",
                               3,
                               TRUE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)cpms_format_check_ready,
                               result);
 }
@@ -3894,7 +3875,6 @@ modem_messaging_set_preferred_storages (MMIfaceModemMessaging *self,
                               cmd,
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)cpms_set_ready,
                               result);
     g_free (cmd);
@@ -3945,7 +3925,6 @@ set_preferred_sms_format (MMBroadbandModem *self,
                               cmd,
                               3,
                               TRUE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)cmgf_set_ready,
                               result);
     g_free (cmd);
@@ -4012,7 +3991,6 @@ modem_messaging_setup_sms_format (MMIfaceModemMessaging *self,
                               "+CMGF=?",
                               3,
                               TRUE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)cmgf_format_check_ready,
                               result);
 }
@@ -4133,7 +4111,6 @@ cmti_received (MMAtSerialPort *port,
                               command,
                               10,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)sms_part_ready,
                               ctx);
     g_free (command);
@@ -4218,7 +4195,6 @@ modem_messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
                               "+CNMI=2,1,2,1,0",
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               callback,
                               user_data);
 }
@@ -4524,7 +4500,6 @@ list_parts_storage_ready (MMBroadbandModem *self,
                                "+CMGL=\"ALL\""),
                               20,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback) (MM_BROADBAND_MODEM (self)->priv->modem_messaging_sms_pdu_mode ?
                                                      sms_pdu_part_list_ready :
                                                      sms_text_part_list_ready),
@@ -4587,7 +4562,6 @@ modem_cdma_load_esn (MMIfaceModemCdma *self,
                               "+GSN",
                               3,
                               TRUE,
-                              NULL, /* cancellable */
                               callback,
                               user_data);
 }
@@ -5055,7 +5029,6 @@ qcdm_cdma_status_ready (MMQcdmSerialPort *port,
                                   "+CSS?",
                                   3,
                                   FALSE,
-                                  NULL, /* cancellable */
                                   (GAsyncReadyCallback)css_query_ready,
                                   ctx);
         return;
@@ -5121,7 +5094,6 @@ modem_cdma_get_cdma1x_serving_system (MMIfaceModemCdma *self,
                               "+CSS?",
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)css_query_ready,
                               ctx);
 }
@@ -5191,7 +5163,6 @@ modem_cdma_get_service_status (MMIfaceModemCdma *self,
                               "+CAD?",
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)cad_query_ready,
                               result);
 }
@@ -5340,7 +5311,6 @@ spservice_ready (MMIfaceModemCdma *self,
                               "$SPERI?",
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)speri_ready,
                               ctx);
 }
@@ -5386,7 +5356,6 @@ modem_cdma_get_detailed_registration_state (MMIfaceModemCdma *self,
                               "+SPSERVICE?",
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)spservice_ready,
                               ctx);
 }
@@ -5522,7 +5491,6 @@ spservice_check_ready (MMIfaceModemCdma *self,
                               "$SPERI?",
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)speri_check_ready,
                               ctx);
 }
@@ -5558,7 +5526,6 @@ modem_cdma_setup_registration_checks (MMIfaceModemCdma *self,
                               "+SPSERVICE?",
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)spservice_check_ready,
                               ctx);
 }
@@ -6516,18 +6483,19 @@ initialize_step (InitializeContext *ctx)
         }
         ctx->close_port = TRUE;
 
+        /* TODO: This two commands are the only ones not subclassable; should
+         * change that. */
+
         /* Try to disable echo */
-        mm_base_modem_at_command_in_port_ignore_reply (
-            MM_BASE_MODEM (ctx->self),
-            ctx->port,
-            "E0",
-            3);
+        mm_base_modem_at_command_full (MM_BASE_MODEM (ctx->self),
+                                       ctx->port,
+                                       "E0", 3,
+                                       FALSE, NULL, NULL, NULL);
         /* Try to get extended errors */
-        mm_base_modem_at_command_in_port_ignore_reply (
-            MM_BASE_MODEM (ctx->self),
-            ctx->port,
-            "+CMEE=1",
-            3);
+        mm_base_modem_at_command_full (MM_BASE_MODEM (ctx->self),
+                                       ctx->port,
+                                       "+CMEE=1", 3,
+                                       FALSE, NULL, NULL, NULL);
         /* Fall down to next step */
         ctx->step++;
     }

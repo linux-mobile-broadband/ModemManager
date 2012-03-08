@@ -171,7 +171,6 @@ connect_3gpp_qmistatus (DetailedConnectContext *ctx)
         "$NWQMISTATUS",
         3, /* timeout */
         FALSE, /* allow_cached */
-        NULL, /* cancellable */
         (GAsyncReadyCallback)connect_3gpp_qmistatus_ready, /* callback */
         ctx); /* user_data */
 
@@ -230,7 +229,6 @@ connect_3gpp (MMBroadbandBearer *self,
         "$NWQMICONNECT=,,,,,,,,,,",
         10, /* timeout */
         FALSE, /* allow_cached */
-        NULL, /* cancellable */
         (GAsyncReadyCallback)connect_3gpp_qmiconnect_ready,
         ctx); /* user_data */
 }
@@ -338,7 +336,6 @@ disconnect_3gpp_check_status (MMBaseModem *modem,
         "$NWQMISTATUS",
         3, /* timeout */
         FALSE, /* allow_cached */
-        NULL, /* cancellable */
         (GAsyncReadyCallback)disconnect_3gpp_status_complete,
         ctx); /* user_data */
 }
@@ -362,7 +359,6 @@ disconnect_3gpp (MMBroadbandBearer *self,
         "$NWQMIDISCONNECT",
         10, /* timeout */
         FALSE, /* allow_cached */
-        NULL, /* cancellable */
         (GAsyncReadyCallback)disconnect_3gpp_check_status,
         ctx); /* user_data */
 }

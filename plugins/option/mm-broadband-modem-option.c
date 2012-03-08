@@ -306,7 +306,6 @@ load_access_technologies_step (AccessTechnologiesContext *ctx)
                                   "_OSSYS?",
                                   3,
                                   FALSE,
-                                  NULL, /* cancellable */
                                   (GAsyncReadyCallback)ossys_query_ready,
                                   ctx);
         break;
@@ -317,7 +316,6 @@ load_access_technologies_step (AccessTechnologiesContext *ctx)
                                       "_OCTI?",
                                       3,
                                       FALSE,
-                                      NULL, /* cancellable */
                                       (GAsyncReadyCallback)octi_query_ready,
                                       ctx);
             return;
@@ -331,7 +329,6 @@ load_access_technologies_step (AccessTechnologiesContext *ctx)
                                       "_OWCTI?",
                                       3,
                                       FALSE,
-                                      NULL, /* cancellable */
                                       (GAsyncReadyCallback)owcti_query_ready,
                                       ctx);
             return;

@@ -81,7 +81,6 @@ load_access_technologies (MMIfaceModem *self,
                               "*CNTI=0",
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               callback,
                               user_data);
 }

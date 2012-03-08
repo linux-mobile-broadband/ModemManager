@@ -206,7 +206,6 @@ load_supported_modes (MMIfaceModem *self,
         "+WS46=?",
         3,
         FALSE,
-        NULL, /* cancellable */
         (GAsyncReadyCallback)supported_networks_query_ready,
         result);
 }
@@ -362,7 +361,6 @@ load_current_bands (MMIfaceModem *self,
         "$NWBAND?",
         3,
         FALSE,
-        NULL,
         (GAsyncReadyCallback)load_current_bands_done,
         result);
 }
@@ -424,7 +422,6 @@ set_bands (MMIfaceModem *self,
         cmd,
         3,
         FALSE,
-        NULL,
         (GAsyncReadyCallback)set_bands_done,
         result);
 

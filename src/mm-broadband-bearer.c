@@ -272,7 +272,7 @@ dial_cdma_ready (MMBaseModem *modem,
     /* DO NOT check for cancellable here. If we got here without errors, the
      * bearer is really connected and therefore we need to reflect that in
      * the state machine. */
-    mm_base_modem_at_command_finish (modem, res, &error);
+    mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
         mm_warn ("Couldn't connect: '%s'", error->message);
         g_simple_async_result_take_error (ctx->result, error);
@@ -296,15 +296,15 @@ cdma_connect_context_dial (DetailedConnectContext *ctx)
         command = g_strconcat ("DT", ctx->self->priv->number, NULL);
     else
         command = g_strdup ("DT#777");
-    mm_base_modem_at_command_in_port (
-        ctx->modem,
-        ctx->primary,
-        command,
-        90,
-        FALSE,
-        NULL, /* cancellable */
-        (GAsyncReadyCallback)dial_cdma_ready,
-        ctx);
+
+    mm_base_modem_at_command_full (ctx->modem,
+                                   ctx->primary,
+                                   command,
+                                   90,
+                                   FALSE,
+                                   NULL,
+                                   (GAsyncReadyCallback)dial_cdma_ready,
+                                   ctx);
     g_free (command);
 }
 
@@ -319,7 +319,7 @@ set_rm_protocol_ready (MMBaseModem *self,
     if (detailed_connect_context_complete_and_free_if_cancelled (ctx))
         return;
 
-    mm_base_modem_at_command_finish (self, res, &error);
+    mm_base_modem_at_command_full_finish (self, res, &error);
     if (error) {
         mm_warn ("Couldn't set RM protocol: '%s'", error->message);
         g_simple_async_result_take_error (ctx->result, error);
@@ -345,7 +345,7 @@ current_rm_protocol_ready (MMBaseModem *self,
     if (detailed_connect_context_complete_and_free_if_cancelled (ctx))
         return;
 
-    result = mm_base_modem_at_command_finish (self, res, &error);
+    result = mm_base_modem_at_command_full_finish (self, res, &error);
     if (error) {
         mm_warn ("Couldn't query current RM protocol: '%s'", error->message);
         g_simple_async_result_take_error (ctx->result, error);
@@ -383,15 +383,14 @@ current_rm_protocol_ready (MMBaseModem *self,
         }
 
         command = g_strdup_printf ("+CRM=%u", new_index);
-        mm_base_modem_at_command_in_port (
-            ctx->modem,
-            ctx->primary,
-            command,
-            3,
-            FALSE,
-            NULL, /* cancellable */
-            (GAsyncReadyCallback)set_rm_protocol_ready,
-            ctx);
+        mm_base_modem_at_command_full (ctx->modem,
+                                       ctx->primary,
+                                       command,
+                                       3,
+                                       FALSE,
+                                       NULL,
+                                       (GAsyncReadyCallback)set_rm_protocol_ready,
+                                       ctx);
         g_free (command);
         return;
     }
@@ -425,15 +424,14 @@ connect_cdma (MMBroadbandBearer *self,
     if (self->priv->rm_protocol != MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
         /* Need to query current RM protocol */
         mm_dbg ("Querying current RM protocol set...");
-        mm_base_modem_at_command_in_port (
-            ctx->modem,
-            ctx->primary,
-            "+CRM?",
-            3,
-            FALSE,
-            NULL, /* cancellable */
-            (GAsyncReadyCallback)current_rm_protocol_ready,
-            ctx);
+        mm_base_modem_at_command_full (ctx->modem,
+                                       ctx->primary,
+                                       "+CRM?",
+                                       3,
+                                       FALSE,
+                                       NULL, /* cancellable */
+                                       (GAsyncReadyCallback)current_rm_protocol_ready,
+                                       ctx);
         return;
     }
 
@@ -535,7 +533,7 @@ extended_error_ready (MMBaseModem *modem,
     if (dial_3gpp_context_complete_and_free_if_cancelled (ctx))
         return;
 
-    result = mm_base_modem_at_command_finish (modem, res, NULL);
+    result = mm_base_modem_at_command_full_finish (modem, res, NULL);
     if (result &&
         g_str_has_prefix (result, "+CEER: ") &&
         strlen (result) > 7) {
@@ -562,19 +560,18 @@ atd_ready (MMBaseModem *modem,
     /* DO NOT check for cancellable here. If we got here without errors, the
      * bearer is really connected and therefore we need to reflect that in
      * the state machine. */
-    mm_base_modem_at_command_finish (modem, res, &ctx->saved_error);
+    mm_base_modem_at_command_full_finish (modem, res, &ctx->saved_error);
 
     if (ctx->saved_error) {
         /* Try to get more information why it failed */
-        mm_base_modem_at_command_in_port (
-            ctx->modem,
-            ctx->primary,
-            "+CEER",
-            3,
-            FALSE,
-            NULL, /* cancellable */
-            (GAsyncReadyCallback)extended_error_ready,
-            ctx);
+        mm_base_modem_at_command_full (ctx->modem,
+                                       ctx->primary,
+                                       "+CEER",
+                                       3,
+                                       FALSE,
+                                       NULL, /* cancellable */
+                                       (GAsyncReadyCallback)extended_error_ready,
+                                       ctx);
         return;
     }
 
@@ -604,15 +601,14 @@ dial_3gpp (MMBroadbandBearer *self,
 
     /* Use default *99 to connect */
     command = g_strdup_printf ("ATD*99***%d#", cid);
-    mm_base_modem_at_command_in_port (
-        ctx->modem,
-        ctx->primary,
-        command,
-        60,
-        FALSE,
-        NULL, /* cancellable */
-        (GAsyncReadyCallback)atd_ready,
-        ctx);
+    mm_base_modem_at_command_full (ctx->modem,
+                                   ctx->primary,
+                                   command,
+                                   60,
+                                   FALSE,
+                                   NULL, /* cancellable */
+                                   (GAsyncReadyCallback)atd_ready,
+                                   ctx);
     g_free (command);
 }
 
@@ -664,7 +660,7 @@ initialize_pdp_context_ready (MMBaseModem *self,
     if (detailed_connect_context_complete_and_free_if_cancelled (ctx))
         return;
 
-    mm_base_modem_at_command_finish (self, res, &error);
+    mm_base_modem_at_command_full_finish (self, res, &error);
     if (error) {
         mm_warn ("Couldn't initialize PDP context with our APN: '%s'",
                  error->message);
@@ -691,7 +687,7 @@ find_cid_ready (MMBaseModem *self,
     gchar *command;
     GError *error = NULL;
 
-    result = mm_base_modem_at_sequence_finish (self, res, NULL, &error);
+    result = mm_base_modem_at_sequence_full_finish (self, res, NULL, &error);
     if (!result) {
         mm_warn ("Couldn't find best CID to use: '%s'", error->message);
         g_simple_async_result_take_error (ctx->result, error);
@@ -710,15 +706,14 @@ find_cid_ready (MMBaseModem *self,
     command = g_strdup_printf ("+CGDCONT=%u,\"IP\",\"%s\"",
                                ctx->cid,
                                ctx->self->priv->apn);
-    mm_base_modem_at_command_in_port (
-        ctx->modem,
-        ctx->primary,
-        command,
-        3,
-        FALSE,
-        NULL, /* cancellable */
-        (GAsyncReadyCallback)initialize_pdp_context_ready,
-        ctx);
+    mm_base_modem_at_command_full (ctx->modem,
+                                   ctx->primary,
+                                   command,
+                                   3,
+                                   FALSE,
+                                   NULL, /* cancellable */
+                                   (GAsyncReadyCallback)initialize_pdp_context_ready,
+                                   ctx);
     g_free (command);
 }
 
@@ -914,15 +909,14 @@ connect_3gpp (MMBroadbandBearer *self,
                                         user_data);
 
     mm_dbg ("Looking for best CID...");
-    mm_base_modem_at_sequence_in_port (
-        ctx->modem,
-        ctx->primary,
-        find_cid_sequence,
-        ctx, /* also passed as response processor context */
-        NULL, /* response_processor_context_free */
-        NULL, /* cancellable */
-        (GAsyncReadyCallback)find_cid_ready,
-        ctx);
+    mm_base_modem_at_sequence_full (ctx->modem,
+                                    ctx->primary,
+                                    find_cid_sequence,
+                                    ctx, /* also passed as response processor context */
+                                    NULL, /* response_processor_context_free */
+                                    NULL, /* cancellable */
+                                    (GAsyncReadyCallback)find_cid_ready,
+                                    ctx);
 }
 
 /*****************************************************************************/
@@ -1343,7 +1337,7 @@ cgact_primary_ready (MMBaseModem *modem,
     GError *error = NULL;
 
     /* Ignore errors for now */
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error);
+    mm_base_modem_at_command_full_finish (MM_BASE_MODEM (modem), res, &error);
     if (error) {
         mm_dbg ("PDP context deactivation failed (not fatal): %s", error->message);
         g_error_free (error);
@@ -1398,15 +1392,14 @@ primary_flash_3gpp_ready (MMSerialPort *port,
         /* Port is disconnected; update the state */
         mm_port_set_connected (ctx->data, FALSE);
 
-    mm_base_modem_at_command_in_port (
-        ctx->modem,
-        ctx->primary,
-        ctx->cgact_command,
-        3,
-        FALSE,
-        NULL, /* cancellable */
-        (GAsyncReadyCallback)cgact_primary_ready,
-        ctx);
+    mm_base_modem_at_command_full (ctx->modem,
+                                   ctx->primary,
+                                   ctx->cgact_command,
+                                   3,
+                                   FALSE,
+                                   NULL, /* cancellable */
+                                   (GAsyncReadyCallback)cgact_primary_ready,
+                                   ctx);
 }
 
 static void
@@ -1416,7 +1409,7 @@ cgact_secondary_ready (MMBaseModem *modem,
 {
     GError *error = NULL;
 
-    mm_base_modem_at_command_finish (MM_BASE_MODEM (modem), res, &error);
+    mm_base_modem_at_command_full_finish (MM_BASE_MODEM (modem), res, &error);
     if (!error)
         ctx->cgact_sent = TRUE;
     else
@@ -1463,15 +1456,14 @@ disconnect_3gpp (MMBroadbandBearer *self,
      */
     if (ctx->secondary &&
         mm_port_get_connected (MM_PORT (ctx->primary))) {
-        mm_base_modem_at_command_in_port (
-            ctx->modem,
-            ctx->secondary,
-            ctx->cgact_command,
-            3,
-            FALSE,
-            NULL, /* cancellable */
-            (GAsyncReadyCallback)cgact_secondary_ready,
-            ctx);
+        mm_base_modem_at_command_full (ctx->modem,
+                                       ctx->secondary,
+                                       ctx->cgact_command,
+                                       3,
+                                       FALSE,
+                                       NULL, /* cancellable */
+                                       (GAsyncReadyCallback)cgact_secondary_ready,
+                                       ctx);
         return;
     }
 
@@ -1742,7 +1734,7 @@ crm_range_ready (MMBaseModem *modem,
     GError *error = NULL;
     const gchar *response;
 
-    response = mm_base_modem_at_command_finish (modem, res, &error);
+    response = mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
         /* We should possibly take this error as fatal. If we were told to use a
          * specific Rm protocol, we must be able to check if it is supported. */
@@ -1868,15 +1860,14 @@ interface_initialization_step (InitAsyncContext *ctx)
          * supported. */
         if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->modem)) &&
             ctx->self->priv->rm_protocol != MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
-            mm_base_modem_at_command_in_port (
-                ctx->modem,
-                ctx->port,
-                "+CRM=?",
-                3,
-                TRUE, /* getting range, so reply can be cached */
-                NULL, /* cancellable */
-                (GAsyncReadyCallback)crm_range_ready,
-                ctx);
+            mm_base_modem_at_command_full (ctx->modem,
+                                           ctx->port,
+                                           "+CRM=?",
+                                           3,
+                                           TRUE, /* getting range, so reply can be cached */
+                                           NULL, /* cancellable */
+                                           (GAsyncReadyCallback)crm_range_ready,
+                                           ctx);
             return;
         }
 

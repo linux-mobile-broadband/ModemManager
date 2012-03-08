@@ -118,20 +118,16 @@ enable_unsolicited_events (MMIfaceModem3gpp *self,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
-    mm_base_modem_at_command_in_port (
-        MM_BASE_MODEM (self),
-        /* Only primary port is expected in the Cinterion modems */
-        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
-        /* AT=CMER=[<mode>[,<keyp>[,<disp>[,<ind>[,<bfr>]]]]]
-         *  but <ind> should be either not set, or equal to 0 or 2.
-         * Enabled with 2.
-         */
-        "+CMER=3,0,0,2",
-        3,
-        FALSE,
-        NULL, /* cancellable */
-        callback,
-        user_data);
+    /* AT=CMER=[<mode>[,<keyp>[,<disp>[,<ind>[,<bfr>]]]]]
+     *  but <ind> should be either not set, or equal to 0 or 2.
+     * Enabled with 2.
+     */
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CMER=3,0,0,2",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
 }
 
 /*****************************************************************************/
@@ -158,7 +154,6 @@ messaging_enable_unsolicited_events (MMIfaceModemMessaging *self,
                               "+CNMI=2,1,2,2,1",
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               callback,
                               user_data);
 }
@@ -204,7 +199,6 @@ send_sleep_mode_command (MMBroadbandModemCinterion *self,
                                   self->priv->sleep_mode_cmd,
                                   5,
                                   FALSE,
-                                  NULL, /* cancellable */
                                   (GAsyncReadyCallback)sleep_ready,
                                   operation_result);
         return;
@@ -281,7 +275,6 @@ modem_power_down (MMIfaceModem *self,
             "+CFUN=?",
             3,
             FALSE,
-            NULL, /* cancellable */
             (GAsyncReadyCallback)supported_functionality_status_query_ready,
             result);
 }
@@ -484,7 +477,6 @@ sind_query_ready (MMBroadbandModemCinterion *self,
             "^SMONG",
             3,
             FALSE,
-            NULL, /* cancellable */
             (GAsyncReadyCallback)smong_query_ready,
             operation_result);
     }
@@ -512,7 +504,6 @@ load_access_technologies (MMIfaceModem *self,
             "^SIND?",
             3,
             FALSE,
-            NULL, /* cancellable */
             (GAsyncReadyCallback)sind_query_ready,
             result);
         return;
@@ -523,7 +514,6 @@ load_access_technologies (MMIfaceModem *self,
         "^SMONG",
         3,
         FALSE,
-        NULL, /* cancellable */
         (GAsyncReadyCallback)smong_query_ready,
         result);
 }
@@ -620,7 +610,6 @@ load_supported_modes (MMIfaceModem *self,
         "+WS46=?",
         3,
         FALSE,
-        NULL, /* cancellable */
         (GAsyncReadyCallback)supported_networks_query_ready,
         result);
 }
@@ -708,7 +697,6 @@ set_allowed_modes (MMIfaceModem *self,
             cmd->str,
             3,
             FALSE,
-            NULL, /* cancellable */
             (GAsyncReadyCallback)allowed_access_technology_update_ready,
             result);
         g_string_free (cmd, TRUE);
@@ -983,7 +971,6 @@ load_current_bands (MMIfaceModem *self,
                               "AT^SCFG=\"Radio/Band\"",
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)((!broadband->priv->only_utran &&
                                                      !broadband->priv->both_geran_utran) ?
                                                     get_2g_band_ready :
@@ -1082,7 +1069,6 @@ set_bands_3g (MMIfaceModem *self,
                               cmd,
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)scfg_set_ready,
                               result);
     g_free (cmd);
@@ -1179,7 +1165,6 @@ set_bands_2g (MMIfaceModem *self,
                               cmd,
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)scfg_set_ready,
                               result);
 
@@ -1261,7 +1246,6 @@ setup_flow_control (MMIfaceModem *self,
                               "\\Q3",
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)setup_flow_control_ready,
                               result);
 }

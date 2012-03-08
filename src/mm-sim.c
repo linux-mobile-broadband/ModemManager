@@ -130,7 +130,6 @@ change_pin (MMSim *self,
                               command,
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)change_pin_ready,
                               result);
     g_free (command);
@@ -299,7 +298,6 @@ enable_pin (MMSim *self,
                               command,
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)enable_pin_ready,
                               result);
     g_free (command);
@@ -470,7 +468,6 @@ common_send_pin_puk (MMSim *self,
                               command,
                               3,
                               FALSE,
-                              NULL, /* cancellable */
                               (GAsyncReadyCallback)send_pin_puk_ready,
                               result);
     g_free (command);
@@ -1068,7 +1065,6 @@ load_sim_identifier (MMSim *self,
         "+CRSM=176,12258,0,0,10",
         20,
         FALSE,
-        NULL, /* cancellable */
         (GAsyncReadyCallback)load_sim_identifier_command_ready,
         g_simple_async_result_new (G_OBJECT (self),
                                    callback,
@@ -1108,7 +1104,6 @@ load_imsi (MMSim *self,
         "+CIMI",
         3,
         TRUE,
-        NULL, /* cancellable */
         (GAsyncReadyCallback)load_imsi_command_ready,
         g_simple_async_result_new (G_OBJECT (self),
                                    callback,
@@ -1246,7 +1241,6 @@ load_operator_identifier (MMSim *self,
         "+CRSM=176,28589,0,0,4",
         10,
         FALSE,
-        NULL, /* cancellable */
         (GAsyncReadyCallback)load_operator_identifier_command_ready,
         g_simple_async_result_new (G_OBJECT (self),
                                    callback,
@@ -1358,7 +1352,6 @@ load_operator_name (MMSim *self,
         "+CRSM=176,28486,0,0,17",
         10,
         FALSE,
-        NULL, /* cancellable */
         (GAsyncReadyCallback)load_operator_name_command_ready,
         g_simple_async_result_new (G_OBJECT (self),
                                    callback,
