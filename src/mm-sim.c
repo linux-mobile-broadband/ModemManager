@@ -1386,15 +1386,11 @@ struct _InitAsyncContext {
     MMSim *self;
     InitializationStep step;
     guint sim_identifier_tries;
-    MMAtSerialPort *port;
 };
 
 static void
-init_async_context_free (InitAsyncContext *ctx,
-                         gboolean close_port)
+init_async_context_free (InitAsyncContext *ctx)
 {
-    if (close_port)
-        mm_serial_port_close (MM_SERIAL_PORT (ctx->port));
     g_object_unref (ctx->self);
     g_object_unref (ctx->result);
     if (ctx->cancellable)
@@ -1569,7 +1565,7 @@ interface_initialization_step (InitAsyncContext *ctx)
         /* We are done without errors! */
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         g_simple_async_result_complete_in_idle (ctx->result);
-        init_async_context_free (ctx, TRUE);
+        init_async_context_free (ctx);
         return;
     }
 
@@ -1585,7 +1581,6 @@ common_init_async (GAsyncInitable *initable,
 
 {
     InitAsyncContext *ctx;
-    GError *error = NULL;
 
     ctx = g_new (InitAsyncContext, 1);
     ctx->self = g_object_ref (initable);
@@ -1598,14 +1593,6 @@ common_init_async (GAsyncInitable *initable,
                         NULL);
     ctx->step = INITIALIZATION_STEP_FIRST;
     ctx->sim_identifier_tries = 0;
-
-    ctx->port = mm_base_modem_get_port_primary (ctx->self->priv->modem);
-    if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->port), &error)) {
-        g_simple_async_result_take_error (ctx->result, error);
-        g_simple_async_result_complete_in_idle (ctx->result);
-        init_async_context_free (ctx, FALSE);
-        return;
-    }
 
     interface_initialization_step (ctx);
 }

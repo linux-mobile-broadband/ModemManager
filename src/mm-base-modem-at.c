@@ -277,7 +277,7 @@ mm_base_modem_at_sequence (MMBaseModem *self,
     GError *error = NULL;
 
     /* No port given, so we'll try to guess which is best */
-    port = mm_base_modem_get_best_at_port (self, &error);
+    port = mm_base_modem_peek_best_at_port (self, &error);
     if (!port) {
         g_assert (error != NULL);
         g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
@@ -487,7 +487,7 @@ mm_base_modem_at_command (MMBaseModem *self,
     GError *error = NULL;
 
     /* No port given, so we'll try to guess which is best */
-    port = mm_base_modem_get_best_at_port (self, &error);
+    port = mm_base_modem_peek_best_at_port (self, &error);
     if (!port) {
         g_assert (error != NULL);
         g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
@@ -536,7 +536,7 @@ mm_base_modem_at_command_ignore_reply (MMBaseModem *self,
     MMAtSerialPort *port;
 
     /* No port given, so we'll try to guess which is best */
-    port = mm_base_modem_get_best_at_port (self, NULL);
+    port = mm_base_modem_peek_best_at_port (self, NULL);
     if (!port)
         /* No valid port, and we ignore replies, so just exit. */
         return;

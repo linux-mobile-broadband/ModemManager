@@ -121,7 +121,7 @@ enable_unsolicited_events (MMIfaceModem3gpp *self,
     mm_base_modem_at_command_in_port (
         MM_BASE_MODEM (self),
         /* Only primary port is expected in the Cinterion modems */
-        mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
         /* AT=CMER=[<mode>[,<keyp>[,<disp>[,<ind>[,<bfr>]]]]]
          *  but <ind> should be either not set, or equal to 0 or 2.
          * Enabled with 2.

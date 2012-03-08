@@ -114,12 +114,20 @@ gboolean  mm_base_modem_owns_port    (MMBaseModem *self,
 gboolean  mm_base_modem_organize_ports (MMBaseModem *self,
                                         GError **error);
 
-MMAtSerialPort   *mm_base_modem_get_port_primary   (MMBaseModem *self);
-MMAtSerialPort   *mm_base_modem_get_port_secondary (MMBaseModem *self);
-MMQcdmSerialPort *mm_base_modem_get_port_qcdm      (MMBaseModem *self);
-MMPort           *mm_base_modem_get_best_data_port (MMBaseModem *self);
-MMAtSerialPort   *mm_base_modem_get_best_at_port   (MMBaseModem *self,
-                                                    GError **error);
+MMAtSerialPort   *mm_base_modem_peek_port_primary   (MMBaseModem *self);
+MMAtSerialPort   *mm_base_modem_peek_port_secondary (MMBaseModem *self);
+MMQcdmSerialPort *mm_base_modem_peek_port_qcdm      (MMBaseModem *self);
+MMAtSerialPort   *mm_base_modem_peek_best_at_port   (MMBaseModem *self,
+                                                     GError **error);
+MMPort           *mm_base_modem_peek_best_data_port (MMBaseModem *self);
+
+MMAtSerialPort   *mm_base_modem_get_port_primary    (MMBaseModem *self);
+MMAtSerialPort   *mm_base_modem_get_port_secondary  (MMBaseModem *self);
+MMQcdmSerialPort *mm_base_modem_get_port_qcdm       (MMBaseModem *self);
+MMAtSerialPort   *mm_base_modem_get_best_at_port    (MMBaseModem *self,
+                                                     GError **error);
+MMPort           *mm_base_modem_get_best_data_port  (MMBaseModem *self);
+
 
 void     mm_base_modem_set_valid    (MMBaseModem *self,
                                      gboolean valid);

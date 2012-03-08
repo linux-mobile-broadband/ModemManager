@@ -325,11 +325,27 @@ mm_base_modem_get_port_primary (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
 
+    return (self->priv->primary ? g_object_ref (self->priv->primary) : NULL);
+}
+
+MMAtSerialPort *
+mm_base_modem_peek_port_primary (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
+
     return self->priv->primary;
 }
 
 MMAtSerialPort *
 mm_base_modem_get_port_secondary (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
+
+    return (self->priv->secondary ? g_object_ref (self->priv->secondary) : NULL);
+}
+
+MMAtSerialPort *
+mm_base_modem_peek_port_secondary (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
 
@@ -341,11 +357,28 @@ mm_base_modem_get_port_qcdm (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
 
+    return (self->priv->qcdm ? g_object_ref (self->priv->qcdm) : NULL);
+}
+
+MMQcdmSerialPort *
+mm_base_modem_peek_port_qcdm (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
+
     return self->priv->qcdm;
 }
 
 MMPort *
 mm_base_modem_get_best_data_port (MMBaseModem *self)
+{
+    MMPort *port;
+
+    port = mm_base_modem_peek_best_data_port (self);
+    return (port ? g_object_ref (port) : NULL);
+}
+
+MMPort *
+mm_base_modem_peek_best_data_port (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
 
@@ -361,24 +394,32 @@ MMAtSerialPort *
 mm_base_modem_get_best_at_port (MMBaseModem *self,
                                 GError **error)
 {
-    MMAtSerialPort *port;
+    MMAtSerialPort *best;
 
+    best = mm_base_modem_peek_best_at_port (self, error);
+    return (best ? g_object_ref (best) : NULL);
+}
+
+MMAtSerialPort *
+mm_base_modem_peek_best_at_port (MMBaseModem *self,
+                                 GError **error)
+{
     /* Decide which port to use */
-    port = mm_base_modem_get_port_primary (self);
-    if (port && !mm_port_get_connected (MM_PORT (port)))
-        return port;
+    if (self->priv->primary &&
+        !mm_port_get_connected (MM_PORT (self->priv->primary)))
+        return self->priv->primary;
 
     /* If primary port is connected, check if we can get the secondary
      * port */
-    port = mm_base_modem_get_port_secondary (self);
-    if (port && !mm_port_get_connected (MM_PORT (port)))
-        return port;
+    if (self->priv->secondary &&
+        !mm_port_get_connected (MM_PORT (self->priv->secondary)))
+        return self->priv->secondary;
 
     /* Otherwise, we cannot get any port */
     g_set_error (error,
                  MM_CORE_ERROR,
                  MM_CORE_ERROR_CONNECTED,
-                 "No port available to run command");
+                 "No AT port available to run command");
     return NULL;
 }
 

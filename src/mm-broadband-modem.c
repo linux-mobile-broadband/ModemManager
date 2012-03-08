@@ -1246,7 +1246,6 @@ modem_load_signal_quality (MMIfaceModem *self,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
-    MMSerialPort *port;
     SignalQualityContext *ctx;
     GError *error = NULL;
 
@@ -1259,9 +1258,8 @@ modem_load_signal_quality (MMIfaceModem *self,
                                              modem_load_signal_quality);
 
     /* Check whether we can get a non-connected AT port */
-    port = (MMSerialPort *)mm_base_modem_get_best_at_port (MM_BASE_MODEM (self), &error);
-    if (port) {
-        ctx->port = g_object_ref (port);
+    ctx->port = (MMSerialPort *)mm_base_modem_get_best_at_port (MM_BASE_MODEM (self), &error);
+    if (ctx->port) {
         if (MM_BROADBAND_MODEM (self)->priv->modem_cind_supported)
             signal_quality_cind (ctx);
         else
@@ -1270,10 +1268,9 @@ modem_load_signal_quality (MMIfaceModem *self,
     }
 
     /* If no best AT port available (all connected), try with QCDM ports */
-    port = (MMSerialPort *)mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
-    if (port) {
+    ctx->port = (MMSerialPort *)mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
+    if (ctx->port) {
         g_error_free (error);
-        ctx->port = g_object_ref (port);
         signal_quality_qcdm (ctx);
         return;
     }
@@ -1446,13 +1443,17 @@ set_unsolicited_events_handlers (MMIfaceModem3gpp *self,
                                         set_unsolicited_events_handlers);
 
     ciev_regex = mm_3gpp_ciev_regex_get ();
-    ports[0] = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
-    ports[1] = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
 
     /* Enable unsolicited events in given port */
-    for (i = 0; ports[i] && i < 2; i++) {
+    for (i = 0; i < 2; i++) {
+        if (!ports[i])
+            continue;
+
         /* Set/unset unsolicited CIEV event handler */
-        mm_dbg ("%s unsolicited events handlers",
+        mm_dbg ("(%s) %s 3GPP unsolicited events handlers",
+                mm_port_get_device (MM_PORT (ports[i])),
                 enable ? "Setting" : "Removing");
         mm_at_serial_port_add_unsolicited_msg_handler (
             ports[i],
@@ -1546,10 +1547,10 @@ run_unsolicited_events_setup (UnsolicitedEventsContext *ctx)
 
     if (!ctx->cmer_primary_done) {
         ctx->cmer_primary_done = TRUE;
-        port = mm_base_modem_get_port_primary (MM_BASE_MODEM (ctx->self));
+        port = mm_base_modem_peek_port_primary (MM_BASE_MODEM (ctx->self));
     } else if (!ctx->cmer_secondary_done) {
         ctx->cmer_secondary_done = TRUE;
-        port = mm_base_modem_get_port_secondary (MM_BASE_MODEM (ctx->self));
+        port = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (ctx->self));
     }
 
     /* Enable unsolicited events in given port */
@@ -2295,31 +2296,31 @@ modem_3gpp_setup_unsolicited_registration (MMIfaceModem3gpp *self,
     MMAtSerialPort *ports[2];
     GPtrArray *array;
     guint i;
-
-    mm_dbg ("setting up unsolicited registration messages handling");
+    guint j;
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
                                         modem_3gpp_setup_unsolicited_registration);
 
-    ports[0] = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
-    ports[1] = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
 
     /* Set up CREG unsolicited message handlers in both ports */
     array = mm_3gpp_creg_regex_get (FALSE);
     for (i = 0; i < 2; i++) {
-        if (ports[i]) {
-            guint j;
+        if (!ports[i])
+            continue;
 
-            for (j = 0; j < array->len; j++) {
-                mm_at_serial_port_add_unsolicited_msg_handler (
-                    MM_AT_SERIAL_PORT (ports[i]),
-                    (GRegex *) g_ptr_array_index (array, j),
-                    (MMAtSerialUnsolicitedMsgFn)registration_state_changed,
-                    self,
-                    NULL);
-            }
+        mm_dbg ("(%s) setting up 3GPP unsolicited registration messages handlers",
+                mm_port_get_device (MM_PORT (ports[i])));
+        for (j = 0; j < array->len; j++) {
+            mm_at_serial_port_add_unsolicited_msg_handler (
+                MM_AT_SERIAL_PORT (ports[i]),
+                (GRegex *) g_ptr_array_index (array, j),
+                (MMAtSerialUnsolicitedMsgFn)registration_state_changed,
+                self,
+                NULL);
         }
     }
     mm_3gpp_creg_regex_destroy (array);
@@ -2349,30 +2350,32 @@ modem_3gpp_cleanup_unsolicited_registration (MMIfaceModem3gpp *self,
     MMAtSerialPort *ports[2];
     GPtrArray *array;
     guint i;
+    guint j;
 
-    mm_dbg ("cleaning up unsolicited registration messages handling");
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
                                         modem_3gpp_cleanup_unsolicited_registration);
 
-    ports[0] = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
-    ports[1] = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
 
     /* Set up CREG unsolicited message handlers in both ports */
     array = mm_3gpp_creg_regex_get (FALSE);
     for (i = 0; i < 2; i++) {
-        if (ports[i]) {
-            guint j;
+        if (!ports[i])
+            continue;
 
-            for (j = 0; j < array->len; j++) {
-                mm_at_serial_port_add_unsolicited_msg_handler (
-                    MM_AT_SERIAL_PORT (ports[i]),
-                    (GRegex *) g_ptr_array_index (array, j),
-                    NULL,
-                    NULL,
-                    NULL);
-            }
+        mm_dbg ("(%s) cleaning up unsolicited registration messages handlers",
+                mm_port_get_device (MM_PORT (ports[i])));
+
+        for (j = 0; j < array->len; j++) {
+            mm_at_serial_port_add_unsolicited_msg_handler (
+                MM_AT_SERIAL_PORT (ports[i]),
+                (GRegex *) g_ptr_array_index (array, j),
+                NULL,
+                NULL,
+                NULL);
         }
     }
     mm_3gpp_creg_regex_destroy (array);
@@ -2858,7 +2861,7 @@ cleanup_registration_sequence_ready (MMBroadbandModem *self,
     if (!ctx->secondary_done) {
         MMAtSerialPort *secondary;
 
-        secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+        secondary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
         if (secondary) {
             /* Now use the same registration setup in secondary port, if any */
             ctx->secondary_done = TRUE;
@@ -2911,7 +2914,7 @@ modem_3gpp_cleanup_cs_registration (MMIfaceModem3gpp *self,
 
     mm_base_modem_at_command_in_port (
         MM_BASE_MODEM (self),
-        mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
         ctx->command,
         10,
         FALSE,
@@ -2936,7 +2939,7 @@ modem_3gpp_cleanup_ps_registration (MMIfaceModem3gpp *self,
 
     mm_base_modem_at_command_in_port (
         MM_BASE_MODEM (self),
-        mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
         ctx->command,
         10,
         FALSE,
@@ -3040,13 +3043,13 @@ setup_registration_sequence_ready (MMBroadbandModem *self,
             return;
         }
 
-        secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+        secondary = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
         if (secondary) {
             /* Now use the same registration setup in secondary port, if any */
             ctx->secondary_done = TRUE;
             mm_base_modem_at_command_in_port (
                 MM_BASE_MODEM (self),
-                mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+                mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
                 g_variant_get_string (command, NULL),
                 3,
                 FALSE,
@@ -3078,7 +3081,7 @@ modem_3gpp_setup_cs_registration (MMIfaceModem3gpp *self,
                                              modem_3gpp_setup_cs_registration);
     mm_base_modem_at_sequence_in_port (
         MM_BASE_MODEM (self),
-        mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
         cs_registration_sequence,
         NULL,  /* response processor context */
         NULL,  /* response processor context free */
@@ -3101,7 +3104,7 @@ modem_3gpp_setup_ps_registration (MMIfaceModem3gpp *self,
                                              modem_3gpp_setup_ps_registration);
     mm_base_modem_at_sequence_in_port (
         MM_BASE_MODEM (self),
-        mm_base_modem_get_port_primary (MM_BASE_MODEM (self)),
+        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
         ps_registration_sequence,
         NULL,  /* response processor context */
         NULL,  /* response processor context free */
@@ -3501,13 +3504,16 @@ set_unsolicited_result_code_handlers (MMIfaceModem3gppUssd *self,
                                         set_unsolicited_events_handlers);
 
     cusd_regex = mm_3gpp_cusd_regex_get ();
-    ports[0] = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
-    ports[1] = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
 
     /* Enable unsolicited result codes in given port */
-    for (i = 0; ports[i] && i < 2; i++) {
+    for (i = 0; i < 2; i++) {
+        if (!ports[i])
+            continue;
         /* Set/unset unsolicited CUSD event handler */
-        mm_dbg ("%s unsolicited result code handlers",
+        mm_dbg ("(%s) %s unsolicited result code handlers",
+                mm_port_get_device (MM_PORT (ports[i])),
                 enable ? "Setting" : "Removing");
         mm_at_serial_port_add_unsolicited_msg_handler (
             ports[i],
@@ -4150,13 +4156,17 @@ set_messaging_unsolicited_events_handlers (MMIfaceModemMessaging *self,
                                         set_messaging_unsolicited_events_handlers);
 
     cmti_regex = mm_3gpp_cmti_regex_get ();
-    ports[0] = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
-    ports[1] = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
 
     /* Enable unsolicited events in given port */
-    for (i = 0; ports[i] && i < 2; i++) {
+    for (i = 0; i < 2; i++) {
+        if (!ports[i])
+            continue;
+
         /* Set/unset unsolicited CMTI event handler */
-        mm_dbg ("%s messaging unsolicited events handlers",
+        mm_dbg ("(%s) %s messaging unsolicited events handlers",
+                mm_port_get_device (MM_PORT (ports[i])),
                 enable ? "Setting" : "Removing");
         mm_at_serial_port_add_unsolicited_msg_handler (
             ports[i],
@@ -4679,7 +4689,7 @@ modem_cdma_get_hdr_state (MMIfaceModemCdma *self,
     HdrStateContext *ctx;
     GByteArray *hdrstate;
 
-    qcdm = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
+    qcdm = mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (self));
     if (!qcdm) {
         g_simple_async_report_error_in_idle (G_OBJECT (self),
                                              callback,
@@ -4803,7 +4813,7 @@ modem_cdma_get_call_manager_state (MMIfaceModemCdma *self,
     CallManagerStateContext *ctx;
     GByteArray *cmstate;
 
-    qcdm = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
+    qcdm = mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (self));
     if (!qcdm) {
         g_simple_async_report_error_in_idle (G_OBJECT (self),
                                              callback,
@@ -5093,8 +5103,6 @@ modem_cdma_get_cdma1x_serving_system (MMIfaceModemCdma *self,
     if (ctx->qcdm) {
         GByteArray *cdma_status;
 
-        g_object_ref (ctx->qcdm);
-
         /* Setup command */
         cdma_status = g_byte_array_sized_new (25);
         cdma_status->len = qcdm_cmd_cdma_status_new ((char *) cdma_status->data, 25);
@@ -5351,7 +5359,7 @@ modem_cdma_get_detailed_registration_state (MMIfaceModemCdma *self,
     /* The default implementation to get detailed registration state
      * requires the use of an AT port; so if we cannot get any, just
      * return the error */
-    port = mm_base_modem_get_best_at_port (MM_BASE_MODEM (self), &error);
+    port = mm_base_modem_peek_best_at_port (MM_BASE_MODEM (self), &error);
     if (!port) {
         g_simple_async_report_take_gerror_in_idle (G_OBJECT (self),
                                                    callback,
@@ -5534,7 +5542,7 @@ modem_cdma_setup_registration_checks (MMIfaceModemCdma *self,
                                              modem_cdma_setup_registration_checks);
 
     /* Check if we have a QCDM port */
-    ctx->has_qcdm_port = !!mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
+    ctx->has_qcdm_port = !!mm_base_modem_peek_port_qcdm (MM_BASE_MODEM (self));
 
     /* If we have cached results of Sprint command checking, use them */
     if (ctx->self->priv->checked_sprint_support) {
@@ -5771,14 +5779,17 @@ setup_ports (MMBroadbandModem *self)
     GPtrArray *array;
     gint i, j;
 
-    ports[0] = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
-    ports[1] = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
 
     /* Cleanup all unsolicited message handlers in all AT ports */
 
     /* Set up CREG unsolicited message handlers, with NULL callbacks */
     array = mm_3gpp_creg_regex_get (FALSE);
-    for (i = 0; ports[i] && i < 2; i++) {
+    for (i = 0; i < 2; i++) {
+        if (!ports[i])
+            continue;
+
         for (j = 0; j < array->len; j++) {
             mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]),
                                                            (GRegex *)g_ptr_array_index (array, j),
@@ -5791,7 +5802,10 @@ setup_ports (MMBroadbandModem *self)
 
     /* Set up CIEV unsolicited message handler, with NULL callback */
     regex = mm_3gpp_ciev_regex_get ();
-    for (i = 0; ports[i] && i < 2; i++) {
+    for (i = 0; i < 2; i++) {
+        if (!ports[i])
+            continue;
+
         mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]),
                                                        regex,
                                                        NULL,
@@ -5802,7 +5816,10 @@ setup_ports (MMBroadbandModem *self)
 
     /* Set up CMTI unsolicited message handler, with NULL callback */
     regex = mm_3gpp_cmti_regex_get ();
-    for (i = 0; ports[i] && i < 2; i++) {
+    for (i = 0; i < 2; i++) {
+        if (!ports[i])
+            continue;
+
         mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]),
                                                        regex,
                                                        NULL,
@@ -5813,7 +5830,10 @@ setup_ports (MMBroadbandModem *self)
 
     /* Set up CUSD unsolicited message handler, with NULL callback */
     regex = mm_3gpp_cusd_regex_get ();
-    for (i = 0; ports[i] && i < 2; i++) {
+    for (i = 0; i < 2; i++) {
+        if (!ports[i])
+            continue;
+
         mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]),
                                                        regex,
                                                        NULL,
@@ -6396,9 +6416,11 @@ initialize_context_complete_and_free (InitializeContext *ctx)
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
     /* balance open/close count */
-    if (ctx->close_port)
-        mm_serial_port_close (MM_SERIAL_PORT (ctx->port));
-    g_object_unref (ctx->port);
+    if (ctx->port) {
+        if (ctx->close_port)
+            mm_serial_port_close (MM_SERIAL_PORT (ctx->port));
+        g_object_unref (ctx->port);
+    }
     g_object_unref (ctx->self);
     g_free (ctx);
 }
@@ -6473,11 +6495,20 @@ initialize_step (InitializeContext *ctx)
     case INITIALIZE_STEP_PRIMARY_OPEN: {
         GError *error = NULL;
 
+        ctx->port = mm_base_modem_get_port_primary (MM_BASE_MODEM (ctx->self));
+        if (!ctx->port) {
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Cannot initialize: couldn't get primary port");
+            initialize_context_complete_and_free (ctx);
+            return;
+        }
+
         /* Open and send first commands to the primary serial port.
          * We do keep the primary port open during the whole initialization
          * sequence. Note that this port is not really passed to the interfaces,
          * they will get the primary port themselves. */
-        ctx->port = g_object_ref (mm_base_modem_get_port_primary (MM_BASE_MODEM (ctx->self)));
         if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->port), &error)) {
             g_simple_async_result_take_error (ctx->result, error);
             initialize_context_complete_and_free (ctx);

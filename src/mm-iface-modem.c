@@ -2300,13 +2300,9 @@ disabling_context_new (MMIfaceModem *self,
 
     ctx = g_new0 (DisablingContext, 1);
     ctx->self = g_object_ref (self);
-    ctx->primary = g_object_ref (mm_base_modem_get_port_primary (MM_BASE_MODEM (self)));
+    ctx->primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
     ctx->secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
-    if (ctx->secondary)
-        g_object_ref (ctx->secondary);
     ctx->qcdm = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
-    if (ctx->qcdm)
-        g_object_ref (ctx->qcdm);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -2341,7 +2337,8 @@ disabling_context_complete_and_free (DisablingContext *ctx)
                                      MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
 
     g_object_unref (ctx->self);
-    g_object_unref (ctx->primary);
+    if (ctx->primary)
+        g_object_unref (ctx->primary);
     if (ctx->secondary)
         g_object_unref (ctx->secondary);
     if (ctx->qcdm)
@@ -2427,7 +2424,7 @@ interface_disabling_step (DisablingContext *ctx)
          * be safe to check whether they are really open before trying to close.
          */
         mm_dbg ("Closing all ports...");
-        if (mm_serial_port_is_open (MM_SERIAL_PORT (ctx->primary)))
+        if (ctx->primary && mm_serial_port_is_open (MM_SERIAL_PORT (ctx->primary)))
             mm_serial_port_close (MM_SERIAL_PORT (ctx->primary));
         if (ctx->secondary && mm_serial_port_is_open (MM_SERIAL_PORT (ctx->secondary)))
             mm_serial_port_close (MM_SERIAL_PORT (ctx->secondary));
@@ -2503,13 +2500,9 @@ enabling_context_new (MMIfaceModem *self,
 
     ctx = g_new0 (EnablingContext, 1);
     ctx->self = g_object_ref (self);
-    ctx->primary = g_object_ref (mm_base_modem_get_port_primary (MM_BASE_MODEM (self)));
+    ctx->primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
     ctx->secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
-    if (ctx->secondary)
-        g_object_ref (ctx->secondary);
     ctx->qcdm = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
-    if (ctx->qcdm)
-        g_object_ref (ctx->qcdm);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -2554,7 +2547,8 @@ enabling_context_complete_and_free (EnablingContext *ctx)
     }
 
     g_object_unref (ctx->self);
-    g_object_unref (ctx->primary);
+    if (ctx->primary)
+        g_object_unref (ctx->primary);
     if (ctx->secondary)
         g_object_unref (ctx->secondary);
     if (ctx->qcdm)
@@ -2737,6 +2731,15 @@ interface_enabling_step (EnablingContext *ctx)
         GError *error = NULL;
 
         /* Open primary port */
+        if (!ctx->primary) {
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Cannot enable: no primary port");
+            enabling_context_complete_and_free (ctx);
+            return;
+        }
+
         if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->primary), &error)) {
             g_simple_async_result_take_error (ctx->result, error);
             enabling_context_complete_and_free (ctx);

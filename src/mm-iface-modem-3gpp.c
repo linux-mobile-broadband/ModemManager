@@ -925,7 +925,6 @@ typedef enum {
 
 struct _DisablingContext {
     MMIfaceModem3gpp *self;
-    MMAtSerialPort *primary;
     DisablingStep step;
     GSimpleAsyncResult *result;
     MmGdbusModem *skeleton;
@@ -940,7 +939,6 @@ disabling_context_new (MMIfaceModem3gpp *self,
 
     ctx = g_new0 (DisablingContext, 1);
     ctx->self = g_object_ref (self);
-    ctx->primary = g_object_ref (mm_base_modem_get_port_primary (MM_BASE_MODEM (self)));
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -959,7 +957,6 @@ disabling_context_complete_and_free (DisablingContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->self);
-    g_object_unref (ctx->primary);
     g_object_unref (ctx->result);
     g_object_unref (ctx->skeleton);
     g_free (ctx);
@@ -1148,7 +1145,6 @@ typedef enum {
 
 struct _EnablingContext {
     MMIfaceModem3gpp *self;
-    MMAtSerialPort *primary;
     EnablingStep step;
     GSimpleAsyncResult *result;
     MmGdbusModem3gpp *skeleton;
@@ -1163,7 +1159,6 @@ enabling_context_new (MMIfaceModem3gpp *self,
 
     ctx = g_new0 (EnablingContext, 1);
     ctx->self = g_object_ref (self);
-    ctx->primary = g_object_ref (mm_base_modem_get_port_primary (MM_BASE_MODEM (self)));
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -1182,7 +1177,6 @@ enabling_context_complete_and_free (EnablingContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->self);
-    g_object_unref (ctx->primary);
     g_object_unref (ctx->result);
     g_object_unref (ctx->skeleton);
     g_free (ctx);

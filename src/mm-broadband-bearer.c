@@ -412,6 +412,8 @@ connect_cdma (MMBroadbandBearer *self,
 {
     DetailedConnectContext *ctx;
 
+    g_assert (primary != NULL);
+
     ctx = detailed_connect_context_new (self,
                                         modem,
                                         primary,
@@ -590,6 +592,8 @@ dial_3gpp (MMBroadbandBearer *self,
 {
     gchar *command;
     Dial3gppContext *ctx;
+
+    g_assert (primary != NULL);
 
     ctx = dial_3gpp_context_new (self,
                                  modem,
@@ -899,6 +903,8 @@ connect_3gpp (MMBroadbandBearer *self,
 {
     DetailedConnectContext *ctx;
 
+    g_assert (primary != NULL);
+
     ctx = detailed_connect_context_new (self,
                                         modem,
                                         primary,
@@ -1084,8 +1090,21 @@ connect (MMBearer *self,
                   NULL);
     g_assert (modem != NULL);
 
-    /* We will launch the ATD call in the primary port */
-    primary = mm_base_modem_get_port_primary (modem);
+    /* We will launch the ATD call in the primary port... */
+    primary = mm_base_modem_peek_port_primary (modem);
+    if (!primary) {
+        g_simple_async_report_error_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_CONNECTED,
+            "Couldn't connect: couldn't get primary port");
+        g_object_unref (modem);
+        return;
+    }
+
+    /* ...only if not already connected */
     if (mm_port_get_connected (MM_PORT (primary))) {
         g_simple_async_report_error_in_idle (
             G_OBJECT (self),
@@ -1099,7 +1118,7 @@ connect (MMBearer *self,
     }
 
     /* Look for best data port, NULL if none available. */
-    data = mm_base_modem_get_best_data_port (modem);
+    data = mm_base_modem_peek_best_data_port (modem);
     if (!data) {
         g_simple_async_report_error_in_idle (
             G_OBJECT (self),
@@ -1149,7 +1168,7 @@ connect (MMBearer *self,
                 MM_BROADBAND_BEARER (self),
                 MM_BROADBAND_MODEM (modem),
                 primary,
-                mm_base_modem_get_port_secondary (modem),
+                mm_base_modem_peek_port_secondary (modem),
                 data,
                 cancellable,
                 (GAsyncReadyCallback) connect_3gpp_ready,
@@ -1170,7 +1189,7 @@ connect (MMBearer *self,
                 MM_BROADBAND_BEARER (self),
                 MM_BROADBAND_MODEM (modem),
                 primary,
-                mm_base_modem_get_port_secondary (modem),
+                mm_base_modem_peek_port_secondary (modem),
                 data,
                 cancellable,
                 (GAsyncReadyCallback) connect_cdma_ready,
@@ -1293,6 +1312,8 @@ disconnect_cdma (MMBroadbandBearer *self,
                  gpointer user_data)
 {
     DetailedDisconnectContext *ctx;
+
+    g_assert (primary != NULL);
 
     ctx = detailed_disconnect_context_new (self,
                                            modem,
@@ -1418,6 +1439,8 @@ disconnect_3gpp (MMBroadbandBearer *self,
                  gpointer user_data)
 {
     DetailedDisconnectContext *ctx;
+
+    g_assert (primary != NULL);
 
     ctx = detailed_disconnect_context_new (self,
                                            modem,
@@ -1552,6 +1575,7 @@ disconnect (MMBearer *self,
             GAsyncReadyCallback callback,
             gpointer user_data)
 {
+    MMAtSerialPort *primary;
     MMBaseModem *modem = NULL;
     DisconnectContext *ctx;
 
@@ -1571,6 +1595,20 @@ disconnect (MMBearer *self,
                   NULL);
     g_assert (modem != NULL);
 
+    /* We need the primary port to disconnect... */
+    primary = mm_base_modem_peek_port_primary (modem);
+    if (!primary) {
+        g_simple_async_report_error_in_idle (
+            G_OBJECT (self),
+            callback,
+            user_data,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_FAILED,
+            "Couldn't disconnect: couldn't get primary port");
+        g_object_unref (modem);
+        return;
+    }
+
     /* In this context, we only keep the stuff we'll need later */
     ctx = g_new0 (DisconnectContext, 1);
     ctx->self = g_object_ref (self);
@@ -1585,8 +1623,8 @@ disconnect (MMBearer *self,
             MM_BROADBAND_BEARER_GET_CLASS (self)->disconnect_3gpp (
                 MM_BROADBAND_BEARER (self),
                 MM_BROADBAND_MODEM (modem),
-                mm_base_modem_get_port_primary (modem),
-                mm_base_modem_get_port_secondary (modem),
+                primary,
+                mm_base_modem_peek_port_secondary (modem),
                 MM_BROADBAND_BEARER (self)->priv->port,
                 (GAsyncReadyCallback) disconnect_3gpp_ready,
                 ctx);
@@ -1596,8 +1634,8 @@ disconnect (MMBearer *self,
         MM_BROADBAND_BEARER_GET_CLASS (self)->disconnect_cdma (
             MM_BROADBAND_BEARER (self),
             MM_BROADBAND_MODEM (modem),
-            mm_base_modem_get_port_primary (modem),
-            mm_base_modem_get_port_secondary (modem),
+            primary,
+            mm_base_modem_peek_port_secondary (modem),
             MM_BROADBAND_BEARER (self)->priv->port,
             (GAsyncReadyCallback) disconnect_cdma_ready,
             ctx);
@@ -1655,8 +1693,11 @@ static void
 init_async_context_free (InitAsyncContext *ctx,
                          gboolean close_port)
 {
-    if (close_port)
-        mm_serial_port_close (MM_SERIAL_PORT (ctx->port));
+    if (ctx->port) {
+        if (close_port)
+            mm_serial_port_close (MM_SERIAL_PORT (ctx->port));
+        g_object_unref (ctx->port);
+    }
     g_object_unref (ctx->self);
     g_object_unref (ctx->modem);
     g_object_unref (ctx->result);
@@ -1919,6 +1960,16 @@ initable_init_async (GAsyncInitable *initable,
                   NULL);
 
     ctx->port = mm_base_modem_get_port_primary (ctx->modem);
+    if (!ctx->port) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't get primary port");
+        g_simple_async_result_complete_in_idle (ctx->result);
+        init_async_context_free (ctx, FALSE);
+        return;
+    }
+
     if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->port), &error)) {
         g_simple_async_result_take_error (ctx->result, error);
         g_simple_async_result_complete_in_idle (ctx->result);

@@ -381,12 +381,18 @@ create_bearer (MMIfaceModem *self,
 static void
 setup_ports (MMBroadbandModem *self)
 {
+    MMAtSerialPort *primary;
+
     /* Call parent's setup ports first always */
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_iridium_parent_class)->setup_ports (self);
 
     /* Set 9600 baudrate by default in the AT port */
     mm_dbg ("Baudrate will be set to 9600 bps...");
-    g_object_set (G_OBJECT (mm_base_modem_get_port_primary (MM_BASE_MODEM (self))),
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (!primary)
+        return;
+
+    g_object_set (G_OBJECT (primary),
                   MM_SERIAL_PORT_BAUD, 9600,
                   NULL);
 }

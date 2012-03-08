@@ -57,6 +57,7 @@ typedef struct {
     MMBearerIridium *self;
     GSimpleAsyncResult *result;
     GCancellable *cancellable;
+    MMAtSerialPort *primary;
     GError *saved_error;
 } ConnectContext;
 
@@ -66,6 +67,8 @@ connect_context_complete_and_free (ConnectContext *ctx)
     g_simple_async_result_complete_in_idle (ctx->result);
     if (ctx->saved_error)
         g_error_free (ctx->saved_error);
+    if (ctx->primary)
+        g_object_unref (ctx->primary);
     g_object_unref (ctx->cancellable);
     g_object_unref (ctx->result);
     g_object_unref (ctx->self);
@@ -111,7 +114,7 @@ connect_report_ready (MMBaseModem *modem,
     }
 
     /* If we got a proper extended reply, build the new error to be set */
-    result = mm_base_modem_at_command_finish (modem, res, NULL);
+    result = mm_base_modem_at_command_in_port_finish (modem, res, NULL);
     if (result &&
         g_str_has_prefix (result, "+CEER: ") &&
         strlen (result) > 7) {
@@ -143,11 +146,12 @@ dial_ready (MMBaseModem *modem,
     /* DO NOT check for cancellable here. If we got here without errors, the
      * bearer is really connected and therefore we need to reflect that in
      * the state machine. */
-    mm_base_modem_at_command_finish (modem, res, &(ctx->saved_error));
+    mm_base_modem_at_command_in_port_finish (modem, res, &(ctx->saved_error));
     if (ctx->saved_error) {
         /* Try to get more information why it failed */
-        mm_base_modem_at_command (
+        mm_base_modem_at_command_in_port (
             modem,
+            ctx->primary,
             "+CEER",
             3,
             FALSE,
@@ -158,7 +162,7 @@ dial_ready (MMBaseModem *modem,
     }
 
     /* Port is connected; update the state */
-    mm_port_set_connected (MM_PORT (mm_base_modem_get_port_primary (modem)), TRUE);
+    mm_port_set_connected (MM_PORT (ctx->primary), TRUE);
 
     /* Build IP config; always PPP based */
     config = mm_bearer_ip_config_new ();
@@ -166,7 +170,7 @@ dial_ready (MMBaseModem *modem,
 
     /* Build result */
     result = g_new0 (ConnectResult, 1);
-    result->data = g_object_ref (mm_base_modem_get_port_primary (modem));
+    result->data = g_object_ref (ctx->primary);
     result->ipv4_config = config;
     result->ipv6_config = g_object_ref (config);
 
@@ -195,7 +199,7 @@ service_type_ready (MMBaseModem *modem,
     }
 
     /* Errors setting the service type will be critical */
-    mm_base_modem_at_command_finish (modem, res, &error);
+    mm_base_modem_at_command_in_port_finish (modem, res, &error);
     if (error) {
         g_simple_async_result_take_error (ctx->result, error);
         connect_context_complete_and_free (ctx);
@@ -205,8 +209,9 @@ service_type_ready (MMBaseModem *modem,
     /* We just use the default number to dial in the Iridium network. Also note
      * that we won't specify a specific port to use; Iridium modems only expose
      * one. */
-    mm_base_modem_at_command (
+    mm_base_modem_at_command_in_port (
         modem,
+        ctx->primary,
         "ATDT008816000025",
         60,
         FALSE,
@@ -235,6 +240,7 @@ connect (MMBearer *self,
     /* In this context, we only keep the stuff we'll need later */
     ctx = g_new0 (ConnectContext, 1);
     ctx->self = g_object_ref (self);
+    ctx->primary = mm_base_modem_get_port_primary (modem);
     ctx->cancellable = g_object_ref (cancellable);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
@@ -243,8 +249,9 @@ connect (MMBearer *self,
 
     /* Bearer service type set to 9600bps (V.110), which behaves better than the
      * default 9600bps (V.32). */
-    mm_base_modem_at_command (
+    mm_base_modem_at_command_in_port (
         modem,
+        ctx->primary,
         "+CBST=71,0,1",
         3,
         FALSE,
@@ -258,6 +265,24 @@ connect (MMBearer *self,
 /*****************************************************************************/
 /* Disconnect */
 
+typedef struct {
+    MMBearerIridium *self;
+    MMBaseModem *modem;
+    MMAtSerialPort *primary;
+    GSimpleAsyncResult *result;
+} DisconnectContext;
+
+static void
+disconnect_context_complete_and_free (DisconnectContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    if (ctx->primary)
+        g_object_unref (ctx->primary);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->self);
+}
+
 static gboolean
 disconnect_finish (MMBearer *self,
                    GAsyncResult *res,
@@ -269,7 +294,7 @@ disconnect_finish (MMBearer *self,
 static void
 primary_flash_ready (MMSerialPort *port,
                      GError *error,
-                     GSimpleAsyncResult *result)
+                     DisconnectContext *ctx)
 {
     if (error) {
         /* Ignore "NO CARRIER" response when modem disconnects and any flash
@@ -282,9 +307,8 @@ primary_flash_ready (MMSerialPort *port,
                               MM_SERIAL_ERROR,
                               MM_SERIAL_ERROR_FLASH_FAILED)) {
             /* Fatal */
-            g_simple_async_result_set_from_error (result, error);
-            g_simple_async_result_complete (result);
-            g_object_unref (result);
+            g_simple_async_result_set_from_error (ctx->result, error);
+            disconnect_context_complete_and_free (ctx);
             return;
         }
         mm_dbg ("Port flashing failed (not fatal): %s", error->message);
@@ -294,40 +318,27 @@ primary_flash_ready (MMSerialPort *port,
      * already have set the port as disconnected (e.g the 3GPP one) */
     mm_port_set_connected (MM_PORT (port), FALSE);
 
-    g_simple_async_result_set_op_res_gboolean (result, TRUE);
-    g_simple_async_result_complete (result);
-    g_object_unref (result);
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    disconnect_context_complete_and_free (ctx);
 }
 
 static gboolean
-after_disconnect_sleep_cb (GSimpleAsyncResult *simple)
+after_disconnect_sleep_cb (DisconnectContext *ctx)
 {
     GError *error = NULL;
-    MMAtSerialPort *primary;
-    MMBearer *self;
-    MMBaseModem *modem;
-
-    self = MM_BEARER (g_async_result_get_source_object (G_ASYNC_RESULT (simple)));
-    g_object_get (self,
-                  MM_BEARER_MODEM, &modem,
-                  NULL);
-    primary = mm_base_modem_get_port_primary (modem);
 
     /* Propagate errors when reopening the port */
-    if (!mm_serial_port_open (MM_SERIAL_PORT (primary), &error)) {
-        g_simple_async_result_take_error (simple, error);
-        g_simple_async_result_complete (simple);
-        g_object_unref (simple);
-    } else {
-        mm_serial_port_flash (MM_SERIAL_PORT (primary),
-                              1000,
-                              TRUE,
-                              (MMSerialFlashFn)primary_flash_ready,
-                              simple);
+    if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->primary), &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        disconnect_context_complete_and_free (ctx);
+        return FALSE;
     }
 
-    g_object_unref (modem);
-    g_object_unref (self);
+    mm_serial_port_flash (MM_SERIAL_PORT (ctx->primary),
+                          1000,
+                          TRUE,
+                          (MMSerialFlashFn)primary_flash_ready,
+                          ctx);
     return FALSE;
 }
 
@@ -336,42 +347,40 @@ disconnect (MMBearer *self,
             GAsyncReadyCallback callback,
             gpointer user_data)
 {
-    MMAtSerialPort *primary;
-    MMBaseModem *modem = NULL;
-    GSimpleAsyncResult *result;
+    DisconnectContext *ctx;
 
+    ctx = g_new (DisconnectContext, 1);
+    ctx->self = g_object_ref (self);
     g_object_get (self,
-                  MM_BEARER_MODEM, &modem,
+                  MM_BEARER_MODEM, &ctx->modem,
                   NULL);
-    g_assert (modem != NULL);
-    primary = mm_base_modem_get_port_primary (modem);
-    g_object_unref (modem);
+    ctx->primary = mm_base_modem_get_port_primary (ctx->modem);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             disconnect);
 
-    if (!mm_port_get_connected (MM_PORT (primary))) {
-        g_simple_async_report_error_in_idle (
-            G_OBJECT (self),
-            callback,
-            user_data,
+    if (!ctx->primary ||
+        !mm_port_get_connected (MM_PORT (ctx->primary))) {
+        g_simple_async_result_set_error (
+            ctx->result,
             MM_CORE_ERROR,
             MM_CORE_ERROR_FAILED,
             "Couldn't disconnect Iridium: this bearer is not connected");
+        disconnect_context_complete_and_free (ctx);
         return;
     }
 
     /* Just flash the primary port */
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        disconnect);
 
     /* When we enable the modem we kept one open count in the primary port.
      * We now need to fully close that one, as if we were disabled, and reopen
      * it again afterwards. */
-    mm_serial_port_close (MM_SERIAL_PORT (primary));
-    g_warn_if_fail (!mm_serial_port_is_open (MM_SERIAL_PORT (primary)));
+    mm_serial_port_close (MM_SERIAL_PORT (ctx->primary));
+    g_warn_if_fail (!mm_serial_port_is_open (MM_SERIAL_PORT (ctx->primary)));
 
     mm_dbg ("Waiting some seconds before reopening the port...");
-    g_timeout_add_seconds (5, (GSourceFunc)after_disconnect_sleep_cb, result);
+    g_timeout_add_seconds (5, (GSourceFunc)after_disconnect_sleep_cb, ctx);
 }
 
 /*****************************************************************************/
