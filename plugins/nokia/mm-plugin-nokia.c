@@ -117,7 +117,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS, subsystems,
                       MM_PLUGIN_BASE_ALLOWED_VENDOR_IDS, vendor_ids,
                       MM_PLUGIN_BASE_CUSTOM_INIT, custom_init,
-                      MM_PLUGIN_BASE_ALLOWED_AT, TRUE,
+                      MM_PLUGIN_BASE_ALLOWED_SINGLE_AT, TRUE, /* only 1 AT port expected! */
                       NULL));
 }
 
