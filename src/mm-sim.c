@@ -140,7 +140,6 @@ change_pin (MMSim *self,
 
 typedef struct {
     MMSim *self;
-    MMBaseModem *modem;
     GDBusMethodInvocation *invocation;
     gchar *old_pin;
     gchar *new_pin;
@@ -150,7 +149,6 @@ static void
 handle_change_pin_context_free (HandleChangePinContext *ctx)
 {
     g_object_unref (ctx->invocation);
-    g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_free (ctx->old_pin);
     g_free (ctx->new_pin);
@@ -235,13 +233,10 @@ handle_change_pin (MMSim *self,
     ctx = g_new0 (HandleChangePinContext, 1);
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
-    g_object_get (self,
-                  MM_SIM_MODEM, &ctx->modem,
-                  NULL);
     ctx->old_pin = g_strdup (old_pin);
     ctx->new_pin = g_strdup (new_pin);
 
-    mm_base_modem_authorize (ctx->modem,
+    mm_base_modem_authorize (self->priv->modem,
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_change_pin_auth_ready,
@@ -308,7 +303,6 @@ enable_pin (MMSim *self,
 
 typedef struct {
     MMSim *self;
-    MMBaseModem *modem;
     GDBusMethodInvocation *invocation;
     gchar *pin;
     gboolean enabled;
@@ -318,7 +312,6 @@ static void
 handle_enable_pin_context_free (HandleEnablePinContext *ctx)
 {
     g_object_unref (ctx->invocation);
-    g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_free (ctx->pin);
     g_free (ctx);
@@ -404,13 +397,10 @@ handle_enable_pin (MMSim *self,
     ctx = g_new0 (HandleEnablePinContext, 1);
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
-    g_object_get (self,
-                  MM_SIM_MODEM, &ctx->modem,
-                  NULL);
     ctx->pin = g_strdup (pin);
     ctx->enabled = enabled;
 
-    mm_base_modem_authorize (ctx->modem,
+    mm_base_modem_authorize (self->priv->modem,
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_enable_pin_auth_ready,
@@ -691,7 +681,6 @@ mm_sim_send_puk (MMSim *self,
 
 typedef struct {
     MMSim *self;
-    MMBaseModem *modem;
     GDBusMethodInvocation *invocation;
     gchar *pin;
 } HandleSendPinContext;
@@ -700,7 +689,6 @@ static void
 handle_send_pin_context_free (HandleSendPinContext *ctx)
 {
     g_object_unref (ctx->invocation);
-    g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_free (ctx->pin);
     g_free (ctx);
@@ -750,12 +738,9 @@ handle_send_pin (MMSim *self,
     ctx = g_new0 (HandleSendPinContext, 1);
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
-    g_object_get (self,
-                  MM_SIM_MODEM, &ctx->modem,
-                  NULL);
     ctx->pin = g_strdup (pin);
 
-    mm_base_modem_authorize (ctx->modem,
+    mm_base_modem_authorize (self->priv->modem,
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_send_pin_auth_ready,
@@ -768,7 +753,6 @@ handle_send_pin (MMSim *self,
 
 typedef struct {
     MMSim *self;
-    MMBaseModem *modem;
     GDBusMethodInvocation *invocation;
     gchar *puk;
     gchar *new_pin;
@@ -778,7 +762,6 @@ static void
 handle_send_puk_context_free (HandleSendPukContext *ctx)
 {
     g_object_unref (ctx->invocation);
-    g_object_unref (ctx->modem);
     g_object_unref (ctx->self);
     g_free (ctx->puk);
     g_free (ctx->new_pin);
@@ -831,13 +814,10 @@ handle_send_puk (MMSim *self,
     ctx = g_new0 (HandleSendPukContext, 1);
     ctx->self = g_object_ref (self);
     ctx->invocation = g_object_ref (invocation);
-    g_object_get (self,
-                  MM_SIM_MODEM, &ctx->modem,
-                  NULL);
     ctx->puk = g_strdup (puk);
     ctx->new_pin = g_strdup (new_pin);
 
-    mm_base_modem_authorize (ctx->modem,
+    mm_base_modem_authorize (self->priv->modem,
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
                              (GAsyncReadyCallback)handle_send_puk_auth_ready,
