@@ -1996,10 +1996,22 @@ unlock_check_context_free (UnlockCheckContext *ctx)
     g_free (ctx);
 }
 
+static void
+reinitialize_ready (MMBaseModem *self,
+                    GAsyncResult *res)
+{
+    mm_base_modem_initialize_finish (self, res, NULL);
+    mm_iface_modem_update_state (MM_IFACE_MODEM (self),
+                                 MM_MODEM_STATE_DISABLED,
+                                 MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+}
+
 static gboolean
 restart_initialize_idle (MMIfaceModem *self)
 {
-    mm_base_modem_initialize (MM_BASE_MODEM (self), NULL, NULL);
+    mm_base_modem_initialize (MM_BASE_MODEM (self),
+                              (GAsyncReadyCallback) reinitialize_ready,
+                              NULL);
     return FALSE;
 }
 
@@ -2018,16 +2030,19 @@ set_lock_status (MMIfaceModem *self,
     if (lock == MM_MODEM_LOCK_NONE ||
         lock == MM_MODEM_LOCK_SIM_PIN2 ||
         lock == MM_MODEM_LOCK_SIM_PUK2) {
+        /* Notify transition from UNKNOWN/LOCKED to DISABLED */
         if (old_lock != MM_MODEM_LOCK_NONE &&
             old_lock != MM_MODEM_LOCK_SIM_PIN2 &&
             old_lock != MM_MODEM_LOCK_SIM_PUK2) {
-            /* Notify transition from UNKNOWN/LOCKED to DISABLED */
-            mm_iface_modem_update_state (self,
-                                         MM_MODEM_STATE_DISABLED,
-                                         MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
-            /* Only restart initialization if going from LOCKED to DISABLED */
+            /* Only restart initialization if going from LOCKED to DISABLED.
+             * If this is the case, we do NOT update the state yet, we wait
+             * to be completely re-initialized to do so. */
             if (old_lock != MM_MODEM_LOCK_UNKNOWN)
                 g_idle_add ((GSourceFunc)restart_initialize_idle, self);
+            else
+                mm_iface_modem_update_state (self,
+                                             MM_MODEM_STATE_DISABLED,
+                                             MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
         }
     } else {
         if (old_lock == MM_MODEM_LOCK_UNKNOWN) {
