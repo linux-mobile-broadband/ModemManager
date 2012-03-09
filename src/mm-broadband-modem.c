@@ -5830,6 +5830,7 @@ typedef enum {
 
 typedef struct {
     MMBroadbandModem *self;
+    GCancellable *cancellable;
     GSimpleAsyncResult *result;
     DisablingStep step;
 } DisablingContext;
@@ -5841,8 +5842,23 @@ disabling_context_complete_and_free (DisablingContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
+    g_object_unref (ctx->cancellable);
     g_object_unref (ctx->self);
     g_free (ctx);
+}
+
+static gboolean
+disabling_context_complete_and_free_if_cancelled (DisablingContext *ctx)
+{
+    if (!g_cancellable_is_cancelled (ctx->cancellable))
+        return FALSE;
+
+    g_simple_async_result_set_error (ctx->result,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_CANCELLED,
+                                     "Disabling cancelled");
+    disabling_context_complete_and_free (ctx);
+    return TRUE;
 }
 
 static gboolean
@@ -5914,6 +5930,10 @@ bearer_list_disconnect_all_bearers_ready (MMBearerList *list,
 static void
 disabling_step (DisablingContext *ctx)
 {
+    /* Don't run new steps if we're cancelled */
+    if (disabling_context_complete_and_free_if_cancelled (ctx))
+        return;
+
     switch (ctx->step) {
     case DISABLING_STEP_FIRST:
         /* Fall down to next step */
@@ -6079,6 +6099,7 @@ disable (MMBaseModem *self,
         ctx = g_new0 (DisablingContext, 1);
         ctx->self = g_object_ref (self);
         ctx->result = result;
+        ctx->cancellable = g_object_ref (cancellable);
         ctx->step = DISABLING_STEP_FIRST;
 
         disabling_step (ctx);
@@ -6109,6 +6130,7 @@ typedef enum {
 
 typedef struct {
     MMBroadbandModem *self;
+    GCancellable *cancellable;
     GSimpleAsyncResult *result;
     EnablingStep step;
 } EnablingContext;
@@ -6120,8 +6142,23 @@ enabling_context_complete_and_free (EnablingContext *ctx)
 {
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->result);
+    g_object_unref (ctx->cancellable);
     g_object_unref (ctx->self);
     g_free (ctx);
+}
+
+static gboolean
+enabling_context_complete_and_free_if_cancelled (EnablingContext *ctx)
+{
+    if (!g_cancellable_is_cancelled (ctx->cancellable))
+        return FALSE;
+
+    g_simple_async_result_set_error (ctx->result,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_CANCELLED,
+                                     "Enabling cancelled");
+    enabling_context_complete_and_free (ctx);
+    return TRUE;
 }
 
 static gboolean
@@ -6174,6 +6211,10 @@ INTERFACE_ENABLE_READY_FN (iface_modem_time,      MM_IFACE_MODEM_TIME,      FALS
 static void
 enabling_step (EnablingContext *ctx)
 {
+    /* Don't run new steps if we're cancelled */
+    if (enabling_context_complete_and_free_if_cancelled (ctx))
+        return;
+
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
         /* Fall down to next step */
@@ -6310,6 +6351,7 @@ enable (MMBaseModem *self,
         ctx = g_new0 (EnablingContext, 1);
         ctx->self = g_object_ref (self);
         ctx->result = result;
+        ctx->cancellable = g_object_ref (cancellable);
         ctx->step = ENABLING_STEP_FIRST;
         enabling_step (ctx);
         return;
@@ -6369,6 +6411,7 @@ typedef enum {
 
 typedef struct {
     MMBroadbandModem *self;
+    GCancellable *cancellable;
     GSimpleAsyncResult *result;
     InitializeStep step;
     MMAtSerialPort *port;
@@ -6388,8 +6431,23 @@ initialize_context_complete_and_free (InitializeContext *ctx)
             mm_serial_port_close (MM_SERIAL_PORT (ctx->port));
         g_object_unref (ctx->port);
     }
+    g_object_unref (ctx->cancellable);
     g_object_unref (ctx->self);
     g_free (ctx);
+}
+
+static gboolean
+initialize_context_complete_and_free_if_cancelled (InitializeContext *ctx)
+{
+    if (!g_cancellable_is_cancelled (ctx->cancellable))
+        return FALSE;
+
+    g_simple_async_result_set_error (ctx->result,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_CANCELLED,
+                                     "Initialization cancelled");
+    initialize_context_complete_and_free (ctx);
+    return TRUE;
 }
 
 static gboolean
@@ -6448,6 +6506,10 @@ INTERFACE_INIT_READY_FN (iface_modem_time,      MM_IFACE_MODEM_TIME,      FALSE)
 static void
 initialize_step (InitializeContext *ctx)
 {
+    /* Don't run new steps if we're cancelled */
+    if (initialize_context_complete_and_free_if_cancelled (ctx))
+        return;
+
     switch (ctx->step) {
     case INITIALIZE_STEP_FIRST:
         /* Fall down to next step */
@@ -6619,6 +6681,7 @@ initialize (MMBaseModem *self,
 
     ctx = g_new0 (InitializeContext, 1);
     ctx->self = g_object_ref (self);
+    ctx->cancellable = g_object_ref (cancellable);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
