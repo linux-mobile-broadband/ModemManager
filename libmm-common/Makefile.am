@@ -14,6 +14,7 @@ GENERATED_H = \
 GENERATED_C = \
 	mm-enums-types.c \
 	mm-errors-types.c \
+	mm-errors-quarks.c \
 	mm-gdbus-manager.c \
 	mm-gdbus-sim.c \
 	mm-gdbus-sms.c \
@@ -50,7 +51,7 @@ mm-enums-types.c: Makefile.am $(top_srcdir)/include/ModemManager-enums.h $(top_s
 		--template $(top_srcdir)/build-aux/mm-enums-template.c \
 		$(top_srcdir)/include/ModemManager-enums.h > $@
 
-# Error types
+# Error types & quarks
 mm-errors-types.h: Makefile.am $(top_srcdir)/include/ModemManager-errors.h $(top_srcdir)/build-aux/mm-errors-template.h
 	$(AM_V_GEN) $(GLIB_MKENUMS) \
 		--fhead "#ifndef __MM_ERRORS_TYPES_H__\n#define __MM_ERRORS_TYPES_H__\n" \
@@ -61,7 +62,13 @@ mm-errors-types.h: Makefile.am $(top_srcdir)/include/ModemManager-errors.h $(top
 mm-errors-types.c: Makefile.am $(top_srcdir)/include/ModemManager-errors.h $(top_srcdir)/build-aux/mm-errors-template.c mm-errors-types.h
 	$(AM_V_GEN) $(GLIB_MKENUMS) \
 		--fhead "#include <ModemManager-errors.h>\n#include \"mm-errors-types.h\"\n" \
-		--template $(top_srcdir)/build-aux/mm-errors-template.h \
+		--template $(top_srcdir)/build-aux/mm-errors-template.c \
+		$(top_srcdir)/include/ModemManager-errors.h > $@
+
+mm-errors-quarks.c: Makefile.am $(top_srcdir)/include/ModemManager-errors.h $(top_srcdir)/build-aux/mm-errors-quarks-template.c $(top_srcdir)/include/ModemManager-names.h mm-errors-types.h
+	$(AM_V_GEN) $(GLIB_MKENUMS) \
+		--fhead "#include <ModemManager-errors.h>\n#include \"mm-errors-types.h\"\n" \
+		--template $(top_srcdir)/build-aux/mm-errors-quarks-template.c \
 		$(top_srcdir)/include/ModemManager-errors.h > $@
 
 # Manager interface
@@ -157,7 +164,6 @@ mm-bearer-properties.c: mm-errors-types.h
 mm-sms-properties.c: mm-errors-types.h
 mm-bearer-ip-config.c: mm-errors-types.h
 mm-location-3gpp.c: mm-errors-types.h
-mm-errors-quarks.c: mm-errors-types.h
 mm-unlock-retries.c: mm-enums-types.h
 mm-network-timezone.c: mm-errors-types.h
 
@@ -185,7 +191,6 @@ nodist_libmm_common_la_SOURCES = \
 	$(GENERATED_C)
 
 libmm_common_la_SOURCES = \
-	mm-errors-quarks.c \
 	mm-common-helpers.h \
 	mm-common-helpers.c \
 	mm-simple-status.h \

@@ -134,6 +134,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define MM_DBUS_SIM_PREFIX    MM_DBUS_PATH "/SIM"
 #define MM_DBUS_SMS_PREFIX    MM_DBUS_PATH "/SMS"
 
+/* Prefix for DBus errors */
+#define MM_DBUS_ERROR_PREFIX "org.freedesktop.ModemManager1.Error"
+
 /**************
  * Interfaces *
  **************/
