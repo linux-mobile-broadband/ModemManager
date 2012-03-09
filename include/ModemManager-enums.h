@@ -93,6 +93,7 @@ typedef enum { /*< underscore_name=mm_modem_lock >*/
 /**
  * MMModemState:
  * @MM_MODEM_STATE_UNKNOWN: State unknown or not reportable.
+ * @MM_MODEM_STATE_INITIALIZING: The modem is currently being initialized.
  * @MM_MODEM_STATE_LOCKED: The modem needs to be unlocked.
  * @MM_MODEM_STATE_DISABLED: The modem is not enabled and is powered down.
  * @MM_MODEM_STATE_DISABLING: The modem is currently transitioning to the @MM_MODEM_STATE_DISABLED state.
@@ -108,16 +109,17 @@ typedef enum { /*< underscore_name=mm_modem_lock >*/
  */
 typedef enum { /*< underscore_name=mm_modem_state >*/
     MM_MODEM_STATE_UNKNOWN       = 0,
-    MM_MODEM_STATE_LOCKED        = 1,
-    MM_MODEM_STATE_DISABLED      = 2,
-    MM_MODEM_STATE_DISABLING     = 3,
-    MM_MODEM_STATE_ENABLING      = 4,
-    MM_MODEM_STATE_ENABLED       = 5,
-    MM_MODEM_STATE_SEARCHING     = 6,
-    MM_MODEM_STATE_REGISTERED    = 7,
-    MM_MODEM_STATE_DISCONNECTING = 8,
-    MM_MODEM_STATE_CONNECTING    = 9,
-    MM_MODEM_STATE_CONNECTED     = 10
+    MM_MODEM_STATE_INITIALIZING  = 1,
+    MM_MODEM_STATE_LOCKED        = 2,
+    MM_MODEM_STATE_DISABLED      = 3,
+    MM_MODEM_STATE_DISABLING     = 4,
+    MM_MODEM_STATE_ENABLING      = 5,
+    MM_MODEM_STATE_ENABLED       = 6,
+    MM_MODEM_STATE_SEARCHING     = 7,
+    MM_MODEM_STATE_REGISTERED    = 8,
+    MM_MODEM_STATE_DISCONNECTING = 9,
+    MM_MODEM_STATE_CONNECTING    = 10,
+    MM_MODEM_STATE_CONNECTED     = 11
 } MMModemState;
 
 /**

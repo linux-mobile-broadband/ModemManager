@@ -985,10 +985,11 @@ mm_iface_modem_update_state (MMIfaceModem *self,
                       NULL);
 
         /* Signal status change */
-        mm_gdbus_modem_emit_state_changed (skeleton,
-                                           old_state,
-                                           new_state,
-                                           reason);
+        if (skeleton)
+            mm_gdbus_modem_emit_state_changed (skeleton,
+                                               old_state,
+                                               new_state,
+                                               reason);
 
         /* If we go to registered state (from unregistered), setup signal
          * quality and access technologies periodic retrieval */
@@ -1287,6 +1288,7 @@ handle_reset_auth_ready (MMBaseModem *self,
 
     switch (modem_state) {
     case MM_MODEM_STATE_UNKNOWN:
+    case MM_MODEM_STATE_INITIALIZING:
     case MM_MODEM_STATE_LOCKED:
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
@@ -1399,6 +1401,7 @@ handle_factory_reset_auth_ready (MMBaseModem *self,
 
     switch (modem_state) {
     case MM_MODEM_STATE_UNKNOWN:
+    case MM_MODEM_STATE_INITIALIZING:
     case MM_MODEM_STATE_LOCKED:
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
@@ -1662,6 +1665,7 @@ handle_set_bands_auth_ready (MMBaseModem *self,
 
     switch (modem_state) {
     case MM_MODEM_STATE_UNKNOWN:
+    case MM_MODEM_STATE_INITIALIZING:
     case MM_MODEM_STATE_LOCKED:
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
@@ -1905,6 +1909,7 @@ handle_set_allowed_modes_auth_ready (MMBaseModem *self,
 
     switch (modem_state) {
     case MM_MODEM_STATE_UNKNOWN:
+    case MM_MODEM_STATE_INITIALIZING:
     case MM_MODEM_STATE_LOCKED:
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
@@ -2000,10 +2005,13 @@ static void
 reinitialize_ready (MMBaseModem *self,
                     GAsyncResult *res)
 {
-    mm_base_modem_initialize_finish (self, res, NULL);
-    mm_iface_modem_update_state (MM_IFACE_MODEM (self),
-                                 MM_MODEM_STATE_DISABLED,
-                                 MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+    GError *error = NULL;
+
+    mm_base_modem_initialize_finish (self, res, &error);
+    if (error) {
+        mm_warn ("Modem reinitialization failed: '%s'", error->message);
+        g_error_free (error);
+    }
 }
 
 static gboolean
@@ -2030,23 +2038,19 @@ set_lock_status (MMIfaceModem *self,
     if (lock == MM_MODEM_LOCK_NONE ||
         lock == MM_MODEM_LOCK_SIM_PIN2 ||
         lock == MM_MODEM_LOCK_SIM_PUK2) {
-        /* Notify transition from UNKNOWN/LOCKED to DISABLED */
+        /* Notify transition from INITIALIZING/LOCKED to DISABLED */
         if (old_lock != MM_MODEM_LOCK_NONE &&
             old_lock != MM_MODEM_LOCK_SIM_PIN2 &&
             old_lock != MM_MODEM_LOCK_SIM_PUK2) {
-            /* Only restart initialization if going from LOCKED to DISABLED.
+            /* Only restart initialization if leaving LOCKED.
              * If this is the case, we do NOT update the state yet, we wait
              * to be completely re-initialized to do so. */
             if (old_lock != MM_MODEM_LOCK_UNKNOWN)
                 g_idle_add ((GSourceFunc)restart_initialize_idle, self);
-            else
-                mm_iface_modem_update_state (self,
-                                             MM_MODEM_STATE_DISABLED,
-                                             MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
         }
     } else {
         if (old_lock == MM_MODEM_LOCK_UNKNOWN) {
-            /* Notify transition from UNKNOWN to LOCKED */
+            /* Notify transition from INITIALIZING to LOCKED */
             mm_iface_modem_update_state (self,
                                          MM_MODEM_STATE_LOCKED,
                                          MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);

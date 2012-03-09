@@ -489,11 +489,15 @@ typedef struct {
     MMSim *self;
     GSimpleAsyncResult *result;
     GError *save_error;
+    gulong wait_for_unlock_id;
 } SendPinPukContext;
 
 static void
 send_pin_puk_context_complete_and_free (SendPinPukContext *ctx)
 {
+    if (ctx->wait_for_unlock_id)
+        g_signal_handler_disconnect (ctx->self->priv->modem,
+                                     ctx->wait_for_unlock_id);
     if (ctx->save_error)
         g_error_free (ctx->save_error);
     g_simple_async_result_complete (ctx->result);
@@ -568,16 +572,17 @@ unlock_check_ready (MMIfaceModem *modem,
             g_simple_async_result_take_error (ctx->result, ctx->save_error);
             ctx->save_error = NULL;
             g_clear_error (&error);
-        }
-        else if (error)
+        } else if (error)
             g_simple_async_result_take_error (ctx->result, error);
         else
             g_simple_async_result_take_error (ctx->result,
                                               error_for_unlock_check (lock));
-    } else
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        send_pin_puk_context_complete_and_free (ctx);
+    }
 
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     send_pin_puk_context_complete_and_free (ctx);
+    return;
 }
 
 static void

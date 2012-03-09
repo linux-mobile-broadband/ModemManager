@@ -135,12 +135,19 @@ handle_activate_auth_ready (MMBaseModem *self,
         g_assert_not_reached ();
         break;
 
-    case MM_MODEM_STATE_LOCKED:
+    case MM_MODEM_STATE_INITIALIZING:
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
                                                "Cannot perform OTA activation: "
-                                               "device locked");
+                                               "device not fully initialized yet");
+        handle_activate_context_free (ctx);
+        return;
+
+    case MM_MODEM_STATE_LOCKED:
+        /* We should never have such request in LOCKED state
+         * (interface wasn't exported yet) */
+        g_assert_not_reached ();
         break;
 
     case MM_MODEM_STATE_ENABLED:
@@ -278,12 +285,19 @@ handle_activate_manual_auth_ready (MMBaseModem *self,
         g_assert_not_reached ();
         break;
 
-    case MM_MODEM_STATE_LOCKED:
+    case MM_MODEM_STATE_INITIALIZING:
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
                                                "Cannot perform manual activation: "
-                                               "device locked");
+                                               "device not fully initialized yet");
+        handle_activate_manual_context_free (ctx);
+        return;
+
+    case MM_MODEM_STATE_LOCKED:
+        /* We should never have such request in LOCKED state
+         * (interface wasn't exported yet) */
+        g_assert_not_reached ();
         break;
 
     case MM_MODEM_STATE_ENABLED:

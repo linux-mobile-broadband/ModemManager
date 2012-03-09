@@ -6066,6 +6066,7 @@ disable (MMBaseModem *self,
         g_assert_not_reached ();
         break;
 
+    case MM_MODEM_STATE_INITIALIZING:
     case MM_MODEM_STATE_LOCKED:
     case MM_MODEM_STATE_DISABLED:
         /* Just return success, don't relaunch enabling */
@@ -6336,6 +6337,14 @@ enable (MMBaseModem *self,
     case MM_MODEM_STATE_UNKNOWN:
         /* We should never have a UNKNOWN->ENABLED transition */
         g_assert_not_reached ();
+        break;
+
+    case MM_MODEM_STATE_INITIALIZING:
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_WRONG_STATE,
+                                         "Cannot enable modem: "
+                                         "device not fully initialized yet");
         break;
 
     case MM_MODEM_STATE_LOCKED:
@@ -6663,6 +6672,12 @@ initialize_step (InitializeContext *ctx)
 
     case INITIALIZE_STEP_LAST:
         /* All initialized without errors! */
+
+        /* Set as disabled (a.k.a. initialized) */
+        mm_iface_modem_update_state (MM_IFACE_MODEM (ctx->self),
+                                     MM_MODEM_STATE_DISABLED,
+                                     MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+
         g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (ctx->result), TRUE);
         initialize_context_complete_and_free (ctx);
         return;
@@ -6677,18 +6692,55 @@ initialize (MMBaseModem *self,
             GAsyncReadyCallback callback,
             gpointer user_data)
 {
-    InitializeContext *ctx;
+    GSimpleAsyncResult *result;
 
-    ctx = g_new0 (InitializeContext, 1);
-    ctx->self = g_object_ref (self);
-    ctx->cancellable = g_object_ref (cancellable);
-    ctx->result = g_simple_async_result_new (G_OBJECT (self),
-                                             callback,
-                                             user_data,
-                                             initialize);
-    ctx->step = INITIALIZE_STEP_FIRST;
+    result = g_simple_async_result_new (G_OBJECT (self), callback, user_data, initialize);
 
-    initialize_step (ctx);
+    /* Check state before launching modem initialization */
+    switch (MM_BROADBAND_MODEM (self)->priv->modem_state) {
+    case MM_MODEM_STATE_UNKNOWN:
+    case MM_MODEM_STATE_LOCKED: {
+        InitializeContext *ctx;
+
+        ctx = g_new0 (InitializeContext, 1);
+        ctx->self = g_object_ref (self);
+        ctx->cancellable = g_object_ref (cancellable);
+        ctx->result = result;
+        ctx->step = INITIALIZE_STEP_FIRST;
+
+        /* Set as being initialized, even if we were locked before */
+        mm_iface_modem_update_state (MM_IFACE_MODEM (self),
+                                     MM_MODEM_STATE_INITIALIZING,
+                                     MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+
+        initialize_step (ctx);
+        return;
+    }
+
+    case MM_MODEM_STATE_INITIALIZING:
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_WRONG_STATE,
+                                         "Cannot initialize modem: "
+                                         "already being initialized");
+        break;
+
+    case MM_MODEM_STATE_DISABLED:
+    case MM_MODEM_STATE_DISABLING:
+    case MM_MODEM_STATE_ENABLING:
+    case MM_MODEM_STATE_ENABLED:
+    case MM_MODEM_STATE_SEARCHING:
+    case MM_MODEM_STATE_REGISTERED:
+    case MM_MODEM_STATE_DISCONNECTING:
+    case MM_MODEM_STATE_CONNECTING:
+    case MM_MODEM_STATE_CONNECTED:
+        /* Just return success, don't relaunch initialization */
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        break;
+    }
+
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
 }
 
 /*****************************************************************************/
