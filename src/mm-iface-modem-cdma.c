@@ -1209,11 +1209,13 @@ struct _EnablingContext {
     MMIfaceModemCdma *self;
     EnablingStep step;
     GSimpleAsyncResult *result;
+    GCancellable *cancellable;
     MmGdbusModemCdma *skeleton;
 };
 
 static EnablingContext *
 enabling_context_new (MMIfaceModemCdma *self,
+                      GCancellable *cancellable,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
@@ -1221,6 +1223,7 @@ enabling_context_new (MMIfaceModemCdma *self,
 
     ctx = g_new0 (EnablingContext, 1);
     ctx->self = g_object_ref (self);
+    ctx->cancellable = g_object_ref (cancellable);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -1240,8 +1243,23 @@ enabling_context_complete_and_free (EnablingContext *ctx)
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->self);
     g_object_unref (ctx->result);
+    g_object_unref (ctx->cancellable);
     g_object_unref (ctx->skeleton);
     g_free (ctx);
+}
+
+static gboolean
+enabling_context_complete_and_free_if_cancelled (EnablingContext *ctx)
+{
+    if (!g_cancellable_is_cancelled (ctx->cancellable))
+        return FALSE;
+
+    g_simple_async_result_set_error (ctx->result,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_CANCELLED,
+                                     "Interface enabling cancelled");
+    enabling_context_complete_and_free (ctx);
+    return TRUE;
 }
 
 gboolean
@@ -1275,6 +1293,10 @@ run_all_registration_checks_ready (MMIfaceModemCdma *self,
 static void
 interface_enabling_step (EnablingContext *ctx)
 {
+    /* Don't run new steps if we're cancelled */
+    if (enabling_context_complete_and_free_if_cancelled (ctx))
+        return;
+
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
         /* Fall down to next step */
@@ -1303,10 +1325,12 @@ interface_enabling_step (EnablingContext *ctx)
 
 void
 mm_iface_modem_cdma_enable (MMIfaceModemCdma *self,
+                            GCancellable *cancellable,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
     interface_enabling_step (enabling_context_new (self,
+                                                   cancellable,
                                                    callback,
                                                    user_data));
 }
@@ -1326,12 +1350,14 @@ typedef enum {
 struct _InitializationContext {
     MMIfaceModemCdma *self;
     MmGdbusModemCdma *skeleton;
+    GCancellable *cancellable;
     GSimpleAsyncResult *result;
     InitializationStep step;
 };
 
 static InitializationContext *
 initialization_context_new (MMIfaceModemCdma *self,
+                            GCancellable *cancellable,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
@@ -1339,6 +1365,7 @@ initialization_context_new (MMIfaceModemCdma *self,
 
     ctx = g_new0 (InitializationContext, 1);
     ctx->self = g_object_ref (self);
+    ctx->cancellable = g_object_ref (cancellable);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -1357,8 +1384,23 @@ initialization_context_complete_and_free (InitializationContext *ctx)
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->self);
     g_object_unref (ctx->result);
+    g_object_unref (ctx->cancellable);
     g_object_unref (ctx->skeleton);
     g_free (ctx);
+}
+
+static gboolean
+initialization_context_complete_and_free_if_cancelled (InitializationContext *ctx)
+{
+    if (!g_cancellable_is_cancelled (ctx->cancellable))
+        return FALSE;
+
+    g_simple_async_result_set_error (ctx->result,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_CANCELLED,
+                                     "Interface initialization cancelled");
+    initialization_context_complete_and_free (ctx);
+    return TRUE;
 }
 
 #undef STR_REPLY_READY_FN
@@ -1391,6 +1433,10 @@ STR_REPLY_READY_FN (esn, "ESN")
 static void
 interface_initialization_step (InitializationContext *ctx)
 {
+    /* Don't run new steps if we're cancelled */
+    if (initialization_context_complete_and_free_if_cancelled (ctx))
+        return;
+
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
         /* Fall down to next step */
@@ -1466,6 +1512,7 @@ mm_iface_modem_cdma_initialize_finish (MMIfaceModemCdma *self,
 
 void
 mm_iface_modem_cdma_initialize (MMIfaceModemCdma *self,
+                                GCancellable *cancellable,
                                 GAsyncReadyCallback callback,
                                 gpointer user_data)
 {
@@ -1501,6 +1548,7 @@ mm_iface_modem_cdma_initialize (MMIfaceModemCdma *self,
 
     /* Perform async initialization here */
     interface_initialization_step (initialization_context_new (self,
+                                                               cancellable,
                                                                callback,
                                                                user_data));
     g_object_unref (skeleton);

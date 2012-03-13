@@ -6259,6 +6259,7 @@ enabling_step (EnablingContext *ctx)
             mm_dbg ("Modem has CDMA capabilities, enabling the Modem CDMA interface...");
             /* Enabling the Modem CDMA interface */
             mm_iface_modem_cdma_enable (MM_IFACE_MODEM_CDMA (ctx->self),
+                                        ctx->cancellable,
                                         (GAsyncReadyCallback)iface_modem_cdma_enable_ready,
                                         ctx);
             return;
@@ -6633,6 +6634,7 @@ initialize_step (InitializeContext *ctx)
         if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->self))) {
             /* Initialize the CDMA interface */
             mm_iface_modem_cdma_initialize (MM_IFACE_MODEM_CDMA (ctx->self),
+                                            ctx->cancellable,
                                             (GAsyncReadyCallback)iface_modem_cdma_initialize_ready,
                                             ctx);
             return;

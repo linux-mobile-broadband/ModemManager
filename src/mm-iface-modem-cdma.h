@@ -160,6 +160,7 @@ GType mm_iface_modem_cdma_get_type (void);
 
 /* Initialize CDMA interface (async) */
 void     mm_iface_modem_cdma_initialize        (MMIfaceModemCdma *self,
+                                                GCancellable *cancellable,
                                                 GAsyncReadyCallback callback,
                                                 gpointer user_data);
 gboolean mm_iface_modem_cdma_initialize_finish (MMIfaceModemCdma *self,
@@ -168,6 +169,7 @@ gboolean mm_iface_modem_cdma_initialize_finish (MMIfaceModemCdma *self,
 
 /* Enable CDMA interface (async) */
 void     mm_iface_modem_cdma_enable        (MMIfaceModemCdma *self,
+                                            GCancellable *cancellable,
                                             GAsyncReadyCallback callback,
                                             gpointer user_data);
 gboolean mm_iface_modem_cdma_enable_finish (MMIfaceModemCdma *self,
