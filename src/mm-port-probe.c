@@ -89,6 +89,66 @@ struct _MMPortProbePrivate {
     PortProbeRunTask *task;
 };
 
+void
+mm_port_probe_set_result_at (MMPortProbe *self,
+                             gboolean at)
+{
+    self->priv->is_at = at;
+    self->priv->flags |= MM_PORT_PROBE_AT;
+
+    if (self->priv->is_at) {
+        mm_dbg ("(%s) port is AT-capable", self->priv->name);
+
+        /* Also set as not a QCDM port */
+        self->priv->is_qcdm = FALSE;
+        self->priv->flags |= MM_PORT_PROBE_QCDM;
+    } else {
+        mm_dbg ("(%s) port is not AT-capable", self->priv->name);
+        self->priv->vendor = NULL;
+        self->priv->product = NULL;
+        self->priv->flags |= (MM_PORT_PROBE_AT_VENDOR | MM_PORT_PROBE_AT_PRODUCT);
+    }
+}
+
+void
+mm_port_probe_set_result_at_vendor (MMPortProbe *self,
+                                    const gchar *at_vendor)
+{
+    mm_dbg ("(%s) vendor probing finished", self->priv->name);
+    self->priv->vendor = g_utf8_casefold (at_vendor, -1);
+    self->priv->flags |= MM_PORT_PROBE_AT_VENDOR;
+}
+
+void
+mm_port_probe_set_result_at_product (MMPortProbe *self,
+                                     const gchar *at_product)
+{
+    mm_dbg ("(%s) product probing finished", self->priv->name);
+    self->priv->product = g_utf8_casefold (at_product, -1);
+    self->priv->flags |= MM_PORT_PROBE_AT_PRODUCT;
+}
+
+void
+mm_port_probe_set_result_qcdm (MMPortProbe *self,
+                               gboolean qcdm)
+{
+    self->priv->is_qcdm = qcdm;
+    self->priv->flags |= MM_PORT_PROBE_QCDM;
+
+    if (self->priv->is_qcdm) {
+        mm_dbg ("(%s) port is QCDM-capable", self->priv->name);
+
+        /* Also set as not an AT port */
+        self->priv->is_at = FALSE;
+        self->priv->vendor = NULL;
+        self->priv->product = NULL;
+        self->priv->flags |= (MM_PORT_PROBE_AT |
+                              MM_PORT_PROBE_AT_VENDOR |
+                              MM_PORT_PROBE_AT_PRODUCT);
+    } else
+        mm_dbg ("(%s) port is not QCDM-capable", self->priv->name);
+}
+
 static gboolean serial_probe_at (MMPortProbe *self);
 static gboolean serial_probe_qcdm (MMPortProbe *self);
 static void serial_probe_schedule (MMPortProbe *self);
@@ -170,6 +230,7 @@ serial_probe_qcdm_parse_response (MMQcdmSerialPort *port,
 {
     QcdmResult *result;
     gint err = QCDM_SUCCESS;
+    gboolean is_qcdm = FALSE;
 
     /* Just the initial poke; ignore it */
     if (!self)
@@ -190,17 +251,14 @@ serial_probe_qcdm_parse_response (MMQcdmSerialPort *port,
                      err);
         } else {
             /* yay, probably a QCDM port */
-            qcdm_result_unref (result);
-            self->priv->is_qcdm = TRUE;
+            is_qcdm = TRUE;
 
-            /* Also set as not an AT port */
-            self->priv->is_at = FALSE;
-            self->priv->flags |= MM_PORT_PROBE_AT;
+            qcdm_result_unref (result);
         }
     }
 
-    /* Mark as being probed */
-    self->priv->flags |= MM_PORT_PROBE_QCDM;
+    /* Set probing result */
+    mm_port_probe_set_result_qcdm (self, is_qcdm);
 
     /* Reschedule probing */
     serial_probe_schedule (self);
@@ -300,16 +358,12 @@ serial_probe_at_product_result_processor (MMPortProbe *self,
     if (result) {
         /* If any result given, it must be a string */
         g_assert (g_variant_is_of_type (result, G_VARIANT_TYPE_STRING));
-
-        mm_dbg ("(%s) product probing finished", self->priv->name);
-        self->priv->product = g_utf8_casefold (g_variant_get_string (result, NULL), -1);
-        self->priv->flags |= MM_PORT_PROBE_AT_PRODUCT;
+        mm_port_probe_set_result_at_product (self,
+                                             g_variant_get_string (result, NULL));
         return;
     }
 
-    mm_dbg ("(%s) no result in product probing", self->priv->name);
-    self->priv->product = NULL;
-    self->priv->flags |= MM_PORT_PROBE_AT_PRODUCT;
+    mm_port_probe_set_result_at_product (self, NULL);
 }
 
 static void
@@ -319,16 +373,12 @@ serial_probe_at_vendor_result_processor (MMPortProbe *self,
     if (result) {
         /* If any result given, it must be a string */
         g_assert (g_variant_is_of_type (result, G_VARIANT_TYPE_STRING));
-
-        mm_dbg ("(%s) vendor probing finished", self->priv->name);
-        self->priv->vendor = g_utf8_casefold (g_variant_get_string (result, NULL), -1);
-        self->priv->flags |= MM_PORT_PROBE_AT_VENDOR;
+        mm_port_probe_set_result_at_vendor (self,
+                                            g_variant_get_string (result, NULL));
         return;
     }
 
-    mm_dbg ("(%s) no result in vendor probing", self->priv->name);
-    self->priv->vendor = NULL;
-    self->priv->flags |= MM_PORT_PROBE_AT_VENDOR;
+    mm_port_probe_set_result_at_vendor (self, NULL);
 }
 
 static void
@@ -340,22 +390,12 @@ serial_probe_at_result_processor (MMPortProbe *self,
         g_assert (g_variant_is_of_type (result, G_VARIANT_TYPE_BOOLEAN));
 
         if (g_variant_get_boolean (result)) {
-            mm_dbg ("(%s) port is AT-capable", self->priv->name);
-            self->priv->is_at = TRUE;
-            self->priv->flags |= MM_PORT_PROBE_AT;
-
-            /* Also set as not a QCDM port */
-            self->priv->is_qcdm = FALSE;
-            self->priv->flags |= MM_PORT_PROBE_QCDM;
+            mm_port_probe_set_result_at (self, TRUE);
             return;
         }
     }
 
-    mm_dbg ("(%s) port is not AT-capable", self->priv->name);
-    self->priv->is_at = FALSE;
-    self->priv->flags |= (MM_PORT_PROBE_AT |
-                          MM_PORT_PROBE_AT_VENDOR |
-                          MM_PORT_PROBE_AT_PRODUCT);
+    mm_port_probe_set_result_at (self, FALSE);
 }
 
 static void

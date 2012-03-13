@@ -65,6 +65,16 @@ const gchar *mm_port_probe_get_port_subsys  (MMPortProbe *self);
 const gchar *mm_port_probe_get_port_physdev (MMPortProbe *self);
 const gchar *mm_port_probe_get_port_driver  (MMPortProbe *self);
 
+/* Probing result setters */
+void mm_port_probe_set_result_at         (MMPortProbe *self,
+                                          gboolean at);
+void mm_port_probe_set_result_at_vendor  (MMPortProbe *self,
+                                          const gchar *at_vendor);
+void mm_port_probe_set_result_at_product (MMPortProbe *self,
+                                          const gchar *at_product);
+void mm_port_probe_set_result_qcdm       (MMPortProbe *self,
+                                          gboolean qcdm);
+
 /* Run probing */
 void     mm_port_probe_run        (MMPortProbe *self,
                                    MMPortProbeFlag flags,
