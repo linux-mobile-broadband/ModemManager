@@ -814,7 +814,9 @@ mm_port_probe_run (MMPortProbe *self,
     g_free (probe_list_str);
 
     /* If any AT probing is needed, start by opening as AT port */
-    if (task->flags & MM_PORT_PROBE_AT) {
+    if (task->flags & MM_PORT_PROBE_AT ||
+        task->flags & MM_PORT_PROBE_AT_VENDOR ||
+        task->flags & MM_PORT_PROBE_AT_PRODUCT) {
         task->at_probing_cancellable = g_cancellable_new ();
         task->source_id = g_idle_add ((GSourceFunc)serial_open_at, self);
         return;
