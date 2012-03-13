@@ -62,6 +62,7 @@ GType mm_iface_modem_location_get_type (void);
 
 /* Initialize Location interface (async) */
 void     mm_iface_modem_location_initialize        (MMIfaceModemLocation *self,
+                                                    GCancellable *cancellable,
                                                     GAsyncReadyCallback callback,
                                                     gpointer user_data);
 gboolean mm_iface_modem_location_initialize_finish (MMIfaceModemLocation *self,
@@ -70,6 +71,7 @@ gboolean mm_iface_modem_location_initialize_finish (MMIfaceModemLocation *self,
 
 /* Enable Location interface (async) */
 void     mm_iface_modem_location_enable        (MMIfaceModemLocation *self,
+                                                GCancellable *cancellable,
                                                 GAsyncReadyCallback callback,
                                                 gpointer user_data);
 gboolean mm_iface_modem_location_enable_finish (MMIfaceModemLocation *self,

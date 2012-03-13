@@ -6280,6 +6280,7 @@ enabling_step (EnablingContext *ctx)
             mm_dbg ("Modem has location capabilities, enabling the Location interface...");
             /* Enabling the Modem Location interface */
             mm_iface_modem_location_enable (MM_IFACE_MODEM_LOCATION (ctx->self),
+                                            ctx->cancellable,
                                             (GAsyncReadyCallback)iface_modem_location_enable_ready,
                                             ctx);
             return;
@@ -6653,6 +6654,7 @@ initialize_step (InitializeContext *ctx)
     case INITIALIZE_STEP_IFACE_LOCATION:
         /* Initialize the Location interface */
         mm_iface_modem_location_initialize (MM_IFACE_MODEM_LOCATION (ctx->self),
+                                            ctx->cancellable,
                                             (GAsyncReadyCallback)iface_modem_location_initialize_ready,
                                             ctx);
         return;

@@ -574,11 +574,13 @@ struct _EnablingContext {
     MMIfaceModemLocation *self;
     EnablingStep step;
     GSimpleAsyncResult *result;
+    GCancellable *cancellable;
     MmGdbusModemLocation *skeleton;
 };
 
 static EnablingContext *
 enabling_context_new (MMIfaceModemLocation *self,
+                      GCancellable *cancellable,
                       GAsyncReadyCallback callback,
                       gpointer user_data)
 {
@@ -586,6 +588,7 @@ enabling_context_new (MMIfaceModemLocation *self,
 
     ctx = g_new0 (EnablingContext, 1);
     ctx->self = g_object_ref (self);
+    ctx->cancellable = g_object_ref (cancellable);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -605,8 +608,23 @@ enabling_context_complete_and_free (EnablingContext *ctx)
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->self);
     g_object_unref (ctx->result);
+    g_object_unref (ctx->cancellable);
     g_object_unref (ctx->skeleton);
     g_free (ctx);
+}
+
+static gboolean
+enabling_context_complete_and_free_if_cancelled (EnablingContext *ctx)
+{
+    if (!g_cancellable_is_cancelled (ctx->cancellable))
+        return FALSE;
+
+    g_simple_async_result_set_error (ctx->result,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_CANCELLED,
+                                     "Interface enabling cancelled");
+    enabling_context_complete_and_free (ctx);
+    return TRUE;
 }
 
 gboolean
@@ -640,6 +658,10 @@ enabling_location_gathering_ready (MMIfaceModemLocation *self,
 static void
 interface_enabling_step (EnablingContext *ctx)
 {
+    /* Don't run new steps if we're cancelled */
+    if (enabling_context_complete_and_free_if_cancelled (ctx))
+        return;
+
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
         /* Fall down to next step */
@@ -670,10 +692,12 @@ interface_enabling_step (EnablingContext *ctx)
 
 void
 mm_iface_modem_location_enable (MMIfaceModemLocation *self,
+                                GCancellable *cancellable,
                                 GAsyncReadyCallback callback,
                                 gpointer user_data)
 {
     interface_enabling_step (enabling_context_new (self,
+                                                   cancellable,
                                                    callback,
                                                    user_data));
 }
@@ -693,6 +717,7 @@ typedef enum {
 struct _InitializationContext {
     MMIfaceModemLocation *self;
     MmGdbusModemLocation *skeleton;
+    GCancellable *cancellable;
     GSimpleAsyncResult *result;
     InitializationStep step;
     MMModemLocationSource capabilities;
@@ -700,6 +725,7 @@ struct _InitializationContext {
 
 static InitializationContext *
 initialization_context_new (MMIfaceModemLocation *self,
+                            GCancellable *cancellable,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
@@ -708,6 +734,7 @@ initialization_context_new (MMIfaceModemLocation *self,
     ctx = g_new0 (InitializationContext, 1);
     ctx->self = g_object_ref (self);
     ctx->capabilities = MM_MODEM_LOCATION_SOURCE_NONE;
+    ctx->cancellable = g_object_ref (cancellable);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
@@ -726,8 +753,23 @@ initialization_context_complete_and_free (InitializationContext *ctx)
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->self);
     g_object_unref (ctx->result);
+    g_object_unref (ctx->cancellable);
     g_object_unref (ctx->skeleton);
     g_free (ctx);
+}
+
+static gboolean
+initialization_context_complete_and_free_if_cancelled (InitializationContext *ctx)
+{
+    if (!g_cancellable_is_cancelled (ctx->cancellable))
+        return FALSE;
+
+    g_simple_async_result_set_error (ctx->result,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_CANCELLED,
+                                     "Interface initialization cancelled");
+    initialization_context_complete_and_free (ctx);
+    return TRUE;
 }
 
 static void
@@ -753,6 +795,10 @@ load_capabilities_ready (MMIfaceModemLocation *self,
 static void
 interface_initialization_step (InitializationContext *ctx)
 {
+    /* Don't run new steps if we're cancelled */
+    if (initialization_context_complete_and_free_if_cancelled (ctx))
+        return;
+
     switch (ctx->step) {
     case INITIALIZATION_STEP_FIRST:
         /* Fall down to next step */
@@ -826,6 +872,7 @@ mm_iface_modem_location_initialize_finish (MMIfaceModemLocation *self,
 
 void
 mm_iface_modem_location_initialize (MMIfaceModemLocation *self,
+                                    GCancellable *cancellable,
                                     GAsyncReadyCallback callback,
                                     gpointer user_data)
 {
@@ -852,9 +899,9 @@ mm_iface_modem_location_initialize (MMIfaceModemLocation *self,
                       NULL);
     }
 
-
     /* Perform async initialization here */
     interface_initialization_step (initialization_context_new (self,
+                                                               cancellable,
                                                                callback,
                                                                user_data));
     g_object_unref (skeleton);
