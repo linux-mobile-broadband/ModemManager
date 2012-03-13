@@ -6225,6 +6225,7 @@ enabling_step (EnablingContext *ctx)
         g_assert (ctx->self->priv->modem_dbus_skeleton != NULL);
         /* Enabling the Modem interface */
         mm_iface_modem_enable (MM_IFACE_MODEM (ctx->self),
+                               ctx->cancellable,
                                (GAsyncReadyCallback)iface_modem_enable_ready,
                                ctx);
         return;
@@ -6582,6 +6583,7 @@ initialize_step (InitializeContext *ctx)
     case INITIALIZE_STEP_IFACE_MODEM:
         /* Initialize the Modem interface */
         mm_iface_modem_initialize (MM_IFACE_MODEM (ctx->self),
+                                   ctx->cancellable,
                                    (GAsyncReadyCallback)iface_modem_initialize_ready,
                                    ctx);
         return;

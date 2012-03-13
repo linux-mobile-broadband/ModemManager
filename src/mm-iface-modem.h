@@ -310,6 +310,7 @@ gboolean mm_iface_modem_is_cdma_only (MMIfaceModem *self);
 
 /* Initialize Modem interface (async) */
 void     mm_iface_modem_initialize        (MMIfaceModem *self,
+                                           GCancellable *cancellable,
                                            GAsyncReadyCallback callback,
                                            gpointer user_data);
 gboolean mm_iface_modem_initialize_finish (MMIfaceModem *self,
@@ -318,6 +319,7 @@ gboolean mm_iface_modem_initialize_finish (MMIfaceModem *self,
 
 /* Enable Modem interface (async) */
 void     mm_iface_modem_enable        (MMIfaceModem *self,
+                                       GCancellable *cancellable,
                                        GAsyncReadyCallback callback,
                                        gpointer user_data);
 gboolean mm_iface_modem_enable_finish (MMIfaceModem *self,
