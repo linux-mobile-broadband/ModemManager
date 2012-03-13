@@ -6235,6 +6235,7 @@ enabling_step (EnablingContext *ctx)
             mm_dbg ("Modem has 3GPP capabilities, enabling the Modem 3GPP interface...");
             /* Enabling the Modem 3GPP interface */
             mm_iface_modem_3gpp_enable (MM_IFACE_MODEM_3GPP (ctx->self),
+                                        ctx->cancellable,
                                         (GAsyncReadyCallback)iface_modem_3gpp_enable_ready,
                                         ctx);
             return;
@@ -6608,6 +6609,7 @@ initialize_step (InitializeContext *ctx)
         if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self))) {
             /* Initialize the 3GPP interface */
             mm_iface_modem_3gpp_initialize (MM_IFACE_MODEM_3GPP (ctx->self),
+                                            ctx->cancellable,
                                             (GAsyncReadyCallback)iface_modem_3gpp_initialize_ready,
                                             ctx);
             return;
