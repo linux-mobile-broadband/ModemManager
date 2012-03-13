@@ -778,7 +778,12 @@ grab_port (MMModem *modem,
         goto out;
 
     if (MM_IS_AT_SERIAL_PORT (port)) {
-        g_object_set (G_OBJECT (port), MM_SERIAL_PORT_SEND_DELAY, (guint64) 0, NULL);
+        g_object_set (G_OBJECT (port),
+                      MM_SERIAL_PORT_SEND_DELAY, (guint64) 0,
+                      /* built-in echo removal conflicts with unsolicited _OWANCALL
+                       * messages, which are not <CR><LF> prefixed. */
+                      MM_AT_SERIAL_PORT_REMOVE_ECHO, FALSE,
+                      NULL);
         if (ptype == MM_PORT_TYPE_PRIMARY) {
             GRegex *regex;
 
@@ -854,4 +859,3 @@ mm_modem_hso_class_init (MMModemHsoClass *klass)
     gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->get_access_technology = get_access_technology;
 }
-
