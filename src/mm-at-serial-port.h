@@ -45,6 +45,8 @@ typedef void (*MMAtSerialResponseFn)     (MMAtSerialPort *port,
                                           GError *error,
                                           gpointer user_data);
 
+#define MM_AT_SERIAL_PORT_REMOVE_ECHO "remove-echo"
+
 struct _MMAtSerialPort {
     MMSerialPort parent;
 };
