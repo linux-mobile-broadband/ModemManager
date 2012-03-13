@@ -680,7 +680,7 @@ supports_port (MMPlugin *plugin,
     }
 
     /* Build flags depending on what probing needed */
-    probe_run_flags = 0;
+    probe_run_flags = MM_PORT_PROBE_NONE;
     if (priv->at)
         probe_run_flags |= MM_PORT_PROBE_AT;
     else if (priv->single_at)
@@ -691,7 +691,23 @@ supports_port (MMPlugin *plugin,
         probe_run_flags |= (MM_PORT_PROBE_AT | MM_PORT_PROBE_AT_PRODUCT);
     if (priv->qcdm)
         probe_run_flags |= MM_PORT_PROBE_QCDM;
+
     g_assert (probe_run_flags != MM_PORT_PROBE_NONE);
+
+    /* If a modem is already available and the plugin says that only one AT port is
+     * expected, check if we alredy got the single AT port. And if so, we know this
+     * port being probed won't be AT. */
+    if (priv->single_at &&
+        existing &&
+        mm_base_modem_has_at_port (existing)) {
+        mm_dbg ("(%s)   not setting up AT probing tasks for (%s,%s): "
+                "modem already has the expected single AT port",
+                priv->name, subsys, name);
+
+        /* Assuming it won't be an AT port. We still run the probe anyway, in
+         * case we need to check for other port types (e.g. QCDM) */
+        mm_port_probe_set_result_at (probe, FALSE);
+    }
 
     /* Setup async call context */
     ctx = g_new (PortProbeRunContext, 1);
