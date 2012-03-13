@@ -6306,6 +6306,7 @@ enabling_step (EnablingContext *ctx)
             mm_dbg ("Modem has time capabilities, enabling the Time interface...");
             /* Enabling the Modem Time interface */
             mm_iface_modem_time_enable (MM_IFACE_MODEM_TIME (ctx->self),
+                                        ctx->cancellable,
                                         (GAsyncReadyCallback)iface_modem_time_enable_ready,
                                         ctx);
             return;
@@ -6671,6 +6672,7 @@ initialize_step (InitializeContext *ctx)
     case INITIALIZE_STEP_IFACE_TIME:
         /* Initialize the Time interface */
         mm_iface_modem_time_initialize (MM_IFACE_MODEM_TIME (ctx->self),
+                                        ctx->cancellable,
                                         (GAsyncReadyCallback)iface_modem_time_initialize_ready,
                                         ctx);
         return;

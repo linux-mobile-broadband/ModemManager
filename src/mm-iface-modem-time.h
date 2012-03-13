@@ -94,6 +94,7 @@ GType mm_iface_modem_time_get_type (void);
 
 /* Initialize Time interface (async) */
 void     mm_iface_modem_time_initialize        (MMIfaceModemTime *self,
+                                                GCancellable *cancellable,
                                                 GAsyncReadyCallback callback,
                                                 gpointer user_data);
 gboolean mm_iface_modem_time_initialize_finish (MMIfaceModemTime *self,
@@ -102,6 +103,7 @@ gboolean mm_iface_modem_time_initialize_finish (MMIfaceModemTime *self,
 
 /* Enable Time interface (async) */
 void     mm_iface_modem_time_enable        (MMIfaceModemTime *self,
+                                            GCancellable *cancellable,
                                             GAsyncReadyCallback callback,
                                             gpointer user_data);
 gboolean mm_iface_modem_time_enable_finish (MMIfaceModemTime *self,
