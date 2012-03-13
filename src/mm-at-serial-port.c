@@ -29,6 +29,12 @@ G_DEFINE_TYPE (MMAtSerialPort, mm_at_serial_port, MM_TYPE_SERIAL_PORT)
 
 #define MM_AT_SERIAL_PORT_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_AT_SERIAL_PORT, MMAtSerialPortPrivate))
 
+enum {
+    PROP_0,
+    PROP_REMOVE_ECHO,
+    LAST_PROP
+};
+
 typedef struct {
     /* Response parser data */
     MMAtSerialResponseParserFn response_parser_fn;
@@ -36,8 +42,9 @@ typedef struct {
     GDestroyNotify response_parser_notify;
     GSList *unsolicited_msg_handlers;
     MMAtPortFlags flags;
-} MMAtSerialPortPrivate;
 
+    gboolean remove_echo;
+} MMAtSerialPortPrivate;
 
 /*****************************************************************************/
 
@@ -90,7 +97,8 @@ parse_response (MMSerialPort *port, GByteArray *response, GError **error)
     g_return_val_if_fail (priv->response_parser_fn != NULL, FALSE);
 
     /* Remove echo */
-    mm_at_serial_port_remove_echo (response);
+    if (priv->remove_echo)
+        mm_at_serial_port_remove_echo (response);
 
     /* Construct the string that AT-parsing functions expect */
     string = g_string_sized_new (response->len + 1);
@@ -184,7 +192,8 @@ parse_unsolicited (MMSerialPort *port, GByteArray *response)
     GSList *iter;
 
     /* Remove echo */
-    mm_at_serial_port_remove_echo (response);
+    if (priv->remove_echo)
+        mm_at_serial_port_remove_echo (response);
 
     for (iter = priv->unsolicited_msg_handlers; iter; iter = iter->next) {
         MMAtUnsolicitedMsgHandler *handler = (MMAtUnsolicitedMsgHandler *) iter->data;
@@ -360,6 +369,42 @@ mm_at_serial_port_new (const char *name)
 static void
 mm_at_serial_port_init (MMAtSerialPort *self)
 {
+    MMAtSerialPortPrivate *priv = MM_AT_SERIAL_PORT_GET_PRIVATE (self);
+
+    /* By default, remove echo */
+    priv->remove_echo = TRUE;
+}
+
+static void
+set_property (GObject *object, guint prop_id,
+              const GValue *value, GParamSpec *pspec)
+{
+    MMAtSerialPortPrivate *priv = MM_AT_SERIAL_PORT_GET_PRIVATE (object);
+
+    switch (prop_id) {
+    case PROP_REMOVE_ECHO:
+        priv->remove_echo = g_value_get_boolean (value);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+
+static void
+get_property (GObject *object, guint prop_id,
+              GValue *value, GParamSpec *pspec)
+{
+    MMAtSerialPortPrivate *priv = MM_AT_SERIAL_PORT_GET_PRIVATE (object);
+
+    switch (prop_id) {
+    case PROP_REMOVE_ECHO:
+        g_value_set_boolean (value, priv->remove_echo);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
 }
 
 static void
@@ -395,10 +440,20 @@ mm_at_serial_port_class_init (MMAtSerialPortClass *klass)
     g_type_class_add_private (object_class, sizeof (MMAtSerialPortPrivate));
 
     /* Virtual methods */
+    object_class->set_property = set_property;
+    object_class->get_property = get_property;
     object_class->finalize = finalize;
 
     port_class->parse_unsolicited = parse_unsolicited;
     port_class->parse_response = parse_response;
     port_class->handle_response = handle_response;
     port_class->debug_log = debug_log;
+
+    g_object_class_install_property
+        (object_class, PROP_REMOVE_ECHO,
+         g_param_spec_boolean (MM_AT_SERIAL_PORT_REMOVE_ECHO,
+                               "Remove echo",
+                               "Built-in echo removal should be applied",
+                               TRUE,
+                               G_PARAM_READWRITE));
 }
