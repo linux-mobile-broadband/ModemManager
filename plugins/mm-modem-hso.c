@@ -733,7 +733,12 @@ port_grabbed (MMGenericGsm *gsm,
     GRegex *regex;
 
     if (MM_IS_AT_SERIAL_PORT (port)) {
-        g_object_set (G_OBJECT (port), MM_SERIAL_PORT_SEND_DELAY, (guint64) 0, NULL);
+        g_object_set (G_OBJECT (port),
+                      MM_SERIAL_PORT_SEND_DELAY, (guint64) 0,
+                      /* built-in echo removal conflicts with unsolicited _OWANCALL
+                       * messages, which are not <CR><LF> prefixed. */
+                      MM_AT_SERIAL_PORT_REMOVE_ECHO, FALSE,
+                      NULL);
 
         regex = g_regex_new ("\\r\\n\\+PACSP0\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
         mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (port), regex, NULL, NULL, NULL);
@@ -809,4 +814,3 @@ mm_modem_hso_class_init (MMModemHsoClass *klass)
     gsm_class->get_allowed_mode = get_allowed_mode;
     gsm_class->get_access_technology = get_access_technology;
 }
-
