@@ -132,6 +132,7 @@ GType mm_iface_modem_messaging_get_type (void);
 
 /* Initialize Messaging interface (async) */
 void     mm_iface_modem_messaging_initialize        (MMIfaceModemMessaging *self,
+                                                     GCancellable *cancellable,
                                                      GAsyncReadyCallback callback,
                                                      gpointer user_data);
 gboolean mm_iface_modem_messaging_initialize_finish (MMIfaceModemMessaging *self,
@@ -140,6 +141,7 @@ gboolean mm_iface_modem_messaging_initialize_finish (MMIfaceModemMessaging *self
 
 /* Enable Messaging interface (async) */
 void     mm_iface_modem_messaging_enable        (MMIfaceModemMessaging *self,
+                                                 GCancellable *cancellable,
                                                  GAsyncReadyCallback callback,
                                                  gpointer user_data);
 gboolean mm_iface_modem_messaging_enable_finish (MMIfaceModemMessaging *self,

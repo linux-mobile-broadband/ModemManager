@@ -6293,7 +6293,8 @@ enabling_step (EnablingContext *ctx)
             mm_dbg ("Modem has messaging capabilities, enabling the Messaging interface...");
             /* Enabling the Modem Messaging interface */
             mm_iface_modem_messaging_enable (MM_IFACE_MODEM_MESSAGING (ctx->self),
-                                            (GAsyncReadyCallback)iface_modem_messaging_enable_ready,
+                                             ctx->cancellable,
+                                             (GAsyncReadyCallback)iface_modem_messaging_enable_ready,
                                              ctx);
             return;
         }
@@ -6662,6 +6663,7 @@ initialize_step (InitializeContext *ctx)
     case INITIALIZE_STEP_IFACE_MESSAGING:
         /* Initialize the Messaging interface */
         mm_iface_modem_messaging_initialize (MM_IFACE_MODEM_MESSAGING (ctx->self),
+                                             ctx->cancellable,
                                              (GAsyncReadyCallback)iface_modem_messaging_initialize_ready,
                                              ctx);
         return;
