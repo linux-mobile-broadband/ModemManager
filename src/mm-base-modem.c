@@ -916,6 +916,12 @@ dispose (GObject *object)
 
     /* Cancel all ongoing auth requests */
     g_cancellable_cancel (self->priv->authp_cancellable);
+    g_clear_object (&self->priv->authp_cancellable);
+    g_clear_object (&self->priv->authp);
+
+    /* Ensure we cancel any ongoing operation */
+    g_cancellable_cancel (self->priv->cancellable);
+    g_clear_object (&self->priv->cancellable);
 
     g_clear_object (&self->priv->primary);
     g_clear_object (&self->priv->secondary);
@@ -927,12 +933,7 @@ dispose (GObject *object)
         self->priv->ports = NULL;
     }
 
-    g_clear_object (&self->priv->cancellable);
-
     g_clear_object (&self->priv->connection);
-
-    g_clear_object (&self->priv->authp);
-    g_clear_object (&self->priv->authp_cancellable);
 
     G_OBJECT_CLASS (mm_base_modem_parent_class)->dispose (object);
 }
