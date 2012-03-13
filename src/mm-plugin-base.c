@@ -486,7 +486,9 @@ cancel_at_probing_in_other_probes (const gchar *key,
                                    MMPortProbe *other,
                                    MMPortProbe *self)
 {
-    if (self != other)
+    if (self != other &&
+        g_str_equal (mm_port_probe_get_port_physdev (self),
+                     mm_port_probe_get_port_physdev (other)))
         mm_port_probe_run_cancel_at_probing (other);
 }
 
@@ -514,7 +516,8 @@ port_probe_run_ready (MMPortProbe *probe,
 
             /* If we were looking for AT ports, and the port is AT,
              * and we were told that only one AT port is expected, cancel AT
-             * probings in the other available support tasks. */
+             * probings in the other available support tasks of the SAME
+             * device. */
             if (priv->single_at &&
                 ctx->flags & MM_PORT_PROBE_AT &&
                 mm_port_probe_is_at (probe)) {
