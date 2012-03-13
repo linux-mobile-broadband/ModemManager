@@ -2098,9 +2098,13 @@ unlock_check_ready (MMIfaceModem *self,
                                                                              res,
                                                                              &error);
     if (error) {
-        /* Treat several SIM related errors as critical and abort the checks
-         * TODO: do this only after the retries? */
-        if (g_error_matches (error,
+        /* Treat several SIM related, serial and other core errors as critical
+         * and abort the checks. */
+        if (error->domain == MM_SERIAL_ERROR ||
+            g_error_matches (error,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_CANCELLED) ||
+            g_error_matches (error,
                              MM_MOBILE_EQUIPMENT_ERROR,
                              MM_MOBILE_EQUIPMENT_ERROR_SIM_NOT_INSERTED) ||
             g_error_matches (error,
@@ -2115,10 +2119,14 @@ unlock_check_ready (MMIfaceModem *self,
             return;
         }
 
+        mm_dbg ("Couldn't check if unlock required: '%s'",
+                error->message);
+        g_error_free (error);
+
         /* Retry up to 3 times */
         if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE &&
             ++ctx->pin_check_tries < 3) {
-
+            mm_dbg ("Retrying (%u) unlock required check", ctx->pin_check_tries);
             if (ctx->pin_check_timeout_id)
                 g_source_remove (ctx->pin_check_timeout_id);
             ctx->pin_check_timeout_id = g_timeout_add_seconds (
