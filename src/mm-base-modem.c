@@ -506,6 +506,23 @@ mm_base_modem_peek_best_at_port (MMBaseModem *self,
     return NULL;
 }
 
+gboolean
+mm_base_modem_has_at_port (MMBaseModem *self)
+{
+    GHashTableIter iter;
+    gpointer value;
+    gpointer key;
+
+    /* We'll iterate the ht of ports, looking for any port which is AT */
+    g_hash_table_iter_init (&iter, self->priv->ports);
+    while (g_hash_table_iter_next (&iter, &key, &value)) {
+        if (MM_IS_AT_SERIAL_PORT (value))
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
 static void
 initialize_ready (MMBaseModem *self,
                   GAsyncResult *res)
