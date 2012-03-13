@@ -18,17 +18,14 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-
 #include <sys/stat.h>
 #include <unistd.h>
-
 #include <string.h>
+
+#include <gudev/gudev.h>
 
 #include <ModemManager.h>
 #include <mm-errors-types.h>
-
-#define G_UDEV_API_IS_SUBJECT_TO_CHANGE
-#include <gudev/gudev.h>
 
 #include "mm-plugin-base.h"
 #include "mm-port-probe-cache.h"
