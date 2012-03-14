@@ -16,6 +16,7 @@ Overview of changes in ModemManager 0.5.2
 - Fixed sending SMS messages with modems that only support PDU mode
 - Fix reading SMS messages in text mode
 - Fix communication with some Nokia phones
+- Retry sending SMS messages in PDU mode if an error occurs in text mode
 
 
 Overview of changes in ModemManager 0.5
