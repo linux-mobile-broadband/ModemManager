@@ -37,6 +37,10 @@ static void iface_modem_init (MMIfaceModem *iface);
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemOption, mm_broadband_modem_option, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
 
+struct _MMBroadbandModemOptionPrivate {
+    guint after_power_up_wait_id;
+};
+
 /*****************************************************************************/
 /* Load access technologies (Modem interface) */
 
@@ -336,7 +340,6 @@ load_access_technologies_step (AccessTechnologiesContext *ctx)
         /* Go on to next step */
         ctx->step++;
 
-
     case ACCESS_TECHNOLOGIES_STEP_LAST:
         /* All done, set result and complete */
         g_simple_async_result_set_op_res_gpointer (ctx->result,
@@ -369,6 +372,56 @@ load_access_technologies (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* After power up (Modem interface) */
+
+static gboolean
+modem_after_power_up_finish (MMIfaceModem *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static gboolean
+after_power_up_wait_cb (GSimpleAsyncResult *result)
+{
+    MMBroadbandModemOption *option;
+
+    option = MM_BROADBAND_MODEM_OPTION (g_async_result_get_source_object (G_ASYNC_RESULT (result)));
+
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete (result);
+    g_object_unref (result);
+
+    option->priv->after_power_up_wait_id = 0;
+    g_object_unref (option);
+
+    return FALSE;
+}
+
+static void
+modem_after_power_up (MMIfaceModem *self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    MMBroadbandModemOption *option = MM_BROADBAND_MODEM_OPTION (self);
+    GSimpleAsyncResult *result;
+
+    /* Some Option devices return OK on +CFUN=1 right away but need some time
+     * to finish initialization.
+     */
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_after_power_up);
+    g_warn_if_fail (option->priv->after_power_up_wait_id == 0);
+    option->priv->after_power_up_wait_id =
+        g_timeout_add_seconds (10,
+                               (GSourceFunc)after_power_up_wait_cb,
+                               result);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemOption *
 mm_broadband_modem_option_new (const gchar *device,
@@ -389,11 +442,18 @@ mm_broadband_modem_option_new (const gchar *device,
 static void
 mm_broadband_modem_option_init (MMBroadbandModemOption *self)
 {
+    /* Initialize private data */
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+                                              MM_TYPE_BROADBAND_MODEM_OPTION,
+                                              MMBroadbandModemOptionPrivate);
+    self->priv->after_power_up_wait_id = 0;
 }
 
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    iface->modem_after_power_up = modem_after_power_up;
+    iface->modem_after_power_up_finish = modem_after_power_up_finish;
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
 }
@@ -401,4 +461,6 @@ iface_modem_init (MMIfaceModem *iface)
 static void
 mm_broadband_modem_option_class_init (MMBroadbandModemOptionClass *klass)
 {
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    g_type_class_add_private (object_class, sizeof (MMBroadbandModemOptionPrivate));
 }
