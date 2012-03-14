@@ -38,6 +38,14 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemOption, mm_broadband_modem_option, MM_TY
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
 
 struct _MMBroadbandModemOptionPrivate {
+    /* Regex for access-technology related notifications */
+    GRegex *_ossysi_regex;
+    GRegex *_octi_regex;
+    GRegex *_ouwcti_regex;
+
+    /* Regex for signal quality related notifications */
+    GRegex *_osigq_regex;
+
     guint after_power_up_wait_id;
 };
 
@@ -422,6 +430,34 @@ modem_after_power_up (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Setup ports (Broadband modem class) */
+
+static void
+setup_ports (MMBroadbandModem *self)
+{
+    MMBroadbandModemOption *option = MM_BROADBAND_MODEM_OPTION (self);
+    MMAtSerialPort *primary;
+
+    /* Call parent's setup ports first always */
+    MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_option_parent_class)->setup_ports (self);
+
+    /* Now reset the unsolicited messages we'll handle, only in the primary port! */
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    mm_at_serial_port_add_unsolicited_msg_handler (primary,
+                                                   option->priv->_ossysi_regex,
+                                                   NULL, NULL, NULL);
+    mm_at_serial_port_add_unsolicited_msg_handler (primary,
+                                                   option->priv->_octi_regex,
+                                                   NULL, NULL, NULL);
+    mm_at_serial_port_add_unsolicited_msg_handler (primary,
+                                                   option->priv->_ouwcti_regex,
+                                                   NULL, NULL, NULL);
+    mm_at_serial_port_add_unsolicited_msg_handler (primary,
+                                                   option->priv->_osigq_regex,
+                                                   NULL, NULL, NULL);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemOption *
 mm_broadband_modem_option_new (const gchar *device,
@@ -440,6 +476,19 @@ mm_broadband_modem_option_new (const gchar *device,
 }
 
 static void
+finalize (GObject *object)
+{
+    MMBroadbandModemOption *self = MM_BROADBAND_MODEM_OPTION (object);
+
+    g_regex_unref (self->priv->_ossysi_regex);
+    g_regex_unref (self->priv->_octi_regex);
+    g_regex_unref (self->priv->_ouwcti_regex);
+    g_regex_unref (self->priv->_osigq_regex);
+
+    G_OBJECT_CLASS (mm_broadband_modem_option_parent_class)->finalize (object);
+}
+
+static void
 mm_broadband_modem_option_init (MMBroadbandModemOption *self)
 {
     /* Initialize private data */
@@ -447,6 +496,16 @@ mm_broadband_modem_option_init (MMBroadbandModemOption *self)
                                               MM_TYPE_BROADBAND_MODEM_OPTION,
                                               MMBroadbandModemOptionPrivate);
     self->priv->after_power_up_wait_id = 0;
+
+    /* Prepare regular expressions to setup */
+    self->priv->_ossysi_regex = g_regex_new ("\\r\\n_OSSYSI:\\s*(\\d+)\\r\\n",
+                                             G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->_octi_regex = g_regex_new ("\\r\\n_OCTI:\\s*(\\d+)\\r\\n",
+                                           G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->_ouwcti_regex = g_regex_new ("\\r\\n_OUWCTI:\\s*(\\d+)\\r\\n",
+                                             G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->_osigq_regex = g_regex_new ("\\r\\n_OSIGQ:\\s*(\\d+),(\\d)\\r\\n",
+                                            G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 }
 
 static void
@@ -462,5 +521,10 @@ static void
 mm_broadband_modem_option_class_init (MMBroadbandModemOptionClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
+
     g_type_class_add_private (object_class, sizeof (MMBroadbandModemOptionPrivate));
+
+    object_class->finalize = finalize;
+    broadband_modem_class->setup_ports = setup_ports;
 }
