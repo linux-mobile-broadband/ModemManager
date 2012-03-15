@@ -57,6 +57,77 @@ struct _MMBroadbandModemOptionPrivate {
 };
 
 /*****************************************************************************/
+/* Load initial allowed/preferred modes (Modem interface) */
+
+static gboolean
+load_allowed_modes_finish (MMIfaceModem *self,
+                           GAsyncResult *res,
+                           MMModemMode *allowed,
+                           MMModemMode *preferred,
+                           GError **error)
+{
+    const gchar *response;
+    const gchar *str;
+    gint a, b;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
+        return FALSE;
+
+    str = mm_strip_tag (response, "_OPSYS:");
+
+    if (!sscanf (str, "%d,%d", &a, &b)) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't parse OPSYS response: '%s'",
+                     response);
+        return FALSE;
+    }
+
+    switch (a) {
+    case 0:
+        *allowed = MM_MODEM_MODE_2G;
+        *preferred = MM_MODEM_MODE_NONE;
+        return TRUE;
+    case 1:
+        *allowed = MM_MODEM_MODE_3G;
+        *preferred = MM_MODEM_MODE_NONE;
+        return TRUE;
+    case 2:
+        *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        *preferred = MM_MODEM_MODE_2G;
+        return TRUE;
+    case 3:
+        *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        *preferred = MM_MODEM_MODE_3G;
+        return TRUE;
+    default:
+        break;
+    }
+
+    g_set_error (error,
+                 MM_CORE_ERROR,
+                 MM_CORE_ERROR_FAILED,
+                 "Couldn't unexpected OPSYS response: '%s'",
+                 response);
+    return FALSE;
+}
+
+static void
+load_allowed_modes (MMIfaceModem *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "_OSSYS?",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Load access technologies (Modem interface) */
 
 typedef enum {
@@ -915,6 +986,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_after_power_up_finish = modem_after_power_up_finish;
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
+    iface->load_allowed_modes = load_allowed_modes;
+    iface->load_allowed_modes_finish = load_allowed_modes_finish;
 }
 
 static void
