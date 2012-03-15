@@ -873,16 +873,22 @@ look_for_sms_in_modem (GetSmsContext *ctx)
     /* Loop looking for the sms in each modem found */
     ctx->current = MM_OBJECT (ctx->modems->data);
     ctx->modems = g_list_delete_link (ctx->modems, ctx->modems);
-    g_debug ("Looking for sms '%s' in modem '%s'...",
-             ctx->sms_path,
-             mm_object_get_path (ctx->current));
 
     modem = mm_object_get_modem_messaging (ctx->current);
-    mm_modem_messaging_list (modem,
-                             ctx->cancellable,
-                             (GAsyncReadyCallback)list_sms_ready,
-                             ctx);
-    g_object_unref (modem);
+    if (modem) {
+        g_debug ("Looking for sms '%s' in modem '%s'...",
+                 ctx->sms_path,
+                 mm_object_get_path (ctx->current));
+        mm_modem_messaging_list (modem,
+                                 ctx->cancellable,
+                                 (GAsyncReadyCallback)list_sms_ready,
+                                 ctx);
+        g_object_unref (modem);
+        return;
+    }
+
+    /* Current modem has no messaging capabilities, try with next modem */
+    look_for_sms_in_modem (ctx);
 }
 
 static void
