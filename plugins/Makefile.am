@@ -136,6 +136,8 @@ libmm_plugin_hso_la_SOURCES = \
 	option/mm-plugin-hso.h \
 	option/mm-broadband-modem-option.c \
 	option/mm-broadband-modem-option.h \
+	option/mm-broadband-bearer-hso.c \
+	option/mm-broadband-bearer-hso.h \
 	option/mm-broadband-modem-hso.c \
 	option/mm-broadband-modem-hso.h
 libmm_plugin_hso_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
