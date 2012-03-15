@@ -50,6 +50,9 @@ struct _MMBroadbandModemOptionPrivate {
     /* Regex for signal quality related notifications */
     GRegex *_osigq_regex;
 
+    /* Regex for other notifications to ignore */
+    GRegex *ignore_regex;
+
     guint after_power_up_wait_id;
 };
 
@@ -588,6 +591,13 @@ set_unsolicited_events_handlers (MMBroadbandModemOption *self,
             enable ? (MMAtSerialUnsolicitedMsgFn)option_signal_changed : NULL,
             enable ? self : NULL,
             NULL);
+
+        /* Other unsolicited events to always ignore */
+        if (!enable)
+            mm_at_serial_port_add_unsolicited_msg_handler (
+                ports[i],
+                self->priv->ignore_regex,
+                NULL, NULL, NULL);
     }
 }
 
@@ -871,6 +881,7 @@ finalize (GObject *object)
     g_regex_unref (self->priv->_octi_regex);
     g_regex_unref (self->priv->_ouwcti_regex);
     g_regex_unref (self->priv->_osigq_regex);
+    g_regex_unref (self->priv->ignore_regex);
 
     G_OBJECT_CLASS (mm_broadband_modem_option_parent_class)->finalize (object);
 }
@@ -892,6 +903,8 @@ mm_broadband_modem_option_init (MMBroadbandModemOption *self)
     self->priv->_ouwcti_regex = g_regex_new ("\\r\\n_OUWCTI:\\s*(\\d+)\\r\\n",
                                              G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
     self->priv->_osigq_regex = g_regex_new ("\\r\\n_OSIGQ:\\s*(\\d+),(\\d)\\r\\n",
+                                            G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->ignore_regex = g_regex_new ("\\r\\n\\+PACSP0\\r\\n",
                                             G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 }
 
