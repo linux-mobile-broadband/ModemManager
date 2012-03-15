@@ -340,8 +340,6 @@ find_bearer_in_list (GList *list,
         }
     }
 
-    g_printerr ("error: couldn't find bearer at '%s'\n", bearer_path);
-    exit (EXIT_FAILURE);
     return NULL;
 }
 
@@ -516,6 +514,12 @@ mmcli_get_bearer_sync (GDBusConnection *connection,
             *o_object = g_object_ref (object);
 
         g_object_unref (modem);
+    }
+
+    if (!found) {
+        g_printerr ("error: couldn't find bearer at '%s': 'not found in any modem'\n",
+                    bearer_path);
+        exit (EXIT_FAILURE);
     }
 
     g_list_free_full (modems, (GDestroyNotify) g_object_unref);
