@@ -1660,6 +1660,21 @@ cmp_properties (MMBearer *self,
              mm_bearer_properties_get_rm_protocol (properties)));
 }
 
+static MMBearerProperties *
+expose_properties (MMBearer *self)
+{
+    MMBroadbandBearer *broadband = MM_BROADBAND_BEARER (self);
+    MMBearerProperties *properties;
+
+    properties = mm_bearer_properties_new ();
+    mm_bearer_properties_set_apn (properties, broadband->priv->apn);
+    mm_bearer_properties_set_number (properties, broadband->priv->number);
+    mm_bearer_properties_set_rm_protocol (properties, broadband->priv->rm_protocol);
+    mm_bearer_properties_set_ip_type (properties, broadband->priv->ip_type);
+    mm_bearer_properties_set_allow_roaming (properties, broadband->priv->allow_roaming);
+    return properties;
+}
+
 /*****************************************************************************/
 
 typedef struct _InitAsyncContext InitAsyncContext;
@@ -1668,7 +1683,6 @@ static void interface_initialization_step (InitAsyncContext *ctx);
 typedef enum {
     INITIALIZATION_STEP_FIRST,
     INITIALIZATION_STEP_CDMA_RM_PROTOCOL,
-    INITIALIZATION_STEP_EXPOSE_PROPERTIES,
     INITIALIZATION_STEP_LAST
 } InitializationStep;
 
@@ -1873,23 +1887,6 @@ interface_initialization_step (InitAsyncContext *ctx)
 
         /* Fall down to next step */
         ctx->step++;
-
-    case INITIALIZATION_STEP_EXPOSE_PROPERTIES: {
-        MMBearerProperties *properties;
-
-        /* We create a new properties object just with the stuff we really used */
-        properties = mm_bearer_properties_new ();
-        mm_bearer_properties_set_apn (properties, ctx->self->priv->apn);
-        mm_bearer_properties_set_number (properties, ctx->self->priv->number);
-        mm_bearer_properties_set_rm_protocol (properties, ctx->self->priv->rm_protocol);
-        mm_bearer_properties_set_ip_type (properties, ctx->self->priv->ip_type);
-        mm_bearer_properties_set_allow_roaming (properties, ctx->self->priv->allow_roaming);
-        mm_bearer_expose_properties (MM_BEARER (ctx->self), properties);
-        g_object_unref (properties);
-
-        /* Fall down to next step */
-        ctx->step++;
-    }
 
     case INITIALIZATION_STEP_LAST:
 
@@ -2135,6 +2132,7 @@ mm_broadband_bearer_class_init (MMBroadbandBearerClass *klass)
     object_class->dispose = dispose;
 
     bearer_class->cmp_properties = cmp_properties;
+    bearer_class->expose_properties = expose_properties;
     bearer_class->connect = connect;
     bearer_class->connect_finish = connect_finish;
     bearer_class->disconnect = disconnect;

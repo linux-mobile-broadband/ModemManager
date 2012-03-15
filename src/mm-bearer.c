@@ -68,11 +68,27 @@ struct _MMBearerPrivate {
 
 /*****************************************************************************/
 
+static void
+bearer_expose_properties (MMBearer *self)
+{
+    MMBearerProperties *properties;
+    GVariant *dictionary;
+
+    properties = MM_BEARER_GET_CLASS (self)->expose_properties (self);
+    dictionary = mm_bearer_properties_get_dictionary (properties);
+    mm_gdbus_bearer_set_properties (MM_GDBUS_BEARER (self), dictionary);
+    g_variant_unref (dictionary);
+    g_object_unref (properties);
+}
+
 void
 mm_bearer_export (MMBearer *self)
 {
     static guint id = 0;
     gchar *path;
+
+    /* Expose properties before exporting */
+    bearer_expose_properties (self);
 
     path = g_strdup_printf (MM_DBUS_BEARER_PREFIX "/%d", id++);
     g_object_set (self,
@@ -633,21 +649,6 @@ mm_bearer_cmp_properties (MMBearer *self,
                           MMBearerProperties *properties)
 {
     return MM_BEARER_GET_CLASS (self)->cmp_properties (self, properties);
-}
-
-/*****************************************************************************/
-
-void
-mm_bearer_expose_properties (MMBearer *bearer,
-                             MMBearerProperties *properties)
-{
-    GVariant *dictionary;
-
-    /* Keep the whole list of properties in the interface */
-    dictionary = mm_bearer_properties_get_dictionary (properties);
-    mm_gdbus_bearer_set_properties (MM_GDBUS_BEARER (bearer),
-                                    dictionary);
-    g_variant_unref (dictionary);
 }
 
 /*****************************************************************************/

@@ -79,6 +79,10 @@ struct _MMBearerClass {
     /* Check if the bearer has the exact same properties */
     gboolean (* cmp_properties) (MMBearer *self,
                                  MMBearerProperties *properties);
+
+    /* Builder of the properties to be exposed in DBus. Bearers should expose only
+     * the input properties they actually ended up using */
+    MMBearerProperties * (* expose_properties) (MMBearer *self);
 };
 
 GType mm_bearer_get_type (void);
