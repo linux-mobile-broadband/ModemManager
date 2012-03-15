@@ -825,8 +825,6 @@ find_sms_in_list (GList *list,
         }
     }
 
-    g_printerr ("error: couldn't find sms at '%s'\n", sms_path);
-    exit (EXIT_FAILURE);
     return NULL;
 }
 
@@ -1012,6 +1010,12 @@ mmcli_get_sms_sync (GDBusConnection *connection,
             *o_object = g_object_ref (object);
 
         g_object_unref (modem);
+    }
+
+    if (!found) {
+        g_printerr ("error: couldn't find SMS at '%s': 'not found in any modem'\n",
+                    sms_path);
+        exit (EXIT_FAILURE);
     }
 
     g_list_free_full (modems, (GDestroyNotify) g_object_unref);
