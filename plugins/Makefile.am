@@ -39,7 +39,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-gobi.la \
 	libmm-plugin-motorola.la \
 	libmm-plugin-novatel.la \
-	libmm-plugin-option.la
+	libmm-plugin-option.la \
+	libmm-plugin-hso.la
 
 #pkglib_LTLIBRARIES = \
 #	libmm-plugin-generic.la \
@@ -128,6 +129,17 @@ libmm_plugin_option_la_SOURCES = \
 	option/mm-broadband-modem-option.h
 libmm_plugin_option_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_option_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
+# HSO
+libmm_plugin_hso_la_SOURCES = \
+	option/mm-plugin-hso.c \
+	option/mm-plugin-hso.h \
+	option/mm-broadband-modem-option.c \
+	option/mm-broadband-modem-option.h \
+	option/mm-broadband-modem-hso.c \
+	option/mm-broadband-modem-hso.h
+libmm_plugin_hso_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_hso_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 ## Sierra
 #libmm_plugin_sierra_la_SOURCES = \
@@ -293,4 +305,3 @@ libmm_plugin_novatel_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 # Additional files to include in the distribution
 EXTRA_DIST = \
 	$(udevrules_DATA)
-#	mm-modem-option-utils.c
