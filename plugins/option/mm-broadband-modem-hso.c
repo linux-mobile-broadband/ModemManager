@@ -33,8 +33,32 @@
 G_DEFINE_TYPE (MMBroadbandModemHso, mm_broadband_modem_hso, MM_TYPE_BROADBAND_MODEM_OPTION);
 
 struct _MMBroadbandModemHsoPrivate {
-    gpointer dummy;
+    /* Regex for connected notifications */
+    GRegex *_owancall_regex;
 };
+
+/*****************************************************************************/
+/* Setup ports (Broadband modem class) */
+
+static void
+setup_ports (MMBroadbandModem *self)
+{
+    /* Call parent's setup ports first always */
+    MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_hso_parent_class)->setup_ports (self);
+
+    /* _OWANCALL unsolicited messages are only expected in the primary port. */
+    mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+        MM_BROADBAND_MODEM_HSO (self)->priv->_owancall_regex,
+        NULL, NULL, NULL);
+
+    g_object_set (mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+                  MM_SERIAL_PORT_SEND_DELAY, (guint64) 0,
+                  /* built-in echo removal conflicts with unsolicited _OWANCALL
+                   * messages, which are not <CR><LF> prefixed. */
+                  MM_AT_SERIAL_PORT_REMOVE_ECHO, FALSE,
+                  NULL);
+}
 
 /*****************************************************************************/
 
@@ -55,18 +79,35 @@ mm_broadband_modem_hso_new (const gchar *device,
 }
 
 static void
+finalize (GObject *object)
+{
+    MMBroadbandModemHso *self = MM_BROADBAND_MODEM_HSO (object);
+
+    g_regex_unref (self->priv->_owancall_regex);
+
+    G_OBJECT_CLASS (mm_broadband_modem_hso_parent_class)->finalize (object);
+}
+
+static void
 mm_broadband_modem_hso_init (MMBroadbandModemHso *self)
 {
     /* Initialize private data */
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
                                               MM_TYPE_BROADBAND_MODEM_HSO,
                                               MMBroadbandModemHsoPrivate);
+
+    self->priv->_owancall_regex = g_regex_new ("_OWANCALL: (\\d),\\s*(\\d)\\r\\n",
+                                               G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
 }
 
 static void
 mm_broadband_modem_hso_class_init (MMBroadbandModemHsoClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandModemHsoPrivate));
+
+    object_class->finalize = finalize;
+    broadband_modem_class->setup_ports = setup_ports;
 }
