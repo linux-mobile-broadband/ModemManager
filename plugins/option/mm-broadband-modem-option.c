@@ -33,9 +33,13 @@
 #include "mm-broadband-modem-option.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
+static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+
+static MMIfaceModem3gpp *iface_modem_3gpp_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemOption, mm_broadband_modem_option, MM_TYPE_BROADBAND_MODEM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
 
 struct _MMBroadbandModemOptionPrivate {
     /* Regex for access-technology related notifications */
@@ -359,9 +363,12 @@ load_access_technologies_step (AccessTechnologiesContext *ctx)
 }
 
 static void
-load_access_technologies (MMIfaceModem *self,
-                          GAsyncReadyCallback callback,
-                          gpointer user_data)
+run_access_technology_loading_sequence (MMIfaceModem *self,
+                                        AccessTechnologiesStep first,
+                                        gboolean check_2g,
+                                        gboolean check_3g,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data)
 {
     AccessTechnologiesContext *ctx;
 
@@ -370,13 +377,26 @@ load_access_technologies (MMIfaceModem *self,
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
                                              user_data,
-                                             load_access_technologies);
-    ctx->step = ACCESS_TECHNOLOGIES_STEP_FIRST;
-    ctx->check_2g = TRUE;
-    ctx->check_3g = TRUE;
+                                             run_access_technology_loading_sequence);
+    ctx->step = first;
+    ctx->check_2g = check_2g;
+    ctx->check_3g = check_3g;
     ctx->access_technology = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
 
     load_access_technologies_step (ctx);
+}
+
+static void
+load_access_technologies (MMIfaceModem *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    run_access_technology_loading_sequence (self,
+                                            ACCESS_TECHNOLOGIES_STEP_FIRST,
+                                            TRUE, /* check 2g */
+                                            TRUE, /* check 3g */
+                                            callback,
+                                            user_data);
 }
 
 /*****************************************************************************/
@@ -430,31 +450,241 @@ modem_after_power_up (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Setup/Cleanup unsolicited events (3GPP interface) */
+
+static void
+option_ossys_tech_changed (MMAtSerialPort *port,
+                           GMatchInfo *info,
+                           MMBroadbandModemOption *self)
+{
+    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    gchar *str;
+
+    str = g_match_info_fetch (info, 1);
+    if (str) {
+        ossys_to_mm (str[0], &act);
+        g_free (str);
+    }
+
+    mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
+                                               act,
+                                               MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
+
+    /* _OSSYSI only indicates general 2G/3G mode, so queue up some explicit
+     * access technology requests.
+     */
+    if (act == MM_MODEM_ACCESS_TECHNOLOGY_GPRS)
+        run_access_technology_loading_sequence (MM_IFACE_MODEM (self),
+                                                ACCESS_TECHNOLOGIES_STEP_OCTI,
+                                                TRUE, /* check 2g */
+                                                FALSE, /* check 3g */
+                                                NULL,
+                                                NULL);
+    else if (act == MM_MODEM_ACCESS_TECHNOLOGY_UMTS)
+        run_access_technology_loading_sequence (MM_IFACE_MODEM (self),
+                                                ACCESS_TECHNOLOGIES_STEP_OWCTI,
+                                                FALSE, /* check 2g */
+                                                TRUE, /* check 3g */
+                                                NULL,
+                                                NULL);
+}
+
+static void
+option_2g_tech_changed (MMAtSerialPort *port,
+                        GMatchInfo *match_info,
+                        MMBroadbandModemOption *self)
+{
+    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    gchar *str;
+
+    str = g_match_info_fetch (match_info, 1);
+    if (str && octi_to_mm (str[0], &act))
+        mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
+                                                   act,
+                                                   MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
+    g_free (str);
+}
+
+static void
+option_3g_tech_changed (MMAtSerialPort *port,
+                        GMatchInfo *match_info,
+                        MMBroadbandModemOption *self)
+{
+    MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    gchar *str;
+
+    str = g_match_info_fetch (match_info, 1);
+    if (str && owcti_to_mm (str[0], &act))
+        mm_iface_modem_update_access_technologies (MM_IFACE_MODEM (self),
+                                                   act,
+                                                   MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
+    g_free (str);
+}
+
+static void
+option_signal_changed (MMAtSerialPort *port,
+                       GMatchInfo *match_info,
+                       MMBroadbandModemOption *self)
+{
+    gchar *str;
+    gint quality = 0;
+
+    str = g_match_info_fetch (match_info, 1);
+    if (str) {
+        quality = atoi (str);
+        g_free (str);
+    }
+
+    if (quality == 99) {
+        /* 99 means unknown */
+        quality = 0;
+    } else {
+        /* Normalize the quality */
+        quality = CLAMP (quality, 0, 31) * 100 / 31;
+    }
+
+    mm_iface_modem_update_signal_quality (MM_IFACE_MODEM (self), (guint)quality);
+}
+
+static void
+set_unsolicited_events_handlers (MMBroadbandModemOption *self,
+                                 gboolean enable)
+{
+    MMAtSerialPort *ports[2];
+    guint i;
+
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+
+    /* Enable unsolicited events in given port */
+    for (i = 0; i < 2; i++) {
+        if (!ports[i])
+            continue;
+
+        /* Access technology related */
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->_ossysi_regex,
+            enable ? (MMAtSerialUnsolicitedMsgFn)option_ossys_tech_changed : NULL,
+            enable ? self : NULL,
+            NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->_octi_regex,
+            enable ? (MMAtSerialUnsolicitedMsgFn)option_2g_tech_changed : NULL,
+            enable ? self : NULL,
+            NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->_ouwcti_regex,
+            enable ? (MMAtSerialUnsolicitedMsgFn)option_3g_tech_changed : NULL,
+            enable ? self : NULL,
+            NULL);
+
+        /* Signal quality related */
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            self->priv->_osigq_regex,
+            enable ? (MMAtSerialUnsolicitedMsgFn)option_signal_changed : NULL,
+            enable ? self : NULL,
+            NULL);
+    }
+}
+
+static gboolean
+modem_3gpp_setup_cleanup_unsolicited_events_finish (MMIfaceModem3gpp *self,
+                                                    GAsyncResult *res,
+                                                    GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+parent_setup_unsolicited_events_ready (MMIfaceModem3gpp *self,
+                                       GAsyncResult *res,
+                                       GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_3gpp_parent->setup_unsolicited_events_finish (self, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else {
+        /* Our own setup now */
+        set_unsolicited_events_handlers (MM_BROADBAND_MODEM_OPTION (self), TRUE);
+        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res), TRUE);
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_3gpp_setup_unsolicited_events (MMIfaceModem3gpp *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_setup_unsolicited_events);
+
+    /* Chain up parent's setup */
+    iface_modem_3gpp_parent->setup_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_setup_unsolicited_events_ready,
+        result);
+}
+
+static void
+parent_cleanup_unsolicited_events_ready (MMIfaceModem3gpp *self,
+                                         GAsyncResult *res,
+                                         GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_3gpp_parent->cleanup_unsolicited_events_finish (self, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res), TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_cleanup_unsolicited_events);
+
+    /* Our own cleanup first */
+    set_unsolicited_events_handlers (MM_BROADBAND_MODEM_OPTION (self), FALSE);
+
+    /* And now chain up parent's cleanup */
+    iface_modem_3gpp_parent->cleanup_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_cleanup_unsolicited_events_ready,
+        result);
+}
+
+/*****************************************************************************/
 /* Setup ports (Broadband modem class) */
 
 static void
 setup_ports (MMBroadbandModem *self)
 {
-    MMBroadbandModemOption *option = MM_BROADBAND_MODEM_OPTION (self);
-    MMAtSerialPort *primary;
-
     /* Call parent's setup ports first always */
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_option_parent_class)->setup_ports (self);
 
-    /* Now reset the unsolicited messages we'll handle, only in the primary port! */
-    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
-    mm_at_serial_port_add_unsolicited_msg_handler (primary,
-                                                   option->priv->_ossysi_regex,
-                                                   NULL, NULL, NULL);
-    mm_at_serial_port_add_unsolicited_msg_handler (primary,
-                                                   option->priv->_octi_regex,
-                                                   NULL, NULL, NULL);
-    mm_at_serial_port_add_unsolicited_msg_handler (primary,
-                                                   option->priv->_ouwcti_regex,
-                                                   NULL, NULL, NULL);
-    mm_at_serial_port_add_unsolicited_msg_handler (primary,
-                                                   option->priv->_osigq_regex,
-                                                   NULL, NULL, NULL);
+    /* Now reset the unsolicited messages we'll handle when enabled */
+    set_unsolicited_events_handlers (MM_BROADBAND_MODEM_OPTION (self), FALSE);
 }
 
 /*****************************************************************************/
@@ -515,6 +745,17 @@ iface_modem_init (MMIfaceModem *iface)
     iface->modem_after_power_up_finish = modem_after_power_up_finish;
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
+}
+
+static void
+iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
+{
+    iface_modem_3gpp_parent = g_type_interface_peek_parent (iface);
+
+    iface->setup_unsolicited_events = modem_3gpp_setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events = modem_3gpp_cleanup_unsolicited_events;
+    iface->cleanup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
 }
 
 static void
