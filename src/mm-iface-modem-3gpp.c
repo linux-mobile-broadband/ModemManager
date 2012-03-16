@@ -100,17 +100,37 @@ mm_iface_modem_3gpp_register_in_network (MMIfaceModem3gpp *self,
                                          gpointer user_data)
 {
     GSimpleAsyncResult *result;
+    MmGdbusModem3gpp *skeleton;
+    const gchar *current_operator_code;
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
                                         mm_iface_modem_3gpp_register_in_network);
-    MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network (
-        self,
-        operator_id,
-        max_registration_time,
-        (GAsyncReadyCallback)register_in_network_ready,
-        result);
+
+    /* If no operator ID given, or if we're already registered with the requested one,
+     * then we're done */
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &skeleton,
+                  NULL);
+    current_operator_code = mm_gdbus_modem3gpp_get_operator_code (skeleton);
+    if (current_operator_code &&
+        (!operator_id || g_str_equal (current_operator_code, operator_id))) {
+        /* Already registered, no need to request it again */
+        mm_dbg ("Already registered in network '%s'...", current_operator_code);
+        g_simple_async_result_set_op_res_gboolean (result, TRUE);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+    } else {
+        MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->register_in_network (
+            self,
+            operator_id,
+            max_registration_time,
+            (GAsyncReadyCallback)register_in_network_ready,
+            result);
+    }
+
+    g_object_unref (skeleton);
 }
 
 typedef struct {
