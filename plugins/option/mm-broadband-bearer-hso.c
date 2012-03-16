@@ -600,6 +600,90 @@ dial_3gpp (MMBroadbandBearer *self,
 }
 
 /*****************************************************************************/
+/* 3GPP disconnect */
+
+typedef struct {
+    MMBroadbandBearerHso *self;
+    MMBaseModem *modem;
+    MMAtSerialPort *primary;
+    GSimpleAsyncResult *result;
+} DisconnectContext;
+
+static void
+disconnect_context_complete_and_free (DisconnectContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->primary);
+    g_object_unref (ctx->self);
+    g_object_unref (ctx->modem);
+    g_free (ctx);
+}
+
+static gboolean
+disconnect_3gpp_finish (MMBroadbandBearer *self,
+                        GAsyncResult *res,
+                        GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+disconnect_owancall_ready (MMBaseModem *modem,
+                           GAsyncResult *res,
+                           DisconnectContext *ctx)
+{
+    GError *error = NULL;
+
+    /* Ignore errors for now */
+    mm_base_modem_at_command_full_finish (MM_BASE_MODEM (modem), res, &error);
+    if (error) {
+        mm_dbg ("Disconnection failed (not fatal): %s", error->message);
+        g_error_free (error);
+    }
+
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    disconnect_context_complete_and_free (ctx);
+}
+
+static void
+disconnect_3gpp (MMBroadbandBearer *self,
+                 MMBroadbandModem *modem,
+                 MMAtSerialPort *primary,
+                 MMAtSerialPort *secondary,
+                 MMPort *data,
+                 guint cid,
+                 GAsyncReadyCallback callback,
+                 gpointer user_data)
+{
+    gchar *command;
+    DisconnectContext *ctx;
+
+    g_assert (primary != NULL);
+
+    ctx = g_new0 (DisconnectContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
+    ctx->primary = g_object_ref (primary);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             disconnect_3gpp);
+
+    /* Use specific CID */
+    command = g_strdup_printf ("AT_OWANCALL=%d,0,0", cid);
+    mm_base_modem_at_command_full (MM_BASE_MODEM (modem),
+                                   primary,
+                                   command,
+                                   3,
+                                   FALSE,
+                                   NULL, /* cancellable */
+                                   (GAsyncReadyCallback)disconnect_owancall_ready,
+                                   ctx);
+    g_free (command);
+}
+
+/*****************************************************************************/
 
 static gboolean
 cmp_properties (MMBearer *self,
@@ -763,6 +847,8 @@ mm_broadband_bearer_hso_class_init (MMBroadbandBearerHsoClass *klass)
     broadband_bearer_class->dial_3gpp_finish = dial_3gpp_finish;
     broadband_bearer_class->get_ip_config_3gpp = get_ip_config_3gpp;
     broadband_bearer_class->get_ip_config_3gpp_finish = get_ip_config_3gpp_finish;
+    broadband_bearer_class->disconnect_3gpp = disconnect_3gpp;
+    broadband_bearer_class->disconnect_3gpp_finish = disconnect_3gpp_finish;
 
     properties[PROP_USER] =
         g_param_spec_string (MM_BROADBAND_BEARER_HSO_USER,
