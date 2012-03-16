@@ -28,14 +28,20 @@
 #include "mm-log.h"
 #include "mm-errors-types.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-3gpp.h"
 #include "mm-base-modem-at.h"
 #include "mm-broadband-modem-hso.h"
 #include "mm-broadband-bearer-hso.h"
+#include "mm-bearer-list.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
+static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+
+static MMIfaceModem3gpp *iface_modem_3gpp_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemHso, mm_broadband_modem_hso, MM_TYPE_BROADBAND_MODEM_OPTION, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
 
 struct _MMBroadbandModemHsoPrivate {
     /* Regex for connected notifications */
@@ -97,6 +103,157 @@ modem_create_bearer (MMIfaceModem *self,
                                  (GAsyncReadyCallback)broadband_bearer_hso_new_ready,
                                  result);
 }
+
+/*****************************************************************************/
+/* Setup/Cleanup unsolicited events (3GPP interface) */
+
+static void
+bearer_list_report_status_foreach (MMBearer *bearer,
+                                   gpointer user_data)
+{
+    mm_broadband_bearer_hso_report_connection_status (
+        MM_BROADBAND_BEARER_HSO (bearer),
+        (MMBroadbandBearerHsoConnectionStatus)GPOINTER_TO_UINT (user_data));
+}
+
+static void
+hso_connection_status_changed (MMAtSerialPort *port,
+                               GMatchInfo *match_info,
+                               MMBroadbandModemHso *self)
+{
+    MMBearerList *list = NULL;
+    MMBroadbandBearerHsoConnectionStatus status = MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_UNKNOWN;
+    gchar *str;
+
+    str = g_match_info_fetch (match_info, 2);
+    if (!str)
+        return;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_BEARER_LIST, &list,
+                  NULL);
+    if (!list)
+        return;
+
+    switch (str[0]) {
+    case '1':
+        status = MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_CONNECTED;
+        break;
+    case '3':
+        status = MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_CONNECTION_FAILED;
+        break;
+    case '0':
+        status = MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_DISCONNECTED;
+        break;
+    default:
+        break;
+    }
+
+    if (status != MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_UNKNOWN) {
+        /* We only expect to have one bearer active. If more found, warn about it */
+        g_warn_if_fail (mm_bearer_list_get_count_active (list) > 1);
+        mm_bearer_list_foreach (list,
+                                bearer_list_report_status_foreach,
+                                GUINT_TO_POINTER (status));
+    }
+
+    g_free (str);
+    g_object_unref (list);
+}
+
+static gboolean
+modem_3gpp_setup_cleanup_unsolicited_events_finish (MMIfaceModem3gpp *self,
+                                                    GAsyncResult *res,
+                                                    GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+parent_setup_unsolicited_events_ready (MMIfaceModem3gpp *self,
+                                       GAsyncResult *res,
+                                       GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_3gpp_parent->setup_unsolicited_events_finish (self, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else {
+        /* Our own setup now */
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+            MM_BROADBAND_MODEM_HSO (self)->priv->_owancall_regex,
+            (MMAtSerialUnsolicitedMsgFn)hso_connection_status_changed,
+            self,
+            NULL);
+
+        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res), TRUE);
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_3gpp_setup_unsolicited_events (MMIfaceModem3gpp *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_setup_unsolicited_events);
+
+    /* Chain up parent's setup */
+    iface_modem_3gpp_parent->setup_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_setup_unsolicited_events_ready,
+        result);
+}
+
+static void
+parent_cleanup_unsolicited_events_ready (MMIfaceModem3gpp *self,
+                                         GAsyncResult *res,
+                                         GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_3gpp_parent->cleanup_unsolicited_events_finish (self, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res), TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_cleanup_unsolicited_events);
+
+    /* Our own cleanup first */
+    mm_at_serial_port_add_unsolicited_msg_handler (
+        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+        MM_BROADBAND_MODEM_HSO (self)->priv->_owancall_regex,
+        NULL, NULL, NULL);
+
+    /* And now chain up parent's cleanup */
+    iface_modem_3gpp_parent->cleanup_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_cleanup_unsolicited_events_ready,
+        result);
+}
+
+/*****************************************************************************/
 /* Setup ports (Broadband modem class) */
 
 static void
@@ -166,6 +323,18 @@ iface_modem_init (MMIfaceModem *iface)
     iface->create_bearer_finish = modem_create_bearer_finish;
 }
 
+static void
+iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
+{
+    iface_modem_3gpp_parent = g_type_interface_peek_parent (iface);
+
+    iface->setup_unsolicited_events = modem_3gpp_setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events = modem_3gpp_cleanup_unsolicited_events;
+    iface->cleanup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
+}
+
+static void
 mm_broadband_modem_hso_class_init (MMBroadbandModemHsoClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
