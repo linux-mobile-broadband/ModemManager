@@ -34,6 +34,13 @@
 #define MM_BROADBAND_BEARER_HSO_USER     "broadband-bearer-hso-user"
 #define MM_BROADBAND_BEARER_HSO_PASSWORD "broadband-bearer-hso-password"
 
+typedef enum {
+    MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_UNKNOWN,
+    MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_CONNECTED,
+    MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_CONNECTION_FAILED,
+    MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_DISCONNECTED
+} MMBroadbandBearerHsoConnectionStatus;
+
 typedef struct _MMBroadbandBearerHso MMBroadbandBearerHso;
 typedef struct _MMBroadbandBearerHsoClass MMBroadbandBearerHsoClass;
 typedef struct _MMBroadbandBearerHsoPrivate MMBroadbandBearerHsoPrivate;
@@ -57,5 +64,8 @@ void mm_broadband_bearer_hso_new (MMBroadbandModemHso *modem,
                                   gpointer user_data);
 MMBearer *mm_broadband_bearer_hso_new_finish (GAsyncResult *res,
                                               GError **error);
+
+void mm_broadband_bearer_hso_report_connection_status (MMBroadbandBearerHso *self,
+                                                       MMBroadbandBearerHsoConnectionStatus status);
 
 #endif /* MM_BROADBAND_BEARER_HSO_H */
