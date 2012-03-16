@@ -105,6 +105,36 @@
       </tp:flag>
     </tp:flags>
 
+    <tp:enum name="MM_MODEM_GSM_ALLOWED_AUTH" type="u">
+      <tp:docstring>
+        A bitfield describing the network's authentication preference; this is
+        only for use if the device offers IpMethods of STATIC or DHCP as in
+        these cases the PPP session is established by the device itself. The
+        ordering of the bitfield matches Ericsson devices in the range 0..4
+      </tp:docstring>
+      <tp:flag suffix="UNKNOWN" value="0x0">
+        <tp:docstring>Unknown or invalid authentication</tp:docstring>
+      </tp:flag>
+      <tp:enumvalue suffix="NONE" value="0x1">
+        <tp:docstring>Supports no authentication</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="PAP" value="0x2">
+        <tp:docstring>Supports PAP authentication</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="CHAP" value="0x4">
+        <tp:docstring>Supports CHAP authentication</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="MSCHAP" value="0x8">
+        <tp:docstring>Supports MSCHAP authentication</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="MSCHAPV2" value="0x10">
+        <tp:docstring>Supports MSCHAPv2 authentication</tp:docstring>
+      </tp:enumvalue>
+      <tp:enumvalue suffix="EAP" value="0x20">
+        <tp:docstring>Supports EAP authentication</tp:docstring>
+      </tp:enumvalue>
+    </tp:enum>
+
     <tp:enum name="MM_MODEM_GSM_ALLOWED_MODE" type="u">
       <tp:docstring>
         Describes the device's current access mode preference; ie the specific
