@@ -2159,7 +2159,9 @@ mm_iface_modem_unlock_check (MMIfaceModem *self,
 
     ctx = unlock_check_context_new (self, callback, user_data);
 
-    if (MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required &&
+    /* If we're already unlocked, we're done */
+    if (mm_gdbus_modem_get_unlock_required (ctx->skeleton) != MM_MODEM_LOCK_NONE &&
+        MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required &&
         MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required_finish) {
         MM_IFACE_MODEM_GET_INTERFACE (ctx->self)->load_unlock_required (
             self,
