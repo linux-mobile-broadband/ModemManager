@@ -577,6 +577,7 @@ connect_auth_ready (MMBaseModem *self,
                     ConnectionContext *ctx)
 {
     GError *error = NULL;
+    MMModemState current = MM_MODEM_STATE_UNKNOWN;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
@@ -591,8 +592,18 @@ connect_auth_ready (MMBaseModem *self,
         return;
     }
 
-    /* Start */
-    ctx->step = CONNECTION_STEP_FIRST;
+    /* We may be able to skip some steps, so check that before doing anything */
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &current,
+                  NULL);
+
+    if (current >= MM_MODEM_STATE_ENABLED)
+        ctx->step = CONNECTION_STEP_ENABLE + 1;
+    else if (current >= MM_MODEM_STATE_DISABLED)
+        ctx->step = CONNECTION_STEP_UNLOCK_CHECK + 1;
+    else
+        ctx->step = CONNECTION_STEP_FIRST;
+
     connection_step (ctx);
 }
 
