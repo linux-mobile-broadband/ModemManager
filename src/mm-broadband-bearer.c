@@ -575,6 +575,7 @@ atd_ready (MMBaseModem *modem,
         return;
     }
 
+    g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     dial_3gpp_context_complete_and_free (ctx);
 }
 
