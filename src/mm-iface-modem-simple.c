@@ -319,7 +319,7 @@ enable_ready (MMBaseModem *self,
 {
     GError *error = NULL;
 
-    if (!MM_BASE_MODEM_GET_CLASS (self)->enable_finish (MM_BASE_MODEM (self), res, &error)) {
+    if (!mm_base_modem_enable_finish (MM_BASE_MODEM (self), res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
         connection_context_free (ctx);
         return;
@@ -428,10 +428,9 @@ connection_step (ConnectionContext *ctx)
     case CONNECTION_STEP_ENABLE:
         mm_info ("Simple connect state (%d/%d): Enable",
                  ctx->step, CONNECTION_STEP_LAST);
-        MM_BASE_MODEM_GET_CLASS (ctx->self)->enable (MM_BASE_MODEM (ctx->self),
-                                                     NULL, /* cancellable */
-                                                     (GAsyncReadyCallback)enable_ready,
-                                                     ctx);
+        mm_base_modem_enable (MM_BASE_MODEM (ctx->self),
+                              (GAsyncReadyCallback)enable_ready,
+                              ctx);
         return;
 
     case CONNECTION_STEP_ALLOWED_MODES: {
