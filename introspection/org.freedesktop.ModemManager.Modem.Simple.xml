@@ -22,6 +22,7 @@
 	  'apn'          : string (GSM/HSPA only)
 	  'number'       : string
 	  'rm-protocol'  : uint (CDMA/EVDO only) (1 - Relay, 2 - Network PPP)
+          'allowed_auth' : uint (GSM/HSPA only) (MM_MODEM_GSM_ALLOWED_AUTH bitfield)
 	</tp:docstring>
       </arg>
     </method>
