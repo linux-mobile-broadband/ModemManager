@@ -132,6 +132,12 @@ mm_broadband_bearer_get_allow_roaming (MMBroadbandBearer *self)
     return self->priv->allow_roaming;
 }
 
+guint
+mm_broadband_bearer_get_3gpp_cid (MMBroadbandBearer *self)
+{
+    return self->priv->cid;
+}
+
 /*****************************************************************************/
 /* Detailed connect context, used in both CDMA and 3GPP sequences */
 typedef struct {
