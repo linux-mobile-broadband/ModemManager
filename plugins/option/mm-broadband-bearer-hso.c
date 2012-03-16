@@ -18,10 +18,12 @@
 #include <config.h>
 
 #include <stdio.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <ctype.h>
+#include <arpa/inet.h>
 
 #include <ModemManager.h>
 #include <libmm-common.h>
@@ -52,6 +54,190 @@ struct _MMBroadbandBearerHsoPrivate {
     guint connect_pending_id;
     gulong connect_cancellable_id;
 };
+
+/*****************************************************************************/
+/* 3GPP IP config retrieval (sub-step of the 3GPP Connection sequence) */
+
+typedef struct {
+    MMBroadbandBearerHso *self;
+    MMBaseModem *modem;
+    MMAtSerialPort *primary;
+    guint cid;
+    GSimpleAsyncResult *result;
+} GetIpConfig3gppContext;
+
+static GetIpConfig3gppContext *
+get_ip_config_3gpp_context_new (MMBroadbandBearerHso *self,
+                                MMBaseModem *modem,
+                                MMAtSerialPort *primary,
+                                guint cid,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data)
+{
+    GetIpConfig3gppContext *ctx;
+
+    ctx = g_new0 (GetIpConfig3gppContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->modem = g_object_ref (modem);
+    ctx->primary = g_object_ref (primary);
+    ctx->cid = cid;
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             get_ip_config_3gpp_context_new);
+    return ctx;
+}
+
+static void
+get_ip_config_context_complete_and_free (GetIpConfig3gppContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->primary);
+    g_object_unref (ctx->modem);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+get_ip_config_3gpp_finish (MMBroadbandBearer *self,
+                           GAsyncResult *res,
+                           MMBearerIpConfig **ipv4_config,
+                           MMBearerIpConfig **ipv6_config,
+                           GError **error)
+{
+    MMBearerIpConfig *ip_config;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    /* No IPv6 for now */
+    ip_config = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    *ipv4_config = g_object_ref (ip_config);
+    *ipv6_config = NULL;
+    return TRUE;
+}
+
+#define OWANDATA_TAG "_OWANDATA: "
+
+static void
+ip_config_ready (MMBaseModem *modem,
+                 GAsyncResult *res,
+                 GetIpConfig3gppContext *ctx)
+{
+    MMBearerIpConfig *ip_config = NULL;
+    const gchar *response;
+    GError *error = NULL;
+    gchar **items;
+    gchar *dns[3] = { 0 };
+    guint i;
+    guint dns_i;
+    guint32 tmp;
+
+    response = mm_base_modem_at_command_full_finish (MM_BASE_MODEM (modem), res, &error);
+    if (error) {
+        g_simple_async_result_take_error (ctx->result, error);
+        get_ip_config_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* TODO: use a regex to parse this */
+
+    /* Check result */
+    if (!g_str_has_prefix (response, OWANDATA_TAG)) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't get IP config: invalid response '%s'",
+                                         response);
+        get_ip_config_context_complete_and_free (ctx);
+        return;
+    }
+
+    response = mm_strip_tag (response, OWANDATA_TAG);
+    items = g_strsplit (response, ", ", 0);
+
+    for (i = 0, dns_i = 0; items[i]; i++) {
+        if (i == 0) { /* CID */
+            glong num;
+
+            errno = 0;
+            num = strtol (items[i], NULL, 10);
+            if (errno != 0 || num < 0 || (gint) num != ctx->cid) {
+                error = g_error_new (MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "Unknown CID in OWANDATA response ("
+                                     "got %d, expected %d)", (guint) num, ctx->cid);
+                break;
+            }
+        } else if (i == 1) { /* IP address */
+            if (!inet_pton (AF_INET, items[i], &tmp))
+                break;
+
+            ip_config = mm_bearer_ip_config_new ();
+            mm_bearer_ip_config_set_method (ip_config, MM_BEARER_IP_METHOD_STATIC);
+            mm_bearer_ip_config_set_address (ip_config,  items[i]);
+        } else if (i == 3 || i == 4) { /* DNS entries */
+            if (!inet_pton (AF_INET, items[i], &tmp)) {
+                g_clear_object (&ip_config);
+                break;
+            }
+
+            dns[dns_i++] = items[i];
+        }
+    }
+
+    if (!ip_config) {
+        if (error)
+            g_simple_async_result_take_error (ctx->result, error);
+        else
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Couldn't get IP config: couldn't parse response '%s'",
+                                             response);
+    } else {
+        /* If we got DNS entries, set them in the IP config */
+        if (dns[0])
+            mm_bearer_ip_config_set_dns (ip_config, (const gchar **)dns);
+
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                   ip_config,
+                                                   (GDestroyNotify)g_object_unref);
+    }
+
+    get_ip_config_context_complete_and_free (ctx);
+    g_strfreev (items);
+}
+
+static void
+get_ip_config_3gpp (MMBroadbandBearer *self,
+                    MMBroadbandModem *modem,
+                    MMAtSerialPort *primary,
+                    MMAtSerialPort *secondary,
+                    MMPort *data,
+                    guint cid,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    gchar *command;
+
+    command = g_strdup_printf ("AT_OWANDATA=%d", cid);
+    mm_base_modem_at_command_full (MM_BASE_MODEM (modem),
+                                   primary,
+                                   command,
+                                   3,
+                                   FALSE,
+                                   NULL, /* cancellable */
+                                   (GAsyncReadyCallback)ip_config_ready,
+                                   get_ip_config_3gpp_context_new (MM_BROADBAND_BEARER_HSO (self),
+                                                                   MM_BASE_MODEM (modem),
+                                                                   primary,
+                                                                   cid,
+                                                                   callback,
+                                                                   user_data));
+    g_free (command);
+}
 
 /*****************************************************************************/
 /* 3GPP Dialing (sub-step of the 3GPP Connection sequence) */
@@ -575,6 +761,8 @@ mm_broadband_bearer_hso_class_init (MMBroadbandBearerHsoClass *klass)
 
     broadband_bearer_class->dial_3gpp = dial_3gpp;
     broadband_bearer_class->dial_3gpp_finish = dial_3gpp_finish;
+    broadband_bearer_class->get_ip_config_3gpp = get_ip_config_3gpp;
+    broadband_bearer_class->get_ip_config_3gpp_finish = get_ip_config_3gpp_finish;
 
     properties[PROP_USER] =
         g_param_spec_string (MM_BROADBAND_BEARER_HSO_USER,
