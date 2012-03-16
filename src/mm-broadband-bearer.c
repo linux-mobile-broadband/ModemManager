@@ -777,7 +777,7 @@ initialize_pdp_context_ready (MMBaseModem *self,
                                                           ctx->modem,
                                                           ctx->primary,
                                                           ctx->cid,
-                                                          FALSE,
+                                                          ctx->cancellable,
                                                           (GAsyncReadyCallback)dial_3gpp_ready,
                                                           ctx);
 }
