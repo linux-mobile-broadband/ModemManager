@@ -1448,9 +1448,6 @@ cgact_primary_ready (MMBaseModem *modem,
         g_error_free (error);
     }
 
-    /* Clear CID if we got any set */
-    if (ctx->self->priv->cid)
-        ctx->self->priv->cid = 0;
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     detailed_disconnect_context_complete_and_free (ctx);
 }
@@ -1482,9 +1479,6 @@ primary_flash_3gpp_ready (MMSerialPort *port,
     /* Don't bother doing the CGACT again if it was done on a secondary port
      * or if not needed */
     if (ctx->cgact_sent) {
-        /* Clear CID if we got any set */
-        if (ctx->self->priv->cid)
-            ctx->self->priv->cid = 0;
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         detailed_disconnect_context_complete_and_free (ctx);
         return;
@@ -1533,6 +1527,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
                  MMAtSerialPort *primary,
                  MMAtSerialPort *secondary,
                  MMPort *data,
+                 guint cid,
                  GAsyncReadyCallback callback,
                  gpointer user_data)
 {
@@ -1549,10 +1544,9 @@ disconnect_3gpp (MMBroadbandBearer *self,
                                            user_data);
 
     /* If no specific CID was used, disable all PDP contexts */
-    ctx->cgact_command =
-        (MM_BROADBAND_BEARER (self)->priv->cid >= 0 ?
-         g_strdup_printf ("+CGACT=0,%d", MM_BROADBAND_BEARER (self)->priv->cid) :
-         g_strdup_printf ("+CGACT=0"));
+    ctx->cgact_command = (cid >= 0 ?
+                          g_strdup_printf ("+CGACT=0,%d", cid) :
+                          g_strdup_printf ("+CGACT=0"));
 
     /* If the primary port is connected (with PPP) then try sending the PDP
      * context deactivation on the secondary port because not all modems will
@@ -1663,8 +1657,12 @@ disconnect_3gpp_ready (MMBroadbandBearer *self,
                                                                        res,
                                                                        &error))
         disconnect_failed (ctx, error);
-    else
+    else {
+        /* Clear CID if we got any set */
+        if (ctx->self->priv->cid)
+            ctx->self->priv->cid = 0;
         disconnect_succeeded (ctx);
+    }
 }
 
 static void
@@ -1723,6 +1721,7 @@ disconnect (MMBearer *self,
                 primary,
                 mm_base_modem_peek_port_secondary (modem),
                 MM_BROADBAND_BEARER (self)->priv->port,
+                MM_BROADBAND_BEARER (self)->priv->cid,
                 (GAsyncReadyCallback) disconnect_3gpp_ready,
                 ctx);
         break;

@@ -345,6 +345,7 @@ disconnect_3gpp (MMBroadbandBearer *self,
                  MMAtSerialPort *primary,
                  MMAtSerialPort *secondary,
                  MMPort *data,
+                 guint cid,
                  GAsyncReadyCallback callback,
                  gpointer user_data)
 {

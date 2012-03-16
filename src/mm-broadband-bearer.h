@@ -100,6 +100,7 @@ struct _MMBroadbandBearerClass {
                                          MMAtSerialPort *primary,
                                          MMAtSerialPort *secondary,
                                          MMPort *data,
+                                         guint cid,
                                          GAsyncReadyCallback callback,
                                          gpointer user_data);
     gboolean (* disconnect_3gpp_finish) (MMBroadbandBearer *self,
