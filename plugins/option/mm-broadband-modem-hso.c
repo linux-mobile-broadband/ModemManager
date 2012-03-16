@@ -27,10 +27,15 @@
 #include "mm-modem-helpers.h"
 #include "mm-log.h"
 #include "mm-errors-types.h"
+#include "mm-iface-modem.h"
 #include "mm-base-modem-at.h"
 #include "mm-broadband-modem-hso.h"
+#include "mm-broadband-bearer-hso.h"
 
-G_DEFINE_TYPE (MMBroadbandModemHso, mm_broadband_modem_hso, MM_TYPE_BROADBAND_MODEM_OPTION);
+static void iface_modem_init (MMIfaceModem *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMBroadbandModemHso, mm_broadband_modem_hso, MM_TYPE_BROADBAND_MODEM_OPTION, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
 
 struct _MMBroadbandModemHsoPrivate {
     /* Regex for connected notifications */
@@ -38,6 +43,60 @@ struct _MMBroadbandModemHsoPrivate {
 };
 
 /*****************************************************************************/
+/* Create Bearer (Modem interface) */
+
+static MMBearer *
+modem_create_bearer_finish (MMIfaceModem *self,
+                            GAsyncResult *res,
+                            GError **error)
+{
+    MMBearer *bearer;
+
+    bearer = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    mm_dbg ("New HSO bearer created at DBus path '%s'", mm_bearer_get_path (bearer));
+
+    return g_object_ref (bearer);
+}
+
+static void
+broadband_bearer_hso_new_ready (GObject *source,
+                                GAsyncResult *res,
+                                GSimpleAsyncResult *simple)
+{
+    MMBearer *bearer = NULL;
+    GError *error = NULL;
+
+    bearer = mm_broadband_bearer_hso_new_finish (res, &error);
+    if (!bearer)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   bearer,
+                                                   (GDestroyNotify)g_object_unref);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_create_bearer (MMIfaceModem *self,
+                     MMBearerProperties *properties,
+                     GAsyncReadyCallback callback,
+                     gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_create_bearer);
+
+    mm_dbg ("Creating HSO bearer...");
+    mm_broadband_bearer_hso_new (MM_BROADBAND_MODEM_HSO (self),
+                                 properties,
+                                 NULL, /* cancellable */
+                                 (GAsyncReadyCallback)broadband_bearer_hso_new_ready,
+                                 result);
+}
 /* Setup ports (Broadband modem class) */
 
 static void
@@ -101,6 +160,12 @@ mm_broadband_modem_hso_init (MMBroadbandModemHso *self)
 }
 
 static void
+iface_modem_init (MMIfaceModem *iface)
+{
+    iface->create_bearer = modem_create_bearer;
+    iface->create_bearer_finish = modem_create_bearer_finish;
+}
+
 mm_broadband_modem_hso_class_init (MMBroadbandModemHsoClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
