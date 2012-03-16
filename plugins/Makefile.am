@@ -46,8 +46,6 @@ pkglib_LTLIBRARIES = \
 #	libmm-plugin-generic.la \
 #	libmm-plugin-moto-c.la \
 #	libmm-plugin-huawei.la \
-#	libmm-plugin-hso.la \
-#	libmm-plugin-option.la \
 #	libmm-plugin-sierra.la \
 #	libmm-plugin-novatel.la \
 #	libmm-plugin-nokia.la \
@@ -98,19 +96,6 @@ libmm_plugin_gobi_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 #	mm-modem-huawei-cdma.h
 #libmm_plugin_huawei_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 #libmm_plugin_huawei_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-#
-## HSO
-#libmm_plugin_hso_la_SOURCES = \
-#	mm-plugin-hso.c \
-#	mm-plugin-hso.h \
-#	mm-modem-gsm-hso-glue.h \
-#	mm-modem-hso.c \
-#	mm-modem-hso.h
-#libmm_plugin_hso_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-#libmm_plugin_hso_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-#
-#mm-modem-gsm-hso-glue.h: $(top_srcdir)/introspection/org.freedesktop.ModemManager.Modem.Gsm.Hso.xml
-#	$(AM_V_GEN) dbus-binding-tool --prefix=mm_modem_gsm_hso --mode=glib-server --output=$@ $<
 #
 ## MBM
 #libmm_plugin_mbm_la_SOURCES = \
@@ -297,11 +282,6 @@ libmm_plugin_novatel_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 #	77-mm-longcheer-port-types.rules \
 #	77-mm-simtech-port-types.rules \
 #	77-mm-x22x-port-types.rules \
-#
-#BUILT_SOURCES = \
-#	mm-modem-gsm-hso-glue.h
-#
-#CLEANFILES = $(BUILT_SOURCES)
 #
 
 # Additional files to include in the distribution
