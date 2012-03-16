@@ -78,6 +78,22 @@ struct _MMBroadbandBearerClass {
                                    GAsyncResult *res,
                                    GError **error);
 
+    /* IP config retrieval sub-part of 3GPP connection.
+     * Only really required when using net port + static IP address. */
+    void     (* get_ip_config_3gpp) (MMBroadbandBearer *self,
+                                     MMBroadbandModem *modem,
+                                     MMAtSerialPort *primary,
+                                     MMAtSerialPort *secondary,
+                                     MMPort *data,
+                                     guint cid,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data);
+    gboolean (* get_ip_config_3gpp_finish) (MMBroadbandBearer *self,
+                                            GAsyncResult *res,
+                                            MMBearerIpConfig **ipv4_config,
+                                            MMBearerIpConfig **ipv6_config,
+                                            GError **error);
+
     /* Full 3GPP disconnection sequence */
     void     (* disconnect_3gpp)        (MMBroadbandBearer *self,
                                          MMBroadbandModem *modem,

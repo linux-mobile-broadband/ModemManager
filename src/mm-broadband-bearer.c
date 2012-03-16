@@ -139,11 +139,43 @@ mm_broadband_bearer_get_3gpp_cid (MMBroadbandBearer *self)
 }
 
 /*****************************************************************************/
+/* Detailed connect result, used in both CDMA and 3GPP sequences */
+typedef struct {
+    MMBearerIpConfig *ipv4_config;
+    MMBearerIpConfig *ipv6_config;
+} DetailedConnectResult;
+
+static void
+detailed_connect_result_free (DetailedConnectResult *result)
+{
+    if (result->ipv4_config)
+        g_object_unref (result->ipv4_config);
+    if (result->ipv6_config)
+        g_object_unref (result->ipv6_config);
+    g_free (result);
+}
+
+static DetailedConnectResult *
+detailed_connect_result_new (MMBearerIpConfig *ipv4_config,
+                             MMBearerIpConfig *ipv6_config)
+{
+    DetailedConnectResult *result;
+
+    result = g_new0 (DetailedConnectResult, 1);
+    if (ipv4_config)
+        result->ipv4_config = g_object_ref (ipv4_config);
+    if (ipv6_config)
+        result->ipv6_config = g_object_ref (ipv6_config);
+    return result;
+}
+
+/*****************************************************************************/
 /* Detailed connect context, used in both CDMA and 3GPP sequences */
 typedef struct {
     MMBroadbandBearer *self;
     MMBaseModem *modem;
     MMAtSerialPort *primary;
+    MMAtSerialPort *secondary;
     MMPort *data;
     GCancellable *cancellable;
     GSimpleAsyncResult *result;
@@ -160,16 +192,15 @@ detailed_connect_finish (MMBroadbandBearer *self,
                          MMBearerIpConfig **ipv6_config,
                          GError **error)
 {
-    MMBearerIpConfig *config;
+    DetailedConnectResult *result;
 
     if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return FALSE;
 
-    config = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    result = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
 
-    /* In the default implementation, we assume we'll have the same configs */
-    *ipv4_config = g_object_ref (config);
-    *ipv6_config = g_object_ref (config);
+    *ipv4_config = (result->ipv4_config ? g_object_ref (result->ipv4_config) : NULL);
+    *ipv6_config = (result->ipv6_config ? g_object_ref (result->ipv6_config) : NULL);
     return TRUE;
 }
 
@@ -181,26 +212,11 @@ detailed_connect_context_complete_and_free (DetailedConnectContext *ctx)
     g_object_unref (ctx->cancellable);
     g_object_unref (ctx->data);
     g_object_unref (ctx->primary);
+    if (ctx->secondary)
+        g_object_unref (ctx->secondary);
     g_object_unref (ctx->self);
     g_object_unref (ctx->modem);
     g_free (ctx);
-}
-
-static void
-detailed_connect_context_complete_and_free_successful (DetailedConnectContext *ctx)
-{
-    MMBearerIpConfig *config;
-
-    /* If serial port, set PPP method. Otherwise, assume DHCP is needed. */
-    config = mm_bearer_ip_config_new ();
-    mm_bearer_ip_config_set_method (config,
-                                    (MM_IS_AT_SERIAL_PORT (ctx->data) ?
-                                     MM_BEARER_IP_METHOD_PPP :
-                                     MM_BEARER_IP_METHOD_DHCP));
-    g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                               config,
-                                               (GDestroyNotify)g_object_unref);
-    detailed_connect_context_complete_and_free (ctx);
 }
 
 static gboolean
@@ -234,6 +250,7 @@ static DetailedConnectContext *
 detailed_connect_context_new (MMBroadbandBearer *self,
                               MMBroadbandModem *modem,
                               MMAtSerialPort *primary,
+                              MMAtSerialPort *secondary,
                               MMPort *data,
                               GCancellable *cancellable,
                               GAsyncReadyCallback callback,
@@ -245,6 +262,7 @@ detailed_connect_context_new (MMBroadbandBearer *self,
     ctx->self = g_object_ref (self);
     ctx->modem = MM_BASE_MODEM (g_object_ref (modem));
     ctx->primary = g_object_ref (primary);
+    ctx->secondary = (secondary ? g_object_ref (secondary) : NULL);
     ctx->data = g_object_ref (data);
     ctx->result = g_simple_async_result_new (G_OBJECT (self),
                                              callback,
@@ -274,6 +292,7 @@ dial_cdma_ready (MMBaseModem *modem,
                  DetailedConnectContext *ctx)
 {
     GError *error = NULL;
+    MMBearerIpConfig *config;
 
     /* DO NOT check for cancellable here. If we got here without errors, the
      * bearer is really connected and therefore we need to reflect that in
@@ -287,7 +306,22 @@ dial_cdma_ready (MMBaseModem *modem,
     }
 
     /* else... Yuhu! */
-    detailed_connect_context_complete_and_free_successful (ctx);
+
+    /* If serial port, set PPP method. Otherwise, assume DHCP is needed. */
+    config = mm_bearer_ip_config_new ();
+    mm_bearer_ip_config_set_method (config,
+                                    (MM_IS_AT_SERIAL_PORT (ctx->data) ?
+                                     MM_BEARER_IP_METHOD_PPP :
+                                     MM_BEARER_IP_METHOD_DHCP));
+
+    /* Assume only IPv4 is given */
+    g_simple_async_result_set_op_res_gpointer (
+        ctx->result,
+        detailed_connect_result_new (config, NULL),
+        (GDestroyNotify)detailed_connect_result_free);
+    detailed_connect_context_complete_and_free (ctx);
+
+    g_object_unref (config);
 }
 
 static void
@@ -422,6 +456,7 @@ connect_cdma (MMBroadbandBearer *self,
     ctx = detailed_connect_context_new (self,
                                         modem,
                                         primary,
+                                        NULL,
                                         data,
                                         cancellable,
                                         callback,
@@ -635,10 +670,42 @@ dial_3gpp (MMBroadbandBearer *self,
  */
 
 static void
+get_ip_config_3gpp_ready (MMBroadbandModem *modem,
+                          GAsyncResult *res,
+                          DetailedConnectContext *ctx)
+{
+    MMBearerIpConfig *ipv4_config = NULL;
+    MMBearerIpConfig *ipv6_config = NULL;
+    GError *error = NULL;
+
+    if (!MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->get_ip_config_3gpp_finish (ctx->self,
+                                                                               res,
+                                                                               &ipv4_config,
+                                                                               &ipv6_config,
+                                                                               &error)) {
+        g_simple_async_result_take_error (ctx->result, error);
+        detailed_connect_context_complete_and_free (ctx);
+        return;
+    }
+
+    g_simple_async_result_set_op_res_gpointer (
+        ctx->result,
+        detailed_connect_result_new (ipv4_config, ipv6_config),
+        (GDestroyNotify)detailed_connect_result_free);
+    detailed_connect_context_complete_and_free (ctx);
+
+    if (ipv4_config)
+        g_object_unref (ipv4_config);
+    if (ipv6_config)
+        g_object_unref (ipv6_config);
+}
+
+static void
 dial_3gpp_ready (MMBroadbandModem *modem,
                  GAsyncResult *res,
                  DetailedConnectContext *ctx)
 {
+    MMBearerIpConfig *config;
     GError *error = NULL;
 
     if (!MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->dial_3gpp_finish (ctx->self,
@@ -652,8 +719,38 @@ dial_3gpp_ready (MMBroadbandModem *modem,
     /* Keep CID around while connected */
     ctx->self->priv->cid = ctx->cid;
 
+    if (MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->get_ip_config_3gpp &&
+        MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->get_ip_config_3gpp_finish) {
+        /* Launch specific IP config retrieval */
+        MM_BROADBAND_BEARER_GET_CLASS (ctx->self)->get_ip_config_3gpp (
+            ctx->self,
+            MM_BROADBAND_MODEM (ctx->modem),
+            ctx->primary,
+            ctx->secondary,
+            ctx->data,
+            ctx->cid,
+            (GAsyncReadyCallback)get_ip_config_3gpp_ready,
+            ctx);
+        return;
+    }
+
     /* Yuhu! */
-    detailed_connect_context_complete_and_free_successful (ctx);
+
+    /* If no specific IP retrieval requested, set the default implementation
+     * (PPP if data port is AT, DHCP otherwise) */
+    config = mm_bearer_ip_config_new ();
+    mm_bearer_ip_config_set_method (config,
+                                    (MM_IS_AT_SERIAL_PORT (ctx->data) ?
+                                     MM_BEARER_IP_METHOD_PPP :
+                                     MM_BEARER_IP_METHOD_DHCP));
+
+    g_simple_async_result_set_op_res_gpointer (
+        ctx->result,
+        detailed_connect_result_new (config, NULL),
+        (GDestroyNotify)detailed_connect_result_free);
+    detailed_connect_context_complete_and_free (ctx);
+
+    g_object_unref (config);
 }
 
 static void
@@ -897,7 +994,7 @@ static void
 connect_3gpp (MMBroadbandBearer *self,
               MMBroadbandModem *modem,
               MMAtSerialPort *primary,
-              MMAtSerialPort *secondary, /* unused by us */
+              MMAtSerialPort *secondary,
               MMPort *data,
               GCancellable *cancellable,
               GAsyncReadyCallback callback,
@@ -910,6 +1007,7 @@ connect_3gpp (MMBroadbandBearer *self,
     ctx = detailed_connect_context_new (self,
                                         modem,
                                         primary,
+                                        secondary,
                                         data,
                                         cancellable,
                                         callback,
