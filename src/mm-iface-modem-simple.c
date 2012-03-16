@@ -199,7 +199,8 @@ connection_context_free (ConnectionContext *ctx)
     g_variant_unref (ctx->dictionary);
     if (ctx->properties)
         g_object_unref (ctx->properties);
-    g_object_unref (ctx->bearer);
+    if (ctx->bearer)
+        g_object_unref (ctx->bearer);
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
     g_object_unref (ctx->self);
