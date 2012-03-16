@@ -541,10 +541,20 @@ connection_step (ConnectionContext *ctx)
         mm_info ("Simple connect state (%d/%d): Connect",
                  ctx->step, CONNECTION_STEP_LAST);
 
-        mm_bearer_connect (ctx->bearer,
-                           (GAsyncReadyCallback)connect_bearer_ready,
-                           ctx);
-        return;
+        /* Wait... if we're already using an existing bearer, we need to check if it is
+         * already connected; and if so, just don't do anything else */
+        if (mm_bearer_get_status (ctx->bearer) != MM_BEARER_STATUS_CONNECTED) {
+            mm_bearer_connect (ctx->bearer,
+                               (GAsyncReadyCallback)connect_bearer_ready,
+                               ctx);
+            return;
+        }
+
+        mm_dbg ("Bearer at '%s' is already connected...",
+                mm_bearer_get_path (ctx->bearer));
+
+        /* Fall down to next step */
+        ctx->step++;
 
     case CONNECTION_STEP_LAST:
         mm_info ("Simple connect state (%d/%d): All done",
