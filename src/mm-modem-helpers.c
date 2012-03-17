@@ -22,7 +22,6 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>
-#include <errno.h>
 
 #include <ModemManager.h>
 #include <libmm-common.h>
@@ -317,33 +316,6 @@ get_mm_access_tech_from_etsi_access_tech (guint act)
     }
 }
 
-static gchar *
-get_unquoted_scan_value (GMatchInfo *info, guint32 num)
-{
-    gchar *quoted;
-    gsize len;
-
-    quoted = g_match_info_fetch (info, num);
-    if (!quoted)
-        return NULL;
-
-    len = strlen (quoted);
-
-    /* Unquote the item if needed */
-    if ((len >= 2) && (quoted[0] == '"') && (quoted[len - 1] == '"')) {
-        quoted[0] = ' ';
-        quoted[len - 1] = ' ';
-        quoted = g_strstrip (quoted);
-    }
-
-    if (!strlen (quoted)) {
-        g_free (quoted);
-        return NULL;
-    }
-
-    return quoted;
-}
-
 static MMModem3gppNetworkAvailability
 parse_network_status (const gchar *str)
 {
@@ -462,18 +434,18 @@ mm_3gpp_parse_cops_test_response (const gchar *reply,
 
         info = g_new0 (MM3gppNetworkInfo, 1);
 
-        tmp = get_unquoted_scan_value (match_info, 1);
+        tmp = mm_get_string_unquoted_from_match_info (match_info, 1);
         info->status = parse_network_status (tmp);
         g_free (tmp);
 
-        info->operator_long = get_unquoted_scan_value (match_info, 2);
-        info->operator_short = get_unquoted_scan_value (match_info, 3);
-        info->operator_code = get_unquoted_scan_value (match_info, 4);
+        info->operator_long = mm_get_string_unquoted_from_match_info (match_info, 2);
+        info->operator_short = mm_get_string_unquoted_from_match_info (match_info, 3);
+        info->operator_code = mm_get_string_unquoted_from_match_info (match_info, 4);
 
         /* Only try for access technology with UMTS-format matches.
          * If none give, assume GSM */
         tmp = (umts_format ?
-               get_unquoted_scan_value (match_info, 5) :
+               mm_get_string_unquoted_from_match_info (match_info, 5) :
                NULL);
         info->access_tech = (tmp ?
                              parse_access_tech (tmp) :
@@ -569,14 +541,17 @@ mm_3gpp_parse_cgdcont_read_response (const gchar *reply,
         while (!inner_error &&
                g_match_info_matches (match_info)) {
             MM3gppPdpContext *pdp;
-            gchar *cid;
 
             pdp = g_new0 (MM3gppPdpContext, 1);
-            cid = g_match_info_fetch (match_info, 1);
-            pdp->cid = (guint)atoi (cid);
-            pdp->pdp_type = get_unquoted_scan_value (match_info, 2);
-            pdp->apn = get_unquoted_scan_value (match_info, 3);
-            g_free (cid);
+            if (!mm_get_uint_from_match_info (match_info, 1, &pdp->cid)) {
+                inner_error = g_error_new (MM_CORE_ERROR,
+                                           MM_CORE_ERROR_FAILED,
+                                           "Couldn't parse CID from reply: '%s'",
+                                           reply);
+                break;
+            }
+            pdp->pdp_type = mm_get_string_unquoted_from_match_info (match_info, 2);
+            pdp->apn = mm_get_string_unquoted_from_match_info (match_info, 3);
 
             list = g_list_prepend (list, pdp);
 
@@ -1240,33 +1215,29 @@ mm_3gpp_parse_cind_read_response (const gchar *reply,
                                   GError **error)
 {
     GByteArray *array = NULL;
-    const gchar *p = reply;
     GRegex *r = NULL;
     GMatchInfo *match_info;
-    guint8 t = 0;
+    GError *inner_error = NULL;
+    guint8 t;
 
     g_return_val_if_fail (reply != NULL, NULL);
 
-    if (!g_str_has_prefix (p, CIND_TAG)) {
-        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                             "Could not parse the +CIND response");
+    if (!g_str_has_prefix (reply, CIND_TAG)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Could not parse the +CIND response '%s': no CIND tag found",
+                     reply);
         return NULL;
     }
 
-    p += strlen (CIND_TAG);
-    while (isspace (*p))
-        p++;
+    reply = mm_strip_tag (reply, CIND_TAG);
 
     r = g_regex_new ("(\\d+)[^0-9]+", G_REGEX_UNGREEDY, 0, NULL);
-    if (!r) {
-        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                             "Internal failure attempting to parse +CIND response");
-        return NULL;
-    }
+    g_assert (r != NULL);
 
-    if (!g_regex_match_full (r, p, strlen (p), 0, 0, &match_info, NULL)) {
-        g_set_error_literal (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
-                             "Failure parsing the +CIND response");
+    if (!g_regex_match_full (r, reply, strlen (reply), 0, 0, &match_info, NULL)) {
+        g_set_error (error, MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                     "Could not parse the +CIND response '%s': didn't match",
+                     reply);
         goto done;
     }
 
@@ -1275,25 +1246,32 @@ mm_3gpp_parse_cind_read_response (const gchar *reply,
     /* Add a zero element so callers can use 1-based indexes returned by
      * mm_3gpp_cind_response_get_index().
      */
+    t = 0;
     g_byte_array_append (array, &t, 1);
 
-    while (g_match_info_matches (match_info)) {
+    while (!inner_error &&
+           g_match_info_matches (match_info)) {
         gchar *str;
-        gulong val;
+        guint val = 0;
 
         str = g_match_info_fetch (match_info, 1);
-
-        errno = 0;
-        val = strtoul (str, NULL, 10);
-
-        t = 0;
-        if ((errno == 0) && (val < 255))
+        if (mm_get_uint_from_str (str, &val) && val < 255) {
             t = (guint8) val;
-        /* FIXME: indicate errors somehow? */
-        g_byte_array_append (array, &t, 1);
+            g_byte_array_append (array, &t, 1);
+        } else {
+            inner_error = g_error_new (MM_CORE_ERROR, MM_CORE_ERROR_FAILED,
+                                       "Could not parse the +CIND response: invalid index '%s'",
+                                       str);
+        }
 
         g_free (str);
         g_match_info_next (match_info, NULL);
+    }
+
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        g_byte_array_unref (array);
+        array = NULL;
     }
 
 done:
@@ -1677,19 +1655,17 @@ static const EriItem eris[] = {
 gboolean
 mm_cdma_parse_speri_read_response (const gchar *reply,
                                    gboolean *out_roaming,
-                                   guint32 *out_ind,
+                                   guint *out_ind,
                                    const gchar **out_desc)
 {
-    glong ind;
+    guint ind;
     const EriItem *iter = &eris[0];
     gboolean found = FALSE;
 
     g_return_val_if_fail (reply != NULL, FALSE);
     g_return_val_if_fail (out_roaming != NULL, FALSE);
 
-    errno = 0;
-    ind = strtol (reply, NULL, 10);
-    if (errno == 0) {
+    if (mm_get_uint_from_str (reply, &ind)) {
         if (out_ind)
             *out_ind = ind;
 
@@ -1863,23 +1839,4 @@ mm_cdma_normalize_band (const gchar *long_band,
 
     /* Unknown/not registered */
     return 'Z';
-}
-
-/*************************************************************************/
-
-gint
-mm_cdma_convert_sid (const gchar *sid)
-{
-    glong tmp_sid;
-
-    g_return_val_if_fail (sid != NULL, MM_MODEM_CDMA_SID_UNKNOWN);
-
-    errno = 0;
-    tmp_sid = strtol (sid, NULL, 10);
-    if ((errno == EINVAL) || (errno == ERANGE))
-        return MM_MODEM_CDMA_SID_UNKNOWN;
-    else if (tmp_sid < G_MININT || tmp_sid > G_MAXINT)
-        return MM_MODEM_CDMA_SID_UNKNOWN;
-
-    return (gint) tmp_sid;
 }

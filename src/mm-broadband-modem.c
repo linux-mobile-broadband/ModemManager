@@ -19,7 +19,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <errno.h>
 #include <string.h>
 #include <ctype.h>
 
@@ -4225,51 +4224,6 @@ modem_messaging_load_initial_sms_parts_finish (MMIfaceModemMessaging *self,
     return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
 }
 
-static gboolean
-get_match_uint (GMatchInfo *m,
-                guint match_index,
-                guint *out_val)
-{
-    gchar *s;
-    gulong num;
-
-    g_return_val_if_fail (out_val != NULL, FALSE);
-
-    s = g_match_info_fetch (m, match_index);
-    g_return_val_if_fail (s != NULL, FALSE);
-
-    errno = 0;
-    num = strtoul (s, NULL, 10);
-    g_free (s);
-
-    if (num <= 1000 && errno == 0) {
-        *out_val = (guint) num;
-        return TRUE;
-    }
-    return FALSE;
-}
-
-static gchar *
-get_match_string_unquoted (GMatchInfo *m,
-                           guint match_index)
-{
-    gchar *s, *p, *q, *ret = NULL;
-
-    q = s = g_match_info_fetch (m, match_index);
-    g_return_val_if_fail (s != NULL, FALSE);
-
-    /* remove quotes */
-    if (*q == '"')
-        q++;
-    p = strchr (q, '"');
-    if (p)
-        *p = '\0';
-    if (*q)
-        ret = g_strdup (q);
-    g_free (s);
-    return ret;
-}
-
 static MMSmsState
 sms_state_from_str (const gchar *str)
 {
@@ -4332,13 +4286,13 @@ sms_text_part_list_ready (MMBroadbandModem *self,
             goto next;
         }
 
-        if (!get_match_uint (match_info, 1, &idx)) {
+        if (!mm_get_uint_from_match_info (match_info, 1, &idx)) {
             mm_dbg ("Failed to convert message index");
             goto next;
         }
 
         /* Get and parse number */
-        number = get_match_string_unquoted (match_info, 3);
+        number = mm_get_string_unquoted_from_match_info (match_info, 3);
         if (!number) {
             mm_dbg ("Failed to get message sender number");
             goto next;
@@ -4348,7 +4302,7 @@ sms_text_part_list_ready (MMBroadbandModem *self,
                                                               number);
 
         /* Get part state */
-        stat = get_match_string_unquoted (match_info, 2);
+        stat = mm_get_string_unquoted_from_match_info (match_info, 2);
         if (!stat) {
             mm_dbg ("Failed to get part status");
             g_free (number);
@@ -4356,7 +4310,7 @@ sms_text_part_list_ready (MMBroadbandModem *self,
         }
 
         /* Get and parse timestamp (always expected in ASCII) */
-        timestamp = get_match_string_unquoted (match_info, 5);
+        timestamp = mm_get_string_unquoted_from_match_info (match_info, 5);
 
         /* Get and parse text */
         text = mm_broadband_modem_take_and_convert_to_utf8 (MM_BROADBAND_MODEM (self),
@@ -4948,7 +4902,8 @@ css_query_ready (MMIfaceModemCdma *self,
 
             /* sid */
             str = g_match_info_fetch (match_info, 3);
-            sid = mm_cdma_convert_sid (str);
+            if (!mm_get_int_from_str (str, &sid))
+                sid = MM_MODEM_CDMA_SID_UNKNOWN;
             g_free (str);
 
             success = TRUE;
@@ -5126,13 +5081,11 @@ cad_query_ready (MMIfaceModemCdma *self,
     if (error)
         g_simple_async_result_take_error (simple, error);
     else {
-        gulong int_cad;
+        guint cad;
 
         /* Strip any leading command tag and spaces */
         result = mm_strip_tag (result, "+CAD:");
-        errno = 0;
-        int_cad = strtol (result, NULL, 10);
-        if ((errno == EINVAL) || (errno == ERANGE))
+        if (!mm_get_uint_from_str (result, &cad))
             g_simple_async_result_set_error (simple,
                                              MM_CORE_ERROR,
                                              MM_CORE_ERROR_FAILED,
@@ -5140,7 +5093,7 @@ cad_query_ready (MMIfaceModemCdma *self,
                                              result);
         else
             /* 1 == CDMA service */
-            g_simple_async_result_set_op_res_gboolean (simple, (int_cad == 1));
+            g_simple_async_result_set_op_res_gboolean (simple, (cad == 1));
     }
 
     g_simple_async_result_complete (simple);

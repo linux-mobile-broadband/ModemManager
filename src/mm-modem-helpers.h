@@ -186,6 +186,5 @@ guint mm_cdma_get_index_from_rm_protocol (MMModemCdmaRmProtocol protocol,
 gint  mm_cdma_normalize_class (const gchar *orig_class);
 gchar mm_cdma_normalize_band  (const gchar *long_band,
                                gint *out_class);
-gint  mm_cdma_convert_sid     (const gchar *sid);
 
 #endif  /* MM_MODEM_HELPERS_H */

@@ -14,6 +14,8 @@
  */
 
 #include <string.h>
+#include <errno.h>
+#include <stdlib.h>
 #include <gio/gio.h>
 
 #include <ModemManager.h>
@@ -499,4 +501,98 @@ mm_common_parse_key_value_string (const gchar *str,
     }
 
     return TRUE;
+}
+
+/*****************************************************************************/
+
+gboolean
+mm_get_int_from_str (const gchar *str,
+                     gint *out)
+{
+    glong num;
+
+    errno = 0;
+    num = strtol (str, NULL, 10);
+    if (!errno && num >= G_MININT && num <= G_MAXINT) {
+        *out = (gint)num;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+gboolean
+mm_get_int_from_match_info (GMatchInfo *match_info,
+                            guint32 match_index,
+                            gint *out)
+{
+    gchar *s;
+    gboolean ret;
+
+    s = g_match_info_fetch (match_info, match_index);
+    g_return_val_if_fail (s != NULL, FALSE);
+
+    ret = mm_get_int_from_str (s, out);
+    g_free (s);
+
+    return ret;
+}
+
+gboolean
+mm_get_uint_from_str (const gchar *str,
+                      guint *out)
+{
+    gulong num;
+
+    errno = 0;
+    num = strtoul (str, NULL, 10);
+    if (!errno && num <= G_MAXUINT) {
+        *out = (guint)num;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+gboolean
+mm_get_uint_from_match_info (GMatchInfo *match_info,
+                             guint32 match_index,
+                             guint *out)
+{
+    gchar *s;
+    gboolean ret;
+
+    s = g_match_info_fetch (match_info, match_index);
+    g_return_val_if_fail (s != NULL, FALSE);
+
+    ret = mm_get_uint_from_str (s, out);
+    g_free (s);
+
+    return ret;
+}
+
+gchar *
+mm_get_string_unquoted_from_match_info (GMatchInfo *match_info,
+                                        guint32 match_index)
+{
+    gchar *str;
+    gsize len;
+
+    str = g_match_info_fetch (match_info, match_index);
+    if (!str)
+        return NULL;
+
+    len = strlen (str);
+
+    /* Unquote the item if needed */
+    if ((len >= 2) && (str[0] == '"') && (str[len - 1] == '"')) {
+        str[0] = ' ';
+        str[len - 1] = ' ';
+        str = g_strstrip (str);
+    }
+
+    if (!str[0]) {
+        g_free (str);
+        return NULL;
+    }
+
+    return str;
 }

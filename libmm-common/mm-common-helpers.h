@@ -10,7 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details:
  *
- * Copyright (C) 2011 - Google, Inc.
+ * Copyright (C) 2011 - 2012 Google, Inc.
+ * Copyright (C) 2012 Aleksander Morgado <aleksander@gnu.org>
  */
 
 #include <glib.h>
@@ -56,5 +57,18 @@ gboolean mm_common_parse_key_value_string (const gchar *str,
                                            MMParseKeyValueForeachFn callback,
                                            gpointer user_data);
 
+/* Common parsers */
+gboolean  mm_get_int_from_str                    (const gchar *str,
+                                                  gint *out);
+gboolean  mm_get_int_from_match_info             (GMatchInfo *match_info,
+                                                  guint32 match_index,
+                                                  gint *out);
+gboolean  mm_get_uint_from_str                   (const gchar *str,
+                                                  guint *out);
+gboolean  mm_get_uint_from_match_info            (GMatchInfo *match_info,
+                                                  guint32 match_index,
+                                                  guint *out);
+gchar    *mm_get_string_unquoted_from_match_info (GMatchInfo *match_info,
+                                                  guint32 match_index);
 
 #endif /* MM_COMMON_HELPERS_H */
