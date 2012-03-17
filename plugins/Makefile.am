@@ -40,7 +40,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-motorola.la \
 	libmm-plugin-novatel.la \
 	libmm-plugin-option.la \
-	libmm-plugin-hso.la
+	libmm-plugin-hso.la \
+	libmm-plugin-anydata.la
 
 #pkglib_LTLIBRARIES = \
 #	libmm-plugin-generic.la \
@@ -190,16 +191,16 @@ libmm_plugin_nokia_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 #	mm-modem-longcheer-gsm.h
 #libmm_plugin_longcheer_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 #libmm_plugin_longcheer_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-#
-## AnyData CDMA
-#libmm_plugin_anydata_la_SOURCES = \
-#	mm-plugin-anydata.c \
-#	mm-plugin-anydata.h \
-#	mm-modem-anydata-cdma.c \
-#	mm-modem-anydata-cdma.h
-#libmm_plugin_anydata_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-#libmm_plugin_anydata_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-#
+
+# AnyData CDMA
+libmm_plugin_anydata_la_SOURCES = \
+	anydata/mm-plugin-anydata.c \
+	anydata/mm-plugin-anydata.h \
+	anydata/mm-broadband-modem-anydata.h \
+	anydata/mm-broadband-modem-anydata.c
+libmm_plugin_anydata_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_anydata_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
 ## SimTech
 #libmm_plugin_simtech_la_SOURCES = \
 #	mm-plugin-simtech.c \
