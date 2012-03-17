@@ -29,8 +29,12 @@
 #include "mm-errors-types.h"
 #include "mm-base-modem-at.h"
 #include "mm-broadband-modem-anydata.h"
+#include "mm-iface-modem-cdma.h"
 
-G_DEFINE_TYPE (MMBroadbandModemAnydata, mm_broadband_modem_anydata, MM_TYPE_BROADBAND_MODEM);
+static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMBroadbandModemAnydata, mm_broadband_modem_anydata, MM_TYPE_BROADBAND_MODEM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init));
 
 /*****************************************************************************/
 
@@ -53,6 +57,13 @@ mm_broadband_modem_anydata_new (const gchar *device,
 static void
 mm_broadband_modem_anydata_init (MMBroadbandModemAnydata *self)
 {
+}
+
+static void
+iface_modem_cdma_init (MMIfaceModemCdma *iface)
+{
+    iface->get_cdma1x_serving_system = NULL;
+    iface->get_cdma1x_serving_system_finish = NULL;
 }
 
 static void
