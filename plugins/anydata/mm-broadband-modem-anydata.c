@@ -30,11 +30,14 @@
 #include "mm-errors-types.h"
 #include "mm-base-modem-at.h"
 #include "mm-broadband-modem-anydata.h"
+#include "mm-iface-modem.h"
 #include "mm-iface-modem-cdma.h"
 
+static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_cdma_init (MMIfaceModemCdma *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemAnydata, mm_broadband_modem_anydata, MM_TYPE_BROADBAND_MODEM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_CDMA, iface_modem_cdma_init));
 
 /*****************************************************************************/
@@ -252,6 +255,30 @@ get_detailed_registration_state (MMIfaceModemCdma *self,
 }
 
 /*****************************************************************************/
+/* Reset (Modem interface) */
+
+static gboolean
+reset_finish (MMIfaceModem *self,
+              GAsyncResult *res,
+              GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+reset (MMIfaceModem *self,
+       GAsyncReadyCallback callback,
+       gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "*RESET",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemAnydata *
 mm_broadband_modem_anydata_new (const gchar *device,
@@ -272,6 +299,13 @@ mm_broadband_modem_anydata_new (const gchar *device,
 static void
 mm_broadband_modem_anydata_init (MMBroadbandModemAnydata *self)
 {
+}
+
+static void
+iface_modem_init (MMIfaceModem *iface)
+{
+    iface->reset = reset;
+    iface->reset_finish = reset_finish;
 }
 
 static void
