@@ -279,6 +279,67 @@ reset (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Setup ports (Broadband modem class) */
+
+static void
+setup_ports (MMBroadbandModem *self)
+{
+    MMAtSerialPort *ports[2];
+    GRegex *regex;
+    guint i;
+
+    /* Call parent's setup ports first always */
+    MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_anydata_parent_class)->setup_ports (self);
+
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+
+    /* Now reset the unsolicited messages  */
+    for (i = 0; i < 2; i++) {
+        if (!ports[i])
+            continue;
+
+        /* Data state notifications */
+
+        /* Data call has connected */
+        regex = g_regex_new ("\\r\\n\\*ACTIVE:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
+
+        /* Data call disconnected */
+        regex = g_regex_new ("\\r\\n\\*INACTIVE:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
+
+        /* Modem is now dormant */
+        regex = g_regex_new ("\\r\\n\\*DORMANT:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
+
+        /* Abnormal state notifications
+         *
+         * FIXME: set 1X/EVDO registration state to UNKNOWN when these
+         * notifications are received?
+         */
+
+        /* Network acquisition fail */
+        regex = g_regex_new ("\\r\\n\\*OFFLINE:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
+
+        /* Registration fail */
+        regex = g_regex_new ("\\r\\n\\*REGREQ:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
+
+        /* Authentication fail */
+        regex = g_regex_new ("\\r\\n\\*AUTHREQ:(.*)\\r\\n", G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+        mm_at_serial_port_add_unsolicited_msg_handler (MM_AT_SERIAL_PORT (ports[i]), regex, NULL, NULL, NULL);
+        g_regex_unref (regex);
+    }
+}
+
+/*****************************************************************************/
 
 MMBroadbandModemAnydata *
 mm_broadband_modem_anydata_new (const gchar *device,
@@ -320,4 +381,7 @@ iface_modem_cdma_init (MMIfaceModemCdma *iface)
 static void
 mm_broadband_modem_anydata_class_init (MMBroadbandModemAnydataClass *klass)
 {
+    MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
+
+    broadband_modem_class->setup_ports = setup_ports;
 }
