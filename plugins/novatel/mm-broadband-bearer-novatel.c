@@ -34,7 +34,25 @@
 
 G_DEFINE_TYPE (MMBroadbandBearerNovatel, mm_broadband_bearer_novatel, MM_TYPE_BROADBAND_BEARER);
 
+enum {
+    PROP_0,
+    PROP_USER,
+    PROP_PASSWORD,
+    PROP_LAST
+};
+
+static GParamSpec *properties[PROP_LAST];
+
 /*****************************************************************************/
+
+
+
+struct _MMBroadbandBearerNovatelPrivate {
+    /* Username for authenticating to APN */
+    gchar *user;
+    /* Password for authenticating to APN */
+    gchar *password;
+};
 
 typedef struct {
     MMBroadbandBearer *self;
@@ -204,7 +222,7 @@ connect_3gpp_qmiconnect_ready (MMBaseModem *modem,
 }
 
 static void
-connect_3gpp (MMBroadbandBearer *self,
+connect_3gpp (MMBroadbandBearer *bearer,
               MMBroadbandModem *modem,
               MMAtSerialPort *primary,
               MMAtSerialPort *secondary,
@@ -213,9 +231,11 @@ connect_3gpp (MMBroadbandBearer *self,
               GAsyncReadyCallback callback,
               gpointer user_data)
 {
+    MMBroadbandBearerNovatel *self = MM_BROADBAND_BEARER_NOVATEL (bearer);
     DetailedConnectContext *ctx;
+    gchar *command, *apn, *user, *password;
 
-    ctx = detailed_connect_context_new (self,
+    ctx = detailed_connect_context_new (bearer,
                                         modem,
                                         primary,
                                         data,
@@ -223,13 +243,22 @@ connect_3gpp (MMBroadbandBearer *self,
                                         callback,
                                         user_data);
 
+    apn = mm_at_serial_port_quote_string (mm_broadband_bearer_get_3gpp_apn (bearer));
+    user = mm_at_serial_port_quote_string (self->priv->user);
+    password = mm_at_serial_port_quote_string (self->priv->password);
+    command = g_strdup_printf ("$NWQMICONNECT=,,,,,,%s,,,%s,%s",
+                               apn, user, password);
+    g_free (apn);
+    g_free (user);
+    g_free (password);
     mm_base_modem_at_command (
         ctx->modem,
-        "$NWQMICONNECT=,,,,,,,,,,",
+        command,
         10, /* timeout */
         FALSE, /* allow_cached */
         (GAsyncReadyCallback)connect_3gpp_qmiconnect_ready,
         ctx); /* user_data */
+    g_free (command);
 }
 
 
@@ -365,20 +394,143 @@ disconnect_3gpp (MMBroadbandBearer *self,
 
 
 static void
+finalize (GObject *object)
+{
+    MMBroadbandBearerNovatel *self = MM_BROADBAND_BEARER_NOVATEL (object);
+
+    g_free (self->priv->user);
+    g_free (self->priv->password);
+
+    G_OBJECT_CLASS (mm_broadband_bearer_novatel_parent_class)->finalize (object);
+}
+
+static void
+set_property (GObject *object,
+              guint prop_id,
+              const GValue *value,
+              GParamSpec *pspec)
+{
+    MMBroadbandBearerNovatel *self = MM_BROADBAND_BEARER_NOVATEL (object);
+
+    switch (prop_id) {
+    case PROP_USER:
+        g_free (self->priv->user);
+        self->priv->user = g_value_dup_string (value);
+        break;
+    case PROP_PASSWORD:
+        g_free (self->priv->password);
+        self->priv->password = g_value_dup_string (value);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+
+static void
+get_property (GObject *object,
+              guint prop_id,
+              GValue *value,
+              GParamSpec *pspec)
+{
+    MMBroadbandBearerNovatel *self = MM_BROADBAND_BEARER_NOVATEL (object);
+
+    switch (prop_id) {
+    case PROP_USER:
+        g_value_set_string (value, self->priv->user);
+        break;
+    case PROP_PASSWORD:
+        g_value_set_string (value, self->priv->password);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+
+static gboolean
+cmp_properties (MMBearer *bearer,
+                MMBearerProperties *properties)
+{
+    MMBroadbandBearerNovatel *self = MM_BROADBAND_BEARER_NOVATEL (bearer);
+
+    return ((mm_broadband_bearer_get_allow_roaming (MM_BROADBAND_BEARER (self)) ==
+             mm_bearer_properties_get_allow_roaming (properties)) &&
+            (!g_strcmp0 (mm_broadband_bearer_get_ip_type (MM_BROADBAND_BEARER (self)),
+                         mm_bearer_properties_get_ip_type (properties))) &&
+            (!g_strcmp0 (mm_broadband_bearer_get_3gpp_apn (MM_BROADBAND_BEARER (self)),
+                         mm_bearer_properties_get_apn (properties))) &&
+            (!g_strcmp0 (self->priv->user,
+                         mm_bearer_properties_get_user (properties))) &&
+            (!g_strcmp0 (self->priv->password,
+                         mm_bearer_properties_get_password (properties))));
+}
+
+static MMBearerProperties *
+expose_properties (MMBearer *bearer)
+{
+    MMBroadbandBearerNovatel *self = MM_BROADBAND_BEARER_NOVATEL (bearer);
+    MMBearerProperties *properties;
+
+    properties = mm_bearer_properties_new ();
+    mm_bearer_properties_set_apn (properties,
+                                  mm_broadband_bearer_get_3gpp_apn (MM_BROADBAND_BEARER (self)));
+    mm_bearer_properties_set_ip_type (properties,
+                                      mm_broadband_bearer_get_ip_type (MM_BROADBAND_BEARER (self)));
+    mm_bearer_properties_set_allow_roaming (properties,
+                                            mm_broadband_bearer_get_allow_roaming (MM_BROADBAND_BEARER (self)));
+    mm_bearer_properties_set_user (properties, self->priv->user);
+    mm_bearer_properties_set_password (properties, self->priv->user);
+    return properties;
+}
+
+static void
 mm_broadband_bearer_novatel_init (MMBroadbandBearerNovatel *self)
 {
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
+                                              MM_TYPE_BROADBAND_BEARER_NOVATEL,
+                                              MMBroadbandBearerNovatelPrivate);
+
+    self->priv->user = NULL;
+    self->priv->password = NULL;
 }
 
 static void
 mm_broadband_bearer_novatel_class_init (MMBroadbandBearerNovatelClass *klass)
 {
-    MMBroadbandBearerClass *bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    MMBearerClass *bearer_class = MM_BEARER_CLASS (klass);
+    MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
 
-    bearer_class->connect_3gpp = connect_3gpp;
-    bearer_class->connect_3gpp_finish = connect_3gpp_finish;
+    g_type_class_add_private (object_class, sizeof (MMBroadbandBearerNovatelPrivate));
 
-    bearer_class->disconnect_3gpp = disconnect_3gpp;
-    bearer_class->disconnect_3gpp_finish = disconnect_3gpp_finish;
+    object_class->get_property = get_property;
+    object_class->set_property = set_property;
+    object_class->finalize = finalize;
+
+    bearer_class->cmp_properties = cmp_properties;
+    bearer_class->expose_properties = expose_properties;
+
+    broadband_bearer_class->connect_3gpp = connect_3gpp;
+    broadband_bearer_class->connect_3gpp_finish = connect_3gpp_finish;
+    broadband_bearer_class->disconnect_3gpp = disconnect_3gpp;
+    broadband_bearer_class->disconnect_3gpp_finish = disconnect_3gpp_finish;
+
+    properties[PROP_USER] =
+        g_param_spec_string (MM_BROADBAND_BEARER_NOVATEL_USER,
+                             "User",
+                             "Username to authenticate to APN",
+                             NULL,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_USER, properties[PROP_USER]);
+
+    properties[PROP_PASSWORD] =
+        g_param_spec_string (MM_BROADBAND_BEARER_NOVATEL_PASSWORD,
+                             "Password",
+                             "Password to authenticate to APN",
+                             NULL,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_PASSWORD, properties[PROP_PASSWORD]);
 }
 
 MMBearer *
@@ -414,5 +566,10 @@ void mm_broadband_bearer_novatel_new (MMBroadbandModemNovatel *modem,
         callback,
         user_data,
         MM_BEARER_MODEM, modem,
+        MM_BROADBAND_BEARER_3GPP_APN,         mm_bearer_properties_get_apn (properties),
+        MM_BROADBAND_BEARER_IP_TYPE,          mm_bearer_properties_get_ip_type (properties),
+        MM_BROADBAND_BEARER_ALLOW_ROAMING,    mm_bearer_properties_get_allow_roaming (properties),
+        MM_BROADBAND_BEARER_NOVATEL_USER,     mm_bearer_properties_get_user (properties),
+        MM_BROADBAND_BEARER_NOVATEL_PASSWORD, mm_bearer_properties_get_password (properties),
         NULL);
 }
