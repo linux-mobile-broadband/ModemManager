@@ -254,7 +254,7 @@ uml290_wmc_encapsulate (char *inbuf,
 
     estimated_out_len = cmd_len + strlen (AT_WMC_PREFIX);
     estimated_out_len += 3;  /* CRC + trailer */
-    estimated_out_len += cmd_len * 1.3;  /* escaping */
+    estimated_out_len += cmd_len * 2;  /* escaping */
     wmc_return_val_if_fail (outbuf_len > estimated_out_len, 0);
 
     memcpy (outbuf, AT_WMC_PREFIX, strlen (AT_WMC_PREFIX));
