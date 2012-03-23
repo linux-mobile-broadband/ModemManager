@@ -104,6 +104,12 @@ void     mm_at_serial_port_queue_command_cached (MMAtSerialPort *self,
                                                  MMAtSerialResponseFn callback,
                                                  gpointer user_data);
 
+/*
+ * Convert a string into a quoted and escaped string. Returns a new
+ * allocated string. Follows ITU V.250 5.4.2.2 "String constants".
+ */
+gchar   *mm_at_serial_port_quote_string (const char *string);
+
 /* Just for unit tests */
 void mm_at_serial_port_remove_echo (GByteArray *response);
 
