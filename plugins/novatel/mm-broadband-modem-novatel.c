@@ -336,6 +336,83 @@ set_bands (MMIfaceModem *self,
     g_free (cmd);
 }
 
+static gboolean
+load_access_technologies_finish (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 MMModemAccessTechnology *access_technologies,
+                                 guint *mask,
+                                 GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    *access_technologies = (MMModemAccessTechnology) GPOINTER_TO_UINT (
+        g_simple_async_result_get_op_res_gpointer (
+            G_SIMPLE_ASYNC_RESULT (res)));
+    *mask = MM_MODEM_ACCESS_TECHNOLOGY_ANY;
+    return TRUE;
+}
+
+static void
+load_access_technologies_ready (MMIfaceModem *self,
+                                GAsyncResult *res,
+                                GSimpleAsyncResult *operation_result)
+{
+    const gchar *response;
+    MMModemAccessTechnology act;
+    GError *error = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response) {
+        mm_dbg ("Couldn't query access technology: '%s'", error->message);
+        g_simple_async_result_take_error (operation_result, error);
+        g_simple_async_result_complete (operation_result);
+        g_object_unref (operation_result);
+        return;
+    }
+
+    act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    if (strstr (response, "LTE"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_LTE;
+    if (strstr (response, "WCDMA"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+    if (strstr (response, "EV-DO Rev 0"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_EVDO0;
+    if (strstr (response, "EV-DO Rev A"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_EVDOA;
+    if (strstr (response, "CDMA 1X"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
+    if (strstr (response, "GSM"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_GSM;
+
+    g_simple_async_result_set_op_res_gpointer (operation_result,
+                                               GUINT_TO_POINTER (act),
+                                               NULL);
+    g_simple_async_result_complete_in_idle (operation_result);
+    g_object_unref (operation_result);
+}
+
+static void
+load_access_technologies (MMIfaceModem *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_access_technologies);
+
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "$NWSYSMODE",
+        3,
+        FALSE,
+        (GAsyncReadyCallback)load_access_technologies_ready,
+        result);
+}
+
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
@@ -347,6 +424,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_current_bands_finish = load_current_bands_finish;
     iface->set_bands = set_bands;
     iface->set_bands_finish = set_bands_finish;
+    iface->load_access_technologies = load_access_technologies;
+    iface->load_access_technologies_finish = load_access_technologies_finish;
 }
 
 static void
