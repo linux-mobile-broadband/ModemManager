@@ -114,18 +114,30 @@ void
 mm_port_probe_set_result_at_vendor (MMPortProbe *self,
                                     const gchar *at_vendor)
 {
-    mm_dbg ("(%s) vendor probing finished", self->priv->name);
-    self->priv->vendor = g_utf8_casefold (at_vendor, -1);
-    self->priv->flags |= MM_PORT_PROBE_AT_VENDOR;
+    if (at_vendor) {
+        mm_dbg ("(%s) vendor probing finished", self->priv->name);
+        self->priv->vendor = g_utf8_casefold (at_vendor, -1);
+        self->priv->flags |= MM_PORT_PROBE_AT_VENDOR;
+    } else {
+        mm_dbg ("(%s) couldn't probe for vendor string", self->priv->name);
+        self->priv->vendor = NULL;
+        self->priv->flags |= MM_PORT_PROBE_AT_VENDOR;
+    }
 }
 
 void
 mm_port_probe_set_result_at_product (MMPortProbe *self,
                                      const gchar *at_product)
 {
-    mm_dbg ("(%s) product probing finished", self->priv->name);
-    self->priv->product = g_utf8_casefold (at_product, -1);
-    self->priv->flags |= MM_PORT_PROBE_AT_PRODUCT;
+    if (at_product) {
+        mm_dbg ("(%s) product probing finished", self->priv->name);
+        self->priv->product = g_utf8_casefold (at_product, -1);
+        self->priv->flags |= MM_PORT_PROBE_AT_PRODUCT;
+    } else {
+        mm_dbg ("(%s) couldn't probe for product string", self->priv->name);
+        self->priv->product = NULL;
+        self->priv->flags |= MM_PORT_PROBE_AT_PRODUCT;
+    }
 }
 
 void
