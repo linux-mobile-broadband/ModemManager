@@ -836,6 +836,8 @@ mm_broadband_bearer_hso_class_init (MMBroadbandBearerHsoClass *klass)
     MMBearerClass *bearer_class = MM_BEARER_CLASS (klass);
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
 
+    g_type_class_add_private (object_class, sizeof (MMBroadbandBearerHsoPrivate));
+
     object_class->get_property = get_property;
     object_class->set_property = set_property;
     object_class->finalize = finalize;
