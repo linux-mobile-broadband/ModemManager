@@ -133,6 +133,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS, subsystems,
                       MM_PLUGIN_BASE_ALLOWED_DRIVERS, drivers,
                       MM_PLUGIN_BASE_ALLOWED_AT, TRUE,
+                      MM_PLUGIN_BASE_ALLOWED_QCDM, TRUE,
                       NULL));
 }
 
