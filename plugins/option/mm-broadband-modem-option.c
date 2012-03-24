@@ -175,6 +175,13 @@ set_allowed_modes (MMIfaceModem *self,
                                         user_data,
                                         set_allowed_modes);
 
+    /* There is no explicit config for CS connections, we just assume we may
+     * have them as part of 2G when no GPRS is available */
+    if (allowed & MM_MODEM_MODE_CS) {
+        allowed |= MM_MODEM_MODE_2G;
+        allowed &= ~MM_MODEM_MODE_CS;
+    }
+
     if (allowed == MM_MODEM_MODE_2G)
         option_mode = 0;
     else if (allowed == MM_MODEM_MODE_3G)
@@ -182,10 +189,11 @@ set_allowed_modes (MMIfaceModem *self,
     else if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G)) {
         if (preferred == MM_MODEM_MODE_2G)
             option_mode = 2;
-        else /* 3G preferred also default when NONE given here */
+        else if (preferred == MM_MODEM_MODE_3G)
             option_mode = 3;
-    } else if (allowed == MM_MODEM_MODE_ANY)
-        option_mode = 5;
+        else /* none preferred, so AUTO */
+            option_mode = 5;
+    }
 
     if (option_mode < 0) {
         gchar *allowed_str;
