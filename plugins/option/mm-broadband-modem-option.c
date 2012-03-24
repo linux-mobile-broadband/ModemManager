@@ -102,6 +102,10 @@ load_allowed_modes_finish (MMIfaceModem *self,
         *allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
         *preferred = MM_MODEM_MODE_3G;
         return TRUE;
+    case 5: /* any */
+        *allowed = (MM_MODEM_MODE_CS | MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        *preferred = MM_MODEM_MODE_NONE;
+        return TRUE;
     default:
         break;
     }
@@ -109,7 +113,7 @@ load_allowed_modes_finish (MMIfaceModem *self,
     g_set_error (error,
                  MM_CORE_ERROR,
                  MM_CORE_ERROR_FAILED,
-                 "Couldn't unexpected OSSYS response: '%s'",
+                 "Couldn't parse unexpected OSSYS response: '%s'",
                  response);
     return FALSE;
 }
