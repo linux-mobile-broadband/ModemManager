@@ -1799,11 +1799,15 @@ mm_iface_modem_set_allowed_modes (MMIfaceModem *self,
     g_object_get (self,
                   MM_IFACE_MODEM_DBUS_SKELETON, &ctx->skeleton,
                   NULL);
-    ctx->allowed = allowed;
-    ctx->preferred = preferred;
-
     /* Get list of supported modes */
     supported = mm_gdbus_modem_get_supported_modes (ctx->skeleton);
+
+    /* Whenever we get 'any', just reset to be equal to the list of supported modes */
+    if (allowed == MM_MODEM_MODE_ANY)
+        allowed = supported;
+
+    ctx->allowed = allowed;
+    ctx->preferred = preferred;
 
     /* Check if any of the modes being allowed is not supported */
     not_supported = ((supported ^ allowed) & allowed);
