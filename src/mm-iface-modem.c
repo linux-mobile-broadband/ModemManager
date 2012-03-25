@@ -1809,6 +1809,14 @@ mm_iface_modem_set_allowed_modes (MMIfaceModem *self,
     ctx->allowed = allowed;
     ctx->preferred = preferred;
 
+    /* Check if we already are in the requested setup */
+    if (mm_gdbus_modem_get_allowed_modes (ctx->skeleton) == allowed &&
+        mm_gdbus_modem_get_preferred_mode (ctx->skeleton) == preferred) {
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        set_allowed_modes_context_complete_and_free (ctx);
+        return;
+    }
+
     /* Check if any of the modes being allowed is not supported */
     not_supported = ((supported ^ allowed) & allowed);
 
