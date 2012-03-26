@@ -24,7 +24,7 @@
 
 #define MM_PLUGIN_GENERIC_NAME "Generic"
 
-#define MM_PLUGIN_MAJOR_VERSION 3
+#define MM_PLUGIN_MAJOR_VERSION 4
 #define MM_PLUGIN_MINOR_VERSION 0
 
 #define MM_TYPE_PLUGIN      (mm_plugin_get_type ())
