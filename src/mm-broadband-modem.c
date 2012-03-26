@@ -2202,7 +2202,7 @@ modem_3gpp_load_operator_name_finish (MMIfaceModem3gpp *self,
     if (!result)
         return NULL;
 
-    operator_name = mm_3gpp_parse_operator (result, MM_MODEM_CHARSET_UNKNOWN);
+    operator_name = mm_3gpp_parse_operator (result, MM_BROADBAND_MODEM (self)->priv->modem_current_charset);
     if (operator_name)
         mm_dbg ("loaded Operator Name: %s", operator_name);
 
