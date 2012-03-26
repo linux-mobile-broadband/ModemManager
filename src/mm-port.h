@@ -24,7 +24,7 @@ typedef enum { /*< underscore_name=mm_port_subsys >*/
     MM_PORT_SUBSYS_TTY,
     MM_PORT_SUBSYS_NET,
 
-    MM_PORT_SUBSYS_LAST = MM_PORT_SUBSYS_NET
+    MM_PORT_SUBSYS_LAST = MM_PORT_SUBSYS_NET /*< skip >*/
 } MMPortSubsys;
 
 typedef enum { /*< underscore_name=mm_port_type >*/
@@ -33,7 +33,7 @@ typedef enum { /*< underscore_name=mm_port_type >*/
     MM_PORT_TYPE_AT,
     MM_PORT_TYPE_QCDM,
 
-    MM_PORT_TYPE_LAST = MM_PORT_TYPE_QCDM
+    MM_PORT_TYPE_LAST = MM_PORT_TYPE_QCDM /*< skip >*/
 } MMPortType;
 
 #define MM_TYPE_PORT            (mm_port_get_type ())
