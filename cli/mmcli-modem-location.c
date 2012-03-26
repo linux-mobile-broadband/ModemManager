@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * Copyright (C) 2012 Google, Inc.
+ * Copyright (C) 2012 Lanedo GmbH <aleksander@lanedo.com>
  */
 
 #include "config.h"
@@ -43,17 +44,17 @@ typedef struct {
 static Context *ctx;
 
 /* Options */
-static gboolean enable_flag;
-static gboolean disable_flag;
+static gboolean enable_3gpp_flag;
+static gboolean disable_3gpp_flag;
 static gboolean get_3gpp_flag;
 
 static GOptionEntry entries[] = {
-    { "location-enable", 0, 0, G_OPTION_ARG_NONE, &enable_flag,
-      "Enable location gathering.",
+    { "location-enable-3gpp", 0, 0, G_OPTION_ARG_NONE, &enable_3gpp_flag,
+      "Enable 3GPP location gathering.",
       NULL
     },
-    { "location-disable", 0, 0, G_OPTION_ARG_NONE, &disable_flag,
-      "Disable location gathering.",
+    { "location-disable-3gpp", 0, 0, G_OPTION_ARG_NONE, &disable_3gpp_flag,
+      "Disable 3GPP location gathering.",
       NULL
     },
     { "location-get-3gpp", 0, 0, G_OPTION_ARG_NONE, &get_3gpp_flag,
@@ -87,8 +88,8 @@ mmcli_modem_location_options_enabled (void)
     if (checked)
         return !!n_actions;
 
-    n_actions = (enable_flag +
-                 disable_flag +
+    n_actions = (enable_3gpp_flag +
+                 disable_3gpp_flag +
                  get_3gpp_flag);
 
     if (n_actions > 1) {
@@ -159,7 +160,7 @@ enable_ready (MMModemLocation *modem_location,
     gboolean operation_result;
     GError *error = NULL;
 
-    operation_result = mm_modem_location_enable_finish (modem_location, result, &error);
+    operation_result = mm_modem_location_setup_finish (modem_location, result, &error);
     enable_process_reply (operation_result, error);
 
     mmcli_async_operation_done ();
@@ -185,7 +186,7 @@ disable_ready (MMModemLocation *modem_location,
     gboolean operation_result;
     GError *error = NULL;
 
-    operation_result = mm_modem_location_disable_finish (modem_location, result, &error);
+    operation_result = mm_modem_location_setup_finish (modem_location, result, &error);
     disable_process_reply (operation_result, error);
 
     mmcli_async_operation_done ();
@@ -238,24 +239,28 @@ get_modem_ready (GObject      *source,
     ensure_modem_location ();
 
     /* Request to enable location gathering? */
-    if (enable_flag) {
-        g_debug ("Asynchronously enabling location gathering...");
+    if (enable_3gpp_flag) {
+        g_debug ("Asynchronously enabling 3GPP location gathering...");
 
-        mm_modem_location_enable (ctx->modem_location,
-                                  ctx->cancellable,
-                                  (GAsyncReadyCallback)enable_ready,
-                                  NULL);
+        mm_modem_location_setup (ctx->modem_location,
+                                 mm_modem_location_get_capabilities (ctx->modem_location) | MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI,
+                                 mm_modem_location_signals_location (ctx->modem_location),
+                                 ctx->cancellable,
+                                 (GAsyncReadyCallback)enable_ready,
+                                 NULL);
         return;
     }
 
     /* Request to disable location gathering? */
-    if (disable_flag) {
-        g_debug ("Asynchronously enabling location gathering...");
+    if (disable_3gpp_flag) {
+        g_debug ("Asynchronously disabling 3GPP location gathering...");
 
-        mm_modem_location_disable (ctx->modem_location,
-                                   ctx->cancellable,
-                                   (GAsyncReadyCallback)disable_ready,
-                                   NULL);
+        mm_modem_location_setup (ctx->modem_location,
+                                 mm_modem_location_get_capabilities (ctx->modem_location) & ~MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI,
+                                 mm_modem_location_signals_location (ctx->modem_location),
+                                 ctx->cancellable,
+                                 (GAsyncReadyCallback)disable_ready,
+                                 NULL);
         return;
     }
 
@@ -305,27 +310,31 @@ mmcli_modem_location_run_synchronous (GDBusConnection *connection)
     ensure_modem_location ();
 
     /* Request to enable location gathering? */
-    if (enable_flag) {
+    if (enable_3gpp_flag) {
         gboolean result;
 
-        g_debug ("Asynchronously enabling location gathering...");
+        g_debug ("Asynchronously enabling 3GPP location gathering...");
 
-        result = mm_modem_location_enable_sync (ctx->modem_location,
-                                                NULL,
-                                                &error);
+        result = mm_modem_location_setup_sync (ctx->modem_location,
+                                               mm_modem_location_get_capabilities (ctx->modem_location) | MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI,
+                                               mm_modem_location_signals_location (ctx->modem_location),
+                                               NULL,
+                                               &error);
         enable_process_reply (result, error);
         return;
     }
 
     /* Request to disable location gathering? */
-    if (disable_flag) {
+    if (disable_3gpp_flag) {
         gboolean result;
 
-        g_debug ("Asynchronously enabling location gathering...");
+        g_debug ("Asynchronously disabling 3GPP location gathering...");
 
-        result = mm_modem_location_disable_sync (ctx->modem_location,
-                                                 NULL,
-                                                 &error);
+        result = mm_modem_location_setup_sync (ctx->modem_location,
+                                               mm_modem_location_get_capabilities (ctx->modem_location) & ~MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI,
+                                               mm_modem_location_signals_location (ctx->modem_location),
+                                               NULL,
+                                               &error);
         disable_process_reply (result, error);
         return;
     }

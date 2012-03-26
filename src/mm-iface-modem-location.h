@@ -43,6 +43,7 @@ struct _MMIfaceModemLocation {
 
     /* Enable location gathering (async) */
     void (* enable_location_gathering) (MMIfaceModemLocation *self,
+                                        MMModemLocationSource source,
                                         GAsyncReadyCallback callback,
                                         gpointer user_data);
     gboolean (*enable_location_gathering_finish) (MMIfaceModemLocation *self,
@@ -51,6 +52,7 @@ struct _MMIfaceModemLocation {
 
     /* Disable location gathering (async) */
     void (* disable_location_gathering) (MMIfaceModemLocation *self,
+                                         MMModemLocationSource source,
                                          GAsyncReadyCallback callback,
                                          gpointer user_data);
     gboolean (*disable_location_gathering_finish) (MMIfaceModemLocation *self,

@@ -23,12 +23,13 @@
   <interface name="org.freedesktop.ModemManager1.Modem.Location">
 
     <!--
-        Enable:
-        @enable: %TRUE to enable location information gathering, %FALSE to disable.
+        Setup:
+        @sources: Bitmask of <link linkend="MMModemLocationSource">MMModemLocationSource</link> flags, specifying which sources should get enabled or disabled. <link linkend="MM-MODEM-LOCATION-SOURCE-NONE:CAPS">MM_MODEM_LOCATION_SOURCE_NONE</link> will disable all location gathering.
         @signal_location: Flag to control whether the device emits signals with the new location information. This argument is ignored when disabling location information gathering.
 
-        Enable or disable location information gathering. This method may
-        require the client to authenticate itself.
+        Configure the location sources to use when gathering location
+        information. Also enable or disable location information gathering.
+        This method may require the client to authenticate itself.
 
         When signals are emitted, any client application (including malicious
         ones!) can listen for location updates unless D-Bus permissions restrict
@@ -40,8 +41,8 @@
         ) to get
         location information.
     -->
-    <method name="Enable">
-      <arg name="enable"          type="b" direction="in" />
+    <method name="Setup">
+      <arg name="sources"         type="u" direction="in" />
       <arg name="signal_location" type="b" direction="in" />
     </method>
 
@@ -64,18 +65,18 @@
         Capabilities:
 
         Bitmask of <link linkend="MMModemLocationSource">MMModemLocationSource</link>
-        values, specifying the location retrieval capabilities of the device.
+        values, specifying the supported location sources.
     -->
     <property name="Capabilities" type="u" access="read" />
 
     <!--
         Enabled:
 
-        %TRUE if location information gathering is enabled for this device,
-        %FALSE if it is disabled. When disabled, the device will not provide
-        location information.
+        Bitmask specifying which of the supported
+        <link linkend="MMModemLocationSource">MMModemLocationSource</link>
+        location sources is currently enabled in the device.
     -->
-    <property name="Enabled" type="b" access="read" />
+    <property name="Enabled" type="u" access="read" />
 
     <!--
         SignalsLocation:
@@ -84,7 +85,7 @@
         location updates will not be emitted.
 
         See the
-        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Location.Enable">Enable()</link>
+        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Location.Setup">Setup()</link>
         method for more information.
     -->
     <property name="SignalsLocation" type="b" access="read" />

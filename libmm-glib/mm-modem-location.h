@@ -18,6 +18,7 @@
  * Boston, MA 02110-1301 USA.
  *
  * Copyright (C) 2012 Google, Inc.
+ * Copyright (C) 2012 Lanedo GmbH <aleksander@lanedo.com>
  */
 
 #ifndef _MM_MODEM_LOCATION_H_
@@ -37,29 +38,23 @@ const gchar *mm_modem_location_get_path (MMModemLocation *self);
 gchar       *mm_modem_location_dup_path (MMModemLocation *self);
 
 MMModemLocationSource mm_modem_location_get_capabilities (MMModemLocation *self);
-gboolean              mm_modem_location_get_enabled      (MMModemLocation *self);
+MMModemLocationSource mm_modem_location_get_enabled      (MMModemLocation *self);
+gboolean              mm_modem_location_signals_location (MMModemLocation *self);
 
-void     mm_modem_location_enable        (MMModemLocation *self,
-                                          GCancellable *cancellable,
-                                          GAsyncReadyCallback callback,
-                                          gpointer user_data);
-gboolean mm_modem_location_enable_finish (MMModemLocation *self,
-                                          GAsyncResult *res,
-                                          GError **error);
-gboolean mm_modem_location_enable_sync   (MMModemLocation *self,
-                                          GCancellable *cancellable,
-                                          GError **error);
-
-void     mm_modem_location_disable        (MMModemLocation *self,
-                                           GCancellable *cancellable,
-                                           GAsyncReadyCallback callback,
-                                           gpointer user_data);
-gboolean mm_modem_location_disable_finish (MMModemLocation *self,
-                                           GAsyncResult *res,
-                                           GError **error);
-gboolean mm_modem_location_disable_sync   (MMModemLocation *self,
-                                           GCancellable *cancellable,
-                                           GError **error);
+void     mm_modem_location_setup        (MMModemLocation *self,
+                                         MMModemLocationSource sources,
+                                         gboolean signal_location,
+                                         GCancellable *cancellable,
+                                         GAsyncReadyCallback callback,
+                                         gpointer user_data);
+gboolean mm_modem_location_setup_finish (MMModemLocation *self,
+                                         GAsyncResult *res,
+                                         GError **error);
+gboolean mm_modem_location_setup_sync   (MMModemLocation *self,
+                                         MMModemLocationSource sources,
+                                         gboolean signal_location,
+                                         GCancellable *cancellable,
+                                         GError **error);
 
 void            mm_modem_location_get_3gpp        (MMModemLocation *self,
                                                    GCancellable *cancellable,

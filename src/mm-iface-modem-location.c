@@ -11,6 +11,7 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2012 Google, Inc.
+ * Copyright (C) 2012 Lanedo GmbH <aleksander@lanedo.com>
  */
 
 #include <ModemManager.h>
@@ -141,12 +142,10 @@ mm_iface_modem_location_3gpp_update_mcc_mnc (MMIfaceModemLocation *self,
                   MM_IFACE_MODEM_LOCATION_DBUS_SKELETON, &skeleton,
                   NULL);
 
-    if (mm_gdbus_modem_location_get_enabled (skeleton)) {
+    if (mm_gdbus_modem_location_get_enabled (skeleton) & MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI) {
         guint changed = 0;
 
-        if (G_UNLIKELY (!ctx->location_3gpp))
-            ctx->location_3gpp = mm_location_3gpp_new ();
-
+        g_assert (ctx->location_3gpp != NULL);
         changed += mm_location_3gpp_set_mobile_country_code (ctx->location_3gpp,
                                                              mobile_country_code);
         changed += mm_location_3gpp_set_mobile_network_code (ctx->location_3gpp,
@@ -171,12 +170,10 @@ mm_iface_modem_location_3gpp_update_lac_ci (MMIfaceModemLocation *self,
                   MM_IFACE_MODEM_LOCATION_DBUS_SKELETON, &skeleton,
                   NULL);
 
-    if (mm_gdbus_modem_location_get_enabled (skeleton)) {
+    if (mm_gdbus_modem_location_get_enabled (skeleton) & MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI) {
         guint changed = 0;
 
-        if (G_UNLIKELY (!ctx->location_3gpp))
-            ctx->location_3gpp = mm_location_3gpp_new ();
-
+        g_assert (ctx->location_3gpp != NULL);
         changed += mm_location_3gpp_set_location_area_code (ctx->location_3gpp,
                                                             location_area_code);
         changed += mm_location_3gpp_set_cell_id (ctx->location_3gpp,
@@ -199,12 +196,10 @@ mm_iface_modem_location_3gpp_clear (MMIfaceModemLocation *self)
                   MM_IFACE_MODEM_LOCATION_DBUS_SKELETON, &skeleton,
                   NULL);
 
-    if (mm_gdbus_modem_location_get_enabled (skeleton)) {
+    if (mm_gdbus_modem_location_get_enabled (skeleton) & MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI) {
         guint changed = 0;
 
-        if (G_UNLIKELY (!ctx->location_3gpp))
-            ctx->location_3gpp = mm_location_3gpp_new ();
-
+        g_assert (ctx->location_3gpp != NULL);
         changed += mm_location_3gpp_set_location_area_code (ctx->location_3gpp, 0);
         changed += mm_location_3gpp_set_cell_id (ctx->location_3gpp, 0);
         changed += mm_location_3gpp_set_mobile_country_code (ctx->location_3gpp, 0);
@@ -218,16 +213,283 @@ mm_iface_modem_location_3gpp_clear (MMIfaceModemLocation *self)
 
 /*****************************************************************************/
 
+static void
+update_location_source_status (MMIfaceModemLocation *self,
+                               MMModemLocationSource source,
+                               gboolean enabled)
+{
+    MMModemLocationSource mask;
+    MmGdbusModemLocation *skeleton = NULL;
+    LocationContext *ctx;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_LOCATION_DBUS_SKELETON, &skeleton,
+                  NULL);
+    g_assert (skeleton != NULL);
+
+    /* Update status in the interface */
+    mask = mm_gdbus_modem_location_get_enabled (skeleton);
+    if (enabled)
+        mask |= source;
+    else
+        mask &= ~source;
+
+    /* Update status in the context */
+    ctx = get_location_context (self);
+
+    switch (source) {
+    case MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI:
+        if (enabled) {
+            if (!ctx->location_3gpp)
+                ctx->location_3gpp = mm_location_3gpp_new ();
+        } else
+            g_clear_object (&ctx->location_3gpp);
+        break;
+    default:
+        break;
+    }
+
+    mm_gdbus_modem_location_set_enabled (skeleton, mask);
+
+    g_object_unref (skeleton);
+}
+
+/*****************************************************************************/
+
+typedef struct {
+    MMIfaceModemLocation *self;
+    MmGdbusModemLocation *skeleton;
+    GSimpleAsyncResult *result;
+    MMModemLocationSource to_enable;
+    MMModemLocationSource to_disable;
+    MMModemLocationSource current;
+} SetupGatheringContext;
+
+static void setup_gathering_step (SetupGatheringContext *ctx);
+
+static void
+setup_gathering_context_complete_and_free (SetupGatheringContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->skeleton);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+setup_gathering_finish (MMIfaceModemLocation *self,
+                        GAsyncResult *res,
+                        GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+enable_location_gathering_ready (MMIfaceModemLocation *self,
+                                 GAsyncResult *res,
+                                 SetupGatheringContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering_finish (self, res, &error)) {
+        gchar *str;
+
+        str = mm_modem_location_source_build_string_from_mask (ctx->current);
+        g_prefix_error (&error,
+                        "Couldn't enable location '%s' gathering: ",
+                        str);
+        g_simple_async_result_take_error (ctx->result, error);
+        setup_gathering_context_complete_and_free (ctx);
+        g_free (str);
+        return;
+    }
+
+    update_location_source_status (self, ctx->current, TRUE);
+
+    /* Keep on with next ones... */
+    ctx->current = ctx->current << 1;
+    setup_gathering_step (ctx);
+}
+
+static void
+disable_location_gathering_ready (MMIfaceModemLocation *self,
+                                  GAsyncResult *res,
+                                  SetupGatheringContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering_finish (self, res, &error)) {
+        gchar *str;
+
+        str = mm_modem_location_source_build_string_from_mask (ctx->current);
+        g_prefix_error (&error,
+                        "Couldn't disable location '%s' gathering: ",
+                        str);
+        g_simple_async_result_take_error (ctx->result, error);
+        setup_gathering_context_complete_and_free (ctx);
+        g_free (str);
+        return;
+    }
+
+    update_location_source_status (self, ctx->current, FALSE);
+
+    /* Keep on with next ones... */
+    ctx->current = ctx->current << 1;
+    setup_gathering_step (ctx);
+}
+
+static void
+setup_gathering_step (SetupGatheringContext *ctx)
+{
+    /* Are we done? */
+    if (ctx->to_enable == MM_MODEM_LOCATION_SOURCE_NONE &&
+        ctx->to_disable == MM_MODEM_LOCATION_SOURCE_NONE) {
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        setup_gathering_context_complete_and_free (ctx);
+        return;
+    }
+
+    while (ctx->current <= MM_MODEM_LOCATION_SOURCE_GPS_NMEA) {
+        gchar *source_str;
+
+        if (ctx->to_enable & ctx->current) {
+            /* Remove from mask */
+            ctx->to_enable &= ~ctx->current;
+
+            /* Plugins can run custom actions to enable location gathering */
+            if (MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->enable_location_gathering &&
+                MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->enable_location_gathering_finish) {
+                MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->enable_location_gathering (
+                    MM_IFACE_MODEM_LOCATION (ctx->self),
+                    ctx->current,
+                    (GAsyncReadyCallback)enable_location_gathering_ready,
+                    ctx);
+                return;
+            }
+
+            update_location_source_status (ctx->self, ctx->current, TRUE);
+
+            source_str = mm_modem_location_source_build_string_from_mask (ctx->current);
+            mm_dbg ("Enabled location '%s' gathering...", source_str);
+            g_free (source_str);
+        } else if (ctx->to_disable & ctx->current) {
+            /* Remove from mask */
+            ctx->to_disable &= ~ctx->current;
+
+            /* Plugins can run custom actions to disable location gathering */
+            if (MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->disable_location_gathering &&
+                MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->disable_location_gathering_finish) {
+                MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->disable_location_gathering (
+                    MM_IFACE_MODEM_LOCATION (ctx->self),
+                    ctx->current,
+                    (GAsyncReadyCallback)disable_location_gathering_ready,
+                    ctx);
+                return;
+            }
+
+            update_location_source_status (ctx->self, ctx->current, FALSE);
+
+            source_str = mm_modem_location_source_build_string_from_mask (ctx->current);
+            mm_dbg ("Disabled location '%s' gathering...", source_str);
+            g_free (source_str);
+        }
+
+        /* go on... */
+        ctx->current = ctx->current << 1;
+    }
+
+    /* We just need to finish now */
+    g_assert (ctx->to_enable == MM_MODEM_LOCATION_SOURCE_NONE);
+    g_assert (ctx->to_disable == MM_MODEM_LOCATION_SOURCE_NONE);
+    setup_gathering_step (ctx);
+}
+
+static void
+setup_gathering (MMIfaceModemLocation *self,
+                 MMModemLocationSource mask,
+                 GAsyncReadyCallback callback,
+                 gpointer user_data)
+{
+    SetupGatheringContext *ctx;
+    MMModemLocationSource currently_enabled;
+    MMModemLocationSource source;
+    gchar *str;
+
+    ctx = g_new (SetupGatheringContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             setup_gathering);
+    g_object_get (self,
+                  MM_IFACE_MODEM_LOCATION_DBUS_SKELETON, &ctx->skeleton,
+                  NULL);
+    g_assert (ctx->skeleton != NULL);
+
+    /* Get current list of enabled sources */
+    currently_enabled = mm_gdbus_modem_location_get_enabled (ctx->skeleton);
+
+    /* Reset the list of sources to enable or disable */
+    ctx->to_enable = MM_MODEM_LOCATION_SOURCE_NONE;
+    ctx->to_disable = MM_MODEM_LOCATION_SOURCE_NONE;
+
+    /* Loop through all known bits in the bitmask to enable/disable specific location sources */
+    for (source = MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI;
+         source <= MM_MODEM_LOCATION_SOURCE_GPS_NMEA;
+         source = source << 1) {
+        /* skip unsupported sources */
+        if (!(mm_gdbus_modem_location_get_capabilities (ctx->skeleton) & source))
+            continue;
+
+        str = mm_modem_location_source_build_string_from_mask (source);
+
+        if (mask & source) {
+            /* Source set in mask, need to enable if disabled */
+            if (currently_enabled & source)
+                mm_dbg ("Location '%s' gathering is already enabled...", str);
+            else
+                ctx->to_enable |= source;
+        } else {
+            /* Source unset in mask, need to disable if enabled */
+            if (currently_enabled & source)
+                ctx->to_disable |= source;
+            else
+                mm_dbg ("Location '%s' gathering is already disabled...", str);
+        }
+
+        g_free (str);
+    }
+
+    if (ctx->to_enable != MM_MODEM_LOCATION_SOURCE_NONE) {
+        str = mm_modem_location_source_build_string_from_mask (ctx->to_enable);
+        mm_dbg ("Need to enable the following location sources: '%s'", str);
+        g_free (str);
+    }
+
+    if (ctx->to_disable != MM_MODEM_LOCATION_SOURCE_NONE) {
+        str = mm_modem_location_source_build_string_from_mask (ctx->to_disable);
+        mm_dbg ("Need to disable the following location sources: '%s'", str);
+        g_free (str);
+    }
+
+    /* Start enabling/disabling location sources */
+    ctx->current = MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI;
+    setup_gathering_step (ctx);
+}
+
+/*****************************************************************************/
+
 typedef struct {
     MmGdbusModemLocation *skeleton;
     GDBusMethodInvocation *invocation;
     MMIfaceModemLocation *self;
-    gboolean enable;
+    guint32 sources;
     gboolean signal_location;
-} HandleEnableContext;
+} HandleSetupContext;
 
 static void
-handle_enable_context_free (HandleEnableContext *ctx)
+handle_setup_context_free (HandleSetupContext *ctx)
 {
     g_object_unref (ctx->skeleton);
     g_object_unref (ctx->invocation);
@@ -236,146 +498,109 @@ handle_enable_context_free (HandleEnableContext *ctx)
 }
 
 static void
-enable_location_gathering_ready (MMIfaceModemLocation *self,
-                                 GAsyncResult *res,
-                                 HandleEnableContext *ctx)
+setup_gathering_ready (MMIfaceModemLocation *self,
+                       GAsyncResult *res,
+                       HandleSetupContext *ctx)
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering_finish (self, res, &error))
+    if (!setup_gathering_finish (self, res, &error))
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else {
-        mm_gdbus_modem_location_set_enabled (ctx->skeleton, TRUE);
-        mm_gdbus_modem_location_complete_enable (ctx->skeleton,
-                                                 ctx->invocation);
-    }
+    else
+        mm_gdbus_modem_location_complete_setup (ctx->skeleton, ctx->invocation);
 
-    handle_enable_context_free (ctx);
+    handle_setup_context_free (ctx);
 }
 
 static void
-disable_location_gathering_ready (MMIfaceModemLocation *self,
-                                  GAsyncResult *res,
-                                  HandleEnableContext *ctx)
+handle_setup_auth_ready (MMBaseModem *self,
+                         GAsyncResult *res,
+                         HandleSetupContext *ctx)
 {
     GError *error = NULL;
-
-    if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering_finish (self, res, &error))
-        g_dbus_method_invocation_take_error (ctx->invocation, error);
-    else {
-        clear_location_context (self);
-        mm_gdbus_modem_location_set_enabled (ctx->skeleton, FALSE);
-        mm_gdbus_modem_location_complete_enable (ctx->skeleton,
-                                                 ctx->invocation);
-    }
-
-    handle_enable_context_free (ctx);
-}
-
-static void
-handle_enable_auth_ready (MMBaseModem *self,
-                          GAsyncResult *res,
-                          HandleEnableContext *ctx)
-{
-    GError *error = NULL;
+    MMModemState modem_state;
+    MMModemLocationSource not_supported;
+    LocationContext *location_ctx;
+    gchar *str;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
-        handle_enable_context_free (ctx);
+        handle_setup_context_free (ctx);
         return;
     }
 
-    /* Enabling */
-    if (ctx->enable) {
-        LocationContext *location_ctx;
-
-        location_ctx = get_location_context (ctx->self);
-        mm_dbg ("Enabling location gathering%s...",
-                ctx->signal_location ? " (with signaling)" : "");
-
-        /* Update the new signal location value */
-        if (mm_gdbus_modem_location_get_signals_location (ctx->skeleton) != ctx->signal_location) {
-            mm_dbg ("%s location signaling",
-                    ctx->signal_location ? "Enabling" : "Disabling");
-            mm_gdbus_modem_location_set_signals_location (ctx->skeleton,
-                                                          ctx->signal_location);
-            mm_gdbus_modem_location_set_location (ctx->skeleton,
-                                                  build_location_dictionary (ctx->signal_location ?
-                                                                             location_ctx->location_3gpp :
-                                                                             NULL));
-        }
-
-        /* If already enabled, just done */
-        if (mm_gdbus_modem_location_get_enabled (ctx->skeleton)) {
-            mm_gdbus_modem_location_complete_enable (ctx->skeleton, ctx->invocation);
-            handle_enable_context_free (ctx);
-            return;
-        }
-
-        /* Plugins can run custom actions to enable location gathering */
-        if (MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering &&
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering_finish) {
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering (
-                MM_IFACE_MODEM_LOCATION (self),
-                (GAsyncReadyCallback)enable_location_gathering_ready,
-                ctx);
-            return;
-        }
-
-        /* If no plugin-specific setup needed or interface not yet enabled, just done */
-        mm_gdbus_modem_location_set_enabled (ctx->skeleton, TRUE);
-        mm_gdbus_modem_location_complete_enable (ctx->skeleton, ctx->invocation);
-        handle_enable_context_free (ctx);
+    modem_state = MM_MODEM_STATE_UNKNOWN;
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+    if (modem_state < MM_MODEM_STATE_ENABLED) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot setup location: "
+                                               "device not yet enabled");
+        handle_setup_context_free (ctx);
         return;
     }
 
-    /* Disabling */
-    mm_dbg ("Disabling location gathering...");
-
-    /* If already disabled, just done */
-    if (!mm_gdbus_modem_location_get_enabled (ctx->skeleton)) {
-        mm_gdbus_modem_location_complete_enable (ctx->skeleton, ctx->invocation);
-        handle_enable_context_free (ctx);
+    /* If any of the location sources being enabled is NOT supported, set error */
+    not_supported = ((mm_gdbus_modem_location_get_capabilities (ctx->skeleton) ^ ctx->sources) & ctx->sources);
+    if (not_supported != MM_MODEM_LOCATION_SOURCE_NONE) {
+        str = mm_modem_location_source_build_string_from_mask (not_supported);
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_UNSUPPORTED,
+                                               "Cannot enable unsupported location sources: '%s'",
+                                               str);
+        handle_setup_context_free (ctx);
+        g_free (str);
         return;
     }
 
-    /* Plugins can run custom actions to disable location gathering */
-    if (MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering &&
-        MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering_finish) {
-        MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering (
-            MM_IFACE_MODEM_LOCATION (self),
-            (GAsyncReadyCallback)disable_location_gathering_ready,
-            ctx);
-        return;
+    /* Enable/disable location signaling */
+    location_ctx = get_location_context (ctx->self);
+    if (mm_gdbus_modem_location_get_signals_location (ctx->skeleton) != ctx->signal_location) {
+        mm_dbg ("%s location signaling",
+                ctx->signal_location ? "Enabling" : "Disabling");
+        mm_gdbus_modem_location_set_signals_location (ctx->skeleton,
+                                                      ctx->signal_location);
+        mm_gdbus_modem_location_set_location (ctx->skeleton,
+                                              build_location_dictionary (ctx->signal_location ?
+                                                                         location_ctx->location_3gpp :
+                                                                         NULL));
     }
 
-    /* If no plugin-specific setup needed, or interface not yet enabled, just done */
-    clear_location_context (ctx->self);
-    mm_gdbus_modem_location_set_enabled (ctx->skeleton, FALSE);
-    mm_gdbus_modem_location_complete_enable (ctx->skeleton, ctx->invocation);
-    handle_enable_context_free (ctx);
+    str = mm_modem_location_source_build_string_from_mask (ctx->sources);
+    mm_dbg ("Setting up location sources: '%s'", str);
+    g_free (str);
+
+    /* Go on to enable or disable the requested sources */
+    setup_gathering (ctx->self,
+                     ctx->sources,
+                     (GAsyncReadyCallback)setup_gathering_ready,
+                     ctx);
 }
 
 static gboolean
-handle_enable (MmGdbusModemLocation *skeleton,
-               GDBusMethodInvocation *invocation,
-               gboolean enable,
-               gboolean signal_location,
-               MMIfaceModemLocation *self)
+handle_setup (MmGdbusModemLocation *skeleton,
+              GDBusMethodInvocation *invocation,
+              guint32 sources,
+              gboolean signal_location,
+              MMIfaceModemLocation *self)
 {
-    HandleEnableContext *ctx;
+    HandleSetupContext *ctx;
 
-    ctx = g_new (HandleEnableContext, 1);
+    ctx = g_new (HandleSetupContext, 1);
     ctx->skeleton = g_object_ref (skeleton);
     ctx->invocation = g_object_ref (invocation);
     ctx->self = g_object_ref (self);
-    ctx->enable = enable;
+    ctx->sources = sources;
     ctx->signal_location = signal_location;
 
     mm_base_modem_authorize (MM_BASE_MODEM (self),
                              invocation,
                              MM_AUTHORIZATION_DEVICE_CONTROL,
-                             (GAsyncReadyCallback)handle_enable_auth_ready,
+                             (GAsyncReadyCallback)handle_setup_auth_ready,
                              ctx);
     return TRUE;
 }
@@ -402,11 +627,26 @@ handle_get_location_auth_ready (MMBaseModem *self,
                                 GAsyncResult *res,
                                 HandleGetLocationContext *ctx)
 {
+    MMModemState modem_state;
     LocationContext *location_ctx;
     GError *error = NULL;
 
     if (!mm_base_modem_authorize_finish (self, res, &error)) {
         g_dbus_method_invocation_take_error (ctx->invocation, error);
+        handle_get_location_context_free (ctx);
+        return;
+    }
+
+    modem_state = MM_MODEM_STATE_UNKNOWN;
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &modem_state,
+                  NULL);
+    if (modem_state < MM_MODEM_STATE_ENABLED) {
+        g_dbus_method_invocation_return_error (ctx->invocation,
+                                               MM_CORE_ERROR,
+                                               MM_CORE_ERROR_WRONG_STATE,
+                                               "Cannot get location: "
+                                               "device not yet enabled");
         handle_get_location_context_free (ctx);
         return;
     }
@@ -503,15 +743,11 @@ disabling_location_gathering_ready (MMIfaceModemLocation *self,
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering_finish (self,
-                                                                                          res,
-                                                                                          &error)) {
+    if (!setup_gathering_finish (self, res, &error)) {
         g_simple_async_result_take_error (ctx->result, error);
         disabling_context_complete_and_free (ctx);
         return;
     }
-
-    mm_gdbus_modem_location_set_enabled (ctx->skeleton, FALSE);
 
     /* Go on to next step */
     ctx->step++;
@@ -527,20 +763,15 @@ interface_disabling_step (DisablingContext *ctx)
         ctx->step++;
 
     case DISABLING_STEP_DISABLE_GATHERING:
-        if (mm_gdbus_modem_location_get_enabled (ctx->skeleton) &&
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->disable_location_gathering &&
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->disable_location_gathering_finish) {
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->disable_location_gathering (
-                ctx->self,
-                (GAsyncReadyCallback)disabling_location_gathering_ready,
-                ctx);
-            return;
-        }
-        /* Fall down to next step */
-        ctx->step++;
+        setup_gathering (ctx->self,
+                         MM_MODEM_LOCATION_SOURCE_NONE,
+                         (GAsyncReadyCallback)disabling_location_gathering_ready,
+                         ctx);
+        return;
 
     case DISABLING_STEP_LAST:
         /* We are done without errors! */
+        clear_location_context (ctx->self);
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         disabling_context_complete_and_free (ctx);
         return;
@@ -642,9 +873,7 @@ enabling_location_gathering_ready (MMIfaceModemLocation *self,
 {
     GError *error = NULL;
 
-    if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering_finish (self,
-                                                                                         res,
-                                                                                         &error)) {
+    if (!setup_gathering_finish (self, res, &error)) {
         g_simple_async_result_take_error (ctx->result, error);
         enabling_context_complete_and_free (ctx);
         return;
@@ -667,18 +896,20 @@ interface_enabling_step (EnablingContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case ENABLING_STEP_ENABLE_GATHERING:
-        if (mm_gdbus_modem_location_get_enabled (ctx->skeleton) &&
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->enable_location_gathering &&
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->enable_location_gathering_finish) {
-            MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->enable_location_gathering (
-                ctx->self,
-                (GAsyncReadyCallback)enabling_location_gathering_ready,
-                ctx);
-            return;
-        }
-        /* Fall down to next step */
-        ctx->step++;
+    case ENABLING_STEP_ENABLE_GATHERING: {
+        MMModemLocationSource default_sources;
+
+        /* By default, we'll enable all NON-GPS sources
+         * (so, only 3GPP-LAC-CI if available) */
+        default_sources = mm_gdbus_modem_location_get_capabilities (ctx->skeleton);
+        default_sources &= ~(MM_MODEM_LOCATION_SOURCE_GPS_RAW | MM_MODEM_LOCATION_SOURCE_GPS_NMEA);
+
+        setup_gathering (ctx->self,
+                         default_sources,
+                         (GAsyncReadyCallback)enabling_location_gathering_ready,
+                         ctx);
+        return;
+    }
 
     case ENABLING_STEP_LAST:
         /* We are done without errors! */
@@ -839,8 +1070,8 @@ interface_initialization_step (InitializationContext *ctx)
 
         /* Handle method invocations */
         g_signal_connect (ctx->skeleton,
-                          "handle-enable",
-                          G_CALLBACK (handle_enable),
+                          "handle-setup",
+                          G_CALLBACK (handle_setup),
                           ctx->self);
         g_signal_connect (ctx->skeleton,
                           "handle-get-location",
@@ -889,7 +1120,7 @@ mm_iface_modem_location_initialize (MMIfaceModemLocation *self,
 
         /* Set all initial property defaults */
         mm_gdbus_modem_location_set_capabilities (skeleton, MM_MODEM_LOCATION_SOURCE_NONE);
-        mm_gdbus_modem_location_set_enabled (skeleton, TRUE);
+        mm_gdbus_modem_location_set_enabled (skeleton, MM_MODEM_LOCATION_SOURCE_NONE);
         mm_gdbus_modem_location_set_signals_location (skeleton, FALSE);
         mm_gdbus_modem_location_set_location (skeleton,
                                               build_location_dictionary (NULL));

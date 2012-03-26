@@ -18,6 +18,7 @@
  * Boston, MA 02110-1301 USA.
  *
  * Copyright (C) 2012 Google, Inc.
+ * Copyright (C) 2012 Lanedo GmbH <aleksander@lanedo.com>
  */
 
 #include <gio/gio.h>
@@ -72,92 +73,64 @@ mm_modem_location_get_capabilities (MMModemLocation *self)
     return (MMModemLocationSource) mm_gdbus_modem_location_get_capabilities (self);
 }
 
-gboolean
+MMModemLocationSource
 mm_modem_location_get_enabled (MMModemLocation *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM_LOCATION (self), FALSE);
 
-    return mm_gdbus_modem_location_get_enabled (self);
+    return (MMModemLocationSource) mm_gdbus_modem_location_get_enabled (self);
 }
 
 gboolean
-mm_modem_location_disable_finish (MMModemLocation *self,
-                                  GAsyncResult *res,
-                                  GError **error)
+mm_modem_location_signals_location (MMModemLocation *self)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM_LOCATION (self), FALSE);
 
-    return mm_gdbus_modem_location_call_enable_finish (self, res, error);
-}
-
-void
-mm_modem_location_disable (MMModemLocation *self,
-                           GCancellable *cancellable,
-                           GAsyncReadyCallback callback,
-                           gpointer user_data)
-{
-    g_return_if_fail (MM_GDBUS_IS_MODEM_LOCATION (self));
-
-    mm_gdbus_modem_location_call_enable (self,
-                                         FALSE,
-                                         FALSE,
-                                         cancellable,
-                                         callback,
-                                         user_data);
+    return mm_gdbus_modem_location_get_signals_location (self);
 }
 
 gboolean
-mm_modem_location_disable_sync (MMModemLocation *self,
-                                GCancellable *cancellable,
+mm_modem_location_setup_finish (MMModemLocation *self,
+                                GAsyncResult *res,
                                 GError **error)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM_LOCATION (self), FALSE);
 
-    return mm_gdbus_modem_location_call_enable_sync (self,
-                                                     FALSE,
-                                                     FALSE,
-                                                     cancellable,
-                                                     error);
-}
-
-gboolean
-mm_modem_location_enable_finish (MMModemLocation *self,
-                                 GAsyncResult *res,
-                                 GError **error)
-{
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM_LOCATION (self), FALSE);
-
-    return mm_gdbus_modem_location_call_enable_finish (self, res, error);
+    return mm_gdbus_modem_location_call_setup_finish (self, res, error);
 }
 
 void
-mm_modem_location_enable (MMModemLocation *self,
-                          GCancellable *cancellable,
-                          GAsyncReadyCallback callback,
-                          gpointer user_data)
+mm_modem_location_setup (MMModemLocation *self,
+                         MMModemLocationSource sources,
+                         gboolean signal_location,
+                         GCancellable *cancellable,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data)
 {
     g_return_if_fail (MM_GDBUS_IS_MODEM_LOCATION (self));
 
-    mm_gdbus_modem_location_call_enable (self,
-                                         TRUE,
-                                         FALSE /* signal_location */,
-                                         cancellable,
-                                         callback,
-                                         user_data);
+    mm_gdbus_modem_location_call_setup (self,
+                                        sources,
+                                        signal_location,
+                                        cancellable,
+                                        callback,
+                                        user_data);
 }
 
 gboolean
-mm_modem_location_enable_sync (MMModemLocation *self,
-                               GCancellable *cancellable,
-                               GError **error)
+mm_modem_location_setup_sync (MMModemLocation *self,
+                              MMModemLocationSource sources,
+                              gboolean signal_location,
+                              GCancellable *cancellable,
+                              GError **error)
 {
     g_return_val_if_fail (MM_GDBUS_IS_MODEM_LOCATION (self), FALSE);
 
-    return mm_gdbus_modem_location_call_enable_sync (self,
-                                                     TRUE,
-                                                     FALSE /* signal_location */,
-                                                     cancellable,
-                                                     error);
+    return mm_gdbus_modem_location_call_setup_sync (self,
+                                                    sources,
+                                                    signal_location,
+                                                    cancellable,
+                                                    error);
 }
 
 static MMLocation3gpp *
