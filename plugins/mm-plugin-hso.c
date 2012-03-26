@@ -142,7 +142,7 @@ grab_port (MMPluginBase *base,
         }
     }
 
-    sysfs_path = mm_plugin_base_supports_task_get_physdev_path (task);
+    sysfs_path = g_udev_device_get_sysfs_path (port);
 
     /* Detect port types */
     if (!strcmp (subsys, "tty")) {
@@ -166,7 +166,7 @@ grab_port (MMPluginBase *base,
 
     ptype = mm_plugin_base_probed_capabilities_to_port_type (caps);
     if (!existing) {
-        modem = mm_modem_hso_new (sysfs_path,
+        modem = mm_modem_hso_new (mm_plugin_base_supports_task_get_physdev_path (task),
                                   mm_plugin_base_supports_task_get_driver (task),
                                   mm_plugin_get_name (MM_PLUGIN (base)),
                                   vendor,
