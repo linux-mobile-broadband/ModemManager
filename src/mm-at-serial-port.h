@@ -41,13 +41,15 @@ typedef struct _MMAtSerialPortClass MMAtSerialPortClass;
  *    only when connecting is port 0 opened for dialing (ATD) and PPP
  */
 typedef enum { /*< underscore_name=mm_at_port_flag >*/
-    MM_AT_PORT_FLAG_NONE      = 0,
+    MM_AT_PORT_FLAG_NONE        = 0,
     /* This port is preferred for command and status */
-    MM_AT_PORT_FLAG_PRIMARY   = 1 << 0,
+    MM_AT_PORT_FLAG_PRIMARY     = 1 << 0,
     /* Use port for command and status if the primary port is connected */
-    MM_AT_PORT_FLAG_SECONDARY = 1 << 1,
+    MM_AT_PORT_FLAG_SECONDARY   = 1 << 1,
     /* This port should be used for PPP */
-    MM_AT_PORT_FLAG_PPP       = 1 << 2,
+    MM_AT_PORT_FLAG_PPP         = 1 << 2,
+    /* This port should be used for GPS control */
+    MM_AT_PORT_FLAG_GPS_CONTROL = 1 << 3,
 } MMAtPortFlag;
 
 typedef gboolean (*MMAtSerialResponseParserFn) (gpointer user_data,

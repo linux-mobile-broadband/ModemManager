@@ -365,9 +365,12 @@ mm_at_serial_port_set_flags (MMAtSerialPort *self, MMAtPortFlag flags)
 {
     g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_AT_SERIAL_PORT (self));
-    g_return_if_fail (flags <= (MM_AT_PORT_FLAG_PRIMARY | MM_AT_PORT_FLAG_SECONDARY | MM_AT_PORT_FLAG_PPP));
+    g_return_if_fail (flags <= (MM_AT_PORT_FLAG_PRIMARY |
+                                MM_AT_PORT_FLAG_SECONDARY |
+                                MM_AT_PORT_FLAG_PPP |
+                                MM_AT_PORT_FLAG_GPS_CONTROL));
 
-    MM_AT_SERIAL_PORT_GET_PRIVATE (self)->flags = flags;    
+    MM_AT_SERIAL_PORT_GET_PRIVATE (self)->flags = flags;
 }
 
 MMAtPortFlag
