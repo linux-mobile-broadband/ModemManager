@@ -219,7 +219,7 @@ mm_base_modem_grab_port (MMBaseModem *self,
         port = MM_PORT (g_object_new (MM_TYPE_PORT,
                                       MM_PORT_DEVICE, name,
                                       MM_PORT_SUBSYS, MM_PORT_SUBSYS_NET,
-                                      /* MM_PORT_TYPE, MM_PORT_TYPE_IGNORED, */
+                                      MM_PORT_TYPE, MM_PORT_TYPE_NET,
                                       NULL));
     } else
         /* We already filter out before all non-tty, non-net ports */
@@ -580,9 +580,10 @@ mm_base_modem_organize_ports (MMBaseModem *self,
 
     g_hash_table_iter_init (&iter, self->priv->ports);
     while (g_hash_table_iter_next (&iter, NULL, (gpointer *) &candidate)) {
-        MMPortSubsys subsys = mm_port_get_subsys (candidate);
+        switch (mm_port_get_port_type (candidate)) {
 
-        if (MM_IS_AT_SERIAL_PORT (candidate)) {
+        case MM_PORT_TYPE_AT:
+            g_assert (MM_IS_AT_SERIAL_PORT (candidate));
             flags = mm_at_serial_port_get_flags (MM_AT_SERIAL_PORT (candidate));
 
             if (flags & MM_AT_PORT_FLAG_PRIMARY) {
@@ -613,13 +614,23 @@ mm_base_modem_organize_ports (MMBaseModem *self,
                 else if (!backup_secondary)
                     backup_secondary = MM_AT_SERIAL_PORT (candidate);
             }
-        } else if (MM_IS_QCDM_SERIAL_PORT (candidate)) {
+            break;
+
+        case MM_PORT_TYPE_QCDM:
+            g_assert (MM_IS_QCDM_SERIAL_PORT (candidate));
             if (!qcdm)
                 qcdm = MM_QCDM_SERIAL_PORT (candidate);
-        } else if (subsys == MM_PORT_SUBSYS_NET) {
+            break;
+
+        case MM_PORT_TYPE_NET:
             /* Net device (if any) is the preferred data port */
             if (!data || MM_IS_AT_SERIAL_PORT (data))
                 data = candidate;
+            break;
+
+        default:
+            /* Ignore port */
+            break;
         }
     }
 

@@ -919,7 +919,7 @@ mm_port_probe_get_port_type (MMPortProbe *self)
     g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
 
     if (g_str_equal (self->priv->subsys, "net"))
-        return MM_PORT_TYPE_UNKNOWN;
+        return MM_PORT_TYPE_NET;
 
     if (self->priv->flags & MM_PORT_PROBE_QCDM &&
         self->priv->is_qcdm)
