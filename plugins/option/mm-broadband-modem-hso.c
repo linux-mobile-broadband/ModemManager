@@ -107,13 +107,20 @@ modem_create_bearer (MMIfaceModem *self,
 /*****************************************************************************/
 /* Setup/Cleanup unsolicited events (3GPP interface) */
 
+typedef struct {
+    guint cid;
+    MMBroadbandBearerHsoConnectionStatus status;
+} BearerListReportStatusForeachContext;
+
 static void
 bearer_list_report_status_foreach (MMBearer *bearer,
-                                   gpointer user_data)
+                                   BearerListReportStatusForeachContext *ctx)
 {
-    mm_broadband_bearer_hso_report_connection_status (
-        MM_BROADBAND_BEARER_HSO (bearer),
-        (MMBroadbandBearerHsoConnectionStatus)GPOINTER_TO_UINT (user_data));
+    if (mm_broadband_bearer_get_3gpp_cid (MM_BROADBAND_BEARER (bearer)) != ctx->cid)
+        return;
+
+    mm_broadband_bearer_hso_report_connection_status (MM_BROADBAND_BEARER_HSO (bearer),
+                                                      ctx->status);
 }
 
 static void
@@ -122,42 +129,48 @@ hso_connection_status_changed (MMAtSerialPort *port,
                                MMBroadbandModemHso *self)
 {
     MMBearerList *list = NULL;
-    MMBroadbandBearerHsoConnectionStatus status = MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_UNKNOWN;
-    gchar *str;
+    BearerListReportStatusForeachContext ctx;
+    guint cid;
+    guint status;
 
-    str = g_match_info_fetch (match_info, 2);
-    if (!str)
+    /* Ensure we got proper parsed values */
+    if (!mm_get_uint_from_match_info (match_info, 1, &cid) ||
+        !mm_get_uint_from_match_info (match_info, 2, &status))
         return;
 
+    /* Setup context */
+    ctx.cid = 0;
+    ctx.status = MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_UNKNOWN;
+
+    switch (status) {
+    case 1:
+        ctx.status = MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_CONNECTED;
+        break;
+    case 3:
+        ctx.status = MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_CONNECTION_FAILED;
+        break;
+    case 0:
+        ctx.status = MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_DISCONNECTED;
+        break;
+    default:
+        break;
+    }
+
+    /* If unknown status, don't try to report anything */
+    if (ctx.status == MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_UNKNOWN)
+        return;
+
+    /* If empty bearer list, nothing else to do */
     g_object_get (self,
                   MM_IFACE_MODEM_BEARER_LIST, &list,
                   NULL);
     if (!list)
         return;
 
-    switch (str[0]) {
-    case '1':
-        status = MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_CONNECTED;
-        break;
-    case '3':
-        status = MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_CONNECTION_FAILED;
-        break;
-    case '0':
-        status = MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_DISCONNECTED;
-        break;
-    default:
-        break;
-    }
-
-    if (status != MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_UNKNOWN) {
-        /* We only expect to have one bearer active. If more found, warn about it */
-        g_warn_if_fail (mm_bearer_list_get_count_active (list) > 1);
-        mm_bearer_list_foreach (list,
-                                bearer_list_report_status_foreach,
-                                GUINT_TO_POINTER (status));
-    }
-
-    g_free (str);
+    /* Will report status only in the bearer with the specific CID */
+    mm_bearer_list_foreach (list,
+                            (MMBearerListForeachFunc)bearer_list_report_status_foreach,
+                            &ctx);
     g_object_unref (list);
 }
 
