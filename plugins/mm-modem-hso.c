@@ -96,6 +96,12 @@ mm_modem_hso_new (const char *device,
 
 /*****************************************************************************/
 
+static gboolean
+hso_has_cid (MMModemHso *self)
+{
+    return (mm_generic_gsm_get_cid (MM_GENERIC_GSM (self)) >= 0);
+}
+
 static gint
 hso_get_cid (MMModemHso *self)
 {
@@ -155,7 +161,6 @@ _internal_hso_modem_authenticate (MMModemHso *self, MMCallbackInfo *info)
     g_assert (primary);
 
     cid = hso_get_cid (self);
-    g_warn_if_fail (cid >= 0);
 
     /* Both user and password are required; otherwise firmware returns an error */
     if (!priv->username || !priv->password)
@@ -447,7 +452,7 @@ unsolicited_disable_done (MMModem *modem,
     }
 
     /* Otherwise, kill any existing connection */
-    if (hso_get_cid (MM_MODEM_HSO (modem)) >= 0)
+    if (hso_has_cid (MM_MODEM_HSO (modem)))
         hso_call_control (MM_MODEM_HSO (modem), FALSE, TRUE, disable_done, info);
     else
         disable_done (modem, NULL, info);
