@@ -1936,7 +1936,15 @@ modem_init_finish (MMIfaceModem *self,
                    GAsyncResult *res,
                    GError **error)
 {
-    return !mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, error);
+    GError *inner_error = NULL;
+
+    mm_base_modem_at_sequence_finish (MM_BASE_MODEM (self), res, NULL, &inner_error);
+    if (inner_error) {
+        g_propagate_error (error, inner_error);
+        return FALSE;
+    }
+
+    return TRUE;
 }
 
 static const MMBaseModemAtCommand modem_init_sequence[] = {
