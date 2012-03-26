@@ -79,7 +79,7 @@ grab_port (MMPluginBase *base,
         }
     }
 
-    sysfs_path = mm_port_probe_get_port_physdev (probe);
+    sysfs_path = g_udev_device_get_sysfs_path (port);
 
     /* Detect AT port types */
     if (g_str_equal (subsys, "tty")) {
@@ -99,7 +99,7 @@ grab_port (MMPluginBase *base,
 
     /* If this is the first port being grabbed, create a new modem object */
     if (!existing)
-        modem = MM_BASE_MODEM (mm_broadband_modem_hso_new (sysfs_path,
+        modem = MM_BASE_MODEM (mm_broadband_modem_hso_new (mm_port_probe_get_port_physdev (probe),
                                                            mm_port_probe_get_port_driver (probe),
                                                            mm_plugin_get_name (MM_PLUGIN (base)),
                                                            vendor,
