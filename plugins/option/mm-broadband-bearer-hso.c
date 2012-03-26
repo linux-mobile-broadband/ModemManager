@@ -374,7 +374,7 @@ mm_broadband_bearer_hso_report_connection_status (MMBroadbandBearerHso *self,
         return;
 
     case MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_DISCONNECTED:
-        if (!ctx) {
+        if (ctx) {
             g_simple_async_result_set_error (ctx->result,
                                              MM_CORE_ERROR,
                                              MM_CORE_ERROR_FAILED,
