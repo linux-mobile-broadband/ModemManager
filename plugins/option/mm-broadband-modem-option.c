@@ -960,8 +960,7 @@ parent_disable_unsolicited_events_ready (MMIfaceModem3gpp *self,
 {
     GError *error = NULL;
 
-    iface_modem_3gpp_parent->disable_unsolicited_events_finish (self, res, &error);
-    if (error)
+    if (!iface_modem_3gpp_parent->disable_unsolicited_events_finish (self, res, &error))
         g_simple_async_result_take_error (simple, error);
     else
         g_simple_async_result_set_op_res_gboolean (simple, TRUE);
@@ -976,7 +975,8 @@ own_disable_unsolicited_events_ready (MMBaseModem *self,
 {
     GError *error = NULL;
 
-    if (!mm_base_modem_at_sequence_full_finish (self, res, NULL, &error)) {
+    mm_base_modem_at_sequence_full_finish (self, res, NULL, &error);
+    if (error) {
         g_simple_async_result_take_error (simple, error);
         g_simple_async_result_complete (simple);
         g_object_unref (simple);
