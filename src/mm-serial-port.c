@@ -1066,6 +1066,10 @@ mm_serial_port_close_force (MMSerialPort *self)
 
     priv = MM_SERIAL_PORT_GET_PRIVATE (self);
 
+    /* If already forced to close, return */
+    if (priv->forced_close)
+        return;
+
     mm_info ("(%s) forced to close port",
              mm_port_get_device (MM_PORT (self)));
 
