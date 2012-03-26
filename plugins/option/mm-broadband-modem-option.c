@@ -113,7 +113,7 @@ load_allowed_modes_finish (MMIfaceModem *self,
     g_set_error (error,
                  MM_CORE_ERROR,
                  MM_CORE_ERROR_FAILED,
-                 "Couldn't unexpected OPSYS response: '%s'",
+                 "Couldn't parse unexpected OPSYS response: '%s'",
                  response);
     return FALSE;
 }
@@ -124,7 +124,7 @@ load_allowed_modes (MMIfaceModem *self,
                     gpointer user_data)
 {
     mm_base_modem_at_command (MM_BASE_MODEM (self),
-                              "_OSSYS?",
+                              "_OPSYS?",
                               3,
                               FALSE,
                               callback,
