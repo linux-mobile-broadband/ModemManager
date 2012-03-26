@@ -334,6 +334,10 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface->create_bearer = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
+
+    /* HSO modems don't need the extra 10s wait after powering up */
+    iface->modem_after_power_up = NULL;
+    iface->modem_after_power_up_finish = NULL;
 }
 
 static void
