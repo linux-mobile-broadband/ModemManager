@@ -79,6 +79,11 @@ struct _MMBaseModemPrivate {
     MMAtSerialPort *secondary;
     MMQcdmSerialPort *qcdm;
     MMPort *data;
+
+    /* GPS-enabled modems will have an AT port for control, and a raw serial
+     * port to receive all GPS traces */
+    MMAtSerialPort *gps_control;
+    MMSerialPort *gps;
 };
 
 static gchar *
@@ -197,6 +202,9 @@ mm_base_modem_grab_port (MMBaseModem *self,
                                                    mm_serial_parser_v1_destroy);
             /* Store flags already */
             mm_at_serial_port_set_flags (MM_AT_SERIAL_PORT (port), at_pflags);
+        } else if (ptype == MM_PORT_TYPE_GPS) {
+            /* Raw GPS port */
+            port = MM_PORT (mm_serial_port_new (name, MM_PORT_TYPE_GPS));
         } else {
             g_set_error (error,
                          MM_CORE_ERROR,
@@ -447,6 +455,38 @@ mm_base_modem_peek_port_qcdm (MMBaseModem *self)
     return self->priv->qcdm;
 }
 
+MMAtSerialPort *
+mm_base_modem_get_port_gps_control (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
+
+    return (self->priv->gps_control ? g_object_ref (self->priv->gps_control) : NULL);
+}
+
+MMAtSerialPort *
+mm_base_modem_peek_port_gps_control (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
+
+    return self->priv->gps_control;
+}
+
+MMSerialPort *
+mm_base_modem_get_port_gps (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
+
+    return (self->priv->gps ? g_object_ref (self->priv->gps) : NULL);
+}
+
+MMSerialPort *
+mm_base_modem_peek_port_gps (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
+
+    return self->priv->gps;
+}
+
 MMPort *
 mm_base_modem_get_best_data_port (MMBaseModem *self)
 {
@@ -570,6 +610,8 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     MMAtSerialPort *secondary = NULL;
     MMAtSerialPort *backup_secondary = NULL;
     MMQcdmSerialPort *qcdm = NULL;
+    MMAtSerialPort *gps_control = NULL;
+    MMSerialPort *gps = NULL;
     MMPort *data = NULL;
 
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), FALSE);
@@ -607,6 +649,11 @@ mm_base_modem_organize_ports (MMBaseModem *self,
                     secondary = MM_AT_SERIAL_PORT (candidate);
             }
 
+            if (flags & MM_AT_PORT_FLAG_GPS_CONTROL) {
+                if (!gps_control)
+                    gps_control = MM_AT_SERIAL_PORT (candidate);
+            }
+
             /* Fallback secondary */
             if (flags == MM_AT_PORT_FLAG_NONE) {
                 if (!secondary)
@@ -626,6 +673,11 @@ mm_base_modem_organize_ports (MMBaseModem *self,
             /* Net device (if any) is the preferred data port */
             if (!data || MM_IS_AT_SERIAL_PORT (data))
                 data = candidate;
+            break;
+
+        case MM_PORT_TYPE_GPS:
+            if (!gps)
+                gps = MM_SERIAL_PORT (candidate);
             break;
 
         default:
@@ -674,16 +726,20 @@ mm_base_modem_organize_ports (MMBaseModem *self,
         mm_at_serial_port_set_flags (MM_AT_SERIAL_PORT (data), flags | MM_AT_PORT_FLAG_PPP);
     }
 
-    log_port (self, MM_PORT (primary),   "primary");
-    log_port (self, MM_PORT (secondary), "secondary");
-    log_port (self, MM_PORT (data),      "data");
-    log_port (self, MM_PORT (qcdm),      "qcdm");
+    log_port (self, MM_PORT (primary),     "primary");
+    log_port (self, MM_PORT (secondary),   "secondary");
+    log_port (self, MM_PORT (data),        "data");
+    log_port (self, MM_PORT (qcdm),        "qcdm");
+    log_port (self, MM_PORT (gps_control), "gps control");
+    log_port (self, MM_PORT (gps),         "gps");
 
     /* We keep new refs to the objects here */
     self->priv->primary = g_object_ref (primary);
     self->priv->secondary = (secondary ? g_object_ref (secondary) : NULL);
     self->priv->data = g_object_ref (data);
     self->priv->qcdm = (qcdm ? g_object_ref (qcdm) : NULL);
+    self->priv->gps_control = (gps_control ? g_object_ref (gps_control) : NULL);
+    self->priv->gps = (gps ? g_object_ref (gps) : NULL);
 
     /* As soon as we get the ports organized, we initialize the modem */
     mm_base_modem_initialize (self,
@@ -951,6 +1007,8 @@ dispose (GObject *object)
     g_clear_object (&self->priv->secondary);
     g_clear_object (&self->priv->data);
     g_clear_object (&self->priv->qcdm);
+    g_clear_object (&self->priv->gps_control);
+    g_clear_object (&self->priv->gps);
 
     if (self->priv->ports) {
         g_hash_table_destroy (self->priv->ports);
