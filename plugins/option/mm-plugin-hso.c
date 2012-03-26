@@ -23,6 +23,7 @@
 #include "mm-private-boxed-types.h"
 #include "mm-plugin-hso.h"
 #include "mm-broadband-modem-hso.h"
+#include "mm-log.h"
 
 G_DEFINE_TYPE (MMPluginHso, mm_plugin_hso, MM_TYPE_PLUGIN_BASE)
 
@@ -43,6 +44,7 @@ grab_port (MMPluginBase *base,
     guint16 vendor = 0, product = 0;
     MMAtPortFlag pflags = MM_AT_PORT_FLAG_NONE;
     gchar *devfile;
+    MMPortType port_type;
 
     port = mm_port_probe_get_port (probe); /* transfer none */
     subsys = mm_port_probe_get_port_subsys (probe);
@@ -82,6 +84,7 @@ grab_port (MMPluginBase *base,
     }
     g_free (devfile);
 
+    port_type = mm_port_probe_get_port_type (probe);
     sysfs_path = g_udev_device_get_sysfs_path (port);
 
     /* Detect AT port types */
@@ -94,7 +97,14 @@ grab_port (MMPluginBase *base,
             if (g_str_has_prefix (contents, "Control"))
                 pflags = MM_AT_PORT_FLAG_PRIMARY;
             else if (g_str_has_prefix (contents, "Application"))
-                pflags = MM_AT_PORT_FLAG_SECONDARY;  /* secondary */
+                pflags = MM_AT_PORT_FLAG_SECONDARY;
+            else if (g_str_has_prefix (contents, "GPS Control"))
+                pflags = MM_AT_PORT_FLAG_GPS_CONTROL;
+            else if (g_str_has_prefix (contents, "GPS")) {
+                /* Not an AT port, but the port to grab GPS traces */
+                g_assert (port_type == MM_PORT_TYPE_UNKNOWN);
+                port_type = MM_PORT_TYPE_GPS;
+            }
             g_free (contents);
         }
         g_free (hsotype_path);
@@ -111,7 +121,7 @@ grab_port (MMPluginBase *base,
     if (!mm_base_modem_grab_port (existing ? existing : modem,
                                   subsys,
                                   name,
-                                  mm_port_probe_get_port_type (probe),
+                                  port_type,
                                   pflags,
                                   error)) {
         if (modem)
