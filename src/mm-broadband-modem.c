@@ -6384,6 +6384,7 @@ typedef struct {
     InitializeStep step;
     MMAtSerialPort *port;
     gboolean close_port;
+    gboolean abort_if_locked;
 } InitializeContext;
 
 static void initialize_step (InitializeContext *ctx);
@@ -6551,12 +6552,10 @@ initialize_step (InitializeContext *ctx)
          * the initialization sequence. Instead, we will re-initialize once
          * we are unlocked. */
         if (ctx->self->priv->modem_state == MM_MODEM_STATE_LOCKED) {
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_WRONG_STATE,
-                                             "Modem is currently locked, "
-                                             "cannot fully initialize");
-            initialize_context_complete_and_free (ctx);
+            /* Jump to the Simple interface */
+            ctx->abort_if_locked = TRUE;
+            ctx->step = INITIALIZE_STEP_IFACE_SIMPLE;
+            initialize_step (ctx);
             return;
         }
         /* Fall down to next step */
@@ -6636,14 +6635,23 @@ initialize_step (InitializeContext *ctx)
         ctx->step++;
 
     case INITIALIZE_STEP_LAST:
-        /* All initialized without errors! */
+        if (ctx->abort_if_locked) {
+            /* We're locked :-/ */
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_WRONG_STATE,
+                                             "Modem is currently locked, "
+                                             "cannot fully initialize");
+        } else {
+            /* All initialized without errors!
+             * Set as disabled (a.k.a. initialized) */
+            mm_iface_modem_update_state (MM_IFACE_MODEM (ctx->self),
+                                         MM_MODEM_STATE_DISABLED,
+                                         MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
 
-        /* Set as disabled (a.k.a. initialized) */
-        mm_iface_modem_update_state (MM_IFACE_MODEM (ctx->self),
-                                     MM_MODEM_STATE_DISABLED,
-                                     MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+            g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (ctx->result), TRUE);
+        }
 
-        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (ctx->result), TRUE);
         initialize_context_complete_and_free (ctx);
         return;
     }
