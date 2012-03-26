@@ -234,10 +234,6 @@ mm_base_modem_grab_port (MMBaseModem *self,
      * Note: 'key' and 'port' now owned by the HT. */
     g_hash_table_insert (self->priv->ports, key, port);
 
-    /* Let subclasses know we've grabbed it */
-    if (MM_BASE_MODEM_GET_CLASS (self)->port_grabbed)
-        MM_BASE_MODEM_GET_CLASS (self)->port_grabbed (self, port);
-
     return TRUE;
 }
 

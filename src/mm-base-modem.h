@@ -56,12 +56,6 @@ struct _MMBaseModem {
 struct _MMBaseModemClass {
     MmGdbusObjectSkeletonClass parent;
 
-    /* Called after the base class grabs a port so that subclasses can
-     * set port flags and other properties on the new port.
-     */
-    void (*port_grabbed) (MMBaseModem *self,
-                          MMPort *port);
-
     /* Modem initialization.
      * As soon as the ports are organized, this method gets called */
     void (* initialize) (MMBaseModem *self,
