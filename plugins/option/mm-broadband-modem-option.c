@@ -74,13 +74,13 @@ load_allowed_modes_finish (MMIfaceModem *self,
     if (!response)
         return FALSE;
 
-    str = mm_strip_tag (response, "_OSSYS:");
+    str = mm_strip_tag (response, "_OPSYS:");
 
     if (!sscanf (str, "%d,%d", &a, &b)) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_FAILED,
-                     "Couldn't parse OSSYS response: '%s'",
+                     "Couldn't parse OPSYS response: '%s'",
                      response);
         return FALSE;
     }
@@ -113,7 +113,7 @@ load_allowed_modes_finish (MMIfaceModem *self,
     g_set_error (error,
                  MM_CORE_ERROR,
                  MM_CORE_ERROR_FAILED,
-                 "Couldn't parse unexpected OSSYS response: '%s'",
+                 "Couldn't unexpected OPSYS response: '%s'",
                  response);
     return FALSE;
 }
