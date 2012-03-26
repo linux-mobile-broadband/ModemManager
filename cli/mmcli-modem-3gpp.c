@@ -161,21 +161,33 @@ context_free (Context *ctx)
 static void
 ensure_modem_3gpp (void)
 {
-    if (ctx->modem_3gpp)
-        return;
+    if (mm_modem_get_unlock_required (mm_object_peek_modem (ctx->object)) != MM_MODEM_LOCK_NONE) {
+        g_printerr ("error: modem not unlocked yet\n");
+        exit (EXIT_FAILURE);
+    }
 
-    g_printerr ("error: modem has no 3GPP capabilities\n");
-    exit (EXIT_FAILURE);
+    if (!ctx->modem_3gpp) {
+        g_printerr ("error: modem has no 3GPP capabilities\n");
+        exit (EXIT_FAILURE);
+    }
+
+    /* Success */
 }
 
 static void
 ensure_modem_3gpp_ussd (void)
 {
-    if (ctx->modem_3gpp_ussd)
-        return;
+    if (mm_modem_get_unlock_required (mm_object_peek_modem (ctx->object)) != MM_MODEM_LOCK_NONE) {
+        g_printerr ("error: modem not unlocked yet\n");
+        exit (EXIT_FAILURE);
+    }
 
-    g_printerr ("error: modem has no USSD capabilities\n");
-    exit (EXIT_FAILURE);
+    if (!ctx->modem_3gpp_ussd) {
+        g_printerr ("error: modem has no USSD capabilities\n");
+        exit (EXIT_FAILURE);
+    }
+
+    /* Success */
 }
 
 void

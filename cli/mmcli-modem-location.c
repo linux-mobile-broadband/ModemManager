@@ -120,11 +120,17 @@ context_free (Context *ctx)
 static void
 ensure_modem_location (void)
 {
-    if (ctx->modem_location)
-        return;
+    if (mm_modem_get_unlock_required (mm_object_peek_modem (ctx->object)) != MM_MODEM_LOCK_NONE) {
+        g_printerr ("error: modem not unlocked yet\n");
+        exit (EXIT_FAILURE);
+    }
 
-    g_printerr ("error: modem has no location capabilities\n");
-    exit (EXIT_FAILURE);
+    if (!ctx->modem_location) {
+        g_printerr ("error: modem has no location capabilities\n");
+        exit (EXIT_FAILURE);
+    }
+
+    /* Success */
 }
 
 void

@@ -125,11 +125,12 @@ context_free (Context *ctx)
 static void
 ensure_modem_simple (void)
 {
-    if (ctx->modem_simple)
-        return;
+    if (!ctx->modem_simple) {
+        g_printerr ("error: modem has no Simple capabilities\n");
+        exit (EXIT_FAILURE);
+    }
 
-    g_printerr ("error: modem has no Simple capabilities\n");
-    exit (EXIT_FAILURE);
+    /* Success */
 }
 
 void
