@@ -44,11 +44,16 @@ typedef struct {
 static Context *ctx;
 
 /* Options */
+static gboolean status_flag;
 static gboolean enable_3gpp_flag;
 static gboolean disable_3gpp_flag;
 static gboolean get_3gpp_flag;
 
 static GOptionEntry entries[] = {
+    { "location-status", 0, 0, G_OPTION_ARG_NONE, &status_flag,
+      "Show status of location gathering.",
+      NULL
+    },
     { "location-enable-3gpp", 0, 0, G_OPTION_ARG_NONE, &enable_3gpp_flag,
       "Enable 3GPP location gathering.",
       NULL
@@ -88,7 +93,8 @@ mmcli_modem_location_options_enabled (void)
     if (checked)
         return !!n_actions;
 
-    n_actions = (enable_3gpp_flag +
+    n_actions = (status_flag +
+                 enable_3gpp_flag +
                  disable_3gpp_flag +
                  get_3gpp_flag);
 
@@ -96,6 +102,9 @@ mmcli_modem_location_options_enabled (void)
         g_printerr ("error: too many Location actions requested\n");
         exit (EXIT_FAILURE);
     }
+
+    if (status_flag)
+        mmcli_force_sync_operation ();
 
     checked = TRUE;
     return !!n_actions;
@@ -138,6 +147,30 @@ void
 mmcli_modem_location_shutdown (void)
 {
     context_free (ctx);
+}
+
+static void
+print_location_status (void)
+{
+    gchar *capabilities_str;
+    gchar *enabled_str;
+
+    capabilities_str = (mm_modem_location_source_build_string_from_mask (
+                            mm_modem_location_get_capabilities (ctx->modem_location)));
+    enabled_str = (mm_modem_location_source_build_string_from_mask (
+                       mm_modem_location_get_enabled (ctx->modem_location)));
+    g_print ("\n"
+             "%s\n"
+             "  ----------------------------\n"
+             "  Location | capabilities: '%s'\n"
+             "           |      enabled: '%s'\n"
+             "           |      signals: '%s'\n",
+             mm_modem_location_get_path (ctx->modem_location),
+             capabilities_str,
+             enabled_str,
+             mm_modem_location_signals_location (ctx->modem_location) ? "yes" : "no");
+    g_free (capabilities_str);
+    g_free (enabled_str);
 }
 
 static void
@@ -238,6 +271,9 @@ get_modem_ready (GObject      *source,
 
     ensure_modem_location ();
 
+    if (status_flag)
+        g_assert_not_reached ();
+
     /* Request to enable location gathering? */
     if (enable_3gpp_flag) {
         g_debug ("Asynchronously enabling 3GPP location gathering...");
@@ -308,6 +344,13 @@ mmcli_modem_location_run_synchronous (GDBusConnection *connection)
     ctx->modem_location = mm_object_get_modem_location (ctx->object);
 
     ensure_modem_location ();
+
+    /* Request to get location status? */
+    if (status_flag) {
+        g_debug ("Printing location status...");
+        print_location_status ();
+        return;
+    }
 
     /* Request to enable location gathering? */
     if (enable_3gpp_flag) {
