@@ -357,16 +357,22 @@ enable_disable_location_gathering_finish (MMIfaceModemLocation *self,
 }
 
 static void
-gps_enabled_disabled_ready (MMBaseModem *self,
-                            GAsyncResult *res,
-                            GSimpleAsyncResult *simple)
+gps_disabled_ready (MMBaseModem *self,
+                    GAsyncResult *res,
+                    GSimpleAsyncResult *simple)
 {
+    MMGpsSerialPort *gps_port;
     GError *error = NULL;
 
     if (!mm_base_modem_at_command_full_finish (self, res, &error))
         g_simple_async_result_take_error (simple, error);
     else
         g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+
+    /* Even if we get an error here, we try to close the GPS port */
+    gps_port = mm_base_modem_peek_port_gps (self);
+    if (gps_port)
+        mm_serial_port_close (MM_SERIAL_PORT (gps_port));
 
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
@@ -394,7 +400,7 @@ disable_location_gathering (MMIfaceModemLocation *self,
                                        3,
                                        FALSE,
                                        NULL, /* cancellable */
-                                       (GAsyncReadyCallback)gps_enabled_disabled_ready,
+                                       (GAsyncReadyCallback)gps_disabled_ready,
                                        result);
         return;
     }
@@ -403,6 +409,41 @@ disable_location_gathering (MMIfaceModemLocation *self,
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
+}
+
+static void
+gps_enabled_ready (MMBaseModem *self,
+                   GAsyncResult *res,
+                   GSimpleAsyncResult *simple)
+{
+    MMGpsSerialPort *gps_port;
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_full_finish (self, res, &error)) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    gps_port = mm_base_modem_peek_port_gps (self);
+    if (!gps_port ||
+        !mm_serial_port_open (MM_SERIAL_PORT (gps_port), &error)) {
+        if (error)
+            g_simple_async_result_take_error (simple, error);
+        else
+            g_simple_async_result_set_error (simple,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Couldn't open raw GPS serial port");
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
 }
 
 static void
@@ -427,7 +468,7 @@ enable_location_gathering (MMIfaceModemLocation *self,
                                        3,
                                        FALSE,
                                        NULL, /* cancellable */
-                                       (GAsyncReadyCallback)gps_enabled_disabled_ready,
+                                       (GAsyncReadyCallback)gps_enabled_ready,
                                        result);
         return;
     }
