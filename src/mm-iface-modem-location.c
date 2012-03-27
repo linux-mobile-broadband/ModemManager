@@ -21,6 +21,8 @@
 #include "mm-iface-modem-location.h"
 #include "mm-log.h"
 
+#define MM_LOCATION_GPS_REFRESH_TIME_SECS 30
+
 #define LOCATION_CONTEXT_TAG "location-context-tag"
 
 static GQuark location_context_quark;
@@ -38,6 +40,9 @@ mm_iface_modem_location_bind_simple_status (MMIfaceModemLocation *self,
 typedef struct {
     /* 3GPP location */
     MMLocation3gpp *location_3gpp;
+    /* GPS location */
+    time_t location_gps_last_time;
+    MMLocationGpsNmea *location_gps_nmea;
 } LocationContext;
 
 static void
@@ -45,6 +50,8 @@ location_context_free (LocationContext *ctx)
 {
     if (ctx->location_3gpp)
         g_object_unref (ctx->location_3gpp);
+    if (ctx->location_gps_nmea)
+        g_object_unref (ctx->location_gps_nmea);
     g_free (ctx);
 }
 
@@ -88,27 +95,122 @@ get_location_context (MMIfaceModemLocation *self)
 /*****************************************************************************/
 
 static GVariant *
-build_location_dictionary (MMLocation3gpp *location_3gpp)
+build_location_dictionary (GVariant *previous,
+                           MMLocation3gpp *location_3gpp,
+                           MMLocationGpsNmea *location_gps_nmea)
 {
     GVariant *location_3gpp_value = NULL;
+    GVariant *location_gps_nmea_value = NULL;
     GVariantBuilder builder;
 
-    if (location_3gpp)
-        location_3gpp_value = mm_location_3gpp_get_string_variant (location_3gpp);
+    /* If a previous dictionary given, parse its values */
+    if (previous) {
+        guint source;
+        GVariant *value;
+        GVariantIter iter;
 
+        g_variant_iter_init (&iter, previous);
+        while (g_variant_iter_next (&iter, "{uv}", &source, &value)) {
+            switch (source) {
+            case MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI:
+                location_3gpp_value = value;
+                break;
+            case MM_MODEM_LOCATION_SOURCE_GPS_NMEA:
+                location_gps_nmea_value = value;
+                break;
+            default:
+                g_warn_if_reached ();
+                break;
+            }
+        }
+    }
+
+    /* Build the new one */
     g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{uv}"));
-    if (location_3gpp_value)
+
+    /* If a new one given, use it */
+    if (location_3gpp) {
+        if (location_3gpp_value)
+            g_variant_unref (location_3gpp_value);
+        location_3gpp_value = mm_location_3gpp_get_string_variant (location_3gpp);
+    }
+
+    if (location_3gpp_value) {
         g_variant_builder_add (&builder,
                                "{uv}",
                                MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI,
                                location_3gpp_value);
+    }
+
+    /* If a new one given, use it */
+    if (location_gps_nmea) {
+        if (location_gps_nmea_value)
+            g_variant_unref (location_gps_nmea_value);
+        location_gps_nmea_value = mm_location_gps_nmea_get_string_variant (location_gps_nmea);
+    }
+
+    if (location_gps_nmea_value)
+        g_variant_builder_add (&builder,
+                               "{uv}",
+                               MM_MODEM_LOCATION_SOURCE_GPS_NMEA,
+                               location_gps_nmea_value);
+
     return g_variant_builder_end (&builder);
 }
 
+/*****************************************************************************/
+
 static void
-notify_location_update (MMIfaceModemLocation *self,
-                        MmGdbusModemLocation *skeleton,
-                        MMLocation3gpp *location_3gpp)
+notify_gps_location_update (MMIfaceModemLocation *self,
+                            MmGdbusModemLocation *skeleton,
+                            MMLocationGpsNmea *location_gps_nmea)
+{
+    const gchar *dbus_path;
+
+    dbus_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (self));
+    mm_info ("Modem %s: GPS location updated",
+             dbus_path);
+
+    /* We only update the property if we are supposed to signal
+     * location */
+    if (mm_gdbus_modem_location_get_signals_location (skeleton))
+        mm_gdbus_modem_location_set_location (
+            skeleton,
+            build_location_dictionary (mm_gdbus_modem_location_get_location (skeleton),
+                                       NULL,
+                                       location_gps_nmea));
+}
+
+void
+mm_iface_modem_location_gps_update (MMIfaceModemLocation *self,
+                                    const gchar *nmea_trace)
+{
+    MmGdbusModemLocation *skeleton;
+    LocationContext *ctx;
+
+    ctx = get_location_context (self);
+    g_object_get (self,
+                  MM_IFACE_MODEM_LOCATION_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    if (mm_gdbus_modem_location_get_enabled (skeleton) & MM_MODEM_LOCATION_SOURCE_GPS_NMEA) {
+        g_assert (ctx->location_gps_nmea != NULL);
+        if (mm_location_gps_nmea_add_trace (ctx->location_gps_nmea, nmea_trace) &&
+            ctx->location_gps_last_time >= MM_LOCATION_GPS_REFRESH_TIME_SECS) {
+            ctx->location_gps_last_time = time (NULL);
+            notify_gps_location_update (self, skeleton, ctx->location_gps_nmea);
+        }
+    }
+
+    g_object_unref (skeleton);
+}
+
+/*****************************************************************************/
+
+static void
+notify_3gpp_location_update (MMIfaceModemLocation *self,
+                             MmGdbusModemLocation *skeleton,
+                             MMLocation3gpp *location_3gpp)
 {
     const gchar *dbus_path;
 
@@ -126,7 +228,9 @@ notify_location_update (MMIfaceModemLocation *self,
     if (mm_gdbus_modem_location_get_signals_location (skeleton))
         mm_gdbus_modem_location_set_location (
             skeleton,
-            build_location_dictionary (location_3gpp));
+            build_location_dictionary (mm_gdbus_modem_location_get_location (skeleton),
+                                       location_3gpp,
+                                       NULL));
 }
 
 void
@@ -151,7 +255,7 @@ mm_iface_modem_location_3gpp_update_mcc_mnc (MMIfaceModemLocation *self,
         changed += mm_location_3gpp_set_mobile_network_code (ctx->location_3gpp,
                                                              mobile_network_code);
         if (changed)
-            notify_location_update (self, skeleton, ctx->location_3gpp);
+            notify_3gpp_location_update (self, skeleton, ctx->location_3gpp);
     }
 
     g_object_unref (skeleton);
@@ -179,7 +283,7 @@ mm_iface_modem_location_3gpp_update_lac_ci (MMIfaceModemLocation *self,
         changed += mm_location_3gpp_set_cell_id (ctx->location_3gpp,
                                                  cell_id);
         if (changed)
-            notify_location_update (self, skeleton, ctx->location_3gpp);
+            notify_3gpp_location_update (self, skeleton, ctx->location_3gpp);
     }
 
     g_object_unref (skeleton);
@@ -205,7 +309,7 @@ mm_iface_modem_location_3gpp_clear (MMIfaceModemLocation *self)
         changed += mm_location_3gpp_set_mobile_country_code (ctx->location_3gpp, 0);
         changed += mm_location_3gpp_set_mobile_network_code (ctx->location_3gpp, 0);
         if (changed)
-            notify_location_update (self, skeleton, ctx->location_3gpp);
+            notify_3gpp_location_update (self, skeleton, ctx->location_3gpp);
     }
 
     g_object_unref (skeleton);
@@ -244,6 +348,13 @@ update_location_source_status (MMIfaceModemLocation *self,
                 ctx->location_3gpp = mm_location_3gpp_new ();
         } else
             g_clear_object (&ctx->location_3gpp);
+        break;
+    case MM_MODEM_LOCATION_SOURCE_GPS_NMEA:
+        if (enabled) {
+            if (!ctx->location_gps_nmea)
+                ctx->location_gps_nmea = mm_location_gps_nmea_new ();
+        } else
+            g_clear_object (&ctx->location_gps_nmea);
         break;
     default:
         break;
@@ -564,10 +675,16 @@ handle_setup_auth_ready (MMBaseModem *self,
                 ctx->signal_location ? "Enabling" : "Disabling");
         mm_gdbus_modem_location_set_signals_location (ctx->skeleton,
                                                       ctx->signal_location);
-        mm_gdbus_modem_location_set_location (ctx->skeleton,
-                                              build_location_dictionary (ctx->signal_location ?
-                                                                         location_ctx->location_3gpp :
-                                                                         NULL));
+        if (ctx->signal_location)
+            mm_gdbus_modem_location_set_location (
+                ctx->skeleton,
+                build_location_dictionary (mm_gdbus_modem_location_get_location (ctx->skeleton),
+                                           location_ctx->location_3gpp,
+                                           location_ctx->location_gps_nmea));
+        else
+            mm_gdbus_modem_location_set_location (
+                ctx->skeleton,
+                build_location_dictionary (NULL, NULL, NULL));
     }
 
     str = mm_modem_location_source_build_string_from_mask (ctx->sources);
@@ -655,7 +772,9 @@ handle_get_location_auth_ready (MMBaseModem *self,
     mm_gdbus_modem_location_complete_get_location (
         ctx->skeleton,
         ctx->invocation,
-        build_location_dictionary (location_ctx->location_3gpp));
+        build_location_dictionary (NULL,
+                                   location_ctx->location_3gpp,
+                                   location_ctx->location_gps_nmea));
 }
 
 static gboolean
@@ -1123,7 +1242,7 @@ mm_iface_modem_location_initialize (MMIfaceModemLocation *self,
         mm_gdbus_modem_location_set_enabled (skeleton, MM_MODEM_LOCATION_SOURCE_NONE);
         mm_gdbus_modem_location_set_signals_location (skeleton, FALSE);
         mm_gdbus_modem_location_set_location (skeleton,
-                                              build_location_dictionary (NULL));
+                                              build_location_dictionary (NULL, NULL, NULL));
 
         g_object_set (self,
                       MM_IFACE_MODEM_LOCATION_DBUS_SKELETON, skeleton,

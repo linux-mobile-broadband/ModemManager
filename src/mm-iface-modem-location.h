@@ -100,6 +100,10 @@ void mm_iface_modem_location_3gpp_update_lac_ci  (MMIfaceModemLocation *self,
                                                   gulong location_area_code,
                                                   gulong cell_id);
 
+/* Update GPS location */
+void mm_iface_modem_location_gps_update (MMIfaceModemLocation *self,
+                                         const gchar *nmea_trace);
+
 /* Bind properties for simple GetStatus() */
 void mm_iface_modem_location_bind_simple_status (MMIfaceModemLocation *self,
                                                  MMSimpleStatus *status);
