@@ -346,6 +346,99 @@ location_load_capabilities (MMIfaceModemLocation *self,
 }
 
 /*****************************************************************************/
+/* Enable/Disable location gathering (Location interface) */
+
+static gboolean
+enable_disable_location_gathering_finish (MMIfaceModemLocation *self,
+                                          GAsyncResult *res,
+                                          GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+gps_enabled_disabled_ready (MMBaseModem *self,
+                            GAsyncResult *res,
+                            GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_full_finish (self, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+disable_location_gathering (MMIfaceModemLocation *self,
+                            MMModemLocationSource source,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        disable_location_gathering);
+
+    /* We only provide specific disabling for GPS-NMEA sources */
+    if (source & MM_MODEM_LOCATION_SOURCE_GPS_NMEA) {
+        /* We enable continuous GPS fixes with AT_OGPS=0 */
+        mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                       mm_base_modem_peek_port_gps_control (MM_BASE_MODEM (self)),
+                                       "_OGPS=0",
+                                       3,
+                                       FALSE,
+                                       NULL, /* cancellable */
+                                       (GAsyncReadyCallback)gps_enabled_disabled_ready,
+                                       result);
+        return;
+    }
+
+    /* For any other location (e.g. 3GPP), just return */
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+static void
+enable_location_gathering (MMIfaceModemLocation *self,
+                           MMModemLocationSource source,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        enable_location_gathering);
+
+    /* We only provide specific enabling for GPS-NMEA sources */
+    if (source & MM_MODEM_LOCATION_SOURCE_GPS_NMEA) {
+        /* We enable continuous GPS fixes with AT_OGPS=2 */
+        mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                       mm_base_modem_peek_port_gps_control (MM_BASE_MODEM (self)),
+                                       "_OGPS=2",
+                                       3,
+                                       FALSE,
+                                       NULL, /* cancellable */
+                                       (GAsyncReadyCallback)gps_enabled_disabled_ready,
+                                       result);
+        return;
+    }
+
+    /* For any other location (e.g. 3GPP), just return */
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* Setup ports (Broadband modem class) */
 
 static void
@@ -437,6 +530,10 @@ iface_modem_location_init (MMIfaceModemLocation *iface)
 
     iface->load_capabilities = location_load_capabilities;
     iface->load_capabilities_finish = location_load_capabilities_finish;
+    iface->enable_location_gathering = enable_location_gathering;
+    iface->enable_location_gathering_finish = enable_disable_location_gathering_finish;
+    iface->disable_location_gathering = disable_location_gathering;
+    iface->disable_location_gathering_finish = enable_disable_location_gathering_finish;
 }
 
 static void
