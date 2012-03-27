@@ -48,6 +48,8 @@ static gboolean status_flag;
 static gboolean enable_3gpp_flag;
 static gboolean disable_3gpp_flag;
 static gboolean get_3gpp_flag;
+static gboolean enable_gps_flag;
+static gboolean disable_gps_flag;
 
 static GOptionEntry entries[] = {
     { "location-status", 0, 0, G_OPTION_ARG_NONE, &status_flag,
@@ -64,6 +66,14 @@ static GOptionEntry entries[] = {
     },
     { "location-get-3gpp", 0, 0, G_OPTION_ARG_NONE, &get_3gpp_flag,
       "Get 3GPP-based location.",
+      NULL
+    },
+    { "location-enable-gps", 0, 0, G_OPTION_ARG_NONE, &enable_gps_flag,
+      "Enable GPS location gathering.",
+      NULL
+    },
+    { "location-disable-gps", 0, 0, G_OPTION_ARG_NONE, &disable_gps_flag,
+      "Disable GPS location gathering.",
       NULL
     },
     { NULL }
@@ -96,6 +106,8 @@ mmcli_modem_location_options_enabled (void)
     n_actions = (status_flag +
                  enable_3gpp_flag +
                  disable_3gpp_flag +
+                 enable_gps_flag +
+                 disable_gps_flag +
                  get_3gpp_flag);
 
     if (n_actions > 1) {
@@ -311,6 +323,32 @@ get_modem_ready (GObject      *source,
         return;
     }
 
+    /* Request to enable location gathering? */
+    if (enable_gps_flag) {
+        g_debug ("Asynchronously enabling GPS location gathering...");
+
+        mm_modem_location_setup (ctx->modem_location,
+                                 mm_modem_location_get_capabilities (ctx->modem_location) | MM_MODEM_LOCATION_SOURCE_GPS_NMEA,
+                                 mm_modem_location_signals_location (ctx->modem_location),
+                                 ctx->cancellable,
+                                 (GAsyncReadyCallback)enable_ready,
+                                 NULL);
+        return;
+    }
+
+    /* Request to disable location gathering? */
+    if (disable_gps_flag) {
+        g_debug ("Asynchronously disabling GPS location gathering...");
+
+        mm_modem_location_setup (ctx->modem_location,
+                                 mm_modem_location_get_capabilities (ctx->modem_location) & ~MM_MODEM_LOCATION_SOURCE_GPS_NMEA,
+                                 mm_modem_location_signals_location (ctx->modem_location),
+                                 ctx->cancellable,
+                                 (GAsyncReadyCallback)disable_ready,
+                                 NULL);
+        return;
+    }
+
     g_warn_if_reached ();
 }
 
@@ -392,6 +430,36 @@ mmcli_modem_location_run_synchronous (GDBusConnection *connection)
                                                   NULL,
                                                   &error);
         get_3gpp_process_reply (result, error);
+        return;
+    }
+
+    /* Request to enable location gathering? */
+    if (enable_gps_flag) {
+        gboolean result;
+
+        g_debug ("Asynchronously enabling GPS location gathering...");
+
+        result = mm_modem_location_setup_sync (ctx->modem_location,
+                                               mm_modem_location_get_capabilities (ctx->modem_location) | MM_MODEM_LOCATION_SOURCE_GPS_NMEA,
+                                               mm_modem_location_signals_location (ctx->modem_location),
+                                               NULL,
+                                               &error);
+        enable_process_reply (result, error);
+        return;
+    }
+
+    /* Request to disable location gathering? */
+    if (disable_gps_flag) {
+        gboolean result;
+
+        g_debug ("Asynchronously disabling GPS location gathering...");
+
+        result = mm_modem_location_setup_sync (ctx->modem_location,
+                                               mm_modem_location_get_capabilities (ctx->modem_location) & ~MM_MODEM_LOCATION_SOURCE_GPS_NMEA,
+                                               mm_modem_location_signals_location (ctx->modem_location),
+                                               NULL,
+                                               &error);
+        disable_process_reply (result, error);
         return;
     }
 
