@@ -29,8 +29,6 @@
 
 #include "mm-log.h"
 #include "mm-serial-enums-types.h"
-#include "mm-at-serial-port.h"
-#include "mm-qcdm-serial-port.h"
 #include "mm-serial-parsers.h"
 #include "mm-modem-helpers.h"
 
@@ -83,7 +81,7 @@ struct _MMBaseModemPrivate {
     /* GPS-enabled modems will have an AT port for control, and a raw serial
      * port to receive all GPS traces */
     MMAtSerialPort *gps_control;
-    MMSerialPort *gps;
+    MMGpsSerialPort *gps;
 };
 
 static gchar *
@@ -204,7 +202,7 @@ mm_base_modem_grab_port (MMBaseModem *self,
             mm_at_serial_port_set_flags (MM_AT_SERIAL_PORT (port), at_pflags);
         } else if (ptype == MM_PORT_TYPE_GPS) {
             /* Raw GPS port */
-            port = MM_PORT (mm_serial_port_new (name, MM_PORT_TYPE_GPS));
+            port = MM_PORT (mm_gps_serial_port_new (name));
         } else {
             g_set_error (error,
                          MM_CORE_ERROR,
@@ -471,7 +469,7 @@ mm_base_modem_peek_port_gps_control (MMBaseModem *self)
     return self->priv->gps_control;
 }
 
-MMSerialPort *
+MMGpsSerialPort *
 mm_base_modem_get_port_gps (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
@@ -479,7 +477,7 @@ mm_base_modem_get_port_gps (MMBaseModem *self)
     return (self->priv->gps ? g_object_ref (self->priv->gps) : NULL);
 }
 
-MMSerialPort *
+MMGpsSerialPort *
 mm_base_modem_peek_port_gps (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
@@ -611,7 +609,7 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     MMAtSerialPort *backup_secondary = NULL;
     MMQcdmSerialPort *qcdm = NULL;
     MMAtSerialPort *gps_control = NULL;
-    MMSerialPort *gps = NULL;
+    MMGpsSerialPort *gps = NULL;
     MMPort *data = NULL;
 
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), FALSE);
@@ -676,8 +674,9 @@ mm_base_modem_organize_ports (MMBaseModem *self,
             break;
 
         case MM_PORT_TYPE_GPS:
+            g_assert (MM_IS_GPS_SERIAL_PORT (candidate));
             if (!gps)
-                gps = MM_SERIAL_PORT (candidate);
+                gps = MM_GPS_SERIAL_PORT (candidate);
             break;
 
         default:
