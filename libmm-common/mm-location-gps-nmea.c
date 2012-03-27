@@ -17,6 +17,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 
+#include "mm-common-helpers.h"
 #include "mm-errors-types.h"
 #include "mm-location-gps-nmea.h"
 
@@ -24,9 +25,36 @@ G_DEFINE_TYPE (MMLocationGpsNmea, mm_location_gps_nmea, G_TYPE_OBJECT);
 
 struct _MMLocationGpsNmeaPrivate {
     GHashTable *traces;
+    GRegex *sequence_regex;
 };
 
 /*****************************************************************************/
+
+static gboolean
+check_append_or_replace (MMLocationGpsNmea *self,
+                         const gchar *trace)
+{
+    /* By default, replace */
+    gboolean append_or_replace = FALSE;
+    GMatchInfo *match_info = NULL;
+
+    if (G_UNLIKELY (!self->priv->sequence_regex))
+        self->priv->sequence_regex = g_regex_new ("\\$GPGSV,(\\d),(\\d).*",
+                                                  G_REGEX_RAW | G_REGEX_OPTIMIZE,
+                                                  0,
+                                                  NULL);
+
+    if (g_regex_match (self->priv->sequence_regex, trace, 0, &match_info)) {
+        guint index;
+
+        /* If we don't have the first element of a sequence, append */
+        if (mm_get_uint_from_match_info (match_info, 2, &index) && index != 1)
+            append_or_replace = TRUE;
+    }
+    g_match_info_free (match_info);
+
+    return append_or_replace;
+}
 
 static gboolean
 location_gps_nmea_take_trace (MMLocationGpsNmea *self,
@@ -42,6 +70,22 @@ location_gps_nmea_take_trace (MMLocationGpsNmea *self,
     trace_type = g_malloc (i - trace + 1);
     memcpy (trace_type, trace, i - trace);
     trace_type[i - trace] = '\0';
+
+    /* Some traces are part of a SEQUENCE; so we need to decide whether we
+     * completely replace the previous trace, or we append the new one to
+     * the already existing list */
+    if (check_append_or_replace (self, trace)) {
+        /* Append */
+        const gchar *previous;
+        gchar *sequence;
+
+        previous = g_hash_table_lookup (self->priv->traces, trace_type);
+        sequence = g_strdup_printf ("%s%s",
+                                    previous ? previous : "",
+                                    trace);
+        g_free (trace);
+        trace = sequence;
+    }
 
     g_hash_table_replace (self->priv->traces,
                           trace_type,
@@ -176,6 +220,8 @@ finalize (GObject *object)
     MMLocationGpsNmea *self = MM_LOCATION_GPS_NMEA (object);
 
     g_hash_table_destroy (self->priv->traces);
+    if (self->priv->sequence_regex)
+        g_regex_unref (self->priv->sequence_regex);
 
     G_OBJECT_CLASS (mm_location_gps_nmea_parent_class)->finalize (object);
 }
