@@ -29,6 +29,7 @@
 #include "mm-errors-types.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
+#include "mm-iface-modem-location.h"
 #include "mm-base-modem-at.h"
 #include "mm-broadband-modem-hso.h"
 #include "mm-broadband-bearer-hso.h"
@@ -36,12 +37,15 @@
 
 static void iface_modem_init (MMIfaceModem *iface);
 static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+static void iface_modem_location_init (MMIfaceModemLocation *iface);
 
 static MMIfaceModem3gpp *iface_modem_3gpp_parent;
+static MMIfaceModemLocation *iface_modem_location_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemHso, mm_broadband_modem_hso, MM_TYPE_BROADBAND_MODEM_OPTION, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_LOCATION, iface_modem_location_init));
 
 struct _MMBroadbandModemHsoPrivate {
     /* Regex for connected notifications */
@@ -267,6 +271,81 @@ modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Location capabilities loading (Location interface) */
+
+static MMModemLocationSource
+location_load_capabilities_finish (MMIfaceModemLocation *self,
+                                   GAsyncResult *res,
+                                   GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_LOCATION_SOURCE_NONE;
+
+    return (MMModemLocationSource) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
+                                                         G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+parent_load_capabilities_ready (MMIfaceModemLocation *self,
+                                GAsyncResult *res,
+                                GSimpleAsyncResult *simple)
+{
+    MMModemLocationSource sources;
+    GError *error = NULL;
+
+    sources = iface_modem_location_parent->load_capabilities_finish (self, res, &error);
+    if (error) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    /* Now our own check.
+     *
+     * We could issue AT_OIFACE? to list the interfaces currently enabled in the
+     * module, to see if there is a 'GPS' interface enabled. But we'll just go
+     * and see if there is already a 'GPS control' AT port and a raw serial 'GPS'
+     * port grabbed.
+     *
+     * NOTE: A deeper implementation could handle the situation where the GPS
+     * interface is found disabled in AT_OIFACE?. In this case, we could issue
+     * AT_OIFACE="GPS",1 to enable it (and AT_OIFACE="GPS",0 to disable it), but
+     * enabling/disabling GPS involves a complete reboot of the modem, which is
+     * probably not the desired thing here.
+     */
+    if (mm_base_modem_peek_port_gps (MM_BASE_MODEM (self)) &&
+        mm_base_modem_peek_port_gps_control (MM_BASE_MODEM (self)))
+        sources |= MM_MODEM_LOCATION_SOURCE_GPS_NMEA;
+
+    /* So we're done, complete */
+    g_simple_async_result_set_op_res_gpointer (simple,
+                                               GUINT_TO_POINTER (sources),
+                                               NULL);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+location_load_capabilities (MMIfaceModemLocation *self,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        location_load_capabilities);
+
+    /* Chain up parent's setup */
+    iface_modem_location_parent->load_capabilities (
+        self,
+        (GAsyncReadyCallback)parent_load_capabilities_ready,
+        result);
+}
+
+/*****************************************************************************/
 /* Setup ports (Broadband modem class) */
 
 static void
@@ -349,6 +428,15 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->setup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = modem_3gpp_cleanup_unsolicited_events;
     iface->cleanup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
+}
+
+static void
+iface_modem_location_init (MMIfaceModemLocation *iface)
+{
+    iface_modem_location_parent = g_type_interface_peek_parent (iface);
+
+    iface->load_capabilities = location_load_capabilities;
+    iface->load_capabilities_finish = location_load_capabilities_finish;
 }
 
 static void
