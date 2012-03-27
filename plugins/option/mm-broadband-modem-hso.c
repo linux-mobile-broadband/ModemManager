@@ -444,6 +444,8 @@ enable_location_gathering (MMIfaceModemLocation *self,
 static void
 setup_ports (MMBroadbandModem *self)
 {
+    MMAtSerialPort *gps_control_port;
+
     /* Call parent's setup ports first always */
     MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_hso_parent_class)->setup_ports (self);
 
@@ -459,6 +461,16 @@ setup_ports (MMBroadbandModem *self)
                    * messages, which are not <CR><LF> prefixed. */
                   MM_AT_SERIAL_PORT_REMOVE_ECHO, FALSE,
                   NULL);
+
+    /* It may happen that the modem was started with GPS already enabled, or
+     * maybe ModemManager got rebooted and it was left enabled before. We'll make
+     * sure that it is disabled when we initialize the modem */
+    gps_control_port = mm_base_modem_peek_port_gps_control (MM_BASE_MODEM (self));
+    if (gps_control_port)
+        mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                       gps_control_port,
+                                       "_OGPS=0",
+                                       3, FALSE, NULL, NULL, NULL);
 }
 
 /*****************************************************************************/
