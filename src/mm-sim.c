@@ -578,11 +578,11 @@ unlock_check_ready (MMIfaceModem *modem,
             g_simple_async_result_take_error (ctx->result,
                                               error_for_unlock_check (lock));
         send_pin_puk_context_complete_and_free (ctx);
+        return;
     }
 
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
     send_pin_puk_context_complete_and_free (ctx);
-    return;
 }
 
 static void
