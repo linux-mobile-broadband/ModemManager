@@ -77,14 +77,18 @@ location_gps_nmea_take_trace (MMLocationGpsNmea *self,
     if (check_append_or_replace (self, trace)) {
         /* Append */
         const gchar *previous;
-        gchar *sequence;
 
         previous = g_hash_table_lookup (self->priv->traces, trace_type);
-        sequence = g_strdup_printf ("%s%s",
-                                    previous ? previous : "",
-                                    trace);
-        g_free (trace);
-        trace = sequence;
+        if (previous) {
+            gchar *sequence;
+
+            sequence = g_strdup_printf ("%s%s%s",
+                                        previous,
+                                        g_str_has_suffix (previous, "\r\n") ? "" : "\r\n",
+                                        trace);
+            g_free (trace);
+            trace = sequence;
+        }
     }
 
     g_hash_table_replace (self->priv->traces,
@@ -116,7 +120,10 @@ build_full_foreach (const gchar *trace_type,
                     const gchar *trace,
                     GString **built)
 {
-    g_string_append (*built, trace);
+    if ((*built)->len == 0 || g_str_has_suffix ((*built)->str, "\r\n"))
+        g_string_append (*built, trace);
+    else
+        g_string_append_printf (*built, "\r\n%s", trace);
 }
 
 gchar *
