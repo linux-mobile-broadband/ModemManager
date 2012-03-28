@@ -3869,22 +3869,28 @@ modem_messaging_set_preferred_storages (MMIfaceModemMessaging *self,
 {
     gchar *cmd;
     GSimpleAsyncResult *result;
+    gchar *mem1_str;
+    gchar *mem2_str;
+    gchar *mem3_str;
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
                                         modem_messaging_set_preferred_storages);
 
-    cmd = g_strdup_printf ("+CPMS=\"%s\",\"%s\",\"%s\"",
-                           g_ascii_strup (mm_sms_storage_get_string (mem1), -1),
-                           g_ascii_strup (mm_sms_storage_get_string (mem2), -1),
-                           g_ascii_strup (mm_sms_storage_get_string (mem3), -1));
+    mem1_str = g_ascii_strup (mm_sms_storage_get_string (mem1), -1);
+    mem2_str = g_ascii_strup (mm_sms_storage_get_string (mem2), -1);
+    mem3_str = g_ascii_strup (mm_sms_storage_get_string (mem3), -1);
+    cmd = g_strdup_printf ("+CPMS=\"%s\",\"%s\",\"%s\"", mem1_str, mem2_str, mem3_str);
     mm_base_modem_at_command (MM_BASE_MODEM (self),
                               cmd,
                               3,
                               FALSE,
                               (GAsyncReadyCallback)cpms_set_ready,
                               result);
+    g_free (mem1_str);
+    g_free (mem2_str);
+    g_free (mem3_str);
     g_free (cmd);
 }
 
