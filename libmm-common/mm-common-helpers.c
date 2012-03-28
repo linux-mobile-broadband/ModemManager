@@ -511,6 +511,14 @@ mm_get_int_from_str (const gchar *str,
 {
     glong num;
 
+    if (!str || !str[0])
+        return FALSE;
+
+    for (num = 0; str[num]; num++) {
+        if (str[num] != '-' && !g_ascii_isdigit (str[num]))
+            return FALSE;
+    }
+
     errno = 0;
     num = strtol (str, NULL, 10);
     if (!errno && num >= G_MININT && num <= G_MAXINT) {
@@ -543,6 +551,14 @@ mm_get_uint_from_str (const gchar *str,
 {
     gulong num;
 
+    if (!str || !str[0])
+        return FALSE;
+
+    for (num = 0; str[num]; num++) {
+        if (!g_ascii_isdigit (str[num]))
+            return FALSE;
+    }
+
     errno = 0;
     num = strtoul (str, NULL, 10);
     if (!errno && num <= G_MAXUINT) {
@@ -574,6 +590,19 @@ mm_get_double_from_str (const gchar *str,
                         gdouble *out)
 {
     gdouble num;
+    guint i;
+
+    if (!str || !str[0])
+        return FALSE;
+
+    for (i = 0; str[i]; i++) {
+        /* we don't really expect numbers in scientific notation, so
+         * don't bother looking for exponents and such */
+        if (str[i] != '-' &&
+            str[i] != '.' &&
+            !g_ascii_isdigit (str[i]))
+            return FALSE;
+    }
 
     errno = 0;
     num = strtod (str, NULL);
