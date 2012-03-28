@@ -66,6 +66,46 @@ MMLocation3gpp *mm_modem_location_get_3gpp_finish (MMModemLocation *self,
 MMLocation3gpp *mm_modem_location_get_3gpp_sync   (MMModemLocation *self,
                                                    GCancellable *cancellable,
                                                    GError **error);
+
+void               mm_modem_location_get_gps_nmea        (MMModemLocation *self,
+                                                          GCancellable *cancellable,
+                                                          GAsyncReadyCallback callback,
+                                                          gpointer user_data);
+MMLocationGpsNmea *mm_modem_location_get_gps_nmea_finish (MMModemLocation *self,
+                                                          GAsyncResult *res,
+                                                          GError **error);
+MMLocationGpsNmea *mm_modem_location_get_gps_nmea_sync   (MMModemLocation *self,
+                                                          GCancellable *cancellable,
+                                                          GError **error);
+
+void              mm_modem_location_get_gps_raw        (MMModemLocation *self,
+                                                        GCancellable *cancellable,
+                                                        GAsyncReadyCallback callback,
+                                                        gpointer user_data);
+MMLocationGpsRaw *mm_modem_location_get_gps_raw_finish (MMModemLocation *self,
+                                                        GAsyncResult *res,
+                                                        GError **error);
+MMLocationGpsRaw *mm_modem_location_get_gps_raw_sync   (MMModemLocation *self,
+                                                        GCancellable *cancellable,
+                                                        GError **error);
+
+void     mm_modem_location_get_full        (MMModemLocation *self,
+                                            GCancellable *cancellable,
+                                            GAsyncReadyCallback callback,
+                                            gpointer user_data);
+gboolean mm_modem_location_get_full_finish (MMModemLocation *self,
+                                            GAsyncResult *res,
+                                            MMLocation3gpp **location_3gpp,
+                                            MMLocationGpsNmea **location_gps_nmea,
+                                            MMLocationGpsRaw **location_gps_raw,
+                                            GError **error);
+gboolean mm_modem_location_get_full_sync   (MMModemLocation *self,
+                                            MMLocation3gpp **location_3gpp,
+                                            MMLocationGpsNmea **location_gps_nmea,
+                                            MMLocationGpsRaw **location_gps_raw,
+                                            GCancellable *cancellable,
+                                            GError **error);
+
 G_END_DECLS
 
 #endif /* _MM_MODEM_LOCATION_H_ */

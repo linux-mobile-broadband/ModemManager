@@ -133,56 +133,78 @@ mm_modem_location_setup_sync (MMModemLocation *self,
                                                     error);
 }
 
-static MMLocation3gpp *
-build_3gpp_location (GVariant *dictionary,
-                     GError **error)
+static gboolean
+build_locations (GVariant *dictionary,
+                 MMLocation3gpp **location_3gpp,
+                 MMLocationGpsNmea **location_gps_nmea,
+                 MMLocationGpsRaw **location_gps_raw,
+                 GError **error)
 {
-    MMLocation3gpp *location = NULL;
     GError *inner_error = NULL;
     GVariant *value;
     guint source;
     GVariantIter iter;
 
     if (!dictionary)
-        return NULL;
+        /* No location provided. Not actually an error. */
+        return TRUE;
 
     g_variant_iter_init (&iter, dictionary);
-    while (!location &&
-           !inner_error &&
+    while (!inner_error &&
            g_variant_iter_next (&iter, "{uv}", &source, &value)) {
-        /* If we have 3GPP LAC/CI location, build result */
-        if (source == MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI)
-            location = mm_location_3gpp_new_from_string_variant (value, &inner_error);
+        switch (source) {
+        case MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI:
+            if (location_3gpp)
+                *location_3gpp = mm_location_3gpp_new_from_string_variant (value, &inner_error);
+            break;
+        case MM_MODEM_LOCATION_SOURCE_GPS_NMEA:
+            if (location_gps_nmea)
+                *location_gps_nmea = mm_location_gps_nmea_new_from_string_variant (value, &inner_error);
+            break;
+        case MM_MODEM_LOCATION_SOURCE_GPS_RAW:
+            if (location_gps_raw)
+                *location_gps_raw = mm_location_gps_raw_new_from_dictionary (value, &inner_error);
+            break;
+        default:
+            g_warn_if_reached ();
+            break;
+        }
 
         g_variant_unref (value);
     }
 
     g_variant_unref (dictionary);
 
-    if (inner_error)
+    if (inner_error) {
         g_propagate_error (error, inner_error);
+        g_prefix_error (error,
+                        "Couldn't build locations result: ");
+        return FALSE;
+    }
 
-    return (MMLocation3gpp *)location;
+    return TRUE;
 }
 
-MMLocation3gpp *
-mm_modem_location_get_3gpp_finish (MMModemLocation *self,
+gboolean
+mm_modem_location_get_full_finish (MMModemLocation *self,
                                    GAsyncResult *res,
+                                   MMLocation3gpp **location_3gpp,
+                                   MMLocationGpsNmea **location_gps_nmea,
+                                   MMLocationGpsRaw **location_gps_raw,
                                    GError **error)
 {
-
     GVariant *dictionary = NULL;
 
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM_LOCATION (self), NULL);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM_LOCATION (self), FALSE);
 
     if (!mm_gdbus_modem_location_call_get_location_finish (self, &dictionary, res, error))
-        return NULL;
+        return FALSE;
 
-    return build_3gpp_location (dictionary, error);
+    return build_locations (dictionary, location_3gpp, location_gps_nmea, location_gps_raw, error);
 }
 
 void
-mm_modem_location_get_3gpp (MMModemLocation *self,
+mm_modem_location_get_full (MMModemLocation *self,
                             GCancellable *cancellable,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
@@ -195,17 +217,113 @@ mm_modem_location_get_3gpp (MMModemLocation *self,
                                                user_data);
 }
 
-MMLocation3gpp *
-mm_modem_location_get_3gpp_sync (MMModemLocation *self,
+gboolean
+mm_modem_location_get_full_sync (MMModemLocation *self,
+                                 MMLocation3gpp **location_3gpp,
+                                 MMLocationGpsNmea **location_gps_nmea,
+                                 MMLocationGpsRaw **location_gps_raw,
                                  GCancellable *cancellable,
                                  GError **error)
 {
     GVariant *dictionary = NULL;
 
-    g_return_val_if_fail (MM_GDBUS_IS_MODEM_LOCATION (self), NULL);
+    g_return_val_if_fail (MM_GDBUS_IS_MODEM_LOCATION (self), FALSE);
 
     if (!mm_gdbus_modem_location_call_get_location_sync (self, &dictionary, cancellable, error))
-        return NULL;
+        return FALSE;
 
-    return build_3gpp_location (dictionary, error);
+    return build_locations (dictionary, location_3gpp, location_gps_nmea, location_gps_raw, error);
+}
+
+MMLocation3gpp *
+mm_modem_location_get_3gpp_finish (MMModemLocation *self,
+                                   GAsyncResult *res,
+                                   GError **error)
+{
+    MMLocation3gpp *location = NULL;
+
+    mm_modem_location_get_full_finish (self, res, &location, NULL, NULL, error);
+    return location;
+}
+
+void
+mm_modem_location_get_3gpp (MMModemLocation *self,
+                            GCancellable *cancellable,
+                            GAsyncReadyCallback callback,
+                            gpointer user_data)
+{
+    mm_modem_location_get_full (self, cancellable, callback, user_data);
+}
+
+MMLocation3gpp *
+mm_modem_location_get_3gpp_sync (MMModemLocation *self,
+                                 GCancellable *cancellable,
+                                 GError **error)
+{
+    MMLocation3gpp *location = NULL;
+
+    mm_modem_location_get_full_sync (self, &location, NULL, NULL, cancellable, error);
+    return location;
+}
+
+MMLocationGpsNmea *
+mm_modem_location_get_gps_nmea_finish (MMModemLocation *self,
+                                       GAsyncResult *res,
+                                       GError **error)
+{
+    MMLocationGpsNmea *location = NULL;
+
+    mm_modem_location_get_full_finish (self, res, NULL, &location, NULL, error);
+    return location;
+}
+
+void
+mm_modem_location_get_gps_nmea (MMModemLocation *self,
+                                GCancellable *cancellable,
+                                GAsyncReadyCallback callback,
+                                gpointer user_data)
+{
+    mm_modem_location_get_full (self, cancellable, callback, user_data);
+}
+
+MMLocationGpsNmea *
+mm_modem_location_get_gps_nmea_sync (MMModemLocation *self,
+                                     GCancellable *cancellable,
+                                     GError **error)
+{
+    MMLocationGpsNmea *location = NULL;
+
+    mm_modem_location_get_full_sync (self, NULL, &location, NULL, cancellable, error);
+    return location;
+}
+
+MMLocationGpsRaw *
+mm_modem_location_get_gps_raw_finish (MMModemLocation *self,
+                                      GAsyncResult *res,
+                                      GError **error)
+{
+    MMLocationGpsRaw *location = NULL;
+
+    mm_modem_location_get_full_finish (self, res, NULL, NULL, &location, error);
+    return location;
+}
+
+void
+mm_modem_location_get_gps_raw (MMModemLocation *self,
+                               GCancellable *cancellable,
+                               GAsyncReadyCallback callback,
+                               gpointer user_data)
+{
+    mm_modem_location_get_full (self, cancellable, callback, user_data);
+}
+
+MMLocationGpsRaw *
+mm_modem_location_get_gps_raw_sync (MMModemLocation *self,
+                                    GCancellable *cancellable,
+                                    GError **error)
+{
+    MMLocationGpsRaw *location = NULL;
+
+    mm_modem_location_get_full_sync (self, NULL, NULL, &location, cancellable, error);
+    return location;
 }
