@@ -50,12 +50,19 @@ static gboolean disable_3gpp_flag;
 static gboolean get_3gpp_flag;
 static gboolean enable_gps_nmea_flag;
 static gboolean disable_gps_nmea_flag;
+static gboolean get_gps_nmea_flag;
 static gboolean enable_gps_raw_flag;
 static gboolean disable_gps_raw_flag;
+static gboolean get_gps_raw_flag;
+static gboolean get_all_flag;
 
 static GOptionEntry entries[] = {
     { "location-status", 0, 0, G_OPTION_ARG_NONE, &status_flag,
       "Show status of location gathering.",
+      NULL
+    },
+    { "location-get", 0, 0, G_OPTION_ARG_NONE, &get_all_flag,
+      "Get all available location information.",
       NULL
     },
     { "location-enable-3gpp", 0, 0, G_OPTION_ARG_NONE, &enable_3gpp_flag,
@@ -78,12 +85,20 @@ static GOptionEntry entries[] = {
       "Disable NMEA-based GPS location gathering.",
       NULL
     },
+    { "location-get-gps-nmea", 0, 0, G_OPTION_ARG_NONE, &get_gps_nmea_flag,
+      "Get NMEA GPS traces.",
+      NULL
+    },
     { "location-enable-gps-raw", 0, 0, G_OPTION_ARG_NONE, &enable_gps_raw_flag,
       "Enable raw GPS location gathering.",
       NULL
     },
     { "location-disable-gps-raw", 0, 0, G_OPTION_ARG_NONE, &disable_gps_raw_flag,
       "Disable raw GPS location gathering.",
+      NULL
+    },
+    { "location-get-gps-raw", 0, 0, G_OPTION_ARG_NONE, &get_gps_raw_flag,
+      "Get raw GPS location.",
       NULL
     },
     { NULL }
@@ -120,6 +135,12 @@ mmcli_modem_location_options_enabled (void)
         exit (EXIT_FAILURE);
     }
 
+    if (get_all_flag) {
+        get_3gpp_flag = TRUE;
+        get_gps_nmea_flag = TRUE;
+        get_gps_raw_flag = TRUE;
+    }
+
     n_actions = (status_flag +
                  !!(enable_3gpp_flag +
                     disable_3gpp_flag +
@@ -127,7 +148,9 @@ mmcli_modem_location_options_enabled (void)
                     disable_gps_nmea_flag +
                     enable_gps_raw_flag +
                     disable_gps_raw_flag) +
-                 get_3gpp_flag);
+                 !!(get_3gpp_flag +
+                    get_gps_nmea_flag +
+                    get_gps_raw_flag));
 
     if (n_actions > 1) {
         g_printerr ("error: too many Location actions requested\n");
@@ -257,37 +280,118 @@ build_sources_from_flags (void)
 }
 
 static void
-get_3gpp_process_reply (MMLocation3gpp *location,
-                        const GError *error)
+get_location_process_reply (MMLocation3gpp *location_3gpp,
+                            MMLocationGpsNmea *location_gps_nmea,
+                            MMLocationGpsRaw *location_gps_raw,
+                            const GError *error)
 {
-    if (!location) {
-        g_printerr ("error: couldn't get 3GPP-based location from the modem: '%s'\n",
-                    error ? error->message : "not available");
+    /* First, check for failures */
+    if (!get_all_flag) {
+        gboolean exit_error = FALSE;
+
+        if (get_3gpp_flag && !location_3gpp) {
+            g_printerr ("error: couldn't get 3GPP-based location from the modem: '%s'\n",
+                        error ? error->message : "not available");
+            exit_error = TRUE;
+        }
+
+        if (get_gps_nmea_flag && !location_gps_nmea) {
+            g_printerr ("error: couldn't get NMEA GPS traces from the modem: '%s'\n",
+                        error ? error->message : "not available");
+            exit_error = TRUE;
+        }
+
+        if (get_gps_raw_flag && !location_gps_raw) {
+            g_printerr ("error: couldn't get raw GPS location from the modem: '%s'\n",
+                        error ? error->message : "not available");
+            exit_error = TRUE;
+        }
+
+        if (exit_error)
+            exit (EXIT_FAILURE);
+    } else if (error) {
+        g_printerr ("error: couldn't get location from the modem: '%s'\n",
+                    error ? error->message : "unknown error");
         exit (EXIT_FAILURE);
     }
 
-    g_print ("  -------------------------\n"
-             "  3GPP location | Mobile country code: '%u'\n"
-             "                | Mobile network code: '%u'\n"
-             "                |  Location area code: '%lu'\n"
-             "                |             Cell ID: '%lu'\n",
-             mm_location_3gpp_get_mobile_country_code (location),
-             mm_location_3gpp_get_mobile_network_code (location),
-             mm_location_3gpp_get_location_area_code (location),
-             mm_location_3gpp_get_cell_id (location));
+    g_print ("\n"
+             "%s\n",
+             mm_modem_location_get_path (ctx->modem_location));
 
-    g_object_unref (location);
+    if (get_3gpp_flag) {
+        if (location_3gpp)
+            g_print ("  -------------------------\n"
+                     "  3GPP location   | Mobile country code: '%u'\n"
+                     "                  | Mobile network code: '%u'\n"
+                     "                  |  Location area code: '%lu'\n"
+                     "                  |             Cell ID: '%lu'\n",
+                     mm_location_3gpp_get_mobile_country_code (location_3gpp),
+                     mm_location_3gpp_get_mobile_network_code (location_3gpp),
+                     mm_location_3gpp_get_location_area_code (location_3gpp),
+                     mm_location_3gpp_get_cell_id (location_3gpp));
+        else
+            g_print ("  -------------------------\n"
+                     "  3GPP location   | Not available\n");
+    }
+
+    if (get_gps_nmea_flag) {
+        gchar *full = NULL;
+
+        if (location_gps_nmea)
+            full = mm_location_gps_nmea_build_full (location_gps_nmea);
+
+        if (full) {
+            g_print ("  -------------------------\n"
+                     "  GPS NMEA traces |\n"
+                     "  %s\n",
+                     full);
+            g_free (full);
+        } else
+            g_print ("  -------------------------\n"
+                     "  GPS NMEA traces | Not available\n");
+    }
+
+    if (get_gps_raw_flag) {
+        if (location_gps_raw)
+            g_print ("  -------------------------\n"
+                     "  Raw GPS         |  UTC time: '%s'\n"
+                     "                  | Longitude: '%lf'\n"
+                     "                  |  Latitude: '%lf'\n"
+                     "                  |  Altitude: '%lf'\n",
+                     mm_location_gps_raw_get_utc_time (location_gps_raw),
+                     mm_location_gps_raw_get_longitude (location_gps_raw),
+                     mm_location_gps_raw_get_latitude (location_gps_raw),
+                     mm_location_gps_raw_get_altitude (location_gps_raw));
+        else
+            g_print ("  -------------------------\n"
+                     "  Raw GPS         | Not available\n");
+    }
+
+    if (location_3gpp)
+        g_object_unref (location_3gpp);
+    if (location_gps_nmea)
+        g_object_unref (location_gps_nmea);
+    if (location_gps_raw)
+        g_object_unref (location_gps_raw);
 }
 
 static void
-get_3gpp_ready (MMModemLocation  *modem_location,
-                GAsyncResult *result)
+get_location_ready (MMModemLocation  *modem_location,
+                    GAsyncResult *result)
 {
-    MMLocation3gpp *operation_result;
+    MMLocation3gpp *location_3gpp = NULL;
+    MMLocationGpsNmea *location_gps_nmea = NULL;
+    MMLocationGpsRaw *location_gps_raw = NULL;
     GError *error = NULL;
 
-    operation_result = mm_modem_location_get_3gpp_finish (modem_location, result, &error);
-    get_3gpp_process_reply (operation_result, error);
+    mm_modem_location_get_full_finish (modem_location,
+                                       result,
+                                       get_3gpp_flag ? &location_3gpp : NULL,
+                                       get_gps_nmea_flag ? &location_gps_nmea : NULL,
+                                       get_gps_raw_flag ? &location_gps_raw : NULL,
+                                       &error);
+    get_location_process_reply (location_3gpp, location_gps_nmea, location_gps_raw, error);
 
     mmcli_async_operation_done ();
 }
@@ -322,13 +426,14 @@ get_modem_ready (GObject      *source,
         return;
     }
 
-    /* Request to get 3GPP location from the modem? */
-    if (get_3gpp_flag) {
-        g_debug ("Asynchronously getting 3GPP-based location from the modem...");
-
-        mm_modem_location_get_3gpp (ctx->modem_location,
+    /* Request to get location from the modem? */
+    if (get_3gpp_flag ||
+        get_gps_nmea_flag ||
+        get_gps_raw_flag) {
+        g_debug ("Asynchronously getting location from the modem...");
+        mm_modem_location_get_full (ctx->modem_location,
                                     ctx->cancellable,
-                                    (GAsyncReadyCallback)get_3gpp_ready,
+                                    (GAsyncReadyCallback)get_location_ready,
                                     NULL);
         return;
     }
@@ -393,16 +498,22 @@ mmcli_modem_location_run_synchronous (GDBusConnection *connection)
         return;
     }
 
-    /* Request to get 3GPP based location from the modem? */
-    if (get_3gpp_flag) {
-        MMLocation3gpp *result;
+    /* Request to get location from the modem? */
+    if (get_3gpp_flag ||
+        get_gps_nmea_flag ||
+        get_gps_raw_flag) {
+        MMLocation3gpp *location_3gpp = NULL;
+        MMLocationGpsNmea *location_gps_nmea = NULL;
+        MMLocationGpsRaw *location_gps_raw = NULL;
 
-        g_debug ("Synchronously getting 3GPP-based location from the modem...");
-
-        result = mm_modem_location_get_3gpp_sync (ctx->modem_location,
-                                                  NULL,
-                                                  &error);
-        get_3gpp_process_reply (result, error);
+        g_debug ("Synchronously getting location from the modem...");
+        mm_modem_location_get_full_sync (ctx->modem_location,
+                                         get_3gpp_flag ? &location_3gpp : NULL,
+                                         get_gps_nmea_flag ? &location_gps_nmea : NULL,
+                                         get_gps_raw_flag ? &location_gps_raw : NULL,
+                                         NULL,
+                                         &error);
+        get_location_process_reply (location_3gpp, location_gps_nmea, location_gps_raw, error);
         return;
     }
 
