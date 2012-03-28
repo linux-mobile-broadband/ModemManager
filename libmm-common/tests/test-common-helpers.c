@@ -346,6 +346,148 @@ band_array_cmp_test_different_multiple_2 (void)
     common_band_array_cmp_test (FALSE, a, G_N_ELEMENTS (a), b, G_N_ELEMENTS (b));
 }
 
+/********************* FIELD PARSERS TESTS *********************/
+
+static void
+field_parser_int (void)
+{
+    gint num;
+    gchar *str;
+
+    /* Failures */
+
+    g_assert (mm_get_int_from_str (NULL, &num) == FALSE);
+
+    g_assert (mm_get_int_from_str ("", &num) == FALSE);
+
+    g_assert (mm_get_int_from_str ("a", &num) == FALSE);
+
+    g_assert (mm_get_int_from_str ("a100", &num) == FALSE);
+
+    g_assert (mm_get_int_from_str ("100a", &num) == FALSE);
+
+    str = g_strdup_printf ("%" G_GINT64_FORMAT, (gint64)G_MAXINT + 1);
+    g_assert (mm_get_int_from_str (str, &num) == FALSE);
+    g_free (str);
+
+    str = g_strdup_printf ("%" G_GINT64_FORMAT, (gint64)(G_MININT) - 1);
+    g_assert (mm_get_int_from_str (str, &num) == FALSE);
+    g_free (str);
+
+    /* Successes */
+
+    g_assert (mm_get_int_from_str ("0", &num) == TRUE);
+    g_assert_cmpint (num, ==, 0);
+
+    g_assert (mm_get_int_from_str ("-100", &num) == TRUE);
+    g_assert_cmpint (num, ==, -100);
+
+    g_assert (mm_get_int_from_str ("100", &num) == TRUE);
+    g_assert_cmpint (num, ==, 100);
+
+    str = g_strdup_printf ("%" G_GINT64_FORMAT, (gint64)G_MAXINT);
+    g_assert (mm_get_int_from_str (str, &num) == TRUE);
+    g_assert_cmpint (num, ==, G_MAXINT);
+    g_free (str);
+
+    str = g_strdup_printf ("%" G_GINT64_FORMAT, (gint64)G_MININT);
+    g_assert (mm_get_int_from_str (str, &num) == TRUE);
+    g_assert_cmpint (num, ==, G_MININT);
+    g_free (str);
+}
+
+static void
+field_parser_uint (void)
+{
+    gchar *str;
+    guint num;
+
+    /* Failures */
+
+    g_assert (mm_get_uint_from_str (NULL, &num) == FALSE);
+
+    g_assert (mm_get_uint_from_str ("", &num) == FALSE);
+
+    g_assert (mm_get_uint_from_str ("a", &num) == FALSE);
+
+    g_assert (mm_get_uint_from_str ("a100", &num) == FALSE);
+
+    g_assert (mm_get_uint_from_str ("100a", &num) == FALSE);
+
+    g_assert (mm_get_uint_from_str ("-100", &num) == FALSE);
+
+    str = g_strdup_printf ("%" G_GUINT64_FORMAT, (guint64)(G_MAXUINT) + 1);
+    g_assert (mm_get_uint_from_str (str, &num) == FALSE);
+    g_free (str);
+
+    /* Successes */
+
+    g_assert (mm_get_uint_from_str ("0", &num) == TRUE);
+    g_assert_cmpuint (num, ==, 0);
+
+    g_assert (mm_get_uint_from_str ("100", &num) == TRUE);
+    g_assert_cmpuint (num, ==, 100);
+
+    str = g_strdup_printf ("%" G_GUINT64_FORMAT, (guint64)G_MAXUINT);
+    g_assert (mm_get_uint_from_str (str, &num) == TRUE);
+    g_assert_cmpuint (num, ==, G_MAXUINT);
+    g_free (str);
+}
+
+static void
+field_parser_double (void)
+{
+    gchar *str;
+    gdouble num;
+
+    /* Failures */
+
+    g_assert (mm_get_double_from_str (NULL, &num) == FALSE);
+
+    g_assert (mm_get_double_from_str ("", &num) == FALSE);
+
+    g_assert (mm_get_double_from_str ("a", &num) == FALSE);
+
+    g_assert (mm_get_double_from_str ("a100", &num) == FALSE);
+
+    g_assert (mm_get_double_from_str ("100a", &num) == FALSE);
+
+    /* Successes */
+
+    g_assert (mm_get_double_from_str ("-100", &num) == TRUE);
+    g_assert (num - (-100.0) < 0000000.1);
+
+    g_assert (mm_get_double_from_str ("-100.7567", &num) == TRUE);
+    g_assert (num - (-100.7567) < 0000000.1);
+
+    g_assert (mm_get_double_from_str ("0", &num) == TRUE);
+    g_assert (num < 0000000.1);
+
+    g_assert (mm_get_double_from_str ("-0.0", &num) == TRUE);
+    g_assert (num < 0000000.1);
+
+    g_assert (mm_get_double_from_str ("0.0", &num) == TRUE);
+    g_assert (num < 0000000.1);
+
+    g_assert (mm_get_double_from_str ("100", &num) == TRUE);
+    g_assert (num - (100.0) < 0000000.1);
+
+    g_assert (mm_get_double_from_str ("100.7567", &num) == TRUE);
+    g_assert (num - (100.7567) < 0000000.1);
+
+    str = g_strdup_printf ("%lf", (gdouble)G_MINDOUBLE);
+    g_assert (mm_get_double_from_str (str, &num) == TRUE);
+    g_assert (num - G_MINDOUBLE < 0000000.1);
+    g_free (str);
+
+    str = g_strdup_printf ("%lf", (gdouble)G_MAXDOUBLE);
+    g_assert (mm_get_double_from_str (str, &num) == TRUE);
+    g_assert (num - G_MAXDOUBLE < 0000000.1);
+    g_free (str);
+}
+
+/**************************************************************/
+
 int main (int argc, char **argv)
 {
     g_type_init ();
@@ -378,6 +520,10 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/Common/BandArray/Cmp/different-none", band_array_cmp_test_different_none);
     g_test_add_func ("/MM/Common/BandArray/Cmp/different-multiple-1", band_array_cmp_test_different_multiple_1);
     g_test_add_func ("/MM/Common/BandArray/Cmp/different-multiple-2", band_array_cmp_test_different_multiple_2);
+
+    g_test_add_func ("/MM/Common/FieldParsers/Int", field_parser_int);
+    g_test_add_func ("/MM/Common/FieldParsers/Uint", field_parser_uint);
+    g_test_add_func ("/MM/Common/FieldParsers/Double", field_parser_double);
 
     return g_test_run ();
 }
