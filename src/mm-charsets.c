@@ -172,9 +172,10 @@ mm_modem_charset_hex_to_utf8 (const char *src, MMModemCharset charset)
                            NULL, NULL, &error);
     if (!converted || error) {
         g_clear_error (&error);
-        g_free (unconverted);
         converted = NULL;
     }
+
+    g_free (unconverted);
 
     return converted;
 }
