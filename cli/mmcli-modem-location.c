@@ -342,10 +342,13 @@ get_location_process_reply (MMLocation3gpp *location_3gpp,
             full = mm_location_gps_nmea_build_full (location_gps_nmea);
 
         if (full) {
+            gchar *prefixed;
+
+            prefixed = mmcli_prefix_newlines ("                  | ", full);
             g_print ("  -------------------------\n"
-                     "  GPS NMEA traces |\n"
-                     "  %s\n",
-                     full);
+                     "  GPS NMEA traces | %s\n",
+                     prefixed);
+            g_free (prefixed);
             g_free (full);
         } else
             g_print ("  -------------------------\n"

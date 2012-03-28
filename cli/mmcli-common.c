@@ -19,6 +19,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 
 #include <libmm-glib.h>
 
@@ -1109,4 +1110,41 @@ const gchar *
 mmcli_get_common_sms_string (void)
 {
     return sms_str;
+}
+
+gchar *
+mmcli_prefix_newlines (const gchar *prefix,
+                       const gchar *str)
+{
+    GString *prefixed_string = NULL;
+    const gchar *line_start = str;
+    const gchar *line_end;
+
+    while ((line_end = strchr (line_start, '\n'))) {
+        gssize line_length;
+
+        line_length = line_end - line_start;
+        if (line_start[line_length - 1] == '\r')
+            line_length--;
+
+        if (line_length > 0) {
+            if (prefixed_string) {
+                /* If not the first line, add the prefix */
+                g_string_append_printf (prefixed_string,
+                                        "\n%s", prefix);
+            } else {
+                prefixed_string = g_string_new ("");
+            }
+
+            g_string_append_len (prefixed_string,
+                                 line_start,
+                                 line_length);
+        }
+
+        line_start = line_end + 1;
+    }
+
+    return (prefixed_string ?
+            g_string_free (prefixed_string, FALSE) :
+            NULL);
 }

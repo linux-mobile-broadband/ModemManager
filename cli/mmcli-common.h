@@ -85,4 +85,7 @@ const gchar  *mmcli_get_common_bearer_string (void);
 const gchar  *mmcli_get_common_sim_string (void);
 const gchar  *mmcli_get_common_sms_string (void);
 
+gchar *mmcli_prefix_newlines (const gchar *prefix,
+                              const gchar *str);
+
 #endif /* _MMCLI_COMMON_H_ */
