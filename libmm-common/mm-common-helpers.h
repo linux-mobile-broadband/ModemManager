@@ -68,6 +68,11 @@ gboolean  mm_get_uint_from_str                   (const gchar *str,
 gboolean  mm_get_uint_from_match_info            (GMatchInfo *match_info,
                                                   guint32 match_index,
                                                   guint *out);
+gboolean  mm_get_double_from_str                 (const gchar *str,
+                                                  gdouble *out);
+gboolean  mm_get_double_from_match_info          (GMatchInfo *match_info,
+                                                  guint32 match_index,
+                                                  gdouble *out);
 gchar    *mm_get_string_unquoted_from_match_info (GMatchInfo *match_info,
                                                   guint32 match_index);
 

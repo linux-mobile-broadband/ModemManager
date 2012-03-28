@@ -569,6 +569,38 @@ mm_get_uint_from_match_info (GMatchInfo *match_info,
     return ret;
 }
 
+gboolean
+mm_get_double_from_str (const gchar *str,
+                        gdouble *out)
+{
+    gdouble num;
+
+    errno = 0;
+    num = strtod (str, NULL);
+    if (!errno) {
+        *out = num;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+gboolean
+mm_get_double_from_match_info (GMatchInfo *match_info,
+                               guint32 match_index,
+                               gdouble *out)
+{
+    gchar *s;
+    gboolean ret;
+
+    s = g_match_info_fetch (match_info, match_index);
+    g_return_val_if_fail (s != NULL, FALSE);
+
+    ret = mm_get_double_from_str (s, out);
+    g_free (s);
+
+    return ret;
+}
+
 gchar *
 mm_get_string_unquoted_from_match_info (GMatchInfo *match_info,
                                         guint32 match_index)
