@@ -825,6 +825,7 @@ handle_get_location_auth_ready (MMBaseModem *self,
                                    location_ctx->location_3gpp,
                                    location_ctx->location_gps_nmea,
                                    location_ctx->location_gps_raw));
+    handle_get_location_context_free (ctx);
 }
 
 static gboolean
