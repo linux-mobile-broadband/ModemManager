@@ -41,8 +41,10 @@ typedef struct {
     /* 3GPP location */
     MMLocation3gpp *location_3gpp;
     /* GPS location */
-    time_t location_gps_last_time;
+    time_t location_gps_nmea_last_time;
     MMLocationGpsNmea *location_gps_nmea;
+    time_t location_gps_raw_last_time;
+    MMLocationGpsRaw *location_gps_raw;
 } LocationContext;
 
 static void
@@ -52,6 +54,8 @@ location_context_free (LocationContext *ctx)
         g_object_unref (ctx->location_3gpp);
     if (ctx->location_gps_nmea)
         g_object_unref (ctx->location_gps_nmea);
+    if (ctx->location_gps_raw)
+        g_object_unref (ctx->location_gps_raw);
     g_free (ctx);
 }
 
@@ -97,10 +101,12 @@ get_location_context (MMIfaceModemLocation *self)
 static GVariant *
 build_location_dictionary (GVariant *previous,
                            MMLocation3gpp *location_3gpp,
-                           MMLocationGpsNmea *location_gps_nmea)
+                           MMLocationGpsNmea *location_gps_nmea,
+                           MMLocationGpsRaw *location_gps_raw)
 {
     GVariant *location_3gpp_value = NULL;
     GVariant *location_gps_nmea_value = NULL;
+    GVariant *location_gps_raw_value = NULL;
     GVariantBuilder builder;
 
     /* If a previous dictionary given, parse its values */
@@ -117,6 +123,9 @@ build_location_dictionary (GVariant *previous,
                 break;
             case MM_MODEM_LOCATION_SOURCE_GPS_NMEA:
                 location_gps_nmea_value = value;
+                break;
+            case MM_MODEM_LOCATION_SOURCE_GPS_RAW:
+                location_gps_raw_value = value;
                 break;
             default:
                 g_warn_if_reached ();
@@ -155,6 +164,19 @@ build_location_dictionary (GVariant *previous,
                                MM_MODEM_LOCATION_SOURCE_GPS_NMEA,
                                location_gps_nmea_value);
 
+    /* If a new one given, use it */
+    if (location_gps_raw) {
+        if (location_gps_raw_value)
+            g_variant_unref (location_gps_raw_value);
+        location_gps_raw_value = mm_location_gps_raw_get_dictionary (location_gps_raw);
+    }
+
+    if (location_gps_raw_value)
+        g_variant_builder_add (&builder,
+                               "{uv}",
+                               MM_MODEM_LOCATION_SOURCE_GPS_RAW,
+                               location_gps_raw_value);
+
     return g_variant_builder_end (&builder);
 }
 
@@ -163,7 +185,8 @@ build_location_dictionary (GVariant *previous,
 static void
 notify_gps_location_update (MMIfaceModemLocation *self,
                             MmGdbusModemLocation *skeleton,
-                            MMLocationGpsNmea *location_gps_nmea)
+                            MMLocationGpsNmea *location_gps_nmea,
+                            MMLocationGpsRaw *location_gps_raw)
 {
     const gchar *dbus_path;
 
@@ -178,7 +201,8 @@ notify_gps_location_update (MMIfaceModemLocation *self,
             skeleton,
             build_location_dictionary (mm_gdbus_modem_location_get_location (skeleton),
                                        NULL,
-                                       location_gps_nmea));
+                                       location_gps_nmea,
+                                       location_gps_raw));
 }
 
 void
@@ -187,6 +211,8 @@ mm_iface_modem_location_gps_update (MMIfaceModemLocation *self,
 {
     MmGdbusModemLocation *skeleton;
     LocationContext *ctx;
+    gboolean update_nmea = FALSE;
+    gboolean update_raw = FALSE;
 
     ctx = get_location_context (self);
     g_object_get (self,
@@ -196,11 +222,26 @@ mm_iface_modem_location_gps_update (MMIfaceModemLocation *self,
     if (mm_gdbus_modem_location_get_enabled (skeleton) & MM_MODEM_LOCATION_SOURCE_GPS_NMEA) {
         g_assert (ctx->location_gps_nmea != NULL);
         if (mm_location_gps_nmea_add_trace (ctx->location_gps_nmea, nmea_trace) &&
-            ctx->location_gps_last_time >= MM_LOCATION_GPS_REFRESH_TIME_SECS) {
-            ctx->location_gps_last_time = time (NULL);
-            notify_gps_location_update (self, skeleton, ctx->location_gps_nmea);
+            ctx->location_gps_nmea_last_time >= MM_LOCATION_GPS_REFRESH_TIME_SECS) {
+            ctx->location_gps_nmea_last_time = time (NULL);
+            update_nmea = TRUE;
         }
     }
+
+    if (mm_gdbus_modem_location_get_enabled (skeleton) & MM_MODEM_LOCATION_SOURCE_GPS_RAW) {
+        g_assert (ctx->location_gps_raw != NULL);
+        if (mm_location_gps_raw_add_trace (ctx->location_gps_raw, nmea_trace) &&
+            ctx->location_gps_raw_last_time >= MM_LOCATION_GPS_REFRESH_TIME_SECS) {
+            ctx->location_gps_raw_last_time = time (NULL);
+            update_raw = TRUE;
+        }
+    }
+
+    if (update_nmea || update_raw)
+        notify_gps_location_update (self,
+                                    skeleton,
+                                    update_nmea ? ctx->location_gps_nmea : NULL,
+                                    update_raw ? ctx->location_gps_raw : NULL);
 
     g_object_unref (skeleton);
 }
@@ -230,7 +271,7 @@ notify_3gpp_location_update (MMIfaceModemLocation *self,
             skeleton,
             build_location_dictionary (mm_gdbus_modem_location_get_location (skeleton),
                                        location_3gpp,
-                                       NULL));
+                                       NULL, NULL));
 }
 
 void
@@ -355,6 +396,13 @@ update_location_source_status (MMIfaceModemLocation *self,
                 ctx->location_gps_nmea = mm_location_gps_nmea_new ();
         } else
             g_clear_object (&ctx->location_gps_nmea);
+        break;
+    case MM_MODEM_LOCATION_SOURCE_GPS_RAW:
+        if (enabled) {
+            if (!ctx->location_gps_raw)
+                ctx->location_gps_raw = mm_location_gps_raw_new ();
+        } else
+            g_clear_object (&ctx->location_gps_raw);
         break;
     default:
         break;
@@ -680,11 +728,12 @@ handle_setup_auth_ready (MMBaseModem *self,
                 ctx->skeleton,
                 build_location_dictionary (mm_gdbus_modem_location_get_location (ctx->skeleton),
                                            location_ctx->location_3gpp,
-                                           location_ctx->location_gps_nmea));
+                                           location_ctx->location_gps_nmea,
+                                           location_ctx->location_gps_raw));
         else
             mm_gdbus_modem_location_set_location (
                 ctx->skeleton,
-                build_location_dictionary (NULL, NULL, NULL));
+                build_location_dictionary (NULL, NULL, NULL, NULL));
     }
 
     str = mm_modem_location_source_build_string_from_mask (ctx->sources);
@@ -774,7 +823,8 @@ handle_get_location_auth_ready (MMBaseModem *self,
         ctx->invocation,
         build_location_dictionary (NULL,
                                    location_ctx->location_3gpp,
-                                   location_ctx->location_gps_nmea));
+                                   location_ctx->location_gps_nmea,
+                                   location_ctx->location_gps_raw));
 }
 
 static gboolean
@@ -1242,7 +1292,7 @@ mm_iface_modem_location_initialize (MMIfaceModemLocation *self,
         mm_gdbus_modem_location_set_enabled (skeleton, MM_MODEM_LOCATION_SOURCE_NONE);
         mm_gdbus_modem_location_set_signals_location (skeleton, FALSE);
         mm_gdbus_modem_location_set_location (skeleton,
-                                              build_location_dictionary (NULL, NULL, NULL));
+                                              build_location_dictionary (NULL, NULL, NULL, NULL));
 
         g_object_set (self,
                       MM_IFACE_MODEM_LOCATION_DBUS_SKELETON, skeleton,
