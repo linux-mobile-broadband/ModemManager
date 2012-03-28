@@ -203,31 +203,32 @@ mm_location_gps_raw_get_dictionary (MMLocationGpsRaw *self)
 
     g_return_val_if_fail (MM_IS_LOCATION_GPS_RAW (self), NULL);
 
+    /* If mandatory parameters are not found, return NULL */
+    if (!self->priv->utc_time ||
+        self->priv->longitude == MM_LOCATION_GPS_RAW_LONGITUDE_UNKNOWN ||
+        self->priv->latitude == MM_LOCATION_GPS_RAW_LATITUDE_UNKNOWN)
+        return NULL;
+
     g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
+    g_variant_builder_add (&builder,
+                           "{sv}",
+                           PROPERTY_UTC_TIME,
+                           g_variant_new_string (self->priv->utc_time));
+    g_variant_builder_add (&builder,
+                           "{sv}",
+                           PROPERTY_LONGITUDE,
+                           g_variant_new_double (self->priv->longitude));
+    g_variant_builder_add (&builder,
+                           "{sv}",
+                           PROPERTY_LATITUDE,
+                           g_variant_new_double (self->priv->latitude));
 
-    if (self->priv->utc_time &&
-        self->priv->longitude != MM_LOCATION_GPS_RAW_LONGITUDE_UNKNOWN &&
-        self->priv->latitude != MM_LOCATION_GPS_RAW_LATITUDE_UNKNOWN) {
+    /* Altitude is optional */
+    if (self->priv->altitude != MM_LOCATION_GPS_RAW_ALTITUDE_UNKNOWN)
         g_variant_builder_add (&builder,
                                "{sv}",
-                               PROPERTY_UTC_TIME,
-                               g_variant_new_string (self->priv->utc_time));
-        g_variant_builder_add (&builder,
-                               "{sv}",
-                               PROPERTY_LONGITUDE,
-                               g_variant_new_double (self->priv->longitude));
-        g_variant_builder_add (&builder,
-                               "{sv}",
-                               PROPERTY_LATITUDE,
-                               g_variant_new_double (self->priv->latitude));
-
-        /* Altitude is optional */
-        if (self->priv->altitude != MM_LOCATION_GPS_RAW_ALTITUDE_UNKNOWN)
-            g_variant_builder_add (&builder,
-                                   "{sv}",
-                                   PROPERTY_ALTITUDE,
-                                   g_variant_new_double (self->priv->altitude));
-    }
+                               PROPERTY_ALTITUDE,
+                               g_variant_new_double (self->priv->altitude));
 
     return g_variant_ref_sink (g_variant_builder_end (&builder));
 }
