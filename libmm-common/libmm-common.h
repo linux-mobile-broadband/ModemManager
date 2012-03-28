@@ -32,6 +32,7 @@
 #include "mm-bearer-properties.h"
 #include "mm-bearer-ip-config.h"
 #include "mm-location-3gpp.h"
+#include "mm-location-gps-raw.h"
 #include "mm-location-gps-nmea.h"
 #include "mm-unlock-retries.h"
 #include "mm-network-timezone.h"
