@@ -503,6 +503,7 @@ send_pin_puk_context_complete_and_free (SendPinPukContext *ctx)
     g_simple_async_result_complete (ctx->result);
     g_object_unref (ctx->result);
     g_object_unref (ctx->self);
+    g_free (ctx);
 }
 
 static GError *
