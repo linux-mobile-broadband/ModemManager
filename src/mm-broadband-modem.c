@@ -2093,6 +2093,7 @@ get_next_facility_lock_status (LoadEnabledFacilityLocksContext *ctx)
                                       FALSE,
                                       (GAsyncReadyCallback)clck_single_query_ready,
                                       ctx);
+            g_free (cmd);
             return;
         }
     }
