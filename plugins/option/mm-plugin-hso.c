@@ -56,7 +56,9 @@ grab_port (MMPluginBase *base,
         return NULL;
     }
 
-    /* Build proper devfile path */
+    /* Build proper devfile path
+     * TODO: Why do we need to do this? If this is useful, a comment should be
+     * added explaining why; if it's not useful, let's get rid of it. */
     devfile = g_strdup (g_udev_device_get_device_file (port));
     if (!devfile) {
         if (g_str_equal (subsys, "net")) {
@@ -78,6 +80,7 @@ grab_port (MMPluginBase *base,
             return NULL;
         }
     }
+    g_free (devfile);
 
     sysfs_path = g_udev_device_get_sysfs_path (port);
 
