@@ -50,6 +50,8 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemHso, mm_broadband_modem_hso, MM_TYPE_BRO
 struct _MMBroadbandModemHsoPrivate {
     /* Regex for connected notifications */
     GRegex *_owancall_regex;
+
+    MMModemLocationSource enabled_sources;
 };
 
 /*****************************************************************************/
@@ -316,7 +318,7 @@ parent_load_capabilities_ready (MMIfaceModemLocation *self,
      */
     if (mm_base_modem_peek_port_gps (MM_BASE_MODEM (self)) &&
         mm_base_modem_peek_port_gps_control (MM_BASE_MODEM (self)))
-        sources |= MM_MODEM_LOCATION_SOURCE_GPS_NMEA;
+        sources |= (MM_MODEM_LOCATION_SOURCE_GPS_NMEA | MM_MODEM_LOCATION_SOURCE_GPS_RAW);
 
     /* So we're done, complete */
     g_simple_async_result_set_op_res_gpointer (simple,
@@ -384,15 +386,26 @@ disable_location_gathering (MMIfaceModemLocation *self,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
 {
+    MMBroadbandModemHso *hso = MM_BROADBAND_MODEM_HSO (self);
     GSimpleAsyncResult *result;
+    gboolean stop_gps = FALSE;
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
                                         disable_location_gathering);
 
-    /* We only provide specific disabling for GPS-NMEA sources */
-    if (source & MM_MODEM_LOCATION_SOURCE_GPS_NMEA) {
+    /* Only stop GPS engine if no GPS-related sources enabled */
+    if (source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                  MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
+        hso->priv->enabled_sources &= ~source;
+
+        if (!(hso->priv->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                                            MM_MODEM_LOCATION_SOURCE_GPS_RAW)))
+            stop_gps = TRUE;
+    }
+
+    if (stop_gps) {
         /* We enable continuous GPS fixes with AT_OGPS=0 */
         mm_base_modem_at_command_full (MM_BASE_MODEM (self),
                                        mm_base_modem_peek_port_gps_control (MM_BASE_MODEM (self)),
@@ -405,7 +418,7 @@ disable_location_gathering (MMIfaceModemLocation *self,
         return;
     }
 
-    /* For any other location (e.g. 3GPP), just return */
+    /* For any other location (e.g. 3GPP), or if still some GPS needed, just return */
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
@@ -452,15 +465,26 @@ enable_location_gathering (MMIfaceModemLocation *self,
                            GAsyncReadyCallback callback,
                            gpointer user_data)
 {
+    MMBroadbandModemHso *hso = MM_BROADBAND_MODEM_HSO (self);
     GSimpleAsyncResult *result;
+    gboolean start_gps = FALSE;
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
                                         user_data,
                                         enable_location_gathering);
 
-    /* We only provide specific enabling for GPS-NMEA sources */
-    if (source & MM_MODEM_LOCATION_SOURCE_GPS_NMEA) {
+    /* NMEA and RAW are both enabled in the same way */
+    if (source & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                  MM_MODEM_LOCATION_SOURCE_GPS_RAW)) {
+        /* Only start GPS engine if not done already */
+        if (!(hso->priv->enabled_sources & (MM_MODEM_LOCATION_SOURCE_GPS_NMEA |
+                                            MM_MODEM_LOCATION_SOURCE_GPS_RAW)))
+            start_gps = TRUE;
+        hso->priv->enabled_sources |= source;
+    }
+
+    if (start_gps) {
         /* We enable continuous GPS fixes with AT_OGPS=2 */
         mm_base_modem_at_command_full (MM_BASE_MODEM (self),
                                        mm_base_modem_peek_port_gps_control (MM_BASE_MODEM (self)),
@@ -473,7 +497,7 @@ enable_location_gathering (MMIfaceModemLocation *self,
         return;
     }
 
-    /* For any other location (e.g. 3GPP), just return */
+    /* For any other location (e.g. 3GPP), or if GPS already running just return */
     g_simple_async_result_set_op_res_gboolean (result, TRUE);
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
@@ -569,6 +593,7 @@ mm_broadband_modem_hso_init (MMBroadbandModemHso *self)
 
     self->priv->_owancall_regex = g_regex_new ("_OWANCALL: (\\d),\\s*(\\d)\\r\\n",
                                                G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+    self->priv->enabled_sources = MM_MODEM_LOCATION_SOURCE_NONE;
 }
 
 static void
