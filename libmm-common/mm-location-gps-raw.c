@@ -276,17 +276,17 @@ mm_location_gps_raw_new_from_dictionary (GVariant *dictionary,
 
     /* If any of the mandatory parameters is missing, cleanup */
     if (!self->priv->utc_time ||
-        !self->priv->longitude ||
-        !self->priv->latitude) {
+        self->priv->longitude == MM_LOCATION_GPS_RAW_LONGITUDE_UNKNOWN ||
+        self->priv->latitude == MM_LOCATION_GPS_RAW_LATITUDE_UNKNOWN) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_INVALID_ARGS,
                      "Cannot create GPS RAW location from dictionary: "
                      "mandatory parameters missing "
                      "(utc-time: %s, longitude: %s, latitude: %s)",
-                     self->priv->utc_time ? "yes" : "no",
-                     self->priv->longitude ? "yes" : "no",
-                     self->priv->latitude ? "yes" : "no");
+                     self->priv->utc_time ? "yes" : "missing",
+                     (self->priv->longitude != MM_LOCATION_GPS_RAW_LONGITUDE_UNKNOWN) ? "yes" : "missing",
+                     (self->priv->latitude != MM_LOCATION_GPS_RAW_LATITUDE_UNKNOWN) ? "yes" : "missing");
         g_clear_object (&self);
     }
 
