@@ -175,6 +175,11 @@
               The allowed key/value pairs and their formats are:
             </para>
             <variablelist>
+              <varlistentry><term><literal>"utc-time"</literal></term>
+                <listitem>
+                  (Required) UTC time in ISO 8601 format, given as a string value (signature <literal>"s"</literal>). e.g. <literal>203015</literal>.
+                </listitem>
+              </varlistentry>
               <varlistentry><term><literal>"latitude"</literal></term>
                 <listitem>
                   (Required) Latitude in Decimal Degrees (positive numbers mean N quadrasphere, negative mean S quadrasphere), given as a double value (signature <literal>"d"</literal>). e.g. <literal>38.889722</literal>, meaning 38d 53' 22" N.
@@ -188,16 +193,6 @@
               <varlistentry><term><literal>"altitude"</literal></term>
                 <listitem>
                   (Optional) Altitude above sea level in meters, given as a double value (signature <literal>"d"</literal>). e.g. <literal>33.5</literal>.
-                </listitem>
-              </varlistentry>
-              <varlistentry><term><literal>"horizontal-velocity"</literal></term>
-                <listitem>
-                  (Optional) Horizontal velocity in meters-per-second, given as a double value (signature <literal>"d"</literal>). e.g. <literal>0.5</literal>.
-                </listitem>
-              </varlistentry>
-              <varlistentry><term><literal>"vertical-velocity"</literal></term>
-                <listitem>
-                  (Optional) Vertical velocity in meters-per-second, given as a double value (signature <literal>"d"</literal>). e.g. <literal>0.01</literal>.
                 </listitem>
               </varlistentry>
             </variablelist>
@@ -229,7 +224,7 @@
               </literal></para>
               If the device then sends a <literal>$GPGSA</literal> sentence about 5 seconds later, the
               <literal>$GPGSA</literal> sentence is added to the string (since no <literal>$GPGSA</literal> sentence was
-              literalviously received in this session), the updated string would be:
+              obviously received in this session), the updated string would be:
               <para><literal>
                 $GPRMC,134526.92,V,,,,,,,030136,,,N*76&lt;CR&gt;&lt;LF&gt;$GPGGA,,,,,,0,00,0.5,,M,0.0001999,M,0.0000099,0000*45&lt;CR&gt;&lt;LF&gt;$GPGSA,A,1,,,,,,,,,,,,,1.1,0.5,1.0*34
               </literal></para>
