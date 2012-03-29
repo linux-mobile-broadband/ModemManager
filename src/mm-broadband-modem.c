@@ -5704,6 +5704,46 @@ modem_location_load_capabilities (MMIfaceModemLocation *self,
 }
 
 /*****************************************************************************/
+/* Enable location gathering (Location interface) */
+
+static gboolean
+enable_location_gathering_finish (MMIfaceModemLocation *self,
+                                  GAsyncResult *res,
+                                  GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+enable_location_gathering (MMIfaceModemLocation *self,
+                           MMModemLocationSource source,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        enable_location_gathering);
+
+    /* 3GPP modems need to re-run registration checks, so that we get up to date
+     * LAC/CI location information. Note that we don't care for when the
+     * registration checks get finished. */
+    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self))) {
+        /* Re-run registration to get update LAC/CI */
+        mm_iface_modem_3gpp_run_all_registration_checks (MM_IFACE_MODEM_3GPP (self), NULL, NULL);
+        /* Reload operator, to get MCC/MNC */
+        mm_iface_modem_3gpp_reload_current_operator (MM_IFACE_MODEM_3GPP (self));
+    }
+
+    /* Done we are */
+    g_simple_async_result_set_op_res_gboolean (result, TRUE);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 
 static void
 setup_ports (MMBroadbandModem *self)
@@ -7215,6 +7255,8 @@ iface_modem_location_init (MMIfaceModemLocation *iface)
 {
     iface->load_capabilities = modem_location_load_capabilities;
     iface->load_capabilities_finish = modem_location_load_capabilities_finish;
+    iface->enable_location_gathering = enable_location_gathering;
+    iface->enable_location_gathering_finish = enable_location_gathering_finish;
 }
 
 static void
