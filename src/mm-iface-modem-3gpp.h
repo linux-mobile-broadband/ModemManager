@@ -262,6 +262,9 @@ gboolean mm_iface_modem_3gpp_run_all_registration_checks_finish (MMIfaceModem3gp
                                                                  GAsyncResult *res,
                                                                  GError **error);
 
+/* Request to reload current operator */
+void mm_iface_modem_3gpp_reload_current_operator (MMIfaceModem3gpp *self);
+
 /* Allow registering in the network */
 gboolean mm_iface_modem_3gpp_register_in_network_finish (MMIfaceModem3gpp *self,
                                                          GAsyncResult *res,

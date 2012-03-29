@@ -649,6 +649,45 @@ load_operator_code_ready (MMIfaceModem3gpp *self,
     g_object_unref (skeleton);
 }
 
+void
+mm_iface_modem_3gpp_reload_current_operator (MMIfaceModem3gpp *self)
+{
+    MMModem3gppRegistrationState state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
+    MmGdbusModem3gpp *skeleton = NULL;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, &state,
+                  MM_IFACE_MODEM_3GPP_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    if (state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
+        state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
+        /* Launch operator code update */
+        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_code &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_code_finish)
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_code (
+                self,
+                (GAsyncReadyCallback)load_operator_code_ready,
+                NULL);
+        /* Launch operator name update */
+        if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_name &&
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_name_finish)
+            MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_name (
+                self,
+                (GAsyncReadyCallback)load_operator_name_ready,
+                NULL);
+    } else {
+        mm_gdbus_modem3gpp_set_operator_code (skeleton, NULL);
+        mm_gdbus_modem3gpp_set_operator_name (skeleton, NULL);
+        if (MM_IS_IFACE_MODEM_LOCATION (self))
+            mm_iface_modem_location_3gpp_update_mcc_mnc (MM_IFACE_MODEM_LOCATION (self), 0, 0);
+    }
+
+    g_object_unref (skeleton);
+}
+
+/*****************************************************************************/
+
 static void
 update_registration_state (MMIfaceModem3gpp *self,
                            MMModem3gppRegistrationState new_state,
@@ -677,23 +716,11 @@ update_registration_state (MMIfaceModem3gpp *self,
                       MM_IFACE_MODEM_3GPP_REGISTRATION_STATE, new_state,
                       NULL);
 
+        /* Reload current operator */
+        mm_iface_modem_3gpp_reload_current_operator (self);
+
         if (new_state == MM_MODEM_3GPP_REGISTRATION_STATE_HOME ||
             new_state == MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING) {
-            /* Launch operator code update */
-            if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_code &&
-                MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_code_finish)
-                MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_code (
-                    self,
-                    (GAsyncReadyCallback)load_operator_code_ready,
-                    NULL);
-            /* Launch operator name update */
-            if (MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_name &&
-                MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_name_finish)
-                MM_IFACE_MODEM_3GPP_GET_INTERFACE (self)->load_operator_name (
-                    self,
-                    (GAsyncReadyCallback)load_operator_name_ready,
-                    NULL);
-
             mm_iface_modem_update_subsystem_state (MM_IFACE_MODEM (self),
                                                    SUBSYSTEM_3GPP,
                                                    MM_MODEM_STATE_REGISTERED,
@@ -701,9 +728,6 @@ update_registration_state (MMIfaceModem3gpp *self,
         }
         /* Not registered neither in home nor roaming network */
         else {
-            mm_gdbus_modem3gpp_set_operator_code (skeleton, NULL);
-            mm_gdbus_modem3gpp_set_operator_name (skeleton, NULL);
-
             mm_iface_modem_update_subsystem_state (
                 MM_IFACE_MODEM (self),
                 SUBSYSTEM_3GPP,
