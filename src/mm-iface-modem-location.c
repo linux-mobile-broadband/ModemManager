@@ -454,6 +454,8 @@ enable_location_gathering_ready (MMIfaceModemLocation *self,
     if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->enable_location_gathering_finish (self, res, &error)) {
         gchar *str;
 
+        update_location_source_status (ctx->self, ctx->current, FALSE);
+
         str = mm_modem_location_source_build_string_from_mask (ctx->current);
         g_prefix_error (&error,
                         "Couldn't enable location '%s' gathering: ",
@@ -463,8 +465,6 @@ enable_location_gathering_ready (MMIfaceModemLocation *self,
         g_free (str);
         return;
     }
-
-    update_location_source_status (self, ctx->current, TRUE);
 
     /* Keep on with next ones... */
     ctx->current = ctx->current << 1;
@@ -481,6 +481,9 @@ disable_location_gathering_ready (MMIfaceModemLocation *self,
     if (!MM_IFACE_MODEM_LOCATION_GET_INTERFACE (self)->disable_location_gathering_finish (self, res, &error)) {
         gchar *str;
 
+        /* Back to enabled then */
+        update_location_source_status (ctx->self, ctx->current, TRUE);
+
         str = mm_modem_location_source_build_string_from_mask (ctx->current);
         g_prefix_error (&error,
                         "Couldn't disable location '%s' gathering: ",
@@ -490,8 +493,6 @@ disable_location_gathering_ready (MMIfaceModemLocation *self,
         g_free (str);
         return;
     }
-
-    update_location_source_status (self, ctx->current, FALSE);
 
     /* Keep on with next ones... */
     ctx->current = ctx->current << 1;
@@ -516,6 +517,12 @@ setup_gathering_step (SetupGatheringContext *ctx)
             /* Remove from mask */
             ctx->to_enable &= ~ctx->current;
 
+            /* We update the location source status before launching the
+             * specific actions to enable the gathering, so that we are
+             * able to get location updates while the gathering gets
+             * enabled. */
+            update_location_source_status (ctx->self, ctx->current, TRUE);
+
             /* Plugins can run custom actions to enable location gathering */
             if (MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->enable_location_gathering &&
                 MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->enable_location_gathering_finish) {
@@ -527,14 +534,14 @@ setup_gathering_step (SetupGatheringContext *ctx)
                 return;
             }
 
-            update_location_source_status (ctx->self, ctx->current, TRUE);
-
             source_str = mm_modem_location_source_build_string_from_mask (ctx->current);
             mm_dbg ("Enabled location '%s' gathering...", source_str);
             g_free (source_str);
         } else if (ctx->to_disable & ctx->current) {
             /* Remove from mask */
             ctx->to_disable &= ~ctx->current;
+
+            update_location_source_status (ctx->self, ctx->current, FALSE);
 
             /* Plugins can run custom actions to disable location gathering */
             if (MM_IFACE_MODEM_LOCATION_GET_INTERFACE (ctx->self)->disable_location_gathering &&
@@ -546,8 +553,6 @@ setup_gathering_step (SetupGatheringContext *ctx)
                     ctx);
                 return;
             }
-
-            update_location_source_status (ctx->self, ctx->current, FALSE);
 
             source_str = mm_modem_location_source_build_string_from_mask (ctx->current);
             mm_dbg ("Disabled location '%s' gathering...", source_str);
