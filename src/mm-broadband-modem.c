@@ -155,7 +155,6 @@ struct _MMBroadbandModemPrivate {
     /*<--- Modem Location interface --->*/
     /* Properties */
     GObject *modem_location_dbus_skeleton;
-    GVariant *modem_location_dictionary;
 
     /*<--- Modem Messaging interface --->*/
     /* Properties */
