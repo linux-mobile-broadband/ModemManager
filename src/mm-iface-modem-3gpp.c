@@ -579,7 +579,6 @@ load_operator_name_ready (MMIfaceModem3gpp *self,
     if (error) {
         mm_warn ("Couldn't load Operator Name: '%s'", error->message);
         g_error_free (error);
-        return;
     }
 
     g_object_get (self,
@@ -630,7 +629,6 @@ load_operator_code_ready (MMIfaceModem3gpp *self,
     if (error) {
         mm_warn ("Couldn't load Operator Code: '%s'", error->message);
         g_error_free (error);
-        return;
     }
 
     g_object_get (self,
@@ -639,14 +637,12 @@ load_operator_code_ready (MMIfaceModem3gpp *self,
     mm_gdbus_modem3gpp_set_operator_code (skeleton, str);
 
     /* If we also implement the location interface, update the 3GPP location */
-    if (MM_IS_IFACE_MODEM_LOCATION (self)) {
+    if (str && MM_IS_IFACE_MODEM_LOCATION (self)) {
         guint mcc = 0;
         guint mnc = 0;
 
         if (parse_mcc_mnc (str, &mcc, &mnc))
-            mm_iface_modem_location_3gpp_update_mcc_mnc (MM_IFACE_MODEM_LOCATION (self),
-                                                         mcc,
-                                                         mnc);
+            mm_iface_modem_location_3gpp_update_mcc_mnc (MM_IFACE_MODEM_LOCATION (self), mcc, mnc);
     }
 
     g_free (str);
