@@ -671,36 +671,14 @@ mm_manager_start (MMManager *manager)
     mm_dbg ("Finished device scan...");
 }
 
-typedef struct {
-    MMManager *manager;
-    MMBaseModem *modem;
-} RemoveInfo;
-
-static gboolean
-remove_disable_one (RemoveInfo *info)
-{
-    remove_modem (info->manager, info->modem);
-    g_free (info);
-    return FALSE;
-}
-
 static void
 remove_disable_ready (MMBaseModem *modem,
                       GAsyncResult *res,
                       MMManager *self)
 {
-    RemoveInfo *info;
-
     /* We don't care about errors disabling at this point */
     mm_base_modem_disable_finish (modem, res, NULL);
-
-    /* Schedule modem removal from an idle handler since we get here deep
-     * in the modem removal callchain and can't remove it quite yet from here.
-     */
-    info = g_malloc0 (sizeof (RemoveInfo));
-    info->manager = self;
-    info->modem = modem;
-    g_idle_add ((GSourceFunc)remove_disable_one, info);
+    remove_modem (self, modem);
 }
 
 static void
