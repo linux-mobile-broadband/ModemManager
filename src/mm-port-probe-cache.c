@@ -29,6 +29,13 @@ get_key (GUdevDevice *port)
                             g_udev_device_get_name (port));
 }
 
+static void
+probe_remove (MMPortProbe *probe)
+{
+    mm_port_probe_run_cancel (probe);
+    g_object_unref (probe);
+}
+
 MMPortProbe *
 mm_port_probe_cache_get (GUdevDevice *port,
                          const gchar *physdev_path,
@@ -43,7 +50,7 @@ mm_port_probe_cache_get (GUdevDevice *port,
         cache = g_hash_table_new_full (g_str_hash,
                                        g_str_equal,
                                        g_free,
-                                       g_object_unref);
+                                       (GDestroyNotify)probe_remove);
     } else {
         probe = g_hash_table_lookup (cache, key);
     }
@@ -51,30 +58,30 @@ mm_port_probe_cache_get (GUdevDevice *port,
     if (!probe) {
         probe = mm_port_probe_new (port, physdev_path, driver);
         g_hash_table_insert (cache, key, probe);
-        key = NULL;
-    }
+    } else
+        g_free (key);
 
-    g_free (key);
     return g_object_ref (probe);
 }
 
 void
 mm_port_probe_cache_remove (GUdevDevice *port)
 {
-    MMPortProbe *probe = NULL;
     gchar *key;
 
     if (G_UNLIKELY (!cache))
         return;
 
     key = get_key (port);
-    probe = g_hash_table_lookup (cache, key);
-    if (probe) {
-        mm_port_probe_run_cancel (probe);
-        g_object_unref (probe);
-    }
     g_hash_table_remove (cache, key);
     g_free (key);
 }
 
+void
+mm_port_probe_cache_clear (void)
+{
+    if (G_UNLIKELY (!cache))
+        return;
 
+    g_hash_table_remove_all (cache);
+}

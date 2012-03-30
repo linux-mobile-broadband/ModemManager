@@ -713,7 +713,6 @@ mm_manager_shutdown (MMManager *self)
     /* Cancel all ongoing auth requests */
     g_cancellable_cancel (self->priv->authp_cancellable);
 
-
     modems = g_hash_table_get_values (self->priv->modems);
     for (iter = modems; iter; iter = g_list_next (iter)) {
         MMBaseModem *modem = MM_BASE_MODEM (iter->data);
@@ -974,6 +973,8 @@ finalize (GObject *object)
     MMManagerPrivate *priv = MM_MANAGER (object)->priv;
 
     g_hash_table_destroy (priv->modems);
+
+    mm_port_probe_cache_clear ();
 
     if (priv->udev)
         g_object_unref (priv->udev);
