@@ -677,53 +677,50 @@ typedef struct {
 } RemoveInfo;
 
 static gboolean
-remove_disable_one (gpointer user_data)
+remove_disable_one (RemoveInfo *info)
 {
-    RemoveInfo *info = user_data;
-
     remove_modem (info->manager, info->modem);
     g_free (info);
     return FALSE;
 }
 
 static void
-remove_disable_done (MMBaseModem *modem,
-                     GError *error,
-                     gpointer user_data)
+remove_disable_ready (MMBaseModem *modem,
+                      GAsyncResult *res,
+                      MMManager *self)
 {
     RemoveInfo *info;
+
+    /* We don't care about errors disabling at this point */
+    mm_base_modem_disable_finish (modem, res, NULL);
 
     /* Schedule modem removal from an idle handler since we get here deep
      * in the modem removal callchain and can't remove it quite yet from here.
      */
     info = g_malloc0 (sizeof (RemoveInfo));
-    info->manager = MM_MANAGER (user_data);
+    info->manager = self;
     info->modem = modem;
-    g_idle_add (remove_disable_one, info);
+    g_idle_add ((GSourceFunc)remove_disable_one, info);
+}
+
+static void
+foreach_disable (gpointer key,
+                 MMBaseModem *modem,
+                 MMManager *self)
+{
+    mm_base_modem_disable (modem, (GAsyncReadyCallback)remove_disable_ready, self);
 }
 
 void
 mm_manager_shutdown (MMManager *self)
 {
-    GList *modems, *iter;
-
     g_return_if_fail (self != NULL);
     g_return_if_fail (MM_IS_MANAGER (self));
 
     /* Cancel all ongoing auth requests */
     g_cancellable_cancel (self->priv->authp_cancellable);
 
-    modems = g_hash_table_get_values (self->priv->modems);
-    for (iter = modems; iter; iter = g_list_next (iter)) {
-        MMBaseModem *modem = MM_BASE_MODEM (iter->data);
-
-        /* TODO */
-        /* if (mm_modem_get_state (modem) >= MM_MODEM_STATE_ENABLING) */
-        /*     mm_modem_disable (modem, remove_disable_done, self); */
-        /* else */
-        remove_disable_done (modem, NULL, self);
-    }
-    g_list_free (modems);
+    g_hash_table_foreach (self->priv->modems, (GHFunc)foreach_disable, self);
 
     /* Disabling may take a few iterations of the mainloop, so the caller
      * has to iterate the mainloop until all devices have been disabled and

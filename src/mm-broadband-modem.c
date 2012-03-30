@@ -6071,15 +6071,13 @@ disable (MMBaseModem *self,
     switch (MM_BROADBAND_MODEM (self)->priv->modem_state) {
     case MM_MODEM_STATE_UNKNOWN:
     case MM_MODEM_STATE_FAILED:
-        /* We should never have a UNKNOWN|FAILED->DISABLED transition requested by
-         * the user. */
-        g_assert_not_reached ();
-        break;
-
     case MM_MODEM_STATE_INITIALIZING:
     case MM_MODEM_STATE_LOCKED:
     case MM_MODEM_STATE_DISABLED:
-        /* Just return success, don't relaunch disabling */
+        /* Just return success, don't relaunch disabling.
+         * Note that we do consider here UNKNOWN and FAILED status on purpose,
+         * as the MMManager will try to disable every modem before removing
+         * it. */
         g_simple_async_result_set_op_res_gboolean (result, TRUE);
         break;
 
