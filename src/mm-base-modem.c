@@ -287,6 +287,12 @@ mm_base_modem_release_port (MMBaseModem *self,
     if (port == (MMPort *)self->priv->qcdm)
         g_clear_object (&self->priv->qcdm);
 
+    if (port == (MMPort *)self->priv->gps_control)
+        g_clear_object (&self->priv->gps_control);
+
+    if (port == (MMPort *)self->priv->gps)
+        g_clear_object (&self->priv->gps);
+
     /* Remove it from the tracking HT */
     mm_dbg ("(%s/%s) type %s released from %s",
             subsys,
