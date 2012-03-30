@@ -172,8 +172,8 @@
         The modem's state (see #org.freedesktop.ModemManager1.Modem:State) changed.
     -->
     <signal name="StateChanged">
-      <arg name="old"    type="u" />
-      <arg name="new"    type="u" />
+      <arg name="old"    type="i" />
+      <arg name="new"    type="i" />
       <arg name="reason" type="u" />
     </signal>
 
@@ -333,7 +333,7 @@
         <link linkend="MM-MODEM-STATE-UNKNOWN:CAPS"><constant>MM_MODEM_STATE_UNKNOWN</constant></link>
         will be reported.
     -->
-    <property name="State" type="u" access="read" />
+    <property name="State" type="i" access="read" />
 
     <!--
         AccessTechnologies:

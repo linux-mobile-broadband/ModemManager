@@ -188,8 +188,10 @@ handle_register_auth_ready (MMBaseModem *self,
                   NULL);
 
     switch (modem_state) {
+    case MM_MODEM_STATE_FAILED:
     case MM_MODEM_STATE_UNKNOWN:
-        /* We should never have a UNKNOWN->REGISTERED transition */
+    case MM_MODEM_STATE_LOCKED:
+        /* We should never have such request (interface wasn't exported yet) */
         g_assert_not_reached ();
         break;
 
@@ -199,13 +201,6 @@ handle_register_auth_ready (MMBaseModem *self,
                                                MM_CORE_ERROR_WRONG_STATE,
                                                "Cannot register modem: "
                                                "device not fully initialized yet");
-        handle_register_context_free (ctx);
-        return;
-
-    case MM_MODEM_STATE_LOCKED:
-        /* We should never have such request in LOCKED state
-         * (interface wasn't exported yet) */
-        g_assert_not_reached ();
         break;
 
     case MM_MODEM_STATE_ENABLED:
@@ -381,8 +376,10 @@ handle_scan_auth_ready (MMBaseModem *self,
                   NULL);
 
     switch (modem_state) {
+    case MM_MODEM_STATE_FAILED:
     case MM_MODEM_STATE_UNKNOWN:
-        /* We should never have such request in UNKNOWN state */
+    case MM_MODEM_STATE_LOCKED:
+        /* We should never have such request (interface wasn't exported yet) */
         g_assert_not_reached ();
         break;
 
@@ -392,13 +389,6 @@ handle_scan_auth_ready (MMBaseModem *self,
                                                MM_CORE_ERROR_WRONG_STATE,
                                                "Cannot scan networks: "
                                                "device not fully initialized yet");
-        handle_scan_context_free (ctx);
-        return;
-
-    case MM_MODEM_STATE_LOCKED:
-        /* We should never have such request in LOCKED state
-         * (interface wasn't exported yet) */
-        g_assert_not_reached ();
         break;
 
     case MM_MODEM_STATE_DISABLED:

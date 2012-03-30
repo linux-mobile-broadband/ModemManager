@@ -6070,7 +6070,8 @@ disable (MMBaseModem *self,
     /* Check state before launching modem disabling */
     switch (MM_BROADBAND_MODEM (self)->priv->modem_state) {
     case MM_MODEM_STATE_UNKNOWN:
-        /* We should never have a UNKNOWN->DISABLED transition requested by
+    case MM_MODEM_STATE_FAILED:
+        /* We should never have a UNKNOWN|FAILED->DISABLED transition requested by
          * the user. */
         g_assert_not_reached ();
         break;
@@ -6078,7 +6079,7 @@ disable (MMBaseModem *self,
     case MM_MODEM_STATE_INITIALIZING:
     case MM_MODEM_STATE_LOCKED:
     case MM_MODEM_STATE_DISABLED:
-        /* Just return success, don't relaunch enabling */
+        /* Just return success, don't relaunch disabling */
         g_simple_async_result_set_op_res_gboolean (result, TRUE);
         break;
 
@@ -6350,7 +6351,8 @@ enable (MMBaseModem *self,
     /* Check state before launching modem enabling */
     switch (MM_BROADBAND_MODEM (self)->priv->modem_state) {
     case MM_MODEM_STATE_UNKNOWN:
-        /* We should never have a UNKNOWN->ENABLED transition */
+    case MM_MODEM_STATE_FAILED:
+        /* We should never have a UNKNOWN|FAILED->ENABLED transition */
         g_assert_not_reached ();
         break;
 
@@ -6420,7 +6422,6 @@ typedef enum {
     INITIALIZE_STEP_PRIMARY_OPEN,
     INITIALIZE_STEP_SETUP_SIMPLE_STATUS,
     INITIALIZE_STEP_IFACE_MODEM,
-    INITIALIZE_STEP_ABORT_IF_LOCKED,
     INITIALIZE_STEP_IFACE_3GPP,
     INITIALIZE_STEP_IFACE_3GPP_USSD,
     INITIALIZE_STEP_IFACE_CDMA,
@@ -6440,7 +6441,6 @@ typedef struct {
     InitializeStep step;
     MMAtSerialPort *port;
     gboolean close_port;
-    gboolean abort_if_locked;
 } InitializeContext;
 
 static void initialize_step (InitializeContext *ctx);
@@ -6486,6 +6486,49 @@ initialize_finish (MMBaseModem *self,
     return TRUE;
 }
 
+static void
+iface_modem_initialize_ready (MMBroadbandModem *self,
+                              GAsyncResult *result,
+                              InitializeContext *ctx)
+{
+    GError *error = NULL;
+
+    /* If the modem interface fails to get initialized, we will move the modem
+     * to a FAILED state. Note that in this case we still export the interface. */
+    if (!mm_iface_modem_initialize_finish (MM_IFACE_MODEM (self), result, &error)) {
+        /* Report the new FAILED state */
+        mm_warn ("Modem couldn't be initialized: %s", error->message);
+        g_error_free (error);
+
+        mm_iface_modem_update_state (MM_IFACE_MODEM (self),
+                                     MM_MODEM_STATE_FAILED,
+                                     MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+
+        /* Just jump to the last step */
+        ctx->step = INITIALIZE_STEP_LAST;
+        initialize_step (ctx);
+        return;
+    }
+
+    /* bind simple properties */
+    mm_iface_modem_bind_simple_status (MM_IFACE_MODEM (self),
+                                       self->priv->modem_simple_status);
+
+    /* If we find ourselves in a LOCKED state, we shouldn't keep on
+     * the initialization sequence. Instead, we will re-initialize once
+     * we are unlocked. */
+    if (ctx->self->priv->modem_state == MM_MODEM_STATE_LOCKED) {
+        /* Jump to the Simple interface */
+        ctx->step = INITIALIZE_STEP_IFACE_SIMPLE;
+        initialize_step (ctx);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    initialize_step (ctx);
+}
+
 #undef INTERFACE_INIT_READY_FN
 #define INTERFACE_INIT_READY_FN(NAME,TYPE,FATAL_ERRORS)                 \
     static void                                                         \
@@ -6495,24 +6538,31 @@ initialize_finish (MMBaseModem *self,
     {                                                                   \
         GError *error = NULL;                                           \
                                                                         \
-        if (!mm_##NAME##_initialize_finish (TYPE (self),                \
-                                            result,                     \
-                                            &error)) {                  \
+        if (!mm_##NAME##_initialize_finish (TYPE (self), result, &error)) { \
             if (FATAL_ERRORS) {                                         \
-                g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (ctx->result), error); \
-                initialize_context_complete_and_free (ctx);             \
+                mm_warn ("Couldn't initialize interface: '%s'",         \
+                         error->message);                               \
+                g_error_free (error);                                   \
+                                                                        \
+                /* Report the new FAILED state */                       \
+                mm_iface_modem_update_state (MM_IFACE_MODEM (self),     \
+                                             MM_MODEM_STATE_FAILED,     \
+                                             MM_MODEM_STATE_CHANGE_REASON_UNKNOWN); \
+                                                                        \
+                /* Just jump to the last step */                        \
+                ctx->step = INITIALIZE_STEP_LAST;                       \
+                initialize_step (ctx);                                  \
                 return;                                                 \
             }                                                           \
                                                                         \
             mm_dbg ("Couldn't initialize interface: '%s'",              \
                     error->message);                                    \
-            /* Just shutdown the interface */                           \
+            /* Just shutdown this interface */                          \
             mm_##NAME##_shutdown (TYPE (self));                         \
             g_error_free (error);                                       \
         } else {                                                        \
             /* bind simple properties */                                \
-            mm_##NAME##_bind_simple_status (TYPE (self),                \
-                                            self->priv->modem_simple_status); \
+            mm_##NAME##_bind_simple_status (TYPE (self), self->priv->modem_simple_status); \
         }                                                               \
                                                                         \
         /* Go on to next step */                                        \
@@ -6520,7 +6570,6 @@ initialize_finish (MMBaseModem *self,
         initialize_step (ctx);                                          \
     }
 
-INTERFACE_INIT_READY_FN (iface_modem,           MM_IFACE_MODEM,           TRUE)
 INTERFACE_INIT_READY_FN (iface_modem_3gpp,      MM_IFACE_MODEM_3GPP,      TRUE)
 INTERFACE_INIT_READY_FN (iface_modem_3gpp_ussd, MM_IFACE_MODEM_3GPP_USSD, FALSE)
 INTERFACE_INIT_READY_FN (iface_modem_cdma,      MM_IFACE_MODEM_CDMA,      TRUE)
@@ -6586,6 +6635,7 @@ initialize_step (InitializeContext *ctx)
         /* Fall down to next step */
         ctx->step++;
     }
+
     case INITIALIZE_STEP_SETUP_SIMPLE_STATUS:
         /* Simple status must be created before any interface initialization,
          * so that interfaces add and bind the properties they want to export.
@@ -6602,20 +6652,6 @@ initialize_step (InitializeContext *ctx)
                                    (GAsyncReadyCallback)iface_modem_initialize_ready,
                                    ctx);
         return;
-
-    case INITIALIZE_STEP_ABORT_IF_LOCKED:
-        /* If we find ourselves in a LOCKED state, we shouldn't keep on
-         * the initialization sequence. Instead, we will re-initialize once
-         * we are unlocked. */
-        if (ctx->self->priv->modem_state == MM_MODEM_STATE_LOCKED) {
-            /* Jump to the Simple interface */
-            ctx->abort_if_locked = TRUE;
-            ctx->step = INITIALIZE_STEP_IFACE_SIMPLE;
-            initialize_step (ctx);
-            return;
-        }
-        /* Fall down to next step */
-        ctx->step++;
 
     case INITIALIZE_STEP_IFACE_3GPP:
         if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (ctx->self))) {
@@ -6691,23 +6727,43 @@ initialize_step (InitializeContext *ctx)
         ctx->step++;
 
     case INITIALIZE_STEP_LAST:
-        if (ctx->abort_if_locked) {
+        if (ctx->self->priv->modem_state == MM_MODEM_STATE_FAILED) {
+            /* Fatal SIM failure :-( */
+            g_simple_async_result_set_error (ctx->result,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_WRONG_STATE,
+                                             "Modem is unusable, "
+                                             "cannot fully initialize");
+            /* Ensure we only leave the Modem interface around */
+            mm_iface_modem_3gpp_shutdown (MM_IFACE_MODEM_3GPP (ctx->self));
+            mm_iface_modem_3gpp_ussd_shutdown (MM_IFACE_MODEM_3GPP_USSD (ctx->self));
+            mm_iface_modem_cdma_shutdown (MM_IFACE_MODEM_CDMA (ctx->self));
+            mm_iface_modem_location_shutdown (MM_IFACE_MODEM_LOCATION (ctx->self));
+            mm_iface_modem_messaging_shutdown (MM_IFACE_MODEM_MESSAGING (ctx->self));
+            mm_iface_modem_time_shutdown (MM_IFACE_MODEM_TIME (ctx->self));
+            mm_iface_modem_simple_shutdown (MM_IFACE_MODEM_SIMPLE (ctx->self));
+            initialize_context_complete_and_free (ctx);
+            return;
+        }
+
+        if (ctx->self->priv->modem_state == MM_MODEM_STATE_LOCKED) {
             /* We're locked :-/ */
             g_simple_async_result_set_error (ctx->result,
                                              MM_CORE_ERROR,
                                              MM_CORE_ERROR_WRONG_STATE,
                                              "Modem is currently locked, "
                                              "cannot fully initialize");
-        } else {
-            /* All initialized without errors!
-             * Set as disabled (a.k.a. initialized) */
-            mm_iface_modem_update_state (MM_IFACE_MODEM (ctx->self),
-                                         MM_MODEM_STATE_DISABLED,
-                                         MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
-
-            g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (ctx->result), TRUE);
+            initialize_context_complete_and_free (ctx);
+            return;
         }
 
+        /* All initialized without errors!
+         * Set as disabled (a.k.a. initialized) */
+        mm_iface_modem_update_state (MM_IFACE_MODEM (ctx->self),
+                                     MM_MODEM_STATE_DISABLED,
+                                     MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+
+        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (ctx->result), TRUE);
         initialize_context_complete_and_free (ctx);
         return;
     }
@@ -6727,6 +6783,15 @@ initialize (MMBaseModem *self,
 
     /* Check state before launching modem initialization */
     switch (MM_BROADBAND_MODEM (self)->priv->modem_state) {
+    case MM_MODEM_STATE_FAILED:
+        /* NOTE: this will only happen if we ever support hot-plugging SIMs */
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_WRONG_STATE,
+                                         "Cannot initialize modem: "
+                                         "device is unusable");
+        break;
+
     case MM_MODEM_STATE_UNKNOWN:
     case MM_MODEM_STATE_LOCKED: {
         InitializeContext *ctx;

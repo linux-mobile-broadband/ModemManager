@@ -92,6 +92,7 @@ typedef enum { /*< underscore_name=mm_modem_lock >*/
 
 /**
  * MMModemState:
+ * @MM_MODEM_STATE_FAILED: The modem is unusable.
  * @MM_MODEM_STATE_UNKNOWN: State unknown or not reportable.
  * @MM_MODEM_STATE_INITIALIZING: The modem is currently being initialized.
  * @MM_MODEM_STATE_LOCKED: The modem needs to be unlocked.
@@ -108,6 +109,7 @@ typedef enum { /*< underscore_name=mm_modem_lock >*/
  * Enumeration of possible modem states.
  */
 typedef enum { /*< underscore_name=mm_modem_state >*/
+    MM_MODEM_STATE_FAILED        = -1,
     MM_MODEM_STATE_UNKNOWN       = 0,
     MM_MODEM_STATE_INITIALIZING  = 1,
     MM_MODEM_STATE_LOCKED        = 2,

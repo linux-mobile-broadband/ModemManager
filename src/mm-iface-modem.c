@@ -1286,31 +1286,18 @@ handle_reset_auth_ready (MMBaseModem *self,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
 
-    switch (modem_state) {
-    case MM_MODEM_STATE_UNKNOWN:
-    case MM_MODEM_STATE_INITIALIZING:
-    case MM_MODEM_STATE_LOCKED:
+    if (modem_state < MM_MODEM_STATE_DISABLED) {
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
                                                "Cannot reset modem: not initialized/unlocked yet");
         handle_reset_context_free (ctx);
         return;
-
-    case MM_MODEM_STATE_DISABLED:
-    case MM_MODEM_STATE_DISABLING:
-    case MM_MODEM_STATE_ENABLING:
-    case MM_MODEM_STATE_ENABLED:
-    case MM_MODEM_STATE_SEARCHING:
-    case MM_MODEM_STATE_REGISTERED:
-    case MM_MODEM_STATE_DISCONNECTING:
-    case MM_MODEM_STATE_CONNECTING:
-    case MM_MODEM_STATE_CONNECTED:
-        MM_IFACE_MODEM_GET_INTERFACE (self)->reset (MM_IFACE_MODEM (self),
-                                                    (GAsyncReadyCallback)handle_reset_ready,
-                                                    ctx);
-        break;
     }
+
+    MM_IFACE_MODEM_GET_INTERFACE (self)->reset (MM_IFACE_MODEM (self),
+                                                (GAsyncReadyCallback)handle_reset_ready,
+                                                ctx);
 }
 
 static gboolean
@@ -1399,10 +1386,7 @@ handle_factory_reset_auth_ready (MMBaseModem *self,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
 
-    switch (modem_state) {
-    case MM_MODEM_STATE_UNKNOWN:
-    case MM_MODEM_STATE_INITIALIZING:
-    case MM_MODEM_STATE_LOCKED:
+    if (modem_state < MM_MODEM_STATE_DISABLED) {
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
@@ -1410,22 +1394,12 @@ handle_factory_reset_auth_ready (MMBaseModem *self,
                                                "not initialized/unlocked yet");
         handle_factory_reset_context_free (ctx);
         return;
-
-    case MM_MODEM_STATE_DISABLED:
-    case MM_MODEM_STATE_DISABLING:
-    case MM_MODEM_STATE_ENABLING:
-    case MM_MODEM_STATE_ENABLED:
-    case MM_MODEM_STATE_SEARCHING:
-    case MM_MODEM_STATE_REGISTERED:
-    case MM_MODEM_STATE_DISCONNECTING:
-    case MM_MODEM_STATE_CONNECTING:
-    case MM_MODEM_STATE_CONNECTED:
-        MM_IFACE_MODEM_GET_INTERFACE (self)->factory_reset (MM_IFACE_MODEM (self),
-                                                            ctx->code,
-                                                            (GAsyncReadyCallback)handle_factory_reset_ready,
-                                                            ctx);
-        break;
     }
+
+    MM_IFACE_MODEM_GET_INTERFACE (self)->factory_reset (MM_IFACE_MODEM (self),
+                                                        ctx->code,
+                                                        (GAsyncReadyCallback)handle_factory_reset_ready,
+                                                        ctx);
 }
 
 static gboolean
@@ -1649,6 +1623,7 @@ handle_set_bands_auth_ready (MMBaseModem *self,
                              GAsyncResult *res,
                              HandleSetBandsContext *ctx)
 {
+    GArray *bands_array;
     MMModemState modem_state;
     GError *error = NULL;
 
@@ -1663,10 +1638,7 @@ handle_set_bands_auth_ready (MMBaseModem *self,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
 
-    switch (modem_state) {
-    case MM_MODEM_STATE_UNKNOWN:
-    case MM_MODEM_STATE_INITIALIZING:
-    case MM_MODEM_STATE_LOCKED:
+    if (modem_state < MM_MODEM_STATE_DISABLED) {
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
@@ -1674,27 +1646,14 @@ handle_set_bands_auth_ready (MMBaseModem *self,
                                                "not initialized/unlocked yet");
         handle_set_bands_context_free (ctx);
         return;
-
-    case MM_MODEM_STATE_DISABLED:
-    case MM_MODEM_STATE_DISABLING:
-    case MM_MODEM_STATE_ENABLING:
-    case MM_MODEM_STATE_ENABLED:
-    case MM_MODEM_STATE_SEARCHING:
-    case MM_MODEM_STATE_REGISTERED:
-    case MM_MODEM_STATE_DISCONNECTING:
-    case MM_MODEM_STATE_CONNECTING:
-    case MM_MODEM_STATE_CONNECTED: {
-        GArray *bands_array;
-
-        bands_array = mm_common_bands_variant_to_garray (ctx->bands);
-        mm_iface_modem_set_bands (MM_IFACE_MODEM (self),
-                                  bands_array,
-                                  (GAsyncReadyCallback)handle_set_bands_ready,
-                                  ctx);
-        g_array_unref (bands_array);
-        break;
-      }
     }
+
+    bands_array = mm_common_bands_variant_to_garray (ctx->bands);
+    mm_iface_modem_set_bands (MM_IFACE_MODEM (self),
+                              bands_array,
+                              (GAsyncReadyCallback)handle_set_bands_ready,
+                              ctx);
+    g_array_unref (bands_array);
 }
 
 static gboolean
@@ -1919,10 +1878,7 @@ handle_set_allowed_modes_auth_ready (MMBaseModem *self,
                   MM_IFACE_MODEM_STATE, &modem_state,
                   NULL);
 
-    switch (modem_state) {
-    case MM_MODEM_STATE_UNKNOWN:
-    case MM_MODEM_STATE_INITIALIZING:
-    case MM_MODEM_STATE_LOCKED:
+    if (modem_state < MM_MODEM_STATE_DISABLED) {
         g_dbus_method_invocation_return_error (ctx->invocation,
                                                MM_CORE_ERROR,
                                                MM_CORE_ERROR_WRONG_STATE,
@@ -1930,23 +1886,13 @@ handle_set_allowed_modes_auth_ready (MMBaseModem *self,
                                                "not initialized/unlocked yet");
         handle_set_allowed_modes_context_free (ctx);
         return;
-
-    case MM_MODEM_STATE_DISABLED:
-    case MM_MODEM_STATE_DISABLING:
-    case MM_MODEM_STATE_ENABLING:
-    case MM_MODEM_STATE_ENABLED:
-    case MM_MODEM_STATE_SEARCHING:
-    case MM_MODEM_STATE_REGISTERED:
-    case MM_MODEM_STATE_DISCONNECTING:
-    case MM_MODEM_STATE_CONNECTING:
-    case MM_MODEM_STATE_CONNECTED:
-        mm_iface_modem_set_allowed_modes (MM_IFACE_MODEM (self),
-                                          ctx->allowed,
-                                          ctx->preferred,
-                                          (GAsyncReadyCallback)handle_set_allowed_modes_ready,
-                                          ctx);
-        break;
     }
+
+    mm_iface_modem_set_allowed_modes (MM_IFACE_MODEM (self),
+                                      ctx->allowed,
+                                      ctx->preferred,
+                                      (GAsyncReadyCallback)handle_set_allowed_modes_ready,
+                                      ctx);
 }
 
 static gboolean
@@ -2075,9 +2021,8 @@ mm_iface_modem_unlock_check_finish (MMIfaceModem *self,
                                     GAsyncResult *res,
                                     GError **error)
 {
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error)) {
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
         return MM_MODEM_LOCK_UNKNOWN;
-    }
 
     return (MMModemLock) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
 }
@@ -2111,7 +2056,8 @@ unlock_check_ready (MMIfaceModem *self,
                                                                              &error);
     if (error) {
         /* Treat several SIM related, serial and other core errors as critical
-         * and abort the checks. */
+         * and abort the checks. These will end up moving the modem to a FAILED
+         * state. */
         if (error->domain == MM_SERIAL_ERROR ||
             g_error_matches (error,
                              MM_CORE_ERROR,
@@ -3014,6 +2960,7 @@ struct _InitializationContext {
     GSimpleAsyncResult *result;
     GCancellable *cancellable;
     MmGdbusModem *skeleton;
+    GError *fatal_error;
 };
 
 static InitializationContext *
@@ -3042,6 +2989,7 @@ initialization_context_new (MMIfaceModem *self,
 static void
 initialization_context_complete_and_free (InitializationContext *ctx)
 {
+    g_assert (ctx->fatal_error == NULL);
     g_simple_async_result_complete_in_idle (ctx->result);
     g_object_unref (ctx->cancellable);
     g_object_unref (ctx->self);
@@ -3116,22 +3064,23 @@ load_current_capabilities_ready (MMIfaceModem *self,
                                  GAsyncResult *res,
                                  InitializationContext *ctx)
 {
-    GError *error = NULL;
-
     /* We have the property in the interface bound to the property in the
      * skeleton. */
     g_object_set (self,
                   MM_IFACE_MODEM_CURRENT_CAPABILITIES,
-                  MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_capabilities_finish (self, res, &error),
+                  MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_capabilities_finish (self,
+                                                                                         res,
+                                                                                         &ctx->fatal_error),
                   NULL);
+    if (ctx->fatal_error) {
+        g_prefix_error (&ctx->fatal_error,
+                        "couldn't load Current Capabilities: ");
+        /* Jump to the last step */
+        ctx->step = INITIALIZATION_STEP_LAST;
+    } else
+        /* Go on to next step */
+        ctx->step++;
 
-    if (error) {
-        mm_warn ("couldn't load Current Capabilities: '%s'", error->message);
-        g_error_free (error);
-    }
-
-    /* Go on to next step */
-    ctx->step++;
     interface_initialization_step (ctx);
 }
 
@@ -3222,20 +3171,17 @@ load_unlock_required_ready (MMIfaceModem *self,
                             GAsyncResult *res,
                             InitializationContext *ctx)
 {
-    GError *error = NULL;
-
     /* NOTE: we already propagated the lock state, no need to do it again */
-    mm_iface_modem_unlock_check_finish (self, res, &error);
-    if (error) {
-        /* FATAL */
-        mm_warn ("couldn't load unlock required status: '%s'", error->message);
-        g_simple_async_result_take_error (ctx->result, error);
-        initialization_context_complete_and_free (ctx);
-        return;
-    }
+    mm_iface_modem_unlock_check_finish (self, res, &ctx->fatal_error);
+    if (ctx->fatal_error) {
+        g_prefix_error (&ctx->fatal_error,
+                        "Couldn't check unlock status: ");
+        /* Jump to the last step */
+        ctx->step = INITIALIZATION_STEP_LAST;
+    } else
+        /* Go on to next step */
+        ctx->step++;
 
-    /* Go on to next step */
-    ctx->step++;
     interface_initialization_step (ctx);
 }
 
@@ -3612,51 +3558,54 @@ interface_initialization_step (InitializationContext *ctx)
     }
 
     case INITIALIZATION_STEP_LAST:
-        /* We are done without errors! */
+        if (ctx->fatal_error) {
+            g_simple_async_result_take_error (ctx->result, ctx->fatal_error);
+            ctx->fatal_error = NULL;
+        } else {
+            /* We are done without errors!
+             * Handle method invocations */
+            g_signal_connect (ctx->skeleton,
+                              "handle-create-bearer",
+                              G_CALLBACK (handle_create_bearer),
+                              ctx->self);
+            g_signal_connect (ctx->skeleton,
+                              "handle-command",
+                              G_CALLBACK (handle_command),
+                              ctx->self);
+            g_signal_connect (ctx->skeleton,
+                              "handle-delete-bearer",
+                              G_CALLBACK (handle_delete_bearer),
+                              ctx->self);
+            g_signal_connect (ctx->skeleton,
+                              "handle-list-bearers",
+                              G_CALLBACK (handle_list_bearers),
+                              ctx->self);
+            g_signal_connect (ctx->skeleton,
+                              "handle-enable",
+                              G_CALLBACK (handle_enable),
+                              ctx->self);
+            g_signal_connect (ctx->skeleton,
+                              "handle-reset",
+                              G_CALLBACK (handle_reset),
+                              ctx->self);
+            g_signal_connect (ctx->skeleton,
+                              "handle-factory-reset",
+                              G_CALLBACK (handle_factory_reset),
+                              ctx->self);
+            g_signal_connect (ctx->skeleton,
+                              "handle-set-bands",
+                              G_CALLBACK (handle_set_bands),
+                              ctx->self);
+            g_signal_connect (ctx->skeleton,
+                              "handle-set-allowed-modes",
+                              G_CALLBACK (handle_set_allowed_modes),
+                              ctx->self);
+            g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        }
 
-        /* Handle method invocations */
-        g_signal_connect (ctx->skeleton,
-                          "handle-create-bearer",
-                          G_CALLBACK (handle_create_bearer),
-                          ctx->self);
-        g_signal_connect (ctx->skeleton,
-                          "handle-command",
-                          G_CALLBACK (handle_command),
-                          ctx->self);
-        g_signal_connect (ctx->skeleton,
-                          "handle-delete-bearer",
-                          G_CALLBACK (handle_delete_bearer),
-                          ctx->self);
-        g_signal_connect (ctx->skeleton,
-                          "handle-list-bearers",
-                          G_CALLBACK (handle_list_bearers),
-                          ctx->self);
-        g_signal_connect (ctx->skeleton,
-                          "handle-enable",
-                          G_CALLBACK (handle_enable),
-                          ctx->self);
-        g_signal_connect (ctx->skeleton,
-                          "handle-reset",
-                          G_CALLBACK (handle_reset),
-                          ctx->self);
-        g_signal_connect (ctx->skeleton,
-                          "handle-factory-reset",
-                          G_CALLBACK (handle_factory_reset),
-                          ctx->self);
-        g_signal_connect (ctx->skeleton,
-                          "handle-set-bands",
-                          G_CALLBACK (handle_set_bands),
-                          ctx->self);
-        g_signal_connect (ctx->skeleton,
-                          "handle-set-allowed-modes",
-                          G_CALLBACK (handle_set_allowed_modes),
-                          ctx->self);
-
-        /* Finally, export the new interface */
+        /* Finally, export the new interface, even if we got errors */
         mm_gdbus_object_skeleton_set_modem (MM_GDBUS_OBJECT_SKELETON (ctx->self),
                                             MM_GDBUS_MODEM (ctx->skeleton));
-
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
         initialization_context_complete_and_free (ctx);
         return;
     }
