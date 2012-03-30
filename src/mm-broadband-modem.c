@@ -5727,13 +5727,15 @@ enable_location_gathering (MMIfaceModemLocation *self,
                                         user_data,
                                         enable_location_gathering);
 
-    /* 3GPP modems need to re-run registration checks, so that we get up to date
-     * LAC/CI location information. Note that we don't care for when the
-     * registration checks get finished. */
-    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self))) {
-        /* Re-run registration to get update LAC/CI */
+    /* 3GPP modems need to re-run registration checks when enabling the 3GPP
+     * location source, so that we get up to date LAC/CI location information.
+     * Note that we don't care for when the registration checks get finished.
+     */
+    if (source == MM_MODEM_LOCATION_SOURCE_3GPP_LAC_CI &&
+        mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self))) {
+        /* Reload registration to get LAC/CI */
         mm_iface_modem_3gpp_run_all_registration_checks (MM_IFACE_MODEM_3GPP (self), NULL, NULL);
-        /* Reload operator, to get MCC/MNC */
+        /* Reload operator to get MCC/MNC */
         mm_iface_modem_3gpp_reload_current_operator (MM_IFACE_MODEM_3GPP (self));
     }
 
