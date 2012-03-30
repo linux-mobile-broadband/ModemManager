@@ -56,6 +56,7 @@ struct _MMBaseModemPrivate {
     /* Modem-wide cancellable. If it ever gets cancelled, no further operations
      * should be done by the modem. */
     GCancellable *cancellable;
+    gulong invalid_if_cancelled;
 
     gchar *device;
     gchar *driver;
@@ -877,10 +878,11 @@ mm_base_modem_init (MMBaseModem *self)
 
     /* Setup modem-wide cancellable */
     self->priv->cancellable = g_cancellable_new ();
-    g_cancellable_connect (self->priv->cancellable,
-                           G_CALLBACK (base_modem_cancelled),
-                           self,
-                           NULL);
+    self->priv->invalid_if_cancelled =
+        g_cancellable_connect (self->priv->cancellable,
+                               G_CALLBACK (base_modem_cancelled),
+                               self,
+                               NULL);
 
     self->priv->ports = g_hash_table_new_full (g_str_hash,
                                                g_str_equal,
@@ -1000,7 +1002,11 @@ dispose (GObject *object)
     g_clear_object (&self->priv->authp_cancellable);
     g_clear_object (&self->priv->authp);
 
-    /* Ensure we cancel any ongoing operation */
+    /* Ensure we cancel any ongoing operation, but before
+     * disconnect our own signal handler, or we'll end up with
+     * another reference of the modem object around. */
+    g_cancellable_disconnect (self->priv->cancellable,
+                              self->priv->invalid_if_cancelled);
     g_cancellable_cancel (self->priv->cancellable);
     g_clear_object (&self->priv->cancellable);
 
