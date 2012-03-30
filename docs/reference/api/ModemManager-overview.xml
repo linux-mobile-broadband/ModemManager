@@ -192,7 +192,7 @@
             </para>
           </listitem>
           <listitem>
-            <para><emphasis>AT Allowed</emphasis></para>
+            <para><emphasis>AT allowed</emphasis></para>
             <para>
               This boolean property allows plugins to specify that they expect and support
               AT serial ports.
@@ -204,7 +204,20 @@
             </para>
           </listitem>
           <listitem>
-            <para><emphasis>QCDM Allowed</emphasis></para>
+            <para><emphasis>Single AT expected</emphasis></para>
+            <para>
+              This boolean property allows plugins to specify that they only expect and support
+              one AT serial port. Whenever the first AT port is grabbed, any remaining AT probing
+              in ports of the same device will get cancelled.
+            </para>
+            <para>
+              This configuration is specified by the <type>MM_PLUGIN_BASE_ALLOWED_SINGLE_AT</type>
+              property in the <structname>MMPluginBase</structname> object provided
+              by the plugin.
+            </para>
+          </listitem>
+          <listitem>
+            <para><emphasis>QCDM allowed</emphasis></para>
             <para>
               This boolean property allows plugins to specify that they expect and support
               QCDM serial ports.
