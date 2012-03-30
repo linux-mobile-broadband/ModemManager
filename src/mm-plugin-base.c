@@ -804,9 +804,10 @@ static void
 mm_plugin_base_init (MMPluginBase *self)
 {
     MMPluginBasePrivate *priv = MM_PLUGIN_BASE_GET_PRIVATE (self);
-    const char *subsys[] = { "tty", "net", NULL };
 
-    priv->client = g_udev_client_new (subsys);
+    /* We pass NULL as we won't need to get notified about uevents,
+     * we just use this client for sync queries. */
+    priv->client = g_udev_client_new (NULL);
 
     priv->tasks = g_hash_table_new_full (g_str_hash,
                                          g_str_equal,
