@@ -170,6 +170,7 @@ register_in_3gpp_or_cdma_network (MMIfaceModemSimple *self,
 typedef enum {
     CONNECTION_STEP_FIRST,
     CONNECTION_STEP_UNLOCK_CHECK,
+    CONNECTION_STEP_WAIT_FOR_INITIALIZED,
     CONNECTION_STEP_ENABLE,
     CONNECTION_STEP_ALLOWED_MODES,
     CONNECTION_STEP_BANDS,
@@ -184,6 +185,8 @@ typedef struct {
     GDBusMethodInvocation *invocation;
     MMIfaceModemSimple *self;
     ConnectionStep step;
+    gulong state_changed_id;
+    guint state_changed_wait_id;
 
     /* Expected input properties */
     GVariant *dictionary;
@@ -196,6 +199,9 @@ typedef struct {
 static void
 connection_context_free (ConnectionContext *ctx)
 {
+    g_assert (ctx->state_changed_id == 0);
+    g_assert (ctx->state_changed_wait_id == 0);
+
     g_variant_unref (ctx->dictionary);
     if (ctx->properties)
         g_object_unref (ctx->properties);
@@ -330,6 +336,52 @@ enable_ready (MMBaseModem *self,
     connection_step (ctx);
 }
 
+static gboolean
+state_changed_wait_expired (ConnectionContext *ctx)
+{
+    g_assert (ctx->state_changed_id != 0);
+    g_assert (ctx->state_changed_wait_id != 0);
+    g_signal_handler_disconnect (ctx->self, ctx->state_changed_id);
+    ctx->state_changed_id = 0;
+    g_source_remove (ctx->state_changed_wait_id);
+    ctx->state_changed_wait_id = 0;
+
+    g_dbus_method_invocation_return_error (ctx->invocation,
+                                           MM_CORE_ERROR,
+                                           MM_CORE_ERROR_RETRY,
+                                           "Too much time waiting to get initialized");
+    connection_context_free (ctx);
+    return FALSE;
+}
+
+static void
+state_changed (MMIfaceModemSimple *self,
+               GParamSpec *spec,
+               ConnectionContext *ctx)
+{
+    MMModemState state = MM_MODEM_STATE_UNKNOWN;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_STATE, &state,
+                  NULL);
+
+    /* We're waiting to get initialized */
+    if (state < MM_MODEM_STATE_DISABLED)
+        return;
+
+    /* Got !initializing, we're done now */
+    g_assert (ctx->state_changed_id != 0);
+    g_assert (ctx->state_changed_wait_id != 0);
+    g_signal_handler_disconnect (ctx->self, ctx->state_changed_id);
+    ctx->state_changed_id = 0;
+    g_source_remove (ctx->state_changed_wait_id);
+    ctx->state_changed_wait_id = 0;
+
+    /* Keep on with the next step now */
+    ctx->step++;
+    connection_step (ctx);
+}
+
 static void
 send_pin_ready (MMSim *sim,
                 GAsyncResult *res,
@@ -343,7 +395,7 @@ send_pin_ready (MMSim *sim,
         return;
     }
 
-    /* Sent pin and unlocked, cool. */
+    /* Sent pin, cool. */
     ctx->step++;
     connection_step (ctx);
 }
@@ -424,6 +476,36 @@ connection_step (ConnectionContext *ctx)
                                      (GAsyncReadyCallback)unlock_check_ready,
                                      ctx);
         return;
+
+    case CONNECTION_STEP_WAIT_FOR_INITIALIZED: {
+        MMModemState state = MM_MODEM_STATE_UNKNOWN;
+
+        mm_info ("Simple connect state (%d/%d): Wait to get fully initialized",
+                 ctx->step, CONNECTION_STEP_LAST);
+
+        g_object_get (ctx->self,
+                      MM_IFACE_MODEM_STATE, &state,
+                      NULL);
+
+        /* If we just sent the PIN code we may still be initializing,
+         * and if so, we really do need to wait to get into DISABLED state
+         */
+        if (state < MM_MODEM_STATE_DISABLED) {
+            /* Want to get notified when modem state changes */
+            ctx->state_changed_id = g_signal_connect (ctx->self,
+                                                      "notify::" MM_IFACE_MODEM_STATE,
+                                                      G_CALLBACK (state_changed),
+                                                      ctx);
+            /* But we don't want to wait forever */
+            ctx->state_changed_wait_id = g_timeout_add_seconds (10,
+                                                                (GSourceFunc)state_changed_wait_expired,
+                                                                ctx);
+            return;
+        }
+
+        /* Fall down to next step */
+        ctx->step++;
+    }
 
     case CONNECTION_STEP_ENABLE:
         mm_info ("Simple connect state (%d/%d): Enable",
@@ -600,7 +682,7 @@ connect_auth_ready (MMBaseModem *self,
     if (current >= MM_MODEM_STATE_ENABLED)
         ctx->step = CONNECTION_STEP_ENABLE + 1;
     else if (current >= MM_MODEM_STATE_DISABLED)
-        ctx->step = CONNECTION_STEP_UNLOCK_CHECK + 1;
+        ctx->step = CONNECTION_STEP_WAIT_FOR_INITIALIZED + 1;
     else
         ctx->step = CONNECTION_STEP_FIRST;
 
