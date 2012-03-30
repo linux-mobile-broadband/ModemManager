@@ -724,10 +724,11 @@ supports_port (MMPlugin *plugin,
                        (GAsyncReadyCallback)port_probe_run_ready,
                        ctx);
 
-    /* Keep track of the probe */
+    /* Keep track of the probe. Note that we got a new reference already
+     * from the cache. */
     g_hash_table_insert (priv->tasks,
                          g_strdup (key),
-                         g_object_ref (probe));
+                         probe);
 
 out:
     if (port)
