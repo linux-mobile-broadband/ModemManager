@@ -41,7 +41,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-novatel.la \
 	libmm-plugin-option.la \
 	libmm-plugin-hso.la \
-	libmm-plugin-anydata.la
+	libmm-plugin-anydata.la \
+	libmm-plugin-linktop.la
 
 #pkglib_LTLIBRARIES = \
 #	libmm-plugin-generic.la \
@@ -201,6 +202,15 @@ libmm_plugin_anydata_la_SOURCES = \
 libmm_plugin_anydata_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_anydata_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
+# Linktop CDMA
+libmm_plugin_linktop_la_SOURCES = \
+	linktop/mm-plugin-linktop.c \
+	linktop/mm-plugin-linktop.h \
+	linktop/mm-broadband-modem-linktop.h \
+	linktop/mm-broadband-modem-linktop.c
+libmm_plugin_linktop_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_linktop_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
 ## SimTech
 #libmm_plugin_simtech_la_SOURCES = \
 #	mm-plugin-simtech.c \
@@ -218,15 +228,6 @@ libmm_plugin_anydata_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 #	mm-modem-x22x-gsm.h
 #libmm_plugin_x22x_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 #libmm_plugin_x22x_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-#
-## Linktop
-#libmm_plugin_linktop_la_SOURCES = \
-#	mm-plugin-linktop.c \
-#	mm-plugin-linktop.h \
-#	mm-modem-linktop.c \
-#	mm-modem-linktop.h
-#libmm_plugin_linktop_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-#libmm_plugin_linktop_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 #
 ## Samsung modem
 #libmm_plugin_samsung_la_SOURCES = \
