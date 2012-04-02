@@ -49,13 +49,6 @@ and manipulate the contacts information stored in SIM or device.
 
 
 --------------------------------------------------------------------------------
- * GPS Location
-
-ModemManager should expose GPS-based location information if the modem exposes
-a port that shows NMEA (or equivalent) traces.
-
-
---------------------------------------------------------------------------------
  * Probing time mitigation
 
 Probing time may end up being quite long if we're checking support of a modem
@@ -69,6 +62,7 @@ is a good way of minimizing this problem. Some ideas:
 
   ** If one AT probing suceeds, don't allow timeouts in remaining ports when
      probing for AT.
+
 
 --------------------------------------------------------------------------------
  * AT+CMUX & Serial multiplexing
