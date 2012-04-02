@@ -385,21 +385,9 @@ disconnect (MMBearer *self,
 
 /*****************************************************************************/
 
-static gboolean
-cmp_properties (MMBearer *self,
-                MMBearerProperties *properties)
-{
-    return (mm_bearer_properties_get_apn (properties) == NULL &&
-            mm_bearer_properties_get_ip_type (properties) == NULL &&
-            mm_bearer_properties_get_number (properties) == NULL &&
-            mm_bearer_properties_get_rm_protocol (properties) == MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN &&
-            mm_bearer_properties_get_allow_roaming (properties));
-}
-
-/*****************************************************************************/
-
 MMBearer *
-mm_bearer_iridium_new (MMBroadbandModemIridium *modem)
+mm_bearer_iridium_new (MMBroadbandModemIridium *modem,
+                       MMBearerProperties *config)
 {
     MMBearer *bearer;
 
@@ -408,6 +396,7 @@ mm_bearer_iridium_new (MMBroadbandModemIridium *modem)
      * g_object_get() here */
     bearer = g_object_new (MM_TYPE_BEARER_IRIDIUM,
                            MM_BEARER_MODEM, modem,
+                           MM_BEARER_CONFIG, config,
                            "ip-timeout", MM_BEARER_IRIDIUM_IP_TIMEOUT_DEFAULT,
                            NULL);
 
@@ -428,7 +417,6 @@ mm_bearer_iridium_class_init (MMBearerIridiumClass *klass)
     MMBearerClass *bearer_class = MM_BEARER_CLASS (klass);
 
     /* Virtual methods */
-    bearer_class->cmp_properties = cmp_properties;
     bearer_class->connect = connect;
     bearer_class->connect_finish = connect_finish;
     bearer_class->disconnect = disconnect;

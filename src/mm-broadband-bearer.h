@@ -146,11 +146,6 @@ void mm_broadband_bearer_new (MMBroadbandModem *modem,
 MMBearer *mm_broadband_bearer_new_finish (GAsyncResult *res,
                                           GError **error);
 
-const gchar *mm_broadband_bearer_get_3gpp_apn         (MMBroadbandBearer *self);
-guint        mm_broadband_bearer_get_cdma_rm_protocol (MMBroadbandBearer *self);
-const gchar *mm_broadband_bearer_get_ip_type          (MMBroadbandBearer *self);
-gboolean     mm_broadband_bearer_get_allow_roaming    (MMBroadbandBearer *self);
-
 guint        mm_broadband_bearer_get_3gpp_cid         (MMBroadbandBearer *self);
 
 #endif /* MM_BROADBAND_BEARER_H */

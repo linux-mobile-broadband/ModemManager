@@ -86,6 +86,9 @@ gboolean mm_bearer_properties_consume_variant (MMBearerProperties *self,
 
 GVariant *mm_bearer_properties_get_dictionary (MMBearerProperties *self);
 
+gboolean mm_bearer_properties_cmp (MMBearerProperties *a,
+                                   MMBearerProperties *b);
+
 G_END_DECLS
 
 #endif /* MM_BEARER_PROPERTIES_H */

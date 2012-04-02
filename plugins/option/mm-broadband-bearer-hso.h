@@ -31,9 +31,6 @@
 #define MM_IS_BROADBAND_BEARER_HSO_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  MM_TYPE_BROADBAND_BEARER_HSO))
 #define MM_BROADBAND_BEARER_HSO_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_BROADBAND_BEARER_HSO, MMBroadbandBearerHsoClass))
 
-#define MM_BROADBAND_BEARER_HSO_USER     "broadband-bearer-hso-user"
-#define MM_BROADBAND_BEARER_HSO_PASSWORD "broadband-bearer-hso-password"
-
 typedef enum {
     MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_UNKNOWN,
     MM_BROADBAND_BEARER_HSO_CONNECTION_STATUS_CONNECTED,
@@ -58,7 +55,7 @@ GType mm_broadband_bearer_hso_get_type (void);
 
 /* Default 3GPP bearer creation implementation */
 void mm_broadband_bearer_hso_new (MMBroadbandModemHso *modem,
-                                  MMBearerProperties *properties,
+                                  MMBearerProperties *config,
                                   GCancellable *cancellable,
                                   GAsyncReadyCallback callback,
                                   gpointer user_data);

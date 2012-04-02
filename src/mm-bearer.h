@@ -40,6 +40,7 @@ typedef struct _MMBearerPrivate MMBearerPrivate;
 #define MM_BEARER_CONNECTION "bearer-connection"
 #define MM_BEARER_MODEM      "bearer-modem"
 #define MM_BEARER_STATUS     "bearer-status"
+#define MM_BEARER_CONFIG     "bearer-config"
 
 typedef enum { /*< underscore_name=mm_bearer_status >*/
     MM_BEARER_STATUS_DISCONNECTED,
@@ -78,25 +79,17 @@ struct _MMBearerClass {
 
     /* Report disconnection */
     void (* report_disconnection) (MMBearer *bearer);
-
-    /* Check if the bearer has the exact same properties */
-    gboolean (* cmp_properties) (MMBearer *self,
-                                 MMBearerProperties *properties);
-
-    /* Builder of the properties to be exposed in DBus. Bearers should expose only
-     * the input properties they actually ended up using */
-    MMBearerProperties * (* expose_properties) (MMBearer *self);
 };
 
 GType mm_bearer_get_type (void);
 
 void         mm_bearer_export   (MMBearer *self);
-const gchar *mm_bearer_get_path (MMBearer *bearer);
 
-void mm_bearer_expose_properties (MMBearer *bearer,
-                                  MMBearerProperties *properties);
+const gchar        *mm_bearer_get_path    (MMBearer *bearer);
+MMBearerStatus      mm_bearer_get_status  (MMBearer *bearer);
+MMBearerProperties *mm_bearer_peek_config (MMBearer *self);
+MMBearerProperties *mm_bearer_get_config  (MMBearer *self);
 
-MMBearerStatus mm_bearer_get_status (MMBearer *bearer);
 
 void     mm_bearer_connect        (MMBearer *self,
                                    GAsyncReadyCallback callback,
@@ -115,8 +108,5 @@ gboolean mm_bearer_disconnect_finish (MMBearer *self,
 void mm_bearer_disconnect_force (MMBearer *self);
 
 void mm_bearer_report_disconnection (MMBearer *self);
-
-gboolean mm_bearer_cmp_properties (MMBearer *self,
-                                   MMBearerProperties *properties);
 
 #endif /* MM_BEARER_H */

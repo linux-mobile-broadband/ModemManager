@@ -45,6 +45,7 @@ enum {
     PROP_CONNECTION,
     PROP_MODEM,
     PROP_STATUS,
+    PROP_CONFIG,
     PROP_LAST
 };
 
@@ -59,6 +60,8 @@ struct _MMBearerPrivate {
     gchar *path;
     /* Status of this bearer */
     MMBearerStatus status;
+    /* Configuration of the bearer */
+    MMBearerProperties *config;
 
     /* Cancellable for connect() */
     GCancellable *connect_cancellable;
@@ -68,27 +71,11 @@ struct _MMBearerPrivate {
 
 /*****************************************************************************/
 
-static void
-bearer_expose_properties (MMBearer *self)
-{
-    MMBearerProperties *properties;
-    GVariant *dictionary;
-
-    properties = MM_BEARER_GET_CLASS (self)->expose_properties (self);
-    dictionary = mm_bearer_properties_get_dictionary (properties);
-    mm_gdbus_bearer_set_properties (MM_GDBUS_BEARER (self), dictionary);
-    g_variant_unref (dictionary);
-    g_object_unref (properties);
-}
-
 void
 mm_bearer_export (MMBearer *self)
 {
     static guint id = 0;
     gchar *path;
-
-    /* Expose properties before exporting */
-    bearer_expose_properties (self);
 
     path = g_strdup_printf (MM_DBUS_BEARER_PREFIX "/%d", id++);
     g_object_set (self,
@@ -625,6 +612,20 @@ mm_bearer_get_path (MMBearer *self)
     return self->priv->path;
 }
 
+MMBearerProperties *
+mm_bearer_peek_config (MMBearer *self)
+{
+    return self->priv->config;
+}
+
+MMBearerProperties *
+mm_bearer_get_config (MMBearer *self)
+{
+    return (self->priv->config ?
+            g_object_ref (self->priv->config) :
+            NULL);
+}
+
 /*****************************************************************************/
 
 static void
@@ -685,17 +686,6 @@ mm_bearer_report_disconnection (MMBearer *self)
     return MM_BEARER_GET_CLASS (self)->report_disconnection (self);
 }
 
-/*****************************************************************************/
-
-gboolean
-mm_bearer_cmp_properties (MMBearer *self,
-                          MMBearerProperties *properties)
-{
-    return MM_BEARER_GET_CLASS (self)->cmp_properties (self, properties);
-}
-
-/*****************************************************************************/
-
 static void
 set_property (GObject *object,
               guint prop_id,
@@ -738,6 +728,18 @@ set_property (GObject *object,
         /* We don't allow g_object_set()-ing the status property */
         g_assert_not_reached ();
         break;
+    case PROP_CONFIG: {
+        GVariant *dictionary;
+
+        g_clear_object (&self->priv->config);
+        self->priv->config = g_value_dup_object (value);
+        /* Also expose the properties */
+        dictionary = mm_bearer_properties_get_dictionary (self->priv->config);
+        mm_gdbus_bearer_set_properties (MM_GDBUS_BEARER (self), dictionary);
+        if (dictionary)
+            g_variant_unref (dictionary);
+        break;
+    }
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -764,6 +766,9 @@ get_property (GObject *object,
         break;
     case PROP_STATUS:
         g_value_set_enum (value, self->priv->status);
+        break;
+    case PROP_CONFIG:
+        g_value_set_object (value, self->priv->config);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -812,8 +817,8 @@ dispose (GObject *object)
         g_clear_object (&self->priv->connection);
     }
 
-    if (self->priv->modem)
-        g_clear_object (&self->priv->modem);
+    g_clear_object (&self->priv->modem);
+    g_clear_object (&self->priv->config);
 
     G_OBJECT_CLASS (mm_bearer_parent_class)->dispose (object);
 }
@@ -865,4 +870,12 @@ mm_bearer_class_init (MMBearerClass *klass)
                            MM_BEARER_STATUS_DISCONNECTED,
                            G_PARAM_READABLE);
     g_object_class_install_property (object_class, PROP_STATUS, properties[PROP_STATUS]);
+
+    properties[PROP_CONFIG] =
+        g_param_spec_object (MM_BEARER_CONFIG,
+                             "Bearer configuration",
+                             "List of user provided properties",
+                             MM_TYPE_BEARER_PROPERTIES,
+                             G_PARAM_READWRITE);
+    g_object_class_install_property (object_class, PROP_CONFIG, properties[PROP_CONFIG]);
 }

@@ -36,20 +36,8 @@
 
 G_DEFINE_TYPE (MMBroadbandBearerHso, mm_broadband_bearer_hso, MM_TYPE_BROADBAND_BEARER);
 
-enum {
-    PROP_0,
-    PROP_USER,
-    PROP_PASSWORD,
-    PROP_LAST
-};
-
-static GParamSpec *properties[PROP_LAST];
-
 struct _MMBroadbandBearerHsoPrivate {
-    gchar *user;
-    gchar *password;
     guint auth_idx;
-
     gpointer connect_pending;
     guint connect_pending_id;
     gulong connect_cancellable_id;
@@ -544,6 +532,8 @@ static void
 authenticate (Dial3gppContext *ctx)
 {
     gchar *command;
+    const gchar *user;
+    const gchar *password;
 
     if (!auth_commands[ctx->auth_idx]) {
         g_simple_async_result_set_error (ctx->result,
@@ -554,8 +544,11 @@ authenticate (Dial3gppContext *ctx)
         return;
     }
 
+    user = mm_bearer_properties_get_user (mm_bearer_peek_config (MM_BEARER (ctx->self)));
+    password = mm_bearer_properties_get_password (mm_bearer_peek_config (MM_BEARER (ctx->self)));
+
     /* Both user and password are required; otherwise firmware returns an error */
-    if (!ctx->self->priv->user || !ctx->self->priv->password)
+    if (!user || !password)
 		command = g_strdup_printf ("%s=%d,0",
                                    auth_commands[ctx->auth_idx],
                                    ctx->cid);
@@ -563,8 +556,8 @@ authenticate (Dial3gppContext *ctx)
         command = g_strdup_printf ("%s=%d,1,\"%s\",\"%s\"",
                                    auth_commands[ctx->auth_idx],
                                    ctx->cid,
-                                   ctx->self->priv->password,
-                                   ctx->self->priv->user);
+                                   password,
+                                   user);
 
     mm_base_modem_at_command_full (ctx->modem,
                                    ctx->primary,
@@ -683,44 +676,6 @@ disconnect_3gpp (MMBroadbandBearer *self,
 
 /*****************************************************************************/
 
-static gboolean
-cmp_properties (MMBearer *self,
-                MMBearerProperties *properties)
-{
-    MMBroadbandBearerHso *hso = MM_BROADBAND_BEARER_HSO (self);
-
-    return ((mm_broadband_bearer_get_allow_roaming (MM_BROADBAND_BEARER (self)) ==
-             mm_bearer_properties_get_allow_roaming (properties)) &&
-            (!g_strcmp0 (mm_broadband_bearer_get_ip_type (MM_BROADBAND_BEARER (self)),
-                         mm_bearer_properties_get_ip_type (properties))) &&
-            (!g_strcmp0 (mm_broadband_bearer_get_3gpp_apn (MM_BROADBAND_BEARER (self)),
-                         mm_bearer_properties_get_apn (properties))) &&
-            (!g_strcmp0 (hso->priv->user,
-                         mm_bearer_properties_get_user (properties))) &&
-            (!g_strcmp0 (hso->priv->password,
-                         mm_bearer_properties_get_password (properties))));
-}
-
-static MMBearerProperties *
-expose_properties (MMBearer *self)
-{
-    MMBroadbandBearerHso *hso = MM_BROADBAND_BEARER_HSO (self);
-    MMBearerProperties *properties;
-
-    properties = mm_bearer_properties_new ();
-    mm_bearer_properties_set_apn (properties,
-                                  mm_broadband_bearer_get_3gpp_apn (MM_BROADBAND_BEARER (self)));
-    mm_bearer_properties_set_ip_type (properties,
-                                      mm_broadband_bearer_get_ip_type (MM_BROADBAND_BEARER (self)));
-    mm_bearer_properties_set_allow_roaming (properties,
-                                            mm_broadband_bearer_get_allow_roaming (MM_BROADBAND_BEARER (self)));
-    mm_bearer_properties_set_user (properties, hso->priv->user);
-    mm_bearer_properties_set_password (properties, hso->priv->user);
-    return properties;
-}
-
-/*****************************************************************************/
-
 MMBearer *
 mm_broadband_bearer_hso_new_finish (GAsyncResult *res,
                                     GError **error)
@@ -743,7 +698,7 @@ mm_broadband_bearer_hso_new_finish (GAsyncResult *res,
 
 void
 mm_broadband_bearer_hso_new (MMBroadbandModemHso *modem,
-                             MMBearerProperties *properties,
+                             MMBearerProperties *config,
                              GCancellable *cancellable,
                              GAsyncReadyCallback callback,
                              gpointer user_data)
@@ -755,56 +710,8 @@ mm_broadband_bearer_hso_new (MMBroadbandModemHso *modem,
         callback,
         user_data,
         MM_BEARER_MODEM, modem,
-        MM_BROADBAND_BEARER_3GPP_APN,      mm_bearer_properties_get_apn (properties),
-        MM_BROADBAND_BEARER_IP_TYPE,       mm_bearer_properties_get_ip_type (properties),
-        MM_BROADBAND_BEARER_ALLOW_ROAMING, mm_bearer_properties_get_allow_roaming (properties),
-        MM_BROADBAND_BEARER_HSO_USER,      mm_bearer_properties_get_user (properties),
-        MM_BROADBAND_BEARER_HSO_PASSWORD,  mm_bearer_properties_get_password (properties),
+        MM_BEARER_CONFIG, config,
         NULL);
-}
-
-static void
-set_property (GObject *object,
-              guint prop_id,
-              const GValue *value,
-              GParamSpec *pspec)
-{
-    MMBroadbandBearerHso *self = MM_BROADBAND_BEARER_HSO (object);
-
-    switch (prop_id) {
-    case PROP_USER:
-        g_free (self->priv->user);
-        self->priv->user = g_value_dup_string (value);
-        break;
-    case PROP_PASSWORD:
-        g_free (self->priv->password);
-        self->priv->password = g_value_dup_string (value);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-        break;
-    }
-}
-
-static void
-get_property (GObject *object,
-              guint prop_id,
-              GValue *value,
-              GParamSpec *pspec)
-{
-    MMBroadbandBearerHso *self = MM_BROADBAND_BEARER_HSO (object);
-
-    switch (prop_id) {
-    case PROP_USER:
-        g_value_set_string (value, self->priv->user);
-        break;
-    case PROP_PASSWORD:
-        g_value_set_string (value, self->priv->password);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-        break;
-    }
 }
 
 static void
@@ -817,31 +724,12 @@ mm_broadband_bearer_hso_init (MMBroadbandBearerHso *self)
 }
 
 static void
-finalize (GObject *object)
-{
-    MMBroadbandBearerHso *self = MM_BROADBAND_BEARER_HSO (object);
-
-    g_free (self->priv->user);
-    g_free (self->priv->password);
-
-    G_OBJECT_CLASS (mm_broadband_bearer_hso_parent_class)->finalize (object);
-}
-
-static void
 mm_broadband_bearer_hso_class_init (MMBroadbandBearerHsoClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
-    MMBearerClass *bearer_class = MM_BEARER_CLASS (klass);
     MMBroadbandBearerClass *broadband_bearer_class = MM_BROADBAND_BEARER_CLASS (klass);
 
     g_type_class_add_private (object_class, sizeof (MMBroadbandBearerHsoPrivate));
-
-    object_class->get_property = get_property;
-    object_class->set_property = set_property;
-    object_class->finalize = finalize;
-
-    bearer_class->cmp_properties = cmp_properties;
-    bearer_class->expose_properties = expose_properties;
 
     broadband_bearer_class->dial_3gpp = dial_3gpp;
     broadband_bearer_class->dial_3gpp_finish = dial_3gpp_finish;
@@ -849,20 +737,4 @@ mm_broadband_bearer_hso_class_init (MMBroadbandBearerHsoClass *klass)
     broadband_bearer_class->get_ip_config_3gpp_finish = get_ip_config_3gpp_finish;
     broadband_bearer_class->disconnect_3gpp = disconnect_3gpp;
     broadband_bearer_class->disconnect_3gpp_finish = disconnect_3gpp_finish;
-
-    properties[PROP_USER] =
-        g_param_spec_string (MM_BROADBAND_BEARER_HSO_USER,
-                             "User",
-                             "Username to use to authenticate the connection",
-                             NULL,
-                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
-    g_object_class_install_property (object_class, PROP_USER, properties[PROP_USER]);
-
-    properties[PROP_PASSWORD] =
-        g_param_spec_string (MM_BROADBAND_BEARER_HSO_PASSWORD,
-                             "Password",
-                             "Password to use to authenticate the connection",
-                             NULL,
-                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
-    g_object_class_install_property (object_class, PROP_PASSWORD, properties[PROP_PASSWORD]);
 }

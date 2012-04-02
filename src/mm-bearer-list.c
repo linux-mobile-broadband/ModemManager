@@ -170,7 +170,7 @@ mm_bearer_list_find (MMBearerList *self,
     GList *l;
 
     for (l = self->priv->bearers; l; l = g_list_next (l)) {
-        if (mm_bearer_cmp_properties (MM_BEARER (l->data), properties))
+        if (mm_bearer_properties_cmp (mm_bearer_peek_config (MM_BEARER (l->data)), properties))
             return g_object_ref (l->data);
     }
 

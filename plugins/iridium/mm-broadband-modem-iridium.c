@@ -360,10 +360,9 @@ create_bearer (MMIfaceModem *self,
                                         callback,
                                         user_data,
                                         create_bearer);
-    /* We just create a MMBearerIridium
-     * Note that we do not need to use properties here */
     mm_dbg ("Creating Iridium bearer...");
-    bearer = mm_bearer_iridium_new (MM_BROADBAND_MODEM_IRIDIUM (self));
+    bearer = mm_bearer_iridium_new (MM_BROADBAND_MODEM_IRIDIUM (self),
+                                    properties);
     g_simple_async_result_set_op_res_gpointer (result,
                                                bearer,
                                                (GDestroyNotify)g_object_unref);

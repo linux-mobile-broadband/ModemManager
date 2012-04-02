@@ -53,24 +53,8 @@ typedef enum {
     CONNECTION_TYPE_CDMA,
 } ConnectionType;
 
-enum {
-    PROP_0,
-    PROP_3GPP_APN,
-    PROP_CDMA_NUMBER,
-    PROP_CDMA_RM_PROTOCOL,
-    PROP_IP_TYPE,
-    PROP_ALLOW_ROAMING,
-    PROP_LAST
-};
-
-static GParamSpec *properties[PROP_LAST];
-
 struct _MMBroadbandBearerPrivate {
     /*-- Common stuff --*/
-    /* IP type  */
-    gchar *ip_type;
-    /* Flag to allow/forbid connections while roaming */
-    gboolean allow_roaming;
     /* Data port used when modem is connected */
     MMPort *port;
     /* Current connection type */
@@ -81,8 +65,6 @@ struct _MMBroadbandBearerPrivate {
     ConnectionForbiddenReason reason_3gpp;
     /* Handler ID for the registration state change signals */
     guint id_3gpp_registration_change;
-    /* APN of the PDP context */
-    gchar *apn;
     /* CID of the PDP context */
     guint cid;
 
@@ -92,10 +74,6 @@ struct _MMBroadbandBearerPrivate {
     /* Handler IDs for the registration state change signals */
     guint id_cdma1x_registration_change;
     guint id_evdo_registration_change;
-    /* (Optional) Number to dial */
-    gchar *number;
-    /* Protocol of the Rm interface */
-    MMModemCdmaRmProtocol rm_protocol;
 };
 
 /*****************************************************************************/
@@ -105,38 +83,6 @@ static const gchar *connection_forbidden_reason_str [CONNECTION_FORBIDDEN_REASON
     "Not registered in the network",
     "Registered in roaming network, and roaming not allowed"
 };
-
-/*****************************************************************************/
-
-const gchar *
-mm_broadband_bearer_get_3gpp_apn (MMBroadbandBearer *self)
-{
-    return self->priv->apn;
-}
-
-MMModemCdmaRmProtocol
-mm_broadband_bearer_get_cdma_rm_protocol (MMBroadbandBearer *self)
-{
-    return self->priv->rm_protocol;
-}
-
-const gchar *
-mm_broadband_bearer_get_ip_type (MMBroadbandBearer *self)
-{
-    return self->priv->ip_type;
-}
-
-gboolean
-mm_broadband_bearer_get_allow_roaming (MMBroadbandBearer *self)
-{
-    return self->priv->allow_roaming;
-}
-
-guint
-mm_broadband_bearer_get_3gpp_cid (MMBroadbandBearer *self)
-{
-    return self->priv->cid;
-}
 
 /*****************************************************************************/
 /* Detailed connect result, used in both CDMA and 3GPP sequences */
@@ -328,12 +274,15 @@ static void
 cdma_connect_context_dial (DetailedConnectContext *ctx)
 {
     gchar *command;
+    const gchar *number;
+
+    number = mm_bearer_properties_get_number (mm_bearer_peek_config (MM_BEARER (ctx->self)));
 
     /* If a number was given when creating the bearer, use that one.
      * Otherwise, use the default one, #777
      */
-    if (ctx->self->priv->number)
-        command = g_strconcat ("DT", ctx->self->priv->number, NULL);
+    if (number)
+        command = g_strconcat ("DT", number, NULL);
     else
         command = g_strdup ("DT#777");
 
@@ -405,14 +354,14 @@ current_rm_protocol_ready (MMBaseModem *self,
         return;
     }
 
-    if (current_rm != ctx->self->priv->rm_protocol) {
+    if (current_rm != mm_bearer_properties_get_rm_protocol (mm_bearer_peek_config (MM_BEARER (self)))) {
         guint new_index;
         gchar *command;
 
         mm_dbg ("Setting requested RM protocol...");
 
         new_index = (mm_cdma_get_index_from_rm_protocol (
-                         ctx->self->priv->rm_protocol,
+                         mm_bearer_properties_get_rm_protocol (mm_bearer_peek_config (MM_BEARER (self))),
                          &error));
         if (error) {
             mm_warn ("Cannot set RM protocol: '%s'",
@@ -462,7 +411,9 @@ connect_cdma (MMBroadbandBearer *self,
                                         callback,
                                         user_data);
 
-    if (self->priv->rm_protocol != MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
+    if (mm_bearer_properties_get_rm_protocol (
+            mm_bearer_peek_config (MM_BEARER (self))) !=
+        MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
         /* Need to query current RM protocol */
         mm_dbg ("Querying current RM protocol set...");
         mm_base_modem_at_command_full (ctx->modem,
@@ -754,7 +705,7 @@ dial_3gpp_ready (MMBroadbandModem *modem,
 }
 
 static void
-initialize_pdp_context_ready (MMBaseModem *self,
+initialize_pdp_context_ready (MMBaseModem *modem,
                               GAsyncResult *res,
                               DetailedConnectContext *ctx)
 {
@@ -764,7 +715,7 @@ initialize_pdp_context_ready (MMBaseModem *self,
     if (detailed_connect_context_complete_and_free_if_cancelled (ctx))
         return;
 
-    mm_base_modem_at_command_full_finish (self, res, &error);
+    mm_base_modem_at_command_full_finish (modem, res, &error);
     if (error) {
         mm_warn ("Couldn't initialize PDP context with our APN: '%s'",
                  error->message);
@@ -783,7 +734,7 @@ initialize_pdp_context_ready (MMBaseModem *self,
 }
 
 static void
-find_cid_ready (MMBaseModem *self,
+find_cid_ready (MMBaseModem *modem,
                 GAsyncResult *res,
                 DetailedConnectContext *ctx)
 {
@@ -791,7 +742,7 @@ find_cid_ready (MMBaseModem *self,
     gchar *command;
     GError *error = NULL;
 
-    result = mm_base_modem_at_sequence_full_finish (self, res, NULL, &error);
+    result = mm_base_modem_at_sequence_full_finish (modem, res, NULL, &error);
     if (!result) {
         mm_warn ("Couldn't find best CID to use: '%s'", error->message);
         g_simple_async_result_take_error (ctx->result, error);
@@ -809,7 +760,7 @@ find_cid_ready (MMBaseModem *self,
     ctx->cid = g_variant_get_uint32 (result);
     command = g_strdup_printf ("+CGDCONT=%u,\"IP\",\"%s\"",
                                ctx->cid,
-                               ctx->self->priv->apn);
+                               mm_bearer_properties_get_apn (mm_bearer_peek_config (MM_BEARER (ctx->self))));
     mm_base_modem_at_command_full (ctx->modem,
                                    ctx->primary,
                                    command,
@@ -822,7 +773,7 @@ find_cid_ready (MMBaseModem *self,
 }
 
 static gboolean
-parse_cid_range (MMBaseModem *self,
+parse_cid_range (MMBaseModem *modem,
                  DetailedConnectContext *ctx,
                  const gchar *command,
                  const gchar *response,
@@ -907,7 +858,7 @@ parse_cid_range (MMBaseModem *self,
 }
 
 static gboolean
-parse_pdp_list (MMBaseModem *self,
+parse_pdp_list (MMBaseModem *modem,
                 DetailedConnectContext *ctx,
                 const gchar *command,
                 const gchar *response,
@@ -960,14 +911,19 @@ parse_pdp_list (MMBaseModem *self,
                 mm_dbg ("Found PDP context with CID %u and no APN",
                         pdp->cid);
                 cid = pdp->cid;
-            } else if (ctx->self->priv->apn &&
-                       g_str_equal (pdp->apn, ctx->self->priv->apn)) {
-                /* Found a PDP context with the same CID, we'll use it. */
-                mm_dbg ("Found PDP context with CID %u for APN '%s'",
-                        pdp->cid, pdp->apn);
-                cid = pdp->cid;
-                /* In this case, stop searching */
-                break;
+            } else {
+                const gchar *apn;
+
+                apn = mm_bearer_properties_get_apn (mm_bearer_peek_config (MM_BEARER (ctx->self)));
+                if (apn &&
+                    g_str_equal (pdp->apn, apn)) {
+                    /* Found a PDP context with the same CID, we'll use it. */
+                    mm_dbg ("Found PDP context with CID %u for APN '%s'",
+                            pdp->cid, pdp->apn);
+                    cid = pdp->cid;
+                    /* In this case, stop searching */
+                    break;
+                }
             }
         }
 
@@ -1767,41 +1723,6 @@ report_disconnection (MMBearer *self)
 
 /*****************************************************************************/
 
-static gboolean
-cmp_properties (MMBearer *self,
-                MMBearerProperties *properties)
-{
-    MMBroadbandBearer *broadband = MM_BROADBAND_BEARER (self);
-
-    return ((!g_strcmp0 (broadband->priv->apn,
-                         mm_bearer_properties_get_apn (properties))) &&
-            (!g_strcmp0 (broadband->priv->ip_type,
-                         mm_bearer_properties_get_ip_type (properties))) &&
-            (broadband->priv->allow_roaming ==
-             mm_bearer_properties_get_allow_roaming (properties)) &&
-            (!g_strcmp0 (broadband->priv->number,
-                         mm_bearer_properties_get_number (properties))) &&
-            (broadband->priv->rm_protocol ==
-             mm_bearer_properties_get_rm_protocol (properties)));
-}
-
-static MMBearerProperties *
-expose_properties (MMBearer *self)
-{
-    MMBroadbandBearer *broadband = MM_BROADBAND_BEARER (self);
-    MMBearerProperties *properties;
-
-    properties = mm_bearer_properties_new ();
-    mm_bearer_properties_set_apn (properties, broadband->priv->apn);
-    mm_bearer_properties_set_number (properties, broadband->priv->number);
-    mm_bearer_properties_set_rm_protocol (properties, broadband->priv->rm_protocol);
-    mm_bearer_properties_set_ip_type (properties, broadband->priv->ip_type);
-    mm_bearer_properties_set_allow_roaming (properties, broadband->priv->allow_roaming);
-    return properties;
-}
-
-/*****************************************************************************/
-
 typedef struct _InitAsyncContext InitAsyncContext;
 static void interface_initialization_step (InitAsyncContext *ctx);
 
@@ -1885,9 +1806,12 @@ crm_range_ready (MMBaseModem *modem,
         if (mm_cdma_parse_crm_test_response (response,
                                              &min, &max,
                                              &error)) {
+            MMModemCdmaRmProtocol current;
+
+            current = mm_bearer_properties_get_rm_protocol (mm_bearer_peek_config (MM_BEARER (ctx->self)));
             /* Check if value within the range */
-            if (ctx->self->priv->rm_protocol >= min &&
-                ctx->self->priv->rm_protocol <= max) {
+            if (current >= min &&
+                current <= max) {
                 /* Fine, go on with next step */
                 ctx->step++;
                 interface_initialization_step (ctx);
@@ -1897,8 +1821,7 @@ crm_range_ready (MMBaseModem *modem,
             error = g_error_new (MM_CORE_ERROR,
                                  MM_CORE_ERROR_FAILED,
                                  "Requested RM protocol '%s' is not supported",
-                                 mm_modem_cdma_rm_protocol_get_string (
-                                     ctx->self->priv->rm_protocol));
+                                 mm_modem_cdma_rm_protocol_get_string (current));
         }
 
         /* Failed, set as fatal as well */
@@ -1933,7 +1856,7 @@ modem_3gpp_registration_state_changed (MMBroadbandModem *modem,
         self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
         break;
     case MM_MODEM_3GPP_REGISTRATION_STATE_ROAMING:
-        if (self->priv->allow_roaming) {
+        if (mm_bearer_properties_get_allow_roaming (mm_bearer_peek_config (MM_BEARER (self)))) {
             mm_dbg ("Bearer allowed to connect, registered in roaming network");
             self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
         } else {
@@ -1964,7 +1887,7 @@ modem_cdma_registration_state_changed (MMBroadbandModem *modem,
 
     if (cdma1x_state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING ||
         evdo_state == MM_MODEM_CDMA_REGISTRATION_STATE_ROAMING) {
-        if (self->priv->allow_roaming) {
+        if (mm_bearer_properties_get_allow_roaming (mm_bearer_peek_config (MM_BEARER (self)))) {
             mm_dbg ("Bearer allowed to connect, registered in roaming network");
             self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_NONE;
         } else {
@@ -1998,7 +1921,8 @@ interface_initialization_step (InitAsyncContext *ctx)
         /* If a specific RM protocol is given, we need to check whether it is
          * supported. */
         if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (ctx->modem)) &&
-            ctx->self->priv->rm_protocol != MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
+            mm_bearer_properties_get_rm_protocol (
+                mm_bearer_peek_config (MM_BEARER (ctx->self))) != MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN) {
             mm_base_modem_at_command_full (ctx->modem,
                                            ctx->port,
                                            "+CRM=?",
@@ -2106,76 +2030,9 @@ mm_broadband_bearer_new (MMBroadbandModem *modem,
         cancellable,
         callback,
         user_data,
-        MM_BEARER_MODEM,                      modem,
-        MM_BROADBAND_BEARER_3GPP_APN,         mm_bearer_properties_get_apn (properties),
-        MM_BROADBAND_BEARER_CDMA_NUMBER,      mm_bearer_properties_get_number (properties),
-        MM_BROADBAND_BEARER_CDMA_RM_PROTOCOL, mm_bearer_properties_get_rm_protocol (properties),
-        MM_BROADBAND_BEARER_IP_TYPE,          mm_bearer_properties_get_ip_type (properties),
-        MM_BROADBAND_BEARER_ALLOW_ROAMING,    mm_bearer_properties_get_allow_roaming (properties),
+        MM_BEARER_MODEM,  modem,
+        MM_BEARER_CONFIG, properties,
         NULL);
-}
-
-static void
-set_property (GObject *object,
-              guint prop_id,
-              const GValue *value,
-              GParamSpec *pspec)
-{
-    MMBroadbandBearer *self = MM_BROADBAND_BEARER (object);
-
-    switch (prop_id) {
-    case PROP_3GPP_APN:
-        g_free (self->priv->apn);
-        self->priv->apn = g_value_dup_string (value);
-        break;
-    case PROP_CDMA_NUMBER:
-        g_free (self->priv->number);
-        self->priv->number = g_value_dup_string (value);
-        break;
-    case PROP_CDMA_RM_PROTOCOL:
-        self->priv->rm_protocol = g_value_get_enum (value);
-        break;
-    case PROP_IP_TYPE:
-        g_free (self->priv->ip_type);
-        self->priv->ip_type = g_value_dup_string (value);
-        break;
-    case PROP_ALLOW_ROAMING:
-        self->priv->allow_roaming = g_value_get_boolean (value);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-        break;
-    }
-}
-
-static void
-get_property (GObject *object,
-              guint prop_id,
-              GValue *value,
-              GParamSpec *pspec)
-{
-    MMBroadbandBearer *self = MM_BROADBAND_BEARER (object);
-
-    switch (prop_id) {
-    case PROP_3GPP_APN:
-        g_value_set_string (value, self->priv->apn);
-        break;
-    case PROP_CDMA_NUMBER:
-        g_value_set_string (value, self->priv->number);
-        break;
-    case PROP_CDMA_RM_PROTOCOL:
-        g_value_set_enum (value, self->priv->rm_protocol);
-        break;
-    case PROP_IP_TYPE:
-        g_value_set_string (value, self->priv->ip_type);
-        break;
-    case PROP_ALLOW_ROAMING:
-        g_value_set_boolean (value, self->priv->allow_roaming);
-        break;
-    default:
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-        break;
-    }
 }
 
 static void
@@ -2188,8 +2045,6 @@ mm_broadband_bearer_init (MMBroadbandBearer *self)
 
     /* Set defaults */
     self->priv->connection_type = CONNECTION_TYPE_NONE;
-    self->priv->allow_roaming = TRUE;
-    self->priv->rm_protocol = MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN;
     self->priv->reason_3gpp = CONNECTION_FORBIDDEN_REASON_NONE;
     self->priv->reason_cdma = CONNECTION_FORBIDDEN_REASON_NONE;
 }
@@ -2225,17 +2080,6 @@ dispose (GObject *object)
 }
 
 static void
-finalize (GObject *object)
-{
-    MMBroadbandBearer *self = MM_BROADBAND_BEARER (object);
-
-    g_free (self->priv->apn);
-    g_free (self->priv->ip_type);
-
-    G_OBJECT_CLASS (mm_broadband_bearer_parent_class)->finalize (object);
-}
-
-static void
 async_initable_iface_init (GAsyncInitableIface *iface)
 {
     iface->init_async = initable_init_async;
@@ -2251,13 +2095,8 @@ mm_broadband_bearer_class_init (MMBroadbandBearerClass *klass)
     g_type_class_add_private (object_class, sizeof (MMBroadbandBearerPrivate));
 
     /* Virtual methods */
-    object_class->get_property = get_property;
-    object_class->set_property = set_property;
-    object_class->finalize = finalize;
     object_class->dispose = dispose;
 
-    bearer_class->cmp_properties = cmp_properties;
-    bearer_class->expose_properties = expose_properties;
     bearer_class->connect = connect;
     bearer_class->connect_finish = connect_finish;
     bearer_class->disconnect = disconnect;
@@ -2276,45 +2115,4 @@ mm_broadband_bearer_class_init (MMBroadbandBearerClass *klass)
     klass->disconnect_3gpp_finish = detailed_disconnect_finish;
     klass->disconnect_cdma = disconnect_cdma;
     klass->disconnect_cdma_finish = detailed_disconnect_finish;
-
-    properties[PROP_3GPP_APN] =
-        g_param_spec_string (MM_BROADBAND_BEARER_3GPP_APN,
-                             "3GPP APN",
-                             "Access Point Name to use in the connection",
-                             NULL,
-                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
-    g_object_class_install_property (object_class, PROP_3GPP_APN, properties[PROP_3GPP_APN]);
-
-    properties[PROP_CDMA_NUMBER] =
-        g_param_spec_string (MM_BROADBAND_BEARER_CDMA_NUMBER,
-                             "Number to dial",
-                             "Number to dial when launching the CDMA connection",
-                             NULL,
-                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
-    g_object_class_install_property (object_class, PROP_CDMA_NUMBER, properties[PROP_CDMA_NUMBER]);
-
-    properties[PROP_CDMA_RM_PROTOCOL] =
-        g_param_spec_enum (MM_BROADBAND_BEARER_CDMA_RM_PROTOCOL,
-                           "Rm Protocol",
-                           "Protocol to use in the CDMA Rm interface",
-                           MM_TYPE_MODEM_CDMA_RM_PROTOCOL,
-                           MM_MODEM_CDMA_RM_PROTOCOL_UNKNOWN,
-                           G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
-    g_object_class_install_property (object_class, PROP_CDMA_RM_PROTOCOL, properties[PROP_CDMA_RM_PROTOCOL]);
-
-    properties[PROP_IP_TYPE] =
-        g_param_spec_string (MM_BROADBAND_BEARER_IP_TYPE,
-                             "IP type",
-                             "IP setup to use in the connection",
-                             NULL,
-                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
-    g_object_class_install_property (object_class, PROP_IP_TYPE, properties[PROP_IP_TYPE]);
-
-    properties[PROP_ALLOW_ROAMING] =
-        g_param_spec_boolean (MM_BROADBAND_BEARER_ALLOW_ROAMING,
-                              "Allow roaming",
-                              "Whether connections are allowed when roaming",
-                              TRUE,
-                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
-    g_object_class_install_property (object_class, PROP_ALLOW_ROAMING, properties[PROP_ALLOW_ROAMING]);
 }

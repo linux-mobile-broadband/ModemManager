@@ -48,6 +48,7 @@ GType mm_bearer_iridium_get_type (void);
 
 /* Iridium bearer creation implementation.
  * NOTE it is *not* a broadband bearer, so not async-initable */
-MMBearer *mm_bearer_iridium_new (MMBroadbandModemIridium *modem);
+MMBearer *mm_bearer_iridium_new (MMBroadbandModemIridium *modem,
+                                 MMBearerProperties *config);
 
 #endif /* MM_BEARER_IRIDIUM_H */

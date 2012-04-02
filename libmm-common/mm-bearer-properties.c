@@ -440,6 +440,22 @@ mm_bearer_properties_dup (MMBearerProperties *orig)
 
 /*****************************************************************************/
 
+gboolean
+mm_bearer_properties_cmp (MMBearerProperties *a,
+                          MMBearerProperties *b)
+{
+    return ((!g_strcmp0 (a->priv->apn, b->priv->apn)) &&
+            (!g_strcmp0 (a->priv->ip_type, b->priv->ip_type)) &&
+            (!g_strcmp0 (a->priv->number, b->priv->number)) &&
+            (!g_strcmp0 (a->priv->user, b->priv->user)) &&
+            (!g_strcmp0 (a->priv->password, b->priv->password)) &&
+            (a->priv->allow_roaming == b->priv->allow_roaming) &&
+            (a->priv->allow_roaming_set == b->priv->allow_roaming_set) &&
+            (a->priv->rm_protocol == b->priv->rm_protocol));
+}
+
+/*****************************************************************************/
+
 MMBearerProperties *
 mm_bearer_properties_new (void)
 {
