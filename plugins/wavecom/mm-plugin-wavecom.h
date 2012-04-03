@@ -17,6 +17,8 @@
  * Boston, MA 02111-1307, USA.
  *
  * Copyright (C) 2011 Ammonit Measurement GmbH
+ * Copyright (C) 2012 Aleksander Morgado <aleksander@gnu.org>
+ *
  * Author: Aleksander Morgado <aleksander@lanedo.com>
  */
 
@@ -24,7 +26,6 @@
 #define MM_PLUGIN_WAVECOM_H
 
 #include "mm-plugin-base.h"
-#include "mm-generic-gsm.h"
 
 #define MM_TYPE_PLUGIN_WAVECOM            (mm_plugin_wavecom_get_type ())
 #define MM_PLUGIN_WAVECOM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_WAVECOM, MMPluginWavecom))

@@ -47,7 +47,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-hso.la \
 	libmm-plugin-anydata.la \
 	libmm-plugin-linktop.la \
-	libmm-plugin-simtech.la
+	libmm-plugin-simtech.la \
+	libmm-plugin-wavecom.la
 
 #pkglib_LTLIBRARIES = \
 #	libmm-plugin-generic.la \
@@ -148,15 +149,15 @@ libmm_plugin_hso_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 #libmm_plugin_sierra_la_LIBADD = \
 #        $(builddir)/libicera-utils.la
 
-## Wavecom (Sierra Airlink)
-#libmm_plugin_wavecom_la_SOURCES = \
-#	mm-plugin-wavecom.c \
-#	mm-plugin-wavecom.h \
-#	mm-modem-wavecom-gsm.c \
-#	mm-modem-wavecom-gsm.h
-#libmm_plugin_wavecom_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-#libmm_plugin_wavecom_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-#
+# Wavecom (Sierra Airlink)
+libmm_plugin_wavecom_la_SOURCES = \
+	wavecom/mm-plugin-wavecom.c \
+	wavecom/mm-plugin-wavecom.h \
+	wavecom/mm-broadband-modem-wavecom.c \
+	wavecom/mm-broadband-modem-wavecom.h
+libmm_plugin_wavecom_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_wavecom_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
 ## Novatel
 #libmm_plugin_novatel_la_SOURCES = \
 #	mm-plugin-novatel.c \
