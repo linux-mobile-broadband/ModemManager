@@ -136,6 +136,213 @@ load_supported_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load initial allowed/preferred modes (Modem interface) */
+
+typedef struct {
+    MMModemMode allowed;
+    MMModemMode preferred;
+} LoadAllowedModesResult;
+
+static gboolean
+load_allowed_modes_finish (MMIfaceModem *self,
+                           GAsyncResult *res,
+                           MMModemMode *allowed,
+                           MMModemMode *preferred,
+                           GError **error)
+{
+    LoadAllowedModesResult *result;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    result = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+
+    *allowed = result->allowed;
+    *preferred = result->preferred;
+    return TRUE;
+}
+
+static void
+wwsm_read_ready (MMBaseModem *self,
+                 GAsyncResult *res,
+                 GSimpleAsyncResult *simple)
+{
+    GRegex *r;
+    GMatchInfo *match_info = NULL;
+    LoadAllowedModesResult result;
+    const gchar *response;
+    GError *error = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    result.allowed = MM_MODEM_MODE_NONE;
+    result.preferred = MM_MODEM_MODE_NONE;
+
+    /* Possible responses:
+     *   +WWSM: 0    (2G only)
+     *   +WWSM: 1    (3G only)
+     *   +WWSM: 2,0  (Any)
+     *   +WWSM: 2,1  (2G preferred)
+     *   +WWSM: 2,2  (3G preferred)
+     */
+    r = g_regex_new ("\\r\\n\\+WWSM: ([0-2])(,([0-2]))?.*$", 0, 0, NULL);
+    g_assert (r != NULL);
+
+    if (g_regex_match_full (r, response, strlen (response), 0, 0, &match_info, NULL)) {
+        guint allowed = 0;
+
+        if (mm_get_uint_from_match_info (match_info, 1, &allowed)) {
+            switch (allowed) {
+            case 0:
+                result.allowed = MM_MODEM_MODE_2G;
+                result.preferred = MM_MODEM_MODE_NONE;
+                break;
+            case 1:
+                result.allowed = MM_MODEM_MODE_3G;
+                result.preferred = MM_MODEM_MODE_NONE;
+                break;
+            case 2: {
+                guint preferred = 0;
+
+                result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+
+                /* 3, to avoid the comma */
+                if (mm_get_uint_from_match_info (match_info, 3, &preferred)) {
+                    switch (preferred) {
+                    case 0:
+                        result.preferred = MM_MODEM_MODE_NONE;
+                        break;
+                    case 1:
+                        result.preferred = MM_MODEM_MODE_2G;
+                        break;
+                    case 2:
+                        result.preferred = MM_MODEM_MODE_3G;
+                        break;
+                    default:
+                        g_warn_if_reached ();
+                        break;
+                    }
+                }
+                break;
+            }
+            default:
+                g_warn_if_reached ();
+                break;
+            }
+        }
+    }
+
+    if (result.allowed == MM_MODEM_MODE_NONE)
+        g_simple_async_result_set_error (simple,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Unknown wireless data service reply: '%s'",
+                                         response);
+    else
+        g_simple_async_result_set_op_res_gpointer (simple, &result, NULL);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+
+    g_regex_unref (r);
+    if (match_info)
+        g_match_info_free (match_info);
+}
+
+static void
+current_ms_class_ready (MMBaseModem *self,
+                        GAsyncResult *res,
+                        GSimpleAsyncResult *simple)
+{
+    LoadAllowedModesResult result;
+    const gchar *response;
+    GError *error = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    response = mm_strip_tag (response, "+CGCLASS:");
+
+    if (strncmp (response,
+                 WAVECOM_MS_CLASS_A_IDSTR,
+                 strlen (WAVECOM_MS_CLASS_A_IDSTR)) == 0) {
+        mm_dbg ("Modem configured as a Class A mobile station");
+        /* For 3G devices, query WWSM status */
+        mm_base_modem_at_command (MM_BASE_MODEM (self),
+                                  "+WWSM?",
+                                  3,
+                                  FALSE,
+                                  (GAsyncReadyCallback)wwsm_read_ready,
+                                  simple);
+        return;
+    }
+
+    result.allowed = MM_MODEM_MODE_NONE;
+    result.preferred = MM_MODEM_MODE_NONE;
+
+    if (strncmp (response,
+                 WAVECOM_MS_CLASS_B_IDSTR,
+                 strlen (WAVECOM_MS_CLASS_B_IDSTR)) == 0) {
+        mm_dbg ("Modem configured as a Class B mobile station");
+        result.allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_CS);
+        result.preferred = MM_MODEM_MODE_2G;
+    } else if (strncmp (response,
+                        WAVECOM_MS_CLASS_CG_IDSTR,
+                        strlen (WAVECOM_MS_CLASS_CG_IDSTR)) == 0) {
+        mm_dbg ("Modem configured as a Class CG mobile station");
+        result.allowed = MM_MODEM_MODE_2G;
+        result.preferred = MM_MODEM_MODE_NONE;
+    } else if (strncmp (response,
+                        WAVECOM_MS_CLASS_CC_IDSTR,
+                        strlen (WAVECOM_MS_CLASS_CC_IDSTR)) == 0) {
+        mm_dbg ("Modem configured as a Class CC mobile station");
+        result.allowed = MM_MODEM_MODE_CS;
+        result.preferred = MM_MODEM_MODE_NONE;
+    }
+
+    if (result.allowed == MM_MODEM_MODE_NONE)
+        g_simple_async_result_set_error (simple,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Unknown mobile station class: '%s'",
+                                         response);
+    else
+        g_simple_async_result_set_op_res_gpointer (simple, &result, NULL);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+load_allowed_modes (MMIfaceModem *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_allowed_modes);
+
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+CGCLASS?",
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)current_ms_class_ready,
+                              result);
+}
+
+/*****************************************************************************/
 /* Flow control (Modem interface) */
 
 static gboolean
@@ -306,6 +513,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface->load_supported_modes = load_supported_modes;
     iface->load_supported_modes_finish = load_supported_modes_finish;
+    iface->load_allowed_modes = load_allowed_modes;
+    iface->load_allowed_modes_finish = load_allowed_modes_finish;
     iface->setup_flow_control = setup_flow_control;
     iface->setup_flow_control_finish = setup_flow_control_finish;
     iface->modem_power_up = modem_power_up;
