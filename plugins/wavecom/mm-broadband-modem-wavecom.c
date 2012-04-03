@@ -37,6 +37,104 @@ static void iface_modem_init (MMIfaceModem *iface);
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemWavecom, mm_broadband_modem_wavecom, MM_TYPE_BROADBAND_MODEM, 0,
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init))
 
+#define WAVECOM_MS_CLASS_CC_IDSTR "\"CC\""
+#define WAVECOM_MS_CLASS_CG_IDSTR "\"CG\""
+#define WAVECOM_MS_CLASS_B_IDSTR  "\"B\""
+#define WAVECOM_MS_CLASS_A_IDSTR  "\"A\""
+
+/*****************************************************************************/
+/* Supported modes (Modem interface) */
+
+static MMModemMode
+load_supported_modes_finish (MMIfaceModem *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_MODE_NONE;
+
+    return (MMModemMode) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
+                                               G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+supported_ms_classes_query_ready (MMBaseModem *self,
+                                  GAsyncResult *res,
+                                  GSimpleAsyncResult *simple)
+{
+    const gchar *response;
+    GError *error = NULL;
+    MMModemMode mode;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response) {
+        /* Let the error be critical. */
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    response = mm_strip_tag (response, "+CGCLASS:");
+    mode = MM_MODEM_MODE_NONE;
+
+    if (strstr (response, WAVECOM_MS_CLASS_A_IDSTR)) {
+        mm_dbg ("Modem supports Class A mobile station");
+        mode |= MM_MODEM_MODE_3G;
+    }
+
+    if (strstr (response, WAVECOM_MS_CLASS_B_IDSTR)) {
+        mm_dbg ("Modem supports Class B mobile station");
+        mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_CS);
+    }
+
+    if (strstr (response, WAVECOM_MS_CLASS_CG_IDSTR)) {
+        mm_dbg ("Modem supports Class CG mobile station");
+        mode |= MM_MODEM_MODE_2G;
+    }
+
+    if (strstr (response, WAVECOM_MS_CLASS_CC_IDSTR)) {
+        mm_dbg ("Modem supports Class CC mobile station");
+        mode |= MM_MODEM_MODE_CS;
+    }
+
+    /* If none received, error */
+    if (mode == MM_MODEM_MODE_NONE)
+        g_simple_async_result_set_error (simple,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't get supported mobile station classes: '%s'",
+                                         response);
+    else
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   GUINT_TO_POINTER (mode),
+                                                   NULL);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+load_supported_modes (MMIfaceModem *self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_supported_modes);
+
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "+CGCLASS=?",
+        3,
+        FALSE,
+        (GAsyncReadyCallback)supported_ms_classes_query_ready,
+        result);
+}
+
 /*****************************************************************************/
 /* Flow control (Modem interface) */
 
@@ -206,6 +304,8 @@ mm_broadband_modem_wavecom_init (MMBroadbandModemWavecom *self)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    iface->load_supported_modes = load_supported_modes;
+    iface->load_supported_modes_finish = load_supported_modes_finish;
     iface->setup_flow_control = setup_flow_control;
     iface->setup_flow_control_finish = setup_flow_control_finish;
     iface->modem_power_up = modem_power_up;
