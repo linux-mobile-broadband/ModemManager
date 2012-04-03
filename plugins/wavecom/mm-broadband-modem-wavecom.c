@@ -27,9 +27,41 @@
 
 #include "ModemManager.h"
 #include "mm-log.h"
+#include "mm-iface-modem.h"
+#include "mm-base-modem-at.h"
 #include "mm-broadband-modem-wavecom.h"
 
-G_DEFINE_TYPE (MMBroadbandModemWavecom, mm_broadband_modem_wavecom, MM_TYPE_BROADBAND_MODEM);
+static void iface_modem_init (MMIfaceModem *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMBroadbandModemWavecom, mm_broadband_modem_wavecom, MM_TYPE_BROADBAND_MODEM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init))
+
+/*****************************************************************************/
+/* Modem power down (Modem interface) */
+
+static gboolean
+modem_power_down_finish (MMIfaceModem *self,
+                         GAsyncResult *res,
+                         GError **error)
+{
+    return !!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+}
+
+static void
+modem_power_down (MMIfaceModem *self,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    /* Use AT+CFUN=4 for power down. It will stop the RF (IMSI detach), and
+     * keeps access to the SIM */
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "+CFUN=4",
+        3,
+        FALSE,
+        callback,
+        user_data);
+}
 
 /*****************************************************************************/
 
@@ -52,6 +84,13 @@ mm_broadband_modem_wavecom_new (const gchar *device,
 static void
 mm_broadband_modem_wavecom_init (MMBroadbandModemWavecom *self)
 {
+}
+
+static void
+iface_modem_init (MMIfaceModem *iface)
+{
+    iface->modem_power_down = modem_power_down;
+    iface->modem_power_down_finish = modem_power_down_finish;
 }
 
 static void
