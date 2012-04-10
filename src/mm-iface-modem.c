@@ -3689,6 +3689,71 @@ mm_iface_modem_shutdown (MMIfaceModem *self)
 
 /*****************************************************************************/
 
+MMModemMode
+mm_iface_modem_get_supported_modes (MMIfaceModem *self)
+{
+    MMModemMode supported = MM_MODEM_MODE_NONE;
+    MmGdbusModem *skeleton;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    if (skeleton) {
+        supported = mm_gdbus_modem_get_supported_modes (skeleton);
+        g_object_unref (skeleton);
+    }
+
+    return supported;
+}
+
+gboolean
+mm_iface_modem_is_2g (MMIfaceModem *self)
+{
+    return (mm_iface_modem_get_supported_modes (self) & MM_MODEM_MODE_2G);
+}
+
+gboolean
+mm_iface_modem_is_2g_only (MMIfaceModem *self)
+{
+    MMModemMode supported;
+
+    supported = mm_iface_modem_get_supported_modes (self);
+    return !((MM_MODEM_MODE_2G ^ supported) & supported);
+}
+
+gboolean
+mm_iface_modem_is_3g (MMIfaceModem *self)
+{
+    return (mm_iface_modem_get_supported_modes (self) & MM_MODEM_MODE_3G);
+}
+
+gboolean
+mm_iface_modem_is_3g_only (MMIfaceModem *self)
+{
+    MMModemMode supported;
+
+    supported = mm_iface_modem_get_supported_modes (self);
+    return !((MM_MODEM_MODE_3G ^ supported) & supported);
+}
+
+gboolean
+mm_iface_modem_is_4g (MMIfaceModem *self)
+{
+    return (mm_iface_modem_get_supported_modes (self) & MM_MODEM_MODE_4G);
+}
+
+gboolean
+mm_iface_modem_is_4g_only (MMIfaceModem *self)
+{
+    MMModemMode supported;
+
+    supported = mm_iface_modem_get_supported_modes (self);
+    return !((MM_MODEM_MODE_4G ^ supported) & supported);
+}
+
+/*****************************************************************************/
+
 MMModemCapability
 mm_iface_modem_get_current_capabilities (MMIfaceModem *self)
 {
