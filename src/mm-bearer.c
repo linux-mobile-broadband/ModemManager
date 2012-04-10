@@ -98,6 +98,60 @@ mm_bearer_export (MMBearer *self)
 }
 
 /*****************************************************************************/
+
+static void
+bearer_reset_interface_status (MMBearer *self)
+{
+    mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (self), FALSE);
+    mm_gdbus_bearer_set_suspended (MM_GDBUS_BEARER (self), FALSE);
+    mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (self), NULL);
+    mm_gdbus_bearer_set_ip4_config (
+        MM_GDBUS_BEARER (self),
+        mm_bearer_ip_config_get_dictionary (NULL));
+    mm_gdbus_bearer_set_ip6_config (
+        MM_GDBUS_BEARER (self),
+        mm_bearer_ip_config_get_dictionary (NULL));
+}
+
+static void
+bearer_update_status (MMBearer *self,
+                      MMBearerStatus status)
+{
+    /* NOTE: we do allow status 'CONNECTED' here; it may happen if we go into
+     * DISCONNECTING and we cannot disconnect */
+
+    /* Update the property value */
+    self->priv->status = status;
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
+
+    /* Ensure that we don't expose any connection related data in the
+     * interface when going into disconnected state. */
+    if (self->priv->status == MM_BEARER_STATUS_DISCONNECTED)
+        bearer_reset_interface_status (self);
+}
+
+static void
+bearer_update_status_connected (MMBearer *self,
+                                const gchar *interface,
+                                MMBearerIpConfig *ipv4_config,
+                                MMBearerIpConfig *ipv6_config)
+{
+    mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (self), TRUE);
+    mm_gdbus_bearer_set_suspended (MM_GDBUS_BEARER (self), FALSE);
+    mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (self), interface);
+    mm_gdbus_bearer_set_ip4_config (
+        MM_GDBUS_BEARER (self),
+        mm_bearer_ip_config_get_dictionary (ipv4_config));
+    mm_gdbus_bearer_set_ip6_config (
+        MM_GDBUS_BEARER (self),
+        mm_bearer_ip_config_get_dictionary (ipv6_config));
+
+    /* Update the property value */
+    self->priv->status = MM_BEARER_STATUS_CONNECTED;
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
+}
+
+/*****************************************************************************/
 /* CONNECT */
 
 gboolean
@@ -124,8 +178,7 @@ disconnect_after_cancel_ready (MMBearer *self,
     else
         mm_dbg ("Disconnected bearer '%s'", self->priv->path);
 
-    self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
-    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
+    bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTED);
 }
 
 static void
@@ -154,10 +207,9 @@ connect_ready (MMBearer *self,
                              MM_CORE_ERROR_CANCELLED)) {
             /* Will launch disconnection */
             launch_disconnect = TRUE;
-        } else {
-            self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
-            g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
-        }
+        } else
+            bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTED);
+
         g_simple_async_result_take_error (simple, error);
     }
     /* Handle cancellations detected after successful connection */
@@ -178,18 +230,11 @@ connect_ready (MMBearer *self,
     else {
         mm_dbg ("Connected bearer '%s'", self->priv->path);
 
-        self->priv->status = MM_BEARER_STATUS_CONNECTED;
-        g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
-
-        /* Update the interface state */
-        mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (self), TRUE);
-        mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (self), mm_port_get_device (data));
-        mm_gdbus_bearer_set_ip4_config (
-            MM_GDBUS_BEARER (self),
-            mm_bearer_ip_config_get_dictionary (ipv4_config));
-        mm_gdbus_bearer_set_ip6_config (
-            MM_GDBUS_BEARER (self),
-            mm_bearer_ip_config_get_dictionary (ipv6_config));
+        /* Update bearer and interface status */
+        bearer_update_status_connected (self,
+                                        mm_port_get_device (data),
+                                        ipv4_config,
+                                        ipv6_config);
 
         g_clear_object (&data);
         g_clear_object (&ipv4_config);
@@ -199,8 +244,7 @@ connect_ready (MMBearer *self,
     }
 
     if (launch_disconnect) {
-        self->priv->status = MM_BEARER_STATUS_DISCONNECTING;
-        g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
+        bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTING);
         MM_BEARER_GET_CLASS (self)->disconnect (
             self,
             (GAsyncReadyCallback)disconnect_after_cancel_ready,
@@ -262,8 +306,7 @@ mm_bearer_connect (MMBearer *self,
     /* Connecting! */
     mm_dbg ("Connecting bearer '%s'", self->priv->path);
     self->priv->connect_cancellable = g_cancellable_new ();
-    self->priv->status = MM_BEARER_STATUS_CONNECTING;
-    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
+    bearer_update_status (self, MM_BEARER_STATUS_CONNECTING);
     MM_BEARER_GET_CLASS (self)->connect (
         self,
         self->priv->connect_cancellable,
@@ -360,23 +403,14 @@ disconnect_ready (MMBearer *self,
 
     if (!MM_BEARER_GET_CLASS (self)->disconnect_finish (self, res, &error)) {
         mm_dbg ("Couldn't disconnect bearer '%s'", self->priv->path);
-        self->priv->status = MM_BEARER_STATUS_CONNECTED;
+        bearer_update_status (self, MM_BEARER_STATUS_CONNECTED);
         g_simple_async_result_take_error (simple, error);
     }
     else {
         mm_dbg ("Disconnected bearer '%s'", self->priv->path);
-        self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
-
-        /* Update the interface state */
-        mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (self), FALSE);
-        mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (self), NULL);
-        mm_gdbus_bearer_set_ip4_config (MM_GDBUS_BEARER (self), NULL);
-        mm_gdbus_bearer_set_ip6_config (MM_GDBUS_BEARER (self), NULL);
-
+        bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTED);
         g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     }
-
-    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
 
     g_simple_async_result_complete (simple);
     g_object_unref (simple);
@@ -398,11 +432,7 @@ status_changed_complete_disconnect (MMBearer *self,
                                  self->priv->disconnect_signal_handler);
     self->priv->disconnect_signal_handler = 0;
 
-    /* Update the interface state */
-    mm_gdbus_bearer_set_connected (MM_GDBUS_BEARER (self), FALSE);
-    mm_gdbus_bearer_set_interface (MM_GDBUS_BEARER (self), NULL);
-    mm_gdbus_bearer_set_ip4_config (MM_GDBUS_BEARER (self), NULL);
-    mm_gdbus_bearer_set_ip6_config (MM_GDBUS_BEARER (self), NULL);
+    /* Note: interface state is updated when the DISCONNECTED state is set */
 
     g_simple_async_result_set_op_res_gboolean (simple, TRUE);
     g_simple_async_result_complete (simple);
@@ -464,8 +494,7 @@ mm_bearer_disconnect (MMBearer *self,
     }
 
     /* Disconnecting! */
-    self->priv->status = MM_BEARER_STATUS_DISCONNECTING;
-    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
+    bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTING);
     MM_BEARER_GET_CLASS (self)->disconnect (
         self,
         (GAsyncReadyCallback)disconnect_ready,
@@ -614,8 +643,7 @@ disconnect_force_ready (MMBearer *self,
     else
         mm_dbg ("Disconnected bearer '%s'", self->priv->path);
 
-    self->priv->status = MM_BEARER_STATUS_DISCONNECTED;
-    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
+    bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTED);
 }
 
 void
@@ -634,8 +662,7 @@ mm_bearer_disconnect_force (MMBearer *self)
     }
 
     /* Disconnecting! */
-    self->priv->status = MM_BEARER_STATUS_DISCONNECTING;
-    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_STATUS]);
+    bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTING);
     MM_BEARER_GET_CLASS (self)->disconnect (
         self,
         (GAsyncReadyCallback)disconnect_force_ready,
@@ -693,6 +720,11 @@ set_property (GObject *object,
         break;
     case PROP_STATUS:
         self->priv->status = g_value_get_enum (value);
+
+        /* Ensure that we don't expose any connection related data in the
+         * interface when going into disconnected state. */
+        if (self->priv->status == MM_BEARER_STATUS_DISCONNECTED)
+            bearer_reset_interface_status (self);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
