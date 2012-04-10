@@ -31,11 +31,10 @@
 #define MM_IS_IFACE_MODEM(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), MM_TYPE_IFACE_MODEM))
 #define MM_IFACE_MODEM_GET_INTERFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE ((obj), MM_TYPE_IFACE_MODEM, MMIfaceModem))
 
-#define MM_IFACE_MODEM_DBUS_SKELETON        "iface-modem-dbus-skeleton"
-#define MM_IFACE_MODEM_CURRENT_CAPABILITIES "iface-modem-current-capabilities"
-#define MM_IFACE_MODEM_STATE                "iface-modem-state"
-#define MM_IFACE_MODEM_SIM                  "iface-modem-sim"
-#define MM_IFACE_MODEM_BEARER_LIST          "iface-modem-bearer-list"
+#define MM_IFACE_MODEM_DBUS_SKELETON "iface-modem-dbus-skeleton"
+#define MM_IFACE_MODEM_STATE         "iface-modem-state"
+#define MM_IFACE_MODEM_SIM           "iface-modem-sim"
+#define MM_IFACE_MODEM_BEARER_LIST   "iface-modem-bearer-list"
 
 typedef struct _MMIfaceModem MMIfaceModem;
 
@@ -298,15 +297,14 @@ struct _MMIfaceModem {
 
 GType mm_iface_modem_get_type (void);
 
-/* Check whether this modem has 3GPP capabilities */
-gboolean mm_iface_modem_is_3gpp (MMIfaceModem *self);
-gboolean mm_iface_modem_is_3gpp_only (MMIfaceModem *self);
-gboolean mm_iface_modem_is_3gpp_lte (MMIfaceModem *self);
-gboolean mm_iface_modem_is_3gpp_lte_only (MMIfaceModem *self);
-
-/* Check whether this modem has CDMA capabilities */
-gboolean mm_iface_modem_is_cdma (MMIfaceModem *self);
-gboolean mm_iface_modem_is_cdma_only (MMIfaceModem *self);
+/* Helpers to query capabilities */
+MMModemCapability mm_iface_modem_get_current_capabilities (MMIfaceModem *self);
+gboolean          mm_iface_modem_is_3gpp                  (MMIfaceModem *self);
+gboolean          mm_iface_modem_is_3gpp_only             (MMIfaceModem *self);
+gboolean          mm_iface_modem_is_3gpp_lte              (MMIfaceModem *self);
+gboolean          mm_iface_modem_is_3gpp_lte_only         (MMIfaceModem *self);
+gboolean          mm_iface_modem_is_cdma                  (MMIfaceModem *self);
+gboolean          mm_iface_modem_is_cdma_only             (MMIfaceModem *self);
 
 /* Initialize Modem interface (async) */
 void     mm_iface_modem_initialize        (MMIfaceModem *self,

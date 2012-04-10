@@ -79,7 +79,6 @@ enum {
     PROP_MODEM_SIM,
     PROP_MODEM_BEARER_LIST,
     PROP_MODEM_STATE,
-    PROP_MODEM_CURRENT_CAPABILITIES,
     PROP_MODEM_3GPP_REGISTRATION_STATE,
     PROP_MODEM_3GPP_CS_NETWORK_SUPPORTED,
     PROP_MODEM_3GPP_PS_NETWORK_SUPPORTED,
@@ -107,7 +106,6 @@ struct _MMBroadbandModemPrivate {
     MMSim *modem_sim;
     MMBearerList *modem_bearer_list;
     MMModemState modem_state;
-    MMModemCapability modem_current_capabilities;
     /* Implementation helpers */
     MMModemCharset modem_current_charset;
     gboolean modem_cind_supported;
@@ -936,7 +934,7 @@ modem_load_supported_modes (MMIfaceModem *self,
     mode = MM_MODEM_MODE_NONE;
 
     /* If the modem has +GSM caps... */
-    if (broadband->priv->modem_current_capabilities & MM_MODEM_CAPABILITY_GSM_UMTS) {
+    if (mm_iface_modem_is_3gpp (self)) {
         /* There are modems which only support CS connections (e.g. Iridium) */
         if (broadband->priv->modem_3gpp_cs_network_supported)
             mode |= MM_MODEM_MODE_CS;
@@ -948,7 +946,7 @@ modem_load_supported_modes (MMIfaceModem *self,
     }
 
     /* If the modem has CDMA caps... */
-    if (broadband->priv->modem_current_capabilities & MM_MODEM_CAPABILITY_CDMA_EVDO) {
+    if (mm_iface_modem_is_cdma (self)) {
         if (broadband->priv->modem_cdma_cdma1x_network_supported)
             mode |= MM_MODEM_MODE_2G;
         if (broadband->priv->modem_cdma_evdo_network_supported)
@@ -956,10 +954,8 @@ modem_load_supported_modes (MMIfaceModem *self,
     }
 
     /* If the modem has LTE caps, it does 4G */
-    if (broadband->priv->modem_current_capabilities & MM_MODEM_CAPABILITY_LTE ||
-        broadband->priv->modem_current_capabilities & MM_MODEM_CAPABILITY_LTE_ADVANCED) {
+    if (mm_iface_modem_is_3gpp_lte (self))
         mode |= MM_MODEM_MODE_4G;
-    }
 
     g_simple_async_result_set_op_res_gpointer (result,
                                                GUINT_TO_POINTER (mode),
@@ -6930,9 +6926,6 @@ set_property (GObject *object,
     case PROP_MODEM_STATE:
         self->priv->modem_state = g_value_get_enum (value);
         break;
-    case PROP_MODEM_CURRENT_CAPABILITIES:
-        self->priv->modem_current_capabilities = g_value_get_flags (value);
-        break;
     case PROP_MODEM_3GPP_REGISTRATION_STATE:
         self->priv->modem_3gpp_registration_state = g_value_get_enum (value);
         break;
@@ -7022,9 +7015,6 @@ get_property (GObject *object,
     case PROP_MODEM_STATE:
         g_value_set_enum (value, self->priv->modem_state);
         break;
-    case PROP_MODEM_CURRENT_CAPABILITIES:
-        g_value_set_flags (value, self->priv->modem_current_capabilities);
-        break;
     case PROP_MODEM_3GPP_REGISTRATION_STATE:
         g_value_set_enum (value, self->priv->modem_3gpp_registration_state);
         break;
@@ -7078,7 +7068,6 @@ mm_broadband_modem_init (MMBroadbandModem *self)
                                               MM_TYPE_BROADBAND_MODEM,
                                               MMBroadbandModemPrivate);
     self->priv->modem_state = MM_MODEM_STATE_UNKNOWN;
-    self->priv->modem_current_capabilities = MM_MODEM_CAPABILITY_NONE;
     self->priv->modem_3gpp_registration_regex = mm_3gpp_creg_regex_get (TRUE);
     self->priv->modem_current_charset = MM_MODEM_CHARSET_UNKNOWN;
     self->priv->modem_3gpp_registration_state = MM_MODEM_3GPP_REGISTRATION_STATE_UNKNOWN;
@@ -7417,10 +7406,6 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     g_object_class_override_property (object_class,
                                       PROP_MODEM_STATE,
                                       MM_IFACE_MODEM_STATE);
-
-    g_object_class_override_property (object_class,
-                                      PROP_MODEM_CURRENT_CAPABILITIES,
-                                      MM_IFACE_MODEM_CURRENT_CAPABILITIES);
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_3GPP_REGISTRATION_STATE,

@@ -3037,7 +3037,7 @@ initialization_context_complete_and_free_if_cancelled (InitializationContext *ct
     }
 
 #undef UINT_REPLY_READY_FN
-#define UINT_REPLY_READY_FN(NAME,DISPLAY)                               \
+#define UINT_REPLY_READY_FN(NAME,DISPLAY,FATAL)                         \
     static void                                                         \
     load_##NAME##_ready (MMIfaceModem *self,                            \
                          GAsyncResult *res,                             \
@@ -3050,41 +3050,27 @@ initialization_context_complete_and_free_if_cancelled (InitializationContext *ct
             MM_IFACE_MODEM_GET_INTERFACE (self)->load_##NAME##_finish (self, res, &error)); \
                                                                         \
         if (error) {                                                    \
-            mm_warn ("couldn't load %s: '%s'", DISPLAY, error->message); \
-            g_error_free (error);                                       \
+            if (FATAL) {                                                \
+                g_propagate_error (&ctx->fatal_error, error);           \
+                g_prefix_error (&ctx->fatal_error, "couldn't load %s: ", DISPLAY); \
+                /* Jump to the last step */                             \
+                ctx->step = INITIALIZATION_STEP_LAST;                   \
+            } else {                                                    \
+                mm_warn ("couldn't load %s: '%s'", DISPLAY, error->message); \
+                g_error_free (error);                                   \
+                /* Go on to next step */                                \
+                ctx->step++;                                            \
+            }                                                           \
+        } else {                                                        \
+            /* Go on to next step */                                    \
+            ctx->step++;                                                \
         }                                                               \
                                                                         \
-        /* Go on to next step */                                        \
-        ctx->step++;                                                    \
         interface_initialization_step (ctx);                            \
     }
 
-static void
-load_current_capabilities_ready (MMIfaceModem *self,
-                                 GAsyncResult *res,
-                                 InitializationContext *ctx)
-{
-    /* We have the property in the interface bound to the property in the
-     * skeleton. */
-    g_object_set (self,
-                  MM_IFACE_MODEM_CURRENT_CAPABILITIES,
-                  MM_IFACE_MODEM_GET_INTERFACE (self)->load_current_capabilities_finish (self,
-                                                                                         res,
-                                                                                         &ctx->fatal_error),
-                  NULL);
-    if (ctx->fatal_error) {
-        g_prefix_error (&ctx->fatal_error,
-                        "couldn't load Current Capabilities: ");
-        /* Jump to the last step */
-        ctx->step = INITIALIZATION_STEP_LAST;
-    } else
-        /* Go on to next step */
-        ctx->step++;
-
-    interface_initialization_step (ctx);
-}
-
-UINT_REPLY_READY_FN (modem_capabilities, "Modem Capabilities")
+UINT_REPLY_READY_FN (current_capabilities, "Current Capabilities", TRUE)
+UINT_REPLY_READY_FN (modem_capabilities, "Modem Capabilities", FALSE)
 STR_REPLY_READY_FN (manufacturer, "Manufacturer")
 STR_REPLY_READY_FN (model, "Model")
 STR_REPLY_READY_FN (revision, "Revision")
@@ -3643,6 +3629,7 @@ mm_iface_modem_initialize (MMIfaceModem *self,
 
         /* Set all initial property defaults */
         mm_gdbus_modem_set_sim (skeleton, NULL);
+        mm_gdbus_modem_set_current_capabilities (skeleton, MM_MODEM_CAPABILITY_NONE);
         mm_gdbus_modem_set_modem_capabilities (skeleton, MM_MODEM_CAPABILITY_NONE);
         mm_gdbus_modem_set_max_bearers (skeleton, 0);
         mm_gdbus_modem_set_max_active_bearers (skeleton, 0);
@@ -3668,10 +3655,6 @@ mm_iface_modem_initialize (MMIfaceModem *self,
         /* Bind our State property */
         g_object_bind_property (self, MM_IFACE_MODEM_STATE,
                                 skeleton, "state",
-                                G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
-        /* Bind our Capabilities property */
-        g_object_bind_property (self, MM_IFACE_MODEM_CURRENT_CAPABILITIES,
-                                skeleton, "current-capabilities",
                                 G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
 
         g_object_set (self,
@@ -3706,75 +3689,66 @@ mm_iface_modem_shutdown (MMIfaceModem *self)
 
 /*****************************************************************************/
 
+MMModemCapability
+mm_iface_modem_get_current_capabilities (MMIfaceModem *self)
+{
+    MMModemCapability current = MM_MODEM_CAPABILITY_NONE;
+    MmGdbusModem *skeleton;
+
+    g_object_get (self,
+                  MM_IFACE_MODEM_DBUS_SKELETON, &skeleton,
+                  NULL);
+
+    if (skeleton) {
+        current = mm_gdbus_modem_get_current_capabilities (skeleton);
+        g_object_unref (skeleton);
+    }
+
+    return current;
+}
+
 gboolean
 mm_iface_modem_is_3gpp (MMIfaceModem *self)
 {
-    MMModemCapability capabilities = MM_MODEM_CAPABILITY_NONE;
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_CURRENT_CAPABILITIES, &capabilities,
-                  NULL);
-
-    return (capabilities & MM_MODEM_CAPABILITY_3GPP);
+    return (mm_iface_modem_get_current_capabilities (self) & MM_MODEM_CAPABILITY_3GPP);
 }
 
 gboolean
 mm_iface_modem_is_3gpp_lte (MMIfaceModem *self)
 {
-    MMModemCapability capabilities = MM_MODEM_CAPABILITY_NONE;
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_CURRENT_CAPABILITIES, &capabilities,
-                  NULL);
-
-    return (capabilities & MM_MODEM_CAPABILITY_3GPP_LTE);
+    return (mm_iface_modem_get_current_capabilities (self) & MM_MODEM_CAPABILITY_3GPP_LTE);
 }
 
 gboolean
 mm_iface_modem_is_cdma (MMIfaceModem *self)
 {
-    MMModemCapability capabilities = MM_MODEM_CAPABILITY_NONE;
-
-    g_object_get (self,
-                  MM_IFACE_MODEM_CURRENT_CAPABILITIES, &capabilities,
-                  NULL);
-
-    return (capabilities & MM_MODEM_CAPABILITY_CDMA_EVDO);
+    return (mm_iface_modem_get_current_capabilities (self) & MM_MODEM_CAPABILITY_CDMA_EVDO);
 }
 
 gboolean
 mm_iface_modem_is_3gpp_only (MMIfaceModem *self)
 {
-    MMModemCapability capabilities = MM_MODEM_CAPABILITY_NONE;
+    MMModemCapability capabilities;
 
-    g_object_get (self,
-                  MM_IFACE_MODEM_CURRENT_CAPABILITIES, &capabilities,
-                  NULL);
-
+    capabilities = mm_iface_modem_get_current_capabilities (self);
     return !((MM_MODEM_CAPABILITY_3GPP ^ capabilities) & capabilities);
 }
 
 gboolean
 mm_iface_modem_is_3gpp_lte_only (MMIfaceModem *self)
 {
-    MMModemCapability capabilities = MM_MODEM_CAPABILITY_NONE;
+    MMModemCapability capabilities;
 
-    g_object_get (self,
-                  MM_IFACE_MODEM_CURRENT_CAPABILITIES, &capabilities,
-                  NULL);
-
+    capabilities = mm_iface_modem_get_current_capabilities (self);
     return !((MM_MODEM_CAPABILITY_3GPP_LTE ^ capabilities) & capabilities);
 }
 
 gboolean
 mm_iface_modem_is_cdma_only (MMIfaceModem *self)
 {
-    MMModemCapability capabilities = MM_MODEM_CAPABILITY_NONE;
+    MMModemCapability capabilities;
 
-    g_object_get (self,
-                  MM_IFACE_MODEM_CURRENT_CAPABILITIES, &capabilities,
-                  NULL);
-
+    capabilities = mm_iface_modem_get_current_capabilities (self);
     return !((MM_MODEM_CAPABILITY_CDMA_EVDO ^ capabilities) & capabilities);
 }
 
@@ -3813,15 +3787,6 @@ iface_modem_init (gpointer g_iface)
                             MM_TYPE_MODEM_STATE,
                             MM_MODEM_STATE_UNKNOWN,
                             G_PARAM_READWRITE));
-
-    g_object_interface_install_property
-        (g_iface,
-         g_param_spec_flags (MM_IFACE_MODEM_CURRENT_CAPABILITIES,
-                             "Current capabilities",
-                             "Current capabilities of the modem",
-                             MM_TYPE_MODEM_CAPABILITY,
-                             MM_MODEM_CAPABILITY_NONE,
-                             G_PARAM_READWRITE));
 
     g_object_interface_install_property
         (g_iface,
