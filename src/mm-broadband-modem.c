@@ -68,6 +68,7 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModem, mm_broadband_modem, MM_TYPE_BASE_MODEM
 
 enum {
     PROP_0,
+    PROP_USE_WS46,
     PROP_MODEM_DBUS_SKELETON,
     PROP_MODEM_3GPP_DBUS_SKELETON,
     PROP_MODEM_3GPP_USSD_DBUS_SKELETON,
@@ -100,6 +101,9 @@ enum {
 #define CIND_INDICATOR_IS_VALID(u) (u != CIND_INDICATOR_INVALID)
 
 struct _MMBroadbandModemPrivate {
+    /* Broadband modem specific implementation */
+    gboolean use_ws46;
+
     /*<--- Modem interface --->*/
     /* Properties */
     GObject *modem_dbus_skeleton;
@@ -917,6 +921,95 @@ modem_load_supported_modes_finish (MMIfaceModem *self,
 }
 
 static void
+supported_networks_query_ready (MMBroadbandModem *self,
+                                GAsyncResult *res,
+                                GSimpleAsyncResult *operation_result)
+{
+    const gchar *response;
+    GError *error = NULL;
+    MMModemMode mode = MM_MODEM_MODE_NONE;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        /* Let the error be critical. */
+        g_simple_async_result_take_error (operation_result, error);
+        g_simple_async_result_complete (operation_result);
+        g_object_unref (operation_result);
+        return;
+    }
+
+    /*
+     * More than one numeric ID may appear in the list, that's why
+     * they are checked separately.
+     *
+     * NOTE: Do not skip WS46 prefix; it would break Cinterion handling.
+     *
+     * From 3GPP TS 27.007 v.11.2.0, section 5.9
+     * 12	GSM Digital Cellular Systems (GERAN only)
+     * 22	UTRAN only
+     * 25	3GPP Systems (GERAN, UTRAN and E-UTRAN)
+     * 28	E-UTRAN only
+     * 29	GERAN and UTRAN
+     * 30	GERAN and E-UTRAN
+     * 31	UTRAN and E-UTRAN
+     */
+
+    if (strstr (response, "12") != NULL) {
+        mm_dbg ("Device allows 2G-only network mode");
+        mode |= MM_MODEM_MODE_2G;
+    }
+
+    if (strstr (response, "22") != NULL) {
+        mm_dbg ("Device allows 3G-only network mode");
+        mode |= MM_MODEM_MODE_3G;
+    }
+
+    if (strstr (response, "28") != NULL) {
+        mm_dbg ("Device allows 4G-only network mode");
+        mode |= MM_MODEM_MODE_4G;
+    }
+
+    if (strstr (response, "29") != NULL) {
+        mm_dbg ("Device allows 2G/3G network mode");
+        mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+    }
+
+    if (strstr (response, "30") != NULL) {
+        mm_dbg ("Device allows 2G/4G network mode");
+        mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_4G);
+    }
+
+    if (strstr (response, "31") != NULL) {
+        mm_dbg ("Device allows 3G/4G network mode");
+        mode |= (MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+    }
+
+    if (strstr (response, "25") != NULL) {
+        if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self))) {
+            mm_dbg ("Device allows every supported 3GPP network mode (2G/3G/4G)");
+            mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
+        } else {
+            mm_dbg ("Device allows every supported 3GPP network mode (2G/3G)");
+            mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+        }
+    }
+
+    /* If no expected ID found, error */
+    if (mode == MM_MODEM_MODE_NONE)
+        g_simple_async_result_set_error (operation_result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Invalid list of supported networks: '%s'",
+                                         response);
+    else
+        g_simple_async_result_set_op_res_gpointer (operation_result,
+                                                   GUINT_TO_POINTER (mode),
+                                                   NULL);
+    g_simple_async_result_complete (operation_result);
+    g_object_unref (operation_result);
+}
+
+static void
 modem_load_supported_modes (MMIfaceModem *self,
                             GAsyncReadyCallback callback,
                             gpointer user_data)
@@ -931,11 +1024,27 @@ modem_load_supported_modes (MMIfaceModem *self,
                                         user_data,
                                         modem_load_supported_modes);
 
+    if (broadband->priv->use_ws46) {
+        /* We try to query the list of supported networks, which gives a more
+         * detailed view of the supported modes (specifically between 2G and 3G)
+         */
+        mm_base_modem_at_command (
+            MM_BASE_MODEM (self),
+            "+WS46=?",
+            3,
+            FALSE,
+            (GAsyncReadyCallback)supported_networks_query_ready,
+            result);
+        return;
+    }
+
+    /* Try to guess from capabilities */
+
     mode = MM_MODEM_MODE_NONE;
 
     /* If the modem has +GSM caps... */
-    if (mm_iface_modem_is_3gpp (self)) {
-        /* There are modems which only support CS connections (e.g. Iridium) */
+    if (mm_iface_modem_is_3gpp (MM_IFACE_MODEM (self))) {
+        /* Some modems, e.g. Iridium, will only support CS */
         if (broadband->priv->modem_3gpp_cs_network_supported)
             mode |= MM_MODEM_MODE_CS;
         /* If PS supported, assume we can do both 2G and 3G, even if it may not really
@@ -946,7 +1055,7 @@ modem_load_supported_modes (MMIfaceModem *self,
     }
 
     /* If the modem has CDMA caps... */
-    if (mm_iface_modem_is_cdma (self)) {
+    if (mm_iface_modem_is_cdma (MM_IFACE_MODEM (self))) {
         if (broadband->priv->modem_cdma_cdma1x_network_supported)
             mode |= MM_MODEM_MODE_2G;
         if (broadband->priv->modem_cdma_evdo_network_supported)
@@ -954,12 +1063,20 @@ modem_load_supported_modes (MMIfaceModem *self,
     }
 
     /* If the modem has LTE caps, it does 4G */
-    if (mm_iface_modem_is_3gpp_lte (self))
+    if (mm_iface_modem_is_3gpp_lte (MM_IFACE_MODEM (self)))
         mode |= MM_MODEM_MODE_4G;
 
-    g_simple_async_result_set_op_res_gpointer (result,
-                                               GUINT_TO_POINTER (mode),
-                                               NULL);
+    /* If no mode found, error */
+    if (mode == MM_MODEM_MODE_NONE)
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Couldn't guess modes from capabilities");
+    else
+        g_simple_async_result_set_op_res_gpointer (result,
+                                                   GUINT_TO_POINTER (mode),
+                                                   NULL);
+
     g_simple_async_result_complete_in_idle (result);
     g_object_unref (result);
 }
@@ -6883,6 +7000,9 @@ set_property (GObject *object,
     MMBroadbandModem *self = MM_BROADBAND_MODEM (object);
 
     switch (prop_id) {
+    case PROP_USE_WS46:
+        self->priv->use_ws46 = g_value_get_boolean (value);
+        break;
     case PROP_MODEM_DBUS_SKELETON:
         g_clear_object (&self->priv->modem_dbus_skeleton);
         self->priv->modem_dbus_skeleton = g_value_dup_object (value);
@@ -6982,6 +7102,9 @@ get_property (GObject *object,
     MMBroadbandModem *self = MM_BROADBAND_MODEM (object);
 
     switch (prop_id) {
+    case PROP_USE_WS46:
+        g_value_set_boolean (value, self->priv->use_ws46);
+        break;
     case PROP_MODEM_DBUS_SKELETON:
         g_value_set_object (value, self->priv->modem_dbus_skeleton);
         break;
@@ -7067,6 +7190,7 @@ mm_broadband_modem_init (MMBroadbandModem *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),
                                               MM_TYPE_BROADBAND_MODEM,
                                               MMBroadbandModemPrivate);
+    self->priv->use_ws46 = FALSE;
     self->priv->modem_state = MM_MODEM_STATE_UNKNOWN;
     self->priv->modem_3gpp_registration_regex = mm_3gpp_creg_regex_get (TRUE);
     self->priv->modem_current_charset = MM_MODEM_CHARSET_UNKNOWN;
@@ -7362,6 +7486,15 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     base_modem_class->disable_finish = disable_finish;
 
     klass->setup_ports = setup_ports;
+
+    g_object_class_install_property (
+        object_class,
+        PROP_USE_WS46,
+        g_param_spec_boolean (MM_BROADBAND_MODEM_USE_WS46,
+                              "Use AT+WS46",
+                              "Whether the modem should use AT+WS46=? when loading supported modes",
+                              FALSE,
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_DBUS_SKELETON,
