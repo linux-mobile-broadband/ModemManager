@@ -1602,21 +1602,30 @@ disconnect_finish (MMBearer *self,
 }
 
 static void
-disconnect_succeeded (DisconnectContext *ctx)
+reset_bearer_connection (MMBroadbandBearer *self)
 {
-    /* If properly disconnected, close the data port */
-    if (MM_IS_AT_SERIAL_PORT (ctx->data))
-        mm_serial_port_close (MM_SERIAL_PORT (ctx->data));
+    if (self->priv->port) {
+        /* If properly disconnected, close the data port */
+        if (MM_IS_AT_SERIAL_PORT (self->priv->port))
+            mm_serial_port_close (MM_SERIAL_PORT (self->priv->port));
 
-    /* Port is disconnected; update the state. Note: implementations may
-     * already have set the port as disconnected (e.g the 3GPP one) */
-    mm_port_set_connected (ctx->data, FALSE);
+        /* Port is disconnected; update the state. Note: implementations may
+         * already have set the port as disconnected (e.g the 3GPP one) */
+        mm_port_set_connected (self->priv->port, FALSE);
 
-    /* Clear data port */
-    g_clear_object (&ctx->self->priv->port);
+        /* Clear data port */
+        g_clear_object (&self->priv->port);
+    }
 
     /* Reset current connection type */
-    ctx->self->priv->connection_type = CONNECTION_TYPE_NONE;
+    self->priv->connection_type = CONNECTION_TYPE_NONE;
+}
+
+static void
+disconnect_succeeded (DisconnectContext *ctx)
+{
+    /* Cleanup all connection related data */
+    reset_bearer_connection (ctx->self);
 
     /* Set operation result */
     g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
@@ -1742,6 +1751,18 @@ disconnect (MMBearer *self,
     }
 
     g_object_unref (modem);
+}
+
+/*****************************************************************************/
+
+static void
+report_disconnection (MMBearer *self)
+{
+    /* Cleanup all connection related data */
+    reset_bearer_connection (MM_BROADBAND_BEARER (self));
+
+    /* Chain up parent's report_disconection() */
+    MM_BEARER_CLASS (mm_broadband_bearer_parent_class)->report_disconnection (self);
 }
 
 /*****************************************************************************/
@@ -2241,6 +2262,7 @@ mm_broadband_bearer_class_init (MMBroadbandBearerClass *klass)
     bearer_class->connect_finish = connect_finish;
     bearer_class->disconnect = disconnect;
     bearer_class->disconnect_finish = disconnect_finish;
+    bearer_class->report_disconnection = report_disconnection;
 
     klass->connect_3gpp = connect_3gpp;
     klass->connect_3gpp_finish = detailed_connect_finish;

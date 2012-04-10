@@ -382,9 +382,7 @@ mm_broadband_bearer_hso_report_connection_status (MMBroadbandBearerHso *self,
             dial_3gpp_context_complete_and_free (ctx);
         } else {
             /* Just ensure we mark ourselves as being disconnected... */
-            g_object_set (self,
-                          MM_BEARER_STATUS, MM_BEARER_STATUS_DISCONNECTED,
-                          NULL);
+            mm_bearer_report_disconnection (MM_BEARER (self));
         }
         break;
     }

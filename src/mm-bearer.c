@@ -671,6 +671,22 @@ mm_bearer_disconnect_force (MMBearer *self)
 
 /*****************************************************************************/
 
+static void
+report_disconnection (MMBearer *self)
+{
+    /* In the generic bearer implementation we just need to reset the
+     * interface status */
+    bearer_update_status (self, MM_BEARER_STATUS_DISCONNECTED);
+}
+
+void
+mm_bearer_report_disconnection (MMBearer *self)
+{
+    return MM_BEARER_GET_CLASS (self)->report_disconnection (self);
+}
+
+/*****************************************************************************/
+
 gboolean
 mm_bearer_cmp_properties (MMBearer *self,
                           MMBearerProperties *properties)
@@ -719,12 +735,8 @@ set_property (GObject *object,
                                     G_BINDING_DEFAULT | G_BINDING_SYNC_CREATE);
         break;
     case PROP_STATUS:
-        self->priv->status = g_value_get_enum (value);
-
-        /* Ensure that we don't expose any connection related data in the
-         * interface when going into disconnected state. */
-        if (self->priv->status == MM_BEARER_STATUS_DISCONNECTED)
-            bearer_reset_interface_status (self);
+        /* We don't allow g_object_set()-ing the status property */
+        g_assert_not_reached ();
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -819,6 +831,8 @@ mm_bearer_class_init (MMBearerClass *klass)
     object_class->finalize = finalize;
     object_class->dispose = dispose;
 
+    klass->report_disconnection = report_disconnection;
+
     properties[PROP_CONNECTION] =
         g_param_spec_object (MM_BEARER_CONNECTION,
                              "Connection",
@@ -849,6 +863,6 @@ mm_bearer_class_init (MMBearerClass *klass)
                            "Status of the bearer",
                            MM_TYPE_BEARER_STATUS,
                            MM_BEARER_STATUS_DISCONNECTED,
-                           G_PARAM_READWRITE);
+                           G_PARAM_READABLE);
     g_object_class_install_property (object_class, PROP_STATUS, properties[PROP_STATUS]);
 }
