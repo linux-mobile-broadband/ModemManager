@@ -51,7 +51,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-wavecom.la \
 	libmm-plugin-huawei.la \
 	libmm-plugin-longcheer.la \
-	libmm-plugin-x22x.la
+	libmm-plugin-x22x.la \
+	libmm-plugin-pantech.la
 
 #pkglib_LTLIBRARIES = \
 #	libmm-plugin-generic.la \
@@ -238,6 +239,13 @@ libmm_plugin_x22x_la_SOURCES = \
 libmm_plugin_x22x_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_x22x_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 udevrules_DATA += x22x/77-mm-x22x-port-types.rules
+
+# Pantech
+libmm_plugin_pantech_la_SOURCES = \
+	pantech/mm-plugin-pantech.c \
+	pantech/mm-plugin-pantech.h
+libmm_plugin_pantech_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_pantech_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
 ## Samsung modem
 #libmm_plugin_samsung_la_SOURCES = \
