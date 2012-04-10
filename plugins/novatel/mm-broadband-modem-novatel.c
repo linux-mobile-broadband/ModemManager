@@ -110,6 +110,7 @@ mm_broadband_modem_novatel_new (const gchar *device,
                          MM_BASE_MODEM_PLUGIN, plugin,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
+                         MM_BROADBAND_MODEM_USE_WS46, TRUE,
                          NULL);
 }
 
@@ -117,99 +118,6 @@ static void
 mm_broadband_modem_novatel_init (MMBroadbandModemNovatel *self)
 {
 }
-
-/*****************************************************************************/
-/* SUPPORTED MODES */
-
-static MMModemMode
-load_supported_modes_finish (MMIfaceModem *self,
-                             GAsyncResult *res,
-                             GError **error)
-{
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_MODE_NONE;
-
-    return (MMModemMode) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                               G_SIMPLE_ASYNC_RESULT (res)));
-}
-
-static void
-supported_networks_query_ready (MMBroadbandModemNovatel *self,
-                                GAsyncResult *res,
-                                GSimpleAsyncResult *operation_result)
-{
-    const gchar *response;
-    GError *error = NULL;
-    MMModemMode mode;
-
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (!response) {
-        /* Let the error be critical. */
-        g_simple_async_result_take_error (operation_result, error);
-        g_simple_async_result_complete (operation_result);
-        g_object_unref (operation_result);
-        return;
-    }
-
-    /*
-     * More than one numeric ID may appear in the list, that's why
-     * they are checked separately.
-     */
-
-    mode = MM_MODEM_MODE_NONE;
-
-    if (strstr (response, "12") != NULL) {
-        mm_dbg ("Device allows 2G-only network mode");
-        mode |= MM_MODEM_MODE_2G;
-    }
-
-    if (strstr (response, "22") != NULL) {
-        mm_dbg ("Device allows 3G-only network mode");
-        mode |= MM_MODEM_MODE_3G;
-    }
-
-    if (strstr (response, "25") != NULL) {
-        mm_dbg ("Device allows 2G/3G/4G network mode");
-        mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G | MM_MODEM_MODE_4G);
-    }
-
-    /* If no expected ID found, error */
-    if (mode == MM_MODEM_MODE_NONE)
-        g_simple_async_result_set_error (operation_result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Invalid list of supported networks: '%s'",
-                                         response);
-    else
-        g_simple_async_result_set_op_res_gpointer (operation_result,
-                                                   GUINT_TO_POINTER (mode),
-                                                   NULL);
-
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
-}
-
-static void
-load_supported_modes (MMIfaceModem *self,
-                      GAsyncReadyCallback callback,
-                      gpointer user_data)
-{
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_supported_modes);
-
-    mm_base_modem_at_command (
-        MM_BASE_MODEM (self),
-        "+WS46=?",
-        3,
-        FALSE,
-        (GAsyncReadyCallback)supported_networks_query_ready,
-        result);
-}
-
 
 /*****************************************************************************/
 /* SUPPORTED BANDS */
@@ -433,8 +341,6 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface->create_bearer = modem_create_bearer;
     iface->create_bearer_finish = modem_create_bearer_finish;
-    iface->load_supported_modes = load_supported_modes;
-    iface->load_supported_modes_finish = load_supported_modes_finish;
     iface->load_supported_bands = load_supported_bands;
     iface->load_supported_bands_finish = load_supported_bands_finish;
     iface->load_current_bands = load_current_bands;
