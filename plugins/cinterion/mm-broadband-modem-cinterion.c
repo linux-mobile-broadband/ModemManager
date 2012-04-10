@@ -49,11 +49,6 @@ struct _MMBroadbandModemCinterionPrivate {
 
     /* Command to go into sleep mode */
     gchar *sleep_mode_cmd;
-
-    /* Supported networks */
-    gboolean only_geran;
-    gboolean only_utran;
-    gboolean both_geran_utran;
 };
 
 /* Setup relationship between the band bitmask in the modem and the bitmask
@@ -519,102 +514,6 @@ load_access_technologies (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
-/* SUPPORTED MODES */
-
-static MMModemMode
-load_supported_modes_finish (MMIfaceModem *self,
-                             GAsyncResult *res,
-                             GError **error)
-{
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
-        return MM_MODEM_MODE_NONE;
-
-    return (MMModemMode) GPOINTER_TO_UINT (g_simple_async_result_get_op_res_gpointer (
-                                               G_SIMPLE_ASYNC_RESULT (res)));
-}
-
-static void
-supported_networks_query_ready (MMBroadbandModemCinterion *self,
-                                GAsyncResult *res,
-                                GSimpleAsyncResult *operation_result)
-{
-    const gchar *response;
-    GError *error = NULL;
-    MMModemMode mode;
-
-    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
-    if (!response) {
-        /* Let the error be critical. */
-        g_simple_async_result_take_error (operation_result, error);
-        g_simple_async_result_complete (operation_result);
-        g_object_unref (operation_result);
-        return;
-    }
-
-    /* Note: Documentation says that AT+WS46=? is replied with '+WS46:' followed
-     * by a list of supported network modes between parenthesis, but the EGS5
-     * used to test this didn't use the 'WS46:' prefix. Also, more than one
-     * numeric ID may appear in the list, that's why they are checked
-     * separately. */
-
-    mode = MM_MODEM_MODE_NONE;
-
-    if (strstr (response, "12") != NULL) {
-        mm_dbg ("Device allows 2G-only network mode");
-        self->priv->only_geran = TRUE;
-        mode |= MM_MODEM_MODE_2G;
-    }
-
-    if (strstr (response, "22") != NULL) {
-        mm_dbg ("Device allows 3G-only network mode");
-        self->priv->only_utran = TRUE;
-        mode |= MM_MODEM_MODE_3G;
-    }
-
-    if (strstr (response, "25") != NULL) {
-        mm_dbg ("Device allows 2G/3G network mode");
-        self->priv->both_geran_utran = TRUE;
-        mode |= (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
-    }
-
-    /* If no expected ID found, error */
-    if (mode == MM_MODEM_MODE_NONE)
-        g_simple_async_result_set_error (operation_result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Invalid list of supported networks: '%s'",
-                                         response);
-    else
-        g_simple_async_result_set_op_res_gpointer (operation_result,
-                                                   GUINT_TO_POINTER (mode),
-                                                   NULL);
-
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
-}
-
-static void
-load_supported_modes (MMIfaceModem *self,
-                      GAsyncReadyCallback callback,
-                      gpointer user_data)
-{
-    GSimpleAsyncResult *result;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        load_supported_modes);
-
-    mm_base_modem_at_command (
-        MM_BASE_MODEM (self),
-        "+WS46=?",
-        3,
-        FALSE,
-        (GAsyncReadyCallback)supported_networks_query_ready,
-        result);
-}
-
-/*****************************************************************************/
 /* ALLOWED MODES */
 
 static gboolean
@@ -649,7 +548,6 @@ set_allowed_modes (MMIfaceModem *self,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
 {
-    MMBroadbandModemCinterion *broadband = MM_BROADBAND_MODEM_CINTERION (self);
     GSimpleAsyncResult *result;
 
     result = g_simple_async_result_new (G_OBJECT (self),
@@ -658,7 +556,8 @@ set_allowed_modes (MMIfaceModem *self,
                                         set_allowed_modes);
 
     /* For dual 2G/3G devices... */
-    if (broadband->priv->both_geran_utran) {
+    if (mm_iface_modem_is_2g (self) &&
+        mm_iface_modem_is_3g (self)) {
         GString *cmd;
 
         /* We will try to simulate the possible allowed modes here. The
@@ -708,8 +607,8 @@ set_allowed_modes (MMIfaceModem *self,
      *
      * Note that the common logic of the interface already limits the
      * allowed/preferred modes that can be tried in these cases. */
-    if (broadband->priv->only_utran ||
-        broadband->priv->only_geran) {
+    if (mm_iface_modem_is_2g_only (self) ||
+        mm_iface_modem_is_3g_only (self)) {
         gchar *allowed_str;
         gchar *preferred_str;
 
@@ -720,7 +619,7 @@ set_allowed_modes (MMIfaceModem *self,
                 "%s-only modem.",
                 allowed_str,
                 preferred_str,
-                broadband->priv->only_utran ? "3G" : "2G");
+                mm_iface_modem_is_3g_only (self) ? "3G" : "2G");
         g_free (allowed_str);
         g_free (preferred_str);
         g_simple_async_result_set_op_res_gboolean (result, TRUE);
@@ -751,7 +650,6 @@ load_supported_bands (MMIfaceModem *self,
                       gpointer user_data)
 {
     GSimpleAsyncResult *result;
-    MMBroadbandModemCinterion *broadband = MM_BROADBAND_MODEM_CINTERION (self);
     GArray *bands;
 
     result = g_simple_async_result_new (G_OBJECT (self),
@@ -769,8 +667,7 @@ load_supported_bands (MMIfaceModem *self,
     g_array_index (bands, MMModemBand, 3) = MM_MODEM_BAND_G850;
 
     /* Add 3G-specific bands */
-    if (broadband->priv->only_utran ||
-        broadband->priv->both_geran_utran) {
+    if (mm_iface_modem_is_3g (self)) {
         g_array_set_size (bands, 7);
         g_array_index (bands, MMModemBand, 4) = MM_MODEM_BAND_U2100;
         g_array_index (bands, MMModemBand, 5) = MM_MODEM_BAND_U1900;
@@ -958,7 +855,6 @@ load_current_bands (MMIfaceModem *self,
                     gpointer user_data)
 {
     GSimpleAsyncResult *result;
-    MMBroadbandModemCinterion *broadband = MM_BROADBAND_MODEM_CINTERION (self);
 
     result = g_simple_async_result_new (G_OBJECT (self),
                                         callback,
@@ -971,10 +867,9 @@ load_current_bands (MMIfaceModem *self,
                               "AT^SCFG=\"Radio/Band\"",
                               3,
                               FALSE,
-                              (GAsyncReadyCallback)((!broadband->priv->only_utran &&
-                                                     !broadband->priv->both_geran_utran) ?
-                                                    get_2g_band_ready :
-                                                    get_3g_band_ready),
+                              (GAsyncReadyCallback)(mm_iface_modem_is_3g (self) ?
+                                                    get_3g_band_ready :
+                                                    get_2g_band_ready),
                               result);
 }
 
@@ -1179,7 +1074,6 @@ set_bands (MMIfaceModem *self,
            GAsyncReadyCallback callback,
            gpointer user_data)
 {
-    MMBroadbandModemCinterion *cinterion = MM_BROADBAND_MODEM_CINTERION (self);
     GSimpleAsyncResult *result;
 
     /* The bands that we get here are previously validated by the interface, and
@@ -1193,11 +1087,10 @@ set_bands (MMIfaceModem *self,
                                         user_data,
                                         set_bands);
 
-    if (!cinterion->priv->only_utran &&
-        !cinterion->priv->both_geran_utran)
-        set_bands_2g (self, bands_array, result);
-    else
+    if (mm_iface_modem_is_3g (self))
         set_bands_3g (self, bands_array, result);
+    else
+        set_bands_2g (self, bands_array, result);
 }
 
 /*****************************************************************************/
@@ -1266,6 +1159,7 @@ mm_broadband_modem_cinterion_new (const gchar *device,
                          MM_BASE_MODEM_VENDOR_ID, vendor_id,
                          MM_BASE_MODEM_PRODUCT_ID, product_id,
                          MM_IFACE_MODEM_MESSAGING_SMS_MEM3_STORAGE, MM_SMS_STORAGE_MT,
+                         MM_BROADBAND_MODEM_USE_WS46, TRUE,
                          NULL);
 }
 
@@ -1294,8 +1188,6 @@ finalize (GObject *object)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
-    iface->load_supported_modes = load_supported_modes;
-    iface->load_supported_modes_finish = load_supported_modes_finish;
     iface->set_allowed_modes = set_allowed_modes;
     iface->set_allowed_modes_finish = set_allowed_modes_finish;
     iface->load_supported_bands = load_supported_bands;
