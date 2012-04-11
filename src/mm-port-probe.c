@@ -1006,9 +1006,16 @@ mm_port_probe_run (MMPortProbe *self,
 gboolean
 mm_port_probe_is_at (MMPortProbe *self)
 {
+    const gchar *subsys;
+    const gchar *name;
+
     g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
 
-    if (g_str_equal (g_udev_device_get_subsystem (self->priv->port), "net"))
+    subsys = g_udev_device_get_subsystem (self->priv->port);
+    name = g_udev_device_get_name (self->priv->port);
+    if (g_str_equal (subsys, "net") ||
+        (g_str_equal (subsys, "usb") &&
+         g_str_has_prefix (name, "cdc-wdm")))
         return FALSE;
 
     return (self->priv->flags & MM_PORT_PROBE_AT ?
@@ -1034,9 +1041,16 @@ mm_port_probe_list_has_at_port (GList *list)
 gboolean
 mm_port_probe_is_qcdm (MMPortProbe *self)
 {
+    const gchar *subsys;
+    const gchar *name;
+
     g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
 
-    if (g_str_equal (g_udev_device_get_subsystem (self->priv->port), "net"))
+    subsys = g_udev_device_get_subsystem (self->priv->port);
+    name = g_udev_device_get_name (self->priv->port);
+    if (g_str_equal (subsys, "net") ||
+        (g_str_equal (subsys, "usb") &&
+         g_str_has_prefix (name, "cdc-wdm")))
         return FALSE;
 
     return (self->priv->flags & MM_PORT_PROBE_QCDM ?
@@ -1047,10 +1061,20 @@ mm_port_probe_is_qcdm (MMPortProbe *self)
 MMPortType
 mm_port_probe_get_port_type (MMPortProbe *self)
 {
+    const gchar *subsys;
+    const gchar *name;
+
     g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
 
-    if (g_str_equal (g_udev_device_get_subsystem (self->priv->port), "net"))
+    subsys = g_udev_device_get_subsystem (self->priv->port);
+    name = g_udev_device_get_name (self->priv->port);
+
+    if (g_str_equal (subsys, "net"))
         return MM_PORT_TYPE_NET;
+
+    if (g_str_equal (subsys, "usb") &&
+        g_str_has_prefix (name, "cdc-wdm"))
+        return MM_PORT_TYPE_QMI;
 
     if (self->priv->flags & MM_PORT_PROBE_QCDM &&
         self->priv->is_qcdm)
@@ -1098,9 +1122,16 @@ mm_port_probe_get_port (MMPortProbe *self)
 const gchar *
 mm_port_probe_get_vendor (MMPortProbe *self)
 {
-    g_return_val_if_fail (MM_IS_PORT_PROBE (self), NULL);
+    const gchar *subsys;
+    const gchar *name;
 
-    if (g_str_equal (g_udev_device_get_subsystem (self->priv->port), "net"))
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
+
+    subsys = g_udev_device_get_subsystem (self->priv->port);
+    name = g_udev_device_get_name (self->priv->port);
+    if (g_str_equal (subsys, "net") ||
+        (g_str_equal (subsys, "usb") &&
+         g_str_has_prefix (name, "cdc-wdm")))
         return NULL;
 
     return (self->priv->flags & MM_PORT_PROBE_AT_VENDOR ?
@@ -1111,9 +1142,16 @@ mm_port_probe_get_vendor (MMPortProbe *self)
 const gchar *
 mm_port_probe_get_product (MMPortProbe *self)
 {
-    g_return_val_if_fail (MM_IS_PORT_PROBE (self), NULL);
+    const gchar *subsys;
+    const gchar *name;
 
-    if (g_str_equal (g_udev_device_get_subsystem (self->priv->port), "net"))
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
+
+    subsys = g_udev_device_get_subsystem (self->priv->port);
+    name = g_udev_device_get_name (self->priv->port);
+    if (g_str_equal (subsys, "net") ||
+        (g_str_equal (subsys, "usb") &&
+         g_str_has_prefix (name, "cdc-wdm")))
         return NULL;
 
     return (self->priv->flags & MM_PORT_PROBE_AT_PRODUCT ?

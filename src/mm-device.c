@@ -140,6 +140,17 @@ get_device_ids (GUdevDevice *device,
                 /* Platform devices don't usually have a VID/PID */
                 success = TRUE;
                 goto out;
+            } else if (!strcmp (parent_subsys, "usb") &&
+                       !strcmp (g_udev_device_get_driver (parent), "qmi_wwan")) {
+                /* Need to look for vendor/product in the parent of the QMI device */
+                GUdevDevice *qmi_parent;
+
+                qmi_parent = g_udev_device_get_parent (parent);
+                if (qmi_parent) {
+                    vid = g_udev_device_get_property (qmi_parent, "ID_VENDOR_ID");
+                    pid = g_udev_device_get_property (qmi_parent, "ID_MODEL_ID");
+                    g_object_unref (qmi_parent);
+                }
             }
         }
     }

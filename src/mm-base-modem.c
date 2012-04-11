@@ -161,7 +161,8 @@ mm_base_modem_grab_port (MMBaseModem *self,
 
     /* Only allow 'tty' and 'net' ports */
     if (!g_str_equal (subsys, "net") &&
-        !g_str_equal (subsys, "tty")) {
+        !g_str_equal (subsys, "tty") &&
+        !(g_str_equal (subsys, "usb") && g_str_has_prefix (name, "cdc-wdm"))) {
         g_set_error (error,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_UNSUPPORTED,
@@ -228,8 +229,17 @@ mm_base_modem_grab_port (MMBaseModem *self,
                                       MM_PORT_SUBSYS, MM_PORT_SUBSYS_NET,
                                       MM_PORT_TYPE, MM_PORT_TYPE_NET,
                                       NULL));
+    }
+    /* QMI ports... */
+    else if (g_str_equal (subsys, "usb") &&
+             g_str_has_prefix (name, "cdc-wdm")) {
+        port = MM_PORT (g_object_new (MM_TYPE_PORT,
+                                      MM_PORT_DEVICE, name,
+                                      MM_PORT_SUBSYS, MM_PORT_SUBSYS_USB,
+                                      MM_PORT_TYPE, MM_PORT_TYPE_QMI,
+                                      NULL));
     } else
-        /* We already filter out before all non-tty, non-net ports */
+        /* We already filter out before all non-tty, non-net, non-wdm ports */
         g_assert_not_reached();
 
     mm_dbg ("(%s) type '%s' claimed by %s",

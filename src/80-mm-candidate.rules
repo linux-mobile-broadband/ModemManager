@@ -11,6 +11,6 @@ ACTION!="add|change|move", GOTO="mm_candidate_end"
 
 SUBSYSTEM=="tty", ENV{ID_MM_CANDIDATE}="1"
 SUBSYSTEM=="net", ENV{ID_MM_CANDIDATE}="1"
+KERNEL=="cdc-wdm*", SUBSYSTEM=="usb", DRIVERS=="qmi_wwan", ENV{ID_MM_CANDIDATE}="1"
 
 LABEL="mm_candidate_end"
-

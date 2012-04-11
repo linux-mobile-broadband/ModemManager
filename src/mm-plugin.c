@@ -589,9 +589,10 @@ mm_plugin_supports_port (MMPlugin *self,
             g_udev_device_get_subsystem (port),
             g_udev_device_get_name (port));
 
-    /* Before launching any probing, check if the port is a net device (which
-     * cannot be probed). */
-    if (g_str_equal (g_udev_device_get_subsystem (port), "net")) {
+    /* Before launching any probing, check if the port is a net OR a wdm device
+     * (which cannot be probed). */
+    if (g_str_equal (g_udev_device_get_subsystem (port), "net") ||
+        g_str_equal (g_udev_device_get_subsystem (port), "cdc-wdm")) {
         g_simple_async_result_set_op_res_gpointer (
             async_result,
             GUINT_TO_POINTER (MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED),
