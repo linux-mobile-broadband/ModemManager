@@ -29,6 +29,7 @@
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-3gpp.h"
 #include "mm-base-modem-at.h"
 #include "mm-broadband-modem-wavecom.h"
 
@@ -489,6 +490,81 @@ set_allowed_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load access technologies (Modem interface) */
+
+static gboolean
+load_access_technologies_finish (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 MMModemAccessTechnology *access_technologies,
+                                 guint *mask,
+                                 GError **error)
+{
+    MMModemAccessTechnology act;
+    const gchar *p;
+    const gchar *response;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!response)
+        return FALSE;
+
+    act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+    p = mm_strip_tag (response, "+WGPRSIND:");
+    if (p) {
+        switch (*p) {
+        case '1':
+            /* GPRS only */
+            act = MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
+            break;
+        case '2':
+            /* EGPRS/EDGE supported */
+            act = MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
+            break;
+        case '3':
+            /* 3G R99 supported */
+            act = MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+            break;
+        case '4':
+            /* HSDPA supported */
+            act = MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
+            break;
+        case '5':
+            /* HSUPA supported */
+            act = MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
+            break;
+        default:
+            break;
+        }
+    }
+
+    if (act == MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't parse access technologies result: '%s'",
+                     response);
+        return FALSE;
+    }
+
+    /* We are reporting ALL 3GPP access technologies here */
+    *access_technologies = act;
+    *mask = MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK;
+    return TRUE;
+}
+
+static void
+load_access_technologies (MMIfaceModem *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+WGPRS=9,2",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
+
+/*****************************************************************************/
 /* Flow control (Modem interface) */
 
 static gboolean
@@ -663,6 +739,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_allowed_modes_finish = load_allowed_modes_finish;
     iface->set_allowed_modes = set_allowed_modes;
     iface->set_allowed_modes_finish = set_allowed_modes_finish;
+    iface->load_access_technologies = load_access_technologies;
+    iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->setup_flow_control = setup_flow_control;
     iface->setup_flow_control_finish = setup_flow_control_finish;
     iface->modem_power_up = modem_power_up;
