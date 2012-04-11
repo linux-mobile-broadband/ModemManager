@@ -83,6 +83,9 @@ struct _MMBaseModemPrivate {
      * port to receive all GPS traces */
     MMAtSerialPort *gps_control;
     MMGpsSerialPort *gps;
+
+    /* QMI port */
+    MMPort *qmi;
 };
 
 static gchar *
@@ -239,7 +242,7 @@ mm_base_modem_grab_port (MMBaseModem *self,
                                       MM_PORT_TYPE, MM_PORT_TYPE_QMI,
                                       NULL));
     } else
-        /* We already filter out before all non-tty, non-net, non-wdm ports */
+        /* We already filter out before all non-tty, non-net, non-qmi ports */
         g_assert_not_reached();
 
     mm_dbg ("(%s) type '%s' claimed by %s",
@@ -303,6 +306,9 @@ mm_base_modem_release_port (MMBaseModem *self,
 
     if (port == (MMPort *)self->priv->gps)
         g_clear_object (&self->priv->gps);
+
+    if (port == (MMPort *)self->priv->qmi)
+        g_clear_object (&self->priv->qmi);
 
     /* Remove it from the tracking HT */
     mm_dbg ("(%s/%s) type %s released from %s",
@@ -503,6 +509,22 @@ mm_base_modem_peek_port_gps (MMBaseModem *self)
 }
 
 MMPort *
+mm_base_modem_get_port_qmi (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
+
+    return (self->priv->qmi ? g_object_ref (self->priv->qmi) : NULL);
+}
+
+MMPort *
+mm_base_modem_peek_port_qmi (MMBaseModem *self)
+{
+    g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
+
+    return self->priv->qmi;
+}
+
+MMPort *
 mm_base_modem_get_best_data_port (MMBaseModem *self)
 {
     MMPort *port;
@@ -624,6 +646,7 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     MMAtSerialPort *gps_control = NULL;
     MMGpsSerialPort *gps = NULL;
     MMPort *data = NULL;
+    MMPort *qmi = NULL;
 
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), FALSE);
 
@@ -692,6 +715,11 @@ mm_base_modem_organize_ports (MMBaseModem *self,
                 gps = MM_GPS_SERIAL_PORT (candidate);
             break;
 
+        case MM_PORT_TYPE_QMI:
+            if (!qmi)
+                qmi = candidate;
+            break;
+
         default:
             /* Ignore port */
             break;
@@ -744,6 +772,7 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     log_port (self, MM_PORT (qcdm),        "qcdm");
     log_port (self, MM_PORT (gps_control), "gps control");
     log_port (self, MM_PORT (gps),         "gps");
+    log_port (self, MM_PORT (qmi),         "qmi");
 
     /* We keep new refs to the objects here */
     self->priv->primary = g_object_ref (primary);
@@ -752,6 +781,7 @@ mm_base_modem_organize_ports (MMBaseModem *self,
     self->priv->qcdm = (qcdm ? g_object_ref (qcdm) : NULL);
     self->priv->gps_control = (gps_control ? g_object_ref (gps_control) : NULL);
     self->priv->gps = (gps ? g_object_ref (gps) : NULL);
+    self->priv->qmi = (qmi ? g_object_ref (qmi) : NULL);
 
     /* As soon as we get the ports organized, we initialize the modem */
     mm_base_modem_initialize (self,
@@ -1026,6 +1056,7 @@ dispose (GObject *object)
     g_clear_object (&self->priv->qcdm);
     g_clear_object (&self->priv->gps_control);
     g_clear_object (&self->priv->gps);
+    g_clear_object (&self->priv->qmi);
 
     if (self->priv->ports) {
         g_hash_table_destroy (self->priv->ports);
