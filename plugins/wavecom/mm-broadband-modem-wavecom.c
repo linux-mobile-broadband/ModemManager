@@ -490,6 +490,65 @@ set_allowed_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load supported bands (Modem interface) */
+
+static GArray *
+load_supported_bands_finish (MMIfaceModem *self,
+                             GAsyncResult *res,
+                             GError **error)
+{
+    /* Never fails */
+    return (GArray *) g_array_ref (g_simple_async_result_get_op_res_gpointer (
+                                       G_SIMPLE_ASYNC_RESULT (res)));
+}
+
+static void
+load_supported_bands (MMIfaceModem *self,
+                      GAsyncReadyCallback callback,
+                      gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    GArray *bands;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_supported_bands);
+
+    /* We do assume that we already know if the modem is 2G-only, 3G-only or
+     * 2G+3G. This is checked quite before trying to load supported bands. */
+
+    /* Add 3G-specific bands */
+    if (mm_iface_modem_is_3g (self)) {
+        bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 10);
+        g_array_index (bands, MMModemBand, 0) = MM_MODEM_BAND_U2100;
+        g_array_index (bands, MMModemBand, 1) = MM_MODEM_BAND_U1800;
+        g_array_index (bands, MMModemBand, 2) = MM_MODEM_BAND_U17IV;
+        g_array_index (bands, MMModemBand, 3) = MM_MODEM_BAND_U800;
+        g_array_index (bands, MMModemBand, 4) = MM_MODEM_BAND_U850;
+        g_array_index (bands, MMModemBand, 5) = MM_MODEM_BAND_U900;
+        g_array_index (bands, MMModemBand, 6) = MM_MODEM_BAND_U900;
+        g_array_index (bands, MMModemBand, 7) = MM_MODEM_BAND_U17IX;
+        g_array_index (bands, MMModemBand, 8) = MM_MODEM_BAND_U1900;
+        g_array_index (bands, MMModemBand, 9) = MM_MODEM_BAND_U2600;
+    }
+    /* Add 2G-specific bands */
+    else {
+        bands = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 4);
+        g_array_index (bands, MMModemBand, 0) = MM_MODEM_BAND_EGSM;
+        g_array_index (bands, MMModemBand, 1) = MM_MODEM_BAND_DCS;
+        g_array_index (bands, MMModemBand, 2) = MM_MODEM_BAND_PCS;
+        g_array_index (bands, MMModemBand, 3) = MM_MODEM_BAND_G850;
+    }
+
+    g_simple_async_result_set_op_res_gpointer (result,
+                                               bands,
+                                               (GDestroyNotify)g_array_unref);
+    g_simple_async_result_complete_in_idle (result);
+    g_object_unref (result);
+}
+
+/*****************************************************************************/
 /* Load access technologies (Modem interface) */
 
 static gboolean
@@ -739,6 +798,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_allowed_modes_finish = load_allowed_modes_finish;
     iface->set_allowed_modes = set_allowed_modes;
     iface->set_allowed_modes_finish = set_allowed_modes_finish;
+    iface->load_supported_bands = load_supported_bands;
+    iface->load_supported_bands_finish = load_supported_bands_finish;
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->setup_flow_control = setup_flow_control;
