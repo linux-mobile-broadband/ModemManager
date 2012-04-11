@@ -27,6 +27,7 @@
 
 #include "ModemManager.h"
 #include "mm-log.h"
+#include "mm-serial-parsers.h"
 #include "mm-modem-helpers.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
@@ -955,6 +956,36 @@ modem_power_down (MMIfaceModem *self,
                               user_data);
 }
 
+static void
+setup_ports (MMBroadbandModem *self)
+{
+    gpointer parser;
+    MMAtSerialPort *primary;
+    GRegex *regex;
+
+    /* Call parent's setup ports first always */
+    MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_wavecom_parent_class)->setup_ports (self);
+
+    /* Set 9600 baudrate by default in the AT port */
+    mm_dbg ("Baudrate will be set to 9600 bps...");
+    primary = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    if (!primary)
+        return;
+
+    /* AT+CPIN? replies will never have an OK appended */
+    parser = mm_serial_parser_v1_new ();
+    regex = g_regex_new ("\\r\\n\\+CPIN: .*\\r\\n",
+                         G_REGEX_RAW | G_REGEX_OPTIMIZE,
+                         0, NULL);
+    mm_serial_parser_v1_set_custom_regex (parser, regex, NULL);
+    g_regex_unref (regex);
+
+    mm_at_serial_port_set_response_parser (MM_AT_SERIAL_PORT (primary),
+                                           mm_serial_parser_v1_parse,
+                                           parser,
+                                           mm_serial_parser_v1_destroy);
+}
+
 /*****************************************************************************/
 
 MMBroadbandModemWavecom *
@@ -1004,4 +1035,7 @@ iface_modem_init (MMIfaceModem *iface)
 static void
 mm_broadband_modem_wavecom_class_init (MMBroadbandModemWavecomClass *klass)
 {
+    MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
+
+    broadband_modem_class->setup_ports = setup_ports;
 }
