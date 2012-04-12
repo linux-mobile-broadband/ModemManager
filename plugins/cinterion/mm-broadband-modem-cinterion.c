@@ -749,7 +749,7 @@ get_2g_band_ready (MMBroadbandModemCinterion *self,
                     if (G_UNLIKELY (!bands_array))
                         bands_array = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
 
-                    for (j = 0; j < 4 && bands_2g[i].mm_bands[j] != 0; j++)
+                    for (j = 0; j < bands_2g[i].n_mm_bands; j++)
                         g_array_append_val (bands_array, bands_2g[i].mm_bands[j]);
 
                     break;
