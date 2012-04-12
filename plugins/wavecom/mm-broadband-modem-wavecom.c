@@ -47,18 +47,19 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemWavecom, mm_broadband_modem_wavecom, MM_
 /* Setup relationship between 2G bands in the modem (identified by a
  * single digit in ASCII) and the bitmask in ModemManager. */
 typedef struct {
-    gchar   wavecom_band;
+    gchar wavecom_band;
+    guint n_mm_bands;
     MMModemBand mm_bands[4];
 } WavecomBand2G;
 static const WavecomBand2G bands_2g[] = {
-    { '0', { MM_MODEM_BAND_G850, MM_MODEM_BAND_UNKNOWN, MM_MODEM_BAND_UNKNOWN, MM_MODEM_BAND_UNKNOWN }},
-    { '1', { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_UNKNOWN, MM_MODEM_BAND_UNKNOWN, MM_MODEM_BAND_UNKNOWN }},
-    { '2', { MM_MODEM_BAND_DCS,  MM_MODEM_BAND_UNKNOWN, MM_MODEM_BAND_UNKNOWN, MM_MODEM_BAND_UNKNOWN }},
-    { '3', { MM_MODEM_BAND_PCS,  MM_MODEM_BAND_UNKNOWN, MM_MODEM_BAND_UNKNOWN, MM_MODEM_BAND_UNKNOWN }},
-    { '4', { MM_MODEM_BAND_G850, MM_MODEM_BAND_PCS,     MM_MODEM_BAND_UNKNOWN, MM_MODEM_BAND_UNKNOWN }},
-    { '5', { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS,     MM_MODEM_BAND_UNKNOWN, MM_MODEM_BAND_UNKNOWN }},
-    { '6', { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_PCS,     MM_MODEM_BAND_UNKNOWN, MM_MODEM_BAND_UNKNOWN }},
-    { '7', { MM_MODEM_BAND_DCS,  MM_MODEM_BAND_PCS,     MM_MODEM_BAND_G850,    MM_MODEM_BAND_EGSM    }}
+    { '0', 1, { MM_MODEM_BAND_G850, 0, 0, 0 }},
+    { '1', 1, { MM_MODEM_BAND_EGSM, 0, 0, 0 }},
+    { '2', 1, { MM_MODEM_BAND_DCS,  0, 0, 0 }},
+    { '3', 1, { MM_MODEM_BAND_PCS,  0, 0, 0 }},
+    { '4', 2, { MM_MODEM_BAND_G850, MM_MODEM_BAND_PCS, 0, 0 }},
+    { '5', 2, { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_DCS, 0, 0 }},
+    { '6', 2, { MM_MODEM_BAND_EGSM, MM_MODEM_BAND_PCS, 0, 0 }},
+    { '7', 4, { MM_MODEM_BAND_DCS,  MM_MODEM_BAND_PCS, MM_MODEM_BAND_G850, MM_MODEM_BAND_EGSM }}
 };
 
 /* Setup relationship between the 3G band bitmask in the modem and the bitmask
@@ -629,9 +630,8 @@ get_2g_band_ready (MMBroadbandModemWavecom *self,
                 if (G_UNLIKELY (!bands_array))
                     bands_array = g_array_new (FALSE, FALSE, sizeof (MMModemBand));
 
-                for (j = 0; j < 4 && bands_2g[i].mm_bands[j] != MM_MODEM_BAND_UNKNOWN; j++)
+                for (j = 0; j < bands_2g[i].n_mm_bands; j++)
                     g_array_append_val (bands_array, bands_2g[i].mm_bands[j]);
-
             }
         }
     }
@@ -736,6 +736,194 @@ load_current_bands (MMIfaceModem *self,
                                   FALSE,
                                   (GAsyncReadyCallback)get_2g_band_ready,
                                   result);
+}
+
+/*****************************************************************************/
+/* Set bands (Modem interface) */
+
+static gboolean
+set_bands_finish (MMIfaceModem *self,
+                  GAsyncResult *res,
+                  GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+wmbs_set_ready (MMBaseModem *self,
+                GAsyncResult *res,
+                GSimpleAsyncResult *operation_result)
+{
+    GError *error = NULL;
+
+    if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error))
+        /* Let the error be critical */
+        g_simple_async_result_take_error (operation_result, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
+
+    g_simple_async_result_complete (operation_result);
+    g_object_unref (operation_result);
+}
+
+static void
+set_bands_3g (MMIfaceModem *self,
+              GArray *bands_array,
+              GSimpleAsyncResult *result)
+{
+    GArray *bands_array_final;
+    guint wavecom_band = 0;
+    guint i;
+    gchar *bands_string;
+    gchar *cmd;
+
+    /* The special case of ANY should be treated separately. */
+    if (bands_array->len == 1 &&
+        g_array_index (bands_array, MMModemBand, 0) == MM_MODEM_BAND_ANY) {
+        /* We build an array with all bands to set; so that we use the same
+         * logic to build the cinterion_band, and so that we can log the list of
+         * bands being set properly */
+        bands_array_final = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), G_N_ELEMENTS (bands_3g));
+        for (i = 0; i < G_N_ELEMENTS (bands_3g); i++)
+            g_array_append_val (bands_array_final, bands_3g[i].mm_band);
+    } else
+        bands_array_final = g_array_ref (bands_array);
+
+    for (i = 0; i < G_N_ELEMENTS (bands_3g); i++) {
+        guint j;
+
+        for (j = 0; j < bands_array_final->len; j++) {
+            if (g_array_index (bands_array_final, MMModemBand, j) == bands_3g[i].mm_band) {
+                wavecom_band |= bands_3g[i].wavecom_band_flag;
+                break;
+            }
+        }
+    }
+
+    bands_string = mm_common_build_bands_string ((MMModemBand *)bands_array_final->data,
+                                                 bands_array_final->len);
+    g_array_unref (bands_array_final);
+
+    if (wavecom_band == 0) {
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_UNSUPPORTED,
+                                         "The given band combination is not supported: '%s'",
+                                         bands_string);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        g_free (bands_string);
+        return;
+    }
+
+    mm_dbg ("Setting new bands to use: '%s'", bands_string);
+    cmd = g_strdup_printf ("+WMBS=\"%u\",1", wavecom_band);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              cmd,
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)wmbs_set_ready,
+                              result);
+    g_free (cmd);
+    g_free (bands_string);
+}
+
+static void
+set_bands_2g (MMIfaceModem *self,
+              GArray *bands_array,
+              GSimpleAsyncResult *result)
+{
+    GArray *bands_array_final;
+    gchar wavecom_band = '\0';
+    guint i;
+    gchar *bands_string;
+    gchar *cmd;
+
+    /* If the iface properly checked the given list against the supported bands,
+     * it's not possible to get an array longer than 4 here. */
+    g_assert (bands_array->len <= 4);
+
+    /* The special case of ANY should be treated separately. */
+    if (bands_array->len == 1 &&
+        g_array_index (bands_array, MMModemBand, 0) == MM_MODEM_BAND_ANY) {
+        const WavecomBand2G *all;
+
+        /* All bands is the last element in our 2G bands array */
+        all = &bands_2g[G_N_ELEMENTS (bands_2g) - 1];
+
+        /* We build an array with all bands to set; so that we use the same
+         * logic to build the cinterion_band, and so that we can log the list of
+         * bands being set properly */
+        bands_array_final = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), 4);
+        g_array_append_vals (bands_array_final, all->mm_bands, all->n_mm_bands);
+    } else
+        bands_array_final = g_array_ref (bands_array);
+
+    for (i = 0; wavecom_band == '\0' && i < G_N_ELEMENTS (bands_2g); i++) {
+        GArray *supported_combination;
+
+        supported_combination = g_array_sized_new (FALSE, FALSE, sizeof (MMModemBand), bands_2g[i].n_mm_bands);
+        g_array_append_vals (supported_combination, bands_2g[i].mm_bands, bands_2g[i].n_mm_bands);
+
+        /* Check if the given array is exactly one of the supported combinations */
+        if (mm_common_bands_garray_cmp (bands_array_final, supported_combination))
+            wavecom_band = bands_2g[i].wavecom_band;
+
+        g_array_unref (supported_combination);
+    }
+
+    bands_string = mm_common_build_bands_string ((MMModemBand *)bands_array_final->data,
+                                                 bands_array_final->len);
+    g_array_unref (bands_array_final);
+
+    if (wavecom_band == '\0') {
+        g_simple_async_result_set_error (result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_UNSUPPORTED,
+                                         "The given band combination is not supported: '%s'",
+                                         bands_string);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        g_free (bands_string);
+        return;
+    }
+
+    mm_dbg ("Setting new bands to use: '%s'", bands_string);
+    cmd = g_strdup_printf ("+WMBS=%c,1", wavecom_band);
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              cmd,
+                              3,
+                              FALSE,
+                              (GAsyncReadyCallback)wmbs_set_ready,
+                              result);
+
+    g_free (cmd);
+    g_free (bands_string);
+}
+
+static void
+set_bands (MMIfaceModem *self,
+           GArray *bands_array,
+           GAsyncReadyCallback callback,
+           gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    /* The bands that we get here are previously validated by the interface, and
+     * that means that ALL the bands given here were also given in the list of
+     * supported bands. BUT BUT, that doesn't mean that the exact list of bands
+     * will end up being valid, as not all combinations are possible. E.g,
+     * Wavecom modems supporting only 2G have specific combinations allowed.
+     */
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        set_bands);
+
+    if (mm_iface_modem_is_3g (self))
+        set_bands_3g (self, bands_array, result);
+    else
+        set_bands_2g (self, bands_array, result);
 }
 
 /*****************************************************************************/
@@ -1022,6 +1210,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_bands_finish = load_supported_bands_finish;
     iface->load_current_bands = load_current_bands;
     iface->load_current_bands_finish = load_current_bands_finish;
+    iface->set_bands = set_bands;
+    iface->set_bands_finish = set_bands_finish;
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->setup_flow_control = setup_flow_control;
