@@ -220,7 +220,9 @@ libmm_plugin_linktop_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 # SimTech
 libmm_plugin_simtech_la_SOURCES = \
 	simtech/mm-plugin-simtech.c \
-	simtech/mm-plugin-simtech.h
+	simtech/mm-plugin-simtech.h \
+	simtech/mm-broadband-modem-simtech.h \
+	simtech/mm-broadband-modem-simtech.c
 libmm_plugin_simtech_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_simtech_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 udevrules_DATA += simtech/77-mm-simtech-port-types.rules

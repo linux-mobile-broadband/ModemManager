@@ -20,7 +20,7 @@
 #include <libmm-common.h>
 
 #include "mm-plugin-simtech.h"
-#include "mm-broadband-modem.h"
+#include "mm-broadband-modem-simtech.h"
 
 G_DEFINE_TYPE (MMPluginSimtech, mm_plugin_simtech, MM_TYPE_PLUGIN_BASE)
 
@@ -86,11 +86,11 @@ grab_port (MMPluginBase *base,
 
     /* If this is the first port being grabbed, create a new modem object */
     if (!existing)
-        modem = MM_BASE_MODEM (mm_broadband_modem_new (mm_port_probe_get_port_physdev (probe),
-                                                       mm_port_probe_get_port_driver (probe),
-                                                       mm_plugin_get_name (MM_PLUGIN (base)),
-                                                       vendor,
-                                                       product));
+        modem = MM_BASE_MODEM (mm_broadband_modem_simtech_new (mm_port_probe_get_port_physdev (probe),
+                                                               mm_port_probe_get_port_driver (probe),
+                                                               mm_plugin_get_name (MM_PLUGIN (base)),
+                                                               vendor,
+                                                               product));
 
     if (!mm_base_modem_grab_port (existing ? existing : modem,
                                   subsys,
