@@ -758,8 +758,9 @@ find_cid_ready (MMBaseModem *modem,
 
     /* Initialize PDP context with our APN */
     ctx->cid = g_variant_get_uint32 (result);
-    command = g_strdup_printf ("+CGDCONT=%u,\"IP\",\"%s\"",
+    command = g_strdup_printf ("+CGDCONT=%u,\"%s\",\"%s\"",
                                ctx->cid,
+                               mm_bearer_properties_get_ip_type (mm_bearer_peek_config (MM_BEARER (ctx->self))),
                                mm_bearer_properties_get_apn (mm_bearer_peek_config (MM_BEARER (ctx->self))));
     mm_base_modem_at_command_full (ctx->modem,
                                    ctx->primary,
@@ -818,8 +819,7 @@ parse_cid_range (MMBaseModem *modem,
 
             pdp_type = g_match_info_fetch (match_info, 3);
 
-            /* TODO: What about PDP contexts of type "IPV6"? */
-            if (g_str_equal (pdp_type, "IP")) {
+            if (g_str_equal (pdp_type, mm_bearer_properties_get_ip_type (mm_bearer_peek_config (MM_BEARER (ctx->self))))) {
                 gchar *max_cid_range_str;
                 guint max_cid_range;
 
@@ -905,7 +905,7 @@ parse_pdp_list (MMBaseModem *modem,
                 pdp->cid,
                 pdp->pdp_type ? pdp->pdp_type : "",
                 pdp->apn ? pdp->apn : "");
-        if (g_str_equal (pdp->pdp_type, "IP")) {
+        if (g_str_equal (pdp->pdp_type, mm_bearer_properties_get_ip_type (mm_bearer_peek_config (MM_BEARER (ctx->self))))) {
             /* PDP with no APN set? we may use that one if not exact match found */
             if (!pdp->apn || !pdp->apn[0]) {
                 mm_dbg ("Found PDP context with CID %u and no APN",
@@ -917,9 +917,9 @@ parse_pdp_list (MMBaseModem *modem,
                 apn = mm_bearer_properties_get_apn (mm_bearer_peek_config (MM_BEARER (ctx->self)));
                 if (apn &&
                     g_str_equal (pdp->apn, apn)) {
-                    /* Found a PDP context with the same CID, we'll use it. */
-                    mm_dbg ("Found PDP context with CID %u for APN '%s'",
-                            pdp->cid, pdp->apn);
+                    /* Found a PDP context with the same CID and PDP type, we'll use it. */
+                    mm_dbg ("Found PDP context with CID %u and PDP type %s for APN '%s'",
+                            pdp->cid, pdp->pdp_type, pdp->apn);
                     cid = pdp->cid;
                     /* In this case, stop searching */
                     break;
