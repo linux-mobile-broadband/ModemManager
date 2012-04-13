@@ -16,6 +16,10 @@ PLUGIN_COMMON_LINKER_FLAGS = \
 	-module \
 	-avoid-version
 
+# UDev rules
+udevrulesdir = $(UDEV_BASE_DIR)/rules.d
+udevrules_DATA =
+
 ###########################
 ## Icera-specific support #
 ###########################
@@ -174,6 +178,7 @@ libmm_plugin_nokia_la_SOURCES = \
 	nokia/mm-broadband-modem-nokia.h
 libmm_plugin_nokia_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_nokia_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+udevrules_DATA += nokia/77-mm-nokia-port-types.rules
 
 ## Zte
 #libmm_plugin_zte_la_SOURCES = \
@@ -260,12 +265,6 @@ libmm_plugin_iridium_la_SOURCES = \
 	iridium/mm-sim-iridium.h
 libmm_plugin_iridium_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_iridium_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
-
-# UDev rules
-udevrulesdir = $(UDEV_BASE_DIR)/rules.d
-udevrules_DATA = \
-	nokia/77-mm-nokia-port-types.rules
-
 
 # Novatel modem
 libmm_plugin_novatel_la_SOURCES = \
