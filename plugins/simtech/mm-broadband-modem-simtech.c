@@ -28,12 +28,184 @@
 #include "ModemManager.h"
 #include "mm-log.h"
 #include "mm-iface-modem.h"
+#include "mm-iface-modem-3gpp.h"
 #include "mm-broadband-modem-simtech.h"
 
 static void iface_modem_init (MMIfaceModem *iface);
+static void iface_modem_3gpp_init (MMIfaceModem3gpp *iface);
+
+static MMIfaceModem3gpp *iface_modem_3gpp_parent;
 
 G_DEFINE_TYPE_EXTENDED (MMBroadbandModemSimtech, mm_broadband_modem_simtech, MM_TYPE_BROADBAND_MODEM, 0,
-                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init)
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM_3GPP, iface_modem_3gpp_init));
+
+/*****************************************************************************/
+/* Setup/Cleanup unsolicited events (3GPP interface) */
+
+static MMModemAccessTechnology
+simtech_act_to_mm_act (int nsmod)
+{
+    if (nsmod == 1)
+        return MM_MODEM_ACCESS_TECHNOLOGY_GSM;
+    else if (nsmod == 2)
+        return MM_MODEM_ACCESS_TECHNOLOGY_GPRS;
+    else if (nsmod == 3)
+        return MM_MODEM_ACCESS_TECHNOLOGY_EDGE;
+    else if (nsmod == 4)
+        return MM_MODEM_ACCESS_TECHNOLOGY_UMTS;
+    else if (nsmod == 5)
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSDPA;
+    else if (nsmod == 6)
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSUPA;
+    else if (nsmod == 7)
+        return MM_MODEM_ACCESS_TECHNOLOGY_HSPA;
+
+    return MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
+}
+
+static void
+simtech_tech_changed (MMAtSerialPort *port,
+                      GMatchInfo *match_info,
+                      MMBroadbandModemSimtech *self)
+{
+    gchar *str;
+
+    str = g_match_info_fetch (match_info, 1);
+    if (str && str[0])
+        mm_iface_modem_update_access_technologies (
+            MM_IFACE_MODEM (self),
+            simtech_act_to_mm_act (atoi (str)),
+            MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK);
+    g_free (str);
+}
+
+static void
+set_unsolicited_events_handlers (MMBroadbandModemSimtech *self,
+                                 gboolean enable)
+{
+    MMAtSerialPort *ports[2];
+    guint i;
+    GRegex *regex;
+
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (self));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (self));
+
+    regex = g_regex_new ("\\r\\n\\+CNSMOD:\\s*(\\d)\\r\\n",
+                         G_REGEX_RAW | G_REGEX_OPTIMIZE, 0, NULL);
+
+    /* Enable unsolicited events in given port */
+    for (i = 0; i < 2; i++) {
+        if (!ports[i])
+            continue;
+
+        /* Access technology related */
+        mm_at_serial_port_add_unsolicited_msg_handler (
+            ports[i],
+            regex,
+            enable ? (MMAtSerialUnsolicitedMsgFn)simtech_tech_changed : NULL,
+            enable ? self : NULL,
+            NULL);
+    }
+
+    g_regex_unref (regex);
+}
+
+static gboolean
+modem_3gpp_setup_cleanup_unsolicited_events_finish (MMIfaceModem3gpp *self,
+                                                    GAsyncResult *res,
+                                                    GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+parent_setup_unsolicited_events_ready (MMIfaceModem3gpp *self,
+                                       GAsyncResult *res,
+                                       GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_3gpp_parent->setup_unsolicited_events_finish (self, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else {
+        /* Our own setup now */
+        set_unsolicited_events_handlers (MM_BROADBAND_MODEM_SIMTECH (self), TRUE);
+        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res), TRUE);
+    }
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_3gpp_setup_unsolicited_events (MMIfaceModem3gpp *self,
+                                     GAsyncReadyCallback callback,
+                                     gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_setup_unsolicited_events);
+
+    /* Chain up parent's setup */
+    iface_modem_3gpp_parent->setup_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_setup_unsolicited_events_ready,
+        result);
+}
+
+static void
+parent_cleanup_unsolicited_events_ready (MMIfaceModem3gpp *self,
+                                         GAsyncResult *res,
+                                         GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_3gpp_parent->cleanup_unsolicited_events_finish (self, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (G_SIMPLE_ASYNC_RESULT (res), TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_cleanup_unsolicited_events);
+
+    /* Our own cleanup first */
+    set_unsolicited_events_handlers (MM_BROADBAND_MODEM_SIMTECH (self), FALSE);
+
+    /* And now chain up parent's cleanup */
+    iface_modem_3gpp_parent->cleanup_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_cleanup_unsolicited_events_ready,
+        result);
+}
+
+/*****************************************************************************/
+/* Setup ports (Broadband modem class) */
+
+static void
+setup_ports (MMBroadbandModem *self)
+{
+    /* Call parent's setup ports first always */
+    MM_BROADBAND_MODEM_CLASS (mm_broadband_modem_simtech_parent_class)->setup_ports (self);
+
+    /* Now reset the unsolicited messages we'll handle when enabled */
+    set_unsolicited_events_handlers (MM_BROADBAND_MODEM_SIMTECH (self), FALSE);
+}
 
 /*****************************************************************************/
 
@@ -59,6 +231,17 @@ mm_broadband_modem_simtech_init (MMBroadbandModemSimtech *self)
 }
 
 static void
+iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
+{
+    iface_modem_3gpp_parent = g_type_interface_peek_parent (iface);
+
+    iface->setup_unsolicited_events = modem_3gpp_setup_unsolicited_events;
+    iface->setup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
+    iface->cleanup_unsolicited_events = modem_3gpp_cleanup_unsolicited_events;
+    iface->cleanup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
+}
+
+static void
 iface_modem_init (MMIfaceModem *iface)
 {
 }
@@ -66,4 +249,7 @@ iface_modem_init (MMIfaceModem *iface)
 static void
 mm_broadband_modem_simtech_class_init (MMBroadbandModemSimtechClass *klass)
 {
+    MMBroadbandModemClass *broadband_modem_class = MM_BROADBAND_MODEM_CLASS (klass);
+
+    broadband_modem_class->setup_ports = setup_ports;
 }
