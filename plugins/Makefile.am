@@ -42,7 +42,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-option.la \
 	libmm-plugin-hso.la \
 	libmm-plugin-anydata.la \
-	libmm-plugin-linktop.la
+	libmm-plugin-linktop.la \
+	libmm-plugin-simtech.la
 
 #pkglib_LTLIBRARIES = \
 #	libmm-plugin-generic.la \
@@ -211,14 +212,12 @@ libmm_plugin_linktop_la_SOURCES = \
 libmm_plugin_linktop_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_linktop_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 
-## SimTech
-#libmm_plugin_simtech_la_SOURCES = \
-#	mm-plugin-simtech.c \
-#	mm-plugin-simtech.h \
-#	mm-modem-simtech-gsm.c \
-#	mm-modem-simtech-gsm.h
-#libmm_plugin_simtech_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-#libmm_plugin_simtech_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+# SimTech
+libmm_plugin_simtech_la_SOURCES = \
+	simtech/mm-plugin-simtech.c \
+	simtech/mm-plugin-simtech.h
+libmm_plugin_simtech_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_simtech_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 #
 ## Alcatel/TCT/JRD x220D and possibly others
 #libmm_plugin_x22x_la_SOURCES = \
