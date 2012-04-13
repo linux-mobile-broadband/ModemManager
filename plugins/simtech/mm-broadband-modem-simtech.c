@@ -27,6 +27,7 @@
 
 #include "ModemManager.h"
 #include "mm-log.h"
+#include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
 #include "mm-iface-modem-3gpp.h"
 #include "mm-broadband-modem-simtech.h"
@@ -195,6 +196,163 @@ modem_3gpp_cleanup_unsolicited_events (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Enabling unsolicited events (3GPP interface) */
+
+static gboolean
+modem_3gpp_enable_unsolicited_events_finish (MMIfaceModem3gpp *self,
+                                             GAsyncResult *res,
+                                             GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+own_enable_unsolicited_events_ready (MMBaseModem *self,
+                                     GAsyncResult *res,
+                                     GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_sequence_full_finish (self, res, NULL, &error);
+    if (error)
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static const MMBaseModemAtCommand unsolicited_enable_sequence[] = {
+    /* Autoreport access technology changes */
+    { "+CNSMOD=1",    5, FALSE, NULL },
+    /* Autoreport CSQ (first arg), and only report when it changes (second arg) */
+    { "+AUTOCSQ=1,1", 5, FALSE, NULL },
+    { NULL }
+};
+
+static void
+parent_enable_unsolicited_events_ready (MMIfaceModem3gpp *self,
+                                        GAsyncResult *res,
+                                        GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_3gpp_parent->enable_unsolicited_events_finish (self, res, &error)) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+    }
+
+    /* Our own enable now */
+    mm_base_modem_at_sequence_full (
+        MM_BASE_MODEM (self),
+        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+        unsolicited_enable_sequence,
+        NULL, /* response_processor_context */
+        NULL, /* response_processor_context_free */
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)own_enable_unsolicited_events_ready,
+        simple);
+}
+
+static void
+modem_3gpp_enable_unsolicited_events (MMIfaceModem3gpp *self,
+                                      GAsyncReadyCallback callback,
+                                      gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_enable_unsolicited_events);
+
+    /* Chain up parent's enable */
+    iface_modem_3gpp_parent->enable_unsolicited_events (
+        self,
+        (GAsyncReadyCallback)parent_enable_unsolicited_events_ready,
+        result);
+}
+
+/*****************************************************************************/
+/* Disabling unsolicited events (3GPP interface) */
+
+static gboolean
+modem_3gpp_disable_unsolicited_events_finish (MMIfaceModem3gpp *self,
+                                              GAsyncResult *res,
+                                              GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static const MMBaseModemAtCommand unsolicited_disable_sequence[] = {
+    { "+CNSMOD=0",  3, FALSE, NULL },
+    { "+AUTOCSQ=0", 3, FALSE, NULL },
+    { NULL }
+};
+
+static void
+parent_disable_unsolicited_events_ready (MMIfaceModem3gpp *self,
+                                         GAsyncResult *res,
+                                         GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    if (!iface_modem_3gpp_parent->disable_unsolicited_events_finish (self, res, &error))
+        g_simple_async_result_take_error (simple, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+own_disable_unsolicited_events_ready (MMBaseModem *self,
+                                      GAsyncResult *res,
+                                      GSimpleAsyncResult *simple)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_sequence_full_finish (self, res, NULL, &error);
+    if (error) {
+        g_simple_async_result_take_error (simple, error);
+        g_simple_async_result_complete (simple);
+        g_object_unref (simple);
+        return;
+    }
+
+    /* Next, chain up parent's disable */
+    iface_modem_3gpp_parent->disable_unsolicited_events (
+        MM_IFACE_MODEM_3GPP (self),
+        (GAsyncReadyCallback)parent_disable_unsolicited_events_ready,
+        simple);
+}
+
+static void
+modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_3gpp_disable_unsolicited_events);
+
+    /* Our own disable first */
+    mm_base_modem_at_sequence_full (
+        MM_BASE_MODEM (self),
+        mm_base_modem_peek_port_primary (MM_BASE_MODEM (self)),
+        unsolicited_disable_sequence,
+        NULL, /* response_processor_context */
+        NULL, /* response_processor_context_free */
+        NULL, /* cancellable */
+        (GAsyncReadyCallback)own_disable_unsolicited_events_ready,
+        result);
+}
+
+/*****************************************************************************/
 /* Setup ports (Broadband modem class) */
 
 static void
@@ -239,6 +397,11 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
     iface->setup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
     iface->cleanup_unsolicited_events = modem_3gpp_cleanup_unsolicited_events;
     iface->cleanup_unsolicited_events_finish = modem_3gpp_setup_cleanup_unsolicited_events_finish;
+
+    iface->enable_unsolicited_events = modem_3gpp_enable_unsolicited_events;
+    iface->enable_unsolicited_events_finish = modem_3gpp_enable_unsolicited_events_finish;
+    iface->disable_unsolicited_events = modem_3gpp_disable_unsolicited_events;
+    iface->disable_unsolicited_events_finish = modem_3gpp_disable_unsolicited_events_finish;
 }
 
 static void
