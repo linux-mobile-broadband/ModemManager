@@ -1047,14 +1047,15 @@ mm_3gpp_parse_cnum_exec_response (const gchar *reply,
     if (!reply || !reply[0])
         return NULL;
 
-    r = g_regex_new ("\\+CNUM:\\s*\"?\\S*\"?,\"(\\S+)\",\\d", G_REGEX_UNGREEDY, 0, NULL);
+    r = g_regex_new ("\\+CNUM:\\s*((\"([^\"]|(\\\"))*\")|([^,]*)),\"(?<num>\\S+)\",\\d",
+                     G_REGEX_UNGREEDY, 0, NULL);
     g_assert (r != NULL);
 
     g_regex_match (r, reply, 0, &match_info);
     while (g_match_info_matches (match_info)) {
         gchar *number;
 
-        number = g_match_info_fetch (match_info, 1);
+        number = g_match_info_fetch_named (match_info, "num");
 
         if (number && number[0]) {
             if (!array)
