@@ -223,6 +223,8 @@ libmm_plugin_simtech_la_SOURCES = \
 	simtech/mm-plugin-simtech.h
 libmm_plugin_simtech_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_simtech_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+udevrules_DATA += simtech/77-mm-simtech-port-types.rules
+
 #
 ## Alcatel/TCT/JRD x220D and possibly others
 #libmm_plugin_x22x_la_SOURCES = \
