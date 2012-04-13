@@ -26,6 +26,7 @@
 #include <libmm-common.h>
 
 #include "ModemManager.h"
+#include "mm-modem-helpers.h"
 #include "mm-log.h"
 #include "mm-base-modem-at.h"
 #include "mm-iface-modem.h"
@@ -353,6 +354,96 @@ modem_3gpp_disable_unsolicited_events (MMIfaceModem3gpp *self,
 }
 
 /*****************************************************************************/
+/* Load access technologies (Modem interface) */
+
+static gboolean
+load_access_technologies_finish (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 MMModemAccessTechnology *access_technologies,
+                                 guint *mask,
+                                 GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    *access_technologies = (MMModemAccessTechnology) GPOINTER_TO_UINT (
+        g_simple_async_result_get_op_res_gpointer (
+            G_SIMPLE_ASYNC_RESULT (res)));
+    *mask = MM_MODEM_ACCESS_TECHNOLOGY_ANY;
+    return TRUE;
+}
+
+static void
+cnsmod_query_ready (MMBroadbandModemSimtech *self,
+                    GAsyncResult *res,
+                    GSimpleAsyncResult *operation_result)
+{
+    const gchar *response, *p;
+    GError *error = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response) {
+        /* Let the error be critical. */
+        g_simple_async_result_take_error (operation_result, error);
+        g_simple_async_result_complete (operation_result);
+        g_object_unref (operation_result);
+        return;
+    }
+
+    p = mm_strip_tag (response, "+CNSMOD:");
+    if (p)
+        p = strchr (p, ',');
+
+    if (!p || !isdigit (*(p + 1)))
+        g_simple_async_result_set_error (
+            operation_result,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_FAILED,
+            "Failed to parse the +CNSMOD response: '%s'",
+            response);
+    else
+        g_simple_async_result_set_op_res_gpointer (
+            operation_result,
+            GUINT_TO_POINTER (simtech_act_to_mm_act (atoi (p + 1))),
+            NULL);
+
+    g_simple_async_result_complete (operation_result);
+    g_object_unref (operation_result);
+}
+
+static void
+load_access_technologies (MMIfaceModem *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        load_access_technologies);
+
+    /* Launch query only for 3GPP modems */
+    if (!mm_iface_modem_is_3gpp (self)) {
+        g_simple_async_result_set_op_res_gpointer (
+            result,
+            GUINT_TO_POINTER (MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN),
+            NULL);
+        g_simple_async_result_complete_in_idle (result);
+        g_object_unref (result);
+        return;
+    }
+
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "AT+CNSMOD?",
+        3,
+        FALSE,
+        (GAsyncReadyCallback)cnsmod_query_ready,
+        result);
+}
+
+/*****************************************************************************/
 /* Setup ports (Broadband modem class) */
 
 static void
@@ -407,6 +498,8 @@ iface_modem_3gpp_init (MMIfaceModem3gpp *iface)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    iface->load_access_technologies = load_access_technologies;
+    iface->load_access_technologies_finish = load_access_technologies_finish;
 }
 
 static void
