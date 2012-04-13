@@ -444,6 +444,205 @@ load_access_technologies (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Load initial allowed/preferred modes (Modem interface) */
+
+typedef struct {
+    MMModemMode allowed;
+    MMModemMode preferred;
+} LoadAllowedModesResult;
+
+typedef struct {
+    MMBroadbandModemSimtech *self;
+    GSimpleAsyncResult *result;
+    gint acqord;
+    gint modepref;
+} LoadAllowedModesContext;
+
+static void
+load_allowed_modes_context_complete_and_free (LoadAllowedModesContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+load_allowed_modes_finish (MMIfaceModem *self,
+                           GAsyncResult *res,
+                           MMModemMode *allowed,
+                           MMModemMode *preferred,
+                           GError **error)
+{
+    LoadAllowedModesResult *result;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return FALSE;
+
+    result = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res));
+    *allowed = result->allowed;
+    *preferred = result->preferred;
+    return TRUE;
+}
+
+static void
+cnmp_query_ready (MMBroadbandModemSimtech *self,
+                  GAsyncResult *res,
+                  LoadAllowedModesContext *ctx)
+{
+    LoadAllowedModesResult *result;
+    const gchar *response, *p;
+    GError *error = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response) {
+        /* Let the error be critical. */
+        g_simple_async_result_take_error (ctx->result, error);
+        load_allowed_modes_context_complete_and_free (ctx);
+        return;
+    }
+
+    p = mm_strip_tag (response, "+CNMP:");
+    if (!p) {
+        g_simple_async_result_set_error (
+            ctx->result,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_FAILED,
+            "Failed to parse the mode preference response: '%s'",
+            response);
+        load_allowed_modes_context_complete_and_free (ctx);
+        return;
+    }
+
+    result = g_new (LoadAllowedModesResult, 1);
+    result->allowed = MM_MODEM_MODE_NONE;
+    result->preferred = MM_MODEM_MODE_NONE;
+
+    ctx->modepref = atoi (p);
+    switch (ctx->modepref) {
+    case 2:
+        /* Automatic */
+        switch (ctx->acqord) {
+        case 0:
+            result->allowed = MM_MODEM_MODE_ANY;
+            result->preferred = MM_MODEM_MODE_NONE;
+            break;
+        case 1:
+            result->allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+            result->preferred = MM_MODEM_MODE_2G;
+            break;
+        case 2:
+            result->allowed = (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G);
+            result->preferred = MM_MODEM_MODE_3G;
+            break;
+        default:
+            g_simple_async_result_set_error (
+                ctx->result,
+                MM_CORE_ERROR,
+                MM_CORE_ERROR_FAILED,
+                "Unknown acquisition order preference: '%d'",
+                ctx->acqord);
+            load_allowed_modes_context_complete_and_free (ctx);
+            return;
+        }
+        break;
+
+    case 13:
+        /* GSM only */
+        result->allowed = MM_MODEM_MODE_2G;
+        result->preferred = MM_MODEM_MODE_NONE;
+        break;
+
+    case 14:
+        /* WCDMA only */
+        result->allowed = MM_MODEM_MODE_3G;
+        result->preferred = MM_MODEM_MODE_NONE;
+        break;
+
+    default:
+        g_simple_async_result_set_error (
+            ctx->result,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_FAILED,
+            "Unknown mode preference: '%d'",
+            ctx->modepref);
+        load_allowed_modes_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Set final result and complete */
+    g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                               result,
+                                               g_free);
+    load_allowed_modes_context_complete_and_free (ctx);
+}
+
+static void
+cnaop_query_ready (MMBroadbandModemSimtech *self,
+                   GAsyncResult *res,
+                   LoadAllowedModesContext *ctx)
+{
+    const gchar *response, *p;
+    GError *error = NULL;
+
+    response = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (!response) {
+        /* Let the error be critical. */
+        g_simple_async_result_take_error (ctx->result, error);
+        load_allowed_modes_context_complete_and_free (ctx);
+        return;
+    }
+
+    p = mm_strip_tag (response, "+CNAOP:");
+    if (p)
+        ctx->acqord = atoi (p);
+
+    if (ctx->acqord < 0 || ctx->acqord > 2) {
+        g_simple_async_result_set_error (
+            ctx->result,
+            MM_CORE_ERROR,
+            MM_CORE_ERROR_FAILED,
+            "Failed to parse the acquisition order response: '%s'",
+            response);
+        load_allowed_modes_context_complete_and_free (ctx);
+        return;
+    }
+
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "+CNMP?",
+        3,
+        FALSE,
+        (GAsyncReadyCallback)cnmp_query_ready,
+        ctx);
+}
+
+static void
+load_allowed_modes (MMIfaceModem *self,
+                    GAsyncReadyCallback callback,
+                    gpointer user_data)
+{
+    LoadAllowedModesContext *ctx;
+
+    ctx = g_new (LoadAllowedModesContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             load_allowed_modes);
+    ctx->acqord = -1;
+    ctx->modepref = -1;
+
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        "+CNAOP?",
+        3,
+        FALSE,
+        (GAsyncReadyCallback)cnaop_query_ready,
+        ctx);
+}
+
+/*****************************************************************************/
 /* Setup ports (Broadband modem class) */
 
 static void
@@ -500,6 +699,8 @@ iface_modem_init (MMIfaceModem *iface)
 {
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
+    iface->load_allowed_modes = load_allowed_modes;
+    iface->load_allowed_modes_finish = load_allowed_modes_finish;
 }
 
 static void
