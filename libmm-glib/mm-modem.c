@@ -505,7 +505,8 @@ mm_modem_get_own_numbers (MMModem *self)
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
     own = mm_gdbus_modem_get_own_numbers (self);
-    return (own && !own[0] ? own : NULL);
+
+    return (own && own[0] ? own : NULL);
 }
 
 gchar **
@@ -516,7 +517,7 @@ mm_modem_dup_own_numbers (MMModem *self)
     g_return_val_if_fail (MM_GDBUS_IS_MODEM (self), NULL);
 
     own = mm_gdbus_modem_dup_own_numbers (self);
-    if (own && !own[0])
+    if (own && own[0])
         return own;
 
     g_strfreev (own);
