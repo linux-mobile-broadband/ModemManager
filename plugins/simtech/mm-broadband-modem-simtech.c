@@ -643,6 +643,138 @@ load_allowed_modes (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Set allowed modes (Modem interface) */
+
+typedef struct {
+    MMBroadbandModemSimtech *self;
+    GSimpleAsyncResult *result;
+    guint nmp;   /* mode preference */
+    guint naop;  /* acquisition order */
+} SetAllowedModesContext;
+
+static void
+set_allowed_modes_context_complete_and_free (SetAllowedModesContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+set_allowed_modes_finish (MMIfaceModem *self,
+                          GAsyncResult *res,
+                          GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+cnaop_set_ready (MMBaseModem *self,
+                 GAsyncResult *res,
+                 SetAllowedModesContext *ctx)
+{
+    GError *error = NULL;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error)
+        /* Let the error be critical. */
+        g_simple_async_result_take_error (ctx->result, error);
+    else
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+
+    set_allowed_modes_context_complete_and_free (ctx);
+}
+
+static void
+cnmp_set_ready (MMBaseModem *self,
+                GAsyncResult *res,
+                SetAllowedModesContext *ctx)
+{
+    GError *error = NULL;
+    gchar *command;
+
+    mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error);
+    if (error) {
+        /* Let the error be critical. */
+        g_simple_async_result_take_error (ctx->result, error);
+        set_allowed_modes_context_complete_and_free (ctx);
+        return;
+    }
+
+    command = g_strdup_printf ("+CNAOP=%u", ctx->naop);
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        command,
+        3,
+        FALSE,
+        (GAsyncReadyCallback)cnaop_set_ready,
+        ctx);
+    g_free (command);
+}
+
+static void
+set_allowed_modes (MMIfaceModem *self,
+                   MMModemMode allowed,
+                   MMModemMode preferred,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
+{
+    SetAllowedModesContext *ctx;
+    gchar *command;
+
+    ctx = g_new (SetAllowedModesContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             set_allowed_modes);
+
+    ctx->nmp = 2;  /* automatic mode preference */
+    ctx->naop = 0; /* automatic acquisition order */
+
+    if (allowed == MM_MODEM_MODE_2G)
+        ctx->nmp = 13;
+    else if (allowed == MM_MODEM_MODE_3G)
+        ctx->nmp = 14;
+    else if (allowed == (MM_MODEM_MODE_2G | MM_MODEM_MODE_3G)) {
+        if (preferred == MM_MODEM_MODE_2G)
+            ctx->naop = 3;
+        else if (preferred == MM_MODEM_MODE_3G)
+            ctx->naop = 2;
+        /* else, auto */
+    } else {
+        gchar *allowed_str;
+        gchar *preferred_str;
+
+        allowed_str = mm_modem_mode_build_string_from_mask (allowed);
+        preferred_str = mm_modem_mode_build_string_from_mask (preferred);
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Requested mode (allowed: '%s', preferred: '%s') not "
+                                         "supported by the modem.",
+                                         allowed_str,
+                                         preferred_str);
+        g_free (allowed_str);
+        g_free (preferred_str);
+
+        set_allowed_modes_context_complete_and_free (ctx);
+        return;
+    }
+
+    command = g_strdup_printf ("+CNMP=%u", ctx->nmp);
+    mm_base_modem_at_command (
+        MM_BASE_MODEM (self),
+        command,
+        3,
+        FALSE,
+        (GAsyncReadyCallback)cnmp_set_ready,
+        ctx);
+    g_free (command);
+}
+
+/*****************************************************************************/
 /* Setup ports (Broadband modem class) */
 
 static void
@@ -701,6 +833,8 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_access_technologies_finish = load_access_technologies_finish;
     iface->load_allowed_modes = load_allowed_modes;
     iface->load_allowed_modes_finish = load_allowed_modes_finish;
+    iface->set_allowed_modes = set_allowed_modes;
+    iface->set_allowed_modes_finish = set_allowed_modes_finish;
 }
 
 static void
