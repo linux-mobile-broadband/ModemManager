@@ -31,6 +31,7 @@ URBF_GET_STATUS = 5
 URBF_CONTROL = 6
 URBF_SET_FEATURE = 7
 URBF_ABORT_PIPE = 8
+URBF_CLASS_IFACE = 9
 
 funcs = {
     "-- URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE:": (URBF_GET_DESC, False, None),
@@ -40,7 +41,8 @@ funcs = {
     "-- URB_FUNCTION_GET_STATUS_FROM_DEVICE:":     (URBF_GET_STATUS, False, None),
     "-- URB_FUNCTION_CONTROL_TRANSFER:":           (URBF_CONTROL, True, "C"),
     "-- URB_FUNCTION_SET_FEATURE_TO_DEVICE:":      (URBF_SET_FEATURE, False, None),
-    "-- URB_FUNCTION_ABORT_PIPE:":                 (URBF_SET_FEATURE, False, None)
+    "-- URB_FUNCTION_ABORT_PIPE:":                 (URBF_SET_FEATURE, False, None),
+    "-- URB_FUNCTION_CLASS_INTERFACE:":            (URBF_CLASS_IFACE, False, None)
 }
 
 def get_urb_info(l):
