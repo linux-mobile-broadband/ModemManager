@@ -274,69 +274,6 @@ load_current_bands (MMIfaceModem *self,
 }
 
 static gboolean
-set_bands_finish (MMIfaceModem *self,
-                  GAsyncResult *res,
-                  GError **error)
-{
-    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
-}
-
-static void
-set_bands_done (MMIfaceModem *self,
-                GAsyncResult *res,
-                GSimpleAsyncResult *operation_result)
-{
-    GError *error = NULL;
-
-    if (!mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, &error))
-        g_simple_async_result_take_error (operation_result, error);
-    else
-        g_simple_async_result_set_op_res_gboolean (operation_result, TRUE);
-
-    g_simple_async_result_complete (operation_result);
-    g_object_unref (operation_result);
-}
-
-static void
-set_bands (MMIfaceModem *self,
-           GArray *bands_array,
-           GAsyncReadyCallback callback,
-           gpointer user_data)
-{
-    GSimpleAsyncResult *result;
-    gchar *cmd;
-    guint32 bandval;
-    guint i, j;
-
-    result = g_simple_async_result_new (G_OBJECT (self),
-                                        callback,
-                                        user_data,
-                                        set_bands);
-
-    bandval = 0;
-    for (i = 0 ; i < bands_array->len ; i++) {
-        MMModemBand band = g_array_index (bands_array, MMModemBand, i);
-        for (j = 0 ; j < G_N_ELEMENTS (bandbits) ; j++) {
-            if (bandbits[j] == band ||
-                (band == MM_MODEM_BAND_ANY && bandbits[j] != MM_MODEM_BAND_UNKNOWN))
-                bandval |= 1 << j;
-        }
-    }
-
-    cmd = g_strdup_printf ("$NWBAND=%x", bandval);
-
-    mm_base_modem_at_command (
-        MM_BASE_MODEM (self),
-        cmd,
-        3,
-        FALSE,
-        (GAsyncReadyCallback)set_bands_done,
-        result);
-
-    g_free (cmd);
-}
-
-static gboolean
 load_access_technologies_finish (MMIfaceModem *self,
                                  GAsyncResult *res,
                                  MMModemAccessTechnology *access_technologies,
@@ -422,8 +359,7 @@ iface_modem_init (MMIfaceModem *iface)
     iface->load_supported_bands_finish = load_supported_bands_finish;
     iface->load_current_bands = load_current_bands;
     iface->load_current_bands_finish = load_current_bands_finish;
-    iface->set_bands = set_bands;
-    iface->set_bands_finish = set_bands_finish;
+    /* No support for setting bands, as it destabilizes the modem. */
     iface->load_access_technologies = load_access_technologies;
     iface->load_access_technologies_finish = load_access_technologies_finish;
 }
