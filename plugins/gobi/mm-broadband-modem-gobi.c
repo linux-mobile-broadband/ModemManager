@@ -59,7 +59,7 @@ load_access_technologies_finish (MMIfaceModem *self,
     p = strchr (p, ',');
     if (p) {
         /* We are reporting ALL 3GPP access technologies here */
-        *access_technologies = mm_3gpp_string_to_access_tech (p + 1);
+        *access_technologies = mm_string_to_access_tech (p + 1);
         *mask = MM_IFACE_MODEM_3GPP_ALL_ACCESS_TECHNOLOGIES_MASK;
         return TRUE;
     }

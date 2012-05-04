@@ -1332,7 +1332,7 @@ mm_3gpp_facility_to_acronym (MMModem3gppFacility facility)
 /*************************************************************************/
 
 MMModemAccessTechnology
-mm_3gpp_string_to_access_tech (const gchar *string)
+mm_string_to_access_tech (const gchar *string)
 {
     MMModemAccessTechnology act = MM_MODEM_ACCESS_TECHNOLOGY_UNKNOWN;
 
@@ -1366,6 +1366,15 @@ mm_3gpp_string_to_access_tech (const gchar *string)
 
     if (strcasestr (string, "GSM"))
         act |= MM_MODEM_ACCESS_TECHNOLOGY_GSM;
+
+    if (strcasestr (string, "EvDO Rel0"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_EVDO0;
+
+    if (strcasestr (string, "EvDO RelA"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_EVDOA;
+
+    if (strcasestr (string, "1xRTT"))
+        act |= MM_MODEM_ACCESS_TECHNOLOGY_1XRTT;
 
     return act;
 }

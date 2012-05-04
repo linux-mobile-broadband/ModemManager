@@ -147,7 +147,7 @@ GByteArray *mm_3gpp_parse_cind_read_response (const gchar *reply,
 MMModem3gppFacility mm_3gpp_acronym_to_facility (const gchar *str);
 gchar *mm_3gpp_facility_to_acronym (MMModem3gppFacility facility);
 
-MMModemAccessTechnology mm_3gpp_string_to_access_tech (const gchar *string);
+MMModemAccessTechnology mm_string_to_access_tech (const gchar *string);
 
 gchar *mm_3gpp_parse_operator (const gchar *reply,
                                MMModemCharset cur_charset);
