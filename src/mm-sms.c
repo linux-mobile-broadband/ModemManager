@@ -1292,7 +1292,7 @@ mm_sms_class_init (MMSmsClass *klass)
                               "Is multipart",
                               "Flag specifying if the SMS is multipart",
                               FALSE,
-                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_IS_MULTIPART, properties[PROP_IS_MULTIPART]);
 
     properties[PROP_MAX_PARTS] =
@@ -1300,7 +1300,7 @@ mm_sms_class_init (MMSmsClass *klass)
                            "Max parts",
                            "Maximum number of parts composing this SMS",
                            1,255, 1,
-                           G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+                           G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_MAX_PARTS, properties[PROP_MAX_PARTS]);
 
     properties[PROP_MULTIPART_REFERENCE] =
@@ -1308,6 +1308,6 @@ mm_sms_class_init (MMSmsClass *klass)
                            "Multipart reference",
                            "Common reference for all parts in the multipart SMS",
                            0, G_MAXUINT, 0,
-                           G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+                           G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_MULTIPART_REFERENCE, properties[PROP_MULTIPART_REFERENCE]);
 }
