@@ -44,13 +44,13 @@ struct _MMBroadbandBearerNovatelPrivate {
 };
 
 typedef struct {
-    MMBroadbandBearer *self;
+    MMBroadbandBearerNovatel *self;
     MMBaseModem *modem;
     MMAtSerialPort *primary;
     MMPort *data;
     GCancellable *cancellable;
     GSimpleAsyncResult *result;
-    int retries;
+    gint retries;
 } DetailedConnectContext;
 
 static DetailedConnectContext *
@@ -128,13 +128,14 @@ poll_connection_ready (MMBaseModem *modem,
     if (!result) {
         mm_warn ("QMI connection status failed: %s", error->message);
         g_error_free (error);
-    } else {
-        result = mm_strip_tag (result, "$NWQMISTATUS:");
-        if (g_strrstr(result, "QMI State: DISCONNECTED")) {
-            mm_bearer_report_disconnection (MM_BEARER (bearer));
-            g_source_remove (bearer->priv->connection_poller);
-            bearer->priv->connection_poller = 0;
-        }
+        return;
+    }
+
+    result = mm_strip_tag (result, "$NWQMISTATUS:");
+    if (g_strrstr (result, "QMI State: DISCONNECTED")) {
+        mm_bearer_report_disconnection (MM_BEARER (bearer));
+        g_source_remove (bearer->priv->connection_poller);
+        bearer->priv->connection_poller = 0;
     }
 }
 
@@ -142,6 +143,7 @@ static gboolean
 poll_connection (MMBroadbandBearerNovatel *bearer)
 {
     MMBaseModem *modem = NULL;
+
     g_object_get (MM_BEARER (bearer),
                   MM_BEARER_MODEM, &modem,
                   NULL);
@@ -153,6 +155,7 @@ poll_connection (MMBroadbandBearerNovatel *bearer)
         (GAsyncReadyCallback)poll_connection_ready,
         bearer);
     g_object_unref (modem);
+
     return TRUE;
 }
 
@@ -170,35 +173,41 @@ connect_3gpp_qmistatus_ready (MMBaseModem *modem,
     if (!result) {
         mm_warn ("QMI connection status failed: %s", error->message);
         g_simple_async_result_take_error (ctx->result, error);
-    } else {
-        result = mm_strip_tag (result, "$NWQMISTATUS:");
-        if (g_strrstr(result, "QMI State: CONNECTED")) {
-            MMBearerIpConfig *config;
-            MMBroadbandBearerNovatel *bearer = MM_BROADBAND_BEARER_NOVATEL (ctx->self);
-            mm_dbg("Connected");
-            bearer->priv->connection_poller = g_timeout_add_seconds (CONNECTION_CHECK_TIMEOUT_SEC,
-                                                                     (GSourceFunc)poll_connection,
-                                                                     bearer);
-            config = mm_bearer_ip_config_new ();
-            mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_DHCP);
-            g_simple_async_result_set_op_res_gpointer (ctx->result,
-                                                       config,
-                                                       (GDestroyNotify)g_object_unref);
-        } else {
-            mm_dbg("Error: '%s'", result);
-            if (ctx->retries > 0) {
-                ctx->retries--;
-                mm_dbg("Retrying status check in a second. %d retries left.",
-                       ctx->retries);
-                g_timeout_add_seconds(1, (GSourceFunc)connect_3gpp_qmistatus, ctx);
-                return;
-            }
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "%s", result);
-        }
+        detailed_connect_context_complete_and_free (ctx);
+        return;
     }
+
+    result = mm_strip_tag (result, "$NWQMISTATUS:");
+    if (g_strrstr (result, "QMI State: CONNECTED")) {
+        MMBearerIpConfig *config;
+
+        mm_dbg("Connected");
+        ctx->self->priv->connection_poller = g_timeout_add_seconds (CONNECTION_CHECK_TIMEOUT_SEC,
+                                                                    (GSourceFunc)poll_connection,
+                                                                    ctx->self);
+        config = mm_bearer_ip_config_new ();
+        mm_bearer_ip_config_set_method (config, MM_BEARER_IP_METHOD_DHCP);
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                   config,
+                                                   (GDestroyNotify)g_object_unref);
+        detailed_connect_context_complete_and_free (ctx);
+        return;
+    }
+
+    mm_dbg ("Error: '%s'", result);
+    if (ctx->retries > 0) {
+        ctx->retries--;
+        mm_dbg ("Retrying status check in a second. %d retries left.",
+                ctx->retries);
+        g_timeout_add_seconds (1, (GSourceFunc)connect_3gpp_qmistatus, ctx);
+        return;
+    }
+
+    /* Already exhausted all retries */
+    g_simple_async_result_set_error (ctx->result,
+                                     MM_CORE_ERROR,
+                                     MM_CORE_ERROR_FAILED,
+                                     "%s", result);
     detailed_connect_context_complete_and_free (ctx);
 }
 
