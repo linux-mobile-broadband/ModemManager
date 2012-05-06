@@ -45,6 +45,7 @@ common_test_part_from_hexpdu (const gchar *hexpdu,
                               const gchar *expected_smsc,
                               const gchar *expected_number,
                               const gchar *expected_timestamp,
+                              gboolean expected_multipart,
                               const gchar *expected_text,
                               const guint8 *expected_data,
                               gsize expected_data_size,
@@ -65,6 +66,7 @@ common_test_part_from_hexpdu (const gchar *hexpdu,
         g_assert_cmpstr (expected_timestamp, ==, mm_sms_part_get_timestamp (part));
     if (expected_text)
         g_assert_cmpstr (expected_text, ==, mm_sms_part_get_text (part));
+    g_assert_cmpuint (expected_multipart, ==, mm_sms_part_should_concat (part));
 
     if (expected_data) {
         guint32 i;
@@ -87,6 +89,7 @@ common_test_part_from_pdu (const guint8 *pdu,
                            const gchar *expected_smsc,
                            const gchar *expected_number,
                            const gchar *expected_timestamp,
+                           gboolean expected_multipart,
                            const gchar *expected_text,
                            const guint8 *expected_data,
                            gsize expected_data_size,
@@ -99,6 +102,7 @@ common_test_part_from_pdu (const guint8 *pdu,
                                   expected_smsc,
                                   expected_number,
                                   expected_timestamp,
+                                  expected_multipart,
                                   expected_text,
                                   expected_data,
                                   expected_data_size,
@@ -133,6 +137,7 @@ test_pdu1 (void)
         "+12404492164", /* smsc */
         "+16175927198", /* number */
         "110228115050-05", /* timestamp */
+        FALSE,
         "Here's a longer message [{with some extended characters}] "
         "thrown in, such as £ and ΩΠΨ and §¿ as well.", /* text */
         NULL, 0, 0);
@@ -153,6 +158,7 @@ test_pdu2 (void)
         "+79037011111", /* smsc */
         "InternetSMS", /* number */
         "110329192004+04", /* timestamp */
+        FALSE,
         "тест", /* text */
         NULL, 0, 0);
 }
@@ -172,6 +178,7 @@ test_pdu3 (void)
         "+12345678901", /* smsc */
         "+18005551212", /* number */
         "110101123456+00", /* timestamp */
+        FALSE,
         "hellohello", /* text */
         NULL, 0, 0);
 }
@@ -192,6 +199,7 @@ test_pdu3_nzpid (void)
         "+12345678901", /* smsc */
         "+18005551212", /* number */
         "110101123456+00", /* timestamp */
+        FALSE,
         "hellohello", /* text */
         NULL, 0, 0);
 }
@@ -212,6 +220,7 @@ test_pdu3_mms (void)
         "+12345678901", /* smsc */
         "+18005551212", /* number */
         "110101123456+00", /* timestamp */
+        FALSE,
         "hellohello", /* text */
         NULL, 0, 0);
 }
@@ -232,6 +241,7 @@ test_pdu3_natl (void)
         "+12345678901", /* smsc */
         "18005551212", /* number, no plus */
         "110101123456+00", /* timestamp */
+        FALSE,
         "hellohello", /* text */
         NULL, 0, 0);
 }
@@ -253,6 +263,7 @@ test_pdu3_8bit (void)
         "+12345678901", /* smsc */
         "+18005551212", /* number */
         "110101123456+00", /* timestamp */
+        FALSE,
         "", /* text */
         expected_data, /* data */
         sizeof (expected_data), /* data size */
@@ -301,6 +312,7 @@ test_pdu_dcsf1 (void)
         "+33609001390", /* smsc */
         "1800", /* number */
         "110624130815+02", /* timestamp */
+        FALSE,
         "Info SFR - Confidentiel, à ne jamais transmettre -\r\n"
         "Voici votre nouveau mot de passe : sw2ced pour gérer "
         "votre compte SFR sur www.sfr.fr ou par téléphone au 963", /* text */
@@ -324,6 +336,7 @@ test_pdu_dcsf_8bit (void)
         "+12345678901", /* smsc */
         "+18005551212", /* number */
         "110101123456+00", /* timestamp */
+        FALSE,
         "", /* text */
         expected_data, /* data */
         sizeof (expected_data), /* data size */
@@ -369,9 +382,43 @@ test_pdu_udhi (void)
         "+31653131316", /* smsc */
         "1002", /* number */
         "110629233219+02", /* timestamp */
+        TRUE,
         "Welkom, bel om uw Voicemail te beluisteren naar +31612001233"
         " (PrePay: *100*1233#). Voicemail ontvangen is altijd gratis."
         " Voor gebruik van mobiel interne", /* text */
+        NULL, 0, 0);
+}
+
+static void
+test_pdu_multipart (void)
+{
+    static const gchar *hexpdu1 =
+        "07912160130320F5440B916171056429F5000021405291650569A00500034C0201A9E8F41C949E"
+        "83C2207B599E07B1DFEE33885E9ED341E4F23C7D7697C920FA1B54C697E5E3F4BC0C6AD7D9F434"
+        "081E96D341E3303C2C4EB3D3F4BC0B94A483E6E8779D4D06CDD1EF3BA80E0785E7A0B7BB0C6A97"
+        "E7F3F0B9CC02B9DF7450780EA2DFDF2C50780EA2A3CBA0BA9B5C96B3F369F71954768FDFE4B4FB"
+        "0C9297E1F2F2BCECA6CF41";
+    static const gchar *hexpdu2 =
+        "07912160130320F6440B916171056429F5000021405291651569320500034C0202E9E8301D4447"
+        "9741F0B09C3E0785E56590BCCC0ED3CB6410FD0D7ABBCBA0B0FB4D4797E52E10";
+
+    common_test_part_from_hexpdu (
+        hexpdu1,
+        "+12063130025", /* smsc */
+        "+16175046925", /* number */
+        "120425195650-04", /* timestamp */
+        TRUE, /* multipart! */
+        "This is a very long test designed to exercise multi part capability. It should "
+        "show up as one message, not as two, as the underlying encoding represents ", /* text */
+        NULL, 0, 0);
+
+    common_test_part_from_hexpdu (
+        hexpdu2,
+        "+12063130026", /* smsc */
+        "+16175046925", /* number */
+        "120425195651-04", /* timestamp */
+        TRUE, /* multipart! */
+        "that the parts are related to one another. ", /* text */
         NULL, 0, 0);
 }
 
@@ -637,6 +684,7 @@ int main (int argc, char **argv)
     g_test_add_func ("/MM/SMS/PDU-Parser/pdu-dcsf-8bit", test_pdu_dcsf_8bit);
     g_test_add_func ("/MM/SMS/PDU-Parser/pdu-insufficient-data", test_pdu_insufficient_data);
     g_test_add_func ("/MM/SMS/PDU-Parser/pdu-udhi", test_pdu_udhi);
+    g_test_add_func ("/MM/SMS/PDU-Parser/pdu-multipart", test_pdu_multipart);
 
     g_test_add_func ("/MM/SMS/Address-Encoder/smsc-intl", test_address_encode_smsc_intl);
     g_test_add_func ("/MM/SMS/Address-Encoder/smsc-unknown", test_address_encode_smsc_unknown);
