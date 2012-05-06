@@ -463,8 +463,8 @@ set_unsolicited_result_codes (MMBroadbandBearerSamsung *self, gboolean enable)
         0,
         NULL);
 
-    ports[0] = mm_base_modem_get_port_primary (MM_BASE_MODEM (modem));
-    ports[1] = mm_base_modem_get_port_secondary (MM_BASE_MODEM (modem));
+    ports[0] = mm_base_modem_peek_port_primary (MM_BASE_MODEM (modem));
+    ports[1] = mm_base_modem_peek_port_secondary (MM_BASE_MODEM (modem));
     for (i = 0; ports[i] && i < 2; i++) {
         mm_at_serial_port_add_unsolicited_msg_handler (
             ports[i],
