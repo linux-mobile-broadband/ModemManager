@@ -445,7 +445,8 @@ disconnect_3gpp (MMBroadbandBearer *bearer,
 }
 
 static void
-set_unsolicited_result_codes (MMBroadbandBearerSamsung *self, gboolean enable)
+set_unsolicited_result_codes (MMBroadbandBearerSamsung *self,
+                              gboolean enable)
 {
     MMBroadbandModemSamsung *modem;
     MMAtSerialPort *ports[2];
@@ -457,7 +458,7 @@ set_unsolicited_result_codes (MMBroadbandBearerSamsung *self, gboolean enable)
                   NULL);
     g_assert (modem != NULL);
 
-    ipdpact_regex = g_regex_new(
+    ipdpact_regex = g_regex_new (
         "\\r\\n%IPDPACT:\\s*(\\d+),\\s*(\\d+),\\s*(\\d+)\\r\\n",
         G_REGEX_RAW | G_REGEX_OPTIMIZE,
         0,
@@ -657,11 +658,12 @@ mm_broadband_bearer_samsung_new_finish (GAsyncResult *res,
     return MM_BEARER (bearer);
 }
 
-void mm_broadband_bearer_samsung_new (MMBroadbandModemSamsung *modem,
-                                      MMBearerProperties *properties,
-                                      GCancellable *cancellable,
-                                      GAsyncReadyCallback callback,
-                                      gpointer user_data)
+void
+mm_broadband_bearer_samsung_new (MMBroadbandModemSamsung *modem,
+                                 MMBearerProperties *properties,
+                                 GCancellable *cancellable,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data)
 {
     g_async_initable_new_async (
         MM_TYPE_BROADBAND_BEARER_SAMSUNG,

@@ -89,9 +89,9 @@ G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
     static const gchar *subsystems[] = { "tty", "net", NULL };
-    static const mm_uint16_pair products[] = { { 0x04e8, 0x6872},
-                                               { 0x04e8, 0x6906},
-                                               {0, 0} };
+    static const mm_uint16_pair products[] = { { 0x04e8, 0x6872 },
+                                               { 0x04e8, 0x6906 },
+                                               { 0, 0 } };
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_SAMSUNG,
                       MM_PLUGIN_BASE_NAME, "Samsung",
