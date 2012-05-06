@@ -359,16 +359,20 @@ disconnect_3gpp_status_complete (MMBaseModem *modem,
     result = mm_base_modem_at_command_finish (MM_BASE_MODEM (modem),
                                               res,
                                               &error);
-
-    g_simple_async_result_set_op_res_gboolean (ctx->result, FALSE);
     if (error) {
         mm_dbg("QMI connection status failed: %s", error->message);
         g_error_free (error);
     }
 
     result = mm_strip_tag (result, "$NWQMISTATUS:");
-    if (g_strrstr (result, "QMI State: DISCONNECTED"))
+    if (result && g_strrstr (result, "QMI State: DISCONNECTED"))
         g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    else
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_FAILED,
+                                         "Error checking if disconnected (%s)",
+                                         result ? result : "no result");
 
     detailed_disconnect_context_complete_and_free (ctx);
 }
