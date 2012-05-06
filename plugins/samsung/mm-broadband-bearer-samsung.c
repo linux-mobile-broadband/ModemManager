@@ -178,7 +178,7 @@ ipdpact_received (MMAtSerialPort *port,
     g_free (str);
 
     if (cid != self->priv->connected_cid) {
-        mm_warn ("Recieved %%IPDPACT message for CID other than the current one (%d).",
+        mm_warn ("Received %%IPDPACT message for CID other than the current one (%d).",
                  self->priv->connected_cid);
         return;
     }
@@ -192,7 +192,7 @@ ipdpact_received (MMAtSerialPort *port,
         case 0:
             /* deactivated */
             if (self->priv->pending_disconnect == NULL) {
-                mm_dbg ("Recieved spontaneous %%IPDPACT disconnect.");
+                mm_dbg ("Received spontaneous %%IPDPACT disconnect.");
                 mm_bearer_report_disconnection (MM_BEARER (self));
                 return;
             }
@@ -201,7 +201,7 @@ ipdpact_received (MMAtSerialPort *port,
         case 1:
             /* activated */
             if (self->priv->pending_dial == NULL) {
-                mm_warn ("Recieved %%IPDPACT connect while not connecting.");
+                mm_warn ("Received %%IPDPACT connect while not connecting.");
                 return;
             }
             dial_3gpp_done (self, self->priv->pending_dial);
