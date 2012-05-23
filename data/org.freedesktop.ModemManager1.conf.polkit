@@ -198,6 +198,4 @@
     <allow own="org.freedesktop.ModemManager1"/>
     <allow send_destination="org.freedesktop.ModemManager1"/>
   </policy>
-
-  <limit name="max_replies_per_connection">512</limit>
 </busconfig>
