@@ -188,6 +188,7 @@ include_HEADERS = \
 	mm-gdbus-modem.h \
 	mm-gdbus-bearer.h \
 	mm-gdbus-sim.h \
+	mm-gdbus-sms.h \
 	libmm-common.h
 
 nodist_libmm_common_la_SOURCES = \
