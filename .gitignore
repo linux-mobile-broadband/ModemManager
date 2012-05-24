@@ -27,7 +27,6 @@ libtool
 *.dirstamp
 org.freedesktop.ModemManager.service
 org.freedesktop.ModemManager.conf
-ModemManager.pc
 callouts/mm-modem-probe
 test/lsudev
 
@@ -51,6 +50,9 @@ libwmc/tests/test-wmc
 data/org.freedesktop.ModemManager1.conf
 data/org.freedesktop.ModemManager1.service
 data/org.freedesktop.ModemManager1.policy
+data/ModemManager.pc
+data/mm-common.pc
+data/mm-glib.pc
 
 include/ModemManager-names.h
 

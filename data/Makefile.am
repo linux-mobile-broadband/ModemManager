@@ -41,6 +41,14 @@ dist_polkit_policy_DATA = $(dist_polkit_policy_in_files:.policy.in=.policy)
 endif
 
 
+# Set up pkg-config .pc files for exported libraries
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = \
+	ModemManager.pc \
+	mm-common.pc \
+	mm-glib.pc
+
+
 DISTCLEANFILES = \
 	$(dbusactivation_DATA) \
 	$(dbusservice_DATA)

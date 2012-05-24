@@ -192,6 +192,9 @@ AM_CONDITIONAL(WMC_STANDALONE, test "yes" = "no")
 AC_CONFIG_FILES([
 Makefile
 data/Makefile
+data/ModemManager.pc
+data/mm-common.pc
+data/mm-glib.pc
 include/Makefile
 build-aux/Makefile
 libmm-common/Makefile
