@@ -50,6 +50,11 @@ include_HEADERS = \
 	mm-object.h \
 	mm-modem.h \
 	mm-modem-3gpp.h \
+	mm-modem-3gpp-ussd.h \
+	mm-modem-cdma.h \
+	mm-modem-messaging.h \
+	mm-modem-location.h \
+	mm-modem-time.h \
 	mm-modem-simple.h \
 	mm-sim.h \
 	mm-sms.h \
