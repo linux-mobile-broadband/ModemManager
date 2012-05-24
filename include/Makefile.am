@@ -2,7 +2,7 @@ XSLTPROC = xsltproc --xinclude --nonet
 
 XMLS = $(wildcard $(top_srcdir)/introspection/*.xml)
 
-includedir = @includedir@/mm
+includedir = @includedir@/ModemManager
 
 include_HEADERS = \
 	ModemManager-names.h \
