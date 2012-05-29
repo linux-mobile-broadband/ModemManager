@@ -414,3 +414,54 @@ wmc_cmd_get_global_mode_result (const char *buf, size_t buflen)
 
 /**********************************************************************/
 
+static wmcbool
+validate_mode (u_int8_t mode)
+{
+    switch (mode) {
+    case WMC_NETWORK_MODE_AUTO_CDMA:
+    case WMC_NETWORK_MODE_CDMA_ONLY:
+    case WMC_NETWORK_MODE_EVDO_ONLY:
+    case WMC_NETWORK_MODE_AUTO_GSM:
+    case WMC_NETWORK_MODE_GPRS_ONLY:
+    case WMC_NETWORK_MODE_UMTS_ONLY:
+    case WMC_NETWORK_MODE_AUTO:
+    case WMC_NETWORK_MODE_LTE_ONLY:
+        return TRUE;
+    default:
+        break;
+    }
+    return FALSE;
+}
+
+size_t
+wmc_cmd_set_global_mode_new (char *buf, size_t buflen, u_int8_t mode)
+{
+    WmcCmdSetGlobalMode *cmd = (WmcCmdSetGlobalMode *) buf;
+
+    wmc_return_val_if_fail (buf != NULL, 0);
+    wmc_return_val_if_fail (buflen >= sizeof (*cmd), 0);
+    wmc_return_val_if_fail (validate_mode (mode) == TRUE, 0);
+
+    memset (cmd, 0, sizeof (*cmd));
+    cmd->hdr.marker = WMC_CMD_MARKER;
+    cmd->hdr.cmd = WMC_CMD_SET_GLOBAL_MODE;
+    cmd->_unknown1 = 0x01;
+    cmd->mode = mode;
+    cmd->_unknown2 = 0x05;
+    cmd->_unknown3 = 0x00;
+    return sizeof (*cmd);
+}
+
+WmcResult *
+wmc_cmd_set_global_mode_result (const char *buf, size_t buflen)
+{
+    wmc_return_val_if_fail (buf != NULL, NULL);
+
+    if (check_command (buf, buflen, WMC_CMD_SET_GLOBAL_MODE, sizeof (WmcCmdGetGlobalModeRsp)) < 0)
+        return NULL;
+
+    return wmc_result_new ();
+}
+
+/**********************************************************************/
+
