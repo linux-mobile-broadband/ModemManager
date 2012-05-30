@@ -208,6 +208,7 @@ libwmc/tests/Makefile
 src/Makefile
 src/tests/Makefile
 plugins/Makefile
+uml290/Makefile
 test/Makefile
 introspection/Makefile
 po/Makefile.in
