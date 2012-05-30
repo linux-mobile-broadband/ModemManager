@@ -15,8 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef LIBQCDM_ERROR_H
-#define LIBQCDM_ERROR_H
+#ifndef LIBQCDM_ERRORS_H
+#define LIBQCDM_ERRORS_H
 
 #include <config.h>
 #include <sys/types.h>
@@ -98,5 +98,5 @@ void _qcdm_log (const char *file,
 #define qcdm_err(domain, ...) \
 	_qcdm_log (__FILE__, __LINE__, __func__, domain, QCDM_LOGL_ERR, ## __VA_ARGS__ )
 
-#endif  /* LIBQCDM_ERROR_H */
+#endif  /* LIBQCDM_ERRORS_H */
 
