@@ -47,8 +47,11 @@ def get_reg_state(state):
 def cdma_inspect(proxy, props):
     cdma = dbus.Interface(proxy, dbus_interface=MM_DBUS_INTERFACE_MODEM_CDMA)
 
-    esn = cdma.GetEsn()
-    print "ESN: %s" % esn
+    try:
+        esn = cdma.GetEsn()
+        print "ESN: %s" % esn
+    except dbus.exceptions.DBusException, e:
+        print "Error reading ESN: %s" % e
 
     try:
         (cdma_1x_state, evdo_state) = cdma.GetRegistrationState()
