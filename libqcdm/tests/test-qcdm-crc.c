@@ -42,7 +42,7 @@ test_crc16_2 (void *f, void *data)
     guint16 expected = 0x6D69;
 
     /* CRC check */
-    crc = crc16 (buf, sizeof (buf));
+    crc = dm_crc16 (buf, sizeof (buf));
     g_assert (crc == expected);
 }
 
@@ -59,7 +59,7 @@ test_crc16_1 (void *f, void *data)
     guint16 expected = 0x097A;
 
     /* CRC check */
-    crc = crc16 (buf, sizeof (buf));
+    crc = dm_crc16 (buf, sizeof (buf));
     g_assert (crc == expected);
 }
 
