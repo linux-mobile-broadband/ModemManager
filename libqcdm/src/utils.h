@@ -15,8 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef UTILS_H
-#define UTILS_H
+#ifndef LIBQCDM_UTILS_H
+#define LIBQCDM_UTILS_H
 
 #include <config.h>
 #include <sys/types.h>
@@ -32,7 +32,7 @@ typedef u_int8_t qcdmbool;
 #define DIAG_CONTROL_CHAR 0x7E
 #define DIAG_TRAILER_LEN  3
 
-u_int16_t crc16 (const char *buffer, size_t len);
+u_int16_t dm_crc16 (const char *buffer, size_t len);
 
 size_t dm_escape (const char *inbuf,
                   size_t inbuf_len,
@@ -59,5 +59,5 @@ qcdmbool dm_decapsulate_buffer (const char *inbuf,
                                 size_t *out_used,
                                 qcdmbool *out_need_more);
 
-#endif  /* UTILS_H */
+#endif  /* LIBQCDM_UTILS_H */
 

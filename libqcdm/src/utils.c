@@ -33,7 +33,7 @@
  */
 
 /* Table of CRCs for each possible byte, with a generator polynomial of 0x8408 */
-const u_int16_t crc_table[256] = {
+static const u_int16_t crc_table[256] = {
     0x0000, 0x1189, 0x2312, 0x329b, 0x4624, 0x57ad, 0x6536, 0x74bf,
     0x8c48, 0x9dc1, 0xaf5a, 0xbed3, 0xca6c, 0xdbe5, 0xe97e, 0xf8f7,
     0x1081, 0x0108, 0x3393, 0x221a, 0x56a5, 0x472c, 0x75b7, 0x643e,
@@ -70,7 +70,7 @@ const u_int16_t crc_table[256] = {
 
 /* Calculate the CRC for a buffer using a seed of 0xffff */
 u_int16_t
-crc16 (const char *buffer, size_t len)
+dm_crc16 (const char *buffer, size_t len)
 {
     u_int16_t crc = 0xffff;
 
@@ -196,7 +196,7 @@ dm_encapsulate_buffer (char *inbuf,
     qcdm_return_val_if_fail (outbuf != NULL, 0);
 
     /* Add the CRC */
-    crc = crc16 (inbuf, cmd_len);
+    crc = dm_crc16 (inbuf, cmd_len);
     inbuf[cmd_len++] = crc & 0xFF;
     inbuf[cmd_len++] = (crc >> 8) & 0xFF;
 
@@ -297,7 +297,7 @@ dm_decapsulate_buffer (const char *inbuf,
     }
 
     /* Check the CRC of the packet's data */
-    crc = crc16 (outbuf, unesc_len - 2);
+    crc = dm_crc16 (outbuf, unesc_len - 2);
     pkt_crc = outbuf[unesc_len - 2] & 0xFF;
     pkt_crc |= (outbuf[unesc_len - 1] & 0xFF) << 8;
     if (crc != pkt_crc) {
