@@ -334,11 +334,11 @@ qcdm_wait_reply (int fd, char *buf, size_t len)
 static int
 qcdm_set_hdr_pref (const char *port, u_int8_t hdrpref)
 {
-    int fd, err;
-    char buf[512];
-    size_t len;
-    QcdmResult *result;
-    size_t reply_len;
+	int fd, err;
+	char buf[512];
+	size_t len;
+	QcdmResult *result;
+	size_t reply_len;
 
 	fd = com_setup (port);
 	if (fd < 0)
@@ -350,8 +350,8 @@ qcdm_set_hdr_pref (const char *port, u_int8_t hdrpref)
 		goto error;
 	}
 
-    len = qcdm_cmd_nv_set_hdr_rev_pref_new (buf, sizeof (buf), hdrpref);
-    assert (len);
+	len = qcdm_cmd_nv_set_hdr_rev_pref_new (buf, sizeof (buf), hdrpref);
+	assert (len);
 
 	/* Send the command */
 	if (!qcdm_send (fd, buf, len)) {
@@ -359,23 +359,23 @@ qcdm_set_hdr_pref (const char *port, u_int8_t hdrpref)
 		goto error;
 	}
 
-    reply_len = qcdm_wait_reply (fd, buf, sizeof (buf));
+	reply_len = qcdm_wait_reply (fd, buf, sizeof (buf));
 	if (!reply_len) {
 		fprintf (stderr, "E: failed to receive HDR pref command reply\n");
 		goto error;
 	}
 
-    /* Parse the response into a result structure */
+	/* Parse the response into a result structure */
 	err = QCDM_SUCCESS;
-    result = qcdm_cmd_nv_set_hdr_rev_pref_result (buf, reply_len, &err);
-    if (!result) {
+	result = qcdm_cmd_nv_set_hdr_rev_pref_result (buf, reply_len, &err);
+	if (!result) {
 		fprintf (stderr, "E: failed to parse HDR pref command reply: %d\n", err);
 		goto error;
-    }
+	}
 
-    qcdm_result_unref (result);
-    close (fd);
-    return 0;
+	qcdm_result_unref (result);
+	close (fd);
+	return 0;
 
 error:
 	close (fd);
