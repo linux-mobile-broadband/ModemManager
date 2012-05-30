@@ -15,8 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef UTILS_H
-#define UTILS_H
+#ifndef LIBWMC_UTILS_H
+#define LIBWMC_UTILS_H
 
 #include <sys/types.h>
 
@@ -33,7 +33,7 @@ typedef u_int8_t wmcbool;
 
 /* Utility and testcase functions */
 
-u_int16_t crc16 (const char *buffer, size_t len, u_int16_t seed);
+u_int16_t wmc_crc16 (const char *buffer, size_t len, u_int16_t seed);
 
 size_t hdlc_escape (const char *inbuf,
                     size_t inbuf_len,
@@ -84,5 +84,5 @@ wmcbool wmc_decapsulate (const char *inbuf,
                          wmcbool *out_need_more,
                          wmcbool uml290);
 
-#endif  /* UTILS_H */
+#endif  /* LIBWMC_UTILS_H */
 
