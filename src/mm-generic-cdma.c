@@ -1858,9 +1858,9 @@ reg_hdrstate_cb (MMQcdmSerialPort *port,
         guint8 almp_state = QCDM_CMD_HDR_SUBSYS_STATE_INFO_ALMP_STATE_INACTIVE;
         guint8 hybrid_mode = 0;
 
-        if (   qcdm_result_get_u8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_SESSION_STATE, &session_state)
-            && qcdm_result_get_u8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_ALMP_STATE, &almp_state)
-            && qcdm_result_get_u8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_HDR_HYBRID_MODE, &hybrid_mode)) {
+        if (   qcdm_result_get_u8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_SESSION_STATE, &session_state) == 0
+            && qcdm_result_get_u8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_ALMP_STATE, &almp_state) == 0
+            && qcdm_result_get_u8 (result, QCDM_CMD_HDR_SUBSYS_STATE_INFO_ITEM_HDR_HYBRID_MODE, &hybrid_mode) == 0) {
 
             /* EVDO state is registered if the HDR subsystem is registered, and
              * we're in hybrid mode, and the Call Manager system mode is
