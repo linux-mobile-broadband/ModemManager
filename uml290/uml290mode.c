@@ -387,7 +387,8 @@ error:
 static void
 usage (const char *prog)
 {
-	fprintf (stderr, "Usage: %s <WMC port> <DM port> <4g|3g|auto> [--debug]\n", prog);
+	fprintf (stderr, "Usage: %s <WMC port> <DM port> <mode> [--debug]\n", prog);
+	fprintf (stderr, "         <mode> = lte, auto-cdma, auto, cdma, evdo, auto-gsm, gprs, umts\n\n");
 }
 
 int
@@ -398,21 +399,39 @@ main (int argc, char *argv[])
 	const char *wmcport = argv[1];
 	const char *dmport = argv[2];
 	const char *smode = argv[3];
+	wmcbool set_evdo = FALSE;
 
 	if (argc != 4 && argc != 5) {
 		usage (argv[0]);
 		return 1;
 	}
 
-	if (strcasecmp (smode, "4g") == 0) {
+	if (strcasecmp (smode, "lte") == 0) {
 		mode = WMC_NETWORK_MODE_LTE_ONLY;
 		hdrpref = QCDM_CMD_NV_HDR_REV_PREF_ITEM_REV_PREF_EHRPD;
-	} else if (strcasecmp (smode, "3g") == 0) {
+		set_evdo = TRUE;
+	} else if (strcasecmp (smode, "auto-cdma") == 0) {
 		mode = WMC_NETWORK_MODE_AUTO_CDMA;
 		hdrpref = QCDM_CMD_NV_HDR_REV_PREF_ITEM_REV_PREF_A;
+		set_evdo = TRUE;
 	} else if (strcasecmp (smode, "auto") == 0) {
 		mode = WMC_NETWORK_MODE_AUTO;
 		hdrpref = QCDM_CMD_NV_HDR_REV_PREF_ITEM_REV_PREF_EHRPD;
+		set_evdo = TRUE;
+	} else if (strcasecmp (smode, "cdma") == 0) {
+		mode = WMC_NETWORK_MODE_CDMA_ONLY;
+		hdrpref = QCDM_CMD_NV_HDR_REV_PREF_ITEM_REV_PREF_A;
+		set_evdo = TRUE;
+	} else if (strcasecmp (smode, "evdo") == 0) {
+		mode = WMC_NETWORK_MODE_EVDO_ONLY;
+		hdrpref = QCDM_CMD_NV_HDR_REV_PREF_ITEM_REV_PREF_A;
+		set_evdo = TRUE;
+	} else if (strcasecmp (smode, "auto-gsm") == 0) {
+		mode = WMC_NETWORK_MODE_AUTO_GSM;
+	} else if (strcasecmp (smode, "gprs") == 0) {
+		mode = WMC_NETWORK_MODE_GPRS_ONLY;
+	} else if (strcasecmp (smode, "umts") == 0) {
+		mode = WMC_NETWORK_MODE_UMTS_ONLY;
 	} else {
 		usage (argv[0]);
 		return 1;
@@ -426,10 +445,10 @@ main (int argc, char *argv[])
 
 	if (wmc_set_global_mode (wmcport, mode))
 		return 1;
-	if (qcdm_set_hdr_pref (dmport, hdrpref))
+	if (set_evdo && qcdm_set_hdr_pref (dmport, hdrpref))
 		return 1;
 	
-	fprintf (stdout, "Success setting mode to '%s': replug your UML290.\n", smode);
+	fprintf (stdout, "Success setting mode to '%s': replug your device.\n", smode);
 	return 0;
 }
 
