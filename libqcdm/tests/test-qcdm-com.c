@@ -625,6 +625,15 @@ test_com_read_mode_pref (void *f, void *data)
     case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_HDR_ONLY:
         msg = "HDR only";
         break;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_GPRS_ONLY:
+        msg = "GPRS only";
+        break;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_UMTS_ONLY:
+        msg = "UMTS only";
+        break;
+    case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_GSM_UMTS_ONLY:
+        msg = "GSM and UMTS only";
+        break;
     case QCDM_CMD_NV_MODE_PREF_ITEM_MODE_PREF_1X_HDR_ONLY:
         msg = "CDMA 1x and HDR only";
         break;
