@@ -34,49 +34,40 @@ int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
 int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 
 static MMBaseModem *
+create_modem (MMPluginBase *plugin,
+              const gchar *sysfs_path,
+              const gchar *driver,
+              guint16 vendor,
+              guint16 product,
+              GList *probes,
+              GError **error)
+{
+    return MM_BASE_MODEM (mm_broadband_modem_novatel_new (sysfs_path,
+                                                          driver,
+                                                          mm_plugin_get_name (MM_PLUGIN (plugin)),
+                                                          vendor,
+                                                          product));
+}
+
+static gboolean
 grab_port (MMPluginBase *base,
-           MMBaseModem *existing,
+           MMBaseModem *modem,
            MMPortProbe *probe,
            GError **error)
 {
-    MMBaseModem *modem = NULL;
-    const gchar *name, *subsys, *driver;
-    guint16 vendor = 0, product = 0;
-
     /* The Novatel plugin uses AT and net ports */
     if (!mm_port_probe_is_at (probe) &&
         !g_str_equal (mm_port_probe_get_port_subsys (probe), "net")) {
         g_set_error (error, 0, 0, "Ignoring non-AT/net port");
-        return NULL;
+        return FALSE;
     }
 
-    subsys = mm_port_probe_get_port_subsys (probe);
-    name = mm_port_probe_get_port_name (probe);
-    driver = mm_port_probe_get_port_driver (probe);
-
-    /* Try to get Product IDs from udev. */
-    mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product);
-
-    /* If this is the first port being grabbed, create a new modem object */
-    if (!existing)
-        modem = MM_BASE_MODEM (mm_broadband_modem_novatel_new (mm_port_probe_get_port_physdev (probe),
-                                                               driver,
-                                                               mm_plugin_get_name (MM_PLUGIN (base)),
-                                                               vendor,
-                                                               product));
-
-    if (!mm_base_modem_grab_port (existing ? existing : modem,
-                                  subsys,
-                                  name,
-                                  mm_port_probe_get_port_type (probe),
-                                  MM_AT_PORT_FLAG_NONE,
-                                  error)) {
-        if (modem)
-            g_object_unref (modem);
-        return NULL;
-    }
-
-    return existing ? existing : modem;
+    return mm_base_modem_grab_port (modem,
+                                    mm_port_probe_get_port_subsys (probe),
+                                    mm_port_probe_get_port_name (probe),
+                                    mm_port_probe_get_port_type (probe),
+                                    MM_AT_PORT_FLAG_NONE,
+                                    error);
 }
 
 /*****************************************************************************/
@@ -107,5 +98,6 @@ mm_plugin_novatel_class_init (MMPluginNovatelClass *klass)
 {
     MMPluginBaseClass *pb_class = MM_PLUGIN_BASE_CLASS (klass);
 
+    pb_class->create_modem = create_modem;
     pb_class->grab_port = grab_port;
 }

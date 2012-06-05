@@ -84,17 +84,14 @@ mm_plugin_supports_port_cancel (MMPlugin *plugin,
 }
 
 MMBaseModem *
-mm_plugin_grab_port (MMPlugin *plugin,
-                     const char *subsys,
-                     const char *name,
-                     MMBaseModem *existing,
-                     GError **error)
+mm_plugin_create_modem (MMPlugin *plugin,
+                        GList *ports,
+                        GError **error)
 {
-    g_return_val_if_fail (MM_IS_PLUGIN (plugin), FALSE);
-    g_return_val_if_fail (subsys != NULL, FALSE);
-    g_return_val_if_fail (name != NULL, FALSE);
+    if (MM_PLUGIN_GET_INTERFACE (plugin)->create_modem)
+        return MM_PLUGIN_GET_INTERFACE (plugin)->create_modem (plugin, ports, error);
 
-    return MM_PLUGIN_GET_INTERFACE (plugin)->grab_port (plugin, subsys, name, existing, error);
+    return NULL;
 }
 
 /*****************************************************************************/

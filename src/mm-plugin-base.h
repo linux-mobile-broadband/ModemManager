@@ -58,10 +58,19 @@ struct _MMPluginBaseClass {
     GObjectClass parent;
 
     /* Mandatory subclass functions */
-    MMBaseModem *(*grab_port) (MMPluginBase *plugin,
-                               MMBaseModem *existing,
-                               MMPortProbe *probe,
-                               GError **error);
+
+    MMBaseModem *(*create_modem) (MMPluginBase *plugin,
+                                  const gchar *sysfs_path,
+                                  const gchar *driver,
+                                  guint16 vendor,
+                                  guint16 product,
+                                  GList *probes,
+                                  GError **error);
+
+    gboolean (*grab_port) (MMPluginBase *plugin,
+                           MMBaseModem *modem,
+                           MMPortProbe *probe,
+                           GError **error);
 };
 
 GType mm_plugin_base_get_type (void);

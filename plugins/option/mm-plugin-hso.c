@@ -33,15 +33,29 @@ int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 /*****************************************************************************/
 
 static MMBaseModem *
+create_modem (MMPluginBase *plugin,
+              const gchar *sysfs_path,
+              const gchar *driver,
+              guint16 vendor,
+              guint16 product,
+              GList *probes,
+              GError **error)
+{
+    return MM_BASE_MODEM (mm_broadband_modem_hso_new (sysfs_path,
+                                                      driver,
+                                                      mm_plugin_get_name (MM_PLUGIN (plugin)),
+                                                      vendor,
+                                                      product));
+}
+
+static gboolean
 grab_port (MMPluginBase *base,
-           MMBaseModem *existing,
+           MMBaseModem *modem,
            MMPortProbe *probe,
            GError **error)
 {
-    MMBaseModem *modem = NULL;
     GUdevDevice *port;
     const gchar *name, *subsys, *sysfs_path;
-    guint16 vendor = 0, product = 0;
     MMAtPortFlag pflags = MM_AT_PORT_FLAG_NONE;
     gchar *devfile;
     MMPortType port_type;
@@ -49,14 +63,6 @@ grab_port (MMPluginBase *base,
     port = mm_port_probe_get_port (probe); /* transfer none */
     subsys = mm_port_probe_get_port_subsys (probe);
     name = mm_port_probe_get_port_name (probe);
-
-    if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product)) {
-        g_set_error_literal (error,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_FAILED,
-                             "Could not get modem product ID");
-        return NULL;
-    }
 
     /* Build proper devfile path
      * TODO: Why do we need to do this? If this is useful, a comment should be
@@ -79,7 +85,7 @@ grab_port (MMPluginBase *base,
                          MM_CORE_ERROR,
                          MM_CORE_ERROR_FAILED,
                          "Could not get port's sysfs file.");
-            return NULL;
+            return FALSE;
         }
     }
     g_free (devfile);
@@ -110,26 +116,12 @@ grab_port (MMPluginBase *base,
         g_free (hsotype_path);
     }
 
-    /* If this is the first port being grabbed, create a new modem object */
-    if (!existing)
-        modem = MM_BASE_MODEM (mm_broadband_modem_hso_new (mm_port_probe_get_port_physdev (probe),
-                                                           mm_port_probe_get_port_driver (probe),
-                                                           mm_plugin_get_name (MM_PLUGIN (base)),
-                                                           vendor,
-                                                           product));
-
-    if (!mm_base_modem_grab_port (existing ? existing : modem,
-                                  subsys,
-                                  name,
-                                  port_type,
-                                  pflags,
-                                  error)) {
-        if (modem)
-            g_object_unref (modem);
-        return NULL;
-    }
-
-    return existing ? existing : modem;
+    return mm_base_modem_grab_port (modem,
+                                    subsys,
+                                    name,
+                                    port_type,
+                                    pflags,
+                                    error);
 }
 
 /*****************************************************************************/
@@ -160,5 +152,6 @@ mm_plugin_hso_class_init (MMPluginHsoClass *klass)
 {
     MMPluginBaseClass *pb_class = MM_PLUGIN_BASE_CLASS (klass);
 
+    pb_class->create_modem = create_modem;
     pb_class->grab_port = grab_port;
 }

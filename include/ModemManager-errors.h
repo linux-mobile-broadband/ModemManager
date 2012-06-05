@@ -49,6 +49,7 @@
  * @MM_CORE_ERROR_TOO_MANY: Too many items.
  * @MM_CORE_ERROR_NOT_FOUND: Item not found.
  * @MM_CORE_ERROR_RETRY: Operation cannot yet be performed, retry later.
+ * @MM_CORE_ERROR_EXISTS: Item already exists.
  *
  * Common errors that may be reported by ModemManager.
  */
@@ -66,6 +67,7 @@ typedef enum { /*< underscore_name=mm_core_error >*/
     MM_CORE_ERROR_TOO_MANY     = 10, /*< nick=TooMany      >*/
     MM_CORE_ERROR_NOT_FOUND    = 11, /*< nick=NotFound     >*/
     MM_CORE_ERROR_RETRY        = 12, /*< nick=Retry        >*/
+    MM_CORE_ERROR_EXISTS       = 13, /*< nick=Exists       >*/
 } MMCoreError;
 
 /**

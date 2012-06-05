@@ -37,9 +37,9 @@ udevrules_DATA =
 
 pkglib_LTLIBRARIES = \
 	libmm-plugin-generic.la \
+	libmm-plugin-nokia.la \
 	libmm-plugin-cinterion.la \
 	libmm-plugin-iridium.la \
-	libmm-plugin-nokia.la \
 	libmm-plugin-gobi.la \
 	libmm-plugin-motorola.la \
 	libmm-plugin-novatel.la \

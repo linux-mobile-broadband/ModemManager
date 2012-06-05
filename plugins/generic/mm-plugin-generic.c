@@ -40,19 +40,27 @@ int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 /*****************************************************************************/
 
 static MMBaseModem *
+create_modem (MMPluginBase *plugin,
+              const gchar *sysfs_path,
+              const gchar *driver,
+              guint16 vendor,
+              guint16 product,
+              GList *probes,
+              GError **error)
+{
+    return MM_BASE_MODEM (mm_broadband_modem_new (sysfs_path,
+                                                  driver,
+                                                  mm_plugin_get_name (MM_PLUGIN (plugin)),
+                                                  vendor,
+                                                  product));
+}
+
+static gboolean
 grab_port (MMPluginBase *base,
-           MMBaseModem *existing,
+           MMBaseModem *modem,
            MMPortProbe *probe,
            GError **error)
 {
-    GUdevDevice *port;
-    MMBaseModem *modem = NULL;
-    const gchar *name, *subsys, *devfile, *driver;
-    guint16 vendor = 0, product = 0;
-
-    subsys = mm_port_probe_get_port_subsys (probe);
-    name = mm_port_probe_get_port_name (probe);
-
     /* The generic plugin cannot do anything with non-AT and non-QCDM ports */
     if (!mm_port_probe_is_at (probe) &&
         !mm_port_probe_is_qcdm (probe)) {
@@ -60,54 +68,15 @@ grab_port (MMPluginBase *base,
                      MM_CORE_ERROR,
                      MM_CORE_ERROR_UNSUPPORTED,
                      "Ignoring non-AT/non-QCDM ports");
-        return NULL;
+        return FALSE;
     }
 
-    driver = mm_port_probe_get_port_driver (probe);
-    port = mm_port_probe_get_port (probe);
-
-    /* Check device file of the port, we expect one */
-    devfile = g_udev_device_get_device_file (port);
-    if (!devfile) {
-        if (!driver || !g_str_equal (driver, "bluetooth")) {
-            g_set_error (error,
-                         MM_CORE_ERROR,
-                         MM_CORE_ERROR_FAILED,
-                         "Could not get port's sysfs file.");
-            return NULL;
-        }
-
-        mm_warn ("%s: (%s/%s) WARNING: missing udev 'device' file",
-                 mm_plugin_get_name (MM_PLUGIN (base)),
-                 subsys,
-                 name);
-    }
-
-    /* Vendor and Product IDs are really optional, we'll just warn if they
-     * cannot get loaded */
-    if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product))
-        mm_warn ("Could not get modem vendor/product ID");
-
-    /* If this is the first port being grabbed, create a new modem object */
-    if (!existing)
-        modem = MM_BASE_MODEM (mm_broadband_modem_new (mm_port_probe_get_port_physdev (probe),
-                                                       driver,
-                                                       mm_plugin_get_name (MM_PLUGIN (base)),
-                                                       vendor,
-                                                       product));
-
-    if (!mm_base_modem_grab_port (existing ? existing : modem,
-                                  subsys,
-                                  name,
-                                  mm_port_probe_get_port_type (probe),
-                                  MM_AT_PORT_FLAG_NONE,
-                                  error)) {
-        if (modem)
-            g_object_unref (modem);
-        return NULL;
-    }
-
-    return existing ? existing : modem;
+    return mm_base_modem_grab_port (modem,
+                                    mm_port_probe_get_port_subsys (probe),
+                                    mm_port_probe_get_port_name (probe),
+                                    mm_port_probe_get_port_type (probe),
+                                    MM_AT_PORT_FLAG_NONE,
+                                    error);
 }
 
 /*****************************************************************************/
@@ -136,5 +105,6 @@ mm_plugin_generic_class_init (MMPluginGenericClass *klass)
 {
     MMPluginBaseClass *pb_class = MM_PLUGIN_BASE_CLASS (klass);
 
+    pb_class->create_modem = create_modem;
     pb_class->grab_port = grab_port;
 }

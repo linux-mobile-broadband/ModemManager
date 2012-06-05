@@ -30,15 +30,29 @@ int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 /*****************************************************************************/
 
 static MMBaseModem *
+create_modem (MMPluginBase *plugin,
+              const gchar *sysfs_path,
+              const gchar *driver,
+              guint16 vendor,
+              guint16 product,
+              GList *probes,
+              GError **error)
+{
+    return MM_BASE_MODEM (mm_broadband_modem_linktop_new (sysfs_path,
+                                                          driver,
+                                                          mm_plugin_get_name (MM_PLUGIN (plugin)),
+                                                          vendor,
+                                                          product));
+}
+
+static gboolean
 grab_port (MMPluginBase *base,
-           MMBaseModem *existing,
+           MMBaseModem *modem,
            MMPortProbe *probe,
            GError **error)
 {
-    MMBaseModem *modem = NULL;
     GUdevDevice *port;
-    const gchar *name, *subsys, *devfile;
-    guint16 vendor = 0, product = 0;
+    const gchar *devfile;
 
     /* The Linktop plugin cannot do anything with non-AT ports */
     if (!mm_port_probe_is_at (probe)) {
@@ -46,7 +60,7 @@ grab_port (MMPluginBase *base,
                              MM_CORE_ERROR,
                              MM_CORE_ERROR_UNSUPPORTED,
                              "Ignoring non-AT port");
-        return NULL;
+        return FALSE;
     }
 
     port = mm_port_probe_get_port (probe); /* transfer none */
@@ -55,40 +69,15 @@ grab_port (MMPluginBase *base,
     devfile = g_udev_device_get_device_file (port);
     if (!devfile) {
         g_set_error (error, 0, 0, "Could not get port's sysfs file.");
-        return NULL;
+        return FALSE;
     }
 
-    subsys = mm_port_probe_get_port_subsys (probe);
-    name = mm_port_probe_get_port_name (probe);
-
-    if (!mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product)) {
-        g_set_error_literal (error,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_FAILED,
-                             "Could not get modem product ID");
-        return NULL;
-    }
-
-    /* If this is the first port being grabbed, create a new modem object */
-    if (!existing)
-        modem = MM_BASE_MODEM (mm_broadband_modem_linktop_new (mm_port_probe_get_port_physdev (probe),
-                                                               mm_port_probe_get_port_driver (probe),
-                                                               mm_plugin_get_name (MM_PLUGIN (base)),
-                                                               vendor,
-                                                               product));
-
-    if (!mm_base_modem_grab_port (existing ? existing : modem,
-                                  subsys,
-                                  name,
-                                  MM_PORT_TYPE_AT, /* we only allow AT ports here */
-                                  MM_AT_PORT_FLAG_NONE,
-                                  error)) {
-        if (modem)
-            g_object_unref (modem);
-        return NULL;
-    }
-
-    return existing ? existing : modem;
+    return mm_base_modem_grab_port (modem,
+                                    mm_port_probe_get_port_subsys (probe),
+                                    mm_port_probe_get_port_name (probe),
+                                    MM_PORT_TYPE_AT, /* we only allow AT ports here */
+                                    MM_AT_PORT_FLAG_NONE,
+                                    error);
 }
 
 /*****************************************************************************/
@@ -118,5 +107,6 @@ mm_plugin_linktop_class_init (MMPluginLinktopClass *klass)
 {
     MMPluginBaseClass *pb_class = MM_PLUGIN_BASE_CLASS (klass);
 
+    pb_class->create_modem = create_modem;
     pb_class->grab_port = grab_port;
 }

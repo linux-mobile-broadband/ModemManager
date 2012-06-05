@@ -83,19 +83,10 @@ struct _MMPlugin {
                                   const char *subsys,
                                   const char *name);
 
-    /* Will only be called if the plugin returns a value greater than 0 for
-     * the supports_port() method for this port.  The plugin should create and
-     * return a  new modem for the port's device if there is no existing modem
-     * to handle the port's hardware device, or should add the port to an
-     * existing modem and return that modem object.  If an error is encountered
-     * while claiming the port, the error information should be returned in the
-     * error argument, and the plugin should return NULL.
-     */
-    MMBaseModem * (*grab_port)    (MMPlugin *self,
-                                   const char *subsys,
-                                   const char *name,
-                                   MMBaseModem *existing,
-                                   GError **error);
+    /* Given all the list of ports, launch creation of a new modem object */
+    MMBaseModem * (*create_modem) (MMPlugin  *self,
+                                   GList     *ports,
+                                   GError   **error);
 };
 
 GType mm_plugin_get_type (void);
@@ -120,10 +111,8 @@ void mm_plugin_supports_port_cancel (MMPlugin *plugin,
                                      const char *subsys,
                                      const char *name);
 
-MMBaseModem *mm_plugin_grab_port    (MMPlugin *plugin,
-                                     const char *subsys,
-                                     const char *name,
-                                     MMBaseModem *existing,
+MMBaseModem *mm_plugin_create_modem (MMPlugin *plugin,
+                                     GList *ports,
                                      GError **error);
 
 #endif /* MM_PLUGIN_H */

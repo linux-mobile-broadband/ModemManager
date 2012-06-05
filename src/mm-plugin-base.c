@@ -759,30 +759,86 @@ supports_port_cancel (MMPlugin *plugin,
 }
 
 static MMBaseModem *
-grab_port (MMPlugin *plugin,
-           const char *subsys,
-           const char *name,
-           MMBaseModem *existing,
-           GError **error)
+create_modem (MMPlugin  *self,
+              GList     *ports,
+              GError   **error)
 {
-    MMPluginBase *self = MM_PLUGIN_BASE (plugin);
-    MMPluginBasePrivate *priv = MM_PLUGIN_BASE_GET_PRIVATE (self);
-    MMPortProbe *probe;
     MMBaseModem *modem = NULL;
-    char *key;
+    MMPluginBasePrivate *priv = MM_PLUGIN_BASE_GET_PRIVATE (self);
+    GList *probes = NULL;
+    GList *l;
+    const gchar *name, *subsys, *sysfs_path, *driver;
+    guint16 vendor = 0, product = 0;
 
-    key = get_key (subsys, name);
-    probe = g_hash_table_lookup (priv->tasks, key);
-    g_assert (probe);
+    /* Get the port probe results for each of the ports */
+    for (l = ports; l; l = g_list_next (l)) {
+        MMPortProbe *probe;
+        gchar *key;
 
-    /* Let the modem grab the port */
-    modem = MM_PLUGIN_BASE_GET_CLASS (self)->grab_port (self,
-                                                        existing,
-                                                        probe,
-                                                        error);
+        subsys = g_udev_device_get_subsystem (G_UDEV_DEVICE (l->data));
+        name = g_udev_device_get_name (G_UDEV_DEVICE (l->data));
 
-    g_hash_table_remove (priv->tasks, key);
-    g_free (key);
+        key = get_key (subsys, name);
+        probe = g_hash_table_lookup (priv->tasks, key);
+        g_assert (probe);
+        probes = g_list_prepend (probes, g_object_ref (probe));
+        g_free (key);
+    }
+
+    /* Get info from the first probe in the list */
+    subsys = mm_port_probe_get_port_subsys (probes->data);
+    name = mm_port_probe_get_port_name (probes->data);
+    sysfs_path = mm_port_probe_get_port_physdev (probes->data);
+    driver = mm_port_probe_get_port_driver (probes->data);
+
+    /* Vendor and Product IDs are really optional, we'll just warn if they
+     * cannot get loaded */
+    if (!mm_plugin_base_get_device_ids (MM_PLUGIN_BASE (self), subsys, name, &vendor, &product))
+        mm_warn ("Could not get modem vendor/product ID");
+
+    /* Let the plugin create the modem from the port probe results */
+    modem = MM_PLUGIN_BASE_GET_CLASS (self)->create_modem (MM_PLUGIN_BASE (self),
+                                                           sysfs_path,
+                                                           driver,
+                                                           vendor,
+                                                           product,
+                                                           probes,
+                                                           error);
+    if (modem) {
+        /* Grab each port */
+        for (l = probes; l; l = g_list_next (l)) {
+            GError *inner_error = NULL;
+
+            /* If grabbing a port fails, just warn. We'll decide if the modem is
+             * valid or not when all ports get organized */
+            if (!MM_PLUGIN_BASE_GET_CLASS (self)->grab_port (MM_PLUGIN_BASE (self),
+                                                             modem,
+                                                             MM_PORT_PROBE (l->data),
+                                                             &inner_error)) {
+                mm_warn ("Could not grab port (%s/%s): '%s'",
+                         mm_port_probe_get_port_subsys (MM_PORT_PROBE (l->data)),
+                         mm_port_probe_get_port_name (MM_PORT_PROBE (l->data)),
+                         inner_error ? inner_error->message : "unknown error");
+                g_clear_error (&inner_error);
+            }
+        }
+
+        /* If organizing ports fails, consider the modem invalid */
+        if (!mm_base_modem_organize_ports (modem, error))
+            g_clear_object (&modem);
+    }
+
+    for (l = probes; l; l = g_list_next (l)) {
+        gchar *key;
+
+        key = get_key (mm_port_probe_get_port_subsys (l->data),
+                       mm_port_probe_get_port_name (l->data));
+        g_hash_table_remove (priv->tasks, key);
+        g_free (key);
+    }
+
+    g_list_free_full (probes, (GDestroyNotify) g_object_unref);
+
     return modem;
 }
 
@@ -797,7 +853,7 @@ plugin_init (MMPlugin *plugin_class)
     plugin_class->supports_port = supports_port;
     plugin_class->supports_port_finish = supports_port_finish;
     plugin_class->supports_port_cancel = supports_port_cancel;
-    plugin_class->grab_port = grab_port;
+    plugin_class->create_modem = create_modem;
 }
 
 static void
@@ -1073,5 +1129,5 @@ mm_plugin_base_class_init (MMPluginBaseClass *klass)
                               "Send delay for characters in the AT port, "
                               "in microseconds",
                               0, G_MAXUINT64, 100000,
-                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 }

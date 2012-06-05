@@ -17,7 +17,7 @@
  * Boston, MA 02111-1307, USA.
  *
  * Copyright (C) 2011 Ammonit Measurement GmbH
- * Copyright (C) 2011 Google Inc.
+ * Copyright (C) 2011 - 2012 Google Inc.
  * Author: Aleksander Morgado <aleksander@lanedo.com>
  */
 
@@ -36,14 +36,27 @@ int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
 int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 
 static MMBaseModem *
+create_modem (MMPluginBase *plugin,
+              const gchar *sysfs_path,
+              const gchar *driver,
+              guint16 vendor,
+              guint16 product,
+              GList *probes,
+              GError **error)
+{
+    return MM_BASE_MODEM (mm_broadband_modem_cinterion_new (sysfs_path,
+                                                            driver,
+                                                            mm_plugin_get_name (MM_PLUGIN (plugin)),
+                                                            vendor,
+                                                            product));
+}
+
+static gboolean
 grab_port (MMPluginBase *base,
-           MMBaseModem *existing,
+           MMBaseModem *modem,
            MMPortProbe *probe,
            GError **error)
 {
-    MMBaseModem *modem = NULL;
-    const gchar *name, *subsys, *driver;
-    guint16 vendor = 0, product = 0;
 
     /* The Cinterion plugin cannot do anything with non-AT ports */
     if (!mm_port_probe_is_at (probe)) {
@@ -51,38 +64,15 @@ grab_port (MMPluginBase *base,
                              MM_CORE_ERROR,
                              MM_CORE_ERROR_UNSUPPORTED,
                              "Ignoring non-AT port");
-        return NULL;
+        return FALSE;
     }
 
-    subsys = mm_port_probe_get_port_subsys (probe);
-    name = mm_port_probe_get_port_name (probe);
-    driver = mm_port_probe_get_port_driver (probe);
-
-    /* Try to get Product IDs from udev. Note that it is not an error
-     * if we can't get them in our case, as we also support serial
-     * modems. */
-    mm_plugin_base_get_device_ids (base, subsys, name, &vendor, &product);
-
-    /* If this is the first port being grabbed, create a new modem object */
-    if (!existing)
-        modem = MM_BASE_MODEM (mm_broadband_modem_cinterion_new (mm_port_probe_get_port_physdev (probe),
-                                                                 driver,
-                                                                 mm_plugin_get_name (MM_PLUGIN (base)),
-                                                                 vendor,
-                                                                 product));
-
-    if (!mm_base_modem_grab_port (existing ? existing : modem,
-                                  subsys,
-                                  name,
-                                  MM_PORT_TYPE_AT, /* we only allow AT ports here */
-                                  MM_AT_PORT_FLAG_NONE,
-                                  error)) {
-        if (modem)
-            g_object_unref (modem);
-        return NULL;
-    }
-
-    return existing ? existing : modem;
+    return mm_base_modem_grab_port (modem,
+                                    mm_port_probe_get_port_subsys (probe),
+                                    mm_port_probe_get_port_name (probe),
+                                    MM_PORT_TYPE_AT, /* we only allow AT ports here */
+                                    MM_AT_PORT_FLAG_NONE,
+                                    error);
 }
 
 /*****************************************************************************/
@@ -114,5 +104,6 @@ mm_plugin_cinterion_class_init (MMPluginCinterionClass *klass)
 {
     MMPluginBaseClass *pb_class = MM_PLUGIN_BASE_CLASS (klass);
 
+    pb_class->create_modem = create_modem;
     pb_class->grab_port = grab_port;
 }
