@@ -47,6 +47,7 @@ typedef struct {
     gboolean init_retried;
     guint32 cpms_tries;
     guint cpms_timeout;
+    gboolean has_net;
     gboolean is_icera;
     MMModemIceraPrivate *icera;
 } MMModemZtePrivate;
@@ -328,7 +329,7 @@ do_disconnect (MMGenericGsm *gsm,
     MMModemZte *self = MM_MODEM_ZTE (gsm);
     MMModemZtePrivate *priv = MM_MODEM_ZTE_GET_PRIVATE (self);
 
-    if (priv->is_icera)
+    if (priv->is_icera && priv->has_net)
         mm_modem_icera_do_disconnect (gsm, cid, callback, user_data);
     else
         MM_GENERIC_GSM_CLASS (mm_modem_zte_parent_class)->do_disconnect (gsm, cid, callback, user_data);
@@ -435,9 +436,16 @@ icera_check_cb (MMModem *modem,
 
         if (result) {
             priv->is_icera = TRUE;
-            g_object_set (G_OBJECT (modem),
-                          MM_MODEM_IP_METHOD, MM_MODEM_IP_METHOD_STATIC,
-                          NULL);
+
+            /* Some devices with Icera chipsets don't have pseudo-ethernet
+             * ports and thus should use PPP.  Some devices use static IP,
+             * while others use DHCP on the net port.  What fun.
+             */
+            if (priv->has_net) {
+                g_object_set (G_OBJECT (modem),
+                              MM_MODEM_IP_METHOD, MM_MODEM_IP_METHOD_STATIC,
+                              NULL);
+            }
         }
     }
 }
@@ -574,8 +582,9 @@ do_connect (MMModem *modem,
             gpointer user_data)
 {
     MMModem *parent_iface;
+    MMModemZtePrivate *priv = MM_MODEM_ZTE_GET_PRIVATE (modem);
 
-    if (MM_MODEM_ZTE_GET_PRIVATE (modem)->is_icera)
+    if (priv->is_icera && priv->has_net)
         mm_modem_icera_do_connect (MM_MODEM_ICERA (modem), number, callback, user_data);
     else {
         parent_iface = g_type_interface_peek_parent (MM_MODEM_GET_INTERFACE (modem));
@@ -657,7 +666,8 @@ port_grabbed (MMGenericGsm *gsm,
 
         /* Add Icera-specific handlers */
         mm_modem_icera_register_unsolicted_handlers (MM_MODEM_ICERA (gsm), MM_AT_SERIAL_PORT (port));
-    }
+    } else if (mm_port_get_subsys (port) == MM_PORT_SUBSYS_NET)
+        MM_MODEM_ZTE_GET_PRIVATE (gsm)->has_net = TRUE;
 }
 
 /*****************************************************************************/
