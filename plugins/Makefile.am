@@ -20,18 +20,18 @@ PLUGIN_COMMON_LINKER_FLAGS = \
 udevrulesdir = $(UDEV_BASE_DIR)/rules.d
 udevrules_DATA =
 
-###########################
-## Icera-specific support #
-###########################
-#
-#noinst_LTLIBRARIES = libicera-utils.la
-#
-#libicera_utils_la_SOURCES = \
-#	mm-modem-icera.c \
-#	mm-modem-icera.h
-#
-#libicera_utils_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-#libicera_utils_la_LIBADD = $(GUDEV_LDFLAGS)
+########################################
+
+# Icera-specific support
+noinst_LTLIBRARIES = libmm-utils-icera.la
+libmm_utils_icera_la_SOURCES = \
+	icera/mm-iface-icera.h \
+	icera/mm-iface-icera.c
+libmm_utils_icera_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_utils_icera_la_LIBADD = $(GUDEV_LDFLAGS)
+
+ICERA_COMMON_COMPILER_FLAGS = -I$(top_srcdir)/plugins/icera
+ICERA_COMMON_LIBADD_FLAGS = $(builddir)/libmm-utils-icera.la
 
 ########################################
 
