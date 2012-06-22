@@ -47,7 +47,7 @@ print_buf (const char *detail, const char *buf, size_t len)
 	u_int32_t flen;
 
 	flen = snprintf (tmp, sizeof (tmp) - 1, "%s (%zu)  ", detail, len);
-	fprintf (stdout, tmp);
+	fprintf (stdout, "%s", tmp);
 	for (i = 0; i < len; i++) {
 		fprintf (stdout, "%02x ", buf[i] & 0xFF);
 		if (((i + 1) % 16) == 0) {
