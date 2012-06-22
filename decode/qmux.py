@@ -60,7 +60,11 @@ class Tlv:
 
     def show(self, prefix):
         svc = services[self.service]
-        cmd = svc[1][self.cmdno]
+        cmd = [ None, None, None ]
+        try:
+            cmd = svc[1][self.cmdno]
+        except KeyError:
+            pass
         tlvlist = None
         if self.direction == TP_REQUEST:
             tlvlist = cmd[1]
@@ -69,7 +73,7 @@ class Tlv:
         elif self.direction == TP_INDICATION:
             tlvlist = cmd[3]
         else:
-            raise ValueError("Unknown TLV dir0ection %s" % self.direction)
+            raise ValueError("Unknown TLV direction %s" % self.direction)
 
         tlvname = "!!! UNKNOWN !!!"
         if self.service == 1 and self.cmdno == 77: # WDS/SET_IP_FAMILY
@@ -78,6 +82,8 @@ class Tlv:
             try:
                 tlvname = tlvlist[self.id]
             except KeyError:
+                pass
+            except TypeError:
                 pass
 
         print prefix + "  TLV:    0x%02x (%s)" % (self.id, tlvname)
@@ -173,7 +179,11 @@ def show(data, prefix, direction):
 
     print prefix + "  TXN:    0x%04x" % txnid
 
-    scmd = qmi_cmd_to_string(cmdno, service)
+    scmd = "!!! UNKNOWN !!!"
+    try:
+        scmd = qmi_cmd_to_string(cmdno, service)
+    except KeyError:
+        pass
     print prefix + "  Cmd:    0x%04x (%s)" % (cmdno, scmd)
 
     print prefix + "  Size:   0x%04x" % size
