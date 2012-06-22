@@ -72,6 +72,27 @@ cmdenum = """
    eQMI_WDS_SET_AUTOCONNECT = 81, // 81 Set the NDIS autoconnect setting
    eQMI_WDS_GET_DNS,              // 82 Get the DNS setting
    eQMI_WDS_SET_DNS,              // 83 Set the DNS setting
+   eQMI_WDS_GET_PRE_DORMANCY,     // 084 Get the CDMA pre-dormancy settings
+   eQMI_WDS_SET_CAM_TIMER,        // 085 Set the CAM timer
+   eQMI_WDS_GET_CAM_TIMER,        // 086 Get the CAM timer
+   eQMI_WDS_SET_SCRM,             // 087 Set SCRM status 
+   eQMI_WDS_GET_SCRM,             // 088 Get SCRM status
+   eQMI_WDS_SET_RDUD,             // 089 Set RDUD status 
+   eQMI_WDS_GET_RDUD,             // 090 Get RDUD status 
+   eQMI_WDS_GET_SIPMIP_CALL_TYPE, // 091 Set SIP/MIP call type 
+   eQMI_WDS_SET_PM_PERIOD,        // 092 Set EV-DO page monitor period
+   eQMI_WDS_SET_FORCE_LONG_SLEEP, // 093 Set EV-DO force long sleep feature
+   eQMI_WDS_GET_PM_PERIOD,        // 094 Get EV-DO page monitor period
+   eQMI_WDS_GET_CALL_THROTTLE,    // 095 Get call throttle info
+   eQMI_WDS_GET_NSAPI,            // 096 Get NSAPI
+   eQMI_WDS_SET_DUN_CTRL_PREF,    // 097 Set DUN control preference
+   eQMI_WDS_GET_DUN_CTRL_INFO,    // 098 Set DUN control info
+   eQMI_WDS_SET_DUN_CTRL_EVENT,   // 099 Set DUN control event preference
+   eQMI_WDS_PENDING_DUN_CTRL,     // 100 Control pending DUN call
+   eQMI_WDS_GET_DATA_SYS = 105,   // 105 Get preferred data system
+   eQMI_WDS_GET_LAST_DATA_STATUS, // 106 Get last data call status
+   eQMI_WDS_GET_CURR_DATA_SYS,    // 107 Get current data systems status
+   eQMI_WDS_GET_PDN_THROTTLE,     // 108 Get PDN throttle info
 
    eQMI_DMS_RESET,               // 00 Reset DMS service state variables
    eQMI_DMS_SET_EVENT,           // 01 Set connection state report conditions
@@ -125,6 +146,8 @@ cmdenum = """
    eQMI_DMS_SET_ALT_NET_CFG,     // 78 Set alternate network config
    eQMI_DMS_GET_IMG_DLOAD_MODE,  // 79 Get next image download mode
    eQMI_DMS_SET_IMG_DLOAD_MODE,  // 80 Set next image download mod
+   eQMI_DMS_GET_SW_VERSION,      // 81 Get software version
+   eQMI_DMS_SET_SPC,             // 82 Set SPC
 
    eQMI_NAS_RESET,               // 00 Reset NAS service state variables
    eQMI_NAS_ABORT,               // 01 Abort previously issued NAS command
@@ -153,13 +176,44 @@ cmdenum = """
    eQMI_NAS_GET_AAA_AUTH_STATUS, // 50 Get AN-AAA authentication status
    eQMI_NAS_SET_SYS_SELECT_PREF, // 51 Set system selection preference
    eQMI_NAS_GET_SYS_SELECT_PREF, // 52 Get system selection preference
-   eQMI_NAS_SYS_SELECT_IND = 52, // 52 System selection pref indication
    eQMI_NAS_SET_DDTM_PREF = 55,  // 55 Set DDTM preference
    eQMI_NAS_GET_DDTM_PREF,       // 56 Get DDTM preference
-   eQMI_NAS_DDTM_IND = 56,       // 56 DDTM preference indication
    eQMI_NAS_GET_PLMN_MODE = 59,  // 59 Get PLMN mode bit from CSP
    eQMI_NAS_PLMN_MODE_IND,       // 60 CSP PLMN mode bit indication
    eQMI_NAS_GET_PLMN_NAME = 68,  // 68 Get operator name for specified network
+   eQMI_NAS_BIND_SUBS,           // 69 Bind client to a specific subscription
+   eQMI_NAS_MANAGED_ROAMING_IND, // 70 Managed roaming indication
+   eQMI_NAS_DSB_PREF_IND,        // 71 Dual standby preference indication
+   eQMI_NAS_SUBS_INFO_IND,       // 72 Subscription info indication
+   eQMI_NAS_GET_MODE_PREF,       // 73 Get mode preference
+   eQMI_NAS_SET_DSB_PREF = 75,   // 75 Set dual standby preference
+   eQMI_NAS_NETWORK_TIME_IND,    // 76 Network time indication
+   eQMI_NAS_GET_SYSTEM_INFO,     // 77 Get system info
+   eQMI_NAS_SYSTEM_INFO_IND,     // 78 System info indication
+   eQMI_NAS_GET_SIGNAL_INFO,     // 79 Get signal info
+   eQMI_NAS_CFG_SIGNAL_INFO,     // 80 Configure signal info report
+   eQMI_NAS_SIGNAL_INFO_IND,     // 81 Signal info indication
+   eQMI_NAS_GET_ERROR_RATE,      // 82 Get error rate info
+   eQMI_NAS_ERROR_RATE_IND,      // 83 Error rate indication
+   eQMI_NAS_EVDO_SESSION_IND,    // 84 CDMA 1xEV-DO session close indication
+   eQMI_NAS_EVDO_UATI_IND,       // 85 CDMA 1xEV-DO UATI update indication
+   eQMI_NAS_GET_EVDO_SUBTYPE,    // 86 Get CDMA 1xEV-DO protocol subtype
+   eQMI_NAS_GET_EVDO_COLOR_CODE, // 87 Get CDMA 1xEV-DO color code
+   eQMI_NAS_GET_ACQ_SYS_MODE,    // 88 Get current acquisition system mode
+   eQMI_NAS_SET_RX_DIVERSITY,    // 89 Set the RX diversity
+   eQMI_NAS_GET_RX_TX_INFO,      // 90 Get detailed RX/TX information
+   eQMI_NAS_UPDATE_AKEY_EXT,     // 91 Update the A-KEY (extended)
+   eQMI_NAS_GET_DSB_PREF,        // 92 Get dual standby preference
+   eQMI_NAS_DETACH_LTE,          // 093 Detach the current LTE system
+   eQMI_NAS_BLOCK_LTE_PLMN,      // 094 Block LTE PLMN
+   eQMI_NAS_UNBLOCK_LTE_PLMN,    // 095 Unblock LTE PLMN
+   eQMI_NAS_RESET_LTE_PLMN_BLK,  // 096 Reset LTE PLMN blocking
+   eQMI_NAS_CUR_PLMN_NAME_IND,   // 097 Current PLMN name indication
+   eQMI_NAS_CONFIG_EMBMS,        // 098 Configure eMBMS
+   eQMI_NAS_GET_EMBMS_STATUS,    // 099 Get eMBMS status
+   eQMI_NAS_EMBMS_STATUS_IND,    // 100 eMBMS status indication
+   eQMI_NAS_GET_CDMA_POS_INFO,   // 101 Get CDMA position info
+   eQMI_NAS_RF_BAND_INFO_IND,    // 102 RF band info indication
 
    eQMI_WMS_RESET,                  // 00 Reset WMS service state variables
    eQMI_WMS_SET_EVENT,              // 01 Set new message report conditions
@@ -192,6 +246,16 @@ cmdenum = """
    eQMI_WMS_MSG_WAITING_IND,        // 68 Message waiting indication
    eQMI_WMS_SET_PRIMARY_CLIENT,     // 69 Set client as primary client
    eQMI_WMS_SMSC_ADDR_IND,          // 70 SMSC address indication
+   eQMI_WMS_INDICATOR_REG,          // 71 Register for indicators
+   eQMI_WMS_GET_TRANSPORT_INFO,     // 72 Get transport layer info
+   eQMI_WMS_TRANSPORT_INFO_IND,     // 73 Transport layer info indication
+   eQMI_WMS_GET_NW_REG_INFO,        // 74 Get network registration info
+   eQMI_WMS_NW_REG_INFO_IND,        // 75 Network registration info indication
+   eQMI_WMS_BIND_SUBSCRIPTION,      // 76 Bind client to a subscription
+   eQMI_WMS_GET_INDICATOR_REG,      // 77 Get indicator registration
+   eQMI_WMS_GET_SMS_PARAMETERS,     // 78 Get SMS EF-SMSP parameters
+   eQMI_WMS_SET_SMS_PARAMETERS,     // 79 Set SMS EF-SMSP parameters
+   eQMI_WMS_CALL_STATUS_IND,        // 80 Call status indication
 
    eQMI_PDS_RESET,                // 00 Reset PDS service state variables
    eQMI_PDS_SET_EVENT,            // 01 Set PDS report conditions
@@ -236,12 +300,28 @@ cmdenum = """
    eQMI_PDS_GET_GPS_STATE,        // 68 Get GPS state
    eQMI_PDS_GET_METHODS = 80,     // 80 Get GPS position methods state
    eQMI_PDS_SET_METHODS,          // 81 Set GPS position methods state
+   eQMI_PDS_INJECT_SENSOR,        // 82 Inject sensor data
+   eQMI_PDS_INJECT_TIME_SYNC,     // 83 Inject time sync data
+   eQMI_PDS_GET_SENSOR_CFG,       // 84 Get sensor config
+   eQMI_PDS_SET_SENSOR_CFG,       // 85 Set sensor config
+   eQMI_PDS_GET_NAV_CFG,          // 86 Get navigation config
+   eQMI_PDS_SET_NAV_CFG,          // 87 Set navigation config
+   eQMI_PDS_SET_WLAN_BLANK = 90,  // 90 Set WLAN blanking
+   eQMI_PDS_SET_LBS_SC_RPT,       // 91 Set LBS security challenge reporting
+   eQMI_PDS_LBS_SC_IND = 91,      // 91 LBS security challenge indication
+   eQMI_PDS_SET_LBS_SC,           // 92 Set LBS security challenge
+   eQMI_PDS_GET_LBS_ENCRYPT_CFG,  // 93 Get LBS security encryption config
+   eQMI_PDS_SET_LBS_UPDATE_RATE,  // 94 Set LBS security update rate
+   eQMI_PDS_SET_CELLDB_CONTROL,   // 95 Set cell database control
+   eQMI_PDS_READY_IND,            // 96 Ready indication
 
    eQMI_AUTH_START_EAP = 32,        // 32 Start the EAP session
    eQMI_AUTH_SEND_EAP,              // 33 Send and receive EAP packets
    eQMI_AUTH_EAP_RESULT_IND,        // 34 EAP session result indication
    eQMI_AUTH_GET_EAP_KEYS,          // 35 Get the EAP session keys
    eQMI_AUTH_END_EAP,               // 36 End the EAP session
+   eQMI_AUTH_RUN_AKA,               // 37 Runs the AKA algorithm
+   eQMI_AUTH_AKA_RESULT_IND,        // 38 AKA algorithm result indication
 
    eQMI_VOICE_INDICATION_REG = 3,    // 03 Set indication registration state
    eQMI_VOICE_CALL_ORIGINATE = 32,   // 32 Originate a voice call
@@ -279,6 +359,17 @@ cmdenum = """
    eQMI_VOICE_SUPS_IND,              // 66 Sup service request indication
    eQMI_VOICE_ASYNC_ORIG_USSD,       // 67 Initiate USSD operation
    eQMI_VOICE_ASYNC_USSD_IND = 67,   // 67 USSD request/notification indication
+   eQMI_VOICE_BIND_SUBSCRIPTION,     // 68 Bind subscription
+   eQMI_VOICE_ALS_SET_LINE_SW,       // 69 ALS set line switching
+   eQMI_VOICE_ALS_SELECT_LINE,       // 70 ALS select line
+   eQMI_VOICE_AOC_RESET_ACM,         // 71 AOC reset ACM
+   eQMI_VOICE_AOC_SET_ACM_MAX,       // 72 ACM set ACM maximum
+   eQMI_VOICE_AOC_GET_CM_INFO,       // 73 AOC get call meter info
+   eQMI_VOICE_AOC_LOW_FUNDS_IND,     // 74 AOC low funds indication
+   eQMI_VOICE_GET_COLP,              // 75 Get COLP info
+   eQMI_VOICE_GET_COLR,              // 76 Get COLR info
+   eQMI_VOICE_GET_CNAP,              // 77 Get CNAP info
+   eQMI_VOICE_MANAGE_IP_CALLS,       // 78 Manage VoIP calls
 
    eQMI_CAT_RESET,                  // 00 Reset CAT service state variables
    eQMI_CAT_SET_EVENT,              // 01 Set new message report conditions
@@ -286,6 +377,18 @@ cmdenum = """
    eQMI_CAT_GET_STATE = 32,         // 32 Get service state information
    eQMI_CAT_SEND_TERMINAL,          // 33 Send a terminal response
    eQMI_CAT_SEND_ENVELOPE,          // 34 Send an envelope command
+   eQMI_CAT_GET_EVENT,              // 35 Get last message report
+   eQMI_CAT_SEND_DECODED_TERMINAL,  // 36 Send a decoded terminal response
+   eQMI_CAT_SEND_DECODED_ENVELOPE,  // 37 Send a decoded envelope command
+   eQMI_CAT_EVENT_CONFIRMATION,     // 38 Event confirmation
+   eQMI_CAT_SCWS_OPEN_CHANNEL,      // 39 Open a channel to a SCWS
+   eQMI_CAT_SCWS_OPEN_IND = 39,     // 39 SCWS open channel indication
+   eQMI_CAT_SCWS_CLOSE_CHANNEL,     // 40 Close a channel to a SCWS
+   eQMI_CAT_SCWS_CLOSE_IND = 40,    // 40 SCWS close channel indication
+   eQMI_CAT_SCWS_SEND_DATA,         // 41 Send data to a SCWS
+   eQMI_CAT_SCWS_SEND_IND = 41,     // 41 SCWS send data indication
+   eQMI_CAT_SCWS_DATA_AVAILABLE,    // 42 Indicate that data is available
+   eQMI_CAT_SCWS_CHANNEL_STATUS,    // 43 Provide channel status
 
    eQMI_RMS_RESET,                  // 00 Reset RMS service state variables
    eQMI_RMS_GET_SMS_WAKE = 32,      // 32 Get SMS wake settings
@@ -294,7 +397,6 @@ cmdenum = """
    eQMI_OMA_RESET,                  // 00 Reset OMA service state variables
    eQMI_OMA_SET_EVENT,              // 01 Set OMA report conditions
    eQMI_OMA_EVENT_IND = 1,          // 01 OMA report indication
-
    eQMI_OMA_START_SESSION = 32,     // 32 Start client inititated session
    eQMI_OMA_CANCEL_SESSION,         // 33 Cancel session
    eQMI_OMA_GET_SESSION_INFO,       // 34 Get session information
