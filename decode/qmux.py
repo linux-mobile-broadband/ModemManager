@@ -65,6 +65,8 @@ class Tlv:
             cmd = svc[1][self.cmdno]
         except KeyError:
             pass
+        except TypeError:
+            pass
         tlvlist = None
         if self.direction == TP_REQUEST:
             tlvlist = cmd[1]
@@ -183,6 +185,8 @@ def show(data, prefix, direction):
     try:
         scmd = qmi_cmd_to_string(cmdno, service)
     except KeyError:
+        pass
+    except TypeError:
         pass
     print prefix + "  Cmd:    0x%04x (%s)" % (cmdno, scmd)
 
