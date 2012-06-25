@@ -43,7 +43,7 @@ funcs = {
     "-- URB_FUNCTION_CONTROL_TRANSFER:":           (URBF_CONTROL, True, "C"),
     "-- URB_FUNCTION_SET_FEATURE_TO_DEVICE:":      (URBF_SET_FEATURE, False, None),
     "-- URB_FUNCTION_ABORT_PIPE:":                 (URBF_SET_FEATURE, False, None),
-    "-- URB_FUNCTION_CLASS_INTERFACE:":            (URBF_CLASS_IFACE, False, None),
+    "-- URB_FUNCTION_CLASS_INTERFACE:":            (URBF_CLASS_IFACE, True, "C"),
     "-- URB_FUNCTION_CLEAR_FEATURE_TO_DEVICE:":    (URBF_CLEAR_FEATURE, False, None)
 }
 
@@ -127,7 +127,7 @@ class Packet:
 
                 if self.func == URBF_TRANSFER:
                     self.protocol = self.transfer_prot
-                elif self.func == URBF_CONTROL:
+                elif self.func == URBF_CONTROL or self.func == URBF_CLASS_IFACE:
                     self.protocol = self.control_prot
 
                 if self.protocol:
@@ -140,7 +140,7 @@ class Packet:
             self.in_data = True
             return False   # not done; need more lines
 
-        if line.find("UrbLink              = ") >= 0:
+        if line.find("UrbLink              = ") >= 0 or line.find("UrbLink                 =") >= 0:
             if self.in_data:
                 self.in_data = False
 
