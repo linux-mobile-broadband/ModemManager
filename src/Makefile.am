@@ -72,7 +72,9 @@ libserial_la_SOURCES = \
 	mm-qcdm-serial-port.c \
 	mm-qcdm-serial-port.h \
 	mm-gps-serial-port.c \
-	mm-gps-serial-port.h
+	mm-gps-serial-port.h \
+	mm-qmi-port.c \
+	mm-qmi-port.h
 
 # Daemon specific enum types
 DAEMON_ENUMS = \
