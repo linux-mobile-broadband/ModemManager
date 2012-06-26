@@ -2,7 +2,7 @@
 lib_LTLIBRARIES = libmm-glib.la
 
 libmm_glib_la_CPPFLAGS = \
-	$(LIBMM_CFLAGS) \
+	$(LIBMM_GLIB_CFLAGS) \
 	-I$(top_srcdir) \
 	-I$(top_srcdir)/include \
 	-I$(top_builddir)/include \
@@ -41,7 +41,7 @@ libmm_glib_la_SOURCES = \
 
 libmm_glib_la_LIBADD = \
 	$(top_builddir)/libmm-common/libmm-common.la \
-	$(LIBMM_LIBS)
+	$(LIBMM_GLIB_LIBS)
 
 includedir = @includedir@/libmm-glib
 include_HEADERS = \
