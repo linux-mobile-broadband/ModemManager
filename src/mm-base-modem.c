@@ -85,7 +85,7 @@ struct _MMBaseModemPrivate {
     MMGpsSerialPort *gps;
 
     /* QMI port */
-    MMPort *qmi;
+    MMQmiPort *qmi;
 };
 
 static gchar *
@@ -236,11 +236,7 @@ mm_base_modem_grab_port (MMBaseModem *self,
     /* QMI ports... */
     else if (g_str_equal (subsys, "usb") &&
              g_str_has_prefix (name, "cdc-wdm")) {
-        port = MM_PORT (g_object_new (MM_TYPE_PORT,
-                                      MM_PORT_DEVICE, name,
-                                      MM_PORT_SUBSYS, MM_PORT_SUBSYS_USB,
-                                      MM_PORT_TYPE, MM_PORT_TYPE_QMI,
-                                      NULL));
+        port = MM_PORT (mm_qmi_port_new (name));
     } else
         /* We already filter out before all non-tty, non-net, non-qmi ports */
         g_assert_not_reached();
@@ -508,7 +504,7 @@ mm_base_modem_peek_port_gps (MMBaseModem *self)
     return self->priv->gps;
 }
 
-MMPort *
+MMQmiPort *
 mm_base_modem_get_port_qmi (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
@@ -516,7 +512,7 @@ mm_base_modem_get_port_qmi (MMBaseModem *self)
     return (self->priv->qmi ? g_object_ref (self->priv->qmi) : NULL);
 }
 
-MMPort *
+MMQmiPort *
 mm_base_modem_peek_port_qmi (MMBaseModem *self)
 {
     g_return_val_if_fail (MM_IS_BASE_MODEM (self), NULL);
