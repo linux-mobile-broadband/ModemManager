@@ -126,5 +126,7 @@ m4/wchar_t.m4
 m4/wint_t.m4
 m4/xsize.m4
 
+uml290/uml290mode
+
 TAGS
 ABOUT-NLS
