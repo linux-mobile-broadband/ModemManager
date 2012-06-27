@@ -589,10 +589,8 @@ mm_plugin_supports_port (MMPlugin *self,
             g_udev_device_get_subsystem (port),
             g_udev_device_get_name (port));
 
-    /* Before launching any probing, check if the port is a net OR a wdm device
-     * (which cannot be probed). */
-    if (g_str_equal (g_udev_device_get_subsystem (port), "net") ||
-        g_str_equal (g_udev_device_get_subsystem (port), "cdc-wdm")) {
+    /* Before launching any probing, check if the port is a net device. */
+    if (g_str_equal (g_udev_device_get_subsystem (port), "net")) {
         g_simple_async_result_set_op_res_gpointer (
             async_result,
             GUINT_TO_POINTER (MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED),
@@ -602,19 +600,25 @@ mm_plugin_supports_port (MMPlugin *self,
     }
 
     /* Build flags depending on what probing needed */
-    probe_run_flags = MM_PORT_PROBE_NONE;
-    if (self->priv->at)
-        probe_run_flags |= MM_PORT_PROBE_AT;
-    else if (self->priv->single_at)
-        probe_run_flags |= MM_PORT_PROBE_AT;
-    if (need_vendor_probing)
-        probe_run_flags |= (MM_PORT_PROBE_AT | MM_PORT_PROBE_AT_VENDOR);
-    if (need_product_probing)
-        probe_run_flags |= (MM_PORT_PROBE_AT | MM_PORT_PROBE_AT_PRODUCT);
-    if (self->priv->qcdm)
-        probe_run_flags |= MM_PORT_PROBE_QCDM;
-    if (self->priv->icera_probe || self->priv->allowed_icera || self->priv->forbidden_icera)
-        probe_run_flags |= (MM_PORT_PROBE_AT | MM_PORT_PROBE_AT_ICERA);
+    if (!g_str_has_prefix (g_udev_device_get_name (port), "cdc-wdm")) {
+        /* Serial ports... */
+        probe_run_flags = MM_PORT_PROBE_NONE;
+        if (self->priv->at)
+            probe_run_flags |= MM_PORT_PROBE_AT;
+        else if (self->priv->single_at)
+            probe_run_flags |= MM_PORT_PROBE_AT;
+        if (need_vendor_probing)
+            probe_run_flags |= (MM_PORT_PROBE_AT | MM_PORT_PROBE_AT_VENDOR);
+        if (need_product_probing)
+            probe_run_flags |= (MM_PORT_PROBE_AT | MM_PORT_PROBE_AT_PRODUCT);
+        if (self->priv->qcdm)
+            probe_run_flags |= MM_PORT_PROBE_QCDM;
+        if (self->priv->icera_probe || self->priv->allowed_icera || self->priv->forbidden_icera)
+            probe_run_flags |= (MM_PORT_PROBE_AT | MM_PORT_PROBE_AT_ICERA);
+    } else {
+        /* cdc-wdm ports... */
+        probe_run_flags = MM_PORT_PROBE_QMI;
+    }
 
     g_assert (probe_run_flags != MM_PORT_PROBE_NONE);
 

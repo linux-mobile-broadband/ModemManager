@@ -24,6 +24,7 @@
 
 #include "mm-port-probe.h"
 #include "mm-log.h"
+#include "mm-qmi-port.h"
 #include "mm-at-serial-port.h"
 #include "mm-serial-port.h"
 #include "mm-serial-parsers.h"
@@ -44,6 +45,8 @@
  *      |----> Is Icera?
  * ----> QCDM Serial Open
  *   |----> QCDM?
+ * ----> QMI Device Open
+ *   |----> QMI Version Info check
  */
 
 G_DEFINE_TYPE (MMPortProbe, mm_port_probe, G_TYPE_OBJECT)
@@ -59,15 +62,21 @@ static GParamSpec *properties[PROP_LAST];
 
 typedef struct {
     /* ---- Generic task context ---- */
+
     GSimpleAsyncResult *result;
     GCancellable *cancellable;
-    GCancellable *at_probing_cancellable;
     guint32 flags;
     guint source_id;
+
+    /* ---- Serial probing specific context ---- */
+
     guint buffer_full_id;
     MMSerialPort *serial;
 
     /* ---- AT probing specific context ---- */
+
+    GCancellable *at_probing_cancellable;
+    /* Send delay for AT commands */
     guint64 at_send_delay;
     /* Number of times we tried to open the AT port */
     guint at_open_tries;
@@ -82,6 +91,9 @@ typedef struct {
     /* Current AT Result processor */
     void (* at_result_processor) (MMPortProbe *self,
                                   GVariant *result);
+
+    /* ---- QMI probing specific context ---- */
+    MMQmiPort *qmi_port;
 } PortProbeRunTask;
 
 struct _MMPortProbePrivate {
@@ -96,6 +108,7 @@ struct _MMPortProbePrivate {
     gchar *vendor;
     gchar *product;
     gboolean is_icera;
+    gboolean is_qmi;
 
     /* Current probing task. Only one can be available at a time */
     PortProbeRunTask *task;
@@ -113,9 +126,10 @@ mm_port_probe_set_result_at (MMPortProbe *self,
                 g_udev_device_get_subsystem (self->priv->port),
                 g_udev_device_get_name (self->priv->port));
 
-        /* Also set as not a QCDM port */
+        /* Also set as not a QCDM/QMI port */
         self->priv->is_qcdm = FALSE;
-        self->priv->flags |= MM_PORT_PROBE_QCDM;
+        self->priv->is_qmi = FALSE;
+        self->priv->flags |= (MM_PORT_PROBE_QCDM | MM_PORT_PROBE_QMI);
     } else {
         mm_dbg ("(%s/%s) port is not AT-capable",
                 g_udev_device_get_subsystem (self->priv->port),
@@ -199,17 +213,47 @@ mm_port_probe_set_result_qcdm (MMPortProbe *self,
                 g_udev_device_get_subsystem (self->priv->port),
                 g_udev_device_get_name (self->priv->port));
 
-        /* Also set as not an AT port */
+        /* Also set as not an AT/QMI port */
         self->priv->is_at = FALSE;
+        self->priv->is_qmi = FALSE;
         self->priv->vendor = NULL;
         self->priv->product = NULL;
         self->priv->is_icera = FALSE;
         self->priv->flags |= (MM_PORT_PROBE_AT |
                               MM_PORT_PROBE_AT_VENDOR |
                               MM_PORT_PROBE_AT_PRODUCT |
-                              MM_PORT_PROBE_AT_ICERA);
+                              MM_PORT_PROBE_AT_ICERA |
+                              MM_PORT_PROBE_QMI);
     } else
         mm_dbg ("(%s/%s) port is not QCDM-capable",
+                g_udev_device_get_subsystem (self->priv->port),
+                g_udev_device_get_name (self->priv->port));
+}
+
+void
+mm_port_probe_set_result_qmi (MMPortProbe *self,
+                              gboolean qmi)
+{
+    self->priv->is_qmi = qmi;
+    self->priv->flags |= MM_PORT_PROBE_QMI;
+
+    if (self->priv->is_qmi) {
+        mm_dbg ("(%s/%s) port is QMI-capable",
+                g_udev_device_get_subsystem (self->priv->port),
+                g_udev_device_get_name (self->priv->port));
+
+        /* Also set as not an AT/QCDM port */
+        self->priv->is_at = FALSE;
+        self->priv->is_qcdm = FALSE;
+        self->priv->vendor = NULL;
+        self->priv->product = NULL;
+        self->priv->flags |= (MM_PORT_PROBE_AT |
+                              MM_PORT_PROBE_AT_VENDOR |
+                              MM_PORT_PROBE_AT_PRODUCT |
+                              MM_PORT_PROBE_AT_ICERA |
+                              MM_PORT_PROBE_QCDM);
+    } else
+        mm_dbg ("(%s/%s) port is not QMI-capable",
                 g_udev_device_get_subsystem (self->priv->port),
                 g_udev_device_get_name (self->priv->port));
 }
@@ -231,6 +275,12 @@ port_probe_run_task_free (PortProbeRunTask *task)
         if (mm_serial_port_is_open (task->serial))
             mm_serial_port_close (task->serial);
         g_object_unref (task->serial);
+    }
+
+    if (task->qmi_port) {
+        if (mm_qmi_port_is_open (task->qmi_port))
+            mm_qmi_port_close (task->qmi_port);
+        g_object_unref (task->qmi_port);
     }
 
     if (task->cancellable)
@@ -285,6 +335,55 @@ port_probe_run_is_cancelled (MMPortProbe *self)
         return TRUE;
     }
 
+    return FALSE;
+}
+
+static void
+qmi_port_open_ready (MMQmiPort *qmi_port,
+                     GAsyncResult *res,
+                     MMPortProbe *self)
+{
+    PortProbeRunTask *task = self->priv->task;
+    GError *error = NULL;
+    gboolean is_qmi;
+
+    is_qmi = mm_qmi_port_open_finish (qmi_port, res, &error);
+    if (!is_qmi) {
+        mm_dbg ("(%s/%s) error checking QMI support: '%s'",
+                g_udev_device_get_subsystem (self->priv->port),
+                g_udev_device_get_name (self->priv->port),
+                error ? error->message : "unknown error");
+        g_clear_error (&error);
+    }
+
+    /* Set probing result */
+    mm_port_probe_set_result_qmi (self, is_qmi);
+
+    mm_qmi_port_close (qmi_port);
+
+    /* All done! Finish asynchronously */
+    port_probe_run_task_complete (task, TRUE, NULL);
+}
+
+static gboolean
+wdm_probe_qmi (MMPortProbe *self)
+{
+    PortProbeRunTask *task = self->priv->task;
+
+    /* If already cancelled, do nothing else */
+    if (port_probe_run_is_cancelled (self))
+        return FALSE;
+
+    mm_dbg ("(%s/%s) probing QMI...",
+            g_udev_device_get_subsystem (self->priv->port),
+            g_udev_device_get_name (self->priv->port));
+
+    /* Create a port and try to open it */
+    task->qmi_port = mm_qmi_port_new (g_udev_device_get_name (self->priv->port));
+    mm_qmi_port_open (task->qmi_port,
+                      NULL,
+                      (GAsyncReadyCallback)qmi_port_open_ready,
+                      self);
     return FALSE;
 }
 
@@ -957,7 +1056,7 @@ mm_port_probe_run (MMPortProbe *self,
     /* Check if we already have the requested probing results.
      * We will fix here the 'task->flags' so that we only request probing
      * for the missing things. */
-    for (i = MM_PORT_PROBE_AT; i <= MM_PORT_PROBE_QCDM; i = (i << 1)) {
+    for (i = MM_PORT_PROBE_AT; i <= MM_PORT_PROBE_QMI; i = (i << 1)) {
         if ((flags & i) && !(self->priv->flags & i)) {
             task->flags += i;
         }
@@ -993,9 +1092,15 @@ mm_port_probe_run (MMPortProbe *self,
         return;
     }
 
-    /* Otherwise, start by opening as QCDM port */
+    /* If QCDM probing needed, start by opening as QCDM port */
     if (task->flags & MM_PORT_PROBE_QCDM) {
         task->source_id = g_idle_add ((GSourceFunc)serial_probe_qcdm, self);
+        return;
+    }
+
+    /* If QMI probing needed, start by opening as a QMI port */
+    if (task->flags & MM_PORT_PROBE_QMI) {
+        task->source_id = g_idle_add ((GSourceFunc)wdm_probe_qmi, self);
         return;
     }
 
@@ -1058,6 +1163,24 @@ mm_port_probe_is_qcdm (MMPortProbe *self)
             FALSE);
 }
 
+gboolean
+mm_port_probe_is_qmi (MMPortProbe *self)
+{
+    const gchar *subsys;
+    const gchar *name;
+
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
+
+    subsys = g_udev_device_get_subsystem (self->priv->port);
+    name = g_udev_device_get_name (self->priv->port);
+    if (!g_str_equal (subsys, "usb") ||
+        !name ||
+        !g_str_has_prefix (name, "cdc-wdm"))
+        return FALSE;
+
+    return self->priv->is_qmi;
+}
+
 MMPortType
 mm_port_probe_get_port_type (MMPortProbe *self)
 {
@@ -1073,7 +1196,8 @@ mm_port_probe_get_port_type (MMPortProbe *self)
         return MM_PORT_TYPE_NET;
 
     if (g_str_equal (subsys, "usb") &&
-        g_str_has_prefix (name, "cdc-wdm"))
+        g_str_has_prefix (name, "cdc-wdm") &&
+        self->priv->is_qmi)
         return MM_PORT_TYPE_QMI;
 
     if (self->priv->flags & MM_PORT_PROBE_QCDM &&
