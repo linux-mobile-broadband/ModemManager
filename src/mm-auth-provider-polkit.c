@@ -187,7 +187,7 @@ mm_auth_provider_polkit_init (MMAuthProviderPolkit *self)
 static void
 dispose (GObject *object)
 {
-    g_clear_object (MM_AUTH_PROVIDER_POLKIT (object)->priv->authority);
+    g_clear_object (&(MM_AUTH_PROVIDER_POLKIT (object)->priv->authority));
 
     G_OBJECT_CLASS (mm_auth_provider_polkit_parent_class)->dispose (object);
 }
