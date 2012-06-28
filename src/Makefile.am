@@ -190,6 +190,8 @@ ModemManager_SOURCES = \
 	mm-iface-modem-time.c \
 	mm-broadband-modem.h \
 	mm-broadband-modem.c \
+	mm-broadband-modem-qmi.h \
+	mm-broadband-modem-qmi.c \
 	mm-serial-parsers.c \
 	mm-serial-parsers.h \
 	mm-port-probe.h \
