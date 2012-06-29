@@ -1181,6 +1181,19 @@ mm_port_probe_is_qmi (MMPortProbe *self)
     return self->priv->is_qmi;
 }
 
+gboolean
+mm_port_probe_list_has_qmi_port (GList *list)
+{
+    GList *l;
+
+    for (l = list; l; l = g_list_next (l)) {
+        if (mm_port_probe_is_qmi (MM_PORT_PROBE (l->data)))
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
 MMPortType
 mm_port_probe_get_port_type (MMPortProbe *self)
 {
