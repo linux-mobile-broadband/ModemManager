@@ -26,10 +26,134 @@
 
 G_DEFINE_TYPE (MMQmiPort, mm_qmi_port, MM_TYPE_PORT)
 
+typedef struct {
+    QmiService service;
+    QmiClient *client;
+} ServiceInfo;
+
 struct _MMQmiPortPrivate {
     gboolean opening;
     QmiDevice *qmi_device;
+    GList *services;
 };
+
+/*****************************************************************************/
+
+QmiClient *
+mm_qmi_port_peek_client (MMQmiPort *self,
+                         QmiService service)
+{
+    GList *l;
+
+    for (l = self->priv->services; l; l = g_list_next (l)) {
+        ServiceInfo *info = l->data;
+
+        if (info->service == service)
+            return info->client;
+    }
+
+    return NULL;
+}
+
+QmiClient *
+mm_qmi_port_get_client (MMQmiPort *self,
+                        QmiService service)
+{
+    QmiClient *client;
+
+    client = mm_qmi_port_peek_client (self, service);
+    return (client ? g_object_ref (client) : NULL);
+}
+
+/*****************************************************************************/
+
+typedef struct {
+    MMQmiPort *self;
+    GSimpleAsyncResult *result;
+    ServiceInfo *info;
+} AllocateClientContext;
+
+static void
+allocate_client_context_complete_and_free (AllocateClientContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+    if (ctx->info) {
+        g_assert (ctx->info->client == NULL);
+        g_free (ctx->info);
+    }
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+gboolean
+mm_qmi_port_allocate_client_finish (MMQmiPort *self,
+                                    GAsyncResult *res,
+                                    GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+allocate_client_ready (QmiDevice *qmi_device,
+                       GAsyncResult *res,
+                       AllocateClientContext *ctx)
+{
+    GError *error = NULL;
+
+    ctx->info->client = qmi_device_allocate_client_finish (qmi_device, res, &error);
+    if (!ctx->info->client) {
+        g_prefix_error (&error,
+                        "Couldn't create client for service '%s': ",
+                        qmi_service_get_string (ctx->info->service));
+        g_simple_async_result_take_error (ctx->result, error);
+    } else {
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+        /* Move the service info to our internal list */
+        ctx->self->priv->services = g_list_prepend (ctx->self->priv->services, ctx->info);
+        ctx->info = NULL;
+    }
+
+    allocate_client_context_complete_and_free (ctx);
+}
+
+void
+mm_qmi_port_allocate_client (MMQmiPort *self,
+                             QmiService service,
+                             GCancellable *cancellable,
+                             GAsyncReadyCallback callback,
+                             gpointer user_data)
+{
+    AllocateClientContext *ctx;
+
+    if (!!mm_qmi_port_peek_client (self, service)) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_EXISTS,
+                                             "Client for service '%s' already allocated",
+                                             qmi_service_get_string (service));
+        return;
+    }
+
+    ctx = g_new0 (AllocateClientContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_qmi_port_allocate_client);
+    ctx->info = g_new0 (ServiceInfo, 1);
+    ctx->info->service = service;
+
+    qmi_device_allocate_client (self->priv->qmi_device,
+                                service,
+                                QMI_CID_NONE,
+                                10,
+                                cancellable,
+                                (GAsyncReadyCallback)allocate_client_ready,
+                                ctx);
+}
 
 /*****************************************************************************/
 
@@ -160,6 +284,7 @@ mm_qmi_port_is_open (MMQmiPort *self)
 void
 mm_qmi_port_close (MMQmiPort *self)
 {
+    GList *l;
     GError *error = NULL;
 
     g_return_if_fail (MM_IS_QMI_PORT (self));
@@ -167,6 +292,21 @@ mm_qmi_port_close (MMQmiPort *self)
     if (!self->priv->qmi_device)
         return;
 
+    /* Release all allocated clients */
+    for (l = self->priv->services; l; l = g_list_next (l)) {
+        ServiceInfo *info = l->data;
+
+        mm_dbg ("Releasing client for service '%s'...", qmi_service_get_string (info->service));
+        qmi_device_release_client (self->priv->qmi_device,
+                                   info->client,
+                                   QMI_DEVICE_RELEASE_CLIENT_FLAGS_RELEASE_CID,
+                                   3, NULL, NULL, NULL);
+        g_clear_object (&info->client);
+    }
+    g_list_free_full (self->priv->services, (GDestroyNotify)g_free);
+    self->priv->services = NULL;
+
+    /* Close and release the device */
     if (!qmi_device_close (self->priv->qmi_device, &error)) {
         mm_warn ("Couldn't properly close QMI device: %s",
                  error->message);

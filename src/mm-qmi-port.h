@@ -20,6 +20,8 @@
 #include <glib-object.h>
 #include <gio/gio.h>
 
+#include <libqmi-glib.h>
+
 #include "mm-port.h"
 
 #define MM_TYPE_QMI_PORT            (mm_qmi_port_get_type ())
@@ -55,5 +57,19 @@ gboolean mm_qmi_port_open_finish (MMQmiPort *self,
                                   GError **error);
 gboolean mm_qmi_port_is_open     (MMQmiPort *self);
 void     mm_qmi_port_close       (MMQmiPort *self);
+
+void     mm_qmi_port_allocate_client        (MMQmiPort *self,
+                                             QmiService service,
+                                             GCancellable *cancellable,
+                                             GAsyncReadyCallback callback,
+                                             gpointer user_data);
+gboolean mm_qmi_port_allocate_client_finish (MMQmiPort *self,
+                                             GAsyncResult *res,
+                                             GError **error);
+
+QmiClient *mm_qmi_port_peek_client (MMQmiPort *self,
+                                    QmiService service);
+QmiClient *mm_qmi_port_get_client  (MMQmiPort *self,
+                                    QmiService service);
 
 #endif /* MM_QMI_PORT_H */
