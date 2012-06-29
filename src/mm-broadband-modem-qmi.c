@@ -179,6 +179,82 @@ modem_load_current_capabilities (MMIfaceModem *self,
 }
 
 /*****************************************************************************/
+/* Manufacturer loading (Modem interface) */
+
+static gchar *
+modem_load_manufacturer_finish (MMIfaceModem *self,
+                                GAsyncResult *res,
+                                GError **error)
+{
+    gchar *manufacturer;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    manufacturer = g_strdup (g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (res)));
+    mm_dbg ("loaded manufacturer: %s", manufacturer);
+    return manufacturer;
+}
+
+static void
+dms_get_manufacturer_ready (QmiClientDms *client,
+                            GAsyncResult *res,
+                            GSimpleAsyncResult *simple)
+{
+    QmiMessageDmsGetManufacturerOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_dms_get_manufacturer_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (simple, error);
+    } else if (!qmi_message_dms_get_manufacturer_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get Manufacturer: ");
+        g_simple_async_result_take_error (simple, error);
+    } else {
+        const gchar *str;
+
+        qmi_message_dms_get_manufacturer_output_get_manufacturer (output, &str, NULL);
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   g_strdup (str),
+                                                   (GDestroyNotify)g_free);
+    }
+
+    if (output)
+        qmi_message_dms_get_manufacturer_output_unref (output);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_load_manufacturer (MMIfaceModem *self,
+                         GAsyncReadyCallback callback,
+                         gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_DMS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_load_manufacturer);
+
+    mm_dbg ("loading manufacturer...");
+    qmi_client_dms_get_manufacturer (QMI_CLIENT_DMS (client),
+                                     NULL,
+                                     5,
+                                     NULL,
+                                     (GAsyncReadyCallback)dms_get_manufacturer_ready,
+                                     result);
+}
+
+/*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
@@ -375,6 +451,8 @@ iface_modem_init (MMIfaceModem *iface)
     /* Initialization steps */
     iface->load_current_capabilities = modem_load_current_capabilities;
     iface->load_current_capabilities_finish = modem_load_current_capabilities_finish;
+    iface->load_manufacturer = modem_load_manufacturer;
+    iface->load_manufacturer_finish = modem_load_manufacturer_finish;
 }
 
 static void
