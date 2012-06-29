@@ -34,6 +34,151 @@ G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmi, mm_broadband_modem_qmi, MM_TYPE_BRO
                         G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
 
 /*****************************************************************************/
+
+static gboolean
+ensure_qmi_client (MMBroadbandModemQmi *self,
+                   QmiService service,
+                   QmiClient **o_client,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
+{
+    QmiClient *client;
+
+    client = mm_qmi_port_peek_client (mm_base_modem_peek_port_qmi (MM_BASE_MODEM (self)), service);
+    if (!client) {
+        g_simple_async_report_error_in_idle (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             MM_CORE_ERROR,
+                                             MM_CORE_ERROR_FAILED,
+                                             "Couldn't peek client for service '%s'",
+                                             qmi_service_get_string (service));
+        return FALSE;
+    }
+
+    *o_client = client;
+    return TRUE;
+}
+
+/*****************************************************************************/
+/* Capabilities loading (Modem interface) */
+
+static MMModemCapability
+modem_load_current_capabilities_finish (MMIfaceModem *self,
+                                        GAsyncResult *res,
+                                        GError **error)
+{
+    MMModemCapability caps;
+    gchar *caps_str;
+
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return MM_MODEM_CAPABILITY_NONE;
+
+    caps = ((MMModemCapability) GPOINTER_TO_UINT (
+                g_simple_async_result_get_op_res_gpointer (
+                    G_SIMPLE_ASYNC_RESULT (res))));
+    caps_str = mm_modem_capability_build_string_from_mask (caps);
+    mm_dbg ("loaded current capabilities: %s", caps_str);
+    g_free (caps_str);
+    return caps;
+}
+
+static MMModemCapability
+qmi_network_to_modem_capability (QmiDmsRadioInterface network)
+{
+    switch (network) {
+    case QMI_DMS_RADIO_INTERFACE_CDMA20001X:
+        return MM_MODEM_CAPABILITY_CDMA_EVDO;
+    case QMI_DMS_RADIO_INTERFACE_EVDO:
+        return MM_MODEM_CAPABILITY_CDMA_EVDO;
+    case QMI_DMS_RADIO_INTERFACE_GSM:
+        return MM_MODEM_CAPABILITY_GSM_UMTS;
+    case QMI_DMS_RADIO_INTERFACE_UMTS:
+        return MM_MODEM_CAPABILITY_GSM_UMTS;
+    case QMI_DMS_RADIO_INTERFACE_LTE:
+        return MM_MODEM_CAPABILITY_LTE;
+    default:
+        mm_warn ("Unhandled QMI radio interface received (%u)",
+                 (guint)network);
+        return MM_MODEM_CAPABILITY_NONE;
+    }
+}
+
+static void
+dms_get_capabilities_ready (QmiClientDms *client,
+                            GAsyncResult *res,
+                            GSimpleAsyncResult *simple)
+{
+    QmiMessageDmsGetCapabilitiesOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_dms_get_capabilities_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (simple, error);
+    } else if (!qmi_message_dms_get_capabilities_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't get Capabilities: ");
+        g_simple_async_result_take_error (simple, error);
+    } else {
+        guint i;
+        guint mask = MM_MODEM_CAPABILITY_NONE;
+        GArray *radio_interface_list;
+
+        qmi_message_dms_get_capabilities_output_get_info (
+            output,
+            NULL, /* info_max_tx_channel_rate */
+            NULL, /* info_max_rx_channel_rate */
+            NULL, /* info_data_service_capability */
+            NULL, /* info_sim_capability */
+            &radio_interface_list,
+            NULL);
+
+        for (i = 0; i < radio_interface_list->len; i++) {
+            mask |= qmi_network_to_modem_capability (g_array_index (radio_interface_list,
+                                                                    QmiDmsRadioInterface,
+                                                                    i));
+        }
+
+        g_simple_async_result_set_op_res_gpointer (simple,
+                                                   GUINT_TO_POINTER (mask),
+                                                   NULL);
+    }
+
+    if (output)
+        qmi_message_dms_get_capabilities_output_unref (output);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+modem_load_current_capabilities (MMIfaceModem *self,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data)
+{
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_BROADBAND_MODEM_QMI (self),
+                            QMI_SERVICE_DMS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        modem_load_current_capabilities);
+
+    mm_dbg ("loading current capabilities...");
+    qmi_client_dms_get_capabilities (QMI_CLIENT_DMS (client),
+                                     NULL,
+                                     5,
+                                     NULL,
+                                     (GAsyncReadyCallback)dms_get_capabilities_ready,
+                                     result);
+}
+
+/*****************************************************************************/
 /* First initialization step */
 
 typedef struct {
@@ -227,6 +372,9 @@ finalize (GObject *object)
 static void
 iface_modem_init (MMIfaceModem *iface)
 {
+    /* Initialization steps */
+    iface->load_current_capabilities = modem_load_current_capabilities;
+    iface->load_current_capabilities_finish = modem_load_current_capabilities_finish;
 }
 
 static void
