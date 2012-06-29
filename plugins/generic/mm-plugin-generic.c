@@ -29,6 +29,7 @@
 
 #include "mm-plugin-generic.h"
 #include "mm-broadband-modem.h"
+#include "mm-broadband-modem-qmi.h"
 #include "mm-serial-parsers.h"
 #include "mm-log.h"
 
@@ -48,6 +49,15 @@ create_modem (MMPlugin *self,
               GList *probes,
               GError **error)
 {
+    if (mm_port_probe_list_has_qmi_port (probes)) {
+        mm_dbg ("QMI-powered generic modem found...");
+        return MM_BASE_MODEM (mm_broadband_modem_qmi_new (sysfs_path,
+                                                          drivers,
+                                                          mm_plugin_get_name (self),
+                                                          vendor,
+                                                          product));
+    }
+
     return MM_BASE_MODEM (mm_broadband_modem_new (sysfs_path,
                                                   drivers,
                                                   mm_plugin_get_name (self),
@@ -60,7 +70,7 @@ create_modem (MMPlugin *self,
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    static const gchar *subsystems[] = { "tty", NULL };
+    static const gchar *subsystems[] = { "tty", "net", "usb", NULL };
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_GENERIC,
