@@ -26,8 +26,12 @@
 #include "ModemManager.h"
 #include "mm-log.h"
 #include "mm-errors-types.h"
+#include "mm-iface-modem.h"
 
-G_DEFINE_TYPE (MMBroadbandModemQmi, mm_broadband_modem_qmi, MM_TYPE_BROADBAND_MODEM);
+static void iface_modem_init (MMIfaceModem *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMBroadbandModemQmi, mm_broadband_modem_qmi, MM_TYPE_BROADBAND_MODEM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
 
 /*****************************************************************************/
 /* First initialization step */
@@ -218,6 +222,11 @@ finalize (GObject *object)
     }
 
     G_OBJECT_CLASS (mm_broadband_modem_qmi_parent_class)->finalize (object);
+}
+
+static void
+iface_modem_init (MMIfaceModem *iface)
+{
 }
 
 static void
