@@ -46,6 +46,30 @@ struct _MMBroadbandModemClass {
      * Plugins which need specific setups should chain up parent's port setup
      * as well. */
     void (* setup_ports) (MMBroadbandModem *self);
+
+    /* First and last initialization steps.
+     * Actually, this is not really the first step, setup_ports() is */
+    void     (* initialization_started)        (MMBroadbandModem *self,
+                                                GAsyncReadyCallback callback,
+                                                gpointer user_data);
+    gpointer (* initialization_started_finish) (MMBroadbandModem *self,
+                                                GAsyncResult *res,
+                                                GError **error);
+    gboolean (* initialization_stopped)        (MMBroadbandModem *self,
+                                                gpointer started_context,
+                                                GError **error);
+
+    /* First enabling step */
+    void     (* enabling_started)        (MMBroadbandModem *self,
+                                          GAsyncReadyCallback callback,
+                                          gpointer user_data);
+    gboolean (* enabling_started_finish) (MMBroadbandModem *self,
+                                          GAsyncResult *res,
+                                          GError **error);
+
+    /* Last disabling step */
+    gboolean (* disabling_stopped) (MMBroadbandModem *self,
+                                    GError **error);
 };
 
 GType mm_broadband_modem_get_type (void);

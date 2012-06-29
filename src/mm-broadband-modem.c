@@ -99,7 +99,12 @@ enum {
 #define CIND_INDICATOR_INVALID 255
 #define CIND_INDICATOR_IS_VALID(u) (u != CIND_INDICATOR_INVALID)
 
+typedef struct _PortsContext PortsContext;
+
 struct _MMBroadbandModemPrivate {
+    /* Broadband modem specific implementation */
+    PortsContext *enabled_ports_ctx;
+
     /*<--- Modem interface --->*/
     /* Properties */
     GObject *modem_dbus_skeleton;
@@ -6149,6 +6154,296 @@ setup_ports (MMBroadbandModem *self)
 }
 
 /*****************************************************************************/
+/* Generic ports open/close context */
+
+struct _PortsContext {
+    volatile gint ref_count;
+
+    MMAtSerialPort *primary;
+    gboolean primary_open;
+    MMAtSerialPort *secondary;
+    gboolean secondary_open;
+    MMQcdmSerialPort *qcdm;
+    gboolean qcdm_open;
+};
+
+static PortsContext *
+ports_context_ref (PortsContext *ctx)
+{
+    g_atomic_int_inc (&ctx->ref_count);
+    return ctx;
+}
+
+static void
+ports_context_unref (PortsContext *ctx)
+{
+    if (g_atomic_int_dec_and_test (&ctx->ref_count)) {
+        if (ctx->primary) {
+            if (ctx->primary_open)
+                mm_serial_port_close (MM_SERIAL_PORT (ctx->primary));
+            g_object_unref (ctx->primary);
+        }
+        if (ctx->secondary) {
+            if (ctx->secondary_open)
+                mm_serial_port_close (MM_SERIAL_PORT (ctx->secondary));
+            g_object_unref (ctx->secondary);
+        }
+        if (ctx->qcdm) {
+            if (ctx->qcdm_open)
+                mm_serial_port_close (MM_SERIAL_PORT (ctx->qcdm));
+            g_object_unref (ctx->qcdm);
+        }
+        g_free (ctx);
+    }
+}
+
+/*****************************************************************************/
+/* Initialization started/stopped */
+
+static gboolean
+initialization_stopped (MMBroadbandModem *self,
+                        gpointer user_data,
+                        GError **error)
+{
+    PortsContext *ctx = (PortsContext *)user_data;
+
+    ports_context_unref (ctx);
+    return TRUE;
+}
+
+typedef struct {
+    MMBroadbandModem *self;
+    GSimpleAsyncResult *result;
+    PortsContext *ports;
+} InitializationStartedContext;
+
+static void
+initialization_started_context_complete_and_free (InitializationStartedContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    ports_context_unref (ctx->ports);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gpointer
+initialization_started_finish (MMBroadbandModem *self,
+                               GAsyncResult *res,
+                               GError **error)
+{
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error))
+        return NULL;
+
+    return ((gpointer) ports_context_ref (
+                g_simple_async_result_get_op_res_gpointer (
+                    G_SIMPLE_ASYNC_RESULT (res))));
+}
+
+static gboolean
+open_ports_initialization (MMBroadbandModem *self,
+                           PortsContext *ctx,
+                           GError **error)
+{
+    ctx->primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    if (!ctx->primary) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't get primary port");
+        return FALSE;
+    }
+
+    /* Open and send first commands to the primary serial port.
+     * We do keep the primary port open during the whole initialization
+     * sequence. Note that this port is not really passed to the interfaces,
+     * they will get the primary port themselves. */
+    if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->primary), error)) {
+        g_prefix_error (error, "Couldn't open primary port: ");
+        return FALSE;
+    }
+
+    ctx->primary_open = TRUE;
+
+    /* Try to disable echo */
+    mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                   ctx->primary,
+                                   "E0", 3,
+                                   FALSE, NULL, NULL, NULL);
+    /* Try to get extended errors */
+    mm_base_modem_at_command_full (MM_BASE_MODEM (self),
+                                   ctx->primary,
+                                   "+CMEE=1", 3,
+                                   FALSE, NULL, NULL, NULL);
+
+    return TRUE;
+}
+
+static void
+initialization_started (MMBroadbandModem *self,
+                        GAsyncReadyCallback callback,
+                        gpointer user_data)
+{
+    GError *error = NULL;
+    InitializationStartedContext *ctx;
+
+    ctx = g_new0 (InitializationStartedContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             initialization_started);
+    ctx->ports = g_new0 (PortsContext, 1);
+    ctx->ports->ref_count = 1;
+
+    if (!open_ports_initialization (self, ctx->ports, &error)) {
+        g_prefix_error (&error, "Couldn't open ports during modem initialization: ");
+        g_simple_async_result_take_error (ctx->result, error);
+    } else
+        g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                   ports_context_ref (ctx->ports),
+                                                   (GDestroyNotify)ports_context_unref);
+
+    initialization_started_context_complete_and_free (ctx);
+}
+
+/*****************************************************************************/
+/* Disabling stopped */
+
+static gboolean
+disabling_stopped (MMBroadbandModem *self,
+                   GError **error)
+{
+    if (self->priv->enabled_ports_ctx) {
+        ports_context_unref (self->priv->enabled_ports_ctx);
+        self->priv->enabled_ports_ctx = NULL;
+    }
+    return TRUE;
+}
+
+/*****************************************************************************/
+/* Enabling started */
+
+typedef struct {
+    MMBroadbandModem *self;
+    GSimpleAsyncResult *result;
+    PortsContext *ports;
+} EnablingStartedContext;
+
+static void
+enabling_started_context_complete_and_free (EnablingStartedContext *ctx)
+{
+    g_simple_async_result_complete_in_idle (ctx->result);
+    ports_context_unref (ctx->ports);
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->self);
+    g_free (ctx);
+}
+
+static gboolean
+enabling_started_finish (MMBroadbandModem *self,
+                         GAsyncResult *res,
+                         GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static gboolean
+open_ports_enabling (MMBroadbandModem *self,
+                     PortsContext *ctx,
+                     GError **error)
+{
+    /* Open primary */
+    ctx->primary = mm_base_modem_get_port_primary (MM_BASE_MODEM (self));
+    if (!ctx->primary) {
+        g_set_error (error,
+                     MM_CORE_ERROR,
+                     MM_CORE_ERROR_FAILED,
+                     "Couldn't get primary port");
+        return FALSE;
+    }
+
+    if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->primary), error)) {
+        g_prefix_error (error, "Couldn't open primary port: ");
+        return FALSE;
+    }
+
+    ctx->primary_open = TRUE;
+
+    /* Open secondary (optional) */
+    ctx->secondary = mm_base_modem_get_port_secondary (MM_BASE_MODEM (self));
+    if (ctx->secondary) {
+        if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->secondary), error)) {
+            g_prefix_error (error, "Couldn't open secondary port: ");
+            return FALSE;
+        }
+        ctx->secondary_open = TRUE;
+    }
+
+    /* Open qcdm (optional) */
+    ctx->qcdm = mm_base_modem_get_port_qcdm (MM_BASE_MODEM (self));
+    if (ctx->qcdm) {
+        if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->qcdm), error)) {
+            g_prefix_error (error, "Couldn't open QCDM port: ");
+            return FALSE;
+        }
+        ctx->qcdm_open = TRUE;
+    }
+
+    return TRUE;
+}
+
+static void
+enabling_flash_done (MMSerialPort *port,
+                     GError *error,
+                     EnablingStartedContext *ctx)
+{
+    if (error) {
+        g_prefix_error (&error, "Primary port flashing failed: ");
+        g_simple_async_result_set_from_error (ctx->result, error);
+    } else {
+        ctx->self->priv->enabled_ports_ctx = ports_context_ref (ctx->ports);
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    }
+
+    enabling_started_context_complete_and_free (ctx);
+}
+
+static void
+enabling_started (MMBroadbandModem *self,
+                  GAsyncReadyCallback callback,
+                  gpointer user_data)
+{
+    GError *error = NULL;
+    EnablingStartedContext *ctx;
+
+    ctx = g_new0 (EnablingStartedContext, 1);
+    ctx->self = g_object_ref (self);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             enabling_started);
+    ctx->ports = g_new0 (PortsContext, 1);
+    ctx->ports->ref_count = 1;
+
+    /* Enabling */
+    if (!open_ports_enabling (self, ctx->ports, &error)) {
+        g_prefix_error (&error, "Couldn't open ports during modem enabling: ");
+        g_simple_async_result_take_error (ctx->result, error);
+        enabling_started_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Ports were correctly opened, now flash the primary port */
+    mm_dbg ("Flashing primary port before enabling...");
+    mm_serial_port_flash (MM_SERIAL_PORT (ctx->ports->primary),
+                          100,
+                          FALSE,
+                          (MMSerialFlashFn)enabling_flash_done,
+                          ctx);
+}
+
+/*****************************************************************************/
 
 typedef enum {
     DISABLING_STEP_FIRST,
@@ -6178,7 +6473,16 @@ static void disabling_step (DisablingContext *ctx);
 static void
 disabling_context_complete_and_free (DisablingContext *ctx)
 {
+    GError *error = NULL;
+
     g_simple_async_result_complete_in_idle (ctx->result);
+
+    if (MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->disabling_stopped &&
+        !MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->disabling_stopped (ctx->self, &error)) {
+        mm_warn ("Error when stopping the disabling sequence: %s", error->message);
+        g_error_free (error);
+    }
+
     g_object_unref (ctx->result);
     g_object_unref (ctx->cancellable);
     g_object_unref (ctx->self);
@@ -6453,6 +6757,7 @@ disable (MMBaseModem *self,
 
 typedef enum {
     ENABLING_STEP_FIRST,
+    ENABLING_STEP_STARTED,
     ENABLING_STEP_IFACE_MODEM,
     ENABLING_STEP_IFACE_3GPP,
     ENABLING_STEP_IFACE_3GPP_USSD,
@@ -6510,6 +6815,24 @@ enable_finish (MMBaseModem *self,
     return TRUE;
 }
 
+static void
+enabling_started_ready (MMBroadbandModem *self,
+                        GAsyncResult *result,
+                        EnablingContext *ctx)
+{
+    GError *error = NULL;
+
+    if (!MM_BROADBAND_MODEM_GET_CLASS (self)->enabling_started_finish (self, result, &error)) {
+        g_simple_async_result_take_error (G_SIMPLE_ASYNC_RESULT (ctx->result), error);
+        enabling_context_complete_and_free (ctx);
+        return;
+    }
+
+    /* Go on to next step */
+    ctx->step++;
+    enabling_step (ctx);
+}
+
 #undef INTERFACE_ENABLE_READY_FN
 #define INTERFACE_ENABLE_READY_FN(NAME,TYPE,FATAL_ERRORS)               \
     static void                                                         \
@@ -6555,6 +6878,17 @@ enabling_step (EnablingContext *ctx)
 
     switch (ctx->step) {
     case ENABLING_STEP_FIRST:
+        /* Fall down to next step */
+        ctx->step++;
+
+    case ENABLING_STEP_STARTED:
+        if (MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->enabling_started &&
+            MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->enabling_started_finish) {
+            MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->enabling_started (ctx->self,
+                                                                        (GAsyncReadyCallback)enabling_started_ready,
+                                                                        ctx);
+            return;
+        }
         /* Fall down to next step */
         ctx->step++;
 
@@ -6746,7 +7080,7 @@ enable (MMBaseModem *self,
 typedef enum {
     INITIALIZE_STEP_FIRST,
     INITIALIZE_STEP_SETUP_PORTS,
-    INITIALIZE_STEP_PRIMARY_OPEN,
+    INITIALIZE_STEP_STARTED,
     INITIALIZE_STEP_SETUP_SIMPLE_STATUS,
     INITIALIZE_STEP_IFACE_MODEM,
     INITIALIZE_STEP_IFACE_3GPP,
@@ -6766,8 +7100,7 @@ typedef struct {
     GCancellable *cancellable;
     GSimpleAsyncResult *result;
     InitializeStep step;
-    MMAtSerialPort *port;
-    gboolean close_port;
+    gpointer ports_ctx;
 } InitializeContext;
 
 static void initialize_step (InitializeContext *ctx);
@@ -6775,14 +7108,17 @@ static void initialize_step (InitializeContext *ctx);
 static void
 initialize_context_complete_and_free (InitializeContext *ctx)
 {
+    GError *error = NULL;
+
     g_simple_async_result_complete_in_idle (ctx->result);
-    g_object_unref (ctx->result);
-    /* balance open/close count */
-    if (ctx->port) {
-        if (ctx->close_port)
-            mm_serial_port_close (MM_SERIAL_PORT (ctx->port));
-        g_object_unref (ctx->port);
+
+    if (MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->initialization_stopped &&
+        !MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->initialization_stopped (ctx->self, ctx->ports_ctx, &error)) {
+        mm_warn ("Error when stopping the initialization sequence: %s", error->message);
+        g_error_free (error);
     }
+
+    g_object_unref (ctx->result);
     g_object_unref (ctx->cancellable);
     g_object_unref (ctx->self);
     g_free (ctx);
@@ -6811,6 +7147,37 @@ initialize_finish (MMBaseModem *self,
         return FALSE;
 
     return TRUE;
+}
+
+static void
+initialization_started_ready (MMBroadbandModem *self,
+                              GAsyncResult *result,
+                              InitializeContext *ctx)
+{
+    GError *error = NULL;
+    gpointer ports_ctx;
+
+    ports_ctx = MM_BROADBAND_MODEM_GET_CLASS (self)->initialization_started_finish (self, result, &error);
+    if (!ports_ctx) {
+        mm_warn ("Couldn't start initialization: %s", error->message);
+        g_error_free (error);
+
+        mm_iface_modem_update_state (MM_IFACE_MODEM (self),
+                                     MM_MODEM_STATE_FAILED,
+                                     MM_MODEM_STATE_CHANGE_REASON_UNKNOWN);
+
+        /* Just jump to the last step */
+        ctx->step = INITIALIZE_STEP_LAST;
+        initialize_step (ctx);
+        return;
+    }
+
+    /* Keep the ctx for later use when stopping initialization */
+    ctx->ports_ctx = ports_ctx;
+
+    /* Go on to next step */
+    ctx->step++;
+    initialize_step (ctx);
 }
 
 static void
@@ -6922,46 +7289,16 @@ initialize_step (InitializeContext *ctx)
         /* Fall down to next step */
         ctx->step++;
 
-    case INITIALIZE_STEP_PRIMARY_OPEN: {
-        GError *error = NULL;
-
-        ctx->port = mm_base_modem_get_port_primary (MM_BASE_MODEM (ctx->self));
-        if (!ctx->port) {
-            g_simple_async_result_set_error (ctx->result,
-                                             MM_CORE_ERROR,
-                                             MM_CORE_ERROR_FAILED,
-                                             "Cannot initialize: couldn't get primary port");
-            initialize_context_complete_and_free (ctx);
+    case INITIALIZE_STEP_STARTED:
+        if (MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->initialization_started &&
+            MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->initialization_started_finish) {
+            MM_BROADBAND_MODEM_GET_CLASS (ctx->self)->initialization_started (ctx->self,
+                                                                              (GAsyncReadyCallback)initialization_started_ready,
+                                                                              ctx);
             return;
         }
-
-        /* Open and send first commands to the primary serial port.
-         * We do keep the primary port open during the whole initialization
-         * sequence. Note that this port is not really passed to the interfaces,
-         * they will get the primary port themselves. */
-        if (!mm_serial_port_open (MM_SERIAL_PORT (ctx->port), &error)) {
-            g_simple_async_result_take_error (ctx->result, error);
-            initialize_context_complete_and_free (ctx);
-            return;
-        }
-        ctx->close_port = TRUE;
-
-        /* TODO: This two commands are the only ones not subclassable; should
-         * change that. */
-
-        /* Try to disable echo */
-        mm_base_modem_at_command_full (MM_BASE_MODEM (ctx->self),
-                                       ctx->port,
-                                       "E0", 3,
-                                       FALSE, NULL, NULL, NULL);
-        /* Try to get extended errors */
-        mm_base_modem_at_command_full (MM_BASE_MODEM (ctx->self),
-                                       ctx->port,
-                                       "+CMEE=1", 3,
-                                       FALSE, NULL, NULL, NULL);
         /* Fall down to next step */
         ctx->step++;
-    }
 
     case INITIALIZE_STEP_SETUP_SIMPLE_STATUS:
         /* Simple status must be created before any interface initialization,
@@ -7420,6 +7757,9 @@ finalize (GObject *object)
 {
     MMBroadbandModem *self = MM_BROADBAND_MODEM (object);
 
+    if (self->priv->enabled_ports_ctx)
+        ports_context_unref (self->priv->enabled_ports_ctx);
+
     if (self->priv->modem_3gpp_registration_regex)
         mm_3gpp_creg_regex_destroy (self->priv->modem_3gpp_registration_regex);
 
@@ -7695,6 +8035,12 @@ mm_broadband_modem_class_init (MMBroadbandModemClass *klass)
     base_modem_class->disable_finish = disable_finish;
 
     klass->setup_ports = setup_ports;
+    klass->initialization_started = initialization_started;
+    klass->initialization_started_finish = initialization_started_finish;
+    klass->initialization_stopped = initialization_stopped;
+    klass->enabling_started = enabling_started;
+    klass->enabling_started_finish = enabling_started_finish;
+    klass->disabling_stopped = disabling_stopped;
 
     g_object_class_override_property (object_class,
                                       PROP_MODEM_DBUS_SKELETON,
