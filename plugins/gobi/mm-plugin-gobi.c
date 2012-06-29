@@ -20,7 +20,9 @@
 #include <libmm-common.h>
 
 #include "mm-plugin-gobi.h"
+#include "mm-broadband-modem-qmi.h"
 #include "mm-broadband-modem-gobi.h"
+#include "mm-log.h"
 
 G_DEFINE_TYPE (MMPluginGobi, mm_plugin_gobi, MM_TYPE_PLUGIN)
 
@@ -38,6 +40,15 @@ create_modem (MMPlugin *self,
               GList *probes,
               GError **error)
 {
+    if (mm_port_probe_list_has_qmi_port (probes)) {
+        mm_dbg ("QMI-powered Gobi modem found...");
+        return MM_BASE_MODEM (mm_broadband_modem_qmi_new (sysfs_path,
+                                                          drivers,
+                                                          mm_plugin_get_name (self),
+                                                          vendor,
+                                                          product));
+    }
+
     return MM_BASE_MODEM (mm_broadband_modem_gobi_new (sysfs_path,
                                                        drivers,
                                                        mm_plugin_get_name (self),
@@ -50,7 +61,7 @@ create_modem (MMPlugin *self,
 G_MODULE_EXPORT MMPlugin *
 mm_plugin_create (void)
 {
-    static const gchar *subsystems[] = { "tty", NULL };
+    static const gchar *subsystems[] = { "tty", "net", "usb", NULL };
     static const gchar *drivers[] = { "qcserial", NULL };
 
     return MM_PLUGIN (
