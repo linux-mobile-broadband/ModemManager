@@ -1146,5 +1146,5 @@ mmcli_prefix_newlines (const gchar *prefix,
 
     return (prefixed_string ?
             g_string_free (prefixed_string, FALSE) :
-            NULL);
+            g_strdup (str));
 }
