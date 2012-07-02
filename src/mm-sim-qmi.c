@@ -214,6 +214,79 @@ load_imsi (MMSim *self,
 }
 
 /*****************************************************************************/
+/* Send PIN */
+
+static gboolean
+send_pin_finish (MMSim *self,
+                 GAsyncResult *res,
+                 GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+dms_uim_verify_pin_ready (QmiClientDms *client,
+                          GAsyncResult *res,
+                          GSimpleAsyncResult *simple)
+{
+    QmiMessageDmsUimVerifyPinOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_dms_uim_verify_pin_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (simple, error);
+    } else if (!qmi_message_dms_uim_verify_pin_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't verify PIN: ");
+        g_simple_async_result_take_error (simple, error);
+    } else {
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    }
+
+    if (output)
+        qmi_message_dms_uim_verify_pin_output_unref (output);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+send_pin (MMSim *self,
+          const gchar *pin,
+          GAsyncReadyCallback callback,
+          gpointer user_data)
+{
+    QmiMessageDmsUimVerifyPinInput *input;
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_SIM_QMI (self),
+                            QMI_SERVICE_DMS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        send_pin);
+
+    mm_dbg ("Sending PIN...");
+    input = qmi_message_dms_uim_verify_pin_input_new ();
+    qmi_message_dms_uim_verify_pin_input_set_info (
+        input,
+        QMI_DMS_UIM_PIN_ID_PIN,
+        pin,
+        NULL);
+    qmi_client_dms_uim_verify_pin (QMI_CLIENT_DMS (client),
+                                   input,
+                                   5,
+                                   NULL,
+                                   (GAsyncReadyCallback)dms_uim_verify_pin_ready,
+                                   result);
+    qmi_message_dms_uim_verify_pin_input_unref (input);
+}
+
+/*****************************************************************************/
 
 MMSim *
 mm_sim_qmi_new_finish (GAsyncResult  *res,
@@ -264,4 +337,6 @@ mm_sim_qmi_class_init (MMSimQmiClass *klass)
     sim_class->load_sim_identifier_finish = load_sim_identifier_finish;
     sim_class->load_imsi = load_imsi;
     sim_class->load_imsi_finish = load_imsi_finish;
+    sim_class->send_pin = send_pin;
+    sim_class->send_pin_finish = send_pin_finish;
 }
