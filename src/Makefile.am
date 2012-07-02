@@ -170,6 +170,8 @@ ModemManager_SOURCES = \
 	mm-sms-part.c \
 	mm-sms.h \
 	mm-sms.c \
+	mm-sim-qmi.h \
+	mm-sim-qmi.c \
 	mm-sms-list.h \
 	mm-sms-list.c \
 	mm-iface-modem.h \
