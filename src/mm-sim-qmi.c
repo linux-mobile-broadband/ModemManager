@@ -363,6 +363,82 @@ send_puk (MMSim *self,
 }
 
 /*****************************************************************************/
+/* Change PIN */
+
+static gboolean
+change_pin_finish (MMSim *self,
+                   GAsyncResult *res,
+                   GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res), error);
+}
+
+static void
+dms_uim_change_pin_ready (QmiClientDms *client,
+                           GAsyncResult *res,
+                           GSimpleAsyncResult *simple)
+{
+    QmiMessageDmsUimChangePinOutput *output = NULL;
+    GError *error = NULL;
+
+    output = qmi_client_dms_uim_change_pin_finish (client, res, &error);
+    if (!output) {
+        g_prefix_error (&error, "QMI operation failed: ");
+        g_simple_async_result_take_error (simple, error);
+    } else if (!qmi_message_dms_uim_change_pin_output_get_result (output, &error)) {
+        g_prefix_error (&error, "Couldn't change PIN: ");
+        g_simple_async_result_take_error (simple, error);
+    } else {
+        g_simple_async_result_set_op_res_gboolean (simple, TRUE);
+    }
+
+    if (output)
+        qmi_message_dms_uim_change_pin_output_unref (output);
+
+    g_simple_async_result_complete (simple);
+    g_object_unref (simple);
+}
+
+static void
+change_pin (MMSim *self,
+            const gchar *old_pin,
+            const gchar *new_pin,
+            GAsyncReadyCallback callback,
+            gpointer user_data)
+{
+    QmiMessageDmsUimChangePinInput *input;
+    GSimpleAsyncResult *result;
+    QmiClient *client = NULL;
+
+    if (!ensure_qmi_client (MM_SIM_QMI (self),
+                            QMI_SERVICE_DMS, &client,
+                            callback, user_data))
+        return;
+
+    result = g_simple_async_result_new (G_OBJECT (self),
+                                        callback,
+                                        user_data,
+                                        change_pin);
+
+    mm_dbg ("Changing PIN...");
+
+    input = qmi_message_dms_uim_change_pin_input_new ();
+    qmi_message_dms_uim_change_pin_input_set_info (
+        input,
+        QMI_DMS_UIM_PIN_ID_PIN,
+        old_pin,
+        new_pin,
+        NULL);
+    qmi_client_dms_uim_change_pin (QMI_CLIENT_DMS (client),
+                                   input,
+                                   5,
+                                   NULL,
+                                   (GAsyncReadyCallback)dms_uim_change_pin_ready,
+                                   result);
+    qmi_message_dms_uim_change_pin_input_unref (input);
+}
+
+/*****************************************************************************/
 
 MMSim *
 mm_sim_qmi_new_finish (GAsyncResult  *res,
@@ -421,4 +497,6 @@ mm_sim_qmi_class_init (MMSimQmiClass *klass)
     sim_class->send_pin_finish = send_pin_finish;
     sim_class->send_puk = send_puk;
     sim_class->send_puk_finish = send_puk_finish;
+    sim_class->change_pin = change_pin;
+    sim_class->change_pin_finish = change_pin_finish;
 }
