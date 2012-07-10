@@ -43,6 +43,9 @@ struct _MMDevicePrivate {
     GUdevDevice *udev_device;
     gchar *udev_device_path;
 
+    /* Kernel driver managing this device */
+    gchar *driver;
+
     /* Best plugin to manage this device */
     MMPlugin *plugin;
 
@@ -75,6 +78,37 @@ mm_device_owns_port (MMDevice    *self,
                                  (GCompareFunc)udev_port_cmp);
 }
 
+static gchar *
+get_driver_name (GUdevDevice *device)
+{
+    GUdevDevice *parent = NULL;
+    const gchar *driver, *subsys;
+    gchar *ret = NULL;
+
+    driver = g_udev_device_get_driver (device);
+    if (!driver) {
+        parent = g_udev_device_get_parent (device);
+        if (parent)
+            driver = g_udev_device_get_driver (parent);
+
+        /* Check for bluetooth; it's driver is a bunch of levels up so we
+         * just check for the subsystem of the parent being bluetooth.
+         */
+        if (!driver && parent) {
+            subsys = g_udev_device_get_subsystem (parent);
+            if (subsys && !strcmp (subsys, "bluetooth"))
+                driver = "bluetooth";
+        }
+    }
+
+    if (driver)
+        ret = g_strdup (driver);
+    if (parent)
+        g_object_unref (parent);
+
+    return ret;
+}
+
 void
 mm_device_grab_port (MMDevice    *self,
                      GUdevDevice *udev_port)
@@ -82,6 +116,15 @@ mm_device_grab_port (MMDevice    *self,
     if (!g_list_find_custom (self->priv->udev_ports,
                              udev_port,
                              (GCompareFunc)udev_port_cmp)) {
+
+        /* Get the driver name out of the first port grabbed */
+        if (!self->priv->udev_ports) {
+            self->priv->driver = get_driver_name (udev_port);
+            mm_dbg ("(%s) managed by driver '%s'",
+                    self->priv->udev_device_path,
+                    self->priv->driver);
+        }
+
         self->priv->udev_ports = g_list_prepend (self->priv->udev_ports,
                                                  g_object_ref (udev_port));
     }
@@ -257,6 +300,12 @@ mm_device_get_path (MMDevice *self)
     return self->priv->udev_device_path;
 }
 
+const gchar *
+mm_device_get_driver (MMDevice *self)
+{
+    return self->priv->driver;
+}
+
 GUdevDevice *
 mm_device_peek_udev_device (MMDevice *self)
 {
@@ -398,6 +447,7 @@ finalize (GObject *object)
     MMDevice *self = MM_DEVICE (object);
 
     g_free (self->priv->udev_device_path);
+    g_free (self->priv->driver);
 
     G_OBJECT_CLASS (mm_device_parent_class)->finalize (object);
 }
