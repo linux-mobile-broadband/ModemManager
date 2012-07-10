@@ -11,9 +11,9 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 - 2011 Red Hat, Inc.
- * Copyright (C) 2011 Aleksander Morgado <aleksander@gnu.org>
- * Copyright (C) 2011 Google, Inc.
+ * Copyright (C) 2009 - 2012 Red Hat, Inc.
+ * Copyright (C) 2011 - 2012 Aleksander Morgado <aleksander@gnu.org>
+ * Copyright (C) 2011 - 2012 Google, Inc.
  */
 
 #include <string.h>
@@ -62,34 +62,7 @@ struct _MMManagerPrivate {
     GDBusObjectManagerServer *object_manager;
 };
 
-typedef struct {
-    MMManager *manager;
-    GUdevDevice *device;
-    GUdevDevice *physical_device;
-} FindPortSupportContext;
-
-static FindPortSupportContext *
-find_port_support_context_new (MMManager *manager,
-                               GUdevDevice *device,
-                               GUdevDevice *physical_device)
-{
-    FindPortSupportContext *ctx;
-
-    ctx = g_new0 (FindPortSupportContext, 1);
-    ctx->manager = manager;
-    ctx->device = g_object_ref (device);
-    ctx->physical_device = g_object_ref (physical_device);
-
-    return ctx;
-}
-
-static void
-find_port_support_context_free (FindPortSupportContext *ctx)
-{
-    g_object_unref (ctx->device);
-    g_object_unref (ctx->physical_device);
-    g_free (ctx);
-}
+/*****************************************************************************/
 
 static MMDevice *
 find_device_by_modem (MMManager *manager,
@@ -140,96 +113,44 @@ find_device_by_udev_device (MMManager *manager,
     return find_device_by_sysfs_path (manager, g_udev_device_get_sysfs_path (udev_device));
 }
 
+/*****************************************************************************/
+
+typedef struct {
+    MMManager *self;
+    MMDevice *device;
+} FindDeviceSupportContext;
+
 static void
-find_port_support_ready_cb (MMPluginManager *plugin_manager,
-                            GAsyncResult *result,
-                            FindPortSupportContext *ctx)
+find_device_support_context_free (FindDeviceSupportContext *ctx)
+{
+    g_object_unref (ctx->self);
+    g_object_unref (ctx->device);
+    g_slice_free (FindDeviceSupportContext, ctx);
+}
+
+static void
+find_device_support_ready (MMPluginManager *plugin_manager,
+                           GAsyncResult *result,
+                           FindDeviceSupportContext *ctx)
 {
     GError *error = NULL;
-    MMDevice *device;
-    MMPlugin *best_plugin;
 
-    /* Look for the container device, if any */
-    device = find_device_by_udev_device (ctx->manager, ctx->physical_device);
-
-    best_plugin = mm_plugin_manager_find_port_support_finish (plugin_manager,
-                                                              result,
-                                                              &error);
-    if (!best_plugin) {
-        if (error) {
-            mm_warn ("(%s/%s): error checking support: '%s'",
-                     g_udev_device_get_subsystem (ctx->device),
-                     g_udev_device_get_name (ctx->device),
-                     error->message);
-            g_error_free (error);
-        } else {
-            mm_dbg ("(%s/%s): not supported by any plugin",
-                    g_udev_device_get_subsystem (ctx->device),
-                    g_udev_device_get_name (ctx->device));
-        }
+    if (!mm_plugin_manager_find_device_support_finish (plugin_manager, result, &error)) {
+        mm_warn ("Couldn't find support for device at '%s': %s",
+                 mm_device_get_path (ctx->device),
+                 error->message);
+        g_error_free (error);
+    } else if (!mm_device_create_modem (ctx->device, ctx->self->priv->object_manager, &error)) {
+        mm_warn ("Couldn't create modem for device at '%s': %s",
+                 mm_device_get_path (ctx->device),
+                 error->message);
+        g_error_free (error);
     } else {
-        /* Found a best plugin for the port */
-
-        if (!device) {
-            /* Create a generic device to track the available ports, and add it to the
-             * manager. */
-            device = mm_device_new (ctx->physical_device);
-            mm_device_set_plugin (device, best_plugin);
-            g_hash_table_insert (ctx->manager->priv->devices,
-                                 g_strdup (g_udev_device_get_sysfs_path (mm_device_peek_udev_device (device))),
-                                 device);
-        }
-        else if (!g_str_equal (mm_plugin_get_name (mm_device_peek_plugin (device)),
-                               mm_plugin_get_name (best_plugin))) {
-            /* Warn if the best plugin found for this port differs from the
-             * best plugin found for the the first grabbed port */
-            mm_warn ("(%s/%s): plugin mismatch error (expected: '%s', got: '%s')",
-                     g_udev_device_get_subsystem (ctx->device),
-                     g_udev_device_get_name (ctx->device),
-                     mm_plugin_get_name (mm_device_peek_plugin (device)),
-                     mm_plugin_get_name (best_plugin));
-        }
-
-        /* Add the port to the device */
-        mm_dbg ("(%s/%s): added to device managed by plugin '%s'",
-                g_udev_device_get_subsystem (ctx->device),
-                g_udev_device_get_name (ctx->device),
-                mm_plugin_get_name (mm_device_peek_plugin (device)));
-        mm_device_grab_port (device, ctx->device);
+        mm_info ("Modem for device at '%s' successfully created",
+                 mm_device_get_path (ctx->device));
     }
 
-    if (device) {
-        const gchar *subsys;
-        const gchar *name;
-
-        /* This port was probed after having created the modem */
-        if (mm_device_peek_modem (device)) {
-            mm_dbg ("(%s/%s): port added to existing modem",
-                    g_udev_device_get_subsystem (ctx->device),
-                    g_udev_device_get_name (ctx->device));
-        }
-        /* Every time we get a supports check result, we need to see if there
-         * are ports of the same device still being probed. */
-        else if (mm_plugin_manager_is_finding_device_support (plugin_manager,
-                                                              g_udev_device_get_sysfs_path (mm_device_peek_udev_device (device)),
-                                                              &subsys,
-                                                              &name)) {
-            mm_dbg ("(%s/%s): outstanding support task prevents export of '%s'",
-                    subsys, name, g_udev_device_get_sysfs_path (mm_device_peek_udev_device (device)));
-        }
-        /* Plugin manager is not trying to find more ports supported by this
-         * device, so we can create the modem now! */
-        else {
-            if (!mm_device_create_modem (device, ctx->manager->priv->object_manager, &error)) {
-                mm_warn ("Couldn't create '%s' modem for device at '%s': %s",
-                         g_udev_device_get_sysfs_path (mm_device_peek_udev_device (device)),
-                         mm_plugin_get_name (mm_device_peek_plugin (device)),
-                         error ? error->message : "Unknown error");
-            }
-        }
-    }
-
-    find_port_support_context_free (ctx);
+    find_device_support_context_free (ctx);
 }
 
 static GUdevDevice *
@@ -298,10 +219,10 @@ static void
 device_added (MMManager *manager,
               GUdevDevice *port)
 {
+    MMDevice *device;
     const char *subsys, *name, *physdev_path, *physdev_subsys;
     gboolean is_candidate;
     GUdevDevice *physdev = NULL;
-    MMDevice *existing;
 
     g_return_if_fail (port != NULL);
 
@@ -366,33 +287,30 @@ device_added (MMManager *manager,
         goto out;
     }
 
-    /* Already launched the same port support check? */
-    if (mm_plugin_manager_is_finding_port_support (manager->priv->plugin_manager,
-                                                   subsys,
-                                                   name,
-                                                   physdev_path)) {
-        mm_dbg ("(%s/%s): support check already requested in port", subsys, name);
-        goto out;
+    /* See if we already created an object to handle ports in this device */
+    device = find_device_by_sysfs_path (manager, physdev_path);
+    if (!device) {
+        FindDeviceSupportContext *ctx;
+
+        /* Keep the device listed in the Manager */
+        device = mm_device_new (physdev);
+        g_hash_table_insert (manager->priv->devices,
+                             g_strdup (physdev_path),
+                             device);
+
+        /* Launch device support check */
+        ctx = g_slice_new (FindDeviceSupportContext);
+        ctx->self = g_object_ref (manager);
+        ctx->device = g_object_ref (device);
+        mm_plugin_manager_find_device_support (
+            manager->priv->plugin_manager,
+            device,
+            (GAsyncReadyCallback)find_device_support_ready,
+            ctx);
     }
 
-    /* If this port's physical modem is already owned by a plugin, don't bother
-     * asking all plugins whether they support this port, just let the owning
-     * plugin check if it supports the port.
-     */
-    existing = find_device_by_udev_device (manager, physdev);
-
-    /* Launch supports check in the Plugin Manager */
-    mm_plugin_manager_find_port_support (
-        manager->priv->plugin_manager,
-        subsys,
-        name,
-        physdev_path,
-        existing ? mm_device_peek_plugin (existing) : NULL,
-        existing ? mm_device_peek_modem (existing) : NULL,
-        (GAsyncReadyCallback)find_port_support_ready_cb,
-        find_port_support_context_new (manager,
-                                       port,
-                                       physdev));
+    /* Grab the port in the existing device. */
+    mm_device_grab_port (device, port);
 
 out:
     if (physdev)
@@ -497,6 +415,8 @@ mm_manager_start (MMManager *manager)
 
     mm_dbg ("Finished device scan...");
 }
+
+/*****************************************************************************/
 
 static void
 remove_disable_ready (MMBaseModem *modem,
