@@ -59,7 +59,7 @@ MMPortProbe *mm_port_probe_new (GUdevDevice *port,
                                 const gchar *physdev_path,
                                 const gchar *driver);
 
-GUdevDevice *mm_port_probe_get_port         (MMPortProbe *self);
+GUdevDevice *mm_port_probe_peek_port        (MMPortProbe *self);
 const gchar *mm_port_probe_get_port_name    (MMPortProbe *self);
 const gchar *mm_port_probe_get_port_subsys  (MMPortProbe *self);
 const gchar *mm_port_probe_get_port_physdev (MMPortProbe *self);

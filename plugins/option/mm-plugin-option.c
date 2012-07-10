@@ -66,7 +66,7 @@ grab_port (MMPlugin *self,
         return FALSE;
     }
 
-    port = mm_port_probe_get_port (probe); /* transfer none */
+    port = mm_port_probe_peek_port (probe);
 
     /* Genuine Option NV devices are always supposed to use USB interface 0 as
      * the modem/data port, per mail with Option engineers.  Only this port

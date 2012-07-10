@@ -933,7 +933,7 @@ mm_port_probe_get_port_type (MMPortProbe *self)
 }
 
 GUdevDevice *
-mm_port_probe_get_port (MMPortProbe *self)
+mm_port_probe_peek_port (MMPortProbe *self)
 {
     g_return_val_if_fail (MM_IS_PORT_PROBE (self), NULL);
 

@@ -60,7 +60,7 @@ grab_port (MMPlugin *self,
     gchar *devfile;
     MMPortType port_type;
 
-    port = mm_port_probe_get_port (probe); /* transfer none */
+    port = mm_port_probe_peek_port (probe);
     subsys = mm_port_probe_get_port_subsys (probe);
     name = mm_port_probe_get_port_name (probe);
 

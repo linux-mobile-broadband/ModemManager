@@ -63,7 +63,7 @@ grab_port (MMPlugin *self,
         return FALSE;
     }
 
-    port = mm_port_probe_get_port (probe); /* transfer none */
+    port = mm_port_probe_peek_port (probe);
 
     /* TODO: Why do we check for device file? */
     devfile = g_udev_device_get_device_file (port);

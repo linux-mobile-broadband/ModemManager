@@ -75,7 +75,7 @@ grab_port (MMPlugin *self,
         return FALSE;
     }
 
-    port = mm_port_probe_get_port (probe); /* transfer none */
+    port = mm_port_probe_peek_port (probe);
 
     /* Look for port type hints */
     if (g_udev_device_get_property_as_boolean (port, "ID_MM_NOKIA_PORT_TYPE_MODEM"))

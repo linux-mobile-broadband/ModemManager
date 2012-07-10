@@ -65,7 +65,7 @@ grab_port (MMPlugin *self,
         return FALSE;
     }
 
-    port = mm_port_probe_get_port (probe); /* transfer none */
+    port = mm_port_probe_peek_port (probe);
 
     /* Look for port type hints; just probing can't distinguish which port should
      * be the data/primary port on these devices.  We have to tag them based on
