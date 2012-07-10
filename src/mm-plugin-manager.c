@@ -31,6 +31,9 @@
 /* Default time to defer probing checks */
 #define SUPPORTS_DEFER_TIMEOUT_SECS 3
 
+/* Time to wait for other ports to appear once the first port is exposed */
+#define MIN_PROBING_TIME_SECS 2
+
 static void initable_iface_init (GInitableIface *iface);
 
 G_DEFINE_TYPE_EXTENDED (MMPluginManager, mm_plugin_manager, G_TYPE_OBJECT, 0,
@@ -525,6 +528,7 @@ typedef struct {
     MMPluginManager *self;
     MMDevice *device;
     GSimpleAsyncResult *result;
+    guint timeout_id;
     gulong grabbed_id;
     gulong released_id;
 
@@ -546,6 +550,18 @@ port_probe_context_free (PortProbeContext *ctx)
 static void
 find_device_support_context_complete_and_free (FindDeviceSupportContext *ctx)
 {
+    g_assert (ctx->timeout_id == 0);
+
+    /* Set async operation result */
+    if (!mm_device_peek_plugin (ctx->device)) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_UNSUPPORTED,
+                                         "not supported by any plugin");
+    } else {
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    }
+
     g_simple_async_result_complete (ctx->result);
 
     g_signal_handler_disconnect (ctx->device, ctx->grabbed_id);
@@ -619,17 +635,12 @@ find_port_support_ready (MMPluginManager *self,
     if (ctx->running_probes != NULL)
         return;
 
+    /* If we didn't use the minimum probing time, wait for it to finish */
+    if (ctx->timeout_id > 0)
+        return;
+
     /* If we just finished the last running probe, we can now finish the device
      * support check */
-    if (!mm_device_peek_plugin (ctx->device)) {
-        g_simple_async_result_set_error (ctx->result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_UNSUPPORTED,
-                                         "not supported by any plugin");
-    } else {
-        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
-    }
-
     find_device_support_context_complete_and_free (ctx);
 }
 
@@ -674,6 +685,18 @@ device_port_released_cb (MMDevice *device,
             g_udev_device_get_name (port));
 }
 
+static gboolean
+min_probing_timeout_cb (FindDeviceSupportContext *ctx)
+{
+    ctx->timeout_id = 0;
+
+    /* If there are no running probes around, we're free to finish */
+    if (ctx->running_probes == NULL)
+        find_device_support_context_complete_and_free (ctx);
+
+    return FALSE;
+}
+
 void
 mm_plugin_manager_find_device_support (MMPluginManager *self,
                                        MMDevice *device,
@@ -699,6 +722,15 @@ mm_plugin_manager_find_device_support (MMPluginManager *self,
                                          MM_DEVICE_PORT_RELEASED,
                                          G_CALLBACK (device_port_released_cb),
                                          ctx);
+
+    /* Set the initial timeout of 2s. We force the probing time of the device to
+     * be at least this amount of time, so that the kernel has enough time to
+     * bring up ports. Given that we launch this only when the first port of the
+     * device has been exposed in udev, this timeout effectively means that we
+     * leave up to 2s to the remaining ports to appear. */
+    ctx->timeout_id = g_timeout_add_seconds (MIN_PROBING_TIME_SECS,
+                                             (GSourceFunc)min_probing_timeout_cb,
+                                             ctx);
 }
 
 /*****************************************************************************/
