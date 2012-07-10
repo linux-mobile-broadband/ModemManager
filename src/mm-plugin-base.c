@@ -780,8 +780,13 @@ create_modem (MMPlugin  *self,
 
         key = get_key (subsys, name);
         probe = g_hash_table_lookup (priv->tasks, key);
-        g_assert (probe);
-        probes = g_list_prepend (probes, g_object_ref (probe));
+        if (!probe)
+            mm_warn ("(%s/%s) Ignoring port when creating modem with plugin '%s'",
+                     subsys,
+                     name,
+                     priv->name);
+        else
+            probes = g_list_prepend (probes, g_object_ref (probe));
         g_free (key);
     }
 
