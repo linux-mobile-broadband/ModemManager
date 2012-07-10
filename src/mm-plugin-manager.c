@@ -392,10 +392,8 @@ port_probe_context_step (PortProbeContext *port_probe_ctx)
 
     /* Ask the current plugin to check support of this port */
     mm_plugin_supports_port (MM_PLUGIN (port_probe_ctx->current->data),
-                             g_udev_device_get_subsystem (port_probe_ctx->port),
-                             g_udev_device_get_name (port_probe_ctx->port),
-                             mm_device_get_path (ctx->device),
-                             NULL, /* TODO: existing modem */
+                             G_OBJECT (ctx->device),
+                             port_probe_ctx->port,
                              (GAsyncReadyCallback)plugin_supports_port_ready,
                              port_probe_ctx);
 }

@@ -97,10 +97,8 @@ const char *mm_plugin_get_name      (MMPlugin *plugin);
 gboolean    mm_plugin_get_sort_last (const MMPlugin *plugin);
 
 void                   mm_plugin_supports_port        (MMPlugin *plugin,
-                                                       const gchar *subsys,
-                                                       const gchar *name,
-                                                       const gchar *physdev_path,
-                                                       MMBaseModem *existing,
+                                                       GObject *device,
+                                                       GUdevDevice *port,
                                                        GAsyncReadyCallback callback,
                                                        gpointer user_data);
 MMPluginSupportsResult mm_plugin_supports_port_finish (MMPlugin *plugin,
@@ -111,7 +109,7 @@ void                   mm_plugin_supports_port_cancel (MMPlugin *plugin,
                                                        const char *name);
 
 MMBaseModem *mm_plugin_create_modem (MMPlugin *plugin,
-                                     GList *port_probes,
+                                     GObject *device,
                                      GError **error);
 
 #endif /* MM_PLUGIN_H */

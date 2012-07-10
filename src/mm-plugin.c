@@ -29,6 +29,7 @@
 #include <mm-errors-types.h>
 
 #include "mm-plugin.h"
+#include "mm-device.h"
 #include "mm-port-probe-cache.h"
 #include "mm-at-serial-port.h"
 #include "mm-qcdm-serial-port.h"
@@ -207,37 +208,6 @@ mm_plugin_get_sort_last (const MMPlugin *plugin)
     return (priv->vendor_strings || priv->product_strings);
 }
 
-static char *
-get_driver_name (GUdevDevice *device)
-{
-    GUdevDevice *parent = NULL;
-    const char *driver, *subsys;
-    char *ret = NULL;
-
-    driver = g_udev_device_get_driver (device);
-    if (!driver) {
-        parent = g_udev_device_get_parent (device);
-        if (parent)
-            driver = g_udev_device_get_driver (parent);
-
-        /* Check for bluetooth; it's driver is a bunch of levels up so we
-         * just check for the subsystem of the parent being bluetooth.
-         */
-        if (!driver && parent) {
-            subsys = g_udev_device_get_subsystem (parent);
-            if (subsys && !strcmp (subsys, "bluetooth"))
-                driver = "bluetooth";
-        }
-    }
-
-    if (driver)
-        ret = g_strdup (driver);
-    if (parent)
-        g_object_unref (parent);
-
-    return ret;
-}
-
 static gboolean
 device_file_exists (const char *name)
 {
@@ -273,10 +243,8 @@ is_virtual_port (const gchar *device_name)
 /* Returns TRUE if the support check request was filtered out */
 static gboolean
 apply_pre_probing_filters (MMPlugin *self,
+                           MMDevice *device,
                            GUdevDevice *port,
-                           const gchar *subsys,
-                           const gchar *name,
-                           const gchar *driver,
                            gboolean *need_vendor_probing,
                            gboolean *need_product_probing)
 {
@@ -286,6 +254,11 @@ apply_pre_probing_filters (MMPlugin *self,
     gboolean product_filtered = FALSE;
     gboolean vendor_filtered = FALSE;
     guint i;
+    const gchar *subsys;
+    const gchar *name;
+
+    subsys = g_udev_device_get_subsystem (port);
+    name = g_udev_device_get_name (port);
 
     *need_vendor_probing = FALSE;
     *need_product_probing = FALSE;
@@ -306,6 +279,17 @@ apply_pre_probing_filters (MMPlugin *self,
     /* The plugin may specify that only some drivers are supported. If that
      * is the case, filter by driver */
     if (priv->drivers) {
+        const gchar *driver;
+
+        /* Detect any modems accessible through the list of virtual ports */
+        driver = (is_virtual_port (name) ?
+                  "virtual" :
+                  mm_device_get_driver (device));
+
+        /* If error retrieving driver: unsupported */
+        if (!driver)
+            return TRUE;
+
         for (i = 0; priv->drivers[i]; i++) {
             if (g_str_equal (driver, priv->drivers[i]))
                 break;
@@ -572,18 +556,14 @@ mm_plugin_supports_port_finish (MMPlugin *self,
 }
 
 void
-mm_plugin_supports_port (MMPlugin *plugin,
-                         const gchar *subsys,
-                         const gchar *name,
-                         const gchar *physdev_path,
-                         MMBaseModem *existing,
+mm_plugin_supports_port (MMPlugin *self,
+                         GObject *device_o,
+                         GUdevDevice *port,
                          GAsyncReadyCallback callback,
                          gpointer user_data)
 {
-    MMPlugin *self = MM_PLUGIN (plugin);
+    MMDevice *device = MM_DEVICE (device_o);
     MMPluginPrivate *priv = MM_PLUGIN_GET_PRIVATE (self);
-    GUdevDevice *port = NULL;
-    gchar *driver = NULL;
     gchar *key = NULL;
     MMPortProbe *probe;
     GSimpleAsyncResult *async_result;
@@ -593,47 +573,18 @@ mm_plugin_supports_port (MMPlugin *plugin,
     MMPortProbeFlag probe_run_flags;
 
     /* Setup key */
-    key = get_key (subsys, name);
+    key = get_key (g_udev_device_get_subsystem (port),
+                   g_udev_device_get_name (port));
 
     async_result = g_simple_async_result_new (G_OBJECT (self),
                                               callback,
                                               user_data,
                                               mm_plugin_supports_port);
 
-    /* Get port device */
-    if (!(port = g_udev_client_query_by_subsystem_and_name (priv->client,
-                                                            subsys,
-                                                            name))) {
-        g_simple_async_result_set_error (async_result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't find port for (%s/%s)",
-                                         subsys,
-                                         name);
-        g_simple_async_result_complete_in_idle (async_result);
-        goto out;
-    }
-
-    /* Detect any modems accessible through the list of virtual ports */
-    if (!(driver = (is_virtual_port (name) ?
-                    g_strdup ("virtual") :
-                    get_driver_name (port)))) {
-        g_simple_async_result_set_error (async_result,
-                                         MM_CORE_ERROR,
-                                         MM_CORE_ERROR_FAILED,
-                                         "Couldn't find driver for (%s/%s)",
-                                         subsys,
-                                         name);
-        g_simple_async_result_complete_in_idle (async_result);
-        goto out;
-    }
-
     /* Apply filters before launching the probing */
     if (apply_pre_probing_filters (self,
+                                   device,
                                    port,
-                                   subsys,
-                                   name,
-                                   driver,
                                    &need_vendor_probing,
                                    &need_product_probing)) {
         /* Filtered! */
@@ -644,34 +595,30 @@ mm_plugin_supports_port (MMPlugin *plugin,
         goto out;
     }
 
-    mm_dbg ("(%s) checking port support (%s,%s)", priv->name, subsys, name);
+    mm_dbg ("(%s) checking port support (%s,%s)",
+            priv->name,
+            g_udev_device_get_subsystem (port),
+            g_udev_device_get_name (port));
 
     /* Need to launch new probing */
 
-    /* Lookup current probes, there shouldn't be any (unless for net devices) */
-    probe = g_hash_table_lookup (priv->tasks, key);
-    if (!probe)
-        probe = mm_port_probe_cache_get (port, physdev_path, driver);
+    probe = mm_device_get_port_probe (device, port);
     g_assert (probe);
 
     /* Before launching any probing, check if the port is a net device (which
      * cannot be probed).
      * TODO: With the new defer-until-suggested we probably don't need the modem
      * object being passed down here just for this. */
-    if (g_str_equal (subsys, "net")) {
+    if (g_str_equal (g_udev_device_get_subsystem (port), "net")) {
         /* Keep track of the probe object, which is considered finished */
         if (!g_hash_table_lookup (priv->tasks, key))
             g_hash_table_insert (priv->tasks,
                                  g_strdup (key),
                                  g_object_ref (probe));
 
-        /* If we already have a existing modem, then mark it as supported.
-         * Otherwise, just defer a bit */
         g_simple_async_result_set_op_res_gpointer (
             async_result,
-            GUINT_TO_POINTER ((existing ?
-                               MM_PLUGIN_SUPPORTS_PORT_SUPPORTED :
-                               MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED)),
+            GUINT_TO_POINTER (MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED),
             NULL);
         g_simple_async_result_complete_in_idle (async_result);
         goto out;
@@ -696,11 +643,12 @@ mm_plugin_supports_port (MMPlugin *plugin,
      * expected, check if we alredy got the single AT port. And if so, we know this
      * port being probed won't be AT. */
     if (priv->single_at &&
-        existing &&
-        mm_base_modem_has_at_port (existing)) {
+        mm_port_probe_list_has_at_port (mm_device_peek_port_probe_list (device))) {
         mm_dbg ("(%s)   not setting up AT probing tasks for (%s,%s): "
                 "modem already has the expected single AT port",
-                priv->name, subsys, name);
+                priv->name,
+                g_udev_device_get_subsystem (port),
+                g_udev_device_get_name (port));
 
         /* Assuming it won't be an AT port. We still run the probe anyway, in
          * case we need to check for other port types (e.g. QCDM) */
@@ -714,7 +662,10 @@ mm_plugin_supports_port (MMPlugin *plugin,
     ctx->flags = probe_run_flags;
 
     /* Launch the probe */
-    mm_dbg ("(%s)   launching probe for (%s,%s)", priv->name, subsys, name);
+    mm_dbg ("(%s)   launching probe for (%s,%s)",
+            priv->name,
+            g_udev_device_get_subsystem (port),
+            g_udev_device_get_name (port));
     mm_port_probe_run (probe,
                        ctx->flags,
                        priv->send_delay,
@@ -729,10 +680,7 @@ mm_plugin_supports_port (MMPlugin *plugin,
                          probe);
 
 out:
-    if (port)
-        g_object_unref (port);
     g_free (key);
-    g_free (driver);
     g_object_unref (async_result);
 }
 
@@ -760,33 +708,36 @@ mm_plugin_supports_port_cancel (MMPlugin *plugin,
 
 MMBaseModem *
 mm_plugin_create_modem (MMPlugin  *self,
-                        GList     *port_probes,
+                        GObject   *device_o,
                         GError   **error)
 {
-    MMBaseModem *modem = NULL;
+    MMDevice *device = MM_DEVICE (device_o);
     MMPluginPrivate *priv = MM_PLUGIN_GET_PRIVATE (self);
-    GList *l;
-    const gchar *name, *subsys, *sysfs_path, *driver;
+    MMBaseModem *modem = NULL;
+    const gchar *name, *subsys;
     guint16 vendor = 0, product = 0;
+    GList *port_probes, *l;
 
     /* Get info from the first probe in the list */
-    subsys = mm_port_probe_get_port_subsys (probes->data);
-    name = mm_port_probe_get_port_name (probes->data);
-    sysfs_path = mm_port_probe_get_port_physdev (probes->data);
-    driver = mm_port_probe_get_port_driver (probes->data);
+    port_probes = mm_device_peek_port_probe_list (device);
+    subsys = mm_port_probe_get_port_subsys (port_probes->data);
+    name = mm_port_probe_get_port_name (port_probes->data);
 
     /* Vendor and Product IDs are really optional, we'll just warn if they
-     * cannot get loaded */
+     * cannot get loaded.
+     *
+     * TODO: load them in MMDevice once
+     **/
     if (!get_device_ids (MM_PLUGIN (self), subsys, name, &vendor, &product))
         mm_warn ("Could not get modem vendor/product ID");
 
     /* Let the plugin create the modem from the port probe results */
     modem = MM_PLUGIN_GET_CLASS (self)->create_modem (MM_PLUGIN (self),
-                                                      sysfs_path,
-                                                      driver,
+                                                      mm_device_get_path (device),
+                                                      mm_device_get_driver (device),
                                                       vendor,
                                                       product,
-                                                      probes,
+                                                      port_probes,
                                                       error);
     if (modem) {
         /* Grab each port */

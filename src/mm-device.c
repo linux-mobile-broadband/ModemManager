@@ -292,7 +292,7 @@ mm_device_create_modem (MMDevice                  *self,
              g_list_length (self->priv->port_probes));
 
     self->priv->modem = mm_plugin_create_modem (self->priv->plugin,
-                                                self->priv->port_probes,
+                                                G_OBJECT (self),
                                                 error);
     if (self->priv->modem) {
         /* Keep the object manager */
