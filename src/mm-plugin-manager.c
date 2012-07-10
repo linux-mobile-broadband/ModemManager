@@ -518,6 +518,191 @@ mm_plugin_manager_is_finding_port_support (MMPluginManager *self,
     return FALSE;
 }
 
+/*****************************************************************************/
+/* Find device support */
+
+typedef struct {
+    MMPluginManager *self;
+    MMDevice *device;
+    GSimpleAsyncResult *result;
+    gulong grabbed_id;
+    gulong released_id;
+
+    GList *running_probes;
+} FindDeviceSupportContext;
+
+typedef struct {
+    GUdevDevice *port;
+    FindDeviceSupportContext *parent_ctx;
+} PortProbeContext;
+
+static void
+port_probe_context_free (PortProbeContext *ctx)
+{
+    g_object_unref (ctx->port);
+    g_slice_free (PortProbeContext, ctx);
+}
+
+static void
+find_device_support_context_complete_and_free (FindDeviceSupportContext *ctx)
+{
+    g_simple_async_result_complete (ctx->result);
+
+    g_signal_handler_disconnect (ctx->device, ctx->grabbed_id);
+    g_signal_handler_disconnect (ctx->device, ctx->released_id);
+
+    g_warn_if_fail (ctx->running_probes == NULL);
+
+    g_object_unref (ctx->result);
+    g_object_unref (ctx->device);
+    g_object_unref (ctx->self);
+    g_slice_free (FindDeviceSupportContext, ctx);
+}
+
+gboolean
+mm_plugin_manager_find_device_support_finish (MMPluginManager *self,
+                                              GAsyncResult *result,
+                                              GError **error)
+{
+    return !g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result), error);
+}
+
+static void
+find_port_support_ready (MMPluginManager *self,
+                         GAsyncResult *result,
+                         PortProbeContext *port_probe_ctx)
+{
+    FindDeviceSupportContext *ctx = port_probe_ctx->parent_ctx;
+    GError *error = NULL;
+    MMPlugin *best_plugin;
+
+    best_plugin = mm_plugin_manager_find_port_support_finish (self, result, &error);
+    if (!best_plugin) {
+        if (error) {
+            mm_warn ("(%s/%s): error checking support: '%s'",
+                     g_udev_device_get_subsystem (port_probe_ctx->port),
+                     g_udev_device_get_name (port_probe_ctx->port),
+                     error->message);
+            g_error_free (error);
+        } else {
+            mm_dbg ("(%s/%s): not supported by any plugin",
+                    g_udev_device_get_subsystem (port_probe_ctx->port),
+                    g_udev_device_get_name (port_probe_ctx->port));
+        }
+    } else {
+        /* Found a best plugin for the port */
+
+        if (!mm_device_peek_plugin (ctx->device)) {
+            mm_dbg ("(%s/%s): found best plugin (%s) for device (%s)",
+                    g_udev_device_get_subsystem (port_probe_ctx->port),
+                    g_udev_device_get_name (port_probe_ctx->port),
+                    mm_plugin_get_name (best_plugin),
+                    mm_device_get_path (ctx->device));
+            mm_device_set_plugin (ctx->device, best_plugin);
+        } else if (!g_str_equal (mm_plugin_get_name (mm_device_peek_plugin (ctx->device)),
+                                 mm_plugin_get_name (best_plugin))) {
+            /* Warn if the best plugin found for this port differs from the
+             * best plugin found for the the first grabbed port */
+            mm_warn ("(%s/%s): plugin mismatch error (expected: '%s', got: '%s')",
+                     g_udev_device_get_subsystem (port_probe_ctx->port),
+                     g_udev_device_get_name (port_probe_ctx->port),
+                     mm_plugin_get_name (mm_device_peek_plugin (ctx->device)),
+                     mm_plugin_get_name (best_plugin));
+        }
+    }
+
+    g_assert (g_list_find (ctx->running_probes, port_probe_ctx) != NULL);
+    ctx->running_probes = g_list_remove (ctx->running_probes, port_probe_ctx);
+    port_probe_context_free (port_probe_ctx);
+
+    /* If there are running probes around, wait for them to finish */
+    if (ctx->running_probes != NULL)
+        return;
+
+    /* If we just finished the last running probe, we can now finish the device
+     * support check */
+    if (!mm_device_peek_plugin (ctx->device)) {
+        g_simple_async_result_set_error (ctx->result,
+                                         MM_CORE_ERROR,
+                                         MM_CORE_ERROR_UNSUPPORTED,
+                                         "not supported by any plugin");
+    } else {
+        g_simple_async_result_set_op_res_gboolean (ctx->result, TRUE);
+    }
+
+    find_device_support_context_complete_and_free (ctx);
+}
+
+static void
+device_port_grabbed_cb (MMDevice *device,
+                        GUdevDevice *port,
+                        FindDeviceSupportContext *ctx)
+{
+    PortProbeContext *port_probe_ctx;
+
+    mm_dbg ("(%s/%s) Launching port support check",
+            g_udev_device_get_subsystem (port),
+            g_udev_device_get_name (port));
+
+    /* Launch probing task on this port with the first plugin of the list */
+    port_probe_ctx = g_slice_new0 (PortProbeContext);
+    port_probe_ctx->port = g_object_ref (port);
+    port_probe_ctx->parent_ctx = ctx;
+
+    /* Set as running */
+    ctx->running_probes = g_list_prepend (ctx->running_probes, port_probe_ctx);
+
+    /* Launch supports check in the Plugin Manager */
+    mm_plugin_manager_find_port_support (
+        ctx->self,
+        g_udev_device_get_subsystem (port_probe_ctx->port),
+        g_udev_device_get_name (port_probe_ctx->port),
+        mm_device_get_path (ctx->device),
+        NULL, /* plugin */
+        NULL, /* modem */
+        (GAsyncReadyCallback)find_port_support_ready,
+        port_probe_ctx);
+}
+
+static void
+device_port_released_cb (MMDevice *device,
+                         GUdevDevice *port,
+                         FindDeviceSupportContext *ctx)
+{
+    mm_dbg ("Aborting port support check for (%s/%s)",
+            g_udev_device_get_subsystem (port),
+            g_udev_device_get_name (port));
+}
+
+void
+mm_plugin_manager_find_device_support (MMPluginManager *self,
+                                       MMDevice *device,
+                                       GAsyncReadyCallback callback,
+                                       gpointer user_data)
+{
+    FindDeviceSupportContext *ctx;
+
+    ctx = g_slice_new0 (FindDeviceSupportContext);
+    ctx->self = g_object_ref (self);
+    ctx->device = g_object_ref (device);
+    ctx->result = g_simple_async_result_new (G_OBJECT (self),
+                                             callback,
+                                             user_data,
+                                             mm_plugin_manager_find_device_support);
+
+    /* Connect to device port grabbed/released notifications */
+    ctx->grabbed_id = g_signal_connect (device,
+                                        MM_DEVICE_PORT_GRABBED,
+                                        G_CALLBACK (device_port_grabbed_cb),
+                                        ctx);
+    ctx->released_id = g_signal_connect (device,
+                                         MM_DEVICE_PORT_RELEASED,
+                                         G_CALLBACK (device_port_released_cb),
+                                         ctx);
+}
+
+/*****************************************************************************/
+
 static MMPlugin *
 load_plugin (const gchar *path)
 {
