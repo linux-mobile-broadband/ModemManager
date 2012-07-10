@@ -58,18 +58,4 @@ gboolean mm_plugin_manager_find_device_support_finish (MMPluginManager *self,
                                                        GAsyncResult *result,
                                                        GError **error);
 
-/* Asynchronous operation to find the best plugin giving support to a
- * given port. */
-void      mm_plugin_manager_find_port_support        (MMPluginManager *self,
-                                                      const gchar *subsys,
-                                                      const gchar *name,
-                                                      const gchar *physdev_path,
-                                                      MMPlugin *suggested_plugin,
-                                                      MMBaseModem *existing,
-                                                      GAsyncReadyCallback callback,
-                                                      gpointer user_data);
-MMPlugin *mm_plugin_manager_find_port_support_finish (MMPluginManager *self,
-                                                      GAsyncResult *result,
-                                                      GError **error);
-
 #endif /* MM_PLUGIN_MANAGER_H */

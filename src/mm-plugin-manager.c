@@ -54,6 +54,8 @@ struct _MMPluginManagerPrivate {
     GHashTable *supports;
 };
 
+/*****************************************************************************/
+
 /* List of support infos associated to the same physical device */
 typedef struct {
     GSList *info_list;
@@ -76,8 +78,6 @@ typedef struct {
     /* Output context */
     MMPlugin *best_plugin;
 } SupportsInfo;
-
-static gboolean find_port_support_idle (SupportsInfo *info);
 
 static void
 supports_info_free (SupportsInfo *info)
@@ -150,6 +150,11 @@ remove_supports_info (MMPluginManager *self,
 
     /* Note that we just remove it from the list, we don't free it */
 }
+
+/*****************************************************************************/
+/* Find port support */
+
+static gboolean find_port_support_idle (SupportsInfo *info);
 
 static void
 suggest_supports_info_result (MMPluginManager *self,
@@ -409,10 +414,10 @@ find_port_support_idle (SupportsInfo *info)
     return FALSE;
 }
 
-MMPlugin *
-mm_plugin_manager_find_port_support_finish (MMPluginManager *self,
-                                            GAsyncResult *result,
-                                            GError **error)
+static MMPlugin *
+find_port_support_finish (MMPluginManager *self,
+                          GAsyncResult *result,
+                          GError **error)
 {
     g_return_val_if_fail (MM_IS_PLUGIN_MANAGER (self), NULL);
     g_return_val_if_fail (G_IS_ASYNC_RESULT (result), NULL);
@@ -425,15 +430,15 @@ mm_plugin_manager_find_port_support_finish (MMPluginManager *self,
     return g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (result));
 }
 
-void
-mm_plugin_manager_find_port_support (MMPluginManager *self,
-                                     const gchar *subsys,
-                                     const gchar *name,
-                                     const gchar *physdev_path,
-                                     MMPlugin *suggested_plugin,
-                                     MMBaseModem *existing,
-                                     GAsyncReadyCallback callback,
-                                     gpointer user_data)
+static void
+find_port_support (MMPluginManager *self,
+                   const gchar *subsys,
+                   const gchar *name,
+                   const gchar *physdev_path,
+                   MMPlugin *suggested_plugin,
+                   MMBaseModem *existing,
+                   GAsyncReadyCallback callback,
+                   gpointer user_data)
 {
     SupportsInfo *info;
 
@@ -451,7 +456,7 @@ mm_plugin_manager_find_port_support (MMPluginManager *self,
     info->result = g_simple_async_result_new (G_OBJECT (self),
                                               callback,
                                               user_data,
-                                              NULL);
+                                              find_port_support);
 
     /* Set first plugin to check */
     info->current = self->priv->plugins;
@@ -542,7 +547,7 @@ find_port_support_ready (MMPluginManager *self,
     GError *error = NULL;
     MMPlugin *best_plugin;
 
-    best_plugin = mm_plugin_manager_find_port_support_finish (self, result, &error);
+    best_plugin = find_port_support_finish (self, result, &error);
     if (!best_plugin) {
         if (error) {
             mm_warn ("(%s/%s): error checking support: '%s'",
@@ -614,7 +619,7 @@ device_port_grabbed_cb (MMDevice *device,
     ctx->running_probes = g_list_prepend (ctx->running_probes, port_probe_ctx);
 
     /* Launch supports check in the Plugin Manager */
-    mm_plugin_manager_find_port_support (
+    find_port_support (
         ctx->self,
         g_udev_device_get_subsystem (port_probe_ctx->port),
         g_udev_device_get_name (port_probe_ctx->port),
