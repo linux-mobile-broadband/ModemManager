@@ -47,6 +47,14 @@
 
 G_DEFINE_TYPE (MMPortProbe, mm_port_probe, G_TYPE_OBJECT)
 
+enum {
+    PROP_0,
+    PROP_PORT,
+    PROP_LAST
+};
+
+static GParamSpec *properties[PROP_LAST];
+
 typedef struct {
     /* ---- Generic task context ---- */
     GSimpleAsyncResult *result;
@@ -983,6 +991,14 @@ mm_port_probe_peek_port (MMPortProbe *self)
     return self->priv->port;
 };
 
+GUdevDevice *
+mm_port_probe_get_port (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), NULL);
+
+    return G_UDEV_DEVICE (g_object_ref (self->priv->port));
+};
+
 const gchar *
 mm_port_probe_get_vendor (MMPortProbe *self)
 {
@@ -1025,15 +1041,14 @@ mm_port_probe_get_port_subsys (MMPortProbe *self)
     return g_udev_device_get_subsystem (self->priv->port);
 }
 
+/*****************************************************************************/
+
 MMPortProbe *
 mm_port_probe_new (GUdevDevice *port)
 {
-    MMPortProbe *self;
-
-    self = MM_PORT_PROBE (g_object_new (MM_TYPE_PORT_PROBE, NULL));
-    self->priv->port = g_object_ref (port);
-
-    return self;
+    return MM_PORT_PROBE (g_object_new (MM_TYPE_PORT_PROBE,
+                                        MM_PORT_PROBE_PORT, port,
+                                        NULL));
 }
 
 static void
@@ -1042,6 +1057,43 @@ mm_port_probe_init (MMPortProbe *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE ((self),                  \
                                               MM_TYPE_PORT_PROBE,      \
                                               MMPortProbePrivate);
+}
+
+static void
+set_property (GObject *object,
+              guint prop_id,
+              const GValue *value,
+              GParamSpec *pspec)
+{
+    MMPortProbe *self = MM_PORT_PROBE (object);
+
+    switch (prop_id) {
+    case PROP_PORT:
+        /* construct only */
+        self->priv->port = g_value_dup_object (value);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
+}
+
+static void
+get_property (GObject *object,
+              guint prop_id,
+              GValue *value,
+              GParamSpec *pspec)
+{
+    MMPortProbe *self = MM_PORT_PROBE (object);
+
+    switch (prop_id) {
+    case PROP_PORT:
+        g_value_set_object (value, self->priv->port);
+        break;
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        break;
+    }
 }
 
 static void
@@ -1076,6 +1128,16 @@ mm_port_probe_class_init (MMPortProbeClass *klass)
     g_type_class_add_private (object_class, sizeof (MMPortProbePrivate));
 
     /* Virtual methods */
+    object_class->get_property = get_property;
+    object_class->set_property = set_property;
     object_class->finalize = finalize;
     object_class->dispose = dispose;
+
+    properties[PROP_PORT] =
+        g_param_spec_object (MM_PORT_PROBE_PORT,
+                             "Port",
+                             "UDev device object of the port",
+                             G_UDEV_TYPE_DEVICE,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_PORT, properties[PROP_PORT]);
 }
