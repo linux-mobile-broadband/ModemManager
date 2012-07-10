@@ -42,12 +42,10 @@
 
 G_DEFINE_TYPE (MMPlugin, mm_plugin, G_TYPE_OBJECT)
 
-#define MM_PLUGIN_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), MM_TYPE_PLUGIN, MMPluginPrivate))
-
 /* Virtual port corresponding to the embeded modem */
 static gchar *virtual_port[] = {"smd0", NULL};
 
-typedef struct {
+struct _MMPluginPrivate {
     gchar *name;
     GHashTable *tasks;
 
@@ -64,7 +62,7 @@ typedef struct {
     gboolean qcdm;
     MMPortProbeAtCommand *custom_init;
     guint64 send_delay;
-} MMPluginPrivate;
+};
 
 enum {
     PROP_0,
@@ -87,18 +85,16 @@ enum {
 /*****************************************************************************/
 
 const char *
-mm_plugin_get_name (MMPlugin *plugin)
+mm_plugin_get_name (MMPlugin *self)
 {
-    return MM_PLUGIN_GET_PRIVATE (plugin)->name;
+    return self->priv->name;
 }
 
 gboolean
-mm_plugin_get_sort_last (const MMPlugin *plugin)
+mm_plugin_get_sort_last (const MMPlugin *self)
 {
-    MMPluginPrivate *priv = MM_PLUGIN_GET_PRIVATE (plugin);
-
     /* If we have any post-probing filter, we need to sort the plugin last */
-    return (priv->vendor_strings || priv->product_strings);
+    return (self->priv->vendor_strings || self->priv->product_strings);
 }
 
 static gboolean
@@ -141,7 +137,6 @@ apply_pre_probing_filters (MMPlugin *self,
                            gboolean *need_vendor_probing,
                            gboolean *need_product_probing)
 {
-    MMPluginPrivate *priv = MM_PLUGIN_GET_PRIVATE (self);
     guint16 vendor;
     guint16 product;
     gboolean product_filtered = FALSE;
@@ -153,23 +148,23 @@ apply_pre_probing_filters (MMPlugin *self,
 
     /* The plugin may specify that only some subsystems are supported. If that
      * is the case, filter by subsystem */
-    if (priv->subsystems) {
+    if (self->priv->subsystems) {
         const gchar *subsys;
 
         subsys = g_udev_device_get_subsystem (port);
-        for (i = 0; priv->subsystems[i]; i++) {
-            if (g_str_equal (subsys, priv->subsystems[i]))
+        for (i = 0; self->priv->subsystems[i]; i++) {
+            if (g_str_equal (subsys, self->priv->subsystems[i]))
                 break;
         }
 
         /* If we didn't match any subsystem: unsupported */
-        if (!priv->subsystems[i])
+        if (!self->priv->subsystems[i])
             return TRUE;
     }
 
     /* The plugin may specify that only some drivers are supported. If that
      * is the case, filter by driver */
-    if (priv->drivers) {
+    if (self->priv->drivers) {
         const gchar *driver;
 
         /* Detect any modems accessible through the list of virtual ports */
@@ -181,13 +176,13 @@ apply_pre_probing_filters (MMPlugin *self,
         if (!driver)
             return TRUE;
 
-        for (i = 0; priv->drivers[i]; i++) {
-            if (g_str_equal (driver, priv->drivers[i]))
+        for (i = 0; self->priv->drivers[i]; i++) {
+            if (g_str_equal (driver, self->priv->drivers[i]))
                 break;
         }
 
         /* If we didn't match any driver: unsupported */
-        if (!priv->drivers[i])
+        if (!self->priv->drivers[i])
             return TRUE;
     }
 
@@ -196,35 +191,35 @@ apply_pre_probing_filters (MMPlugin *self,
 
     /* The plugin may specify that only some vendor IDs are supported. If that
      * is the case, filter by vendor ID. */
-    if (priv->vendor_ids) {
+    if (self->priv->vendor_ids) {
         /* If we didn't get any vendor: filtered */
         if (!vendor)
             vendor_filtered = TRUE;
         else {
-            for (i = 0; priv->vendor_ids[i]; i++)
-                if (vendor == priv->vendor_ids[i])
+            for (i = 0; self->priv->vendor_ids[i]; i++)
+                if (vendor == self->priv->vendor_ids[i])
                     break;
 
             /* If we didn't match any vendor: filtered */
-            if (!priv->vendor_ids[i])
+            if (!self->priv->vendor_ids[i])
                 vendor_filtered = TRUE;
         }
     }
 
     /* The plugin may specify that only some product IDs are supported. If
      * that is the case, filter by vendor+product ID pair */
-    if (priv->product_ids) {
+    if (self->priv->product_ids) {
         /* If we didn't get any product: filtered */
         if (!product)
             product_filtered = TRUE;
         else {
-            for (i = 0; priv->product_ids[i].l; i++)
-                if (vendor == priv->product_ids[i].l &&
-                    product == priv->product_ids[i].r)
+            for (i = 0; self->priv->product_ids[i].l; i++)
+                if (vendor == self->priv->product_ids[i].l &&
+                    product == self->priv->product_ids[i].r)
                     break;
 
             /* If we didn't match any product: filtered */
-            if (!priv->product_ids[i].l)
+            if (!self->priv->product_ids[i].l)
                 product_filtered = TRUE;
         }
     }
@@ -232,32 +227,32 @@ apply_pre_probing_filters (MMPlugin *self,
     /* If we got filtered by vendor or product IDs  and we do not have vendor
      * or product strings to compare with: unsupported */
     if ((vendor_filtered || product_filtered) &&
-        !priv->vendor_strings &&
-        !priv->product_strings)
+        !self->priv->vendor_strings &&
+        !self->priv->product_strings)
         return TRUE;
 
     /* If we need to filter by vendor/product strings, need to probe for both.
      * This covers the case where a RS232 modem is connected via a USB<->RS232
      * adaptor, and we get in udev the vendor ID of the adaptor */
 
-    if (priv->product_strings) {
+    if (self->priv->product_strings) {
         *need_vendor_probing = TRUE;
         *need_product_probing = TRUE;
-    } else if (priv->vendor_strings)
+    } else if (self->priv->vendor_strings)
         *need_vendor_probing = TRUE;
 
     /* The plugin may specify that only ports with some given udev tags are
      * supported. If that is the case, filter by udev tag */
-    if (priv->udev_tags) {
-        for (i = 0; priv->udev_tags[i]; i++) {
+    if (self->priv->udev_tags) {
+        for (i = 0; self->priv->udev_tags[i]; i++) {
             /* Check if the port was tagged */
             if (g_udev_device_get_property_as_boolean (port,
-                                                       priv->udev_tags[i]))
+                                                       self->priv->udev_tags[i]))
                 break;
         }
 
         /* If we didn't match any udev tag: unsupported */
-        if (!priv->udev_tags[i])
+        if (!self->priv->udev_tags[i])
             return TRUE;
     }
 
@@ -269,14 +264,13 @@ static gboolean
 apply_post_probing_filters (MMPlugin *self,
                             MMPortProbe *probe)
 {
-    MMPluginPrivate *priv = MM_PLUGIN_GET_PRIVATE (self);
     gboolean vendor_filtered = FALSE;
     gboolean product_filtered = FALSE;
     guint i;
 
     /* The plugin may specify that only some vendor strings are supported. If
      * that is the case, filter by vendor string. */
-    if (priv->vendor_strings) {
+    if (self->priv->vendor_strings) {
         const gchar *vendor;
 
         vendor = mm_port_probe_get_vendor (probe);
@@ -285,11 +279,11 @@ apply_post_probing_filters (MMPlugin *self,
         if (!vendor)
             vendor_filtered = TRUE;
         else {
-            for (i = 0; priv->vendor_strings[i]; i++) {
+            for (i = 0; self->priv->vendor_strings[i]; i++) {
                 gboolean found;
                 gchar *casefolded;
 
-                casefolded = g_utf8_casefold (priv->vendor_strings[i], -1);
+                casefolded = g_utf8_casefold (self->priv->vendor_strings[i], -1);
                 found = !!strstr (vendor, casefolded);
                 g_free (casefolded);
                 if (found)
@@ -297,12 +291,12 @@ apply_post_probing_filters (MMPlugin *self,
             }
 
             /* If we didn't match any vendor: filtered */
-            if (!priv->vendor_strings[i])
+            if (!self->priv->vendor_strings[i])
                 vendor_filtered = TRUE;
         }
 
         if (vendor_filtered) {
-            if (!priv->product_strings)
+            if (!self->priv->product_strings)
                 return TRUE;
         } else
             /* Vendor matched */
@@ -311,7 +305,7 @@ apply_post_probing_filters (MMPlugin *self,
 
     /* The plugin may specify that only some vendor+product string pairs are
      * supported. If that is the case, filter by product string */
-    if (priv->product_strings) {
+    if (self->priv->product_strings) {
         const gchar *vendor;
         const gchar *product;
 
@@ -322,13 +316,13 @@ apply_post_probing_filters (MMPlugin *self,
         if (!vendor || !product)
             product_filtered = TRUE;
         else {
-            for (i = 0; priv->product_strings[i].l; i++) {
+            for (i = 0; self->priv->product_strings[i].l; i++) {
                 gboolean found;
                 gchar *casefolded_vendor;
                 gchar *casefolded_product;
 
-                casefolded_vendor = g_utf8_casefold (priv->product_strings[i].l, -1);
-                casefolded_product = g_utf8_casefold (priv->product_strings[i].r, -1);
+                casefolded_vendor = g_utf8_casefold (self->priv->product_strings[i].l, -1);
+                casefolded_product = g_utf8_casefold (self->priv->product_strings[i].r, -1);
                 found = (!!strstr (vendor, casefolded_vendor) &&
                          !!strstr (product, casefolded_product));
                 g_free (casefolded_vendor);
@@ -338,7 +332,7 @@ apply_post_probing_filters (MMPlugin *self,
             }
 
             /* If we didn't match any product: unsupported */
-            if (!priv->product_strings[i].l)
+            if (!self->priv->product_strings[i].l)
                 product_filtered = TRUE;
         }
 
@@ -351,7 +345,7 @@ apply_post_probing_filters (MMPlugin *self,
 /* Context for the asynchronous probing operation */
 typedef struct {
     GSimpleAsyncResult *result;
-    MMPlugin *plugin;
+    MMPlugin *self;
     MMPortProbeFlag flags;
     MMDevice *device;
 } PortProbeRunContext;
@@ -361,7 +355,6 @@ port_probe_run_ready (MMPortProbe *probe,
                       GAsyncResult *probe_result,
                       PortProbeRunContext *ctx)
 {
-    MMPluginPrivate *priv = MM_PLUGIN_GET_PRIVATE (ctx->plugin);
     GError *error = NULL;
 
     if (!mm_port_probe_run_finish (probe, probe_result, &error)) {
@@ -371,7 +364,7 @@ port_probe_run_ready (MMPortProbe *probe,
         /* Probing succeeded */
         MMPluginSupportsResult supports_result;
 
-        if (!apply_post_probing_filters (ctx->plugin, probe)) {
+        if (!apply_post_probing_filters (ctx->self, probe)) {
             /* Port is supported! */
             supports_result = MM_PLUGIN_SUPPORTS_PORT_SUPPORTED;
 
@@ -379,7 +372,7 @@ port_probe_run_ready (MMPortProbe *probe,
              * and we were told that only one AT port is expected, cancel AT
              * probings in the other available support tasks of the SAME
              * device. */
-            if (priv->single_at &&
+            if (ctx->self->priv->single_at &&
                 ctx->flags & MM_PORT_PROBE_AT &&
                 mm_port_probe_is_at (probe)) {
                 GList *l;
@@ -405,7 +398,7 @@ port_probe_run_ready (MMPortProbe *probe,
 
     g_object_unref (ctx->device);
     g_object_unref (ctx->result);
-    g_object_unref (ctx->plugin);
+    g_object_unref (ctx->self);
     g_free (ctx);
 }
 
@@ -436,7 +429,6 @@ mm_plugin_supports_port (MMPlugin *self,
                          gpointer user_data)
 {
     MMDevice *device = MM_DEVICE (device_o);
-    MMPluginPrivate *priv = MM_PLUGIN_GET_PRIVATE (self);
     MMPortProbe *probe;
     GSimpleAsyncResult *async_result;
     PortProbeRunContext *ctx;
@@ -464,7 +456,7 @@ mm_plugin_supports_port (MMPlugin *self,
     }
 
     mm_dbg ("(%s) checking port support (%s,%s)",
-            priv->name,
+            self->priv->name,
             g_udev_device_get_subsystem (port),
             g_udev_device_get_name (port));
 
@@ -488,15 +480,15 @@ mm_plugin_supports_port (MMPlugin *self,
 
     /* Build flags depending on what probing needed */
     probe_run_flags = MM_PORT_PROBE_NONE;
-    if (priv->at)
+    if (self->priv->at)
         probe_run_flags |= MM_PORT_PROBE_AT;
-    else if (priv->single_at)
+    else if (self->priv->single_at)
         probe_run_flags |= MM_PORT_PROBE_AT;
     if (need_vendor_probing)
         probe_run_flags |= (MM_PORT_PROBE_AT | MM_PORT_PROBE_AT_VENDOR);
     if (need_product_probing)
         probe_run_flags |= (MM_PORT_PROBE_AT | MM_PORT_PROBE_AT_PRODUCT);
-    if (priv->qcdm)
+    if (self->priv->qcdm)
         probe_run_flags |= MM_PORT_PROBE_QCDM;
 
     g_assert (probe_run_flags != MM_PORT_PROBE_NONE);
@@ -504,11 +496,11 @@ mm_plugin_supports_port (MMPlugin *self,
     /* If a modem is already available and the plugin says that only one AT port is
      * expected, check if we alredy got the single AT port. And if so, we know this
      * port being probed won't be AT. */
-    if (priv->single_at &&
+    if (self->priv->single_at &&
         mm_port_probe_list_has_at_port (mm_device_peek_port_probe_list (device))) {
         mm_dbg ("(%s)   not setting up AT probing tasks for (%s,%s): "
                 "modem already has the expected single AT port",
-                priv->name,
+                self->priv->name,
                 g_udev_device_get_subsystem (port),
                 g_udev_device_get_name (port));
 
@@ -519,20 +511,20 @@ mm_plugin_supports_port (MMPlugin *self,
 
     /* Setup async call context */
     ctx = g_new (PortProbeRunContext, 1);
-    ctx->plugin = g_object_ref (self);
+    ctx->self = g_object_ref (self);
     ctx->device = g_object_ref (device);
     ctx->result = g_object_ref (async_result);
     ctx->flags = probe_run_flags;
 
     /* Launch the probe */
     mm_dbg ("(%s)   launching probe for (%s,%s)",
-            priv->name,
+            self->priv->name,
             g_udev_device_get_subsystem (port),
             g_udev_device_get_name (port));
     mm_port_probe_run (probe,
                        ctx->flags,
-                       priv->send_delay,
-                       priv->custom_init,
+                       self->priv->send_delay,
+                       self->priv->custom_init,
                        (GAsyncReadyCallback)port_probe_run_ready,
                        ctx);
 
@@ -593,70 +585,74 @@ mm_plugin_create_modem (MMPlugin  *self,
 static void
 mm_plugin_init (MMPlugin *self)
 {
-    MMPluginPrivate *priv = MM_PLUGIN_GET_PRIVATE (self);
+    self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
+                                              MM_TYPE_PLUGIN,
+                                              MMPluginPrivate);
 
     /* Defaults */
-    priv->send_delay = 100000;
+    self->priv->send_delay = 100000;
 }
 
 static void
-set_property (GObject *object, guint prop_id,
-              const GValue *value, GParamSpec *pspec)
+set_property (GObject *object,
+              guint prop_id,
+              const GValue *value,
+              GParamSpec *pspec)
 {
-    MMPluginPrivate *priv = MM_PLUGIN_GET_PRIVATE (object);
+    MMPlugin *self = MM_PLUGIN (object);
 
     switch (prop_id) {
     case PROP_NAME:
         /* Construct only */
-        priv->name = g_value_dup_string (value);
+        self->priv->name = g_value_dup_string (value);
         break;
     case PROP_ALLOWED_SUBSYSTEMS:
         /* Construct only */
-        priv->subsystems = g_value_dup_boxed (value);
+        self->priv->subsystems = g_value_dup_boxed (value);
         break;
     case PROP_ALLOWED_DRIVERS:
         /* Construct only */
-        priv->drivers = g_value_dup_boxed (value);
+        self->priv->drivers = g_value_dup_boxed (value);
         break;
     case PROP_ALLOWED_VENDOR_IDS:
         /* Construct only */
-        priv->vendor_ids = g_value_dup_boxed (value);
+        self->priv->vendor_ids = g_value_dup_boxed (value);
         break;
     case PROP_ALLOWED_PRODUCT_IDS:
         /* Construct only */
-        priv->product_ids = g_value_dup_boxed (value);
+        self->priv->product_ids = g_value_dup_boxed (value);
         break;
     case PROP_ALLOWED_VENDOR_STRINGS:
         /* Construct only */
-        priv->vendor_strings = g_value_dup_boxed (value);
+        self->priv->vendor_strings = g_value_dup_boxed (value);
         break;
     case PROP_ALLOWED_PRODUCT_STRINGS:
         /* Construct only */
-        priv->product_strings = g_value_dup_boxed (value);
+        self->priv->product_strings = g_value_dup_boxed (value);
         break;
     case PROP_ALLOWED_UDEV_TAGS:
         /* Construct only */
-        priv->udev_tags = g_value_dup_boxed (value);
+        self->priv->udev_tags = g_value_dup_boxed (value);
         break;
     case PROP_ALLOWED_AT:
         /* Construct only */
-        priv->at = g_value_get_boolean (value);
+        self->priv->at = g_value_get_boolean (value);
         break;
     case PROP_ALLOWED_SINGLE_AT:
         /* Construct only */
-        priv->single_at = g_value_get_boolean (value);
+        self->priv->single_at = g_value_get_boolean (value);
         break;
     case PROP_ALLOWED_QCDM:
         /* Construct only */
-        priv->qcdm = g_value_get_boolean (value);
+        self->priv->qcdm = g_value_get_boolean (value);
         break;
     case PROP_CUSTOM_INIT:
         /* Construct only */
-        priv->custom_init = g_value_dup_boxed (value);
+        self->priv->custom_init = g_value_dup_boxed (value);
         break;
     case PROP_SEND_DELAY:
         /* Construct only */
-        priv->send_delay = (guint64)g_value_get_uint64 (value);
+        self->priv->send_delay = (guint64)g_value_get_uint64 (value);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -665,50 +661,52 @@ set_property (GObject *object, guint prop_id,
 }
 
 static void
-get_property (GObject *object, guint prop_id,
-              GValue *value, GParamSpec *pspec)
+get_property (GObject *object,
+              guint prop_id,
+              GValue *value,
+              GParamSpec *pspec)
 {
-    MMPluginPrivate *priv = MM_PLUGIN_GET_PRIVATE (object);
+    MMPlugin *self = MM_PLUGIN (object);
 
     switch (prop_id) {
     case PROP_NAME:
-        g_value_set_string (value, priv->name);
+        g_value_set_string (value, self->priv->name);
         break;
     case PROP_ALLOWED_SUBSYSTEMS:
-        g_value_set_boxed (value, priv->subsystems);
+        g_value_set_boxed (value, self->priv->subsystems);
         break;
     case PROP_ALLOWED_DRIVERS:
-        g_value_set_boxed (value, priv->drivers);
+        g_value_set_boxed (value, self->priv->drivers);
         break;
     case PROP_ALLOWED_VENDOR_IDS:
-        g_value_set_boxed (value, priv->vendor_ids);
+        g_value_set_boxed (value, self->priv->vendor_ids);
         break;
     case PROP_ALLOWED_PRODUCT_IDS:
-        g_value_set_boxed (value, priv->product_ids);
+        g_value_set_boxed (value, self->priv->product_ids);
         break;
     case PROP_ALLOWED_VENDOR_STRINGS:
-        g_value_set_boxed (value, priv->vendor_strings);
+        g_value_set_boxed (value, self->priv->vendor_strings);
         break;
     case PROP_ALLOWED_PRODUCT_STRINGS:
-        g_value_set_boxed (value, priv->product_strings);
+        g_value_set_boxed (value, self->priv->product_strings);
         break;
     case PROP_ALLOWED_AT:
-        g_value_set_boolean (value, priv->at);
+        g_value_set_boolean (value, self->priv->at);
         break;
     case PROP_ALLOWED_SINGLE_AT:
-        g_value_set_boolean (value, priv->single_at);
+        g_value_set_boolean (value, self->priv->single_at);
         break;
     case PROP_ALLOWED_QCDM:
-        g_value_set_boolean (value, priv->qcdm);
+        g_value_set_boolean (value, self->priv->qcdm);
         break;
     case PROP_ALLOWED_UDEV_TAGS:
-        g_value_set_boxed (value, priv->udev_tags);
+        g_value_set_boxed (value, self->priv->udev_tags);
         break;
     case PROP_CUSTOM_INIT:
-        g_value_set_boxed (value, priv->custom_init);
+        g_value_set_boxed (value, self->priv->custom_init);
         break;
     case PROP_SEND_DELAY:
-        g_value_set_uint64 (value, priv->send_delay);
+        g_value_set_uint64 (value, self->priv->send_delay);
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -719,9 +717,9 @@ get_property (GObject *object, guint prop_id,
 static void
 finalize (GObject *object)
 {
-    MMPluginPrivate *priv = MM_PLUGIN_GET_PRIVATE (object);
+    MMPlugin *self = MM_PLUGIN (object);
 
-    g_free (priv->name);
+    g_free (self->priv->name);
 
     G_OBJECT_CLASS (mm_plugin_parent_class)->finalize (object);
 }

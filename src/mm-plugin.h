@@ -61,11 +61,13 @@ typedef enum {
 
 typedef struct _MMPlugin MMPlugin;
 typedef struct _MMPluginClass MMPluginClass;
+typedef struct _MMPluginPrivate MMPluginPrivate;
 
 typedef MMPlugin *(*MMPluginCreateFunc) (void);
 
 struct _MMPlugin {
     GObject parent;
+    MMPluginPrivate *priv;
 };
 
 struct _MMPluginClass {
