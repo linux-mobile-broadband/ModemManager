@@ -72,17 +72,4 @@ MMPlugin *mm_plugin_manager_find_port_support_finish (MMPluginManager *self,
                                                       GAsyncResult *result,
                                                       GError **error);
 
-/* Returns TRUE if there is an ongoing find operation on the given port */
-gboolean mm_plugin_manager_is_finding_port_support (MMPluginManager *self,
-                                                    const gchar *subsys,
-                                                    const gchar *name,
-                                                    const gchar *physdev_path);
-
-/* Returns TRUE if there is an ongoing find operation in a port of the given
- * device (and if so, returns subsystem and name of the port) */
-gboolean mm_plugin_manager_is_finding_device_support (MMPluginManager *self,
-                                                      const gchar *physdev_path,
-                                                      const gchar **subsys,
-                                                      const gchar **name);
-
 #endif /* MM_PLUGIN_MANAGER_H */

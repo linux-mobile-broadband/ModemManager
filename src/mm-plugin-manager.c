@@ -471,56 +471,6 @@ mm_plugin_manager_find_port_support (MMPluginManager *self,
                                   info);
 }
 
-gboolean
-mm_plugin_manager_is_finding_device_support (MMPluginManager *self,
-                                             const gchar *physdev_path,
-                                             const gchar **subsys,
-                                             const gchar **name)
-{
-    SupportsInfoList *list;
-
-    list = g_hash_table_lookup (self->priv->supports,
-                                physdev_path);
-    if (list) {
-        if (subsys)
-            *subsys = ((SupportsInfo *)list->info_list->data)->subsys;
-        if (name)
-            *name = ((SupportsInfo *)list->info_list->data)->name;
-
-        return TRUE;
-    }
-    return FALSE;
-}
-
-gboolean
-mm_plugin_manager_is_finding_port_support (MMPluginManager *self,
-                                           const gchar *subsys,
-                                           const gchar *name,
-                                           const gchar *physdev_path)
-{
-    SupportsInfoList *list;
-
-    list = g_hash_table_lookup (self->priv->supports,
-                                physdev_path);
-    if (list) {
-        GSList *l;
-
-        for (l = list->info_list;
-             l;
-             l = g_slist_next (l)) {
-            SupportsInfo *info = l->data;
-
-            if (g_str_equal (subsys, info->subsys) &&
-                g_str_equal (name, info->name)) {
-                /* Support check task already exists */
-                return TRUE;
-            }
-        }
-    }
-
-    return FALSE;
-}
-
 /*****************************************************************************/
 /* Find device support */
 
