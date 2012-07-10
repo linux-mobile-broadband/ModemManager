@@ -578,26 +578,6 @@ out:
     g_object_unref (async_result);
 }
 
-void
-mm_plugin_supports_port_cancel (MMPlugin *plugin,
-                                const char *subsys,
-                                const char *name)
-{
-    MMPlugin *self = MM_PLUGIN (plugin);
-    MMPluginPrivate *priv = MM_PLUGIN_GET_PRIVATE (self);
-    MMPortProbe *probe;
-    gchar *key;
-
-    key = get_key (subsys, name);
-    probe = g_hash_table_lookup (priv->tasks, key);
-    if (probe) {
-        mm_port_probe_run_cancel (probe);
-        g_hash_table_remove (priv->tasks, key);
-    }
-
-    g_free (key);
-}
-
 /*****************************************************************************/
 
 MMBaseModem *

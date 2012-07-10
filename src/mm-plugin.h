@@ -104,9 +104,6 @@ void                   mm_plugin_supports_port        (MMPlugin *plugin,
 MMPluginSupportsResult mm_plugin_supports_port_finish (MMPlugin *plugin,
                                                        GAsyncResult *result,
                                                        GError **error);
-void                   mm_plugin_supports_port_cancel (MMPlugin *plugin,
-                                                       const char *subsys,
-                                                       const char *name);
 
 MMBaseModem *mm_plugin_create_modem (MMPlugin *plugin,
                                      GObject *device,
