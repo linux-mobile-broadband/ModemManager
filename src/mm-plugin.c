@@ -49,7 +49,6 @@ static gchar *virtual_port[] = {"smd0", NULL};
 
 typedef struct {
     gchar *name;
-    GUdevClient *client;
     GHashTable *tasks;
 
     /* Plugin-specific setups */
@@ -596,10 +595,6 @@ mm_plugin_init (MMPlugin *self)
 {
     MMPluginPrivate *priv = MM_PLUGIN_GET_PRIVATE (self);
 
-    /* We pass NULL as we won't need to get notified about uevents,
-     * we just use this client for sync queries. */
-    priv->client = g_udev_client_new (NULL);
-
     /* Defaults */
     priv->send_delay = 100000;
 }
@@ -727,8 +722,6 @@ finalize (GObject *object)
     MMPluginPrivate *priv = MM_PLUGIN_GET_PRIVATE (object);
 
     g_free (priv->name);
-
-    g_object_unref (priv->client);
 
     G_OBJECT_CLASS (mm_plugin_parent_class)->finalize (object);
 }
