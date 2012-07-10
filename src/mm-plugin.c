@@ -360,18 +360,8 @@ typedef struct {
     GSimpleAsyncResult *result;
     MMPlugin *plugin;
     MMPortProbeFlag flags;
+    MMDevice *device;
 } PortProbeRunContext;
-
-static void
-cancel_at_probing_in_other_probes (const gchar *key,
-                                   MMPortProbe *other,
-                                   MMPortProbe *self)
-{
-    if (self != other &&
-        g_str_equal (mm_port_probe_get_port_physdev (self),
-                     mm_port_probe_get_port_physdev (other)))
-        mm_port_probe_run_cancel_at_probing (other);
-}
 
 static void
 port_probe_run_ready (MMPortProbe *probe,
@@ -402,9 +392,13 @@ port_probe_run_ready (MMPortProbe *probe,
             if (priv->single_at &&
                 ctx->flags & MM_PORT_PROBE_AT &&
                 mm_port_probe_is_at (probe)) {
-                g_hash_table_foreach (priv->tasks,
-                                      (GHFunc) cancel_at_probing_in_other_probes,
-                                      probe);
+                GList *l;
+
+                for (l = mm_device_peek_port_probe_list (ctx->device); l; l = g_list_next (l)) {
+                    if (l->data != probe) {
+                        mm_port_probe_run_cancel_at_probing (MM_PORT_PROBE (l->data));
+                    }
+                }
             }
 
         } else {
@@ -430,6 +424,7 @@ port_probe_run_ready (MMPortProbe *probe,
         g_free (key);
     }
 
+    g_object_unref (ctx->device);
     g_object_unref (ctx->result);
     g_object_unref (ctx->plugin);
     g_free (ctx);
@@ -557,6 +552,7 @@ mm_plugin_supports_port (MMPlugin *self,
     /* Setup async call context */
     ctx = g_new (PortProbeRunContext, 1);
     ctx->plugin = g_object_ref (self);
+    ctx->device = g_object_ref (device);
     ctx->result = g_object_ref (async_result);
     ctx->flags = probe_run_flags;
 
