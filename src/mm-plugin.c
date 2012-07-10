@@ -35,7 +35,6 @@
 #include "mm-qcdm-serial-port.h"
 #include "mm-serial-parsers.h"
 #include "mm-marshal.h"
-#include "mm-utils.h"
 #include "mm-private-boxed-types.h"
 #include "libqcdm/src/commands.h"
 #include "libqcdm/src/utils.h"
@@ -88,104 +87,6 @@ enum {
 };
 
 /*****************************************************************************/
-
-static gboolean
-get_device_ids (MMPlugin *self,
-                const char *subsys,
-                const char *name,
-                guint16 *vendor,
-                guint16 *product)
-{
-    MMPluginPrivate *priv;
-    GUdevDevice *device = NULL, *parent = NULL;
-    const char *vid = NULL, *pid = NULL, *parent_subsys;
-    gboolean success = FALSE;
-
-    g_return_val_if_fail (self != NULL, FALSE);
-    g_return_val_if_fail (MM_IS_PLUGIN (self), FALSE);
-    g_return_val_if_fail (subsys != NULL, FALSE);
-    g_return_val_if_fail (name != NULL, FALSE);
-    if (vendor)
-        g_return_val_if_fail (*vendor == 0, FALSE);
-    if (product)
-        g_return_val_if_fail (*product == 0, FALSE);
-
-    priv = MM_PLUGIN_GET_PRIVATE (self);
-
-    device = g_udev_client_query_by_subsystem_and_name (priv->client, subsys, name);
-    if (!device)
-        goto out;
-
-    parent = g_udev_device_get_parent (device);
-    if (parent) {
-        parent_subsys = g_udev_device_get_subsystem (parent);
-        if (parent_subsys) {
-            if (!strcmp (parent_subsys, "bluetooth")) {
-                /* Bluetooth devices report the VID/PID of the BT adapter here,
-                 * which isn't really what we want.  Just return null IDs instead.
-                 */
-                success = TRUE;
-                goto out;
-            } else if (!strcmp (parent_subsys, "pcmcia")) {
-                /* For PCMCIA devices we need to grab the PCMCIA subsystem's
-                 * manfid and cardid, since any IDs on the tty device itself
-                 * may be from PCMCIA controller or something else.
-                 */
-                vid = g_udev_device_get_sysfs_attr (parent, "manf_id");
-                pid = g_udev_device_get_sysfs_attr (parent, "card_id");
-                if (!vid || !pid)
-                    goto out;
-            } else if (!strcmp (parent_subsys, "platform")) {
-                /* Platform devices don't usually have a VID/PID */
-                success = TRUE;
-                goto out;
-            }
-        }
-    }
-
-    if (!vid)
-        vid = g_udev_device_get_property (device, "ID_VENDOR_ID");
-    if (!vid)
-        goto out;
-
-    if (strncmp (vid, "0x", 2) == 0)
-        vid += 2;
-    if (strlen (vid) != 4)
-        goto out;
-
-    if (vendor) {
-        *vendor = (guint16) (utils_hex2byte (vid + 2) & 0xFF);
-        *vendor |= (guint16) ((utils_hex2byte (vid) & 0xFF) << 8);
-    }
-
-    if (!pid)
-        pid = g_udev_device_get_property (device, "ID_MODEL_ID");
-    if (!pid) {
-        *vendor = 0;
-        goto out;
-    }
-
-    if (strncmp (pid, "0x", 2) == 0)
-        pid += 2;
-    if (strlen (pid) != 4) {
-        *vendor = 0;
-        goto out;
-    }
-
-    if (product) {
-        *product = (guint16) (utils_hex2byte (pid + 2) & 0xFF);
-        *product |= (guint16) ((utils_hex2byte (pid) & 0xFF) << 8);
-    }
-
-    success = TRUE;
-
-out:
-    if (device)
-        g_object_unref (device);
-    if (parent)
-        g_object_unref (parent);
-    return success;
-}
 
 static char *
 get_key (const char *subsys, const char *name)
@@ -249,16 +150,11 @@ apply_pre_probing_filters (MMPlugin *self,
                            gboolean *need_product_probing)
 {
     MMPluginPrivate *priv = MM_PLUGIN_GET_PRIVATE (self);
-    guint16 vendor = 0;
-    guint16 product = 0;
+    guint16 vendor;
+    guint16 product;
     gboolean product_filtered = FALSE;
     gboolean vendor_filtered = FALSE;
     guint i;
-    const gchar *subsys;
-    const gchar *name;
-
-    subsys = g_udev_device_get_subsystem (port);
-    name = g_udev_device_get_name (port);
 
     *need_vendor_probing = FALSE;
     *need_product_probing = FALSE;
@@ -266,6 +162,9 @@ apply_pre_probing_filters (MMPlugin *self,
     /* The plugin may specify that only some subsystems are supported. If that
      * is the case, filter by subsystem */
     if (priv->subsystems) {
+        const gchar *subsys;
+
+        subsys = g_udev_device_get_subsystem (port);
         for (i = 0; priv->subsystems[i]; i++) {
             if (g_str_equal (subsys, priv->subsystems[i]))
                 break;
@@ -282,7 +181,7 @@ apply_pre_probing_filters (MMPlugin *self,
         const gchar *driver;
 
         /* Detect any modems accessible through the list of virtual ports */
-        driver = (is_virtual_port (name) ?
+        driver = (is_virtual_port (g_udev_device_get_name (port)) ?
                   "virtual" :
                   mm_device_get_driver (device));
 
@@ -300,7 +199,8 @@ apply_pre_probing_filters (MMPlugin *self,
             return TRUE;
     }
 
-    get_device_ids (self, subsys, name, &vendor, &product);
+    vendor = mm_device_get_vendor (device);
+    product = mm_device_get_product (device);
 
     /* The plugin may specify that only some vendor IDs are supported. If that
      * is the case, filter by vendor ID. */
@@ -714,29 +614,16 @@ mm_plugin_create_modem (MMPlugin  *self,
     MMDevice *device = MM_DEVICE (device_o);
     MMPluginPrivate *priv = MM_PLUGIN_GET_PRIVATE (self);
     MMBaseModem *modem = NULL;
-    const gchar *name, *subsys;
-    guint16 vendor = 0, product = 0;
     GList *port_probes, *l;
 
-    /* Get info from the first probe in the list */
     port_probes = mm_device_peek_port_probe_list (device);
-    subsys = mm_port_probe_get_port_subsys (port_probes->data);
-    name = mm_port_probe_get_port_name (port_probes->data);
-
-    /* Vendor and Product IDs are really optional, we'll just warn if they
-     * cannot get loaded.
-     *
-     * TODO: load them in MMDevice once
-     **/
-    if (!get_device_ids (MM_PLUGIN (self), subsys, name, &vendor, &product))
-        mm_warn ("Could not get modem vendor/product ID");
 
     /* Let the plugin create the modem from the port probe results */
     modem = MM_PLUGIN_GET_CLASS (self)->create_modem (MM_PLUGIN (self),
                                                       mm_device_get_path (device),
                                                       mm_device_get_driver (device),
-                                                      vendor,
-                                                      product,
+                                                      mm_device_get_vendor (device),
+                                                      mm_device_get_product (device),
                                                       port_probes,
                                                       error);
     if (modem) {

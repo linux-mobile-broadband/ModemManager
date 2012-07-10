@@ -23,7 +23,7 @@
 #include <mm-errors-types.h>
 
 #include "mm-device.h"
-
+#include "mm-utils.h"
 #include "mm-log.h"
 
 G_DEFINE_TYPE (MMDevice, mm_device, G_TYPE_OBJECT);
@@ -49,6 +49,8 @@ struct _MMDevicePrivate {
     /* Parent UDev device */
     GUdevDevice *udev_device;
     gchar *udev_device_path;
+    guint16 vendor;
+    guint16 product;
 
     /* Kernel driver managing this device */
     gchar *driver;
@@ -92,6 +94,84 @@ mm_device_owns_port (MMDevice    *self,
     return !!device_find_probe_with_device (self, udev_port);
 }
 
+static gboolean
+get_device_ids (GUdevDevice *device,
+                guint16     *vendor,
+                guint16     *product)
+{
+    GUdevDevice *parent = NULL;
+    const gchar *vid = NULL, *pid = NULL, *parent_subsys;
+    gboolean success = FALSE;
+
+    parent = g_udev_device_get_parent (device);
+    if (parent) {
+        parent_subsys = g_udev_device_get_subsystem (parent);
+        if (parent_subsys) {
+            if (g_str_equal (parent_subsys, "bluetooth")) {
+                /* Bluetooth devices report the VID/PID of the BT adapter here,
+                 * which isn't really what we want.  Just return null IDs instead.
+                 */
+                success = TRUE;
+                goto out;
+            } else if (g_str_equal (parent_subsys, "pcmcia")) {
+                /* For PCMCIA devices we need to grab the PCMCIA subsystem's
+                 * manfid and cardid, since any IDs on the tty device itself
+                 * may be from PCMCIA controller or something else.
+                 */
+                vid = g_udev_device_get_sysfs_attr (parent, "manf_id");
+                pid = g_udev_device_get_sysfs_attr (parent, "card_id");
+                if (!vid || !pid)
+                    goto out;
+            } else if (g_str_equal (parent_subsys, "platform")) {
+                /* Platform devices don't usually have a VID/PID */
+                success = TRUE;
+                goto out;
+            }
+        }
+    }
+
+    if (!vid)
+        vid = g_udev_device_get_property (device, "ID_VENDOR_ID");
+    if (!vid)
+        goto out;
+
+    if (strncmp (vid, "0x", 2) == 0)
+        vid += 2;
+    if (strlen (vid) != 4)
+        goto out;
+
+    if (vendor) {
+        *vendor = (guint16) (utils_hex2byte (vid + 2) & 0xFF);
+        *vendor |= (guint16) ((utils_hex2byte (vid) & 0xFF) << 8);
+    }
+
+    if (!pid)
+        pid = g_udev_device_get_property (device, "ID_MODEL_ID");
+    if (!pid) {
+        *vendor = 0;
+        goto out;
+    }
+
+    if (strncmp (pid, "0x", 2) == 0)
+        pid += 2;
+    if (strlen (pid) != 4) {
+        *vendor = 0;
+        goto out;
+    }
+
+    if (product) {
+        *product = (guint16) (utils_hex2byte (pid + 2) & 0xFF);
+        *product |= (guint16) ((utils_hex2byte (pid) & 0xFF) << 8);
+    }
+
+    success = TRUE;
+
+out:
+    if (parent)
+        g_object_unref (parent);
+    return success;
+}
+
 static gchar *
 get_driver_name (GUdevDevice *device)
 {
@@ -132,9 +212,17 @@ mm_device_grab_port (MMDevice    *self,
     if (mm_device_owns_port (self, udev_port))
         return;
 
-    /* Get the driver name out of the first port grabbed */
-    if (!self->priv->port_probes)
+    /* Get the driver name and vendor/product IDs out of the first port
+     * grabbed */
+    if (!self->priv->port_probes) {
         self->priv->driver = get_driver_name (udev_port);
+        if (!get_device_ids (udev_port,
+                             &self->priv->vendor,
+                             &self->priv->product)) {
+            mm_dbg ("(%s) could not get vendor/product ID",
+                    self->priv->udev_device_path);
+        }
+    }
 
     /* Create and store new port probe */
     probe = mm_port_probe_new (udev_port,
@@ -320,6 +408,18 @@ const gchar *
 mm_device_get_driver (MMDevice *self)
 {
     return self->priv->driver;
+}
+
+guint16
+mm_device_get_vendor (MMDevice *self)
+{
+    return self->priv->vendor;
+}
+
+guint16
+mm_device_get_product (MMDevice *self)
+{
+    return self->priv->product;
 }
 
 GUdevDevice *

@@ -74,6 +74,8 @@ void     mm_device_remove_modem (MMDevice  *self);
 
 const gchar *mm_device_get_path         (MMDevice *self);
 const gchar *mm_device_get_driver       (MMDevice *self);
+guint16      mm_device_get_vendor       (MMDevice *self);
+guint16      mm_device_get_product      (MMDevice *self);
 GUdevDevice *mm_device_peek_udev_device (MMDevice *self);
 GUdevDevice *mm_device_get_udev_device  (MMDevice *self);
 void         mm_device_set_plugin       (MMDevice *self,
