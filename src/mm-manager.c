@@ -173,8 +173,8 @@ find_port_support_ready_cb (MMPluginManager *plugin_manager,
         if (!device) {
             /* Create a generic device to track the available ports, and add it to the
              * manager. */
-            device = mm_device_new (ctx->physical_device,
-                                    best_plugin);
+            device = mm_device_new (ctx->physical_device);
+            mm_device_set_plugin (device, best_plugin);
             g_hash_table_insert (ctx->manager->priv->devices,
                                  g_strdup (g_udev_device_get_sysfs_path (mm_device_peek_udev_device (device))),
                                  device);

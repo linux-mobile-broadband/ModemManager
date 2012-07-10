@@ -262,6 +262,15 @@ mm_device_get_udev_device (MMDevice *self)
     return G_UDEV_DEVICE (g_object_ref (self->priv->udev_device));
 }
 
+void
+mm_device_set_plugin (MMDevice *self,
+                      MMPlugin *plugin)
+{
+    g_object_set (self,
+                  MM_DEVICE_PLUGIN, plugin,
+                  NULL);
+}
+
 MMPlugin *
 mm_device_peek_plugin (MMDevice *self)
 {
@@ -271,7 +280,9 @@ mm_device_peek_plugin (MMDevice *self)
 MMPlugin *
 mm_device_get_plugin (MMDevice *self)
 {
-    return MM_PLUGIN (g_object_ref (self->priv->plugin));
+    return (self->priv->plugin ?
+            MM_PLUGIN (g_object_ref (self->priv->plugin)) :
+            NULL);
 }
 
 MMBaseModem *
@@ -293,12 +304,10 @@ mm_device_get_modem (MMDevice *self)
 /*****************************************************************************/
 
 MMDevice *
-mm_device_new (GUdevDevice *udev_device,
-               MMPlugin *plugin)
+mm_device_new (GUdevDevice *udev_device)
 {
     return MM_DEVICE (g_object_new (MM_TYPE_DEVICE,
                                     MM_DEVICE_UDEV_DEVICE, udev_device,
-                                    MM_DEVICE_PLUGIN,      plugin,
                                     NULL));
 }
 
@@ -325,7 +334,7 @@ set_property (GObject *object,
         self->priv->udev_device = g_value_dup_object (value);
         break;
     case PROP_PLUGIN:
-        /* construct only */
+        g_clear_object (&(self->priv->plugin));
         self->priv->plugin = g_value_dup_object (value);
         break;
     case PROP_MODEM:
@@ -400,7 +409,7 @@ mm_device_class_init (MMDeviceClass *klass)
                              "Plugin",
                              "Best plugin to manage this device",
                              MM_TYPE_PLUGIN,
-                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+                             G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_PLUGIN, properties[PROP_PLUGIN]);
 
     properties[PROP_MODEM] =

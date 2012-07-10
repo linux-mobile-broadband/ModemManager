@@ -49,8 +49,7 @@ struct _MMDeviceClass {
 
 GType mm_device_get_type (void);
 
-MMDevice *mm_device_new (GUdevDevice *udev_device,
-                         MMPlugin *plugin);
+MMDevice *mm_device_new (GUdevDevice *udev_device);
 
 void     mm_device_grab_port    (MMDevice    *self,
                                  GUdevDevice *udev_port);
@@ -66,6 +65,8 @@ void     mm_device_remove_modem (MMDevice  *self);
 
 GUdevDevice *mm_device_peek_udev_device (MMDevice *self);
 GUdevDevice *mm_device_get_udev_device  (MMDevice *self);
+void         mm_device_set_plugin       (MMDevice *self,
+                                         MMPlugin *plugin);
 MMPlugin    *mm_device_peek_plugin      (MMDevice *self);
 MMPlugin    *mm_device_get_plugin       (MMDevice *self);
 MMBaseModem *mm_device_peek_modem       (MMDevice *self);
