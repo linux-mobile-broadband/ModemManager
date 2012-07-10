@@ -893,10 +893,9 @@ mm_port_probe_is_at (MMPortProbe *self)
     if (g_str_equal (self->priv->subsys, "net"))
         return FALSE;
 
-    /* Warn if it wasn't probed */
-    g_return_val_if_fail (self->priv->flags & MM_PORT_PROBE_AT, FALSE);
-
-    return self->priv->is_at;
+    return (self->priv->flags & MM_PORT_PROBE_AT ?
+            self->priv->is_at :
+            FALSE);
 }
 
 gboolean
@@ -905,7 +904,9 @@ mm_port_probe_list_has_at_port (GList *list)
     GList *l;
 
     for (l = list; l; l = g_list_next (l)){
-        if (mm_port_probe_is_at (MM_PORT_PROBE (l->data)))
+        MMPortProbe *probe = MM_PORT_PROBE (l->data);
+        if (probe->priv->flags & MM_PORT_PROBE_AT &&
+            probe->priv->is_at)
             return TRUE;
     }
 
@@ -920,10 +921,9 @@ mm_port_probe_is_qcdm (MMPortProbe *self)
     if (g_str_equal (self->priv->subsys, "net"))
         return FALSE;
 
-    /* Warn if it wasn't probed */
-    g_return_val_if_fail (self->priv->flags & MM_PORT_PROBE_QCDM, FALSE);
-
-    return self->priv->is_qcdm;
+    return (self->priv->flags & MM_PORT_PROBE_QCDM ?
+            self->priv->is_qcdm :
+            FALSE);
 }
 
 MMPortType
@@ -961,10 +961,9 @@ mm_port_probe_get_vendor (MMPortProbe *self)
     if (g_str_equal (self->priv->subsys, "net"))
         return NULL;
 
-    /* Warn if it wasn't probed */
-    g_return_val_if_fail (self->priv->flags & MM_PORT_PROBE_AT_VENDOR, NULL);
-
-    return self->priv->vendor;
+    return (self->priv->flags & MM_PORT_PROBE_AT_VENDOR ?
+            self->priv->vendor :
+            NULL);
 }
 
 const gchar *
@@ -975,10 +974,9 @@ mm_port_probe_get_product (MMPortProbe *self)
     if (g_str_equal (self->priv->subsys, "net"))
         return NULL;
 
-    /* Warn if it wasn't probed */
-    g_return_val_if_fail (self->priv->flags & MM_PORT_PROBE_AT_PRODUCT, NULL);
-
-    return self->priv->product;
+    return (self->priv->flags & MM_PORT_PROBE_AT_PRODUCT ?
+            self->priv->product :
+            NULL);
 }
 
 const gchar *
