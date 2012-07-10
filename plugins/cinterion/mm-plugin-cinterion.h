@@ -23,7 +23,7 @@
 #ifndef MM_PLUGIN_CINTERION_H
 #define MM_PLUGIN_CINTERION_H
 
-#include "mm-plugin-base.h"
+#include "mm-plugin.h"
 
 #define MM_TYPE_PLUGIN_CINTERION            (mm_plugin_cinterion_get_type ())
 #define MM_PLUGIN_CINTERION(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_CINTERION, MMPluginCinterion))
@@ -33,11 +33,11 @@
 #define MM_PLUGIN_CINTERION_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PLUGIN_CINTERION, MMPluginCinterionClass))
 
 typedef struct {
-    MMPluginBase parent;
+    MMPlugin parent;
 } MMPluginCinterion;
 
 typedef struct {
-    MMPluginBaseClass parent;
+    MMPluginClass parent;
 } MMPluginCinterionClass;
 
 GType mm_plugin_cinterion_get_type (void);

@@ -25,7 +25,7 @@
 #include "mm-broadband-modem-hso.h"
 #include "mm-log.h"
 
-G_DEFINE_TYPE (MMPluginHso, mm_plugin_hso, MM_TYPE_PLUGIN_BASE)
+G_DEFINE_TYPE (MMPluginHso, mm_plugin_hso, MM_TYPE_PLUGIN)
 
 int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
 int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
@@ -33,7 +33,7 @@ int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 /*****************************************************************************/
 
 static MMBaseModem *
-create_modem (MMPluginBase *plugin,
+create_modem (MMPlugin *self,
               const gchar *sysfs_path,
               const gchar *driver,
               guint16 vendor,
@@ -43,13 +43,13 @@ create_modem (MMPluginBase *plugin,
 {
     return MM_BASE_MODEM (mm_broadband_modem_hso_new (sysfs_path,
                                                       driver,
-                                                      mm_plugin_get_name (MM_PLUGIN (plugin)),
+                                                      mm_plugin_get_name (self),
                                                       vendor,
                                                       product));
 }
 
 static gboolean
-grab_port (MMPluginBase *base,
+grab_port (MMPlugin *self,
            MMBaseModem *modem,
            MMPortProbe *probe,
            GError **error)
@@ -134,11 +134,11 @@ mm_plugin_create (void)
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_HSO,
-                      MM_PLUGIN_BASE_NAME, "Option High-Speed",
-                      MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS, subsystems,
-                      MM_PLUGIN_BASE_ALLOWED_DRIVERS, drivers,
-                      MM_PLUGIN_BASE_ALLOWED_AT, TRUE,
-                      MM_PLUGIN_BASE_ALLOWED_QCDM, TRUE,
+                      MM_PLUGIN_NAME,               "Option High-Speed",
+                      MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
+                      MM_PLUGIN_ALLOWED_DRIVERS,    drivers,
+                      MM_PLUGIN_ALLOWED_AT,         TRUE,
+                      MM_PLUGIN_ALLOWED_QCDM,       TRUE,
                       NULL));
 }
 
@@ -150,8 +150,8 @@ mm_plugin_hso_init (MMPluginHso *self)
 static void
 mm_plugin_hso_class_init (MMPluginHsoClass *klass)
 {
-    MMPluginBaseClass *pb_class = MM_PLUGIN_BASE_CLASS (klass);
+    MMPluginClass *plugin_class = MM_PLUGIN_CLASS (klass);
 
-    pb_class->create_modem = create_modem;
-    pb_class->grab_port = grab_port;
+    plugin_class->create_modem = create_modem;
+    plugin_class->grab_port = grab_port;
 }

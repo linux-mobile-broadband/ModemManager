@@ -24,7 +24,7 @@
 #include "mm-plugin-option.h"
 #include "mm-broadband-modem-option.h"
 
-G_DEFINE_TYPE (MMPluginOption, mm_plugin_option, MM_TYPE_PLUGIN_BASE)
+G_DEFINE_TYPE (MMPluginOption, mm_plugin_option, MM_TYPE_PLUGIN)
 
 int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
 int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
@@ -32,7 +32,7 @@ int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 /*****************************************************************************/
 
 static MMBaseModem *
-create_modem (MMPluginBase *plugin,
+create_modem (MMPlugin *self,
               const gchar *sysfs_path,
               const gchar *driver,
               guint16 vendor,
@@ -42,13 +42,13 @@ create_modem (MMPluginBase *plugin,
 {
     return MM_BASE_MODEM (mm_broadband_modem_option_new (sysfs_path,
                                                          driver,
-                                                         mm_plugin_get_name (MM_PLUGIN (plugin)),
+                                                         mm_plugin_get_name (self),
                                                          vendor,
                                                          product));
 }
 
 static gboolean
-grab_port (MMPluginBase *base,
+grab_port (MMPlugin *self,
            MMBaseModem *modem,
            MMPortProbe *probe,
            GError **error)
@@ -98,12 +98,12 @@ mm_plugin_create (void)
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_OPTION,
-                      MM_PLUGIN_BASE_NAME, "Option",
-                      MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS, subsystems,
-                      MM_PLUGIN_BASE_ALLOWED_DRIVERS, drivers,
-                      MM_PLUGIN_BASE_ALLOWED_VENDOR_IDS, vendor_ids,
-                      MM_PLUGIN_BASE_ALLOWED_PRODUCT_IDS, product_ids,
-                      MM_PLUGIN_BASE_ALLOWED_AT, TRUE,
+                      MM_PLUGIN_NAME,                "Option",
+                      MM_PLUGIN_ALLOWED_SUBSYSTEMS,  subsystems,
+                      MM_PLUGIN_ALLOWED_DRIVERS,     drivers,
+                      MM_PLUGIN_ALLOWED_VENDOR_IDS,  vendor_ids,
+                      MM_PLUGIN_ALLOWED_PRODUCT_IDS, product_ids,
+                      MM_PLUGIN_ALLOWED_AT,          TRUE,
                       NULL));
 }
 
@@ -115,8 +115,8 @@ mm_plugin_option_init (MMPluginOption *self)
 static void
 mm_plugin_option_class_init (MMPluginOptionClass *klass)
 {
-    MMPluginBaseClass *pb_class = MM_PLUGIN_BASE_CLASS (klass);
+    MMPluginClass *plugin_class = MM_PLUGIN_CLASS (klass);
 
-    pb_class->create_modem = create_modem;
-    pb_class->grab_port = grab_port;
+    plugin_class->create_modem = create_modem;
+    plugin_class->grab_port = grab_port;
 }

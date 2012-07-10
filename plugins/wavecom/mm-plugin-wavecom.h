@@ -25,7 +25,7 @@
 #ifndef MM_PLUGIN_WAVECOM_H
 #define MM_PLUGIN_WAVECOM_H
 
-#include "mm-plugin-base.h"
+#include "mm-plugin.h"
 
 #define MM_TYPE_PLUGIN_WAVECOM            (mm_plugin_wavecom_get_type ())
 #define MM_PLUGIN_WAVECOM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_WAVECOM, MMPluginWavecom))
@@ -35,11 +35,11 @@
 #define MM_PLUGIN_WAVECOM_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PLUGIN_WAVECOM, MMPluginWavecomClass))
 
 typedef struct {
-    MMPluginBase parent;
+    MMPlugin parent;
 } MMPluginWavecom;
 
 typedef struct {
-    MMPluginBaseClass parent;
+    MMPluginClass parent;
 } MMPluginWavecomClass;
 
 GType mm_plugin_wavecom_get_type (void);

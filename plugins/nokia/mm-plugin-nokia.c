@@ -24,7 +24,7 @@
 #include "mm-plugin-nokia.h"
 #include "mm-broadband-modem-nokia.h"
 
-G_DEFINE_TYPE (MMPluginNokia, mm_plugin_nokia, MM_TYPE_PLUGIN_BASE)
+G_DEFINE_TYPE (MMPluginNokia, mm_plugin_nokia, MM_TYPE_PLUGIN)
 
 int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
 int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
@@ -42,7 +42,7 @@ static const MMPortProbeAtCommand custom_init[] = {
 /*****************************************************************************/
 
 static MMBaseModem *
-create_modem (MMPluginBase *plugin,
+create_modem (MMPlugin *self,
               const gchar *sysfs_path,
               const gchar *driver,
               guint16 vendor,
@@ -52,13 +52,13 @@ create_modem (MMPluginBase *plugin,
 {
     return MM_BASE_MODEM (mm_broadband_modem_nokia_new (sysfs_path,
                                                         driver,
-                                                        mm_plugin_get_name (MM_PLUGIN (plugin)),
+                                                        mm_plugin_get_name (self),
                                                         vendor,
                                                         product));
 }
 
 static gboolean
-grab_port (MMPluginBase *base,
+grab_port (MMPlugin *self,
            MMBaseModem *modem,
            MMPortProbe *probe,
            GError **error)
@@ -101,11 +101,11 @@ mm_plugin_create (void)
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_NOKIA,
-                      MM_PLUGIN_BASE_NAME, "Nokia",
-                      MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS, subsystems,
-                      MM_PLUGIN_BASE_ALLOWED_VENDOR_IDS, vendor_ids,
-                      MM_PLUGIN_BASE_CUSTOM_INIT, custom_init,
-                      MM_PLUGIN_BASE_ALLOWED_SINGLE_AT, TRUE, /* only 1 AT port expected! */
+                      MM_PLUGIN_NAME,               "Nokia",
+                      MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
+                      MM_PLUGIN_ALLOWED_VENDOR_IDS, vendor_ids,
+                      MM_PLUGIN_CUSTOM_INIT,        custom_init,
+                      MM_PLUGIN_ALLOWED_SINGLE_AT,  TRUE, /* only 1 AT port expected! */
                       NULL));
 }
 
@@ -117,8 +117,8 @@ mm_plugin_nokia_init (MMPluginNokia *self)
 static void
 mm_plugin_nokia_class_init (MMPluginNokiaClass *klass)
 {
-    MMPluginBaseClass *pb_class = MM_PLUGIN_BASE_CLASS (klass);
+    MMPluginClass *plugin_class = MM_PLUGIN_CLASS (klass);
 
-    pb_class->create_modem = create_modem;
-    pb_class->grab_port = grab_port;
+    plugin_class->create_modem = create_modem;
+    plugin_class->grab_port = grab_port;
 }

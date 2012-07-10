@@ -18,7 +18,7 @@
 #ifndef MM_PLUGIN_MOTOROLA_H
 #define MM_PLUGIN_MOTOROLA_H
 
-#include "mm-plugin-base.h"
+#include "mm-plugin.h"
 
 #define MM_TYPE_PLUGIN_MOTOROLA            (mm_plugin_motorola_get_type ())
 #define MM_PLUGIN_MOTOROLA(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_MOTOROLA, MMPluginMotorola))
@@ -28,11 +28,11 @@
 #define MM_PLUGIN_MOTOROLA_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PLUGIN_MOTOROLA, MMPluginMotorolaClass))
 
 typedef struct {
-    MMPluginBase parent;
+    MMPlugin parent;
 } MMPluginMotorola;
 
 typedef struct {
-    MMPluginBaseClass parent;
+    MMPluginClass parent;
 } MMPluginMotorolaClass;
 
 GType mm_plugin_motorola_get_type (void);

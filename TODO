@@ -91,10 +91,6 @@ example to update the signal quality value or check registration status.
      - MMModem (instead of MMBaseModem), MMModemBroadband, MMModemPots
      - MMBearer, MMBearerBroadband, MMBearerPots
 
-  ** MMPlugin: do we really need a separate interface for the plugin? Why not
-     just assume that all plugins need to provide objects subclassing
-     MMPluginBase?
-
   ** Test cases for CIEV responses.
 
   ** When a modem gets initialized for the first time it goes into DISABLED, but

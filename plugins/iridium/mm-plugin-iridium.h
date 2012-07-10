@@ -23,7 +23,7 @@
 #ifndef MM_PLUGIN_IRIDIUM_H
 #define MM_PLUGIN_IRIDIUM_H
 
-#include "mm-plugin-base.h"
+#include "mm-plugin.h"
 
 #define MM_TYPE_PLUGIN_IRIDIUM            (mm_plugin_iridium_get_type ())
 #define MM_PLUGIN_IRIDIUM(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_IRIDIUM, MMPluginIridium))
@@ -33,11 +33,11 @@
 #define MM_PLUGIN_IRIDIUM_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PLUGIN_IRIDIUM, MMPluginIridiumClass))
 
 typedef struct {
-    MMPluginBase parent;
+    MMPlugin parent;
 } MMPluginIridium;
 
 typedef struct {
-    MMPluginBaseClass parent;
+    MMPluginClass parent;
 } MMPluginIridiumClass;
 
 GType mm_plugin_iridium_get_type (void);

@@ -197,9 +197,7 @@ ModemManager_SOURCES = \
 	mm-port-probe-cache.h \
 	mm-port-probe-cache.c \
 	mm-plugin.c \
-	mm-plugin.h \
-	mm-plugin-base.c \
-	mm-plugin-base.h
+	mm-plugin.h
 
 # Additional dependency rules
 mm-bearer.c: mm-daemon-enums-types.h

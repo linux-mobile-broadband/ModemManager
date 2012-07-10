@@ -17,7 +17,6 @@
 #define MM_PLUGIN_GENERIC_H
 
 #include "mm-plugin.h"
-#include "mm-plugin-base.h"
 
 #define MM_TYPE_PLUGIN_GENERIC            (mm_plugin_generic_get_type ())
 #define MM_PLUGIN_GENERIC(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_GENERIC, MMPluginGeneric))
@@ -27,11 +26,11 @@
 #define MM_PLUGIN_GENERIC_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PLUGIN_GENERIC, MMPluginGenericClass))
 
 typedef struct {
-    MMPluginBase parent;
+    MMPlugin parent;
 } MMPluginGeneric;
 
 typedef struct {
-    MMPluginBaseClass parent;
+    MMPluginClass parent;
 } MMPluginGenericClass;
 
 GType mm_plugin_generic_get_type (void);

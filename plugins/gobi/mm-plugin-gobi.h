@@ -17,7 +17,7 @@
 #ifndef MM_PLUGIN_GOBI_H
 #define MM_PLUGIN_GOBI_H
 
-#include "mm-plugin-base.h"
+#include "mm-plugin.h"
 
 #define MM_TYPE_PLUGIN_GOBI            (mm_plugin_gobi_get_type ())
 #define MM_PLUGIN_GOBI(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_GOBI, MMPluginGobi))
@@ -27,11 +27,11 @@
 #define MM_PLUGIN_GOBI_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PLUGIN_GOBI, MMPluginGobiClass))
 
 typedef struct {
-    MMPluginBase parent;
+    MMPlugin parent;
 } MMPluginGobi;
 
 typedef struct {
-    MMPluginBaseClass parent;
+    MMPluginClass parent;
 } MMPluginGobiClass;
 
 GType mm_plugin_gobi_get_type (void);
@@ -39,4 +39,3 @@ GType mm_plugin_gobi_get_type (void);
 G_MODULE_EXPORT MMPlugin *mm_plugin_create (void);
 
 #endif /* MM_PLUGIN_GOBI_H */
-

@@ -30,13 +30,13 @@
 #include "mm-private-boxed-types.h"
 #include "mm-log.h"
 
-G_DEFINE_TYPE (MMPluginIridium, mm_plugin_iridium, MM_TYPE_PLUGIN_BASE)
+G_DEFINE_TYPE (MMPluginIridium, mm_plugin_iridium, MM_TYPE_PLUGIN)
 
 int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
 int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 
 static MMBaseModem *
-create_modem (MMPluginBase *plugin,
+create_modem (MMPlugin *self,
               const gchar *sysfs_path,
               const gchar *driver,
               guint16 vendor,
@@ -46,13 +46,13 @@ create_modem (MMPluginBase *plugin,
 {
     return MM_BASE_MODEM (mm_broadband_modem_iridium_new (sysfs_path,
                                                           driver,
-                                                          mm_plugin_get_name (MM_PLUGIN (plugin)),
+                                                          mm_plugin_get_name (self),
                                                           vendor,
                                                           product));
 }
 
 static gboolean
-grab_port (MMPluginBase *base,
+grab_port (MMPlugin *self,
            MMBaseModem *modem,
            MMPortProbe *probe,
            GError **error)
@@ -88,12 +88,12 @@ mm_plugin_create (void)
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_IRIDIUM,
-                      MM_PLUGIN_BASE_NAME, "Iridium",
-                      MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS, subsystems,
-                      MM_PLUGIN_BASE_ALLOWED_VENDOR_STRINGS, vendor_strings,
-                      MM_PLUGIN_BASE_ALLOWED_PRODUCT_STRINGS, product_strings,
-                      MM_PLUGIN_BASE_ALLOWED_VENDOR_IDS, vendor_ids,
-                      MM_PLUGIN_BASE_ALLOWED_AT, TRUE,
+                      MM_PLUGIN_NAME,                    "Iridium",
+                      MM_PLUGIN_ALLOWED_SUBSYSTEMS,      subsystems,
+                      MM_PLUGIN_ALLOWED_VENDOR_STRINGS,  vendor_strings,
+                      MM_PLUGIN_ALLOWED_PRODUCT_STRINGS, product_strings,
+                      MM_PLUGIN_ALLOWED_VENDOR_IDS,      vendor_ids,
+                      MM_PLUGIN_ALLOWED_AT,              TRUE,
                       NULL));
 }
 
@@ -105,8 +105,8 @@ mm_plugin_iridium_init (MMPluginIridium *self)
 static void
 mm_plugin_iridium_class_init (MMPluginIridiumClass *klass)
 {
-    MMPluginBaseClass *pb_class = MM_PLUGIN_BASE_CLASS (klass);
+    MMPluginClass *plugin_class = MM_PLUGIN_CLASS (klass);
 
-    pb_class->create_modem = create_modem;
-    pb_class->grab_port = grab_port;
+    plugin_class->create_modem = create_modem;
+    plugin_class->grab_port = grab_port;
 }

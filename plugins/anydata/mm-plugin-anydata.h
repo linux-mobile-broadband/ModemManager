@@ -19,7 +19,7 @@
 #ifndef MM_PLUGIN_ANYDATA_H
 #define MM_PLUGIN_ANYDATA_H
 
-#include "mm-plugin-base.h"
+#include "mm-plugin.h"
 
 #define MM_TYPE_PLUGIN_ANYDATA            (mm_plugin_anydata_get_type ())
 #define MM_PLUGIN_ANYDATA(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_ANYDATA, MMPluginAnydata))
@@ -29,11 +29,11 @@
 #define MM_PLUGIN_ANYDATA_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PLUGIN_ANYDATA, MMPluginAnydataClass))
 
 typedef struct {
-    MMPluginBase parent;
+    MMPlugin parent;
 } MMPluginAnydata;
 
 typedef struct {
-    MMPluginBaseClass parent;
+    MMPluginClass parent;
 } MMPluginAnydataClass;
 
 GType mm_plugin_anydata_get_type (void);

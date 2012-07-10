@@ -18,7 +18,7 @@
 #ifndef MM_PLUGIN_HSO_H
 #define MM_PLUGIN_HSO_H
 
-#include "mm-plugin-base.h"
+#include "mm-plugin.h"
 
 #define MM_TYPE_PLUGIN_HSO            (mm_plugin_hso_get_type ())
 #define MM_PLUGIN_HSO(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_HSO, MMPluginHso))
@@ -28,11 +28,11 @@
 #define MM_PLUGIN_HSO_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PLUGIN_HSO, MMPluginHsoClass))
 
 typedef struct {
-    MMPluginBase parent;
+    MMPlugin parent;
 } MMPluginHso;
 
 typedef struct {
-    MMPluginBaseClass parent;
+    MMPluginClass parent;
 } MMPluginHsoClass;
 
 GType mm_plugin_hso_get_type (void);

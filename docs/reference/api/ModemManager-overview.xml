@@ -99,8 +99,8 @@
               launched as requested by the given plugin.
             </para>
             <para>
-              This filter is specified by the <type>MM_PLUGIN_BASE_ALLOWED_VENDOR_IDS</type>
-              property in the <structname>MMPluginBase</structname> object provided
+              This filter is specified by the <type>MM_PLUGIN_ALLOWED_VENDOR_IDS</type>
+              property in the <structname>MMPlugin</structname> object provided
               by the plugin.
             </para>
           </listitem>
@@ -118,8 +118,8 @@
               expected to work only with a given specific product of a given vendor.
             </para>
             <para>
-              This filter is specified by the <type>MM_PLUGIN_BASE_ALLOWED_PRODUCT_IDS</type>
-              property in the <structname>MMPluginBase</structname> object provided
+              This filter is specified by the <type>MM_PLUGIN_ALLOWED_PRODUCT_IDS</type>
+              property in the <structname>MMPlugin</structname> object provided
               by the plugin.
             </para>
           </listitem>
@@ -130,8 +130,8 @@
               any port detected with a subsystem not listed by the plugin.
             </para>
             <para>
-              This filter is specified by the <type>MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS</type>
-              property in the <structname>MMPluginBase</structname> object provided
+              This filter is specified by the <type>MM_PLUGIN_ALLOWED_SUBSYSTEMS</type>
+              property in the <structname>MMPlugin</structname> object provided
               by the plugin.
             </para>
           </listitem>
@@ -142,8 +142,8 @@
               any port detected being managed by a driver not listed by the plugin.
             </para>
             <para>
-              This filter is specified by the <type>MM_PLUGIN_BASE_ALLOWED_DRIVERS</type>
-              property in the <structname>MMPluginBase</structname> object provided
+              This filter is specified by the <type>MM_PLUGIN_ALLOWED_DRIVERS</type>
+              property in the <structname>MMPlugin</structname> object provided
               by the plugin.
             </para>
           </listitem>
@@ -154,8 +154,8 @@
               any port detected which doesn't expose any of the given tags.
             </para>
             <para>
-              This filter is specified by the <type>MM_PLUGIN_BASE_ALLOWED_UDEV_TAGS</type>
-              property in the <structname>MMPluginBase</structname> object provided
+              This filter is specified by the <type>MM_PLUGIN_ALLOWED_UDEV_TAGS</type>
+              property in the <structname>MMPlugin</structname> object provided
               by the plugin.
             </para>
           </listitem>
@@ -186,8 +186,8 @@
               AT or not.
             </para>
             <para>
-              This configuration is specified by the <type>MM_PLUGIN_BASE_CUSTOM_INIT</type>
-              property in the <structname>MMPluginBase</structname> object provided
+              This configuration is specified by the <type>MM_PLUGIN_CUSTOM_INIT</type>
+              property in the <structname>MMPlugin</structname> object provided
               by the plugin.
             </para>
           </listitem>
@@ -198,8 +198,8 @@
               AT serial ports.
             </para>
             <para>
-              This configuration is specified by the <type>MM_PLUGIN_BASE_ALLOWED_AT</type>
-              property in the <structname>MMPluginBase</structname> object provided
+              This configuration is specified by the <type>MM_PLUGIN_ALLOWED_AT</type>
+              property in the <structname>MMPlugin</structname> object provided
               by the plugin.
             </para>
           </listitem>
@@ -211,8 +211,8 @@
               in ports of the same device will get cancelled.
             </para>
             <para>
-              This configuration is specified by the <type>MM_PLUGIN_BASE_ALLOWED_SINGLE_AT</type>
-              property in the <structname>MMPluginBase</structname> object provided
+              This configuration is specified by the <type>MM_PLUGIN_ALLOWED_SINGLE_AT</type>
+              property in the <structname>MMPlugin</structname> object provided
               by the plugin.
             </para>
           </listitem>
@@ -223,8 +223,8 @@
               QCDM serial ports.
             </para>
             <para>
-              This configuration is specified by the <type>MM_PLUGIN_BASE_ALLOWED_QCDM</type>
-              property in the <structname>MMPluginBase</structname> object provided
+              This configuration is specified by the <type>MM_PLUGIN_ALLOWED_QCDM</type>
+              property in the <structname>MMPlugin</structname> object provided
               by the plugin.
             </para>
           </listitem>
@@ -250,8 +250,8 @@
               it can handle this modem.
             </para>
             <para>
-              This filter is specified by the <type>MM_PLUGIN_BASE_ALLOWED_VENDOR_STRINGS</type>
-              property in the <structname>MMPluginBase</structname> object provided
+              This filter is specified by the <type>MM_PLUGIN_ALLOWED_VENDOR_STRINGS</type>
+              property in the <structname>MMPlugin</structname> object provided
               by the plugin.
             </para>
           </listitem>
@@ -268,8 +268,8 @@
               expected to work only with a given specific product of a given vendor.
             </para>
             <para>
-              This filter is specified by the <type>MM_PLUGIN_BASE_ALLOWED_PRODUCT_STRINGS</type>
-              property in the <structname>MMPluginBase</structname> object provided
+              This filter is specified by the <type>MM_PLUGIN_ALLOWED_PRODUCT_STRINGS</type>
+              property in the <structname>MMPlugin</structname> object provided
               by the plugin.
             </para>
           </listitem>
@@ -304,15 +304,15 @@ mm_plugin_create (void)
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_IRIDIUM,
-                      MM_PLUGIN_BASE_NAME, "Example",
+                      MM_PLUGIN_NAME, "Example",
 
                       /* Next items are pre-probing filters */
-                      MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS, subsystems,
-                      MM_PLUGIN_BASE_ALLOWED_VENDOR_IDS, vendor_ids,
-                      MM_PLUGIN_BASE_ALLOWED_PRODUCT_IDS, product_ids,
+                      MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
+                      MM_PLUGIN_ALLOWED_VENDOR_IDS, vendor_ids,
+                      MM_PLUGIN_ALLOWED_PRODUCT_IDS, product_ids,
 
                       /* Next items are probing sequence setup */
-                      MM_PLUGIN_BASE_ALLOWED_AT, TRUE,
+                      MM_PLUGIN_ALLOWED_AT, TRUE,
 
                       /* No post-probing filters */
                       NULL));
@@ -332,17 +332,17 @@ mm_plugin_create (void)
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_IRIDIUM,
-                      MM_PLUGIN_BASE_NAME, "Example",
+                      MM_PLUGIN_NAME, "Example",
 
                       /* Next items are pre-probing filters */
-                      MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS, subsystems,
+                      MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
 
                       /* Next items are probing sequence setup */
-                      MM_PLUGIN_BASE_ALLOWED_AT, TRUE,
+                      MM_PLUGIN_ALLOWED_AT, TRUE,
 
                       /* Next items are post-probing filters */
-                      MM_PLUGIN_BASE_VENDOR_STRINGS, vendor_strings,
-                      MM_PLUGIN_BASE_PRODUCT_STRINGS, product_strings,
+                      MM_PLUGIN_VENDOR_STRINGS, vendor_strings,
+                      MM_PLUGIN_PRODUCT_STRINGS, product_strings,
                       NULL));
 }
           </programlisting>
@@ -381,15 +381,15 @@ mm_plugin_create (void)
 
     return MM_PLUGIN (
         g_object_new (MM_TYPE_PLUGIN_NOKIA,
-                      MM_PLUGIN_BASE_NAME, "Example",
+                      MM_PLUGIN_NAME, "Example",
 
                       /* Next items are pre-probing filters */
-                      MM_PLUGIN_BASE_ALLOWED_SUBSYSTEMS, subsystems,
-                      MM_PLUGIN_BASE_ALLOWED_VENDOR_IDS, vendor_ids,
+                      MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
+                      MM_PLUGIN_ALLOWED_VENDOR_IDS, vendor_ids,
 
                       /* Next items are probing sequence setup */
-                      MM_PLUGIN_BASE_CUSTOM_INIT, custom_init,
-                      MM_PLUGIN_BASE_ALLOWED_AT, TRUE,
+                      MM_PLUGIN_CUSTOM_INIT, custom_init,
+                      MM_PLUGIN_ALLOWED_AT, TRUE,
 
                       /* No post-probing filters */
                       NULL));

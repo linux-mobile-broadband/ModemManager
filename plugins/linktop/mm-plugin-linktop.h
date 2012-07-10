@@ -18,7 +18,7 @@
 #ifndef MM_PLUGIN_LINKTOP_H
 #define MM_PLUGIN_LINKTOP_H
 
-#include "mm-plugin-base.h"
+#include "mm-plugin.h"
 
 #define MM_TYPE_PLUGIN_LINKTOP            (mm_plugin_linktop_get_type ())
 #define MM_PLUGIN_LINKTOP(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_LINKTOP, MMPluginLinktop))
@@ -28,11 +28,11 @@
 #define MM_PLUGIN_LINKTOP_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PLUGIN_LINKTOP, MMPluginLinktopClass))
 
 typedef struct {
-    MMPluginBase parent;
+    MMPlugin parent;
 } MMPluginLinktop;
 
 typedef struct {
-    MMPluginBaseClass parent;
+    MMPluginClass parent;
 } MMPluginLinktopClass;
 
 GType mm_plugin_linktop_get_type (void);

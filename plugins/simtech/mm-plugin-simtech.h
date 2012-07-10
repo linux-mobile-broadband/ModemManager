@@ -18,7 +18,7 @@
 #ifndef MM_PLUGIN_SIMTECH_H
 #define MM_PLUGIN_SIMTECH_H
 
-#include "mm-plugin-base.h"
+#include "mm-plugin.h"
 
 #define MM_TYPE_PLUGIN_SIMTECH            (mm_plugin_simtech_get_type ())
 #define MM_PLUGIN_SIMTECH(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_SIMTECH, MMPluginSimtech))
@@ -28,11 +28,11 @@
 #define MM_PLUGIN_SIMTECH_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PLUGIN_SIMTECH, MMPluginSimtechClass))
 
 typedef struct {
-    MMPluginBase parent;
+    MMPlugin parent;
 } MMPluginSimtech;
 
 typedef struct {
-    MMPluginBaseClass parent;
+    MMPluginClass parent;
 } MMPluginSimtechClass;
 
 GType mm_plugin_simtech_get_type (void);
