@@ -75,8 +75,6 @@ struct _MMPortProbePrivate {
     GUdevDevice *port;
     gchar *subsys;
     gchar *name;
-    gchar *physdev_path;
-    gchar *driver;
 
     /* Probing results */
     guint32 flags;
@@ -995,26 +993,8 @@ mm_port_probe_get_port_subsys (MMPortProbe *self)
     return self->priv->subsys;
 }
 
-const gchar *
-mm_port_probe_get_port_physdev (MMPortProbe *self)
-{
-    g_return_val_if_fail (MM_IS_PORT_PROBE (self), NULL);
-
-    return self->priv->physdev_path;
-}
-
-const gchar *
-mm_port_probe_get_port_driver (MMPortProbe *self)
-{
-    g_return_val_if_fail (MM_IS_PORT_PROBE (self), NULL);
-
-    return self->priv->driver;
-}
-
 MMPortProbe *
-mm_port_probe_new (GUdevDevice *port,
-                   const gchar *physdev_path,
-                   const gchar *driver)
+mm_port_probe_new (GUdevDevice *port)
 {
     MMPortProbe *self;
 
@@ -1022,8 +1002,6 @@ mm_port_probe_new (GUdevDevice *port,
     self->priv->port = g_object_ref (port);
     self->priv->subsys = g_strdup (g_udev_device_get_subsystem (port));
     self->priv->name = g_strdup (g_udev_device_get_name (port));
-    self->priv->physdev_path = g_strdup (physdev_path);
-    self->priv->driver = g_strdup (driver);
 
     return self;
 }
@@ -1046,8 +1024,6 @@ finalize (GObject *object)
 
     g_free (self->priv->subsys);
     g_free (self->priv->name);
-    g_free (self->priv->physdev_path);
-    g_free (self->priv->driver);
     g_free (self->priv->vendor);
     g_free (self->priv->product);
 

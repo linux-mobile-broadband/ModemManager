@@ -225,9 +225,7 @@ mm_device_grab_port (MMDevice    *self,
     }
 
     /* Create and store new port probe */
-    probe = mm_port_probe_new (udev_port,
-                               self->priv->udev_device_path,
-                               self->priv->driver);
+    probe = mm_port_probe_new (udev_port);
     self->priv->port_probes = g_list_prepend (self->priv->port_probes, probe);
 
     /* Notify about the grabbed port */

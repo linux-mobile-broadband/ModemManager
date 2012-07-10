@@ -55,15 +55,11 @@ struct _MMPortProbeClass {
 
 GType mm_port_probe_get_type (void);
 
-MMPortProbe *mm_port_probe_new (GUdevDevice *port,
-                                const gchar *physdev_path,
-                                const gchar *driver);
+MMPortProbe *mm_port_probe_new (GUdevDevice *port);
 
 GUdevDevice *mm_port_probe_peek_port        (MMPortProbe *self);
 const gchar *mm_port_probe_get_port_name    (MMPortProbe *self);
 const gchar *mm_port_probe_get_port_subsys  (MMPortProbe *self);
-const gchar *mm_port_probe_get_port_physdev (MMPortProbe *self);
-const gchar *mm_port_probe_get_port_driver  (MMPortProbe *self);
 
 /* Probing result setters */
 void mm_port_probe_set_result_at         (MMPortProbe *self,
