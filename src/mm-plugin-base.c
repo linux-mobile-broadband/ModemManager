@@ -90,12 +90,12 @@ enum {
 
 /*****************************************************************************/
 
-gboolean
-mm_plugin_base_get_device_ids (MMPluginBase *self,
-                               const char *subsys,
-                               const char *name,
-                               guint16 *vendor,
-                               guint16 *product)
+static gboolean
+get_device_ids (MMPluginBase *self,
+                const char *subsys,
+                const char *name,
+                guint16 *vendor,
+                guint16 *product)
 {
     MMPluginBasePrivate *priv;
     GUdevDevice *device = NULL, *parent = NULL;
@@ -318,7 +318,7 @@ apply_pre_probing_filters (MMPluginBase *self,
             return TRUE;
     }
 
-    mm_plugin_base_get_device_ids (self, subsys, name, &vendor, &product);
+    get_device_ids (self, subsys, name, &vendor, &product);
 
     /* The plugin may specify that only some vendor IDs are supported. If that
      * is the case, filter by vendor ID. */
@@ -798,7 +798,7 @@ create_modem (MMPlugin  *self,
 
     /* Vendor and Product IDs are really optional, we'll just warn if they
      * cannot get loaded */
-    if (!mm_plugin_base_get_device_ids (MM_PLUGIN_BASE (self), subsys, name, &vendor, &product))
+    if (!get_device_ids (MM_PLUGIN_BASE (self), subsys, name, &vendor, &product))
         mm_warn ("Could not get modem vendor/product ID");
 
     /* Let the plugin create the modem from the port probe results */

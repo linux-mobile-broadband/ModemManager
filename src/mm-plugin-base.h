@@ -75,10 +75,5 @@ struct _MMPluginBaseClass {
 
 GType mm_plugin_base_get_type (void);
 
-gboolean mm_plugin_base_get_device_ids (MMPluginBase *self,
-                                        const char *subsys,
-                                        const char *name,
-                                        guint16 *vendor,
-                                        guint16 *product);
 
 #endif /* MM_PLUGIN_BASE_H */
