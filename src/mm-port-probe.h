@@ -96,4 +96,7 @@ gboolean      mm_port_probe_is_qcdm          (MMPortProbe *self);
 const gchar  *mm_port_probe_get_vendor       (MMPortProbe *self);
 const gchar  *mm_port_probe_get_product      (MMPortProbe *self);
 
+/* Additional helpers */
+gboolean mm_port_probe_list_has_at_port (GList *list);
+
 #endif /* MM_PORT_PROBE_H */

@@ -900,6 +900,19 @@ mm_port_probe_is_at (MMPortProbe *self)
 }
 
 gboolean
+mm_port_probe_list_has_at_port (GList *list)
+{
+    GList *l;
+
+    for (l = list; l; l = g_list_next (l)){
+        if (mm_port_probe_is_at (MM_PORT_PROBE (l->data)))
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
+gboolean
 mm_port_probe_is_qcdm (MMPortProbe *self)
 {
     g_return_val_if_fail (MM_IS_PORT_PROBE (self), FALSE);
