@@ -87,12 +87,6 @@ enum {
 
 /*****************************************************************************/
 
-static char *
-get_key (const char *subsys, const char *name)
-{
-    return g_strdup_printf ("%s%s", subsys, name);
-}
-
 const char *
 mm_plugin_get_name (MMPlugin *plugin)
 {
@@ -370,7 +364,6 @@ port_probe_run_ready (MMPortProbe *probe,
 {
     MMPluginPrivate *priv = MM_PLUGIN_GET_PRIVATE (ctx->plugin);
     GError *error = NULL;
-    gboolean keep_probe = FALSE;
 
     if (!mm_port_probe_run_finish (probe, probe_result, &error)) {
         /* Probing failed */
@@ -380,10 +373,8 @@ port_probe_run_ready (MMPortProbe *probe,
         MMPluginSupportsResult supports_result;
 
         if (!apply_post_probing_filters (ctx->plugin, probe)) {
-            /* Port is supported! Leave it in the internal HT until port gets
-             * grabbed. */
+            /* Port is supported! */
             supports_result = MM_PLUGIN_SUPPORTS_PORT_SUPPORTED;
-            keep_probe = TRUE;
 
             /* If we were looking for AT ports, and the port is AT,
              * and we were told that only one AT port is expected, cancel AT
@@ -400,7 +391,6 @@ port_probe_run_ready (MMPortProbe *probe,
                     }
                 }
             }
-
         } else {
             /* Unsupported port, remove from internal tracking HT */
             supports_result = MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
@@ -413,16 +403,6 @@ port_probe_run_ready (MMPortProbe *probe,
 
     /* Complete the async supports port request */
     g_simple_async_result_complete_in_idle (ctx->result);
-
-    /* If no longer needed, Remove probe from internal HT */
-    if (!keep_probe) {
-        gchar *key;
-
-        key = get_key (mm_port_probe_get_port_subsys (probe),
-                       mm_port_probe_get_port_name (probe));
-        g_hash_table_remove (priv->tasks, key);
-        g_free (key);
-    }
 
     g_object_unref (ctx->device);
     g_object_unref (ctx->result);
@@ -458,17 +438,12 @@ mm_plugin_supports_port (MMPlugin *self,
 {
     MMDevice *device = MM_DEVICE (device_o);
     MMPluginPrivate *priv = MM_PLUGIN_GET_PRIVATE (self);
-    gchar *key = NULL;
     MMPortProbe *probe;
     GSimpleAsyncResult *async_result;
     PortProbeRunContext *ctx;
     gboolean need_vendor_probing;
     gboolean need_product_probing;
     MMPortProbeFlag probe_run_flags;
-
-    /* Setup key */
-    key = get_key (g_udev_device_get_subsystem (port),
-                   g_udev_device_get_name (port));
 
     async_result = g_simple_async_result_new (G_OBJECT (self),
                                               callback,
@@ -504,12 +479,6 @@ mm_plugin_supports_port (MMPlugin *self,
      * TODO: With the new defer-until-suggested we probably don't need the modem
      * object being passed down here just for this. */
     if (g_str_equal (g_udev_device_get_subsystem (port), "net")) {
-        /* Keep track of the probe object, which is considered finished */
-        if (!g_hash_table_lookup (priv->tasks, key))
-            g_hash_table_insert (priv->tasks,
-                                 g_strdup (key),
-                                 g_object_ref (probe));
-
         g_simple_async_result_set_op_res_gpointer (
             async_result,
             GUINT_TO_POINTER (MM_PLUGIN_SUPPORTS_PORT_DEFER_UNTIL_SUGGESTED),
@@ -568,13 +537,7 @@ mm_plugin_supports_port (MMPlugin *self,
                        (GAsyncReadyCallback)port_probe_run_ready,
                        ctx);
 
-    /* Keep track of the probe. Note that we got a new reference already */
-    g_hash_table_insert (priv->tasks,
-                         g_strdup (key),
-                         probe);
-
 out:
-    g_free (key);
     g_object_unref (async_result);
 }
 
@@ -586,7 +549,6 @@ mm_plugin_create_modem (MMPlugin  *self,
                         GError   **error)
 {
     MMDevice *device = MM_DEVICE (device_o);
-    MMPluginPrivate *priv = MM_PLUGIN_GET_PRIVATE (self);
     MMBaseModem *modem = NULL;
     GList *port_probes, *l;
 
@@ -624,15 +586,6 @@ mm_plugin_create_modem (MMPlugin  *self,
             g_clear_object (&modem);
     }
 
-    for (l = port_probes; l; l = g_list_next (l)) {
-        gchar *key;
-
-        key = get_key (mm_port_probe_get_port_subsys (l->data),
-                       mm_port_probe_get_port_name (l->data));
-        g_hash_table_remove (priv->tasks, key);
-        g_free (key);
-    }
-
     return modem;
 }
 
@@ -647,10 +600,6 @@ mm_plugin_init (MMPlugin *self)
      * we just use this client for sync queries. */
     priv->client = g_udev_client_new (NULL);
 
-    priv->tasks = g_hash_table_new_full (g_str_hash,
-                                         g_str_equal,
-                                         g_free,
-                                         (GDestroyNotify) g_object_unref);
     /* Defaults */
     priv->send_delay = 100000;
 }
@@ -780,8 +729,6 @@ finalize (GObject *object)
     g_free (priv->name);
 
     g_object_unref (priv->client);
-
-    g_hash_table_destroy (priv->tasks);
 
     G_OBJECT_CLASS (mm_plugin_parent_class)->finalize (object);
 }
