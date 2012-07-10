@@ -32,7 +32,6 @@
 #include "mm-auth.h"
 #include "mm-plugin.h"
 #include "mm-log.h"
-#include "mm-port-probe-cache.h"
 
 static void initable_iface_init (GInitableIface *iface);
 
@@ -324,9 +323,6 @@ device_removed (MMManager *self,
     MMDevice *device;
 
     g_return_if_fail (udev_device != NULL);
-
-    /* Ensure cached port probe infos get removed when the port is gone */
-    mm_port_probe_cache_remove (udev_device);
 
     if (!g_str_equal (g_udev_device_get_subsystem (udev_device), "usb")) {
         /* Handle tty/net port removal */
@@ -716,8 +712,6 @@ finalize (GObject *object)
     MMManagerPrivate *priv = MM_MANAGER (object)->priv;
 
     g_hash_table_destroy (priv->devices);
-
-    mm_port_probe_cache_clear ();
 
     if (priv->udev)
         g_object_unref (priv->udev);

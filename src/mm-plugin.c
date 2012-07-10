@@ -30,7 +30,6 @@
 
 #include "mm-plugin.h"
 #include "mm-device.h"
-#include "mm-port-probe-cache.h"
 #include "mm-at-serial-port.h"
 #include "mm-qcdm-serial-port.h"
 #include "mm-serial-parsers.h"
@@ -573,8 +572,7 @@ mm_plugin_supports_port (MMPlugin *self,
                        (GAsyncReadyCallback)port_probe_run_ready,
                        ctx);
 
-    /* Keep track of the probe. Note that we got a new reference already
-     * from the cache. */
+    /* Keep track of the probe. Note that we got a new reference already */
     g_hash_table_insert (priv->tasks,
                          g_strdup (key),
                          probe);
