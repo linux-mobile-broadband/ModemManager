@@ -756,37 +756,18 @@ mm_plugin_supports_port_cancel (MMPlugin *plugin,
     g_free (key);
 }
 
+/*****************************************************************************/
+
 MMBaseModem *
 mm_plugin_create_modem (MMPlugin  *self,
-                        GList     *ports,
+                        GList     *port_probes,
                         GError   **error)
 {
     MMBaseModem *modem = NULL;
     MMPluginPrivate *priv = MM_PLUGIN_GET_PRIVATE (self);
-    GList *probes = NULL;
     GList *l;
     const gchar *name, *subsys, *sysfs_path, *driver;
     guint16 vendor = 0, product = 0;
-
-    /* Get the port probe results for each of the ports */
-    for (l = ports; l; l = g_list_next (l)) {
-        MMPortProbe *probe;
-        gchar *key;
-
-        subsys = g_udev_device_get_subsystem (G_UDEV_DEVICE (l->data));
-        name = g_udev_device_get_name (G_UDEV_DEVICE (l->data));
-
-        key = get_key (subsys, name);
-        probe = g_hash_table_lookup (priv->tasks, key);
-        if (!probe)
-            mm_warn ("(%s/%s) Ignoring port when creating modem with plugin '%s'",
-                     subsys,
-                     name,
-                     priv->name);
-        else
-            probes = g_list_prepend (probes, g_object_ref (probe));
-        g_free (key);
-    }
 
     /* Get info from the first probe in the list */
     subsys = mm_port_probe_get_port_subsys (probes->data);
@@ -809,7 +790,7 @@ mm_plugin_create_modem (MMPlugin  *self,
                                                       error);
     if (modem) {
         /* Grab each port */
-        for (l = probes; l; l = g_list_next (l)) {
+        for (l = port_probes; l; l = g_list_next (l)) {
             GError *inner_error = NULL;
 
             /* If grabbing a port fails, just warn. We'll decide if the modem is
@@ -831,7 +812,7 @@ mm_plugin_create_modem (MMPlugin  *self,
             g_clear_object (&modem);
     }
 
-    for (l = probes; l; l = g_list_next (l)) {
+    for (l = port_probes; l; l = g_list_next (l)) {
         gchar *key;
 
         key = get_key (mm_port_probe_get_port_subsys (l->data),
@@ -839,8 +820,6 @@ mm_plugin_create_modem (MMPlugin  *self,
         g_hash_table_remove (priv->tasks, key);
         g_free (key);
     }
-
-    g_list_free_full (probes, (GDestroyNotify) g_object_unref);
 
     return modem;
 }

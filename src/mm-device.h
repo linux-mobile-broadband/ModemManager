@@ -83,4 +83,11 @@ MMPlugin    *mm_device_get_plugin       (MMDevice *self);
 MMBaseModem *mm_device_peek_modem       (MMDevice *self);
 MMBaseModem *mm_device_get_modem        (MMDevice *self);
 
+MMPortProbe *mm_device_peek_port_probe      (MMDevice *self,
+                                             GUdevDevice *udev_port);
+MMPortProbe *mm_device_get_port_probe       (MMDevice *self,
+                                             GUdevDevice *udev_port);
+GList       *mm_device_peek_port_probe_list (MMDevice *self);
+GList       *mm_device_get_port_probe_list  (MMDevice *self);
+
 #endif /* MM_DEVICE_H */

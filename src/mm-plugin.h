@@ -111,7 +111,7 @@ void                   mm_plugin_supports_port_cancel (MMPlugin *plugin,
                                                        const char *name);
 
 MMBaseModem *mm_plugin_create_modem (MMPlugin *plugin,
-                                     GList *ports,
+                                     GList *port_probes,
                                      GError **error);
 
 #endif /* MM_PLUGIN_H */
