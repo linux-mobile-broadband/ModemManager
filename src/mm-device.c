@@ -41,6 +41,7 @@ static GParamSpec *properties[PROP_LAST];
 struct _MMDevicePrivate {
     /* Parent UDev device */
     GUdevDevice *udev_device;
+    gchar *udev_device_path;
 
     /* Best plugin to manage this device */
     MMPlugin *plugin;
@@ -250,6 +251,12 @@ mm_device_create_modem (MMDevice                  *self,
 
 /*****************************************************************************/
 
+const gchar *
+mm_device_get_path (MMDevice *self)
+{
+    return self->priv->udev_device_path;
+}
+
 GUdevDevice *
 mm_device_peek_udev_device (MMDevice *self)
 {
@@ -332,6 +339,7 @@ set_property (GObject *object,
     case PROP_UDEV_DEVICE:
         /* construct only */
         self->priv->udev_device = g_value_dup_object (value);
+        self->priv->udev_device_path = g_strdup (g_udev_device_get_sysfs_path (self->priv->udev_device));
         break;
     case PROP_PLUGIN:
         g_clear_object (&(self->priv->plugin));
@@ -385,6 +393,16 @@ dispose (GObject *object)
 }
 
 static void
+finalize (GObject *object)
+{
+    MMDevice *self = MM_DEVICE (object);
+
+    g_free (self->priv->udev_device_path);
+
+    G_OBJECT_CLASS (mm_device_parent_class)->finalize (object);
+}
+
+static void
 mm_device_class_init (MMDeviceClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
@@ -394,6 +412,7 @@ mm_device_class_init (MMDeviceClass *klass)
     /* Virtual methods */
     object_class->get_property = get_property;
     object_class->set_property = set_property;
+    object_class->finalize = finalize;
     object_class->dispose = dispose;
 
     properties[PROP_UDEV_DEVICE] =

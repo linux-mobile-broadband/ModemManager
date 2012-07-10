@@ -63,6 +63,7 @@ gboolean mm_device_create_modem (MMDevice                  *self,
                                  GError                   **error);
 void     mm_device_remove_modem (MMDevice  *self);
 
+const gchar *mm_device_get_path         (MMDevice *self);
 GUdevDevice *mm_device_peek_udev_device (MMDevice *self);
 GUdevDevice *mm_device_get_udev_device  (MMDevice *self);
 void         mm_device_set_plugin       (MMDevice *self,
