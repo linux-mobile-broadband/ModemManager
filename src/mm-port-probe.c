@@ -1050,12 +1050,20 @@ finalize (GObject *object)
     g_free (self->priv->name);
     g_free (self->priv->physdev_path);
     g_free (self->priv->driver);
-    g_object_unref (self->priv->port);
-
     g_free (self->priv->vendor);
     g_free (self->priv->product);
 
     G_OBJECT_CLASS (mm_port_probe_parent_class)->finalize (object);
+}
+
+static void
+dispose (GObject *object)
+{
+    MMPortProbe *self = MM_PORT_PROBE (object);
+
+    g_clear_object (&self->priv->port);
+
+    G_OBJECT_CLASS (mm_port_probe_parent_class)->dispose (object);
 }
 
 static void
@@ -1067,4 +1075,5 @@ mm_port_probe_class_init (MMPortProbeClass *klass)
 
     /* Virtual methods */
     object_class->finalize = finalize;
+    object_class->dispose = dispose;
 }
