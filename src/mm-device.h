@@ -38,6 +38,9 @@ typedef struct _MMDevicePrivate MMDevicePrivate;
 #define MM_DEVICE_PLUGIN      "plugin"
 #define MM_DEVICE_MODEM       "modem"
 
+#define MM_DEVICE_PORT_GRABBED  "port-grabbed"
+#define MM_DEVICE_PORT_RELEASED "port-released"
+
 struct _MMDevice {
     GObject parent;
     MMDevicePrivate *priv;
@@ -45,6 +48,12 @@ struct _MMDevice {
 
 struct _MMDeviceClass {
     GObjectClass parent;
+
+    /* signals */
+    void (* port_grabbed)  (MMDevice *self,
+                            GUdevDevice *port);
+    void (* port_released) (MMDevice *self,
+                            GUdevDevice *port);
 };
 
 GType mm_device_get_type (void);

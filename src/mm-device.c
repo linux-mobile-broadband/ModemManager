@@ -36,7 +36,14 @@ enum {
     PROP_LAST
 };
 
+enum {
+    SIGNAL_PORT_GRABBED,
+    SIGNAL_PORT_RELEASED,
+    SIGNAL_LAST
+};
+
 static GParamSpec *properties[PROP_LAST];
+static guint signals[SIGNAL_LAST];
 
 struct _MMDevicePrivate {
     /* Parent UDev device */
@@ -118,15 +125,13 @@ mm_device_grab_port (MMDevice    *self,
                              (GCompareFunc)udev_port_cmp)) {
 
         /* Get the driver name out of the first port grabbed */
-        if (!self->priv->udev_ports) {
+        if (!self->priv->udev_ports)
             self->priv->driver = get_driver_name (udev_port);
-            mm_dbg ("(%s) managed by driver '%s'",
-                    self->priv->udev_device_path,
-                    self->priv->driver);
-        }
 
         self->priv->udev_ports = g_list_prepend (self->priv->udev_ports,
                                                  g_object_ref (udev_port));
+
+        g_signal_emit (self, signals[SIGNAL_PORT_GRABBED], 0, udev_port);
     }
 }
 
@@ -140,8 +145,11 @@ mm_device_release_port (MMDevice    *self,
                                 udev_port,
                                 (GCompareFunc)udev_port_cmp);
     if (found) {
-        g_object_unref (found->data);
+        GUdevDevice *found_port = found->data;
+
         self->priv->udev_ports = g_list_delete_link (self->priv->udev_ports, found);
+        g_signal_emit (self, signals[SIGNAL_PORT_RELEASED], 0, found_port);
+        g_object_unref (found_port);
     }
 }
 
@@ -488,4 +496,22 @@ mm_device_class_init (MMDeviceClass *klass)
                              MM_TYPE_BASE_MODEM,
                              G_PARAM_READWRITE);
     g_object_class_install_property (object_class, PROP_MODEM, properties[PROP_MODEM]);
+
+    signals[SIGNAL_PORT_GRABBED] =
+        g_signal_new (MM_DEVICE_PORT_GRABBED,
+                      G_OBJECT_CLASS_TYPE (object_class),
+                      G_SIGNAL_RUN_FIRST,
+                      G_STRUCT_OFFSET (MMDeviceClass, port_grabbed),
+                      NULL, NULL,
+                      g_cclosure_marshal_generic,
+                      G_TYPE_NONE, 1, G_UDEV_TYPE_DEVICE);
+
+    signals[SIGNAL_PORT_RELEASED] =
+        g_signal_new (MM_DEVICE_PORT_RELEASED,
+                      G_OBJECT_CLASS_TYPE (object_class),
+                      G_SIGNAL_RUN_FIRST,
+                      G_STRUCT_OFFSET (MMDeviceClass, port_released),
+                      NULL, NULL,
+                      g_cclosure_marshal_generic,
+                      G_TYPE_NONE, 1, G_UDEV_TYPE_DEVICE);
 }
