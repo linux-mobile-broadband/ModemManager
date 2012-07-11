@@ -549,12 +549,6 @@ out:
     return plugin;
 }
 
-static void
-found_plugin (MMPlugin *plugin)
-{
-    mm_info ("Loaded plugin '%s'", mm_plugin_get_name (plugin));
-}
-
 static gboolean
 load_plugins (MMPluginManager *self,
               GError **error)
@@ -563,6 +557,7 @@ load_plugins (MMPluginManager *self,
     const gchar *fname;
     MMPlugin *generic_plugin = NULL;
     gchar *plugindir_display = NULL;
+    GList *l;
 
 	if (!g_module_supported ()) {
         g_set_error (error,
@@ -628,7 +623,8 @@ load_plugins (MMPluginManager *self,
 
     /* Now report about all the found plugins, in the same order they will be
      * used while checking support */
-    g_list_foreach (self->priv->plugins, (GFunc)found_plugin, NULL);
+    for (l = self->priv->plugins; l; l = g_list_next (l))
+        mm_info ("Loaded plugin '%s'", mm_plugin_get_name (MM_PLUGIN (l->data)));
 
     mm_info ("Successfully loaded %u plugins",
              g_list_length (self->priv->plugins));
