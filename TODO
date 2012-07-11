@@ -119,3 +119,7 @@ example to update the signal quality value or check registration status.
      > 'AT+CNMI=2,1,2,1,0'
      +CMS ERROR: 303'
 
+  ** Longcheer plugin: Load PIN/PUK retries left, with the following format:
+     > AT+CPNNUM
+     PIN1=3; PUK1=10; PIN2=0; PUK2=10
+
