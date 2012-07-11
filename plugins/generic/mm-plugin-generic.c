@@ -55,30 +55,6 @@ create_modem (MMPlugin *self,
                                                   product));
 }
 
-static gboolean
-grab_port (MMPlugin *self,
-           MMBaseModem *modem,
-           MMPortProbe *probe,
-           GError **error)
-{
-    /* The generic plugin cannot do anything with non-AT and non-QCDM ports */
-    if (!mm_port_probe_is_at (probe) &&
-        !mm_port_probe_is_qcdm (probe)) {
-        g_set_error (error,
-                     MM_CORE_ERROR,
-                     MM_CORE_ERROR_UNSUPPORTED,
-                     "Ignoring non-AT/non-QCDM ports");
-        return FALSE;
-    }
-
-    return mm_base_modem_grab_port (modem,
-                                    mm_port_probe_get_port_subsys (probe),
-                                    mm_port_probe_get_port_name (probe),
-                                    mm_port_probe_get_port_type (probe),
-                                    MM_AT_PORT_FLAG_NONE,
-                                    error);
-}
-
 /*****************************************************************************/
 
 G_MODULE_EXPORT MMPlugin *
@@ -106,5 +82,4 @@ mm_plugin_generic_class_init (MMPluginGenericClass *klass)
     MMPluginClass *plugin_class = MM_PLUGIN_CLASS (klass);
 
     plugin_class->create_modem = create_modem;
-    plugin_class->grab_port = grab_port;
 }

@@ -51,29 +51,6 @@ create_modem (MMPlugin *self,
                                                           product));
 }
 
-static gboolean
-grab_port (MMPlugin *self,
-           MMBaseModem *modem,
-           MMPortProbe *probe,
-           GError **error)
-{
-    /* The Iridium plugin cannot do anything with non-AT ports */
-    if (!mm_port_probe_is_at (probe)) {
-        g_set_error_literal (error,
-                             MM_CORE_ERROR,
-                             MM_CORE_ERROR_UNSUPPORTED,
-                             "Ignoring non-AT port");
-        return FALSE;
-    }
-
-    return mm_base_modem_grab_port (modem,
-                                    mm_port_probe_get_port_subsys (probe),
-                                    mm_port_probe_get_port_name (probe),
-                                    MM_PORT_TYPE_AT, /* we only allow AT ports here */
-                                    MM_AT_PORT_FLAG_NONE,
-                                    error);
-}
-
 /*****************************************************************************/
 
 G_MODULE_EXPORT MMPlugin *
@@ -108,5 +85,4 @@ mm_plugin_iridium_class_init (MMPluginIridiumClass *klass)
     MMPluginClass *plugin_class = MM_PLUGIN_CLASS (klass);
 
     plugin_class->create_modem = create_modem;
-    plugin_class->grab_port = grab_port;
 }
