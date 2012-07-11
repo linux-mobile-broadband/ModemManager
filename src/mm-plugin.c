@@ -60,7 +60,7 @@ struct _MMPluginPrivate {
     gboolean at;
     gboolean single_at;
     gboolean qcdm;
-    MMPortProbeAtCommand *custom_init;
+    MMPortProbeAtCommand *custom_at_probe;
     guint64 send_delay;
 };
 
@@ -77,7 +77,7 @@ enum {
     PROP_ALLOWED_AT,
     PROP_ALLOWED_SINGLE_AT,
     PROP_ALLOWED_QCDM,
-    PROP_CUSTOM_INIT,
+    PROP_CUSTOM_AT_PROBE,
     PROP_SEND_DELAY,
     LAST_PROP
 };
@@ -524,7 +524,7 @@ mm_plugin_supports_port (MMPlugin *self,
     mm_port_probe_run (probe,
                        ctx->flags,
                        self->priv->send_delay,
-                       self->priv->custom_init,
+                       self->priv->custom_at_probe,
                        (GAsyncReadyCallback)port_probe_run_ready,
                        ctx);
 
@@ -646,9 +646,9 @@ set_property (GObject *object,
         /* Construct only */
         self->priv->qcdm = g_value_get_boolean (value);
         break;
-    case PROP_CUSTOM_INIT:
+    case PROP_CUSTOM_AT_PROBE:
         /* Construct only */
-        self->priv->custom_init = g_value_dup_boxed (value);
+        self->priv->custom_at_probe = g_value_dup_boxed (value);
         break;
     case PROP_SEND_DELAY:
         /* Construct only */
@@ -702,8 +702,8 @@ get_property (GObject *object,
     case PROP_ALLOWED_UDEV_TAGS:
         g_value_set_boxed (value, self->priv->udev_tags);
         break;
-    case PROP_CUSTOM_INIT:
-        g_value_set_boxed (value, self->priv->custom_init);
+    case PROP_CUSTOM_AT_PROBE:
+        g_value_set_boxed (value, self->priv->custom_at_probe);
         break;
     case PROP_SEND_DELAY:
         g_value_set_uint64 (value, self->priv->send_delay);
@@ -833,10 +833,10 @@ mm_plugin_class_init (MMPluginClass *klass)
                                G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property
-        (object_class, PROP_CUSTOM_INIT,
-         g_param_spec_boxed (MM_PLUGIN_CUSTOM_INIT,
-                             "Custom initialization",
-                             "List of custom initializations this plugin needs, "
+        (object_class, PROP_CUSTOM_AT_PROBE,
+         g_param_spec_boxed (MM_PLUGIN_CUSTOM_AT_PROBE,
+                             "Custom AT Probe",
+                             "Custom set of commands to probe for AT support, "
                              "should be an array of MMPortProbeAtCommand structs "
                              "finished with 'NULL'",
                              MM_TYPE_POINTER_ARRAY,

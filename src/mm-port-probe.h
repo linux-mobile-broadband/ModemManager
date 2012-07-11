@@ -78,7 +78,7 @@ void mm_port_probe_set_result_qcdm       (MMPortProbe *self,
 void     mm_port_probe_run        (MMPortProbe *self,
                                    MMPortProbeFlag flags,
                                    guint64 at_send_delay,
-                                   const MMPortProbeAtCommand *at_custom_init,
+                                   const MMPortProbeAtCommand *at_custom_probe,
                                    GAsyncReadyCallback callback,
                                    gpointer user_data);
 gboolean mm_port_probe_run_finish (MMPortProbe *self,

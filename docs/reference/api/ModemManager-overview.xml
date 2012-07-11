@@ -172,26 +172,6 @@
         </para>
         <itemizedlist>
           <listitem>
-            <para><emphasis>Custom AT initialization</emphasis></para>
-            <para>
-              This property allows plugins to specify custom initialization sequences to
-              run in the modem before any additional probing happens. This helps in the cases
-              where modems require commands to, for example, shutdown unsolicited messages.
-            </para>
-            <para>
-              An additional benefit of the custom initialization through AT commands is that
-              it can already provide information on whether the port is AT or not. In other
-              words, a plugin with custom initialization sequence which reports that the
-              port being initialized is AT won't run the generic checks to see if the port is
-              AT or not.
-            </para>
-            <para>
-              This configuration is specified by the <type>MM_PLUGIN_CUSTOM_INIT</type>
-              property in the <structname>MMPlugin</structname> object provided
-              by the plugin.
-            </para>
-          </listitem>
-          <listitem>
             <para><emphasis>AT allowed</emphasis></para>
             <para>
               This boolean property allows plugins to specify that they expect and support
@@ -212,6 +192,18 @@
             </para>
             <para>
               This configuration is specified by the <type>MM_PLUGIN_ALLOWED_SINGLE_AT</type>
+              property in the <structname>MMPlugin</structname> object provided
+              by the plugin.
+            </para>
+          </listitem>
+          <listitem>
+            <para><emphasis>Custom AT probing</emphasis></para>
+            <para>
+              This property allows plugins to specify custom commands to check whether a port
+              is AT or not. By default, the 'AT' command will be used if no custom one specified.
+            </para>
+            <para>
+              This configuration is specified by the <type>MM_PLUGIN_CUSTOM_AT_PROBE</type>
               property in the <structname>MMPlugin</structname> object provided
               by the plugin.
             </para>
@@ -352,10 +344,10 @@ mm_plugin_create (void)
           <title>Probing setup for a plugin with custom initialization requirements</title>
           <programlisting>
 static gboolean
-parse_init (const gchar *response,
-            const GError *error,
-            GValue *result,
-            GError **result_error)
+parse_custom_at (const gchar *response,
+                 const GError *error,
+                 GValue *result,
+                 GError **result_error)
 {
     if (error) {
         *result_error = g_error_copy (error);
@@ -368,8 +360,8 @@ parse_init (const gchar *response,
     return TRUE;
 }
 
-static const MMPortProbeAtCommand custom_init[] = {
-    { "ATE1 E0", parse_init },
+static const MMPortProbeAtCommand custom_at_probe[] = {
+    { "AT+SOMETHING", parse_custom_at },
     { NULL }
 };
 
@@ -380,7 +372,7 @@ mm_plugin_create (void)
     static const guint16 vendor_ids[] = { 0xabcd, 0 };
 
     return MM_PLUGIN (
-        g_object_new (MM_TYPE_PLUGIN_NOKIA,
+        g_object_new (MM_TYPE_PLUGIN_EXAMPLE,
                       MM_PLUGIN_NAME, "Example",
 
                       /* Next items are pre-probing filters */
@@ -388,8 +380,8 @@ mm_plugin_create (void)
                       MM_PLUGIN_ALLOWED_VENDOR_IDS, vendor_ids,
 
                       /* Next items are probing sequence setup */
-                      MM_PLUGIN_CUSTOM_INIT, custom_init,
-                      MM_PLUGIN_ALLOWED_AT, TRUE,
+                      MM_PLUGIN_CUSTOM_AT_PROBE, custom_at_probe,
+                      MM_PLUGIN_ALLOWED_AT,      TRUE,
 
                       /* No post-probing filters */
                       NULL));

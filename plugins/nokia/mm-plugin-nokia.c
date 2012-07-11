@@ -30,9 +30,9 @@ int mm_plugin_major_version = MM_PLUGIN_MAJOR_VERSION;
 int mm_plugin_minor_version = MM_PLUGIN_MINOR_VERSION;
 
 /*****************************************************************************/
-/* CUSTOM INIT */
+/* Custom commands for AT probing */
 
-static const MMPortProbeAtCommand custom_init[] = {
+static const MMPortProbeAtCommand custom_at_probe[] = {
     { "ATE1 E0", 3, mm_port_probe_response_processor_is_at },
     { "ATE1 E0", 3, mm_port_probe_response_processor_is_at },
     { "ATE1 E0", 3, mm_port_probe_response_processor_is_at },
@@ -104,7 +104,7 @@ mm_plugin_create (void)
                       MM_PLUGIN_NAME,               "Nokia",
                       MM_PLUGIN_ALLOWED_SUBSYSTEMS, subsystems,
                       MM_PLUGIN_ALLOWED_VENDOR_IDS, vendor_ids,
-                      MM_PLUGIN_CUSTOM_INIT,        custom_init,
+                      MM_PLUGIN_CUSTOM_AT_PROBE,    custom_at_probe,
                       MM_PLUGIN_ALLOWED_SINGLE_AT,  TRUE, /* only 1 AT port expected! */
                       NULL));
 }

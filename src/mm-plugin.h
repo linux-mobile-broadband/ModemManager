@@ -48,7 +48,7 @@
 #define MM_PLUGIN_ALLOWED_AT              "allowed-at"
 #define MM_PLUGIN_ALLOWED_SINGLE_AT       "allowed-single-at"
 #define MM_PLUGIN_ALLOWED_QCDM            "allowed-qcdm"
-#define MM_PLUGIN_CUSTOM_INIT             "custom-init"
+#define MM_PLUGIN_CUSTOM_AT_PROBE         "custom-at-probe"
 #define MM_PLUGIN_SEND_DELAY              "send-delay"
 #define MM_PLUGIN_SORT_LAST               "sort-last"
 
