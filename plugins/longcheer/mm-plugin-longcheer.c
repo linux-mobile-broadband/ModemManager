@@ -23,7 +23,7 @@
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-plugin-longcheer.h"
-#include "mm-broadband-modem.h"
+#include "mm-broadband-modem-longcheer.h"
 
 G_DEFINE_TYPE (MMPluginLongcheer, mm_plugin_longcheer, MM_TYPE_PLUGIN)
 
@@ -187,11 +187,11 @@ create_modem (MMPlugin *self,
               GList *probes,
               GError **error)
 {
-    return MM_BASE_MODEM (mm_broadband_modem_new (sysfs_path,
-                                                  driver,
-                                                  mm_plugin_get_name (self),
-                                                  vendor,
-                                                  product));
+    return MM_BASE_MODEM (mm_broadband_modem_longcheer_new (sysfs_path,
+                                                            driver,
+                                                            mm_plugin_get_name (self),
+                                                            vendor,
+                                                            product));
 }
 
 static gboolean

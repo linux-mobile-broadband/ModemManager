@@ -193,7 +193,9 @@ udevrules_DATA += nokia/77-mm-nokia-port-types.rules
 # Longcheer (and rebranded dongles)
 libmm_plugin_longcheer_la_SOURCES = \
 	longcheer/mm-plugin-longcheer.c \
-	longcheer/mm-plugin-longcheer.h
+	longcheer/mm-plugin-longcheer.h \
+	longcheer/mm-broadband-modem-longcheer.h \
+	longcheer/mm-broadband-modem-longcheer.c
 libmm_plugin_longcheer_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_longcheer_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 udevrules_DATA += longcheer/77-mm-longcheer-port-types.rules
