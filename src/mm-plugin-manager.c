@@ -44,7 +44,7 @@ G_DEFINE_TYPE_EXTENDED (MMPluginManager, mm_plugin_manager, G_TYPE_OBJECT, 0,
 struct _MMPluginManagerPrivate {
     /* The list of plugins. It is loaded once when the program starts, and the
      * list is NOT expected to change after that. */
-    GSList *plugins;
+    GList *plugins;
 };
 
 /*****************************************************************************/
@@ -65,7 +65,7 @@ typedef struct {
     FindDeviceSupportContext *parent_ctx;
     GUdevDevice *port;
 
-    GSList *current;
+    GList *current;
     MMPlugin *best_plugin;
     MMPlugin *suggested_plugin;
     guint defer_id;
@@ -314,14 +314,14 @@ plugin_supports_port_ready (MMPlugin *plugin,
                 /* The last plugin we tried is NOT the one we got suggested, so
                  * directly check support with the suggested plugin. If we
                  * already checked its support, it won't be checked again. */
-                port_probe_ctx->current = g_slist_find (port_probe_ctx->current,
-                                                        port_probe_ctx->suggested_plugin);
+                port_probe_ctx->current = g_list_find (port_probe_ctx->current,
+                                                       port_probe_ctx->suggested_plugin);
             }
         } else {
             /* If the plugin knows it doesn't support the modem, just keep on
              * checking the next plugin.
              */
-            port_probe_ctx->current = g_slist_next (port_probe_ctx->current);
+            port_probe_ctx->current = g_list_next (port_probe_ctx->current);
         }
 
         /* Step */
@@ -337,8 +337,8 @@ plugin_supports_port_ready (MMPlugin *plugin,
                     g_udev_device_get_subsystem (port_probe_ctx->port),
                     g_udev_device_get_name (port_probe_ctx->port),
                     mm_plugin_get_name (MM_PLUGIN (port_probe_ctx->suggested_plugin)));
-            port_probe_ctx->current = g_slist_find (port_probe_ctx->current,
-                                                    port_probe_ctx->suggested_plugin);
+            port_probe_ctx->current = g_list_find (port_probe_ctx->current,
+                                                   port_probe_ctx->suggested_plugin);
         } else {
             mm_dbg ("(%s): (%s/%s) deferring support check",
                     mm_plugin_get_name (MM_PLUGIN (port_probe_ctx->current->data)),
@@ -420,8 +420,8 @@ device_port_grabbed_cb (MMDevice *device,
     /* If we got one suggested, it will be the first one */
     port_probe_ctx->suggested_plugin = mm_device_get_plugin (device);
     if (port_probe_ctx->suggested_plugin)
-        port_probe_ctx->current = g_slist_find (port_probe_ctx->current,
-                                                port_probe_ctx->suggested_plugin);
+        port_probe_ctx->current = g_list_find (port_probe_ctx->current,
+                                               port_probe_ctx->suggested_plugin);
 
     /* Set as running */
     ctx->running_probes = g_list_prepend (ctx->running_probes, port_probe_ctx);
@@ -602,19 +602,19 @@ load_plugins (MMPluginManager *self,
                              MM_PLUGIN_GENERIC_NAME))
                 generic_plugin = plugin;
             else
-                self->priv->plugins = g_slist_append (self->priv->plugins,
-                                                      plugin);
+                self->priv->plugins = g_list_append (self->priv->plugins,
+                                                     plugin);
         }
     }
 
     /* Sort last plugins that request it */
-    self->priv->plugins = g_slist_sort (self->priv->plugins,
-                                        (GCompareFunc)mm_plugin_cmp);
+    self->priv->plugins = g_list_sort (self->priv->plugins,
+                                       (GCompareFunc)mm_plugin_cmp);
 
     /* Make sure the generic plugin is last */
     if (generic_plugin)
-        self->priv->plugins = g_slist_append (self->priv->plugins,
-                                              generic_plugin);
+        self->priv->plugins = g_list_append (self->priv->plugins,
+                                             generic_plugin);
 
     /* Treat as error if we don't find any plugin */
     if (!self->priv->plugins) {
@@ -628,10 +628,10 @@ load_plugins (MMPluginManager *self,
 
     /* Now report about all the found plugins, in the same order they will be
      * used while checking support */
-    g_slist_foreach (self->priv->plugins, (GFunc)found_plugin, NULL);
+    g_list_foreach (self->priv->plugins, (GFunc)found_plugin, NULL);
 
     mm_info ("Successfully loaded %u plugins",
-             g_slist_length (self->priv->plugins));
+             g_list_length (self->priv->plugins));
 
 out:
     if (dir)
@@ -687,8 +687,7 @@ finalize (GObject *object)
     /* g_hash_table_destroy (self->priv->supports); */
 
     /* Cleanup list of plugins */
-    g_slist_foreach (self->priv->plugins, (GFunc)g_object_unref, NULL);
-    g_slist_free (self->priv->plugins);
+    g_list_free_full (self->priv->plugins, (GDestroyNotify)g_object_unref);
 
     G_OBJECT_CLASS (mm_plugin_manager_parent_class)->finalize (object);
 }
