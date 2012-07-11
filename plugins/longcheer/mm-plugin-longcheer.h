@@ -11,13 +11,14 @@
  * GNU General Public License for more details:
  *
  * Copyright (C) 2008 - 2009 Novell, Inc.
- * Copyright (C) 2009 Red Hat, Inc.
+ * Copyright (C) 2009 - 2012 Red Hat, Inc.
+ * Copyright (C) 2012 Aleksander Morgado <aleksander@gnu.org>
  */
 
 #ifndef MM_PLUGIN_LONGCHEER_H
 #define MM_PLUGIN_LONGCHEER_H
 
-#include "mm-plugin-base.h"
+#include "mm-plugin.h"
 
 #define MM_TYPE_PLUGIN_LONGCHEER            (mm_plugin_longcheer_get_type ())
 #define MM_PLUGIN_LONGCHEER(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_PLUGIN_LONGCHEER, MMPluginLongcheer))
@@ -27,11 +28,11 @@
 #define MM_PLUGIN_LONGCHEER_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  MM_TYPE_PLUGIN_LONGCHEER, MMPluginLongcheerClass))
 
 typedef struct {
-    MMPluginBase parent;
+    MMPlugin parent;
 } MMPluginLongcheer;
 
 typedef struct {
-    MMPluginBaseClass parent;
+    MMPluginClass parent;
 } MMPluginLongcheerClass;
 
 GType mm_plugin_longcheer_get_type (void);

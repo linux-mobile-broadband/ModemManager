@@ -49,7 +49,8 @@ pkglib_LTLIBRARIES = \
 	libmm-plugin-linktop.la \
 	libmm-plugin-simtech.la \
 	libmm-plugin-wavecom.la \
-	libmm-plugin-huawei.la
+	libmm-plugin-huawei.la \
+	libmm-plugin-longcheer.la
 
 #pkglib_LTLIBRARIES = \
 #	libmm-plugin-generic.la \
@@ -188,15 +189,14 @@ udevrules_DATA += nokia/77-mm-nokia-port-types.rules
 #libmm_plugin_zte_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 #libmm_plugin_zte_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 #libmm_plugin_zte_la_LIBADD = $(builddir)/libicera-utils.la
-#
-## Longcheer (and rebranded dongles)
-#libmm_plugin_longcheer_la_SOURCES = \
-#	mm-plugin-longcheer.c \
-#	mm-plugin-longcheer.h \
-#	mm-modem-longcheer-gsm.c \
-#	mm-modem-longcheer-gsm.h
-#libmm_plugin_longcheer_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
-#libmm_plugin_longcheer_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+
+# Longcheer (and rebranded dongles)
+libmm_plugin_longcheer_la_SOURCES = \
+	longcheer/mm-plugin-longcheer.c \
+	longcheer/mm-plugin-longcheer.h
+libmm_plugin_longcheer_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
+libmm_plugin_longcheer_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
+udevrules_DATA += longcheer/77-mm-longcheer-port-types.rules
 
 # AnyData CDMA
 libmm_plugin_anydata_la_SOURCES = \
