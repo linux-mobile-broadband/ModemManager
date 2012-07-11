@@ -23,6 +23,7 @@
 #include <mm-errors-types.h>
 
 #include "mm-device.h"
+#include "mm-plugin.h"
 #include "mm-utils.h"
 #include "mm-log.h"
 
@@ -377,9 +378,7 @@ mm_device_create_modem (MMDevice                  *self,
              mm_plugin_get_name (self->priv->plugin),
              g_list_length (self->priv->port_probes));
 
-    self->priv->modem = mm_plugin_create_modem (self->priv->plugin,
-                                                G_OBJECT (self),
-                                                error);
+    self->priv->modem = mm_plugin_create_modem (self->priv->plugin, self, error);
     if (self->priv->modem) {
         /* Keep the object manager */
         self->priv->object_manager = g_object_ref (object_manager);
@@ -434,24 +433,26 @@ mm_device_get_udev_device (MMDevice *self)
 
 void
 mm_device_set_plugin (MMDevice *self,
-                      MMPlugin *plugin)
+                      GObject  *plugin)
 {
     g_object_set (self,
                   MM_DEVICE_PLUGIN, plugin,
                   NULL);
 }
 
-MMPlugin *
+GObject *
 mm_device_peek_plugin (MMDevice *self)
 {
-    return self->priv->plugin;
+    return (self->priv->plugin ?
+            G_OBJECT (self->priv->plugin) :
+            NULL);
 }
 
-MMPlugin *
+GObject *
 mm_device_get_plugin (MMDevice *self)
 {
     return (self->priv->plugin ?
-            MM_PLUGIN (g_object_ref (self->priv->plugin)) :
+            g_object_ref (self->priv->plugin) :
             NULL);
 }
 

@@ -467,12 +467,11 @@ mm_plugin_supports_port_finish (MMPlugin *self,
 
 void
 mm_plugin_supports_port (MMPlugin *self,
-                         GObject *device_o,
+                         MMDevice *device,
                          GUdevDevice *port,
                          GAsyncReadyCallback callback,
                          gpointer user_data)
 {
-    MMDevice *device = MM_DEVICE (device_o);
     MMPortProbe *probe;
     GSimpleAsyncResult *async_result;
     PortProbeRunContext *ctx;
@@ -579,10 +578,9 @@ out:
 
 MMBaseModem *
 mm_plugin_create_modem (MMPlugin  *self,
-                        GObject   *device_o,
+                        MMDevice *device,
                         GError   **error)
 {
-    MMDevice *device = MM_DEVICE (device_o);
     MMBaseModem *modem = NULL;
     GList *port_probes, *l;
 

@@ -165,19 +165,19 @@ port_probe_context_finished (PortProbeContext *port_probe_ctx)
                     g_udev_device_get_name (port_probe_ctx->port),
                     mm_plugin_get_name (port_probe_ctx->best_plugin),
                     mm_device_get_path (ctx->device));
-            mm_device_set_plugin (ctx->device, port_probe_ctx->best_plugin);
+            mm_device_set_plugin (ctx->device, G_OBJECT (port_probe_ctx->best_plugin));
 
             /* Suggest this plugin also to other port probes */
             suggest_port_probe_result (ctx, port_probe_ctx->best_plugin);
         }
         /* Warn if the best plugin found for this port differs from the
          * best plugin found for the the first probed port. */
-        else if (!g_str_equal (mm_plugin_get_name (mm_device_peek_plugin (ctx->device)),
+        else if (!g_str_equal (mm_plugin_get_name (MM_PLUGIN (mm_device_peek_plugin (ctx->device))),
                                mm_plugin_get_name (port_probe_ctx->best_plugin))) {
             mm_warn ("(%s/%s): plugin mismatch error (expected: '%s', got: '%s')",
                      g_udev_device_get_subsystem (port_probe_ctx->port),
                      g_udev_device_get_name (port_probe_ctx->port),
-                     mm_plugin_get_name (mm_device_peek_plugin (ctx->device)),
+                     mm_plugin_get_name (MM_PLUGIN (mm_device_peek_plugin (ctx->device))),
                      mm_plugin_get_name (port_probe_ctx->best_plugin));
         }
     }
@@ -392,7 +392,7 @@ port_probe_context_step (PortProbeContext *port_probe_ctx)
 
     /* Ask the current plugin to check support of this port */
     mm_plugin_supports_port (MM_PLUGIN (port_probe_ctx->current->data),
-                             G_OBJECT (ctx->device),
+                             ctx->device,
                              port_probe_ctx->port,
                              (GAsyncReadyCallback)plugin_supports_port_ready,
                              port_probe_ctx);
@@ -418,7 +418,9 @@ device_port_grabbed_cb (MMDevice *device,
     port_probe_ctx->current = ctx->self->priv->plugins;
 
     /* If we got one suggested, it will be the first one */
-    port_probe_ctx->suggested_plugin = mm_device_get_plugin (device);
+    port_probe_ctx->suggested_plugin = (!!mm_device_peek_plugin (device) ?
+                                        MM_PLUGIN (mm_device_get_plugin (device)) :
+                                        NULL);
     if (port_probe_ctx->suggested_plugin)
         port_probe_ctx->current = g_list_find (port_probe_ctx->current,
                                                port_probe_ctx->suggested_plugin);

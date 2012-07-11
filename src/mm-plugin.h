@@ -25,6 +25,7 @@
 #include "mm-base-modem.h"
 #include "mm-port.h"
 #include "mm-port-probe.h"
+#include "mm-device.h"
 
 #define MM_PLUGIN_GENERIC_NAME "Generic"
 #define MM_PLUGIN_MAJOR_VERSION 4
@@ -101,7 +102,7 @@ gint         mm_plugin_cmp      (const MMPlugin *plugin_a,
                                  const MMPlugin *plugin_b);
 
 void                   mm_plugin_supports_port        (MMPlugin *plugin,
-                                                       GObject *device,
+                                                       MMDevice *device,
                                                        GUdevDevice *port,
                                                        GAsyncReadyCallback callback,
                                                        gpointer user_data);
@@ -110,7 +111,7 @@ MMPluginSupportsResult mm_plugin_supports_port_finish (MMPlugin *plugin,
                                                        GError **error);
 
 MMBaseModem *mm_plugin_create_modem (MMPlugin *plugin,
-                                     GObject *device,
+                                     MMDevice *device,
                                      GError **error);
 
 #endif /* MM_PLUGIN_H */
