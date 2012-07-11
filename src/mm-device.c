@@ -226,7 +226,7 @@ mm_device_grab_port (MMDevice    *self,
     }
 
     /* Create and store new port probe */
-    probe = mm_port_probe_new (udev_port);
+    probe = mm_port_probe_new (self, udev_port);
     self->priv->port_probes = g_list_prepend (self->priv->port_probes, probe);
 
     /* Notify about the grabbed port */
@@ -472,14 +472,17 @@ mm_device_get_modem (MMDevice *self)
             NULL);
 }
 
-MMPortProbe *
+GObject *
 mm_device_peek_port_probe (MMDevice *self,
                            GUdevDevice *udev_port)
 {
-    return device_find_probe_with_device (self, udev_port);
+    MMPortProbe *probe;
+
+    probe = device_find_probe_with_device (self, udev_port);
+    return (probe ? G_OBJECT (probe) : NULL);
 }
 
-MMPortProbe *
+GObject *
 mm_device_get_port_probe (MMDevice *self,
                           GUdevDevice *udev_port)
 {

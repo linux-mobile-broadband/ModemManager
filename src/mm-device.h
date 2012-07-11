@@ -22,7 +22,6 @@
 #include <gudev/gudev.h>
 
 #include "mm-base-modem.h"
-#include "mm-port-probe.h"
 
 #define MM_TYPE_DEVICE            (mm_device_get_type ())
 #define MM_DEVICE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MM_TYPE_DEVICE, MMDevice))
@@ -86,9 +85,9 @@ GObject     *mm_device_get_plugin       (MMDevice *self);
 MMBaseModem *mm_device_peek_modem       (MMDevice *self);
 MMBaseModem *mm_device_get_modem        (MMDevice *self);
 
-MMPortProbe *mm_device_peek_port_probe      (MMDevice *self,
+GObject     *mm_device_peek_port_probe      (MMDevice *self,
                                              GUdevDevice *udev_port);
-MMPortProbe *mm_device_get_port_probe       (MMDevice *self,
+GObject     *mm_device_get_port_probe       (MMDevice *self,
                                              GUdevDevice *udev_port);
 GList       *mm_device_peek_port_probe_list (MMDevice *self);
 GList       *mm_device_get_port_probe_list  (MMDevice *self);

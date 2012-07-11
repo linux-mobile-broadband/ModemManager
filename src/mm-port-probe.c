@@ -49,6 +49,7 @@ G_DEFINE_TYPE (MMPortProbe, mm_port_probe, G_TYPE_OBJECT)
 
 enum {
     PROP_0,
+    PROP_DEVICE,
     PROP_PORT,
     PROP_LAST
 };
@@ -83,7 +84,8 @@ typedef struct {
 } PortProbeRunTask;
 
 struct _MMPortProbePrivate {
-    /* Port and properties */
+    /* Properties */
+    MMDevice *device;
     GUdevDevice *port;
 
     /* Probing results */
@@ -1004,6 +1006,22 @@ mm_port_probe_get_port_type (MMPortProbe *self)
     return MM_PORT_TYPE_UNKNOWN;
 }
 
+MMDevice *
+mm_port_probe_peek_device (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), NULL);
+
+    return self->priv->device;
+}
+
+MMDevice *
+mm_port_probe_get_device (MMPortProbe *self)
+{
+    g_return_val_if_fail (MM_IS_PORT_PROBE (self), NULL);
+
+    return MM_DEVICE (g_object_ref (self->priv->device));
+}
+
 GUdevDevice *
 mm_port_probe_peek_port (MMPortProbe *self)
 {
@@ -1065,10 +1083,12 @@ mm_port_probe_get_port_subsys (MMPortProbe *self)
 /*****************************************************************************/
 
 MMPortProbe *
-mm_port_probe_new (GUdevDevice *port)
+mm_port_probe_new (MMDevice *device,
+                   GUdevDevice *port)
 {
     return MM_PORT_PROBE (g_object_new (MM_TYPE_PORT_PROBE,
-                                        MM_PORT_PROBE_PORT, port,
+                                        MM_PORT_PROBE_DEVICE, device,
+                                        MM_PORT_PROBE_PORT,   port,
                                         NULL));
 }
 
@@ -1089,6 +1109,10 @@ set_property (GObject *object,
     MMPortProbe *self = MM_PORT_PROBE (object);
 
     switch (prop_id) {
+    case PROP_DEVICE:
+        /* construct only, no new reference! */
+        self->priv->device = g_value_get_object (value);
+        break;
     case PROP_PORT:
         /* construct only */
         self->priv->port = g_value_dup_object (value);
@@ -1108,6 +1132,9 @@ get_property (GObject *object,
     MMPortProbe *self = MM_PORT_PROBE (object);
 
     switch (prop_id) {
+    case PROP_DEVICE:
+        g_value_set_object (value, self->priv->device);
+        break;
     case PROP_PORT:
         g_value_set_object (value, self->priv->port);
         break;
@@ -1136,6 +1163,9 @@ dispose (GObject *object)
 {
     MMPortProbe *self = MM_PORT_PROBE (object);
 
+    /* We didn't get a reference to the device */
+    self->priv->device = NULL;
+
     g_clear_object (&self->priv->port);
 
     G_OBJECT_CLASS (mm_port_probe_parent_class)->dispose (object);
@@ -1153,6 +1183,14 @@ mm_port_probe_class_init (MMPortProbeClass *klass)
     object_class->set_property = set_property;
     object_class->finalize = finalize;
     object_class->dispose = dispose;
+
+    properties[PROP_DEVICE] =
+        g_param_spec_object (MM_PORT_PROBE_DEVICE,
+                             "Device",
+                             "Device owning this probe",
+                             MM_TYPE_DEVICE,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+    g_object_class_install_property (object_class, PROP_DEVICE, properties[PROP_DEVICE]);
 
     properties[PROP_PORT] =
         g_param_spec_object (MM_PORT_PROBE_PORT,

@@ -505,7 +505,7 @@ mm_plugin_supports_port (MMPlugin *self,
 
     /* Need to launch new probing */
 
-    probe = mm_device_get_port_probe (device, port);
+    probe = MM_PORT_PROBE (mm_device_get_port_probe (device, port));
     g_assert (probe);
 
     /* Before launching any probing, check if the port is a net device (which
