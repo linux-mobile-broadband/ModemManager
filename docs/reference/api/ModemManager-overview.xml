@@ -142,9 +142,13 @@
               any port detected being managed by a driver not listed by the plugin.
             </para>
             <para>
-              This filter is specified by the <type>MM_PLUGIN_ALLOWED_DRIVERS</type>
-              property in the <structname>MMPlugin</structname> object provided
-              by the plugin.
+              Plugins can also specify which drivers they do not expect, so that we
+              filter out any port detected being managed by a driver listed by the plugin.
+            </para>
+            <para>
+              These filters are specified by the <type>MM_PLUGIN_ALLOWED_DRIVERS</type>
+              and <type>MM_PLUGIN_FORBIDDEN_DRIVERS</type> properties in the
+              <structname>MMPlugin</structname> object provided by the plugin.
             </para>
           </listitem>
           <listitem>

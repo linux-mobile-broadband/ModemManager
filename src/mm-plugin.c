@@ -52,6 +52,7 @@ struct _MMPluginPrivate {
     /* Plugin-specific setups */
     gchar **subsystems;
     gchar **drivers;
+    gchar **forbidden_drivers;
     guint16 *vendor_ids;
     mm_uint16_pair *product_ids;
     gchar **vendor_strings;
@@ -69,6 +70,7 @@ enum {
     PROP_NAME,
     PROP_ALLOWED_SUBSYSTEMS,
     PROP_ALLOWED_DRIVERS,
+    PROP_FORBIDDEN_DRIVERS,
     PROP_ALLOWED_VENDOR_IDS,
     PROP_ALLOWED_PRODUCT_IDS,
     PROP_ALLOWED_VENDOR_STRINGS,
@@ -162,9 +164,10 @@ apply_pre_probing_filters (MMPlugin *self,
             return TRUE;
     }
 
-    /* The plugin may specify that only some drivers are supported. If that
-     * is the case, filter by driver */
-    if (self->priv->drivers) {
+    /* The plugin may specify that only some drivers are supported, or that some
+     * drivers are not supported. If that is the case, filter by driver */
+    if (self->priv->drivers ||
+        self->priv->forbidden_drivers) {
         const gchar *driver;
 
         /* Detect any modems accessible through the list of virtual ports */
@@ -176,14 +179,25 @@ apply_pre_probing_filters (MMPlugin *self,
         if (!driver)
             return TRUE;
 
-        for (i = 0; self->priv->drivers[i]; i++) {
-            if (g_str_equal (driver, self->priv->drivers[i]))
-                break;
-        }
+        /* Filtering by allowed drivers */
+        if (self->priv->drivers) {
+            for (i = 0; self->priv->drivers[i]; i++) {
+                if (g_str_equal (driver, self->priv->drivers[i]))
+                    break;
+            }
 
-        /* If we didn't match any driver: unsupported */
-        if (!self->priv->drivers[i])
-            return TRUE;
+            /* If we didn't match any driver: unsupported */
+            if (!self->priv->drivers[i])
+                return TRUE;
+        }
+        /* Filtering by forbidden drivers */
+        else {
+            for (i = 0; self->priv->forbidden_drivers[i]; i++) {
+                /* If we match a forbidden driver: unsupported */
+                if (g_str_equal (driver, self->priv->forbidden_drivers[i]))
+                    return TRUE;
+            }
+        }
     }
 
     vendor = mm_device_get_vendor (device);
@@ -614,6 +628,10 @@ set_property (GObject *object,
         /* Construct only */
         self->priv->drivers = g_value_dup_boxed (value);
         break;
+    case PROP_FORBIDDEN_DRIVERS:
+        /* Construct only */
+        self->priv->forbidden_drivers = g_value_dup_boxed (value);
+        break;
     case PROP_ALLOWED_VENDOR_IDS:
         /* Construct only */
         self->priv->vendor_ids = g_value_dup_boxed (value);
@@ -677,6 +695,9 @@ get_property (GObject *object,
         break;
     case PROP_ALLOWED_DRIVERS:
         g_value_set_boxed (value, self->priv->drivers);
+        break;
+    case PROP_FORBIDDEN_DRIVERS:
+        g_value_set_boxed (value, self->priv->forbidden_drivers);
         break;
     case PROP_ALLOWED_VENDOR_IDS:
         g_value_set_boxed (value, self->priv->vendor_ids);
@@ -758,6 +779,15 @@ mm_plugin_class_init (MMPluginClass *klass)
          g_param_spec_boxed (MM_PLUGIN_ALLOWED_DRIVERS,
                              "Allowed drivers",
                              "List of drivers this plugin can support, "
+                             "should be an array of strings finished with 'NULL'",
+                             G_TYPE_STRV,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_FORBIDDEN_DRIVERS,
+         g_param_spec_boxed (MM_PLUGIN_FORBIDDEN_DRIVERS,
+                             "Forbidden drivers",
+                             "List of drivers this plugin cannot support, "
                              "should be an array of strings finished with 'NULL'",
                              G_TYPE_STRV,
                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
