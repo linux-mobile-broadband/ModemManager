@@ -232,7 +232,9 @@ udevrules_DATA += simtech/77-mm-simtech-port-types.rules
 # Alcatel/TCT/JRD x220D and possibly others
 libmm_plugin_x22x_la_SOURCES = \
 	x22x/mm-plugin-x22x.c \
-	x22x/mm-plugin-x22x.h
+	x22x/mm-plugin-x22x.h \
+	x22x/mm-broadband-modem-x22x.h \
+	x22x/mm-broadband-modem-x22x.c
 libmm_plugin_x22x_la_CPPFLAGS = $(PLUGIN_COMMON_COMPILER_FLAGS)
 libmm_plugin_x22x_la_LDFLAGS = $(PLUGIN_COMMON_LINKER_FLAGS)
 udevrules_DATA += x22x/77-mm-x22x-port-types.rules

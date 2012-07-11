@@ -23,7 +23,7 @@
 #include "mm-log.h"
 #include "mm-modem-helpers.h"
 #include "mm-plugin-x22x.h"
-#include "mm-broadband-modem.h"
+#include "mm-broadband-modem-x22x.h"
 
 G_DEFINE_TYPE (MMPluginX22x, mm_plugin_x22x, MM_TYPE_PLUGIN)
 
@@ -186,11 +186,11 @@ create_modem (MMPlugin *self,
               GList *probes,
               GError **error)
 {
-    return MM_BASE_MODEM (mm_broadband_modem_new (sysfs_path,
-                                                  driver,
-                                                  mm_plugin_get_name (self),
-                                                  vendor,
-                                                  product));
+    return MM_BASE_MODEM (mm_broadband_modem_x22x_new (sysfs_path,
+                                                       driver,
+                                                       mm_plugin_get_name (self),
+                                                       vendor,
+                                                       product));
 }
 
 static gboolean
