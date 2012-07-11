@@ -75,10 +75,8 @@ struct _MMPlugin {
 struct _MMPluginClass {
     GObjectClass parent;
 
-    /* Mandatory subclass functions */
-
     /* Plugins need to provide a method to create a modem object given
-     * a list of port probes */
+     * a list of port probes (Mandatory) */
     MMBaseModem *(*create_modem) (MMPlugin *plugin,
                                   const gchar *sysfs_path,
                                   const gchar *driver,
@@ -88,7 +86,7 @@ struct _MMPluginClass {
                                   GError **error);
 
     /* Plugins need to provide a method to grab independent ports
-     * identified by port probes */
+     * identified by port probes (Optional) */
     gboolean (*grab_port) (MMPlugin *plugin,
                            MMBaseModem *modem,
                            MMPortProbe *probe,

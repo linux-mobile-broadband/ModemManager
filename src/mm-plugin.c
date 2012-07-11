@@ -598,13 +598,25 @@ mm_plugin_create_modem (MMPlugin  *self,
         /* Grab each port */
         for (l = port_probes; l; l = g_list_next (l)) {
             GError *inner_error = NULL;
+            MMPortProbe *probe = MM_PORT_PROBE (l->data);
+            gboolean grabbed;
 
             /* If grabbing a port fails, just warn. We'll decide if the modem is
              * valid or not when all ports get organized */
-            if (!MM_PLUGIN_GET_CLASS (self)->grab_port (MM_PLUGIN (self),
-                                                        modem,
-                                                        MM_PORT_PROBE (l->data),
-                                                        &inner_error)) {
+
+            if (MM_PLUGIN_GET_CLASS (self)->grab_port)
+                grabbed = MM_PLUGIN_GET_CLASS (self)->grab_port (MM_PLUGIN (self),
+                                                                 modem,
+                                                                 probe,
+                                                                 &inner_error);
+            else
+                grabbed = mm_base_modem_grab_port (modem,
+                                                   mm_port_probe_get_port_subsys (probe),
+                                                   mm_port_probe_get_port_name (probe),
+                                                   mm_port_probe_get_port_type (probe),
+                                                   MM_AT_PORT_FLAG_NONE,
+                                                   &inner_error);
+            if (!grabbed) {
                 mm_warn ("Could not grab port (%s/%s): '%s'",
                          mm_port_probe_get_port_subsys (MM_PORT_PROBE (l->data)),
                          mm_port_probe_get_port_name (MM_PORT_PROBE (l->data)),
