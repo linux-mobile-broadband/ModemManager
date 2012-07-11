@@ -176,6 +176,20 @@
         </para>
         <itemizedlist>
           <listitem>
+            <para><emphasis>Custom initialization</emphasis></para>
+            <para>
+              This property allows plugins to provide an asynchronous method which will get
+              executed as soon as the AT port gets opened. This method may be used for any
+              purpose, like running an early command in the ports as soon as possible, or
+              querying the modem for info about the port layout.
+            </para>
+            <para>
+              This configuration is specified by the <type>MM_PLUGIN_CUSTOM_INIT</type>
+              property in the <structname>MMPlugin</structname> object provided
+              by the plugin.
+            </para>
+          </listitem>
+          <listitem>
             <para><emphasis>AT allowed</emphasis></para>
             <para>
               This boolean property allows plugins to specify that they expect and support

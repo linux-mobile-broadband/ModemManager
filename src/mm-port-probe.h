@@ -21,6 +21,7 @@
 #include <gio/gio.h>
 #include <gudev/gudev.h>
 
+#include "mm-private-boxed-types.h"
 #include "mm-port-probe-at.h"
 #include "mm-at-serial-port.h"
 
@@ -55,6 +56,19 @@ struct _MMPortProbeClass {
     GObjectClass parent;
 };
 
+/* Custom AT probing initialization setup.
+ * Plugins can use this to configure how AT ports need to get initialized.
+ * It also helps to implement plugin-specific checks, as plugins can set
+ * their own probing results on the 'probe' object. */
+typedef void     (* MMPortProbeAtCustomInit)       (MMPortProbe *probe,
+                                                    MMAtSerialPort *port,
+                                                    GCancellable *cancellable,
+                                                    GAsyncReadyCallback callback,
+                                                    gpointer user_data);
+typedef gboolean (* MMPortProbeAtCustomInitFinish) (MMPortProbe *probe,
+                                                    GAsyncResult *result,
+                                                    GError **error);
+
 GType mm_port_probe_get_type (void);
 
 MMPortProbe *mm_port_probe_new (GUdevDevice *port);
@@ -79,6 +93,7 @@ void     mm_port_probe_run        (MMPortProbe *self,
                                    MMPortProbeFlag flags,
                                    guint64 at_send_delay,
                                    const MMPortProbeAtCommand *at_custom_probe,
+                                   const MMAsyncMethod *at_custom_init,
                                    GAsyncReadyCallback callback,
                                    gpointer user_data);
 gboolean mm_port_probe_run_finish (MMPortProbe *self,

@@ -62,6 +62,7 @@ struct _MMPluginPrivate {
     gboolean single_at;
     gboolean qcdm;
     MMPortProbeAtCommand *custom_at_probe;
+    MMAsyncMethod *custom_init;
     guint64 send_delay;
 };
 
@@ -80,6 +81,7 @@ enum {
     PROP_ALLOWED_SINGLE_AT,
     PROP_ALLOWED_QCDM,
     PROP_CUSTOM_AT_PROBE,
+    PROP_CUSTOM_INIT,
     PROP_SEND_DELAY,
     LAST_PROP
 };
@@ -372,8 +374,20 @@ port_probe_run_ready (MMPortProbe *probe,
     GError *error = NULL;
 
     if (!mm_port_probe_run_finish (probe, probe_result, &error)) {
-        /* Probing failed */
-        g_simple_async_result_take_error (ctx->result, error);
+        /* Probing failed saying the port is unsupported. This is not to be
+         * treated as a generic error, the plugin is just telling us as nicely
+         * as it can that the port is not supported, so don't warn these cases.
+         */
+        if (g_error_matches (error,
+                             MM_CORE_ERROR,
+                             MM_CORE_ERROR_UNSUPPORTED)) {
+            g_simple_async_result_set_op_res_gpointer (ctx->result,
+                                                       GUINT_TO_POINTER (MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED),
+                                                       NULL);
+        } else {
+            /* For remaining errors, just propagate them */
+            g_simple_async_result_take_error (ctx->result, error);
+        }
     } else {
         /* Probing succeeded */
         MMPluginSupportsResult supports_result;
@@ -427,8 +441,7 @@ mm_plugin_supports_port_finish (MMPlugin *self,
                           MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED);
 
     /* Propagate error, if any */
-    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result),
-                                               error)) {
+    if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result), error)) {
         return MM_PLUGIN_SUPPORTS_PORT_UNSUPPORTED;
     }
 
@@ -539,6 +552,7 @@ mm_plugin_supports_port (MMPlugin *self,
                        ctx->flags,
                        self->priv->send_delay,
                        self->priv->custom_at_probe,
+                       self->priv->custom_init,
                        (GAsyncReadyCallback)port_probe_run_ready,
                        ctx);
 
@@ -668,6 +682,10 @@ set_property (GObject *object,
         /* Construct only */
         self->priv->custom_at_probe = g_value_dup_boxed (value);
         break;
+    case PROP_CUSTOM_INIT:
+        /* Construct only */
+        self->priv->custom_init = g_value_dup_boxed (value);
+        break;
     case PROP_SEND_DELAY:
         /* Construct only */
         self->priv->send_delay = (guint64)g_value_get_uint64 (value);
@@ -725,6 +743,9 @@ get_property (GObject *object,
         break;
     case PROP_CUSTOM_AT_PROBE:
         g_value_set_boxed (value, self->priv->custom_at_probe);
+        break;
+    case PROP_CUSTOM_INIT:
+        g_value_set_boxed (value, self->priv->custom_init);
         break;
     case PROP_SEND_DELAY:
         g_value_set_uint64 (value, self->priv->send_delay);
@@ -870,6 +891,15 @@ mm_plugin_class_init (MMPluginClass *klass)
                              "should be an array of MMPortProbeAtCommand structs "
                              "finished with 'NULL'",
                              MM_TYPE_POINTER_ARRAY,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+    g_object_class_install_property
+        (object_class, PROP_CUSTOM_INIT,
+         g_param_spec_boxed (MM_PLUGIN_CUSTOM_INIT,
+                             "Custom initialization",
+                             "Asynchronous method setup which contains the "
+                             "custom initializations this plugin needs.",
+                             MM_TYPE_ASYNC_METHOD,
                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
     g_object_class_install_property

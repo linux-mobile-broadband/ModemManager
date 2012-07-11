@@ -37,6 +37,7 @@
 /*
  * Steps and flow of the Probing process:
  * ----> AT Serial Open
+ *   |----> Custom Init
  *   |----> AT?
  *      |----> Vendor
  *      |----> Product
@@ -68,6 +69,10 @@ typedef struct {
     guint64 at_send_delay;
     /* Number of times we tried to open the AT port */
     guint at_open_tries;
+    /* Custom initialization setup */
+    gboolean at_custom_init_run;
+    MMPortProbeAtCustomInit at_custom_init;
+    MMPortProbeAtCustomInitFinish at_custom_init_finish;
     /* Custom commands to look for AT support */
     const MMPortProbeAtCommand *at_custom_probe;
     /* Current group of AT commands to be sent */
@@ -561,6 +566,24 @@ static const MMPortProbeAtCommand product_probing[] = {
 };
 
 static void
+at_custom_init_ready (MMPortProbe *self,
+                      GAsyncResult *res)
+{
+    PortProbeRunTask *task = self->priv->task;
+    GError *error = NULL;
+
+    if (!task->at_custom_init_finish (self, res, &error)) {
+        /* All errors propagated up end up forcing an UNSUPPORTED result */
+        port_probe_run_task_complete (task, FALSE, error);
+        return;
+    }
+
+    /* Keep on with remaining probings */
+    task->at_custom_init_run = TRUE;
+    serial_probe_schedule (self);
+}
+
+static void
 serial_probe_schedule (MMPortProbe *self)
 {
     PortProbeRunTask *task = self->priv->task;
@@ -568,6 +591,19 @@ serial_probe_schedule (MMPortProbe *self)
     /* If already cancelled, do nothing else */
     if (port_probe_run_is_cancelled (self))
         return;
+
+    /* If we got some custom initialization setup requested, go on with it
+     * first. */
+    if (!task->at_custom_init_run &&
+        task->at_custom_init &&
+        task->at_custom_init_finish) {
+        task->at_custom_init (self,
+                              MM_AT_SERIAL_PORT (task->serial),
+                              task->at_probing_cancellable,
+                              (GAsyncReadyCallback)at_custom_init_ready,
+                              NULL);
+        return;
+    }
 
     /* Cleanup */
     task->at_result_processor = NULL;
@@ -833,6 +869,7 @@ mm_port_probe_run (MMPortProbe *self,
                    MMPortProbeFlag flags,
                    guint64 at_send_delay,
                    const MMPortProbeAtCommand *at_custom_probe,
+                   const MMAsyncMethod *at_custom_init,
                    GAsyncReadyCallback callback,
                    gpointer user_data)
 {
@@ -851,6 +888,9 @@ mm_port_probe_run (MMPortProbe *self,
     task->at_send_delay = at_send_delay;
     task->flags = MM_PORT_PROBE_NONE;
     task->at_custom_probe = at_custom_probe;
+    task->at_custom_init = at_custom_init ? (MMPortProbeAtCustomInit)at_custom_init->async : NULL;
+    task->at_custom_init_finish = at_custom_init ? (MMPortProbeAtCustomInitFinish)at_custom_init->finish : NULL;
+
     task->result = g_simple_async_result_new (G_OBJECT (self),
                                               callback,
                                               user_data,
