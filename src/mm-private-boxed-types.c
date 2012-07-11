@@ -170,3 +170,40 @@ mm_pointer_array_get_type (void)
 
     return g_define_type_id__volatile;
 }
+
+static void
+async_method_free (MMAsyncMethod *method)
+{
+    g_slice_free (MMAsyncMethod, method);
+}
+
+static MMAsyncMethod *
+async_method_copy (MMAsyncMethod *original)
+{
+    MMAsyncMethod *copy;
+
+    if (!original)
+        return NULL;
+
+    copy = g_slice_new (MMAsyncMethod);
+    copy->async = original->async;
+    copy->finish = original->finish;
+    return copy;
+}
+
+GType
+mm_async_method_get_type (void)
+{
+    static volatile gsize g_define_type_id__volatile = 0;
+
+    if (g_once_init_enter (&g_define_type_id__volatile)) {
+        GType g_define_type_id =
+            g_boxed_type_register_static (g_intern_static_string ("MMAsyncMethod"),
+                                          (GBoxedCopyFunc) async_method_copy,
+                                          (GBoxedFreeFunc) async_method_free);
+
+        g_once_init_leave (&g_define_type_id__volatile, g_define_type_id);
+    }
+
+    return g_define_type_id__volatile;
+}
