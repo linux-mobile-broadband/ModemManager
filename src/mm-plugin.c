@@ -493,9 +493,7 @@ mm_plugin_supports_port (MMPlugin *self,
     g_assert (probe);
 
     /* Before launching any probing, check if the port is a net device (which
-     * cannot be probed).
-     * TODO: With the new defer-until-suggested we probably don't need the modem
-     * object being passed down here just for this. */
+     * cannot be probed). */
     if (g_str_equal (g_udev_device_get_subsystem (port), "net")) {
         g_simple_async_result_set_op_res_gpointer (
             async_result,
