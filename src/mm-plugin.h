@@ -96,8 +96,9 @@ struct _MMPluginClass {
 
 GType mm_plugin_get_type (void);
 
-const char *mm_plugin_get_name      (MMPlugin *plugin);
-gboolean    mm_plugin_get_sort_last (const MMPlugin *plugin);
+const gchar *mm_plugin_get_name (MMPlugin *plugin);
+gint         mm_plugin_cmp      (const MMPlugin *plugin_a,
+                                 const MMPlugin *plugin_b);
 
 void                   mm_plugin_supports_port        (MMPlugin *plugin,
                                                        GObject *device,

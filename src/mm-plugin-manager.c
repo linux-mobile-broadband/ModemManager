@@ -549,25 +549,6 @@ out:
     return plugin;
 }
 
-static gint
-compare_plugins (const MMPlugin *plugin_a,
-                 const MMPlugin *plugin_b)
-{
-    /* The order of the plugins in the list is the same order used to check
-     * whether the plugin can manage a given modem:
-     *  - First, modems that will check vendor ID from udev.
-     *  - Then, modems that report to be sorted last (those which will check
-     *    vendor ID also from the probed ones..
-     */
-    if (mm_plugin_get_sort_last (plugin_a) &&
-        !mm_plugin_get_sort_last (plugin_b))
-        return 1;
-    if (!mm_plugin_get_sort_last (plugin_a) &&
-        mm_plugin_get_sort_last (plugin_b))
-        return -1;
-    return 0;
-}
-
 static void
 found_plugin (MMPlugin *plugin)
 {
@@ -628,7 +609,7 @@ load_plugins (MMPluginManager *self,
 
     /* Sort last plugins that request it */
     self->priv->plugins = g_slist_sort (self->priv->plugins,
-                                        (GCompareFunc)compare_plugins);
+                                        (GCompareFunc)mm_plugin_cmp);
 
     /* Make sure the generic plugin is last */
     if (generic_plugin)

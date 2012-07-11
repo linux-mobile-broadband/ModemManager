@@ -88,18 +88,35 @@ enum {
 
 /*****************************************************************************/
 
-const char *
+const gchar *
 mm_plugin_get_name (MMPlugin *self)
 {
     return self->priv->name;
 }
 
-gboolean
-mm_plugin_get_sort_last (const MMPlugin *self)
+/*****************************************************************************/
+
+gint
+mm_plugin_cmp (const MMPlugin *plugin_a,
+               const MMPlugin *plugin_b)
 {
     /* If we have any post-probing filter, we need to sort the plugin last */
-    return (self->priv->vendor_strings || self->priv->product_strings);
+#define SORT_LAST(self) (self->priv->vendor_strings || self->priv->product_strings)
+
+    /* The order of the plugins in the list is the same order used to check
+     * whether the plugin can manage a given modem:
+     *  - First, modems that will check vendor ID from udev.
+     *  - Then, modems that report to be sorted last (those which will check
+     *    vendor ID also from the probed ones..
+     */
+    if (SORT_LAST (plugin_a) && !SORT_LAST (plugin_b))
+        return 1;
+    if (!SORT_LAST (plugin_a) && SORT_LAST (plugin_b))
+        return -1;
+    return 0;
 }
+
+/*****************************************************************************/
 
 static gboolean
 device_file_exists (const char *name)
