@@ -26,10 +26,51 @@
 #include "ModemManager.h"
 #include "mm-log.h"
 #include "mm-errors-types.h"
+#include "mm-modem-helpers.h"
 #include "mm-base-modem-at.h"
+#include "mm-iface-modem.h"
 #include "mm-broadband-modem-x22x.h"
 
-G_DEFINE_TYPE (MMBroadbandModemX22x, mm_broadband_modem_x22x, MM_TYPE_BROADBAND_MODEM);
+static void iface_modem_init (MMIfaceModem *iface);
+
+G_DEFINE_TYPE_EXTENDED (MMBroadbandModemX22x, mm_broadband_modem_x22x, MM_TYPE_BROADBAND_MODEM, 0,
+                        G_IMPLEMENT_INTERFACE (MM_TYPE_IFACE_MODEM, iface_modem_init));
+
+/*****************************************************************************/
+/* Load access technologies (Modem interface) */
+
+static gboolean
+load_access_technologies_finish (MMIfaceModem *self,
+                                 GAsyncResult *res,
+                                 MMModemAccessTechnology *access_technologies,
+                                 guint *mask,
+                                 GError **error)
+{
+    const gchar *result;
+
+    result = mm_base_modem_at_command_finish (MM_BASE_MODEM (self), res, error);
+    if (!result)
+        return FALSE;
+
+    result = mm_strip_tag (result, "+SSND:");
+    *access_technologies = mm_string_to_access_tech (result);
+    *mask = MM_MODEM_ACCESS_TECHNOLOGY_ANY;
+    return TRUE;
+}
+
+static void
+load_access_technologies (MMIfaceModem *self,
+                          GAsyncReadyCallback callback,
+                          gpointer user_data)
+{
+    mm_dbg ("loading access technology (x22x)...");
+    mm_base_modem_at_command (MM_BASE_MODEM (self),
+                              "+SSND?",
+                              3,
+                              FALSE,
+                              callback,
+                              user_data);
+}
 
 /*****************************************************************************/
 
@@ -52,6 +93,13 @@ mm_broadband_modem_x22x_new (const gchar *device,
 static void
 mm_broadband_modem_x22x_init (MMBroadbandModemX22x *self)
 {
+}
+
+static void
+iface_modem_init (MMIfaceModem *iface)
+{
+    iface->load_access_technologies = load_access_technologies;
+    iface->load_access_technologies_finish = load_access_technologies_finish;
 }
 
 static void
